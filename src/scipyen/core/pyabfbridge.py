@@ -489,7 +489,7 @@ from collections import namedtuple
 
 from core import quantities as scq
 from core import datatypes, strutils, utilities
-from core.triggerevent import (TriggerEvent, TriggerEventType)
+from core.triggerevent import (TriggerEvent, TriggerEventType, MarkType)
 from core.triggerprotocols import TriggerProtocol
 from core.prog import scipywarn
 from ephys.ephys_protocol import ElectrophysiologyProtocol
@@ -2291,7 +2291,13 @@ class ABFProtocol(ElectrophysiologyProtocol):
                             fromRunStart:bool=False,
                             samples:bool=False) -> pq.Quantity:
         """Starting time of the epoch (in time units or samples) relative to run or sweep.
-        
+        Parameters:
+        -----------
+        epoch: ABFEpoch, str (epoch letter) or int (epoch index, 0-based)
+        dac: ABFOutputConfiguration (i.e. a DAC output), str (DAC name), or 
+            int (DAC physical index)
+        sweep: index of the sweep; must be in the half-open interval [0, nSweeps)
+        holding: When True (default), timings include the sweep holding time
         """
         dac, epoch = self._check_DAC_Epoch_(dac, epoch)
         units = epoch.firstDuration.units
@@ -2304,7 +2310,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
             if holding:
                 ret += self.holdingSampleCount
         else:
-            if includeholding:
+            if holding:
                 ret += self.holdingTime
                 
         if fromRunStart:
@@ -2324,7 +2330,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         dac, epoch = self._check_DAC_Epoch_(dac, epoch)
         if float(epoch.pulsePeriod) == 0.:
             return 0
-        return int(self.getEpochDuration(epoch, dac, sweep)/epoch.pulsePeriod)
+        return int(np.ceil(self.getEpochDuration(epoch, dac, sweep)/epoch.pulsePeriod))
     
     def getEpochPulsePeriod(self, epoch:typing.Union[ABFEpoch, int, str],
                                   dac:typing.Union[ABFOutputConfiguration, int, str],
@@ -2352,8 +2358,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
 
         t0 = self.getEpochStart(epoch, dac, sweep, holding, fromRunStart, samples)
 
-        ret = tuple(t0 + pp * p for p in range(pc))
-    
+        return tuple(t0 + pp * p for p in range(pc))
+        
     def getEpochPulseWidth(self, epoch:typing.Union[ABFEpoch, int, str],
                                  dac:typing.Union[ABFOutputConfiguration, int, str],
                                  samples:bool=False) -> int:
@@ -2768,6 +2774,351 @@ class ABFProtocol(ElectrophysiologyProtocol):
             
             return (0,) * self.nDIGChannels
         
+    def getEpochTriggers(self, epoch:typing.Union[ABFEpoch, str, int], /, 
+                             sweep:int = 0, 
+                             dac:typing.Optional[typing.Union[ABFOutputConfiguration, int, str]] = None,
+                             digChannel:typing.Optional[typing.Union[int, typing.Sequence[int]]] = None,
+                             eventType:typing.Optional[TriggerEventType] = TriggerEventType.presynaptic,
+                             label:typing.Optional[typing.Union[str, typing.Sequence[str]]] = None,
+                             name:typing.Optional[str] = None,
+                             enableEmptyEvent:bool=True):
+        """ TriggerEvent emitted by digital output channels (TTLs) during an ABF Epoch.
+        
+        For an Epoch of type Step or Pulse AND where digital output is enabled (i.e.
+        the digital pattern is non-zero in any DIG output) the method will generate
+        TriggerEvents (in the time domain) based on the specified digital channel(s)
+        
+        Otherwise, the method return None or an empty TriggerEvent (see 
+        'enableEmptyEvent' parameter, below).
+        
+        NOTE: A TriggerEvent object (see 'core.triggerevent' module) can contain
+        more than one time stamp. Since an Epoch can, in principle, use more than 
+        one DIG channel to emit TTL signals, the method will return as many
+        trigger events as DIG channels queried (these can be all DIG channels 
+        emitting TTLs if the 'digChannel' parameter is None).
+        
+        Parameters:
+        ------------
+        
+        epoch: ABFEpoch, int index of ABFEpoch or letter of ABFEpoch
+        
+        sweep: index of sweep (0-based)
+        
+        digChannel: int or sequence of int; index or indices of digital output
+            channels where a TTL output is expected.
+        
+            Specifying a tuple of int here (e.g., (0,1)) is convenient for the 
+            situation where alternate digital outputs are used to generate the 
+            same type of TriggerEvent (such as presynaptic). Such alternate 
+            digital outputs will be emitted on distinct digital output channels, 
+            even though they both represent the same type of event (in this case, 
+            presynaptic pulses). This scenario can be used for Hebbian synaptic    
+            plasticity experiments where synaptic responses are recorded 
+            alternatively from two distinct presynaptic pathways converging on 
+            the same cell.
+        
+            When None, the method will generate TriggerEvent instances using
+            digital patterns from  ALL used digital channels (if any).
+        
+        sweep: int, index of the sweep in the protocol. 
+            Normally, an ABF Epoch (and any digital output patterns defined 
+            within) is repeated in each sweep - hence the sweep index is 
+            irrelevant. 
+    
+            When alternate digital outputs are enabled, the sweep index BECOMES
+            RELEVANT, as the main digital pattern is emitted during sweeps with 
+            even indices (0, 2, 4, …) whereas the alternate digital pattern is
+            emitted during sweeps with odd indices (1, 3, 5, …).
+        
+            Such scenario is also likely to involve distinct digital output 
+            channels in the main and the alternate digital patterns. In this 
+            case it is recommended to specify BOTH digital output channels used
+            in the protocol (see above).
+        
+        eventType: optional; default is TriggerEventType.presynaptic for 
+            Necessary in building a TriggerProtocol for the experiment.
+        
+        label: The label(s) for each individual time stamp in the resulting
+            TriggerEvent object
+        
+        name: The name of the resulting TriggerEvent object.
+        
+        enableEmptyEvent: when True (default) the function will return an empty
+            TriggerEvent (i.e. without any time stamps) in any of the following
+            cases:
+        
+            • the ABF Epoch is neither a Step or Pulse Type
+        
+            • Neither of the digital channels given in digChannel are active in
+                the epoch during the specified sweep
+            
+        Returns:
+        ========
+        
+        A TriggerEvent object, which may be empty, or None - see 
+        'enableEmptyEvent' parameter, above.
+        
+        NOTE 1: Digital signals (triggers) are emitted during epochs defined on 
+        the "active" DAC
+        
+        NOTE 2: An ABF Epoch supports sending digital signals simultaneously via 
+        more than one digital output channel; however, Clampex does not support
+        defining different timings for distinct digital output channels, EXCEPT
+        for the case where digital train and digital pulse are emitted by
+        distinct channels.
+        
+        In such case, the digital train emitted on one channel is interpreted
+        as a sequence of trigger events, whereas the digital pulse emitted on 
+        a distinct digital channel can be intepreted here as a single trigger
+        event, with the onset being equal to the timing of the first pulse in 
+        the digital train (both being defined by the epoch's onset time in the 
+        sweep0).
+        
+        Cases like this one are ambiguous and are best avoided, if possible.
+        
+        However, because distinct digital output channels can drive different
+        devices, it is necessary to specify their "semantic" within the experiment
+        (i.e. the trigger event type for a specific digital output channel).
+        
+        In synaptic plasticity experiments it is usual to use two digital output
+        channels to send digital trains ALTERNATIVELY to two pathways. Since
+        both outputs are effectively presynaptic stimuli, one can specify
+        the output indices by passing a tuple of int to the digChannel parameter.
+
+        """
+        if sweep not in range(self.nSweeps):
+            raise ValueError(f"Invalid sweep index {sweep} for {self.nSweeps} sweeps")
+        
+        actualOutput = dac is None
+            
+        dac, epoch = self._check_DAC_Epoch_(dac, epoch)
+        
+        hoDACActive = self.activeDACChannel not in (0,1)
+        
+        # if epoch.type not in (ABFEpochType.Step, ABFEpochType.Pulse):
+        #     return TriggerEvent(event_type = eventType, name=name, labels = label) if enableEmptyEvent else None
+        
+        isAlternateDigital = False
+        if self.alternateDigitalOutputsEnabled:
+            if actualOutput:
+                if hoDACActive:
+                    isAlternateDigital = True
+                else:
+                    isAlternateDigital =  sweep % 2 > 0
+            else:
+                isAlternateDigital = dac.physicalIndex != self.activeDACChannel
+        
+        if actualOutput:
+            if self.alternateDigitalOutputsEnabled:
+                digDACs = self.getDACsForEpoch(epoch.number)
+                if len(digDACs) > 1:
+                    assert dac.physicalIndex in digDACs, f"DAC {dac.physicalIndex} not in digital-emitting DACs"
+                    thisDacNdx = digDACs.index(dac.physicalIndex)
+                    if self.activeDACChannel == 0:
+                        myDac = self.getDAC(1 if isAlternateDigital else 0)
+                    elif self.activeDACChannel == 1:
+                        myDac = self.getDAC(0 if isAlternateDigital else 1)
+                    else:
+                        assert hoDACActive, f"Active DAC index expected to be > 1; got {self.activeDACChannel}"
+                        # activeDAC is a HO DAC
+                        if sweep % 2 == 0 and 0 in digDACs: # "even" sweeps => query DAC0
+                            myDac = self.getDAC(0)
+                        elif sweep % 2 > 0 and 1 in digDACs: # "odd" sweeps => query DAC1
+                            myDac = self.getDAC(1)
+                        else:
+                            myDac = dac
+                            # continue
+                        
+                    # to report correct temporal params for epoch in DAC, given sweep index    
+                    myEpoch = myDac.getEpoch(epoch.number)
+                    
+                else:
+                    myDac = dac
+                    myEpoch = epoch
+                    
+            else:
+                myDac = dac
+                myEpoch = epoch
+        else:
+            # OK here: shows the Epoch table AS DEFINED in Clampex, regardless 
+            # of the sweep
+            myDac = dac
+            myEpoch = epoch
+            
+        if myEpoch.type not in (ABFEpochType.Step, ABFEpochType.Pulse):
+            return TriggerEvent(event_type = eventType, name=name, labels = label) if enableEmptyEvent else None
+        # if myEpoch.type.value <= 0:
+        #     return TriggerEvent(event_type = eventType, name=name, labels = label) if enableEmptyEvent else None
+            
+        durationSamples = self.getEpochDuration(myEpoch, myDac, sweep, samples = True)
+        deltaDurationSamples = self.getEpochDeltaDuration(myEpoch, myDac, samples=True)
+        finalDurationSamples = self.getEpochDuration(myEpoch, myDac, self.nSweeps-1, samples = True)
+        pulsePeriodSamples = self.getEpochPulsePeriod(myEpoch, myDac, True)
+        pulseWidthSamples = self.getEpochPulseWidth(myEpoch, myDac, True)    
+        
+        pulseCount = 0 if pulsePeriodSamples == 0. else int(np.ceil(durationSamples/pulsePeriodSamples))
+        finalPulseCount = 0 if pulsePeriodSamples == 0. else int(np.ceil(finalDurationSamples/pulsePeriodSamples))
+        
+        pulseCount = self.getEpochPulseCount(myEpoch, myDac, sweep)
+        finalPulseCount= self.getEpochPulseCount(myEpoch, myDac, self.nSweeps-1)
+        
+        # NOTE: 2024-10-28 17:28:04
+        # trick to avoid calling getEpochDigitalPattern twice - see docstring for 
+        # self.getUsedDigitalChannels() - the trick is that getEpochDigitalPattern
+        # now accepts a digital but pattern tuple (with some caveats!)
+        # digPattern = self.getEpochDigitalPattern(sweep, myEpoch) # either main or alternate, depending on the sweep
+        digPattern = self.getEpochDigitalPattern(myEpoch, isAlternateDigital) # either main or alternate, depending on the sweep
+        usedDigs = self.getUsedDigitalChannels(digPattern)
+        
+        useAnalog=False
+        
+        if isinstance(digChannel, int):
+            digChannel = (digChannel,)
+        
+        elif digChannel is None:
+            digChannel = usedDigs
+            
+        elif isinstance(digChannel, (tuple, int)) and all(isinstance(v, int) for v in digChannel) :
+            digChannel = tuple(sorted(set(digChannel)))
+            
+        elif digChannel is MISSING:
+            useAnalog=True
+                
+            
+        else:
+            raise TypeError(f"Unexpected digChannel specification {digChannel}")
+        
+        # print(f"{self.__class__.__name__}.getEpochTriggers: epoch = {myEpoch}, dac = {myDac}, sweep = {sweep}, pulseCount = {pulseCount}, digChannel = {digChannel}")
+        if useAnalog:
+            raise NotImplementedError("Parsing the analog waveform not yet implemented")
+        
+        if len(digChannel) == 0:
+            return TriggerEvent(event_type = eventType, name=name, labels = label) if enableEmptyEvent else None
+        else:
+            trigs = list()
+            digChannelValue = tuple(digPattern[chnl] for chnl in digChannel)
+            for k, chnl in enumerate(digChannel):
+                times = list()
+                if digChannelValue[k] == 1:
+                    times = [self.getEpochStart(epoch, myDac, sweep).rescale(pq.s)]
+                elif digChannelValue[k] == "*":
+                    tt = self.getEpochPulseTimes(epoch, myDac, sweep)
+                    if len(tt):
+                        times = [x.rescale(pq.s) for x in tt]
+
+                trig = TriggerEvent(times=times, units = pq.s, event_type = eventType, 
+                                    name=name, labels = label) if enableEmptyEvent else None
+                
+                if isinstance(trig, TriggerEvent) and trig.size > 0:
+                    # see BUG: 2023-10-03 17:57:30 in triggerevent.TriggerEvent.__new__ 
+                    if isinstance(label, str) and len(label.strip()):
+                        trig.labels = [f"{label}{k}" for k in range(trig.times.size)]
+                        
+                    trigs.append(trig)
+            
+            uniqueTrigs = list()
+            
+            for k,t in enumerate(trigs):
+                if k == 0:
+                    uniqueTrigs.append(t)
+                else:
+                    if t not in uniqueTrigs:
+                        uniqueTrigs.append(t)
+                        
+            if len(uniqueTrigs) == 1:
+                return uniqueTrigs[0]
+            
+            else:
+                return uniqueTrigs
+        
+    def getTriggers(self, sweep:int = 0,
+                    dac:typing.Optional[typing.Union[ABFOutputConfiguration, int, str]]=None,
+                    digChannel:typing.Optional[typing.Union[int, typing.Sequence[int]]] = None,
+                    ) -> typing.Sequence:
+        """Trigger events emitted by the epochs in this DAC
+        WARNING Do not use yet.
+        """
+        if sweep not in range(self.nSweeps):
+            raise ValueError(f"Invalid sweep index {sweep} for {self.nSweeps} sweeps")
+        
+        actualOutput = dac is None
+            
+        dac, _ = self._check_DAC_Epoch_(dac, None)
+        
+        # set of DAC physical indexes for those DACs where DIG output is configured
+        # but not necesarily enabled
+        digDACs = self.getDACsWithDigitalOutput()
+        
+        if len(digDACs) == 0 or dac.physicalIndex not in digDACs:
+            return list()
+        
+        hoDACActive = self.activeDACChannel not in (0,1)
+        
+        isAlternateDigital = False
+        if self.alternateDigitalOutputsEnabled:
+            if actualOutput:
+                if hoDACActive:
+                    isAlternateDigital = True
+                else:
+                    isAlternateDigital =  sweep % 2 > 0
+            else:
+                isAlternateDigital = dac.physicalIndex != self.activeDACChannel
+                
+        if actualOutput:
+            if self.alternateDigitalOutputsEnabled:
+                # digDACs = self.getDACsForEpoch(epoch.number)
+                if len(digDACs) > 1:
+                    # assert dac.physicalIndex in digDACs, f"DAC {dac.physicalIndex} not in digital-emitting DACs"
+                    thisDacNdx = digDACs.index(dac.physicalIndex)
+                    if self.activeDACChannel == 0:
+                        myDac = self.getDAC(1 if isAlternateDigital else 0)
+                    elif self.activeDACChannel == 1:
+                        myDac = self.getDAC(0 if isAlternateDigital else 1)
+                    else:
+                        assert hoDACActive, f"Active DAC index expected to be > 1; got {self.activeDACChannel}"
+                        # activeDAC is a HO DAC
+                        if sweep % 2 == 0 and 0 in digDACs: # "even" sweeps => query DAC0
+                            myDac = self.getDAC(0)
+                        elif sweep % 2 > 0 and 1 in digDACs: # "odd" sweeps => query DAC1
+                            myDac = self.getDAC(1)
+                        else:
+                            myDac = dac
+                else:
+                    myDac = dac
+                    
+            else:
+                myDac = dac
+        else:
+            # OK here: shows the Epoch table AS DEFINED in Clampex, regardless 
+            # of the sweep
+            myDac = dac
+        
+        # a tuple of ABFEpoch numbers where digital outputs are defined:
+        digEpochs = self.epochsWithDigitalOutput
+        
+        usedDigs = tuple(itertools.chain.from_iterable(map(lambda x: tuple(itertools.chain.from_iterable(x)) if isinstance(x, ABFDigitalPattern) else x, (self.getUsedDigitalChannels(sweep, e) for e in digEpochs))))
+
+        if isinstance(digChannel, int):
+            if digChannel not in usedDigs:
+                return list()
+            digChannel = (digChannel,)
+            
+        elif isinstance(digChannel, (list, tuple)) and all(isinstance(v, int) for v in digChannel):
+            digChannel = tuple(sorted(set(digChannel)))
+            
+        elif digChannel is None:
+            digChannel = tuple(sorted(set(usedDigs)))
+            
+        else:
+            raise TypeError(f"expecting digChannel an int or sequence of int; instead got {digChannel}")
+            
+        trigs = list()
+        for epoch in myDac.epochs:
+            if epoch.type not in (ABFEpochType.Step, ABFEpochType.Pulse):
+                if enableEmptyEvent:
+                    trigs.append(TriggerEvent(event_type = eventType, name=name, labels = label))
+            
+            
     def getEpochsTable(self, sweep:int = 0, /,
                        dac:typing.Optional[typing.Union[ABFOutputConfiguration, int, str]]=None,
                        includeDigitalPattern:bool=True) -> pd.DataFrame:
@@ -3030,7 +3381,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
                            separateWaves:bool=True,
                            normalized:bool=False,
                            asSignals:bool=False) -> neo.AnalogSignal:
-        """TTL waveforms for the given sweep.
+        """TTL (digital) waveforms for the given sweep.
         See NOTE in the docstring for self.getEpochsTable(…)
         """
         if sweep not in range(self.nSweeps):
@@ -3418,6 +3769,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
             
         elif isinstance(digChannel, (tuple, int)) and all(isinstance(v, int) for v in digChannel) :
             digChannel = tuple(sorted(set(digChannel)))
+            
         else:
             raise TypeError(f"Expecting digChannel an int or a sequence of int; instead got {digChannel}")
         
@@ -4871,83 +5223,83 @@ class ABFOutputConfiguration:
         
         return [e for e in self.epochs if e.emulatesTTL]
     
-    def getDigitalTriggerEvent(self, sweep:int = 0, digChannel:typing.Optional[typing.Union[int, typing.Sequence[int]]] = None,
-                         eventType:TriggerEventType = TriggerEventType.presynaptic,
-                         label:typing.Optional[typing.Union[str, typing.Sequence[str]]] = None,
-                         name:typing.Optional[str] = None,
-                         enableEmptyEvent:bool=True) -> TriggerEvent|None:
-        """Generates TriggerEvent objects from all epochs in the protocol.
-        These may be empty if the protocol epochs do not define digital patterns.
-        (NOTE: 'enableEmptyEvent' parameter is not yet used)
-        
-        See also: self.getEpochDigitalTriggerEvent
-        """
-        usedDigs = list(itertools.chain.from_iterable([epoch.getUsedDigitalOutputChannels() for epoch in self.epochs]))
-        
-        if isinstance(digChannel, int):
-            if digChannel not in usedDigs:
-                raise ValueError(f"Invalid DIG channel index {digChannel}")
-            
-            digChannel = (digChannel,)
-            
-        elif isinstance(digChannel, (list, tuple)) and all(isinstance(v, int) for v in digChannel):
-            if all(v not in usedDigs for v in digChannel):
-                raise ValueError(f"Invalid DIG channel indexes {digChannel}")
-            
-            digChannel = tuple(sorted(set(digChannel)))
-            
-        elif digChannel is None:
-            digChannel = tuple(sorted(set(usedDigs)))
-            
-        else:
-            raise TypeError(f"expecting digChannel an int or sequence of int; instead got {digChannel}")
-            
-        channel_times = [list()] * len(digChannel)
-        
-        # print(f"{self.__class__.__name__}.getDigitalTriggerEvent(sweep={sweep}) -> digChannel: {digChannel}")
-        for epoch in self.epochs:
-            if epoch.type not in (ABFEpochType.Step, ABFEpochType.Pulse):
-                continue
-            digPattern = tuple(itertools.chain.from_iterable(map(lambda x: reversed(x), self.getEpochDigitalPattern(epoch, sweep))))
-            digChannelValue = tuple(digPattern[chnl] for chnl in digChannel)
-            # print(f"{self.__class__.__name__}.getDigitalTriggerEvent(sweep={sweep}) -> epoch: {epoch.epochNumber}, digPattern: {digPattern}, digChannelValue: {digChannelValue}")
-            
-            # digChannelValue = [tuple(reversed(self.getEpochDigitalPattern(epoch, sweep)[chnl // 4]))[chnl] for chnl in digChannel]
-            # print(f"digChannelValue = {digChannelValue}" )
-            for k, chnl in enumerate(digChannel):
-                # print(f"k: {k} -> chnl: {chnl}")
-                # if chnl >= len(digChannelValue):
-                #     continue
-                # if digChannelValue[chnl] == "*":
-                if digChannelValue[k] == "*":
-                    channel_times[k].extend([x.rescale(pq.s) for x in self.getEpochActualPulseTimes(epoch, sweep)])
-                    
-                elif digChannelValue[k] == 1:
-                    channel_times[k].extend([self.getEpochRecordingStartTimeActual(epoch, sweep).rescale(pq.s)])
-                    
-        # print(f"{self.__class__.__name__}.getDigitalTriggerEvent(sweep={sweep}) -> channel_times: {channel_times}")
-        trigs = [TriggerEvent(times=channel_times[k], units = pq.s, event_type = eventType, 
-                            name=name, labels = label) for k in range(len(channel_times))]
-
-        # NOTE: 2023-10-31 15:00:10
-        # remove duplicates
-        # CAUTION: TriggerEvent objects are not hashable hence cannot use 
-        # set logic to achieve this
-        uniqueTrigs = list()
-
-        for k,t in enumerate(trigs):
-            if k == 0:
-                uniqueTrigs.append(t)
-            else:
-                if t not in uniqueTrigs:
-                    uniqueTrigs.append(t)
-                    
-        if len(uniqueTrigs) == 1:
-            return uniqueTrigs[0]
-        
-        else:
-            return uniqueTrigs
-        
+#     def getDigitalTriggerEvent(self, sweep:int = 0, digChannel:typing.Optional[typing.Union[int, typing.Sequence[int]]] = None,
+#                          eventType:TriggerEventType = TriggerEventType.presynaptic,
+#                          label:typing.Optional[typing.Union[str, typing.Sequence[str]]] = None,
+#                          name:typing.Optional[str] = None,
+#                          enableEmptyEvent:bool=True) -> TriggerEvent|None:
+#         """Generates TriggerEvent objects from all epochs in the protocol.
+#         These may be empty if the protocol epochs do not define digital patterns.
+#         (NOTE: 'enableEmptyEvent' parameter is not yet used)
+#         
+#         See also: self.getEpochDigitalTriggerEvent
+#         """
+#         usedDigs = list(itertools.chain.from_iterable([epoch.getUsedDigitalOutputChannels() for epoch in self.epochs]))
+#         
+#         if isinstance(digChannel, int):
+#             if digChannel not in usedDigs:
+#                 raise ValueError(f"Invalid DIG channel index {digChannel}")
+#             
+#             digChannel = (digChannel,)
+#             
+#         elif isinstance(digChannel, (list, tuple)) and all(isinstance(v, int) for v in digChannel):
+#             if all(v not in usedDigs for v in digChannel):
+#                 raise ValueError(f"Invalid DIG channel indexes {digChannel}")
+#             
+#             digChannel = tuple(sorted(set(digChannel)))
+#             
+#         elif digChannel is None:
+#             digChannel = tuple(sorted(set(usedDigs)))
+#             
+#         else:
+#             raise TypeError(f"expecting digChannel an int or sequence of int; instead got {digChannel}")
+#             
+#         channel_times = [list()] * len(digChannel)
+#         
+#         # print(f"{self.__class__.__name__}.getDigitalTriggerEvent(sweep={sweep}) -> digChannel: {digChannel}")
+#         for epoch in self.epochs:
+#             if epoch.type not in (ABFEpochType.Step, ABFEpochType.Pulse):
+#                 continue
+#             digPattern = tuple(itertools.chain.from_iterable(map(lambda x: reversed(x), self.getEpochDigitalPattern(epoch, sweep))))
+#             digChannelValue = tuple(digPattern[chnl] for chnl in digChannel)
+#             # print(f"{self.__class__.__name__}.getDigitalTriggerEvent(sweep={sweep}) -> epoch: {epoch.epochNumber}, digPattern: {digPattern}, digChannelValue: {digChannelValue}")
+#             
+#             # digChannelValue = [tuple(reversed(self.getEpochDigitalPattern(epoch, sweep)[chnl // 4]))[chnl] for chnl in digChannel]
+#             # print(f"digChannelValue = {digChannelValue}" )
+#             for k, chnl in enumerate(digChannel):
+#                 # print(f"k: {k} -> chnl: {chnl}")
+#                 # if chnl >= len(digChannelValue):
+#                 #     continue
+#                 # if digChannelValue[chnl] == "*":
+#                 if digChannelValue[k] == "*":
+#                     channel_times[k].extend([x.rescale(pq.s) for x in self.getEpochActualPulseTimes(epoch, sweep)])
+#                     
+#                 elif digChannelValue[k] == 1:
+#                     channel_times[k].extend([self.getEpochRecordingStartTimeActual(epoch, sweep).rescale(pq.s)])
+#                     
+#         # print(f"{self.__class__.__name__}.getDigitalTriggerEvent(sweep={sweep}) -> channel_times: {channel_times}")
+#         trigs = [TriggerEvent(times=channel_times[k], units = pq.s, event_type = eventType, 
+#                             name=name, labels = label) for k in range(len(channel_times))]
+# 
+#         # NOTE: 2023-10-31 15:00:10
+#         # remove duplicates
+#         # CAUTION: TriggerEvent objects are not hashable hence cannot use 
+#         # set logic to achieve this
+#         uniqueTrigs = list()
+# 
+#         for k,t in enumerate(trigs):
+#             if k == 0:
+#                 uniqueTrigs.append(t)
+#             else:
+#                 if t not in uniqueTrigs:
+#                     uniqueTrigs.append(t)
+#                     
+#         if len(uniqueTrigs) == 1:
+#             return uniqueTrigs[0]
+#         
+#         else:
+#             return uniqueTrigs
+#         
 #         # if isinstance(digChannel, int):
 #         if len(digChannel) == 1:
 #             times = list()
@@ -5036,199 +5388,199 @@ class ABFOutputConfiguration:
 #                 return uniqueTrigs
             
     
-    def getEpochDigitalTriggerEvent(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int = 0, 
-                             digChannel:typing.Union[int, typing.Sequence[int]] = 0,
-                             eventType:TriggerEventType = TriggerEventType.presynaptic,
-                             label:typing.Optional[typing.Union[str, typing.Sequence[str]]] = None,
-                             name:typing.Optional[str] = None,
-                             enableEmptyEvent:bool=True) -> typing.Union[TriggerEvent, typing.List[TriggerEvent]]:
-        """
-        TODO: Move this code to ABFProtocol, thus breaking the need to store
-        a reference to the protocol in this ABFOutputConfiguration instance.
-        
-        Trigger events from an individual Step or Pulse-type ABF Epoch.
-        
-        Parameters:
-        ------------
-        
-        epoch: ABFEpoch, int index of ABFEpoch or letter of ABFEpoch
-        
-        sweep: index of sweep (0-based)
-        
-        digChannel: int or sequence of int; index or indices of digital output
-            channels where a TTL output is expected.
-        
-            Specifying a tuple of int here (e.g., (0,1)) is convenient for the 
-            situation where alternate digital outputs are used to generate the 
-            same type of TriggerEvent (such as presynaptic). Such alternate 
-            digital outputs will be emitted on distinct digital output channels, 
-            even though they both represent the same type of event (in this case, 
-            presynaptic pulses). This scenario can be used for Hebbian synaptic    
-            plasticity experiments where synaptic responses are recorded 
-            alternatively from two distinct presynaptic pathways converging on 
-            the same cell.
-        
-        sweep: int, index of the sweep in the protocol. 
-            Normally, an ABF Epoch (and any digital output patterns defined 
-            within) is repeated in each sweep - hence the sweep index is 
-            irrelevant. 
-    
-            When alternate digital outputs are enabled, the sweep index BECOMES
-            RELEVANT, as the main digital pattern is emitted during sweeps with 
-            even indices (0, 2, 4, …) whereas the alternate digital pattern is
-            emitted during sweeps with odd indices (1, 3, 5, …).
-        
-            Such scenario is also likely to involve distinct digital output 
-            channels in the main and the alternate digital patterns. In this 
-            case it is recommended to specify BOTH digital output channels used
-            in the protocol (see above).
-        
-        eventType: optional; default is TriggerEventType.presynaptic
-            Necessary in building a TriggerProtocol for the experiment.
-        
-        label: The label(s) for each individual time stamp in the resulting
-            TriggerEvent object
-        
-        name: The name of the resulting TriggerEvent object.
-        
-        enableEmptyEvent: when True (default) the function will return an empty
-            TriggerEvent (i.e. without any time stamps) in any of the following
-            cases:
-        
-            • the ABF Epoch is neither a Step or Pulse Type
-        
-            • Neither of the digital channels given in digChannel are active in
-                the epoch during the specified sweep
-            
-        Returns:
-        ========
-        
-        A TriggerEvent object. This may be empty, or None - see 'enableEmptyEvent'
-        
-        If the epoch has digital outputs, the time stamps for the trigger
-        events will be set by the timings of the digital TTL signals during
-        
-        NOTE 1: Digital signals (triggers) are emitted during epochs defined on 
-        the "active" DAC
-        
-        NOTE 2: An ABF Epoch supports sending digital signals simultaneously via 
-        more than one digital output channel; however, Clampex does not support
-        defining different timings for distinct digital output channels, EXCEPT
-        for for the case where digital train and digital pulse are emitted by
-        distinct channels.
-        
-        In such case, the digital train emitted on one channel is interpreted
-        as a sequence of trigger events, whereas the digital pulse emitted on 
-        a distinct digital channel can be intepreted here as a single trigger
-        event, with the onset being equal to the timing of the first pulse in 
-        the digital train (both being defined by the epoch's onset time in the 
-        sweep0).
-        
-        Cases like this one are ambiguous and are best avoided, if possible.
-        
-        However, because distinct digital output channels can drive different
-        devices, it is necessary to specify their "semantic" within the experiment
-        (i.e. the trigger event type for a specific digital output channel).
-        
-        In synaptic plasticity experiments it is usual to use two digital output
-        channels to send digital trains ALTERNATIVELY to two pathways. Since
-        both outputs are effectively presynaptic stimuli, one can specify
-        the output indices by passing a tuple of int to the digChannel parameter.
-        
-        """
-        if isinstance(epoch, (str, int)):
-            e = self.getEpoch(epoch)
-            
-            if e is None:
-                raise ValueError(f"Invalid epoch index or name {epoch} for {len(self.epochs)} epochs defined for this DAC ({self.dacChannel})")
-            
-            epoch = e
-            
-        if epoch.type not in (ABFEpochType.Step, ABFEpochType.Pulse):
-            return TriggerEvent(event_type = eventType, name=name, labels = label) if enableEmptyEvent else None
-        
-        usedDigs = epoch.getUsedDigitalOutputChannels()
-        
-        if isinstance(digChannel, int) and digChannel not in usedDigs:
-            return TriggerEvent(event_type = eventType, name=name, labels = label) if enableEmptyEvent else None
-        
-        elif isinstance(digChannel, (list, tuple)) and all(isinstance(v, int) for v in digChannel):
-            if any(v not in usedDigs for v in digChannel):
-                return TriggerEvent(event_type = eventType, name=name, labels = label) if enableEmptyEvent else None
-            
-        elif digChannel is None:
-            digChannel = usedDigs
-        
-        if isinstance(digChannel, int):
-            times = list()
-            
-            digPattern = self.getEpochDigitalPattern(epoch, sweep)[digChannel // 4]
-            
-            digChannelValue = tuple(reversed(digPattern))[digChannel]
-            
-            if digChannelValue == "*": # ⟹ pulse train
-                times = [x.rescale(pq.s) for x in self.getEpochActualPulseTimes(epoch, sweep)]
-            
-            elif digChannelValue == 1: # ⟹ single TTL pulse ⇒ take the onset time as
-                                    # a trigger event; in theory, a device may 
-                                    # actually require a "ON" state during which 
-                                    # it performs some ciclic function etc;
-                                    # regardless of this we may conosider the onset
-                                    # of the "ON" state as a trigger for such device
-                times = [self.getEpochRecordingStartTimeActual(epoch, sweep).rescale(pq.s)]
-                
-            trig = TriggerEvent(times=times, units = pq.s, event_type = eventType, 
-                                name=name, labels = label) if enableEmptyEvent else None
-            
-            if isinstance(trig, TriggerEvent) and trig.size > 0:
-                # see BUG: 2023-10-03 17:57:30 in triggerevent.TriggerEvent.__new__ 
-                if isinstance(label, str) and len(label.strip()):
-                    trig.labels = [f"{label}{k}" for k in range(trig.times.size)]
-                
-            return trig
-        
-        elif isinstance(digChannel, (list, tuple)) and all(isinstance(v, int) for v in digChannel):
-            digChannelValue = [tuple(reversed(self.getEpochDigitalPattern(epoch, sweep)[chnl // 4]))[chnl] for chnl in digChannel]
-            
-            trigs = list()
-            
-            for k,chnl in enumerate(digChannel):
-                times = list()
-                
-                if digChannelValue[k] == "*":
-                    times = [x.rescale(pq.s) for x in self.getEpochActualPulseTimes(epoch, sweep)]
-                    
-                elif digChannelValue[k] == 1:
-                    times = [self.getEpochRecordingStartTimeActual(epoch, sweep).rescale(pq.s)]
-                    
-                trig = TriggerEvent(times=times, units = pq.s, event_type = eventType, 
-                                    name=name, labels = label) if enableEmptyEvent else None
-                
-                if isinstance(trig, TriggerEvent) and trig.size > 0:
-                    # see BUG: 2023-10-03 17:57:30 in triggerevent.TriggerEvent.__new__ 
-                    if isinstance(label, str) and len(label.strip()):
-                        trig.labels = [f"{label}{k}" for k in range(trig.times.size)]
-                        
-                    trigs.append(trig)
-                    
-            # NOTE: 2023-10-31 15:01:50 see NOTE: 2023-10-31 15:00:10
-            uniqueTrigs = list()
-
-            for k,t in enumerate(trigs):
-                if k == 0:
-                    uniqueTrigs.append(t)
-                else:
-                    if t not in uniqueTrigs:
-                        uniqueTrigs.append(t)
-                        
-            if len(uniqueTrigs) == 1:
-                return uniqueTrigs[0]
-            
-            else:
-                return uniqueTrigs
-            
-        else:
-            raise TypeError(f"digChannel expected an int or a sequence of int; instead, got {digChannel}")
+#     def getEpochDigitalTriggerEvent(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int = 0, 
+#                              digChannel:typing.Union[int, typing.Sequence[int]] = 0,
+#                              eventType:TriggerEventType = TriggerEventType.presynaptic,
+#                              label:typing.Optional[typing.Union[str, typing.Sequence[str]]] = None,
+#                              name:typing.Optional[str] = None,
+#                              enableEmptyEvent:bool=True) -> typing.Union[TriggerEvent, typing.List[TriggerEvent]]:
+#         """
+#         TODO: Move this code to ABFProtocol, thus breaking the need to store
+#         a reference to the protocol in this ABFOutputConfiguration instance.
+#         
+#         Trigger events from an individual Step or Pulse-type ABF Epoch.
+#         
+#         Parameters:
+#         ------------
+#         
+#         epoch: ABFEpoch, int index of ABFEpoch or letter of ABFEpoch
+#         
+#         sweep: index of sweep (0-based)
+#         
+#         digChannel: int or sequence of int; index or indices of digital output
+#             channels where a TTL output is expected.
+#         
+#             Specifying a tuple of int here (e.g., (0,1)) is convenient for the 
+#             situation where alternate digital outputs are used to generate the 
+#             same type of TriggerEvent (such as presynaptic). Such alternate 
+#             digital outputs will be emitted on distinct digital output channels, 
+#             even though they both represent the same type of event (in this case, 
+#             presynaptic pulses). This scenario can be used for Hebbian synaptic    
+#             plasticity experiments where synaptic responses are recorded 
+#             alternatively from two distinct presynaptic pathways converging on 
+#             the same cell.
+#         
+#         sweep: int, index of the sweep in the protocol. 
+#             Normally, an ABF Epoch (and any digital output patterns defined 
+#             within) is repeated in each sweep - hence the sweep index is 
+#             irrelevant. 
+#     
+#             When alternate digital outputs are enabled, the sweep index BECOMES
+#             RELEVANT, as the main digital pattern is emitted during sweeps with 
+#             even indices (0, 2, 4, …) whereas the alternate digital pattern is
+#             emitted during sweeps with odd indices (1, 3, 5, …).
+#         
+#             Such scenario is also likely to involve distinct digital output 
+#             channels in the main and the alternate digital patterns. In this 
+#             case it is recommended to specify BOTH digital output channels used
+#             in the protocol (see above).
+#         
+#         eventType: optional; default is TriggerEventType.presynaptic
+#             Necessary in building a TriggerProtocol for the experiment.
+#         
+#         label: The label(s) for each individual time stamp in the resulting
+#             TriggerEvent object
+#         
+#         name: The name of the resulting TriggerEvent object.
+#         
+#         enableEmptyEvent: when True (default) the function will return an empty
+#             TriggerEvent (i.e. without any time stamps) in any of the following
+#             cases:
+#         
+#             • the ABF Epoch is neither a Step or Pulse Type
+#         
+#             • Neither of the digital channels given in digChannel are active in
+#                 the epoch during the specified sweep
+#             
+#         Returns:
+#         ========
+#         
+#         A TriggerEvent object. This may be empty, or None - see 'enableEmptyEvent'
+#         
+#         If the epoch has digital outputs, the time stamps for the trigger
+#         events will be set by the timings of the digital TTL signals during
+#         
+#         NOTE 1: Digital signals (triggers) are emitted during epochs defined on 
+#         the "active" DAC
+#         
+#         NOTE 2: An ABF Epoch supports sending digital signals simultaneously via 
+#         more than one digital output channel; however, Clampex does not support
+#         defining different timings for distinct digital output channels, EXCEPT
+#         for for the case where digital train and digital pulse are emitted by
+#         distinct channels.
+#         
+#         In such case, the digital train emitted on one channel is interpreted
+#         as a sequence of trigger events, whereas the digital pulse emitted on 
+#         a distinct digital channel can be intepreted here as a single trigger
+#         event, with the onset being equal to the timing of the first pulse in 
+#         the digital train (both being defined by the epoch's onset time in the 
+#         sweep0).
+#         
+#         Cases like this one are ambiguous and are best avoided, if possible.
+#         
+#         However, because distinct digital output channels can drive different
+#         devices, it is necessary to specify their "semantic" within the experiment
+#         (i.e. the trigger event type for a specific digital output channel).
+#         
+#         In synaptic plasticity experiments it is usual to use two digital output
+#         channels to send digital trains ALTERNATIVELY to two pathways. Since
+#         both outputs are effectively presynaptic stimuli, one can specify
+#         the output indices by passing a tuple of int to the digChannel parameter.
+#         
+#         """
+#         if isinstance(epoch, (str, int)):
+#             e = self.getEpoch(epoch)
+#             
+#             if e is None:
+#                 raise ValueError(f"Invalid epoch index or name {epoch} for {len(self.epochs)} epochs defined for this DAC ({self.dacChannel})")
+#             
+#             epoch = e
+#             
+#         if epoch.type not in (ABFEpochType.Step, ABFEpochType.Pulse):
+#             return TriggerEvent(event_type = eventType, name=name, labels = label) if enableEmptyEvent else None
+#         
+#         usedDigs = epoch.getUsedDigitalOutputChannels()
+#         
+#         if isinstance(digChannel, int) and digChannel not in usedDigs:
+#             return TriggerEvent(event_type = eventType, name=name, labels = label) if enableEmptyEvent else None
+#         
+#         elif isinstance(digChannel, (list, tuple)) and all(isinstance(v, int) for v in digChannel):
+#             if any(v not in usedDigs for v in digChannel):
+#                 return TriggerEvent(event_type = eventType, name=name, labels = label) if enableEmptyEvent else None
+#             
+#         elif digChannel is None:
+#             digChannel = usedDigs
+#         
+#         if isinstance(digChannel, int):
+#             times = list()
+#             
+#             digPattern = self.getEpochDigitalPattern(epoch, sweep)[digChannel // 4]
+#             
+#             digChannelValue = tuple(reversed(digPattern))[digChannel]
+#             
+#             if digChannelValue == "*": # ⟹ pulse train
+#                 times = [x.rescale(pq.s) for x in self.getEpochActualPulseTimes(epoch, sweep)]
+#             
+#             elif digChannelValue == 1: # ⟹ single TTL pulse ⇒ take the onset time as
+#                                     # a trigger event; in theory, a device may 
+#                                     # actually require a "ON" state during which 
+#                                     # it performs some ciclic function etc;
+#                                     # regardless of this we may conosider the onset
+#                                     # of the "ON" state as a trigger for such device
+#                 times = [self.getEpochRecordingStartTimeActual(epoch, sweep).rescale(pq.s)]
+#                 
+#             trig = TriggerEvent(times=times, units = pq.s, event_type = eventType, 
+#                                 name=name, labels = label) if enableEmptyEvent else None
+#             
+#             if isinstance(trig, TriggerEvent) and trig.size > 0:
+#                 # see BUG: 2023-10-03 17:57:30 in triggerevent.TriggerEvent.__new__ 
+#                 if isinstance(label, str) and len(label.strip()):
+#                     trig.labels = [f"{label}{k}" for k in range(trig.times.size)]
+#                 
+#             return trig
+#         
+#         elif isinstance(digChannel, (list, tuple)) and all(isinstance(v, int) for v in digChannel):
+#             digChannelValue = [tuple(reversed(self.getEpochDigitalPattern(epoch, sweep)[chnl // 4]))[chnl] for chnl in digChannel]
+#             
+#             trigs = list()
+#             
+#             for k,chnl in enumerate(digChannel):
+#                 times = list()
+#                 
+#                 if digChannelValue[k] == "*":
+#                     times = [x.rescale(pq.s) for x in self.getEpochActualPulseTimes(epoch, sweep)]
+#                     
+#                 elif digChannelValue[k] == 1:
+#                     times = [self.getEpochRecordingStartTimeActual(epoch, sweep).rescale(pq.s)]
+#                     
+#                 trig = TriggerEvent(times=times, units = pq.s, event_type = eventType, 
+#                                     name=name, labels = label) if enableEmptyEvent else None
+#                 
+#                 if isinstance(trig, TriggerEvent) and trig.size > 0:
+#                     # see BUG: 2023-10-03 17:57:30 in triggerevent.TriggerEvent.__new__ 
+#                     if isinstance(label, str) and len(label.strip()):
+#                         trig.labels = [f"{label}{k}" for k in range(trig.times.size)]
+#                         
+#                     trigs.append(trig)
+#                     
+#             # NOTE: 2023-10-31 15:01:50 see NOTE: 2023-10-31 15:00:10
+#             uniqueTrigs = list()
+# 
+#             for k,t in enumerate(trigs):
+#                 if k == 0:
+#                     uniqueTrigs.append(t)
+#                 else:
+#                     if t not in uniqueTrigs:
+#                         uniqueTrigs.append(t)
+#                         
+#             if len(uniqueTrigs) == 1:
+#                 return uniqueTrigs[0]
+#             
+#             else:
+#                 return uniqueTrigs
+#             
+#         else:
+#             raise TypeError(f"digChannel expected an int or a sequence of int; instead, got {digChannel}")
     
 #     def getEpochsTable(self, sweep:int = 0, includeDigitalPattern:bool=True):
 #         """Generate a Pandas DataFrame with the epochs definition for this DAC channel.
@@ -5303,310 +5655,310 @@ class ABFOutputConfiguration:
         
         return self.epochs[e]
     
-    def getEpochAnalogWaveform(self, epoch:typing.Union[ABFEpoch, str, int], previousLevel:pq.Quantity, 
-                      sweep:int = 0, lastLevelOnly:bool=False,
-                      returnLevels:bool=False) -> pq.Quantity:
-        """
-        TODO: Move this code to ABFProtocol, thus breaking the need to store
-        a reference to the protocol in this ABFOutputConfiguration instance.
-        
+#     def getEpochAnalogWaveform(self, epoch:typing.Union[ABFEpoch, str, int], previousLevel:pq.Quantity, 
+#                       sweep:int = 0, lastLevelOnly:bool=False,
+#                       returnLevels:bool=False) -> pq.Quantity:
+#         """
+#         TODO: Move this code to ABFProtocol, thus breaking the need to store
+#         a reference to the protocol in this ABFOutputConfiguration instance.
+#         
+#     
+#         Realizes the analog waveform associated with a single epoch.
+#         An 'epoch' is defined as a specific time interval in a sweep, during 
+#         which the DAC outputs a command signal waveform givemn the epoch's type
+#         (step, ramp, pulse, etc). This information is configured using the 
+#         Channel tab inside the Waveform tab of the Clampex Protocol Editor.
+#         Complex DAC output commands can be generated by defining and concatenating
+#         several epochs (subject to the constraints of the Clampex software version)
+#         """
+#         if isinstance(epoch, (int, str)):
+#             e = self.getEpoch(epoch)
+#             if e is None:
+#                 raise ValueError(f"Invalid epoch index or name {epoch} for {len(self.epochs)} epochs defined for this DAC ({self.dacChannel})")
+#             
+#             epoch = e
+#             
+#         if self.protocol:
+#             isAlternateWaveform = self.alternateDACOutputStateEnabled and sweep % 2 > 0
+#             
+#         actualDuration = epoch.firstDuration + sweep * epoch.deltaDuration
+#         epochSamplesCount = scq.nSamples(actualDuration, self.samplingRate)
+#         actualLevel = epoch.firstLevel + sweep * epoch.deltaLevel
+#         
+#         if epoch.type == ABFEpochType.Step:
+#             wave = actualLevel if lastLevelOnly else np.full([epochSamplesCount, 1], float(actualLevel)) * self.units
+#         
+#         elif epoch.type == ABFEpochType.Ramp:
+#             wave = actualLevel if lastLevelOnly else np.linspace(previousLevel, actualLevel, epochSamplesCount)[:,np.newaxis]
+#             
+#         elif epoch.type == ABFEpochType.Pulse:
+#             pulsePeriod = self.getEpochPulsePeriodSamples(epoch)
+#             pulseSamples = self.getEpochPulseWidthSamples(epoch)
+#             pulseCount = self.getEpochPulseCount(epoch)
+#             
+#             if lastLevelOnly:
+#                 wave = actualLevel
+#             else:
+#                 wave = np.full([epochSamplesCount, 1], float(previousLevel)) * self.units
+#                 
+#                 for pulse in range(pulseCount):
+#                     p1 = int(pulsePeriod * pulse)
+#                     p2 = int(p1 + pulseSamples)
+#                     wave[p1:p2] = actualLevel
+#                         
+#         elif epoch.type == ABFEpochType.Triangular:
+#             pulsePeriod = self.getEpochPulsePeriodSamples(epoch)
+#             pulseSamples = self.getEpochPulseWidthSamples(epoch)
+#             pulseCount = self.getEpochPulseCount(epoch)
+#             
+#             if lastLevelOnly:
+#                 wave = actualLevel
+#             else:
+#                 wave = np.full([epochSamplesCount, 1], float(previousLevel)) * self.units
+#                             
+#                 for pulse in range(pulseCount):
+#                     p1 = int(pulsePeriod * pulse)
+#                     p2 = int(p1 + pulseSamples)
+#                     p3 = int(p1 + pulsePeriod)
+#                     
+#                     wave[p1:p2] = np.linspace(previousLevel, actualLevel, pulseSamples)[:,np.newaxis]
+#                     wave[p2:p3] = np.linspace(actualLevel, previousLevel, int(pulsePeriod - pulseSamples))[:,np.newaxis]
+#             
+#         elif epoch.type == ABFEpochType.Cosine:
+#             if lastLevelOnly:
+#                 wave = actualLevel
+#             else:
+#                 pulseCount = self.getEpochPulseCount(epoch)
+#                 levelDelta = float(actualLevel) - float(previousLevel)
+#                 values = np.linspace(0, 2*pulseCount*np.pi, epochSamplesCount) + np.pi
+#                 cosines = (np.cos(values) * levelDelta / 2 + levelDelta/2 ) * self.units + previousLevel
+#                 wave = cosines[:, np.newaxis]
+#             
+#         elif epoch.type == ABFEpochType.Biphasic:
+#             pulsePeriod = self.getEpochPulsePeriodSamples(epoch)
+#             pulseSamples = self.getEpochPulseWidthSamples(epoch)
+#             pulseCount = self.getEpochPulseCount(epoch)
+#             levelDelta = actualLevel - previousLevel
+#             
+#             if lastLevelOnly:
+#                 wave = actualLevel
+#             else:
+#                 wave = np.full([epochSamplesCount, 1], float(previousLevel)) * self.units
+#                 
+#                 for pulse in range(pulseCount):
+#                     p1 = int(pulsePeriod * pulse)
+#                     p3 = int(p1 + pulseSamples)
+#                     p2 = int((p1+p3)/2)
+#                     wave[p1:p2] = previousLevel + levelDelta
+#                     wave[p2:p3] = previousLevel - levelDelta
+#             
+#         else:
+#             wave = np.full([epochSamplesCount, 1], float(previousLevel)) * self.units
+#             
+#         if returnLevels:
+#             return wave, actualLevel
+#         
+#         return wave
     
-        Realizes the analog waveform associated with a single epoch.
-        An 'epoch' is defined as a specific time interval in a sweep, during 
-        which the DAC outputs a command signal waveform givemn the epoch's type
-        (step, ramp, pulse, etc). This information is configured using the 
-        Channel tab inside the Waveform tab of the Clampex Protocol Editor.
-        Complex DAC output commands can be generated by defining and concatenating
-        several epochs (subject to the constraints of the Clampex software version)
-        """
-        if isinstance(epoch, (int, str)):
-            e = self.getEpoch(epoch)
-            if e is None:
-                raise ValueError(f"Invalid epoch index or name {epoch} for {len(self.epochs)} epochs defined for this DAC ({self.dacChannel})")
+#     def getEpochDigitalWaveform(self, epoch:typing.Union[ABFEpoch, str, int], /, 
+#                                 sweep:int = 0, 
+#                                 digChannel: typing.Optional[typing.Union[int, typing.Sequence[int]]] = None, 
+#                                 lastLevelOnly:bool=False,
+#                                 separateWaves:bool=True,
+#                                 digOFF:typing.Optional[pq.Quantity]=None,
+#                                 digON:typing.Optional[pq.Quantity]=None,
+#                                 trainOFF:typing.Optional[pq.Quantity]=None,
+#                                 trainON:typing.Optional[pq.Quantity]=None,
+#                                 returnLevels:bool=False) -> typing.Union[pq.Quantity, typing.Sequence[pq.Quantity]]:
+#         """Waveform with the TTL signals emitted by the epoch.
+#         
+#         Mandatory positional parameters:
+#         --------------------------------
+#         
+#         epoch: the ABF epoch that is queried
+#         
+#         Named parameters:
+#         -----------------
+#         
+#         sweep: the index of the ABF sweep (digital outputs may be specific to the 
+#                 sweep index, when alternate digital patterns are enabled in the 
+#                 ABF protocol)
+#         
+#                 Default is 0 (first sweep)
+#         
+#         digChannel:default is None, meaning that the function returns a waveform
+#             for each digital output channel that is active during this epoch
+#             (and during the specified sweep)
+#         
+#         lastLevelOnly: default is False; when True, just generate a constant wave
+#             with the value of the last digital logic level; that is, OFF for digital 
+#             pulse or train. NOTE that the actual value of this level is either 0 V 
+#             or 5 V, depending on the values of protocol.digitalHoldingValue(channel) 
+#             and protocol.digitalTrainActiveLogic.
+#         
+#             See self.getDigitalLogicLevels, self.getDigitalPulseLogicLevels,
+#             and self.getDigitalTrainLogicLevels
+#         
+#         separateWaves: default is False. 
+#             When False, and more than one digChannel is queried, the function 
+#             returns a Quantity array with one channel-specific waveform per
+#             column.
+#         
+#             When True, the function returns a list of vector waveforms (one per 
+#             channel)
+#         
+#         digOFF, digON, trainOFF, trainON: scalar Python Quantities representing
+#             the logic levels for digital pulses and trains, respectively; when 
+#             they are None (default) the function will query these values from the 
+#             ABF protocol that associates this DAC output.
+#         
+#         returnLevels: default False; When True, returns the waves and the digOFF, 
+#         digON, trainOFF and trainON logical levels
+#         
+#         Returns:
+#         --------
+#         waves, [digOFF, digON, trainOFF, trainON], where:
+#         
+#         waves: list of Python quantities (Quantity arrays) whith the digital waveforms
+#         for each specified DIG channel are returned.
+#         
+#             The list contains:
+#                 • a single 1D Quantity array, when digChannel parameter is an int 
+#                     (but see below)
+#                 • as many 1D Quantity arrays as DIG channel indexes specified in 
+#                     digChannel parameter, and separateWaves is True
+#                 • a single 2D Quantity array with shape (N,M) where:
+#                     ∘ N is the number of samples recorded by the epoch
+#                     ∘ M is the number of DIG channels specified in digChannel
+#         
+#             The list is EMPTY when not all DIG channel indexes specified
+#                     in the digChannel parameter are used by the epoch.
+#         
+#         digOFF, digON, trainOFF, trainON - scalar Python Quantities with the values
+#             of the logical levels for digital pulse and digital train.
+#         
+#             NOTE:
+#             1. trainOFF and trainON are None when the epoch emits only digital pulses
+#             2. digOFF and digON are None when the epoch emits only digital pulse trains
+#             3. Within a given epoch, these levels are identical for all DIG channels.
+#         
+#         When not all DIG channel indexes are used by the epoch to emit digital signals
+#         the function returns None
+#     
+#         """
+#         if isinstance(epoch, (int, str)):
+#             e = self.getEpoch(epoch)
+#             if e is None:
+#                 raise ValueError(f"Invalid epoch index or name {epoch} for {len(self.epochs)} epochs defined for this DAC ({self.dacChannel})")
+#             
+#             epoch = e
+#             
+#         actualDuration = epoch.firstDuration + sweep * epoch.deltaDuration
+#         epochSamplesCount = scq.nSamples(actualDuration, self.samplingRate)
+#         pulsePeriod = self.getEpochPulsePeriodSamples(epoch)
+#         pulseSamples = self.getEpochPulseWidthSamples(epoch)
+#         pulseCount = self.getEpochPulseCount(epoch)
+# 
+#         usedDigs = epoch.digitalOutputChannels
+#         
+#         if len(usedDigs) == 0:
+#             scipywarn(f"The epoch {epoch.number} ({epoch.letter}) of DAC {self.physicalIndex} ({self.name}) does NOT emit digital outputs")
+#             return 
+#         
+#         if isinstance(digChannel, int):
+#             if digChannel not in usedDigs:
+#                 scipywarn(f"The DIG channel {digChannel} is not used in the epoch {epoch.number} ({epoch.letter}) of DAC {self.physicalIndex} ({self.name}) ")
+#                 return 
+#                 # raise ValueError(f"Invalid DIG channel index {digChannel}")
+#             
+#             digChannel = (digChannel,)
+#         
+#         elif isinstance(digChannel, (list, tuple)) and all(isinstance(v, int) for v in digChannel):
+#             if any(v not in usedDigs for v in digChannel):
+#                 scipywarn(f"Not all specified DIG channels {digChannel} are used by the epoch {epoch.number} ({epoch.letter}) of DAC {self.physicalIndex} ({self.name}) ")
+#                 return 
+#             
+#                 # raise ValueError(f"Invalid DIG channel index {digChannel}")
+#             
+#         elif digChannel is None:
+#             digChannel = tuple(usedDigs.keys())
+#             
+#         else:
+#             raise TypeError(f"Expecting digChannel an int or a sequence of int; instead got {digChannel}")
+# 
+#         digPattern = tuple(itertools.chain.from_iterable(map(lambda x: reversed(x), self.getEpochDigitalPattern(epoch, sweep))))
+#         digChannelValue = tuple(digPattern[chnl] for chnl in digChannel)
+#         
+#         epochDIGs = epoch.digitalOutputChannels # a dict
+# 
+#         waves = list()
+#         
+#         for k, chnl in enumerate(digChannel):
+#             wave = np.full([epochSamplesCount, 1], 0) * self.units
+#             
+#             if digChannelValue[k] == 1: # emits pulse
+#                 if any(v is None for v in (digOFF, digON)):
+#                     digOFF, digON = self.getDigitalPulseLogicLevels(chnl)
+#                 
+#                 if lastLevelOnly:
+#                     wave[:] = digOFF
+#                 else:
+#                     wave[:] = digON
+#                     
+#             elif digChannelValue[k] == "*": # emits train
+#                 if any(v is None for v in (trainOFF, trainON)):
+#                     trainOFF, trainON = self.getDigitalTrainLogicLevels()
+# 
+#                 wave[:] = trainOFF
+#                 if not lastLevelOnly:
+#                     for pulse in range(pulseCount):
+#                         p1 = int(pulsePeriod * pulse)
+#                         p2 = int(p1 + pulseSamples)
+#                         wave[p1:p2] = trainON
+#                         
+#             waves.append(wave)
+#             
+#         if not separateWaves:
+#             waves = [np.hstack(waves) * self.units]
+#             
+#         if returnLevels:
+#             return waves, digOFF, digON, trainOFF, trainON
+#         
+#         return waves
             
-            epoch = e
-            
-        if self.protocol:
-            isAlternateWaveform = self.alternateDACOutputStateEnabled and sweep % 2 > 0
-            
-        actualDuration = epoch.firstDuration + sweep * epoch.deltaDuration
-        epochSamplesCount = scq.nSamples(actualDuration, self.samplingRate)
-        actualLevel = epoch.firstLevel + sweep * epoch.deltaLevel
-        
-        if epoch.type == ABFEpochType.Step:
-            wave = actualLevel if lastLevelOnly else np.full([epochSamplesCount, 1], float(actualLevel)) * self.units
-        
-        elif epoch.type == ABFEpochType.Ramp:
-            wave = actualLevel if lastLevelOnly else np.linspace(previousLevel, actualLevel, epochSamplesCount)[:,np.newaxis]
-            
-        elif epoch.type == ABFEpochType.Pulse:
-            pulsePeriod = self.getEpochPulsePeriodSamples(epoch)
-            pulseSamples = self.getEpochPulseWidthSamples(epoch)
-            pulseCount = self.getEpochPulseCount(epoch)
-            
-            if lastLevelOnly:
-                wave = actualLevel
-            else:
-                wave = np.full([epochSamplesCount, 1], float(previousLevel)) * self.units
-                
-                for pulse in range(pulseCount):
-                    p1 = int(pulsePeriod * pulse)
-                    p2 = int(p1 + pulseSamples)
-                    wave[p1:p2] = actualLevel
                         
-        elif epoch.type == ABFEpochType.Triangular:
-            pulsePeriod = self.getEpochPulsePeriodSamples(epoch)
-            pulseSamples = self.getEpochPulseWidthSamples(epoch)
-            pulseCount = self.getEpochPulseCount(epoch)
-            
-            if lastLevelOnly:
-                wave = actualLevel
-            else:
-                wave = np.full([epochSamplesCount, 1], float(previousLevel)) * self.units
-                            
-                for pulse in range(pulseCount):
-                    p1 = int(pulsePeriod * pulse)
-                    p2 = int(p1 + pulseSamples)
-                    p3 = int(p1 + pulsePeriod)
-                    
-                    wave[p1:p2] = np.linspace(previousLevel, actualLevel, pulseSamples)[:,np.newaxis]
-                    wave[p2:p3] = np.linspace(actualLevel, previousLevel, int(pulsePeriod - pulseSamples))[:,np.newaxis]
-            
-        elif epoch.type == ABFEpochType.Cosine:
-            if lastLevelOnly:
-                wave = actualLevel
-            else:
-                pulseCount = self.getEpochPulseCount(epoch)
-                levelDelta = float(actualLevel) - float(previousLevel)
-                values = np.linspace(0, 2*pulseCount*np.pi, epochSamplesCount) + np.pi
-                cosines = (np.cos(values) * levelDelta / 2 + levelDelta/2 ) * self.units + previousLevel
-                wave = cosines[:, np.newaxis]
-            
-        elif epoch.type == ABFEpochType.Biphasic:
-            pulsePeriod = self.getEpochPulsePeriodSamples(epoch)
-            pulseSamples = self.getEpochPulseWidthSamples(epoch)
-            pulseCount = self.getEpochPulseCount(epoch)
-            levelDelta = actualLevel - previousLevel
-            
-            if lastLevelOnly:
-                wave = actualLevel
-            else:
-                wave = np.full([epochSamplesCount, 1], float(previousLevel)) * self.units
-                
-                for pulse in range(pulseCount):
-                    p1 = int(pulsePeriod * pulse)
-                    p3 = int(p1 + pulseSamples)
-                    p2 = int((p1+p3)/2)
-                    wave[p1:p2] = previousLevel + levelDelta
-                    wave[p2:p3] = previousLevel - levelDelta
-            
-        else:
-            wave = np.full([epochSamplesCount, 1], float(previousLevel)) * self.units
-            
-        if returnLevels:
-            return wave, actualLevel
-        
-        return wave
-    
-    def getEpochDigitalWaveform(self, epoch:typing.Union[ABFEpoch, str, int], /, 
-                                sweep:int = 0, 
-                                digChannel: typing.Optional[typing.Union[int, typing.Sequence[int]]] = None, 
-                                lastLevelOnly:bool=False,
-                                separateWaves:bool=True,
-                                digOFF:typing.Optional[pq.Quantity]=None,
-                                digON:typing.Optional[pq.Quantity]=None,
-                                trainOFF:typing.Optional[pq.Quantity]=None,
-                                trainON:typing.Optional[pq.Quantity]=None,
-                                returnLevels:bool=False) -> typing.Union[pq.Quantity, typing.Sequence[pq.Quantity]]:
-        """Waveform with the TTL signals emitted by the epoch.
-        
-        Mandatory positional parameters:
-        --------------------------------
-        
-        epoch: the ABF epoch that is queried
-        
-        Named parameters:
-        -----------------
-        
-        sweep: the index of the ABF sweep (digital outputs may be specific to the 
-                sweep index, when alternate digital patterns are enabled in the 
-                ABF protocol)
-        
-                Default is 0 (first sweep)
-        
-        digChannel:default is None, meaning that the function returns a waveform
-            for each digital output channel that is active during this epoch
-            (and during the specified sweep)
-        
-        lastLevelOnly: default is False; when True, just generate a constant wave
-            with the value of the last digital logic level; that is, OFF for digital 
-            pulse or train. NOTE that the actual value of this level is either 0 V 
-            or 5 V, depending on the values of protocol.digitalHoldingValue(channel) 
-            and protocol.digitalTrainActiveLogic.
-        
-            See self.getDigitalLogicLevels, self.getDigitalPulseLogicLevels,
-            and self.getDigitalTrainLogicLevels
-        
-        separateWaves: default is False. 
-            When False, and more than one digChannel is queried, the function 
-            returns a Quantity array with one channel-specific waveform per
-            column.
-        
-            When True, the function returns a list of vector waveforms (one per 
-            channel)
-        
-        digOFF, digON, trainOFF, trainON: scalar Python Quantities representing
-            the logic levels for digital pulses and trains, respectively; when 
-            they are None (default) the function will query these values from the 
-            ABF protocol that associates this DAC output.
-        
-        returnLevels: default False; When True, returns the waves and the digOFF, 
-        digON, trainOFF and trainON logical levels
-        
-        Returns:
-        --------
-        waves, [digOFF, digON, trainOFF, trainON], where:
-        
-        waves: list of Python quantities (Quantity arrays) whith the digital waveforms
-        for each specified DIG channel are returned.
-        
-            The list contains:
-                • a single 1D Quantity array, when digChannel parameter is an int 
-                    (but see below)
-                • as many 1D Quantity arrays as DIG channel indexes specified in 
-                    digChannel parameter, and separateWaves is True
-                • a single 2D Quantity array with shape (N,M) where:
-                    ∘ N is the number of samples recorded by the epoch
-                    ∘ M is the number of DIG channels specified in digChannel
-        
-            The list is EMPTY when not all DIG channel indexes specified
-                    in the digChannel parameter are used by the epoch.
-        
-        digOFF, digON, trainOFF, trainON - scalar Python Quantities with the values
-            of the logical levels for digital pulse and digital train.
-        
-            NOTE:
-            1. trainOFF and trainON are None when the epoch emits only digital pulses
-            2. digOFF and digON are None when the epoch emits only digital pulse trains
-            3. Within a given epoch, these levels are identical for all DIG channels.
-        
-        When not all DIG channel indexes are used by the epoch to emit digital signals
-        the function returns None
-    
-        """
-        if isinstance(epoch, (int, str)):
-            e = self.getEpoch(epoch)
-            if e is None:
-                raise ValueError(f"Invalid epoch index or name {epoch} for {len(self.epochs)} epochs defined for this DAC ({self.dacChannel})")
-            
-            epoch = e
-            
-        actualDuration = epoch.firstDuration + sweep * epoch.deltaDuration
-        epochSamplesCount = scq.nSamples(actualDuration, self.samplingRate)
-        pulsePeriod = self.getEpochPulsePeriodSamples(epoch)
-        pulseSamples = self.getEpochPulseWidthSamples(epoch)
-        pulseCount = self.getEpochPulseCount(epoch)
-
-        usedDigs = epoch.digitalOutputChannels
-        
-        if len(usedDigs) == 0:
-            scipywarn(f"The epoch {epoch.number} ({epoch.letter}) of DAC {self.physicalIndex} ({self.name}) does NOT emit digital outputs")
-            return 
-        
-        if isinstance(digChannel, int):
-            if digChannel not in usedDigs:
-                scipywarn(f"The DIG channel {digChannel} is not used in the epoch {epoch.number} ({epoch.letter}) of DAC {self.physicalIndex} ({self.name}) ")
-                return 
-                # raise ValueError(f"Invalid DIG channel index {digChannel}")
-            
-            digChannel = (digChannel,)
-        
-        elif isinstance(digChannel, (list, tuple)) and all(isinstance(v, int) for v in digChannel):
-            if any(v not in usedDigs for v in digChannel):
-                scipywarn(f"Not all specified DIG channels {digChannel} are used by the epoch {epoch.number} ({epoch.letter}) of DAC {self.physicalIndex} ({self.name}) ")
-                return 
-            
-                # raise ValueError(f"Invalid DIG channel index {digChannel}")
-            
-        elif digChannel is None:
-            digChannel = tuple(usedDigs.keys())
-            
-        else:
-            raise TypeError(f"Expecting digChannel an int or a sequence of int; instead got {digChannel}")
-
-        digPattern = tuple(itertools.chain.from_iterable(map(lambda x: reversed(x), self.getEpochDigitalPattern(epoch, sweep))))
-        digChannelValue = tuple(digPattern[chnl] for chnl in digChannel)
-        
-        epochDIGs = epoch.digitalOutputChannels # a dict
-
-        waves = list()
-        
-        for k, chnl in enumerate(digChannel):
-            wave = np.full([epochSamplesCount, 1], 0) * self.units
-            
-            if digChannelValue[k] == 1: # emits pulse
-                if any(v is None for v in (digOFF, digON)):
-                    digOFF, digON = self.getDigitalPulseLogicLevels(chnl)
-                
-                if lastLevelOnly:
-                    wave[:] = digOFF
-                else:
-                    wave[:] = digON
-                    
-            elif digChannelValue[k] == "*": # emits train
-                if any(v is None for v in (trainOFF, trainON)):
-                    trainOFF, trainON = self.getDigitalTrainLogicLevels()
-
-                wave[:] = trainOFF
-                if not lastLevelOnly:
-                    for pulse in range(pulseCount):
-                        p1 = int(pulsePeriod * pulse)
-                        p2 = int(p1 + pulseSamples)
-                        wave[p1:p2] = trainON
-                        
-            waves.append(wave)
-            
-        if not separateWaves:
-            waves = [np.hstack(waves) * self.units]
-            
-        if returnLevels:
-            return waves, digOFF, digON, trainOFF, trainON
-        
-        return waves
-            
-                        
-    def getPreviousSweepLastEpochLevel(self, sweep:int) -> pq.Quantity:
-        """Final analog value in the previous epoch"""
-        # FIXME: 2023-09-18 23:34:27
-        # this can become very expensive for many sweeps!
-        if len(self.epochs) == 0 or sweep == 0:
-            return self.dacHoldingLevel
-        
-        if self.returnToHold:
-            prevLevel = self.dacHoldingLevel
-            for s in range(sweep):
-                for e in self.epochs:
-                    prevLevel = self.getEpochAnalogWaveform(e, prevLevel, s, True)
-                    
-            return prevLevel
-        
-        return self.dacHoldingLevel
-    
-    def getPreviousSweepLastDigitalLevel(self, sweep:int, digChannel:int,
-                                         trainOFF, trainON, digOFF, digON) -> pq.Quantity:
-        if len(self.epochs) == 0 or sweep == 0:
-            return digOFF * pq.V
-        
-        if self.digitalUseLastEpochHolding:
-            prevLevel = digOFF * pq.V
-            for s in range(sweep):
-                for e in self.epochs:
-                    prevLevel = self.epochDigitalWaveform(e, trainOFF, trainON, digOFF, digON, sweep, digChannel,
-                                                          True)
-                    
-                return prevLevel
-            
-        return digOFF * pq.V
+#     def getPreviousSweepLastEpochLevel(self, sweep:int) -> pq.Quantity:
+#         """Final analog value in the previous epoch"""
+#         # FIXME: 2023-09-18 23:34:27
+#         # this can become very expensive for many sweeps!
+#         if len(self.epochs) == 0 or sweep == 0:
+#             return self.dacHoldingLevel
+#         
+#         if self.returnToHold:
+#             prevLevel = self.dacHoldingLevel
+#             for s in range(sweep):
+#                 for e in self.epochs:
+#                     prevLevel = self.getEpochAnalogWaveform(e, prevLevel, s, True)
+#                     
+#             return prevLevel
+#         
+#         return self.dacHoldingLevel
+#     
+#     def getPreviousSweepLastDigitalLevel(self, sweep:int, digChannel:int,
+#                                          trainOFF, trainON, digOFF, digON) -> pq.Quantity:
+#         if len(self.epochs) == 0 or sweep == 0:
+#             return digOFF * pq.V
+#         
+#         if self.digitalUseLastEpochHolding:
+#             prevLevel = digOFF * pq.V
+#             for s in range(sweep):
+#                 for e in self.epochs:
+#                     prevLevel = self.epochDigitalWaveform(e, trainOFF, trainON, digOFF, digON, sweep, digChannel,
+#                                                           True)
+#                     
+#                 return prevLevel
+#             
+#         return digOFF * pq.V
         
 #     def getEpochsForDigitalChannel(self, digChannel: int, sweep: int = 0, 
 #                                    indexes: bool=False, 
@@ -6013,109 +6365,109 @@ class ABFOutputConfiguration:
 #             return self.protocol.alternateDACOutputStateEnabled
 #         return False
         
-    def getAnalogWaveform(self, sweep:int=0) -> neo.AnalogSignal:
-        return self.getCommandWaveform(sweep)
-    
-    def getCommandWaveform(self, sweep:int=0) -> neo.AnalogSignal: 
-        """Generates an AnalogSignal representation of the command waveform.
-        
-        CAUTION: The 'sweep' parameter is only used to get the epoch parameter 
-        values where these values vary from one sweep to another ("Delta level" 
-        and "Delta duration"), and not to establish if the DAC would emit a 
-        waveform for that particular sweep or not. 
-    
-        Whether a DAC emits an analog wavefomr on a particular sweep is determined
-        entirely by the protocol. The DAC only does what its Epochs "tell" it to do.
-        The protocol "tells" the DAC to emit a wavefomr or not, depending on the
-        protocols' alternateDACOutputStateEnabled and on the sweep number!
-    
-        Therefore, the wavefomr returned here reflects sweep-specific state of 
-        the epoch parametrs, and nothing else.
-    
-    
-    
-    
-    The analog waveform returned here is the one generated by
-        the Epchs in the DAC regardless 
-     
-        NOTE: DAC command waveforms and digital outputs are enabled only in 
-        Episodic Stimulation type of experiments.
-     
-        """
-        if self.analogWaveformSource == ABFDACWaveformSource.none or not self.analogWaveformEnabled:
-            # return empty signal (containing np.nan)
-            return neo.AnalogSignal(np.full((self.protocol.sweepSampleCount, 1), np.nan),
-                                    units = self.units, t_start = 0*pq.s,
-                                    sampling_rate = self.samplingRate,
-                                    name = self.dacName)
-        
-        if self.analogWaveformSource == ABFDACWaveformSource.epochs:
-            if len(self.epochs) == 0:
-                return neo.AnalogSignal(np.full((self.protocol.sweepSampleCount, 1), float(holdingLevel)),
-                                        units = self.units, t_start = 0*pq.s,
-                                        sampling_rate = self.samplingRate,
-                                        name = self.dacName)
-            
-            if sweep > 0 and self.returnToHold:
-                # is the waveform of a subsequent sweep is sought, and returnToHold
-                # is True, then we need the level of the last epoch in the "previous"
-                # sweep
-                # previousLevel = self.epochs[-1].firstLevel + self.epochs[-1].deltaLevel * (sweep-1)
-                previousLevel = self.getPreviousSweepLastEpochLevel(sweep)
-            else:
-                previousLevel = self.dacHoldingLevel
-            
-            waveform = neo.AnalogSignal(np.full((self.protocol.sweepSampleCount, 1), float(previousLevel)),
-                                        units = self.units, t_start = 0*pq.s,
-                                        sampling_rate = self.samplingRate,
-                                        name = self.dacName)
-            
-            t0 = t1 = self.holdingTime.rescale(pq.s)
-            
-            for epoch in self.epochs:
-                actualDuration = epoch.firstDuration + sweep * epoch.deltaDuration
-                epochSamplesCount = scq.nSamples(actualDuration, self.samplingRate)
-                actualLevel = epoch.firstLevel + sweep * epoch.deltaLevel
-
-                t1 = t0 + actualDuration
-                tt = np.array([t0,t1])*pq.s
-                ndx = waveform.time_index(tt)
-                
-                wave = self.getEpochAnalogWaveform(epoch, previousLevel, sweep)
-                
-                waveform[ndx[0]:ndx[1],0] = wave
-                
-                previousLevel = actualLevel
-                t0 = t1
-                
-            if self.returnToHold:
-                waveform[ndx[1]:, 0] = previousLevel
-                
-        
-        else:
-            # TODO: 2023-09-18 15:44:03
-            # use waveform (stimulus) file
-            # for that, I need to modify axonrawio (or provide alternative) so 
-            # that the strings section is properly read and inserted into the 
-            # metadata / resulting neo.Block's annotations.
-            #
-            # a possible solution is to read the ABF file post-hoc using pyabf
-            # (called from a pictio function) and populate annotations there, 
-            # thus avoiding changes to neo stock code
-            #
-            # NOTE: 2023-09-21 00:44:48
-            # the above logic is now implemented in pictio
-            # TODO: 2023-09-21 00:45:03
-            # use that informaiton here (search under annotations["sections"]["StringsSection"]["IndexedStrings"])
-            warnings.warning(f"Command waveforms from external stimulus files are not yet supported", RuntimeWarning)
-            return neo.AnalogSignal(np.full((self.protocol.sweepSampleCount, 1), np.nan),
-                                    units = self.units, t_start = 0*pq.s,
-                                    sampling_rate = self.samplingRate,
-                                    name = self.dacName)
-        
-            
-                
-        return waveform
+#     def getAnalogWaveform(self, sweep:int=0) -> neo.AnalogSignal:
+#         return self.getCommandWaveform(sweep)
+#     
+#     def getCommandWaveform(self, sweep:int=0) -> neo.AnalogSignal: 
+#         """Generates an AnalogSignal representation of the command waveform.
+#         
+#         CAUTION: The 'sweep' parameter is only used to get the epoch parameter 
+#         values where these values vary from one sweep to another ("Delta level" 
+#         and "Delta duration"), and not to establish if the DAC would emit a 
+#         waveform for that particular sweep or not. 
+#     
+#         Whether a DAC emits an analog wavefomr on a particular sweep is determined
+#         entirely by the protocol. The DAC only does what its Epochs "tell" it to do.
+#         The protocol "tells" the DAC to emit a wavefomr or not, depending on the
+#         protocols' alternateDACOutputStateEnabled and on the sweep number!
+#     
+#         Therefore, the wavefomr returned here reflects sweep-specific state of 
+#         the epoch parametrs, and nothing else.
+#     
+#     
+#     
+#     
+#     The analog waveform returned here is the one generated by
+#         the Epchs in the DAC regardless 
+#      
+#         NOTE: DAC command waveforms and digital outputs are enabled only in 
+#         Episodic Stimulation type of experiments.
+#      
+#         """
+#         if self.analogWaveformSource == ABFDACWaveformSource.none or not self.analogWaveformEnabled:
+#             # return empty signal (containing np.nan)
+#             return neo.AnalogSignal(np.full((self.protocol.sweepSampleCount, 1), np.nan),
+#                                     units = self.units, t_start = 0*pq.s,
+#                                     sampling_rate = self.samplingRate,
+#                                     name = self.dacName)
+#         
+#         if self.analogWaveformSource == ABFDACWaveformSource.epochs:
+#             if len(self.epochs) == 0:
+#                 return neo.AnalogSignal(np.full((self.protocol.sweepSampleCount, 1), float(holdingLevel)),
+#                                         units = self.units, t_start = 0*pq.s,
+#                                         sampling_rate = self.samplingRate,
+#                                         name = self.dacName)
+#             
+#             if sweep > 0 and self.returnToHold:
+#                 # is the waveform of a subsequent sweep is sought, and returnToHold
+#                 # is True, then we need the level of the last epoch in the "previous"
+#                 # sweep
+#                 # previousLevel = self.epochs[-1].firstLevel + self.epochs[-1].deltaLevel * (sweep-1)
+#                 previousLevel = self.getPreviousSweepLastEpochLevel(sweep)
+#             else:
+#                 previousLevel = self.dacHoldingLevel
+#             
+#             waveform = neo.AnalogSignal(np.full((self.protocol.sweepSampleCount, 1), float(previousLevel)),
+#                                         units = self.units, t_start = 0*pq.s,
+#                                         sampling_rate = self.samplingRate,
+#                                         name = self.dacName)
+#             
+#             t0 = t1 = self.holdingTime.rescale(pq.s)
+#             
+#             for epoch in self.epochs:
+#                 actualDuration = epoch.firstDuration + sweep * epoch.deltaDuration
+#                 epochSamplesCount = scq.nSamples(actualDuration, self.samplingRate)
+#                 actualLevel = epoch.firstLevel + sweep * epoch.deltaLevel
+# 
+#                 t1 = t0 + actualDuration
+#                 tt = np.array([t0,t1])*pq.s
+#                 ndx = waveform.time_index(tt)
+#                 
+#                 wave = self.getEpochAnalogWaveform(epoch, previousLevel, sweep)
+#                 
+#                 waveform[ndx[0]:ndx[1],0] = wave
+#                 
+#                 previousLevel = actualLevel
+#                 t0 = t1
+#                 
+#             if self.returnToHold:
+#                 waveform[ndx[1]:, 0] = previousLevel
+#                 
+#         
+#         else:
+#             # TODO: 2023-09-18 15:44:03
+#             # use waveform (stimulus) file
+#             # for that, I need to modify axonrawio (or provide alternative) so 
+#             # that the strings section is properly read and inserted into the 
+#             # metadata / resulting neo.Block's annotations.
+#             #
+#             # a possible solution is to read the ABF file post-hoc using pyabf
+#             # (called from a pictio function) and populate annotations there, 
+#             # thus avoiding changes to neo stock code
+#             #
+#             # NOTE: 2023-09-21 00:44:48
+#             # the above logic is now implemented in pictio
+#             # TODO: 2023-09-21 00:45:03
+#             # use that informaiton here (search under annotations["sections"]["StringsSection"]["IndexedStrings"])
+#             warnings.warning(f"Command waveforms from external stimulus files are not yet supported", RuntimeWarning)
+#             return neo.AnalogSignal(np.full((self.protocol.sweepSampleCount, 1), np.nan),
+#                                     units = self.units, t_start = 0*pq.s,
+#                                     sampling_rate = self.samplingRate,
+#                                     name = self.dacName)
+#         
+#             
+#                 
+#         return waveform
     
 #     def getDigitalWaveform(self, sweep:int=0, 
 #                            digChannel:typing.Optional[typing.Union[int, typing.Sequence[int]]] = None,

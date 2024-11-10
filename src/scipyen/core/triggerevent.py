@@ -753,6 +753,24 @@ class DataMark(neo.Event):
         if isinstance(self, TriggerEvent):
             setattr(self, "__event_type__", getattr(other, "__event_type__", TriggerEventType.presynaptic))
         
+    @staticmethod
+    def defaultLabel(event_type):
+        if isinstance(event_type, str):
+            if event_type in MarkType.names():
+                event_type = MarkType.namevalue(event_type)
+            else:
+                return
+            
+        elif isinstance(event_type, int):
+            tt = tuple(t for t in MarkType.values() if event_type & t)
+            if len(tt):
+                event_type = tt[0]
+            else:
+                return
+            
+        if isinstance(event_type, MarkType):
+            return event_type.name
+
     def duplicate_with_new_data(self, times, labels=None, units=None):
         '''
         Create a new object with the same metadata but different data
@@ -1044,11 +1062,8 @@ class DataMark(neo.Event):
     
     @type.setter
     def type(self, value):
-        if isinstance(self, TriggerEvent) and  not isinstance(value, TriggerEventType):
-            raise TypeError("Expecting a TriggerEventType enum value; got %s instead" % type(value).__name__)
-        
-        elif not isinstance(value, MarkType):
-            raise TypeError("Expecting a MarkType enum value; got %s instead" % type(value).__name__)
+        if not isinstance(value, (MarkType, TriggerEventType)):
+            raise TypeError("Expecting a MarkType or TriggerEventType enum value; got %s instead" % type(value).__name__)
         
         self.__mark_type__ = value
 
@@ -1141,7 +1156,20 @@ class TriggerEvent(DataMark):
     #equal_nan = True
     
     @staticmethod
-    def defaultLabel(event_type):
+    def defaultLabel(event_type:typing.Union[int,str,TriggerEventType, MarkType]):
+        if isinstance(event_type, str):
+            if event_type in TriggerEventType.names():
+                event_type = TriggerEventType.namevalue(event_type)
+            else:
+                return
+                
+        elif isinstance(event_type, int):
+            tt = tuple(t for t in TriggerEventType.values() if event_type & t)
+            if len(tt):
+                event_type = tt[0]
+            else:
+                return
+        
         if event_type & TriggerEventType.presynaptic:
             return "epsp"
         
