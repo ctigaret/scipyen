@@ -76,30 +76,31 @@ class MarkType(TypeEnum):
     """
     # TODO 2024-11-12 18:58:21
     # refine this !
-    up          = 1 # "upward" deflection (step)
-    down        = 2 # "downward" deflection (step)
+    up          = 1 # "upward" deflection (step, edge)
+    down        = 2 # "downward" deflection (step, edge)
     pulse       = up | down         # = 3 = down | up: sequence of two steps in opposite direction
-    ppulse      = pulse | up        # = 4: "positive" pulse, first step upward
-    npulse      = pulse | down      # = 5: "negative" pulse, first step downward
-    bipulse     = pulse | pulse     # = 6: sequence of two pulses in opposite direction (biphasic)
+    # ppulse      = pulse | up        # = 4: "positive" pulse, first step upward
+    # npulse      = pulse | down      # = 5: "negative" pulse, first step downward
+    # bipulse     = pulse | pulse     # = 6: sequence of two pulses in opposite direction (biphasic)
+    bipulse     = 4                   # = 4: sequence of two pulses in opposite direction (biphasic)
     pbip        = bipulse | up      # = 7: biphasic, first pulse positive
     nbip        = bipulse | down    # = 8: biphasic, first pulse negative
-    slope       = 16                # upward -> positive; downward -> negative
+    slope       = 8                 # upward -> positive; downward -> negative
     angle       = slope
-    pslope      = slope | up        # = 17: "positive" angle (CCW on unit circle)
-    pangle      = pslope
-    nslope      = slope | down      # = 18: "negative" angle (CW on unit circle)
-    nangle      = nslope      
-    triangle    = pslope | nslope   # = 35: sequence of two slopes in opposite directions; can be asymmetric
-    peak        = triangle | up     # = 36: triangle, first slope up
-    trough      = triangle | down   # = 37: triangle, first slope down
-    train       = 128               # train of events:
-    wave        = 256 # cosine wave
+    pslope      = slope | up        # = 9: "positive" angle (CCW on unit circle)
+    # pangle      = pslope
+    nslope      = slope | down      # = 10: "negative" angle (CW on unit circle)
+    # nangle      = nslope      
+    triangle    = 16                # = 32: sequence of two slopes in opposite directions; can be asymmetric
+    peak        = triangle | up     # = 17: triangle, first slope up
+    trough      = triangle | down   # = 18: triangle, first slope down
+    train       = 32               # train of events:
+    wave        = 64 # cosine wave
     uchirp      = wave | up         # = 257: wave of increasing frequency: up-chirp
     dchirp      = wave | down       # = 258: wave of decreasing frequency: down-chirp
     
-    user        = 512
-    place       = up | down | edge | angle | trough | peak | user
+    user        = 128
+    place       = up | down | pulse | bipulse | pbip | nbip | slope | pslope | nslope | triangle | peak | trough | wave | uchirp | dchirp | user
     
     
 
