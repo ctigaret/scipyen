@@ -71,7 +71,6 @@ def get_wm():
             wm = inxiout.get("wm", None)
             
             return wm
-            
 
 def get_desktop(what:str="desktop"):
     """Somewhat redundant to get_wm()

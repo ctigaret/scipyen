@@ -177,7 +177,7 @@ def is_path(s:str) -> bool:
     return isinstance(s, str) and any(c in s for c in (os.sep, os.pathsep, ";", "\\"))
     
 def str2range(s:str) -> range:
-    """Parses the stirng representation of a range into a range object"""
+    """Parses the string representation of a range into a range object"""
     parts = list(int(s_) for s_ in s.split(":"))
     if len(parts) <= 3:
         return range(*parts)
@@ -186,7 +186,7 @@ def str2range(s:str) -> range:
     
 def is_pathname_valid(pathname: str) -> bool:
     '''
-    `True` if the passed pathname is a valid pathname for the current OS;
+    `True` if 'pathname' is a valid pathname regardless of the current OS;
     `False` otherwise.
     
     See:
@@ -203,7 +203,7 @@ def is_pathname_valid(pathname: str) -> bool:
     # If this pathname is either not a string or is but is empty, this pathname
     # is invalid.
     try:
-        if not isinstance(pathname, str) or not pathname:
+        if not (isinstance(pathname, str) and len(pathname.strip)>0) or not pathname:
             return False
 
         # Strip this pathname's Windows-specific drive specifier (e.g., `C:\`)
@@ -263,7 +263,7 @@ def is_pathname_valid(pathname: str) -> bool:
     # (e.g., a bug). Permit this exception to unwind the call stack.
     #
     # Did we mention this should be shipped with Python already?
-
+    
 def get_int_sfx(s:str, sep:str = "_", use_re:bool=False) -> typing.Tuple[str, int]:
     """Parses an integral suffix from the string.
     

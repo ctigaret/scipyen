@@ -489,7 +489,7 @@ from collections import namedtuple
 
 from core import quantities as scq
 from core import datatypes, strutils, utilities
-from core.triggerevent import (TriggerEvent, TriggerEventType, MarkType)
+from core.triggerevent import (DataMark, TriggerEvent, TriggerEventType, MarkType)
 from core.triggerprotocols import TriggerProtocol
 from core.prog import scipywarn
 from ephys.ephys_protocol import ElectrophysiologyProtocol
@@ -3042,7 +3042,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
     def getDigitalTriggers(self, sweep:int = 0,
                     dac:typing.Optional[typing.Union[ABFOutputConfiguration, int, str]]=None,
                     digChannel:typing.Optional[typing.Union[int, typing.Sequence[int]]] = None,
-                    byDigIndex:bool=False,
+                    byDIGIndex:bool=False,
                     relativeToRunStart:typing.Optional[bool]=True,
                     useHoldingTime:bool=True) -> typing.Sequence:
         """Trigger events emitted by the epochs in this DAC.
@@ -3069,7 +3069,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
             or None (default) in which case the method returns a TriggerEvent
             for each DIG channel used to send TTLs
         
-        byDigIndex: flag indicating whether the TriggerEvent objects should be
+        byDIGIndex: flag indicating whether the TriggerEvent objects should be
             packed in a mapping according to the index iof the DIG channel that
             emits them. Default is False
         
@@ -3179,7 +3179,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
             if digChannel not in usedDigs:
                 # none opf the specified digChannels is in use => return 
                 # empty trigger event or None
-                return TriggerEvent(event_type = eventType, name=name, labels = label) if enableEmptyEvent else None
+                return TriggerEvent(event_type = eventType, name=name, labels = label) # if enableEmptyEvent else None
             
             digChannel = (digChannel,)
             
@@ -3204,7 +3204,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
                 continue
             # collect as mapping DIG index ↦ trigger event for all non-empty trigger events
             # in the epoch
-            epoch_triggers = dict(filter(lambda x: len(x[1]), map(lambda x: (x, self.getEpochDigitalTriggers(epoch, sweep, myDac,digChannel=x)), digChannel)))
+            epoch_triggers = dict(filter(lambda x: len(x[1]), map(lambda x: (x, self.getEpochDigitalTriggers(epoch, sweep, myDac, digChannel=x)), digChannel)))
             
             # if DIG index in triggers, then "concatenate"; else, just enter in triggers
             
@@ -3224,7 +3224,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
                     new_labels = np.hstack((triggers[digIndex].labels, epoch_trigger.labels))
                     triggers[digIndex] = TriggerEvent(new_times, units = time_units, labels=new_labels, name = triggers[digIndex].name)
                     
-        if byDigIndex:
+        if byDIGIndex:
             return triggers
         else:
             triggers = tuple(triggers.values())
@@ -3235,7 +3235,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
     def getEpochsTable(self, sweep:int = 0, /,
                        dac:typing.Optional[typing.Union[ABFOutputConfiguration, int, str]]=None,
                        includeDigitalPattern:bool=True) -> pd.DataFrame:
-        """Returns the table of ABFEpochs defined for a specific DAC.
+        """Returns the Epochs Description table for a specific DAC.
         
         Parameters:
         ----------
@@ -4058,6 +4058,119 @@ class ABFProtocol(ElectrophysiologyProtocol):
                 ret.segments.append(segment)
             
         return ret
+    
+    def getCommandEvents(self, sweep:int = 0,
+                         dac:typing.Optional[typing.Union[ABFOutputConfiguration, int, str]]=None,
+                         ignoreIsWaveformEnabled:bool=False,
+                         relativeToRunStart:typing.Optional[bool]=True,
+                         useHoldingTime:bool=True):
+        if sweep not in range(self.nSweeps):
+            raise ValueError(f"Invalid sweep index {sweep} for {self.nSweeps} sweeps")
+        
+        actualOutput = dac is None
+            
+        dac, _ = self._check_DAC_Epoch_(dac, None)
+        
+        analogDACs = tuple(d for d in self.DACs if d.analogWaveformEnabled)
+        
+        if len(analogDACs) == 0:
+            return DataMark() # if enableEmptyEvent else None
+        
+        # NOTE: 2024-11-12 11:42:09
+        # code below applies the logic in getCommandWaveform
+        #
+        if actualOutput:
+            if self.alternateWaveformsEnabled:
+                if sweep % 2 == 0:
+                    return self.getDACAnalogEvents(analogDACs[0], sweep)
+                else:
+                    if len(analogDACs) > 1:
+                        return self.getDACAnalogEvents(analogDACs[1], sweep)
+                    else:
+                        return DataMark()
+            else:
+                return tuple(self.getDACAnalogEvents(d, sweep), analogDACs)
+            
+        else:
+            if self.alternateWaveformsEnabled:
+                dNdx = tuple(d.physicalIndex for d in analogDACs)
+                if dac.physicalIndex not in dNdx:
+                    # dac not found in analog DACs
+                    return DataMark()
+                
+                # Find out where if this dac's physical index is among analogDACs.
+                dacNdx = dNdx.index(dac.physicalIndex)
+                if dacNdx == 0:
+                    # this DAC has the lowest physical index => emit waveform
+                    # if sweep is even, else emit empty waveform
+                    if sweep % 2 == 0:
+                        return self.getDACAnalogEvents(dac, sweep)
+                    else:
+                        return DataMark()
+
+                elif dacNdx == 1:
+                    # this DAC is the next highest => emit waveform if the 
+                    # sweep is odd else emit empty waveform
+                    if sweep % 2 == 1:
+                        return self.getDACAnalogEvents(dac, sweep)
+                    else:
+                        return DataMark()
+                        
+                else:
+                    # in case there are multiple analog emitting DACs, and
+                    # this DAC has a higher index than the first two => 
+                    # return empty wave:
+                    return neo.AnalogSignal(np.full((self.sweepSampleCount, 1), dac.dacHoldingLevel),
+                                            units = dac.units, t_start = 0*pq.s,
+                                            sampling_rate = self.samplingRate,
+                                            name = dac.name)
+            else:
+                # return self.getDACCommandWaveform(dac, sweep)
+                if ignoreIsWaveformEnabled:
+                    return self.getDACAnalogEvents(dac, sweep)
+                else:
+                    if dac.analogWaveformEnabled:
+                        return self.getDACAnalogEvents(dac, sweep)
+                    
+                    return DataMark()
+                
+    def getDACAnalogEvents(self, dac, sweep):
+        dac, _ = self._check_DAC_Epoch_(dac, None)
+        
+        t0 = t1 = self.holdingTime.rescale(pq.s)
+            
+        if dac.analogWaveformSource == ABFDACWaveformSource.epochs:
+            for epoch in dac.epochs:
+                actualDuration = epoch.firstDuration + sweep * epoch.deltaDuration
+                # actualLevel = epoch.firstLevel + sweep * epoch.deltaLevel
+                t1 = t0 + actualDuration
+                tt = np.array([t0,t1])*pq.s
+                ndx = waveform.time_index(tt)
+                
+                events = self.getDACAnalogEvents(epoch, previousLevel, sweep,
+                                                   dac, lastLevelOnly=False,
+                                                   returnLevels=True)
+                # TODO: 2024-11-12 13:02:16
+                # now, "concatenate" the events
+                t0=t1
+                
+        else:
+            # TODO: 2024-11-12 13:03:03
+            # just use the time stamps already present in the external stimulus 
+            # file
+            scipywarn(f"Waveform source {myDac.analogWaveformSource} are not yet supported")
+            
+            
+        if dac.returnToHold:
+            waveform[ndx[1]:,0] = previousLevel
+            
+        return waveform
+        
+        pass
+        
+    def getEpochAnalogEvent(self,):
+        pass
+        
             
     def getAnalogWaveform(self, sweep:int=0, 
                           dac:typing.Optional[typing.Union[ABFOutputConfiguration, int, str]]=None,
@@ -4266,6 +4379,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
         durations and levels of the Epochs defined for the DAC.
         
         """
+        from iolib import pictio as pio
+        
         dac, _ = self._check_DAC_Epoch_(dac, None)
         if sweep > 0 and dac.returnToHold:
             previousLevel = self.getPreviousSweepLastEpochLevel(dac,sweep)
@@ -4295,7 +4410,25 @@ class ABFProtocol(ElectrophysiologyProtocol):
                 t0=t1
                 
         else:
-            scipywarn(f"Waveform source {myDac.analogWaveformSource} are not yet supported")
+            stimData = None
+            if len(myDac.stimulusFile.strip()):
+                try:
+                    stimData = pio.loadFile(myDac.stimulusFile)
+                except:
+                    scipywarn(f"Simulus file DAC#{myDac.physicalIndex} ({myDac.name}) is not valid for {sys.platform} platform")
+                    if askForStimFile:
+                        # TODO: 2024-11-12 16:25:17 
+                        # bring up file open dialog
+                        pass
+                    return waveform
+            else:
+                scipywarn(f"DAC#{myDac.physicalIndex} ({myDac.name}) is configured to use a waveform source {myDac.analogWaveformSource} but the stimulus file is not defined")
+                return waveform
+            
+            if isinstance(stimData, neo.Block):
+                # TODO: 2024-11-12 16:26:31
+                # ask for sweep # and signal # in the stimulus file
+                pass
             
             
         if dac.returnToHold:
@@ -4847,7 +4980,8 @@ class ABFOutputConfiguration:
                  interEpisodeLevel:bool = True,
                  waveFormEnabled:bool=False,
                  waveFormSource:typing.Optional[typing.Union[ABFDACWaveformSource, int]] = None,
-                 epochs:typing.Optional[typing.Sequence[ABFEpoch]] = None
+                 epochs:typing.Optional[typing.Sequence[ABFEpoch]] = None,
+                 stimulusFile:typing.Optional[typing.Union[str, pathlib.Path]] = None
                  ):
         
         self._epochs_ = list()
@@ -4865,8 +4999,12 @@ class ABFOutputConfiguration:
                         logical = obj._dacSection.nDACNum.index(dacChannel)
                         self._dacChannel_ = logical
                         
-                        dacName = obj._stringsSection._indexedStrings[obj._dacSection.lDACChannelNameIndex[self._dacChannel_]]
-                        dacUnits = obj._stringsSection._indexedStrings[obj._dacSection.lDACChannelUnitsIndex[self._dacChannel_]]
+                        dacName = obj._stringsSection._indexedStrings[obj._dacSection.lDACChannelNameIndex[self._physicalChannelIndex_]]
+                        dacUnits = obj._stringsSection._indexedStrings[obj._dacSection.lDACChannelUnitsIndex[self._physicalChannelIndex_]]
+                        dacStimFile = obj._stringsSection._indexedStrings[obj._dacSection.lDACFilePathIndex[self._physicalChannelIndex_]]
+                        # dacName = obj._stringsSection._indexedStrings[obj._dacSection.lDACChannelNameIndex[self._dacChannel_]]
+                        # dacUnits = obj._stringsSection._indexedStrings[obj._dacSection.lDACChannelUnitsIndex[self._dacChannel_]]
+                        # dacStimFile = obj._stringsSection._indexedStrings[obj._dacSection.lDACFilePathIndex[self._dacChannel_]]
                         
                     else:
                         raise ValueError(f"Invalid physical DAC channel index specified ({dacChannel}) for physical DAC channels {obj._dacSection.nDACNum}")
@@ -4875,8 +5013,9 @@ class ABFOutputConfiguration:
                     if dacChannel in range(len(obj._dacSection.nDACNum)):
                         self._dacChannel_ = dacChannel
                         self._physicalChannelIndex_ = obj._dacSection.nDACNum[dacChannel]
-                        dacName = obj._stringsSection._indexedStrings[obj._dacSection.lDACChannelNameIndex[self._dacChannel_]]
-                        dacUnits = obj._stringsSection._indexedStrings[obj._dacSection.lDACChannelUnitsIndex[self._dacChannel_]]
+                        dacName = obj._stringsSection._indexedStrings[obj._dacSection.lDACChannelNameIndex[self._physicalChannelIndex_]]
+                        dacUnits = obj._stringsSection._indexedStrings[obj._dacSection.lDACChannelUnitsIndex[self._physicalChannelIndex_]]
+                        dacStimFile = obj._stringsSection._indexedStrings[obj._dacSection.lDACFilePathIndex[self._physicalChannelIndex_]]
                         
                     else:
                         raise ValueError(f"Invalid logical DAC channel index specified {dacChannel} for {len(obj._dacSection.nDACNum)} channels")
@@ -4884,9 +5023,11 @@ class ABFOutputConfiguration:
                         self._physicalChannelIndex_ = None
                         dacName =""
                         dacUnits = ""
+                        dacStimFile = ""
                 
                 self._dacName_ = dacName 
                 self._dacUnits_ = scq.unitQuantityFromNameOrSymbol(dacUnits)
+                self._dacStimulusFile_ = dacStimFile
                 self._dacHoldingLevel_ = float(obj._dacSection.fDACHoldingLevel[self._dacChannel_]) * self._dacUnits_
                 self._interEpisodeLevel_ = bool(obj._dacSection.nInterEpisodeLevel[self._dacChannel_])
                 
@@ -4899,7 +5040,7 @@ class ABFOutputConfiguration:
                     self._waveformSource_ = ABFDACWaveformSource.type(wsrc)
                 else:
                     self._waveformSource_ = ABFDACWaveformSource.none
-                
+                    
                 # # digital (TTL) waveform flags & parameters:
                 # NOTE 2023-10-17 17:31:40 FIXME
                 # not sure this is the correct approach
@@ -4919,13 +5060,17 @@ class ABFOutputConfiguration:
                     self._physicalChannelIndex_ = dacChannel
                     logical = p.index(dacChannel)
                     self._dacChannel_ = logical
-                    dacName = info_dict["listDACInfo"][logical]["DACChNames"].decode()
-                    dacUnits = info_dict["listDACInfo"][logical]["DACChUnits"].decode()
+                    dacName = info_dict["listDACInfo"][self._physicalChannelIndex_]["DACChNames"].decode()
+                    dacUnits = info_dict["listDACInfo"][self._physicalChannelIndex_]["DACChUnits"].decode()
+                    dacStimFile = info_dict["sections"]["StringsSection"]["IndexedStrings"][info_dict["listDACInfo"][self._physicalChannelIndex_]["lDACFilePathIndex"]]
+                    # dacName = info_dict["listDACInfo"][logical]["DACChNames"].decode()
+                    # dacUnits = info_dict["listDACInfo"][logical]["DACChUnits"].decode()
                 else:
                     self._physicalChannelIndex_ = None
                     self._dacChannel_ = None
                     dacName = ""
                     dacUnits = ""
+                    dacStimFile = ""
                     
             else: # specify via its logical index
                 if dacChannel in range(len(info_dict["listDACInfo"])):
@@ -4933,14 +5078,17 @@ class ABFOutputConfiguration:
                     self._physicalChannelIndex_ = info_dict["listDACInfo"][dacChannel]["nDACNum"]
                     dacName = info_dict["listDACInfo"][dacChannel]["DACChNames"].decode()
                     dacUnits = info_dict["listDACInfo"][dacChannel]["DACChUnits"].decode()
+                    dacStimFile = info_dict["sections"]["StringsSection"]["IndexedStrings"][info_dict["listDACInfo"][self._physicalChannelIndex_]["lDACFilePathIndex"]]
                 else:
                     self._physicalChannelIndex_ = None
                     self._dacChannel_ = None
                     dacName = ""
                     dacUnits = ""
+                    dacStimFile = ""
                     
             self._dacName_ = dacName
             self._dacUnits_ = scq.unitQuantityFromNameOrSymbol(dacUnits)
+            self._dacStimulusFile_ = dacStimFile
 
             self._dacHoldingLevel_ = float(info_dict["listDACInfo"][self._dacChannel_]["fDACHoldingLevel"]) * self._dacUnits_
             self._interEpisodeLevel_ = bool(info_dict["listDACInfo"][self._dacChannel_]["nInterEpisodeLevel"])
@@ -5029,10 +5177,12 @@ class ABFOutputConfiguration:
             else:
                 self._waveformSource_ = ABFDACWaveformSource.none
                 
+            if isinstance(stimulusFile, str):
+                self._dacStimulusFile_ = stimulusFile
+                
             # print(f"\tepochs: {epochs}")
             if isinstance(epochs, (tuple, list)) and all(isinstance(e, ABFEpoch) for e in epochs):
                 self._epochs_ = epochs
-                
             
     def __repr__(self):
         return f"{self.__class__.__name__} ({super().__repr__()}): \'{self.name}\' (\'{scq.shortSymbol(self.units)}\') at index {self.physicalIndex} ↔ {self.logicalIndex}  (physical ↔ logical)"
@@ -6351,6 +6501,14 @@ class ABFOutputConfiguration:
             self._waveformSource_ = val
         else:
             self._waveformSource_ = ABFDACWaveformSource.none
+            
+    @property
+    def stimulusFile(self) -> str:
+        return self._dacStimulusFile_
+    
+    @stimulusFile.setter
+    def stimulusFile(self, val:str):
+        self._dacStimulusFile_ = val
     
     # @property
     # def isactiveDACChannel(self) -> bool:
