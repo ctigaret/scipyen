@@ -72,16 +72,34 @@ def _new_TriggerEvent(cls, times = None, labels=None, units=None, name=None,
     return e
     
 class MarkType(TypeEnum):
-    """Some standard data mark types
+    """Some useful data mark types
     """
-    up      =  1 # step up
-    down    =  2 # step down
-    edge    =  4
-    angle   =  8
-    trough  = 16
-    peak    = 32
-    user    = 64
-    place   = up | down | edge | angle | trough | peak | user
+    # TODO 2024-11-12 18:58:21
+    # refine this !
+    up          = 1 # "upward" deflection (step)
+    down        = 2 # "downward" deflection (step)
+    pulse       = up | down         # = 3 = down | up: sequence of two steps in opposite direction
+    ppulse      = pulse | up        # = 4: "positive" pulse, first step upward
+    npulse      = pulse | down      # = 5: "negative" pulse, first step downward
+    bipulse     = pulse | pulse     # = 6: sequence of two pulses in opposite direction (biphasic)
+    pbip        = bipulse | up      # = 7: biphasic, first pulse positive
+    nbip        = bipulse | down    # = 8: biphasic, first pulse negative
+    slope       = 16                # upward -> positive; downward -> negative
+    angle       = slope
+    pslope      = slope | up        # = 17: "positive" angle (CCW on unit circle)
+    pangle      = pslope
+    nslope      = slope | down      # = 18: "negative" angle (CW on unit circle)
+    nangle      = nslope      
+    triangle    = pslope | nslope   # = 35: sequence of two slopes in opposite directions; can be asymmetric
+    peak        = triangle | up     # = 36: triangle, first slope up
+    trough      = triangle | down   # = 37: triangle, first slope down
+    train       = 128               # train of events:
+    wave        = 256 # cosine wave
+    uchirp      = wave | up         # = 257: wave of increasing frequency: up-chirp
+    dchirp      = wave | down       # = 258: wave of decreasing frequency: down-chirp
+    
+    user        = 512
+    place       = up | down | edge | angle | trough | peak | user
     
     
 

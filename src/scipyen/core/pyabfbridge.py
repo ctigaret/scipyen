@@ -4147,7 +4147,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
                 tt = np.array([t0,t1])*pq.s
                 ndx = waveform.time_index(tt)
                 
-                events = self.getDACAnalogEvents(epoch, previousLevel, sweep,
+                events = self.getEpochAnalogEvent(epoch, previousLevel, sweep,
                                                    dac, lastLevelOnly=False,
                                                    returnLevels=True)
                 # TODO: 2024-11-12 13:02:16
@@ -4161,14 +4161,37 @@ class ABFProtocol(ElectrophysiologyProtocol):
             scipywarn(f"Waveform source {myDac.analogWaveformSource} are not yet supported")
             
             
-        if dac.returnToHold:
-            waveform[ndx[1]:,0] = previousLevel
-            
-        return waveform
+#         if dac.returnToHold:
+#             waveform[ndx[1]:,0] = previousLevel
+#             
+#         return waveform
         
         pass
         
-    def getEpochAnalogEvent(self,):
+    def getEpochAnalogEvent(self, epoch:typing.Union[ABFEpoch, str, int],
+                            sweep:int = 0,
+                            dac:typing.Optional[typing.Union[ABFOutputConfiguration,str, int]] = None,
+                            collapse:bool=False):
+        if sweep not in range(self.nSweeps):
+            raise ValueError(f"Invalid sweep index {sweep} for {self.nSweeps} sweeps")
+        
+        actualOutput = dac is None
+        
+        dac, epoch = self._check_DAC_Epoch_(dac, epoch)
+
+        actualDuration = epoch.firstDuration + sweep * epoch.deltaDuration
+        epochSamplesCount = scq.nSamples(actualDuration, self.samplingRate)
+        actualLevel = epoch.firstLevel + sweep * epoch.deltaLevel
+        
+        if epoch.type == ABFEpochType.Step:
+            if collapse:
+                markType = MarkType.ppulse if actualLevel > epoch.firstLevel else MarkType.npulse if actualLevel < epoch.firstLevel else MarkType.step # (undetermined)
+            else:
+                # report as TWO events ()
+                markType0 = MarkType.pedge if actualLevel > epoch.firstLevel else MarkType.nedge if actualLevel < epoch.firstLevel else MarkType.edge # (undetermined)
+                markType1 = MarkType.nedge if actualLevel > epoch.firstLevel else MarkType.pedge if actualLevel < epoch.firstLevel else MarkType.edge # (undetermined)
+        
+      
         pass
         
             
@@ -4427,9 +4450,17 @@ class ABFProtocol(ElectrophysiologyProtocol):
             
             if isinstance(stimData, neo.Block):
                 # TODO: 2024-11-12 16:26:31
-                # ask for sweep # and signal # in the stimulus file
-                pass
-            
+                # ask for sweep and signal indexes in the stimulus file
+                # 
+                segNdx = 0
+                sigNdx = 0
+                if segNdx < len(stimData.segments):
+                    seg = stimData.segments[segNdx]
+                    if sigNdx < len(seg.analogsignals):
+                        return seg.analogsignals[sigNdx]
+                #     return waveform
+                # return waveform
+            return waveform
             
         if dac.returnToHold:
             waveform[ndx[1]:,0] = previousLevel
