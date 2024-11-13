@@ -133,7 +133,7 @@ from neo.core.dataobject import ArrayDict
 
 from . import jsonio # brings the CustomEncoder type and the decode_hook function
 import core
-from core.prog import (safeWrapper, signature2Dict, 
+from core.prog import (safeWrapper, signature2Dict, printStyled,
                        parse_module_class_path, get_loaded_module)
 from core import prog
 from core.traitcontainers import DataBag
@@ -1051,7 +1051,7 @@ def group2neoDataObject(g:h5py.Group, target_class:type, cache:dict = {}):
     ax0["t_start"]              = 0.*pq.s
     ax0["t_stop"]               = None
     ax0["sampling_rate"]        = 1.*pq.Hz
-    ax0["left_sweep"]           = None
+    # ax0["left_sweep"]           = None
     ax0["time_units"]           = pq.s
     ax0["units"]                = pq.s
     ax0["dtype"]                = np.dtype(float)
@@ -1130,7 +1130,7 @@ def group2neoDataObject(g:h5py.Group, target_class:type, cache:dict = {}):
                 ax0["t_stop"]               = ax0attrs.get("end", None)
                 ax0["t_start"]              = ax0attrs.get("origin", 0.*ax0["units"])
                 ax0["sampling_rate"]        = ax0attrs.get("sampling_rate", 1.*pq.Hz)
-                ax0["left_sweep"]           = ax0attrs.get("left_sweep", None)
+                # ax0["left_sweep"]           = ax0attrs.get("left_sweep", None)
                 ax0["dtype"]                = ax0attrs.get("dtype", np.dtype(float))
                 ax0["time_dtype"]           = ax0attrs.get("time_dtype", np.dtype(float))
                 ax0["time_units"]           = ax0attrs.get("time_units", pq.s)
@@ -1152,19 +1152,30 @@ def group2neoDataObject(g:h5py.Group, target_class:type, cache:dict = {}):
         else:
             waveforms = None
             
+        left_sweep_set_name = f"{g.name.split('/')[-1]}_left_sweep"
+        left_sweep_set = g[left_sweep_set_name] if left_sweep_set_name in g else None
+        
+        if isinstance(left_sweep_set, h5py.Dataset):
+            left_sweeps = np.array(left_sweep_set)
+        else:
+            left_sweeps = None
+            
         t_start       = ax0["t_start"]
         t_stop        = ax0["t_stop"]
         time_units    = ax0["time_units"]
         sampling_rate = ax0["sampling_rate"]
-        left_sweep    = ax0["left_sweep"]
+        # left_sweep    = ax0["left_sweep"]
         units         = ax0["units"]
         dtype         = ax0["dtype"]
         # time_dtype    = ax0["time_dtype"] # not needed
             
         obj = target_class(times, t_start = ax0["t_start"], t_stop = ax0["t_stop"],
                            sampling_rate = ax0["sampling_rate"], 
-                           left_sweep = ax0["left_sweep"],
-                           units = ax0["units"], dtype = ax0["dtype"])
+                           units = ax0["units"], dtype = ax0["dtype"],
+                           # left_sweep = ax0["left_sweep"],
+                           waveforms = waveforms,
+                           left_sweep = left_sweep,
+                           )
         
         for k,v in rec_attrs.items():
             setattr(obj, k, v)
@@ -1274,6 +1285,7 @@ def group2neo(g:h5py.Group, target_class:type, cache:dict = {}):
         ∘ neo.core.basesignal.BaseSignal (neo.AnalogSignal, neo.IrregularlySampledSignal, 
                                           DataSignal, IrregularlySampledDataSignal)
         ∘ neo.Event, neo.Epoch, DataMark, TriggerEvent, DataZone
+        ∘ neo.SpikeTrain
         
     • neo.ChannelView
     
@@ -2569,7 +2581,7 @@ def toHDF5(obj, group:h5py.Group, name:typing.Optional[str]=None,
         stored as a Group containing at least two Dataset objects:
         1. a Dataset that stores the main data  
         2. a Dataset for each axis, that stores the information for the 
-        correspondong array axis.
+        corresponding array axis.
       
         The main data set stores the (typically, numeric) array data of the 
         object.
@@ -2659,6 +2671,7 @@ def toHDF5(obj, group:h5py.Group, name:typing.Optional[str]=None,
         
         return entity
     
+    #  NOTE: actual object encoding starts here
     if isinstance(obj, (vigra.filters.Kernel1D, vigra.filters.Kernel2D)):
         # vigra Kernel types → straight to HDF5 Dataset child of group
         # TODO: 2022-10-09 23:29:28
@@ -2748,6 +2761,8 @@ def toHDF5(obj, group:h5py.Group, name:typing.Optional[str]=None,
         # for vigra.VigraArray and neo.core.dataobject.DataObject objects !!!
         # see single dispatched versions of makeDataset
         # 
+        # the array data is actually encoded as a Dataset in this group
+        #
         # makeHDF5Dataset populates 'entity' (here, a Group) with a Dataset
         # and returns the Dataset.
         #
@@ -2900,7 +2915,9 @@ def makeHDF5Dataset(obj, group: h5py.Group, name:typing.Optional[str]=None,
                             track_order = track_order, entity_cache = entity_cache)
         return dset
     except:
-        print(f"makeHDF5Dataset offending object: {obj} (type: {type(obj)}) for target name {target_name}")
+        msg = printStyled(f"makeHDF5Dataset offending object: {obj} (type: {type(obj)}) for target name {target_name}",
+                          color="red", bright=True)
+        print(f"{msg}")
         raise
         
 
@@ -2963,7 +2980,9 @@ def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
                                         track_order=track_order)
             
     except:
-        print(f"makeDataset<str> offending object: {obj} (len: {len(obj)})")
+        msg = printStyled(f"makeDataset<str> offending object: {obj} (len: {len(obj)})",
+                          color="red", bright=True)
+        print(f"{msg}")
         raise
             
     dset.attrs.update(attrs)
@@ -2999,7 +3018,9 @@ def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
                                         chunks = chunks, track_order=track_order)
         
     except:
-        print(f"makeDataset<{type(obj).__name__}> offending object: {obj} (len: {len(obj)}) converted to {data}")
+        msg = printStyled(f"makeDataset<{type(obj).__name__}> offending object: {obj} (len: {len(obj)}) converted to {data}", 
+                          color="red", bright=True)
+        print(f"{msg}")
         try:
             data = np.array(obj.hex(), dtype=h5py.string_dtype())
             if data.size == 0:
@@ -3117,6 +3138,11 @@ def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
     # 2.1 populate axes child group with axis Datasets and use these as axis 
     # scales attached to the data Dataset child created in 1. above
     
+    # NOTE 2024-11-13 17:32:17 
+    # this approach is no OK for neo.SpikeTrain, where two additional datasets
+    # are associated with the time stamps: the "waveforms" and the "left_sweep" 
+    # arrays; only one of them can be attached as axis scales
+    
     for k in range(obj.ndim):
         makeAxisScale(obj, dset, axgroup, k, compression=compression,
                       chunks=chunks, track_order=track_order)
@@ -3150,12 +3176,15 @@ def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
     # waveforms of the neo.SpikeTrain objects should go into the main data object
     # group
     #
+    # NOTE 2024-11-13 17:49:51 and left_sweep too!
+    #
     # NOTE: 2022-10-05 23:29:51
     # since just before neo 0.11.0 SpikeTrain also have a "left_sweep" attribute
     # which is taken care of by makeAxisScale/makeNeoDataAxisDict above (1.)
-    # NOTE: 2024-11-13 15:43:21 UPDATE
-    # the left_sweep is actually an narrat therefoeew it cannot be made into
-    # So, just  make sure thee are NOT also accessed by makeDataTypeAttrs
+    # NOTE: 2024-11-13 17:50:46 this is wrong, one cannot attach two scales
+    # to the same axis! The "waveforms" and "left_sweep" must be stored as 
+    # separate datasets next to the main data set for the spike train
+    # 
     waveforms = getattr(obj, "waveforms", None)
     if isinstance(waveforms, np.ndarray) and waveforms.size > 0:
         cached_entity = getCachedEntity(entity_cache, waveforms)
@@ -3165,23 +3194,20 @@ def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
             waveforms_dset = toHDF5(waveforms, group, name = "waveforms",
                                     compression = compression, chunks = chunks,
                                     track_order = track_order)
-            waveforms_dset.make_scale("waveforms")
-            dset.dims[0].attach_scale(waveforms_dset)
+            # waveforms_dset.make_scale("waveforms")
+            # dset.dims[0].attach_scale(waveforms_dset)
             
-    # NOTE: 2024-11-13 12:41:27 NOT HERE!
-    # see NOTE: 2022-10-05 23:29:51
-    #
-    # left_sweep = getattr(obj, "left_sweep". None)
-    # if isinstance(left_sweep, np.ndarray) and left_sweep.size > 0:
-    #     cached_entity = getCachedEntity(entity_cache, left_sweep)
-    #     if isinstance(cached_entity, (hypy.Group, h5py.Dataset)):
-    #         group]["left_sweep"] = cached_entity
-    #     else:
-    #         left_sweep_dset = toHDF5(left_sweep, group, name="left_sweep",
-    #                                  compresssion = compression, chunks = chunks,
-    #                                  track_order = track_order)
-    #         left_sweep_dset.make_scale("left_sweep")
-    #         dest.dims[0]
+    left_sweep = getattr(obj, "left_sweep", None)
+    if isinstance(left_sweep, np.ndarray) and left_sweep.size > 0:
+        cached_entity = getCachedEntity(entity_cache, left_sweep)
+        if isinstance(cached_entity, (h5py.Group, h5py.Dataset)):
+            group["left_sweep"] = cached_entity
+        else:
+            left_sweep_dset = toHDF5(left_sweep, group, name="left_sweep",
+                                     compresssion = compression, chunks = chunks,
+                                     track_order = track_order)
+            # left_sweep_dset.make_scale("left_sweep")
+            # dest.dims[0]
         
     # 5. Create annotations child Group in group
     annotations = getattr(obj, "annotations", None)
