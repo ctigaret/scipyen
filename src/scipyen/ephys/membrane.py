@@ -73,7 +73,7 @@ import core.neoutils as neoutils
 from core.triggerevent import (TriggerEvent, TriggerEventType)
 from core.triggerprotocols import (TriggerProtocol, auto_define_trigger_events, auto_detect_trigger_protocols)
 
-from core.prog import (safeWrapper, with_doc, scipywarn)
+from core.prog import (safeWrapper, with_doc, scipywarn, printStyled)
 #from core.patchneo import *
 
 #### END pict.core modules
@@ -4428,8 +4428,14 @@ def detect_AP_waveform_times(sig, thr=10, smooth_window=5,
             that do not cross this threshold defalt is 0 (mV)
     
     """
-    
-    from scipy.signal import boxcar
+    try:
+        major, minor, dot = tuple(map(lambda x: int(x), scipy.__version__.split('.')))
+        if minor < 7:
+            from scipy.signal import boxcar
+        else:
+            from scipy.signal.windows import boxcar
+    except:
+        from scipy.signal import boxcar
     
     if not isinstance(sig, neo.AnalogSignal):
         raise TypeError("Expecting a neo.AnalogSignal; got %s instead" % type(sig).__name__)
@@ -7706,7 +7712,8 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
             # ret["Depolarising_steps"].append(segment_result)
             ret["Current_injection_steps"].append(segment_result)
         
-        print(f"\x1b[1;32m\n***\nanalyse_AP_step_injection_series: {len(ret['Current_injection_steps'])} injection steps\n***\n\x1b[0m")
+        msg = printStyled(f"n***\nanalyse_AP_step_injection_series: {len(ret['Current_injection_steps'])} injection steps\n***\n")
+        print(f"{msg}")
     
         seg_times = [s.analogsignals[0].t_start for s in segments]
         

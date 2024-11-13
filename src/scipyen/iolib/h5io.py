@@ -632,7 +632,7 @@ def _(x):
 def _(x):
     if isinstance(x, pq.Quantity):
         if x.size > 1:
-            raise ValueError("non-scalar quantities cannot be stored as HDF5 Attributes; convert them to HDF5 Dataset")
+            raise ValueError(f"non-scalar quantities {x} cannot be stored as HDF5 Attributes; convert them to HDF5 Dataset")
         
         return f"QUANTITY {quantity2str(x)}"
 #         return f"{float(xx.magnitude)}, pq.{xx.units.dimensionality})"
@@ -1836,11 +1836,19 @@ def makeObjAttrs(obj:typing.Any, oname:typing.Optional[str]=None):
         
     obj_attrs = makeDataTypeAttrs(obj)
     
-    if isinstance(obj, (neo.core.baseneo.BaseNeo)):
+    if isinstance(obj, neo.core.baseneo.BaseNeo):
         # NOTE: 2022-10-09 17:36:29
         # these include ScanData, AnalysisUnit
         for a in obj._recommended_attrs:
-            obj_attrs[a[0]] = makeAttr(getattr(obj, a[0]))
+            # if a in ("waveforms", "left_sweep"):
+            if isinstance(obj, neo.SpikeTrain) and a[0] in ("waveforms", "left_sweep"):
+                continue
+            try:
+                obj_attrs[a[0]] = makeAttr(getattr(obj, a[0]))
+            except:
+                print(f"In object {obj} ({type(obj)}), attribute '{a[0]}':")
+                traceback.print_exc()
+                raise
     
     # as_group = isinstance(obj, (collections.abc.Iterable, neo.core.container.Container)) and not isinstance(obj, (str, bytes, bytearray, np.ndarray))
     as_group = isinstance(obj, (collections.abc.Iterable, neo.core.baseneo.BaseNeo)) and not isinstance(obj, (str, bytes, bytearray, np.ndarray))
@@ -2220,8 +2228,8 @@ def _(obj, axisindex):
         ret["origin"] = obj.t_start
         ret["time_units"] = obj.times.units
         ret["time_dtype"] = jsonio.dtype2JSON(obj.times.dtype)
-        ret["left_sweep"] = obj.left_sweep
-        #ret["__waveforms__"] = obj.waveforms # → as separate child Dataset
+        # ret["left_sweep"] = obj.left_sweep # -> as separate child Dataset !cannot use this if its size > 1 !!!
+        # ret["__waveforms__"] = obj.waveforms # → as separate child Dataset
         ret["end"] = obj.t_stop
         ret["units"] = obj.units
         ret["dtype"] = jsonio.dtype2JSON(obj.dtype)
@@ -3145,20 +3153,35 @@ def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
     # NOTE: 2022-10-05 23:29:51
     # since just before neo 0.11.0 SpikeTrain also have a "left_sweep" attribute
     # which is taken care of by makeAxisScale/makeNeoDataAxisDict above (1.)
-    #
+    # NOTE: 2024-11-13 15:43:21 UPDATE
+    # the left_sweep is actually an narrat therefoeew it cannot be made into
+    # So, just  make sure thee are NOT also accessed by makeDataTypeAttrs
     waveforms = getattr(obj, "waveforms", None)
     if isinstance(waveforms, np.ndarray) and waveforms.size > 0:
         cached_entity = getCachedEntity(entity_cache, waveforms)
         if isinstance(cached_entity, (h5py.Group, h5py.Dataset)):
             group["waveforms"] = cached_entity # (hard link)
         else:
-            waveforms_dset = toHDF5(waveforms, group, 
-                                            name = "waveforms",
-                                            compression = compression,
-                                            chunks = chunks,
-                                            track_order = track_order)
+            waveforms_dset = toHDF5(waveforms, group, name = "waveforms",
+                                    compression = compression, chunks = chunks,
+                                    track_order = track_order)
             waveforms_dset.make_scale("waveforms")
             dset.dims[0].attach_scale(waveforms_dset)
+            
+    # NOTE: 2024-11-13 12:41:27 NOT HERE!
+    # see NOTE: 2022-10-05 23:29:51
+    #
+    # left_sweep = getattr(obj, "left_sweep". None)
+    # if isinstance(left_sweep, np.ndarray) and left_sweep.size > 0:
+    #     cached_entity = getCachedEntity(entity_cache, left_sweep)
+    #     if isinstance(cached_entity, (hypy.Group, h5py.Dataset)):
+    #         group]["left_sweep"] = cached_entity
+    #     else:
+    #         left_sweep_dset = toHDF5(left_sweep, group, name="left_sweep",
+    #                                  compresssion = compression, chunks = chunks,
+    #                                  track_order = track_order)
+    #         left_sweep_dset.make_scale("left_sweep")
+    #         dest.dims[0]
         
     # 5. Create annotations child Group in group
     annotations = getattr(obj, "annotations", None)

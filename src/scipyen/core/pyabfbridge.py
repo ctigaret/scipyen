@@ -4322,7 +4322,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
                                                 name = dac.name)
                     
             else:
-                return tuple(lambda x: self.getDACCommandWaveform(d, sweep), analogDACs)
+                return tuple(map(lambda x: self.getDACCommandWaveform(x, sweep), analogDACs))
             # if dac is None:
                     
         else:
