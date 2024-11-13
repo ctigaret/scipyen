@@ -1064,7 +1064,12 @@ def group2neoDataObject(g:h5py.Group, target_class:type, cache:dict = {}):
 #     ax1["dtype"] = np.dtype(float)
 #     
     attrs = attrs2dict(g.attrs)
-    rec_attrs = dict((a[0], attrs[a[0]]) for a in target_class._recommended_attrs)
+    # WARNING: 2024-11-13 20:51:52 potential BUG
+    # only the "waveforms" and "left_sweep" are NOT stored in attrs, and this is 
+    # only when the target_class is neo.SpikeTrain!
+    # The line below might skip other stuff as well...
+    rec_attrs = dict((a[0], attrs[a[0]]) for a in target_class._recommended_attrs if a[0] in attrs)
+    # rec_attrs = dict((a[0], attrs[a[0]]) for a in target_class._recommended_attrs)
     
     data_set = g.get("data", None)
     
@@ -1144,21 +1149,27 @@ def group2neoDataObject(g:h5py.Group, target_class:type, cache:dict = {}):
     # update kwargs with a dict of recommended attrs (see neo API)
     
     if target_class == neo.SpikeTrain:
-        waveforms_set_name = f"{g.name.split('/')[-1]}_waveforms"
-        waveforms_set = g[waveforms_set_name] if waveforms_set_name in g else None
+        # print(f"{group2neoDataObject} target_class = {target_class}; group name = {g.name}")
+        
+        # waveforms_set_name = f"{g.name.split('/')[-1]}_waveforms"
+        # waveforms_set = g[waveforms_set_name] if waveforms_set_name in g else None
+        waveforms_set = g.get("waveforms", None)
         
         if isinstance(waveforms_set, h5py.Dataset):
-            waveforms  = np.array(waveforms_set)
+            waveforms  = fromHDF5(waveforms_set, cache)
+            # waveforms  = np.array(waveforms_set)
         else:
             waveforms = None
             
-        left_sweep_set_name = f"{g.name.split('/')[-1]}_left_sweep"
-        left_sweep_set = g[left_sweep_set_name] if left_sweep_set_name in g else None
+        # left_sweep_set_name = f"{g.name.split('/')[-1]}_left_sweep"
+        # left_sweep_set = g[left_sweep_set_name] if left_sweep_set_name in g else None
+        left_sweep_set = g.get("left_sweep", None)
         
         if isinstance(left_sweep_set, h5py.Dataset):
-            left_sweeps = np.array(left_sweep_set)
+            left_sweep = fromHDF5(left_sweep_set, cache)
+            # left_sweep = np.array(left_sweep_set)
         else:
-            left_sweeps = None
+            left_sweep = None
             
         t_start       = ax0["t_start"]
         t_stop        = ax0["t_stop"]

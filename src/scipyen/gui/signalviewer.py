@@ -510,7 +510,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     
     defaultLeftAxisLabelSpace = 40
     
-    defaultLeftAxisLabelWrapMode = "WrapAtWordBoundaryOrAnywhere"
+    # defaultLeftAxisLabelWrapMode = "WrapAtWordBoundaryOrAnywhere"
+    defaultLeftAxisLabelWrapMode = "WrapAtWordBoundary"
 
     def __init__(self, x: (neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None, y: (neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None, parent: (QtWidgets.QMainWindow, type(None)) = None, ID:(int, type(None)) = None, win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None, frameIndex:(int, tuple, list, range, slice, type(None)) = None, frameAxis:(int, type(None)) = None, signalIndex:(str, int, tuple, list, range, slice, type(None)) = None, signalChannelAxis:(int, type(None)) = None, signalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, irregularSignalIndex:(str, int, tuple, list, range, slice, type(None)) = None, irregularSignalChannelAxis:(int, type(None)) = None, irregularSignalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, separateSignalChannels:bool = False, singleFrame:bool=False, interval:(tuple, list) = None, channelIndex:object = None, currentFrame:(int, type(None)) = None, plotStyle: str = "plot", nAxes:typing.Optional[int] = None,*args, **kwargs):
         """SignalViewer constructor.
@@ -519,6 +520,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         super(QMainWindow, self).__init__(parent)
         
         self.threadpool = QtCore.QThreadPool()
+        
+        self._axesColumn_ = 0
 
         # NOTE: 2023-04-26 12:07:26
         # for each axis, the following has a tuple of offset, factor
@@ -8461,6 +8464,7 @@ signals in the signal collection.
                 prev_ax.getAxis("bottom").setStyle(showValues=False)
 
                 # ax.getAxis("left").setWidth(60)
+                ax.getAxis("left").setWidth(self.leftLabelSpace)
                 
                 # if ax in axes_with_X_overlap: # also hide axis values if same boundaries
                 #     prev_ax.getAxis("bottom").setStyle(showValues=False)
@@ -9875,6 +9879,7 @@ signals in the signal collection.
         
     @safeWrapper
     def _adjust_left_label_space_(self):
+        # BUG 2024-11-13 21:11:58 FIXME
         # Try eliding the label text, move the full version to the tooltip. 
         # QGraphicsTextItem does NOT contain API to do that, so I'd need to apply
         # my own guiutils.get_elided_text() function.
@@ -9919,7 +9924,7 @@ signals in the signal collection.
                     labelItem.setTextWidth(-1)
                 labelSpace = labelItem.boundingRect().height() * 0.8
             else:
-                labelSpace = 0
+                labelSpace = self.leftLabelSpace
             
             labelSpace += axisItem.style["tickTextWidth"]
             
@@ -10364,7 +10369,11 @@ signals in the signal collection.
                 #
                 plotname = f"signal_axis_{k}"
                 plotItem = pg.PlotItem(name = plotname)
-                self.signalsLayout.addItem(plotItem, row=k, col=1)
+                
+                # NOTE: 2024-11-13 20:31:54 CAUTION
+                # until we sort out how to manage left axis label spaces
+                # add ALL plotitems to column 0! (or at least ot the same column)
+                self.signalsLayout.addItem(plotItem, row = k, col = self._axesColumn_)
                 plotItem.sigXRangeChanged.connect(self._slot_plot_axis_x_range_changed)
                 plotItem.vb.sigRangeChangedManually.connect(self._slot_plot_axis_range_changed_manually)
                 plotItem.scene().sigMouseMoved[object].connect(self._slot_mouseMovedInPlotItem)
@@ -10404,7 +10413,7 @@ signals in the signal collection.
                 self._events_axis_.scene().sigMouseMoved[object].connect(self._slot_mouseMovedInPlotItem)
         
         if self._events_axis_ not in self.signalsLayout.items:
-            self.signalsLayout.addItem(self._events_axis_, row = _n_signal_axes_, col=0)
+            self.signalsLayout.addItem(self._events_axis_, row = _n_signal_axes_, col = self._axesColumn_) # see NOTE: 2024-11-13 20:31:54 CAUTION
             self._events_axis_.scene().sigMouseMoved[object].connect(self._slot_mouseMovedInPlotItem)
         
         # NOTE: 2023-01-17 10:45:24
@@ -10418,7 +10427,7 @@ signals in the signal collection.
                 self._spiketrains_axis_.scene().sigMouseMoved[object].connect(self._slot_mouseMovedInPlotItem)
             
         if self._spiketrains_axis_ not in self.signalsLayout.items:
-            self.signalsLayout.addItem(self._spiketrains_axis_, row = _n_signal_axes_ + 1, col = 0)
+            self.signalsLayout.addItem(self._spiketrains_axis_, row = _n_signal_axes_ + 1, col = self._axesColumn_) # see NOTE: 2024-11-13 20:31:54 CAUTION
             self._spiketrains_axis_.scene().sigMouseMoved[object].connect(self._slot_mouseMovedInPlotItem)
             
         # NOTE: 2023-06-02 12:57:26
@@ -10439,11 +10448,15 @@ signals in the signal collection.
             self._clear_targets_overlay_(plotItem)
             self._clear_labels_overlay_(plotItem)
             
-            plotItem.axes["left"]["item"].setStyle(autoExpandTextSpace=True,
-                                                    autoReduceTextSpace=True,
-                                                    hideOverlappingLabels=True,
-                                                    maxTickLevel=2,
-                                                    maxTextLevel=2)
+            # NOTE: 2024-11-13 20:20:22 BUG/FiXME
+            # hold thif off until we figure out a better way to manage the horizontal
+            # space for the left axis label (title)
+            #
+            # plotItem.axes["left"]["item"].setStyle(autoExpandTextSpace=True,
+            #                                         autoReduceTextSpace=True,
+            #                                         hideOverlappingLabels=True,
+            #                                         maxTickLevel=2,
+            #                                         maxTextLevel=2)
             
             # NOTE: 2024-10-23 10:27:20
             # Seemingly a good-ish solution to get the axes aligned on their
