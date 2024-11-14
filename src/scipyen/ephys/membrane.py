@@ -4135,7 +4135,17 @@ def detect_AP_rises(s, dsdt, d2sdt2, dsdt_thr, minisi, vm_thr=0,
     return fast_rise_start_times, fast_rise_stop_times, peak_times#, waves, dwaves
         
 
-def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple],tail:pq.Quantity=0.5*pq.s,method:str="state_levels",box_size:numbers.Number=0, adcres:numbers.Number=15,adcrange:numbers.Number=10,adcscale:numbers.Number=1e3,resample_with_period:(pq.Quantity, type(None)) = None,resample_with_rate:(pq.Quantity, type(None)) = None,Itimes_relative:bool = True,Itimes_samples:bool=False):
+def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple],
+                     tail:pq.Quantity=0.5*pq.s,
+                     method:str="state_levels",
+                     box_size:numbers.Number=0, 
+                     adcres:numbers.Number=15,
+                     adcrange:numbers.Number=10,
+                     adcscale:numbers.Number=1e3,
+                     resample_with_period:(pq.Quantity, type(None)) = None,
+                     resample_with_rate:(pq.Quantity, type(None)) = None,
+                     Itimes_relative:bool = True,
+                     Itimes_samples:bool = False):
     """
     Extract the time slice of the VM corresponding to a current injection step.
     
@@ -4323,6 +4333,16 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
         Ihold = im[0]
         inj = Ihold
             
+        # TODO 2024-11-14 22:30:36
+        # do away with Itimes_samples parameter
+        # instead, infer from their type — (I know, not very Pythonic :( — as
+        # follows:
+        # 1) im[1], im[1] are both int => they are SAMPLES - hence ALWAYS relative
+        # 2) both im[1] and im[2] are float scalars => time stamps, to multiply by time.units
+        # 3) both im[1] and im[2] are time units => we're OK
+        # Furthermore: if Itimes_relative is True then the times in (2) and (3)
+        # above are RELATIVE to signal's t_start (as in current implementation)
+        # 
         if Itimes_samples:
             istart = int(im[1]) * vm.sampling_period
             istop = int(im[2]) * vm.sampling_period

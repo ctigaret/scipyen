@@ -2283,6 +2283,14 @@ class ABFProtocol(ElectrophysiologyProtocol):
         if samples:
             return scq.nSamples(ret, self.samplingRate)
         return ret
+    
+    def getEpochlevel(self, epoch:typing.Union[ABFEpoch, str, int], 
+                            dac:typing.Union[ABFOutputConfiguration, int, str],
+                            sweep:int = 0,
+                            ):
+        dac, epoch = self._check_DAC_Epoch_(dac, epoch)
+        return epoch.firstLevel + sweep * epoch.deltaLevel
+       
 
     def getEpochStart(self, epoch:typing.Union[ABFEpoch, str, int], 
                             dac:typing.Union[ABFOutputConfiguration, int, str],
