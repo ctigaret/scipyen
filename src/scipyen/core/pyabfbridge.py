@@ -480,6 +480,7 @@ device such as an image acquisition workstation - e.g. linescan TTLs or frame TT
 """
 import typing, struct, inspect, itertools, functools, warnings, pathlib
 from functools import singledispatch, singledispatchmethod, partial
+import traceback
 import numpy as np
 import pandas as pd
 import quantities as pq
@@ -1788,17 +1789,17 @@ class ABFProtocol(ElectrophysiologyProtocol):
         The inferrence is based on the physical units of the input - output signal
         pair, as follows:
         
-        Input units             Output units:           Clamping mode:
+        Input (ADC) units       Output (DAC) units:     Clamping mode:
         -----------------------------------------------------------
         electrical current      electrical potential    voltage clamp
         electrical potential    electrical current      current clamp
         
-        In any other combination: no clamping. NOTE that this is not necessarily
-        encountered in practice. Rather, one can have membrane voltage recorded
-        in the input, with current units for any signal sent on the output as 
-        "command voltage", but with the amplifier set to voltage follower mode 
-        (e.g. 'I=0' setting in some amplifiers). Technically, this is a NoClamp
-        case, although the DAQ device may not be able to detect this.
+        Any other combination maps to no clampingm but NOTE that this is not 
+        necessarily encountered in practice. An example is the case when the 
+        amplifier is set in voltage follower mode (e.g. 'I=0' setting in some 
+        amplifiers), one measures "voltage" (hence the input, or ADC, has voltage
+        units, and the "output" has current units, although not sending any 
+        command waveform). Technically, this is a NoClamp case.
         
         Parameters:
         -----------
@@ -1822,11 +1823,12 @@ class ABFProtocol(ElectrophysiologyProtocol):
         
         """
         # from ephys.ephys import ClampMode
+        adcIndex = adc
         if not isinstance(adc, ABFInputConfiguration):
-            adc = self.getADC(adc, physical=physicalADC) # get first (primary) input by default
-
+            adc = self.getADC(adcIndex, physical=physicalADC) # get first (primary) input by default
+            
         if adc is None:
-            raise ValueError(f"{'Physical' if physicalADC else 'Logical'} ADC index {adcIndex} is invalid for this protocol")
+            raise ValueError(f"Specified {'physical' if physicalADC else 'logical'} ADC index {adcIndex} is invalid for this protocol")
 
         recordsCurrent = scq.checkElectricalCurrentUnits(adc.units)
         recordsPotential = scq.checkElectricalPotentialUnits(adc.units)
@@ -2284,7 +2286,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
             return scq.nSamples(ret, self.samplingRate)
         return ret
     
-    def getEpochlevel(self, epoch:typing.Union[ABFEpoch, str, int], 
+    def getEpochLevel(self, epoch:typing.Union[ABFEpoch, str, int], 
                             dac:typing.Union[ABFOutputConfiguration, int, str],
                             sweep:int = 0,
                             ):
@@ -7484,7 +7486,8 @@ def _(abf:pyabf.ABF, reverse_banks:bool=False, wrap:bool=False,
 @singledispatch
 def getABFHoldDelay(obj):
     """Returns the duration of holding time before actual sweep start.
-
+    DEPRECATED: 2024-11-15 10:34:29 use protocol.holdingTime property, instead
+    
     WARNING: Only works with a neo.Block generated from an Axon ABF file.
     
     The function first tries to create a pyabf.ABF object using the Axon (ABF)
@@ -7508,17 +7511,17 @@ def _(abf:pyabf.ABF):
 @getABFHoldDelay.register(neo.Block)
 def _(data:neo.Block):
     try:
-        isABF2 = data.annotations["fFileSignature"].decode() == "ABF2"
+        isABF2 = data.annotations["generator"]["fFileSignature"].decode() == "ABF2"
         if not isABF2:
             raise NotImplementedError("This function only supports ABF2 version")
         
-        protocol = data.annotations["protocol"]
+        protocol = data.annotations["generator"]["protocol"]
         
         # NOTE: 2023-08-28 09:35:22
         # this could be obtained from the analogsignals, but what if someone
         # corrupts the data by inserting an analog signal with a different 
         # sampling rate? It seems 'neo' does not have a way to prevent that.
-        samplingPeriod = 1 * pq.s/data.annotations["sampling_rate"]
+        samplingPeriod = 1 * pq.s/data.annotations["generator"]["sampling_rate"]
         
         # NOTE: 2023-08-28 09:40:18
         # the number of points per sweep is calculated as (see pyabf):
@@ -7528,7 +7531,7 @@ def _(data:neo.Block):
         # dataPointCount    → ["sections"]["DataSection"]["llNumEntries"]
         # sweepCount        → ["lActualEpisodes"] = ["protocol"]["lEpisodesPerRun"]
         # channelCount      → ["sections"]["ADCSection"]["llNumEntries"]
-        sweepPointCount = data.annotations["sections"]["DataSection"]["llNumEntries"] / data.annotations["lActualEpisodes"] / data.annotations["sections"]["ADCSection"]["llNumEntries"]
+        sweepPointCount = data.annotations["generator"]["sections"]["DataSection"]["llNumEntries"] / data.annotations["generator"]["lActualEpisodes"] / data.annotations["generator"]["sections"]["ADCSection"]["llNumEntries"]
         
         return int(sweepPointCount/64) * samplingPeriod
 

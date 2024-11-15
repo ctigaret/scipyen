@@ -7069,15 +7069,514 @@ def collect_Iclamp_steps(block, VmSignal = "Vm_prim_1", ImSignal = "Im_sec_1", h
     
     return ret
 
-def getCurrentInjectionProtocolParametersABF(data:neo.Block, protocolEpochs:tuple):
-    """Parses the current injection steps in a neo.Block
-"""
+def getCurrentInjectionParameters(data:neo.Block, 
+                                  epoch:typing.Optional[typing.Union[pab.ABFEpoch, int, str]] = None) -> typing.Optional[tuple]:
+    """Parses the current injection steps in a neo.Block.
+    
+    Parameters:
+    -----------
+    data: neo.Block: ABF trial (i.e., acquired in Clampex) configured for episodic mode.
+    
+    epoch: int, str, or None (default); index or letter(s) of the Clampex 
+        ABFEpoch where the parameters of the current injection are defined.
+    
+        Optional, default is None. When None, the function will "parse" the protocol
+        to search for a suitable current injection epoch that statisfies the
+        following conditions:
+    
+        epoch type: Step (ABFEpochType.Step)
+        first level != 0
+        delta level != 0 (increments injected current amplitude with each sweep)
+        first duration > 0
+        delta duration == 0 (all steps have the same duration)
+    
+    Returns:
+    -------
+    A tuple of three Quantity arrays (Iinj, Istart, Istop), where:
+    • Iinj = amplitude(s) of current injection steps in each sweep
+    • Istart = time of current injection onset, in each sweep (relative to the 
+                start of the trial)
+    • Istop = end time of the current injection, in each sweep (relative to the
+                start of the trial)
+    
+    If no suitable epoch is found (see 'Parameters') the function returns None.
+    
+    """
+    # TODO: 2024-11-15 10:27:25 Finalise this, or remove!!!
     if not isinstance(data, neo.Block):
         raise TypeError(f"Expecting a neo.Block; instead, got {type(data).__name__}")
     
-    hold_delay = ephys.getABFHoldDelay(data)
+    protocol = ephys.getProtocol(data)
+    if not isinstance(protocol, pab.ABFProtocol):
+        raise ValueError(f"This function only supports data recorded with Clampex® ")
+    
+    if protocol.acquisitionMode != pab.ABFAcquisitionMode.episodic_stimulation:
+        raise ValueError(f"Data block {data.name} was not recorded in Episodic mode")
+    
+    hold_delay = protocol.holdingTime
+    dac = protocol.activeDACOutput
+    # if not scq.unitsConvertible(dac.units, pq.A):
+    if not scq.checkElectricalCurrentUnits(dac.units):
+        raise ValueError(f"Data block {data.name} does not appear to be a current clamp experiment. Expecting a DAC command in units of electrical current; instead, got {dac.dacUnits}")
+    
+    checkIinjEpoch = lambda x: x.type == pab.ABFEpochType.Step and x.firstLevel != 0 and x.deltaLevel != 0 and x.firstDuration > 0 and x.deltaDuration == 0
+    
+    if isinstance(epoch, (pab.ABFEpoch, int, str)):
+        dac, epoch = protocol._check_DAC_Epoch(dac, epoch)
+        
+        if not checkIinjEpoch(epoch):
+            return
+        
+    elif epoch is None:
+        epochs = tuple(filter(checkIinjEpoch, dac.epochs))
+        
+        if len(epochs) == 0:
+            return
+        
+        if len(epochs) > 1:
+            scipywarn(f"More than one Epoch seems to be generating variable step depolarizations; will use the first available one ({epochs[0].index}, {epochs[0].letter})")
+        
+        epoch = epochs[0]
+        
+    else:
+        raise TypeError(f"'epoch' parameter has unexpected type {type(epoch).__name__}; expecting an ABFEpoch, int (epoch index) or str (epoch 'letter(s)')")
     
 
+    # NOTE: 2024-11-15 13:05:10 nice and elegant, but would result it too many
+    # function calls; unwinding the iteration below would be more efficient, me
+    # thinks...
+#     Iinj = np.array(tuple(map(lambda x: protocol.getEpochLevel(epochs[0], dac, x), range(protocol.nSweeps)))) * dac.units
+#     Istart = np.array(tuple(map(lambda x: protocol.getEpochStart)))
+    
+    Iinj = list()
+    Istart = list()
+    Idurations = list()
+    
+    for s in range(protocol.nSweeps):
+        Iinj.append(protocol.getEpochLevel(epoch, dac, s))
+        Istart.append(protocol.getEpochStart(epoch, dac, s))
+        Idurations.append(protocol.getEpochDuration(epoch, dac, s))
+        
+    Iinj = np.array(Iinj) * dac.units
+    Istart = np.array(Istart) * Istart[0].units
+    Idurations = np.array(Idurations) * Istart.units
+    Istop = Istart + Idurations
+        
+    return Iinj, Istart, Istop
+    
+def analyse_AP_step_injection_trial(trial:neo.Block,
+                                    adc:typing.Union[int,str],
+                                    /,
+                                    epoch:typing.Optional[typing.Union[int,str]]=None,
+                                    dac:typing.Optional[typing.Union[int,str]]=None,
+                                    **kwargs):
+    """Variant of analyse_AP_step_injection_series that uses only neo.Block as data.
+    
+    This relies ENTIRELY on the recording protocol parsed from the trial metadata
+    (i.e. Block's annotations).
+    
+    Currently, only Clampex trials are supported.
+
+    Parameters:
+    ----------
+    trial : neo.Block containing current-clamp (CC) recordings from one run of a
+            series of current injections 'steps', with one 'step' per sweep.
+            Each sweep delivers a rectangular current injection pulse (the 'step')
+            with the SAME duration, and with amplitude incremented by the same
+            amount, in each sweep.
+    
+            Each sweep is stored as a neo.Segment in the Block's 'segments'
+            attribute (a sequence of segments).
+    
+    adc: int or str: index or name of the ABFInputConfiguration (a.k.a ADC channel)
+        used to record the membrane voltage
+    
+    Named parameters:
+    -----------------
+    epoch: int, str, or None (default); index or letter(s) of the Clampex 
+        ABFEpoch where the parameters of the current injection are defined.
+    
+        Optional, default is None. When None, the function will "parse" the protocol
+        to search for a suitable current injection epoch.
+
+        See getCurrentInjectionParameters(…) for details.
+        
+    Var-keyword parameters (kwargs):
+    --------------------------------
+    VmSignal: int or str; index or name of the Vm analog signal
+        integer index, or name (string) of the Vm analog signal
+        NOTE: the index is the signal's index in the segments' 'analogsignals'
+        attribute (a list of AnalogSignal objects)
+    
+        
+    rheo: boolean, default True
+    
+        When True, the function attempts to calculate the rheobase & membrane
+        time constant using rheobase_latency() function.
+        
+        This assumes that data is a neo.Block or a sequence of neo.Segment
+        containing records of different current injection step amplitudes
+        (one segment for each value of depolarizing current intensity).
+        
+        This parameter is ignored when data has lees than minsteps segments
+
+    fitrheo:boolean, default False
+        When True, and rheo is True, the function will estimate rheobase current
+        from latency vs Iinj curve.
+        
+    minsteps: int (default is 3)
+        minimum number of curent injection steps where APs were triggered, for
+        performing rheobase-latency analysis
+        
+    thr : float or python Quantity
+        value of the dV/dt (in V/s) above which the waveform belongs to an AP.
+        optional; default is 20 V/s
+    
+    plot_rheo: boolean, default is True 
+        (plots the fitted curve) -- useful when a block or a list of segments is
+        analyzed 
+        
+    Var-keyword parameters passed on to analyse_AP_step_injection_sweep():
+    ----------------------------------------------------------------
+    tail: scalar Quantity (units: "s"); default is 0 s
+        duration of the analyzed Vm trace after current injection has ceased
+    
+    
+    resample_with_period: None (default), scalar float or Quantity
+        When not None, the Vm signal will be resampled before processing.
+        
+        When Quantity, it must be in units convertible (scalable) to the signal's
+        sampling period units.
+        
+        Resampling occurs on the region corresponding to the depolarizing current
+        injection, before detection of AP waveforms.
+        
+        Upsampling might be useful (see Naundorf et al, 2006) but slows down
+        the execution. To upsample the Vm signal, pass here a value smaller than
+        the sampling period of the Vm signal.
+        
+    resample_with_rate: None (default), scalar float or Quantity
+        When not None, the Vm signal will be resampled before processing.
+        
+        When Quantity, it must be in units convertible (scalable) to the signal's
+        sampling rate units.
+        
+        Resampling occurs on the region corresponding to the depolarizing current
+        injection, before performing detection of AP waveforms.
+        
+        Upsampling might be useful (see Naundorf et al, 2006) but slows down
+        the execution. To upsample the Vm signal, pass here a value larger than 
+        the sampling period of the Vm signal.
+        
+    box_size: int >= 0; default is 0.
+    
+        size of the boxcar (scipy.signal.boxcar) used for filtering the Im signal
+        (containing the step current injection) before detecting the step 
+        boundaries (start & stop)
+        
+        default is 0 (no boxcar filtering)
+        
+    method: str, one of "state_levels" (default) or "kmeans": method for detection
+        "up" vs "down" states of the step current injection waveform
+    
+    adcres, adcrange, adcscale: float scalars, see signalprocessing.state_levels()
+        called from signalprocessing.detect_boxcar() 
+        
+        Used only when method is "state_levels"
+        
+    before, after: floating point scalars, or Python Quantity objects in time 
+        units convertible to the time units used by VmSignal.
+        interval of the VmSignal data, respectively, before and after the actual
+        AP in the returned AP waveforms -- parameters are passed to detect_AP_waveforms_in_train()
+        
+        defaults are:
+        before: 1e-3
+        after: None
+        
+    min_fast_rise_duration : None, scalar or Quantity (units "s");
+    
+        The minimum duration of the initial (fast) segment of the rising 
+        phase of a putative AP waveform.
+        
+        When None, is will be set to the next higher power of 10 above the sampling period
+        of the signal.
+    
+    min_ap_isi : None, scalar or Quantity;
+    
+                Minimum interval between two consecutive AP fast rising times 
+                ("kinks"). Used to discriminate against suprious fast rising time
+                points that occur DURING the rising phase of AP waveforms.
+                
+                This can happen when the AP waveforms has prominent IS and the SD 
+                "spikes", 
+                
+                see Bean, B. P. (2007) The action potential in mammalian central neurons.
+                Nat.Rev.Neurosci (8), 451-465
+
+    rtol, atol: float scalars;
+        the relative and absolute tolerance, respectively, used in value 
+        comparisons (see numpy.isclose())
+        
+        defaults are:
+        rtol: 1e-5
+        atol: 1e-8
+                
+    reTime:bool, default is True.
+        When True, the afterspike potential waveforms are all set to start at 0 s
+    
+    fAHP_window:pq.Quantity window duration for fAHP analysis; default is 3 * pq.ms
+    
+    ADP_window:pq.Quantity window duration for ADP analysis; default is 6 * pq.ms
+
+    use_min_detected_isi: boolean, default True
+    
+        When True, individual AP waveforms cropped from the Vm signal "sig" will
+            have the duration equal to the minimum detected inter-AP interval.
+        
+        When False, the durations of the AP waveforms will be taken to the onset
+            of the next AP waveform, or the end of the Vm signal
+            
+    smooth_window: int >= 0; default is 5
+        The length (in samples) of a smoothing window (boxcar) used for the 
+        signal's derivatives.
+        
+        The length of the window will be adjusted if the signal is upsampled.
+        
+    interpolate_roots: boolean, default False
+        When true, use linear inerpolation to find the time coordinates of the
+        AP waveform rise and decay phases crossing over the onset, half-maximum
+        and 0 mV. 
+        
+        When False, use the time coordinate of the first & last sample >= Vm value
+        (onset, half-max, or 0 mV) respectively, on the rise and decay phases of
+        the AP waveform.
+        
+        see ap_waveform_roots()
+        
+    decay_intercept_approx: str, one of "linear" (default) or "levels"
+        Used when the end of the decay phase cannot be estimated from the onset
+        Vm.
+        
+        The end of the decay is considerd to be the time point when the decaying
+        Vm crosses over (i.e. goes below) the onset value of the action potential.
+        
+        Whe the AP waveform is riing on a rising baseline, this time point cannot
+        be determined.
+        
+        Instead, it is estimated as specified by "decay_intercept_approx" parameter:
+        
+        When decay_intercept_approx is "linear", the function uses linear extrapolation
+        from a (higher than Vm onset) value specified by decay_ref (see below)
+        to the onset value.
+        
+        When decay_intercept_approx is "levels", the function estimates a "pseudo-baseline"
+        as the lowest of two state levels determined from the AP waveform histogram.
+        
+        The pseudo-baseline is then used to estimate the time intercept on the decay
+        phase.
+        
+    decay_ref: str, one of "hm" or "zero", or floating point scalar
+        Which Vm value should be used to approximate the end of the decay phase
+        when using the "linear" approximation method (see above)
+        
+    get_duration_at_Vm: also get AP waveform duration at specified Vm,
+        (in addition to Vhal-max and V0)
+            default: -15 mV
+            
+    vm_thr: scalar, optional (default is 0) - discard Vm events that do not cross
+        this value, see detect_AP_rises
+        
+        This parameter prevents the fast passive rising phase of the Vm at the
+        start of current injection from being flagged as an AP (and similarly, 
+        for other fast-rising events)
+
+    passive_analysis: bool, default is False
+        When True, then the function will analyze the passive membrane properties
+        for those sweeps with hypoperpolarizing current injection steps, where 
+        Iinj < 0
+        
+
+    NOTE: See analyse_AP_step_injection_sweep() documentation for details
+    
+    Var-keyword parameters related to the experiment "metadata"
+    -----------------------------------------------------------
+    cell: str (default, "NA")
+        Cell ID
+        NOTE: Case-sensitive
+        
+    source: str (default, "NA")
+        Source ID (e.g. animal)
+        NOTE: Case-sensitive
+        
+    genotype: str (default "NA")
+        genotype (e.g., WT, HET, HOM or any other appropriate string)
+        NOTE: Case-sensitive
+        
+    sex: str (default "M")
+        sex: either "F" or "M"
+        NOTE: Case-insensitive
+        
+    treatment: str (default "veh") ATTENTION: case-sensitive!
+        
+    age: python Quantity (one of days, months, years), "NA" or None 
+        Default is None; either None or "NA" result in the string "NA" for age
+        
+    post_natal: bool (default True)
+    
+    name: str
+        name of the results (string), or None; 
+        optional; default is None
+        
+    
+    Returns (see also 'Side effects', below):
+    -----------------------------------------
+    ret: ordered dict with the following key/value pairs:
+    
+        "Name": str or None; 
+            the name parameter
+            
+        "Segment_k" where k is a running counter (int): a dictionary with the
+            following key/value pairs:
+            
+            "Name": the name of the kth segment
+            
+            "AP_analysis": the result returned by calling analyse_AP_step_injection_sweep on
+                the kth segment
+            
+            "Vm_signal": the region of the Vm signal in the kth segment, that 
+                has been analyzed (possibly, upsampled); this corresponds to the
+                current injection step or longer as specified by the "tail" 
+                parameter to the analyse_AP_step_injection_sweep function, so it is usually only
+                a time slice of the original Vm signal.
+        
+        ret["Injected_current"] : neo.IrregularlySampledSignal
+            The intensity of the injected current step, one per segment.
+                                            
+        ret["Reference_AP_threshold"] : neo.IrregularlySampledSignal
+            values of Vm at AP threshold, one per segment.
+            
+        ret["Reference_AP_latency"] : neo.IrregularlySampledSignal
+            the latency of the first AP detected (time from start of step 
+            current injection), one per segment.
+            
+        ret["Mean_AP_Frequency"] : neo.IrregularlySampledSignal
+            mean AP frequency (ie. number of APs / duration of the current injection
+            step, expressed in Hz), one for each segment,
+            
+        ret["Inter_AP_intervals"] : list of arrays with inter-AP intervals
+            (one array per segment) or None for segments without APs
+        
+        ret["AP_peak_values"] : list of arrays with AP_peak_values
+            (one for each segment, or None for segments without APs)
+            
+        ret["AP_peak_amplitudes"] : list of arrays with AP amplitudes
+            (one for each segment or None for segments without APs)
+        
+        ret["AP_durations_at_half-max"] : list of arrays with AP width at 1/2 max
+            (one for eaxch segment or None for segments without APs)
+            
+        ret["AP_durations_V_0"] : list of arrays with AP width at Vm = 0
+            (one for each segment, or None for segments without APs)
+            
+        ret["AP_durations_V_onset"] : list of arrays with AP width at 
+            Vm = threshold potential (one for each segment or None for segments
+            without APs)
+            
+        ret["AP_maximum_dV_dt"] : list of arrays with the maximum dV/dt per AP
+            (one for each segment, or None for segments without APs)
+    
+        NOTE: the lengths of the arrays returned as list elements equals the 
+            number of APs detected in the corresponding segment; if no APs are
+            detected, None is inserted instead of an empty array.
+        
+    Side effects
+    ------------
+        The detected APs are embedded as SpikeTrain objects in the segments
+        where they have been detected.
+
+    """
+    
+    Iinj_params = getCurrentInjectionParameters(trial)
+    
+    cellid = kwargs.pop("cell", "NA")
+    sourceid = kwargs.pop("source", "NA")
+    genotype = kwargs.pop("genotype", "NA")
+    sex = kwargs.pop("sex", "M")
+    age = kwargs.pop("age", "NA")
+    passive_analysis = kwargs.pop("passive_analysis", False)
+    if isinstance(age, pq.Quantity):
+        if not any([age.dimensionality == ref.dimensionality for ref in [pq.day, pq.month, pq.year] ]):
+            raise TypeError("age expected to be a python Quanity in day, month or year, or None; got %s instead" % age)
+        
+    elif age is None:
+        age = "NA"
+        
+    treatment = kwargs.pop("treatment", "veh")
+    
+    post_natal = kwargs.pop("post_natal", True)
+    
+    if sex.lower() not in ("m", "f", "na"):
+        raise ValueError("Allowed values for sex are 'm' or 'f'; got %s instead" % sex)
+    
+    plot_rheo = kwargs.pop("plot_rheo", False)
+    
+    thr = kwargs.pop("thr", 10)
+  
+    rheo = kwargs.pop("rheo", True)
+    
+    minsteps = kwargs.pop("minsteps", 3)
+    
+    if not isinstance(minsteps, int):
+        raise TypeError("minsteps expected to be an int; got %s instead" % type(minsteps).__name__)
+
+    if minsteps < 1:
+        raise ValueError("minsteps must be > 0: got %s instead" % minsteps)
+    
+    rheoargs = dict()
+    
+    rheoargs["fitrheo"] = kwargs.pop("fitrheo", False)
+    
+    rheoargs["xstart"] = kwargs.pop("xstart", 0)
+    
+    rheoargs["xend"] = kwargs.pop("xend", 0.1)
+    
+    rheoargs["npts"] = kwargs.pop("npts", 100)
+    
+    rheoargs["minsteps"] = minsteps
+    
+    prefix = "AP_Train_Analysis"
+    
+    name = kwargs.pop("name", None)
+    
+    if name is None or (isinstance(name, str) and len(name.strip()) == 0):
+        name = trial.name
+
+    kwargs["thr"] = thr
+    ret = collections.OrderedDict()
+    
+    ret["Data"] = name
+    ret["Cell"] = cellid
+    ret["Source"] = sourceid
+    ret["Age"] = age
+    ret["Post-natal"] = post_natal
+    ret["Genotype"] = genotype
+    ret["Sex"] = sex
+    ret["Treatment"] = treatment
+    ret["Current_injection_steps"] = list()
+    
+    kwargs["VmSignal"] = VmSignal
+    
+    try:
+        # NOTE: 2024-11-15 14:49:30 TODO URGENT
+        # call here a revamped / refined version of the analyse_AP_step_injection_sweep
+        # based on Iinj, Istart, Istop being Quantity arrays
+        # to also include passive properties analysis (if trial contains sweeps
+        # with hyperpolarizing current injection steps)
+        pass
+    except:
+        traceback.print_exc()
+    
+    
 def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, tuple, list], 
                                      **kwargs):
     """ Action potential (AP) detection and analysis in I-clamp experiment.
