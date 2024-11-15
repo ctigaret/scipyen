@@ -168,37 +168,53 @@ class MembranePropertiesAnalysisParameters:
     
     
     VmSignal:typing.Union[str, int] = "Vm_prim_0"  
-    # The name or index of the actual membrane voltage signal.
-    # the name depends on how the ADC signals were named in Clampex's Lab bench.
+    # The name or logical index of the recorded membrane voltage signal.
+    # The name depends on how the ADC signals were named in Clampex's Lab bench.
+    # In any case this should resolve to the ADC used to record the Vm.
     #
     # When not sure, just use the int index (e.g. 0 for the first signal, etc.)
-    # just inspect the data (neo.Block) in SignalViewer to see which signal is the 
-    # one carrying a copy of the currrent injection command
+    # found by inspecting the trial data (neo.Block) in SignalViewer to see which 
+    # of the recorded signals carry the recorded Vm.
     # 
 
     ImSignal:typing.Union[str, int] = "Im_sec_0"   
-    # The name of the signal representing the membrane current - this depends on
-    # how the ADC signals were named in Clampex's Lab bench
+    # The name or physical index of the signal representing the membrane current
+    # (command waveform) this depends on how the DAC signals were named in 
+    # Clampex's Lab bench.
     #
-    # When not sure, just use the int index (e.g. 1 for the second signal, etc.)
-    # just inspect the data (neo.Block) in SignalViewer to see which signal is the 
-    # one carrying a copy of the currrent injection command
+    # CAUTION: By default, this signal is not recorded during the trial, unless
+    # one of the following configurations are implemented:
     #
-    # If such signal is NOT found, then set 'useEmbeddedProtocol' to True
+    # 1) The amplifier supplies a "secondary" output signal representing a copy
+    # of the command waveform (in current clamp this would be the scaled "membrane 
+    # current") and this signal is fed into an ADC input port of the DAQ device.
+    # NOTE: MultiClamp 700 series amplifiers supply such "secondary" signals with
+    # each of their channels.
+    #
+    # 2) The DAC output signal from the DAQ device, which is normally fed into 
+    # the amplifier to supply the command waveform is "teed" into an ADC input 
+    # port of the same DAQ device, thus allowing a direct record of the DAC output
+    # NOTE: This is better avoided, because it may distort the actual command waveform
+    # sent to the amplifier.
     # 
-    # NOTE: This signal is the secondary output signal (when the
-    # amplitifer is in IC mode, this signal ≊ injected current) and is recorded
-    # only if the correspnodiong am output is plugged into an analog input of the
-    # DAQ board
+    # In any case, 'ImSignal' should resolve to the DAC used to send command
+    # waveforms during the trial.
     #
-    # Here, it is used to infer the intensity and timings of the current injection
-    # in each sweep.
+    # When this signal is NOT recorded, the analysis uses the DAC corresponding 
+    # to this signal (see above) in order to determine the command waveform 
+    # parameters (here, injected current amplitude, onset and duration of current
+    # injection) based on the information contained in the trial's protocol, see
+    # 'useEmbeddedProtocol' parameter below.
     #
-    # Alternatively, one should set 'useEmbeddedProtocol' to True
+    # "Legacy" code in Scipyen's ephys.membrane module relies heavily on this
+    # signal being recorded in order to "guesstimate" these parameters from a
+    # heuristic analysis of this signal. In the absence of this signal, one 
+    # MUST manually supply the amplitude of the injected current (in each sweep)
+    # and the current injection timings.
     #
-    # This parameter is use only if 'useEmbeddedProtocol' is False, see below
-    #
-
+    # Since now Scipyen is able to extract ABF protocol information from the trials,
+    # such code is fast becoming obsolete and deprecated.
+    
     useEmbeddedProtocol:bool = True 
     # Flag indicating whether to use the ABF protocol information embedded in the 
     # data (stored in ABF files) to infer the timings and amplitude of the current 
@@ -209,24 +225,25 @@ class MembranePropertiesAnalysisParameters:
     # WARNING when this is True, this requires the latest build of Scipyen
     #
 
-    CurrentInjectionEpochIndex:int = 1
+    CurrentInjectionEpochIndex:typing.Optional[int] = 1
     # index of the ABF epoch in the protocol that defines the current injection
-    # step (typically this is epoch 1 i.e., the second epoch)
+    # step (typically this is epoch 1 i.e., the second epoch, because the first epoch
+    # is typically a "blank" step to provide some baseline)
     #
-    # NOTE: Currently this is not used; the code in batch_primary_analysis tries
-    # to infer the relevant epoch using the protocol information reconstructed 
-    # from the neo.Block data.
+    # NOTE: One can pass None here, and let the code infer which epoch is used 
+    # for current injection steps. However, this can fail if there are, say, 
+    # "conditioning" epochs tha also provide current injection steps.
     #
 
     dV_dt_thr:pq.Quantity = dataclasses.field(default_factory = lambda: 10 * pq.V/pq.s)  # this is the default; change values here
-    # This is the dV/dt threshold for AP detection: an Vm change faster than
-    # this value is considered to belong to the start of an AP upstroke.
+    # This is the dV/dt threshold for AP detection: a Vm change that is faster
+    # than this value is considered to indicate the start of an AP upstroke.
     #
     # By default, this is now 10 * pq.V/pq.s but you may want/need to change it
     # to suit your cells. Just change the numeric value, leave units as they are.
     #
-    # A value of 20 was historic (Tamagnini et al) but overestimates the start 
-    # time of the AP (and hence its onset)!!!
+    # The value in Tamagnini et al, of 20 V/s, overestimates the start time of 
+    # the AP (and hence its onset)!!!
 
     min_Vm_AP:pq.Quantity = dataclasses.field(default_factory = lambda: 0 * pq.mV)  # this is the default; change values here
     # Threshold of membrane voltage that needs to be crossed by the upstroke
@@ -7165,11 +7182,7 @@ def getCurrentInjectionParameters(data:neo.Block,
     return Iinj, Istart, Istop
     
 def analyse_AP_step_injection_trial(trial:neo.Block,
-                                    adc:typing.Union[int,str],
-                                    /,
-                                    epoch:typing.Optional[typing.Union[int,str]]=None,
-                                    dac:typing.Optional[typing.Union[int,str]]=None,
-                                    **kwargs):
+                                    parameters:MembranePropertiesAnalysisParameters):
     """Variant of analyse_AP_step_injection_series that uses only neo.Block as data.
     
     This relies ENTIRELY on the recording protocol parsed from the trial metadata
@@ -7188,8 +7201,14 @@ def analyse_AP_step_injection_trial(trial:neo.Block,
             Each sweep is stored as a neo.Segment in the Block's 'segments'
             attribute (a sequence of segments).
     
-    adc: int or str: index or name of the ABFInputConfiguration (a.k.a ADC channel)
-        used to record the membrane voltage
+    adc: int or str: logical index or name of the ABFInputConfiguration 
+        (i.e., ADC channel) used to record the membrane voltage:
+
+        • When a name, this is the same as the name of the Vm signal in the 
+            neo.Block (trial data)
+    
+        • When an index this MUST be the same as the index of the Vm signal in 
+            the 'analogsignals' of every Segment in the Block.
     
     Named parameters:
     -----------------
@@ -7495,7 +7514,11 @@ def analyse_AP_step_injection_trial(trial:neo.Block,
         where they have been detected.
 
     """
+    protocol = ephys.getProtocol(trial)
     
+    adcIndex = adc
+    adc = protocol.getADC(adcIndex, physical=False)
+        
     Iinj_params = getCurrentInjectionParameters(trial)
     
     cellid = kwargs.pop("cell", "NA")
@@ -7551,7 +7574,7 @@ def analyse_AP_step_injection_trial(trial:neo.Block,
     if name is None or (isinstance(name, str) and len(name.strip()) == 0):
         name = trial.name
 
-    kwargs["thr"] = thr
+    # kwargs["thr"] = thr
     ret = collections.OrderedDict()
     
     ret["Data"] = name
@@ -7569,10 +7592,19 @@ def analyse_AP_step_injection_trial(trial:neo.Block,
     try:
         # NOTE: 2024-11-15 14:49:30 TODO URGENT
         # call here a revamped / refined version of the analyse_AP_step_injection_sweep
-        # based on Iinj, Istart, Istop being Quantity arrays
-        # to also include passive properties analysis (if trial contains sweeps
-        # with hyperpolarizing current injection steps)
-        pass
+        # based on Iinj, Istart, Istop being Quantity arrays, to also include
+        # passive properties analysis (if trial contains sweeps with hyperpolarizing
+        # current injection steps)
+        for k, segment in enumerate(trial.segments):
+            vm = segment.analogsignals[adc.logicalIndex].time_slice(Istart[k], Istop[k])
+            if Iinj[k] < 0:
+                # NOTE: 2024-11-15 21:09:42
+                # run passive properties analysis
+                pass
+            else:
+                # NOTE: 2024-11-15 21:28:07
+                # run AP analysis
+                pass
     except:
         traceback.print_exc()
     
@@ -8907,6 +8939,30 @@ def report_AP_analysis(data, name=None):
     
     return summary, params, waveforms
 
+# def analyse_AP_step_injection_segment():
+#     tail                    = kwargs.pop("tail", 0*pq.s)
+#     resample_with_period    = kwargs.pop("resample_with_period", None)
+#     resample_with_rate      = kwargs.pop("resample_with_rate", None)
+#     method                  = kwargs.pop("method", "state_levels")
+#     box_size                = kwargs.pop("box_size", 0)
+#     adcres                  = kwargs.pop("adcres", 15)
+#     adcrange                = kwargs.pop("adcrange", 10)
+#     adcscale                = kwargs.pop("adcscale", 1e3) # (mV -> V)
+#     smooth_window           = kwargs.pop("smooth_window", 5)
+#     steadyStateDuration     = kwargs.pop("steadyStateDuration", 0.05*pq.s)
+#     box_size                = kwargs.pop("box_size", 0)
+#     relTime                 = kwargs.pop("relTime", True)
+#     fAHP_window             = kwargs.pop("fAHP_window", 3 * pq.ms)
+#     ADP_window              = kwargs.pop("ADP_window", 6 * pq.ms)
+# 
+#     kwargs.pop("return_all", None) # remove the debugging parameter
+#     
+#     if isinstance(VmSignal, str):
+#         VmSignal = neoutils.get_index_of_named_signal(segment, VmSignal)
+#     
+#     vm = segment.analogsignals[VmSignal].copy()
+        
+
 def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "Vm_prim_1", 
                                     ImSignal:typing.Union[int, str, tuple] = "Im_sec_1", 
                                     Itimes_relative:bool = True,
@@ -9194,7 +9250,7 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
     kwargs.pop("return_all", None) # remove the debugging parameter
     
     # NOTE: 2019-05-03 13:08:48
-    # removed: result not has individual AP analysis for all detected APs
+    # removed: result now has individual AP analysis for all detected APs
     # 
     
     if isinstance(VmSignal, str):

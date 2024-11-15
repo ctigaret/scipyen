@@ -2130,12 +2130,17 @@ class ABFProtocol(ElectrophysiologyProtocol):
         
         if len(inputconfs):
             return inputconfs[0]
+        
         else:
-            ndx = adcChannel if physical else self.adcLogical2PhysicalIndexMap[adcChannel]
+            chtype = "physical" if physical else "logical"
+            ndx = adcChannel if physical else self.adcLogical2PhysicalIndexMap.get(adcChannel, None)
+            if ndx is None:
+                raise ValueError(f"Invalid {chtype} ADC channel index specified ({adcChannel})")
+            
             if ndx in range(self.nADCChannels):
                 return self.inputs[ndx]
-            chtype = "physical" if physical else "logical"
-            raise ValueError(f"Invalid {chtype} ADC channel specified {adcChannel}")
+            
+            raise ValueError(f"Invalid {chtype} ADC channel index specified ({adcChannel})")
 
     def getInput(self, adcChannel:int = 0, physical:bool=True) -> ABFInputConfiguration:
         """Calls self.getADC(…)"""
