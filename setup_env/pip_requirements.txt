@@ -200,6 +200,7 @@ requests-toolbelt
 researchpy
 scikit-image
 scikit-learn
+scikit-bio
 scipy
 seaborn
 shapely
@@ -218,6 +219,7 @@ statsmodels
 sympy
 tables ; python_version >= '3.9.7'
 tabulate
+taxoniq
 tenacity
 termcolor
 terminado

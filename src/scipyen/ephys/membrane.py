@@ -55,6 +55,7 @@ import neo
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
+
 import core.workspacefunctions as wf
 import core.pyabfbridge as pab
 import core.signalprocessing as sigp
@@ -68,6 +69,7 @@ from core.datazone import (DataZone, Interval)
 from core import quantities as scq
 from core.quantities import unitsConvertible
 import core.neoutils as neoutils
+from core.basescipyen import BaseScipyenData
 # from core.utilities import unique
 #import core.triggerprotocols
 from core.triggerevent import (TriggerEvent, TriggerEventType)
@@ -103,8 +105,12 @@ AP_WIDTH_CODES =   {0: "AP_durations_V_0",
 
 @dataclass
 class MembranePropertiesAnalysisParameters:
+    metadata:BaseScipyenData = dataclasses.field(default_factory = BaseScipyenData)
     # biological sample parameters
-    cell:str = "c01"
+    # NOTE: 2024-11-16 09:57:25
+    # the old fields (cell, source, etc) are now part of the BaseScipyenData
+    
+    # cell:str = "c01"
     # identifier for this cell; there may be more than one cell from the same animal
     #
     # NOTE: the rules for constructing a cell ID are up to you, BUT:
@@ -113,7 +119,7 @@ class MembranePropertiesAnalysisParameters:
     #   3) should NOT begin with a digit or underscore ('_')
     # 
     
-    source:str = "test" 
+    # source:str = "test" 
     # identifier for the cell source: this may a (meaningful) combination of:
     #   animal ID,
     #   experimental date
@@ -127,11 +133,11 @@ class MembranePropertiesAnalysisParameters:
     #   3) should NOT begin with a digit or underscore ('_')
     
     
-    sex:str = "f"
+    # sex:str = "f"
     # ID of animal sex; one of "f", "m", "na" (case-insensitive)
     #
     
-    genotype:str = "het"
+    # genotype:str = "het"
     # genotype of the animal - keep it simple
     #
     # NOTE: avoid strings like (+/-, TSNeo/-, etc) as they don't play well when
@@ -140,7 +146,7 @@ class MembranePropertiesAnalysisParameters:
     # animal model they would have a well-defined meaning
     #
     
-    age:str = "NA"
+    # age:str = "NA"
     # animale age - almost free-form string, see NOTE for animal ID - keep it
     #   simple, yet meaningful, and indicate units (e.g. 3_mo, or 20_d, or 1_yr)
     #
@@ -148,12 +154,12 @@ class MembranePropertiesAnalysisParameters:
     # provide a more standardized way to store this information, hopefully more
     # suitable to some sort of database management
     
-    postnatal:bool = True
+    # postnatal:bool = True
     # this is only useful for recordings spanning animal models and cultures
     # leave as is, for now
     #
     
-    treatment:str = "veh"
+    # treatment:str = "veh"
     # this is only useful when drugs were applied to the slice/cell; 
     # the string may contain dosage or concentration, and maybe duration,
     #   e.g. 'Nim_10uM_5_min'
@@ -7182,7 +7188,8 @@ def getCurrentInjectionParameters(data:neo.Block,
     return Iinj, Istart, Istop
     
 def analyse_AP_step_injection_trial(trial:neo.Block,
-                                    parameters:MembranePropertiesAnalysisParameters):
+                                    parameters:MembranePropertiesAnalysisParameters,
+                                    biometrics:BaseScipyenData):
     """Variant of analyse_AP_step_injection_series that uses only neo.Block as data.
     
     This relies ENTIRELY on the recording protocol parsed from the trial metadata
@@ -7200,6 +7207,10 @@ def analyse_AP_step_injection_trial(trial:neo.Block,
     
             Each sweep is stored as a neo.Segment in the Block's 'segments'
             attribute (a sequence of segments).
+    
+    parameters: analysis parameters
+    
+    biometrics: contains information about the biological sample (cell, source, etc)
     
     adc: int or str: logical index or name of the ABFInputConfiguration 
         (i.e., ADC channel) used to record the membrane voltage:

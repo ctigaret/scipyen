@@ -50,6 +50,21 @@ from core.vigra_patches import vigra
 import neo
 from neo.core import (baseneo, basesignal, container,)
 from neo.core.dataobject import (DataObject, ArrayDict,)
+
+hasTaxoniq = False
+try:
+    import taxoniq
+    from taxoniq import Taxon
+    hasTaxoniq = True
+except:
+    hasTaxoniq = False
+    taxoniq = None
+    class Taxon():
+        def __new__(obj, *args, **kwargs):
+            return NISSING
+        def __init__(self, *args, **kwargs):
+            pass
+            
 #### END 3rd party modules
 
 #### BEGIN pict.core.modules
@@ -750,6 +765,28 @@ def categorize_data_frame_columns(data, *column_names, inplace=True):
             
         return ret
     
+    
+class TaxonDescriptor:
+    def __init__(self, *, default:Taxon = MISSING):
+        if hasTaxoniq and isinstance(default, taxoniq.Taxon):
+            self._default = default
+        else:
+            self._default = MISSING
+            
+    def __set_name__(self, obj:object, name:str):
+        if len(name.strip()) == 0:
+            raise ValueError("Cannot accept an empty name")
+        self._name = "_"+name
+        
+    def __get__(self, obj:object, objtype:type) -> object:
+        if obj is None:
+            return self._default
+        return getattr(obj, self._name, self._default)
+    
+    def __set__(self, obj:object, value:typing.Optional[Taxon] = None):
+        if isinstance(value, Taxon):
+            setattr(obj, self._name, value)
+            
 class TypeEnum(IntEnum):
     """Common ancestor for enum types used in Scipyen
     """
@@ -1053,7 +1090,22 @@ class TypeEnum(IntEnum):
         """ Applies strand() to the name of this object and the argument.
         """
         return self.strand(self.name, name)
-        
+    
+class BioSourceType(TypeEnum):
+    exvivo      = 1
+    invitro     = 2
+    insilico    = 4
+    monolayer   = 8     # e.g. "primary" culture = invitro | monolayer = 10
+    tissue      = 16    # e.g. acute brain slice = exvivo | tissue = 17 
+                        # e.g. "organotypic" slice culture = invitro | tissue  = 18
+    assembloid  = 32    # e.g. "organoid" = invitro | assembloid = 34
+    
+    invivo      = 64
+    
+    organism    = 128   
+    
+    
+    
 class ProcedureType(TypeEnum):
     null = 0
     mating = 1
