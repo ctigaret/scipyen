@@ -1199,11 +1199,14 @@ class Procedure:
     
     A succession of procedures (attached to the episodes of a Schedule) 
         represents an experimental protocol.
+        
+    NOTE: The Treatment class is recommended for use in lieu of generic Procedure
+    where procedureType is 'treatment'
     
     """
     name:str = ""
     _:KW_ONLY
-    procedureType: ProcedureType = ProcedureType.null
+    type: ProcedureType = ProcedureType.null
     description: str = ""
     
     def __eq__(self, other):
@@ -1232,7 +1235,7 @@ class Procedure:
         if isinstance(name, str) and len(name.strip()):
             target_name = name
         
-        attrs = {"name": self.name, "procedureType": self.procedureType, 
+        attrs = {"name": self.name, "procedureType": self.type, 
                  "description": self.description}
         
         objattrs = h5io.makeAttrDict(**attrs)
@@ -1257,7 +1260,19 @@ class Procedure:
         procedureType = attrs["procedureType"]
         description = attrs["description"]
         
-        return cls(name, procedureType=procedureType, description=description)
+        return cls(name, type=procedureType, description=description)
+
+    @classmethod
+    def fromDict(cls, **kwargs):
+        """Constructs an instance of this class using 'kwargs' keys that match the class fields.
+        Keys in kwargs that are NOT valid field names for this class are silently 
+        ignored. 
+        """
+        field_names = tuple(f.name for f in dataclasses.fields(cls))
+        
+        initkwargs = dict((i, kwargs[i]) for i in field_names if i in kwargs)
+        
+        return cls(**initkwargs)
     
 class DoseDescriptor:
     def __init__(self, *, default:typing.Optional[pq.Quantity]=None):
@@ -1266,7 +1281,7 @@ class DoseDescriptor:
                 raise ValueError(f"Expecting dosage units; instead, got {default.units}")
             
         elif default is not None:
-            raise TypeError(f"Expecting a pq.Quantity or None; instead, got {type(default).__name__}")
+            raise TypeError(f"Expecting a scalar dosage Quantity or None; instead, got {type(default).__name__}")
         
         self._default = default
         
@@ -1286,10 +1301,105 @@ class DoseDescriptor:
                 raise ValueError(f"Expecting dosage units; instead got {value.units}")
             
         elif value is not None:
-            raise TypeError(f"Expecting a dosage Quantity or None; instead got {type(value).__name__}")
-        
+            raise TypeError(f"Expecting a scalar dosage Quantity, or None; instead got {type(value).__name__}")
+
         setattr(obj, self._name, value)
+        
+        
+@dataclass
+class Substance:
+    name:str = "Vehicle"
+    dose: DoseDescriptor = DoseDescriptor(default=None)
     
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            return False
+        
+        ret = self.name == other.name
+        
+        if ret:
+            if isinstance(self.dose, pq.Quantity):
+                ret &= self.dose.ndim == other.dose.ndim
+                if ret:
+                    ret &= self.dose.shape == other.dose.shape
+                    
+                if ret:
+                    ret &= scq.unitsConvertible(self.dose, other.dose)
+                    
+                if ret:
+                    if self.dose.units != other.dose.units:
+                        ret &= np.all(self.dose == other.dose.rescale(self.dose.units))
+                    else:
+                        ret &= np.all(self.dose == other.dose)
+        
+        return ret
+    
+    def toHDF5(self,group:h5py.Group, name:str, oname:str, 
+                       compression:str, chunks:bool, track_order:bool,
+                       entity_cache:dict) -> h5py.Group:
+        from iolib import h5io
+        target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
+        cached_entity = h5io.getCachedEntity(entity_cache, self)
+        if isinstance(cached_entity, h5py.Dataset):
+            group[target_name] = cached_entity
+            return cached_entity
+        
+        # NOTE: 2024-07-20 15:03:37
+        # Because only scalar Quantities can be stored as HDF5 attributes, this 
+        # would preclude using using time-varying dose data types such as AnalogSignal, 
+        # IrregularlySampledSignal. 
+        # 
+        # Instead, the dose is stored as a HDF5 Dataset
+        #
+        
+        if isinstance(name, str) and len(name.strip()):
+            target_name = name
+        
+        attrs = {"name": self.name}
+        
+        objattrs = h5io.makeAttrDict(**attrs)
+        obj_attrs.update(objattrs)
+        
+        entity = group.create_group(target_name, track_order=track_order)
+        entity.attrs.update(obj_attrs)
+        # NOTE: 2024-07-20 15:16:44 see NOTE: 2024-07-20 15:03:37
+        # stores the "dose" Quantity as a dataset
+        h5io.toHDF5(self.dose, entity, name="dose", oname="dose",
+                            compression=compression,chunks=chunks,
+                            track_order=track_order, entity_cache=entity_cache)
+        
+        h5io.storeEntityInCache(entity_cache, self, entity)
+        
+        return entity
+    
+    @classmethod
+    def fromHDF5(cls, entity:h5py.Group, 
+                             attrs:typing.Optional[dict] = None, cache:dict = {}):
+        
+        from iolib import h5io
+        if entity in cache:
+            return cache[entity]
+        
+        attrs = h5io.attrs2dict(entity.attrs)
+        
+        name = attrs["name"]
+        
+        dose = h5io.fromHDF5(entity["dose"], cache)
+        
+        return cls(name, dose=dose)
+     
+    @classmethod
+    def fromDict(cls, **kwargs):
+        """Constructs an instance of this class using 'kwargs' keys that match the class fields.
+        Keys in kwargs that are NOT valid field names for this class are silently 
+        ignored. 
+        """
+        field_names = tuple(f.name for f in dataclasses.fields(cls))
+        
+        initkwargs = dict((i, kwargs[i]) for i in field_names if i in kwargs)
+        
+        return cls(**initkwargs)
+
 @dataclass
 class Treatment(Procedure):
     """
@@ -1306,17 +1416,17 @@ class Treatment(Procedure):
                 discrete, possibly irregular, times
     
     """
-    name:str = "Vehicle"
+    name:str = "Treatment"
     _:KW_ONLY
-    # dose: dataclasses.InitVar(pq.Quantity | None) = field(default = None)
-    dose: DoseDescriptor = DoseDescriptor(default=None)
+    substance:typing.Union[Substance, typing.Sequence[Substance]] = field(default_factory=Substance)
+    # allow combination of compounds
     route:AdministrationRoute = AdministrationRoute.null
     description: str = ""
-    procedureType:ImmutableDescriptor = ImmutableDescriptor(default=ProcedureType.treatment)
+    type:ImmutableDescriptor = ImmutableDescriptor(default=ProcedureType.treatment)
     
     def __post_init__(self):
-        super().__init__(name=self.name, description=self.description, 
-                         procedureType = ProcedureType.treatment)
+        super().__init__(name=self.name, compound=self.compound, description=self.description, 
+                         type = ProcedureType.treatment)
         
     def __eq__(self, other):
         if not isinstance(other, self.__class__):
@@ -1325,23 +1435,12 @@ class Treatment(Procedure):
         ret = self.name == other.name
         
         if ret:
-            ret &= type(self.dose) == type(other.dose)
+            ret &= type(self.substance) == type(other.substance)
+            # ret &= type(self.dose) == type(other.dose)
             
         if ret:
-            if isinstance(self.dose, pq.Quantity):
-                ret &= self.dose.ndim == other.dose.ndim
-                if ret:
-                    ret &= self.dose.shape == other.dose.shape
-                    
-                if ret:
-                    ret &= scq.unitsConvertible(self.dose, other.dose)
-                    
-                if ret:
-                    if self.dose.units != other.dose.units:
-                        ret &= np.all(self.dose == other.dose.rescale(self.dose.units))
-                    else:
-                        ret &= np.all(self.dose == other.dose)
-        
+            ret &= self.substance == other.substance
+            
         if ret:
             ret &= self.route == other.route
             
@@ -1349,7 +1448,6 @@ class Treatment(Procedure):
             ret &= self.descripion == other.description
             
         return ret
-       
         
     def toHDF5(self, group, name, oname, compression, chunks, track_order,
                        entity_cache) -> h5py.Group:
@@ -1361,13 +1459,8 @@ class Treatment(Procedure):
             group[target_name] = cached_entity
             return cached_entity
 
-        # NOTE: 2024-07-20 15:03:37
-        # Because only scalar Quantities can be stored as HDF5 attributes, this 
-        # would preclude using using time-varying dose data types such as AnalogSignal, 
-        # IrregularlySampledSignal. 
-        # 
-        # Instead, the dose is stored as a HDF5 Dataset
-        #
+        # NOTE: 2024-11-16 21:29:09
+        # 'dose' moved to Substance
         
         attrs = {"name": getattr(self, "name", ""), 
                  "route": getattr(self, "route", AdministrationRoute.null), 
@@ -1382,15 +1475,12 @@ class Treatment(Procedure):
         entity = group.create_group(target_name, track_order=track_order)
         entity.attrs.update(obj_attrs)
         
-        # NOTE: 2024-07-20 15:16:44 see NOTE: 2024-07-20 15:03:37
-        # stores the "dose" Quantity as a dataset
-        h5io.toHDF5(self.dose, entity, name="dose", oname="dose",
-                            compression=compression,chunks=chunks,
-                            track_order=track_order, entity_cache=entity_cache)
+        h5io.toHDF5(self.substance, entity, name="substance", oname="substance",
+                    compression=compression, chunks=chunks,
+                    track_order=track_order, entity_cache=entity_cache)
         
         h5io.storeEntityInCache(entity_cache, self, entity)
         return entity
-        
         
     @classmethod
     def fromHDF5(cls, entity:h5py.Group, 
@@ -1406,11 +1496,22 @@ class Treatment(Procedure):
         route = attrs["route"]
         description = attrs["description"]
         
-        dose = h5io.fromHDF5(entity["dose"], cache)
+        substabce = h5io.fromHDF5(entity["substance"], cache)
         
-        return cls(name, dose=dose, route=route, description=description,
-                   procedureType = ProcedureType.treatment)
+        return cls(name, substance=substance, route=route, description=description)#,
+                   # type = ProcedureType.treatment)
 
+    @classmethod
+    def fromDict(cls, **kwargs):
+        """Constructs an instance of this class using 'kwargs' keys that match the class fields.
+        Keys in kwargs that are NOT valid field names for this class are silently 
+        ignored. 
+        """
+        field_names = tuple(f.name for f in dataclasses.fields(cls))
+        
+        initkwargs = dict((i, kwargs[i]) for i in field_names if i in kwargs)
+        
+        return cls(**initkwargs)
 
 @dataclass
 class Episode:
@@ -1501,6 +1602,18 @@ class Episode:
                    beginFrame=beginFrame, endFrame=endFrame,
                    procedure=procedure)
         
+    @classmethod
+    def fromDict(cls, **kwargs):
+        """Constructs an instance of this class using 'kwargs' keys that match the class fields.
+        Keys in kwargs that are NOT valid field names for this class are silently 
+        ignored. 
+        """
+        field_names = tuple(f.name for f in dataclasses.fields(cls))
+        
+        initkwargs = dict((i, kwargs[i]) for i in field_names if i in kwargs)
+        
+        return cls(**initkwargs)
+
 @dataclass
 class Schedule:
     """Logical grouping of a sequence of episodes.
@@ -1870,4 +1983,15 @@ class Schedule:
     def procedures(self):
         return [e.procedure for e in self.episodes]
     
+    @classmethod
+    def fromDict(cls, **kwargs):
+        """Constructs an instance of this class using 'kwargs' keys that match the class fields.
+        Keys in kwargs that are NOT valid field names for this class are silently 
+        ignored. 
+        """
+        field_names = tuple(f.name for f in dataclasses.fields(cls))
+        
+        initkwargs = dict((i, kwargs[i]) for i in field_names if i in kwargs)
+        
+        return cls(**initkwargs)
     

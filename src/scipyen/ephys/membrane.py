@@ -387,6 +387,15 @@ class MembranePropertiesAnalysisParameters:
     
     # __changed__ = False
     
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            return False
+        
+        ret = self.name == other.name
+        
+        if ret:
+            ret &= all(getattr(self, f.name) == getattr(other, f.name) for f in dataclasses.fields(self.__class__))
+
     def __repr__(self):
         repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {x}"
         ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
@@ -453,6 +462,18 @@ class MembranePropertiesAnalysisParameters:
                     
         return cls(**kwargs)
         
+    @classmethod
+    def fromDict(cls, **kwargs):
+        """Constructs an instance of this class using 'kwargs' keys that match the class fields.
+        Keys in kwargs that are NOT valid field names for this class are silently 
+        ignored. 
+        """
+        field_names = tuple(f.name for f in dataclasses.fields(cls))
+        
+        initkwargs = dict((i, kwargs[i]) for i in field_names if i in kwargs)
+        
+        return cls(**initkwargs)
+
 def parse_current_injection_timings(data:neo.Block):
     """
     Extract current injection timings from the data.

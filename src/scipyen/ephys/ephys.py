@@ -2659,6 +2659,18 @@ class SynapticPathway:
                    stimulus=stimulus, electrode=electrodeMode,
                    schedule=schedule, measurements=measurements)#, source=source)
         
+    @classmethod
+    def fromDict(cls, **kwargs):
+        """Constructs an instance of this class using 'kwargs' keys that match the class fields.
+        Keys in kwargs that are NOT valid field names for this class are silently 
+        ignored. 
+        """
+        field_names = tuple(f.name for f in dataclasses.fields(cls))
+        
+        initkwargs = dict((i, kwargs[i]) for i in field_names if i in kwargs)
+        
+        return cls(**initkwargs)
+    
 @dataclass
 class LocationMeasure:
     """Functor to calculate a signal measure at a location using a suitable function or functor.

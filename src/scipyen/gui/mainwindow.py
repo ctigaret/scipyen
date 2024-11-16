@@ -261,12 +261,15 @@ import colorama # for console output styles
 
 from core import datazone
 from core import datatypes
+from core import basescipyen
 from core import neoutils
 from core import prog
 from core import pyabfbridge as pab
 from core import scipyen_plugin_loader
 from core import scipyen_config as scipyenconf
 from core import utilities
+
+from core.basescipyen import BaseScipyenData
 
 from core.datazone import (DataZone, Interval, 
                            intervals2cursors, intervals2epoch,
