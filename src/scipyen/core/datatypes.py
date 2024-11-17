@@ -16,6 +16,7 @@ EQUALS_NAN
 from __future__ import print_function
 
 #### BEGIN core python modules
+from abc import ABC
 import collections 
 from collections import deque, namedtuple
 from functools import (singledispatch, singledispatchmethod)
@@ -516,8 +517,6 @@ def type2str(t:type) -> str:
         return type_origin.__name__
     
     return t.__name__
-
-
     
 def array_slice(data:np.ndarray, slicing:(dict, type(None))):
     """Dynamic slicing of nD arrays and introducing new axis in the array.
@@ -765,6 +764,33 @@ def categorize_data_frame_columns(data, *column_names, inplace=True):
             
         return ret
     
+# class ScipyenDataclassABC(ABC):
+#     @classmethod
+#     def fromDict(cls, **kwargs):
+#         """Constructs an instance of this class using a keywords that match the class fields.
+#     
+#         The dict keys or keywords are NOT valid field names for this class are silently 
+#         ignored. 
+# 
+#         """
+#         field_names = tuple(f.name for f in dataclasses.fields(cls))
+#         
+#         initkwargs = dict((i, kwargs[i]) for i in field_names if i in kwargs)
+#         
+#         print(f"{cls.__name__}.fromDict({tuple(initkwargs.keys())})")
+#         
+#         # if len(args):
+#         #     if isinstance(args[0], dict):
+#         #         mykwargs = args[0].copy()
+#         #     else:
+#         #         raise TypeError(f"Expecting a dict; instead, got a {type(args[0]).__name__}")
+#         #     mykwargs.update(kwargs)
+#         #     initkwargs = dict((i, kwargs[i]) for i in field_names if i in mykwargs)
+#         # else:
+#         #     initkwargs = dict((i, kwargs[i]) for i in field_names if i in kwargs)
+#         
+#         return cls(**initkwargs)
+        
     
 class TaxonDescriptor:
     def __init__(self, *, default:Taxon = MISSING):
@@ -1193,6 +1219,7 @@ def inspect_members(obj, predicate=None):
         
     return dict(mb)
 
+# class Procedure(ScipyenDataclassABC):
 @dataclass
 class Procedure:
     """An experimental procedure: what is being done during an Episode.
@@ -1262,17 +1289,17 @@ class Procedure:
         
         return cls(name, type=procedureType, description=description)
 
-    @classmethod
-    def fromDict(cls, **kwargs):
-        """Constructs an instance of this class using 'kwargs' keys that match the class fields.
-        Keys in kwargs that are NOT valid field names for this class are silently 
-        ignored. 
-        """
-        field_names = tuple(f.name for f in dataclasses.fields(cls))
-        
-        initkwargs = dict((i, kwargs[i]) for i in field_names if i in kwargs)
-        
-        return cls(**initkwargs)
+#     @classmethod
+#     def fromDict(cls, **kwargs):
+#         """Constructs an instance of this class using 'kwargs' keys that match the class fields.
+#         Keys in kwargs that are NOT valid field names for this class are silently 
+#         ignored. 
+#         """
+#         field_names = tuple(f.name for f in dataclasses.fields(cls))
+#         
+#         initkwargs = dict((i, kwargs[i]) for i in field_names if i in kwargs)
+#         
+#         return cls(**initkwargs)
     
 class DoseDescriptor:
     def __init__(self, *, default:typing.Optional[pq.Quantity]=None):
@@ -1306,8 +1333,20 @@ class DoseDescriptor:
         setattr(obj, self._name, value)
         
         
+# class SubstanceDosage(ScipyenDataclassABC):
 @dataclass
-class Substance:
+class SubstanceDosage:
+    """Logical mapping between a compund (or substance) and a dose, in a Treatment.
+    Fields:
+    name:str. Name of the compound (free-form within Python's rules)
+    dose: pq.Quantity. This can be:
+        • a scalar quantity - unique dose admnistered during a Treatment
+        • a signal-like object:
+            ∘ neo.AnalogSignal - a "continuously" time-varying dose, sampled at
+                regular time intervals
+            ∘ neo.IrregularlySampledSignal - different doses administered at 
+                discrete, possibly irregular, times
+    """
     name:str = "Vehicle"
     dose: DoseDescriptor = DoseDescriptor(default=None)
     
@@ -1388,44 +1427,25 @@ class Substance:
         
         return cls(name, dose=dose)
      
-    @classmethod
-    def fromDict(cls, **kwargs):
-        """Constructs an instance of this class using 'kwargs' keys that match the class fields.
-        Keys in kwargs that are NOT valid field names for this class are silently 
-        ignored. 
-        """
-        field_names = tuple(f.name for f in dataclasses.fields(cls))
-        
-        initkwargs = dict((i, kwargs[i]) for i in field_names if i in kwargs)
-        
-        return cls(**initkwargs)
-
 @dataclass
 class Treatment(Procedure):
     """
-    Encapsulates the administration of a dose of compound via a specified route.
+    Encapsulates the administration of a dose of substance(s) via a specified route.
     
     name: treatment name (typically, the compound's name)
-    dose: a pq.Quantity. This can be:
-        • a scalar quantity - unique dose administered just once during this 
-            treatment
-        • a signal-like object:
-            ∘ neo.AnalogSignal - a "continuously" time-varying dose, sampled at
-                regular time intervals
-            ∘ neo.IrregularlySampledSignal - different doses administered at 
-                discrete, possibly irregular, times
+    substance: SubstanceDosage or sequence (tuple, list) of SubstanceDosage
     
     """
     name:str = "Treatment"
     _:KW_ONLY
-    substance:typing.Union[Substance, typing.Sequence[Substance]] = field(default_factory=Substance)
+    substance:typing.Union[SubstanceDosage, typing.Sequence[SubstanceDosage]] = field(default_factory=SubstanceDosage)
     # allow combination of compounds
     route:AdministrationRoute = AdministrationRoute.null
     description: str = ""
     type:ImmutableDescriptor = ImmutableDescriptor(default=ProcedureType.treatment)
     
     def __post_init__(self):
-        super().__init__(name=self.name, compound=self.compound, description=self.description, 
+        super().__init__(name=self.name, substance=self.substance, description=self.description, 
                          type = ProcedureType.treatment)
         
     def __eq__(self, other):
@@ -1460,7 +1480,7 @@ class Treatment(Procedure):
             return cached_entity
 
         # NOTE: 2024-11-16 21:29:09
-        # 'dose' moved to Substance
+        # 'dose' moved to SubstanceDosage
         
         attrs = {"name": getattr(self, "name", ""), 
                  "route": getattr(self, "route", AdministrationRoute.null), 
@@ -1501,18 +1521,7 @@ class Treatment(Procedure):
         return cls(name, substance=substance, route=route, description=description)#,
                    # type = ProcedureType.treatment)
 
-    @classmethod
-    def fromDict(cls, **kwargs):
-        """Constructs an instance of this class using 'kwargs' keys that match the class fields.
-        Keys in kwargs that are NOT valid field names for this class are silently 
-        ignored. 
-        """
-        field_names = tuple(f.name for f in dataclasses.fields(cls))
-        
-        initkwargs = dict((i, kwargs[i]) for i in field_names if i in kwargs)
-        
-        return cls(**initkwargs)
-
+# class Episode(ScipyenDataclassABC):
 @dataclass
 class Episode:
     """Generic episode for frame-based data.
@@ -1602,18 +1611,7 @@ class Episode:
                    beginFrame=beginFrame, endFrame=endFrame,
                    procedure=procedure)
         
-    @classmethod
-    def fromDict(cls, **kwargs):
-        """Constructs an instance of this class using 'kwargs' keys that match the class fields.
-        Keys in kwargs that are NOT valid field names for this class are silently 
-        ignored. 
-        """
-        field_names = tuple(f.name for f in dataclasses.fields(cls))
-        
-        initkwargs = dict((i, kwargs[i]) for i in field_names if i in kwargs)
-        
-        return cls(**initkwargs)
-
+# class Schedule(ScipyenDataclassABC):
 @dataclass
 class Schedule:
     """Logical grouping of a sequence of episodes.
@@ -1982,16 +1980,4 @@ class Schedule:
     @property
     def procedures(self):
         return [e.procedure for e in self.episodes]
-    
-    @classmethod
-    def fromDict(cls, **kwargs):
-        """Constructs an instance of this class using 'kwargs' keys that match the class fields.
-        Keys in kwargs that are NOT valid field names for this class are silently 
-        ignored. 
-        """
-        field_names = tuple(f.name for f in dataclasses.fields(cls))
-        
-        initkwargs = dict((i, kwargs[i]) for i in field_names if i in kwargs)
-        
-        return cls(**initkwargs)
     

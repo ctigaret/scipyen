@@ -14,7 +14,6 @@ import numpy as np
 import quantities as pq
 import neo
 import h5py
-
 from core.vigra_patches import vigra
 import pandas as pd
 from traitlets.utils.importstring import import_item
@@ -25,6 +24,7 @@ from core.datatypes import (Episode, Schedule, ProcedureType, AdministrationRout
                             Procedure, TypeEnum, BioSourceType, TaxonDescriptor, Taxon,
                             )
 
+# class BaseScipyenData(ScipyenDataclassABC):
 @dataclass
 class BaseScipyenData:
     # NOTE: 2024-11-16 10:07:21
@@ -188,14 +188,3 @@ class BaseScipyenData:
                     
         return cls(**kwargs)
     
-    @classmethod
-    def fromDict(cls, **kwargs):
-        """Constructs an instance of this class using 'kwargs' keys that match the class fields.
-        Keys in kwargs that are NOT valid field names for this class are silently 
-        ignored. 
-        """
-        field_names = tuple(f.name for f in dataclasses.fields(cls))
-        
-        initkwargs = dict((i, kwargs[i]) for i in field_names if i in kwargs)
-        
-        return cls(**initkwargs)
