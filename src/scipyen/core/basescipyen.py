@@ -21,11 +21,12 @@ from core import quantities as cq
 from core.triggerprotocols import TriggerProtocol
 from core.quantities import unitsConvertible
 
-# from core.datatypes import * # FIXME: clashes with datetime.datetime !!!
+# from core.datatypes import * # clashes with datetime class imported from datetime module !!!
 
 from core.datatypes import (Episode, Schedule, ProcedureType, AdministrationRoute, 
                             Procedure, TypeEnum, BioSourceType, TaxonDescriptor, Taxon,
-                            BiologicalSource,
+                            BiologicalSource, CellCompartment, CellCompartmentType,
+                            Organism, Biometrics, 
                             )
 
 # class BaseScipyenData(ScipyenDataclassABC):
@@ -49,73 +50,10 @@ class BaseScipyenData:
     # (with the caveat that it would be too deeply nested in the final object)
     # triggers:typing.Union[TriggerProtocol, list] = dataclasses.field(default_factory=TriggerProtocol)
     
-    source:BioSourceType = dataclasses.field(default=BioSourceType.exvivo)
+    source:BiologicalSource = dataclasses.field(default_factory=BiologicalSource)
     
-    taxon:TaxonDescriptor = dataclasses.field(default=TaxonDescriptor())
-    
-    subspecies:str = "Sprague Dawley"
-    
-    sourceID:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
-    # identifier for the cell source: this may a (meaningful) combination of:
-    #   animal ID,
-    #   experimental date
-    #   cortex region
-    #
-    #   e.g. TS2_1234567_01_02_22_VisCx_
-    #
-    # NOTE: the rules for naming the source are up to you, BUT:
-    #   1) be consistent
-    #   2) should contain ONLY alphanumeric characters and underscore ('_')
-    #   3) should NOT begin with a digit or underscore ('_')
-
-    cell:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
-    # identifier for this cell; there may be more than one cell from the same animal
-    #
-    # NOTE: the rules for constructing a cell ID are up to you, BUT:
-    #   1) be consistent
-    #   2) should contain ONLY alphanumeric characters and underscore ('_')
-    #   3) should NOT begin with a digit or underscore ('_')
-    # 
-    
-    field:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
-
-    genotype:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
-    # genotype of the source - keep it simple
-    #
-    # NOTE: avoid strings like (+/-, TSNeo/-, etc) as they don't play well when
-    # importing data in, say, R
-    # These are entirely conventional, and, within the same line of genetic 
-    # animal model they would have a well-defined meaning
-    #
-    
-
-    sex:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
-    # ID of source sex (where appropriate); one of "f", "m", "na" (case-insensitive)
-    #
-    
-    age:typing.Union[pq.Quantity, type(pd.NA)] = dataclasses.field(default=pd.NA)
-    # animal's age (more generaly the age of the biological source)- almost 
-    # free-form string, see NOTE for animal ID - keep it
-    #   simple, yet meaningful, and indicate units (e.g. 3_mo, or 20_d, or 1_yr)
-    #
-    # NOTE: these are simply for a quick information; in the future Scipyen will
-    # provide a more standardized way to store this information, hopefully more
-    # suitable to some sort of database management
-    
-    biometric_weight:typing.Union[pq.Quantity, type(pd.NA)] = dataclasses.field(default=pd.NA) 
-    biometric_height:typing.Union[pq.Quantity, type(pd.NA)] = dataclasses.field(default=pd.NA)
-    
-    procedure:typing.Optional[Procedure] = None
+    procedure:Procedure = dataclasses.field(default_factory=Procedure)
     # This WILL include treatment, with dosage route, and schedule
-    
-    # NOTE: 2024-11-16 10:03:19
-    # these below are DEPRECATED, as they are now fields of procedure, above
-    
-    # procedure_type:typing.Union[str, int, ProcedureType, type(pd.NA)] = dataclasses.field(default=pd.NA)
-    # procedure_name:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
-    # procedure_dose:typing.Union[pq.Quantity, type(pd.NA)] = dataclasses.field(default=pd.NA)
-    # procedure_route:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
-    # procedure_schedule:neo.Epoch = dataclasses.field(default_factory=neo.Epoch)
     
     def __eq__(self, other):
         if not isinstance(other, self.__class__):

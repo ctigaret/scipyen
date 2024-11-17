@@ -764,7 +764,72 @@ def categorize_data_frame_columns(data, *column_names, inplace=True):
             
         return ret
     
-# class ScipyenDataclassABC(ABC):
+class ScipyenDataclassABC(ABC):
+    def toHDF5(self,group:h5py.Group, name:str, oname:str, 
+                       compression:str, chunks:bool, track_order:bool,
+                       entity_cache:dict) -> h5py.Group:
+        from iolib import h5io
+        target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
+        cached_entity = h5io.getCachedEntity(entity_cache, self)
+        if isinstance(cached_entity, h5py.Dataset):
+            group[target_name] = cached_entity
+            return cached_entity
+        
+        if isinstance(name, str) and len(name.strip()):
+            target_name = name
+        
+        attrs = dict(filter(lambda x: not dataclasses.is_dataclass(x[1]) and not isinstance(x[1], np.ndarray), map(lambda f:(f.name, getattr(self, name, None)), dataclasses.fields(self))))
+        
+        dcattrs = dict(filter(lambda x: dataclasses.is_dataclass(x[1]), map(lambda f:(f.name, getattr(self, name, None)), dataclasses.fields(self))))
+        
+        arrayattrs = dict(filter(lambda x: isinstance(x[1], np.ndarray), map(lambda f:(f.name, getattr(self, name, None)), dataclasses.fields(self))))
+        
+        objattrs = h5io.makeAttrDict(**attrs)
+        obj_attrs.update(objattrs)
+        
+        entity = group.create_group(target_name, track_order=track_order)
+        entity.attrs.update(obj_attrs)
+        
+        if len(dcattrs):
+            for k,v in dcattrs.items():
+                h5io.toHDF5(v, entity, name=k, oname=k,
+                            compression=compression,chunks=chunks,
+                            track_order=track_order,
+                            entity_cache=entity_cache)
+                
+        if len(arrayattrs):
+            for k,v in arrayattrs.items():
+                h5io.toHDF5(v, entity, name=k, oname=k,
+                            compression=compression,chunks=chunks,
+                            track_order=track_order,
+                            entity_cache=entity_cache)
+        
+        h5io.storeEntityInCache(entity_cache, self, entity)
+        return entity
+    
+    @classmethod
+    def fromHDF5(cls, entity:h5py.Group, 
+                             attrs:typing.Optional[dict] = None, cache:dict = {}):
+        from iolib import h5io
+        if entity in cache:
+            return cache[entity]
+        
+        attrs = h5io.attrs2dict(entity.attrs)
+        
+        attrs_as_entities = [a for a in cls.__match_args__ if a not in attrs]
+        
+        kwargs = dict()
+        
+        for a in cls.__match_args__:
+            if a in attrs:
+                kwargs[a] = attrs[a]
+            else:
+                if a in entity.keys():
+                    kwargs[a] = h5io.fromHDF5(entity[a], cache=cache)
+                    
+        return cls(**kwargs)
+        # return cls(**attrs)
+       
 #     @classmethod
 #     def fromDict(cls, **kwargs):
 #         """Constructs an instance of this class using a keywords that match the class fields.
@@ -1117,6 +1182,23 @@ class TypeEnum(IntEnum):
         """
         return self.strand(self.name, name)
     
+class CellCompartmentType(TypeEnum):
+    """Follows SWC/CNIC specification augmented with 'spine', 'nucleus', 'nucleolus'. 
+    See http://www.neuronland.org/NLMorphologyConverter/MorphologyFormats/SWC/Spec.html
+    """
+    undefined = 0
+    soma = 1
+    axon = 2
+    dendrite = 3 # basal dendrite
+    apical_dendrite = 4
+    fork_point = 5
+    end_point = 6
+    spine = 7
+    basal_dendrite_spine = dendrite | spine # = 10
+    apical_dendrite_spine = apical_dendrite | spine # = 11
+    nucleus = 12
+    nucleolus = 13
+    
 class BioSourceType(TypeEnum):
     exvivo      = 1
     invitro     = 2
@@ -1218,18 +1300,90 @@ def inspect_members(obj, predicate=None):
     return dict(mb)
 
 @dataclass
-class BiologicalSource:
-    """A 'shim' class
+class CellCompartment(ScipyenDataclassABC):
+    name:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
+    type:CellCompartmentType = CellCompartmentType.undefined
+    id:int = 0
+
+@dataclass
+class Biometrics(ScipyenDataclassABC):
+    genotype:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
+    # genotype of the source - keep it simple
+    #
+    # NOTE: avoid strings like (+/-, TSNeo/-, etc) as they don't play well when
+    # importing data in, say, R
+    # These are entirely conventional, and, within the same line of genetic 
+    # animal model they would have a well-defined meaning
+    #
+
+    sex:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
+    # ID of source sex (where appropriate); one of "f", "m", "na" (case-insensitive)
+    #
+    
+    age:typing.Union[pq.Quantity, type(pd.NA)] = dataclasses.field(default=pd.NA)
+    # animal's age (more generaly the age of the biological source)- almost 
+    # free-form string, see NOTE for animal ID - keep it
+    #   simple, yet meaningful, and indicate units (e.g. 3_mo, or 20_d, or 1_yr)
+    #
+    # NOTE: these are simply for a quick information; in the future Scipyen will
+    # provide a more standardized way to store this information, hopefully more
+    # suitable to some sort of database management
+    
+    weight:typing.Union[pq.Quantity, type(pd.NA)] = dataclasses.field(default=pd.NA) 
+    height:typing.Union[pq.Quantity, type(pd.NA)] = dataclasses.field(default=pd.NA)
+    
+@dataclass
+class Organism(ScipyenDataclassABC):
+    taxon:TaxonDescriptor = dataclasses.field(default=TaxonDescriptor())
+    subspecies:str = "Sprague Dawley"
+
+@dataclass
+class BiologicalSource(ScipyenDataclassABC):
+    """
         TODO: 2024-11-17 21:11:13 : locate and use neuronal taxonomy API
     """
-    sourceType:BioSourceType
-    organ:str
-    tissue:str
-    region:str
-    subregion:str
-    cellType:str
-    cellSubtype:str="NA"
+    organism:Organism = dataclasses.field(default_factory=Organism)
+    biometrics:Biometrics = dataclasses.field(default_factory=Biometrics)
+    organ:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
+    tissue:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
+    region:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
+    subregion:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
+    cellType:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA) # e.g. "neuron"
+    cellMorphologicalType:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA) # e.g."pyramidal"
+    cellDescriptors:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
+    sourceType:BioSourceType = dataclasses.field(default=BioSourceType.exvivo)
+    sourceID:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
+    # identifier for the cell source: this may a (meaningful) combination of:
+    #   animal ID,
+    #   experimental date
+    #   cortex region
+    #
+    #   e.g. TS2_1234567_01_02_22_VisCx_
+    #
+    # NOTE: the rules for naming the source are up to you, BUT:
+    #   1) be consistent
+    #   2) should contain ONLY alphanumeric characters and underscore ('_')
+    #   3) should NOT begin with a digit or underscore ('_')
 
+    cellID:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
+    # identifier for this cell; there may be more than one cell from the same animal
+    #
+    # NOTE: the rules for constructing a cell ID are up to you, BUT:
+    #   1) be consistent
+    #   2) should contain ONLY alphanumeric characters and underscore ('_')
+    #   3) should NOT begin with a digit or underscore ('_')
+    # 
+    
+    fieldID:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
+    # ID for a microscopy field — useful only for experiments involving imaging
+    # unique identifier for the microscopy field (e.g. one can record from more 
+    # than one field containing (sub)-regions of the same cell — spines, 
+    # dendritic segments, etc)
+    
+    compartment:CellCompartment = dataclasses.field(default_factory=CellCompartment)
+    # cellular compartment (there may be more than one in the same
+    # field) — e,g, "spine", "dendrite", "axon", "soma"
+    
 # class Procedure(ScipyenDataclassABC):
 @dataclass
 class Procedure:
