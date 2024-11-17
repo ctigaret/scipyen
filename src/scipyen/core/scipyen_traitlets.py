@@ -609,7 +609,7 @@ class DataFrameTrait(Instance, ScipyenTraitTypeMixin):
 
 class SeriesTrait(Instance, ScipyenTraitTypeMixin):
     info_text = "Trait for pandas.Series"
-    default_value = pd.Series()
+    default_value = pd.Series(dtype="float64")
     klass = pd.Series
     _valid_defaults = (pd.Series,)
     

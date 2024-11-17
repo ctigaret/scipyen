@@ -1130,8 +1130,6 @@ class BioSourceType(TypeEnum):
     
     organism    = 128   
     
-    
-    
 class ProcedureType(TypeEnum):
     null = 0
     mating = 1
@@ -1218,6 +1216,18 @@ def inspect_members(obj, predicate=None):
         mb = tuple(filter(lambda x: predicate(x[1]), mb))
         
     return dict(mb)
+
+@dataclass
+class BiologicalSource:
+    """A 'shim' class
+        TODO: 2024-11-17 21:11:13 : locate and use neuronal taxonomy API
+    """
+    sourceType:BioSourceType
+    tissue:str
+    region:str
+    subregion:str
+    cellType:str
+    cellSubtype:str="NA"
 
 # class Procedure(ScipyenDataclassABC):
 @dataclass
@@ -1340,7 +1350,7 @@ class SubstanceDosage:
     Fields:
     name:str. Name of the compound (free-form within Python's rules)
     dose: pq.Quantity. This can be:
-        • a scalar quantity - unique dose admnistered during a Treatment
+        • a scalar quantity - unique dose administered during a Treatment
         • a signal-like object:
             ∘ neo.AnalogSignal - a "continuously" time-varying dose, sampled at
                 regular time intervals

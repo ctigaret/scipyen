@@ -242,3 +242,14 @@ winshell ; sys_platform == 'win32'
 xarray
 xyzservices
 zipp
+
+allensdk
+pynwb
+### NOTE: thiese below will also install:
+### brainglobe-atlasapi, brainglobe-space, brainglobe-utils, brainglobe-workflows
+### cellfinder, cellfinder[napari], morphapi
+napari[all]
+brainglobe
+brainrender 
+brainglobe-segmentation
+
