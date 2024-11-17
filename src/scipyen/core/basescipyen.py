@@ -20,8 +20,12 @@ from traitlets.utils.importstring import import_item
 from core import quantities as cq
 from core.triggerprotocols import TriggerProtocol
 from core.quantities import unitsConvertible
+
+# from core.datatypes import * # FIXME: clashes with datetime.datetime !!!
+
 from core.datatypes import (Episode, Schedule, ProcedureType, AdministrationRoute, 
                             Procedure, TypeEnum, BioSourceType, TaxonDescriptor, Taxon,
+                            BiologicalSource,
                             )
 
 # class BaseScipyenData(ScipyenDataclassABC):

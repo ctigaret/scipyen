@@ -1223,6 +1223,7 @@ class BiologicalSource:
         TODO: 2024-11-17 21:11:13 : locate and use neuronal taxonomy API
     """
     sourceType:BioSourceType
+    organ:str
     tissue:str
     region:str
     subregion:str
