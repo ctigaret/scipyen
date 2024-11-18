@@ -16,7 +16,7 @@ EQUALS_NAN
 from __future__ import print_function
 
 #### BEGIN core python modules
-from abc import ABC
+from abc import ABC, ABCMeta, abstractmethod
 import collections 
 from collections import deque, namedtuple
 from functools import (singledispatch, singledispatchmethod)
@@ -52,6 +52,13 @@ import neo
 from neo.core import (baseneo, basesignal, container,)
 from neo.core.dataobject import (DataObject, ArrayDict,)
 
+class Taxon:
+    """Shim class that will be overwritten below if taxoniq package is installed"""
+    def __new__(obj, *args, **kwargs):
+        return NISSING
+    def __init__(self, *args, **kwargs):
+        pass
+    
 hasTaxoniq = False
 try:
     import taxoniq
@@ -60,11 +67,21 @@ try:
 except:
     hasTaxoniq = False
     taxoniq = None
-    class Taxon():
-        def __new__(obj, *args, **kwargs):
-            return NISSING
-        def __init__(self, *args, **kwargs):
-            pass
+
+class BGStructure:
+    """Shim class that will be overwritten below if brainglobe packages are installed"""
+    def __new__(obj, *args, **kwargs):
+        return NISSING
+    def __init__(self, *args, **kwargs):
+        pass
+    
+hasBrainGlobe=False
+try:
+    import brainglobe_atlasapi
+    from brainglobe_atlasapi.structure_class import Structure as BGStructure
+    hasBrainGlobe=True
+except:
+    hasBrainGlobe=False
             
 #### END 3rd party modules
 
@@ -764,99 +781,91 @@ def categorize_data_frame_columns(data, *column_names, inplace=True):
             
         return ret
     
-class ScipyenDataclassABC(ABC):
-    def toHDF5(self,group:h5py.Group, name:str, oname:str, 
-                       compression:str, chunks:bool, track_order:bool,
-                       entity_cache:dict) -> h5py.Group:
-        from iolib import h5io
-        target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
-        cached_entity = h5io.getCachedEntity(entity_cache, self)
-        if isinstance(cached_entity, h5py.Dataset):
-            group[target_name] = cached_entity
-            return cached_entity
+class BrainGlobeStructureDescriptor:
+    """Generic, str-based brain structure descriptor.
+    Currently, a shim, to evolve into a descriptor for instances of 
+    brainglobe_atlasapi.structure_class.Structure once I've figured out a way to
+    "normalize" the structure IDs for corresponding structures across various 
+    atlases.
+    
+    For example, the structure with name "Hippocampal formation" has the acronym
+    "HF" in Waxholm rat brain atlas, but to "HPF" in Allen adult brain atlas (and 
+    (and the derived ones, like Princeton mouse atlas or Kim mouse atlas).
+    
+    
+    There are also discrepancies in the "canonical" name of the structure, e.g.
+    acronym "CA1" is mapped to "Cornu ammonis 1" in Waxholm, "Field CA1" in Allen
+    and Princeton atlases, bu to "Field CA1 of the hippocampus" in Kim atlas.
+    
         
-        if isinstance(name, str) and len(name.strip()):
-            target_name = name
+    """
+    def __init__(self, *, default:typing.Optional[typing.Union[str, type(pd.NA)]] = None):
+        if isinstance(default, str):
+            if len(default.strip()) == 0:
+                default = pd.NA
+            
+        elif default is None:
+            default = pd.NA
+            
+        elif not isinstance(default, type(pd.NA)):
+            raise TypeError(f"Expecting a non-empty str, pandas NA, or None; instead, got {type(default).__name__}")
         
-        attrs = dict(filter(lambda x: not dataclasses.is_dataclass(x[1]) and not isinstance(x[1], np.ndarray), map(lambda f:(f.name, getattr(self, name, None)), dataclasses.fields(self))))
+        self._default = default
         
-        dcattrs = dict(filter(lambda x: dataclasses.is_dataclass(x[1]), map(lambda f:(f.name, getattr(self, name, None)), dataclasses.fields(self))))
-        
-        arrayattrs = dict(filter(lambda x: isinstance(x[1], np.ndarray), map(lambda f:(f.name, getattr(self, name, None)), dataclasses.fields(self))))
-        
-        objattrs = h5io.makeAttrDict(**attrs)
-        obj_attrs.update(objattrs)
-        
-        entity = group.create_group(target_name, track_order=track_order)
-        entity.attrs.update(obj_attrs)
-        
-        if len(dcattrs):
-            for k,v in dcattrs.items():
-                h5io.toHDF5(v, entity, name=k, oname=k,
-                            compression=compression,chunks=chunks,
-                            track_order=track_order,
-                            entity_cache=entity_cache)
+    def __set_name__(self, obj:object, name:str):
+        if len(name.strip()) == 0:
+            raise ValueError("Cannot accept an empty name")
+        self._name = "_"+name
+    
+    def __get__(self, obj:object, objtype:type) -> object:
+        if obj is None:
+            return self._default
+        return getattr(obj, self._name, self._default)
+    
+    def __set__(self, obj:object, value:typing.Optional[typing.Union[str, type(pd.NA)]] = None):
+        if isinstance(value, str):
+            if len(value.strip()) == 0:
+                value = pd.NA
                 
-        if len(arrayattrs):
-            for k,v in arrayattrs.items():
-                h5io.toHDF5(v, entity, name=k, oname=k,
-                            compression=compression,chunks=chunks,
-                            track_order=track_order,
-                            entity_cache=entity_cache)
+        elif value is None:
+            value = pd.NA
+            
+        elif not isinstance(value, type(pd.NA)):
+            raise TypeError(f"Expecting a non-empty str, pandas NA, or None; instead, got {type(default).__name__}")
+            
+        setattr(obj, self._name, value)
         
-        h5io.storeEntityInCache(entity_cache, self, entity)
-        return entity
+class DoseDescriptor:
+    def __init__(self, *, default:typing.Optional[pq.Quantity]=None):
+        if isinstance(default, pq.Quantity):
+            if not scq.checkDosageUnits(default):
+                raise ValueError(f"Expecting dosage units; instead, got {default.units}")
+            
+        elif default is not None:
+            raise TypeError(f"Expecting a scalar dosage Quantity or None; instead, got {type(default).__name__}")
+        
+        self._default = default
+        
+    def __set_name__(self, obj:object, name:str):
+        if len(name.strip()) == 0:
+            raise ValueError("Cannot accept an empty name")
+        self._name = "_"+name
+        
+    def __get__(self, obj:object, objtype:type) -> object:
+        if obj is None:
+            return self._default
+        return getattr(obj, self._name, self._default)
     
-    @classmethod
-    def fromHDF5(cls, entity:h5py.Group, 
-                             attrs:typing.Optional[dict] = None, cache:dict = {}):
-        from iolib import h5io
-        if entity in cache:
-            return cache[entity]
+    def __set__(self, obj:object, value:typing.Optional[pq.Quantity] = None):
+        if isinstance(value, pq.Quantity):
+            if not scq.checkDosageUnits(value):
+                raise ValueError(f"Expecting dosage units; instead got {value.units}")
+            
+        elif value is not None:
+            raise TypeError(f"Expecting a scalar dosage Quantity, or None; instead got {type(value).__name__}")
+
+        setattr(obj, self._name, value)
         
-        attrs = h5io.attrs2dict(entity.attrs)
-        
-        attrs_as_entities = [a for a in cls.__match_args__ if a not in attrs]
-        
-        kwargs = dict()
-        
-        for a in cls.__match_args__:
-            if a in attrs:
-                kwargs[a] = attrs[a]
-            else:
-                if a in entity.keys():
-                    kwargs[a] = h5io.fromHDF5(entity[a], cache=cache)
-                    
-        return cls(**kwargs)
-        # return cls(**attrs)
-       
-#     @classmethod
-#     def fromDict(cls, **kwargs):
-#         """Constructs an instance of this class using a keywords that match the class fields.
-#     
-#         The dict keys or keywords are NOT valid field names for this class are silently 
-#         ignored. 
-# 
-#         """
-#         field_names = tuple(f.name for f in dataclasses.fields(cls))
-#         
-#         initkwargs = dict((i, kwargs[i]) for i in field_names if i in kwargs)
-#         
-#         print(f"{cls.__name__}.fromDict({tuple(initkwargs.keys())})")
-#         
-#         # if len(args):
-#         #     if isinstance(args[0], dict):
-#         #         mykwargs = args[0].copy()
-#         #     else:
-#         #         raise TypeError(f"Expecting a dict; instead, got a {type(args[0]).__name__}")
-#         #     mykwargs.update(kwargs)
-#         #     initkwargs = dict((i, kwargs[i]) for i in field_names if i in mykwargs)
-#         # else:
-#         #     initkwargs = dict((i, kwargs[i]) for i in field_names if i in kwargs)
-#         
-#         return cls(**initkwargs)
-        
-    
 class TaxonDescriptor:
     def __init__(self, *, default:Taxon = MISSING):
         if hasTaxoniq and isinstance(default, taxoniq.Taxon):
@@ -878,6 +887,102 @@ class TaxonDescriptor:
         if isinstance(value, Taxon):
             setattr(obj, self._name, value)
             
+# class ScipyenDataclassABC(metaclass=ABCMeta):
+#     @abstractmethod
+#     def __repr__(self):
+#         return ""
+#     
+#     @abstractmethod
+#     def __eq__(self, other):
+#         pass
+#     
+#     @abstractmethod
+#     def toHDF5(self, *args, **kwargs):
+#         pass
+#     
+#     @classmethod
+#     @abstractmethod
+#     def fromHDF5(cls, *args, **kwargs):
+#         pass
+
+@dataclass
+# class ScipyenDataclass(ScipyenDataclassABC):
+class ScipyenDataclass:
+    # def __repr__(self):
+    #     print(f"{self.__class__.__name__}.__repr__()")
+    #     repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {x}"
+    #     ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
+    #     return "\n".join(ret)
+    
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            return False
+        
+        ret = self.name == other.name
+        
+        if ret:
+            ret &= all(getattr(self, f.name) == getattr(other, f.name) for f in dataclasses.fields(self.__class__))
+            
+        return ret
+    
+    def toHDF5(self, group:h5py.Group, name:str, oname:str, 
+                       compression:str, chunks:bool, track_order:bool,
+                       entity_cache:dict) -> h5py.Group:
+        from iolib import h5io
+        target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
+        cached_entity = h5io.getCachedEntity(entity_cache, self)
+        if isinstance(cached_entity, h5py.Dataset):
+            group[target_name] = cached_entity
+            return cached_entity
+        
+        if isinstance(name, str) and len(name.strip()):
+            target_name = name
+        
+        full_attrs = dataclasses.asdict(self)
+        
+        attr_types = tuple(h5io.makeAttr.registry.keys())
+        
+        attrs = dict((k,v) for k,v in full_attrs.items() if isinstance(v, attr_types))
+        child_entities_dict = dict((k,v) for k,v in full_attrs.items() if not isinstance(v, attr_types))
+        
+        objattrs = h5io.makeAttrDict(**attrs)
+        obj_attrs.update(objattrs)
+        
+        entity = group.create_group(target_name, track_order=track_order)
+        entity.attrs.update(obj_attrs)
+        
+        if len(child_entities_dict):
+            for k,v in child_entities_dict.items():
+                h5io.toHDF5(v, entity, name=k, oname=k,
+                            compression=compression,chunks=chunks,
+                            track_order=track_order,
+                            entity_cache=entity_cache)
+                
+        h5io.storeEntityInCache(entity_cache, self, entity)
+        return entity
+    
+    @classmethod
+    def fromHDF5(cls, entity:h5py.Group, 
+                             attrs:typing.Optional[dict] = None, cache:dict = {}):
+        from iolib import h5io
+        if entity in cache:
+            return cache[entity]
+        
+        attrs = h5io.attrs2dict(entity.attrs)
+        
+        attrs_as_entities = [a for a in cls.__match_args__ if a not in attrs]
+        
+        kwargs = dict()
+        
+        for a in attrs_as_entities:
+            if a in attrs:
+                kwargs[a] = attrs[a]
+            else:
+                if a in entity.keys():
+                    kwargs[a] = h5io.fromHDF5(entity[a], cache=cache)
+                    
+        return cls(**kwargs)
+       
 class TypeEnum(IntEnum):
     """Common ancestor for enum types used in Scipyen
     """
@@ -1187,6 +1292,7 @@ class CellCompartmentType(TypeEnum):
     See http://www.neuronland.org/NLMorphologyConverter/MorphologyFormats/SWC/Spec.html
     """
     undefined = 0
+    cell = undefined
     soma = 1
     axon = 2
     dendrite = 3 # basal dendrite
@@ -1224,6 +1330,23 @@ class ProcedureType(TypeEnum):
     weaning = 128
     cull = 256
     other = 512
+    
+class OrganismStage(TypeEnum):
+    undefined   = 0
+    zygote      = 1
+    morula      = 2
+    blastula    = 4
+    gastrula    = 8
+    embryo      = zygote | morula | blastula | gastrula # = 15
+    foetal      = 16
+    prenatal = embryo | foetal # = 31
+    larva       = 32
+    prepubertal = larva
+    preweaning  = prepubertal
+    adolescent  = 33
+    adult       = 34
+    juvenile    = larva | adolescent # = 65
+    postnatal   = larva | adolescent | adult # = 99
     
 class AdministrationRoute(TypeEnum):
     null = 0
@@ -1300,13 +1423,19 @@ def inspect_members(obj, predicate=None):
     return dict(mb)
 
 @dataclass
-class CellCompartment(ScipyenDataclassABC):
+class CellCompartment(ScipyenDataclass):
     name:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
     type:CellCompartmentType = CellCompartmentType.undefined
     id:int = 0
 
+    def __repr__(self):
+        indent = lambda x: x.replace("\n", "\n\t")
+        repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}"
+        ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
+        return "\n".join(ret)
+    
 @dataclass
-class Biometrics(ScipyenDataclassABC):
+class Biometrics(ScipyenDataclass):
     genotype:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
     # genotype of the source - keep it simple
     #
@@ -1329,28 +1458,48 @@ class Biometrics(ScipyenDataclassABC):
     # provide a more standardized way to store this information, hopefully more
     # suitable to some sort of database management
     
+    postnatal:bool=True
+    
     weight:typing.Union[pq.Quantity, type(pd.NA)] = dataclasses.field(default=pd.NA) 
     height:typing.Union[pq.Quantity, type(pd.NA)] = dataclasses.field(default=pd.NA)
     
+    def __repr__(self):
+        indent = lambda x: x.replace("\n", "\n\t")
+        repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}"
+        ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
+        return "\n".join(ret)
+    
 @dataclass
-class Organism(ScipyenDataclassABC):
+class Organism(ScipyenDataclass):
     taxon:TaxonDescriptor = dataclasses.field(default=TaxonDescriptor())
     subspecies:str = "Sprague Dawley"
+    stage:OrganismStage = dataclasses.field(default=OrganismStage.postnatal)
+    biometrics:Biometrics = dataclasses.field(default_factory=Biometrics)
+    
+    def __repr__(self):
+        indent = lambda x: x.replace("\n", "\n\t")
+        repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}"
+        ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
+        return "\n".join(ret)
+    
+# @dataclass
+# class Organ(ScipyenDataclass):
+#     name:str = "brain"
+#     # structure:BrainGlobeStructureDescriptor = BrainGlobeStructureDescriptor()
+    
 
 @dataclass
-class BiologicalSource(ScipyenDataclassABC):
+class BiologicalSource(ScipyenDataclass):
     """
         TODO: 2024-11-17 21:11:13 : locate and use neuronal taxonomy API
     """
     organism:Organism = dataclasses.field(default_factory=Organism)
-    biometrics:Biometrics = dataclasses.field(default_factory=Biometrics)
-    organ:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
-    tissue:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
-    region:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
-    subregion:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
+    # organ:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
+    structure:BrainGlobeStructureDescriptor = BrainGlobeStructureDescriptor()
+    # for now, only brain atlas api are supported
     cellType:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA) # e.g. "neuron"
     cellMorphologicalType:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA) # e.g."pyramidal"
-    cellDescriptors:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
+    cellDescriptors:typing.Union[str, type(pd.NA), typing.Sequence[str]] = dataclasses.field(default=pd.NA)
     sourceType:BioSourceType = dataclasses.field(default=BioSourceType.exvivo)
     sourceID:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
     # identifier for the cell source: this may a (meaningful) combination of:
@@ -1374,19 +1523,26 @@ class BiologicalSource(ScipyenDataclassABC):
     #   3) should NOT begin with a digit or underscore ('_')
     # 
     
-    fieldID:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
-    # ID for a microscopy field — useful only for experiments involving imaging
-    # unique identifier for the microscopy field (e.g. one can record from more 
-    # than one field containing (sub)-regions of the same cell — spines, 
-    # dendritic segments, etc)
+    # TODO: 2024-11-18 16:51:36
+    # move this to ScanData metadata
+    # fieldID:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
+    # # ID for a microscopy field — useful only for experiments involving imaging
+    # # unique identifier for the microscopy field (e.g. one can record from more 
+    # # than one field containing (sub)-regions of the same cell — spines, 
+    # # dendritic segments, etc)
     
-    compartment:CellCompartment = dataclasses.field(default_factory=CellCompartment)
+    cellCompartment:CellCompartment = dataclasses.field(default_factory=CellCompartment)
     # cellular compartment (there may be more than one in the same
     # field) — e,g, "spine", "dendrite", "axon", "soma"
     
-# class Procedure(ScipyenDataclassABC):
+    def __repr__(self):
+        indent = lambda x: x.replace("\n", "\n\t")
+        repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}"
+        ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
+        return "\n".join(ret)
+    
 @dataclass
-class Procedure:
+class Procedure(ScipyenDataclass):
     """An experimental procedure: what is being done during an Episode.
     
     A succession of procedures (attached to the episodes of a Schedule) 
@@ -1401,106 +1557,68 @@ class Procedure:
     type: ProcedureType = ProcedureType.null
     description: str = ""
     
-    def __eq__(self, other):
-        if not isinstance(other, self.__class__):
-            return False
-        
-        ret = self.name == other.name
-        
-        if ret:
-            ret &= all(getattr(self, f.name) == getattr(other, f.name) for f in dataclasses.fields(self.__class__))
-            # # skip 'description' as this is not definitory
-            # ret &= all(getattr(self, f.name) == getattr(other, f.name) for f in filter(lambda x: x.name != "description", dataclasses.fields(self.__class__)))
-            
-        return ret
+    def __repr__(self):
+        indent = lambda x: x.replace("\n", "\n\t")
+        repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}"
+        ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
+        return "\n".join(ret)
     
-    def toHDF5(self,group:h5py.Group, name:str, oname:str, 
-                       compression:str, chunks:bool, track_order:bool,
-                       entity_cache:dict) -> h5py.Group:
-        from iolib import h5io
-        target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
-        cached_entity = h5io.getCachedEntity(entity_cache, self)
-        if isinstance(cached_entity, h5py.Dataset):
-            group[target_name] = cached_entity
-            return cached_entity
-        
-        if isinstance(name, str) and len(name.strip()):
-            target_name = name
-        
-        attrs = {"name": self.name, "procedureType": self.type, 
-                 "description": self.description}
-        
-        objattrs = h5io.makeAttrDict(**attrs)
-        obj_attrs.update(objattrs)
-        
-        entity = group.create_group(target_name, track_order=track_order)
-        entity.attrs.update(obj_attrs)
-        h5io.storeEntityInCache(entity_cache, self, entity)
-        return entity
-    
-    @classmethod
-    def fromHDF5(cls, entity:h5py.Group, 
-                             attrs:typing.Optional[dict] = None, cache:dict = {}):
-        
-        from iolib import h5io
-        if entity in cache:
-            return cache[entity]
-        
-        attrs = h5io.attrs2dict(entity.attrs)
-        
-        name = attrs["name"]
-        procedureType = attrs["procedureType"]
-        description = attrs["description"]
-        
-        return cls(name, type=procedureType, description=description)
-
+#     def __eq__(self, other):
+#         if not isinstance(other, self.__class__):
+#             return False
+#         
+#         ret = self.name == other.name
+#         
+#         if ret:
+#             ret &= all(getattr(self, f.name) == getattr(other, f.name) for f in dataclasses.fields(self.__class__))
+#             # # skip 'description' as this is not definitory
+#             # ret &= all(getattr(self, f.name) == getattr(other, f.name) for f in filter(lambda x: x.name != "description", dataclasses.fields(self.__class__)))
+#             
+#         return ret
+#     
+#     def toHDF5(self,group:h5py.Group, name:str, oname:str, 
+#                        compression:str, chunks:bool, track_order:bool,
+#                        entity_cache:dict) -> h5py.Group:
+#         from iolib import h5io
+#         target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
+#         cached_entity = h5io.getCachedEntity(entity_cache, self)
+#         if isinstance(cached_entity, h5py.Dataset):
+#             group[target_name] = cached_entity
+#             return cached_entity
+#         
+#         if isinstance(name, str) and len(name.strip()):
+#             target_name = name
+#         
+#         attrs = {"name": self.name, "procedureType": self.type, 
+#                  "description": self.description}
+#         
+#         objattrs = h5io.makeAttrDict(**attrs)
+#         obj_attrs.update(objattrs)
+#         
+#         entity = group.create_group(target_name, track_order=track_order)
+#         entity.attrs.update(obj_attrs)
+#         h5io.storeEntityInCache(entity_cache, self, entity)
+#         return entity
+#     
 #     @classmethod
-#     def fromDict(cls, **kwargs):
-#         """Constructs an instance of this class using 'kwargs' keys that match the class fields.
-#         Keys in kwargs that are NOT valid field names for this class are silently 
-#         ignored. 
-#         """
-#         field_names = tuple(f.name for f in dataclasses.fields(cls))
+#     def fromHDF5(cls, entity:h5py.Group, 
+#                              attrs:typing.Optional[dict] = None, cache:dict = {}):
 #         
-#         initkwargs = dict((i, kwargs[i]) for i in field_names if i in kwargs)
+#         from iolib import h5io
+#         if entity in cache:
+#             return cache[entity]
 #         
-#         return cls(**initkwargs)
-    
-class DoseDescriptor:
-    def __init__(self, *, default:typing.Optional[pq.Quantity]=None):
-        if isinstance(default, pq.Quantity):
-            if not scq.checkDosageUnits(default):
-                raise ValueError(f"Expecting dosage units; instead, got {default.units}")
-            
-        elif default is not None:
-            raise TypeError(f"Expecting a scalar dosage Quantity or None; instead, got {type(default).__name__}")
-        
-        self._default = default
-        
-    def __set_name__(self, obj:object, name:str):
-        if len(name.strip()) == 0:
-            raise ValueError("Cannot accept an empty name")
-        self._name = "_"+name
-        
-    def __get__(self, obj:object, objtype:type) -> object:
-        if obj is None:
-            return self._default
-        return getattr(obj, self._name, self._default)
-    
-    def __set__(self, obj:object, value:typing.Optional[pq.Quantity] = None):
-        if isinstance(value, pq.Quantity):
-            if not scq.checkDosageUnits(value):
-                raise ValueError(f"Expecting dosage units; instead got {value.units}")
-            
-        elif value is not None:
-            raise TypeError(f"Expecting a scalar dosage Quantity, or None; instead got {type(value).__name__}")
+#         attrs = h5io.attrs2dict(entity.attrs)
+#         
+#         name = attrs["name"]
+#         procedureType = attrs["procedureType"]
+#         description = attrs["description"]
+#         
+#         return cls(name, type=procedureType, description=description)
 
-        setattr(obj, self._name, value)
         
-        
-# class SubstanceDosage(ScipyenDataclassABC):
 @dataclass
-class SubstanceDosage:
+class SubstanceDosage(ScipyenDataclass):
     """Logical mapping between a compund (or substance) and a dose, in a Treatment.
     Fields:
     name:str. Name of the compound (free-form within Python's rules)
@@ -1514,6 +1632,12 @@ class SubstanceDosage:
     """
     name:str = "Vehicle"
     dose: DoseDescriptor = DoseDescriptor(default=None)
+    
+    def __repr__(self):
+        indent = lambda x: x.replace("\n", "\n\t")
+        repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}"
+        ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
+        return "\n".join(ret)
     
     def __eq__(self, other):
         if not isinstance(other, self.__class__):
@@ -1538,59 +1662,59 @@ class SubstanceDosage:
         
         return ret
     
-    def toHDF5(self,group:h5py.Group, name:str, oname:str, 
-                       compression:str, chunks:bool, track_order:bool,
-                       entity_cache:dict) -> h5py.Group:
-        from iolib import h5io
-        target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
-        cached_entity = h5io.getCachedEntity(entity_cache, self)
-        if isinstance(cached_entity, h5py.Dataset):
-            group[target_name] = cached_entity
-            return cached_entity
-        
-        # NOTE: 2024-07-20 15:03:37
-        # Because only scalar Quantities can be stored as HDF5 attributes, this 
-        # would preclude using using time-varying dose data types such as AnalogSignal, 
-        # IrregularlySampledSignal. 
-        # 
-        # Instead, the dose is stored as a HDF5 Dataset
-        #
-        
-        if isinstance(name, str) and len(name.strip()):
-            target_name = name
-        
-        attrs = {"name": self.name}
-        
-        objattrs = h5io.makeAttrDict(**attrs)
-        obj_attrs.update(objattrs)
-        
-        entity = group.create_group(target_name, track_order=track_order)
-        entity.attrs.update(obj_attrs)
-        # NOTE: 2024-07-20 15:16:44 see NOTE: 2024-07-20 15:03:37
-        # stores the "dose" Quantity as a dataset
-        h5io.toHDF5(self.dose, entity, name="dose", oname="dose",
-                            compression=compression,chunks=chunks,
-                            track_order=track_order, entity_cache=entity_cache)
-        
-        h5io.storeEntityInCache(entity_cache, self, entity)
-        
-        return entity
+#     def toHDF5(self,group:h5py.Group, name:str, oname:str, 
+#                        compression:str, chunks:bool, track_order:bool,
+#                        entity_cache:dict) -> h5py.Group:
+#         from iolib import h5io
+#         target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
+#         cached_entity = h5io.getCachedEntity(entity_cache, self)
+#         if isinstance(cached_entity, h5py.Dataset):
+#             group[target_name] = cached_entity
+#             return cached_entity
+#         
+#         # NOTE: 2024-07-20 15:03:37
+#         # Because only scalar Quantities can be stored as HDF5 attributes, this 
+#         # would preclude using using time-varying dose data types such as AnalogSignal, 
+#         # IrregularlySampledSignal. 
+#         # 
+#         # Instead, the dose is stored as a HDF5 Dataset
+#         #
+#         
+#         if isinstance(name, str) and len(name.strip()):
+#             target_name = name
+#         
+#         attrs = {"name": self.name}
+#         
+#         objattrs = h5io.makeAttrDict(**attrs)
+#         obj_attrs.update(objattrs)
+#         
+#         entity = group.create_group(target_name, track_order=track_order)
+#         entity.attrs.update(obj_attrs)
+#         # NOTE: 2024-07-20 15:16:44 see NOTE: 2024-07-20 15:03:37
+#         # stores the "dose" Quantity as a dataset
+#         h5io.toHDF5(self.dose, entity, name="dose", oname="dose",
+#                             compression=compression,chunks=chunks,
+#                             track_order=track_order, entity_cache=entity_cache)
+#         
+#         h5io.storeEntityInCache(entity_cache, self, entity)
+#         
+#         return entity
     
-    @classmethod
-    def fromHDF5(cls, entity:h5py.Group, 
-                             attrs:typing.Optional[dict] = None, cache:dict = {}):
-        
-        from iolib import h5io
-        if entity in cache:
-            return cache[entity]
-        
-        attrs = h5io.attrs2dict(entity.attrs)
-        
-        name = attrs["name"]
-        
-        dose = h5io.fromHDF5(entity["dose"], cache)
-        
-        return cls(name, dose=dose)
+#     @classmethod
+#     def fromHDF5(cls, entity:h5py.Group, 
+#                              attrs:typing.Optional[dict] = None, cache:dict = {}):
+#         
+#         from iolib import h5io
+#         if entity in cache:
+#             return cache[entity]
+#         
+#         attrs = h5io.attrs2dict(entity.attrs)
+#         
+#         name = attrs["name"]
+#         
+#         dose = h5io.fromHDF5(entity["dose"], cache)
+#         
+#         return cls(name, dose=dose)
      
 @dataclass
 class Treatment(Procedure):
@@ -1608,6 +1732,12 @@ class Treatment(Procedure):
     route:AdministrationRoute = AdministrationRoute.null
     description: str = ""
     type:ImmutableDescriptor = ImmutableDescriptor(default=ProcedureType.treatment)
+    
+    def __repr__(self):
+        indent = lambda x: x.replace("\n", "\n\t")
+        repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}"
+        ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
+        return "\n".join(ret)
     
     def __post_init__(self):
         super().__init__(name=self.name, substance=self.substance, description=self.description, 
@@ -1634,61 +1764,60 @@ class Treatment(Procedure):
             
         return ret
         
-    def toHDF5(self, group, name, oname, compression, chunks, track_order,
-                       entity_cache) -> h5py.Group:
+#     def toHDF5(self, group, name, oname, compression, chunks, track_order,
+#                        entity_cache) -> h5py.Group:
+# 
+#         from iolib import h5io
+#         target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
+#         cached_entity = h5io.getCachedEntity(entity_cache, self)
+#         if isinstance(cached_entity, h5py.Dataset):
+#             group[target_name] = cached_entity
+#             return cached_entity
+# 
+#         # NOTE: 2024-11-16 21:29:09
+#         # 'dose' moved to SubstanceDosage
+#         
+#         attrs = {"name": getattr(self, "name", ""), 
+#                  "route": getattr(self, "route", AdministrationRoute.null), 
+#                  "description": getattr(self, "description", "")}
+#         
+#         objattrs = h5io.makeAttrDict(**attrs)
+#         obj_attrs.update(objattrs)
+#         
+#         if isinstance(name, str) and len(name.strip()):
+#             target_name = name
+#             
+#         entity = group.create_group(target_name, track_order=track_order)
+#         entity.attrs.update(obj_attrs)
+#         
+#         h5io.toHDF5(self.substance, entity, name="substance", oname="substance",
+#                     compression=compression, chunks=chunks,
+#                     track_order=track_order, entity_cache=entity_cache)
+#         
+#         h5io.storeEntityInCache(entity_cache, self, entity)
+#         return entity
+#         
+#     @classmethod
+#     def fromHDF5(cls, entity:h5py.Group, 
+#                              attrs:typing.Optional[dict] = None, cache:dict = {}):
+#         
+#         from iolib import h5io
+#         if entity in cache:
+#             return cache[entity]
+#         
+#         attrs = h5io.attrs2dict(entity.attrs)
+#         
+#         name = attrs["name"]
+#         route = attrs["route"]
+#         description = attrs["description"]
+#         
+#         substance = h5io.fromHDF5(entity["substance"], cache)
+#         
+#         return cls(name, substance=substance, route=route, description=description)#,
+#                    # type = ProcedureType.treatment)
 
-        from iolib import h5io
-        target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
-        cached_entity = h5io.getCachedEntity(entity_cache, self)
-        if isinstance(cached_entity, h5py.Dataset):
-            group[target_name] = cached_entity
-            return cached_entity
-
-        # NOTE: 2024-11-16 21:29:09
-        # 'dose' moved to SubstanceDosage
-        
-        attrs = {"name": getattr(self, "name", ""), 
-                 "route": getattr(self, "route", AdministrationRoute.null), 
-                 "description": getattr(self, "description", "")}
-        
-        objattrs = h5io.makeAttrDict(**attrs)
-        obj_attrs.update(objattrs)
-        
-        if isinstance(name, str) and len(name.strip()):
-            target_name = name
-            
-        entity = group.create_group(target_name, track_order=track_order)
-        entity.attrs.update(obj_attrs)
-        
-        h5io.toHDF5(self.substance, entity, name="substance", oname="substance",
-                    compression=compression, chunks=chunks,
-                    track_order=track_order, entity_cache=entity_cache)
-        
-        h5io.storeEntityInCache(entity_cache, self, entity)
-        return entity
-        
-    @classmethod
-    def fromHDF5(cls, entity:h5py.Group, 
-                             attrs:typing.Optional[dict] = None, cache:dict = {}):
-        
-        from iolib import h5io
-        if entity in cache:
-            return cache[entity]
-        
-        attrs = h5io.attrs2dict(entity.attrs)
-        
-        name = attrs["name"]
-        route = attrs["route"]
-        description = attrs["description"]
-        
-        substabce = h5io.fromHDF5(entity["substance"], cache)
-        
-        return cls(name, substance=substance, route=route, description=description)#,
-                   # type = ProcedureType.treatment)
-
-# class Episode(ScipyenDataclassABC):
 @dataclass
-class Episode:
+class Episode(ScipyenDataclass):
     """Generic episode for frame-based data.
         NOTE: The `beginFrame` and `endFrame` fields are inclusive indices.
         To use them in indexing a sequence (or frames), add 1 (one) to the 
@@ -1712,73 +1841,78 @@ class Episode:
     description:str = ""
     procedure:typing.Optional[Procedure] = field(default = None)
     
-    def __eq__(self, other):
-        if not isinstance(other, self.__class__):
-            return False
-        
-        ret = True
-        ret &= self.name == other.name
-        if ret:
-            # don't compare description as this is not definitory
-            ret &= all(getattr(self, f.name) == getattr(other, f.name) for f in list(filter(lambda x: x.name != "description", dataclasses.fields(self.__class__))))
-            
-        return ret
+#     def __eq__(self, other):
+#         if not isinstance(other, self.__class__):
+#             return False
+#         
+#         ret = True
+#         ret &= self.name == other.name
+#         if ret:
+#             # don't compare description as this is not definitory
+#             ret &= all(getattr(self, f.name) == getattr(other, f.name) for f in list(filter(lambda x: x.name != "description", dataclasses.fields(self.__class__))))
+#             
+#         return ret
     
-    def toHDF5(self,group:h5py.Group, name:str, oname:str, 
-                       compression:str, chunks:bool, track_order:bool,
-                       entity_cache:dict) -> h5py.Dataset:
-        """Encodes an episode as an empty hdf5 dataset"""
-        from iolib import h5io
-        target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
-        cached_entity = h5io.getCachedEntity(entity_cache, self)
-        if isinstance(cached_entity, h5py.Dataset):
-            group[target_name] = cached_entity
-            return cached_entity
-        
-        attrs = dict((x, getattr(self, x)) for x in ("name", "begin", "end", "beginFrame", "endFrame", "description"))
-        
-        objattrs = h5io.makeAttrDict(**attrs)
-        obj_attrs.update(objattrs)
-        
-        if isinstance(name, str) and len(name.strip()):
-            target_name = name
-        
-        entity = group.create_dataset(name, data = h5py.Empty("f"), track_order=track_order)
-        entity.attrs.update(obj_attrs)
-        
-        h5io.toHDF5(self.procedure, entity, name="procedure", oname="procedure",
-                            compression=compression,chunks=chunks,
-                            track_order=track_order,
-                            entity_cache=entity_cache)
-        
-        h5io.storeEntityInCache(entity_cache, self, entity)
-        
-        return entity
+    def __repr__(self):
+        indent = lambda x: x.replace("\n", "\n\t")
+        repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}"
+        ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
+        return "\n".join(ret)
     
-    @classmethod
-    def fromHDF5(cls, entity:h5py.Dataset,
-                             attrs:typing.Optional[dict]=None, cache:dict={}):
-        from iolib import h5io
-        if entity in cache:
-            return cache[entity]
+#     def toHDF5(self,group:h5py.Group, name:str, oname:str, 
+#                        compression:str, chunks:bool, track_order:bool,
+#                        entity_cache:dict) -> h5py.Dataset:
+#         """Encodes an episode as an empty hdf5 dataset"""
+#         from iolib import h5io
+#         target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
+#         cached_entity = h5io.getCachedEntity(entity_cache, self)
+#         if isinstance(cached_entity, h5py.Dataset):
+#             group[target_name] = cached_entity
+#             return cached_entity
+#         
+#         attrs = dict((x, getattr(self, x)) for x in ("name", "begin", "end", "beginFrame", "endFrame", "description"))
+#         
+#         objattrs = h5io.makeAttrDict(**attrs)
+#         obj_attrs.update(objattrs)
+#         
+#         if isinstance(name, str) and len(name.strip()):
+#             target_name = name
+#         
+#         entity = group.create_dataset(name, data = h5py.Empty("f"), track_order=track_order)
+#         entity.attrs.update(obj_attrs)
+#         
+#         h5io.toHDF5(self.procedure, entity, name="procedure", oname="procedure",
+#                             compression=compression,chunks=chunks,
+#                             track_order=track_order,
+#                             entity_cache=entity_cache)
+#         
+#         h5io.storeEntityInCache(entity_cache, self, entity)
+#         
+#         return entity
+#     
+#     @classmethod
+#     def fromHDF5(cls, entity:h5py.Dataset,
+#                              attrs:typing.Optional[dict]=None, cache:dict={}):
+#         from iolib import h5io
+#         if entity in cache:
+#             return cache[entity]
+#         
+#         attrs = h5io.attrs2dict(entity.attrs)
+#         
+#         name = attrs["name"]
+#         begin = attrs["begin"]
+#         end = attrs["end"]
+#         beginFrame = attrs["beginFrame"]
+#         endFrame = attrs["endFrame"]
+# 
+#         procedure = h5io.fromHDF5(entity["procedure"], cache=cache)
+#         
+#         return cls(name, begin=begin, end=end, 
+#                    beginFrame=beginFrame, endFrame=endFrame,
+#                    procedure=procedure)
         
-        attrs = h5io.attrs2dict(entity.attrs)
-        
-        name = attrs["name"]
-        begin = attrs["begin"]
-        end = attrs["end"]
-        beginFrame = attrs["beginFrame"]
-        endFrame = attrs["endFrame"]
-
-        procedure = h5io.fromHDF5(entity["procedure"], cache=cache)
-        
-        return cls(name, begin=begin, end=end, 
-                   beginFrame=beginFrame, endFrame=endFrame,
-                   procedure=procedure)
-        
-# class Schedule(ScipyenDataclassABC):
 @dataclass
-class Schedule:
+class Schedule(ScipyenDataclass):
     """Logical grouping of a sequence of episodes.
         A Schedule can be logically considered a "protocol", where any of its
         constituent episodes may associate a Procedure. 
@@ -1786,6 +1920,12 @@ class Schedule:
     name:str = ""
     _:KW_ONLY
     episodes:typing.Sequence[Episode] = field(default_factory = lambda : list())
+    
+    def __repr__(self):
+        indent = lambda x: x.replace("\n", "\n\t")
+        repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}"
+        ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
+        return "\n".join(ret)
     
     def __eq__(self, other):
         if not isinstance(other, self.__class__):

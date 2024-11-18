@@ -517,17 +517,6 @@ def exploreHDF(hdf_file:typing.Union[str, h5py.Group]):
             print(f"cannot read dimension scales in {dset.name}")
             pass
                 
-        # print(h5py.h5ds.get_num_scales(dset))
-        
-        # dimscales = [(k, d) for k, d in enumerate(dset.dims)]
-        # if len(dimscales):
-        #     print("with dimension scales:")
-        #     for kd, dim in dimscales:
-        #         print(f"\tdimension {kd}:")
-        #         for k,v in dim.items():
-        #             print(f"\t\t{k}: {printHdf(v)}, (type: {type(v)}, dtype: {v.dtype.kind})")
-        #     print("\n")
-
     if isinstance(hdf_file, str):
         if os.path.isfile(hdf_file):
             with h5py.File(hdf_file, 'r') as f:
@@ -627,87 +616,19 @@ def _(x):
     except:
         raise HDFDataError(f"The object {x}\n with type {type(x).__name__} cannot be serialized in json")
 
-@makeAttr.register(np.ndarray)
-@makeAttr.register(pq.Quantity)
-def _(x):
-    if isinstance(x, pq.Quantity):
-        if x.size > 1:
-            raise ValueError(f"non-scalar quantities {x} cannot be stored as HDF5 Attributes; convert them to HDF5 Dataset")
-        
-        return f"QUANTITY {quantity2str(x)}"
-#         return f"{float(xx.magnitude)}, pq.{xx.units.dimensionality})"
-#         xx = x.simplified
+# @makeAttr.register(np.ndarray)
+# @makeAttr.register(pq.Quantity)
+# def _(x):
+#     if isinstance(x, pq.Quantity):
+#         if x.size > 1:
+#             raise ValueError(f"non-scalar quantities {x} cannot be stored as HDF5 Attributes; convert them to HDF5 Dataset")
 #         
-#         return f"pq.Quantity({float(xx.magnitude)}, pq.{xx.units.dimensionality})"
-    
-    elif x.dtype.kind in NUMPY_STRING_KINDS:
-        return np.array(x, dtype=h5py.string_dtype(), order="K")
-    else:
-        return jsonio.dumps(x) 
-    
-
-    
-
-# def makeAttr(x:typing.Optional[typing.Union[str, list, tuple, dict, deque, np.ndarray, datetime.datetime]]=None):
-#     """Returns a representation of 'x' suitable as a HDF5 entity attribute.
+#         return f"QUANTITY {quantity2str(x)}"
 #     
-#     `x` is typically a basic Python type, and the representation is a JSON string.
-#     
-#     Parameters:
-#     -----------
-#     'x': basic Python type (str or scalar number), or numpy array
-#     
-#     Returns:
-#     --------
-#     A string when 'x' is a str, or is a container with elements that can be
-#         written to a JSON-formatted string.
-#         
-#         As a rule of thumb, these objects should be relatively small, and the 
-#         container should be relatively simple.
-#     
-#     A numpy array with dtype j5py.string_dtype() when 'x' is a numpy array with
-#     dtype.kind of 'S' or 'U' (i.e., strings)
-#     
-#     'x' itself in any other case.
-#     
-#     CAUTION h5py will raise exception when 'x' is of a type that h5py cannot 
-#     store as attrs value to a Group or Dataset.
-#     
-#     """
-#     if x is None:
-#         return jsonio.dumps(x)
-#     
-#     if isinstance(x, str):
-#         # because np.str_ resolves to str in later versions; but data saved with
-#         # old numpy API msy still hold scalars of type np.str_
-#         if isinstance(x, np.str_):
-#             return str(x)
-#         
-#         return x
-#     
-#     # NOTE: 2022-11-28 17:54:36
-#     # store datetime.datetime in their isoformat string representation
-#     if isinstance(x, (datetime.datetime, datetime.date, datetime.time)):
-#         return f"{x.__class__.__module__}.{x.__class__.__name__} {x.isoformat()}"
-#         
-#     if isinstance(x, (list, tuple, dict)): 
-#         # will raise exception if elements or values are not json-able
-#         # CAUTION Do not use large data objects here!
-#         # We use the CustomEncoder which has wider coverage and its own 
-#         # limitations/caveats
-#         # 
-#         try:
-#             return jsonio.dumps(x)
-#         except:
-#             raise HDFDataError(f"The object {x}\n with type {type(x).__name__} cannot be serialized in json")
-# 
-#     if isinstance(x, np.ndarray):
-#         if x.dtype.kind in NUMPY_STRING_KINDS:
-#             return np.array(x, dtype=h5py.string_dtype(), order="K")
-#         else:
-#             return jsonio.dumps(x) 
-#         
-#     return x
+#     elif x.dtype.kind in NUMPY_STRING_KINDS:
+#         return np.array(x, dtype=h5py.string_dtype(), order="K")
+#     else:
+#         return jsonio.dumps(x) 
 
 def makeAttrDict(**kwargs):
     """Generates a dict suitable for storage as 'attrs' property of a HDF5 entity.
@@ -724,6 +645,7 @@ def makeAttrDict(**kwargs):
             'obj' is a h5py Group or Dataset
             'x' is the dict object returned by this function.
     
+    CAUTION: only simple data types (str, scalars) can be stored as attributes
     """
     ret = dict()
     

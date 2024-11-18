@@ -247,7 +247,8 @@ allensdk
 pynwb
 swick
 ### NOTE: thiese below will also install:
-### brainglobe-atlasapi, brainglobe-space, brainglobe-utils, brainglobe-workflows
+### brainglobe-atlasapi, brainglobe-space, brainglobe-utils, 
+brainglobe-workflows
 ### cellfinder, cellfinder[napari], morphapi
 napari[all]
 brainglobe

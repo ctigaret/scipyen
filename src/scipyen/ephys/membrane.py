@@ -103,72 +103,11 @@ AP_WIDTH_CODES =   {0: "AP_durations_V_0",
                     4: "AP_durations_V_quart_max"}
 
 
-# class MembranePropertiesAnalysisParameters(datatypes.ScipyenDataclassABC):
 @dataclass
-class MembranePropertiesAnalysisParameters:
+class MembranePropertiesAnalysisParameters(datatypes.ScipyenDataclass):
     metadata:BaseScipyenData = dataclasses.field(default_factory = BaseScipyenData)
-    # biological sample parameters
-    # NOTE: 2024-11-16 09:57:25
-    # the old fields (cell, source, etc) are now part of the BaseScipyenData
-    
-    # cell:str = "c01"
-    # identifier for this cell; there may be more than one cell from the same animal
-    #
-    # NOTE: the rules for constructing a cell ID are up to you, BUT:
-    #   1) be consistent
-    #   2) should contain ONLY alphanumeric characters and underscore ('_')
-    #   3) should NOT begin with a digit or underscore ('_')
-    # 
-    
-    # source:str = "test" 
-    # identifier for the cell source: this may a (meaningful) combination of:
-    #   animal ID,
-    #   experimental date
-    #   cortex region
-    #
-    #   e.g. TS2_1234567_01_02_22_VisCx_
-    #
-    # NOTE: the rules for naming the source are up to you, BUT:
-    #   1) be consistent
-    #   2) should contain ONLY alphanumeric characters and underscore ('_')
-    #   3) should NOT begin with a digit or underscore ('_')
-    
-    
-    # sex:str = "f"
-    # ID of animal sex; one of "f", "m", "na" (case-insensitive)
-    #
-    
-    # genotype:str = "het"
-    # genotype of the animal - keep it simple
-    #
-    # NOTE: avoid strings like (+/-, TSNeo/-, etc) as they don't play well when
-    # importing data in, say, R
-    # These are entirely conventional, and, within the same line of genetic 
-    # animal model they would have a well-defined meaning
-    #
-    
-    # age:str = "NA"
-    # animale age - almost free-form string, see NOTE for animal ID - keep it
-    #   simple, yet meaningful, and indicate units (e.g. 3_mo, or 20_d, or 1_yr)
-    #
-    # NOTE: these are simply for a quick information; in the future Scipyen will
-    # provide a more standardized way to store this information, hopefully more
-    # suitable to some sort of database management
-    
-    # postnatal:bool = True
-    # this is only useful for recordings spanning animal models and cultures
-    # leave as is, for now
-    #
-    
-    # treatment:str = "veh"
-    # this is only useful when drugs were applied to the slice/cell; 
-    # the string may contain dosage or concentration, and maybe duration,
-    #   e.g. 'Nim_10uM_5_min'
-    #
-    # NOTE: in the future Scipyen will provide a standardized way to store 
-    # treatment manipulation (e.g drug dosage, duration, phase of experiment when
-    # drug is applied, etc), hopefully more suitable to some sort of database 
-    # management.
+    # Contains biological sample parameters, procedure details and origin (file,
+    # file datetime, recording datetime, analysis datetime)
 
     # Electrophysiology recording parameters: <- These are important and need to
     # reflect the Clampex protocol used.
