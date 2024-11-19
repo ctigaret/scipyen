@@ -52,23 +52,7 @@ import neo
 from neo.core import (baseneo, basesignal, container,)
 from neo.core.dataobject import (DataObject, ArrayDict,)
 
-class Taxon:
-    """Shim class that will be overwritten below if taxoniq package is installed"""
-    def __new__(obj, *args, **kwargs):
-        return MISSING
-    def __init__(self, *args, **kwargs):
-        pass
-    
-hasTaxoniq = False
-try:
-    import taxoniq
-    from taxoniq import Taxon
-    hasTaxoniq = True
-except:
-    hasTaxoniq = False
-    taxoniq = None
-
-            
+          
 #### END 3rd party modules
 
 #### BEGIN pict.core.modules
@@ -85,6 +69,9 @@ from core.bgbridge import (BGStructure, BGAtlas, BGStructureDescriptor,
                            get_downloaded_atlases,
                            get_local_atlas_version,
                            show_atlases)
+
+from core.taxonbridge import(Taxon, TaxonDescriptor)
+
 #### END pict.core.modules
 
 # CHANGELOG (most recent first)
@@ -772,7 +759,6 @@ def categorize_data_frame_columns(data, *column_names, inplace=True):
             
         return ret
     
-        
 class DoseDescriptor:
     def __init__(self, *, default:typing.Optional[pq.Quantity]=None):
         if isinstance(default, pq.Quantity):
@@ -804,32 +790,6 @@ class DoseDescriptor:
 
         setattr(obj, self._name, value)
         
-class TaxonDescriptor:
-    def __init__(self, *, default:typing.Optional[typing.Union[Taxon, str, type(pd.NA), type(MISSING)]] = None):
-        if hasTaxoniq and isinstance(default, taxoniq.Taxon):
-            self._default = default
-        elif isinstance(default, str) or default in (None, MISSING, pd.NA):
-            self._default = default
-        else:
-            raise TypeError(f"Expecting a str, a Taxon, None, or MISSING; instead, got {type(value).__name__}")
-            
-    def __set_name__(self, obj:object, name:str):
-        if len(name.strip()) == 0:
-            raise ValueError("Cannot accept an empty name")
-        self._name = "_"+name
-        
-    def __get__(self, obj:object, objtype:type) -> object:
-        if obj is None:
-            return self._default
-        return getattr(obj, self._name, self._default)
-    
-    def __set__(self, obj:object, value:typing.Optional[typing.Union[str, Taxon, type(MISSING)]] = None):
-        if isinstance(value, Taxon):
-            setattr(obj, self._name, value)
-        elif isinstance(value, str) or value in (None, MISSING, pd.NA):
-            setattr(obj, self._name, value)
-        else:
-            raise TypeError(f"Expecting a str, a Taxon, None, or MISSING; instead, got {type(value).__name__}")
             
 # class ScipyenDataclassABC(metaclass=ABCMeta):
 #     @abstractmethod

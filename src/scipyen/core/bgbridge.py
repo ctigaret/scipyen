@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 """
-Wrapper around BrainGlobe API
+Wrapper around BrainGlobe API, with shims
 """
 import collections, typing, dataclasses
 from dataclasses import MISSING
