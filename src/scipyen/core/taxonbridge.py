@@ -13,6 +13,8 @@ class Taxon:
     def __init__(self, *args, **kwargs):
         pass
     
+from core.ncbi_entrez import list_databases
+    
 hasTaxoniq = False
 try:
     import taxoniq
@@ -34,7 +36,11 @@ class TaxonDescriptor:
             self._default = default
         elif isinstance(default, str) or default in (None, MISSING, pd.NA):
             if hasTaxoniq:
+                pass # TODO: 2024-11-19 22:40:24
+                # code to resolve name into a txoniq.Taxon object
+                # using entrezpy or biopython?
                 self._default = default
+            self._default=default
         else:
             raise TypeError(f"Expecting a str, a Taxon, None, or MISSING; instead, got {type(value).__name__}")
             

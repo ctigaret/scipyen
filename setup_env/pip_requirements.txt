@@ -219,7 +219,6 @@ statsmodels
 sympy
 tables ; python_version >= '3.9.7'
 tabulate
-taxoniq
 tenacity
 termcolor
 terminado
@@ -243,6 +242,10 @@ xarray
 xyzservices
 zipp
 
+# NOTE: since 2024-11-19 22:04:24
+nbci-taxonomist # will also install entrezpy
+biopython
+taxoniq
 allensdk
 pynwb
 swick
