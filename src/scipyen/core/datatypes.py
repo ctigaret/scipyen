@@ -55,7 +55,7 @@ from neo.core.dataobject import (DataObject, ArrayDict,)
 class Taxon:
     """Shim class that will be overwritten below if taxoniq package is installed"""
     def __new__(obj, *args, **kwargs):
-        return NISSING
+        return MISSING
     def __init__(self, *args, **kwargs):
         pass
     
@@ -68,20 +68,6 @@ except:
     hasTaxoniq = False
     taxoniq = None
 
-class BGStructure:
-    """Shim class that will be overwritten below if brainglobe packages are installed"""
-    def __new__(obj, *args, **kwargs):
-        return NISSING
-    def __init__(self, *args, **kwargs):
-        pass
-    
-hasBrainGlobe=False
-try:
-    import brainglobe_atlasapi
-    from brainglobe_atlasapi.structure_class import Structure as BGStructure
-    hasBrainGlobe=True
-except:
-    hasBrainGlobe=False
             
 #### END 3rd party modules
 
@@ -93,7 +79,12 @@ from core.prog import (safeWrapper, is_hashable, is_type_or_subclass,
                        ImmutableDescriptor, scipywarn, NoData)
 from core.datazone import DataZone
 from core.datasignal import (_new_DataSignal, _new_IrregularlySampledDataSignal, DataSignal, IrregularlySampledDataSignal)
-
+from core.bgbridge import (BGStructure, BGAtlas, BGStructureDescriptor,
+                           get_all_atlases_lastversions,
+                           get_atlases_lastversions,
+                           get_downloaded_atlases,
+                           get_local_atlas_version,
+                           show_atlases)
 #### END pict.core.modules
 
 # CHANGELOG (most recent first)
@@ -781,59 +772,6 @@ def categorize_data_frame_columns(data, *column_names, inplace=True):
             
         return ret
     
-class BrainGlobeStructureDescriptor:
-    """Generic, str-based brain structure descriptor.
-    Currently, a shim, to evolve into a descriptor for instances of 
-    brainglobe_atlasapi.structure_class.Structure once I've figured out a way to
-    "normalize" the structure IDs for corresponding structures across various 
-    atlases.
-    
-    For example, the structure with name "Hippocampal formation" has the acronym
-    "HF" in Waxholm rat brain atlas, but to "HPF" in Allen adult brain atlas (and 
-    (and the derived ones, like Princeton mouse atlas or Kim mouse atlas).
-    
-    
-    There are also discrepancies in the "canonical" name of the structure, e.g.
-    acronym "CA1" is mapped to "Cornu ammonis 1" in Waxholm, "Field CA1" in Allen
-    and Princeton atlases, bu to "Field CA1 of the hippocampus" in Kim atlas.
-    
-        
-    """
-    def __init__(self, *, default:typing.Optional[typing.Union[str, type(pd.NA)]] = None):
-        if isinstance(default, str):
-            if len(default.strip()) == 0:
-                default = pd.NA
-            
-        elif default is None:
-            default = pd.NA
-            
-        elif not isinstance(default, type(pd.NA)):
-            raise TypeError(f"Expecting a non-empty str, pandas NA, or None; instead, got {type(default).__name__}")
-        
-        self._default = default
-        
-    def __set_name__(self, obj:object, name:str):
-        if len(name.strip()) == 0:
-            raise ValueError("Cannot accept an empty name")
-        self._name = "_"+name
-    
-    def __get__(self, obj:object, objtype:type) -> object:
-        if obj is None:
-            return self._default
-        return getattr(obj, self._name, self._default)
-    
-    def __set__(self, obj:object, value:typing.Optional[typing.Union[str, type(pd.NA)]] = None):
-        if isinstance(value, str):
-            if len(value.strip()) == 0:
-                value = pd.NA
-                
-        elif value is None:
-            value = pd.NA
-            
-        elif not isinstance(value, type(pd.NA)):
-            raise TypeError(f"Expecting a non-empty str, pandas NA, or None; instead, got {type(default).__name__}")
-            
-        setattr(obj, self._name, value)
         
 class DoseDescriptor:
     def __init__(self, *, default:typing.Optional[pq.Quantity]=None):
@@ -867,11 +805,13 @@ class DoseDescriptor:
         setattr(obj, self._name, value)
         
 class TaxonDescriptor:
-    def __init__(self, *, default:Taxon = MISSING):
+    def __init__(self, *, default:typing.Optional[typing.Union[Taxon, str, type(pd.NA), type(MISSING)]] = None):
         if hasTaxoniq and isinstance(default, taxoniq.Taxon):
             self._default = default
+        elif isinstance(default, str) or default in (None, MISSING, pd.NA):
+            self._default = default
         else:
-            self._default = MISSING
+            raise TypeError(f"Expecting a str, a Taxon, None, or MISSING; instead, got {type(value).__name__}")
             
     def __set_name__(self, obj:object, name:str):
         if len(name.strip()) == 0:
@@ -883,9 +823,13 @@ class TaxonDescriptor:
             return self._default
         return getattr(obj, self._name, self._default)
     
-    def __set__(self, obj:object, value:typing.Optional[Taxon] = None):
+    def __set__(self, obj:object, value:typing.Optional[typing.Union[str, Taxon, type(MISSING)]] = None):
         if isinstance(value, Taxon):
             setattr(obj, self._name, value)
+        elif isinstance(value, str) or value in (None, MISSING, pd.NA):
+            setattr(obj, self._name, value)
+        else:
+            raise TypeError(f"Expecting a str, a Taxon, None, or MISSING; instead, got {type(value).__name__}")
             
 # class ScipyenDataclassABC(metaclass=ABCMeta):
 #     @abstractmethod
@@ -1485,7 +1429,7 @@ class Organism(ScipyenDataclass):
 # @dataclass
 # class Organ(ScipyenDataclass):
 #     name:str = "brain"
-#     # structure:BrainGlobeStructureDescriptor = BrainGlobeStructureDescriptor()
+#     # structure:BGStructureDescriptor = BGStructureDescriptor()
     
 
 @dataclass
@@ -1495,7 +1439,7 @@ class BiologicalSource(ScipyenDataclass):
     """
     organism:Organism = dataclasses.field(default_factory=Organism)
     # organ:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
-    structure:BrainGlobeStructureDescriptor = BrainGlobeStructureDescriptor()
+    structure:BGStructureDescriptor = BGStructureDescriptor()
     # for now, only brain atlas api are supported
     cellType:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA) # e.g. "neuron"
     cellMorphologicalType:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA) # e.g."pyramidal"
