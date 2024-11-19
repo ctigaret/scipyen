@@ -1415,7 +1415,7 @@ class Biometrics(ScipyenDataclass):
     
 @dataclass
 class Organism(ScipyenDataclass):
-    taxon:TaxonDescriptor = dataclasses.field(default=TaxonDescriptor())
+    taxon:TaxonDescriptor = TaxonDescriptor()
     subspecies:str = "Sprague Dawley"
     stage:OrganismStage = dataclasses.field(default=OrganismStage.postnatal)
     biometrics:Biometrics = dataclasses.field(default_factory=Biometrics)
