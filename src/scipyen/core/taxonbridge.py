@@ -33,7 +33,8 @@ class TaxonDescriptor:
         if hasTaxoniq and isinstance(default, taxoniq.Taxon):
             self._default = default
         elif isinstance(default, str) or default in (None, MISSING, pd.NA):
-            self._default = default
+            if hasTaxoniq:
+                self._default = default
         else:
             raise TypeError(f"Expecting a str, a Taxon, None, or MISSING; instead, got {type(value).__name__}")
             
