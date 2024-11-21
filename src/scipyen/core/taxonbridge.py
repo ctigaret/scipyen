@@ -13,8 +13,8 @@ class Taxon:
     def __init__(self, *args, **kwargs):
         pass
     
-from core.ncbi_entrez import list_databases
-    
+# from core.ncbi_entrez import list_databases
+
 hasTaxoniq = False
 try:
     import taxoniq
@@ -24,22 +24,32 @@ except:
     hasTaxoniq = False
     taxoniq = None
 
-import collections, typing, dataclasses
+import collections, typing, dataclasses, traceback
 from dataclasses import MISSING
 import numpy as np
 import pandas as pd
 
+def get_common_name(t:Taxon):
+    if hasTaxoniq and isinstance(t, taxoniq.Taxon):
+        try:
+            return t.common_name
+        except:
+            traceback.print_exc()
+            return ""
+    
+    return ""
+
+supported_species=["Homo", "Danio", "Caenorhabditis", "Rattus", "Mus", "Gallus"]
+    
 
 class TaxonDescriptor:
     def __init__(self, *, default:typing.Optional[typing.Union[Taxon, str, type(pd.NA), type(MISSING)]] = None):
         if hasTaxoniq and isinstance(default, taxoniq.Taxon):
             self._default = default
         elif isinstance(default, str) or default in (None, MISSING, pd.NA):
-            if hasTaxoniq:
-                pass # TODO: 2024-11-19 22:40:24
-                # code to resolve name into a txoniq.Taxon object
-                # using entrezpy or biopython?
-                self._default = default
+            if hasTaxoniq and isinstance(default, str) and default in supported_species:
+                self._default = Taxon(scientific_name=default)
+                # self._default = default
             self._default=default
         else:
             raise TypeError(f"Expecting a str, a Taxon, None, or MISSING; instead, got {type(value).__name__}")
@@ -58,6 +68,8 @@ class TaxonDescriptor:
         if isinstance(value, Taxon):
             setattr(obj, self._name, value)
         elif isinstance(value, str) or value in (None, MISSING, pd.NA):
+            if hasTaxoniq and isinstance(value, str) and value in supported_species:
+                value = Taxon(scientific_name=value)
             setattr(obj, self._name, value)
         else:
             raise TypeError(f"Expecting a str, a Taxon, None, or MISSING; instead, got {type(value).__name__}")

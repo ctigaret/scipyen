@@ -138,6 +138,7 @@ lesscpy
 libNeuroML
 linguistics
 lxml
+marisa-trie # installed by taxoniq but useful if taxoniq is omitted; may not be available on win32 platform
 matlab_kernel
 matplotlib
 matplotlib-inline
