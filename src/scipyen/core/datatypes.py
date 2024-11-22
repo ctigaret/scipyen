@@ -1400,7 +1400,7 @@ class BiologicalSource(ScipyenDataclass):
     organism:Organism = dataclasses.field(default_factory=Organism)
     # organ:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
     structure:BGStructureDescriptor = BGStructureDescriptor()
-    # for now, only brain atlas api are supported
+    # for now, only brain atlas api is supported
     cellType:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA) # e.g. "neuron"
     cellMorphologicalType:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA) # e.g."pyramidal"
     cellDescriptors:typing.Union[str, type(pd.NA), typing.Sequence[str]] = dataclasses.field(default=pd.NA)

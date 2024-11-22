@@ -11,6 +11,11 @@ from dataclasses import MISSING
 import numpy as np
 import pandas as pd
 
+from core.prog import scipywarn
+
+DEFAULT_RAT_BRAIN_ATLAS = "whs_sd_rat_39um" 
+DEFAULT_MOUSE_BRAIN_ATLAS = "allen_mouse_50um"
+
 class BGStructure:
     """Shim class that will be overwritten below if brainglobe packages are installed"""
     def __new__(obj, *args, **kwargs):
@@ -77,7 +82,7 @@ class BGStructureDescriptor:
     
     There are also discrepancies in the "canonical" name of the structure, e.g.
     acronym "CA1" is mapped to "Cornu ammonis 1" in Waxholm, "Field CA1" in Allen
-    and Princeton atlases, bu to "Field CA1 of the hippocampus" in Kim atlas.
+    and Princeton atlases, but to "Field CA1 of the hippocampus" in Kim atlas.
     
         
     """
@@ -105,6 +110,63 @@ class BGStructureDescriptor:
         if hasBrainGlobeAtlasAPI and isinstance(value, BGStructure):
             setattr(obj, self._name, value)
         elif isinstance(value, str) or value in (None, MISSING, pd.NA):
+            if isinstance(value, str):
+                if hasattr(obj, "organism") and hasattr(obj.organism, "taxon"):
+                    if isinstance(obj.organism.taxon, str):
+                        atlas = resolve_atlas(obj.organism.taxon)
+                
             setattr(obj, self._name, value)
         else:
             raise TypeError(f"Expecting a non-empty str, pandas NA, or None; instead, got {type(default).__name__}")
+
+def resolve_atlas(taxon:object):
+    from core import taxonbridge
+    if hasBrainGlobeAtlasAPI:
+        if taxonbridge.hasTaxoniq:
+            species = taxonbridge.get_common_name(taxon)
+        elif isinstance(taxon, str) and taxon in taxonbridge.supported_species:
+            local_atlas_names = get_downloaded_atlases()
+            if len(local_atlas_names):
+                if taxon.startswith("Rat"):
+                    species = "rat"
+                    rat_atlas_names = [a for a in local_atlas_names if "rat" in a]
+                    if len(rat_atlas_names) == 0:
+                        scipywarn("No rat brain atlas is installed locally; please use brainglobe_atlasapi to download")
+                        return
+                    
+                    elif len(rat_atlas_names) > 1:
+                        if DEFAULT_RAT_BRAIN_ATLAS in rat_atlas_names:
+                            scipywarn(f"There is more than one rat brain atlas downloaded locally. The default one {DEFAULT_RAT_BRAIN_ATLAS} will be used")
+                            return DEFAULT_RAT_BRAIN_ATLAS
+                        else:
+                            scipywarn(f"There is more than one rat brain atlas downloaded locally, but the default one {DEFAULT_RAT_BRAIN_ATLAS} is not among them. The first available one ({rat_atlas_names[0]}) will be used")
+                            return rat_atlas_names[0]
+                        
+                    else:
+                        return rat_atlas_names[0]
+                            
+                elif taxon.startswith("Mus"):
+                    species = "mouse"
+                else:
+                    scipywarn("The only supported species are rat (Rattus) and mouse (Mus)")
+                    return
+                
+                atlas_names = [a for a in local_atlas_names if species in a]
+                if len(atlas_names) == 0:
+                    scipywarn(f"No brain atlasfor species {species} is installed locally; please use brainglobe_atlasapi to download")
+                    return
+                
+                elif len(atlas_names) > 1:
+                    if DEFAULT_MOUSE_BRAIN_ATLAS in mouse_atlas_names:
+                        scipywarn(f"There is more than one rat brain atlas downloaded locally. The default one {DEFAULT_MOUSE_BRAIN_ATLAS} will be used")
+                        return DEFAULT_MOUSE_BRAIN_ATLAS
+                    else:
+                        scipywarn(f"There is more than one rat brain atlas downloaded locally, but the default one {DEFAULT_MOUSE_BRAIN_ATLAS} is not among them. The first available one ({mouse_atlas_names[0]}) will be used")
+                        return mouse_atlas_names[0]
+                    
+                else:
+                    return mouse_atlas_names[0]
+                            
+        
+    
+    

@@ -29,13 +29,20 @@ from dataclasses import MISSING
 import numpy as np
 import pandas as pd
 
-def get_common_name(t:Taxon):
+from core.prog import (scipywarn, safeWrapper)
+
+@safeWrapper
+def get_nearest_parent_common_name(t:Taxon):
+    """Returns the common name of the taxon.
+    If the taxon does not have a common name, then returns the common name of
+    its nearest parent.
+    """
     if hasTaxoniq and isinstance(t, taxoniq.Taxon):
         try:
             return t.common_name
         except:
-            traceback.print_exc()
-            return ""
+            ret = get_nearest_parent_common_name(t.parent)
+            return ret
     
     return ""
 
@@ -43,6 +50,9 @@ supported_species=["Homo", "Danio", "Caenorhabditis", "Rattus", "Mus", "Gallus"]
     
 
 class TaxonDescriptor:
+    """Python descriptors for taxoniq.Taxon or a placeholder if taxoniq is not available
+    default can be a string (scientific name of the species, e.g. Rattus, Mus, Homo, Dabio, Gallus)
+    """
     def __init__(self, *, default:typing.Optional[typing.Union[Taxon, str, type(pd.NA), type(MISSING)]] = None):
         if hasTaxoniq and isinstance(default, taxoniq.Taxon):
             self._default = default
