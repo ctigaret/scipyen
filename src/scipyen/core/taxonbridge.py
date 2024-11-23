@@ -46,7 +46,8 @@ def get_nearest_parent_common_name(t:Taxon):
     
     return ""
 
-supported_species=["Homo", "Danio", "Caenorhabditis", "Rattus", "Mus", "Gallus"]
+# supported_species=["Homo", "Danio", "Caenorhabditis", "Rattus", "Mus", "Gallus"]
+supported_species=["Rattus", "Mus"]
     
 
 class TaxonDescriptor:

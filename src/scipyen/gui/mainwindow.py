@@ -268,6 +268,7 @@ from core import pyabfbridge as pab
 from core import scipyen_plugin_loader
 from core import scipyen_config as scipyenconf
 from core import utilities
+from core import (bgbridge, taxonbridge)
 
 from core.basescipyen import BaseScipyenData
 

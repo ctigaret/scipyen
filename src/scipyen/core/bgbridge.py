@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 
 from core.prog import scipywarn
+from core import taxonbridge
 
 DEFAULT_RAT_BRAIN_ATLAS = "whs_sd_rat_39um" 
 DEFAULT_MOUSE_BRAIN_ATLAS = "allen_mouse_50um"
@@ -119,54 +120,98 @@ class BGStructureDescriptor:
         else:
             raise TypeError(f"Expecting a non-empty str, pandas NA, or None; instead, got {type(default).__name__}")
 
-def resolve_atlas(taxon:object):
-    from core import taxonbridge
+def get_atlas_for_species(taxon:typing.Union[str, taxonbridge.Taxon]) -> BGAtlas | None:
+    # from core import taxonbridge
     if hasBrainGlobeAtlasAPI:
+        atlas_names = get_downloaded_atlases()
+        if len(atlas_names) == 0:
+            scipywarn("No mouse or rat brain atlases are donwloaded locally; make sure you have a good internet conection")
+            atlases = get_all_atlases_lastversions()
+            if len(atlases) == 0:
+                scipywarn("Cannot query the atlases database - check your internet connection")
+                return
+            atlas_names = list(atlases.keys())
+                
         if taxonbridge.hasTaxoniq:
-            species = taxonbridge.get_common_name(taxon)
-        elif isinstance(taxon, str) and taxon in taxonbridge.supported_species:
-            local_atlas_names = get_downloaded_atlases()
-            if len(local_atlas_names):
-                if taxon.startswith("Rat"):
-                    species = "rat"
-                    rat_atlas_names = [a for a in local_atlas_names if "rat" in a]
-                    if len(rat_atlas_names) == 0:
-                        scipywarn("No rat brain atlas is installed locally; please use brainglobe_atlasapi to download")
-                        return
-                    
-                    elif len(rat_atlas_names) > 1:
-                        if DEFAULT_RAT_BRAIN_ATLAS in rat_atlas_names:
-                            scipywarn(f"There is more than one rat brain atlas downloaded locally. The default one {DEFAULT_RAT_BRAIN_ATLAS} will be used")
-                            return DEFAULT_RAT_BRAIN_ATLAS
-                        else:
-                            scipywarn(f"There is more than one rat brain atlas downloaded locally, but the default one {DEFAULT_RAT_BRAIN_ATLAS} is not among them. The first available one ({rat_atlas_names[0]}) will be used")
-                            return rat_atlas_names[0]
-                        
-                    else:
-                        return rat_atlas_names[0]
-                            
-                elif taxon.startswith("Mus"):
-                    species = "mouse"
-                else:
-                    scipywarn("The only supported species are rat (Rattus) and mouse (Mus)")
-                    return
+            species = taxonbridge.get_nearest_parent_common_name(taxon)
+            if "mice" in species.lower():
+                species = "mouse"
                 
-                atlas_names = [a for a in local_atlas_names if species in a]
-                if len(atlas_names) == 0:
-                    scipywarn(f"No brain atlasfor species {species} is installed locally; please use brainglobe_atlasapi to download")
-                    return
-                
-                elif len(atlas_names) > 1:
-                    if DEFAULT_MOUSE_BRAIN_ATLAS in mouse_atlas_names:
-                        scipywarn(f"There is more than one rat brain atlas downloaded locally. The default one {DEFAULT_MOUSE_BRAIN_ATLAS} will be used")
-                        return DEFAULT_MOUSE_BRAIN_ATLAS
-                    else:
-                        scipywarn(f"There is more than one rat brain atlas downloaded locally, but the default one {DEFAULT_MOUSE_BRAIN_ATLAS} is not among them. The first available one ({mouse_atlas_names[0]}) will be used")
-                        return mouse_atlas_names[0]
-                    
-                else:
-                    return mouse_atlas_names[0]
-                            
+        elif isinstance(taxon, str):
+            if len(taxon.strip()) == 0:
+                raise ValueError("taxon is an empty string!")
+            
+            if taxon not in [s.lower() for s in taxonbridge.supported_species] + ["mouse", "mice", "rat"]:
+                raise ValueError(f"taxon {taxon} is not supported")
+            
+            if taxon.lower().startswith("rat") or taxon.lower().endswith("rat"):
+                species = "rat"
+            elif any(taxon.lower().startswith(a) or taxon.lower().endswith(a) for a in ("mus", "mouse", "mice")):
+                species = "mouse"
+            
+        else:
+            raise TypeError(f"'taxon' expectd to be Taxon or a str; instad got a {type(taxon).__name__}")
         
+        atlas_names = [a for a in atlas_names if species in a]
+        
+        if species == "mouse":
+            default_atlas = DEFAULT_MOUSE_BRAIN_ATLAS
+        elif species == "rat":
+            default_atlas = DEFAULT_RAT_BRAIN_ATLAS
+        else:
+            raise ValueError(f"Species {species} is not yet supported ")
+        
+        ret = ""
+        
+        if len(atlas_names) == 0:
+            scipywarn(f"No brain atlas for species {species} is installed locally; please use brainglobe_atlasapi to download")
+            return
+        
+        elif len(atlas_names) > 1:
+            if default_atlas in atlas_names:
+                scipywarn(f"There is more than one brain atlas available. The default one ({default_atlas}) will be used")
+                ret = default_atlas
+            else:
+                scipywarn(f"There is more than one brain atlas available, but the default one ({default_atlas}) is not among them. The first available one ({atlas_names[0]}) will be used")
+                ret = atlas_names[0]
+            
+        else:
+            ret = atlas_names[0]
+                
+        if len(ret.strip()):
+            return BGAtlas(ret)
+                            
+def get_atlas_structure(name:str, atlas:BGAtlas, acro:bool=False) -> dict | None:
+    import editdistance
+    if not hasBrainGlobeAtlasAPI:
+        scipywarn("BrainGlobe Atlas API is not installed")
+        return
     
+    if not isinstance(name, str):
+        raise TypeError(f"Expecting a str; got {type(name).__name__} instead")
+    
+    if len(name.strip()) == 0:
+        raise ValueError("Expecting a non-empty string")
+    
+    # structures, snames, sacronyms, sids = zip(*[(s, s["name"], s["acronym"], s["id"]) for s in atlas.structures_list])
+    structures, snames, sacronyms = zip(*[(s, s["name"], s["acronym"]) for s in atlas.structures_list])
+    
+    sss = sacronyms if acro else snames
+    
+    ll = list(map(lambda x: editdistance.eval(name, x), sss))
+    
+    closestNdx = ll.index(min(ll))
+    
+    ret = structures[closestNdx]
+    ret["atlas_name"] = atlas.atlas_name
+    
+    return ret
+    
+#     words = name.split()
+#     
+#     a = set([(x, sacronyms[k], sids[k]) for k,x in enumerate(snames) if name.lower() in x.lower() or all(w.lower() in x.lower() for w in words)])
+# 
+#     b = set([(snames[k], x, sids[k]) for k, x in enumerate(sacronyms) if name.lower() in x.lower() or all(w.lower() in x.lower() for w in words)])
+#     
+#     return a | b
     
