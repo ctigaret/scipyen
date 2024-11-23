@@ -110,11 +110,13 @@ class BGStructureDescriptor:
     def __set__(self, obj:object, value:typing.Optional[typing.Union[BGStructure, str, type(pd.NA), type(MISSING)]] = None):
         if hasBrainGlobeAtlasAPI and isinstance(value, BGStructure):
             setattr(obj, self._name, value)
+            
         elif isinstance(value, str) or value in (None, MISSING, pd.NA):
             if isinstance(value, str):
                 if hasattr(obj, "organism") and hasattr(obj.organism, "taxon"):
                     if isinstance(obj.organism.taxon, str):
-                        atlas = resolve_atlas(obj.organism.taxon)
+                        atlas = get_atlas_for_species(obj.organism.taxon)
+                        structure = get_atlas_structure(value, atlas)
                 
             setattr(obj, self._name, value)
         else:
@@ -132,10 +134,8 @@ def get_atlas_for_species(taxon:typing.Union[str, taxonbridge.Taxon]) -> BGAtlas
                 return
             atlas_names = list(atlases.keys())
                 
-        if taxonbridge.hasTaxoniq:
+        if taxonbridge.hasTaxoniq and isinstance(taxon, taxonbridge.Taxon):
             species = taxonbridge.get_nearest_parent_common_name(taxon)
-            if "mice" in species.lower():
-                species = "mouse"
                 
         elif isinstance(taxon, str):
             if len(taxon.strip()) == 0:
@@ -144,14 +144,29 @@ def get_atlas_for_species(taxon:typing.Union[str, taxonbridge.Taxon]) -> BGAtlas
             if taxon not in [s.lower() for s in taxonbridge.supported_species] + ["mouse", "mice", "rat"]:
                 raise ValueError(f"taxon {taxon} is not supported")
             
-            if taxon.lower().startswith("rat") or taxon.lower().endswith("rat"):
+            # NOTE: 2024-11-23 14:40:50
+            # try and get a Taxon object using this species string, then get the 
+            # actual species from thisTaxon object
+            taxonObj = taxonbridge.get_taxon(taxon)
+            
+            if isnstance(taxonObj, taxonbridge.Taxon):
+                species = taxonbridge.get_nearest_parent_common_name(taxonObj)
+            else:
+                # could not retrieve a Taxon object => use taxon parameter as species
+                # and continue with that
+                species = taxon
+            
+            if species.lower().startswith("rat") or species.lower().endswith("rat"):
                 species = "rat"
-            elif any(taxon.lower().startswith(a) or taxon.lower().endswith(a) for a in ("mus", "mouse", "mice")):
+            elif any(species.lower().startswith(a) or species.lower().endswith(a) for a in ("mus", "mouse", "mice")):
                 species = "mouse"
             
         else:
-            raise TypeError(f"'taxon' expectd to be Taxon or a str; instad got a {type(taxon).__name__}")
+            raise TypeError(f"'taxon' expected to be Taxon or a str; instad got a {type(taxon).__name__}")
         
+        if "mice" in species.lower():
+            species = "mouse"
+            
         atlas_names = [a for a in atlas_names if species in a]
         
         if species == "mouse":
@@ -181,7 +196,9 @@ def get_atlas_for_species(taxon:typing.Union[str, taxonbridge.Taxon]) -> BGAtlas
         if len(ret.strip()):
             return BGAtlas(ret)
                             
-def get_atlas_structure(name:str, atlas:BGAtlas, acro:bool=False) -> dict | None:
+def get_atlas_structure(name:str, atlas:typing.Optional[BGAtlas]=None, 
+                        acro:bool=False,
+                        ) -> dict | None:
     import editdistance
     if not hasBrainGlobeAtlasAPI:
         scipywarn("BrainGlobe Atlas API is not installed")
@@ -197,10 +214,17 @@ def get_atlas_structure(name:str, atlas:BGAtlas, acro:bool=False) -> dict | None
     structures, snames, sacronyms = zip(*[(s, s["name"], s["acronym"]) for s in atlas.structures_list])
     
     sss = sacronyms if acro else snames
-    
     ll = list(map(lambda x: editdistance.eval(name, x), sss))
     
+#     la = list(map(lambda x: editdistance.eval(name, x), sacronyms))
+#     ln = list(map(lambda x: editdistance.eval(name, x), snames))
+#     
+#     ll = list(map(lambda x: min(x), zip(ln,la)))
+    
+    
     closestNdx = ll.index(min(ll))
+    
+    if closestNdx == 0:
     
     ret = structures[closestNdx]
     ret["atlas_name"] = atlas.atlas_name
