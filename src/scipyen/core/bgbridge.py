@@ -105,7 +105,20 @@ class BGStructureDescriptor:
     def __get__(self, obj:object, objtype:type) -> object:
         if obj is None:
             return self._default
-        return getattr(obj, self._name, self._default)
+        
+        ret = getattr(obj, self._name, self._default)
+
+        if isinstance(ret, str):
+            if hasattr(obj, "organism") and hasattr(obj.organism, "taxon"):
+                if isinstance(obj.organism.taxon, str):
+                    atlas = get_atlas_for_species(obj.organism.taxon)
+                    if isinstance(atlas, brainglobe_atlasapi.BrainGlobeAtlas):
+                        structure = get_atlas_structure(value, atlas)
+                        ret = structure
+                        setattr(obj, self._name, ret)
+                        
+        return ret
+    
     
     def __set__(self, obj:object, value:typing.Optional[typing.Union[BGStructure, str, type(pd.NA), type(MISSING)]] = None):
         if hasBrainGlobeAtlasAPI and isinstance(value, BGStructure):
@@ -117,6 +130,7 @@ class BGStructureDescriptor:
                     if isinstance(obj.organism.taxon, str):
                         atlas = get_atlas_for_species(obj.organism.taxon)
                         structure = get_atlas_structure(value, atlas)
+                        setattr(obj, self._name, structure)
                 
             setattr(obj, self._name, value)
         else:
@@ -149,7 +163,7 @@ def get_atlas_for_species(taxon:typing.Union[str, taxonbridge.Taxon]) -> BGAtlas
             # actual species from thisTaxon object
             taxonObj = taxonbridge.get_taxon(taxon)
             
-            if isnstance(taxonObj, taxonbridge.Taxon):
+            if isinstance(taxonObj, taxonbridge.Taxon):
                 species = taxonbridge.get_nearest_parent_common_name(taxonObj)
             else:
                 # could not retrieve a Taxon object => use taxon parameter as species
@@ -196,10 +210,75 @@ def get_atlas_for_species(taxon:typing.Union[str, taxonbridge.Taxon]) -> BGAtlas
         if len(ret.strip()):
             return BGAtlas(ret)
                             
-def get_atlas_structure(name:str, atlas:typing.Optional[BGAtlas]=None, 
+def get_atlas_structure(name:str, atlas:BGAtlas, 
                         acro:bool=False,
+                        cutoff = 0.5,
+                        maxfound = 10,
                         ) -> dict | None:
-    import editdistance
+    """Best-guess for the atlas a structure corresponding to a named brain region.
+
+    The function tries to match the brain region name given in 'name' parameter
+    to the 'name' or 'acronym' attribute of the structures in the atlas — depending
+    in the value of the 'acro' parameters. 
+
+    Matching is performed by difflib.get_close_matches. When matches are found, 
+    the "best" matching structure is returned.
+    
+
+    Parameters:
+    ===========
+    name:   common name of the brain region. Case sensitive sometimes¹ 
+    
+    atlas:  a brainglobe_atlasapi.BrainGlobeAtlas instance
+    
+    acro:   flag indicating is the search for matches will take place primarily
+            on stucture acronyms (True) or names (False)
+            Default: False, meaning that the function will first try to match
+            'name' against the structure names, then (and only if no matches are
+            found) against the structure acronyms in the atlas.
+    
+    cutoff: the 'cutoff' parameter for the 'difflib.get_close_matches' function.
+            default (here) is 0.5
+    
+    maxfound:the maximum number of matches to be returned (passed directly to 
+            difflib.get_close_matches function).
+            Default is 10
+    
+    See also: difflib.get_close_matches in Python standard library
+    
+    WARNING: This may yield surprising results, so it is best avoid ambiguities 
+        in the 'name' parameter. 
+    
+    ¹Case sensitivity does not always work as you may think, here, see below.
+
+    Some examples using the Waxholm Space Atlas of the Sprague Dawley Rat Brain 
+    (https://www.nitrc.org/projects/whs-sd-atlas):
+    
+    'name'                          best guess structure:
+                                    name                        acronym
+    --------------------------------------------------------------------
+    hippocampus                     alveus of the hippocampus   alv
+    Hippocampus                     Hippocampal region          HR
+    Hippocamp                       Hippocampal region          HR
+    hippocamp                       Hippocampal region          HR
+    Hippocampal                     Hippocampal region          HR
+    hippocampal                     Hippocampal region          HR
+    CA1                             Cornu ammonis 1             CA1
+    ca1                             anterior commissure, 
+                                    anterior limb               aca     !
+    accum                           Tectum                      Tc      !
+    accumb                          Nucleus accumbens           NAc
+    core                            cochlea                     Co      !
+    accumbens core                  Nucleus accumbens, core     NAc-c
+    accumbens, core                 Nucleus accumbens, core     NAc-c
+    shell                           Lateral lemniscus           ll      !
+    accumbens shell                 Nucleus accumbens, shell    NAc-sh
+    accumbens, shell                Nucleus accumbens, shell    NAc-sh
+    
+
+    """
+    # import editdistance
+    import difflib
     if not hasBrainGlobeAtlasAPI:
         scipywarn("BrainGlobe Atlas API is not installed")
         return
@@ -213,8 +292,28 @@ def get_atlas_structure(name:str, atlas:typing.Optional[BGAtlas]=None,
     # structures, snames, sacronyms, sids = zip(*[(s, s["name"], s["acronym"], s["id"]) for s in atlas.structures_list])
     structures, snames, sacronyms = zip(*[(s, s["name"], s["acronym"]) for s in atlas.structures_list])
     
+    # first, check against the primary (the "primary" being sacronyms if acro,
+    # else snames) 
     sss = sacronyms if acro else snames
-    ll = list(map(lambda x: editdistance.eval(name, x), sss))
+    matches = list(map(lambda x: structures[x], map(lambda x: sss.index(x), difflib.get_close_matches(name, sss, 10, 0.5))))
+    
+    if len(matches) == 0:
+        # nothing found => check against the secondary (the "secondary" being
+        # the one left out above, i.e., snames if acro else sacronyms)
+        sss = snames if acro else sacronyms
+        matches = list(map(lambda x: structures[x], map(lambda x: sss.index(x), difflib.get_close_matches(name, sss, 10, 0.5))))
+    
+    # finally, get the best match (if any found) and augment with atlas name
+    # return None when nothing was found
+    if len(matches):
+        ret = matches[0]
+        ret["atlas_name"] = atlas.atlas_name
+        return ret
+    
+    
+        
+        
+    # ll = list(map(lambda x: editdistance.eval(name, x), sss))
     
 #     la = list(map(lambda x: editdistance.eval(name, x), sacronyms))
 #     ln = list(map(lambda x: editdistance.eval(name, x), snames))
@@ -222,15 +321,14 @@ def get_atlas_structure(name:str, atlas:typing.Optional[BGAtlas]=None,
 #     ll = list(map(lambda x: min(x), zip(ln,la)))
     
     
-    closestNdx = ll.index(min(ll))
+#     closestNdx = ll.index(min(ll))
+#     
+#     if closestNdx == 0:
+#         return
     
-    if closestNdx == 0:
-        return
+    # ret = structures[closestNdx]
     
-    ret = structures[closestNdx]
-    ret["atlas_name"] = atlas.atlas_name
-    
-    return ret
+    # return ret
     
 #     words = name.split()
 #     

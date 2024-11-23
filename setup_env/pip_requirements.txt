@@ -29,6 +29,10 @@
 # also see nrn/docs/docs_requirements.txt, reproduced below after excluding 
 # linguistics
 # packages already listed above
+#
+# ALSO NOTE that linguistics only supports python up to ~ 3.6 or so (see Pypi)
+# because one of its dependencies (slytherin); importing slytherin or any package
+# that imports slytherin will raise an error on Pyton >= 3.11 
 
 # CHANGELOG
 # 2024-05-02 08:45:19
@@ -136,7 +140,7 @@ language_tool_python
 lazy_loader
 lesscpy
 libNeuroML
-linguistics
+# linguistics
 lxml
 marisa-trie # installed by taxoniq but useful if taxoniq is omitted; may not be available on win32 platform
 matlab_kernel
@@ -205,7 +209,7 @@ scikit-bio
 scipy
 seaborn
 shapely
-slytherin
+# slytherin
 smart-open
 smmap
 sniffio
