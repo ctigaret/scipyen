@@ -225,6 +225,7 @@ def get_atlas_structure(name:str, atlas:typing.Optional[BGAtlas]=None,
     closestNdx = ll.index(min(ll))
     
     if closestNdx == 0:
+        return
     
     ret = structures[closestNdx]
     ret["atlas_name"] = atlas.atlas_name
