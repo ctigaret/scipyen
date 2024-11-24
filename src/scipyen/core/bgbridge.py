@@ -20,7 +20,7 @@ DEFAULT_MOUSE_BRAIN_ATLAS = "allen_mouse_50um"
 class BGStructure:
     """Shim class that will be overwritten below if brainglobe packages are installed"""
     def __new__(obj, *args, **kwargs):
-        return NISSING
+        return MISSING
     def __init__(self, *args, **kwargs):
         pass
     
