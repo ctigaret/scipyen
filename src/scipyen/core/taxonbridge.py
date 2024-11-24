@@ -52,6 +52,12 @@ supported_species=["Rattus", "Mus"]
 def get_taxon(s:str) -> Taxon | None:
     if hasTaxoniq:
         try:
+            if s.lower() in ["mouse", "mice"]:
+                s = "Mus"
+                
+            elif s.lower() in ["rat", "rats"]:
+                s = "Rattus"
+                
             taxon = taxoniq.Taxon(scientific_name=s)
             return taxon
         except:

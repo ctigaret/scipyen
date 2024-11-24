@@ -478,8 +478,8 @@ class WorkerThread(QtCore.QThread):
         
 class LoopWorkerThread(QtCore.QThread):
     """Thread for an atomic function call in a loop.
-See https://stackoverflow.com/questions/9957195/updating-gui-elements-in-multithreaded-pyqt/9964621#9964621
-"""
+    See https://stackoverflow.com/questions/9957195/updating-gui-elements-in-multithreaded-pyqt/9964621#9964621
+    """
     # sig_ready = Signal(object, name="sig_ready")
     
     def __init__(self, parent, fn:typing.Callable, /, 
@@ -513,3 +513,4 @@ See https://stackoverflow.com/questions/9957195/updating-gui-elements-in-multith
             # self.signals.signal_Result.emit(result)
             self.signals.signal_Finished.emit()
             
+        

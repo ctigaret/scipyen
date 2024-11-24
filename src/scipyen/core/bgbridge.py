@@ -6,13 +6,20 @@
 """
 Wrapper around BrainGlobe API, with shims
 """
-import collections, typing, dataclasses
+import collections, typing, dataclasses, traceback
 from dataclasses import MISSING
 import numpy as np
 import pandas as pd
+from qtpy import (QtCore, QtWidgets, QtGui)
+from qtpy.QtCore import (Signal, Slot, Property)
+
+# import qasync
+# from qasync import asyncSlot
 
 from core.prog import scipywarn
 from core import taxonbridge
+from core import workspacefunctions as wf
+import gui.pictgui as pgui
 
 DEFAULT_RAT_BRAIN_ATLAS = "whs_sd_rat_39um" 
 DEFAULT_MOUSE_BRAIN_ATLAS = "allen_mouse_50um"
@@ -80,7 +87,6 @@ class BGStructureDescriptor:
     "HF" in Waxholm rat brain atlas, but to "HPF" in Allen adult brain atlas (and 
     (and the derived ones, like Princeton mouse atlas or Kim mouse atlas).
     
-    
     There are also discrepancies in the "canonical" name of the structure, e.g.
     acronym "CA1" is mapped to "Cornu ammonis 1" in Waxholm, "Field CA1" in Allen
     and Princeton atlases, but to "Field CA1 of the hippocampus" in Kim atlas.
@@ -88,7 +94,8 @@ class BGStructureDescriptor:
         
     """
     def __init__(self, *, default:typing.Optional[typing.Union[BGStructure, str, type(pd.NA), type(MISSING)]] = None):
-        if hasBrainGlobeAtlasAPI and isinstance(default, BGStructure):
+        # if hasBrainGlobeAtlasAPI and isinstance(default, BGStructure):
+        if hasBrainGlobeAtlasAPI and isinstance(default, brainglobe_atlasapi.structure_class.Structure):
             self._default = default
             
         elif isinstance(default, str) or default in (None, MISSING, pd.NA):
@@ -101,53 +108,95 @@ class BGStructureDescriptor:
         if len(name.strip()) == 0:
             raise ValueError("Cannot accept an empty name")
         self._name = "_"+name
-    
+        
     def __get__(self, obj:object, objtype:type) -> object:
         if obj is None:
             return self._default
         
-        ret = getattr(obj, self._name, self._default)
+        return getattr(obj, self._name, self._default)
 
-        if isinstance(ret, str):
-            if hasattr(obj, "organism") and hasattr(obj.organism, "taxon"):
-                if isinstance(obj.organism.taxon, str):
-                    atlas = get_atlas_for_species(obj.organism.taxon)
-                    if isinstance(atlas, brainglobe_atlasapi.BrainGlobeAtlas):
-                        structure = get_atlas_structure(value, atlas)
-                        ret = structure
-                        setattr(obj, self._name, ret)
-                        
-        return ret
+#         if isinstance(ret, str):
+#             if hasattr(obj, "organism") and hasattr(obj.organism, "taxon"):
+#                 if isinstance(obj.organism.taxon, str):
+#                     atlas = get_atlas_for_species(obj.organism.taxon)
+#                     if isinstance(atlas, brainglobe_atlasapi.BrainGlobeAtlas):
+#                         structure = get_atlas_structure(value, atlas)
+#                         ret = structure
+#                         setattr(obj, self._name, ret)
+#                         
+#         return ret
     
     
     def __set__(self, obj:object, value:typing.Optional[typing.Union[BGStructure, str, type(pd.NA), type(MISSING)]] = None):
-        if hasBrainGlobeAtlasAPI and isinstance(value, BGStructure):
+        if hasBrainGlobeAtlasAPI and isinstance(value, brainglobe_atlasapi.structure_class.Structure):
             setattr(obj, self._name, value)
             
         elif isinstance(value, str) or value in (None, MISSING, pd.NA):
-            if isinstance(value, str):
-                if hasattr(obj, "organism") and hasattr(obj.organism, "taxon"):
-                    if isinstance(obj.organism.taxon, str):
-                        atlas = get_atlas_for_species(obj.organism.taxon)
-                        structure = get_atlas_structure(value, atlas)
-                        setattr(obj, self._name, structure)
+            # if isinstance(value, str):
+            #     if hasattr(obj, "organism") and hasattr(obj.organism, "taxon"):
+            #         if isinstance(obj.organism.taxon, str):
+            #             atlas = get_atlas_for_species(obj.organism.taxon)
+            #             structure = get_atlas_structure(value, atlas)
+            #             setattr(obj, self._name, structure)
+            #             return
                 
             setattr(obj, self._name, value)
         else:
-            raise TypeError(f"Expecting a non-empty str, pandas NA, or None; instead, got {type(default).__name__}")
+            raise TypeError(f"Expecting a non-empty str, pandas NA, or None; instead, got {type(value).__name__}")
 
-def get_atlas_for_species(taxon:typing.Union[str, taxonbridge.Taxon]) -> BGAtlas | None:
-    # from core import taxonbridge
-    if hasBrainGlobeAtlasAPI:
-        atlas_names = get_downloaded_atlases()
-        if len(atlas_names) == 0:
-            scipywarn("No mouse or rat brain atlases are donwloaded locally; make sure you have a good internet conection")
-            atlases = get_all_atlases_lastversions()
-            if len(atlases) == 0:
-                scipywarn("Cannot query the atlases database - check your internet connection")
-                return
-            atlas_names = list(atlases.keys())
+class BrainAtlasResolver(QtCore.QObject):
+    _instance = None
+    def __new__(cls, parent=None):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+
+        return cls._instance
+    
+    def __init__(self, parent=None):
+        super().__init__(parent=parent)
+        self._atlas = None
+        self._atlas_name_ = None
+        self.downloadThread = None
+        self.progressDlg = None
+        self.scipyenWindow = None
+        ws = wf.user_workspace()
+        if ws is not None:
+            self.scipyenWindow = ws["mainWindow"]
+        else:
+            frame_records = inspect.getouterframes(inspect.currentframe())
+            for (n,f) in enumerate(frame_records):
+                if "ScipyenWindow" in f[0].f_globals:
+                    self.scipyenWindow = f[0].f_globals["ScipyenWindow"].instance()
+                    break
+        
+        if hasBrainGlobeAtlasAPI:
+            self.local_atlas_names = get_downloaded_atlases()
+            if len(self.local_atlas_names) == 0:
+                scipywarn("No mouse or rat brain atlases are downloaded locally; a suitable atlas will be downloaded shortly, but make sure you have a good internet conection")
                 
+            self.all_atlases = get_all_atlases_lastversions() # mapping atlas name ↦ version
+            if len(self.all_atlases) == 0:
+                scipywarn("Cannot query the atlases database - check your internet connection")
+            
+            all_atlas_names = list(self.all_atlases.keys())
+            if len(all_atlas_names + self.local_atlas_names) == 0:
+                scipywarn("No local atlases and no reliable internet connection - bailing out...")
+                return
+                
+            self.all_available_atlas_names = sorted(list(set(all_atlas_names) | set(self.local_atlas_names)))
+            
+        else:
+            scipywarn(f"Please install brainglobe or at least brainglobe_atlasapi first")
+            self.all_available_atlas_names = list()
+            self.local_atlas_names = list()
+            self.all_atlases = dict()
+            
+            
+    def resolveAtlas(self, taxon:typing.Union[str, taxonbridge.Taxon], atlas_name:typing.Optional[str]=None):
+        if len(self.all_available_atlas_names) == 0:
+            scipywarn("No atlases are available")
+            return
+        
         if taxonbridge.hasTaxoniq and isinstance(taxon, taxonbridge.Taxon):
             species = taxonbridge.get_nearest_parent_common_name(taxon)
                 
@@ -155,7 +204,7 @@ def get_atlas_for_species(taxon:typing.Union[str, taxonbridge.Taxon]) -> BGAtlas
             if len(taxon.strip()) == 0:
                 raise ValueError("taxon is an empty string!")
             
-            if taxon not in [s.lower() for s in taxonbridge.supported_species] + ["mouse", "mice", "rat"]:
+            if taxon not in [s.lower() for s in taxonbridge.supported_species] + ["mouse", "mice", "rat", "rats"]:
                 raise ValueError(f"taxon {taxon} is not supported")
             
             # NOTE: 2024-11-23 14:40:50
@@ -172,6 +221,7 @@ def get_atlas_for_species(taxon:typing.Union[str, taxonbridge.Taxon]) -> BGAtlas
             
             if species.lower().startswith("rat") or species.lower().endswith("rat"):
                 species = "rat"
+                
             elif any(species.lower().startswith(a) or species.lower().endswith(a) for a in ("mus", "mouse", "mice")):
                 species = "mouse"
             
@@ -181,35 +231,95 @@ def get_atlas_for_species(taxon:typing.Union[str, taxonbridge.Taxon]) -> BGAtlas
         if "mice" in species.lower():
             species = "mouse"
             
-        atlas_names = [a for a in atlas_names if species in a]
+        atlas_names_for_species = [a for a in self.all_available_atlas_names if species in a]
         
-        if species == "mouse":
-            default_atlas = DEFAULT_MOUSE_BRAIN_ATLAS
-        elif species == "rat":
-            default_atlas = DEFAULT_RAT_BRAIN_ATLAS
+        if isinstance(atlas_name, str) and len(atlas_name.strip()):
+            if atlas_name not in atlas_names_for_species:
+                scipwarn(f"The supplied atlas name {atlas_name} is not valid for species {species}")
+                
+            else:
+                default_atlas = atlas_name
+                
         else:
-            raise ValueError(f"Species {species} is not yet supported ")
+            if species == "mouse":
+                default_atlas = DEFAULT_MOUSE_BRAIN_ATLAS
+                
+            elif species == "rat":
+                default_atlas = DEFAULT_RAT_BRAIN_ATLAS
+                
+            else:
+                raise ValueError(f"Species {species} is not yet supported ")
         
         ret = ""
         
-        if len(atlas_names) == 0:
-            scipywarn(f"No brain atlas for species {species} is installed locally; please use brainglobe_atlasapi to download")
+        if len(atlas_names_for_species) == 0:
+            scipywarn(f"No brain atlas for species {species} is found")
             return
         
-        elif len(atlas_names) > 1:
-            if default_atlas in atlas_names:
+        elif len(atlas_names_for_species) > 1:
+            if default_atlas in atlas_names_for_species:
                 scipywarn(f"There is more than one brain atlas available. The default one ({default_atlas}) will be used")
                 ret = default_atlas
             else:
                 scipywarn(f"There is more than one brain atlas available, but the default one ({default_atlas}) is not among them. The first available one ({atlas_names[0]}) will be used")
-                ret = atlas_names[0]
+                ret = atlas_names_for_species[0]
             
         else:
-            ret = atlas_names[0]
+            ret = atlas_names_for_species[0]
+            
+        self._atlas_name_ = ret
                 
-        if len(ret.strip()):
-            return BGAtlas(ret)
-                            
+        if len(self._atlas_name_.strip()):
+            if self._atlas_name_ not in self.local_atlas_names:
+                self._resolveAtlasThreaded()
+                # return dl.result # FIXME: 2024-11-24 22:28:01 WRONG
+                    
+            else:
+                # TODO 2024-11-24 21:23:14
+                # make 'check_latest' below a Scipyen configurable variable
+                # (not Qt configurable)
+                self._atlas = BGAtlas(self._atlas_name_, check_latest=False) 
+                
+    def _resolveAtlasThreaded(self): #, atlas_name:str):
+        scipywarn(f"Will try and download {self._atlas_name_}")
+        self.progressDlg = QtWidgets.QProgressDialog(f"Downloading {self._atlas_name_}", "", 0, 0, self.scipyenWindow)
+        self.progressDlg.setMinimumDuration(1000)
+        self.progreDlg.setCancelButton(None)
+        self.downloadThread = AtlasDownloadThread(self, self._atlas_name_)
+        self.downloadThread.signals.signal_setMaximum[int].connect(self.progressDlg.setMaximum)
+        self.downloadThread.signals.signal_Progress[int].connect(self.progressDlg.setValue)
+        self.downloadThread.signals.signal_Result[object].connect(self._slot_setAtlas)
+        self.downloadThread.signals.signal_Finished.connect(self.finished)
+        print(f"Start downloading atlas {self._atlas_name_}.")
+        self.downloadThread.start()
+        
+    @property
+    def atlas(self):
+        if isinstance(self.downloadThread, QtCore.QThread) and self.downloadThread.isRunning():
+            print(f"Atlas {self._atlas_name_} is still downloading; please wait")
+            return
+        return self._atlas
+    
+    @atlas.setter
+    def atlas(self, o:object):
+        self._atlas = o
+        
+    @Slot(object)
+    def _slot_setAtlas(self, o:object):
+        self.atlas = o
+        
+    @Slot()
+    def finished(self):
+        print(f"Atlas {self._atlas_name_} has been downloaded.")
+        if isinstance(self.downloadThread, QtCore.QThread) and self.downloadThread.isRunning():
+            self.downloadThread.requestInterruption()
+        self.downloadThread.quit()
+        self.downloadThread.wait()
+        self.progressDlg.cancel()
+        self.progressDlg.reset()
+        self.progressDlg.close()
+        self._instance = None
+        
 def get_atlas_structure(name:str, atlas:BGAtlas, 
                         acro:bool=False,
                         cutoff = 0.5,
@@ -227,7 +337,7 @@ def get_atlas_structure(name:str, atlas:BGAtlas,
 
     Parameters:
     ===========
-    name:   common name of the brain region. Case sensitive sometimes¹ 
+    name:   common name of the brain region. Case sensitive (sometimes)¹ 
     
     atlas:  a brainglobe_atlasapi.BrainGlobeAtlas instance
     
@@ -249,7 +359,7 @@ def get_atlas_structure(name:str, atlas:BGAtlas,
     WARNING: This may yield surprising results, so it is best avoid ambiguities 
         in the 'name' parameter. 
     
-    ¹Case sensitivity does not always work as you may think, here, see below.
+    ¹Case sensitivity does not always work as you may think, see examples below.
 
     Some examples using the Waxholm Space Atlas of the Sprague Dawley Rat Brain 
     (https://www.nitrc.org/projects/whs-sd-atlas):
@@ -306,35 +416,43 @@ def get_atlas_structure(name:str, atlas:BGAtlas,
     # finally, get the best match (if any found) and augment with atlas name
     # return None when nothing was found
     if len(matches):
-        ret = matches[0]
+        ret = atlas.structures[matches[0]["id"]]
         ret["atlas_name"] = atlas.atlas_name
         return ret
     
-    
+class AtlasDownloadThread(QtCore.QThread):
+    def __init__(self, parent, atlas_name:str):
+        """
+        """
+        QtCore.QThread.__init__(self, parent)
+        self.atlas_name = atlas_name
+        self.signals = pgui.ProgressWorkerSignals()
+        self.result=None
         
+    def progressUpdater(self, current:int, total:int):
+        self.signals.signal_setMaximum.emit(total)
+        self.signals.signal_Progress.emit(current)
+#         if current==0:
+#             self.signals.signal_setMaximum.emit(total)
+#             
+#         else:
+#             self.signals.signal_Progress.emit(current)
         
-    # ll = list(map(lambda x: editdistance.eval(name, x), sss))
-    
-#     la = list(map(lambda x: editdistance.eval(name, x), sacronyms))
-#     ln = list(map(lambda x: editdistance.eval(name, x), snames))
-#     
-#     ll = list(map(lambda x: min(x), zip(ln,la)))
-    
-    
-#     closestNdx = ll.index(min(ll))
-#     
-#     if closestNdx == 0:
-#         return
-    
-    # ret = structures[closestNdx]
-    
-    # return ret
-    
-#     words = name.split()
-#     
-#     a = set([(x, sacronyms[k], sids[k]) for k,x in enumerate(snames) if name.lower() in x.lower() or all(w.lower() in x.lower() for w in words)])
-# 
-#     b = set([(snames[k], x, sids[k]) for k, x in enumerate(sacronyms) if name.lower() in x.lower() or all(w.lower() in x.lower() for w in words)])
-#     
-#     return a | b
+    def run(self):
+        try:
+            print(f"Downloading {self.atlas_name}")
+            self.result = brainglobe_atlasapi.bg_atlas.BrainGlobeAtlas(self.atlas_name, fn_update=self.progressUpdater)
+            self.signals.signal_Result.emit(self.result)
+        except:
+            traceback.print_exc()
+            exctype, value = sys.exc_info()[:2]
+            self.signals.sig_error.emit((exctype, value, traceback.format_exc()))
+            
+        else:
+            # self.signals.signal_Result.emit(result)
+            self.signals.signal_Finished.emit()
+        finally:
+            # self.signals.signal_Result.emit(result)
+            self.signals.signal_Finished.emit()
+            
     
