@@ -178,6 +178,15 @@ class ProgressWorkerSignals(QtCore.QObject):
     signal_setMaximum = Signal(int)
     signal_Canceled = Signal()
     
+    @property
+    def signals(self):
+        return (self.signal_Finished,
+                self.sig_error,
+                self.signal_Result,
+                self.signal_Progress,
+                self.signal_setMaximum,
+                self.signal_Canceled)
+    
 class ProgressWorkerRunnable(QtCore.QRunnable):
     """
     ProgressWorkerRunnable thread
