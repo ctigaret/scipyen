@@ -50,6 +50,7 @@ from core.prog import scipywarn
 from core import taxonbridge
 from core import workspacefunctions as wf
 import gui.pictgui as pgui
+from iolib import network
 
 DEFAULT_RAT_BRAIN_ATLAS = "whs_sd_rat_39um" 
 DEFAULT_MOUSE_BRAIN_ATLAS = "allen_mouse_50um"
