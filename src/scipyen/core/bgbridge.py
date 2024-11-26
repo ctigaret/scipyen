@@ -43,6 +43,9 @@ import pandas as pd
 from qtpy import (QtCore, QtWidgets, QtGui)
 from qtpy.QtCore import (Signal, Slot, Property)
 
+import configparser # from standard library; Scipyen uses confuse from  pypi
+                    # so don't "confuse" them(!)
+
 # import qasync
 # from qasync import asyncSlot
 
@@ -173,6 +176,7 @@ class BrainAtlasManager(QtCore.QObject):
         self.progressDlg = None
         self.scipyenWindow = None
         self.loopControl = {"break":False}
+        self.netMan = network.ScipyenNetworkManager()
         ws = wf.user_workspace()
         if ws is not None:
             self.scipyenWindow = ws["mainWindow"]
@@ -306,14 +310,6 @@ class BrainAtlasManager(QtCore.QObject):
             # make 'check_latest' below a Scipyen configurable variable
             # (not Qt configurable)
             self._atlas = BGAtlas(name, check_latest=False) 
-#         if len(name.strip()):
-#             if name not in self._all_available_atlas_names_:
-#                 scipywarn(f"'{name}' is not a valid atlas name; call self.showAtlases() for a table of available atlases both locally and online, or check the properties self.localAtlasNames and self.availableAtlasNames")
-#                 return    
-#             
-#             elif name not in self._local_atlas_names_:
-#                 
-#             else:
                 
     def showAtlases(self, show_local_path:bool=False, toConsole:bool=True, 
                     table_width:int=80) -> typing.Optional[pd.DataFrame]:
@@ -513,6 +509,86 @@ class BrainAtlasManager(QtCore.QObject):
             self._downloadAtlas(name, False)
         else:
             self._updateAtlas(name)
+            
+    def getBrainGlobeConfigurationRemote(self):
+        """Does what brainglobe_atlasapi.utils.conf_from_url(…) does.
+        Uses QtNetwork module.
+        """
+        if not hasBrainGlobeAtlasAPI:
+            return
+        # self.netMan.checkInternetConnection()
+        # if not netman.hasInternet:
+        #     raise RuntimeError("No network connection")
+        
+        url = BGAtlas._remote_url_base.format("last_versions.conf")
+        self.netMan.sig_textFromUrl[str].connect(self.slot_remoteConfigReceived)
+        self.netMan.getTextFromUrl(url)
+            
+            # ### BEGIN comment out while developing
+#             if not cache_path.parent.exists():
+#                 cache_path.parent.mkdir(parents=True, exist_ok=True)
+#                 
+#             with open(cache_path, "w") as f_out:
+#                 config_obj.write(f_out)
+            # ### END comment out while developing
+                
+            return config_obj
+        
+    @Slot(object)
+    def slot_remoteConfigReceived(self, txt:object):
+        if isinstance(txt, str):
+            conf_object = configparse.ConfigParser()
+            config_obj.read_string(conf_text)
+            cache_path = brainglobe_atlasapi.config.get_brainglobe_dir() / "last_versions.conf"
+        print(txt)
+    
+    def getBrainGlobeConfigurationLocal(self, file_path:pathlib.Path):
+        """Delegates to brainglobe_atlasapi.utils.conf_from_file(…)"""
+        return brainglobe_atlasapi.utils.conf_from_file(file_path)
+        
+            
+    def getAtlasRemoteVersion(self, atlas:BGAtlas):
+        if not hasBrainGlobeAtlasAPI:
+            return
+        netman = network.ScipyenNetworkManager()
+        netman.checkInternetConnection()
+        if not netman.hasInternet:
+            raise RuntimeError("No network connection")
+        
+    
+    
+    
+class AtlasDownloadThread(QtCore.QThread):
+    def __init__(self, parent, atlas_name:str):
+        """
+        """
+        QtCore.QThread.__init__(self, parent)
+        self.atlas_name = atlas_name
+        self.signals = pgui.ProgressWorkerSignals()
+        self.result=None
+        
+    def progressUpdater(self, current:int, total:int):
+        self.signals.signal_setMaximum.emit(total)
+        self.signals.signal_Progress.emit(current)
+        
+    def run(self):
+        try:
+            print(f"Downloading {self.atlas_name}")
+            self.result = brainglobe_atlasapi.bg_atlas.BrainGlobeAtlas(self.atlas_name, fn_update=self.progressUpdater)
+            self.signals.signal_Result.emit(self.result)
+        except:
+            traceback.print_exc()
+            exctype, value = sys.exc_info()[:2]
+            self.signals.sig_error.emit((exctype, value, traceback.format_exc()))
+            
+        else:
+            self.signals.signal_Finished.emit()
+            
+        finally:
+            self.signals.signal_Finished.emit()
+            
+    
+# ### BEGIN ---- module-level functions
         
 def get_atlas_structure(name:str, atlas:BGAtlas, 
                         acro:bool=False,
@@ -614,33 +690,5 @@ def get_atlas_structure(name:str, atlas:BGAtlas,
         ret["atlas_name"] = atlas.atlas_name
         return ret
     
-class AtlasDownloadThread(QtCore.QThread):
-    def __init__(self, parent, atlas_name:str):
-        """
-        """
-        QtCore.QThread.__init__(self, parent)
-        self.atlas_name = atlas_name
-        self.signals = pgui.ProgressWorkerSignals()
-        self.result=None
-        
-    def progressUpdater(self, current:int, total:int):
-        self.signals.signal_setMaximum.emit(total)
-        self.signals.signal_Progress.emit(current)
-        
-    def run(self):
-        try:
-            print(f"Downloading {self.atlas_name}")
-            self.result = brainglobe_atlasapi.bg_atlas.BrainGlobeAtlas(self.atlas_name, fn_update=self.progressUpdater)
-            self.signals.signal_Result.emit(self.result)
-        except:
-            traceback.print_exc()
-            exctype, value = sys.exc_info()[:2]
-            self.signals.sig_error.emit((exctype, value, traceback.format_exc()))
-            
-        else:
-            self.signals.signal_Finished.emit()
-            
-        finally:
-            self.signals.signal_Finished.emit()
-            
+# ### END ---- module-level functions
     

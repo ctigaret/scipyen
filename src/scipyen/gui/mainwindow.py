@@ -377,7 +377,7 @@ from .workspacegui import (WorkspaceGuiMixin, DirectoryObserver)
 from .workspacemodel import WorkspaceModel
                     
 
-from iolib import h5io, jsonio
+from iolib import h5io, jsonio, network
 from iolib import pictio as pio
 
 

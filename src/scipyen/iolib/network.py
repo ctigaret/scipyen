@@ -16,55 +16,103 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
 
 class ScipyenNetworkManager(QtCore.QObject):
-    def __init__(self, timeout_ms:int=QtNetwork.QNetworkRequest.DefaultTransferTimeoutConstant,
+    sig_hasInternet = Signal(bool, "sig_hasInternet")
+    sig_textFromUrl = Signal(str)
+    _sig_goAhead = Signal("_sig_goAhead")
+    
+    def __init__(self, _timeout_ms_:int=QtNetwork.QNetworkRequest.DefaultTransferTimeoutConstant,
                  parent:typing.Optional[QtCore.QObject] = None):
         super().__init__(parent=parent)
-        self.timeout_ms = timeout_ms
-        self.manager = QtNetwork.QNetworkAccessManager(self)
-        self.manager.setTransferTimeout(timeout_ms)
-        self.hasInternet=False
+        self._timeout_ms_ = _timeout_ms_
+        self._manager_ = QtNetwork.QNetworkAccessManager(self)
+        self._manager_.setTransferTimeout(_timeout_ms_)
+        self._hasInternet_=False
+        self._networkReply_ = None
+        self._replyText_ = None
 
-    def check_internet_connection(self, url:str = "http://www.google.com/", 
+    def checkInternetConnection(self, url:typing.Union[str, QtCore.QUrl] = "http://www.google.com/", 
                                   raise_error:bool=True):
-        request = QtNetwork.QNetworkRequest(QtCore.QUrl(url))
+        
+        if isinstance(url, str):
+            url = QtCore.QUrl(url)
+        
+        request = QtNetwork.QNetworkRequest(url)
         request.setRawHeader(b"User-Agent", b"Mozilla 5.0")
-        reply = self.manager.get(request)
-        reply.readyRead.connect(self.slot_checkConnectionReady)
-        reply.finished.connect(self.slot_checkConnectionFinished)
-        reply.errorOccurred.connect(self.slot_checkConnectionError)
-        reply.sslErrors.connect(self.slot_checkConnectionSSLError)
-        reply.deleteLater()
+        self._networkReply_ = self._manager_.get(request)
+        self._networkReply_.readyRead.connect(self.slot_checkConnectionReady)
+        self._networkReply_.finished.connect(self.slot_checkConnectionFinished)
+        self._networkReply_.errorOccurred.connect(self.slot_checkConnectionError)
+        self._networkReply_.sslErrors.connect(self.slot_checkConnectionSSLError)
+        # self._networkReply_.deleteLater()
+        
+    def getTextfromUrl(self, url:typing.Union[str, QtCore.QUrl]):
+        if isinstance(url, str):
+            url = QtCore.QUrl(url)
+        
+        request = QtNetwork.QNetworkRequest(url)
+        request.setRawHeader(b"User-Agent", b"Mozilla 5.0")
+        self._replyText_ = None
+        self._networkReply_ = self._manager_.get(request)
+        self._networkReply_.readyRead.connect(self.slot_replyReady)
+        self._networkReply_.finished.connect(self.slot_replyFinished)
+        self._networkReply_.errorOccurred.connect(self.slot_replyConnectionError)
+        self._networkReply_.sslErrors.connect(self.slot_replySSLError)
         
     @Slot()
-    def slot_readyRead(self):
+    def slot_replyReady(self):
         pass
-    
+        # self._replyText_ = bytes(self._networkReply_.readAll()).decode()
+        
+    @Slot()
+    def slot_replyFinished(self):
+        self._replyText_ = bytes(self._networkReply_.readAll()).decode()
+        self.sig_textFromUrl.emit(self._replyText_)
+        
     @Slot()
     def slot_checkConnectionFinished(self):
-        reply = self.sender()
-        rawHeaders = reply.rawHeaderPairs()
-        for x in rawHeaders:
-            print(f"{bytes(x[0]).decode()} ↦ {bytes(x[1]).decode()}")
-        self.hasInternet = True
+        # reply = self.sender()
+        rawHeaders = self._networkReply_.rawHeaderPairs()
+        # for x in rawHeaders:
+        #     print(f"{bytes(x[0]).decode()} ↦ {bytes(x[1]).decode()}")
+        self._hasInternet_ = len(rawHeaders) > 0
+        self.sig_hasInternet.emit(self._hasInternet_)
+        if self._hasInternet_:
+            self._sig_goAhead.emit()
     
     @Slot()
     def slot_checkConnectionReady(self):
-        reply = self.sender()
-        rawHeaders = reply.rawHeaderPairs()
-        for x in rawHeaders:
-            print(f"{bytes(x[0]).decode()} ↦ {bytes(x[1]).decode()}")
-        self.hasInternet = True
+        # reply = self.sender()
+        data = bytes(self._networkReply_.readAll()).decode()
+        # rawHeaders = self._networkReply_.rawHeaderPairs()
+        # for x in rawHeaders:
+        #     print(f"{bytes(x[0]).decode()} ↦ {bytes(x[1]).decode()}")
+        self._hasInternet_ = len(data) > 0
+        self.sig_hasInternet.emit(self._hasInternet_)
     
     @Slot()
-    def slot_Error(self):
+    def slot_replyConnectionError(self):
         scipywarn("No internet connection available.")
+        self._hasInternet_=False
+        self.sig_hasInternet.emit(self._hasInternet_)
     
     @Slot()
     def slot_checkConnectionError(self):
         scipywarn("No internet connection available.")
-        self.hasInternet=False
+        self._hasInternet_=False
+        self.sig_hasInternet.emit(self._hasInternet_)
     
     @Slot()
     def slot_checkConnectionSSLError(self):
         scipywarn("No secure internet connection available.")
-        self.hasInternet=False
+        self._hasInternet_=False
+        self.sig_hasInternet.emit(self._hasInternet_)
+
+    @Slot()
+    def slot_replySSLError(self):
+        scipywarn("No secure internet connection available.")
+        self._hasInternet_=False
+        self.sig_hasInternet.emit(self._hasInternet_)
+
+    @property
+    def networkReply(self) -> QNetworkReply | None:
+        return self._networkReply_
