@@ -191,7 +191,7 @@ class BrainAtlasManager(QtCore.QObject):
                     break
         
         # self.refresh()
-        self._retrieveRemoteAtlasesList()
+        # self._retrieveRemoteAtlasesList()
             
     def refresh(self):
         if hasBrainGlobeAtlasAPI:

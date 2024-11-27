@@ -106,7 +106,7 @@ from collections import deque, ChainMap
 # BEGIN 3rd party modules
 
 # BEGIN PyQtxxx and utilities for setting GUI appearance
-from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg,)
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork,)
 from qtpy.QtCore import (Signal, Slot, Property,)
 from qtpy.uic import loadUiType
 try:
