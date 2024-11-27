@@ -167,6 +167,8 @@ class BrainAtlasManager(QtCore.QObject):
     # 
     #     return cls._instance
     
+    default_config_file = brainglobe_atlasapi.config.get_brainglobe_dir() / "last_versions.conf" if hasBrainGlobeAtlasAPI else None
+    
     def __init__(self, parent=None):
         super().__init__(parent=parent)
         self._atlas = None
@@ -177,6 +179,7 @@ class BrainAtlasManager(QtCore.QObject):
         self.scipyenWindow = None
         self.loopControl = {"break":False}
         self.netMan = network.ScipyenNetworkManager()
+        
         ws = wf.user_workspace()
         if ws is not None:
             self.scipyenWindow = ws["mainWindow"]
@@ -187,7 +190,8 @@ class BrainAtlasManager(QtCore.QObject):
                     self.scipyenWindow = f[0].f_globals["ScipyenWindow"].instance()
                     break
         
-        self.refresh()
+        # self.refresh()
+        self._retrieveRemoteAtlasesList()
             
     def refresh(self):
         if hasBrainGlobeAtlasAPI:
@@ -510,53 +514,62 @@ class BrainAtlasManager(QtCore.QObject):
         else:
             self._updateAtlas(name)
             
-    def getBrainGlobeConfigurationRemote(self):
+    def _retrieveRemoteAtlasesList(self):
         """Does what brainglobe_atlasapi.utils.conf_from_url(…) does.
-        Uses QtNetwork module.
+        Uses Qt Network framework.
         """
         if not hasBrainGlobeAtlasAPI:
             return
-        # self.netMan.checkInternetConnection()
-        # if not netman.hasInternet:
-        #     raise RuntimeError("No network connection")
         
         url = BGAtlas._remote_url_base.format("last_versions.conf")
-        self.netMan.sig_textFromUrl[str].connect(self.slot_remoteConfigReceived)
+        self.netMan.sig_textFromUrl[object].connect(self._slot_remoteConfigReceived)
         self.netMan.getTextFromUrl(url)
             
-            # ### BEGIN comment out while developing
-#             if not cache_path.parent.exists():
-#                 cache_path.parent.mkdir(parents=True, exist_ok=True)
-#                 
-#             with open(cache_path, "w") as f_out:
-#                 config_obj.write(f_out)
-            # ### END comment out while developing
-                
-            return config_obj
-        
     @Slot(object)
-    def slot_remoteConfigReceived(self, txt:object):
-        if isinstance(txt, str):
-            conf_object = configparse.ConfigParser()
-            config_obj.read_string(conf_text)
-            cache_path = brainglobe_atlasapi.config.get_brainglobe_dir() / "last_versions.conf"
-        print(txt)
-    
-    def getBrainGlobeConfigurationLocal(self, file_path:pathlib.Path):
-        """Delegates to brainglobe_atlasapi.utils.conf_from_file(…)"""
-        return brainglobe_atlasapi.utils.conf_from_file(file_path)
+    def _slot_remoteConfigReceived(self, txt:object):
+        if hasBrainGlobeAtlasAPI:
+            if isinstance(txt, str):
+                conf_object = configparser.ConfigParser()
+                conf_object.read_string(txt)
+                if not self.default_config_file.parent.exists():
+                    self.default_config_file.parent.mkdir(parents=True, exist_ok=True)
+                    
+                with open(self.default_config_file, "w") as f_out:
+                    conf_object.write(f_out)
+         
+    def getBrainGlobeConfiguration(self, file_path:typing.Optional[pathlib.Path]=None) -> configparser.ConfigParser:
+        """Reads the brainglobe atlas configuration from a local file.
+        The file is a plain ASCII file with contents in the following format:
+        [atlases]
+        <atlas name> = <major_version.minor_version>
+        ⋮
         
-            
-    def getAtlasRemoteVersion(self, atlas:BGAtlas):
+        where <major_version.minor_version> consists of a digit-dot-digit
+        
+        On UN*X platforms, by default, this is file is '~/.brainglobe/last_versions.conf'
+        
+        """
         if not hasBrainGlobeAtlasAPI:
             return
-        netman = network.ScipyenNetworkManager()
-        netman.checkInternetConnection()
-        if not netman.hasInternet:
-            raise RuntimeError("No network connection")
+        if file_path is None:
+            file_path = self.default_config_file
+            
+        if not isinstance(file_path, pathlib.Path) or not file_path.exists():
+            return
+            
+        conf_object = configparser.ConfigParser()
+        with open(file_path) as file_object:
+            conf_object.read_file(file_object)
+            return dict(conf_object["atlases"])
+    
+    def getAllAtlasesLastVersions(self):
+        if not hasBrainGlobeAtlasAPI:
+            return
         
-    
-    
+        
+        
+        
+            
     
 class AtlasDownloadThread(QtCore.QThread):
     def __init__(self, parent, atlas_name:str):

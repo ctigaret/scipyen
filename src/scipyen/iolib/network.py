@@ -16,9 +16,9 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
 
 class ScipyenNetworkManager(QtCore.QObject):
-    sig_hasInternet = Signal(bool, "sig_hasInternet")
-    sig_textFromUrl = Signal(str)
-    _sig_goAhead = Signal("_sig_goAhead")
+    sig_hasInternet = Signal(bool, name="sig_hasInternet")
+    sig_textFromUrl = Signal(object)
+    _sig_goAhead = Signal(name="_sig_goAhead")
     
     def __init__(self, _timeout_ms_:int=QtNetwork.QNetworkRequest.DefaultTransferTimeoutConstant,
                  parent:typing.Optional[QtCore.QObject] = None):
@@ -26,6 +26,7 @@ class ScipyenNetworkManager(QtCore.QObject):
         self._timeout_ms_ = _timeout_ms_
         self._manager_ = QtNetwork.QNetworkAccessManager(self)
         self._manager_.setTransferTimeout(_timeout_ms_)
+        # self._manager_.finished[QtNetwork.QNetworkReply].connect(self.slot_replyFinished)
         self._hasInternet_=False
         self._networkReply_ = None
         self._replyText_ = None
@@ -45,7 +46,7 @@ class ScipyenNetworkManager(QtCore.QObject):
         self._networkReply_.sslErrors.connect(self.slot_checkConnectionSSLError)
         # self._networkReply_.deleteLater()
         
-    def getTextfromUrl(self, url:typing.Union[str, QtCore.QUrl]):
+    def getTextFromUrl(self, url:typing.Union[str, QtCore.QUrl]):
         if isinstance(url, str):
             url = QtCore.QUrl(url)
         
@@ -63,10 +64,16 @@ class ScipyenNetworkManager(QtCore.QObject):
         pass
         # self._replyText_ = bytes(self._networkReply_.readAll()).decode()
         
+    # @Slot(QtNetwork.QNetworkReply)
+    # def slot_replyFinished(self, reply:QtNetwork.QNetworkReply):
     @Slot()
     def slot_replyFinished(self):
-        self._replyText_ = bytes(self._networkReply_.readAll()).decode()
-        self.sig_textFromUrl.emit(self._replyText_)
+        reply = self.sender()
+        txt = bytes(reply.readAll()).decode()
+        self.sig_textFromUrl.emit(txt)
+        
+        # self._replyText_ = bytes(reply.readAll()).decode()
+        # self.sig_textFromUrl.emit(self._replyText_)
         
     @Slot()
     def slot_checkConnectionFinished(self):
@@ -114,5 +121,5 @@ class ScipyenNetworkManager(QtCore.QObject):
         self.sig_hasInternet.emit(self._hasInternet_)
 
     @property
-    def networkReply(self) -> QNetworkReply | None:
+    def networkReply(self) -> QtNetwork.QNetworkReply | None:
         return self._networkReply_
