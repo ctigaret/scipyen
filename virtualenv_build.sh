@@ -274,7 +274,7 @@ function dopyqt5 ()
             sip_wheel_exec=sip-wheel
         fi
         
-        echo "Using ${py_exec} as `whoami` to build PyQt5"
+        echo "Using ${py_exec} as user `whoami` to build PyQt5"
         
         pyqt5_src_url=`${py_exec} $installscriptdir/locate_pyqt5_src.py`
         pyqt5_src=`basename $pyqt5_src_url`
@@ -919,7 +919,7 @@ install_dir=${HOME}
 realscript=`realpath $0`
 scipyendir=`dirname "$realscript"`
 docdir=${scipyendir}/doc
-installscriptdir=${scipyendir}/environment-setup
+installscriptdir=${scipyendir}/setup_env
 scipyensrcdir=${scipyendir}/src/scipyen
 using_python=""
 install_neuron=0
@@ -1224,7 +1224,7 @@ if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
         exit 1
     fi
     
-    build Pyqt5/6 NOTE: 2023-06-25 10:55:09 FIXME how to pass the virtualenv python to builder when run as root?
+    # build Pyqt5/6 NOTE: 2023-06-25 10:55:09 FIXME how to pass the virtualenv python to builder when run as root?
     dopyqt5
     
 #     dopyqt6 # NOTE: 2024-05-29 10:45:15 not yet ...
@@ -1254,7 +1254,7 @@ if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
     make_desktop_entry
     
     # NOTE: install console color schemes
-    cd $scipyendir/src/scipyen/scipyen_console_styles
+    cd $scipyendir/src/scipyen/gui/scipyen_console_styles
     pip install .
     cd $scipyendir
     
