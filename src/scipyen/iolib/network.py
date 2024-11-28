@@ -5,8 +5,8 @@
 
 """
 """
-import sys, os, typing, collections, traceback
-import inspect, functools
+import sys, os, typing, collections, pathlib, tarfile
+import inspect, functools, traceback
 from functools import (singledispatch, singledispatchmethod)
 from qtpy import QtCore, QtGui, QtWidgets, QtSvg, QtNetwork
 from qtpy.QtCore import Signal, Slot, Property
@@ -47,6 +47,7 @@ class ScipyenNetworkManager(QtCore.QObject):
         self._downloadedCount_ = 0 # qt5ex
         self._totalCount_ = 0 # qt5ex
         self._outputFile_ = QtCore.QFile() # qt5ex
+        self._outputFileName_ = None
         self._currentDownload_ = None # cannot instantiate QNetworkReply (is abstract) # qt5ex
         self._downloadTime_ = QtCore.QTime() # ~qt5ex
         self._progressDialog_ = None # ~qt5ex
@@ -59,22 +60,33 @@ class ScipyenNetworkManager(QtCore.QObject):
         self._networkReply_ = None # cannot instantiate QNetworkReply (is abstract)
         self._replyText_ = None
         
+    def getFromUrl(self, o:typing.Union[str, QtCore.QUrl, typing.Sequence[typing.Union[str, QtCore.QUrl]]],
+                   destination:typing.Optional[str]=None) -> None:
+        self._append(o, destination)#, asText)
+        
     @singledispatchmethod
-    def append(self, o:object):  # qt5ex
+    def _append(self, o:object, fileName:typing.Optional[str]=None):  # qt5ex
+        """When passing a sequence of URLs AND a fileName, AND he fileName already
+        exists, then each URL will be saved to fileNameStem<X>.fileNameSuffix where X is 0, 1, 2, etc
+        Whe fileName is None, fileName will be generated from the basename  of the URL
+        """
         raise NotImplementedError(f"Method is not implemented for {type(o).__name__} arguments")
         
-    @append.register(list)
-    @append.register(tuple)
-    @append.register(collections.deque)
-    def _(self, urlList:typing.Sequence[typing.Union[str, QtCore.QUrl]]) -> None:  # qt5ex
+    @_append.register(list)
+    @_append.register(tuple)
+    @_append.register(collections.deque)
+    def _(self, urlList:typing.Sequence[typing.Union[str, QtCore.QUrl]], # qt5ex
+          fileName:typing.Optional[str]=None) -> None:  
         for u in urlList:
-            self.append(u)
+            self._append(u, fileName)
             
         if len(self._downloadQueue_) == 0:
             QtCore.QTimer.singleShot(0, self.sig_finished)
             
-    @append.register
-    def _(self, u: str | QtCore.QUrl) -> None:  # qt5ex
+    @_append.register(str)
+    @_append.register(QtCore.QUrl)
+    def _(self, u: str | QtCore.QUrl, fileName:typing.Optional[str]=None) -> None:  # qt5ex
+        self._outputFileName_ = fileName
         if len(self._downloadQueue_) == 0:
             QtCore.QTimer.singleShot(0, self._startNextDownload)
             
@@ -89,13 +101,22 @@ class ScipyenNetworkManager(QtCore.QObject):
             self.sig_finished.emit()
             return
         
-        self._progressBar_ = QtWidgets.QProgressBar(parent = self.scipyenWindow)
-        self.scipyenWindow.statusBar().addWidget(self._progressBar_)
-        url = _downloadQueue_.popleft()
+        if self._progressBar_ is None:
+            self._progressBar_ = QtWidgets.QProgressBar(parent = self.scipyenWindow)
+            self.scipyenWindow.statusBar().addWidget(self._progressBar_)
+        else:
+            if not self._progressBar_.isVisible():
+                self.scipyenWindow.statusBar().addWidget(self._progressBar_)
+                self._progressBar_.show()
+                
+        url = self._downloadQueue_.popleft()
         
-        fileName = self._saveFileName(url)
+        fileName = self._outputFileName_
         
-        self._outputFile_.setFilename(fileName)
+        if fileName is None:
+            fileName = self._saveFileName(url)
+        
+        self._outputFile_.setFileName(fileName)
         
         if not self._outputFile_.open(QtCore.QIODevice.WriteOnly):
             scipywarn(f"Problem opening save file {fileName} for download from {url.url()}: {self._outputFile_.errorString()}")
@@ -105,32 +126,36 @@ class ScipyenNetworkManager(QtCore.QObject):
         
         request = QtNetwork.QNetworkRequest(url)
         self._currentDownload_ = self._manager_.get(request)
-        self._currentDownload_.downloadProgress[int, int].connect(self.slot_downloadProgress)
+        self._currentDownload_.downloadProgress["qint64", "qint64"].connect(self.slot_downloadProgress)
         self._currentDownload_.finished.connect(self.slot_downloadFinished)
         self._currentDownload_.readyRead.connect(self.slot_downloadReadyRead)
         
         msg = printStyled(f"")
         
-        print(printStyled(f"Downloading {url.url()}..."))
+        print(printStyled(f"Downloading {url.url()} ...", "green",True))
         self._downloadTime_.start()
         
-    def _saveFileName(self, url:QtCore.QUrl) -> str:  # qt5ex
+    def _saveFileName(self, url:QtCore.QUrl) -> str:  # ~qt5ex
         path = pathlib.Path(url.path())
         basename = path.name
         if len(basename.strip()) == 0:
             basename="download"
+        
+        suffix = pathlib.Path(basename).suffix
+        basename = pathlib.Path(basename).stem
             
-        if pathlib.Path(basename).exists():
+        if pathlib.Path(basename+suffix).exists():
             i = 0
             basename += "."
-            while(pathlib.Path(f"{basename}{i}").exists()):
+            while(pathlib.Path(f"{basename}{i}{suffix}").exists()):
                 i += 1
                 
             basename += f"{i}"
             
-        return basename
+        return basename+suffix
             
-    @Slot(int, int)
+    # @Slot(int, int)
+    @Slot("qint64", "qint64")
     def slot_downloadProgress(self, bytesReceived:int, bytesTotal:int) -> None: # qt5ex
         speed = bytesReceived * 1000. / self._downloadTime_.elapsed()
         
@@ -144,18 +169,29 @@ class ScipyenNetworkManager(QtCore.QObject):
         else:
             speed /= (1024 * 1024)
             units = "MB/s"
+            
+        self._progressBar_.setRange(0, bytesTotal)
+        self._progressBar_.setValue(bytesReceived)
         
         print(f"bytes: {bytesReceived} / {bytesTotal} (speed: {speed} {units})")
-        pass # TODO 2024-11-27 11:26:10 
         
     @Slot()
-    def slot_downloadFinished(self)-> None: # qt5ex
-        pass
+    def slot_downloadFinished(self)-> None: # ~qt5ex
+        self._outputFile_.close()
+        self._progressBar_.reset() # clear progressbar
+        self.scipyenWindow.statusBar().removeWidget(self._progressBar_)
+        if self._currentDownload_.error():
+            scipywarn(f"Failed:\n {self._currentDownload_.errorString()} ")
+        else:
+            print("Succeeded")
+            self._downloadedCount_ += 1
+            
+        self._currentDownload_.deleteLater()
+        self._startNextDownload()
     
     @Slot()
     def slot_downloadReadyRead(self) -> None: # qt5ex
-        # self._progressBar_.reset() clear progressbar
-        pass
+        self._outputFile_.write(self._currentDownload_.readAll())
         
         
 
