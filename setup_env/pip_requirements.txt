@@ -36,7 +36,7 @@
 
 # CHANGELOG
 # 2024-05-02 08:45:19
-# accommodate installaiton of PyQt6
+# accommodate installation of PyQt6
 
 distlib
 pickleshare
