@@ -320,7 +320,7 @@ class ScipyenNetworkManager(QtCore.QObject):
     
     @Slot()
     def slot_downloadReadyRead(self) -> None: # qt5ex   
-        print(f"{self.__class__.__name__}.slot_downloadReadyRead:"))
+        print(f"{self.__class__.__name__}.slot_downloadReadyRead:")
         # if isinstance(self._outputFile_, QtCore.QIODevice) and self._outputFileName_ is not None:
         if isinstance(self._outputFile_, QtCore.QFile) and self._outputFile_.exists():
             self._outputFile_.write(self._networkReply_.readAll())
