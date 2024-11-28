@@ -5,8 +5,9 @@
 
 """
 """
-import sys, os, typing, collections, pathlib, tarfile
+import sys, os, typing, collections, pathlib, tarfile, dataclasses
 import inspect, functools, traceback
+from dataclasses import MISSING
 from functools import (singledispatch, singledispatchmethod)
 from qtpy import QtCore, QtGui, QtWidgets, QtSvg, QtNetwork
 from qtpy.QtCore import Signal, Slot, Property
@@ -28,6 +29,7 @@ class ScipyenNetworkManager(QtCore.QObject):
     _sig_goAhead = Signal(name="_sig_goAhead")
     
     def __init__(self, _timeout_ms_:int=QtNetwork.QNetworkRequest.DefaultTransferTimeoutConstant,
+                 downloadSizeGetter:typing.Optional[typing.Callable] = None,
                  parent:typing.Optional[QtCore.QObject] = None):
         from core import workspacefunctions as wf
         super().__init__(parent=parent)
@@ -47,46 +49,82 @@ class ScipyenNetworkManager(QtCore.QObject):
         self._downloadedCount_ = 0 # qt5ex
         self._totalCount_ = 0 # qt5ex
         self._outputFile_ = QtCore.QFile() # qt5ex
-        self._outputFileName_ = None
+        
+        self._outputFileName_ = dataclasses.MISSING
+        """This can be MISSING, None or a string:
+        MISSING: let ScipyenNetworkManager decide (by calling self._setSaveFileName)
+        None: do NOT download the file
+        A string: download to a faile with path given by the string
+        """
+        
         self._currentDownload_ = None # cannot instantiate QNetworkReply (is abstract) # qt5ex
         self._downloadTime_ = QtCore.QTime() # ~qt5ex
         self._progressDialog_ = None # ~qt5ex
         self._progressBar_ = None # ~qt5ex
+        self._content_length_ = 0
+        self._downloadSizeGetter_ = downloadSizeGetter
         
         self._manager_ = QtNetwork.QNetworkAccessManager(self) # also qt5ex
         self._manager_.setTransferTimeout(_timeout_ms_)
         # self._manager_.finished[QtNetwork.QNetworkReply].connect(self.slot_replyFinished)
-        self._hasInternet_=False
-        self._networkReply_ = None # cannot instantiate QNetworkReply (is abstract)
-        self._replyText_ = None
+        # self._hasInternet_=False
+        # self._networkReply_ = None # cannot instantiate QNetworkReply (is abstract)
+        # self._replyText_ = None
         
-    def getFromUrl(self, o:typing.Union[str, QtCore.QUrl, typing.Sequence[typing.Union[str, QtCore.QUrl]]],
-                   destination:typing.Optional[str]=None) -> None:
-        self._append(o, destination)#, asText)
+    def saveFromUrl(self, source:typing.Union[str, QtCore.QUrl, typing.Sequence[typing.Union[str, QtCore.QUrl]]],
+                   destination:typing.Optional[typing.Union[str, type(MISSING)]]=MISSING) -> None:
+        """Download a remote file
+        Parameters:
+        source: url string QUrl, or a sequence (tuple, list) of these
+        
+        fileName: destination file path (including the file name & extension if any)
+            Optional, default is dataclasses.MISSING
+        
+            When MISSING, a file name will be generated from the url's basename;
+                if such a file exists locally, then an integer counter will be 
+                included in its name, just before the extension, such that:
+                a) no existing file will be overwritten
+                b) the file mime type contingent on the file name extension (or
+                    suffix) will not be changed.
+        
+            When None, then no file will be saved; instead, the downloaded data
+                contents will be stored in an internal cache.
+        
+            When a str, a file will be saved under this name, subject to the rules
+                (a) and (b) listed above.
+                
+                In addition, when the 'source' parameter specifies a sequence of URLs,
+                the fileName will automatically be modified subject to the above
+        """
+        self._append(source, destination)
         
     @singledispatchmethod
-    def _append(self, o:object, fileName:typing.Optional[str]=None):  # qt5ex
-        """When passing a sequence of URLs AND a fileName, AND he fileName already
-        exists, then each URL will be saved to fileNameStem<X>.fileNameSuffix where X is 0, 1, 2, etc
-        Whe fileName is None, fileName will be generated from the basename  of the URL
-        """
+    def _append(self, o:object, fileName:typing.Optional[str]=dataclasses.MISSING,
+                save:bool=True):  # qt5ex
         raise NotImplementedError(f"Method is not implemented for {type(o).__name__} arguments")
         
     @_append.register(list)
     @_append.register(tuple)
     @_append.register(collections.deque)
     def _(self, urlList:typing.Sequence[typing.Union[str, QtCore.QUrl]], # qt5ex
-          fileName:typing.Optional[str]=None) -> None:  
+          fileName:typing.Optional[typing.Union[str, type(MISSING)]]=MISSING) -> None:  
         for u in urlList:
-            self._append(u, fileName)
+            self._append(u, fileName)#, save)
             
         if len(self._downloadQueue_) == 0:
             QtCore.QTimer.singleShot(0, self.sig_finished)
+            self._totalCount_ = 0
             
     @_append.register(str)
     @_append.register(QtCore.QUrl)
-    def _(self, u: str | QtCore.QUrl, fileName:typing.Optional[str]=None) -> None:  # qt5ex
+    def _(self, u: str | QtCore.QUrl, 
+          fileName:typing.Optional[typing.Union[str, type(MISSING)]]=MISSING) -> None:  # qt5ex
         self._outputFileName_ = fileName
+        # if save:
+        #     self._outputFileName_ = fileName
+        # else:
+        #     self._outputFileName_ = None
+            
         if len(self._downloadQueue_) == 0:
             QtCore.QTimer.singleShot(0, self._startNextDownload)
             
@@ -97,7 +135,7 @@ class ScipyenNetworkManager(QtCore.QObject):
         
     def _startNextDownload(self):  # qt5ex
         if len(self._downloadQueue_) == 0:
-            print(f"{self._downloadedCount_}/{self._totalCount_} files downloaded successfully")
+            print(f"{self._downloadedCount_}/{self._totalCount_} files downloaded")
             self.sig_finished.emit()
             return
         
@@ -111,46 +149,71 @@ class ScipyenNetworkManager(QtCore.QObject):
                 
         url = self._downloadQueue_.popleft()
         
-        fileName = self._outputFileName_
-        
-        if fileName is None:
-            fileName = self._saveFileName(url)
-        
-        self._outputFile_.setFileName(fileName)
-        
-        if not self._outputFile_.open(QtCore.QIODevice.WriteOnly):
-            scipywarn(f"Problem opening save file {fileName} for download from {url.url()}: {self._outputFile_.errorString()}")
+        if self._outputFileName_ is not None:
+            # save to a file; its path and file name are either:
+            # a) given in self._outputFileName_
+            fileName = self._outputFileName_
             
-            self._startNextDownload()
-            return
+            if fileName is dataclasses.MISSING:
+                fileName = self._setSaveFileName(url)
+            
+            self._outputFile_.setFileName(fileName)
+            
+            if not self._outputFile_.open(QtCore.QIODevice.WriteOnly):
+                scipywarn(f"Problem opening save file {fileName} for download from {url.url()}: {self._outputFile_.errorString()}")
+                
+                self._startNextDownload()
+                return
         
         request = QtNetwork.QNetworkRequest(url)
+        request.setRawHeader(b"User-Agent", b"Mozilla 5.0")
         self._currentDownload_ = self._manager_.get(request)
         self._currentDownload_.downloadProgress["qint64", "qint64"].connect(self.slot_downloadProgress)
         self._currentDownload_.finished.connect(self.slot_downloadFinished)
         self._currentDownload_.readyRead.connect(self.slot_downloadReadyRead)
+        self._currentDownload_.metaDataChanged.connect(self.slot_downloadHeaderChanged)
         
         msg = printStyled(f"")
         
         print(printStyled(f"Downloading {url.url()} ...", "green",True))
         self._downloadTime_.start()
         
-    def _saveFileName(self, url:QtCore.QUrl) -> str:  # ~qt5ex
+    def _setSaveFileName(self, url:QtCore.QUrl) -> str:  # ~qt5ex
+        from iolib import pictio as pio
         path = pathlib.Path(url.path())
         basename = path.name
         if len(basename.strip()) == 0:
             basename="download"
+            
+#         mimeFileType = pio.getMimeAndFileType(basename)
+#         
+#         if all(all(a in m for a in ("x-tar", "gzip")) for m in mimeFileType):
+            
+        path = pathlib.Path(basename)
+        suffixes = path.suffixes
         
-        suffix = pathlib.Path(basename).suffix
-        basename = pathlib.Path(basename).stem
+        # deal with tag.gz, tar.bz situations ...
+        if len(suffixes) > 1:
+            if suffixes[-2] == ".tar":
+                suffix = "".join(suffixes[-2:])
+                ndx = path.stem.index(suffixes[-2])
+                stem = path.stem[0:ndx]
+                
+            else:
+                suffix = suffixes[-1]
+                stem = path.stem
+        else:
+            suffix = path.suffix
+            stem = path.stem
+        
+        basename = stem
             
         if pathlib.Path(basename+suffix).exists():
             i = 0
-            basename += "."
-            while(pathlib.Path(f"{basename}{i}{suffix}").exists()):
+            while(pathlib.Path(f"{basename}_{i}_{suffix}").exists()):
                 i += 1
                 
-            basename += f"{i}"
+            basename += f"_{i}_"
             
         return basename+suffix
             
@@ -170,7 +233,8 @@ class ScipyenNetworkManager(QtCore.QObject):
             speed /= (1024 * 1024)
             units = "MB/s"
             
-        self._progressBar_.setRange(0, bytesTotal)
+        total = bytesTotal if bytesTotal >=0 else self._content_length_
+        self._progressBar_.setRange(0, total)
         self._progressBar_.setValue(bytesReceived)
         
         print(f"bytes: {bytesReceived} / {bytesTotal} (speed: {speed} {units})")
@@ -188,101 +252,154 @@ class ScipyenNetworkManager(QtCore.QObject):
             
         self._currentDownload_.deleteLater()
         self._startNextDownload()
+        
+    @Slot()
+    def slot_downloadHeaderChanged(self):
+        # NOTE 2024-11-28 09:20:58
+        # Won't work if content length is not supplied by the server, in the header.
+        # For some sites a trick is to get the size of the downloaded file from
+        # somewhere else - e.g., in BrainbGlobe atlases, to download the "src" page 
+        # for a given atlas, and parse the (expected) size from there
+        # 
+        # However, that is just a particular case...
+        #
+        # TODO: 2024-11-28 09:43:20
+        # So what I can do here is to use a Callable object defined elsewhere
+        # that can deal with a particular case, and which is to be fed to the 
+        # constructor of ScipyenNetworkManager instance as the "downloadSizeGetter"
+        # parameter.
+        #
+        # Strategy:
+        # 1) use another instance of ScipyenNetworkManager to download the content
+        # of an appropriate web page detailing the content size, but storing the 
+        # the content to an internal variable instead of saving it to disk
+        # 2) parse the interval variable assigned at (1) to obtain the size of
+        # the file being downloaded here
+        #
+        # Potential problems:
+        # needs to be asynchronous; 
+        # by the time the contents are parsed, some chunks may have already been 
+        # downoaded
+        #
+        # For BrainbGlobe Id do something like:
+        # URL to retrieve the file
+        # url = bgbridge.brainglobe_atlasapi.bg_atlas.BrainGlobeAtlas._remote_url_base.format("example_mouse_100um_v1.2.tar.gz")
+        #
+        # URL to get file size:
+        # src_url = url.replace("raw", "src")
+        #
+        
+        
+        rawHeaders = self._currentDownload_.rawHeaderPairs()
+        for x in rawHeaders:
+            print(f"{bytes(x[0]).decode()} ↦ {bytes(x[1]).decode()}")
+        if self._currentDownload_.hasHeader(b"content-length"):
+            self._content_length_ = self._currentDownload_.header(QtNetwork.QNetworkRequest.ContentLengthHeader)
+        else:
+            if isinstance(self._downloadSizeGetter_, typing.Callable):
+                self._content_length_ = self._downloadSizeGetter_()
+            else:
+                self._content_length_ = 0
+        print(f"{self._content_length_}")
     
     @Slot()
     def slot_downloadReadyRead(self) -> None: # qt5ex
-        self._outputFile_.write(self._currentDownload_.readAll())
+        if isinstance(self._outputFile_, QtCore.QIODevice):
+            self._outputFile_.write(self._currentDownload_.readAll())
+            
+        else:
+            pass
         
         
 
-    def checkInternetConnection(self, url:typing.Union[str, QtCore.QUrl] = "http://www.google.com/", 
-                                  raise_error:bool=True):
+#     def checkInternetConnection(self, url:typing.Union[str, QtCore.QUrl] = "http://www.google.com/", 
+#                                   raise_error:bool=True):
+#         
+#         if isinstance(url, str):
+#             url = QtCore.QUrl(url)
+#         
+#         request = QtNetwork.QNetworkRequest(url)
+#         request.setRawHeader(b"User-Agent", b"Mozilla 5.0")
+#         self._networkReply_ = self._manager_.get(request)
+#         self._networkReply_.readyRead.connect(self.slot_checkConnectionReady)
+#         self._networkReply_.finished.connect(self.slot_checkConnectionFinished)
+#         self._networkReply_.errorOccurred.connect(self.slot_checkConnectionError)
+#         self._networkReply_.sslErrors.connect(self.slot_checkConnectionSSLError)
+#         # self._networkReply_.deleteLater()
         
-        if isinstance(url, str):
-            url = QtCore.QUrl(url)
+#     def getTextFromUrl(self, url:typing.Union[str, QtCore.QUrl]):
+#         if isinstance(url, str):
+#             url = QtCore.QUrl(url)
+#         
+#         request = QtNetwork.QNetworkRequest(url)
+#         request.setRawHeader(b"User-Agent", b"Mozilla 5.0")
+#         self._replyText_ = None
+#         self._networkReply_ = self._manager_.get(request)
+#         self._networkReply_.readyRead.connect(self.slot_replyReady)
+#         self._networkReply_.finished.connect(self.slot_replyFinished)
+#         self._networkReply_.errorOccurred.connect(self.slot_replyConnectionError)
+#         self._networkReply_.sslErrors.connect(self.slot_replySSLError)
         
-        request = QtNetwork.QNetworkRequest(url)
-        request.setRawHeader(b"User-Agent", b"Mozilla 5.0")
-        self._networkReply_ = self._manager_.get(request)
-        self._networkReply_.readyRead.connect(self.slot_checkConnectionReady)
-        self._networkReply_.finished.connect(self.slot_checkConnectionFinished)
-        self._networkReply_.errorOccurred.connect(self.slot_checkConnectionError)
-        self._networkReply_.sslErrors.connect(self.slot_checkConnectionSSLError)
-        # self._networkReply_.deleteLater()
-        
-    def getTextFromUrl(self, url:typing.Union[str, QtCore.QUrl]):
-        if isinstance(url, str):
-            url = QtCore.QUrl(url)
-        
-        request = QtNetwork.QNetworkRequest(url)
-        request.setRawHeader(b"User-Agent", b"Mozilla 5.0")
-        self._replyText_ = None
-        self._networkReply_ = self._manager_.get(request)
-        self._networkReply_.readyRead.connect(self.slot_replyReady)
-        self._networkReply_.finished.connect(self.slot_replyFinished)
-        self._networkReply_.errorOccurred.connect(self.slot_replyConnectionError)
-        self._networkReply_.sslErrors.connect(self.slot_replySSLError)
-        
-    @Slot()
-    def slot_replyReady(self):
-        pass
+    # @Slot()
+    # def slot_replyReady(self):
+    #     pass
         # self._replyText_ = bytes(self._networkReply_.readAll()).decode()
         
     # @Slot(QtNetwork.QNetworkReply)
     # def slot_replyFinished(self, reply:QtNetwork.QNetworkReply):
-    @Slot()
-    def slot_replyFinished(self):
-        reply = self.sender()
-        txt = bytes(reply.readAll()).decode()
-        self.sig_textFromUrl.emit(txt)
+    # @Slot()
+    # def slot_replyFinished(self):
+    #     reply = self.sender()
+    #     txt = bytes(reply.readAll()).decode()
+    #     self.sig_textFromUrl.emit(txt)
         
         # self._replyText_ = bytes(reply.readAll()).decode()
         # self.sig_textFromUrl.emit(self._replyText_)
         
-    @Slot()
-    def slot_checkConnectionFinished(self):
-        # reply = self.sender()
-        rawHeaders = self._networkReply_.rawHeaderPairs()
-        # for x in rawHeaders:
-        #     print(f"{bytes(x[0]).decode()} ↦ {bytes(x[1]).decode()}")
-        self._hasInternet_ = len(rawHeaders) > 0
-        self.sig_hasInternet.emit(self._hasInternet_)
-        if self._hasInternet_:
-            self._sig_goAhead.emit()
+    # @Slot()
+    # def slot_checkConnectionFinished(self):
+    #     # reply = self.sender()
+    #     rawHeaders = self._networkReply_.rawHeaderPairs()
+    #     # for x in rawHeaders:
+    #     #     print(f"{bytes(x[0]).decode()} ↦ {bytes(x[1]).decode()}")
+    #     self._hasInternet_ = len(rawHeaders) > 0
+    #     self.sig_hasInternet.emit(self._hasInternet_)
+    #     if self._hasInternet_:
+    #         self._sig_goAhead.emit()
     
-    @Slot()
-    def slot_checkConnectionReady(self):
-        # reply = self.sender()
-        data = bytes(self._networkReply_.readAll()).decode()
-        # rawHeaders = self._networkReply_.rawHeaderPairs()
-        # for x in rawHeaders:
-        #     print(f"{bytes(x[0]).decode()} ↦ {bytes(x[1]).decode()}")
-        self._hasInternet_ = len(data) > 0
-        self.sig_hasInternet.emit(self._hasInternet_)
+    # @Slot()
+    # def slot_checkConnectionReady(self):
+    #     # reply = self.sender()
+    #     data = bytes(self._networkReply_.readAll()).decode()
+    #     # rawHeaders = self._networkReply_.rawHeaderPairs()
+    #     # for x in rawHeaders:
+    #     #     print(f"{bytes(x[0]).decode()} ↦ {bytes(x[1]).decode()}")
+    #     self._hasInternet_ = len(data) > 0
+    #     self.sig_hasInternet.emit(self._hasInternet_)
     
-    @Slot()
-    def slot_replyConnectionError(self):
-        scipywarn("No internet connection available.")
-        self._hasInternet_=False
-        self.sig_hasInternet.emit(self._hasInternet_)
+    # @Slot()
+    # def slot_replyConnectionError(self):
+    #     scipywarn("No internet connection available.")
+    #     self._hasInternet_=False
+    #     self.sig_hasInternet.emit(self._hasInternet_)
     
-    @Slot()
-    def slot_checkConnectionError(self):
-        scipywarn("No internet connection available.")
-        self._hasInternet_=False
-        self.sig_hasInternet.emit(self._hasInternet_)
+    # @Slot()
+    # def slot_checkConnectionError(self):
+    #     scipywarn("No internet connection available.")
+    #     self._hasInternet_=False
+    #     self.sig_hasInternet.emit(self._hasInternet_)
     
-    @Slot()
-    def slot_checkConnectionSSLError(self):
-        scipywarn("No secure internet connection available.")
-        self._hasInternet_=False
-        self.sig_hasInternet.emit(self._hasInternet_)
+    # @Slot()
+    # def slot_checkConnectionSSLError(self):
+    #     scipywarn("No secure internet connection available.")
+    #     self._hasInternet_=False
+    #     self.sig_hasInternet.emit(self._hasInternet_)
 
-    @Slot()
-    def slot_replySSLError(self):
-        scipywarn("No secure internet connection available.")
-        self._hasInternet_=False
-        self.sig_hasInternet.emit(self._hasInternet_)
+    # @Slot()
+    # def slot_replySSLError(self):
+    #     scipywarn("No secure internet connection available.")
+    #     self._hasInternet_=False
+    #     self.sig_hasInternet.emit(self._hasInternet_)
 
     @property
     def networkReply(self) -> QtNetwork.QNetworkReply | None:
