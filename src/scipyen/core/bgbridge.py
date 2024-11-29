@@ -190,9 +190,6 @@ class BrainAtlasManager(QtCore.QObject):
                     self.scipyenWindow = f[0].f_globals["ScipyenWindow"].instance()
                     break
         
-        # self.refresh()
-        # self._retrieveRemoteAtlasesList()
-            
     def refresh(self):
         if hasBrainGlobeAtlasAPI:
             self._local_atlases_ = get_atlases_lastversions()
@@ -551,6 +548,7 @@ class BrainAtlasManager(QtCore.QObject):
         """
         if not hasBrainGlobeAtlasAPI:
             return
+        
         if file_path is None:
             file_path = self.default_config_file
             
@@ -560,11 +558,22 @@ class BrainAtlasManager(QtCore.QObject):
         conf_object = configparser.ConfigParser()
         with open(file_path) as file_object:
             conf_object.read_file(file_object)
-            return dict(conf_object["atlases"])
+            
+        return conf_object
+            # return dict(conf_object["atlases"])
+            
+    def getAtlasesVersions(self, file_path:typing.Optional[pathlib.Path]=None):
+        if not hasBrainGlobeAtlasAPI:
+            return
+        
+        conf = self.getBrainGlobeConfiguration(file_path)
+        # atlases = 
     
     def getAllAtlasesLastVersions(self):
         if not hasBrainGlobeAtlasAPI:
             return
+        
+        url = brainglobe_atlasapi.bg_atlas.BrainGlobeAtlas._remote_url_base.format("last_versions.conf")
         
         
         

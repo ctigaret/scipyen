@@ -133,12 +133,14 @@ else:
 
 #makeConfigurable = WorkspaceGuiMixin.makeConfigurable
 
-if os.environ["QT_API"] in ("pyqt5", "pyside2"):
-    consoleLayoutDirection = OrderedDict(sorted(( (name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.LayoutDirection) ) , 
-                                                key = lambda x: x[1]))
-else:
-    consoleLayoutDirection = OrderedDict(sorted(( (name,val) for name, val in QtCore.Qt.LayoutDirection._member_map_.items()) ,
-                                                key = lambda x: x[1].value))
+consoleLayoutDirection = OrderedDict(sorted(( (name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.LayoutDirection) ) , 
+                                            key = lambda x: x[1]))
+# if os.environ["QT_API"] in ("pyqt5", "pyside2"):
+#     consoleLayoutDirection = OrderedDict(sorted(( (name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.LayoutDirection) ) , 
+#                                                 key = lambda x: x[1]))
+# else:
+#     consoleLayoutDirection = OrderedDict(sorted(( (name,val) for name, val in QtCore.Qt.LayoutDirection._member_map_.items()) ,
+                                                # key = lambda x: x[1].value))
 
 defaultFixedFont = QtGui.QFontDatabase.systemFont(QtGui.QFontDatabase.FixedFont)
 
@@ -3493,7 +3495,10 @@ class ScipyenConsoleWidget(ConsoleWidget):
         # NOTE: 2019-08-07 16:34:58
         # enforce qt5 backend for matplotlib
         # see NOTE: 2019-08-07 16:34:23 
-        self.ipkernel.shell.run_line_magic("matplotlib", "qt5")
+        if os.environ["QT_API"].lower() in ("pyqt6", "pyside5"):
+            self.ipkernel.shell.run_line_magic("matplotlib", "qt6")
+        else:
+            self.ipkernel.shell.run_line_magic("matplotlib", "qt5")
         
         self.drop_cache=None
         

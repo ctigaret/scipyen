@@ -40,11 +40,20 @@ else:
     raise RuntimeError("Scipyen must be run in a virtualenv virtual Python environment or a conda environment\n")
 
 
+# print(f"Argv: {sys.argv}")
+
 # NOTE: 2024-05-02 10:22:39
 # optional use of Qt6 as PyQt5/6 or PySide2/6
 # but currently, force Qt5 (for now)
-os.environ["QT_API"] = "pyqt5"
-os.environ["PYQTGRAPH_QT_LIB"] = "PyQt5"
+# os.environ["QT_API"] = "pyqt5"
+# os.environ["PYQTGRAPH_QT_LIB"] = "PyQt5"
+# 
+# if len(sys.argv) > 1:
+#     if sys.argv[1].lower == "pyqt6":
+#         os.environ["QT_API"] = "pyqt6"
+#         os.environ["PYQTGRAPH_QT_LIB"] = "PyQt6"
+        
+
 
 if sys.platform == "linux":
     # NOTE: 2024-05-04 10:14:08
@@ -94,18 +103,22 @@ if len(sys.argv) > 1:
     if "pyqt6" in sys.argv:
         os.environ["QT_API"] = "pyqt6"
         os.environ["PYQTGRAPH_QT_LIB"] = "PyQt6"
+        os.environ["FORCE_QT_API"] = "1"
         
     elif "pyside2" in sys.argv:
         os.environ["QT_API"] = "pyside2" # for up to Qt5
         os.environ["PYQTGRAPH_QT_LIB"] = "PySide2"
+        os.environ["FORCE_QT_API"] = "1"
         
     elif "pyside6" in sys.argv:
         os.environ["QT_API"] = "pyside6"
         os.environ["PYQTGRAPH_QT_LIB"] = "PySide6"
+        os.environ["FORCE_QT_API"] = "1"
         
     else:
         os.environ["QT_API"] = "pyqt5"
         os.environ["PYQTGRAPH_QT_LIB"] = "PyQt5"
+        os.environ["FORCE_QT_API"] = "1"
         
 
 #import cProfile

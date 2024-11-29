@@ -29,45 +29,15 @@ CHANGELOG:
         
 
 """
-# TODO 2020-07-09 22:34:34 TODO TODO ??? What's that???
-# use shell's API for variable management (e.g. shell.find_(...) etc) in relation
-# to mainWindow.history -- place this into workspacemodel module
-#
-# TODO STUDY:
-# IPython/core/interactiveshell.py for InteractiveShell
-# ipykernel/zmqshell.py for ZMQInteractiveShell
-# ipykernel/inprocess/ipkernel.py for InProcessInteractiveshell
-#
 # TODO breadcrumbs navigation for the file system model & tree.
 # TODO enable drag&drop from history to outside of the Scipyen (e.g.
 # a text editor, desktop file manager etc)
 
-# BEGIN import modules
-
-# NOTE: 2020-09-28 11:37:25
-# ### BEGIN expose important data types
-# The following data types, introduced by Scipyen, are important and therefore
-# should be available in the Scipyen Console namespace. We expose them by
-# importing here.
-# Other important data types come from 3rd party packages and they can be accessed
-# from their parent modules:
-# numpy (aliased as np; core module for numeric data processing)
-# scipy (for signal processing etc on numpy data types),
-# quantities (aliased as pq; for dimensional units),
-# vigra (for VigraArray, AxisTags, AxisInfo),
-# vigra.filters (Kernel1D, Kernel2D),
-# neo (for Block, Segment, AnalogSignal, etc),
-# pandas (aliased as pd; for DataFrame and Series),
-# seaborn (aliased as sb; for fancy plotting routines),
-# pyqtgraph (aliased as pg; for efficient Qt-based plotting),
-# matplotlib (aliased as mpl; for versatile plotting)
-
-
-# ### END expose important data types
-
 
 # NOTE: 2021-10-21 13:24:24
 # all things imported below will be available in the user workspace
+
+# BEGIN import modules
 # BEGIN core python modules
 import sys
 import os
@@ -106,6 +76,10 @@ from collections import deque, ChainMap
 # BEGIN 3rd party modules
 
 # BEGIN PyQtxxx and utilities for setting GUI appearance
+import qtpy
+# print(f"In module: {__name__}: QT_API = {os.environ['QT_API']}, qtpy.API = {qtpy.API}, qtpy.API_NAME = {qtpy.API_NAME}")
+# might have to force this:
+qtpy.API = os.environ["QT_API"]
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork,)
 from qtpy.QtCore import (Signal, Slot, Property,)
 from qtpy.uic import loadUiType
@@ -115,7 +89,6 @@ try:
 except:
     has_sip = False
 # import sip
-
 
 # BEGIN About QStyle plugins
 # WARNING: 2024-09-26 15:44:57
@@ -231,7 +204,7 @@ import matplotlib.pyplot as plt
 # BEGIN configure matplotlib
 # NOTE: 2024-05-02 10:47:43
 # the  next line is obsolete as os.environ["QT_API"] should take care of it ?
-mpl.use("Qtagg")
+# mpl.use("Qtagg")
 # mpl.use("Qt5Agg") #
 # NOTE: 2021-08-17 12:17:08
 # this is NOT recommended anymore
@@ -611,6 +584,7 @@ def infoSoftwareComponents() -> str:
     
     
     return "\n".join(txt)
+
 
 if os.environ["QT_API"] in ("pyqt5", "pyside2"):
     # Form class,        Base class
