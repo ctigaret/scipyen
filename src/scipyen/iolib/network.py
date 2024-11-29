@@ -26,7 +26,7 @@ class ScipyenNetworkManager(QtCore.QObject):
     sig_hasInternet = Signal(bool, name="sig_hasInternet")
     sig_textFromUrl = Signal(object)
     sig_finished = Signal(name="sig_finished")
-    _sig_goAhead = Signal(name="_sig_goAhead")
+    # _sig_goAhead = Signal(name="_sig_goAhead")
     
     def __init__(self, _timeout_ms_:int=QtNetwork.QNetworkRequest.DefaultTransferTimeoutConstant,
                  downloadSizeGetter:typing.Optional[typing.Callable] = None,
@@ -111,7 +111,8 @@ class ScipyenNetworkManager(QtCore.QObject):
                 elements
                 
         """
-        self._totalCount_ = 0 # reset counter
+        self._totalCount_ = 0 # reset counters
+        self._downloadedCount_ = 0 # reset counters
         self._removeOnFail_ = removeOnFailure
         if isinstance(destination, (tuple, list)):
             if not isinstance(source, (tuple, list)):
@@ -280,7 +281,7 @@ class ScipyenNetworkManager(QtCore.QObject):
                         scipywarn(f"In {self.__class__.__name__}.slot_downloadFinished Failed to remove incomplete download file:\n {self._outputFile_.fileName()} ")
                         
             else:
-                print(printStyled("Succeeded", "green", True)
+                print(printStyled("Succeeded", "green", True))
                 self._downloadedCount_ += 1
             
         self._progressBar_.reset() # clear progressbar
