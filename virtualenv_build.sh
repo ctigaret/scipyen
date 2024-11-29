@@ -59,6 +59,14 @@ function show_help ()
 
 function findqmake ()
 {
+    # Identifes which qmake is there available on the platform.
+    # 
+    # Since Linux dsitributions currently provide both Qt5 and Qt6, their respective
+    # qmake tools bear different names.
+    #
+    # Not sure this is as generic as possible across the Linux distributions...
+    #
+    
     qmake_binary=`which qmake`
     if [ -z "$qmake_binary" ] ; then
         qmake_binary=`which qmake-qt5`
@@ -132,39 +140,48 @@ function upgrade_virtualenv ()
 
 function makevirtenv ()
 {
+    # Generates if necessary, then activates the virtual environment for Scipyen.
+    #
     echo -e "Trying to create/use virtual environment ${virtual_env} in ${install_dir} using ${using_python}\n"
-    #NOTE: Generates a virtual environment
-    # check if the environment directory exists (and that it does belong to a
-    # virtual python environment - that is, it contains a file named "pyenv.cfg"
-    # containing "virtualenv" in it, has a "bin" directory with "activate" script,
-    # which can be sourced to generate VIRTUAL_ENV variable)
-#     if [ -d $install_dir/$virtual_env ] ; then
-    if [ -d $virtual_env ] ; then
-#         if [ -a $install_dir/$virtual_env/pyvenv.cfg ] ; then
-        if [ -a $virtual_env/pyvenv.cfg ] ; then
-#             aa=`cat $install_dir/$virtual_env/pyvenv.cfg | grep "virtualenv"`
+    
+    # Checks if the environment directory exists and that it does belong to a
+    # virtual python environment:
+    # 1) it contains a file named "pyenv.cfg" defining a "virtualenv" variable
+    # 2) contains a "bin" directory with "activate" script which can be sourced 
+    #   to generate — among other things — a VIRTUAL_ENV environment variable
+    # If such directory does NOT exist then tries to create a virtual environment
+    # using virtualenv package (NOT python's standard library venv !!!)
+    # 
+    # If either was successful then activates the environment for the script to
+    # proceed with installation of dependencies in this environment
+    #
+    
+    if [ -d $virtual_env ] ; then 
+        # virtual environment directory apparently found
+        if [ -a $virtual_env/pyvenv.cfg ] ; then 
+            # and has pyvenv.cfg => check if pyvenv.cfg is what is expected to be
             aa=`cat $virtual_env/pyvenv.cfg | grep "virtualenv"`
-            if [ -n "$aa" ] ; then
-#                 if [ ! -d $install_dir/$virtual_env/bin ] ; then
+            if [ -n "$aa" ] ; then 
+                # and pyvenv.cfg defines a vitualenv variable -> OK so far
+                # => check for bin subdirerctory
                 if [ ! -d $virtual_env/bin ] ; then
-#                     echo -e "$install_dir/$virtual_env/ does not look like a virtual environment directory. Goodbye!\n"
+                    # bin subdirectory missing -> BAD!!!
                     echo -e "$virtual_env/ does not look like a virtual environment directory. Goodbye!\n"
                     exit 1
                 fi
-#                 if [ ! -r $install_dir/$virtual_env/bin ] ; then
                 if [ ! -r $virtual_env/bin ] ; then
-#                     echo -e "$install_dir/$virtual_env/ does not look like a virtual environment directory. Goodbye!\n"
+                    # bin subdirectory not readable -> BAD!!!
                     echo -e "$virtual_env/ does not look like a virtual environment directory. Goodbye!\n"
                     exit 1
                 fi
                 
                 echo -e "Virtual environment found; activating it...\n"
                 
-#                 source $install_dir/$virtual_env/bin/activate
+                # so far so good; try and activate the virtual environment
                 source $virtual_env/bin/activate
                 
                 if [[ -z ${VIRTUAL_ENV} ]]; then
-#                     echo -r "Cannot activate a virtual environment from  $install_dir/$virtual_env . Goodbye!\n"
+                    # failed to activate => bail out
                     echo -r "Cannot activate a virtual environment from  $virtual_env . Goodbye!\n"
                     exit 1
                 fi
@@ -173,37 +190,34 @@ function makevirtenv ()
                 
                 echo -e "Virtual environment activated and will use ${python_executable}\n"
                 
-                
-                
             else
-#                 echo -e "$install_dir/$virtual_env/ does not look like a virtual environment directory. Goodbye!\n"
                 echo -e "$virtual_env/ does not look like a virtual environment directory. Goodbye!\n"
                 exit 1
             fi 
         fi
     else
-#         ${python_executable} -m virtualenv --python ${python_executable} $install_dir/$virtual_env && source $install_dir/$virtual_env/bin/activate
+        # putative virtual environment directory not found => need to generate one
         ${python_executable} -m virtualenv --python ${python_executable} $virtual_env
         
         if [[ $? -ne 0 ]] ; then
-#             echo -e "Could NOT create a virtual environment at ${install_dir}/${virtual_env}. Bailing out...\n"
+            # the above attempt failed => bail out
             echo -e "Could NOT create a virtual environment at ${virtual_env}. Bailing out...\n"
             exit 1
         fi
 
-#         echo -e "Virtual environment created at ${install_dir}/${virtual_env}\n"
         echo -e "Virtual environment created at ${virtual_env}\n"
         echo -e "Activating the virtual environment\n"
-        
-#         source $install_dir/$virtual_env/bin/activate
+
+        # so far so good:  virtual environment directory tree created, now try
+        # to activate it
         source $virtual_env/bin/activate
         
         if [[ $? -ne 0 ]] ; then
-#             echo -e "Could NOT activate the virtual environment at ${install_dir}/${virtual_env}. Bailing out...\n"
             echo -e "Could NOT activate the virtual environment at ${virtual_env}. Bailing out...\n"
             exit 1
         fi
         
+        # just cache this for the rest of this script
         python_executable=`which python3`
         
         echo -e "Virtual environment at ${VIRTUAL_ENV} activated; python executable is ${python_executable}\n"
@@ -215,7 +229,7 @@ function makevirtenv ()
 function installpipreqs ()
 {
     # installs pip packaged listed in pip_requirements
-    # assumes (and therefore REQUIRES that the virtual environment is active)
+    # assumes (and therefore REQUIRES) that the virtual environment is active
     if [[ -z "$VIRTUAL_ENV" ]] ; then
         echo -e "Not in an active environment! Goodbye!\n"
         exit 1
@@ -223,13 +237,15 @@ function installpipreqs ()
     
     if [ ! -r ${VIRTUAL_ENV}/.pipdone ] || [[ $reinstall_pips -gt 0 ]] ; then
         # NOTE: since around Jan 2023 sklearn has been deprecated in favour of 
-        # scikit-learn, suchn that an error message is issues whenever pip tries
+        # scikit-learn, such that an error message is issued whenever pip tries
         # to install sklearn.
         # HOWEVER, a LARGE number of packages still list sklearn among their 
-        # dependencies, yet pip has no way to check this BEFORE installing them,
+        # dependencies, yet pip has no way to check this BEFORE installing them.
+        #
         # Until all of them catch up with this, we circumvent the error message
         # by setting up the environment variable below
         # For details please see https://pypi.org/project/sklearn/
+        #
         export SKLEARN_ALLOW_DEPRECATED_SKLEARN_PACKAGE_INSTALL=True 
         
         echo -e "Using ${python_executable} as `whoami` to install PyPI packages\n"
@@ -248,6 +264,16 @@ function installpipreqs ()
 
 function dopyqt5 ()
 {
+    # Builds, then installs a pyqt5 wheel locally - I chose this approach because
+    # on Linux, ready-made wheels (e.g. from PyPI) do not integrate well with the
+    # native platform look and feel (for example, they notoriously miss the Breeze
+    # style plugins). This approach also offers the possibility to opt-in/out 
+    # installation of various Qt modules.
+    #
+    # Obviously this depends on having installed the appropriate build toolchain
+    # and Qt5 development package on the platform, and adds some extra lead time
+    # for having a ready environment — a small price to pay, IMHO.
+    #
     if [[ -z "$VIRTUAL_ENV" ]] ; then
         echo -e "Not in an active environment! Goodbye!\n"
         exit 1
@@ -256,6 +282,7 @@ function dopyqt5 ()
     if [ ! -r ${VIRTUAL_ENV}/.pyqt5done ] || [[ $reinstall_pyqt5 -gt 0 ]] || [[ $build_pyqt5 -gt 0 ]] ; then
         mkdir -p ${VIRTUAL_ENV}/src && cd ${VIRTUAL_ENV}/src
         
+        # figure out which qmake there is on the host platform
         findqmake
         
         if [ `pwd` != "$VIRTUAL_ENV"/src ]; then
