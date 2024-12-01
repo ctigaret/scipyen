@@ -602,13 +602,7 @@ class BrainAtlasManager(QtCore.QObject):
         self._tempFile_ = file_path
         url = brainglobe_atlasapi.bg_atlas.BrainGlobeAtlas._remote_url_base.format("last_versions.conf")
         self.netMan.sig_finished.connect(self._slot_last_versions_conf_downloaded)
-        self.netMan.getUrl(url, file_path)
-        # @Slot()
-        # def _dl():
-        #     self.netMan.getUrl(url, file_path)
-        # # dl = functools.partialmethod(self.netMan.getUrl, url = url, destination = file_path)
-        # QtCore.QTimer.singleShot(100, _dl)
-        # return self.getAtlasVersions(file_path)
+        self.netMan.getUrl(url, destination=file_path)
         
     def compareAtlasVersions(self):
         # TODO: 2024-11-29 13:48:08
@@ -624,10 +618,6 @@ class BrainAtlasManager(QtCore.QObject):
         print(printStyled(f"Latest atlas versions information was downloaded to {self._tempFile_}; you can call getAtlasVersions('{self._tempFile_}') method again", "green", True))
         self._tempFile_ = None
         self.netMan.sig_finished.disconnect()
-        
-        
-        
-            
     
 class AtlasDownloadThread(QtCore.QThread):
     def __init__(self, parent, atlas_name:str):
