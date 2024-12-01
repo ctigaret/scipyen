@@ -29,9 +29,9 @@ class ScipyenNetworkManager(QtCore.QObject):
     # _sig_goAhead = Signal(name="_sig_goAhead")
     
     def __init__(self, _timeout_ms_:int=QtNetwork.QNetworkRequest.DefaultTransferTimeoutConstant,
-                 downloadSizeGetter:typing.Optional[typing.Callable] = None,
-                 parent:typing.Optional[QtCore.QObject] = None, 
-                 verbose:bool=True):
+                 replyHandler:typing.Optional[typing.Callable] = None,
+                 verbose:bool=True,
+                 parent:typing.Optional[QtCore.QObject] = None):
         from core import workspacefunctions as wf
         super().__init__(parent=parent)
         
@@ -70,12 +70,17 @@ class ScipyenNetworkManager(QtCore.QObject):
         self._progressDialog_ = None # ~qt5ex
         self._progressBar_ = None # ~qt5ex
         self._content_length_ = 0
-        self._downloadSizeGetter_ = downloadSizeGetter
+        self._temp_download_size_ = 0
+        
+        self._replyHandler_ = replyHandler
         
         self._manager_ = QtNetwork.QNetworkAccessManager(self) # also qt5ex
         self._manager_.setTransferTimeout(_timeout_ms_)
         # self._manager_.finished[QtNetwork.QNetworkReply].connect(self.slot_replyFinished)
         # self._hasInternet_=False
+        
+    def setDownloadSize(self, val:int):
+        self._temp_download_size_ = val
         
     def getUrl(self, source:typing.Union[str, QtCore.QUrl, typing.Sequence[typing.Union[str, QtCore.QUrl]]],
                    destination:typing.Optional[typing.Union[typing.Sequence[str], str, type(MISSING)]]=MISSING,
@@ -164,6 +169,8 @@ class ScipyenNetworkManager(QtCore.QObject):
         self._totalCount_ += 1
         
     def _startNextDownload(self): # qt5ex
+        self._content_length_ = 0
+        self._temp_download_size_ = 0
         if len(self._downloadQueue_) == 0:
             print(f"{self._downloadedCount_}/{self._totalCount_} files downloaded")
             self.sig_finished.emit()
@@ -296,37 +303,23 @@ class ScipyenNetworkManager(QtCore.QObject):
             print(f"In {self.__class__.__name__}.slot_handleNetworkData")
             
         if not reply.error():
-            self._replyText_ = bytes(reply.readAll()).decode()
+            info = bytes(reply.readAll()).decode()
+            if isinstance(self._replyHandler_, typing.Callable):
+                self._replyHandler_(info, self)
+            self._replyText_ = info
             self.sig_textFromUrl.emit(self._replyText_)
             self._downloadedCount_ += 1
         
     @Slot()
     def slot_downloadHeaderChanged(self):
         # NOTE 2024-11-28 09:20:58
-        # Won't work if content length is not supplied by the server, in the header.
+        # Won't work well if content length is not supplied in the header.
         # For some sites a trick is to get the size of the downloaded file from
         # somewhere else - e.g., in BrainbGlobe atlases, to download the "src" page 
         # for a given atlas, and parse the (expected) size from there
         # 
         # However, that is just a particular case...
         #
-        # TODO: 2024-11-28 09:43:20
-        # So what I can do here is to use a Callable object defined elsewhere
-        # that can deal with a particular case, and which is to be fed to the 
-        # constructor of ScipyenNetworkManager instance as the "downloadSizeGetter"
-        # parameter.
-        #
-        # Strategies:
-        # 1) use another instance of ScipyenNetworkManager to download the content
-        # of an appropriate web page detailing the content size, but storing the 
-        # the content to an internal variable instead of saving it to disk; then
-        # parse that variable to obtain the size of the file being downloaded here
-        #
-        # Problem: this is asynchronous, and therefore problematic since the second
-        # instance we may not have received/parsed the content size by the time 
-        # the first instance proceeds with the download.
-        #
-        # 
         #
         # For BrainGlobe I'd do something like:
         # URL to retrieve the file
@@ -345,8 +338,8 @@ class ScipyenNetworkManager(QtCore.QObject):
         if self._networkReply_.hasRawHeader(b"content-length"):
             self._content_length_ = self._networkReply_.header(QtNetwork.QNetworkRequest.ContentLengthHeader)
         else:
-            self._content_length_ = 0
-                
+            self._content_length_ = self._temp_download_size_
+            
         if self._verbose_:
             print(f"In {self.__class__.__name__}.slot_downloadHeaderChanged: content length = {self._content_length_}")
     
@@ -467,3 +460,16 @@ def getDownloadSize(s:str) -> int:
     elif pfx == "K":
         sz *= 1e3
     return int(sz)        
+
+def test_conditioning_sequential_download(info:str,
+                                          manager:ScipyenNetworkManager,
+                                          url:typing.Union[str, QtCore.QUrl], 
+                                          ):
+    # use manager to downloads from url conditioned on prevInfo
+    # pass a partial to it, fixing the url
+    # in network manager, pass the info and manager parameters
+    sz = getDownloadSize(info)
+    manager.setDownloadSize(sz)
+    manager.getUrl(url)
+    
+    
