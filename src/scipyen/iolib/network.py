@@ -25,7 +25,8 @@ class ScipyenNetworkManager(QtCore.QObject):
     #
     sig_hasInternet = Signal(bool, name="sig_hasInternet")
     sig_replyFromUrl = Signal(object)
-    sig_finished = Signal(name="sig_finished")
+    sig_finished = Signal(name="sig_finished)")
+    sig_resultReady = Signal(object, name="sig_resultReady")
     
     def __init__(self, timeout_ms:int=QtNetwork.QNetworkRequest.DefaultTransferTimeoutConstant,
                  replyHandler:typing.Optional[typing.Callable] = None,
@@ -224,10 +225,12 @@ class ScipyenNetworkManager(QtCore.QObject):
     def _startNextDownload(self): # qt5ex
         if len(self._downloadQueue_) == 0:
             print(f"{self._downloadedCount_}/{self._totalCount_} files downloaded")
-            self.sig_finished.emit()
             self._temp_download_size_ = None
             self._content_length_ = 0
             self._downloadedCount_ = 0
+            if self._saveToFile_:
+                self.sig_resultReady.emit(self._outputFile_.fileName())
+            self.sig_finished.emit()
             # self._totalCount_ = 0
             return
         
@@ -356,9 +359,7 @@ class ScipyenNetworkManager(QtCore.QObject):
         
     @Slot()
     def slot_downloadFinished(self)-> None: # ~qt5ex
-        print(f"In {self.__class__.__name__}.slot_downloadFinished:  output file name: {self._outputFile_.fileName()}, reply handler: {self._replyHandler_}")
-        if self._verbose_:
-            print(f"In {self.__class__.__name__}.slot_downloadFinished:  {self._outputFile_.fileName()}")
+        # print(f"In {self.__class__.__name__}.slot_downloadFinished:  output file name: {self._outputFile_.fileName()}, reply handler: {self._replyHandler_}")
         if self._saveToFile_:
             if self._outputFile_.isOpen():
                 self._outputFile_.close()
@@ -373,12 +374,6 @@ class ScipyenNetworkManager(QtCore.QObject):
                 print(printStyled("Succeeded", "green", True))
                 self._downloadedCount_ += 1
                 
-                self.sig_replyFromUrl.emit(self._outputFile_.fileName())
-        else:
-            self._replyInfo_ = self._networkReply_.readAll()
-            self.sig_replyFromUrl(self._replyInfo_)
-            pass
-                
         self._progressBar_.reset() # clear progressbar
         self.scipyenWindow.statusBar().removeWidget(self._progressBar_)
         
@@ -387,9 +382,7 @@ class ScipyenNetworkManager(QtCore.QObject):
         
     @Slot(QtNetwork.QNetworkReply)
     def slot_handleNetworkManagerFinished(self, reply:QtNetwork.QNetworkReply):
-        print(f"In {self.__class__.__name__}.slot_handleNetworkManagerFinished")
-        if self._verbose_:
-            print(f"In {self.__class__.__name__}.slot_handleNetworkManagerFinished")
+        # print(f"In {self.__class__.__name__}.slot_handleNetworkManagerFinished")
             
         if not reply.error():
             # info = bytes(reply.readAll()).decode()
@@ -625,5 +618,30 @@ def example_sequential_download_handler(info:QtCore.QByteArray,
         
     manager.getUrl(url, replyHandler=example_generic_handler) 
     
-def example_generic_handler(obj:object, manager:ScipyenNetworkManager):
+def example_generic_handler(obj:object, manager:ScipyenNetworkManager) -> None:
     print(f"example_generic_handler(obj:{type(obj).__name__})")
+    
+# def extract_archive(obj:str, manager:ScipyenNetworkManager, target_dir:str) -> None:
+#     print(f"In {__name__}.extract_archive:\n\tobj = {obj}")
+#     if isinstance(obj, str):
+#         obj = pathlib.Path(obj)
+#         
+#     elif not isinstance(obj, pathlib.Path):
+#         raise TypeError(f"'obj' expected a str or a pathlib.Path; instead, got {type(obj).__name__}")
+#         
+#     if not isinstance(target_dir, str) or not os.path.isdir(target_dir):
+#         raise ValueError(f"'target_dir ('{target_dir}') is not a directory")
+#     
+#     if isinstance(obj, pathlib.Path):
+#         path = obj.as_posix()
+#         if not obj.exists():
+#             raise RuntimeError(f"In {__name__}.extract_archive: File object {path} does not exist!")
+#         
+#         print(f"In {__name__}.extract_archive: path = {path}")
+#         tar = tarfile.open(path)
+#         try:
+#             tar.extractall(path = target_dir)
+#             tar.close()
+#             obj.unlink()
+#         except:
+#             traceback.print_exc()

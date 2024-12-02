@@ -171,6 +171,8 @@ class BrainAtlasManager(QtCore.QObject):
     # default_config_file = brainglobe_atlasapi.config.get_brainglobe_dir() / "last_versions.conf" if hasBrainGlobeAtlasAPI else None
     default_config_file = brainglobe_atlasapi.config.CONFIG_PATH if hasBrainGlobeAtlasAPI else None
     
+    remote_url_base = brainglobe_atlasapi.bg_atlas.BrainGlobeAtlas._remote_url_base if hasBrainGlobeAtlasAPI else None
+    
     def __init__(self, parent=None):
         super().__init__(parent=parent)
         self._atlas = None
@@ -180,7 +182,7 @@ class BrainAtlasManager(QtCore.QObject):
         self.progressDlg = None
         self.scipyenWindow = None
         self.loopControl = {"break":False}
-        self.netMan = network.ScipyenNetworkManager(verbose=False)
+        # self.netMan = network.ScipyenNetworkManager(verbose=False)
         self._tempFile_ = None
         # self._waitCondition_ = QtCore.QWaitCondition()
         # self._mutex_ = QtCore.QMutex()
@@ -305,6 +307,95 @@ class BrainAtlasManager(QtCore.QObject):
         
         self.initAtlas(ret)
         
+    @staticmethod
+    def _getArchiveSizeAndDownload(info:QtCore.QByteArray,
+                                   manager:network.ScipyenNetworkManager,
+                                   target_dir:str,
+                                   url:typing.Union[str, QtCore.QUrl],
+                                   ) -> None:
+        def _parse_size(s:str) -> int:
+            import re
+            search_result = re.search("([0-9]+\.[0-9] [MGK]B)|([0-9]+ [MGK]B)", s)
+            assert search_result is not None
+            sz_str = search_result.group()
+            assert sz_str is not None
+            sz = float(sz_str[:-3])
+            pfx = sz_str[-2]
+            if pfx == "G":
+                sz *= 1e9
+            elif pfx == "M":
+                sz *= 1e6
+            elif pfx == "K":
+                sz *= 1e3
+            return int(sz)    
+        
+        if not isinstance(info, QtCore.QByteArray):
+            raise TypeError(f"In BrainAtlasManager._getArchiveSizeAndDownload: Expecting a QByteArray; instead, got {type(info).__name__}")
+        
+        info = bytes(info).decode()
+        
+        if not isinstance(info, str) or len(info.strip()) == 0:
+            scipywarn("BrainAtlasManager._getArchiveSizeAndDownload received invalid data")
+            return 
+        
+        sz = _parse_size(info)
+        
+        if isinstance(sz, int):
+            manager.setNextDownloadSize(sz)
+        else:
+            scipywarn("In BrainAtlasManager._getArchiveSizeAndDownload: Could not get the size of the next download")
+        
+        # target_dir = self.getBrainGlobeConfiguration()["default_dirs"]["brainglobe_dir"]   
+        destination = os.path.join(target_dir, "archive.tar.gz")
+        manager.getUrl(url, destination=destination, replyHandler = None) 
+        
+    def testAtlasDownload(self):
+        """Tests downloading and extracting an atlas archive.
+        See iolib.network.example_sequential_download_handler for explanations
+        """
+        if not hasBrainGlobeAtlasAPI:
+            print(f"{self.__class__.__name__}.testAtlasDownload: no brain globe atlas api found")
+            return 
+        url = self.remote_url_base.format("example_mouse_100um_v1.2.tar.gz")
+        url1 = url.replace("raw", "src")
+        target_dir = self.getBrainGlobeConfiguration()["default_dirs"]["interm_download_dir"]
+        
+        manager = network.ScipyenNetworkManager()
+        manager.sig_resultReady[object].connect(self._slot_extractArchive)
+        
+        handle = functools.partial(self._getArchiveSizeAndDownload, 
+                                   target_dir = target_dir,
+                                   url = url)
+        
+        manager.getUrl(url1, destination=None, replyHandler=handle)
+        
+    @Slot(object)
+    def _slot_extractArchive(self, target:typing.Union[str, pathlib.Path]) -> None:
+        import tarfile
+        target_dir = self.getBrainGlobeConfiguration()["default_dirs"]["brainglobe_dir"]
+        if isinstance(target, str):
+            target = pathlib.Path(target)
+            
+        elif not isinstance(target, pathlib.Path):
+            raise TypeError(f"'target' expected a str or a pathlib.Path; instead, got {type(target).__name__}")
+            
+        if not isinstance(target_dir, str) or not os.path.isdir(target_dir):
+            raise ValueError(f"'target_dir ('{target_dir}') is not a directory")
+        
+        if isinstance(target, pathlib.Path):
+            path = target.as_posix()
+            if not target.exists():
+                raise RuntimeError(f"In {__name__}.extract_archive: File object {path} does not exist!")
+            
+            print(f"In {self.__class__.__name__}._slot_extractArchive: path = {path}")
+            tar = tarfile.open(path)
+            try:
+                tar.extractall(path = target_dir)
+                tar.close()
+                target.unlink()
+            except:
+                traceback.print_exc()
+        
     def initAtlas(self, name:typing.Optional[str]=None):
         if name is None or (isinstance(name, str) and (len(name.strip()) == 0 or name not in self.availableAtlasNames)):
             name = self._selectAtlas()
@@ -339,21 +430,24 @@ class BrainAtlasManager(QtCore.QObject):
                 return pd.DataFrame({"Names": names, "Downloaded": downloaded, "Updated": updated, "Local version": local_version, "Latest version": latest_version},
                                    columns = ["Names", "Downloaded", "Updated", "Local version", "Latest version"])
                 
-    def _downloadAtlas(self, name:str, setOwn:bool=True):
+    def _downloadAtlas(self, name:str):
+        """
+        """
+        pass
         # scipywarn(f"Will try and download {name}")
-        self.progressDlg = QtWidgets.QProgressDialog(f"Downloading {name}", "", 0, 0, self.scipyenWindow)
-        self.progressDlg.setMinimumDuration(1000)
-        self.progressDlg.setCancelButton(None)
-        self.downloadThread = AtlasDownloadThread(self, name)
-        self.downloadThread.signals.signal_setMaximum[int].connect(self.progressDlg.setMaximum)
-        self.downloadThread.signals.signal_Progress[int].connect(self.progressDlg.setValue)
-        if setOwn:
-            self.downloadThread.signals.signal_Result[object].connect(self._slot_setAtlas)
-        self.downloadThread.signals.signal_Finished.connect(self.finished)
-        # print(f"Start downloading atlas {name}.")
-        if setOwn:
-            self._atlas_in_progress_ = name
-        self.downloadThread.start()
+        # self.progressDlg = QtWidgets.QProgressDialog(f"Downloading {name}", "", 0, 0, self.scipyenWindow)
+        # self.progressDlg.setMinimumDuration(1000)
+        # self.progressDlg.setCancelButton(None)
+        # self.downloadThread = AtlasDownloadThread(self, name)
+        # self.downloadThread.signals.signal_setMaximum[int].connect(self.progressDlg.setMaximum)
+        # self.downloadThread.signals.signal_Progress[int].connect(self.progressDlg.setValue)
+        # if setOwn:
+        #     self.downloadThread.signals.signal_Result[object].connect(self._slot_setAtlas)
+        # self.downloadThread.signals.signal_Finished.connect(self.finished)
+        # # print(f"Start downloading atlas {name}.")
+        # if setOwn:
+        #     self._atlas_in_progress_ = name
+        # self.downloadThread.start()
         
     def _updateAtlas(self, atlas_name:str, inBatch:bool=False):
         from brainglobe_atlasapi.utils import (
@@ -541,7 +635,8 @@ class BrainAtlasManager(QtCore.QObject):
 #                 with open(self.default_config_file, "w") as f_out:
 #                     conf_object.write(f_out)
          
-    def getBrainGlobeConfiguration(self, file_path:typing.Optional[pathlib.Path]=None,
+    @classmethod
+    def getBrainGlobeConfiguration(cls, file_path:typing.Optional[pathlib.Path]=None,
                                    asDict:bool = False) -> configparser.ConfigParser:
         """Reads the brainglobe configuration from a local file.
         
@@ -554,7 +649,7 @@ class BrainAtlasManager(QtCore.QObject):
             return
         
         if file_path is None:
-            file_path = self.default_config_file
+            file_path = cls.default_config_file
             
         if not isinstance(file_path, pathlib.Path) or not file_path.exists():
             return
@@ -601,8 +696,9 @@ class BrainAtlasManager(QtCore.QObject):
             
         self._tempFile_ = file_path
         url = brainglobe_atlasapi.bg_atlas.BrainGlobeAtlas._remote_url_base.format("last_versions.conf")
-        self.netMan.sig_finished.connect(self._slot_last_versions_conf_downloaded)
-        self.netMan.getUrl(url, destination=file_path)
+        manager = network.ScipyenNetworkManager()
+        manager.sig_finished.connect(self._slot_last_versions_conf_downloaded)
+        manager.getUrl(url, destination=file_path)
         
     def compareAtlasVersions(self):
         # TODO: 2024-11-29 13:48:08
@@ -753,3 +849,123 @@ def get_atlas_structure(name:str, atlas:BGAtlas,
     
 # ### END ---- module-level functions
     
+# def downloadExtractAtlas(info:QtCore.QByteArray,
+#                   manager:network.ScipyenNetworkManager,
+#                   url:typing.Union[str, QtCore.QUrl], 
+#                   ) -> None:
+#     """Example of reply handler for sequential download of URLs using ScipyenNetworkManager.
+#         
+#         The handler accomplishes the task of calculating the expected download size
+#         of the specified URL, using information retrieved from a previous URL.
+#         
+#         This is applicable for the particular case of downloading a remote archive
+#         from a site that advertises the size of the archive on a distinct url.
+#         
+#         Example: 
+# 
+#         Suppose the archive url is "https://www.some_place.org/archive.tar.gz";
+#         also suppose that the file size of the archive is listed on the web page
+#         with url: "https://www.some_place.org/archive_sizes.html"
+#         
+#         Let: 
+#             # url of the archive file
+#             url = "https://www.some_place.org/archive.tar.gz"
+#             
+#             # url containing informtion about the size of the archive file
+#             url1= "https://www.some_place.org/archive_sizes.html"
+#         
+#         The problem: we want to know the expected size of "archive.tar.gz" file
+#         in order to properly update a progress message or widget while downloading
+#         this file.
+# 
+#         The solution proposed here is to calculate or retrieve the size of 
+#         "archive.tar.gz" using the information downloaded from `url1`, then 
+#         use this value in the progress message or widget, while downloading 
+#         "archive.tar.gz" from `url2`. 
+# 
+#         In this example, the size of the archive file is parsed using a simple 
+#         regular expression applied on the text retrieved form url1, using the 
+#         auxiliary function `example_get_download_size`. 
+# 
+#         The auxiliary function could have been def-ed nested inside this
+#         example function (see _parse_size, in the code).
+#         
+#         Implementation of the solution:
+#         1) Create a functools.partial of this function by "fixing" the 'url' parameter
+#             to the URL of the archive to be downloaded:
+# 
+#         handle = functools.partial(network.example_sequential_download_handler, url = url)
+#         
+#         2) Create an instance of the ScipyenNetworkManager
+#         
+#             manager = network.ScipyenNetworkManager(verbose=False)
+#         
+#         3) Make sure the ScipyenNetworkManager signal `sig_replyFromUrl` is connected
+#             to its slot `slot_processUrlReply`. This slot will actually call the handler
+#             pased to `manager` at (4) below.
+#         
+#             manager.sig_replyFromUrl.connect(manager.slot_processUrlReply)
+#         
+#         4) Now, use `manager` to retrieve `url1`, passing the `handle` as the
+#         reply handler; 
+#         
+#             manager.getUrl(url1, destination=None, replyHandler=handle)
+#         
+#     Applicability
+#     -------------
+#     Thus example function was designed specifically to replicate downloading
+#     brainglobe atlas data from their repository IN A NON UI-BLOCKING MANNER.
+#         
+#     The code in the brainglobe_atlas uses the `requests` package to donwload the 
+#     two URLs sequentially, which is fine when run directly in a regular 
+#     python console (where they also provide a cli progress bar via the `rich`
+#     package). However, these operations are executed in a synchronous mode, and
+#     hence they are blocking (i.e., no user interaction can take place while the 
+#     code is executed.) While this could in principle be made asynchronous, the 
+#     tools provided by Python standard library to achieve this cannot be (easily)
+#     used from within the Qt event loop that runs inside the main thread of Scipyen.
+#         
+#     NOTE that in this case, `url` would be, e.g.,
+#         
+#     bgbridge.brainglobe_atlasapi.bg_atlas.BrainGlobeAtlas._remote_url_base.format("example_mouse_100um_v1.2.tar.gz")
+#         
+#     and `url1` would be
+#         
+#         url1 = url.replace("raw", "src")
+#         
+#     """
+#     def _parse_size(s:str) -> int:
+#         import re
+#         search_result = re.search("([0-9]+\.[0-9] [MGK]B)|([0-9]+ [MGK]B)", s)
+#         assert search_result is not None
+#         sz_str = search_result.group()
+#         assert sz_str is not None
+#         sz = float(sz_str[:-3])
+#         pfx = sz_str[-2]
+#         if pfx == "G":
+#             sz *= 1e9
+#         elif pfx == "M":
+#             sz *= 1e6
+#         elif pfx == "K":
+#             sz *= 1e3
+#         return int(sz)    
+#     
+#     # use manager to download from url conditioned on prevInfo
+#     # pass a partial to it, fixing the url
+#     # in network manager, pass the info and manager parameters
+#     if not isinstance(info, QtCore.QByteArray):
+#         raise TypeError(f"Expecting a QByteArray; instead, got {type(info).__name__}")
+#     
+#     info = bytes(info).decode()
+#     
+#     if not isinstance(info, str) or len(info.strip()) == 0:
+#         scipywarn("example_sequential_download_handler received invalid data")
+#         return 
+#     sz = _parse_size(info)
+#     if isinstance(sz, int):
+#         manager.setNextDownloadSize(sz)
+#     else:
+#         scipywarn("example_sequential_download_handler: Could not get the size of the next download")
+#         
+#     handle = functools.partial(network.extract_archive, target_dir = target_dir)
+    # manager.getUrl(url, replyHandler=network.extract_archive) 
