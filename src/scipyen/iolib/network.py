@@ -30,8 +30,9 @@ class ScipyenNetworkManager(QtCore.QObject):
     
     def __init__(self, timeout_ms:int=QtNetwork.QNetworkRequest.DefaultTransferTimeoutConstant,
                  replyHandler:typing.Optional[typing.Callable] = None,
-                 verbose:bool=False,
                  parent:typing.Optional[QtCore.QObject] = None):
+                 # verbose:bool=False,
+                 # parent:typing.Optional[QtCore.QObject] = None):
         """Constructor for ScipyenNetworkManager
         Parameters:
         ----------
@@ -74,7 +75,7 @@ class ScipyenNetworkManager(QtCore.QObject):
                     self.scipyenWindow = f[0].f_globals["ScipyenWindow"].instance()
                     break
         
-        self._verbose_ = verbose
+        # self._verbose_ = verbose
         self._timeout_ms_ = timeout_ms
         self._downloadQueue_ = collections.deque() # qt5ex
         self._downloadedCount_ = 0 # qt5ex
@@ -113,7 +114,7 @@ class ScipyenNetworkManager(QtCore.QObject):
         self._manager_.finished[QtNetwork.QNetworkReply].connect(self.slot_handleNetworkManagerFinished)
     
     def setNextDownloadSize(self, val:typing.Optional[int] = None):
-        print(f"{self.__class__.__name__}.setNextDownloadSize: {type(val)} = {val}")
+        # print(f"{self.__class__.__name__}.setNextDownloadSize: {type(val)} = {val}")
         if isinstance(val, int):
             self._temp_download_size_ = val
         else:
@@ -211,8 +212,8 @@ class ScipyenNetworkManager(QtCore.QObject):
     def _(self, u: str | QtCore.QUrl, 
           fileName:typing.Optional[typing.Union[str, type(MISSING)]]=MISSING) -> None:  # qt5ex
         
-        if self._verbose_:
-            print(f"In {self.__class__.__name__}._append(url= {u}, fileName = {fileName})")
+        # if self._verbose_:
+        #     print(f"In {self.__class__.__name__}._append(url= {u}, fileName = {fileName})")
             
         if len(self._downloadQueue_) == 0:
             QtCore.QTimer.singleShot(0, self._startNextDownload)
@@ -354,8 +355,8 @@ class ScipyenNetworkManager(QtCore.QObject):
         self._progressBar_.setRange(0, total)
         self._progressBar_.setValue(bytesReceived)
         
-        if self._verbose_:
-            print(f"bytes: {bytesReceived} / {total} (speed: {speed} {units})")
+        # if self._verbose_:
+        #     print(f"bytes: {bytesReceived} / {total} (speed: {speed} {units})")
         
     @Slot()
     def slot_downloadFinished(self)-> None: # ~qt5ex
@@ -426,7 +427,7 @@ class ScipyenNetworkManager(QtCore.QObject):
     @Slot(object)
     def slot_processUrlReply(self, s:object):
         if isinstance(self._replyHandler_, typing.Callable):
-            print(f"{self.__class__.__name__}.slot_processUrlReply will call {self._replyHandler_}")
+            # print(f"{self.__class__.__name__}.slot_processUrlReply will call {self._replyHandler_}")
             try:
                 self._replyHandler_(s, self)
             except:
@@ -456,10 +457,10 @@ class ScipyenNetworkManager(QtCore.QObject):
         #
         
         rawHeaders = self._networkReply_.rawHeaderPairs()
-        if self._verbose_:
-            print(f"{self.__class__.__name__}.slot_downloadHeaderChanged:")
-            for x in rawHeaders:
-                print(f"{bytes(x[0]).decode()} ↦ {bytes(x[1]).decode()}")
+        # if self._verbose_:
+        #     print(f"{self.__class__.__name__}.slot_downloadHeaderChanged:")
+        #     for x in rawHeaders:
+        #         print(f"{bytes(x[0]).decode()} ↦ {bytes(x[1]).decode()}")
             
         if not isinstance(self._temp_download_size_, int):
             if self._networkReply_.hasRawHeader(b"content-length"):
@@ -467,13 +468,13 @@ class ScipyenNetworkManager(QtCore.QObject):
         else:
             self._content_length_ = self._temp_download_size_
             
-        if self._verbose_:
-            print(f"In {self.__class__.__name__}.slot_downloadHeaderChanged: content length = {self._content_length_}")
+        # if self._verbose_:
+        #     print(f"In {self.__class__.__name__}.slot_downloadHeaderChanged: content length = {self._content_length_}")
     
     @Slot()
     def slot_downloadReadyRead(self) -> None: # qt5ex   
-        if self._verbose_:
-            print(f"In {self.__class__.__name__}.slot_downloadReadyRead:")
+        # if self._verbose_:
+        #     print(f"In {self.__class__.__name__}.slot_downloadReadyRead:")
 
         if isinstance(self._outputFile_, QtCore.QFile) and self._outputFile_.exists():
             self._outputFile_.write(self._networkReply_.readAll())
