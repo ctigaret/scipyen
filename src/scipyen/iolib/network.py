@@ -79,6 +79,7 @@ class ScipyenNetworkManager(QtCore.QObject):
         self._downloadedCount_ = 0 # qt5ex
         self._totalCount_ = 0 # qt5ex
         self._outputFile_ = QtCore.QFile() # qt5ex
+        self._saveToFile_ = False
         # self._replyTextBuffer_ = QtCore.QTextStream()
         
         # self._outputFileName_ = dataclasses.MISSING
@@ -105,6 +106,8 @@ class ScipyenNetworkManager(QtCore.QObject):
         self._manager_ = QtNetwork.QNetworkAccessManager(self) # also qt5ex
         self._manager_.setTransferTimeout(self._timeout_ms_)
         
+        # this is OK here
+        self.sig_replyFromUrl.connect(self.slot_processUrlReply)
     
     def setNextDownloadSize(self, val:typing.Optional[int] = None):
         print(f"{self.__class__.__name__}.setNextDownloadSize: {type(val)} = {val}")
@@ -240,6 +243,7 @@ class ScipyenNetworkManager(QtCore.QObject):
             fileName = self._setSaveFileName(url)
             
         if isinstance(fileName, str):
+            self._saveToFile_ = True
             self._outputFile_.setFileName(fileName)
             if not self._outputFile_.open(QtCore.QIODevice.WriteOnly):
                 # NOTE: 2024-12-01 15:08:42
@@ -247,6 +251,9 @@ class ScipyenNetworkManager(QtCore.QObject):
                 scipywarn(f"In {self.__class__.__name__}._startNextDownload: Problem opening file {fileName} for saving from {url.url()}:\n{self._outputFile_.errorString()}")
                 self._startNextDownload() # NOTE: 2024-12-01 15:09:16 will reset counters if download quere is empty
                 return
+            
+        else:
+            self._saveToFile_ = False
             
         request = QtNetwork.QNetworkRequest(url)
         request.setRawHeader(b"User-Agent", b"Mozilla 5.0")
@@ -344,6 +351,7 @@ class ScipyenNetworkManager(QtCore.QObject):
         
     @Slot()
     def slot_downloadFinished(self)-> None: # ~qt5ex
+        print(f"In {self.__class__.__name__}.slot_downloadFinished:  output file name: {self._outputFile_.fileName()}, reply handler: {self._replyHandler_}")
         if self._outputFile_.isOpen():
             if self._verbose_:
                 print(f"In {self.__class__.__name__}.slot_downloadFinished:  {self._outputFile_.fileName()}")
@@ -358,7 +366,6 @@ class ScipyenNetworkManager(QtCore.QObject):
                         
             else:
                 print(printStyled("Succeeded", "green", True))
-                print(f"{self.__class__.__name__}.slot_downloadFinished: replyHandler: {self._replyHandler_}")
                 self._downloadedCount_ += 1
             
         self._progressBar_.reset() # clear progressbar
@@ -369,13 +376,19 @@ class ScipyenNetworkManager(QtCore.QObject):
         
     @Slot(QtNetwork.QNetworkReply)
     def slot_handleNetworkManagerFinished(self, reply:QtNetwork.QNetworkReply):
+        print(f"In {self.__class__.__name__}.slot_handleNetworkManagerFinished")
         if self._verbose_:
             print(f"In {self.__class__.__name__}.slot_handleNetworkManagerFinished")
             
         if not reply.error():
-            info = bytes(reply.readAll()).decode()
+            # info = bytes(reply.readAll()).decode()
+            # self._replyInfo_ = info
             
-            self._replyInfo_ = info
+            if self._saveToFile_ and self._outputFile_.exists():
+                self._replyInfo_ = self._outputFile_.fileName()
+            else:
+                self._replyInfo_ = reply.readAll()
+            
             # The signal sig_replyFromUrl must be connected to a slot that
             # processes reply data `_replyInfo_` in-memory; this can be either:
             # • self.slot_processUrlReply
@@ -404,14 +417,16 @@ class ScipyenNetworkManager(QtCore.QObject):
             
             # ### END DO NOT DELETE
             
-            self._downloadedCount_ += 1
-            # self._startNextDownload()
+            # self._downloadedCount_ += 1
             
     @Slot(object)
     def slot_processUrlReply(self, s:object):
         if isinstance(self._replyHandler_, typing.Callable):
             print(f"{self.__class__.__name__}.slot_processUrlReply will call {self._replyHandler_}")
-            self._replyHandler_(s, self)
+            try:
+                self._replyHandler_(s, self)
+            except:
+                traceback.print_exc()
         
     @Slot()
     def slot_downloadHeaderChanged(self):
@@ -479,7 +494,7 @@ def example_get_download_size(s:str) -> int:
         sz *= 1e3
     return int(sz)        
 
-def example_sequential_download_handler(info:str,
+def example_sequential_download_handler(info:QtCore.QByteArray,
                                           manager:ScipyenNetworkManager,
                                           url:typing.Union[str, QtCore.QUrl], 
                                           ) -> None:
@@ -583,6 +598,11 @@ def example_sequential_download_handler(info:str,
     # use manager to download from url conditioned on prevInfo
     # pass a partial to it, fixing the url
     # in network manager, pass the info and manager parameters
+    if not isinstance(info, QtCore.QByteArray):
+        raise TypeError(f"Expecting a QByteArray; instead, got {type(info).__name__}")
+    
+    info = bytes(info).decode()
+    
     if not isinstance(info, str) or len(info.strip()) == 0:
         scipywarn("example_sequential_download_handler received invalid data")
         return 
