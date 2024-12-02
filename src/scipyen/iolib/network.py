@@ -108,6 +108,8 @@ class ScipyenNetworkManager(QtCore.QObject):
         
         # this is OK here
         self.sig_replyFromUrl.connect(self.slot_processUrlReply)
+        
+        self._manager_.finished[QtNetwork.QNetworkReply].connect(self.slot_handleNetworkManagerFinished)
     
     def setNextDownloadSize(self, val:typing.Optional[int] = None):
         print(f"{self.__class__.__name__}.setNextDownloadSize: {type(val)} = {val}")
@@ -226,7 +228,7 @@ class ScipyenNetworkManager(QtCore.QObject):
             self._temp_download_size_ = None
             self._content_length_ = 0
             self._downloadedCount_ = 0
-            self._totalCount_ = 0
+            # self._totalCount_ = 0
             return
         
         if self._progressBar_ is None:
@@ -275,11 +277,14 @@ class ScipyenNetworkManager(QtCore.QObject):
         # to it, in write mode -> just save the data to that file
         #
         #
-        if fileName is None:
-            self._manager_.finished[QtNetwork.QNetworkReply].connect(self.slot_handleNetworkManagerFinished)
-        else:
+#         if fileName is None:
+#             self._manager_.finished[QtNetwork.QNetworkReply].connect(self.slot_handleNetworkManagerFinished)
+#         else:
+#             self._networkReply_.finished.connect(self.slot_downloadFinished)
+#             
+        if self._saveToFile_:
             self._networkReply_.finished.connect(self.slot_downloadFinished)
-            
+        
         self._networkReply_.readyRead.connect(self.slot_downloadReadyRead)
         self._networkReply_.metaDataChanged.connect(self.slot_downloadHeaderChanged)
         
@@ -352,11 +357,11 @@ class ScipyenNetworkManager(QtCore.QObject):
     @Slot()
     def slot_downloadFinished(self)-> None: # ~qt5ex
         print(f"In {self.__class__.__name__}.slot_downloadFinished:  output file name: {self._outputFile_.fileName()}, reply handler: {self._replyHandler_}")
-        if self._outputFile_.isOpen():
-            if self._verbose_:
-                print(f"In {self.__class__.__name__}.slot_downloadFinished:  {self._outputFile_.fileName()}")
-
-            self._outputFile_.close()
+        if self._verbose_:
+            print(f"In {self.__class__.__name__}.slot_downloadFinished:  {self._outputFile_.fileName()}")
+        if self._saveToFile_:
+            if self._outputFile_.isOpen():
+                self._outputFile_.close()
 
             if self._networkReply_.error():
                 scipywarn(f"In {self.__class__.__name__}.slot_downloadFinished Failed downloading {self._outputFile_.fileName()}:\n {self._networkReply_.errorString()} ")
@@ -367,7 +372,10 @@ class ScipyenNetworkManager(QtCore.QObject):
             else:
                 print(printStyled("Succeeded", "green", True))
                 self._downloadedCount_ += 1
-            
+                self.sig_replyFromUrl.emit(self._outputFile_.fileName())
+        else:
+            pass
+                
         self._progressBar_.reset() # clear progressbar
         self.scipyenWindow.statusBar().removeWidget(self._progressBar_)
         
