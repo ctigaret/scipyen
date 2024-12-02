@@ -372,8 +372,11 @@ class ScipyenNetworkManager(QtCore.QObject):
             else:
                 print(printStyled("Succeeded", "green", True))
                 self._downloadedCount_ += 1
+                
                 self.sig_replyFromUrl.emit(self._outputFile_.fileName())
         else:
+            self._replyInfo_ = self._networkReply_.readAll()
+            self.sig_replyFromUrl(self._replyInfo_)
             pass
                 
         self._progressBar_.reset() # clear progressbar
