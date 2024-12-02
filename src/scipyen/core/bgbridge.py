@@ -182,9 +182,9 @@ class BrainAtlasManager(QtCore.QObject):
         self.loopControl = {"break":False}
         self.netMan = network.ScipyenNetworkManager(verbose=False)
         self._tempFile_ = None
-        self._waitCondition_ = QtCore.QWaitCondition()
-        self._mutex_ = QtCore.QMutex()
-        self._locker_ = QtCore.QMutexLocker(self._mutex_)
+        # self._waitCondition_ = QtCore.QWaitCondition()
+        # self._mutex_ = QtCore.QMutex()
+        # self._locker_ = QtCore.QMutexLocker(self._mutex_)
         
 
         ws = wf.user_workspace()
