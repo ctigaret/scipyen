@@ -50,7 +50,7 @@ import configparser # from standard library; Scipyen uses confuse from  pypi
 # import qasync
 # from qasync import asyncSlot
 
-from core.prog import scipywarn
+from core.prog import scipywarn, printStyled
 from core import taxonbridge
 from core import workspacefunctions as wf
 import gui.pictgui as pgui
@@ -182,7 +182,7 @@ class BrainAtlasManager(QtCore.QObject):
         self.progressDlg = None
         self.scipyenWindow = None
         self.loopControl = {"break":False}
-        # self.netMan = network.ScipyenNetworkManager(verbose=False)
+        self.netMan = network.ScipyenNetworkManager(verbose=False)
         self._tempFile_ = None
         # self._waitCondition_ = QtCore.QWaitCondition()
         # self._mutex_ = QtCore.QMutex()
@@ -360,14 +360,17 @@ class BrainAtlasManager(QtCore.QObject):
         url1 = url.replace("raw", "src")
         target_dir = self.getBrainGlobeConfiguration()["default_dirs"]["interm_download_dir"]
         
-        manager = network.ScipyenNetworkManager()
-        manager.sig_resultReady[object].connect(self._slot_extractArchive)
+        self.netMan = network.ScipyenNetworkManager()
+        self.netMan.sig_resultReady[object].connect(self._slot_extractArchive)
         
         handle = functools.partial(self._getArchiveSizeAndDownload, 
                                    target_dir = target_dir,
                                    url = url)
         
-        manager.getUrl(url1, destination=None, replyHandler=handle)
+        # cb = functools.partialmethod(manager.getUrl, url=url1, destination=None, replyHandler=handle)
+        # QtCore.QTimer.singleShot(0, Slot()(cb))
+        
+        self.netMan.getUrl(url1, destination=None, replyHandler=handle)
         
     @Slot(object)
     def _slot_extractArchive(self, target:typing.Union[str, pathlib.Path]) -> None:
@@ -696,9 +699,9 @@ class BrainAtlasManager(QtCore.QObject):
             
         self._tempFile_ = file_path
         url = brainglobe_atlasapi.bg_atlas.BrainGlobeAtlas._remote_url_base.format("last_versions.conf")
-        manager = network.ScipyenNetworkManager()
-        manager.sig_finished.connect(self._slot_last_versions_conf_downloaded)
-        manager.getUrl(url, destination=file_path)
+        self.netMan = network.ScipyenNetworkManager()
+        self.netMan.sig_finished.connect(self._slot_last_versions_conf_downloaded)
+        self.netMan.getUrl(url, destination=file_path)
         
     def compareAtlasVersions(self):
         # TODO: 2024-11-29 13:48:08
