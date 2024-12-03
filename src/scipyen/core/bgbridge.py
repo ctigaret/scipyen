@@ -161,6 +161,8 @@ class BGStructureDescriptor:
             raise TypeError(f"Expecting a non-empty str, pandas NA, or None; instead, got {type(value).__name__}")
 
 class BrainAtlasManager(QtCore.QObject):
+    """Access for brainglobe atlasapi, with non UI blocking network operations.
+    """
     # _instance = None
     # def __new__(cls, parent=None):
     #     if cls._instance is None:
@@ -340,7 +342,8 @@ class BrainAtlasManager(QtCore.QObject):
         if len(resolution):
             atlas_name, atlas_version = resolution[0]
             
-        local_atlas_dir = pathlib.Path(self.getBrainGlobeConfiguration()["default_dirs"]["brainglobe_dir"]) / f"{atlas_name}_v{atlas_version}"
+        # local_atlas_dir = pathlib.Path(self.getBrainGlobeConfiguration()["default_dirs"]["brainglobe_dir"]) / f"{atlas_name}_v{atlas_version}"
+        local_atlas_dir = self.localAtlasRepository / f"{atlas_name}_v{atlas_version}"
         
         if local_atlas_dir.exists():
             shutil.rmtree(local_atlas_dir)
@@ -352,13 +355,14 @@ class BrainAtlasManager(QtCore.QObject):
         url = self.remote_url_base.format(archive_name)
         
         url1 = url.replace("raw", "src")
-        target_dir = self.getBrainGlobeConfiguration()["default_dirs"]["interm_download_dir"]
+        # target_dir = self.getBrainGlobeConfiguration()["default_dirs"]["interm_download_dir"]
+        target_dir = self.localDownloadDirectory
         
         self.netMan = network.ScipyenNetworkManager()
         self.netMan.sig_resultReady[object].connect(self._slot_extractArchive)
         
         handle = functools.partial(self._getArchiveSizeAndDownload, 
-                                   target_dir = target_dir,
+                                   target_dir = self.localDownloadDirectory,
                                    url = url)
         
         # cb = functools.partialmethod(manager.getUrl, url=url1, destination=None, replyHandler=handle)
@@ -478,6 +482,7 @@ class BrainAtlasManager(QtCore.QObject):
             self._downloadAtlas(name, setOwn=False)
             
     def installAtlas(self, name:typing.Optional[str] = None):
+        # TODO 2024-12-03 14:06:33 finalize me!
         from gui.itemslistdialog import ItemsListDialog
         if name is None or (isinstance(name, str) and (len(name.strip()) == 0 or name not in self.availableAtlasNames)):
             name = self._selectAtlas()
@@ -486,9 +491,13 @@ class BrainAtlasManager(QtCore.QObject):
                     
         self._downloadAtlas(name, setOwn=False)
         
-    def _selectAtlas(self) -> str:
+    def _selectAtlas(self, choices:typing.Optional[typing.Sequence[str]]=None) -> str:
         from gui.itemslistdialog import ItemsListDialog
-        dlg = ItemsListDialog(parent = self.scipyenWindow, itemsList = self.availableAtlasNames,
+        names = self.availableAtlasNames
+        if isinstance(choices, (tuple, list)) and all(isinstance(v, str) for v in choices):
+            names = list(filter(lambda x: x in names, choices))
+            
+        dlg = ItemsListDialog(parent = self.scipyenWindow, itemsList = names,
                                 title = f"Choose atlas:")
         a = dlg.exec_()
         
@@ -750,26 +759,55 @@ class BrainAtlasManager(QtCore.QObject):
         # self._current_atlases_versions_updated_ = True
         # self._parseLocalAtlasesConf(target.as_posix())
         
+    def getArchiveNameForAtlas(self, entryName:typing.Optional[str]=None) -> str | None:
+        atlasPath = self.atlasDir(entryName)
+        if isinstance(atlasPath, pathlib.Path):
+            return atlasPath.name + ".tar.gz"
         
-    def atlasDirForEntry(self, entryName:str) -> pathlib.Path | None:
-        """Get the atlas directory for a given atlas name.
+    @property
+    def localAtlasRepository(self) -> pathlib.Path:
+        """The local directory where atlases are stored.
+        WARNING: The path may not exist in your file system!
+        """
+        return pathlib.Path(self.getBrainGlobeConfiguration()["default_dirs"]["brainglobe_dir"])
+    
+    @property
+    def localDownloadDirectory(self) -> pathlib.Path:
+        """The local directory where temporary atlas archives are downloaded.
+        WARNING: The path may not exist in your file system!
+        """
+        return self.getBrainGlobeConfiguration()["default_dirs"]["interm_download_dir"]
+        
+    def atlasDir(self, entryName:typing.Optional[str]=None) -> pathlib.Path | None:
+        """Get the local atlas directory for a given atlas name.
         WARNING: The returned pathlib Path may NOT exist; this needs to be 
         verified by the caller of this method!
         """
+        from gui.itemslistdialog import ItemsListDialog
         if not hasBrainGlobeAtlasAPI:
             return
         atlasConf = self.getAtlasVersions()
-        if entryName not in atlasConf:
-            keys = list(map(lambda x: entryName in x, atlasConf.keys()))
-            if len(keys) == 0:
-                raise ValueError(f"{entryName} is not a valid atlas name")
-            if len(keys) > 1:
-                
         
-        bgdir = pathlib.Path(self.getBrainGlobeConfiguration()["default_dirs"]["brainglobe_dir"])
+        if entryName not in atlasConf:
+            if isinstance(entryName, str):
+                keys = list(map(lambda x: entryName in x, atlasConf.keys()))
+                if len(keys) == 0:
+                    entryName = self._selectAtlas()
+                elif len(keys) > 1:
+                    entryName = self._selectAtlas(keys)
+                else:
+                    entryName = keys[0]
+                    
+            if entryName is None:
+                entryName = self._selectAtlas()
+                if entryName is None:
+                    return
+        
+        # bgdir = pathlib.Path(self.getBrainGlobeConfiguration()["default_dirs"]["brainglobe_dir"])
         
         name = f"{entryName}_v{atlasConf[entryName]}"
-        return bgdir / name
+        # return bgdir / name
+        return self.localAtlasRepository / name
         
     
     def compareAtlasVersions(self):
@@ -928,9 +966,9 @@ def name2components(n:str) -> str | tuple:
     if len(resolution) == 0:
         return n # no resolution found, return the full name
     
-    ndx = resolution[0]
+    ndx = resolution[0][0]
     parts.pop(ndx)
-    resolutionString = resolution[1]
+    resolutionString = resolution[0][1]
     resolution = float(resolutionString.strip("um"))
     
     return "_".join(parts), resolutionString, resolution
