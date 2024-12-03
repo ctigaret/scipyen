@@ -342,7 +342,6 @@ class BrainAtlasManager(QtCore.QObject):
         if len(resolution):
             atlas_name, atlas_version = resolution[0]
             
-        # local_atlas_dir = pathlib.Path(self.getBrainGlobeConfiguration()["default_dirs"]["brainglobe_dir"]) / f"{atlas_name}_v{atlas_version}"
         local_atlas_dir = self.localAtlasRepository / f"{atlas_name}_v{atlas_version}"
         
         if local_atlas_dir.exists():
@@ -355,8 +354,6 @@ class BrainAtlasManager(QtCore.QObject):
         url = self.remote_url_base.format(archive_name)
         
         url1 = url.replace("raw", "src")
-        # target_dir = self.getBrainGlobeConfiguration()["default_dirs"]["interm_download_dir"]
-        target_dir = self.localDownloadDirectory
         
         self.netMan = network.ScipyenNetworkManager()
         self.netMan.sig_resultReady[object].connect(self._slot_extractArchive)
@@ -364,9 +361,6 @@ class BrainAtlasManager(QtCore.QObject):
         handle = functools.partial(self._getArchiveSizeAndDownload, 
                                    target_dir = self.localDownloadDirectory,
                                    url = url)
-        
-        # cb = functools.partialmethod(manager.getUrl, url=url1, destination=None, replyHandler=handle)
-        # QtCore.QTimer.singleShot(0, Slot()(cb))
         
         self.netMan.getUrl(url1, destination=None, replyHandler=handle)
         
@@ -488,9 +482,9 @@ class BrainAtlasManager(QtCore.QObject):
             name = self._selectAtlas()
             if name is None:
                 return
-                    
-        self._downloadAtlas(name, setOwn=False)
-        
+            
+        pass
+
     def _selectAtlas(self, choices:typing.Optional[typing.Sequence[str]]=None) -> str:
         from gui.itemslistdialog import ItemsListDialog
         names = self.availableAtlasNames
@@ -818,6 +812,19 @@ class BrainAtlasManager(QtCore.QObject):
         # to be updated
         pass
     
+    def getLocalAtlasVersions(self, n:typing.Optional[str]=None, 
+                              asString:bool=True):
+        p = self.localAtlasRepository
+        if not isinstance(n, str) ir len(n.strip()) == 0:
+            n = self._selectAtlas()
+            
+        dirs = list(p.glob(f"{n}*"))
+        if len(dirs) > 0:
+            vStrings = list(map(lambda x: x.name[len(n):].strip("_v"), dirs))
+            return vStrings
+            
+
+    
 class AtlasDownloadThread(QtCore.QThread):
     def __init__(self, parent, atlas_name:str):
         """
@@ -950,9 +957,14 @@ def get_atlas_structure(name:str, atlas:BGAtlas,
         ret["atlas_name"] = atlas.atlas_name
         return ret
     
+            
+    
 # ### END ---- module-level functions
 
-def name2components(n:str) -> str | tuple:
+def atlas_name2components(n:str) -> str | tuple:
+    """Breaks up an atlas name (`n`) into its identifier and resolution.
+    NOTE: atlas version is NOT contained in the atlas name
+    """
     # 1. break apart
     parts = n.split("_")
     if len(parts) == 1:
@@ -970,6 +982,9 @@ def name2components(n:str) -> str | tuple:
     parts.pop(ndx)
     resolutionString = resolution[0][1]
     resolution = float(resolutionString.strip("um"))
+    
+    # version = list(filter(lambda x: x[1].startswith("v"), enumerate(parts)))
+    # if len
     
     return "_".join(parts), resolutionString, resolution
         
