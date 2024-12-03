@@ -50,7 +50,7 @@ import configparser # from standard library; Scipyen uses confuse from  pypi
 # import qasync
 # from qasync import asyncSlot
 
-from core.prog import scipywarn, printStyled
+from core.prog import scipywarn, printStyled, safeWrapper
 from core import taxonbridge
 from core import workspacefunctions as wf
 import gui.pictgui as pgui
@@ -168,7 +168,6 @@ class BrainAtlasManager(QtCore.QObject):
     # 
     #     return cls._instance
     
-    # default_config_file = brainglobe_atlasapi.config.get_brainglobe_dir() / "last_versions.conf" if hasBrainGlobeAtlasAPI else None
     default_config_file = brainglobe_atlasapi.config.CONFIG_PATH if hasBrainGlobeAtlasAPI else None
     
     remote_url_base = brainglobe_atlasapi.bg_atlas.BrainGlobeAtlas._remote_url_base if hasBrainGlobeAtlasAPI else None
@@ -189,6 +188,7 @@ class BrainAtlasManager(QtCore.QObject):
         # self._waitCondition_ = QtCore.QWaitCondition()
         # self._mutex_ = QtCore.QMutex()
         # self._locker_ = QtCore.QMutexLocker(self._mutex_)
+        self._all_available_atlas_names_ = list()
         
 
         ws = wf.user_workspace()
@@ -347,7 +347,7 @@ class BrainAtlasManager(QtCore.QObject):
             # local_atlas_dir.unlink()
         
         if not hasBrainGlobeAtlasAPI:
-            print(f"{self.__class__.__name__}.testAtlasDownload: no brain globe atlas api found")
+            scipywarn(f"{self.__class__.__name__}.testAtlasDownload: no brain globe atlas api found")
             return 
         url = self.remote_url_base.format(archive_name)
         
@@ -529,10 +529,27 @@ class BrainAtlasManager(QtCore.QObject):
     
     @property
     def localAtlasNames(self) -> list[str]:
+        atlasConf = self.getAtlasVersions()
+        
         return self._local_atlas_names_
     
     @property
     def availableAtlasNames(self) -> list[str]:
+        """List of available atlas names.
+    
+        A 'canonical' atlas name is of the form:
+        
+        name = <identifier>_{<identifier>_}*<resolution>um
+        
+        identifier = [a-zA-Z0-9]
+        
+        Name parts:
+        
+        
+        """
+        atlasConf = self.getAtlasVersions()
+        # self._all_available_atlas_names_ = list(map(lambda x: x.replace("_", " "), atlasConf.keys()))
+        self._all_available_atlas_names_ = list(atlasConf.keys())
         return self._all_available_atlas_names_
     
     @property
@@ -680,15 +697,6 @@ class BrainAtlasManager(QtCore.QObject):
         if self._parseLocalAtlasesConf(atlases_conf_path):
             return self._current_atlases_versions_
         
-        # atlases_conf = configparser.ConfigParser()
-        # with open(atlases_conf_path) as atlases_conf_file:
-        #     atlases_conf.read_file(atlases_conf_file)
-        # if atlases_conf.has_section("atlases"):
-        #     self._current_atlases_versions_ = dict(atlases_conf["atlases"])
-        #     return self._current_atlases_versions_
-        # else:
-        #     raise RuntimeError(f"Invalid atlases configuration file {atlases_conf_path}")
-            
         else:
             scipywarn(f"File {atlases_conf_path} does not exist; will retrieve a copy from the remote GIN site, then call this method again")
             # self._current_atlases_versions_updated_ = False
@@ -743,6 +751,25 @@ class BrainAtlasManager(QtCore.QObject):
         # self._parseLocalAtlasesConf(target.as_posix())
         
         
+    def atlasDirForEntry(self, entryName:str) -> pathlib.Path | None:
+        """Get the atlas directory for a given atlas name.
+        WARNING: The returned pathlib Path may NOT exist; this needs to be 
+        verified by the caller of this method!
+        """
+        if not hasBrainGlobeAtlasAPI:
+            return
+        atlasConf = self.getAtlasVersions()
+        if entryName not in atlasConf:
+            keys = list(map(lambda x: entryName in x, atlasConf.keys()))
+            if len(keys) == 0:
+                raise ValueError(f"{entryName} is not a valid atlas name")
+            if len(keys) > 1:
+                
+        
+        bgdir = pathlib.Path(self.getBrainGlobeConfiguration()["default_dirs"]["brainglobe_dir"])
+        
+        name = f"{entryName}_v{atlasConf[entryName]}"
+        return bgdir / name
         
     
     def compareAtlasVersions(self):
@@ -886,6 +913,29 @@ def get_atlas_structure(name:str, atlas:BGAtlas,
         return ret
     
 # ### END ---- module-level functions
+
+def name2components(n:str) -> str | tuple:
+    # 1. break apart
+    parts = n.split("_")
+    if len(parts) == 1:
+        parts = n.split(" ")
+        
+        if len(parts) == 1:
+            return parts[0]
+        
+    # 2. locate the resolution
+    resolution = list(filter(lambda x: x[1].endswith("um"), enumerate(parts)))
+    if len(resolution) == 0:
+        return n # no resolution found, return the full name
+    
+    ndx = resolution[0]
+    parts.pop(ndx)
+    resolutionString = resolution[1]
+    resolution = float(resolutionString.strip("um"))
+    
+    return "_".join(parts), resolutionString, resolution
+        
+    
     
 # def downloadExtractAtlas(info:QtCore.QByteArray,
 #                   manager:network.ScipyenNetworkManager,
