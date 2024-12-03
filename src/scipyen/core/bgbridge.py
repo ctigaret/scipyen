@@ -812,16 +812,16 @@ class BrainAtlasManager(QtCore.QObject):
         # to be updated
         pass
     
-    def getLocalAtlasVersions(self, n:typing.Optional[str]=None, 
-                              asString:bool=True):
+    def getLocalAtlasVersion(self, n:typing.Optional[str]=None, 
+                              asString:bool=True) -> list | None:
         p = self.localAtlasRepository
-        if not isinstance(n, str) ir len(n.strip()) == 0:
+        if not isinstance(n, str) or len(n.strip()) == 0:
             n = self._selectAtlas()
             
         dirs = list(p.glob(f"{n}*"))
         if len(dirs) > 0:
             vStrings = list(map(lambda x: x.name[len(n):].strip("_v"), dirs))
-            return vStrings
+            return vStrings if asString else list(map(lambda x: float(x), vStrings))
             
 
     
