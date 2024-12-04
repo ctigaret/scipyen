@@ -12,6 +12,7 @@ from qtpy.uic import loadUiType as __loadUiType__
 # NOTE: 2023-07-14 16:32:06
 # necessary to adapt to the situation where Scipyen is bundled
 from core.sysutils import adapt_ui_path
+from gui import guiutils
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 

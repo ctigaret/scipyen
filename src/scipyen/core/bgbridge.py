@@ -36,8 +36,8 @@ Wrapper around BrainGlobe API, with shims
 # to be continued... 2024-11-25 17:09:34
 
 
-import collections, typing, dataclasses, traceback, os, sys, pathlib
-import functools, shutil
+import traceback, os, sys, pathlib, shutil
+import collections, typing, dataclasses, functools, itertools
 from dataclasses import MISSING
 import numpy as np
 import pandas as pd
@@ -207,7 +207,7 @@ class BrainAtlasManager(QtCore.QObject):
         
     def initAtlasForSpecies(self, taxon:typing.Union[str, taxonbridge.Taxon], atlas_name:typing.Optional[str]=None):
         if not hasBrainGlobeAtlasAPI:
-            scipywarn("Please install REQUIRED package: brainglobe (or at least brainglobe_atlasapi)")
+            scipywarn("The 'brainglobe_atlasapi' package is not installed")
             return
         
         if len(self._all_available_atlas_names_) == 0:
@@ -349,8 +349,9 @@ class BrainAtlasManager(QtCore.QObject):
             # local_atlas_dir.unlink()
         
         if not hasBrainGlobeAtlasAPI:
-            scipywarn(f"{self.__class__.__name__}.testAtlasDownload: no brain globe atlas api found")
-            return 
+            scipywarn("The 'brainglobe_atlasapi' package is not installed")
+            return
+
         url = self.remote_url_base.format(archive_name)
         
         url1 = url.replace("raw", "src")
@@ -398,7 +399,7 @@ class BrainAtlasManager(QtCore.QObject):
         
     def initAtlas(self, name:typing.Optional[str]=None):
         if name is None or (isinstance(name, str) and (len(name.strip()) == 0 or name not in self.availableAtlasNames)):
-            name = self._selectAtlas()
+            name = self.selectAtlasName()
             if name is None:
                 return
                     
@@ -479,20 +480,47 @@ class BrainAtlasManager(QtCore.QObject):
         # TODO 2024-12-03 14:06:33 finalize me!
         from gui.itemslistdialog import ItemsListDialog
         if name is None or (isinstance(name, str) and (len(name.strip()) == 0 or name not in self.availableAtlasNames)):
-            name = self._selectAtlas()
+            name = self.selectAtlasName()
             if name is None:
                 return
             
         pass
 
-    def _selectAtlas(self, choices:typing.Optional[typing.Sequence[str]]=None) -> str:
+    def selectAtlasName(self, choices:typing.Optional[typing.Sequence[str]]=None,
+                        dlgTitle:typing.Optional[str]=None) -> str:
         from gui.itemslistdialog import ItemsListDialog
-        names = self.availableAtlasNames
+
+        if not hasBrainGlobeAtlasAPI:
+            scipywarn("The 'brainglobe_atlasapi' package is not installed")
+            return
+
+        atlasNames = self.availableAtlasNames
+        
         if isinstance(choices, (tuple, list)) and all(isinstance(v, str) for v in choices):
-            names = list(filter(lambda x: x in names, choices))
+            names = list(itertools.chain.from_iterable(map(lambda c: filter(lambda x: c in x, atlasNames), choices)))
+            if len(names) == 0:
+                scipywarn("No valid atlas names were supplied")
+                names = atlasNames
             
+        elif isinstance(choices, str) and len(choices.strip()):
+            names = list(filter(lambda x: choices in x, atlasNames))
+            if len(names) == 0:
+                scipywarn("No valid atlas names were supplied")
+                names = atlasNames
+            
+        else:
+            names = atlasNames
+            
+        if len(names) == 0:
+            scipywarn
+            
+        if not isinstance(dlgTitle, str) or len(dlgTitle.strip()) == 0:
+            dlgTitle = "Choose from available atlas names:"
+            
+        
         dlg = ItemsListDialog(parent = self.scipyenWindow, itemsList = names,
-                                title = f"Choose atlas:")
+                                title = dlgTitle)
+        
         a = dlg.exec_()
         
         if a == QtWidgets.QDialog.Accepted:
@@ -550,6 +578,10 @@ class BrainAtlasManager(QtCore.QObject):
         
         
         """
+        if not hasBrainGlobeAtlasAPI:
+            scipywarn("The 'brainglobe_atlasapi' package is not installed")
+            return
+
         atlasConf = self.getAtlasVersions()
         # self._all_available_atlas_names_ = list(map(lambda x: x.replace("_", " "), atlasConf.keys()))
         self._all_available_atlas_names_ = list(atlasConf.keys())
@@ -561,6 +593,7 @@ class BrainAtlasManager(QtCore.QObject):
     
     @property
     def localAtlases(self) -> dict:
+        p = self.localAtlasRepository
         return self._local_atlases_
         # return dict((k,v) for k,v in self.atlases.items() if k in self.localAtlasNames)
     
@@ -668,6 +701,7 @@ class BrainAtlasManager(QtCore.QObject):
         
         """
         if not hasBrainGlobeAtlasAPI:
+            scipywarn("The 'brainglobe_atlasapi' package is not installed")
             return
         
         if file_path is None:
@@ -691,6 +725,7 @@ class BrainAtlasManager(QtCore.QObject):
     def getAtlasVersions(self, atlases_conf_path:typing.Optional[pathlib.Path]=None,
                          conf_path:typing.Optional[pathlib.Path] = None) -> dict | None:
         if not hasBrainGlobeAtlasAPI:
+            scipywarn("The 'brainglobe_atlasapi' package is not installed")
             return
         
         if not isinstance(atlases_conf_path, pathlib.Path) or not atlases_conf_path.exists():
@@ -719,6 +754,7 @@ class BrainAtlasManager(QtCore.QObject):
             
     def getRemoteAtlasVersions(self, file_path:typing.Optional[pathlib.Path]=None):
         if not hasBrainGlobeAtlasAPI:
+            scipywarn("The 'brainglobe_atlasapi' package is not installed")
             return
         
         if file_path is None:
@@ -779,21 +815,23 @@ class BrainAtlasManager(QtCore.QObject):
         """
         from gui.itemslistdialog import ItemsListDialog
         if not hasBrainGlobeAtlasAPI:
+            scipywarn("The 'brainglobe_atlasapi' package is not installed")
             return
+
         atlasConf = self.getAtlasVersions()
         
         if entryName not in atlasConf:
             if isinstance(entryName, str):
                 keys = list(map(lambda x: entryName in x, atlasConf.keys()))
                 if len(keys) == 0:
-                    entryName = self._selectAtlas()
+                    entryName = self.selectAtlasName()
                 elif len(keys) > 1:
-                    entryName = self._selectAtlas(keys)
+                    entryName = self.selectAtlasName(keys)
                 else:
                     entryName = keys[0]
                     
             if entryName is None:
-                entryName = self._selectAtlas()
+                entryName = self.selectAtlasName()
                 if entryName is None:
                     return
         
@@ -814,14 +852,31 @@ class BrainAtlasManager(QtCore.QObject):
     
     def getLocalAtlasVersion(self, n:typing.Optional[str]=None, 
                               asString:bool=True) -> list | None:
+        if not hasBrainGlobeAtlasAPI:
+            scipywarn("The 'brainglobe_atlasapi' package is not installed")
+            return
+        
         p = self.localAtlasRepository
+        
         if not isinstance(n, str) or len(n.strip()) == 0:
-            n = self._selectAtlas()
-            
-        dirs = list(p.glob(f"{n}*"))
+            n = self.selectAtlasName()
+        elif n not in self.availableAtlasNames:
+            n = self.selectAtlasName(n)
+
+        dirs = list(p.glob(f"*{n}*"))
         if len(dirs) > 0:
             vStrings = list(map(lambda x: x.name[len(n):].strip("_v"), dirs))
             return vStrings if asString else list(map(lambda x: float(x), vStrings))
+        
+        else:
+            scipywarn(f"No local atlas named, or with name containing '{n}' was found")
+        
+    def getRemoteAtlasVersion(self, n:typing.Optional[str]=None, 
+                              asString:bool=True) -> list | None:
+        
+        if not hasBrainGlobeAtlasAPI:
+            scipywarn("The 'brainglobe_atlasapi' package is not installed")
+            return
             
 
     
@@ -927,7 +982,7 @@ def get_atlas_structure(name:str, atlas:BGAtlas,
     # import editdistance
     import difflib
     if not hasBrainGlobeAtlasAPI:
-        scipywarn("BrainGlobe Atlas API is not installed")
+        scipywarn("The 'brainglobe_atlasapi' package is not installed")
         return
     
     if not isinstance(name, str):

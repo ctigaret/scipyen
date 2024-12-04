@@ -139,8 +139,6 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 import qimage2ndarray 
 from qimage2ndarray import gray2qimage, array2qimage, alpha_view, rgb_view, byte_view
 
-#Ui_ItemsListDialog, QDialog = __loadUiType__(os.path.join(__module_path__,'itemslistdialog.ui'))
-
 # used for ImageWindow below
 Ui_ImageViewerWindow, QMainWindow = __loadUiType__(adapt_ui_path(__module_path__, 'imageviewer.ui'))
 
