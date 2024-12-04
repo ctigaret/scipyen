@@ -81,6 +81,8 @@ class ScipyenNetworkManager(QtCore.QObject):
         self._downloadedCount_ = 0 # qt5ex
         self._totalCount_ = 0 # qt5ex
         self._outputFile_ = QtCore.QFile() # qt5ex
+        self._tempFile_ = QtCore.QTemporaryFile()
+        self._tempFile_.setAutoRemove(False)
         self._saveToFile_ = False
         # self._replyTextBuffer_ = QtCore.QTextStream()
         
@@ -175,7 +177,7 @@ class ScipyenNetworkManager(QtCore.QObject):
             if not isinstance(source, (tuple, list)):
                 raise TypeError("'destination' cannot be a seauence when only one URL is requested")
             if len(destination) != len(source):
-                raise ValueError("Both 'source' and 'destination' musyt contain the same number of elements")
+                raise ValueError("Both 'source' and 'destination' must contain the same number of elements")
                 
             if not all(isinstance(d, str) and len(d.strip()) for d in destination):
                 raise ValueError("Invalid 'destination'")
@@ -214,7 +216,7 @@ class ScipyenNetworkManager(QtCore.QObject):
         
         # if self._verbose_:
         #     print(f"In {self.__class__.__name__}._append(url= {u}, fileName = {fileName})")
-            
+        
         if len(self._downloadQueue_) == 0:
             QtCore.QTimer.singleShot(0, self._startNextDownload)
             
@@ -230,7 +232,10 @@ class ScipyenNetworkManager(QtCore.QObject):
             self._content_length_ = 0
             self._downloadedCount_ = 0
             if self._saveToFile_:
-                self.sig_resultReady.emit(self._outputFile_.fileName())
+                if self._tempFile_.exists():
+                    self.sig_resultReady.emit(self._tempFile_)
+            elif self._outputFile_.exists():
+                    self.sig_resultReady.emit(self._outputFile_.fileName())
             self.sig_finished.emit()
             # self._totalCount_ = 0
             return
@@ -250,13 +255,19 @@ class ScipyenNetworkManager(QtCore.QObject):
             
         if isinstance(fileName, str):
             self._saveToFile_ = True
-            self._outputFile_.setFileName(fileName)
-            if not self._outputFile_.open(QtCore.QIODevice.WriteOnly):
-                # NOTE: 2024-12-01 15:08:42
-                # This branch called when one could not open fileName for writing
-                scipywarn(f"In {self.__class__.__name__}._startNextDownload: Problem opening file {fileName} for saving from {url.url()}:\n{self._outputFile_.errorString()}")
-                self._startNextDownload() # NOTE: 2024-12-01 15:09:16 will reset counters if download quere is empty
-                return
+            if fileName.lower() == "temp":
+                if not self._tempFile_.open(QtCore.QIODevice.WriteOnly):
+                    scipywarn(f"In {self.__class__.__name__}._startNextDownload: Problem opening temporary file {fileName} for saving from {url.url()}:\n{self._tempFile_.errorString()}")
+                    self._startNextDownload() # NOTE: 2024-12-01 15:09:16 will reset counters if download quere is empty
+                    return
+            else:
+                self._outputFile_.setFileName(fileName)
+                if not self._outputFile_.open(QtCore.QIODevice.WriteOnly):
+                    # NOTE: 2024-12-01 15:08:42
+                    # This branch called when one could not open fileName for writing
+                    scipywarn(f"In {self.__class__.__name__}._startNextDownload: Problem opening file {fileName} for saving from {url.url()}:\n{self._outputFile_.errorString()}")
+                    self._startNextDownload() # NOTE: 2024-12-01 15:09:16 will reset counters if download quere is empty
+                    return
             
         else:
             self._saveToFile_ = False
@@ -293,8 +304,11 @@ class ScipyenNetworkManager(QtCore.QObject):
         self._networkReply_.metaDataChanged.connect(self.slot_downloadHeaderChanged)
         
         # msg = printStyled(f"")
-        
-        print(printStyled(f"Downloading {url.url()} ...", "green",True))
+        if self._saveToFile_:
+            fName = self._tempFile_.fileName() if self._tempFile_.isOpen() else self._outputFile_.fileName() if (isinstance(self._outputFile_, QtCore.QFile) and self._outputFile_.isOpen()) else ""
+            print(printStyled(f"Downloading {url.url()} to {fName} ...", "green",True))
+        else:
+            print(printStyled(f"Downloading {url.url()} ...", "green",True))
         self._downloadTime_.start()
         
     def _setSaveFileName(self, url:QtCore.QUrl) -> str:  # ~qt5ex
@@ -362,18 +376,27 @@ class ScipyenNetworkManager(QtCore.QObject):
     def slot_downloadFinished(self)-> None: # ~qt5ex
         # print(f"In {self.__class__.__name__}.slot_downloadFinished:  output file name: {self._outputFile_.fileName()}, reply handler: {self._replyHandler_}")
         if self._saveToFile_:
-            if self._outputFile_.isOpen():
+            if self._tempFile_.isOpen():
+                self._tempFile_.close()
+                fName = self._tempFile_.fileName()
+                
+            elif self._outputFile_.isOpen():
                 self._outputFile_.close()
-
+                fName = self._outputFile_.fileName()
+                
             if self._networkReply_.error():
-                scipywarn(f"In {self.__class__.__name__}.slot_downloadFinished Failed downloading {self._outputFile_.fileName()}:\n {self._networkReply_.errorString()} ")
+                scipywarn(f"In {self.__class__.__name__}.slot_downloadFinished Failed downloading {fName}:\n {self._networkReply_.errorString()} ")
                 if self._removeOnFail_:
-                    if not self._outputFile_.remove():
-                        scipywarn(f"In {self.__class__.__name__}.slot_downloadFinished Failed to remove incomplete download file:\n {self._outputFile_.fileName()} ")
-                        
+                    if self._outputFile_.exists():
+                        if not self._outputFile_.remove():
+                            scipywarn(f"In {self.__class__.__name__}.slot_downloadFinished Failed to remove incomplete download file:\n {self._outputFile_.fileName()} ")
+                    elif self._tempFile_.exists():
+                        if not self._tempFile_.remove():
+                            scipywarn(f"In {self.__class__.__name__}.slot_downloadFinished Failed to remove incomplete temporary file:\n {self._tempFile_.fileName()} ")
             else:
                 print(printStyled("Succeeded", "green", True))
                 self._downloadedCount_ += 1
+                
                 
         self._progressBar_.reset() # clear progressbar
         self.scipyenWindow.statusBar().removeWidget(self._progressBar_)
@@ -473,10 +496,9 @@ class ScipyenNetworkManager(QtCore.QObject):
     
     @Slot()
     def slot_downloadReadyRead(self) -> None: # qt5ex   
-        # if self._verbose_:
-        #     print(f"In {self.__class__.__name__}.slot_downloadReadyRead:")
-
-        if isinstance(self._outputFile_, QtCore.QFile) and self._outputFile_.exists():
+        if self._tempFile_.isOpen():
+            self._tempFile_.write(self._networkReply_.readAll())
+        elif isinstance(self._outputFile_, QtCore.QFile) and self._outputFile_.exists():
             self._outputFile_.write(self._networkReply_.readAll())
 
     @property

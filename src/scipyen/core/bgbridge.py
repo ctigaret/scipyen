@@ -51,7 +51,7 @@ import configparser # from standard library; Scipyen uses confuse from  pypi
 # from qasync import asyncSlot
 
 from core.prog import scipywarn, printStyled, safeWrapper
-from core import taxonbridge
+from core import taxonbridge, utilities
 from core import workspacefunctions as wf
 import gui.pictgui as pgui
 from iolib import network
@@ -185,13 +185,16 @@ class BrainAtlasManager(QtCore.QObject):
         self.loopControl = {"break":False}
         self.netMan = network.ScipyenNetworkManager()
         self._current_atlases_versions_ = None # cache this
-        # self._current_atlases_versions_updated_ = True
+        self._current_atlases_versions_updated_ = True
         # self._tempFile_ = None
         # self._waitCondition_ = QtCore.QWaitCondition()
         # self._mutex_ = QtCore.QMutex()
         # self._locker_ = QtCore.QMutexLocker(self._mutex_)
-        self._all_available_atlas_names_ = list()
+        # self._all_available_atlas_names_ = list()
+        # self._local_atlas_names_ = list()
         
+        # self._tempFile_ = QtCore.QTemporaryFile()
+        # self._tempFile_.setAutoRemove(False)
 
         ws = wf.user_workspace()
         # self._user_ns_ = ws
@@ -333,6 +336,7 @@ class BrainAtlasManager(QtCore.QObject):
     def testAtlasDownload(self):
         """Tests downloading and extracting an atlas archive.
         See iolib.network.example_sequential_download_handler for explanations
+        TODO - refactor this into self.downloadAtlas/self._updateAtlas
         """
         archive_name = "example_mouse_100um_v1.2.tar.gz"
         versions = self.getAtlasVersions()
@@ -413,6 +417,9 @@ class BrainAtlasManager(QtCore.QObject):
                 
     def showAtlases(self, show_local_path:bool=False, toConsole:bool=True, 
                     table_width:int=80) -> typing.Optional[pd.DataFrame]:
+        """Shows atlases using brainglobe_atlasapi.
+        WARNING: May be blocking the GUI
+        """
         if toConsole:
             show_atlases(show_local_path, table_width)
         else:
@@ -432,25 +439,14 @@ class BrainAtlasManager(QtCore.QObject):
                                    columns = ["Names", "Downloaded", "Updated", "Local version", "Latest version"])
                 
     def _downloadAtlas(self, name:str):
-        """
+        """TODO
         """
         pass
-        # scipywarn(f"Will try and download {name}")
-        # self.progressDlg = QtWidgets.QProgressDialog(f"Downloading {name}", "", 0, 0, self.scipyenWindow)
-        # self.progressDlg.setMinimumDuration(1000)
-        # self.progressDlg.setCancelButton(None)
-        # self.downloadThread = AtlasDownloadThread(self, name)
-        # self.downloadThread.signals.signal_setMaximum[int].connect(self.progressDlg.setMaximum)
-        # self.downloadThread.signals.signal_Progress[int].connect(self.progressDlg.setValue)
-        # if setOwn:
-        #     self.downloadThread.signals.signal_Result[object].connect(self._slot_setAtlas)
-        # self.downloadThread.signals.signal_Finished.connect(self.finished)
-        # # print(f"Start downloading atlas {name}.")
-        # if setOwn:
-        #     self._atlas_in_progress_ = name
-        # self.downloadThread.start()
         
     def _updateAtlas(self, atlas_name:str, inBatch:bool=False):
+        """
+        TODO - Do NOT use yet! - see testAtlasDownload()
+        """
         from brainglobe_atlasapi.utils import (
             _rich_atlas_metadata,
             check_gin_status,
@@ -494,7 +490,7 @@ class BrainAtlasManager(QtCore.QObject):
             scipywarn("The 'brainglobe_atlasapi' package is not installed")
             return
 
-        atlasNames = self.availableAtlasNames
+        atlasNames = self.atlasNames
         
         if isinstance(choices, (tuple, list)) and all(isinstance(v, str) for v in choices):
             names = list(itertools.chain.from_iterable(map(lambda c: filter(lambda x: c in x, atlasNames), choices)))
@@ -529,6 +525,9 @@ class BrainAtlasManager(QtCore.QObject):
                 return names[0]
         
     def uninstallAtlas(self, name:str):
+        """
+        TODO - Do NOT use yet!
+        """
         from gui.itemslistdialog import ItemsListDialog
         
         if len(self.localAtlasNames) == 0:
@@ -545,28 +544,67 @@ class BrainAtlasManager(QtCore.QObject):
                 if len(names):
                     name = names[0]
         
-        self._downloadAtlas(name, setOwn=False)
+        # self._downloadAtlas(name, setOwn=False)
         
     @property
     def atlas(self):
-        if isinstance(self.downloadThread, QtCore.QThread) and self.downloadThread.isRunning() and isinstance(self._atlas_in_progress_, str):
-            print(f"Atlas {self._atlas_in_progress_} is still downloading; please wait")
-            return
+        """
+        TODO  - do NOT use yet!
+        """
+        pass
+#         if isinstance(self.downloadThread, QtCore.QThread) and self.downloadThread.isRunning() and isinstance(self._atlas_in_progress_, str):
+#             print(f"Atlas {self._atlas_in_progress_} is still downloading; please wait")
+#             return
+#         
+#         if self._atlas is None:
+#             scipywarn("No atlas has been initialized yet; please call one of:\n self.initAtlas(…)\n self.initAtlasForSpecies(…)\n self.installAtlas(…)\n")
+#             
+#         return self._atlas
+    
+    @property
+    def localAtlases(self) -> dict:
+        if not hasBrainGlobeAtlasAPI:
+            scipywarn("The 'brainglobe_atlasapi' package is not installed")
+            return dict()
         
-        if self._atlas is None:
-            scipywarn("No atlas has been initialized yet; please call one of:\n self.initAtlas(…)\n self.initAtlasForSpecies(…)\n self.installAtlas(…)\n")
+        p = self.localAtlasRepository
+        
+        atlasDirsVers = sorted(map(lambda x: x.name.split("_v"), filter(lambda x: x.is_dir(), p.glob("*"))))
+        
+        atlasNames, atlasVers = zip(*atlasDirsVers)
+        
+        uniqueAtlasNames = utilities.unique(atlasNames)
+        
+        if len(uniqueAtlasNames) < len(atlasNames):
+            # there are atlases with several versions stored locally
             
-        return self._atlas
+            check_singleton = lambda x: x[0] if len(x) == 1 else tuple(x)
+            
+            return dict((u, check_singleton(list(map(lambda x: x[1], filter(lambda x: x[0] == u, atlasDirsVers))))) for u in uniqueAtlasNames)
+                    
+        return dict(atlasDirsVers)
+        # return dict(sorted(map(lambda x: x.name.split("_v"), filter(lambda x: x.is_dir(), p.glob("*")))))
     
     @property
     def localAtlasNames(self) -> list[str]:
-        atlasConf = self.getAtlasVersions()
-        
-        return self._local_atlas_names_
+        return list(self.localAtlases.keys())
     
     @property
-    def availableAtlasNames(self) -> list[str]:
-        """List of available atlas names.
+    def localAtlasVersions(self) -> list:
+        return list(self.localAtlases.values())
+    
+    @property
+    def atlases(self) -> dict:
+        """A mapping with all available atlases, of the form name ↦ version"""
+        if not hasBrainGlobeAtlasAPI:
+            scipywarn("The 'brainglobe_atlasapi' package is not installed")
+            return dict()
+        
+        return self.getAtlasVersions()
+    
+    @property
+    def atlasNames(self) -> list[str]:
+        """List of available atlas names (local or remote).
     
         A 'canonical' atlas name is of the form:
         
@@ -574,68 +612,111 @@ class BrainAtlasManager(QtCore.QObject):
         
         identifier = [a-zA-Z0-9]
         
-        Name parts:
-        
-        
         """
         if not hasBrainGlobeAtlasAPI:
             scipywarn("The 'brainglobe_atlasapi' package is not installed")
-            return
+            return list()
 
         atlasConf = self.getAtlasVersions()
-        # self._all_available_atlas_names_ = list(map(lambda x: x.replace("_", " "), atlasConf.keys()))
-        self._all_available_atlas_names_ = list(atlasConf.keys())
-        return self._all_available_atlas_names_
-    
-    @property
-    def atlases(self) -> dict:
-        return self._all_atlases_
-    
-    @property
-    def localAtlases(self) -> dict:
-        p = self.localAtlasRepository
-        return self._local_atlases_
-        # return dict((k,v) for k,v in self.atlases.items() if k in self.localAtlasNames)
-    
-    @Slot(object)
-    def _slot_setAtlas(self, o:object):
-        self._atlas = o
-        self._atlas_in_progress_ = None
         
-    @Slot()
-    def finished(self):
-        # print(f"Atlas {self._atlas_name_} has been downloaded.")
-        if isinstance(self.downloadThread, QtCore.QThread) and self.downloadThread.isRunning():
-            self.downloadThread.requestInterruption()
-        # for signal in self.downloadThread.signals.signals:
-        #     signal.disconnect()
-        self.downloadThread.quit()
-        self.downloadThread.wait()
-        self.progressDlg.cancel()
-        self.progressDlg.reset()
-        self.progressDlg.close()
-        self.progressDlg = None
-        self.downloadThread = None
-        self._atlas_in_progress_ = None
-        # self._instance = None
+        return list(atlasConf.keys())
+    
+    # @Slot(object)
+    # def _slot_setAtlas(self, o:object):
+    #     self._atlas = o
+    #     self._atlas_in_progress_ = None
+        
+    # @Slot()
+    # def finished(self):
+    #     # print(f"Atlas {self._atlas_name_} has been downloaded.")
+    #     if isinstance(self.downloadThread, QtCore.QThread) and self.downloadThread.isRunning():
+    #         self.downloadThread.requestInterruption()
+    #     # for signal in self.downloadThread.signals.signals:
+    #     #     signal.disconnect()
+    #     self.downloadThread.quit()
+    #     self.downloadThread.wait()
+    #     self.progressDlg.cancel()
+    #     self.progressDlg.reset()
+    #     self.progressDlg.close()
+    #     self.progressDlg = None
+    #     self.downloadThread = None
+    #     self._atlas_in_progress_ = None
+    #     # self._instance = None
+        
+    def displayAtlases(self, asDict:bool=False, showNeedsUpdate:bool=True,
+                       pretty:bool=True, prettier:bool=False) -> pd.DataFrame | dict:
+        if not hasBrainGlobeAtlasAPI:
+            scipywarn("The 'brainglobe_atlasapi' package is not installed")
+            if asDict:
+                return dict()
+            else:
+                return pd.DataFrame()
+            
+        all_atlases = self.getAtlasVersions()
+        local_atlases = self.localAtlases
+        
+        # vercomp = lambda x,y: atlas_version_str2tuple(x) == atlas_version_str2tuple(y) if isinstance(y, str) else atlas_version_str2tuple(x) in tuple(map(lambda v: atlas_version_str2tuple(v), y)) if isinstance(y, tuple) else False
+        
+        if prettier: 
+            pretty = True
+        
+        if pretty:
+            if showNeedsUpdate:
+                names, remote_vers, is_local, local_vers, uptodate = zip(*sorted(sorted(map(lambda k: (k, all_atlases[k], "✓" if k in local_atlases else "", local_atlases.get(k, ""), "✓" if atlas_vercomp(all_atlases[k], local_atlases.get(k, None)) else ""), all_atlases.keys()), key=lambda x: x[0]), key=lambda x: x[2], reverse=True))
+            else:
+                names, remote_vers, is_local, local_vers = zip(*sorted(sorted(map(lambda k: (k, all_atlases[k], "✓" if k in local_atlases else "", local_atlases.get(k, "")), all_atlases.keys()), key=lambda x: x[0]), key=lambda x: x[2], reverse=True))
+        else:
+            if showNeedsUpdate:
+                names, remote_vers, is_local, local_vers, uptodate = zip(*sorted(sorted(map(lambda k: (k, all_atlases[k], k in local_atlases, local_atlases.get(k, pd.NA)), all_atlases.keys(), atlas_vercomp(all_atlases[k], local_atlases.get(k, None))), key=lambda x: x[0]), key=lambda x: x[2], reverse=True))
+            else:
+                names, remote_vers, is_local, local_vers = zip(*sorted(sorted(map(lambda k: (k, all_atlases[k], k in local_atlases, local_atlases.get(k, pd.NA)), all_atlases.keys()), key=lambda x: x[0]), key=lambda x: x[2], reverse=True))
+            
+        if showNeedsUpdate:
+            ret = {"Atlas":names,
+                "Remote version":remote_vers,
+                "Local":is_local,
+                "Local version":local_vers,
+                "Up to date": uptodate}
+        else:
+            ret = {"Atlas":names,
+                "Remote version":remote_vers,
+                "Local":is_local,
+                "Local version":local_vers}
+        
+        if asDict:
+            return ret
+        
+        if prettier:
+            r1 = ret.copy()
+            r1.pop("Atlas")
+            return pd.DataFrame(r1, columns=r1.keys(), index = ret["Atlas"])
+        
+        return pd.DataFrame(ret, columns=ret.keys())
         
     def updateLocalAtlases(self, force:bool=False):
-        # from brainglobe_atlasapi.update_atlases import update_atlas
-        progressDlg = QtWidgets.QProgressDialog("Updating local atlases...", "Abort",
-                                                0, len(self.localAtlasNames), 
-                                                self.scipyenWindow)
-        
-        progressDlg.setMinimumDuration(1000)
-        progressDlg.canceled.connect(self._slot_breakLoop)
-        
-        workerThread = pgui.LoopWorkerThread(self, self.batchUpdate)
-        workerThread.signals.signal_Progress[int].connect(progressDlg.setValue)
-        workerThread.signals.signal_Result[object].connect(self.batchUpdateReady)
-        workerThread.signals.signal_Finished.connect(progressDlg.reset)
-        workerThread.start()
+        """
+        TODO - Do NOt use yet!
+        """
+        pass
+#         # from brainglobe_atlasapi.update_atlases import update_atlas
+#         progressDlg = QtWidgets.QProgressDialog("Updating local atlases...", "Abort",
+#                                                 0, len(self.localAtlasNames), 
+#                                                 self.scipyenWindow)
+#         
+#         progressDlg.setMinimumDuration(1000)
+#         progressDlg.canceled.connect(self._slot_breakLoop)
+#         
+#         workerThread = pgui.LoopWorkerThread(self, self.batchUpdate)
+#         workerThread.signals.signal_Progress[int].connect(progressDlg.setValue)
+#         workerThread.signals.signal_Result[object].connect(self.batchUpdateReady)
+#         workerThread.signals.signal_Finished.connect(progressDlg.reset)
+#         workerThread.start()
         
         
     def batchUpdate(self, **kwargs):
+        """
+        TODO - Do NOt use yet!
+        """
         canceled = False
         progressSignal = kwargs.pop("progressSignal", None)        
         for k, name in enumerate(self.localAtlasNames):
@@ -650,6 +731,9 @@ class BrainAtlasManager(QtCore.QObject):
         
     @Slot(object)
     def batchUpdateReady(self, _):
+        """
+        TODO - Do NOt use yet!
+        """
         self.loopControl["break"] = False
         # try:
         #     ok = bool(obj) == True
@@ -661,6 +745,9 @@ class BrainAtlasManager(QtCore.QObject):
         self.loopControl["break"] = True
         
     def updateLocalAtlas(self, name:str, force:bool=False):
+        """
+        TODO - Do NOt use yet!
+        """
         # from brainglobe_atlasapi.update_atlases import update_atlas
         if name not in self.localAtlasNames:
             self._downloadAtlas(name, False)
@@ -726,31 +813,42 @@ class BrainAtlasManager(QtCore.QObject):
                          conf_path:typing.Optional[pathlib.Path] = None) -> dict | None:
         if not hasBrainGlobeAtlasAPI:
             scipywarn("The 'brainglobe_atlasapi' package is not installed")
-            return
+            return dict()
         
         if not isinstance(atlases_conf_path, pathlib.Path) or not atlases_conf_path.exists():
             conf = self.getBrainGlobeConfiguration(conf_path)
             atlases_conf_path = pathlib.Path(os.path.join(conf["default_dirs"]["brainglobe_dir"], "last_versions.conf"))
         
-        if self._parseLocalAtlasesConf(atlases_conf_path):
-            return self._current_atlases_versions_
-        
-        else:
-            scipywarn(f"File {atlases_conf_path} does not exist; will retrieve a copy from the remote GIN site, then call this method again")
+        if not atlases_conf_path.exists():
+            scipywarn(f"File {atlases_conf_path} does not exist; a copy from the remote GIN site will be downloaded. You will need to call getAtlasVersions method again")
             # self._current_atlases_versions_updated_ = False
             self.getRemoteAtlasVersions()
+        else:
+            self._current_atlases_versions_ = self._parseLocalAtlasesConf(atlases_conf_path)
+            return self._current_atlases_versions_
+        
+        # if self._parseLocalAtlasesConf(atlases_conf_path):
+        #     return self._current_atlases_versions_
+        #
+        # else:
+        #     scipywarn(f"File {atlases_conf_path} does not exist; a copy from the remote GIN site will be downloaded. You will need to call getAtlasVersions method again")
+        #     # self._current_atlases_versions_updated_ = False
+        #     self.getRemoteAtlasVersions()
             
-    def _parseLocalAtlasesConf(self, atlases_conf_path) -> bool:
+    # def _parseLocalAtlasesConf(self, atlases_conf_path) -> bool:
+    def _parseLocalAtlasesConf(self, atlases_conf_path) -> dict:
         atlases_conf = configparser.ConfigParser()
         with open(atlases_conf_path) as atlases_conf_file:
             atlases_conf.read_file(atlases_conf_file)
             
         if atlases_conf.has_section("atlases"):
-            self._current_atlases_versions_ = dict(sorted(((k,v) for k,v in atlases_conf["atlases"].items()), key=lambda x: x[0]))
-            return True
+            # self._current_atlases_versions_ = dict(sorted(((k,v) for k,v in atlases_conf["atlases"].items()), key=lambda x: x[0]))
+            return dict(sorted(((k,v) for k,v in atlases_conf["atlases"].items()), key=lambda x: x[0]))
+            # return True
         else:
             scipywarn(f"Invalid atlases configuration file {atlases_conf_path}")
-            return False
+            return dict()
+            # return False
             
     def getRemoteAtlasVersions(self, file_path:typing.Optional[pathlib.Path]=None):
         if not hasBrainGlobeAtlasAPI:
@@ -761,13 +859,62 @@ class BrainAtlasManager(QtCore.QObject):
             conf = self.getBrainGlobeConfiguration()
             file_path = os.path.join(conf["default_dirs"]["brainglobe_dir"], "last_versions.conf")
             
-        # self._tempFile_ = file_path
         url = brainglobe_atlasapi.bg_atlas.BrainGlobeAtlas._remote_url_base.format("last_versions.conf")
         self.netMan = network.ScipyenNetworkManager()
         self.netMan.sig_resultReady[object].connect(self._slot_lastVersionsConfDownloaded)
         self.netMan.getUrl(url, destination=file_path, replyHandler = None)
         
+    def compareAtlasVersionsDB(self):
+        # import tempfile
+        if not hasBrainGlobeAtlasAPI:
+            scipywarn("The 'brainglobe_atlasapi' package is not installed")
+            return
+        # self._tempFile_.setFileTemplate("last_versions_XXXXXX")
+        url = brainglobe_atlasapi.bg_atlas.BrainGlobeAtlas._remote_url_base.format("last_versions.conf")
+        self.netMan = network.ScipyenNetworkManager()
+        self.netMan.sig_resultReady[object].connect(self._slot_lastVersionsConfTempDownloaded)
+        self.netMan.getUrl(url, destination="temp", replyHandler = None)
+    
+    @Slot(object)
+    def _slot_lastVersionsConfTempDownloaded(self, o:typing.Union[str, pathlib.Path, QtCore.QFile]):
+        from gui.workspacegui import GuiMessages
+        if isinstance(o, str):
+            target = pathlib.Path(o)
+            
+        elif isinstance(o, pathlib.Path):
+            target = o
+            
+        elif isinstance(o, QtCore.QFile):
+            target = pathlib.Path(o.fileName())
+            
+        else:
+            raise TypeError(f"In {self.__class__.__name__}._slot_lastVersionsConfDownloaded: expecting a str, a pathlib.Path, or a QtCore.QFile; instead, got {type(o).__name__}")
+
+        atlasConf = self.getAtlasVersions()
         
+        tempRemoteConf = self._parseLocalAtlasesConf(target)
+        
+        self._current_atlases_versions_updated_ = atlasConf != tempRemoteConf
+        
+        if self.netMan.receivers(self.netMan.sig_finished) > 0:
+            self.netMan.sig_finished.disconnect()
+            
+        if self.netMan.receivers(self.netMan.sig_replyFromUrl) > 0:
+            self.netMan.sig_replyFromUrl.disconnect()
+            
+        if isinstance(o, QtCore.QFile):
+            o.remove()
+        
+        self._slot_reportLocalDBUpdated()
+            
+    @Slot()
+    def _slot_reportLocalDBUpdated(self):
+        if not self._current_atlases_versions_updated_:
+            scipywarn("Atlas versions database needs updating; please call 'getRemoteAtlasVersions()' ")
+            GuiMessages.informationMessage_static(self.scipyenWindow, "Atlases Database", f"Local database needs updating.\nPlease call getRemoteAtlasVersions() method of the {self.__class__.__name__} instance")
+        else:
+            GuiMessages.informationMessage_static(self.scipyenWindow, "Atlases Database", "Local Atlases Database is Uptodate")
+            
     @Slot(object)
     def _slot_lastVersionsConfDownloaded(self, o:typing.Union[str, pathlib.Path]):
         if isinstance(o, str):
@@ -779,15 +926,14 @@ class BrainAtlasManager(QtCore.QObject):
             raise TypeError(f"In {self.__class__.__name__}._slot_lastVersionsConfDownloaded: expecting a str or a pathlib.Path; indteag, got {type(o).__name__}")
     
         print(printStyled(f"Latest atlas versions information was downloaded to {target.as_posix()}.", "green", True))
-        # self._tempFile_ = None
         
         if self.netMan.receivers(self.netMan.sig_finished) > 0:
             self.netMan.sig_finished.disconnect()
+            
         if self.netMan.receivers(self.netMan.sig_replyFromUrl) > 0:
             self.netMan.sig_replyFromUrl.disconnect()
         
-        # self._current_atlases_versions_updated_ = True
-        # self._parseLocalAtlasesConf(target.as_posix())
+        self._current_atlases_versions_updated_ = True
         
     def getArchiveNameForAtlas(self, entryName:typing.Optional[str]=None) -> str | None:
         atlasPath = self.atlasDir(entryName)
@@ -835,23 +981,50 @@ class BrainAtlasManager(QtCore.QObject):
                 if entryName is None:
                     return
         
-        # bgdir = pathlib.Path(self.getBrainGlobeConfiguration()["default_dirs"]["brainglobe_dir"])
-        
         name = f"{entryName}_v{atlasConf[entryName]}"
-        # return bgdir / name
+
         return self.localAtlasRepository / name
         
     
-    def compareAtlasVersions(self):
-        # TODO: 2024-11-29 13:48:08
-        # write code to retrieve versions from locally downloaded atlases
-        # the retrieve the remote last_versions.conf to compare versions
-        # advertise atlas: name current and remote version and whether it needs
-        # to be updated
-        pass
-    
+    def atlasIsUpdated(self, atlasName:typing.Optional[str] = None) -> bool:
+        """
+        Returns False if:
+        • a local copy of the named atlas does NOT have the latest version available.
+        • there is no local copy of the named atlas
+        
+        Raised an error if there is no atlas with that name available anywhere
+        
+        NOTE: The latest version available is the one cached in the local brainglobe
+        database. You may want to update it first, by calling getRemoteAtlasVersions().
+        
+        """
+        if not hasBrainGlobeAtlasAPI:
+            scipywarn("The brainglobe_atlasapi package is not installed")
+            return False
+        
+        a = atlasName if isinstance(atlasName, str) else None
+        
+        allAtlases = self.getAtlasVersions()
+        localAtlases = self.localAtlases
+        if atlasName not in self.atlasNames:
+            atlasName = self.selectAtlasName(list(allAtlases.keys()))
+            
+        if atlasName is None:
+            if isinstance(a, str):
+                raise ValueError(f"No atlas named '{a}' was found")
+            else:
+                raise ValueError(f"No atlas is available")
+        
+        if atlasName not in localAtlases:
+            return False
+            
+        remoteVersion = atlas_version_str2tuple(allAtlases[localName])
+        localVersion = localAtlases[atlasName]
+        
+        return atlas_vercomp(remoteVersion, localVersion)
+        
     def getLocalAtlasVersion(self, n:typing.Optional[str]=None, 
-                              asString:bool=True) -> list | None:
+                              asString:bool=True) -> str | list | None:
         if not hasBrainGlobeAtlasAPI:
             scipywarn("The 'brainglobe_atlasapi' package is not installed")
             return
@@ -860,24 +1033,35 @@ class BrainAtlasManager(QtCore.QObject):
         
         if not isinstance(n, str) or len(n.strip()) == 0:
             n = self.selectAtlasName()
-        elif n not in self.availableAtlasNames:
+            
+        elif n not in self.atlasNames:
             n = self.selectAtlasName(n)
 
-        dirs = list(p.glob(f"*{n}*"))
+        dirs = sorted(p.glob(f"*{n}*"))
+        
         if len(dirs) > 0:
             vStrings = list(map(lambda x: x.name[len(n):].strip("_v"), dirs))
-            return vStrings if asString else list(map(lambda x: float(x), vStrings))
+            if len(vStrings) == 1:
+                return vStrings[0] if asString else atlas_version_str2tuple(vString[0])
+            return vStrings if asString else list(map(atlas_version_str2tuple, vStrings))
         
         else:
             scipywarn(f"No local atlas named, or with name containing '{n}' was found")
         
     def getRemoteAtlasVersion(self, n:typing.Optional[str]=None, 
-                              asString:bool=True) -> list | None:
-        
+                              asString:bool=True) -> str |None:
         if not hasBrainGlobeAtlasAPI:
             scipywarn("The 'brainglobe_atlasapi' package is not installed")
             return
             
+        if not isinstance(n, str) or len(n.strip()) == 0:
+            n = self.selectAtlasName()
+            
+        elif n not in self.atlasNames:
+            n = self.selectAtlasName(n)
+            
+        return self.atlases[n] if asString else atlas_version_str2tuple(self.atlases[n])
+        
 
     
 class AtlasDownloadThread(QtCore.QThread):
@@ -1012,12 +1196,60 @@ def get_atlas_structure(name:str, atlas:BGAtlas,
         ret["atlas_name"] = atlas.atlas_name
         return ret
     
-            
+def atlas_vercomp(x:str, y:typing.Union[str, typing.Tuple[str]]) -> bool:
+    """Compares remote atlas versions tring (x) to local atlas version (str, or tuple[str]).
+    NOTE: Unlike the equivalent code in brainglobe_atlasapi, this allows to existence,
+    locally, of more than one version of the atlas...
+    """
+    return atlas_version_str2tuple(x) == atlas_version_str2tuple(y) if isinstance(y, str) else atlas_version_str2tuple(x) in tuple(map(lambda v: atlas_version_str2tuple(v), y)) if isinstance(y, tuple) else False
     
-# ### END ---- module-level functions
+def atlas_dirname2name_version(n:str) -> tuple:
+    """Breaks up atlas directory name into atlas name and version.
+    
+       A 'canonical' atlas name is of the form:
+        
+        name = <identifier>_{<identifier>_}*<resolution>um
+        
+        identifier = [a-zA-Z0-9]
+        
+        In addition, an atlas directory name has the version apended:
+    
+        dirname = <name>_v<maj.min>
+        maj = [0-9]+
+        min = [0-9]+
+    
+    Returns:
+    --------
+    A tuple[str]: (name, version)
+    
+    """
+    return n.split("_v")
+
+def atlas_version_str2tuple(v:str)->tuple | None:
+    """Code from brainglobe_atlasapi.bg_atlas._version_tuple_from_str.
+    Used here for convenience in case brainglobe_atlasapi is not available.
+    """
+    return tuple(map(lambda x: int(x), v.split(".")))
+
+def atlas_version_tuple2str(t:tuple[int])-> str | None:
+    """Code from brainglobe_atlasapi.bg_atlas._version_str_from_tuple.
+    Used here for convenience in case brainglobe_atlasapi is not available.
+    """
+    try:
+        return f"{t[0]}.{t[1]}"
+    except:
+        traceback.print_exc()
+        return
 
 def atlas_name2components(n:str) -> str | tuple:
     """Breaks up an atlas name (`n`) into its identifier and resolution.
+    
+       A 'canonical' atlas name is of the form:
+        
+        name = <identifier>_{<identifier>_}*<resolution>um
+        
+        identifier = [a-zA-Z0-9]
+        
     NOTE: atlas version is NOT contained in the atlas name
     """
     # 1. break apart
@@ -1043,125 +1275,6 @@ def atlas_name2components(n:str) -> str | tuple:
     
     return "_".join(parts), resolutionString, resolution
         
+# ### END ---- module-level functions
+
     
-    
-# def downloadExtractAtlas(info:QtCore.QByteArray,
-#                   manager:network.ScipyenNetworkManager,
-#                   url:typing.Union[str, QtCore.QUrl], 
-#                   ) -> None:
-#     """Example of reply handler for sequential download of URLs using ScipyenNetworkManager.
-#         
-#         The handler accomplishes the task of calculating the expected download size
-#         of the specified URL, using information retrieved from a previous URL.
-#         
-#         This is applicable for the particular case of downloading a remote archive
-#         from a site that advertises the size of the archive on a distinct url.
-#         
-#         Example: 
-# 
-#         Suppose the archive url is "https://www.some_place.org/archive.tar.gz";
-#         also suppose that the file size of the archive is listed on the web page
-#         with url: "https://www.some_place.org/archive_sizes.html"
-#         
-#         Let: 
-#             # url of the archive file
-#             url = "https://www.some_place.org/archive.tar.gz"
-#             
-#             # url containing informtion about the size of the archive file
-#             url1= "https://www.some_place.org/archive_sizes.html"
-#         
-#         The problem: we want to know the expected size of "archive.tar.gz" file
-#         in order to properly update a progress message or widget while downloading
-#         this file.
-# 
-#         The solution proposed here is to calculate or retrieve the size of 
-#         "archive.tar.gz" using the information downloaded from `url1`, then 
-#         use this value in the progress message or widget, while downloading 
-#         "archive.tar.gz" from `url2`. 
-# 
-#         In this example, the size of the archive file is parsed using a simple 
-#         regular expression applied on the text retrieved form url1, using the 
-#         auxiliary function `example_get_download_size`. 
-# 
-#         The auxiliary function could have been def-ed nested inside this
-#         example function (see _parse_size, in the code).
-#         
-#         Implementation of the solution:
-#         1) Create a functools.partial of this function by "fixing" the 'url' parameter
-#             to the URL of the archive to be downloaded:
-# 
-#         handle = functools.partial(network.example_sequential_download_handler, url = url)
-#         
-#         2) Create an instance of the ScipyenNetworkManager
-#         
-#             manager = network.ScipyenNetworkManager(verbose=False)
-#         
-#         3) Make sure the ScipyenNetworkManager signal `sig_replyFromUrl` is connected
-#             to its slot `slot_processUrlReply`. This slot will actually call the handler
-#             pased to `manager` at (4) below.
-#         
-#             manager.sig_replyFromUrl.connect(manager.slot_processUrlReply)
-#         
-#         4) Now, use `manager` to retrieve `url1`, passing the `handle` as the
-#         reply handler; 
-#         
-#             manager.getUrl(url1, destination=None, replyHandler=handle)
-#         
-#     Applicability
-#     -------------
-#     Thus example function was designed specifically to replicate downloading
-#     brainglobe atlas data from their repository IN A NON UI-BLOCKING MANNER.
-#         
-#     The code in the brainglobe_atlas uses the `requests` package to donwload the 
-#     two URLs sequentially, which is fine when run directly in a regular 
-#     python console (where they also provide a cli progress bar via the `rich`
-#     package). However, these operations are executed in a synchronous mode, and
-#     hence they are blocking (i.e., no user interaction can take place while the 
-#     code is executed.) While this could in principle be made asynchronous, the 
-#     tools provided by Python standard library to achieve this cannot be (easily)
-#     used from within the Qt event loop that runs inside the main thread of Scipyen.
-#         
-#     NOTE that in this case, `url` would be, e.g.,
-#         
-#     bgbridge.brainglobe_atlasapi.bg_atlas.BrainGlobeAtlas._remote_url_base.format("example_mouse_100um_v1.2.tar.gz")
-#         
-#     and `url1` would be
-#         
-#         url1 = url.replace("raw", "src")
-#         
-#     """
-#     def _parse_size(s:str) -> int:
-#         import re
-#         search_result = re.search("([0-9]+\.[0-9] [MGK]B)|([0-9]+ [MGK]B)", s)
-#         assert search_result is not None
-#         sz_str = search_result.group()
-#         assert sz_str is not None
-#         sz = float(sz_str[:-3])
-#         pfx = sz_str[-2]
-#         if pfx == "G":
-#             sz *= 1e9
-#         elif pfx == "M":
-#             sz *= 1e6
-#         elif pfx == "K":
-#             sz *= 1e3
-#         return int(sz)    
-#     
-#     # use manager to download from url conditioned on prevInfo
-#     # pass a partial to it, fixing the url
-#     # in network manager, pass the info and manager parameters
-#     if not isinstance(info, QtCore.QByteArray):
-#         raise TypeError(f"Expecting a QByteArray; instead, got {type(info).__name__}")
-#     
-#     info = bytes(info).decode()
-#     
-#     if not isinstance(info, str) or len(info.strip()) == 0:
-#         scipywarn("example_sequential_download_handler received invalid data")
-#         return 
-#     sz = _parse_size(info)
-#     if isinstance(sz, int):
-#         manager.setNextDownloadSize(sz)
-#     else:
-#         scipywarn("example_sequential_download_handler: Could not get the size of the next download")
-#         
-#     handle = functools.partial(network.extract_archive, target_dir = target_dir)
-    # manager.getUrl(url, replyHandler=network.extract_archive) 
