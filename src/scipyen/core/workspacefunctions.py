@@ -479,12 +479,34 @@ def getMainScipyenWindow() -> object:
         try:
             app = QtWidgets.QApplication.instance()
             if app is not None:
-                ww = list(filter(lambda x: "ScipyenWindow" in c.__class__.__name__, app.topLevelWidgets()))
+                ww = list(filter(lambda x: "ScipyenWindow" in x.__class__.__name__, app.topLevelWidgets()))
                 if len(ww):
                     ret = ww[0]
         except:
             traceback.print_exc()
 
+    return ret
+
+def getCallSource() -> object:
+    # FIXME
+    from qtpy import QtWidgets
+    ret = None
+    frame_records = inspect.getouterframes(inspect.currentframe())
+    for (n,f) in enumerate(frame_records):
+        if "ScipyenWindow" in f[0].f_globals:
+            ret = f[0].f_globals["ScipyenWindow"].instance()
+            break
+    if ret is None:
+        for (n,f) in enumerate(frame_records):
+            if "ScipyenConsole" in f[0].f_globals:
+                ret = f[0].f_globals["ScipyenConsole"].instance()
+                break
+    if ret is None:
+        for (n,f) in enumerate(frame_records):
+            if "ExternalConsoleWindow" in f[0].f_globals:
+                ret = f[0].f_globals["ExternalConsoleWindow"].instance()
+                break
+            
     return ret
 
 def user_workspace():
