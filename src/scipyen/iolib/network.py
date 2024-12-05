@@ -69,15 +69,7 @@ class ScipyenNetworkManager(QtCore.QObject):
         from core import workspacefunctions as wf
         super().__init__(parent=parent)
         
-        ws = wf.user_workspace()
-        if ws is not None:
-            self.scipyenWindow = ws["mainWindow"]
-        else:
-            frame_records = inspect.getouterframes(inspect.currentframe())
-            for (n,f) in enumerate(frame_records):
-                if "ScipyenWindow" in f[0].f_globals:
-                    self.scipyenWindow = f[0].f_globals["ScipyenWindow"].instance()
-                    break
+        self.scipyenWindow = wf.getMainScipyenWindow()
         
         # self._verbose_ = verbose
         self._timeout_ms_ = timeout_ms
@@ -295,19 +287,24 @@ class ScipyenNetworkManager(QtCore.QObject):
             # self._totalCount_ = 0
             return
         
-        print(f"{self.__class__.__name__}._startNextDownload: self._progressUIFactory_: {self._progressUIFactory_}")
+        if self.scipyenWindow is None:
+            factory = QtWidgets.QProgressDialog
+        else:
+            factory = self._progressUIFactory_
+            
+        # print(f"{self.__class__.__name__}._startNextDownload: self._progressUIFactory_: {self._progressUIFactory_}")
         
         if self._progressUI_ is None:
             # self._progressUI_ = QtWidgets.QProgressBar(parent = self.scipyenWindow)
             self._progressUI_ = self._progressUIFactory_(parent = self.scipyenWindow)
-            if isinstance(self._progressUI_, QtWidgets.QProgressBar):
+            if isinstance(self._progressUI_, QtWidgets.QProgressBar) and self.scipyenWindow is not None:
                 self.scipyenWindow.statusBar().addWidget(self._progressUI_)
             elif isinstance(self._progressUI_, QtWidgets.QProgressDialog):
                 self._progressUI_.setLabelText("Downloading...")
                 self._progressUI_.canceled.connect(self.slot_abortReply)
         else:
             if not self._progressUI_.isVisible():
-                if isinstance(self._progressUI_, QtWidgets.QProgressBar):
+                if isinstance(self._progressUI_, QtWidgets.QProgressBar) and self.scipyenWindow is not None:
                     self.scipyenWindow.statusBar().addWidget(self._progressUI_)
                 self._progressUI_.show()
                 
@@ -431,7 +428,7 @@ class ScipyenNetworkManager(QtCore.QObject):
         if netError:
             print(printStyled(f"{self.__class__.__name__}._startNextDownload: {reply.request().url().url()}: {getNetworkErrorName(netError)}", "red"))
             self._progressUI_.reset() # clear progressbar
-            if isinstance(self._progressUI_, QtWidgets.QProgressBar):
+            if isinstance(self._progressUI_, QtWidgets.QProgressBar) and self.scipyenWindow is not None:
                 self.scipyenWindow.statusBar().removeWidget(self._progressUI_)
             elif isinstance(self._progressUI_, QtWidgets.QProgressDialog):
                 self._progressUI_.close()
@@ -499,7 +496,7 @@ class ScipyenNetworkManager(QtCore.QObject):
                 self._downloadedCount_ += 1
                 
         self._networkError_ = netError
-        if isinstance(self._progressUI_, QtWidgets.QProgressBar):
+        if isinstance(self._progressUI_, QtWidgets.QProgressBar) and self.scipyenWindow is not None:
             self._progressUI_.reset() # clear progressbar
             self.scipyenWindow.statusBar().removeWidget(self._progressUI_)
         elif isinstance(self._progressUI_, QtWidgets.QProgressDialog):
@@ -586,7 +583,7 @@ class ScipyenNetworkManager(QtCore.QObject):
             
         if isinstance(self._progressUI_, (QtWidgets.QProgressBar, QtWidgets.QProgressDialog)):
             self._progressUI_.reset()
-            if isinstance(self._progressUI_, QtWidgets.QProgressBar):
+            if isinstance(self._progressUI_, QtWidgets.QProgressBar) and self.scipyenWindow is not None:
                 self.scipyenWindow.statusBar().removeWidget(self._progressUI_)
             else:
                 self._progressUI_.close()

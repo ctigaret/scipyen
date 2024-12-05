@@ -2762,7 +2762,7 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
             ##widget._control.setLayoutDirection(self.window.getScrollBarPosition())
     
     def init_qt_elements(self):
-        # Create the widget.
+        # Creates the widget and calls kernel initalization commands
         base_path = os.path.abspath(os.path.dirname(__file__))
         
         ip = self.ip
@@ -2815,7 +2815,6 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         self.window._supplement_kernel_menu_()
         self.window._supplement_view_menu_()
         
-        
         # NOTE 2020-07-09 01:05:35
         # run general kernel intialization python commands here, as this function
         # does not call new_frontend_master(...)
@@ -2833,9 +2832,19 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
 
         self.window.setWindowTitle('External Scipyen Console')
         
-        
     def _scipyen_init_exec_(self, client):
         client.execute(code="\n".join(init_commands), silent=True, store_history=False)
+        
+    def init_scipyen_gui(self,client=None):
+        if os.environ["QT_API"].lower() in ("pyqt6", "pyside6"):
+            qtgui = "qt6"
+        else:
+            qtgui = "qt5"
+            
+        code = f"if 'ipykernel' in shell.__class__.__module__: shell.run_line_magic('gui', '{qtgui}')"
+        if client is None:
+            client = self.active_kernel_client
+        client.execute(code=code, silent=True, store_history=False)
 
     def init_colors(self, widget):
         """Configure the coloring of the widget"""
@@ -3014,7 +3023,15 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         # NOTE: 2021-08-29 21:49:44
         # Do NOT confuse this with Scipyen app (self.app)
         # In fact it is a reference to ExternalIPython, which is returned below
-        app = cls.instance(**kwargs) # 
+        withScipyenGui = kwargs.pop("withScipyenGui", False)
+        
+            
+        
+        app = cls.instance(**kwargs) # this is the ExternalIPython instance !
+                                     # WARNING: do not confuse with Scipyen's 
+                                     # global QtApplication
+                                     # NOTE: the latter is the atribute `app` of
+                                     # app (i.e., app.app)
         # TODO 2021-01-15 15:39:44
         # allow launching with an external kernel
         if isinstance(existing, str) and len(existing.strip()):
@@ -3022,8 +3039,17 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
             
         app.initialize(argv)
         app.start()
+        if isinstance(withScipyenGui, bool) and withScipyenGui:
+            if os.environ["QT_API"].lower() in ("pyqt6", "pyside6"):
+                qtgui = "qt6"
+            else:
+                qtgui = "qt5"
+                
+            app.widget.kernel_client.execute(code = f"if 'ipykernel' in shell.__class__.__module__: shell.run_line_magic('gui', '{qtgui}')", silent=True, store_history=False)
+                
+            
 
-        return app
+        return app # the ExternalIPython instance
     
     #### BEGIN some useful properties
     
@@ -3495,7 +3521,7 @@ class ScipyenConsoleWidget(ConsoleWidget):
         # NOTE: 2019-08-07 16:34:58
         # enforce qt5 backend for matplotlib
         # see NOTE: 2019-08-07 16:34:23 
-        if os.environ["QT_API"].lower() in ("pyqt6", "pyside5"):
+        if os.environ["QT_API"].lower() in ("pyqt6", "pyside6"):
             self.ipkernel.shell.run_line_magic("matplotlib", "qt6")
         else:
             self.ipkernel.shell.run_line_magic("matplotlib", "qt5")

@@ -379,7 +379,7 @@ class GuiMessages(object):
 
     @staticmethod
     def questionMessage_static(obj:typing.Optional[QtWidgets.QWidget]=None, title:str="Question", text:str="", default=QtWidgets.QMessageBox.No):
-        """Check the return value for equality to with QtWidgets.QMessageBox.Yes"""
+        """Check the return value for equality to QtWidgets.QMessageBox.Yes"""
         return QtWidgets.QMessageBox.question(obj, title, text, defaultButton=default)
         
     @safeWrapper

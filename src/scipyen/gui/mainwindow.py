@@ -2884,8 +2884,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             # self.external_console.window.sig_kernel_count_changed[int].connect(self._slot_remote_kernel_count_changed)
 
             # NOTE: 2021-01-15 14:46:07
-            # any value of new other than "neuron" or "neuron_ext" is ignored when the console
-            # is first initiated
+            # any value of new other than "neuron" or "neuron_ext" is ignored 
+            # when the console is first initiated
             if isinstance(new, str):
                 if new == "neuron":
                     self.external_console.execute(nrn_ipython_initialization_cmd,

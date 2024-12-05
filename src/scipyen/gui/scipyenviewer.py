@@ -707,7 +707,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         # is NOT a client (child) of another Scipyen app (e.g. LSCaTWindow)
         
         if self.isTopLevel:
-            if self._delete_on_close_ or self.appWindow.autoRemoveViewers:
+            if self._delete_on_close_ or (self.appWindow is not None and self.appWindow.autoRemoveViewers):
                 if any([v is self for v in self.appWindow.workspace.values()]):
                     self.appWindow.deRegisterWindow(self) # this will also save settings and close the viewer window
                     self.appWindow.removeFromWorkspace(self, by_name=False)

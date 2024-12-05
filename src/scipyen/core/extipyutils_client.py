@@ -167,9 +167,11 @@ init_commands.extend(
     "from imaging.axiscalibration import (AxesCalibration,AxisCalibrationData, ChannelCalibrationData, CalibrationData)",
     "from iolib import pictio as pio",
     "from iolib import h5io, jsonio",
+    "shell = get_ipython()",
     "print('To use matplotlib run %matplotlib magic')",
     
     ])
+    
 
 if os.path.isfile(_ext_ipython_initialization_file):
     init_commands.append(_ext_ipython_initialization_cmd)
@@ -179,6 +181,11 @@ init_commands.extend([
     "get_ipython().user_ns_hidden.update(u_ns)",
     "del u_ns"
     ])
+
+init_scipyen_qt_gui = [
+    "%gui qt5"
+    "import gui as scipyengui",
+    ]
 
 class ForeignCall(DataBag):
     """Usage:

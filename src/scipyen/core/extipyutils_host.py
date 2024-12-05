@@ -20,8 +20,22 @@ extipyutils_client.
 
 To expose Scipyen API inside the REMOTE IPython kernel workspace, either insert
 relevant import statements in the init_commands list inside extipyutils_client
-module. NOTE: extipy_init module cannot be used for importing Scipyen API in 
-the REMOTE kernel namespace, as it is oblivious of Scipyen's module paths.
+module. 
+
+NOTE: extipy_init module cannot be used for importing Scipyen API in 
+the REMOTE kernel namespace, as it is oblivious of most of Scipyen's modules. 
+Although many of these are imported in the remote kernel by executing 'init_commands'
+defined in the module extipyutils_client (called from the Scipyen's "side") the
+PyQt classes will be useless there (see NOTE below), unless a new instance of 
+QApplication is started (CAUTION: This may break things!)
+
+NOTE: Currently, there is no Qt event loop in the foreign kernel although, in
+principle, one could be started and run independently of the Scipyen's main Qt 
+event loop.
+While the external console lives in the main Scipyen's process, it only provides 
+a command line interface to the remote kernel. Any commands run at the external 
+console will be executed in the remote kernel workspace, with no access to 
+Scipyen's QApplication.
 
 NOTE: NeuronMagics are useful to start NEURON manually from an external IPython
 kernel, optionally with ('nrngui') or without NEURON GUI ('nrnpy')

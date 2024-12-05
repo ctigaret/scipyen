@@ -14,7 +14,7 @@ from __future__ import print_function
 
 import re as _re # re is also imported directly from pict
 
-import inspect, keyword, warnings, typing, os, sys
+import inspect, keyword, warnings, typing, os, sys, traceback
 
 from operator import attrgetter, itemgetter, methodcaller
 
@@ -452,6 +452,40 @@ def get_symbol_in_namespace(x:typing.Any, ws:typing.Optional[dict] = None):
         raise TypeError("'ws' expected ot be a dict; got %s instead" % type(ws).__name__)
         
     return [k for k in ws if ws[k] is x and not k.startswith("_")]
+
+def getMainScipyenWindow() -> object:
+    """Try and retrieve Scipyen's main window instance.
+    This is searched in 
+        1) the user's workspace;
+        2) the call stack
+        3) in the list of top level widgets of the QApplication
+    
+    Returns None if the SciyenWindow instance is not found
+    
+    """
+    from qtpy import QtWidgets
+    ret = None
+    ws = user_workspace()
+    if ws is not None:
+        ret = ws["mainWindow"]
+    else:
+        frame_records = inspect.getouterframes(inspect.currentframe())
+        for (n,f) in enumerate(frame_records):
+            if "ScipyenWindow" in f[0].f_globals:
+                ret = f[0].f_globals["ScipyenWindow"].instance()
+                break
+            
+    if ret is None:
+        try:
+            app = QtWidgets.QApplication.instance()
+            if app is not None:
+                ww = list(filter(lambda x: "ScipyenWindow" in c.__class__.__name__, app.topLevelWidgets()))
+                if len(ww):
+                    ret = ww[0]
+        except:
+            traceback.print_exc()
+
+    return ret
 
 def user_workspace():
     """Returns a reference to the user workspace (a.k.a user namespace)

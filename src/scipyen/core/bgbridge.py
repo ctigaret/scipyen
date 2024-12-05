@@ -55,7 +55,7 @@ from core.prog import scipywarn, printStyled, safeWrapper
 from core import taxonbridge, utilities
 from core import workspacefunctions as wf
 from core import quantities as scq
-import gui.pictgui as pgui
+# import gui.pictgui as pgui # avoid circular import
 from iolib import network
 
 DEFAULT_RAT_BRAIN_ATLAS = "whs_sd_rat_39um" 
@@ -213,7 +213,7 @@ class BrainAtlasManager(QtCore.QObject):
         self._atlas_in_progress_ = None
         self.downloadThread = None
         self.progressDlg = None
-        self.scipyenWindow = None
+        # self.scipyenWindow = None
         self.loopControl = {"break":False}
         self.netMan = network.ScipyenNetworkManager()
         self._current_atlases_versions_ = None # cache this
@@ -222,28 +222,21 @@ class BrainAtlasManager(QtCore.QObject):
             self._maxFreeSpaceFraction_ = maxFileSystemFraction
         else:
             self._maxFreeSpaceFraction_ = self.default_free_space_fraction_allowed
+            
+        self.scipyenWindow = wf.getMainScipyenWindow()
         
-        # self._tempFile_ = None
-        # self._waitCondition_ = QtCore.QWaitCondition()
-        # self._mutex_ = QtCore.QMutex()
-        # self._locker_ = QtCore.QMutexLocker(self._mutex_)
-        # self._all_available_atlas_names_ = list()
-        # self._local_atlas_names_ = list()
+        # ws = wf.user_workspace()
+        # # self._user_ns_ = ws
+        # if ws is not None:
+        #     self.scipyenWindow = ws["mainWindow"]
+        # else:
+        #     # self._user_ns_ = dict()
+        #     frame_records = inspect.getouterframes(inspect.currentframe())
+        #     for (n,f) in enumerate(frame_records):
+        #         if "ScipyenWindow" in f[0].f_globals:
+        #             self.scipyenWindow = f[0].f_globals["ScipyenWindow"].instance()
+        #             break
         
-        # self._tempFile_ = QtCore.QTemporaryFile()
-        # self._tempFile_.setAutoRemove(False)
-
-        ws = wf.user_workspace()
-        # self._user_ns_ = ws
-        if ws is not None:
-            self.scipyenWindow = ws["mainWindow"]
-        else:
-            # self._user_ns_ = dict()
-            frame_records = inspect.getouterframes(inspect.currentframe())
-            for (n,f) in enumerate(frame_records):
-                if "ScipyenWindow" in f[0].f_globals:
-                    self.scipyenWindow = f[0].f_globals["ScipyenWindow"].instance()
-                    break
     @classmethod
     def hasBrainGlobeAtlasAPI(self)->bool:
         from gui.workspacegui import GuiMessages
@@ -1026,17 +1019,13 @@ class BrainAtlasManager(QtCore.QObject):
             raise TypeError(f"In {self.__class__.__name__}._slot_lastVersionsConfDownloaded: expecting a str, a pathlib.Path, or a QtCore.QFile; instead, got {type(o).__name__}")
 
         atlasConf = self.getAtlasVersions()
+        # print(f"atlasConf = {atlasConf}")
         
         tempRemoteConf = self._parseLocalAtlasesConf(target)
+        # print(f"tempRemoteConf = {tempRemoteConf}")
         
-        self._current_atlases_versions_updated_ = atlasConf != tempRemoteConf
+        self._current_atlases_versions_updated_ = atlasConf == tempRemoteConf
         
-        # if self.netMan.receivers(self.netMan.sig_finished) > 0:
-        #     self.netMan.sig_finished.disconnect()
-            
-        # if self.netMan.receivers(self.netMan.sig_replyFromUrl) > 0:
-        #     self.netMan.sig_replyFromUrl.disconnect()
-            
         if isinstance(o, QtCore.QFile):
             o.remove()
         
@@ -1046,10 +1035,17 @@ class BrainAtlasManager(QtCore.QObject):
     def _slot_reportLocalDBUpdated(self):
         from gui.workspacegui import GuiMessages
         if not self._current_atlases_versions_updated_:
-            scipywarn("Atlas versions database needs updating; please call 'getRemoteAtlasVersions()' ")
-            GuiMessages.informationMessage_static(self.scipyenWindow, 
+            scipywarn("Atlas versions database needs updating. To update, call 'getRemoteAtlasVersions()'")
+            ret = GuiMessages.questionMessage_static(self.scipyenWindow,
                                                   f"{self.__class__.__name__}", 
-                                                  f"Local database needs updating.\nPlease call getRemoteAtlasVersions() method of the {self.__class__.__name__} instance")
+                                                  f"Local database needs updating.\nDo you wish to download it?")
+            
+            if ret == QtWidgets.QMessageBox.Yes:
+                self.getRemoteAtlasVersions()
+            
+            # GuiMessages.informationMessage_static(self.scipyenWindow, 
+            #                                       f"{self.__class__.__name__}", 
+            #                                       f"Local database needs updating.\nPlease call getRemoteAtlasVersions() method of the {self.__class__.__name__} instance")
         else:
             GuiMessages.informationMessage_static(self.scipyenWindow, 
                                                   f"{self.__class__.__name__}", 
@@ -1206,34 +1202,34 @@ class BrainAtlasManager(QtCore.QObject):
             
         return self.atlases[n] if asString else atlas_version_str2tuple(self.atlases[n])
         
-class AtlasDownloadThread(QtCore.QThread):
-    def __init__(self, parent, atlasName:str):
-        """
-        """
-        QtCore.QThread.__init__(self, parent)
-        self.atlasName = atlasName
-        self.signals = pgui.ProgressWorkerSignals()
-        self.result=None
-        
-    def progressUpdater(self, current:int, total:int):
-        self.signals.signal_setMaximum.emit(total)
-        self.signals.signal_Progress.emit(current)
-        
-    def run(self):
-        try:
-            print(f"Downloading {self.atlasName}")
-            self.result = brainglobe_atlasapi.bg_atlas.BrainGlobeAtlas(self.atlasName, fn_update=self.progressUpdater)
-            self.signals.signal_Result.emit(self.result)
-        except:
-            traceback.print_exc()
-            exctype, value = sys.exc_info()[:2]
-            self.signals.sig_error.emit((exctype, value, traceback.format_exc()))
-            
-        else:
-            self.signals.signal_Finished.emit()
-            
-        finally:
-            self.signals.signal_Finished.emit()
+# class AtlasDownloadThread(QtCore.QThread):
+#     def __init__(self, parent, atlasName:str):
+#         """
+#         """
+#         QtCore.QThread.__init__(self, parent)
+#         self.atlasName = atlasName
+#         self.signals = pgui.ProgressWorkerSignals()
+#         self.result=None
+#         
+#     def progressUpdater(self, current:int, total:int):
+#         self.signals.signal_setMaximum.emit(total)
+#         self.signals.signal_Progress.emit(current)
+#         
+#     def run(self):
+#         try:
+#             print(f"Downloading {self.atlasName}")
+#             self.result = brainglobe_atlasapi.bg_atlas.BrainGlobeAtlas(self.atlasName, fn_update=self.progressUpdater)
+#             self.signals.signal_Result.emit(self.result)
+#         except:
+#             traceback.print_exc()
+#             exctype, value = sys.exc_info()[:2]
+#             self.signals.sig_error.emit((exctype, value, traceback.format_exc()))
+#             
+#         else:
+#             self.signals.signal_Finished.emit()
+#             
+#         finally:
+#             self.signals.signal_Finished.emit()
             
     
 # ### BEGIN ---- module-level functions
