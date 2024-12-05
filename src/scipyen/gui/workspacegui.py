@@ -346,8 +346,14 @@ class _X11WMBridge_(QtCore.QObject): # FIXME: 2023-05-08 21:39:42 not used !
 
 class GuiMessages(object):
     @safeWrapper
-    def errorMessage(self, title, text):
+    def errorMessage(self, title:str, text:str):
         errMsgDlg = QtWidgets.QErrorMessage(self)
+        errMsgDlg.setWindowTitle(title)
+        errMsgDlg.showMessage(text)
+        
+    @staticmethod
+    def errorMessage_static(obj:typing.Optional[QtWidgets.QWidget]=None, title:str="Error Message", text:str="Error"):
+        errMsgDlg = QtWidgets.QErrorMessage(obj)
         errMsgDlg.setWindowTitle(title)
         errMsgDlg.showMessage(text)
         
@@ -373,6 +379,7 @@ class GuiMessages(object):
 
     @staticmethod
     def questionMessage_static(obj:typing.Optional[QtWidgets.QWidget]=None, title:str="Question", text:str="", default=QtWidgets.QMessageBox.No):
+        """Check the return value for equality to with QtWidgets.QMessageBox.Yes"""
         return QtWidgets.QMessageBox.question(obj, title, text, defaultButton=default)
         
     @safeWrapper

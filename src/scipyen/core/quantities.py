@@ -78,7 +78,11 @@ BinaryPrefixes = dict((k,v) for k,v in AllPrefixes.items() if v["mantissa"] == 2
 BinaryPowers = dict((v["exponent"], {("name", k), ("symbol", v["symbol"])}) for k,v in BinaryPrefixes.items())
 
 
-def makeScaledUnitQuantity(quantity:pq.Quantity, power:typing.Optional[typing.Union[int, str]]=None, base:int=10, scale:typing.Union[int, float] = 1., symbol:typing.Optional[str]=None, name:typing.Optional[str] = None):
+def makeScaledUnitQuantity(quantity:pq.Quantity, 
+                           power:typing.Optional[typing.Union[int, str]]=None, 
+                           base:int=10, scale:typing.Union[int, float] = 1., 
+                           symbol:typing.Optional[str]=None, 
+                           name:typing.Optional[str] = None):
     """Create custom quantity as a scaled version of an existing quantity
     
     The function generates a new quantity, scaled by base^power * scale.
@@ -319,6 +323,22 @@ qe = 1.602176634e-19 * pq.C
 
 # Avogadro constant
 N_A = 6.02214076e23 * pq.mol**(-1)
+
+BinaryUnitsByPower = [pq.byte, pq.kibibyte, pq.mebibyte, pq.gibibyte, 
+                      pq.tebibyte, pq.pebibyte, pq.exbibyte, pq.zebibyte, 
+                      pq.yobibyte]
+
+def getInformationQuantity(v:int, asQuantity:bool=True) -> pq.Quantity | tuple:
+    from core import quantities as scq
+    import math
+    
+    bpower = math.floor(math.log(v, 1024))
+    
+    units = BinaryUnitsByPower[bpower]
+    
+    ret = v/1024**bpower
+    
+    return ret*units if asQuantity else  (ret, units)
 
 def getConstants():
     ret = dict()
@@ -727,7 +747,9 @@ def prettySymbol(x:typing.Union[pq.Quantity, pq.dimensionality.Dimensionality]) 
     return delim.join(list(map(lambda v: f"{v[0]}{_pretty_power_(v[1])}", list((k.symbol, p) for k,p in x.items()))))
        
 
-def quantity2str(x:typing.Union[pq.Quantity, pq.UnitQuantity, pq.dimensionality.Dimensionality], precision:int = 2, format:str="f"):
+def quantity2str(x:typing.Union[pq.Quantity, pq.UnitQuantity, pq.dimensionality.Dimensionality], 
+                 precision:int = 2, 
+                 format:str="f"):
     """Returns a str representation of a scalar Quantity or Dimensionality.
     Useful to store quantities via json/yaml etc.
     WARNING: There will be loss of precision!

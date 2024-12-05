@@ -17,6 +17,7 @@ from core.sysutils import adapt_ui_path
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
+QtReplyNetworkErrors = dict((name, val) for name, val in vars(QtNetwork.QNetworkReply).items() if isinstance(val, QtNetwork.QNetworkReply.NetworkError))
 
 class ScipyenNetworkManager(QtCore.QObject):
     # NOTE: 2024-11-27 11:16:32
@@ -24,12 +25,15 @@ class ScipyenNetworkManager(QtCore.QObject):
     # starting out with Qt 5 examples/network/downloadmanager a.k.a qt5ex
     #
     sig_hasInternet = Signal(bool, name="sig_hasInternet")
-    sig_replyFromUrl = Signal(object)
+    sig_replyFromUrl = Signal(object, name="sig_replyFromUrl")
     sig_finished = Signal(name="sig_finished)")
     sig_resultReady = Signal(object, name="sig_resultReady")
+    sig_networkError = Signal(object,name="sig_networkError")
+    defaultMaxDownloadSizeForProgressBar = 2147483647
     
     def __init__(self, timeout_ms:int=QtNetwork.QNetworkRequest.DefaultTransferTimeoutConstant,
                  replyHandler:typing.Optional[typing.Callable] = None,
+                 progressUIFactory:typing.Optional[typing.Callable]=None,
                  parent:typing.Optional[QtCore.QObject] = None):
                  # verbose:bool=False,
                  # parent:typing.Optional[QtCore.QObject] = None):
@@ -84,6 +88,9 @@ class ScipyenNetworkManager(QtCore.QObject):
         self._tempFile_ = QtCore.QTemporaryFile()
         self._tempFile_.setAutoRemove(False)
         self._saveToFile_ = False
+        self._networkError_ = QtNetwork.QNetworkReply.NoError
+        self._urlToCheck_ = None
+        # self._urlToDownload_ = None
         # self._replyTextBuffer_ = QtCore.QTextStream()
         
         # self._outputFileName_ = dataclasses.MISSING
@@ -100,12 +107,16 @@ class ScipyenNetworkManager(QtCore.QObject):
         
         self._networkReply_ = None # cannot instantiate QNetworkReply (is abstract) # qt5ex
         self._downloadTime_ = QtCore.QTime() # ~qt5ex
-        self._progressDialog_ = None # ~qt5ex
-        self._progressBar_ = None # ~qt5ex
+        self._progressUI_ = None # ~qt5ex
+        self._progressUIFactory_ = QtWidgets.QProgressBar
+
+        self._userDefinedProgressUIFactory_ = progressUIFactory
+            
         self._content_length_ = 0
         self._temp_download_size_ = None
         
         self._replyHandler_ = replyHandler
+        self._maxDownloadSizeForProgressBar = int(5e6)
         
         self._manager_ = QtNetwork.QNetworkAccessManager(self) # also qt5ex
         self._manager_.setTransferTimeout(self._timeout_ms_)
@@ -115,13 +126,50 @@ class ScipyenNetworkManager(QtCore.QObject):
         
         self._manager_.finished[QtNetwork.QNetworkReply].connect(self.slot_handleNetworkManagerFinished)
     
+    @property
+    def networkManager(self)-> QtNetwork.QNetworkAccessManager:
+        return self._manager_
+    
     def setNextDownloadSize(self, val:typing.Optional[int] = None):
-        # print(f"{self.__class__.__name__}.setNextDownloadSize: {type(val)} = {val}")
+        print(f"{self.__class__.__name__}.setNextDownloadSize: {val} bytes")
+        self._progressUIFactory_ = self.getProgressUIFactory(val)
         if isinstance(val, int):
             self._temp_download_size_ = val
         else:
             self._temp_download_size_ = None
+            
+        # self._progressUIFactory_ = QtWidgets.QProgressBar if val < 2147483647 else QtWidgets.QProgressDialog
         
+    @property
+    def maximumDownloadSizeForProgressBar(self):
+        return self._maxDownloadSizeForProgressBar
+    
+    @maximumDownloadSizeForProgressBar.setter
+    def maximumDownloadSizeForProgressBar(self, val:int):
+        if val > self.defaultMaxDownloadSizeForProgressBar:
+            val = defaultMaxDownloadSizeForProgressBar
+        elif val <= 0:
+            val = int(5e6)
+            
+        self._maxDownloadSizeForProgressBar = val
+        
+    def getProgressUIFactory(self, downloadSize:int) -> typing.Callable:
+        if self._userDefinedProgressUIFactory_ is not None:
+            return self._userDefinedProgressUIFactory_
+        
+        if downloadSize >= self.maximumDownloadSizeForProgressBar:
+            return QtWidgets.QProgressDialog
+        
+        return QtWidgets.QProgressBar
+    
+    @property
+    def networkError(self) -> QtNetwork.QNetworkReply.NetworkError:
+        return self._networkError_
+    
+    @property
+    def networkErrorName(self) -> str:
+        return getNetworkErrorName(self._networkError_)
+    
     @property
     def replyHandler(self) -> typing.Callable | None:
         return self._replyHandler_
@@ -225,6 +273,12 @@ class ScipyenNetworkManager(QtCore.QObject):
         self._downloadQueue_.append((url, fileName))
         self._totalCount_ += 1
         
+    def _getRequest(self): # not used but keep ⌢
+        if isinstance(self._request_, QtNetwork.QNetworkRequest):
+            self._networkReply_ = self._manager_.get(self._request_)
+        else:
+            self._networkReply_ = None
+        
     def _startNextDownload(self): # qt5ex
         if len(self._downloadQueue_) == 0:
             print(f"{self._downloadedCount_}/{self._totalCount_} files downloaded")
@@ -234,19 +288,28 @@ class ScipyenNetworkManager(QtCore.QObject):
             if self._saveToFile_:
                 if self._tempFile_.exists():
                     self.sig_resultReady.emit(self._tempFile_)
-            elif self._outputFile_.exists():
+                elif self._outputFile_.exists():
                     self.sig_resultReady.emit(self._outputFile_.fileName())
             self.sig_finished.emit()
+            # self._urlToDownload_ = None
             # self._totalCount_ = 0
             return
         
-        if self._progressBar_ is None:
-            self._progressBar_ = QtWidgets.QProgressBar(parent = self.scipyenWindow)
-            self.scipyenWindow.statusBar().addWidget(self._progressBar_)
+        print(f"{self.__class__.__name__}._startNextDownload: self._progressUIFactory_: {self._progressUIFactory_}")
+        
+        if self._progressUI_ is None:
+            # self._progressUI_ = QtWidgets.QProgressBar(parent = self.scipyenWindow)
+            self._progressUI_ = self._progressUIFactory_(parent = self.scipyenWindow)
+            if isinstance(self._progressUI_, QtWidgets.QProgressBar):
+                self.scipyenWindow.statusBar().addWidget(self._progressUI_)
+            elif isinstance(self._progressUI_, QtWidgets.QProgressDialog):
+                self._progressUI_.setLabelText("Downloading...")
+                self._progressUI_.canceled.connect(self.slot_abortReply)
         else:
-            if not self._progressBar_.isVisible():
-                self.scipyenWindow.statusBar().addWidget(self._progressBar_)
-                self._progressBar_.show()
+            if not self._progressUI_.isVisible():
+                if isinstance(self._progressUI_, QtWidgets.QProgressBar):
+                    self.scipyenWindow.statusBar().addWidget(self._progressUI_)
+                self._progressUI_.show()
                 
         url,fileName = self._downloadQueue_.popleft()
         
@@ -275,6 +338,7 @@ class ScipyenNetworkManager(QtCore.QObject):
         request = QtNetwork.QNetworkRequest(url)
         request.setRawHeader(b"User-Agent", b"Mozilla 5.0")
         self._networkReply_ = self._manager_.get(request)
+        
         self._networkReply_.downloadProgress["qint64", "qint64"].connect(self.slot_downloadProgress)
         
         # NOTE: 2024-12-01 15:09:49
@@ -291,25 +355,38 @@ class ScipyenNetworkManager(QtCore.QObject):
         # 2) if fileName is a str, then this mens there is an output file pointing
         # to it, in write mode -> just save the data to that file
         #
-        #
-#         if fileName is None:
-#             self._manager_.finished[QtNetwork.QNetworkReply].connect(self.slot_handleNetworkManagerFinished)
-#         else:
-#             self._networkReply_.finished.connect(self.slot_downloadFinished)
-#             
+
         if self._saveToFile_:
             self._networkReply_.finished.connect(self.slot_downloadFinished)
-        
+            
         self._networkReply_.readyRead.connect(self.slot_downloadReadyRead)
         self._networkReply_.metaDataChanged.connect(self.slot_downloadHeaderChanged)
         
-        # msg = printStyled(f"")
         if self._saveToFile_:
             fName = self._tempFile_.fileName() if self._tempFile_.isOpen() else self._outputFile_.fileName() if (isinstance(self._outputFile_, QtCore.QFile) and self._outputFile_.isOpen()) else ""
             print(printStyled(f"Downloading {url.url()} to {fName} ...", "green",True))
         else:
             print(printStyled(f"Downloading {url.url()} ...", "green",True))
+            # print(printStyled(f"Handler: {self._replyHandler_} ...", "green",True))
+            
         self._downloadTime_.start()
+        
+    def checkUrl(self, url:typing.Union[str, QtCore.QUrl]) -> bool:
+        self._networkError_ = QtNetwork.QNetworkReply.NoError
+        if isinstance(url, str):
+            url = QtCore.QUrl(url)
+            
+        self._urlToCheck_ = url
+        QtCore.QTimer.singleShot(1000, self._startCheckUrl)
+        
+        
+    def _startCheckUrl(self):
+        if self._urlToCheck_ is None:
+            return
+        request = QtNetwork.QNetworkRequest(self._urlToCheck_)
+        request.setRawHeader(b"User-Agent", b"Mozilla 5.0")
+        self._networkReply_ = self._manager_.get(request)
+        self._manager_.finished.connect(self.slot_handleNetworkData)
         
     def _setSaveFileName(self, url:QtCore.QUrl) -> str:  # ~qt5ex
         from iolib import pictio as pio
@@ -317,10 +394,6 @@ class ScipyenNetworkManager(QtCore.QObject):
         basename = path.name
         if len(basename.strip()) == 0:
             basename="download"
-            
-#         mimeFileType = pio.getMimeAndFileType(basename)
-#         
-#         if all(all(a in m for a in ("x-tar", "gzip")) for m in mimeFileType):
             
         path = pathlib.Path(basename)
         suffixes = path.suffixes
@@ -352,6 +425,20 @@ class ScipyenNetworkManager(QtCore.QObject):
             
     @Slot("qint64", "qint64")
     def slot_downloadProgress(self, bytesReceived:int, bytesTotal:int) -> None: # qt5ex
+        reply = self.sender()
+        netError = reply.error()
+        self._networkError_ = netError
+        if netError:
+            print(printStyled(f"{self.__class__.__name__}._startNextDownload: {reply.request().url().url()}: {getNetworkErrorName(netError)}", "red"))
+            self._progressUI_.reset() # clear progressbar
+            if isinstance(self._progressUI_, QtWidgets.QProgressBar):
+                self.scipyenWindow.statusBar().removeWidget(self._progressUI_)
+            elif isinstance(self._progressUI_, QtWidgets.QProgressDialog):
+                self._progressUI_.close()
+                
+            self.sig_networkError.emit((reply.request().url().url(), getNetworkErrorName(netError)))
+            return
+        
         speed = bytesReceived * 1000. / self._downloadTime_.elapsed()
         
         units = ""
@@ -366,12 +453,24 @@ class ScipyenNetworkManager(QtCore.QObject):
             units = "MB/s"
             
         total = bytesTotal if bytesTotal >=0 else self._content_length_
-        self._progressBar_.setRange(0, total)
-        self._progressBar_.setValue(bytesReceived)
-        
-        # if self._verbose_:
-        #     print(f"bytes: {bytesReceived} / {total} (speed: {speed} {units})")
-        
+        try:
+            self._progressUI_.setRange(0, total)
+            self._progressUI_.setValue(bytesReceived)
+        except:
+            # when range exceeds -2147483648 to 2147483647:
+            self._progressUI_.setRange(0, 100)
+            self._progressUI_.setValue(int(bytesReceived*100/total))
+            
+    @Slot()
+    def slot_abortReply(self):
+        try:
+            self._networkReply_.abort()
+            self._networkReply_.close()
+        except:
+            traceback.print_exc()
+            
+        self._manager_.finished.emit(None)
+            
     @Slot()
     def slot_downloadFinished(self)-> None: # ~qt5ex
         # print(f"In {self.__class__.__name__}.slot_downloadFinished:  output file name: {self._outputFile_.fileName()}, reply handler: {self._replyHandler_}")
@@ -384,7 +483,9 @@ class ScipyenNetworkManager(QtCore.QObject):
                 self._outputFile_.close()
                 fName = self._outputFile_.fileName()
                 
-            if self._networkReply_.error():
+            netError = self._networkReply_.error()
+                
+            if netError:
                 scipywarn(f"In {self.__class__.__name__}.slot_downloadFinished Failed downloading {fName}:\n {self._networkReply_.errorString()} ")
                 if self._removeOnFail_:
                     if self._outputFile_.exists():
@@ -397,55 +498,100 @@ class ScipyenNetworkManager(QtCore.QObject):
                 print(printStyled("Succeeded", "green", True))
                 self._downloadedCount_ += 1
                 
-                
-        self._progressBar_.reset() # clear progressbar
-        self.scipyenWindow.statusBar().removeWidget(self._progressBar_)
+        self._networkError_ = netError
+        if isinstance(self._progressUI_, QtWidgets.QProgressBar):
+            self._progressUI_.reset() # clear progressbar
+            self.scipyenWindow.statusBar().removeWidget(self._progressUI_)
+        elif isinstance(self._progressUI_, QtWidgets.QProgressDialog):
+            self._progressUI_.reset() # clear progressbar
+            self._progressUI_.close()
         
         self._networkReply_.deleteLater()
+        self._progressUI_ = None
         self._startNextDownload()
+        
+    @Slot(QtNetwork.QNetworkReply)
+    def slot_handleURLCheck(self, reply:QtNetwork.QNetworkReply):
+        url = reply.url()
+        if isinstance(self._urlToCheck_, QtCore.Qurl) and url != self._urlToCheck_:
+            scipywarn(f"{self.__class__.__name__}.slot_handleURLCheck: Expecting to check {self._urlToCheck_.url()}; insetad, got {url.url()}")
+            return
+        
+        netError = reply.error()
+        if netError:
+            scipywarn(f"{printStyled(getNetworkErrorName(netError), 'yellow', True)} for {printStyled(url.url(), 'green', True)}")
+            
+        reply.deleteLater()
+        self._networkError_ = netError
+        self.sig_resultReady.emit([self._networkError_, url.url()])
+        self._urlToCheck_ = None
+        
+        
+    @Slot(QtNetwork.QNetworkReply)
+    def slot_handleNetworkData(self, reply:QtNetwork.QNetworkReply):
+        """Generic handler"""
+        url = reply.url()
+        netError = reply.error()
+        if netError:
+            scipywarn(getNetworkErrorName(netError))
+            
+        reply.deleteLater()
+        self._networkError_ = netError
         
     @Slot(QtNetwork.QNetworkReply)
     def slot_handleNetworkManagerFinished(self, reply:QtNetwork.QNetworkReply):
         # print(f"In {self.__class__.__name__}.slot_handleNetworkManagerFinished")
+        
+        if isinstance(reply, QtNetwork.QNetworkReply):
+            netError = reply.error()
+            self._networkError_ = netError
             
-        if not reply.error():
-            # info = bytes(reply.readAll()).decode()
-            # self._replyInfo_ = info
+            if not netError:
+                if self._saveToFile_ and self._outputFile_.exists():
+                    self._replyInfo_ = self._outputFile_.fileName()
+                else:
+                    self._replyInfo_ = reply.readAll()
+                
+                # The signal sig_replyFromUrl must be connected to a slot that
+                # processes reply data `_replyInfo_` in-memory; this can be either:
+                # • self.slot_processUrlReply
+                #   which will call self._replyHandler_
+                #
+                # • a suitable slot in another QObject instance
+                #   which takes care of the processing of `_replyInfo_`
+                #
+                # TODO: 2024-12-01 22:31:38
+                # must find a way to pass other data if necessary, to the handle,
+                # not just the _replyInfo_ !
+                self.sig_replyFromUrl.emit(self._replyInfo_)
+                
+                # ### BEGIN DO NOT DELETE - this exmplains why we need to call the
+                # replyHandler via a signal.slot mechanism!
+                #
+                # What if I call the processing function directly ?!?
+                #
+                # self.slot_processUrlReply(self._replyInfo_)
+                #
+                # Unfortunately, this won't work, in the sense that variables assigned
+                # to by the processing code won't be seen by `self` by the time it 
+                # carries out the next task; 
+                #
+                # The tasks NEED to be triggered via the signal.slot mechanism!!!
+                
+                # ### END DO NOT DELETE
+                
+                # self._downloadedCount_ += 1
+                
+            reply.deleteLater()
             
-            if self._saveToFile_ and self._outputFile_.exists():
-                self._replyInfo_ = self._outputFile_.fileName()
+        if isinstance(self._progressUI_, (QtWidgets.QProgressBar, QtWidgets.QProgressDialog)):
+            self._progressUI_.reset()
+            if isinstance(self._progressUI_, QtWidgets.QProgressBar):
+                self.scipyenWindow.statusBar().removeWidget(self._progressUI_)
             else:
-                self._replyInfo_ = reply.readAll()
-            
-            # The signal sig_replyFromUrl must be connected to a slot that
-            # processes reply data `_replyInfo_` in-memory; this can be either:
-            # • self.slot_processUrlReply
-            #   which will call self._replyHandler_
-            #
-            # • a suitable slot in another QObject instance
-            #   which takes care of the processing of `_replyInfo_`
-            #
-            # TODO: 2024-12-01 22:31:38
-            # must find a way to pass other data if necessary, to the handle,
-            # not just the _replyInfo_ !
-            self.sig_replyFromUrl.emit(self._replyInfo_)
-            
-            # ### BEGIN DO NOT DELETE - this exmplains why we need to call the
-            # replyHandler via a signal.slot mechanism!
-            #
-            # What if I call the processing function directly ?!?
-            #
-            # self.slot_processUrlReply(self._replyInfo_)
-            #
-            # Unfortunately, this won't work, in the sense that variables assigned
-            # to by the processing code won't be seen by `self` by the time it 
-            # carries out the next task; 
-            #
-            # The tasks NEED to be triggered via the signal.slot mechanism!!!
-            
-            # ### END DO NOT DELETE
-            
-            # self._downloadedCount_ += 1
+                self._progressUI_.close()
+                
+        self._progressUI_ = None
             
     @Slot(object)
     def slot_processUrlReply(self, s:object):
@@ -478,7 +624,7 @@ class ScipyenNetworkManager(QtCore.QObject):
         # URL to get file size:
         # src_url = url.replace("raw", "src")
         #
-        
+        netError = self._networkReply_.error()
         rawHeaders = self._networkReply_.rawHeaderPairs()
         # if self._verbose_:
         #     print(f"{self.__class__.__name__}.slot_downloadHeaderChanged:")
@@ -491,15 +637,24 @@ class ScipyenNetworkManager(QtCore.QObject):
         else:
             self._content_length_ = self._temp_download_size_
             
+        self._networkError_ = netError
         # if self._verbose_:
         #     print(f"In {self.__class__.__name__}.slot_downloadHeaderChanged: content length = {self._content_length_}")
     
     @Slot()
     def slot_downloadReadyRead(self) -> None: # qt5ex   
-        if self._tempFile_.isOpen():
-            self._tempFile_.write(self._networkReply_.readAll())
-        elif isinstance(self._outputFile_, QtCore.QFile) and self._outputFile_.exists():
-            self._outputFile_.write(self._networkReply_.readAll())
+        netError = self._networkReply_.error()
+        
+        if not netError:
+            if self._tempFile_.isOpen():
+                self._tempFile_.write(self._networkReply_.readAll())
+            elif isinstance(self._outputFile_, QtCore.QFile) and self._outputFile_.exists():
+                self._outputFile_.write(self._networkReply_.readAll())
+        else:
+            scipywarn(getNetworkErrorName(netError))
+            
+        self._networkError_ = netError
+                
 
     @property
     def networkReply(self) -> QtNetwork.QNetworkReply | None:
@@ -520,6 +675,8 @@ def example_get_download_size(s:str) -> int:
     elif pfx == "K":
         sz *= 1e3
     return int(sz)        
+
+# ### BEGIN Module-level functions
 
 def example_sequential_download_handler(info:QtCore.QByteArray,
                                           manager:ScipyenNetworkManager,
@@ -644,27 +801,10 @@ def example_sequential_download_handler(info:QtCore.QByteArray,
 def example_generic_handler(obj:object, manager:ScipyenNetworkManager) -> None:
     print(f"example_generic_handler(obj:{type(obj).__name__})")
     
-# def extract_archive(obj:str, manager:ScipyenNetworkManager, target_dir:str) -> None:
-#     print(f"In {__name__}.extract_archive:\n\tobj = {obj}")
-#     if isinstance(obj, str):
-#         obj = pathlib.Path(obj)
-#         
-#     elif not isinstance(obj, pathlib.Path):
-#         raise TypeError(f"'obj' expected a str or a pathlib.Path; instead, got {type(obj).__name__}")
-#         
-#     if not isinstance(target_dir, str) or not os.path.isdir(target_dir):
-#         raise ValueError(f"'target_dir ('{target_dir}') is not a directory")
-#     
-#     if isinstance(obj, pathlib.Path):
-#         path = obj.as_posix()
-#         if not obj.exists():
-#             raise RuntimeError(f"In {__name__}.extract_archive: File object {path} does not exist!")
-#         
-#         print(f"In {__name__}.extract_archive: path = {path}")
-#         tar = tarfile.open(path)
-#         try:
-#             tar.extractall(path = target_dir)
-#             tar.close()
-#             obj.unlink()
-#         except:
-#             traceback.print_exc()
+def getNetworkErrorName(e:QtNetwork.QNetworkReply.NetworkError) -> str:
+    found = [name for name in QtReplyNetworkErrors if QtReplyNetworkErrors[name] == e]
+    if len(found):
+        return found[0]
+    return "Undefined network error"
+
+# ### END Module-level functions
