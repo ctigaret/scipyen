@@ -9,11 +9,12 @@ import sys, os, typing, collections, pathlib, tarfile, dataclasses
 import inspect, functools, traceback
 from dataclasses import MISSING
 from functools import (singledispatch, singledispatchmethod)
-from qtpy import QtCore, QtGui, QtWidgets, QtSvg, QtNetwork
+from qtpy import QtCore, QtGui, QtWidgets, QtSvg, QtNetwork, sip
 from qtpy.QtCore import Signal, Slot, Property
 from qtpy.uic import loadUiType as __loadUiType__
 from core.prog import (safeWrapper, scipywarn, printStyled)
 from core.sysutils import adapt_ui_path
+from gui.widgets.cancellableqprogressbar import CancellableQProgressBar
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
@@ -33,7 +34,7 @@ class ScipyenNetworkManager(QtCore.QObject):
     
     def __init__(self, timeout_ms:int=QtNetwork.QNetworkRequest.DefaultTransferTimeoutConstant,
                  replyHandler:typing.Optional[typing.Callable] = None,
-                 progressUIFactory:typing.Optional[typing.Callable]=None,
+                 progressUIFactory:typing.Optional[sip.wrappertype]=None,
                  parent:typing.Optional[QtCore.QObject] = None):
                  # verbose:bool=False,
                  # parent:typing.Optional[QtCore.QObject] = None):
@@ -145,14 +146,15 @@ class ScipyenNetworkManager(QtCore.QObject):
             
         self._maxDownloadSizeForProgressBar = val
         
-    def getProgressUIFactory(self, downloadSize:int) -> typing.Callable:
-        if self._userDefinedProgressUIFactory_ is not None:
-            return self._userDefinedProgressUIFactory_
+    def getProgressUIFactory(self, downloadSize:int) -> sip.wrappertype:
+        factory = self._setUIFactory()
+        print(f"{self.__class__.__name__}.getProgressUIFactory: factory = {factory}")
+        ui_cancellable = self._isCancellableProgressUI(factory)
+        if downloadSize >= self.maximumDownloadSizeForProgressBar and not ui_cancellable:
+            factory = QtWidgets.QProgressDialog
         
-        if downloadSize >= self.maximumDownloadSizeForProgressBar:
-            return QtWidgets.QProgressDialog
-        
-        return QtWidgets.QProgressBar
+        print(f"{self.__class__.__name__}.getProgressUIFactory: adjusted factory = {factory}")
+        return factory
     
     @property
     def networkError(self) -> QtNetwork.QNetworkReply.NetworkError:
@@ -270,7 +272,66 @@ class ScipyenNetworkManager(QtCore.QObject):
             self._networkReply_ = self._manager_.get(self._request_)
         else:
             self._networkReply_ = None
+            
+    def _isCancellableProgressUI(self, factory:sip.wrappertype) -> bool:
+        cancel_sigs = list(filter(lambda x: x[0]=="canceled", inspect.getmembers_static(factory, predicate=lambda x: isinstance(x, QtCore.Signal))))
+        return len(cancel_sigs)==1
+            
+    def _setUIFactory(self) -> sip.wrappertype:
+        if isinstance(self._userDefinedProgressUIFactory_, sip.wrappertype):
+            self._progressUIFactory_ = self._userDefinedProgressUIFactory_
+            
+        if self.scipyenWindow is None:
+            if not any(c in inspect.getmro(self._progressUIFactory_) for c in (QtWidgets.QDialog, QtWidgets.QMainWindow)):
+                factory = QtWidgets.QProgressDialog
+            else:
+                factory = self._progressUIFactory_
+        else:
+            factory = self._progressUIFactory_
+            
+        return factory
+    
+    def _initProgressUI(self):
+        factory = self._setUIFactory()
         
+        if self._progressUI_ is None:
+            ui_cancellable = self._isCancellableProgressUI(factory)
+            self._progressUI_ = factory(parent = self.scipyenWindow)
+            # self._progressUI_ = QtWidgets.QProgressBar(parent = self.scipyenWindow)
+            # self._progressUI_ = self._progressUIFactory_(parent = self.scipyenWindow)
+            # if isinstance(self._progressUI_, QtWidgets.QProgressBar, CancellableQProgressBar) and self.scipyenWindow is not None:
+            # elif isinstance(self._progressUI_, QtWidgets.QProgressDialog, CancellableQProgressBar):
+            if isinstance(self._progressUI_, (QtWidgets.QMainWindow, QtWidgets.QDialog)):
+                self._progressUI_.setLabelText("Downloading...")
+            else:
+                # self.scipyenWindow.statusBar().addWidget(self._progressUI_)
+                self.scipyenWindow.statusBar().addPermanentWidget(self._progressUI_)
+                
+            if ui_cancellable:
+                self._progressUI_.canceled.connect(self.slot_abortReply)
+        else:
+            ui_cancellable = self._isCancellableProgressUI(type(self._progressUI_))
+            if not self._progressUI_.isVisible():
+                # if isinstance(self._progressUI_, QtWidgets.QProgressBar) and self.scipyenWindow is not None:
+                if not isinstance(self._progressUI_, (QtWidgets.QMainWindow, QtWidgets.QDialog)):
+                    if self._progressUI_ not in self.scipyenWindow.statusBar().children():
+                        # self.scipyenWindow.statusBar().addWidget(self._progressUI_)
+                        self.scipyenWindow.statusBar().addPermanentWidget(self._progressUI_)
+                self._progressUI_.show()
+                
+    def _resetProgressUI_(self, remove:bool=False):
+        if isinstance(self._progressUI_, (QtWidgets.QMainWindow, QtWidgets.QDialog)):
+            self._progressUI_.reset() # clear progressbar
+            self._progressUI_.close()
+        elif self.scipyenWindow is not None and self._progressUI_:
+            self._progressUI_.reset() # clear progressbar
+            self.scipyenWindow.statusBar().removeWidget(self._progressUI_)
+            self._progressUI_.close()
+            
+        if remove:
+            self._progressUI_ = None
+       
+         
     def _startNextDownload(self): # qt5ex
         if len(self._downloadQueue_) == 0:
             print(f"{self._downloadedCount_}/{self._totalCount_} files downloaded")
@@ -287,27 +348,8 @@ class ScipyenNetworkManager(QtCore.QObject):
             # self._totalCount_ = 0
             return
         
-        if self.scipyenWindow is None:
-            factory = QtWidgets.QProgressDialog
-        else:
-            factory = self._progressUIFactory_
-            
-        # print(f"{self.__class__.__name__}._startNextDownload: self._progressUIFactory_: {self._progressUIFactory_}")
+        self._initProgressUI()
         
-        if self._progressUI_ is None:
-            # self._progressUI_ = QtWidgets.QProgressBar(parent = self.scipyenWindow)
-            self._progressUI_ = self._progressUIFactory_(parent = self.scipyenWindow)
-            if isinstance(self._progressUI_, QtWidgets.QProgressBar) and self.scipyenWindow is not None:
-                self.scipyenWindow.statusBar().addWidget(self._progressUI_)
-            elif isinstance(self._progressUI_, QtWidgets.QProgressDialog):
-                self._progressUI_.setLabelText("Downloading...")
-                self._progressUI_.canceled.connect(self.slot_abortReply)
-        else:
-            if not self._progressUI_.isVisible():
-                if isinstance(self._progressUI_, QtWidgets.QProgressBar) and self.scipyenWindow is not None:
-                    self.scipyenWindow.statusBar().addWidget(self._progressUI_)
-                self._progressUI_.show()
-                
         url,fileName = self._downloadQueue_.popleft()
         
         if fileName is MISSING:
@@ -427,11 +469,12 @@ class ScipyenNetworkManager(QtCore.QObject):
         self._networkError_ = netError
         if netError:
             print(printStyled(f"{self.__class__.__name__}._startNextDownload: {reply.request().url().url()}: {getNetworkErrorName(netError)}", "red"))
-            self._progressUI_.reset() # clear progressbar
-            if isinstance(self._progressUI_, QtWidgets.QProgressBar) and self.scipyenWindow is not None:
-                self.scipyenWindow.statusBar().removeWidget(self._progressUI_)
-            elif isinstance(self._progressUI_, QtWidgets.QProgressDialog):
-                self._progressUI_.close()
+            self._resetProgressUI_(False)
+            # self._progressUI_.reset() # clear progressbar
+            # if isinstance(self._progressUI_, QtWidgets.QProgressBar) and self.scipyenWindow is not None:
+            #     self.scipyenWindow.statusBar().removeWidget(self._progressUI_)
+            # elif isinstance(self._progressUI_, QtWidgets.QProgressDialog):
+            #     self._progressUI_.close()
                 
             self.sig_networkError.emit((reply.request().url().url(), getNetworkErrorName(netError)))
             return
@@ -496,15 +539,24 @@ class ScipyenNetworkManager(QtCore.QObject):
                 self._downloadedCount_ += 1
                 
         self._networkError_ = netError
-        if isinstance(self._progressUI_, QtWidgets.QProgressBar) and self.scipyenWindow is not None:
-            self._progressUI_.reset() # clear progressbar
-            self.scipyenWindow.statusBar().removeWidget(self._progressUI_)
-        elif isinstance(self._progressUI_, QtWidgets.QProgressDialog):
-            self._progressUI_.reset() # clear progressbar
-            self._progressUI_.close()
+        
+        self._resetProgressUI_(False)
+        
+        # if isinstance(self._progressUI_, (QtWidgets.QMainWindow, QtWidgets.QDialog))
+        #     self._progressUI_.reset() # clear progressbar
+        #     self._progressUI_.close()
+        # elif self.scipyenWindow is not None:
+        #     self._progressUI_.reset() # clear progressbar
+        #     self.scipyenWindow.statusBar().removeWidget(self._progressUI_)
+        #     self._progressUI_.close()
+        # if isinstance(self._progressUI_, QtWidgets.QProgressBar) and self.scipyenWindow is not None:
+        #     self._progressUI_.reset() # clear progressbar
+        #     self.scipyenWindow.statusBar().removeWidget(self._progressUI_)
+        # elif isinstance(self._progressUI_, QtWidgets.QProgressDialog):
+        #     self._progressUI_.reset() # clear progressbar
         
         self._networkReply_.deleteLater()
-        self._progressUI_ = None
+        # self._progressUI_ = None
         self._startNextDownload()
         
     @Slot(QtNetwork.QNetworkReply)
@@ -581,14 +633,23 @@ class ScipyenNetworkManager(QtCore.QObject):
                 
             reply.deleteLater()
             
-        if isinstance(self._progressUI_, (QtWidgets.QProgressBar, QtWidgets.QProgressDialog)):
-            self._progressUI_.reset()
-            if isinstance(self._progressUI_, QtWidgets.QProgressBar) and self.scipyenWindow is not None:
-                self.scipyenWindow.statusBar().removeWidget(self._progressUI_)
-            else:
-                self._progressUI_.close()
+        self._resetProgressUI_(True)
+        # if isinstance(self._progressUI_, (QtWidgets.QMainWindow, QtWidgets.QDialog))
+        #     self._progressUI_.reset() # clear progressbar
+        #     self._progressUI_.close()
+        # elif self.scipyenWindow is not None:
+        #     self._progressUI_.reset() # clear progressbar
+        #     self.scipyenWindow.statusBar().removeWidget(self._progressUI_)
+        #     self._progressUI_.close()
+
+        # if isinstance(self._progressUI_, (QtWidgets.QProgressBar, QtWidgets.QProgressDialog)):
+        #     self._progressUI_.reset()
+        #     if isinstance(self._progressUI_, QtWidgets.QProgressBar) and self.scipyenWindow is not None:
+        #         self.scipyenWindow.statusBar().removeWidget(self._progressUI_)
+        #     else:
+        #         self._progressUI_.close()
                 
-        self._progressUI_ = None
+        # self._progressUI_ = None
             
     @Slot(object)
     def slot_processUrlReply(self, s:object):

@@ -56,6 +56,7 @@ from core import taxonbridge, utilities
 from core import workspacefunctions as wf
 from core import quantities as scq
 # import gui.pictgui as pgui # avoid circular import
+from gui.widgets.cancellableqprogressbar import CancellableQProgressBar
 from iolib import network
 
 DEFAULT_RAT_BRAIN_ATLAS = "whs_sd_rat_39um" 
@@ -215,7 +216,7 @@ class BrainAtlasManager(QtCore.QObject):
         self.progressDlg = None
         # self.scipyenWindow = None
         self.loopControl = {"break":False}
-        self.netMan = network.ScipyenNetworkManager()
+        self.netMan = network.ScipyenNetworkManager(progressUIFactory = CancellableQProgressBar)
         self._current_atlases_versions_ = None # cache this
         self._current_atlases_versions_updated_ = True
         if isinstance(maxFileSystemFraction, float) and maxFileSystemFraction >= 0.1 and maxFileSystemFraction <= 0.9:
@@ -380,7 +381,7 @@ class BrainAtlasManager(QtCore.QObject):
                        f"This will occupy over {self.default_free_space_fraction_allowed} of the currently available file system space ({scq.quantity2str(freeSpace, precision=1)}).",
                        "Do you want to continue?"]
                 ret = GuiMessages.questionMessage_static(None,
-                                                   title="File download",
+                                                   title="Large File Download!",
                                                    text="\n".join(txt))
                 if ret != QtWidgets.QMessageBox.Yes:
                     self.cancelDownload()
@@ -421,7 +422,7 @@ class BrainAtlasManager(QtCore.QObject):
         
         url1 = url.replace("raw", "src")
         
-        self.netMan = network.ScipyenNetworkManager()
+        self.netMan = network.ScipyenNetworkManager(progressUIFactory = CancellableQProgressBar)
         self.netMan.sig_networkError[object].connect(self._slot_networkError)
         self.netMan.sig_resultReady[object].connect(self._slot_extractArchive)
         self.netMan.sig_finished.connect(self.slot_networkOperationFinished)
@@ -573,7 +574,7 @@ class BrainAtlasManager(QtCore.QObject):
         
         url1 = url.replace("raw", "src")
         
-        self.netMan = network.ScipyenNetworkManager()
+        self.netMan = network.ScipyenNetworkManager(progressUIFactory = CancellableQProgressBar)
         self.netMan.sig_resultReady[object].connect(self._slot_extractArchive)
         
         handle = functools.partial(self._getArchiveSizeAndDownload, 
@@ -992,7 +993,7 @@ class BrainAtlasManager(QtCore.QObject):
             file_path = os.path.join(conf["default_dirs"]["brainglobe_dir"], "last_versions.conf")
             
         url = brainglobe_atlasapi.bg_atlas.BrainGlobeAtlas._remote_url_base.format("last_versions.conf")
-        self.netMan = network.ScipyenNetworkManager()
+        self.netMan = network.ScipyenNetworkManager(progressUIFactory = CancellableQProgressBar)
         self.netMan.sig_resultReady[object].connect(self._slot_lastVersionsConfDownloaded)
         self.netMan.getUrl(url, destination=file_path, replyHandler = None)
         
@@ -1000,7 +1001,7 @@ class BrainAtlasManager(QtCore.QObject):
         if not self.hasBrainGlobeAtlasAPI():
             return
         url = brainglobe_atlasapi.bg_atlas.BrainGlobeAtlas._remote_url_base.format("last_versions.conf")
-        self.netMan = network.ScipyenNetworkManager()
+        self.netMan = network.ScipyenNetworkManager(progressUIFactory = CancellableQProgressBar)
         self.netMan.sig_resultReady[object].connect(self._slot_lastVersionsConfTempDownloaded)
         self.netMan.getUrl(url, destination="temp", replyHandler = None)
     
