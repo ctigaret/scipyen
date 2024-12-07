@@ -297,14 +297,9 @@ class ScipyenNetworkManager(QtCore.QObject):
         if self._progressUI_ is None:
             ui_cancellable = self._isCancellableProgressUI(factory)
             self._progressUI_ = factory(parent = self.scipyenWindow)
-            # self._progressUI_ = QtWidgets.QProgressBar(parent = self.scipyenWindow)
-            # self._progressUI_ = self._progressUIFactory_(parent = self.scipyenWindow)
-            # if isinstance(self._progressUI_, QtWidgets.QProgressBar, CancellableQProgressBar) and self.scipyenWindow is not None:
-            # elif isinstance(self._progressUI_, QtWidgets.QProgressDialog, CancellableQProgressBar):
             if isinstance(self._progressUI_, (QtWidgets.QMainWindow, QtWidgets.QDialog)):
                 self._progressUI_.setLabelText("Downloading...")
             else:
-                # self.scipyenWindow.statusBar().addWidget(self._progressUI_)
                 self.scipyenWindow.statusBar().addPermanentWidget(self._progressUI_)
                 
             if ui_cancellable:
@@ -312,10 +307,8 @@ class ScipyenNetworkManager(QtCore.QObject):
         else:
             ui_cancellable = self._isCancellableProgressUI(type(self._progressUI_))
             if not self._progressUI_.isVisible():
-                # if isinstance(self._progressUI_, QtWidgets.QProgressBar) and self.scipyenWindow is not None:
                 if not isinstance(self._progressUI_, (QtWidgets.QMainWindow, QtWidgets.QDialog)):
                     if self._progressUI_ not in self.scipyenWindow.statusBar().children():
-                        # self.scipyenWindow.statusBar().addWidget(self._progressUI_)
                         self.scipyenWindow.statusBar().addPermanentWidget(self._progressUI_)
                 self._progressUI_.show()
                 
@@ -344,8 +337,6 @@ class ScipyenNetworkManager(QtCore.QObject):
                 elif self._outputFile_.exists():
                     self.sig_resultReady.emit(self._outputFile_.fileName())
             self.sig_finished.emit()
-            # self._urlToDownload_ = None
-            # self._totalCount_ = 0
             return
         
         self._initProgressUI()
