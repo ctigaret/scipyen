@@ -55,7 +55,7 @@ def get_taxon(s:str) -> Taxon | None:
             if s.lower() in ["mouse", "mice"]:
                 s = "Mus"
                 
-            elif s.lower() in ["rat", "rats"]:
+            elif s.lower() in ["rat", "rats"] or s.lower().startswith("rat"):
                 s = "Rattus"
                 
             taxon = taxoniq.Taxon(scientific_name=s)

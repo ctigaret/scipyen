@@ -640,7 +640,7 @@ class BrainAtlasManager(QtCore.QObject):
             
         pass
 
-    def selectAtlasName(self, choices:typing.Optional[typing.Sequence[str]]=None,
+    def selectAtlasName(self, choices:typing.Optional[typing.Union[typing.Sequence[str | taxonbridge.Taxon], str, taxonbridge.Taxon]]=None,
                         dlgTitle:typing.Optional[str]=None,
                         dlgParent:typing.Optional[QtWidgets.QWidget] = None) -> str:
         from gui.itemslistdialog import ItemsListDialog
@@ -650,11 +650,15 @@ class BrainAtlasManager(QtCore.QObject):
         
         atlasNames = self.atlasNames
         
-        if isinstance(choices, (tuple, list)) and all(isinstance(v, str) for v in choices):
-            names = list(itertools.chain.from_iterable(map(lambda c: filter(lambda x: c in x, atlasNames), choices)))
-            if len(names) == 0:
-                scipywarn("No valid atlas names were supplied")
-                names = atlasNames
+        if isinstance(choices, (tuple, list)):
+            if all(isinstance(v, str) for v in choices):
+                names = list(itertools.chain.from_iterable(map(lambda c: filter(lambda x: c in x, atlasNames), choices)))
+                if len(names) == 0:
+                    scipywarn("No valid atlas names were supplied")
+                    names = atlasNames
+                    
+            # TODO: use taxon names via taxonbridge
+                
             
         elif isinstance(choices, str) and len(choices.strip()):
             names = list(filter(lambda x: choices in x, atlasNames))
