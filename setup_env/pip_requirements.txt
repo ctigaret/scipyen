@@ -250,6 +250,7 @@ zipp
 
 # NOTE: since 2024-11-19 22:04:24
 nbci-taxonomist # will also install entrezpy
+entrez-utils
 biopython
 taxoniq
 allensdk

@@ -101,7 +101,8 @@ try:
                                                   get_downloaded_atlases,
                                                   get_local_atlas_version,
                                                   show_atlases)
-    from brainglobe_atlasapi.structure_class import Structure as BGStructure
+    from brainglobe_atlasapi.structure_class import Structure
+    BGStructure = Structure
     
     hasBrainGlobe=True
     hasBrainGlobeAtlasAPI=True
@@ -210,7 +211,7 @@ class BrainAtlasManager(QtCore.QObject):
         """
         super().__init__(parent=parent)
         self._atlas = None
-        self._atlas_name_ = None
+        self._atlas_name_to_initialize_ = None
         self._atlas_in_progress_ = None
         self.downloadThread = None
         self.progressDlg = None
@@ -250,11 +251,12 @@ class BrainAtlasManager(QtCore.QObject):
         
         return True
         
-    def initAtlasForSpecies(self, taxon:typing.Union[str, taxonbridge.Taxon], atlasName:typing.Optional[str]=None):
+    def initAtlasForSpecies(self, taxon:typing.Union[str, taxonbridge.Taxon], 
+                            atlasName:typing.Optional[str]=None):
         if not self.hasBrainGlobeAtlasAPI():
             return
         
-        if len(self._all_available_atlas_names_) == 0:
+        if len(self.atlasNames) == 0:
             scipywarn("No atlases are available. Make sure the REQUIRED package brainglobe (or at least brainglobe_atlasapi) is installed.")
             return
         
@@ -280,7 +282,7 @@ class BrainAtlasManager(QtCore.QObject):
                 # and continue with that
                 species = taxon
             
-            if species.lower().startswith("rat") or species.lower().endswith("rat"):
+            if any(species.lower().startswith(a) or species.lower().endswith(a) for a in ("rat", "rats")):
                 species = "rat"
                 
             elif any(species.lower().startswith(a) or species.lower().endswith(a) for a in ("mus", "mouse", "mice")):
@@ -292,16 +294,28 @@ class BrainAtlasManager(QtCore.QObject):
         if "mice" in species.lower():
             species = "mouse"
             
-        atlas_names_for_species = [a for a in self._all_available_atlas_names_ if species in a]
+        atlas_names_for_species = list(filter(lambda x: species in x, self.atlasNames))
+        
+        chosen_atlas = None
         
         if isinstance(atlasName, str) and len(atlasName.strip()):
             if atlasName not in atlas_names_for_species:
                 scipwarn(f"The supplied atlas name {atlasName} is not valid for species {species}")
                 
             else:
-                default_atlas = atlasName
+                chosen_atlas = atlasName
                 
         else:
+            if len(atlas_names_for_species) > 1:
+                chosen_atlas = self.selectAtlasName(atlas_names_for_species, retNone=True)
+            elif len(atlas_names_for_species) == 1:
+                chosen_atlas = atlas_names_for_species[0]
+            else:
+                chosen_atlas = self.selectAtlasName(species, retNone=True)
+        
+        ret = ""
+        
+        if chosen_atlas is None:
             if species == "mouse":
                 default_atlas = DEFAULT_MOUSE_BRAIN_ATLAS
                 
@@ -311,26 +325,22 @@ class BrainAtlasManager(QtCore.QObject):
             else:
                 raise ValueError(f"Species {species} is not yet supported ")
         
-        ret = ""
-        
-        if len(atlas_names_for_species) == 0:
-            scipywarn(f"No brain atlas for species {species} is found")
-            return
-        
-        elif len(atlas_names_for_species) > 1:
-            if default_atlas in atlas_names_for_species:
-                scipywarn(f"There is more than one brain atlas available. The default one ({default_atlas}) will be used")
-                ret = default_atlas
-            else:
-                scipywarn(f"There is more than one brain atlas available, but the default one ({default_atlas}) is not among them. The first available one ({atlas_names[0]}) will be used")
-                ret = atlas_names_for_species[0]
+            if len(atlas_names_for_species) == 0:
+                scipywarn(f"No brain atlas for species {species} is found")
+                return
+            
+            elif len(atlas_names_for_species) > 1:
+                if default_atlas in atlas_names_for_species:
+                    scipywarn(f"There is more than one brain atlas available. The default one ({default_atlas}) will be used")
+                    ret = default_atlas
+                else:
+                    scipywarn(f"There is more than one brain atlas available, but the default one ({default_atlas}) is not among them. The first available one ({atlas_names_for_species[0]}) will be used")
+                    ret = atlas_names_for_species[0]
             
         else:
-            ret = atlas_names_for_species[0]
+            ret = chosen_atlas
             
-        self._atlas_name_ = ret
-        
-        self.initAtlas(ret)
+        return self.initAtlas(ret)
         
     def _parse_size(self, s:str) -> int:
         """Parses the archive size from the HTML file for a given atlas archive.
@@ -425,7 +435,7 @@ class BrainAtlasManager(QtCore.QObject):
         
         self.netMan = network.ScipyenNetworkManager(progressUIFactory = CancellableQProgressBar)
         self.netMan.sig_networkError[object].connect(self._slot_networkError)
-        self.netMan.sig_resultReady[object].connect(self._slot_extractArchive)
+        self.netMan.sig_resultReady[object].connect(self._slot_extractAtlasArchive)
         self.netMan.sig_finished.connect(self.slot_networkOperationFinished)
         
         handle = functools.partial(self._getArchiveSizeAndDownload, 
@@ -442,10 +452,9 @@ class BrainAtlasManager(QtCore.QObject):
                                            f"{self.__class__.__name__}",
                                            f"Error from {url_msg[0]}:\n{url_msg[1]}")
         
-    @Slot(object)
-    def _slot_extractArchive(self, target:typing.Union[str, pathlib.Path]) -> None:
+    def _extractAtlasArchive(self, target:typing.Union[str, pathlib.Path]) -> bool:
         import tarfile
-        print(f"{self.__class__.__name__}._slot_extractArchive: target = {target}")
+        print(f"{self.__class__.__name__}._extractAtlasArchive: target = {target}")
         targetDir = self.getBrainGlobeConfiguration()["default_dirs"]["brainglobe_dir"]
         if isinstance(target, str):
             target = pathlib.Path(target)
@@ -459,37 +468,50 @@ class BrainAtlasManager(QtCore.QObject):
         if isinstance(target, pathlib.Path):
             path = target.as_posix()
             if not target.exists():
-                raise RuntimeError(f"In {__name__}.extract_archive: File object {path} does not exist!")
+                raise RuntimeError(f"In {self.__class__.__name__}._extractAtlasArchive: File object {path} does not exist!")
             
-            # print(f"In {self.__class__.__name__}._slot_extractArchive: path = {path}")
             tar = tarfile.open(path)
             try:
                 tar.extractall(path = targetDir)
                 tar.close()
                 target.unlink()
+                return True
             except:
                 traceback.print_exc()
+                return False
+            
+        return False
         
-        # if self.netMan.receivers(self.netMan.sig_finished) > 0:
-        #     self.netMan.sig_finished.disconnect()
-        # if self.netMan.receivers(self.netMan.sig_replyFromUrl) > 0:
-        #     self.netMan.sig_replyFromUrl.disconnect()
-        # if self.netMan.receivers(self.netMan.sig_resultReady) > 0:
-        #     self.netMan.sig_resultReady.disconnect()
+    @Slot(object)
+    def _slot_extractAtlasArchive(self, target:typing.Union[str, pathlib.Path]) -> None:
+        ret = self._extractAtlasArchive(target)
+                
+    @Slot(object)
+    def _slot_extractAtlasArchiveAndInit(self, target:typing.Union[str, pathlib.Path]) -> None:
+        # print(f"{self.__class__.__name__}._slot_extractAtlasArchiveAndInit: target = {target}")
+        ret = self._extractAtlasArchive(target)
+        if ret and self._atlas_name_to_initialize_ is not None:
+            self._atlas = BGAtlas(self._atlas_name_to_initialize_, check_latest=False)
+            print(f"{printStyled(f'{self._atlas_name_to_initialize_}', 'green')} was initialized")
+            self._atlas_name_to_initialize_ = None
         
     def initAtlas(self, name:typing.Optional[str]=None):
-        if name is None or (isinstance(name, str) and (len(name.strip()) == 0 or name not in self.availableAtlasNames)):
+        if name is None or (isinstance(name, str) and (len(name.strip()) == 0 or name not in self.atlasNames)):
             name = self.selectAtlasName()
             if name is None:
                 return
                     
-        if name not in self._local_atlas_names_:
-            self._downloadAtlas(name)
+        if name not in self.localAtlasNames:
+            scipywarn(f"The atlas {name} will be available as the 'atlas' attribute once donwloaded and initialized")
+            self.downloadAtlas(name, True)
         else:
             # TODO 2024-11-24 21:23:14
             # make 'check_latest' below a Scipyen configurable variable
             # (not Qt configurable)
             self._atlas = BGAtlas(name, check_latest=False) 
+            self._atlas_name_to_initialize_ = None
+            
+            return self._atlas
                 
     def showAtlases(self, show_local_path:bool=False, toConsole:bool=True, 
                     table_width:int=80) -> typing.Optional[pd.DataFrame]:
@@ -546,7 +568,7 @@ class BrainAtlasManager(QtCore.QObject):
         except:
             traceback.print_exc()
             
-    def downloadAtlas(self, name:typing.Optional[str]) -> None:
+    def downloadAtlas(self, name:typing.Optional[str], initAtlas:bool=False) -> None:
         """Downloads an atlas data from the BrainGlobe GIN repository
         
         https://gin.g-node.org/brainglobe/atlases/raw/master/
@@ -566,6 +588,10 @@ class BrainAtlasManager(QtCore.QObject):
         
         if not self.hasBrainGlobeAtlasAPI():
             return
+        
+        slot = self._slot_extractAtlasArchiveAndInit if initAtlas else self._slot_extractAtlasArchive
+        
+        self._atlas_name_to_initialize_ = name if initAtlas else None
         
         versions = self.getAtlasesConfiguration()
         if not isinstance(name, str) or len(name.strip()) == 0 or name not in self.atlases:
@@ -587,7 +613,7 @@ class BrainAtlasManager(QtCore.QObject):
         url1 = url.replace("raw", "src")
         
         self.netMan = network.ScipyenNetworkManager(progressUIFactory = CancellableQProgressBar)
-        self.netMan.sig_resultReady[object].connect(self._slot_extractArchive)
+        self.netMan.sig_resultReady[object].connect(self._slot_extractAtlasArchive)
         
         handle = functools.partial(self._getArchiveSizeAndDownload, 
                                    targetDir = self.localDownloadDirectory,
@@ -640,7 +666,8 @@ class BrainAtlasManager(QtCore.QObject):
             
         pass
 
-    def selectAtlasName(self, choices:typing.Optional[typing.Union[typing.Sequence[str | taxonbridge.Taxon], str, taxonbridge.Taxon]]=None,
+    def selectAtlasName(self, choices:typing.Optional[typing.Union[typing.Sequence[str], str]]=None,
+                        retNone:bool=False,
                         dlgTitle:typing.Optional[str]=None,
                         dlgParent:typing.Optional[QtWidgets.QWidget] = None) -> str:
         from gui.itemslistdialog import ItemsListDialog
@@ -656,9 +683,6 @@ class BrainAtlasManager(QtCore.QObject):
                 if len(names) == 0:
                     scipywarn("No valid atlas names were supplied")
                     names = atlasNames
-                    
-            # TODO: use taxon names via taxonbridge
-                
             
         elif isinstance(choices, str) and len(choices.strip()):
             names = list(filter(lambda x: choices in x, atlasNames))
@@ -670,7 +694,8 @@ class BrainAtlasManager(QtCore.QObject):
             names = atlasNames
             
         if len(names) == 0:
-            scipywarn
+            if retNone:
+                return
             
         if not isinstance(dlgTitle, str) or len(dlgTitle.strip()) == 0:
             dlgTitle = "Choose from available atlas names:"
@@ -710,20 +735,29 @@ class BrainAtlasManager(QtCore.QObject):
         
         # self._downloadAtlas(name, setOwn=False)
         
+    def getAtlasStructure(self, name:str,
+                        acro:bool=False,
+                        cutoff = 0.5,
+                        maxfound = 10,
+                        ):
+        """See get_atlas_structure(…) module-level function"""
+        if self._atlas is None:
+            raise RuntimeError("no atlas has been initialized yet")
+        
+        return get_atlas_structure(name, self._atlas)
+        
     @property
     def atlas(self):
         """
-        TODO  - do NOT use yet!
         """
-        pass
-#         if isinstance(self.downloadThread, QtCore.QThread) and self.downloadThread.isRunning() and isinstance(self._atlas_in_progress_, str):
-#             print(f"Atlas {self._atlas_in_progress_} is still downloading; please wait")
-#             return
-#         
-#         if self._atlas is None:
-#             scipywarn("No atlas has been initialized yet; please call one of:\n self.initAtlas(…)\n self.initAtlasForSpecies(…)\n self.installAtlas(…)\n")
-#             
-#         return self._atlas
+        if self._atlas is None:
+            if self._atlas_name_to_initialize_ is None:
+                return self.initAtlas()
+                # scipywarn("No atlas has been initialized yet; please call one of:\n self.initAtlas(…)\n self.initAtlasForSpecies(…)\n self.installAtlas(…)\n")
+            else:
+                self._atlas = BGAtlas(self._atlas_name_to_initialize_, check_latest=False)
+                
+        return self._atlas
     
     @property
     def localAtlases(self) -> dict:
@@ -792,7 +826,7 @@ class BrainAtlasManager(QtCore.QObject):
         
     # @Slot()
     # def finished(self):
-    #     # print(f"Atlas {self._atlas_name_} has been downloaded.")
+    #     # print(f"Atlas {self._atlas_name_to_initialize_} has been downloaded.")
     #     if isinstance(self.downloadThread, QtCore.QThread) and self.downloadThread.isRunning():
     #         self.downloadThread.requestInterruption()
     #     # for signal in self.downloadThread.signals.signals:
@@ -1401,7 +1435,7 @@ def get_atlas_structure(name:str, atlas:BGAtlas,
     # return None when nothing was found
     if len(matches):
         ret = atlas.structures[matches[0]["id"]]
-        ret["atlasName"] = atlas.atlasName
+        ret["atlasName"] = atlas.atlas_name
         return ret
     
 def atlas_vercomp(x:str, y:typing.Union[str, typing.Tuple[str]]) -> bool:
