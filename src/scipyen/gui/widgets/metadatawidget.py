@@ -1,7 +1,23 @@
 # -*- coding: utf-8 -*-
 """Common widget for meta-information in results
 """
-import os, math, typing, datetime
+# -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
+"""
+"""
+import sys, os, typing
+from qtpy import QtCore, QtGui, QtWidgets, QtSvg, QtNetwork, sip
+from qtpy.QtCore import Signal, Slot, Property
+from qtpy.uic import loadUiType as __loadUiType__
+from core.prog import safeWrapper, scipywarn, printStyled
+from core.sysutils import adapt_ui_path
+
+__module_path__ = os.path.abspath(os.path.dirname(__file__))
+
+import math, datetime
 import numpy as np
 import quantities as pq
 from core import quantities as scq
@@ -9,16 +25,10 @@ from core import strutils
 from core.datatypes import UnitTypes, GENOTYPES
 import pandas as pd
 
-from qtpy import QtCore, QtGui, QtWidgets
-from qtpy.QtCore import Signal, Slot, Property
-from qtpy.uic import loadUiType
-
 from gui.widgets.small_widgets import QuantitySpinBox, QuantityChooserWidget
 from gui.textviewer import TextViewer
 
-__module_path__ = os.path.abspath(os.path.dirname(__file__))
-
-Ui_MetaDataWidget, QWidget = loadUiType(os.path.join(__module_path__, "metadatawidget.ui"))
+Ui_MetaDataWidget, QWidget = __loadUiType__(os.path.join(__module_path__, "metadatawidget.ui"))
 
 class MetaDataWidget(Ui_MetaDataWidget, QWidget):
     """Widget for displaying the most commonly used data attributes in Scipyen.
@@ -28,6 +38,7 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
     sig_valueChanged = Signal(name="sig_valueChanged")
     
     def __init__(self, parent=None, **kwargs):
+        scipywarn(printStyled(f"The class {self.__class__.__name__} is deprecated", "yellow"))
         QWidget.__init__(self, parent=parent)
         
         self._dataVarName = kwargs.pop("varname", "")

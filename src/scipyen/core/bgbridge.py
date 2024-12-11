@@ -62,47 +62,46 @@ from iolib import network
 DEFAULT_RAT_BRAIN_ATLAS = "whs_sd_rat_39um" 
 DEFAULT_MOUSE_BRAIN_ATLAS = "allen_mouse_50um"
 
-class BGStructure:
+class Structure(collections.UserDict):
     """Shim class that will be overwritten below if brainglobe packages are installed"""
-    def __new__(obj, *args, **kwargs):
-        return MISSING
-    def __init__(self, *args, **kwargs):
-        pass
+    def __getitem__(self, name:str):
+        scipywarn(f"The current {self.__class__.__name__} is a shim. You need to install the brainglobe_atlasapi package for full functionality")
+        return self.data.get(name, None)
     
-class BGAtlas:
+class StructuresDict(collections.UserDict):
+    """Shim class that will be overwritten below if brainglobe packages are installed"""
+    def __init__(self, data:list):
+        super().__init__()
+        self.acronym_to_id_map = dict()
+        self.tree = None
+        for k,i in enumerate(data):
+            if isinstance(i, Structure):
+                sid = i.get("id", k)
+                acro = i.get("name", f"Structure Shim {k}")
+                self.data[sid] = i
+                self.acronym_to_id_map[acro] = sid
+        
+    def __getitem__(self, name:str):
+        scipywarn(f"The current {self.__class__.__name__} is a shim. You need to install the brainglobe_atlasapi package for full functionality")
+        return self.data.get(name, None)
+    
+class BrainGlobeAtlas:
     """Shim class that will be overwritten below if brainglobe_atlasapi package is installed"""
-    def __init__(self, *args, **kwargs):
-        pass
-    
-    @property
-    def annotation(self) -> np.ndarray: return np.array([])
-
-    @property
-    def atlas_name(self) -> str: return ""
-    
-    def additional_references(self) -> collections.UserDict : return collections.UserDict()
-    
-    @property
-    def lookup_df(self) -> pd.DataFrame: return pd.DataFrame(columns = ["acronym", "id", "name"])
-    
-    def local_full_name(self) -> str: return ""
-
-    def __getattr__(self, name:str):
-        scipywarn(f"The brainglobe_atlasapi package is not installed; {self.__class__.__name__} is just a placeholder")
-        return
+    def __init__(self, **kwargs):
+        self.atlas_name = kwargs.pop("atlas_name", None)
     
 hasBrainGlobe=False
 hasBrainGlobeAtlasAPI=False
 try:
     import brainglobe_atlasapi
-    from brainglobe_atlasapi import BrainGlobeAtlas as BGAtlas
+    from brainglobe_atlasapi import BrainGlobeAtlas
     from brainglobe_atlasapi.list_atlases import (get_all_atlases_lastversions,
                                                   get_atlases_lastversions,
                                                   get_downloaded_atlases,
                                                   get_local_atlas_version,
                                                   show_atlases)
-    from brainglobe_atlasapi.structure_class import Structure
-    BGStructure = Structure
+    from brainglobe_atlasapi.structure_class import Structure, StructuresDict
+    # BGStructure = Structure
     
     hasBrainGlobe=True
     hasBrainGlobeAtlasAPI=True
@@ -132,8 +131,8 @@ class BGStructureDescriptor:
     
         
     """
-    def __init__(self, *, default:typing.Optional[typing.Union[BGStructure, str, type(pd.NA), type(MISSING)]] = None):
-        # if hasBrainGlobeAtlasAPI and isinstance(default, BGStructure):
+    def __init__(self, *, default:typing.Optional[typing.Union[Structure, str, type(pd.NA), type(MISSING)]] = None):
+        # if hasBrainGlobeAtlasAPI and isinstance(default, Structure):
         if hasBrainGlobeAtlasAPI and isinstance(default, brainglobe_atlasapi.structure_class.Structure):
             self._default = default
             
@@ -154,7 +153,7 @@ class BGStructureDescriptor:
         
         return getattr(obj, self._name, self._default)
 
-    def __set__(self, obj:object, value:typing.Optional[typing.Union[BGStructure, str, type(pd.NA), type(MISSING)]] = None):
+    def __set__(self, obj:object, value:typing.Optional[typing.Union[Structure, str, type(pd.NA), type(MISSING)]] = None):
         if hasBrainGlobeAtlasAPI and isinstance(value, brainglobe_atlasapi.structure_class.Structure):
             setattr(obj, self._name, value)
             
@@ -491,7 +490,7 @@ class BrainAtlasManager(QtCore.QObject):
         # print(f"{self.__class__.__name__}._slot_extractAtlasArchiveAndInit: target = {target}")
         ret = self._extractAtlasArchive(target)
         if ret and self._atlas_name_to_initialize_ is not None:
-            self._atlas = BGAtlas(self._atlas_name_to_initialize_, check_latest=False)
+            self._atlas = BrainGlobeAtlas(self._atlas_name_to_initialize_, check_latest=False)
             print(f"{printStyled(f'{self._atlas_name_to_initialize_}', 'green')} was initialized")
             self._atlas_name_to_initialize_ = None
         
@@ -508,7 +507,7 @@ class BrainAtlasManager(QtCore.QObject):
             # TODO 2024-11-24 21:23:14
             # make 'check_latest' below a Scipyen configurable variable
             # (not Qt configurable)
-            self._atlas = BGAtlas(name, check_latest=False) 
+            self._atlas = BrainGlobeAtlas(name, check_latest=False) 
             self._atlas_name_to_initialize_ = None
             
             return self._atlas
@@ -656,15 +655,15 @@ class BrainAtlasManager(QtCore.QObject):
 #         else:
 #             self._downloadAtlas(name, setOwn=False)
             
-    def installAtlas(self, name:typing.Optional[str] = None):
-        # TODO 2024-12-03 14:06:33 finalize me!
-        from gui.itemslistdialog import ItemsListDialog
-        if name is None or (isinstance(name, str) and (len(name.strip()) == 0 or name not in self.availableAtlasNames)):
-            name = self.selectAtlasName()
-            if name is None:
-                return
-            
-        pass
+#     def installAtlas(self, name:typing.Optional[str] = None):
+#         # TODO 2024-12-03 14:06:33 finalize me!
+#         from gui.itemslistdialog import ItemsListDialog
+#         if name is None or (isinstance(name, str) and (len(name.strip()) == 0 or name not in self.availableAtlasNames)):
+#             name = self.selectAtlasName()
+#             if name is None:
+#                 return
+#             
+#         pass
 
     def selectAtlasName(self, choices:typing.Optional[typing.Union[typing.Sequence[str], str]]=None,
                         retNone:bool=False,
@@ -713,27 +712,27 @@ class BrainAtlasManager(QtCore.QObject):
             if len(names):
                 return names[0]
         
-    def uninstallAtlas(self, name:str):
-        """
-        TODO - Do NOT use yet!
-        """
-        from gui.itemslistdialog import ItemsListDialog
-        
-        if len(self.localAtlasNames) == 0:
-            print("No atlas is installed locally")
-            return
-        
-        if name not in self.localAtlasNames:
-            dlg = ItemsListDialog(parent = self.scipyenWindow, itemsList = self.localAtlasNames,
-                                  title = f"Choose atlas:")
-            a = dlg.exec_()
-            
-            if a == QtWidgets.QDialog.Accepted:
-                names = dlg.selectedItemsText
-                if len(names):
-                    name = names[0]
-        
-        # self._downloadAtlas(name, setOwn=False)
+#     def uninstallAtlas(self, name:str):
+#         """
+#         TODO - Do NOT use yet!
+#         """
+#         from gui.itemslistdialog import ItemsListDialog
+#         
+#         if len(self.localAtlasNames) == 0:
+#             print("No atlas is installed locally")
+#             return
+#         
+#         if name not in self.localAtlasNames:
+#             dlg = ItemsListDialog(parent = self.scipyenWindow, itemsList = self.localAtlasNames,
+#                                   title = f"Choose atlas:")
+#             a = dlg.exec_()
+#             
+#             if a == QtWidgets.QDialog.Accepted:
+#                 names = dlg.selectedItemsText
+#                 if len(names):
+#                     name = names[0]
+#         
+#         # self._downloadAtlas(name, setOwn=False)
         
     def getAtlasStructure(self, name:str,
                         acro:bool=False,
@@ -755,7 +754,7 @@ class BrainAtlasManager(QtCore.QObject):
                 return self.initAtlas()
                 # scipywarn("No atlas has been initialized yet; please call one of:\n self.initAtlas(…)\n self.initAtlasForSpecies(…)\n self.installAtlas(…)\n")
             else:
-                self._atlas = BGAtlas(self._atlas_name_to_initialize_, check_latest=False)
+                self._atlas = BrainGlobeAtlas(self._atlas_name_to_initialize_, check_latest=False)
                 
         return self._atlas
     
@@ -890,66 +889,66 @@ class BrainAtlasManager(QtCore.QObject):
         
         return pd.DataFrame(ret, columns=ret.keys())
         
-    def updateLocalAtlases(self, force:bool=False):
-        """
-        TODO - Do NOt use yet!
-        """
-        pass
-#         # from brainglobe_atlasapi.update_atlases import update_atlas
-#         progressDlg = QtWidgets.QProgressDialog("Updating local atlases...", "Abort",
-#                                                 0, len(self.localAtlasNames), 
-#                                                 self.scipyenWindow)
+#     def updateLocalAtlases(self, force:bool=False):
+#         """
+#         TODO - Do NOt use yet!
+#         """
+#         pass
+# #         # from brainglobe_atlasapi.update_atlases import update_atlas
+# #         progressDlg = QtWidgets.QProgressDialog("Updating local atlases...", "Abort",
+# #                                                 0, len(self.localAtlasNames), 
+# #                                                 self.scipyenWindow)
+# #         
+# #         progressDlg.setMinimumDuration(1000)
+# #         progressDlg.canceled.connect(self._slot_breakLoop)
+# #         
+# #         workerThread = pgui.LoopWorkerThread(self, self.batchUpdate)
+# #         workerThread.signals.signal_Progress[int].connect(progressDlg.setValue)
+# #         workerThread.signals.signal_Result[object].connect(self.batchUpdateReady)
+# #         workerThread.signals.signal_Finished.connect(progressDlg.reset)
+# #         workerThread.start()
+        
 #         
-#         progressDlg.setMinimumDuration(1000)
-#         progressDlg.canceled.connect(self._slot_breakLoop)
-#         
-#         workerThread = pgui.LoopWorkerThread(self, self.batchUpdate)
-#         workerThread.signals.signal_Progress[int].connect(progressDlg.setValue)
-#         workerThread.signals.signal_Result[object].connect(self.batchUpdateReady)
-#         workerThread.signals.signal_Finished.connect(progressDlg.reset)
-#         workerThread.start()
+#     def batchUpdate(self, **kwargs):
+#         """
+#         TODO - Do NOt use yet!
+#         """
+#         canceled = False
+#         progressSignal = kwargs.pop("progressSignal", None)        
+#         for k, name in enumerate(self.localAtlasNames):
+#             try:
+#                 self._updateAtlas(name, inBatch=True)
+#                 
+#             except:
+#                 traceback.print_exc()
+#                 continue
+#             
+#             progressSignal.emit(k)
         
-        
-    def batchUpdate(self, **kwargs):
-        """
-        TODO - Do NOt use yet!
-        """
-        canceled = False
-        progressSignal = kwargs.pop("progressSignal", None)        
-        for k, name in enumerate(self.localAtlasNames):
-            try:
-                self._updateAtlas(name, inBatch=True)
-                
-            except:
-                traceback.print_exc()
-                continue
-            
-            progressSignal.emit(k)
-        
-    @Slot(object)
-    def batchUpdateReady(self, _):
-        """
-        TODO - Do NOt use yet!
-        """
-        self.loopControl["break"] = False
-        # try:
-        #     ok = bool(obj) == True
-        # except:
-        #     ok = False
+    # @Slot(object)
+    # def batchUpdateReady(self, _):
+    #     """
+    #     TODO - Do NOt use yet!
+    #     """
+    #     self.loopControl["break"] = False
+    #     # try:
+    #     #     ok = bool(obj) == True
+    #     # except:
+    #     #     ok = False
             
     @Slot()
     def _slot_breakLoop(self):
         self.loopControl["break"] = True
         
-    def updateLocalAtlas(self, name:str, force:bool=False):
-        """
-        TODO - Do NOt use yet!
-        """
-        # from brainglobe_atlasapi.update_atlases import update_atlas
-        if name not in self.localAtlasNames:
-            self._downloadAtlas(name, False)
-        else:
-            self._updateAtlas(name)
+    # def updateLocalAtlas(self, name:str, force:bool=False):
+    #     """
+    #     TODO - Do NOt use yet!
+    #     """
+    #     # from brainglobe_atlasapi.update_atlases import update_atlas
+    #     if name not in self.localAtlasNames:
+    #         self._downloadAtlas(name, False)
+    #     else:
+    #         self._updateAtlas(name)
             
 #     def _retrieveRemoteAtlasesList(self):
 #         """Does what brainglobe_atlasapi.utils.conf_from_url(…) does.
@@ -1338,7 +1337,7 @@ class BrainAtlasManager(QtCore.QObject):
     
 # ### BEGIN ---- module-level functions
         
-def get_atlas_structure(name:str, atlas:BGAtlas, 
+def get_atlas_structure(name:str, atlas:BrainGlobeAtlas, 
                         acro:bool=False,
                         cutoff = 0.5,
                         maxfound = 10,

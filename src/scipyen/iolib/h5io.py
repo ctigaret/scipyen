@@ -1280,8 +1280,9 @@ def fromHDF5(entity:typing.Union[h5py.Group, h5py.Dataset], cache:dict={}):
     # this is useful for dealing with 'soft links' in the HDF5 so we 
     # don't duplicate data upon reading from the file
     
-    # print(f"\tentity : {entity}")
-    # print(f"\tentity name: {entity.name}")
+    from core import taxonbridge, bgbridge
+    
+    # print(f"\tentity : {entity} name: {entity.name} type: {type(entity).__name__}")
     
     if entity in cache:
         return cache[entity]
@@ -1292,7 +1293,7 @@ def fromHDF5(entity:typing.Union[h5py.Group, h5py.Dataset], cache:dict={}):
 
     try:
         type_name = attrs.get("type_name", None)
-        # print(f"\ttype_name: {type_name}")
+        print(f"\ttype_name: {type_name}")
         if type_name is None:
             return None
         python_class = attrs["python_class"]
@@ -1368,6 +1369,24 @@ def fromHDF5(entity:typing.Union[h5py.Group, h5py.Dataset], cache:dict={}):
                 if target_class == bytearray:
                     obj = bytearray(obj)
                 
+            elif target_class is taxonbridge.Taxon:
+                # return the scientific name if cannot instantiate, although the
+                # shim in taxonbridge should work
+                data = dataset2string(entity)
+                try:
+                    obj = target_class(scientific_name = data)
+                except:
+                    traceback.print_exc()
+                    return data
+                
+            elif target_class is bgbridge.BrainGlobeAtlas:
+                data = dataset2string(entity)
+                try:
+                    obj = target_class(data, check_latest=False)
+                except:
+                    traceback.print_exc()
+                    return data
+                
             elif target_class == datetime.timedelta:
                 days = int(attrs.get("days", 0))
                 microseconds = int(attrs.get("microseconds", 0))
@@ -1416,7 +1435,11 @@ def fromHDF5(entity:typing.Union[h5py.Group, h5py.Dataset], cache:dict={}):
                 obj = vu.kernelfromarray(data)
                 
             else:
-                obj = target_class # for now
+                if enum.Enum in inspect.getmro(target_class):
+                    data = entity[()]
+                    obj = target_class(data)
+                else:
+                    obj = target_class # for now
             
     else: # entity is a group
         # NOTE: 2022-10-06 13:50:07
@@ -2492,25 +2515,25 @@ def toHDF5(obj, group:h5py.Group, name:typing.Optional[str]=None,
     by delegating to 'makeHDF5Group' and 'makeHDF5Dataset', respectively, 
     according to the following general rule:
     
-    * a container object (e.g., dict, list, deque) generates a child group 
+    • a container object (e.g., dict, list, deque) generates a child group 
         (via 'makeHDF5Group'), with the container's elements stored inside the 
         newly generated child group (either as a data set, or as a nested group,
         according to the object's type AND the rules described here)    
     
-    * str, bytes, bytearray, numpy ndarray (including numpy structured array) 
+    • str, bytes, bytearray, numpy ndarray (including numpy structured array) 
         objects are stored directly as data sets (via makeHDF5Dataset)
     
     Object type specific information is stored in the 'attrs' dictionary of
     the child group or data set.
     
     A few types require special handling, hence they are EXCEPTIONS from this
-    rule. 
+    rule:
     
-    Kernel1D, Kernel2D (vigra.filters):
+    • Kernel1D, Kernel2D (vigra.filters):
         These are converted to numpy array (see vigrautils.kernel2array) then 
         stored as child Dataset.
       
-    VigraArray (vigra) and neo's DataObjects (e.g., AnalogSignal, etc), are ALL
+    • VigraArray (vigra) and neo's DataObjects (e.g., AnalogSignal, etc), are ALL
         stored as a Group containing at least two Dataset objects:
         1. a Dataset that stores the main data  
         2. a Dataset for each axis, that stores the information for the 
@@ -2528,13 +2551,13 @@ def toHDF5(obj, group:h5py.Group, name:typing.Optional[str]=None,
         calibration, name, units (VigraArrays and neo-like data objects) and 
         axistags (for VigraArrays).
       
-    neo's ChannelView: 
+    • neo's ChannelView: 
         stored as a group + child data set (via makeHDF5Dataset)
     
-    Python's Enum types:
+    • Python's Enum types:
         stored directly as data sets with h5py enum dtype 
       
-    Pandas DataFrame and Series objects:
+    • Pandas DataFrame and Series objects:
         These objects types are converted to a structured array first (see
         'pandas2Structarray' function); therefore, they will be stored as a
         group, and the data itself as a data set generated on the structured 
@@ -2542,20 +2565,26 @@ def toHDF5(obj, group:h5py.Group, name:typing.Optional[str]=None,
         Categorical data information, when present, is also stored as a nested
         child group in 'group' (named "categorical_info").
         
-    Numpy array (other than Python Quantity, VigraArray, neo dataobjects), 
+    • Numpy array (other than Python Quantity, VigraArray, neo dataobjects), 
         objects of the Python iterable types: str, bytes, bytearray, and 
         Python homogeneous sequences (i.e., with ALL elements of the same scalar 
         type or str):
       strored as data set via makeHDF5Dataset
     
-    Python iterable and neo's Container objects (e.g. Block, Segment, etc)
+    • Python iterable and neo's Container objects (e.g. Block, Segment, etc)
       stored as a group via makeHDF5Group
+    
+    • Taxon: this can be a shim class or indeed the taxoniq.Taxon class, depending
+      on whether taxoniq is installed or not. In either case we only store the 
+        scientific_name:str attribute, as this is the lowest common denominator
+        for constructing both classes.
       
     Objects that define their own 'toHDF5' method are stored as defined
-    by the method code. 
+    by the code in their own method. 
       
     """
     from imaging import vigrautils as vu
+    from core import taxonbridge, bgbridge
 
     # NOTE: 2024-07-18 14:00:22
     # 1. check if the data type defines an instance method 'toHDF5'; 
@@ -2803,6 +2832,52 @@ def toHDF5(obj, group:h5py.Group, name:typing.Optional[str]=None,
         storeEntityInCache(entity_cache, obj, entity)
         
         return entity
+    
+    elif isinstance(obj, taxonbridge.Taxon):
+        # store the scientific_name attribute as a dataset, but attributes will 
+        # indicate this is a Taxon instance
+        # upon loading fromHDF5 will use this entity to construct a new Taxon 
+        # instance (which may be a shim)
+        cached_entity = getCachedEntity(entity_cache, obj)
+        if isinstance(cached_entity, h5py.Dataset):
+            group[target_name] = cached_entity
+            return cached_entity
+        
+        # bypass makeHDF5Dataset, because obj is a taxan although we only store
+        # its scientific name (a str); the latter will be used to reconstruct
+        # from the HDF5
+        
+        # ATTENTION: the created dataset will have NO shape !!! (i.e. len shape is 0)
+        entity = makeDataset(obj.scientific_name, group, obj_attrs, target_name,
+                             compression=compression, chunks=chunks,
+                             track_order=track_order, entity_cache=entity_cache)
+        
+        storeEntityInCache(entity_cache, obj, entity)
+        return entity
+    
+    elif isinstance(obj, bgbridge.BrainGlobeAtlas):
+        # store the atlas_name attribute as a dataset, but attributes will 
+        # indicate this is a BrainGlobeAtlas instance
+        # upon loading from HDF5 will use this entity to construct a new instance
+        # of the brainglobe atlas which may be a shim if api is not available
+        
+        cached_entity = getCachedEntity(entity_cache, obj)
+        if isinstance(cached_entity, h5py.Dataset):
+            group[target_name] = cached_entity
+            return cached_entity
+        
+        entity = makeDataset(obj.atlas_name, group, obj_attrs, target_name,
+                             compression=compression, chunks=chunks,
+                             track_order=track_order, entity_cache=entity_cache)
+        
+        storeEntityInCache(entity_cache, obj, entity)
+        return entity
+        
+        
+    
+#     elif isinstance(obj, bgbridge.Structure, bgbridge.StructuresDict):
+#         
+        
     
     else:
         if (isinstance(obj, (collections.abc.Iterable, neo.core.container.Container)) or hasattr(type(obj),"__iter__")) and \

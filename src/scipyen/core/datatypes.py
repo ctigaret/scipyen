@@ -36,6 +36,7 @@ import types
 import warnings
 import weakref
 import h5py
+import treelib
 from copy import (deepcopy, copy,)
 
 #### END core python modules
@@ -60,10 +61,10 @@ from core import quantities as scq
 from core import xmlutils
 from core import strutils
 from core.prog import (safeWrapper, is_hashable, is_type_or_subclass, 
-                       ImmutableDescriptor, scipywarn, NoData)
+                       ImmutableDescriptor, scipywarn, NoData, printStyled)
 from core.datazone import DataZone
 from core.datasignal import (_new_DataSignal, _new_IrregularlySampledDataSignal, DataSignal, IrregularlySampledDataSignal)
-from core.bgbridge import (BGStructure, BGAtlas, BGStructureDescriptor,
+from core.bgbridge import (BGStructureDescriptor,
                            get_all_atlases_lastversions,
                            get_atlases_lastversions,
                            get_downloaded_atlases,
@@ -810,7 +811,6 @@ class DoseDescriptor:
 #         pass
 
 @dataclass
-# class ScipyenDataclass(ScipyenDataclassABC):
 class ScipyenDataclass:
     # def __repr__(self):
     #     print(f"{self.__class__.__name__}.__repr__()")

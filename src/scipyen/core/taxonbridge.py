@@ -7,11 +7,19 @@
 Wrapper around BrainGlobe API, with shims
 """
 class Taxon:
-    """Shim class that will be overwritten below if taxoniq package is installed"""
-    def __new__(obj, *args, **kwargs):
-        return MISSING
-    def __init__(self, *args, **kwargs):
-        pass
+    """Shim class that will be overwritten below if taxoniq package is installed.
+    For HDF5 storage, all we need is a scientific_name
+    """
+    # def __new__(obj, *args, **kwargs):
+    #     return MISSING
+    def __init__(self, **kwargs):
+        self.tax_id = None
+        self.scientific_name = kwargs.pop("scientific_name", None)
+        
+    def __getattr__(self, name:str):
+        scipywarn(f"The current {self.__class__.__name__} is a shim. You need to install the taxoniq package for full functionality")
+        return
+        
     
 # from core.ncbi_entrez import list_databases
 
@@ -67,6 +75,9 @@ def get_taxon(s:str) -> Taxon | str:
     else:
         scipywarn(f"taxoniq package is not installed")
         return s
+    
+# def toHDF5(obj:tpying.Union[Taxon, str]): # -> see iolib.h5io
+#     pass
 
 class TaxonDescriptor:
     """Python descriptors for taxoniq.Taxon or a placeholder if taxoniq is not available
