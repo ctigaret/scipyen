@@ -64,7 +64,7 @@ function install_miniforge ()
     rm -fr Miniforge3.sh
 }
 
-function complete_install ()
+function install_additionals_for_miniforge ()
 {
     echo
     echo "Installing additional pip packages"
@@ -129,15 +129,15 @@ if [ -z "$CONDA_DEFAULT_ENV" ]; then
     select opt in "${conda_options[@]}"
     do
         case $opt in
-            "Miniforge is installed in a custom place")
-                request_miniforge
-                break
-                ;;
             "Install Miniforge")
                 echo
                 echo "Will install Miniforge in $HOME/miniforge3"
                 echo
                 install_miniforge
+                break
+                ;;
+            "Miniforge is installed elsewhere")
+                request_miniforge
                 break
                 ;;
             "Quit")
@@ -175,7 +175,7 @@ fi
 
 echo "$env_name IS ACTIVE"
 echo
-complete_install
+install_additionals_for_miniforge
 
 if [[ $? -ne 0 ]]; then
     echo "You must complete the installation manually"
