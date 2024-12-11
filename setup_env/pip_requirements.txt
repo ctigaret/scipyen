@@ -205,7 +205,6 @@ requests-toolbelt
 researchpy
 scikit-image
 scikit-learn
-scikit-bio
 scipy
 seaborn
 shapely
@@ -249,7 +248,7 @@ xyzservices
 zipp
 
 # NOTE: since 2024-11-19 22:04:24
-nbci-taxonomist # will also install entrezpy
+ncbi-taxonomist # will also install entrezpy
 entrez-utils
 biopython
 taxoniq
@@ -264,4 +263,5 @@ napari[all]
 brainglobe
 brainrender 
 brainglobe-segmentation
+scikit-bio
 

@@ -120,36 +120,18 @@ echo
 
 }
 
-# echo "Run this script from a directory OUTSIDE scipyen repo"
-realscript=`realpath $0`
-scipyendir=`dirname "$realscript"`
-env_name="scipyenv"
-miniforge_dir=$HOME/miniforge3
-virtualenv_dir=$HOME/$env_name
-
-# if [[ $(pwd) == ${scipyendir} ]]; then
-#     conda_reqs=setup_env/conda_reqs.txt
-#     echo
-#     echo "You must run this script from a directory OUTSIDE scipyen repo."
-#     echo "Goodbye!"
-#     echo
-#     exit -1
-# else
-#     conda_reqs="$scipyendir"/setup_env/conda_reqs.txt
-# fi
-
-
+function install_in_miniforge() 
+{
 if [ -z "$CONDA_DEFAULT_ENV" ]; then
     echo "Conda (Miniforge) does not appear to be available."
     PS3='Please enter your choice: '
-    options=("Install Miniforge" "Miniforge is installed elsewhere" "Quit")
-    select opt in "${options[@]}"
+    conda_options=("Install Miniforge" "Miniforge is installed elsewhere" "Quit")
+    select opt in "${conda_options[@]}"
     do
         case $opt in
             "Miniforge is installed in a custom place")
                 request_miniforge
                 break
-    #             echo "you chose choice 1"
                 ;;
             "Install Miniforge")
                 echo
@@ -158,9 +140,6 @@ if [ -z "$CONDA_DEFAULT_ENV" ]; then
                 install_miniforge
                 break
                 ;;
-    #         "Option 3")
-    #             echo "you chose choice $REPLY which is $opt"
-    #             ;;
             "Quit")
                 exit 0
                 break
@@ -220,6 +199,50 @@ fi
 
 make_launch_script_conda
 
+}
+
+# echo "Run this script from a directory OUTSIDE scipyen repo"
+realscript=`realpath $0`
+scipyendir=`dirname "$realscript"`
+env_name="scipyenv"
+miniforge_dir=$HOME/miniforge3
+virtualenv_dir=$HOME/$env_name
+
+# if [[ $(pwd) == ${scipyendir} ]]; then
+#     conda_reqs=setup_env/conda_reqs.txt
+#     echo
+#     echo "You must run this script from a directory OUTSIDE scipyen repo."
+#     echo "Goodbye!"
+#     echo
+#     exit -1
+# else
+#     conda_reqs="$scipyendir"/setup_env/conda_reqs.txt
+# fi
+
+if [ $# == 0 ] ; then
+    install_options=("Use Miniforge" "Build virtual environment (requires virtualenv)" "Quit")
+    select option in "${install_options[@]}"
+    do
+        case $option in 
+            "Use Miniforge")
+                install_in_miniforge
+                break
+                ;;
+                
+            "Build local environment")
+                exec ${scipyendir}/virtualenv_build.sh
+                break
+                ;;
+                
+            "Quit")
+                exit 0
+                break
+                ;;
+        esac
+    done
+else
+    exec ${scipyendir}/virtualenv_build.sh $*
+fi
 
 # the scipyenv is already created
 
