@@ -49,7 +49,7 @@ def get_nearest_parent_common_name(t:Taxon):
 # supported_species=["Homo", "Danio", "Caenorhabditis", "Rattus", "Mus", "Gallus"]
 supported_species=["Rattus", "Mus"]
     
-def get_taxon(s:str) -> Taxon | None:
+def get_taxon(s:str) -> Taxon | str:
     if hasTaxoniq:
         try:
             if s.lower() in ["mouse", "mice"]:
@@ -63,9 +63,10 @@ def get_taxon(s:str) -> Taxon | None:
         except:
             errorstr = traceback.format_exc()
             scipywarn(f"Cannot obtain a Taxon for {s}:\n{errorstr}")
-            return 
+            return s
     else:
         scipywarn(f"taxoniq package is not installed")
+        return s
 
 class TaxonDescriptor:
     """Python descriptors for taxoniq.Taxon or a placeholder if taxoniq is not available

@@ -1377,6 +1377,7 @@ class Biometrics(ScipyenDataclass):
 class Organism(ScipyenDataclass):
     taxon:TaxonDescriptor = TaxonDescriptor(default="Rattus")
     subspecies:str = "Sprague Dawley"
+    strain:str = ""
     stage:OrganismStage = dataclasses.field(default=OrganismStage.postnatal)
     biometrics:Biometrics = dataclasses.field(default_factory=Biometrics)
     
@@ -1644,7 +1645,7 @@ class Treatment(Procedure):
         return "\n".join(ret)
     
     def __post_init__(self):
-        super().__init__(name=self.name, substance=self.substance, description=self.description, 
+        super().__init__(name=self.name, description=self.description, 
                          type = ProcedureType.treatment)
         
     def __eq__(self, other):
