@@ -105,6 +105,7 @@ AP_WIDTH_CODES =   {0: "AP_durations_V_0",
 
 @dataclass
 class MembranePropertiesAnalysisParameters(datatypes.ScipyenDataclass):
+    name:str = "Membrane properties analysis parameters"
     metadata:BaseScipyenData = dataclasses.field(default_factory = BaseScipyenData)
     # Contains biological sample parameters, procedure details and origin (file,
     # file datetime, recording datetime, analysis datetime)
@@ -327,14 +328,14 @@ class MembranePropertiesAnalysisParameters(datatypes.ScipyenDataclass):
     
     # __changed__ = False
     
-    def __eq__(self, other):
-        if not isinstance(other, self.__class__):
-            return False
-        
-        ret = self.name == other.name
-        
-        if ret:
-            ret &= all(getattr(self, f.name) == getattr(other, f.name) for f in dataclasses.fields(self.__class__))
+#     def __eq__(self, other):
+#         if not isinstance(other, self.__class__):
+#             return False
+#         
+#         ret = self.name == other.name
+#         
+#         if ret:
+#             ret &= all(getattr(self, f.name) == getattr(other, f.name) for f in dataclasses.fields(self.__class__))
 
     def __repr__(self):
         indent = lambda x: x.replace("\n", "\n\t")

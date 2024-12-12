@@ -362,6 +362,8 @@ def sequence_element_type(s):
     from core.utilities import unique
     return unique(tuple(type(e) for e in s))
 
+
+
 def check_type(t:typing.Union[type, typing.Sequence[type], typing.Set[type]], 
                      ref:typing.Union[type, typing.Sequence[type], typing.Set[type], typing._UnionGenericAlias],
                      use_mro:bool=False,
@@ -792,55 +794,52 @@ class DoseDescriptor:
         setattr(obj, self._name, value)
         
             
-# class ScipyenDataclassABC(metaclass=ABCMeta):
-#     @abstractmethod
-#     def __repr__(self):
-#         return ""
-#     
-#     @abstractmethod
-#     def __eq__(self, other):
-#         pass
-#     
-#     @abstractmethod
-#     def toHDF5(self, *args, **kwargs):
-#         pass
-#     
-#     @classmethod
-#     @abstractmethod
-#     def fromHDF5(cls, *args, **kwargs):
-#         pass
-
 @dataclass
 class ScipyenDataclass:
-    # BUG: 2024-12-12 00:43:33  FIXME
-    # cannot store all fields as entity attributes, because subclasses of 
-    # ScipyenDataclass MAY have composite types which cannot be encoded in json.
-    #
-    # Therefore: TODO: convert to dict using asdict then store it as if is was a dict!
-    # TODO: adapt fromHDF5 to reflect this!
+    name:str = dataclasses.field(default_factory=str)
     
-    # see examples in h5io.objectToEntity
-    # def __repr__(self):
-    #     print(f"{self.__class__.__name__}.__repr__()")
-    #     repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {x}"
-    #     ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
-    #     return "\n".join(ret)
+    def diff(self, other):
+        if other.__class__ != self.__class__:
+            raise TypeError(f"Expecting an object of type {self.__class__.__name__}; instead, got {type(other).__name__}")
+        
+        diff_fields = tuple(filter(lambda f: np.all(getattr(self, f.name) != getattr(other, f.name)), dataclasses.fields(self.__class__)))
+        
+        return dict(map(lambda f: (f.name, (getattr(self, f.name), getattr(other, f.name))), diff_fields))
     
-    def __eq__(self, other):
+    def __eq__(self, other) -> bool:
         if not isinstance(other, self.__class__):
             return False
         
         ret = self.name == other.name
         
         if ret:
-            ret &= all(getattr(self, f.name) == getattr(other, f.name) for f in dataclasses.fields(self.__class__))
+            # ret &= all(getattr(self, f.name) == getattr(other, f.name) for f in dataclasses.fields(self.__class__))
+            ret &= all(map(lambda f: np.all(getattr(self, f.name) == getattr(other, f.name)), dataclasses.fields(self.__class__)))
             
         return ret
+    
+    # def __repr__(self):
+    #     print(f"{self.__class__.__name__}.__repr__()")
+    #     repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {x}"
+    #     ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
+    #     return "\n".join(ret)
     
     def toHDF5(self, group:h5py.Group, name:str, oname:str, 
                        compression:str, chunks:bool, track_order:bool,
                        entity_cache:dict) -> h5py.Group:
+        # BUG: 2024-12-12 00:43:33  FIXME
+        # cannot store all fields as entity attributes, because subclasses of 
+        # ScipyenDataclass MAY have composite types which cannot be encoded in json.
+        #
+        # Therefore: TODO: convert to dict using asdict then store it as if is was a dict!
+        # TODO: adapt fromHDF5 to reflect this!
+        
+        # see examples in h5io.objectToEntity
+        
         from iolib import h5io
+        
+        # print(f"{self.__class__.__name__}.toHDF5")
+        
         target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
         cached_entity = h5io.getCachedEntity(entity_cache, self)
         if isinstance(cached_entity, h5py.Dataset):
@@ -849,30 +848,37 @@ class ScipyenDataclass:
         
         if isinstance(name, str) and len(name.strip()):
             target_name = name
+            
+        # calling asDict recursively converts all nested dataclass instances to
+        # a dict -- effectively "peeling out" the dataclass
+        data = dataclasses.asdict(self)
         
-        full_attrs = dataclasses.asdict(self)
+        # therefore, I need to inspect which of the fields ARE in fact, instances
+        # of dataclass
+        dataclass_fields = list(filter(lambda f: dataclasses.is_dataclass(getattr(self, f.name)), dataclasses.fields(self)))
         
-        attr_types = tuple(h5io.makeAttr.registry.keys())
-        
-        attrs = dict((k,v) for k,v in full_attrs.items() if isinstance(v, attr_types))
-        child_entities_dict = dict((k,v) for k,v in full_attrs.items() if not isinstance(v, attr_types))
-        
-        objattrs = h5io.makeAttrDict(**attrs)
-        obj_attrs.update(objattrs)
-        
-        entity = group.create_group(target_name, track_order=track_order)
+        # then assign these back into the dictionary from above:
+        data.update(dict(map(lambda f: (f.name, getattr(self, f.name)), dataclass_fields)))
+
+        # NOTE: 2024-12-12 15:41:25
+        # instead of creating a nested hf5 group, just populate this one with
+        # the items from the updated data dict above
+        entity = group.create_group(target_name, track_order = track_order)
         entity.attrs.update(obj_attrs)
         
-        if len(child_entities_dict):
-            for k,v in child_entities_dict.items():
-                h5io.toHDF5(v, entity, name=k, oname=k,
-                            compression=compression,chunks=chunks,
-                            track_order=track_order,
-                            entity_cache=entity_cache)
+        for name, value in data.items():
+            cached_entity = h5io.getCachedEntity(entity_cache, value)
+            if isinstance(cached_entity, (h5py.Group, h5py.Dataset)):
+                entity[name] = cached_entity
+            else:
+                element_entity = h5io.toHDF5(value, entity, name=name,
+                                             compression=compression,
+                                             chunks=chunks,
+                                             track_order=track_order,
+                                             entity_cache=entity_cache)
                 
-        h5io.storeEntityInCache(entity_cache, self, entity)
         return entity
-    
+        
     @classmethod
     def fromHDF5(cls, entity:h5py.Group, 
                 attrs:typing.Optional[dict] = None, cache:dict = {}):
@@ -882,19 +888,24 @@ class ScipyenDataclass:
         
         attrs = h5io.attrs2dict(entity.attrs)
         
+        # print(f"{cls.__name__}.fromHDF5: attrs = {attrs}")
+        
+        assert attrs["python_class"] == str(cls).strip("<").strip(">").strip("class").strip()[1:-1], \
+        f"Object has unexpected class: {python_class}"
+        
         attrs_as_entities = [a for a in cls.__match_args__ if a not in attrs]
         
         kwargs = dict()
         
+        # data = entity["data"]
+        
         for a in attrs_as_entities:
-            if a in attrs:
-                kwargs[a] = attrs[a]
-            else:
-                if a in entity.keys():
-                    kwargs[a] = h5io.fromHDF5(entity[a], cache=cache)
+            if a in entity.keys():
+                kwargs[a] = h5io.fromHDF5(entity[a], cache=cache)
+                print(f"{cls.__name__}.fromHDF5: got field '{a}' with type: {type(kwargs[a]).__name__}\n")
                     
         return cls(**kwargs)
-       
+    
 class TypeEnum(IntEnum):
     """Common ancestor for enum types used in Scipyen
     """
