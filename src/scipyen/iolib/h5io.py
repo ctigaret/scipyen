@@ -111,6 +111,7 @@ mammal lion     80.5     run
 
 import os, sys, tempfile, traceback, warnings, numbers, datetime, enum
 import types, typing, inspect, functools, itertools, importlib, pathlib
+from dataclasses import MISSING
 from functools import (partial, singledispatch)
 from pprint import (pprint, pformat)
 import collections, collections.abc
@@ -1283,63 +1284,65 @@ def fromHDF5(entity:typing.Union[h5py.Group, h5py.Dataset], cache:dict=dict()):
     
     # from core import taxonbridge, bgbridge
     
-    # print(f"\tentity : {entity} name: {entity.name} type: {type(entity).__name__}")
+    print(f"h5io.fromHDF5: entity name '{entity.name}' type: {type(entity).__name__}")
     
     if entity in cache:
         return cache[entity]
     
     attrs = attrs2dict(entity.attrs)
     
-    # print(f"fromHDF5 attrs = {attrs}")
+    print(f"h5io.fromHDF5: attrs = {attrs}")
 
-    try:
-        type_name = attrs.get("type_name", None)
-        # print(f"\ttype_name: {type_name}")
-        if type_name is None:
-            return None
-        python_class = attrs["python_class"]
-        python_class_comps = python_class.split(".")
-        module_name = attrs["module_name"]
-        module_name_comps = module_name.split(".")
+    target_class = attrs["python_class"]
+    
+    # try:
+        # type_name = attrs.get("type_name", None)
+        # # print(f"\ttype_name: {type_name}")
+        # if type_name is None:
+        #     return None
+        # python_class = attrs["python_class"]
+        # python_class_comps = python_class.split(".")
+        # module_name = attrs["module_name"]
+        # module_name_comps = module_name.split(".")
         
-        if module_name_comps[0] == "builtins":
-            target_class = eval(type_name)
-        else:
-            try:
-                if module_name in sys.modules:
-                    pymodule = sys.modules[module_name]
-                    target_class = eval(type_name, pymodule.__dict__)
-                    
-                else:
-                    if module_name_comps[0] not in sys.modules:
-                        pymodule = importlib.import_module(module_name_comps[0])
-                        
-                    else:
-                        pymodule = sys.modules[module_name_comps[0]]
-                    
-                    target_class = eval(".".join(python_class_comps[1:]), pymodule.__dict__)
-                    
-                # print(f"target_class: {target_class} from pymodule: {pymodule}")
-
-                # NOTE: 2022-10-05 18:40:53 FIXME possible BUG
-                # this doesn't work if the module is imported under an alias
-                    
-            except:
-                traceback.print_exc()
-                print(f"😢 python_class: {python_class}")
-                print(f"😢 fromHDF5 -> python_class_comps: {python_class_comps}")
-                print(f"😢 fromHDF5 -> module_name: {module_name}")
-                print(f"😢 fromHDF5 -> module_name_comps: {module_name_comps}")
-                print(f"😢 fromHDF5 -> wanted target_class: {'.'.join(python_class_comps[1:])}")
-                raise
-            
-    except:
-        print(f"😢 fromHDF5 -> entity: {entity.name}")
-        traceback.print_exc()
-        raise
+#         if module_name_comps[0] == "builtins":
+#             target_class = eval(type_name)
+#         else:
+#             try:
+#                 if module_name in sys.modules:
+#                     pymodule = sys.modules[module_name]
+#                     target_class = eval(type_name, pymodule.__dict__)
+#                     
+#                 else:
+#                     if module_name_comps[0] not in sys.modules:
+#                         pymodule = importlib.import_module(module_name_comps[0])
+#                         
+#                     else:
+#                         pymodule = sys.modules[module_name_comps[0]]
+#                     
+#                     target_class = eval(".".join(python_class_comps[1:]), pymodule.__dict__)
+#                     
+#                 # print(f"target_class: {target_class} from pymodule: {pymodule}")
+# 
+#                 # NOTE: 2022-10-05 18:40:53 FIXME possible BUG
+#                 # this doesn't work if the module is imported under an alias
+#                     
+#             except:
+#                 traceback.print_exc()
+#                 print(f"😢 python_class: {python_class}")
+#                 print(f"😢 fromHDF5 -> python_class_comps: {python_class_comps}")
+#                 print(f"😢 fromHDF5 -> module_name: {module_name}")
+#                 print(f"😢 fromHDF5 -> module_name_comps: {module_name_comps}")
+#                 print(f"😢 fromHDF5 -> wanted target_class: {'.'.join(python_class_comps[1:])}")
+#                 raise
+#             
+#     except:
+#         print(f"😢 fromHDF5 -> entity: {entity.name}")
+#         traceback.print_exc()
+#         raise
     
     
-    print(f"h5io.fromHDF5 entity {entity.name} has target_class {target_class}")
+    print(f"h5io.fromHDF5: entity '{entity.name}' has target_class {target_class}")
     
     object_decoder = inspect.getattr_static(target_class,"fromHDF5", None)
     
@@ -1564,102 +1567,117 @@ def attrs2dict(attrs:h5py.AttributeManager):
     """
     ret = dict()
     for k,v in attrs.items():
-        try:
-            if isinstance(v, str) and v == "null":
-                v = None
-            
-            elif hasattr(v, "dtype"):
-                # print(f"dtype: {v.dtype}, {v.dtype.kind}")
-                if v.dtype == h5py.string_dtype():
-                    v = list(v)
-                    # v = v.decode("utf-8")
-                    # v = np.array(v, dtype=np.dtype("U"))[()]
-                    
-                elif v.dtype.kind == "O":
-                    if type(v[()]) == bytes:
-                        v = v[()].decode()
-                        
-                    else:
-                        v = v[()]
-                        
-                elif v.dtype == np.dtype(np.bool_) and v.size == 1:
-                    v = bool(v) if v.ndim == 0 else bool(v[0])
-                    
-                elif v.dtype == np.dtype(np.int_) and v.size == 1:
-                    v = int(v) if v.ndim == 0 else int(v[0])
-                    
-                elif v.dtype == np.dtype(np.float_) and v.size == 1:
-                    v = float(v) if v.ndim == 0 else float(v[0])
-                    
-                elif np.any(np.iscomplex(v)) and v.size == 1:
-                    v = complex(v) if v.ndim == 0 else complex(v[0])
-                        
+        print(f"attrs2dict: {k} = {v}")
+        if k in ("type_name", "module_name"):
+            continue
+        
+        if k == "python_class":
+            try:
+                v = eval(v)
+            except:
+                module_name = attrs["module_name"]
+                type_name = attrs["type_name"]
+                if type_name == "NoneType":
+                    v = type(None)
+                elif type_name == "NAType":
+                    v = type(pd.NA)
+                # elif type_name == "_MISSING_TYPE" # TODO: 2024-12-12 23:11:24 
+                                                    # check this works below, first!
                 else:
-                    if type(v) == bytes:
-                        v = v.decode()
-                        
-                if isinstance(v, str) and v.startswith("{") and v.endswith("}"):
-                    v = jsonio.loads(v)
-                    
-            elif isinstance(v, str):
-                if v.startswith("{") and v.endswith("}"):
-                    v = jsonio.loads(v)
-                    
-                elif "datetime" in v:
-                    # print(f"attrs2dict {v}")
-                    parts = v.split(" ")
-                    if len(parts) == 2:
-                        klass, isofmt = parts
-                        v = eval(f"{klass}.fromisoformat('{isofmt}')")
+                    if module_name in sys.modules:
+                        module = sys.modules[module_name]
+                        v = module.__dict__[type_name]
                     else:
-                        v = None # BUG 2024-07-21 23:16:35 FIXME/TODO
-                    #     klass = parts[0]
-                    # klass, isofmt = v.split(" ")
-                    # v = eval(f"{klass}.fromisoformat('{isofmt}')")
-                    # if "timedelta" in v:
-                    #     v = eval(v)
-                    # else:
-                    #     klass, isofmt = v.split(" ")
-                    #     v = eval(f"{klass}.fromisoformat('{isofmt}')")
+                        v = None
+            
+        elif isinstance(v, str) and v == "null":
+            v = None
+        
+        elif hasattr(v, "dtype"):
+            # print(f"dtype: {v.dtype}, {v.dtype.kind}")
+            if v.dtype == h5py.string_dtype():
+                v = list(v)
+                # v = v.decode("utf-8")
+                # v = np.array(v, dtype=np.dtype("U"))[()]
+                
+            elif v.dtype.kind == "O":
+                if type(v[()]) == bytes:
+                    v = v[()].decode()
                     
-                elif "pq.Quantity" in v:
-                    # leave here for back-compatibility
-                    try:
-                        v = eval(v)
-                    except:
-                        vv = v.replace("pq.Quantity(", "").replace(")", "").replace("pq.", "")
-                        v = str2quantity(vv)
+                else:
+                    v = v[()]
                     
-                elif v.startswith("QUANTITY "):
-                    v = v.replace("QUANTITY ", "")
-                    v = str2quantity(v)
+            elif v.dtype == np.dtype(np.bool_) and v.size == 1:
+                v = bool(v) if v.ndim == 0 else bool(v[0])
+                
+            elif v.dtype == np.dtype(np.int_) and v.size == 1:
+                v = int(v) if v.ndim == 0 else int(v[0])
+                
+            elif v.dtype == np.dtype(np.float_) and v.size == 1:
+                v = float(v) if v.ndim == 0 else float(v[0])
+                
+            elif np.any(np.iscomplex(v)) and v.size == 1:
+                v = complex(v) if v.ndim == 0 else complex(v[0])
                     
-                elif v.startswith("ENUM "):
-                    # print(f"attrs2dict: {v} ({type(v).__name__})")
-                    _, v = v.split(" ")
-                    # print(f"v.split: {_} {v} ({type(v).__name__})")
-                    srcstr = v
-                    try:
-                        v = eval(v)
-                    except:
-                        target, args = v.split("(")
-                        args = f"({args}" # reattach opening parenthesis
-                            
-                        obj = parse_module_class_path(target)
-                        if not isinstance(obj, type):
-                            raise RuntimeError(f"'{srcstr}' did not resolve to a type")
-                        module = get_loaded_module(obj.__module__)
+            else:
+                if type(v) == bytes:
+                    v = v.decode()
+                    
+            if isinstance(v, str) and v.startswith("{") and v.endswith("}"):
+                v = jsonio.loads(v)
+                
+        elif isinstance(v, str):
+            if v.startswith("{") and v.endswith("}"):
+                v = jsonio.loads(v)
+                
+            elif "datetime" in v:
+                # print(f"attrs2dict {v}")
+                parts = v.split(" ")
+                if len(parts) == 2:
+                    klass, isofmt = parts
+                    v = eval(f"{klass}.fromisoformat('{isofmt}')")
+                else:
+                    v = None # BUG 2024-07-21 23:16:35 FIXME/TODO
+                
+            elif "pq.Quantity" in v:
+                # leave here for back-compatibility
+                try:
+                    v = eval(v)
+                except:
+                    vv = v.replace("pq.Quantity(", "").replace(")", "").replace("pq.", "")
+                    v = str2quantity(vv)
+                
+            elif v.startswith("QUANTITY "):
+                v = v.replace("QUANTITY ", "")
+                v = str2quantity(v)
+                
+            elif v.startswith("ENUM "):
+                # print(f"attrs2dict: {v} ({type(v).__name__})")
+                _, v = v.split(" ")
+                # print(f"v.split: {_} {v} ({type(v).__name__})")
+                srcstr = v
+                try:
+                    v = eval(v)
+                except:
+                    target, args = v.split("(")
+                    args = f"({args}" # reattach opening parenthesis
                         
-                        v2 = f"{obj.__name__}{args}"
-                        
-                        # print(f"new eval: '{v2}'")
-                        
-                        v = eval(v2, module.__dict__)
-                        # if isinstance(v, type)
+                    obj = parse_module_class_path(target)
+                    if not isinstance(obj, type):
+                        raise RuntimeError(f"'{srcstr}' did not resolve to a type")
+                    module = get_loaded_module(obj.__module__)
                     
-        except:
-            # print(f"k = {k} v = {v} has dtype: {v.dtype if hasattr(v, 'dtype') else 'no'}")
-            traceback.print_exc()
+                    v2 = f"{obj.__name__}{args}"
+                    
+                    # print(f"new eval: '{v2}'")
+                    
+                    v = eval(v2, module.__dict__)
+                    # if isinstance(v, type)
+#         try:
+#                     
+#         except:
+#             # print(f"k = {k} v = {v} has dtype: {v.dtype if hasattr(v, 'dtype') else 'no'}")
+#             traceback.print_exc()
             
         ret[k] = v
         
@@ -1804,12 +1822,14 @@ def makeObjAttrs(obj:typing.Any, oname:typing.Optional[str]=None):
     
     """
     #print(type(obj))
+    obj_attrs = makeDataTypeAttrs(obj)
+    
     if isinstance(obj, prog.CALLABLE_TYPES):
         # FIXME: 2022-10-09 15:53:52
         # this is contentious for functions provided by 3rd party libraries, 
         # because there is no pythonic access to their signatures
         # (e.g. Boost.python.functions)
-        return makeAttrDict (function_or_method = jsonio.dumps(prog.signature2Dict(obj)))
+        return makeAttrDict(function_or_method = jsonio.dumps(prog.signature2Dict(obj)))
     
     if obj is None:
         return makeEntryName(obj), {}
@@ -1817,7 +1837,6 @@ def makeObjAttrs(obj:typing.Any, oname:typing.Optional[str]=None):
     if not isinstance(oname, str) or len(oname.strip()) == 0:
         oname = getattr(obj, "name", "")
         
-    obj_attrs = makeDataTypeAttrs(obj)
     
     if isinstance(obj, neo.core.baseneo.BaseNeo):
         # NOTE: 2022-10-09 17:36:29
@@ -3037,6 +3056,8 @@ def makeHDF5Dataset(obj, group: h5py.Group, name:typing.Optional[str]=None,
     target_name, obj_attrs = makeObjAttrs(obj)
     if isinstance(name, str) and len(name.strip()):
         target_name = name
+        
+    print(f"h5io.makeHDF5Dataset({type(obj).__name__}): obj_attrs = {obj_attrs}")
 
     try:
         dset = makeDataset(obj, group, obj_attrs, target_name, 
@@ -3215,8 +3236,14 @@ def _(obj:typing.Union[datetime.date, datetime.time, datetime.datetime],
         group[name] = cached_entity # make a hard link
         return cached_entity
     print(f"h5io.makeDataset({type(obj).__name__})")
-    return makeDataset(obj.isoformat(), group, attrs, name, compression, chunks, track_order, entity_cache)
-    
+    val = obj.isoformat()
+    dset = group.create_dataset(name, data = np.array(val, dtype=h5py.string_dtype()),
+                                track_order=track_order)
+    # dset = makeDataset(obj.isoformat(), group, attrs, name, compression, chunks, track_order, entity_cache)
+    dset.attrs.update(attrs)
+    storeEntityInCache(entity_cache, obj, dset)
+    return dset
+
 @makeDataset.register(datetime.timedelta)
 def _(obj:datetime.timedelta, group, attrs, name, compression, chunks, track_order, entity_cache):
     cached_entity = getCachedEntity(entity_cache, obj)
@@ -3640,7 +3667,14 @@ def _(entity:h5py.Dataset, target_class:type, attrs:dict, cache:dict=dict()):
         # most likely a scalar and therefore we attempt to instantiate
         # one as such
         # print(f"target_class {target_class}")
-        if target_class == bool:
+        if target_class == type(None):
+            obj = None
+        elif target_class == type(pd.NA):
+            obj = pd.NA
+        elif target_class == type(MISSING):
+            obj = MISSING
+            
+        elif target_class == bool:
             obj = target_class(entity)
             
         elif target_class == str:

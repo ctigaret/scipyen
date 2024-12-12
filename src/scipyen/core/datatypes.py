@@ -798,13 +798,18 @@ class DoseDescriptor:
 class ScipyenDataclass:
     name:str = dataclasses.field(default_factory=str)
     
-    def diff(self, other):
+    def diff(self, other, showValues:bool=False) -> dict | tuple:
         if other.__class__ != self.__class__:
             raise TypeError(f"Expecting an object of type {self.__class__.__name__}; instead, got {type(other).__name__}")
         
         diff_fields = tuple(filter(lambda f: np.all(getattr(self, f.name) != getattr(other, f.name)), dataclasses.fields(self.__class__)))
         
-        return dict(map(lambda f: (f.name, (getattr(self, f.name), getattr(other, f.name))), diff_fields))
+        if showValues:
+            return dict(map(lambda f: (f.name, (getattr(self, f.name), getattr(other, f.name))), diff_fields))
+        
+        return tuple(map(lambda f: f.name, diff_fields))
+    
+        
     
     def __eq__(self, other) -> bool:
         if not isinstance(other, self.__class__):
@@ -838,12 +843,14 @@ class ScipyenDataclass:
         
         from iolib import h5io
         
-        # print(f"{self.__class__.__name__}.toHDF5")
+        print(f"\n\n### BEGIN {self.__class__.__name__}.toHDF5")
         
         target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
         cached_entity = h5io.getCachedEntity(entity_cache, self)
         if isinstance(cached_entity, h5py.Dataset):
             group[target_name] = cached_entity
+            print(f"{self.__class__.__name__}.toHDF5 found entity {cached_entity}")
+            print(f"### END {self.__class__.__name__}.toHDF5 \n\n")
             return cached_entity
         
         if isinstance(name, str) and len(name.strip()):
@@ -876,22 +883,29 @@ class ScipyenDataclass:
                                              chunks=chunks,
                                              track_order=track_order,
                                              entity_cache=entity_cache)
+                print(f"{self.__class__.__name__}.toHDF5 created entity for field '{name}' ({type(value).__name__})\n")
                 
+        print(f"### END {self.__class__.__name__}.toHDF5 \n\n")
         return entity
         
     @classmethod
     def fromHDF5(cls, entity:h5py.Group, 
                 attrs:typing.Optional[dict] = None, cache:dict = {}):
         from iolib import h5io
+        
+        print(f"\n\n### BEGIN {cls.__name__}.fromHDF5 ")
+        
         if entity in cache:
-            return cache[entity]
+            val = cache[entity]
+            print(f"{cls.__name__}.fromHDF5 got cached entity {type(val).__name__}")
+            return val
         
         attrs = h5io.attrs2dict(entity.attrs)
         
         # print(f"{cls.__name__}.fromHDF5: attrs = {attrs}")
         
-        assert attrs["python_class"] == str(cls).strip("<").strip(">").strip("class").strip()[1:-1], \
-        f"Object has unexpected class: {python_class}"
+        # assert attrs["python_class"] == str(cls).strip("<").strip(">").strip("class").strip()[1:-1], \
+        assert attrs["python_class"] == cls, f"Object has unexpected class: {attrs['python_class']}"
         
         attrs_as_entities = [a for a in cls.__match_args__ if a not in attrs]
         
@@ -904,6 +918,7 @@ class ScipyenDataclass:
                 kwargs[a] = h5io.fromHDF5(entity[a], cache=cache)
                 print(f"{cls.__name__}.fromHDF5: got field '{a}' with type: {type(kwargs[a]).__name__}\n")
                     
+        print(f"### END {cls.__name__}.fromHDF5 \n\n")
         return cls(**kwargs)
     
 class TypeEnum(IntEnum):
