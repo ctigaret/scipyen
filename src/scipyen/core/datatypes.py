@@ -812,6 +812,14 @@ class DoseDescriptor:
 
 @dataclass
 class ScipyenDataclass:
+    # BUG: 2024-12-12 00:43:33  FIXME
+    # cannot store all fields as entity attributes, because subclasses of 
+    # ScipyenDataclass MAY have composite types which cannot be encoded in json.
+    #
+    # Therefore: TODO: convert to dict using asdict then store it as if is was a dict!
+    # TODO: adapt fromHDF5 to reflect this!
+    
+    # see examples in h5io.objectToEntity
     # def __repr__(self):
     #     print(f"{self.__class__.__name__}.__repr__()")
     #     repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {x}"
@@ -867,7 +875,7 @@ class ScipyenDataclass:
     
     @classmethod
     def fromHDF5(cls, entity:h5py.Group, 
-                             attrs:typing.Optional[dict] = None, cache:dict = {}):
+                attrs:typing.Optional[dict] = None, cache:dict = {}):
         from iolib import h5io
         if entity in cache:
             return cache[entity]

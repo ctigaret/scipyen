@@ -8144,8 +8144,11 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             return False
 
         if isinstance(obj, (tuple, list, deque)) or hasattr(obj, "__iter__") or hasattr(obj, "__len__"):
-            if len(obj) < 1:
-                return False
+            try:
+                if len(obj) < 1:
+                    return False
+            except:
+                return False    
 
         if isinstance(winType, str) and winType in [v.__name__ for v in self.viewers.keys()]:
             if winType not in self.viewers.keys():
