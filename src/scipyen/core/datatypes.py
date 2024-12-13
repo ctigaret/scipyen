@@ -799,15 +799,25 @@ class ScipyenDataclass:
     name:str = dataclasses.field(default_factory=str)
     
     def diff(self, other, showValues:bool=False) -> dict | tuple:
+        from core.utilities import safe_identity_test
         if other.__class__ != self.__class__:
             raise TypeError(f"Expecting an object of type {self.__class__.__name__}; instead, got {type(other).__name__}")
         
-        diff_fields = tuple(filter(lambda f: np.all(getattr(self, f.name) != getattr(other, f.name)), dataclasses.fields(self.__class__)))
+        fields = tuple(map(lambda f: (f.name, getattr(self, f.name), getattr(other, f.name)), dataclasses.fields(self.__class__)))
+        
+        # test_eq = lambda x: ( pd.isna(x[0]) and pd.isna(x[1])) or \
+        #     (math.isnan(x[0]) and math.isnan(x[1])) or (math.isinf(x[0]) and math.isinf(x[1])) or\
+        #         ( np.all(x[0]==x[1]) if any(map(lambda x_: isinstance(x_, np.ndarray), x)) else (x[0] == x[1]) )
+        
+        diff_fields = tuple(filter(lambda f: type(f[1]) != type(f[2]) or not safe_identity_test(f[1], f[2]), fields))
+        
+        # diff_fields = tuple(filter(lambda f: np.all(getattr(self, f.name) != getattr(other, f.name)), dataclasses.fields(self.__class__)))
         
         if showValues:
-            return dict(map(lambda f: (f.name, (getattr(self, f.name), getattr(other, f.name))), diff_fields))
+            # return dict(map(lambda f: (f.name, (getattr(self, f.name), getattr(other, f.name))), diff_fields))
+            return dict(map(lambda f: (f[0], (f[1], f[2])), diff_fields))
         
-        return tuple(map(lambda f: f.name, diff_fields))
+        return tuple(map(lambda f: f[0], diff_fields))
     
         
     
@@ -1434,8 +1444,18 @@ class BiologicalSource(ScipyenDataclass):
     """
     organism:Organism = dataclasses.field(default_factory=Organism)
     # organ:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
+    
+    # BUG: 2024-12-13 15:31:40 FIXME
+    # accessing this will trigger the lazy initialization of the "mesh" object,
+    # and invalidate future comparisons (e.g. see ScipyenDataclass.__eq__ and
+    # ScipyenDataclass.diff)
+    #
+    # NOTE: 2024-12-13 15:40:14
+    # understand how meshio obejcts are being compared - see meshio package!
     structure:BGStructureDescriptor = BGStructureDescriptor()
     # for now, only brain atlas api is supported
+    
+    
     cellType:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA) # e.g. "neuron"
     cellMorphologicalType:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA) # e.g."pyramidal"
     cellDescriptors:typing.Union[str, type(pd.NA), typing.Sequence[str]] = dataclasses.field(default=pd.NA)
@@ -1585,7 +1605,8 @@ class SubstanceDosage(ScipyenDataclass):
         ret = self.name == other.name
         
         if ret:
-            if isinstance(self.dose, pq.Quantity):
+            ret &= isinstance(self.dose, pq.Quantity) and isinstance(other.dose, pq.Quantity)
+            if ret:
                 ret &= self.dose.ndim == other.dose.ndim
                 if ret:
                     ret &= self.dose.shape == other.dose.shape

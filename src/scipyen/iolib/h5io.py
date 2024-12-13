@@ -1832,7 +1832,7 @@ def makeObjAttrs(obj:typing.Any, oname:typing.Optional[str]=None):
         return makeAttrDict(function_or_method = jsonio.dumps(prog.signature2Dict(obj)))
     
     if obj is None:
-        return makeEntryName(obj), {}
+        return makeEntryName(obj), obj_attrs
     
     if not isinstance(oname, str) or len(oname.strip()) == 0:
         oname = getattr(obj, "name", "")
@@ -3021,6 +3021,8 @@ def toHDF5(obj, group:h5py.Group, name:typing.Optional[str]=None,
 
     target_name, obj_attrs = makeObjAttrs(obj, oname=oname)
     
+    print(f"h5io.toHDF5: target_name = {target_name}, obj_attrs = {obj_attrs}")
+    
     if isinstance(name, str) and len(name.strip()):
         target_name = name
         
@@ -3032,6 +3034,7 @@ def toHDF5(obj, group:h5py.Group, name:typing.Optional[str]=None,
         #
         # don't bother with hard links here...
         entity = group.create_dataset(target_name, data = h5py.Empty("f"))
+        entity.attrs.update(obj_attrs)
         
         return entity
     
@@ -3170,6 +3173,8 @@ def _(obj:pathlib.Path, group, attrs, name, compression, chunks, track_order,
         else:
             dset = group.create_dataset(name, data = np.array(data, dtype = h5py.string_dtype()),
                                         track_order=track_order)
+            
+        # print(f"h5io.makeDataset({type(obj).__name__}): data: {data}, attrs: {attrs}")
             
     except:
         msg = printStyled(f"makeDataset<str> offending object: {obj} (len: {len(obj)})",
@@ -3680,7 +3685,7 @@ def _(entity:h5py.Dataset, target_class:type, attrs:dict, cache:dict=dict()):
         elif target_class == str:
             obj = dataset2string(entity)
             
-        elif target_class == pathlib.Path:
+        elif issubclass(target_class, pathlib.Path):
             data = dataset2string(entity)
             obj = pathlib.Path(data)
             
@@ -3691,7 +3696,7 @@ def _(entity:h5py.Dataset, target_class:type, attrs:dict, cache:dict=dict()):
             if target_class == bytearray:
                 obj = bytearray(obj)
             
-        elif target_class is taxonbridge.Taxon:
+        elif issubclass(target_class, taxonbridge.Taxon):
             # return the scientific name if cannot instantiate, although the
             # shim in taxonbridge should work
             data = dataset2string(entity)
@@ -3701,7 +3706,7 @@ def _(entity:h5py.Dataset, target_class:type, attrs:dict, cache:dict=dict()):
                 traceback.print_exc()
                 return data
             
-        elif target_class is bgbridge.BrainGlobeAtlas:
+        elif issubclass(target_class, bgbridge.BrainGlobeAtlas):
             data = dataset2string(entity)
             try:
                 obj = target_class(data, check_latest=False)
@@ -3709,13 +3714,13 @@ def _(entity:h5py.Dataset, target_class:type, attrs:dict, cache:dict=dict()):
                 traceback.print_exc()
                 return data
         
-        elif target_class == datetime.timedelta:
+        elif issubclass(target_class, datetime.timedelta):
             days = int(attrs.get("days", 0))
             microseconds = int(attrs.get("microseconds", 0))
             seconds = int(attrs.get("seconds", 0))
             obj = target_class(days=days, seconds=seconds, microseconds=microseconds)
             
-        elif target_class in (datetime.date, datetime.time, datetime.datetime):
+        elif issubclass(target_class,  (datetime.date, datetime.time, datetime.datetime)):
             try:
                 val = dataset2string(entity)
                 # print(f"val {val} decoded {val.decode()}")
@@ -3724,7 +3729,8 @@ def _(entity:h5py.Dataset, target_class:type, attrs:dict, cache:dict=dict()):
                 traceback.print_exc()
                 raise
             
-        elif any(k in inspect.getmro(target_class) for k in (int, float, complex)):
+        # elif any(k in inspect.getmro(target_class) for k in (int, float, complex)):
+        elif issubclass(target_class, (int, float, complex)):
             # NOTE: 2022-10-08 13:20:20
             # numpy scalar types (e.g. numpy.float64 etc) are subclasses of
             # these 
@@ -3779,7 +3785,7 @@ def _(entity:h5py.Group, target_class:type, attrs:dict, cache:dict=dict()):
         
     elif target_class == bgbridge.Structure:
         data = dict(map(lambda k: (k, fromHDF5(entity[k], cache)), entity.keys()))
-        obj = bgbridge.Structure(dict=data)
+        obj = bgbridge.Structure(**data)
         
     else:
         mro = inspect.getmro(target_class)

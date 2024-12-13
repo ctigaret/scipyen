@@ -211,6 +211,7 @@ def loadHDF5File(fName:str):
             ret = h5io.read_hdf5(h5file)
         except:
             traceback.print_exc()
+            raise
     return ret
         
     
