@@ -800,6 +800,7 @@ class ScipyenDataclass:
     
     def diff(self, other, showValues:bool=False) -> dict | tuple:
         from core.utilities import safe_identity_test
+            
         if other.__class__ != self.__class__:
             raise TypeError(f"Expecting an object of type {self.__class__.__name__}; instead, got {type(other).__name__}")
         
@@ -828,8 +829,9 @@ class ScipyenDataclass:
         ret = self.name == other.name
         
         if ret:
+            ret = ret & len(self.diff(other)) == 0
             # ret &= all(getattr(self, f.name) == getattr(other, f.name) for f in dataclasses.fields(self.__class__))
-            ret &= all(map(lambda f: np.all(getattr(self, f.name) == getattr(other, f.name)), dataclasses.fields(self.__class__)))
+            # ret &= all(map(lambda f: np.all(getattr(self, f.name) == getattr(other, f.name)), dataclasses.fields(self.__class__)))
             
         return ret
     

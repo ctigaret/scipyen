@@ -568,18 +568,18 @@ def makeAttr(x):
     return x
 
 @makeAttr.register(type(None))
-def _(x):
+def _(x:type(None)):
     return jsonio.dumps(x)
 
 @makeAttr.register(str)
-def _(x):
+def _(x:str):
     if isinstance(x, np.str_):
         return str(x)
     
     return x
 
 @makeAttr.register(enum.Enum)
-def _(x):
+def _(x:enum.Enum):
     mdl = x.__class__.__module__
     kls = x.__class__.__name__
     if mdl == "__main__":
@@ -588,17 +588,15 @@ def _(x):
         klass = f"ENUM {mdl}.{kls}"
         
     return f"{klass}({x.value})"
-        
-    
 
 @makeAttr.register(datetime.date)
 @makeAttr.register(datetime.time)
 @makeAttr.register(datetime.datetime)
-def _(x):
+def _(x:typing.Union[datetime.datem datetime.time, datetime,datetime]):
     return f"{x.__class__.__module__}.{x.__class__.__name__} {x.isoformat()}"
 
 @makeAttr.register(datetime.timedelta)
-def _(x):
+def _(x:datetime.timedelta):
     raise NotImplementedError(f"{type(x).__name__} objects cannot (and should not) be encoded as HDF5 Attribute")
     # return f"{x.__class__.__module__}.{x.__class__.__name__}(days={x.days}, seconds={x.seconds})"
     
@@ -606,7 +604,7 @@ def _(x):
 @makeAttr.register(list)
 @makeAttr.register(tuple)
 @makeAttr.register(dict)
-def _(x):
+def _(x:typing.Union[list, tuple, dict]):
     # BUG: 2024-07-20 14:28:52 FIXME
     # will raise exception if elements or values are not json-able
     # CAUTION Do not use large data objects here!
@@ -618,19 +616,22 @@ def _(x):
     except:
         raise HDFDataError(f"The object {x}\n with type {type(x).__name__} cannot be serialized in json")
 
-# @makeAttr.register(np.ndarray)
-# @makeAttr.register(pq.Quantity)
-# def _(x):
-#     if isinstance(x, pq.Quantity):
-#         if x.size > 1:
-#             raise ValueError(f"non-scalar quantities {x} cannot be stored as HDF5 Attributes; convert them to HDF5 Dataset")
-#         
-#         return f"QUANTITY {quantity2str(x)}"
-#     
-#     elif x.dtype.kind in NUMPY_STRING_KINDS:
-#         return np.array(x, dtype=h5py.string_dtype(), order="K")
-#     else:
-#         return jsonio.dumps(x) 
+@makeAttr.register(pq.Quantity)
+def _(x:pq.Quantity):
+    if isinstance(x, pq.Quantity):
+        if x.size > 1:
+            raise ValueError(f"non-scalar quantities {x} cannot be stored as HDF5 Attributes; convert them to HDF5 Dataset")
+        
+        # return f"QUANTITY {quantity2str(x)}"
+        return jsonio.dumps(x)
+    
+@makeAttr.register(np.ndarray)
+def _(x:np.ndarray):
+    elif x.dtype.kind in NUMPY_STRING_KINDS:
+        return np.array(x, dtype=h5py.string_dtype(), order="K")
+    else:
+        return jsonio.dumps(x) 
+    
 
 def makeAttrDict(**kwargs):
     """Generates a dict suitable for storage as 'attrs' property of a HDF5 entity.
@@ -1589,6 +1590,8 @@ def attrs2dict(attrs:h5py.AttributeManager):
                         v = module.__dict__[type_name]
                     else:
                         v = None
+            
+        elif k == "units":
             
         elif isinstance(v, str) and v == "null":
             v = None

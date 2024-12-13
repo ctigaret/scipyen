@@ -674,13 +674,21 @@ def _(o:pd.CategoricalDtype):
     return pandasDtype2JSON(o)
 
 @object2JSON.register(pq.UnitQuantity)
-def _(o: pq.UnitQuantity):
+def _(o:pq.UnitQuantity):
     hdr, ret = makeJSONStub(o)
     factory = makeFuncStub("core.quantities.unitQuantityFromNameOrSymbol")
     factory["posonly"] = (o.dimensionality.string, )
     ret["factory"] = factory
     return {hdr:ret}
 
+@object2JSON.register(pq.dimensionality.Dimensionality)
+def _(o:pq.dimensionality.Dimensionality):
+    hdr, ret = makeJSONStub(o)
+    # dims_dict = dict(o)
+    factory = makeFuncStub("pq.dimensionality.Dimensionality")
+    factory["varkw"] = dict(lambda x: (object2JSON(x[0]), x[1]), o.items())
+    return{hdr:ret}
+    
 @object2JSON.register(pq.Quantity)
 def _(o:pq.Quantity):
     hdr, ret = makeJSONStub(o)
