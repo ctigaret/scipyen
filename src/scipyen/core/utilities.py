@@ -914,11 +914,21 @@ def similar_strings(a:str, b:str) -> bool:
 
 @safeWrapper
 def safe_identity_test2(x, y) -> bool:
-    """Uses SafeComparator object"""
+    """Uses SafeComparator object
+    Work in progress, expect bugs!
+    """
     return SafeComparator(comp=eq)(x, y)
 
+
+def diff(x:object, y:object, idcheck:bool=True) -> dict:
+    """Reveal differences between x and y attributes.
+    x and y MUST be instances of the SAME class (type)
+    # TODO 2024-12-14 15:04:29
+    """
+    
+    pass
+
 # @safeWrapper
-# def safe_identity_test(x, y) -> bool:
 def safe_identity_test(x:object, y:object, idcheck:bool=True) -> bool:
     """Test that symbols in x and y refer to identical Python objects.
     
@@ -958,27 +968,48 @@ def safe_identity_test(x:object, y:object, idcheck:bool=True) -> bool:
     to save some typing, you can use the alias 'eq'
     
 """
+    from core import bgbridge
     try:
-        ret = x==y
-        if pd.isna(ret): # implies at least one of them is pd.NA
-            ret = all(map(pd.isna, (x,y))) # when False, one of them may be pd.NA
+        if all(isinstance(o, bgbridge.Structure) for o in (x,y)):
+            # print(f"safe_identity_test for two BrainGlobe Atlas Structure objects")
+            if bgbridge.hasBrainGlobeAtlasAPI:
+                # NOTE: 2024-12-14 15:34:31
+                # avoid comparing the mesh object in brainglobe atlasapi Structure - 
+                # they will NEVER be reported as same even if loaded from the same 
+                # physical data - I think that is because of the way meshio creates 
+                # these objects...
+                x_dict = dict(filter(lambda i: i[0] != "mesh", x.data.items()))
+                y_dict = dict(filter(lambda i: i[0] != "mesh", y.data.items()))
+                ret = x_dict == y_dict
+            else:
+                ret = x == y # TODO: 2024-12-14 15:40:08 verify this works...
             
-        # here ret may be False if x != y; but:
-        # • all below are False, yet if both are their corresponding singletons we
-        # need to return True here, to compare composite objects that contain them;
-        #   ∘ np.nan == np.nan
-        #   ∘ math.nan == np.nan
-        #   ∘ math.nan == math.nan
-        #
-        # NOTE: dataclasses.MISSING and math.inf behave as expected
-        #
-        if not ret and not any(map(pd.isna, (x,y))): # ret is False NOT because one is pd.NA!
-            if all(map(lambda v: isinstance(v, numbers.Number), (x,y))):
-                ret = all(map(math.isnan, (x,y)))
+        else:
+            ret = x == y
+            
+            if np.any(pd.isna(ret)): # implies at least one of them is pd.NA
+                ret = all(map(pd.isna, (x,y))) # when False, one of them may be pd.NA
+                
+            if isinstance(ret, np.ndarray):
+                ret = np.all(ret)
+                
+            # here ret may be False if x != y; but:
+            # • all below are False, yet if both are their corresponding singletons we
+            # need to return True here, to compare composite objects that contain them;
+            #   ∘ np.nan == np.nan
+            #   ∘ math.nan == np.nan
+            #   ∘ math.nan == math.nan
+            #
+            # NOTE: dataclasses.MISSING and math.inf behave as expected
+            #
+            if not ret and not any(map(pd.isna, (x,y))): # ret is False NOT because one is pd.NA!
+                if all(map(lambda v: isinstance(v, Number), (x,y))):
+                    ret = all(map(math.isnan, (x,y)))
                 
         return ret
     
     except:
+        traceback.print_exc()
         try:
             if x is y:
                 return True

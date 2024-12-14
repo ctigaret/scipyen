@@ -328,7 +328,8 @@ class MembranePropertiesAnalysisParameters(datatypes.ScipyenDataclass):
     
     # __changed__ = False
     
-#     def __eq__(self, other):
+    def __eq__(self, other):
+        return super().__eq__(other)
 #         if not isinstance(other, self.__class__):
 #             return False
 #         

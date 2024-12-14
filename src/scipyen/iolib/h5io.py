@@ -456,9 +456,9 @@ def h5pyIterator(g:h5py.Group, prefix:str='',
             return fromHDF5(item)
             # yield (path, item, item.attrs)
         elif isinstance(item, h5py.Group): # test for group (go down)
-            print(f"Group '{item.name}' attributes:")
-            for k,v in item.attrs.items():
-                print(f"\t{k}: {printHdf(v)}")
+            # print(f"Group '{item.name}' attributes:")
+            # for k,v in item.attrs.items():
+            #     print(f"\t{k}: {printHdf(v)}")
             #pprint(dict(item.attrs))
             yield from h5pyDatasetIterator(item, path)
             
@@ -486,9 +486,9 @@ def h5pyDatasetIterator(g:h5py.Group, prefix:str=''):
             #yield (path, item)
             yield (path, item, item.attrs)
         elif isinstance(item, h5py.Group): # test for group (go down)
-            print(f"Group '{item.name}' attributes:")
-            for k,v in item.attrs.items():
-                print(f"\t{k}: {printHdf(v)}")
+            # print(f"Group '{item.name}' attributes:")
+            # for k,v in item.attrs.items():
+            #     print(f"\t{k}: {printHdf(v)}")
             #pprint(dict(item.attrs))
             yield from h5pyDatasetIterator(item, path)
             
@@ -592,7 +592,7 @@ def _(x:enum.Enum):
 @makeAttr.register(datetime.date)
 @makeAttr.register(datetime.time)
 @makeAttr.register(datetime.datetime)
-def _(x:typing.Union[datetime.datem datetime.time, datetime,datetime]):
+def _(x:typing.Union[datetime.date, datetime.time, datetime,datetime]):
     return f"{x.__class__.__module__}.{x.__class__.__name__} {x.isoformat()}"
 
 @makeAttr.register(datetime.timedelta)
@@ -618,16 +618,15 @@ def _(x:typing.Union[list, tuple, dict]):
 
 @makeAttr.register(pq.Quantity)
 def _(x:pq.Quantity):
-    if isinstance(x, pq.Quantity):
-        if x.size > 1:
-            raise ValueError(f"non-scalar quantities {x} cannot be stored as HDF5 Attributes; convert them to HDF5 Dataset")
-        
-        # return f"QUANTITY {quantity2str(x)}"
-        return jsonio.dumps(x)
+    if x.size > 1:
+        raise ValueError(f"non-scalar quantities {x} cannot be stored as HDF5 Attributes; convert them to HDF5 Dataset")
+    
+    # return f"QUANTITY {quantity2str(x)}"
+    return jsonio.dumps(x)
     
 @makeAttr.register(np.ndarray)
 def _(x:np.ndarray):
-    elif x.dtype.kind in NUMPY_STRING_KINDS:
+    if x.dtype.kind in NUMPY_STRING_KINDS:
         return np.array(x, dtype=h5py.string_dtype(), order="K")
     else:
         return jsonio.dumps(x) 
@@ -1285,14 +1284,14 @@ def fromHDF5(entity:typing.Union[h5py.Group, h5py.Dataset], cache:dict=dict()):
     
     # from core import taxonbridge, bgbridge
     
-    print(f"h5io.fromHDF5: entity name '{entity.name}' type: {type(entity).__name__}")
+    # print(f"h5io.fromHDF5: entity name '{entity.name}' type: {type(entity).__name__}")
     
     if entity in cache:
         return cache[entity]
     
     attrs = attrs2dict(entity.attrs)
     
-    print(f"h5io.fromHDF5: attrs = {attrs}")
+    # print(f"h5io.fromHDF5: attrs = {attrs}")
 
     target_class = attrs["python_class"]
     
@@ -1343,11 +1342,11 @@ def fromHDF5(entity:typing.Union[h5py.Group, h5py.Dataset], cache:dict=dict()):
 #         raise
     
     
-    print(f"h5io.fromHDF5: entity '{entity.name}' has target_class {target_class}")
+    # print(f"h5io.fromHDF5: entity '{entity.name}' has target_class {target_class}")
     
     object_decoder = inspect.getattr_static(target_class,"fromHDF5", None)
     
-    print(f"h5io.fromHDF5: {target_class}.fromHDF5 is {type(object_decoder).__name__ if object_decoder is not None else object_decoder}")
+    # print(f"h5io.fromHDF5: {target_class}.fromHDF5 is {type(object_decoder).__name__ if object_decoder is not None else object_decoder}")
 
     if isinstance(object_decoder, prog.CALLABLE_TYPES + (classmethod,)):
         return target_class.fromHDF5(entity, attrs, cache)
@@ -1568,7 +1567,7 @@ def attrs2dict(attrs:h5py.AttributeManager):
     """
     ret = dict()
     for k,v in attrs.items():
-        print(f"attrs2dict: {k} = {v}")
+        # print(f"attrs2dict: {k} = {v}")
         if k in ("type_name", "module_name"):
             continue
         
@@ -1592,6 +1591,11 @@ def attrs2dict(attrs:h5py.AttributeManager):
                         v = None
             
         elif k == "units":
+            # print(f"attrs2dict: k = {k} , v = {v}")
+            v  = jsonio.loads(v)
+            # pass # TODO: 2024-12-14 10:02:47 FIXME
+            # how to store the Quantity's units as a HDF5 attribute?
+            # 
             
         elif isinstance(v, str) and v == "null":
             v = None
@@ -1675,12 +1679,6 @@ def attrs2dict(attrs:h5py.AttributeManager):
                     # print(f"new eval: '{v2}'")
                     
                     v = eval(v2, module.__dict__)
-                    # if isinstance(v, type)
-#         try:
-#                     
-#         except:
-#             # print(f"k = {k} v = {v} has dtype: {v.dtype if hasattr(v, 'dtype') else 'no'}")
-#             traceback.print_exc()
             
         ret[k] = v
         
@@ -1851,7 +1849,7 @@ def makeObjAttrs(obj:typing.Any, oname:typing.Optional[str]=None):
             try:
                 obj_attrs[a[0]] = makeAttr(getattr(obj, a[0]))
             except:
-                print(f"In object {obj} ({type(obj)}), attribute '{a[0]}':")
+                # print(f"In object {obj} ({type(obj)}), attribute '{a[0]}':")
                 traceback.print_exc()
                 raise
     
@@ -2761,11 +2759,14 @@ def _(obj:bgbridge.Structure,
             group[target_name] = cached_entity
             return cached_entity
         
-        data = getattr(obj, "data", dict())
+        obj_data = getattr(obj, "data", dict())
         
-        entity = makeHDF5Group(data, group, name=name, compression=compression,
-                               chunks=chunks, track_order=track_order, 
-                               entity_cache = entity_cache)
+        if bgbridge.hasBrainGlobeAtlasAPI and isinstance(obj, bgbridge.brainglobe_atlasapi.structure_class.Structure) and len(obj_data):
+            obj_data["mesh"] = None
+        
+        entity = makeHDF5Group(obj_data, group, name=name, compression=compression,
+                            chunks=chunks, track_order=track_order, 
+                            entity_cache = entity_cache)
         
         entity.attrs.update(obj_attrs)
         
@@ -2993,7 +2994,7 @@ def toHDF5(obj, group:h5py.Group, name:typing.Optional[str]=None,
     # 1. check if the data type defines an instance method 'toHDF5'; 
     entity_factory_method = getattr(obj, "toHDF5", None)
     
-    print(f"h5io.toHDF5: {obj.__class__.__name__}.toHDF5 is {type(entity_factory_method).__name__ if entity_factory_method is not None else entity_factory_method}")
+    # print(f"h5io.toHDF5: {obj.__class__.__name__}.toHDF5 is {type(entity_factory_method).__name__ if entity_factory_method is not None else entity_factory_method}")
     
     # 2. check if a custom-made toHDF5 function is passed here (this
     # will override the instance method above, if defined)
@@ -3024,7 +3025,7 @@ def toHDF5(obj, group:h5py.Group, name:typing.Optional[str]=None,
 
     target_name, obj_attrs = makeObjAttrs(obj, oname=oname)
     
-    print(f"h5io.toHDF5: target_name = {target_name}, obj_attrs = {obj_attrs}")
+    # print(f"h5io.toHDF5: target_name = {target_name}, obj_attrs = {obj_attrs}")
     
     if isinstance(name, str) and len(name.strip()):
         target_name = name
@@ -3063,7 +3064,7 @@ def makeHDF5Dataset(obj, group: h5py.Group, name:typing.Optional[str]=None,
     if isinstance(name, str) and len(name.strip()):
         target_name = name
         
-    print(f"h5io.makeHDF5Dataset({type(obj).__name__}): obj_attrs = {obj_attrs}")
+    # print(f"h5io.makeHDF5Dataset({type(obj).__name__}): obj_attrs = {obj_attrs}")
 
     try:
         dset = makeDataset(obj, group, obj_attrs, target_name, 
@@ -3243,7 +3244,7 @@ def _(obj:typing.Union[datetime.date, datetime.time, datetime.datetime],
     if isinstance(cached_entity, h5py.Dataset):
         group[name] = cached_entity # make a hard link
         return cached_entity
-    print(f"h5io.makeDataset({type(obj).__name__})")
+    # print(f"h5io.makeDataset({type(obj).__name__})")
     val = obj.isoformat()
     dset = group.create_dataset(name, data = np.array(val, dtype=h5py.string_dtype()),
                                 track_order=track_order)
@@ -3537,13 +3538,13 @@ def _(obj:dict, group, attrs, name, compression, chunks, track_order,
         return cached_entity
         
     grp = group.create_group(name, track_order = track_order)
-    print(f"h5io.makeGroup(dict): grp = {grp}")
+    # print(f"h5io.makeGroup(dict): grp = {grp}")
     grp.attrs.update(attrs)
     storeEntityInCache(entity_cache, obj, grp)
     
     if all(isinstance(k, str) for k in obj.keys()):
         for k, element in obj.items():
-            print(f"\th5io.makeGroup(dict): k = {k}, element = {type(element).__name__}")
+            # print(f"\th5io.makeGroup(dict): k = {k}, element = {type(element).__name__}")
             cached_entity = getCachedEntity(entity_cache, element)
             if isinstance(cached_entity, (h5py.Group, h5py.Dataset)):
                 grp[k] = cached_entity
@@ -3669,7 +3670,7 @@ def _(entity:h5py.Dataset, target_class:type, attrs:dict, cache:dict=dict()):
     # specialized objects such a neo signal etc
     # hence these will be dealt with in the "group" branch below; don't
     # call fromHDF5 on the children datsets there!
-    print(f"h5io.objectFromEntity({type(entity).__name__}): target_class = {target_class}")
+    # print(f"h5io.objectFromEntity({type(entity).__name__}): target_class = {target_class}")
     if entity.shape is None or len(entity.shape) == 0: 
         # no axes imply no Dataset dimscales either
         # most likely a scalar and therefore we attempt to instantiate
