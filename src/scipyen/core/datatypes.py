@@ -1573,28 +1573,6 @@ class SubstanceDosage(ScipyenDataclass):
     def __eq__(self, other) -> bool:
         return super().__eq__(other)
     
-#         if not isinstance(other, self.__class__):
-#             return False
-#         
-#         ret = self.name == other.name
-#         
-#         if ret:
-#             ret &= isinstance(self.dose, pq.Quantity) and isinstance(other.dose, pq.Quantity)
-#             if ret:
-#                 ret &= self.dose.ndim == other.dose.ndim
-#                 if ret:
-#                     ret &= self.dose.shape == other.dose.shape
-#                     
-#                 if ret:
-#                     ret &= scq.unitsConvertible(self.dose, other.dose)
-#                     
-#                 if ret:
-#                     if self.dose.units != other.dose.units:
-#                         ret &= np.all(self.dose == other.dose.rescale(self.dose.units))
-#                     else:
-#                         ret &= np.all(self.dose == other.dose)
-#         
-#         return ret
     
 @dataclass
 class Treatment(Procedure):
@@ -1613,11 +1591,11 @@ class Treatment(Procedure):
     description: str = ""
     type:ImmutableDescriptor = ImmutableDescriptor(default=ProcedureType.treatment)
     
-    def __repr__(self):
-        indent = lambda x: x.replace("\n", "\n\t")
-        repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}"
-        ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
-        return "\n".join(ret)
+    # def __repr__(self):
+    #     indent = lambda x: x.replace("\n", "\n\t")
+    #     repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}"
+    #     ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
+    #     return "\n".join(ret)
     
     def __post_init__(self):
         super().__init__(name=self.name, description=self.description, 

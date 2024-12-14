@@ -1002,7 +1002,7 @@ def safe_identity_test(x:object, y:object, idcheck:bool=True) -> bool:
             #
             # NOTE: dataclasses.MISSING and math.inf behave as expected
             #
-            if not ret and not any(map(pd.isna, (x,y))): # ret is False NOT because one is pd.NA!
+            if not ret and not np.any(map(lambda v: np.all(pd.isna(v)), (x,y))): # ret is False NOT because one is pd.NA!
                 if all(map(lambda v: isinstance(v, Number), (x,y))):
                     ret = all(map(math.isnan, (x,y)))
                 

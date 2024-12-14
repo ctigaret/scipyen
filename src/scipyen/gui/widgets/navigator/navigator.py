@@ -138,16 +138,6 @@ def appendSlashToPath(url:QtCore.QUrl):
         
     return url
 
-def concatPaths(path1:str, path2:str):
-    assert not path2.startswith('/')
-    
-    if len(path1) == 0:
-        return path2
-    
-    path1 = appendSlash(path1)
-    path1 += path2
-    return path1
-
 def isRegFileMask(mode):
     # TODO: use pathlib
     pass
@@ -1601,7 +1591,7 @@ class Navigator(QtWidgets.QWidget):
         if text.startswith('/'):
             url.setPath(text)
         else:
-            url.setPath(concatPaths(url.path(), text))
+            url.setPath(pictio.concatPaths(url.path(), text).as_posix())
             
         if os.path.isdir(url.path()):
             self.slotApplyUrl(url)

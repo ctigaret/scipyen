@@ -6930,7 +6930,7 @@ def unitStrAsQuantity(x:str, convert:bool=True):
 def sourcedFromABF(x:neo.Block) -> bool:
     return x.annotations.get("software", None) == "Axon"
 
-def getABF(obj:typing.Union[str, neo.Block]):
+def getABF(obj:typing.Union[str, pathlib.Path, neo.Block]):
     """
     Returns a pyabf.ABF object from an ABF file.
     
@@ -6952,17 +6952,19 @@ def getABF(obj:typing.Union[str, neo.Block]):
     else:
         filename = getattr(obj, "file_origin", None)
         
-    if not os.path.exists(filename):
+    filename = pathlib.Path(filename)
+    if not filename.is_file():
         return
-    
     loader = pio.getLoaderForFile(filename)
     
     if loader == pio.loadAxonFile:
         try:
-            if filename.lower().endswith(".abf"):
-                return pyabf.ABF(filename)
-            elif filename.lower().endswith(".atf"):
-                return pyabf.ATF(filename)
+            # if filename.lower().endswith(".abf"):
+            if filename.suffix.lower() == ".abf":
+                return pyabf.ABF(filename.as_posix())
+            # elif filename.lower().endswith(".atf"):
+            elif filename.suffix.lower() == ".atf":
+                return pyabf.ATF(filename.as_posix())
             else:
                 raise RuntimeError("pyabf can only handle ABF and ATF files")
         except:

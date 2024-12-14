@@ -156,6 +156,20 @@ mimetypes.add_type("application/x-matlab", ".mat")
 mimetypes.add_type("application/x-octave", ".oct")
 mimetypes.add_type("text/plain", ".cfg") # adds to already known extensions
 
+def ensureExtension(fileName:typing.Union[str, pathlib.Path], ext:str) -> pathlib.Path:
+    fileName = pathlib.Path(fileName)
+    if len(ext) == 0:
+        return fileName
+    if not ext.startswith("."):
+        ext = "."+ext
+        
+    name, extn = fileName.stem, fileName.suffix
+    
+    if len(extn) == 0 or extn != ext:
+        newFname = pathlib.Path(name).with_suffix(ext)
+        
+    return newFname if fileName.parent == "." else fileName.parent / newFname
+
 def __ndArray2csv__(data, writer):
     for l in data:
         writer.writerow(l)
@@ -193,17 +207,13 @@ def is_hidden(filepath:typing.Union[str, pathlib.Path]):
     else:
         return name.startswith(".")   
         
-def concatPaths(path1:str, path2:str):
-    assert(path2.startswith("/"))
+def concatPaths(path1:typing.Union[str, pathlib.Path], path2:typing.Union[str, pathlib.Path]) -> pathlib.Path:
     
-    if len(path1) == 0:
-        return path2
-    elif not path1.endswith("/"):
-        return path1 + "/" + path2
-    else:
-        return path1 + path2
+    path1, path2 = map(lambda x: pathlib.Path(x), (path1, path2))
+    
+    return path1 / path2
         
-def loadHDF5File(fName:str):
+def loadHDF5File(fName:typing.Union[str, pathlib.Path]):
     """
     """
     with h5py.File(fName) as h5file:
@@ -213,12 +223,18 @@ def loadHDF5File(fName:str):
             traceback.print_exc()
             raise
     return ret
+
+def loadHDF5(fName:typing.Union[str, pathlib.Path]) -> object:
+    return loadHDF5File(fName)
         
     
+def loadImage(fileName:str, asVolume:bool=False, suppress_cpp_warnings=False) -> object:
+    return loadImageFile(fileName, asVolume, suppress_cpp_warnings)
+
 # NOTE: 2017-09-21 16:34:21
 # BioFormats dumped mid 2017 because there are no good python ports to it
 # (it uses javabridge which is suboptimal)
-def loadImageFile(fileName:str, asVolume:bool=False, suppress_cpp_warnings=False):
+def loadImageFile(fileName:str, asVolume:bool=False, suppress_cpp_warnings=False) -> object:
     ''' Reads pixel data from a raster image file
     Uses the vigra impex library.
     
@@ -301,7 +317,8 @@ def loadImageFile(fileName:str, asVolume:bool=False, suppress_cpp_warnings=False
     return ret
         
 # TODO: diverge onto HDF5, and bioformats handling
-def saveImageFile(data, fileName:str, separateChannels:bool=True):
+def saveImageFile(data, fileName:typing.Union[str, pathlib.Path], 
+                  separateChannels:bool=True):
     """
     Writes a vigra array to one of the image file formats supported by Vigra
     library
@@ -327,8 +344,10 @@ def saveImageFile(data, fileName:str, separateChannels:bool=True):
     """
     #print("ndim:", data.ndim, "nchannels: ", data.channels, "shape:", data.shape)
     
+    fileName = pathlib.Path(fileName)
+    
     if data.ndim == 2: # trivial
-        vigra.impex.writeImage(data, fileName, "")
+        vigra.impex.writeImage(data, fileName.as_posix(), "")
         
     elif data.ndim == 3: # less trivial
         if data.channels == 1:
@@ -338,10 +357,10 @@ def saveImageFile(data, fileName:str, separateChannels:bool=True):
             
             if data.dropChannelAxis().ndim == 2:
                 # dropping channel axis does indeed decrease dimensionality
-                vigra.impex.writeImage(data.dropChannelAxis(), fileName, "")
+                vigra.impex.writeImage(data.dropChannelAxis(), fileName.as_posix(), "")
                 
             else:
-                vigra.impex.writeVolume(data.dropChannelAxis(), fileName, "")
+                vigra.impex.writeVolume(data.dropChannelAxis(), fileName.as_posix(), "")
             
         else:
             # NOTE: 2019-01-21 14:13:02 multi-band data; 
@@ -353,14 +372,17 @@ def saveImageFile(data, fileName:str, separateChannels:bool=True):
             # by vigra.impex unless there are three bands (channels)
             
             if data.channels == 3 and not separateChannels:
-                vigra.impex.writeImage(vigra.RGBImage(data), fileName, "")
+                vigra.impex.writeImage(vigra.RGBImage(data), fileName.as_posix(), "")
                     
             else:
-                bname, ext = os.path.splitext(fileName)
+                bname, ext = fileName.stem, fileName.suffix
+                bname = fileName.parent / pathlib.Path(bname) if fileName.parent != "." else pathlib.Path(bname)
+                    
+                # bname, ext = os.path.splitext(fileName)
                 
                 for c in range(data.channels):
                     out = data.bindAxis("c", c) # 2D array
-                    vigra.impex.writeImage(out, "%s_channel_%d%s" % (bname, c, ext), "")
+                    vigra.impex.writeImage(out, "%s_channel_%d%s" % (bname.as_posix(), c, ext), "")
                     
     elif data.ndim == 4: # not trivial
         if data.channels == 1:
@@ -368,7 +390,7 @@ def saveImageFile(data, fileName:str, separateChannels:bool=True):
             # see NOTE: 2019-01-21 12:01:21
             if data.dropChannelAxis().ndim == 3:
                 # convert to a 3D array by dropping its channel axis then write as volume
-                vigra.impex.writeVolume(data.dropChannelAxis(), fileName, '')
+                vigra.impex.writeVolume(data.dropChannelAxis(), fileName.as_posix(), '')
                 
             else:
                 # NOTE: 2019-01-21 12:10:28
@@ -379,10 +401,12 @@ def saveImageFile(data, fileName:str, separateChannels:bool=True):
                 # "slices" as separate volumes (each slice will have 1-less dimensions)
                 # suffixed with "_x_k" where "x" stands for the key of the outermost 
                 # axistag and "k" is the kth coordinate on axis "x"
-                bname, ext = os.path.splitext(fileName)
+                # bname, ext = os.path.splitext(fileName)
+                bname, ext = fileName.stem, fileName.suffix
+                bname = fileName.parent / pathlib.Path(bname) if fileName.parent != "." else pathlib.Path(bname)
                 
                 for k in range(data.shape[-1]):
-                    vigra.impex.writeVolume(data.bindAxis(data.axistags[-1], k), "%s_%s_%d%s" % (bname, data.axistags[-1].key, k, ext), "")
+                    vigra.impex.writeVolume(data.bindAxis(data.axistags[-1], k), "%s_%s_%d%s" % (bname.as_posix(), data.axistags[-1].key, k, ext), "")
         
         else: 
             # NOTE: 2019-01-21 14:21:50
@@ -393,17 +417,19 @@ def saveImageFile(data, fileName:str, separateChannels:bool=True):
             
             if data.channels == 3 and not separateChannels:
                 # pack data in an RGB volume
-                vigra.impex.writeVolume(vigra.RGBVolume(data), fileName, "")
+                vigra.impex.writeVolume(vigra.RGBVolume(data), fileName.as_posix(), "")
                 
             else:
                 # force separate channels -- iterate (bind) over the
                 # channel axis => 3D single-band volumes
                     
-                bname, ext = os.path.splitext(fileName)
+                # bname, ext = os.path.splitext(fileName)
+                bname, ext = fileName.stem, fileName.suffix
+                bname = fileName.parent / pathlib.Path(bname) if fileName.parent != "." else pathlib.Path(bname)
                 
                 for c in range(data.channels):
                     out = data.bindAxis("c", c) # 3D volume, single-band
-                    vigra.impex.writeVolume(out, "%s_channel_%d%s" % (bname, c, ext), "")
+                    vigra.impex.writeVolume(out, "%s_channel_%d%s" % (bname.as_posix(), c, ext), "")
         
     elif data.ndim == 5:
         if data.channels == 1:
@@ -412,10 +438,12 @@ def saveImageFile(data, fileName:str, separateChannels:bool=True):
                 # data has a real channel axis; dropping it reduces dimensionality to 4
                 # behave as for a 4D data without channel axis, see NOTE: 2019-01-21 12:10:28
                 
-                bname, ext = os.path.splitext(fileName)
+                # bname, ext = os.path.splitext(fileName)
+                bname, ext = fileName.stem, fileName.suffix
+                bname = fileName.parent / pathlib.Path(bname) if fileName.parent != "." else pathlib.Path(bname)
                 
                 for k in range(data.dropChannelAxis().shape[-1]):
-                    vigra.impex.writeVolume(data.dropChannelAxis().bindAxis(data.dropChannelAxis().axistags[-1], k), "%s_%s_%d%s" % (bname, data.dropChannelAxis().axistags[-1].key, k, ext), "")
+                    vigra.impex.writeVolume(data.dropChannelAxis().bindAxis(data.dropChannelAxis().axistags[-1], k), "%s_%s_%d%s" % (bname.as_posix(), data.dropChannelAxis().axistags[-1].key, k, ext), "")
         
                 
             else:
@@ -424,10 +452,12 @@ def saveImageFile(data, fileName:str, separateChannels:bool=True):
                 # its dimensionality
                 # we iterate along the two outermost axes and generate 3D slices 
                 # that we then write as individual volumes
-                bname, ext = os.path.splitext(fileName)
+                # bname, ext = os.path.splitext(fileName)
+                bname, ext = fileName.stem, fileName.suffix
+                bname = fileName.parent / pathlib.Path(bname) if fileName.parent != "." else pathlib.Path(bname)
                 for k0 in range(data.shape[-1]):
                     for k1 in range(data.shape[-2]):
-                        vigra.impex.writeVolume(data.bindAxis(data.axistags[-1],k0).bindAxis(data.axistags[-2],k1), "%s_%s_%d_%s_%d%s" % (bname, data.axistags[-1].key, k0, data.axistags[-2].key, k1, ext), "")
+                        vigra.impex.writeVolume(data.bindAxis(data.axistags[-1],k0).bindAxis(data.axistags[-2],k1), "%s_%s_%d_%s_%d%s" % (bname.as_posix(), data.axistags[-1].key, k0, data.axistags[-2].key, k1, ext), "")
                         
         else: 
             # NOTE: 2019-01-21 13:19:22
@@ -436,7 +466,9 @@ def saveImageFile(data, fileName:str, separateChannels:bool=True):
             # outermost non-channel axis axis to generate multi-banded 3D sub-volumes
             
             # ATTENTION: vigra impex only supports TIFFs with a single or three bands
-            bname, ext = os.path.splitext(fileName)
+            # bname, ext = os.path.splitext(fileName)
+            bname, ext = fileName.stem, fileName.suffix
+            bname = fileName.parent / pathlib.Path(bname) if fileName.parent != "." else pathlib.Path(bname)
             
             if data.channelIndex == data.ndim-1:
                 outerSliceAxis = data.axistags[data.channelIndex-1]
@@ -453,27 +485,27 @@ def saveImageFile(data, fileName:str, separateChannels:bool=True):
             if data.channels == 3 and not separateChannels:
                 for k_out in range(data.shape[data.axistags.index(outerSliceAxis.key)]):
                     out = vigra.RGBVolume(data.bindAxis(outerSliceAxis.key, k_out)) # 4D but multi band with packed pixels
-                    vigra.impex.writeVolume(out, "%s_%s_%d%s" % (bname, outerSliceAxis.key, k_out, ext), "")
+                    vigra.impex.writeVolume(out, "%s_%s_%d%s" % (bname.as_posix(), outerSliceAxis.key, k_out, ext), "")
                     
             else:
                 for c in data.channels: # binds each channel to a 4D data single-band
                     for k_out in range(data.shape[data.axistags.index(outerSliceAxis.key)]):
                         out = data.bindAxis("c", c).bindAxis(outerSliceAxis.key, k_out)
-                        vigra.impex.writeVolume(out, "%s_channel_%d_%s_%d%s" % (bname, c, outerSliceAxis.key, k_out, ext), "")
+                        vigra.impex.writeVolume(out, "%s_channel_%d_%s_%d%s" % (bname.as_posix(), c, outerSliceAxis.key, k_out, ext), "")
             
     else:
         raise TypeError("VigraArrays with %d dimensions are not supported" % data.ndim)
     
-def loadOctave(fileName):
+def loadOctave(fileName) -> object:
     raise RuntimeError("Loading of Octave binary files is not yet supported; please convert them to matlab files first")
     
-def loadMatlab(fileName:str, **kwargs) -> dict:
+def loadMatlab(fileName:typing.Union[str, pathlib.Path], **kwargs) -> dict:
     """Simple wrapper around scipy.io.loadmat.
     
     Parameters:
     ----------
     
-    fileName: str; name of the file (or fully qualified path name)
+    fileName: str or pathlib Path; name of the file (or fully qualified path name)
     
     Returns:
     -------
@@ -481,17 +513,21 @@ def loadMatlab(fileName:str, **kwargs) -> dict:
         the output from scipy.io.loadmat (see scipy.io.loadmat for details)
         The keys in mat_dict represent the name of the variables in the mat file.
     """
-    if not os.path.isfile(fileName):
+    
+    fileName = pathlib.Path(fileName)
+    
+    # if not os.path.isfile(fileName):
+    if not fileName.is_file():
         raise OSError("File %s not found" % fileName)
         
     try:
-        return sio.loadmat(fileName) # a dict
+        return sio.loadmat(fileName.as_posix()) # a dict
         
     except Exception as e:
         traceback.print_exc()
         
     
-def loadCFSmatlab(fileName:str):
+def loadCFSmatlab(fileName:typing.Union[str, pathlib.Path]) -> object:
     """Load CFS data exported from Signal5 as matlab
     CAUTION: under development
     Returns an analog signal (?)
@@ -502,7 +538,9 @@ def loadCFSmatlab(fileName:str):
     # (the variables themselves, in the form of numpy record arrays)
     # all keys in this dict are strings
     
-    matlab_dict = sio.loadmat(fileName)
+    fileName = pathlib.Path(fileName)
+    
+    matlab_dict = sio.loadmat(fileName.as_posix())
     
     # this could be any matlab file; check if it's what's expected
     
@@ -668,7 +706,10 @@ def loadCFSmatlab(fileName:str):
         
         return ret
         
-def loadAxonTextFile(fileName:str):
+def loadAxonText(fileName:typing.Union[str, pathlib.Path]) -> object:
+    return loadAxonTextFile(fileName)
+
+def loadAxonTextFile(fileName:typing.Union[str, pathlib.Path]) -> object:
     """Reads the contents of an axon text file.
     
     Returns:
@@ -683,7 +724,9 @@ def loadAxonTextFile(fileName:str):
     Also returns the metadata (it used to be optional)
     
     """
-    if not os.path.isfile(fileName):
+    fileName = pathlib.Path(fileName)
+    # if not os.path.isfile(fileName):
+    if not fileName.is_file():
         raise OSError("File %s not found" % fileName)
     
     skip_header = 2 # two mandatory header lines in ATF files EXCLUDING column names
@@ -766,8 +809,6 @@ def loadAxonTextFile(fileName:str):
         # NOTE: 2019-04-22 17:13:09
         # allow plain ascii files "masquerading" as ATF files
             
-    #print("data_units", data_units)
-        
     # NOTE: 2019-04-22 16:55:12
     # this is a structured numpy array (ndim = 1) as data_names is never 
     # empty (see NOTE: 2019-04-22 16:49:09)
@@ -807,12 +848,6 @@ def loadAxonTextFile(fileName:str):
                 time_units = pq.s
                 channel_units = [pq.dimensionless for c in channel_names]
                 
-            
-            #chndx = neo.ChannelIndex(index=np.arange(len(channel_names)),
-                                        #channel_ids = range(len(channel_names)),
-                                        #channel_names = channel_names,
-                                        #name = "Channels")
-
             # try to guess if this is a regularly sampled signal
             dtime = np.ediff1d(time_vector)
             
@@ -838,9 +873,6 @@ def loadAxonTextFile(fileName:str):
                                                         time_units = time_units,
                                                         name = name) \
                         for k, name in enumerate(channel_names)]
-                
-            #for k, sig in enumerate(signals):
-                #sig.channel_index = chndx[k]
                     
         else: # no "Time" column
             # we assume all data columns are analog signals, sampled at 1 Hz
@@ -848,11 +880,6 @@ def loadAxonTextFile(fileName:str):
             time_units = pq.s
             t_start = 0 * time_units
             sampling_period = 1 * pq.s
-            
-            #chndx = neo.ChannelIndex(index = np.arange(len(data_col_names)),
-                                        #channel_ids = range(len(data_col_names)),
-                                        #channel_names = data_col_names,
-                                        #name = "Channels")
             
             if len(data_units):
                 signals = [neo.AnalogSignal(data[name],
@@ -870,21 +897,12 @@ def loadAxonTextFile(fileName:str):
                                         name = name) \
                         for name in data_col_names]
                 
-            #for k, sig in enumerate(signals):
-                #sig.channel_index = chndx[k]
-                
-                
     else:
         data_col_names = ["Signal_%d" % k for k in range(data.shape[1])]
         
         time_units = pq.s
         t_start = 0 * time_units
         sampling_period = 1 * pq.s
-        
-        #chndx = neo.ChannelIndex(index = np.arange(len(data_col_names)),
-                                    #channel_ids = range(len(data_col_names)),
-                                    #channel_names = data_col_names,
-                                    #name = "Channels")
         
         if len(data_units):
             signals = [neo.AnalogSignal(data[:,k],
@@ -902,10 +920,6 @@ def loadAxonTextFile(fileName:str):
                                         name = data_col_names[k]) \
                     for k in range(data.shape[1])]
             
-        #for k, sig in enumerate(signals):
-            #sig.channel_index = chndx[k]
-            
-            
     segment = neo.Segment()
 
     analog = True
@@ -915,19 +929,20 @@ def loadAxonTextFile(fileName:str):
     result = neo.Block(name=os.path.basename(fileName),
                        file_origin = fileName)
     
-    #result.channel_indexes.append(chndx)
-    
     result.segments.append(segment)
     
     result.annotate(header=records)
     
     return result
-    #return result, records
-    #if with_optional_header:
-    
-    #return result
 
-def loadAxonFile(fileName:typing.Union[str, pathlib.Path], create_group_across_segment:typing.Union[bool, dict]=False, signal_group_mode:typing.Optional[str]="split-all"):
+def loadAxon(fileName:typing.Union[str, pathlib.Path], 
+             create_group_across_segment:typing.Union[bool, dict]=False, 
+             signal_group_mode:typing.Optional[str]="split-all") -> object:
+    return loadAxonFile(fileName, create_group_across_segment, signal_group_mode)
+
+def loadAxonFile(fileName:typing.Union[str, pathlib.Path], 
+                 create_group_across_segment:typing.Union[bool, dict]=False, 
+                 signal_group_mode:typing.Optional[str]="split-all") -> object:
     """Loads a binary Axon file (*.abf).
     
     Parameters:
@@ -990,20 +1005,16 @@ def loadAxonFile(fileName:typing.Union[str, pathlib.Path], create_group_across_s
         
     """
     
-    if isinstance(fileName, str) and not os.path.isfile(fileName):
+    fileName = pathlib.Path(fileName)
+
+    if not fileName.is_file():
         raise OSError(f"File {fileName} not found")
-
-    elif isinstance(fileName, pathlib.Path):
-        if not fileName.is_file():
-            raise OSError(f"File {fileName} not found")
-
-        fileName = str(fileName)
     
     data = neo.Block()
     axon_info = dict()
     
     try:
-        axonIO = neo.io.AxonIO(filename=fileName)
+        axonIO = neo.io.AxonIO(filename=fileName.as_posix())
         
         # NOTE: 2020-12-23 17:33:36
         # adapt to the neo 0.9.0 API
@@ -1067,7 +1078,7 @@ def loadAxonFile(fileName:typing.Union[str, pathlib.Path], create_group_across_s
         traceback.print_exc()
         
 @safeWrapper
-def importDataFrame(fileName):
+def importDataFrame(fileName:typing.Union[str, pathlib.Path]):
     fileType = getMimeAndFileType(fileName)[0]
     
     if any([s in fileType for s in ("excel", "spreadsheet")]):
@@ -1080,7 +1091,7 @@ def importDataFrame(fileName):
             dialect = csv.Sniffer().sniff(csvfile.read(2048))
             
         if dialect.delimiter in ("\t", " "): # tab-separated
-            return pd.read_table(fileName)
+            return pd.read_table(fileName) # supports both str and pathlib.Path!
             
         elif dialect.delimiter == ",": # comma-separated
             return pd.read_csv(fileName)
@@ -1092,7 +1103,7 @@ def importDataFrame(fileName):
         warnings.warn("Unsupported file type: %s" % fileType)
         
 @safeWrapper
-def loadPickleFile(fileName):
+def loadPickleFile(fileName:typing.Union[str, pathlib.Path]) -> object:
     """Loads pickled data.
     ATTENTION: 
     Work in progress to enable loading data from pickle files saved with old 
@@ -1122,6 +1133,7 @@ def loadPickleFile(fileName):
         with open(fileName, mode="rb") as fileSrc:
             ret = pickle.load(fileSrc)
         return ret
+    
     except Exception as e:
         # print(f"loadPickleFile exception {type(e).__name__}:\n {str(e)}")
         if isinstance(e, (ModuleNotFoundError, TypeError, ValueError)):
@@ -1137,42 +1149,40 @@ def loadPickleFile(fileName):
             return ret
         
         raise
-        
     
+def loadPickle(fileName:typing.Union[str, pathlib.Path]) -> object:
+    return loadPickleFile(fileName)
+
 @safeWrapper            
-def savePickleFile(val, fileName, protocol=None):
+def savePickleFile(val, fileName:typing.Union[str, pathlib.Path], protocol=None):
     #if inspect.isfunction(val): # DO NOT attempt to pickle unbound functions
         #return
+        
+    fileName = ensureExtension(fileName, ".pkl")
     
     if protocol is None:
         protocol = pickle.HIGHEST_PROTOCOL
     
-    (name,extn) = os.path.splitext(fileName)
-    
-    if len(extn)==0 or extn != ".pkl":
-        fileName += ".pkl"
-
-    # print(f"pickling {type(val).__name__}")
-        
     with open(fileName, mode="wb") as fileDest:
-        #print("Writing %s" % fileName)
         pickle.dump(val, fileDest, protocol=protocol)
-    
-def saveNixIOFile(val, fileName):
-    (name,extn) = os.path.splitext(fileName)
-    if len(extn)==0 or extn not in neo.NixIO.extensions:
-        fileName += ".nix"
-    #if len(extn)==0 or extn != ".h5":
-        #fileName += ".h5"
         
-    nixio = neo.NixIO(fileName)
-    #nixio = neo.NixIO(fileName=fileName)
+def savePickle(val, fileName:typing.Union[str, pathlib.Path], protocol=None):
+    savePickleFile(val, fileName, protocol)
+    
+def saveNixIOFile(val, fileName:typing.Union[str, pathlib.Path]):
+    fileName = ensureExtension(fileName, ".nix")
+        
+    nixio = neo.NixIO(fileName=fileName)
     nixio.write(val)
     
     nixio.close()
     
-def loadNixIOFile(fileName):
-    if os.path.isfile(fileName):
+def saveNixIO(val, fileName:typing.Union[str, pathlib.Path]):
+    saveNixIOFile(val, fileName)
+    
+def loadNixIOFile(fileName:typing.Union[str, pathlib.Path]) -> object:
+    fileName = pathlib.Path(fileName)
+    if fileName.is_file():
         nixio = neo.NixIO(fileName)
         ret = nixio.read() # always returns a list of neo.Block objects
         nixio.close()
@@ -1182,7 +1192,10 @@ def loadNixIOFile(fileName):
     else:
         raise OSError("File Not Found)")
     
-def signal_to_atf(data, fileName=None):
+def loadNixIO(fileName:typing.Union[str, pathlib.Path]) -> object:
+    return loadNixIOFile(fileName):
+    
+def signal_to_atf(data, fileName:typing.Optional[typing.Union[str, pathlib.Path]]=None):
     if not isinstance(data, neo.AnalogSignal):
         raise TypeError("Expecting a neo.AnalogSignal; got %s instead" % (type(data).__name__))
     
@@ -1193,19 +1206,13 @@ def signal_to_atf(data, fileName=None):
                 if not type(v).__name__ in ("module","type", "function", "builtin_function_or_method"):
                     if v is data and not k.startswith("_"):
                         fileName = strutils.str2symbol(k)
-                        #print(fileName)
-                    #print(type(v).__name__)
         finally:
             del(cframe)
             
-    if fileName is None or not isinstance(fileName, str):
+    if fileName is None or not isinstance(fileName, (str, pathlib.Path)):
         raise TypeError("Expecting a file name")
         
-    
-    (name,extn) = os.path.splitext(fileName)
-    
-    if len(extn) == 0 or extn != ".atf":
-        fileName += ".atf"
+    fileName = ensureExtension(fileName, ".atf")
         
     nColumns = data.shape[1] + 1
         
@@ -1245,7 +1252,10 @@ def signal_to_atf(data, fileName=None):
         traceback.print_exc()
         csvfile.close()
     
-def segment_to_atf(segment, fileName=None, skipHeader=True, skipTimes=True, acquisition_mode="Episodic Stimulation", comment="", SyncTimeUnits=3.33333):
+def segment_to_atf(segment, fileName:typing.Optional[typing.Union[str, pathlib.Path]]=None, 
+                   skipHeader=True, skipTimes=True, 
+                   acquisition_mode="Episodic Stimulation", comment="", 
+                   SyncTimeUnits=3.33333):
     """
     """
     # NOTE: one segment => one sweep!
@@ -1298,8 +1308,6 @@ def segment_to_atf(segment, fileName=None, skipHeader=True, skipTimes=True, acqu
     headerlist += atf_header
     headerlist.append(column_header)
     
-    #print(headerlist)
-    
     if fileName is None:
         cframe = inspect.getouterframes(inspect.currentframe())[1][0]
         try:
@@ -1311,16 +1319,11 @@ def segment_to_atf(segment, fileName=None, skipHeader=True, skipTimes=True, acqu
         finally:
             del(cframe)
             
-    if fileName is None or not isinstance(fileName, str):
+    if fileName is None or not isinstance(fileName, (str, pathlib.Path)):
         raise TypeError("Expecting a file name")
         
+    fileName = ensureExtension(fileName, ".atf")
     
-    (name,extn) = os.path.splitext(fileName)
-    
-    if len(extn) == 0 or extn != ".atf":
-        fileName += ".atf"
-        
-        
     data_columns = list()
     
     if not skipTimes:
@@ -1347,21 +1350,23 @@ def segment_to_atf(segment, fileName=None, skipHeader=True, skipTimes=True, acqu
         traceback.print_exc()
         csvfile.close()
         
-def saveJSON(obj, fileName):
+def saveJSON(obj, fileName:typing.Union[str, pathlib.Path]):
     from . import jsonio
+    fileName = ensureExtension(fileName, ".json")
     with open(fileName, mode="wt") as jsonfile:
         jsonio.dump(obj, jsonfile)
         
-def loadJSON(fileName):
+def loadJSON(fileName:typing.Union[str, pathlib.Path]) -> object:
     from . import jsonio
     return jsonio.load(fileName)
             
-def saveText(s, fileName):
+def saveText(s, fileName:typing.Union[str, pathlib.Path]):
     with open(fileName, mode="wt") as fileDest:
         fileDest.write(s)
             
 @safeWrapper
-def writeCsv(data, fileName=None, header=None):
+def writeCsv(data, fileName:typing.Optional[typing.Union[str, pathlib.Path]]=None, 
+             header=None):
     """Exports data to a csv (TAB-separated) file
     
     data: a column vector or a matrix (np.ndarray)
@@ -1389,21 +1394,13 @@ def writeCsv(data, fileName=None, header=None):
                 if not type(v).__name__ in ("module","type", "function", "builtin_function_or_method"):
                     if v is data and not k.startswith("_"):
                         fileName = strutils.str2symbol(k)
-                        #print(fileName)
-                    #print(type(v).__name__)
         finally:
             del(cframe)
             
-    if fileName is None or not isinstance(fileName, str):
+    if fileName is None or not isinstance(fileName, (str, pathlib.Path)):
         raise TypeError("Expecting a file name")
         
-    
-    (name,extn) = os.path.splitext(fileName)
-    
-    #print(extn)
-    
-    if len(extn) == 0 or extn != ".csv":
-        fileName += ".csv"
+    fileName = ensureExtension(fileName, ".csv")
         
     if isinstance(data, neo.SpikeTrain):
         pass
@@ -1533,15 +1530,20 @@ def writeCsv(data, fileName=None, header=None):
     else:
         raise NotImplementedError(f"{type(data).__name__} is not yet supported")
             
-def loadXMLFile(fileName):
-    if os.path.isfile(fileName):
+def loadXML(fileName:typing.Union[str, pathlib.Path]) -> object:
+    return loadXMLFile(fileName)
+
+def loadXMLFile(fileName:typing.Union[str, pathlib.Path]) -> object:
+    fileName = pathlib.Path(fileName)
+    # if os.path.isfile(fileName):
+    if fileName.is_file():
         ret = xmlutils.xml.dom.minidom.parse(fileName)
         # augument with a text node called "document_filesource"
         #print("loadXMLFile: doc path",  os.path.dirname(fileName))
         #print("loadXMLFile: doc file name",  os.path.basename(fileName))
         
         doc_filepath = ret.createElement("DocPath")
-        doc_path = ret.createTextNode(os.path.dirname(fileName))
+        doc_path = ret.createTextNode(os.path.dirname(fileName)) # this is OK, os.path.dirname supports pathlib.Path
         doc_filepath.appendChild(doc_path)
         ret.documentElement.appendChild(doc_filepath)
         
@@ -1562,16 +1564,20 @@ def loadXMLFile(fileName):
     #else:
         #raise OSError("File %s not found" % fileName)
 
-def loadTextFile(fileName, forceText=False):
+def loadText(fileName:typing.Union[str, pathlib.Path], forceText=False) -> object:
+    return loadTextFile(fileName, forceText)
+
+def loadTextFile(fileName:typing.Union[str, pathlib.Path], forceText=False) -> object:
     """Reads a file as text, returns a string.
     If the string contains <?xml version and forceText is False the result
     is an xml Document.
     """
-    if os.path.isfile(fileName):
+    fileName = pathlib.Path(fileName)
+    if fileName.is_file():
         # we may have been landed here from an Axon Text File
-        root, ext = os.path.splitext(fileName)
+        # root, ext = os.path.splitext(fileName)
         
-        if ext.lower() == ".atf":
+        if fileName.suffix == ".atf":
             return loadAxonTextFile(fileName)
         
         f = open(fileName, "r", encoding="utf-8")
@@ -1590,9 +1596,6 @@ def loadTextFile(fileName, forceText=False):
                 ret = xml.dom.minidom.parseString(text1)
                 # augument with a text node called "document_filesource"
                 
-                #print("loadTextFile: doc path",  os.path.dirname(fileName))
-                #print("loadTextFile: doc file name",  os.path.basename(fileName))
-                
                 doc_filepath = ret.createElement("DocPath")
                 doc_path = ret.createTextNode(os.path.dirname(fileName))
                 doc_filepath.appendChild(doc_path)
@@ -1608,7 +1611,6 @@ def loadTextFile(fileName, forceText=False):
                 excInfo = sys.exc_info()
                 traceback.print_exception(excInfo[0], excInfo[1], excInfo[2])
                 
-        #ret = xmlutils.xml.dom.minidom.parse(fileName)
         return ret
     else:
         raise OSError("File %s not found" % fileName)
@@ -1636,8 +1638,11 @@ fileLoaders["application/x-matlab"] = loadMatlab
 fileLoaders["application/x-octave"] = loadOctave
 fileLoaders["application/octet-stream"]
 
-def getLoaderForFile(fName):
-    if "pkl" in os.path.splitext(fName)[-1]:
+def getLoaderForFile(fName:typing.Union[str, pathlib.Path]):
+    fName = pathlib.Path(fName)
+    # if isinstance(fName, str):
+    # if "pkl" in os.path.splitext(fName)[-1]:
+    if "pkl" in fName.suffix:
         return fileLoaders["application/x-pickle"]
     
     mime_type, file_type, _ = getMimeAndFileType(fName)
@@ -1691,7 +1696,7 @@ def getLoaderForFile(fName):
                                     
     return ret
 
-def getMimeAndFileType(fileName):
+def getMimeAndFileType(fileName:typing.Union[str, pathlib.Path]):
     """Returns the mime type and the file type for the file specified by fileName.
     
     Parameters:
@@ -1730,13 +1735,16 @@ def getMimeAndFileType(fileName):
     mime_type = None
     encoding = None
     
+    fileName = pathlib.Path(fileName)
+    
     # NOTE: 2020-02-16 18:15:34
     # 1) DETERMINE THE FILE TYPE
     # 1.1) try the python-magic first
     if libmagic: # is not None:
         # magic module is loaded
         try:
-            if os.path.isfile(fileName):
+            # if os.path.isfile(fileName):
+            if fileName.is_file():
                 file_type = libmagic.from_file(fileName)
             
                 if isinstance(file_type, bytes):
@@ -1749,7 +1757,8 @@ def getMimeAndFileType(fileName):
     if file_type is None:
         if sys.platform == "linux":
             try:
-                if os.path.isfile(fileName):
+                # if os.path.isfile(fileName):
+                if fileName.is_file():
                     file_type = os.popen("file %s" % fileName).read()
 
             except Exception as e:
@@ -1792,31 +1801,34 @@ def getMimeAndFileType(fileName):
         
     return mime_type, file_type, encoding
 
-def is_python_source(fileName:str):
+def is_python_source(fileName:typing.Union[str, pathlib.Path]):
     mime_type, file_type, encoding = getMimeAndFileType(fileName)
     
     types = tuple([v for v in (mime_type, file_type) if isinstance(v, str) and len(v.strip())])
     
-    return any("python" in s.lower() for s in types) or os.path.splitext(fileName)[-1] == ".py"
+    # return any("python" in s.lower() for s in types) or os.path.splitext(fileName)[-1] == ".py"
+    return any("python" in s.lower() for s in types) or pathlib.Path(fileName).suffix == ".py"
 
-def is_spreadsheet(fileName:str):
+def is_spreadsheet(fileName:typing.Union[str, pathlib.Path]):
     mime_type, file_type, encoding = getMimeAndFileType(fileName)
     
     types = tuple([v for v in (mime_type, file_type) if isinstance(v, str) and len(v.strip())])
     
-    return any(any(m in s.lower() for m in ("spreadsheet", "excel", "csv", "tab-separated-values")) for s in types) or os.path.splitext(fileName)[-1] in (".csv", ".tsv", ".xls", ".xlsx")
+    # return any(any(m in s.lower() for m in ("spreadsheet", "excel", "csv", "tab-separated-values")) for s in types) or os.path.splitext(fileName)[-1] in (".csv", ".tsv", ".xls", ".xlsx")
+    return any(any(m in s.lower() for m in ("spreadsheet", "excel", "csv", "tab-separated-values")) for s in types) or pathlib.Path(fileName).suffix in (".csv", ".tsv", ".xls", ".xlsx")
     
-def loadFile(fName):
+def loadFile(fName:typing.Union[str, pathlib.Path]) -> object:
     value = None
     fileLoader = getLoaderForFile(fName)
     value = fileLoader(fName)
     return value
     
 @safeWrapper
-def saveHDF5(data, fileName):
-    (name,extn) = os.path.splitext(fileName)
-    if isinstance(extn, str) and len(extn.strip())==0 or extn not in (".h5", ".hdf5"):
-        fileName += ".h5"
+def saveHDF5(data, fileName:typing.Union[str, pathlib.Path]):
+    fileName = ensureExtension(fileName, ".h5")
+    # (name,extn) = os.path.splitext(fileName)
+    # if isinstance(extn, str) and len(extn.strip())==0 or extn not in (".h5", ".hdf5"):
+    #     fileName += ".h5"
         
     with h5py.File(fileName, mode="w") as h5file:
         h5io.toHDF5(data, h5file, name=os.path.basename(name))

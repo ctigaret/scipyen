@@ -50,5 +50,5 @@ def uchar(x:str):
 #     except csv.Error as e:
 #         sys.exit('file {}, line {}: {}'.format(filename, reader.line_num, e))
 
-# def sup(x:typing.union[int, str]) -> str:
+# def sup(x:typing.Union[int, str]) -> str:
 #     return _superscripts_(x)
