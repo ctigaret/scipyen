@@ -160,6 +160,7 @@ def ensureExtension(fileName:typing.Union[str, pathlib.Path], ext:str) -> pathli
     fileName = pathlib.Path(fileName)
     if len(ext) == 0:
         return fileName
+    
     if not ext.startswith("."):
         ext = "."+ext
         
@@ -167,8 +168,10 @@ def ensureExtension(fileName:typing.Union[str, pathlib.Path], ext:str) -> pathli
     
     if len(extn) == 0 or extn != ext:
         newFname = pathlib.Path(name).with_suffix(ext)
+        return newFname if fileName.parent == "." else fileName.parent / newFname
+    
+    return fileName
         
-    return newFname if fileName.parent == "." else fileName.parent / newFname
 
 def __ndArray2csv__(data, writer):
     for l in data:
@@ -1831,7 +1834,8 @@ def saveHDF5(data, fileName:typing.Union[str, pathlib.Path]):
     #     fileName += ".h5"
         
     with h5py.File(fileName, mode="w") as h5file:
-        h5io.toHDF5(data, h5file, name=os.path.basename(name))
+        # h5io.toHDF5(data, h5file, name=os.path.basename(name))
+        h5io.toHDF5(data, h5file, name=fileName.stem)
     
 @safeWrapper
 def save(*args:typing.Optional[typing.Any], name:typing.Optional[str]=None, ws:typing.Optional[dict]=None, mode:str="pkl", **kwargs):

@@ -1005,6 +1005,8 @@ def safe_identity_test(x:object, y:object, idcheck:bool=True) -> bool:
             if not ret and not np.any(map(lambda v: np.all(pd.isna(v)), (x,y))): # ret is False NOT because one is pd.NA!
                 if all(map(lambda v: isinstance(v, Number), (x,y))):
                     ret = all(map(math.isnan, (x,y)))
+                elif all(map(lambda v: isinstance(v, np.ndarray), (x,y))):
+                    ret = np.all(tuple(map(math.isnan, (x,y))))
                 
         return ret
     

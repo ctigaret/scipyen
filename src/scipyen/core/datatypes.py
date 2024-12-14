@@ -895,7 +895,8 @@ class ScipyenDataclass:
                                              chunks=chunks,
                                              track_order=track_order,
                                              entity_cache=entity_cache)
-                # print(f"{self.__class__.__name__}.toHDF5 created entity for field '{name}' ({type(value).__name__})\n")
+                if name == "dose":
+                    print(f"{self.__class__.__name__}.toHDF5 created entity {element_entity} for field '{name}' ({type(value).__name__})\n")
                 
         # print(f"### END {self.__class__.__name__}.toHDF5 \n\n")
         return entity
@@ -1591,39 +1592,12 @@ class Treatment(Procedure):
     description: str = ""
     type:ImmutableDescriptor = ImmutableDescriptor(default=ProcedureType.treatment)
     
-    # def __repr__(self):
-    #     indent = lambda x: x.replace("\n", "\n\t")
-    #     repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}"
-    #     ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
-    #     return "\n".join(ret)
-    
     def __post_init__(self):
         super().__init__(name=self.name, description=self.description, 
                          type = ProcedureType.treatment)
         
     def __eq__(self, other) -> bool:
         return super().__eq__(other)
-    
-#         if not isinstance(other, self.__class__):
-#             return False
-#         
-#         ret = self.name == other.name
-#         
-#         if ret:
-#             ret &= type(self.substance) == type(other.substance)
-#             # ret &= type(self.dose) == type(other.dose)
-#             
-#         if ret:
-#             ret &= self.substance == other.substance
-#             
-#         if ret:
-#             ret &= self.route == other.route
-#             
-#         if ret: 
-#             ret &= self.descripion == other.description
-#             
-#         return ret
-        
 @dataclass
 class Episode(ScipyenDataclass):
     """Generic episode for frame-based data.

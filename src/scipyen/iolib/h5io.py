@@ -3743,7 +3743,7 @@ def _(entity:h5py.Dataset, target_class:type, attrs:dict, cache:dict=dict()):
         elif target_class == pq.Quantity:
             units = attrs.get("units", pq.dimensionless)
             data = np.array(entity)
-            obj = data*units
+            obj = data * units
             
         else:
             try:
