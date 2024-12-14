@@ -1193,7 +1193,7 @@ def loadNixIOFile(fileName:typing.Union[str, pathlib.Path]) -> object:
         raise OSError("File Not Found)")
     
 def loadNixIO(fileName:typing.Union[str, pathlib.Path]) -> object:
-    return loadNixIOFile(fileName):
+    return loadNixIOFile(fileName)
     
 def signal_to_atf(data, fileName:typing.Optional[typing.Union[str, pathlib.Path]]=None):
     if not isinstance(data, neo.AnalogSignal):
