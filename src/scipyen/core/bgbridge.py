@@ -147,8 +147,14 @@ class BGStructureDescriptor:
             raise ValueError("Cannot accept an empty name")
         self._name = "_"+name
         
-    def __get__(self, obj:object, objtype:type) -> object:
+    # This one below: instance of                       owner class
+    #                 owner class                       
+    #                  ↓                                ↓
+    def __get__(self, obj:typing.Optional[object]=None, objtype:typing.Optional[type]=None) -> object:
         if obj is None:
+            if isinstance(objtype, type):
+                return getattr(objtype, self._name, self._default)
+            
             return self._default
         
         return getattr(obj, self._name, self._default)

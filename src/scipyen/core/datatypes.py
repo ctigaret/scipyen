@@ -792,7 +792,10 @@ class DoseDescriptor:
             
 @dataclass
 class ScipyenDataclass:
+    # BUG: 2024-12-15 12:33:55 FIXME
+    # __match_args__ in subclasses must reflect superclass and keyword args
     name:str = dataclasses.field(default_factory=str)
+    description: str = dataclasses.field(default_factory=str)
     
     def diff(self, other, showValues:bool=False) -> dict | tuple:
         # print(f"{self.__class__.__name__}.diff: ")
@@ -840,6 +843,13 @@ class ScipyenDataclass:
     #     repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {x}"
     #     ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
     #     return "\n".join(ret)
+    
+#     def __get__(self, instance:typing.Optional[object]=None, owner:typing.Optional[type]=None)-> object:
+#         if instance is None:
+#             if isinstance(owner, type):
+#                 return getattr(owner, self._name, self)
+#             
+#             return getattr(instance, self._name, self)
     
     def toHDF5(self, group:h5py.Group, name:str, oname:str, 
                        compression:str, chunks:bool, track_order:bool,
@@ -906,7 +916,7 @@ class ScipyenDataclass:
                 attrs:typing.Optional[dict] = None, cache:dict = {}):
         from iolib import h5io
         
-        # print(f"\n\n### BEGIN {cls.__name__}.fromHDF5 ")
+        print(f"\n\n### BEGIN {cls.__name__}.fromHDF5 ")
         
         if entity in cache:
             val = cache[entity]
@@ -924,14 +934,12 @@ class ScipyenDataclass:
         
         kwargs = dict()
         
-        # data = entity["data"]
-        
         for a in attrs_as_entities:
             if a in entity.keys():
                 kwargs[a] = h5io.fromHDF5(entity[a], cache=cache)
                 # print(f"{cls.__name__}.fromHDF5: got field '{a}' with type: {type(kwargs[a]).__name__}\n")
                     
-        # print(f"### END {cls.__name__}.fromHDF5 \n\n")
+        print(f"### END {cls.__name__}.fromHDF5 \n\n")
         return cls(**kwargs)
     
 class TypeEnum(IntEnum):
@@ -1585,12 +1593,14 @@ class Treatment(Procedure):
     
     """
     name:str = "Treatment"
+    __match_args__ = ("name", "substance", "route", "type")
     _:KW_ONLY
     substance:typing.Union[SubstanceDosage, typing.Sequence[SubstanceDosage]] = field(default_factory=SubstanceDosage)
     # allow combination of compounds
     route:AdministrationRoute = AdministrationRoute.null
-    description: str = ""
+    
     type:ImmutableDescriptor = ImmutableDescriptor(default=ProcedureType.treatment)
+    
     
     def __post_init__(self):
         super().__init__(name=self.name, description=self.description, 
@@ -1598,6 +1608,7 @@ class Treatment(Procedure):
         
     def __eq__(self, other) -> bool:
         return super().__eq__(other)
+    
 @dataclass
 class Episode(ScipyenDataclass):
     """Generic episode for frame-based data.

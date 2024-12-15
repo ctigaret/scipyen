@@ -2412,6 +2412,9 @@ def objectToEntity(obj,
                     track_order:typing.Optional[bool] = True, 
                     entity_cache:typing.Optional[dict]=None,
                     **kwargs):
+    
+    # print(f"h5io.objectToEntity: {type(obj).__name__}")
+    
     if (isinstance(obj, (collections.abc.Iterable, neo.core.container.Container)) or hasattr(type(obj),"__iter__")) and \
         not isinstance(obj, (str, bytes, bytearray, np.ndarray, neo.core.spiketrainlist.SpikeTrainList)):
         # neo Container, tuple, list, dict → h5py.Group child of group
@@ -3033,10 +3036,11 @@ def toHDF5(obj, group:h5py.Group, name:typing.Optional[str]=None,
     if not isinstance(entity_cache, dict):
         entity_cache = dict()
     
+    # NOTE: 2024-12-15 09:06:21
+    # for None we just create an empty dataset;
+    # for everthing else we call objectToEntity
     if obj is None:
-        # → straight to Dataset child of group
-        #
-        # don't bother with hard links here...
+        # → go straight to Dataset child of group, don't bother with hard links here...
         entity = group.create_dataset(target_name, data = h5py.Empty("f"))
         entity.attrs.update(obj_attrs)
         
