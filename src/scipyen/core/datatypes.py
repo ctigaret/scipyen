@@ -792,6 +792,63 @@ class DoseDescriptor:
             
 @dataclass
 class ScipyenDataclass:
+    """An 'enhanced' dataclass, ancestor of Scipyen data classes.
+    
+    
+    WARNING: to derive (i.e. create a subclass) from ScipyenDataclass follow the 
+    steps below:
+
+    1) use the '@dataclass' decorator
+    2) define the class attribute '__match_args__' of the subclass, to include 
+        the elements of the parent class attribute '__match_args__'
+    
+    This is because inheriting from a dataclass is not as straightforward as it 
+    is for general python classes; specifically, the '__match_args__' is set up
+    by the decorator code unless defined in the subclass, yet we use it for 
+    reconstituting the instance of the subclass from HDF5 data structure.
+
+    NOTE: passing this through a set constructor ensures the fields are uniquely
+    contained in __match_args__
+    
+    For example (pseudo-code, not supposed to run):
+    
+    @dataclass
+    class MyClass(ScipyenDataclass):
+        field1 …
+        field2 …
+        __match_args__ = tuple(set(ScipyenDataclass.__match_args__ + ("field1", "field2")))
+    
+        ⋮
+    
+        <other code in your subclass definition>
+    
+    And, one step further in the inheritance chain (again pseudo-code, it won't run):
+    
+    @dataclass
+    class MySubclass(MyClass):
+        field_A …
+        field_B …
+        _:KW_ONLY
+        field_C
+        
+        __match_args__ = tuple(set(MyClass.__match_args__ + ("field_A", "field_B", "field_C")))
+    
+        ⋮
+        
+        <other code in your subclass definition>
+    
+    So, the two new classes will show:
+        
+    MyClass.__match_args__
+        -> ("name", "description", "field1", "field2")
+    
+    MySubClass.__match_args__
+        -> ("name", "description", "field1", "field2", "field_A", "field_B", "field_C")
+    
+    
+    Replicate this mechanism for sub-subclasses.
+    
+    """
     # BUG: 2024-12-15 12:33:55 FIXME
     # __match_args__ in subclasses must reflect superclass and keyword args
     name:str = dataclasses.field(default_factory=str)
@@ -821,36 +878,12 @@ class ScipyenDataclass:
         
         return tuple(map(lambda f: f[0], diff_fields))
     
-        
-    
     def __eq__(self, other) -> bool:
         if not isinstance(other, self.__class__):
             return False
         
         return len(self.diff(other)) == 0
         
-#         ret = self.name == other.name
-#         
-#         if ret:
-#             ret = ret & len(self.diff(other)) == 0
-#             # ret &= all(getattr(self, f.name) == getattr(other, f.name) for f in dataclasses.fields(self.__class__))
-#             # ret &= all(map(lambda f: np.all(getattr(self, f.name) == getattr(other, f.name)), dataclasses.fields(self.__class__)))
-#             
-#         return ret
-    
-    # def __repr__(self):
-    #     print(f"{self.__class__.__name__}.__repr__()")
-    #     repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {x}"
-    #     ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
-    #     return "\n".join(ret)
-    
-#     def __get__(self, instance:typing.Optional[object]=None, owner:typing.Optional[type]=None)-> object:
-#         if instance is None:
-#             if isinstance(owner, type):
-#                 return getattr(owner, self._name, self)
-#             
-#             return getattr(instance, self._name, self)
-    
     def toHDF5(self, group:h5py.Group, name:str, oname:str, 
                        compression:str, chunks:bool, track_order:bool,
                        entity_cache:dict) -> h5py.Group:
@@ -905,8 +938,8 @@ class ScipyenDataclass:
                                              chunks=chunks,
                                              track_order=track_order,
                                              entity_cache=entity_cache)
-                if name == "dose":
-                    print(f"{self.__class__.__name__}.toHDF5 created entity {element_entity} for field '{name}' ({type(value).__name__})\n")
+                # if name == "dose":
+                #     print(f"{self.__class__.__name__}.toHDF5 created entity {element_entity} for field '{name}' ({type(value).__name__})\n")
                 
         # print(f"### END {self.__class__.__name__}.toHDF5 \n\n")
         return entity
@@ -916,7 +949,7 @@ class ScipyenDataclass:
                 attrs:typing.Optional[dict] = None, cache:dict = {}):
         from iolib import h5io
         
-        print(f"\n\n### BEGIN {cls.__name__}.fromHDF5 ")
+        # print(f"\n\n### BEGIN {cls.__name__}.fromHDF5 ")
         
         if entity in cache:
             val = cache[entity]
@@ -939,7 +972,7 @@ class ScipyenDataclass:
                 kwargs[a] = h5io.fromHDF5(entity[a], cache=cache)
                 # print(f"{cls.__name__}.fromHDF5: got field '{a}' with type: {type(kwargs[a]).__name__}\n")
                     
-        print(f"### END {cls.__name__}.fromHDF5 \n\n")
+        # print(f"### END {cls.__name__}.fromHDF5 \n\n")
         return cls(**kwargs)
     
 class TypeEnum(IntEnum):
@@ -1300,6 +1333,7 @@ class OrganismStage(TypeEnum):
     foetal      = 16
     prenatal = embryo | foetal # = 31
     larva       = 32
+    pup         = larva
     prepubertal = larva
     preweaning  = prepubertal
     adolescent  = 33
@@ -1383,9 +1417,11 @@ def inspect_members(obj, predicate=None):
 
 @dataclass
 class CellCompartment(ScipyenDataclass):
-    name:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
+    # name:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
     type:CellCompartmentType = CellCompartmentType.undefined
     id:int = 0
+    
+    __match_args__ = tuple(set(ScipyenDataclass.__match_args__ + ("type", "id")))
 
     def __repr__(self):
         indent = lambda x: x.replace("\n", "\n\t")
@@ -1425,6 +1461,10 @@ class Biometrics(ScipyenDataclass):
     weight:typing.Union[pq.Quantity, type(pd.NA)] = dataclasses.field(default=pd.NA) 
     height:typing.Union[pq.Quantity, type(pd.NA)] = dataclasses.field(default=pd.NA)
     
+    __match_args__ = tuple(set(ScipyenDataclass.__match_args__ + ("genotype", "sex",
+                                                                  "age", "postnatal",
+                                                                  "weight", "height")))
+    
     def __repr__(self):
         indent = lambda x: x.replace("\n", "\n\t")
         repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}"
@@ -1442,6 +1482,14 @@ class Organism(ScipyenDataclass):
     stage:OrganismStage = dataclasses.field(default=OrganismStage.postnatal)
     biometrics:Biometrics = dataclasses.field(default_factory=Biometrics)
     
+    __match_args__ = tuple(set(ScipyenDataclass.__match_args__ + ("taxon", "subspecies",
+                                                                  "strain","stage",
+                                                                  "biometrics")))
+    
+    def __post_init__(self):
+        if isinstance(self.biometrics, Biometrics):
+            self.biometrics.postnatal = self.stage > OrganismStage.prenatal
+                
     def __repr__(self):
         indent = lambda x: x.replace("\n", "\n\t")
         repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}"
@@ -1451,12 +1499,6 @@ class Organism(ScipyenDataclass):
     def __eq__(self, other) -> bool:
         return super().__eq__(other)
     
-# @dataclass
-# class Organ(ScipyenDataclass):
-#     name:str = "brain"
-#     # structure:BGStructureDescriptor = BGStructureDescriptor()
-    
-
 @dataclass
 class BiologicalSource(ScipyenDataclass):
     """
@@ -1523,6 +1565,16 @@ class BiologicalSource(ScipyenDataclass):
     # cellular compartment (there may be more than one in the same
     # field) — e,g, "spine", "dendrite", "axon", "soma"
     
+    __match_args__ = tuple(set(ScipyenDataclass.__match_args__ + ("organism",
+                                                                  "structure",
+                                                                  "cellType",
+                                                                  "cellMorphologicalType",
+                                                                  "cellDescriptors",
+                                                                  "sourceType",
+                                                                  "sourceID",
+                                                                  "cellID",
+                                                                  "cellCompartment",)))
+    
     def __repr__(self):
         indent = lambda x: x.replace("\n", "\n\t")
         repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}"
@@ -1543,10 +1595,12 @@ class Procedure(ScipyenDataclass):
     where procedureType is 'treatment'
     
     """
-    name:str = ""
+    # name:str = ""
     _:KW_ONLY
     type: ProcedureType = ProcedureType.null
-    description: str = ""
+    # description: str = ""
+    
+    __match_args__ = tuple(set(ScipyenDataclass.__match_args__ + ("type", ) )) # "name" and "description" inherited from ScipyenDataclass
     
     def __repr__(self):
         indent = lambda x: x.replace("\n", "\n\t")
@@ -1573,6 +1627,8 @@ class SubstanceDosage(ScipyenDataclass):
     name:str = "Vehicle"
     dose: DoseDescriptor = DoseDescriptor(default=None)
     
+    __match_args__ = tuple(set(ScipyenDataclass.__match_args__ + ("dose", )))
+    
     def __repr__(self):
         indent = lambda x: x.replace("\n", "\n\t")
         repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}"
@@ -1593,14 +1649,13 @@ class Treatment(Procedure):
     
     """
     name:str = "Treatment"
-    __match_args__ = ("name", "substance", "route", "type")
+    __match_args__ = tuple(set(Procedure.__match_args__ + ("substance", "route", "type")))
     _:KW_ONLY
     substance:typing.Union[SubstanceDosage, typing.Sequence[SubstanceDosage]] = field(default_factory=SubstanceDosage)
     # allow combination of compounds
     route:AdministrationRoute = AdministrationRoute.null
     
     type:ImmutableDescriptor = ImmutableDescriptor(default=ProcedureType.treatment)
-    
     
     def __post_init__(self):
         super().__init__(name=self.name, description=self.description, 
@@ -1625,27 +1680,31 @@ class Episode(ScipyenDataclass):
         In addition, the `description` attribute (a str) has an informative role
         without affecting the identity of an Episode
     """
-    name:str = ""
+    # name:str = ""
     _:KW_ONLY
     begin:datetime.datetime = datetime.datetime.now()
     end:datetime.datetime = datetime.datetime.now()
     beginFrame:int = 0
     endFrame:int = 0
-    description:str = ""
+    # description:str = ""
     procedure:typing.Optional[Procedure] = field(default = None)
+    
+    __match_args__ = tuple(set(ScipyenDataclass.__match_args__ + ("begin", "end", 
+                                                                  "beginFrame", "endFrame",
+                                                                  "procedure")))
     
     def __eq__(self, other) -> bool:
         return super().__eq__(other)
     
-#         if not isinstance(other, self.__class__):
-#             return False
-#         
-#         ret = True
-#         ret &= self.name == other.name
-#         if ret:
-#             # don't compare description as this is not definitory
-#             ret &= all(getattr(self, f.name) == getattr(other, f.name) for f in list(filter(lambda x: x.name != "description", dataclasses.fields(self.__class__))))
-#             
+# #         if not isinstance(other, self.__class__):
+# #             return False
+# #         
+# #         ret = True
+# #         ret &= self.name == other.name
+# #         if ret:
+# #             # don't compare description as this is not definitory
+# #             ret &= all(getattr(self, f.name) == getattr(other, f.name) for f in list(filter(lambda x: x.name != "description", dataclasses.fields(self.__class__))))
+# #             
 #         return ret
     
     def __repr__(self):
@@ -1712,9 +1771,11 @@ class Schedule(ScipyenDataclass):
         A Schedule can be logically considered a "protocol", where any of its
         constituent episodes may associate a Procedure. 
     """
-    name:str = ""
+    # name:str = ""
     _:KW_ONLY
     episodes:typing.Sequence[Episode] = field(default_factory = lambda : list())
+    
+    __match_args__ = tuple(set(ScipyenDataclass.__match_args__ + ("episodes",)))
     
     def __repr__(self):
         indent = lambda x: x.replace("\n", "\n\t")

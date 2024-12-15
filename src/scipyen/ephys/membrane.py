@@ -328,6 +328,17 @@ class MembranePropertiesAnalysisParameters(datatypes.ScipyenDataclass):
     
     # __changed__ = False
     
+    __match_args__ = tuple(set(datatypes.ScipyenDataclass.__match_args__ + 
+                               ("metadata", "VmSignal", "ImSignal",
+                                "useEmbeddedProtocol", "CurrentInjectionEpochIndex",
+                                "dV_dt_thr", "min_Vm_AP", "freq_bounds",
+                                "width_code", "ssDuration", "box_size",
+                                "average_passive_results", "fitrheo",
+                                "rheobase_factor", "test_Iinj",
+                                "minAPs_for_active_properties", "nAPs",
+                                "isi_span", "isi_span", "fAHP_window",
+                                "ADP_window", "resample")))
+    
     def __eq__(self, other):
         return super().__eq__(other)
 #         if not isinstance(other, self.__class__):

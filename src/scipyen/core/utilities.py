@@ -973,6 +973,7 @@ def safe_identity_test(x:object, y:object, idcheck:bool=True) -> bool:
         if all(isinstance(o, bgbridge.Structure) for o in (x,y)):
             # print(f"safe_identity_test for two BrainGlobe Atlas Structure objects")
             if bgbridge.hasBrainGlobeAtlasAPI:
+                # print(f"has brain globe atlas = {bgbridge.hasBrainGlobeAtlasAPI}")
                 # NOTE: 2024-12-14 15:34:31
                 # avoid comparing the mesh object in brainglobe atlasapi Structure - 
                 # they will NEVER be reported as same even if loaded from the same 
@@ -980,10 +981,44 @@ def safe_identity_test(x:object, y:object, idcheck:bool=True) -> bool:
                 # these objects...
                 x_dict = dict(filter(lambda i: i[0] != "mesh", x.data.items()))
                 y_dict = dict(filter(lambda i: i[0] != "mesh", y.data.items()))
-                ret = x_dict == y_dict
+                # print(f"same dicts: {x_dict == y_dict}")
+                return x_dict == y_dict
             else:
-                ret = x == y # TODO: 2024-12-14 15:40:08 verify this works...
+                return x == y # TODO: 2024-12-14 15:40:08 verify this works...
+                
+            # return ret
+                
+        if all(isinstance(o, np.ndarray) for o in (x,y)):
+            ret = type(x) == type(y)
             
+            if ret:
+                ret &= x.dtype == y.dtype
+                
+            if ret & all(isinstance(o, pq.Quantity) for o in (x,y)):
+                ret &= x.units == y.units
+                
+            if ret:
+                ret &= x.size == y.size
+                
+            if ret:
+                ret &= x.ndim == y.ndim
+                
+            if ret:
+                if x.size == 1:
+                    if any(pd.isnull(o) for o in (x,y)):
+                        ret &= all(pd.isnull(o) for o in (x,y))
+                    else:
+                        ret &= x == y
+                            
+                else:
+                    xnull = pd.isnull(x[:])
+                    ynull = pd.isnull(y[:])
+                    if any((np.any(xnull), np.any(ynull))):
+                        ret &= np.all(xnull==ynull)
+                        # ret &= np.all(pd.isnull(x[:]) == pd.isnull(y[:]))
+                    else:
+                        ret &= np.all(x[:]==y[:])
+                        
         else:
             ret = x == y
             

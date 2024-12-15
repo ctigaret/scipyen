@@ -3105,8 +3105,12 @@ def makeDataset(obj, group:h5py.Group, attrs:dict, name:str,
             compression = None
             chunks = None
             
-        dset = group.create_dataset(name, data = obj, compression=compression,
-                                    chunks=chunks, track_order=track_order)
+        if isinstance(obj, bool):
+            dset = group.create_dataset(name, data = 1 if obj else 0, compression=compression,
+                                        chunks=chunks, track_order=track_order)
+        else:
+            dset = group.create_dataset(name, data = obj, compression=compression,
+                                        chunks=chunks, track_order=track_order)
         
     dset.attrs.update(attrs)
     storeEntityInCache(entity_cache, obj, dset)
@@ -3682,13 +3686,16 @@ def _(entity:h5py.Dataset, target_class:type, attrs:dict, cache:dict=dict()):
         # print(f"target_class {target_class}")
         if target_class == type(None):
             obj = None
+            
         elif target_class == type(pd.NA):
             obj = pd.NA
+            
         elif target_class == type(MISSING):
             obj = MISSING
             
         elif target_class == bool:
-            obj = target_class(entity)
+            obj = target_class(entity[()])
+            # print(f"h5io.objectFromEntity({target_class}): {obj}")
             
         elif target_class == str:
             obj = dataset2string(entity)
