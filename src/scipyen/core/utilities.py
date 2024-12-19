@@ -920,13 +920,130 @@ def safe_identity_test2(x, y) -> bool:
     return SafeComparator(comp=eq)(x, y)
 
 
-def diff(x:object, y:object, idcheck:bool=True) -> dict:
+def diff(x:object, y:object, showValues:bool=False, idcheck:bool=True) -> dict:
     """Reveal differences between x and y attributes.
     x and y MUST be instances of the SAME class (type)
     # TODO 2024-12-14 15:04:29
     """
+    import dataclasses
+    if type(x) != type(y):
+        if showValues:
+            return {"class": (type(x), type(y))}
+        return ("class", )
     
-    pass
+    if idcheck:
+        idx = id(x)
+        idy = id(y)
+        if idx != idy:
+            return ({"id": (idx, idy)}) if showValues else ("id", )
+        
+
+    # NOTE: 2024-12-19 08:53:29
+    # since x, y are of the same class, then if x has "diff" so should y; furthermore,
+    # if both are dataclasses, they should both have the same fields; 
+    if "diff" in tuple(map(lambda i: i[0], inspect.getmembers_static(x, predicate=lambda m: inspect.isfunction(m)))):
+        return x.diff(y)
+    
+    if all(map(dataclasses.is_dataclass, (x,y))):
+        # NOTE: both are dataclasses, but not necessarily of the SAME type
+        x_field_names = tuple(map(lambda f: f[0], dataclasses.fields(type(x))))
+        y_field_names = tuple(map(lambda f: f[0], dataclasses.fields(type(y))))
+        if len(x_field_names) != len(y_field_names) or x_field_names != y_field_names:
+            if showValues:
+                return {"field_names": (x_field_names, y_field_names)}
+            return ("field names", )
+        
+        # emulate ScipyenDataclass diff method
+        # at this stage, they should both have the same field names
+        fields = tuple(map(lambda f: (f.name, getattr(x, f.name), getattr(y, f.name)), dataclasses.fields(type(x))))
+        diff_fields = tuple(filter(lambda f: type(f[1]) != type(f[2]) or not safe_identity_test(f[1], f[2]), fields))
+        if showValues:
+            return dict(map(lambda f: (f[0], (f[1], f[2])), diff_fields))
+        
+        return tuple(map(lambda f: f[0], diff_fields))
+    
+    if isinstance(x, (numbers.Number, str, bytes, bytearray)):
+        if x != y:
+            return {"value": (x, y)} if showValues else ("value", )
+        
+    if isinstance(x, (tuple, list, collections.deque)):
+        if len(x) != len(y):
+            return {"length":(len(x), len(y))} if showValues else ("length", )
+        
+        if not all(map(lambda x: x[0] == x[1], zip(x,y))):
+            # diff_elems = dict(filter(lambda x: x[1][0]!=x[1][1], enumerate(zip(x,y))))
+            diff_elems = dict(filter(lambda x: safe_identity_test(*x[1], idcheck=False), enumerate(zip(x,y))))
+            return diff_elems if showValues else tuple(diff_elems.keys())
+        
+    if isinstance(x, dict):
+        x_keys = tuple(x.keys())
+        y_keys = tuple(y.keys())
+        if x_keys != y_keys:
+            return diff(x_keys, y_keys, showValues, False)
+        
+        x_vals = tuple(x.values())
+        y_vals = tuple(y.values())
+        if x_vals != y_vals:
+            return diff(x_vals, y_vals, showValues, False)
+        
+    if isinstance(x, np.ndaray):
+        ret = dict()
+        if x.size != y.size:
+            ret["size"] = (x.size, y.size)
+            
+        if x.ndim != y.ndim:
+            ret["ndim"] = (x.ndim, y.ndim)
+            
+        if x.shape != y.shape:
+            ret["shape"] = (x.shape, y.shape)
+    
+        if x.dtype != y.dtype:
+            ret["dtype"] = (x.dtype, y.dtype)
+            
+        if isinstance(x, pq.Quantity):
+            if x.units != y.units:
+                ret["units"] = (x.units, y.units)
+                
+        if isinstance(x, vigra.VigraArray):
+            if x.axistags != y.axistags:
+                ret["axistags"] = (x.axistags, y.axistags)
+                
+        return ret if showValues else tuple(ret.keys())
+    
+    if isinstance(x, (pd.DataFrame, pd.Series, pd.Index)):
+        ret = dict()
+        if x.size != y.size:
+            ret["size"] = (x.size, y.size)
+            
+        if x.shape != y.shape:
+            ret["shape"] = (x.shape, y.shape)
+            
+        if isinstance(x, (pd.Series, pd.Index)):
+            if x.dtype != y.dtype:
+                ret["dtype"] = (x.dtype, y.dtype)
+                
+        if isinstance(x, (pd.Series, pd.DataFrame)):
+            x_ndx = x.index
+            y_ndx = y.index
+            if x_ndx != y_ndx:
+                ret["index"] = diff(x_ndx, y_ndx, showValues, False)
+            if isinstance(x, pd.DataFrame):
+                x_col = x.columns
+                y_col = y.columns
+                if x_col != y_col:
+                    ret["columns" = diff(x_col, y_col, showValues, False)
+        
+        return ret if showValues else tuple(ret.keys()) # TODO revisit this !
+    
+    members = inspect.getmembers_static(x, predicate = lambda x: not inspect.isfunction(x))
+    
+    # TODO: 2024-12-19 09:54:25
+    # 1. filter the above to use the public API of x & y only
+    # 2. craft the special case of neo data types
+                       
+                       
+        
+    return tuple()
 
 # @safeWrapper
 def safe_identity_test(x:object, y:object, idcheck:bool=True) -> bool:

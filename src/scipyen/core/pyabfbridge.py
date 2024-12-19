@@ -6947,12 +6947,20 @@ def getABF(obj:typing.Union[str, pathlib.Path, neo.Block]):
     #     warning.warn("getABF requires pyabf package")
     #     return
 
-    if isinstance(obj, str):
-        filename = obj
-    else:
+    if isinstance(obj, neo.Block):
         filename = getattr(obj, "file_origin", None)
+    
+    elif isinstance(obj, (str, pathlib.Path)):
+        filename = pathlib.Path(obj)
         
-    filename = pathlib.Path(filename)
+    else:
+        raise TypeError(f"Expecting a neo.Block, or a file past (str or patlhib.Path); instead, got {type(obj).__name__}")
+#         if isinstance(obj, pathlib.Path):
+#         filename = obj.as_posix()
+#         # filename = getattr(obj, "file_origin", None)
+#         
+#     filename = pathlib.Path(filename)
+    
     if not filename.is_file():
         return
     loader = pio.getLoaderForFile(filename)
