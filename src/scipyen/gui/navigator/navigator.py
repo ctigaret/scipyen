@@ -148,9 +148,9 @@ archiveTypeStr = ("-compress", "arj", "zip", "rar", "zoo", "lha", "cab", "iso")
 
 NetworkProtocols = ("fish", "ftp", "sftp", "smb", "webdav")
 
-Protocols = ("file", "desktop")
+Protocols = ("file", )
 
-SpecialProtocols = ("trash")
+SpecialProtocols = ("desktop", "trash")
 
 SupportedProtocols = Protocols
 
@@ -754,17 +754,16 @@ class NavigatorButton(NavigatorButtonBase):
     # def __init__(self, path:pathlib.Path, isBranch:bool=False, parentCrumb=None, parent=None):
     # def __init__(self, path:pathlib.Path, isBranch:bool=False, parent=None):
     def __init__(self, url:typing.Union[QtCore.QUrl, pathlib.Path], 
+                 isBranch:bool=False,
                  parent:typing.Optional[Navigator]=None):
         super().__init__(parent=parent)
-        # self._isLeaf_ = not isBranch # CMT
+        self._isLeaf_ = not isBranch # CMT
         self._hoverArrow_ = False
         self._pressed_ = False
         self._pendingTextChange_ = False
         self._replaceButton_ = False
         self._showMnemonic_ = False
         self._wheelSteps_ = 0
-        
-        self._url_ = url.as_uri() if isinstance(url, pathlib.Path) else url
         
         self._subDir_ = "" # TODO
         # self._openSubDirsTimer_ = None # QtCore.QTimer() # TODO
@@ -773,7 +772,7 @@ class NavigatorButton(NavigatorButtonBase):
         self._subDirs_ = list() # of SubdirInfo
         
         self.setAcceptDrops(True)
-        self.setUrl(url)
+        self.setUrl(QtCore.QUrl(url.as_uri()) if isinstance(url, pathlib.Path) else url)
         self.setMouseTracking(True)
         
         self._openSubDirsTimer_ = QtCore.QTimer(self)
@@ -819,15 +818,15 @@ class NavigatorButton(NavigatorButtonBase):
         self._url_ = url
         
         # NOTE: 2023-05-08 18:06:14 KIO original
-        protocolBlackList = {"nfs", "fish", "ftp", "sftp", "smb", "webdav", "mtp", "http", "https"}
+        # protocolBlackList = {"nfs", "fish", "ftp", "sftp", "smb", "webdav", "mtp", "http", "https"}
         
         # protocolBlackList = {"nfs", "fish", "ftp", "sftp", "smb", "webdav", "mtp",
         #                      "http", "https", "man", "info", "gopher", "baloosearch", "filenamesearch", # CMT
         #                      "recoll", "rkward", "remote", "applications", "fonts"} # CMT
         
-        supportedProtocols = {"file", "desktop"}
+        # supportedProtocols = {"file", "desktop"}
         
-        startTextResolving = self._url_.isValid() and not self._url_.isLocalFile() and self._url_.scheme() not in protocolBlackList
+        startTextResolving = self._url_.isValid() and not self._url_.isLocalFile() and self._url_.scheme() not in SupportedProtocols
         
         if startTextResolving:
             # NOTE: 2024-12-30 17:31:41
@@ -863,8 +862,18 @@ class NavigatorButton(NavigatorButtonBase):
         else:
             self.setText(self._url_.fileName().replace('&', '&&'))
             
-    def url(self):
+            
+    @property
+    def url(self) -> QtCore.QUrl:
         return self._url_
+    
+    @url.setter
+    def url(self, val:typing.Union[QtCore.QUrl, pathlib.Path]):
+        self.setUrl(val)
+    
+    @property
+    def path(self) -> typing.Optional[pathlib.Path]:
+        return pathlib.Path(self.url.path()) if self.url.isLocalFile else None
         
     def setText(self, text): 
         if len(text) == 0:
