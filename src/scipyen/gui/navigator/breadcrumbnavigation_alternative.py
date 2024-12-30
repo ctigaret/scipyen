@@ -1,3 +1,11 @@
+# -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
+"""
+Do not use yet...
+"""
 class BreadCrumb(QtWidgets.QWidget):
     navigate = Signal(str, name="navigate")
         
@@ -122,7 +130,8 @@ class BreadCrumbsNavigator(QtWidgets.QWidget):
     sig_chDirString = Signal(str, name = "sig_chDirString")
     sig_switchToEditor = Signal(name = "sig_switchToEditor")
     # def __init__(self, url:QtCore.QUrl, parent:typing.Optional[QtWidgets.QWidget] = None):
-    def __init__(self, path:pathlib.Path, parent:typing.Optional[QtWidgets.QWidget] = None):
+    def __init__(self, path:pathlib.Path, 
+                 parent:typing.Optional[QtWidgets.QWidget] = None):
         super().__init__(parent=parent)
         if not path.is_dir():
             path = path.parent

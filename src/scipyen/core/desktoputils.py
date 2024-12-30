@@ -693,7 +693,7 @@ class PlacesModel(QtCore.QAbstractItemModel): # TODO/FIXME
         pass
     
     # NOTE: 2023-05-01 13:43:24
-    # ### BEGIN methods that need KDE Solid framework
+    # ### BEGIN methods that need KDE Solid framework -- NOT IMPLEMENTED
     #
 #     def deviceForIndex(self, index:QtCore.QModelIndex):
 #         pass

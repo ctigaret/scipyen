@@ -1123,6 +1123,13 @@ def safe_identity_test(x:object, y:object, idcheck:bool=True,
     if type(x) != type(y):
         return False
     
+    check_modules = map(lambda o: inspect.ismodule(o), (x,y))
+    
+    if any(check_modules):
+        if all(check_modules):
+            return x == y
+        return False
+    
     if isfunction(x):
         return x == y
     
@@ -1180,7 +1187,7 @@ def safe_identity_test(x:object, y:object, idcheck:bool=True,
                     
         return ret
     
-    if all(map(lambda x: isinstance(o, pd.DataFrame), (x,y))):
+    if all(map(lambda o: isinstance(o, pd.DataFrame), (x,y))):
         ret = x.size == y.size
         if ret:
             ret &= x.shape == y.shape
@@ -1200,7 +1207,7 @@ def safe_identity_test(x:object, y:object, idcheck:bool=True,
         
         return ret
         
-    if all(map(lambda x: isinstance(o, pd.Series), (x,y))):
+    if all(map(lambda o: isinstance(o, pd.Series), (x,y))):
         ret = x.size == y.size
         if ret:
             ret &= x.shape == y.shape
@@ -1216,7 +1223,7 @@ def safe_identity_test(x:object, y:object, idcheck:bool=True,
         
         return ret
         
-    if all(map(lambda x: isinstance(o, pd.Index), (x,y))):
+    if all(map(lambda o: isinstance(o, pd.Index), (x,y))):
         ret = x.size == y.size
         if ret:
             ret &= x.shape == y.shape
@@ -1234,10 +1241,17 @@ def safe_identity_test(x:object, y:object, idcheck:bool=True,
     
     ret = True
     
-    if all(hasattr(v, "__eq__") and not isinstance(v, (np.ndarray, pd.DataFrame, pd.Series, pd.Index)) for v in (x,y)):
-        ret &= x.__eq__(y)
+    if all(hasattr(o, "__eq__") and not isinstance(o, (np.ndarray, pd.DataFrame, pd.Series, pd.Index)) and not inspect.ismodule(o) for o in (x,y)):
+        try:
+            ret &= x.__eq__(y)
+        except: 
+            traceback.print_exc()
+            # print(f"in hasattr __eq__: x is {type(x)} and y is {type(y)}")
+            ret = False
+                
+                
         if not ret:
-            return ret.
+            return ret
     
     if all(map(lambda o: hasattr(o, "size"), (x,y))): 
         ret &= x.size == y.size
@@ -1319,10 +1333,10 @@ def safe_identity_test(x:object, y:object, idcheck:bool=True,
                 ret = np.all(tuple(map(math.isnan, (x,y))))
             
     return ret
-    try:
-    
-    except:
-        traceback.print_exc()
+#     try:
+#     
+#     except:
+#         traceback.print_exc()
         # try:
 #             if x is y:
 #                 return True
@@ -1497,12 +1511,12 @@ def safe_identity_test(x:object, y:object, idcheck:bool=True,
             
             # return ret ## good fallback, though potentially expensive
     
-        except:
-            traceback.print_exc()
-            frame = inspect.currentframe()
-            call_stack = "\n".join([f"{fi.function} from {fi.filename} at line {fi.lineno}" for fi in inspect.getouterframes(frame)])
-            print("Call stack:")
-            print(call_stack)
+        # except:
+        #     traceback.print_exc()
+        #     frame = inspect.currentframe()
+        #     call_stack = "\n".join([f"{fi.function} from {fi.filename} at line {fi.lineno}" for fi in inspect.getouterframes(frame)])
+        #     print("Call stack:")
+        #     print(call_stack)
         
 eq = safe_identity_test
 

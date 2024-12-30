@@ -1,3 +1,9 @@
+# -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
+
 import typing, pathlib, functools, os, itertools
 from urllib.parse import urlparse, urlsplit
 from collections import namedtuple
@@ -636,7 +642,8 @@ class NavigatorButton(NavigatorButtonBase):
     # def __init__(self, text:str, leaf:bool=False, parent=None):
     # def __init__(self, path:pathlib.Path, isBranch:bool=False, parentCrumb=None, parent=None):
     # def __init__(self, path:pathlib.Path, isBranch:bool=False, parent=None):
-    def __init__(self, url.QtCore.QUrl, parent:typing.Optional[Navigator]=None):
+    def __init__(self, url:typing.Union[QtCore.QUrl, pathlib.Path], 
+                 parent:typing.Optional[Navigator]=None):
         super().__init__(parent=parent)
         # self._isLeaf_ = not isBranch # CMT
         self._hoverArrow_ = False
@@ -645,9 +652,11 @@ class NavigatorButton(NavigatorButtonBase):
         self._replaceButton_ = False
         self._showMnemonic_ = False
         self._wheelSteps_ = 0
-        self._url_ = url
+        
+        self._url_ = url.as_uri() if isinstance(url, pathlib.Path) else url
+        
         self._subDir_ = "" # TODO
-        self._openSubDirsTimer_ = None # QtCore.QTimer() # TODO
+        # self._openSubDirsTimer_ = None # QtCore.QTimer() # TODO
         self._subDirsJob_ = None # originally, a KIO.listDir → TODO: replace with Python logic (qasync?)
         self._subDirsMenu_ = None # NavigatorMenu # TODO
         self._subDirs_ = list() # of SubdirInfo
@@ -705,7 +714,7 @@ class NavigatorButton(NavigatorButtonBase):
         #                      "http", "https", "man", "info", "gopher", "baloosearch", "filenamesearch", # CMT
         #                      "recoll", "rkward", "remote", "applications", "fonts"} # CMT
         
-        startTextResolving = self._url_.isValid() and not self._url_.isLocalFile() and self._url_.scheme() is not in protocolBlackList
+        startTextResolving = self._url_.isValid() and not self._url_.isLocalFile() and self._url_.scheme() not in protocolBlackList
         
         if startTextResolving:
             # A-ha! whenever the protocol specified by the url scheme is not black-listed,
@@ -921,7 +930,7 @@ class NavigatorButton(NavigatorButtonBase):
             evt.acceptProposedAction()
             self.update()
             
-    def dragMoveEvent(self, QtGui.QDragMoveEvent):
+    def dragMoveEvent(self, evt:QtGui.QDragMoveEvent):
         rect = evt.answerRect()
         if self.isAboveArrow(rect.center().x()):
             self._hoverArrow_ = True
@@ -972,7 +981,7 @@ class NavigatorButton(NavigatorButtonBase):
             self._hoverArrow_ = hoverArrow
             self.update()
             
-    def wheelEvent(self, QtGui.QWheelEvent):
+    def wheelEvent(self, evt:QtGui.QWheelEvent):
         if evt.angleDelta().y() != 0:
             self._wheelSteps_ = evt.angleDelta().y() / 120
             self._replaceButton_ = True
@@ -1420,6 +1429,9 @@ class NavigatorPathSelectorEventFilter(QtCore.QObject):
                         self.tabRequested.emit(url)
                         return True
                     
+            except:
+                traceback.print_exc()
+                    
         return QtCore.QObject.eventFilter(watched, evt)
         
 
@@ -1444,7 +1456,9 @@ class Navigator(QtWidgets.QWidget):
     urlSelectionRequested = Signal(QtCore.QUrl, name = "urlSelectionRequested")
     # ### END signals
     
-    def __init__(self, placesModel:typing.Optional[PlacesModel]=None, url:typing.Optional[QtCore.QUrl]=None, parent:typing.Optional[QtWidgets.QWidget] = None):
+    def __init__(self, placesModel:typing.Optional[PlacesModel]=None,
+                 url:typing.Optional[QtCore.QUrl]=None, 
+                 parent:typing.Optional[QtWidgets.QWidget] = None):
         super().__init__(parent=parent)
         
         # NOTE: 2023-05-06 22:27:36
@@ -2019,7 +2033,7 @@ class Navigator(QtWidgets.QWidget):
     # ### BEGIN KUrlNavigatorPrivate slots
     
     @Slot(QtCore.QPoint)
-    def openContextMenu(self, p:QtCore.Qpoint):
+    def openContextMenu(self, p:QtCore.QPoint):
         """Navigator's context menu
         Allows 
         • copy/paste of path, 
@@ -2166,7 +2180,7 @@ class Navigator(QtWidgets.QWidget):
         # elif (button & QtCore.Qt.LeftButton) and (modifiers & QtCore.Qt.ShiftModifier):
         #     self.newWindowRequested.emit(url)
             
-        elif ((button & QtCore.Qt.MiddleButton) or ((button & QtCore.Qt.LeftButton) and (modifiers & QtCore.Qt.ControlModifier)) or ((button & QtCore.Qt.LeftButton) and (modifiers & QtCore.Qt.ShiftModifier)))
+        elif ((button & QtCore.Qt.MiddleButton) or ((button & QtCore.Qt.LeftButton) and (modifiers & QtCore.Qt.ControlModifier)) or ((button & QtCore.Qt.LeftButton) and (modifiers & QtCore.Qt.ShiftModifier))):
             self.newWindowRequested.emit(url)
             
         elif (button & QtCore.Qt.LeftButton):
