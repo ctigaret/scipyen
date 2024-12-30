@@ -2,6 +2,14 @@
 # SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
+import os, sys
+import pathlib, typing, traceback
+
+from qtpy import QtCore, QtGui, QtWidgets, QtSvg
+from qtpy.QtCore import Signal, Slot, Property
+from qtpy.uic import loadUiType as __loadUiType__
+
+from gui import guiutils
 
 """
 Do not use yet...
@@ -9,9 +17,10 @@ Do not use yet...
 class BreadCrumb(QtWidgets.QWidget):
     navigate = Signal(str, name="navigate")
         
-    def __init__(self, path:pathlib.Path, isBranch:bool=False, parentCrumb=None,parent:typing.Optional[QtWidgets.QWidget]=None):
+    def __init__(self, path:pathlib.Path, isBranch:bool=False, 
+                 parentCrumb:typing.Optional[QtWidgets.QWidget]=None,
+                 parent:typing.Optional[QtWidgets.QWidget]=None):
         super().__init__(parent=parent)
-        # if not path.is_absolute():
         path = path.resolve()
         # print(f"{self.__class__.__name__}.__init__ path = {path}")
         if not path.is_dir():
@@ -57,25 +66,28 @@ class BreadCrumb(QtWidgets.QWidget):
         # self.dirButton.setSizePolicy(QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Maximum, QtWidgets.QSizePolicy.Fixed))
         self.dirButton.clicked.connect(self.dirButtonClicked)
         
-        # self.branchIcon = QtGui.QIcon.fromTheme("go-next")
-        # self.iconSize = self.branchIcon.actualSize(QtCore.QSize(16,h), state=QtGui.QIcon.On)
+#         self.branchIcon = QtGui.QIcon.fromTheme("go-next")
+#         self.iconSize = self.branchIcon.actualSize(QtCore.QSize(16,h), state=QtGui.QIcon.On)
+#         
+#         self.branchButton = QtWidgets.QPushButton(self.branchIcon, "", self)
+        # self.branchButton.setFlat(True)
         
-        # self.branchButton = QtWidgets.QPushButton(self.branchIcon, "", self)
-        # self.branchButton = ArrowButton(self)
         self.branchButton = QtWidgets.QToolButton(self)
         self.branchButton.setArrowType(QtCore.Qt.RightArrow)
-        # self.branchButton.setFlat(True)
         self.branchButton.setPopupMode(QtWidgets.QToolButton.InstantPopup)
         # self.branchButton.setMinimumSize(self.iconSize.width(), self.iconSize.height())
         # self.branchButton.setSizePolicy(QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum))
-        self.branchButton.setSizePolicy(QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Maximum, QtWidgets.QSizePolicy.Fixed))
+ 
+        self.branchButton.setSizePolicy(QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, 
+                                                              QtWidgets.QSizePolicy.Fixed))
         self.branchButton.clicked.connect(self.branchButtonClicked)
         
         
         self.hlayout.addWidget(self.dirButton)
         self.hlayout.addWidget(self.branchButton)
         
-        self.branchButton.setVisible(self.isBranch)
+        # self.branchButton.setVisible(self.isBranch)
+        self.branchButton.setVisible(self.fileSystemModel.hasChildren(self.rootIndex))
 
     @property
     def isBranch(self):
@@ -88,7 +100,7 @@ class BreadCrumb(QtWidgets.QWidget):
         
     @Slot()
     def dirButtonClicked(self):
-        # print(f"{self.__class__.__name__}.dirButtonClicked on {self.name}")
+        print(f"{self.__class__.__name__}.dirButtonClicked on {self.name}")
         self.navigate.emit(self.path.as_posix())
         
     @Slot()
@@ -160,17 +172,17 @@ class BreadCrumbsNavigator(QtWidgets.QWidget):
                 
         for k, p in enumerate(partPaths):
             if k > 0:
-                # b = BreadCrumb(p, True, parentCrumb = self.crumbs[-1])#, parent=self)
-                b = NavigatorButton(p, True)#, parentCrumb = self.crumbs[-1])
+                b = BreadCrumb(p, True, parentCrumb = self.crumbs[-1])#, parent=self)
+                # b = NavigatorButton(p, True)#, parentCrumb = self.crumbs[-1])
             else:
-                # b = BreadCrumb(p, True)#, parent=self)
-                b = NavigatorButton(p, True)#, parent=self)
+                b = BreadCrumb(p, True)#, parent=self)
+                # b = NavigatorButton(p, True)#, parent=self)
                 
             b.navigate.connect(self.slot_crumb_clicked)
             self.crumbs.append(b)
             
-        # b = BreadCrumb(self._path_, False, parentCrumb=self.crumbs[-1]) # last dir in path = LEAF !!!
-        b = NavigatorButton(self._path_, False)#, parentCrumb=self.crumbs[-1]) # last dir in path = LEAF !!!
+        b = BreadCrumb(self._path_, False, parentCrumb=self.crumbs[-1]) # last dir in path = LEAF !!!
+        # b = NavigatorButton(self._path_, False)#, parentCrumb=self.crumbs[-1]) # last dir in path = LEAF !!!
         b.navigate.connect(self.slot_crumb_clicked)
         self.crumbs.append(b)
         

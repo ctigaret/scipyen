@@ -3,6 +3,108 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
+"""
+About special protocols (KIO slaves) in KDE:
+NOTE: A list of available protocols can be seen in KDE gui via the Dolphin file
+manager open a Dolphin window, click in the navigator bar to show is as an 
+editable field, then clear the field ⇒ the leftmost dropdown menu that appears
+before the (now empty) editable field shows the protocols available on YOUR system 
+
+On my machine :
+    Operating System: openSUSE Tumbleweed 20241226
+    KDE Plasma Version: 6.2.4
+    KDE Frameworks Version: 6.9.0
+    Qt Version: 6.8.1
+    Kernel Version: 6.12.6-1-default (64-bit)
+    Graphics Platform: Wayland
+
+these protocol are as follows (<sep> is a menu separator): 
+
+file - file system navigation
+fish - file system navigation (possibly remote) over ssh
+ftp - 
+sftp - "secure" ftp"
+smb - "samba" (i.e. Windows "network")
+webdav 
+<sep> 
+desktop - navigates to the platform specific "Desktop" - NB this may be an actual
+            file system directory e.g. ~/Desktop or a virtual folder (Windows)
+fonts - two virtual folders - collect fonts installed in the user account or machine-wide
+    fonts:/Personal
+    fonts:/System
+programs - the virtual folder of all applications installed
+    on Linux with XDG-compliant desktops, programs:/ contains the full application menu
+        and its submenus; the "files" are the *.desktop files (application launchers)
+trash - the "Wastebin" - should point to the same file "recycling" system on XDG-compliant desktops
+        (KDE, GNOME, XFCE, COSMIC and variants) - virtual folder (trash:/)
+        NB this is supported by an actual file system directory (e.g. ~/.local/share/Trash)
+        the contents of which shuold not be directly accessible, and containing three objects: "files" - a directory of trashed filw system items;
+        "info" - a directory with *.trashinfo files; "directorysizes"
+        
+
+<sep>
+Devices has a submenu as it may be served by more than one protocol (unlike fonts:/)
+    On this machine it provides
+        camera:/
+        remote:/ - the "Network" virtual folder i, ncluding all network links that are
+            configured on the machin. (NB these are NOT the same things as network connections,
+            but are defined via "desktop" files and when executed instantiate various
+            network protocols listed above, (e.g. smb, ftp, fish) as well as any of
+            the protocols listed under "Other" (e.g., recoll:/, buetooth:/, etc), see
+            below
+Other
+    a collection of "KIO slaves" - depends on what has been installed - one entry for each, e.g. 
+    activities:/ (KDE only)
+    afc:/ (Apple devices)
+    akonadi:/ (KDE only)
+    aplications:/ - the same as programs:/ (see above)
+    ar:/, sevenz:/ tar:/ zip:/ - protocols for opening archive files as a folder (sevenz = 7zip)
+    audiocd:/ videodvd:/ - protocols for accessing media (audio CD, video disks, DVD)
+    baloosearch:/ (KDE only)
+    bluetooth:/ - virtual folder with the configured blutetooth connections
+    bup:/ -- ?
+    cifs:/ - virtual folder with configured printers (Linux only, and only when using CIFS)
+    mtp:/ - virtual folder with configured connections using the MTP protocol (media transfer protocol)
+        i.e. mp3 players, cell (smart) phones
+    dav:/, davs:/
+    filenamesearch:/ 
+    gdrive:/ - virtual folder with the configured connections to your google drive accounts
+    kdeconnect:/ (KDE only) - virtual folder with connection to Android phones and tablets
+    ldap:/, ldaps:/ - virtual folders -- lightweight directory access protocol
+    man:/ - virtual folder with unix manual pages (KDE only, as it is useful only in konqueror)
+    obexftp:/ -- file transfer over bluetooth (OBject EXchange)
+    perldoc:/ (PERL documentation ?)
+    recentlyused:/ (KDE only ?) -- virtual folder with the history of file system navigation inlcuding opened files
+        only useful in KDE as it relies on the applcation to align with KDE philosophy & frameworks
+    tags:/ virtual folder with defines file tags (UNIX/Linux only, and it depends on the file system used 
+        e.g. btrfs, xfs, etc)
+    timeline:/ - variant of recentlyused - virtual folder organized by calendar - see recentlyused:/
+    webdavs:/ 
+    zeroconf:/ (zero configration networking - never used this - Linux only, I guess)
+    
+Which of these are useful to implement in Scipyen?
+
+file - definitely
+desktop - maybe (as in "should"), gives quick access to "that" place in a platform compliant way
+trash - maye (as in potentially useful, but only if Scipyen's file manager allows removing and restoring files,
+    which would mean implementing file operations -- currently, Scipyen's file manager is read-only,
+    although objects can be written to files in the current directory)
+    The problem with implementing this is that the code will be "tied" to a specific
+    set of platforms KDE, GNOME, as I am not sure these are working on Windows or MacOS
+fish, smb - maybe, if one wants to access remote machines over TCP/IP or Windows 
+    shares, but I won't recommend it
+nfs
+    
+anything else -- definitely NOT!
+
+A potential useful thing would be to implement the "Places" protocol (not really a 
+KIO slave protocol but a layer that interfaces with KIO slaves) -- useful to access "bookmarked"
+places. At its most basic, it is NOT platform--specific (in fact, it is , but Qt provides
+some very basic standardisation here).
+
+
+
+"""
 
 import typing, pathlib, functools, os, itertools
 from urllib.parse import urlparse, urlsplit
@@ -704,17 +806,20 @@ class NavigatorButton(NavigatorButtonBase):
 #         
 #         # ### END CMT 2023-05-08 17:56:23
 
-    def setUrl(self, url:QtCore.QUrl): # FIXME/TODO: replace with a pythonic async protocol
+    def setUrl(self, url:QtCore.QUrl): # FIXME/TODO: replace with a pythonic async protocol - what's that?!?
         self._url_ = url
         
         # NOTE: 2023-05-08 18:06:14 KIO original
-        protocolBlackList = {"nfs", "fish", "ftp", "sftp", "smb", "webdav", "mtp"}
+        protocolBlackList = {"nfs", "fish", "ftp", "sftp", "smb", "webdav", "mtp", "http", "https"}
         
         # protocolBlackList = {"nfs", "fish", "ftp", "sftp", "smb", "webdav", "mtp",
         #                      "http", "https", "man", "info", "gopher", "baloosearch", "filenamesearch", # CMT
         #                      "recoll", "rkward", "remote", "applications", "fonts"} # CMT
         
-        startTextResolving = self._url_.isValid() and not self._url_.isLocalFile() and self._url_.scheme() not in protocolBlackList
+        supportedProtocols = {"file", "desktop"}
+        
+        startTextResolving = self._url_.isValid() and not self._url_.isLocalFile() and self._url_.scheme() in supportedProtocols
+        # startTextResolving = self._url_.isValid() and not self._url_.isLocalFile() and self._url_.scheme() not in protocolBlackList
         
         if startTextResolving:
             # A-ha! whenever the protocol specified by the url scheme is not black-listed,
@@ -725,11 +830,6 @@ class NavigatorButton(NavigatorButtonBase):
             # • special KDE frameworks protocol - WARNING these may be supplied by
             #  3ʳᵈ party KDE applications via KDE plugins framework (so-called
             #  KIO slaves); examples include Rkward, Recoll, Clementine, Amarok, etc.
-            #
-            # NOTE: A list of available protocols can be seen in KDE gui via the
-            # file nmanager Dolphin: open a Dolphin window, click in the navigator
-            # bar to show is as an editable field, clear the field ⇒ the leftmost
-            # dropdown menu shows the available protocols in YOUR system 
             #
             # The 'special' ones are usually in an "Other" submenu
             #
