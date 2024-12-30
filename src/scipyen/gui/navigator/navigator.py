@@ -102,6 +102,15 @@ KIO slave protocol but a layer that interfaces with KIO slaves) -- useful to acc
 places. At its most basic, it is NOT platform--specific (in fact, it is , but Qt provides
 some very basic standardisation here).
 
+Implementation:
+a) there would be a lot of code to port - not my cup of tea... - OR
+b) use KDE framework - this would "tie" Scipyen into KDE too much:
+    TODO: contemplate calling kioclient OR kioclient5 (depends on the XDG_DESKTOP_SESSION)
+            /usr/libexec/kf5/kioexec OR
+            /usr/libexec/kf6/kioexec
+    (filter these out so that they only show for sys.platform == "linux")
+
+
 
 
 """
@@ -818,29 +827,38 @@ class NavigatorButton(NavigatorButtonBase):
         
         supportedProtocols = {"file", "desktop"}
         
-        startTextResolving = self._url_.isValid() and not self._url_.isLocalFile() and self._url_.scheme() in supportedProtocols
-        # startTextResolving = self._url_.isValid() and not self._url_.isLocalFile() and self._url_.scheme() not in protocolBlackList
+        startTextResolving = self._url_.isValid() and not self._url_.isLocalFile() and self._url_.scheme() not in protocolBlackList
         
         if startTextResolving:
-            # A-ha! whenever the protocol specified by the url scheme is not black-listed,
-            # start aynchronous job to resolve it
-            # This is for a url that IS NOT local, and , as per KIO original, the scheme
-            # indicates:
-            # • internet protocol (http, htpps, )
-            # • special KDE frameworks protocol - WARNING these may be supplied by
-            #  3ʳᵈ party KDE applications via KDE plugins framework (so-called
-            #  KIO slaves); examples include Rkward, Recoll, Clementine, Amarok, etc.
-            #
-            # The 'special' ones are usually in an "Other" submenu
-            #
-            # TODO: contemplate calling kioexec5 for these !!!
-            # TODO: filter these out so that they only show for sys.platform == "linux"
-            #
-            self._pendingTextChange_ = True
-            # starts a KIO job via 
-            # job = KIO.stat(self._url_, hide progress info)
-            # then connects job.result to self.statFinished
-            # finally, emit self.startedTextResolving
+            # NOTE: 2024-12-30 17:31:41
+            # This branch would be active if KIO was implemented in Scipyen...
+            # ... but it is not ...
+            raise NotImplementedError(f"Unsupported URI scheme {self._url_.scheme()}")
+            # # ### BEGIN
+            # # A-ha! whenever the protocol specified by the url scheme is not black-listed,
+            # # start aynchronous job to resolve it
+            # # indicates:
+            # # • internet protocol (http, htpps, )
+            # # • special KDE frameworks protocol - WARNING these may be supplied by
+            # #  3ʳᵈ party KDE applications via KDE plugins framework (so-called
+            # #  KIO slaves); examples include Rkward, Recoll, Clementine, Amarok, etc.
+            # #
+            # # The 'special' ones are usually in an "Other" submenu
+            # # TODO: If going ahead with implementing these in Scipyen:
+            # # a) there would be a lot of code to port - not my cup of tea... - OR
+            # # b) use KDE framework - this would "tie" Scipyen into KDE too much:
+            # #   TODO: contemplate calling kioclient OR kioclient5 (depends on the XDG_DESKTOP_SESSION)
+            # #           /usr/libexec/kf5/kioexec OR
+            # #           /usr/libexec/kf6/kioexec
+            # #   TODO: filter these out so that they only show for sys.platform == "linux"
+            # #
+            # self._pendingTextChange_ = True
+            # # starts a KIO job via 
+            # # job = KIO.stat(self._url_, hide progress info)
+            # # then connects job.result to self.statFinished
+            # # finally, emit self.startedTextResolving
+            # # This is for a url that IS NOT local, and , as per KIO original, the scheme
+            # # ### END
             
         else:
             self.setText(self._url_.fileName().replace('&', '&&'))
