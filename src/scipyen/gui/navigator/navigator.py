@@ -156,9 +156,19 @@ SupportedProtocols = Protocols
 
 ArrowSize = 10
 
-class NavigatorJob(QtCore.QThread):
+class ListDirsJob(QtCore.QThread):
     entries = Signal(list, name="entries")
-    result = Signal(name="result")
+    # result = Signal(name="result")
+    
+    def __init__(self, path:pathlib.Path, parent:typing.Optional[QtCore.QObject]=None):
+        super().__init__(parent=parent)
+        
+        self.path = path
+        
+    def run(self):
+        
+        
+        
 
 class Navigator:
     pass # fwd decl
@@ -1165,13 +1175,19 @@ class NavigatorButton(NavigatorButtonBase):
         # • if _replaceButton_ is False, then a menu with the subdirectories of
         # the current path of the button will open.
         #
+        # • instantiates a KIO::ListJob by calling KIO::listDir(…)
+        #   ∘ this indirectly constructs a ListJob by calling the sttais method ListJobPrivate::newJob(…)
+        #       ▷ ListJob c'tor (protected) in fact instantiates a ListJobPrivate which actually represents the "job"
+        #       ▷ the ListJobPrivate instance is a SimpleJobPrivate with CMD_LISTDIR macro (commands_p.h
+        #           defines the internal commands that can be invoked by a job)
+        #
         # Now the Job emits two signals:
         # • entries -> connected to self.addEntriesToSubdirs TODO write me
         # • result -> connected to:
         #   ∘ self.replaceButton if _replaceButton_ is True
         #   ∘ self.openSubDirMenu otherwise
         
-        # I don't use a KIO Job here for ovbious reasons (i.e. there is no
+        # I don't use a KIO Job here for obvious reasons (i.e. there is no
         # Python port, and even if there was one, it would "tie" Scipyen to KDE
         # frameworks -- sorry ⌣); instead, I try to keep it "sprity" through Qt's
         # QThread and Signal/Slot mechanisms.
