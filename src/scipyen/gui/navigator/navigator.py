@@ -280,9 +280,26 @@ def upUrl(url:QtCore.QUrl):
     if url.hasFragment():
         u.setFragment("")
         
-    u = u.adjusted(QtCore.QUrl.StripTrailingSlash)
+    if url.isRelative():
+        u = QtCore.QUrl(upPath(pathlib.Path(u.path())).as_posix())
     
-    return u.adjusted(QtCore.QUrl.RemoveFilename)
+    return u.adjusted(QtCore.QUrl.StripTrailingSlash)
+    
+    # return u.adjusted(QtCore.QUrl.RemoveFilename)
+
+def upPath(path:pathlib.Path) -> pathlib.Path:
+    # NOTE: 2024-12-30 19:36:35
+    # this below would resolve the current path - not what I want
+    # # if not path.is_absolute():
+    # #     return path.parent.resolve()
+    
+    # in reality I want to resolve the parent path (i.e. the ".." in "../somepath")
+    # therefore see the False branch below
+    if path.is_absolute():
+        return pathlib.Path(path.parent)
+    else:
+        p = pathlib.Path("..") / path
+        return p.parent.resolve()
     
 class SchemeCategory(IntEnum):
     CoreCategory = 0
@@ -743,18 +760,18 @@ class NavigatorToggleButton(NavigatorButtonBase):
             self.setCursor(QtCore.Qt.IBeamCursor)
 
 class NavigatorButton(NavigatorButtonBase): 
+    # TODO: 2024-12-30 19:01:04 finalise me!
     # FIXME/TODO 2023-05-07 23:34:55 finalize
     navigate = Signal(str, name="navigate")
     urlsDroppedOnNavButton = Signal(QtCore.QUrl, QtGui.QDropEvent, name = "urlsDroppedOnNavButton")
     navigatorButtonActivated = Signal(QtCore.QUrl, QtCore.Qt.MouseButton, QtCore.Qt.KeyboardModifiers, name = "navigatorButtonActivated")
     startedTextResolving = Signal(name = "startedTextResolving")
     finishedTextResolving = Signal(name = "finishedTextResolving")
+    _sig_siblingsDone_ = Signal(name="_sig_siblingsDone_")
     
-    # def __init__(self, text:str, leaf:bool=False, parent=None):
-    # def __init__(self, path:pathlib.Path, isBranch:bool=False, parentCrumb=None, parent=None):
-    # def __init__(self, path:pathlib.Path, isBranch:bool=False, parent=None):
     def __init__(self, url:typing.Union[QtCore.QUrl, pathlib.Path], 
                  isBranch:bool=False,
+                 model:typing.Optional[QtWidgets.QFileSystemModel] = None,
                  parent:typing.Optional[Navigator]=None):
         super().__init__(parent=parent)
         self._isLeaf_ = not isBranch # CMT
@@ -766,8 +783,8 @@ class NavigatorButton(NavigatorButtonBase):
         self._wheelSteps_ = 0
         
         self._subDir_ = "" # TODO
-        # self._openSubDirsTimer_ = None # QtCore.QTimer() # TODO
-        self._subDirsJob_ = None # originally, a KIO.listDir → TODO: replace with Python logic (qasync?)
+        # self._subDirsJob_ = None # originally, a KIO.listDir → TODO
+        self._siblingDirs_ = list()
         self._subDirsMenu_ = None # NavigatorMenu # TODO
         self._subDirs_ = list() # of SubdirInfo
         
@@ -775,12 +792,13 @@ class NavigatorButton(NavigatorButtonBase):
         self.setUrl(QtCore.QUrl(url.as_uri()) if isinstance(url, pathlib.Path) else url)
         self.setMouseTracking(True)
         
-        self._openSubDirsTimer_ = QtCore.QTimer(self)
-        self._openSubDirsTimer_.setSingleShot(True)
-        self._openSubDirsTimer_.setInterval(300)
-        self._openSubDirsTimer_.timeout.connect(self.startSubDirsJob)
+        self._readSiblingDirsTimer_ = QtCore.QTimer(self)
+        self._readSiblingDirsTimer_.setSingleShot(True)
+        self._readSiblingDirsTimer_.setInterval(300)
+        self._readSiblingDirsTimer_.timeout.connect(self.getSiblingDirs)
         
-        self.pressed.connect(self.requestSubDirs)
+        self.pressed.connect(self.startSubDirsJob)
+        self.
         
 #         # ### BEGIN CMT 2023-05-08 17:56:23
 #         
@@ -798,15 +816,22 @@ class NavigatorButton(NavigatorButtonBase):
 #         
 #         # self.parentCrumb = parentCrumb
 #         
-#         self.subDirsMenu = None
+#         self._subDirsMenu_ = None
 #         
-#         # NOTE: 2023-05-07 23:42:42 
-#         # use Qt file system model; does away with KIOJob etc (?!?)
-#         self.fileSystemModel = QtWidgets.QFileSystemModel(parent=self)
-#         self.fileSystemModel.setReadOnly(True)
-#         self.fileSystemModel.setFilter(QtCore.QDir.AllDirs | QtCore.QDir.CaseSensitive | QtCore.QDir.NoDotAndDotDot)
-#         self.fileSystemModel.setRootPath(self.path.as_posix())
-#         self.rootIndex = self.fileSystemModel.index(self.fileSystemModel.rootPath())
+        # NOTE: 2023-05-07 23:42:42 
+        # use Qt file system model; does away with KIOJob etc (?!?)
+        # NOTE: 2024-12-30 19:20:27
+        # allow the use of an external file system model (e.g. the one used by 
+        # Scipyen's MainWindow)
+        if not isinstance(model, QtWidgets.QFileSystemModel):
+            self._fileSystemModel_ = QtWidgets.QFileSystemModel(parent=self)
+            self._fileSystemModel_.setReadOnly(True)
+            self._fileSystemModel_.setFilter(QtCore.QDir.AllDirs | QtCore.QDir.CaseSensitive | QtCore.QDir.NoDotAndDotDot)
+            self._fileSystemModel_.setRootPath(self.path.as_posix())
+            self._fileSystemModelIndex_ = self._fileSystemModel_.index(self._fileSystemModel_.rootPath())
+        else:
+            self._fileSystemModel_ = model
+            self._fileSystemModelIndex_ = self._fileSystemModel_.index(self.path.as_posix())
 # 
 #         # self.frameStyleOptions = QtWidgets.QStyleOptionFrame()
 #         # self.frameStyleOptions.initFrom(self)
@@ -879,7 +904,6 @@ class NavigatorButton(NavigatorButtonBase):
         if len(text) == 0:
             text = self._url_.scheme()
             
-        
         super().setText(text)
         
         self.updateMinimumWidth()
@@ -903,7 +927,7 @@ class NavigatorButton(NavigatorButtonBase):
     def arrowWidth(self):
         width = 0
         if not self.isLeaf:
-            width = self.height()/2
+            width = int(self.height()/2)
             if width < 4:
                 width = 4
         
@@ -972,13 +996,14 @@ class NavigatorButton(NavigatorButtonBase):
             option.palette.setColor(QtGui.QPalette.WindowText, fgColor)
             option.palette.setColor(QtGui.QPalette.ButtonText, fgColor)
             
+            hoverX = arrowX
+            
             if self._hoverArrow_:
                 hoverColor = self.palette().color(QtGui.QPalette.HighlightedText)
                 hoverColor.setAlpha(96)
                 painter.setPen(QtCore.Qt.NoPen)
                 painter.setBrush(hoverColor)
                 
-                hoverX = arrowX
                 
                 if not leftToRight:
                     hoverX -= self.BorderWidth
@@ -1038,7 +1063,7 @@ class NavigatorButton(NavigatorButtonBase):
         elif evtKey == QtCore.Qt.Key_Down:
             pass
         elif evtKey == QtCore.Qt.Key_Space:
-            self.startSubDirsJob() # TODO 2023-05-08 13:18:48
+            self.getSiblingDirs() # TODO 2023-05-08 13:18:48
             return
         
         else:
@@ -1064,16 +1089,16 @@ class NavigatorButton(NavigatorButtonBase):
             self.update()
             
             if self._subDirsMenu_ is None:
-                self.requestSubDirs() # TODO: 2023-05-08 13:27:04
+                self.startSubDirsJob() # TODO: 2023-05-08 13:27:04
             elif self._subDirsMenu_.parent() != self:
                 self._subDirsMenu_.close()
                 self._subDirsMenu_.deleteLater()
                 self._subDirsMenu_ = None
                 
-                self.requestSubDirs()
+                self.startSubDirsJob()
                 
         else:
-            if self._openSubDirsTimer_.isActive(): # TODO 2023-05-08 13:28:35 self._openSubDirsTimer_
+            if self._readSiblingDirsTimer_.isActive(): # TODO 2023-05-08 13:28:35 self._readSiblingDirsTimer_
                 self.cancelSubDirsRequest() # TODO 2023-05-08 13:29:04
                 
             self._subDirsMenu_.deleteLater()
@@ -1113,27 +1138,56 @@ class NavigatorButton(NavigatorButtonBase):
             self._wheelSteps_ = evt.angleDelta().y() / 120
             self._replaceButton_ = True
             self.startSubDirsJob()
+            # self.getSiblingDirs()
             
         super().wheelEvent(evt)
             
     def isTextClipped(self):
-        availableWidth = self.width() - 2*self.BorderWidth
+        availableWidth = self.width() - 2 * self.BorderWidth
         adjustedFont = self.font()
         adjustedFont.setBold(self.isLeaf)
         return QtGui.QFontMetrics(adjustedFont).size(QtCore.Qt.TextSingleLine, self.text()).width() >= availableWidth
         
-    def requestSubDirs(self): # TODO 2023-05-08 13:39:57 finalize
-        if not self._openSubDirsTimer_.isActive() and self._subDirsJob_ is None:
-            self._openSubDirsTimer_.start() # TODO/FIXME 2023-05-08 13:36:13 make sure you understand what this does
+    def startSubDirsJob(self): # TODO 2023-05-08 13:39:57 finalize
+        # NOTE: 2024-12-30 23:48:13
+        # this is the startSubDirsJob in KIO
+        #
+        # in KIO:
+        # • if _replaceButton_ is True, the directory that this button
+        # points to will have changed to one of its siblings; for example, when this
+        # is triggered by a wheel event, it will result in "scrolling" through
+        # the sibling directories
+        #
+        # • if _replaceButton_ is False, then a menu with the subdirectories of
+        # the current path of the button will open.
+        #
+        # Now the Job emits two signals:
+        # • entries -> connected to self.addEntriesToSubdirs TODO write me
+        # • result -> connected to:
+        #   ∘ self.replaceButton if _replaceButton_ is True
+        #   ∘ self.openSubDirMenu otherwise
+        
+        # I don't use a KIO Job here for ovbious reasons (i.e. there is no
+        # Python port, and even if there was one, it would "tie" Scipyen to KDE
+        # frameworks -- sorry ⌣); instead, I try to keep it "sprity" through Qt's
+        # Signal/Slot mechanism.
+        
+        if not self._readSiblingDirsTimer_.isActive() and len(self._siblingDirs_) == 0:
+            self._readSiblingDirsTimer_.start() # TODO/FIXME 2023-05-08 13:36:13 make sure you understand what this does
     
-    def startSubDirsJob(self): # TODO/FIXME 2023-05-08 13:37:00 make sure you understand what this does
-        if self._subDirsJob_ is None:
-            return
+    def getSiblingDirs(self): # TODO/FIXME 2023-05-08 13:37:00 make sure you understand what this does
+        # if self._subDirsJob_ is None:
+        #     return
         
         url = upUrl(self._url_) if self._replaceButton_ else self._url_
-        
+        self._siblingDirs_ = list(filter(lambda x: x not in (".", ".."), QtCore.QDir(url.path()).entryList(filter=QtCore.QDir.Dirs)))
+        # currentEntryNdx = entries.index(self.url.fileName())
         # TODO 2023-05-08 13:19:49 create a listDir job iobject to work with QTimer
-        pass
+        self._sig_siblingsDone_.emit()
+    
+    @Slot()
+    def _slot_siblingsDone(self):
+        
     
     
     def cancelSubDirsRequest(self):
@@ -1142,26 +1196,26 @@ class NavigatorButton(NavigatorButtonBase):
         
     @safeWrapper
     def subDirMenuRequested(self, evt:QtGui.QMouseEvent): # TODO/FIXME finalize
-        if self.subDirsMenu is None:
-            self.subDirsMenu = QtWidgets.QMenu("", self)
-            self.subDirsMenu.aboutToHide.connect(self.slot_menuHiding)
+        if self._subDirsMenu_ is None:
+            self._subDirsMenu_ = QtWidgets.QMenu("", self)
+            self._subDirsMenu_.aboutToHide.connect(self.slot_menuHiding)
             
-        self.subDirsMenu.clear()
+        self._subDirsMenu_.clear()
         
-        if self.fileSystemModel.hasChildren(self.rootIndex):
-            subDirs = [self.fileSystemModel.data(self.fileSystemModel.index(row, 0, self.rootIndex)) for row in range(self.fileSystemModel.rowCount(self.rootIndex))]
+        if self._fileSystemModel_.hasChildren(self._fileSystemModelIndex_):
+            subDirs = [self._fileSystemModel_.data(self._fileSystemModel_.index(row, 0, self._fileSystemModelIndex_)) for row in range(self._fileSystemModel_.rowCount(self._fileSystemModelIndex_))]
             # print(f"{self.__class__.__name__}.subDirMenuRequested rootIndex subDirs {subDirs}")
             if len(subDirs):
                 for k, subDir in enumerate(subDirs):
                     # print(f"subDir {subDir}")
-                    action = self.subDirsMenu.addAction(subDir)
+                    action = self._subDirsMenu_.addAction(subDir)
                     action.setText(subDir)
                     action.triggered.connect(self.slot_subDirClick)
         
-                self.subDirsMenu.popup(self.mapToGlobal(evt.pos()))
+                self._subDirsMenu_.popup(self.mapToGlobal(evt.pos()))
     
     @Slot()
-    def slot_subDirClick(self): # TODO/FIXME NOW - self.path not existent
+    def slot_subDirClick(self): 
         action = self.sender()
         ps = os.path.join(self.path.as_posix(), action.text())
         self.navigate.emit(ps)
