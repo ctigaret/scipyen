@@ -156,6 +156,10 @@ SupportedProtocols = Protocols
 
 ArrowSize = 10
 
+class NavigatorJob(QtCore.QThread):
+    entries = Signal(list, name="entries")
+    result = Signal(name="result")
+
 class Navigator:
     pass # fwd decl
 
@@ -1170,7 +1174,7 @@ class NavigatorButton(NavigatorButtonBase):
         # I don't use a KIO Job here for ovbious reasons (i.e. there is no
         # Python port, and even if there was one, it would "tie" Scipyen to KDE
         # frameworks -- sorry ⌣); instead, I try to keep it "sprity" through Qt's
-        # Signal/Slot mechanism.
+        # QThread and Signal/Slot mechanisms.
         
         if not self._readSiblingDirsTimer_.isActive() and len(self._siblingDirs_) == 0:
             self._readSiblingDirsTimer_.start() # TODO/FIXME 2023-05-08 13:36:13 make sure you understand what this does
