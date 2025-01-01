@@ -131,6 +131,7 @@ from qtpy.QtCore import (Signal, Slot, Property,)
 from qtpy.uic import loadUiType
 
 from core import desktoputils as dutils
+from core import qtutils
 from core.desktoputils import PlacesModel
 from core.prog import safeWrapper
 import gui.pictgui as pgui
@@ -157,15 +158,41 @@ SupportedProtocols = Protocols
 ArrowSize = 10
 
 class ListDirsJob(QtCore.QThread):
-    entries = Signal(list, name="entries")
-    # result = Signal(name="result")
+    sig_entries = Signal(list, name="sig_entries")
+    # sig_result = Signal(name="sig_result")
     
-    def __init__(self, path:pathlib.Path, parent:typing.Optional[QtCore.QObject]=None):
-        super().__init__(parent=parent)
+    def __init__(self, path:pathlib.Path, showHidden:bool=False,
+                 parent:typing.Optional[QtCore.QObject]=None):
+        if not path.is_absolute():
+            p = path.resolve()
+        else:
+            p = pathlib.Path(path)
         
-        self.path = path
+        if not p.exists():
+            raise ValueError(f"Path {path.as_posix} does not exist")
+            
+        if not p.isdir():
+            self.path = p.parent
+        else:
+            self.path = p
+            
+        self.entries = list() # of pathlib.Path objects
+        
+        self.showHidden = showHidden is True
+        
+        QtCore.QThread.__init__(self, parent=parent)
         
     def run(self):
+        filters = QtCore.QDir.Dirs | QtCore.QDir.NoDotAndDotDot | QtCore.QDir.CaseSensitive
+        if self.showHidden:
+            filters |= QtCore.QDir.Hidden
+            
+        qDir = QtCore.QDir(self.path.as_posix(), "*", 
+                           QtCore.QDir.Name | QtCore.QDir.DirsFirst, filters)
+        self.entries = list(map(lambda x: self.path / x, qDir.entryList()))
+        self.sig_entries.emit(entries)
+        # self.sig_result.emit()
+        
         
         
         
@@ -609,6 +636,59 @@ class UrlComboBox(QtWidgets.QComboBox):
     # def setCompletionObject(self, compObj:QtWidgets.QCompleter, hsig:bool):
     #     compObj.setModelSorting(QtWidgets.QCompleter.CaseSensitivelySortedModel)
                     
+class NavigatorMenu(QtWidgets.QMenu):
+    sig_urlDropped = Signal(QtWidgets.QAction, QtGui.QDropEvent, 
+                            name="sig_urlDropped")
+    sig_mouseButtonClicked = Signal(QtWidgets.QAction, QtCore.Qt.MouseButton, 
+                                    name="sig_mouseButtonClicked")
+    def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None):
+        super().__init__(parent=parent)
+        self._initialMousePosition = QtGui.QCursor.pos()
+        self._mouseMoved = False
+        self.setAcceptDrops(True)
+        self.setMouseTracking(True)
+        
+        
+    def dragEnterEvent(self, evt:QtGui.QDragEnterEvent):
+        if evt.mimeData().hasUrls():
+            evt.acceptProposedAction()
+    
+    def dragMoveEvent(self, evt:QtGui.QDragMoveEvent):
+        eventPosition = evt.position()
+        globalEventPosition = self.mapToGlobal(eventPosition)
+        newEvt = QtGui.QMouseEvent(QtGui.QMouseEvent(QtCore.QEvent.MouseMove, 
+                                                     eventPosition, globalEventPosition,
+                                                     QtCore.Qt.LeftButton, 
+                                                     evt.button(), 
+                                                     evt.modifiers()))
+        
+        self.mouseMoveEvent(newEvt)
+    
+    def dropEvent(self, evt:QtGui.QDropEvent):
+        action = self.actionAt(evt.position().toPoint())
+        if action is not None:
+            self.sig_urlDropped.emit(action, evt)
+    
+    def mouseMoveEvent(self, evt:QtGui.QMouseEvent):
+        if not self._mouseMoved:
+            moveDistance = self.maptoGlobal(evt.pos()) - self._initialMousePosition
+            self._mouseMoved = moveDistance.manhattanLength() >= QtWidgets.QApplication.startDragDistance()
+            
+        if self._mouseMoved:
+            super().mouseMoveEvent(evt)
+    
+    def mouseReleaseEvent(self, evt:QtGui.QMouseEvent):
+        btn = evt.button()
+        
+        if self._mouseMoved or btn != QtCore.Qt.LeftButton:
+            action = self.actionAt(evt.pos())
+            if action is not None:
+                self.sig_mouseButtonClicked.emit(action, btn)
+                self.setActiveAction(None)
+                
+            super().mouseReleaseEvent(evt)
+            
+        self._mouseMoved = True
     
 class NavigatorButtonBase(QtWidgets.QPushButton):
     """Common ancestor for breadcrumbs buttons
@@ -797,22 +877,22 @@ class NavigatorButton(NavigatorButtonBase):
         self._wheelSteps_ = 0
         
         self._subDir_ = "" # TODO
-        # self._subDirsJob_ = None # originally, a KIO.listDir → TODO
-        self._siblingDirs_ = list()
+        self._subDirsJob_ = None # originally, a KIO::ListJob → here, a QThread
+        self._subDirs_ = list() # of SubdirInfo → here, a list of pathlib.Path objects
+        # self._siblingDirs_ = list()
         self._subDirsMenu_ = None # NavigatorMenu # TODO
-        self._subDirs_ = list() # of SubdirInfo
         
         self.setAcceptDrops(True)
         self.setUrl(QtCore.QUrl(url.as_uri()) if isinstance(url, pathlib.Path) else url)
         self.setMouseTracking(True)
         
-        self._readSiblingDirsTimer_ = QtCore.QTimer(self)
-        self._readSiblingDirsTimer_.setSingleShot(True)
-        self._readSiblingDirsTimer_.setInterval(300)
-        self._readSiblingDirsTimer_.timeout.connect(self.getSiblingDirs)
+        # self._readSiblingDirsTimer_ = QtCore.QTimer(self)
+        # self._readSiblingDirsTimer_.setSingleShot(True)
+        # self._readSiblingDirsTimer_.setInterval(300)
+        # self._readSiblingDirsTimer_.timeout.connect(self.getSiblingDirs)
         
         self.pressed.connect(self.startSubDirsJob)
-        self.
+        # self.
         
 #         # ### BEGIN CMT 2023-05-08 17:56:23
 #         
@@ -853,8 +933,14 @@ class NavigatorButton(NavigatorButtonBase):
 #         
 #         # ### END CMT 2023-05-08 17:56:23
 
-    def setUrl(self, url:QtCore.QUrl): # FIXME/TODO: replace with a pythonic async protocol - what's that?!?
-        self._url_ = url
+    def setUrl(self, url:typing.Union[QtCore.QUrl, pathlib.Path]): 
+        if isinstance(url, pathlib.Path):
+            if not url.is_dir() or not url.exists():
+                raise ValueError(f"Path {url.as_posix()} is inexistent")
+            
+            self._url_ = QtCore.QUrl(url.as_uri())
+        else:
+            self._url_ = url
         
         # NOTE: 2023-05-08 18:06:14 KIO original
         # protocolBlackList = {"nfs", "fish", "ftp", "sftp", "smb", "webdav", "mtp", "http", "https"}
@@ -969,6 +1055,9 @@ class NavigatorButton(NavigatorButtonBase):
             
     def showMnemonic(self):
         return self._showMnemonic_
+    
+    def initMenu(self, menu: QtWidgets.QMenu, startIndex:int):
+        menu.mouseButtonClick.connect()
         
     def paintEvent(self, evt:QtGui.QPaintEvent):
         painter = QtGui.QPainter(self)
@@ -1192,23 +1281,88 @@ class NavigatorButton(NavigatorButtonBase):
         # frameworks -- sorry ⌣); instead, I try to keep it "sprity" through Qt's
         # QThread and Signal/Slot mechanisms.
         
-        if not self._readSiblingDirsTimer_.isActive() and len(self._siblingDirs_) == 0:
-            self._readSiblingDirsTimer_.start() # TODO/FIXME 2023-05-08 13:36:13 make sure you understand what this does
+        # if not self._readSiblingDirsTimer_.isActive() and len(self._siblingDirs_) == 0:
+        #     self._readSiblingDirsTimer_.start() # TODO/FIXME 2023-05-08 13:36:13 make sure you understand what this does
     
-    def getSiblingDirs(self): # TODO/FIXME 2023-05-08 13:37:00 make sure you understand what this does
-        # if self._subDirsJob_ is None:
-        #     return
-        
+        if not isinstance(self.path, pathlib.Path) or not self.path.is_dir() or not self.path.exists():
+            return
+    
+        if isinstance(self._subDirsJob_, QtCore.QThread) and qtutils.isQObjectAlive(self._subdir):
+            return
+    
         url = upUrl(self._url_) if self._replaceButton_ else self._url_
-        self._siblingDirs_ = list(filter(lambda x: x not in (".", ".."), QtCore.QDir(url.path()).entryList(filter=QtCore.QDir.Dirs)))
-        # currentEntryNdx = entries.index(self.url.fileName())
-        # TODO 2023-05-08 13:19:49 create a listDir job iobject to work with QTimer
-        self._sig_siblingsDone_.emit()
-    
-    @Slot()
-    def _slot_siblingsDone(self):
         
+        navigator = self.parent()
+        assert qtutils.isQObjectAlive(navigator), f"Parent object was deleted"
+        
+        self._subDirsJob_ = ListDirsJob(url, self)
+        self._subDirs_.clear()
+        
+        self._subDirsJob_.sig_entries.connect(self._slot_addEntriesToSubdirs)
+        if self._replaceButton_:
+            self._subDirsJob_.finished.connect(self._slot_replaceButton)
+        else:
+            self._subDirsJob_.finished.connect(self._slot_openSubDirsMenu)
+            
+        self._subDirsJob_.deleteLater()
+        
+    @Slot()
+    def _slot_replaceButton(self):
+        self._subDirsJob_ = None
+        self._replaceButton_ = False
+        if len(self._subDirs_) == 0:
+            return
+        
+        navigator = self.parent()
+        assert qtutils.isQObjectAlive(navigator), f"Parent object was deleted"
+        currentIndex = self._subDirs_.index(self.path)
+        targetIndex = currentIndex - self._wheelSteps_
+        if targetIndex < 0:
+            targetIndex = 0
+        elif targetIndex >= len(self._subDirs_):
+            targetIndex = len(self._subDirs_)-1
+            
+        newUrl = QtCore.QUrl(self._subDirs_[targetIndex].as_uri())
+        self.navigatorButtonActivated.emit(newUrl, QtCore.Qt.LeftButton, QtCore.Qt.NoModifier)
+        
+        # NOTE: 2025-01-01 12:20:49 
+        # in KIO the text of the button and its underlying URI are not modified here 
+        # (i.e. they are not set to the new directory) - to find out if this is 
+        # happening AFTER the navigator has successfully navigated to the new directory
+        # (my guess is that this is what actually happens)
+        
+        self._subDirs_.clear()
+        
+    @Slot()
+    def _slot_openSubDirsMenu(self):
+        self._subDirsJob_ = None
+        if len(self._subDirs_) == 0:
+            return
+        navigator = self.parent()
+        assert qtutils.isQObjectAlive(navigator), f"Parent object was deleted"
+        
+        self.setDisplayHintEnabled(DisplayHint.PopupActiveHint, True)
+        self.update()
+        
+        if isinstance(self._subDirsMenu_, QtWidgets.QMenu) and qtutils.isQObjectAlive(self._subDirsMenu_):
+            self._subDirsMenu_.close()
+            self._subDirsMenu_.deleteLater()
+            self._subDirsMenu_ = None
+            
+        self._subDirsMenu_ = QtWidgets.QMenu("", self)
+        self.initMenu(self._subDirsMenu_, 0)
     
+    @Slot(list)
+    def _slot_addEntriesToSubdirs(self, entries:list[pathlib.Path]):
+        if len(entries) == 0:
+            return
+        assert all(isinstance(v, pathlib.Path) for v in entries), "Expecting a list of Path objects"
+        
+        dirEntries = list(filter(lambda x: x.is_dir() and x.exists(), entries))
+        if len(dirEntries) == 0:
+            return
+        
+        self._subDirs_[:] = dirEntries[:]
     
     def cancelSubDirsRequest(self):
         # TODO 2023-05-08 13:29:21
