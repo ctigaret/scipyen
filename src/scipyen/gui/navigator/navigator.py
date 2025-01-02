@@ -684,7 +684,7 @@ class NavigatorMenu(QtWidgets.QMenu):
             action = self.actionAt(evt.pos())
             if action is not None:
                 self.sig_mouseButtonClicked.emit(action, btn)
-                self.setActiveAction(None)
+                self.setActiveAction(QWidgets.QAction())
                 
             super().mouseReleaseEvent(evt)
             
@@ -697,7 +697,6 @@ class NavigatorButtonBase(QtWidgets.QPushButton):
     
     def __init__(self, parent:typing.Optional[QtWidgets.QWidget]=None):
         super().__init__(parent)
-        self._isLeaf_=False
         self._isDown_ = False
         self._active_=True
         self._displayHint_ = 0
@@ -857,81 +856,67 @@ class NavigatorButton(NavigatorButtonBase):
     # TODO: 2024-12-30 19:01:04 finalise me!
     # FIXME/TODO 2023-05-07 23:34:55 finalize
     navigate = Signal(str, name="navigate")
-    urlsDroppedOnNavButton = Signal(QtCore.QUrl, QtGui.QDropEvent, name = "urlsDroppedOnNavButton")
-    navigatorButtonActivated = Signal(QtCore.QUrl, QtCore.Qt.MouseButton, QtCore.Qt.KeyboardModifiers, name = "navigatorButtonActivated")
+    urlsDroppedOnNavButton = Signal(QtCore.QUrl, QtGui.QDropEvent, 
+                                    name = "urlsDroppedOnNavButton")
+    navigatorButtonActivated = Signal(QtCore.QUrl, QtCore.Qt.MouseButton, 
+                                      QtCore.Qt.KeyboardModifiers, 
+                                      name = "navigatorButtonActivated")
     startedTextResolving = Signal(name = "startedTextResolving")
     finishedTextResolving = Signal(name = "finishedTextResolving")
     _sig_siblingsDone_ = Signal(name="_sig_siblingsDone_")
     
     def __init__(self, url:typing.Union[QtCore.QUrl, pathlib.Path], 
-                 isBranch:bool=False,
                  model:typing.Optional[QtWidgets.QFileSystemModel] = None,
                  parent:typing.Optional[Navigator]=None):
         super().__init__(parent=parent)
-        self._isLeaf_ = not isBranch # CMT
         self._hoverArrow_ = False
-        self._pressed_ = False
+        # self._pressed_ = False # NOTE: 2025-01-02 01:20:39 by CMT for use in paintEvent
         self._pendingTextChange_ = False
         self._replaceButton_ = False
         self._showMnemonic_ = False
         self._wheelSteps_ = 0
         
-        self._subDir_ = "" # TODO
+        self._url_ = None
+        self._subDir_ = ""  # NOTE: 2025-01-02 00:21:29 this is to be set, actually,
+                            # by code in Navigator
+                            # this is set when the navigator button does NOT
+                            # show the active directory in the navigator!
+                            
         self._subDirsJob_ = None # originally, a KIO::ListJob → here, a QThread
         self._subDirs_ = list() # of SubdirInfo → here, a list of pathlib.Path objects
-        # self._siblingDirs_ = list()
-        self._subDirsMenu_ = None # NavigatorMenu # TODO
+        self._subDirsMenu_ = None # NavigatorMenu 
+        
+        self._openSubDirsTimer = QtCore.QTimer(self)
+        self._openSubDirsTimer.setSingleShot(True)
+        self._openSubDirsTimer.setInterval(1000)
+        self._openSubDirsTimer.timeout.connect(self.slot_startSubDirsJob)
         
         self.setAcceptDrops(True)
         self.setUrl(QtCore.QUrl(url.as_uri()) if isinstance(url, pathlib.Path) else url)
         self.setMouseTracking(True)
         
-        # self._readSiblingDirsTimer_ = QtCore.QTimer(self)
-        # self._readSiblingDirsTimer_.setSingleShot(True)
-        # self._readSiblingDirsTimer_.setInterval(300)
-        # self._readSiblingDirsTimer_.timeout.connect(self.getSiblingDirs)
+        self.pressed.connect(self.slot_requestSubDirs)
         
-        self.pressed.connect(self.startSubDirsJob)
-        # self.
-        
-#         # ### BEGIN CMT 2023-05-08 17:56:23
-#         
-#         path = path.resolve()
-#         
-#         if not path.is_dir():
-#             path = path.parent
-#             
-#         self.path = path
-#         self.name = self.path.name
-#         if len(self.name) == 0:
-#             self.name = self.path.parts[0]
-#     
-#         self.setText(self.name)
-#         
-#         # self.parentCrumb = parentCrumb
-#         
-#         self._subDirsMenu_ = None
-#         
-        # NOTE: 2023-05-07 23:42:42 
-        # use Qt file system model; does away with KIOJob etc (?!?)
-        # NOTE: 2024-12-30 19:20:27
-        # allow the use of an external file system model (e.g. the one used by 
-        # Scipyen's MainWindow)
-        if not isinstance(model, QtWidgets.QFileSystemModel):
-            self._fileSystemModel_ = QtWidgets.QFileSystemModel(parent=self)
-            self._fileSystemModel_.setReadOnly(True)
-            self._fileSystemModel_.setFilter(QtCore.QDir.AllDirs | QtCore.QDir.CaseSensitive | QtCore.QDir.NoDotAndDotDot)
-            self._fileSystemModel_.setRootPath(self.path.as_posix())
-            self._fileSystemModelIndex_ = self._fileSystemModel_.index(self._fileSystemModel_.rootPath())
-        else:
-            self._fileSystemModel_ = model
-            self._fileSystemModelIndex_ = self._fileSystemModel_.index(self.path.as_posix())
-# 
-#         # self.frameStyleOptions = QtWidgets.QStyleOptionFrame()
-#         # self.frameStyleOptions.initFrom(self)
-#         # self.frameStyleOptions.
-#         
-#         # ### END CMT 2023-05-08 17:56:23
+#         # NOTE: 2023-05-07 23:42:42 
+#         # use Qt file system model; does away with KIOJob etc (?!?)
+#         # NOTE: 2024-12-30 19:20:27
+#         # allow the use of an external file system model (e.g. the one used by 
+#         # Scipyen's MainWindow)
+#         if not isinstance(model, QtWidgets.QFileSystemModel):
+#             self._fileSystemModel_ = QtWidgets.QFileSystemModel(parent=self)
+#             self._fileSystemModel_.setReadOnly(True)
+#             self._fileSystemModel_.setFilter(QtCore.QDir.AllDirs | QtCore.QDir.CaseSensitive | QtCore.QDir.NoDotAndDotDot)
+#             self._fileSystemModel_.setRootPath(self.path.as_posix())
+#             self._fileSystemModelIndex_ = self._fileSystemModel_.index(self._fileSystemModel_.rootPath())
+#         else:
+#             self._fileSystemModel_ = model
+#             self._fileSystemModelIndex_ = self._fileSystemModel_.index(self.path.as_posix())
+# # 
+# #         # self.frameStyleOptions = QtWidgets.QStyleOptionFrame()
+# #         # self.frameStyleOptions.initFrom(self)
+# #         # self.frameStyleOptions.
+# #         
+# #         # ### END CMT 2023-05-08 17:56:23
 
     def setUrl(self, url:typing.Union[QtCore.QUrl, pathlib.Path]): 
         if isinstance(url, pathlib.Path):
@@ -987,23 +972,18 @@ class NavigatorButton(NavigatorButtonBase):
         else:
             self.setText(self._url_.fileName().replace('&', '&&'))
             
-            
-    @property
     def url(self) -> QtCore.QUrl:
         return self._url_
     
-    @url.setter
-    def url(self, val:typing.Union[QtCore.QUrl, pathlib.Path]):
-        self.setUrl(val)
-    
-    @property
     def path(self) -> typing.Optional[pathlib.Path]:
-        return pathlib.Path(self.url.path()) if self.url.isLocalFile else None
+        return pathlib.Path(self.url().path()) if self.url().isLocalFile else None
         
-    def setText(self, text): 
-        if len(text) == 0:
-            text = self._url_.scheme()
+    def setText(self, text):
+        adjustedText = text
+        if len(adjustedText) == 0:
+            adjustedText = self._url_.scheme()
             
+        adjustedText.replace("\n", " ")
         super().setText(text)
         
         self.updateMinimumWidth()
@@ -1026,19 +1006,27 @@ class NavigatorButton(NavigatorButtonBase):
         
     def arrowWidth(self):
         width = 0
-        if not self.isLeaf:
+        if len(self._subDir_) > 0:
             width = int(self.height()/2)
             if width < 4:
                 width = 4
         
         return width
     
-    def isAboveArrow(self, x:int):
+    def isAboveArrow(self, x:int) -> bool:
         leftToRight = self.layoutDirection() == QtCore.Qt.LeftToRight
         if x >= self.width() - self.arrowWidth():
             return leftToRight
         else:
             return x < self.arrowWidth()
+        
+    def setShowMnemonic(self, val:bool):
+        val = val is True
+        if self._showMnemonic_ != val:
+            self._showMnemonic_ = val
+            
+    def showMnemonic(self) -> bool:
+        return self._showMnemonic_
         
     def updateMinimumWidth(self):
         oldMinWidth = self.minimumWidth()
@@ -1053,17 +1041,44 @@ class NavigatorButton(NavigatorButtonBase):
         if oldMinWidth != minWidth:
             self.setMinimumWidth(minWidth)
             
-    def showMnemonic(self):
-        return self._showMnemonic_
-    
     def initMenu(self, menu: QtWidgets.QMenu, startIndex:int):
-        menu.mouseButtonClick.connect()
+        menu.sig_mouseButtonClick.connect(self._slotMenuActionClicked)
+        menu.sig_urlDropped.connect(self._slotUrlsDropped)
+        menu.triggered.connect(self._slotMenuActionClicked)
+        menu.setLayoutDirection(QtCore.Qt.LeftToRight)
+        
+        maxIndex = startIndex + 30  # (max 30 items shown in the menu)
+        subDirsSize = len(self._subDirs_)
+        lastIndex = min(subDirsSize - 1, maxIndex)
+        
+        subDirsNames = list(map(lambda x: x.name), self._subDirs_[startIndex : lastIndex])
+        
+        subDirsActions = list(map(lambda x: QtWidgets.QAction(guiutils.csqueeze(x.replace('&', '&&'), 60), self), subDirsNames))
+
+        
+        # if self.path in self._subDirs_:
+        if self._subDir_ in subDirsNames:
+            # currentIndex = self._subDirs_.index(self.path)
+            currentIndex = subDirsNames.index(self._subDir_)
+            font = QtGui.QFont(subDirsActions[currentIndex].font())
+            font.setBold(True)
+            subDirsActions[currentIndex].setFont(font)
+            
+        for k, i in enumerate(range(startIndex, lastIndex)):
+            subDirsActions[k].setData(i)
+            menu.addAction(subDirsActions[k])
+            
+        if subDirsSize > maxIndex:
+            menu.addSeparator()
+            subDirsMenu = NavigatorMenu("More", menu)
+            self.initMenu(subDirsMenu, maxIndex)
+            menu.addMenu(subDirsMenu)
         
     def paintEvent(self, evt:QtGui.QPaintEvent):
         painter = QtGui.QPainter(self)
         
         adjustedFont = QtGui.QFont(self.font())
-        adjustedFont.setBold(self.isLeaf)
+        adjustedFont.setBold(len(self._subDir_) == 0)
         painter.setFont(adjustedFont)
         
         buttonWidth = self.width()
@@ -1086,7 +1101,9 @@ class NavigatorButton(NavigatorButtonBase):
         
         leftToRight = self.layoutDirection() == QtCore.Qt.LeftToRight
         
-        if not self.isLeaf:
+        # if not self.isLeaf:
+        if len(self._subDir_) > 0:
+            # draws arrow
             arrowSize = self.arrowWidth()
             arrowX = int((buttonWidth - arrowSize) - self.BorderWidth) if leftToRight else int(self.BorderWidth)
             arrowY = int((buttonHeight - arrowSize) / 2)
@@ -1099,7 +1116,6 @@ class NavigatorButton(NavigatorButtonBase):
             option.palette.setColor(QtGui.QPalette.WindowText, fgColor)
             option.palette.setColor(QtGui.QPalette.ButtonText, fgColor)
             
-            hoverX = arrowX
             
             if self._hoverArrow_:
                 hoverColor = self.palette().color(QtGui.QPalette.HighlightedText)
@@ -1107,15 +1123,20 @@ class NavigatorButton(NavigatorButtonBase):
                 painter.setPen(QtCore.Qt.NoPen)
                 painter.setBrush(hoverColor)
                 
-                
+                hoverX = arrowX
                 if not leftToRight:
                     hoverX -= self.BorderWidth
                     
                 painter.drawRect(QtCore.QRect(hoverX, 0, arrowSize + self.BorderWidth, buttonHeight))
             
-            arrow = QtWidgets.QStyle.PE_IndicatorArrowDown if self._pressed_ else QtWidgets.QStyle.PE_IndicatorArrowRight if leftToRight else QtWidgets.QStyle.PE_IndicatorArrowLeft
-
+            # arrow = QtWidgets.QStyle.PE_IndicatorArrowDown if self._pressed_ else QtWidgets.QStyle.PE_IndicatorArrowRight if leftToRight else QtWidgets.QStyle.PE_IndicatorArrowLeft
+            arrow = QtWidgets.QStyle.PE_IndicatorArrowRight if leftToRight else QtWidgets.QStyle.PE_IndicatorArrowLeft
             self.style().drawPrimitive(arrow, option, painter, self)
+            
+            if not leftToRight:
+                textLeft += arrowSize + 2 * self.BorderWidth
+            textWidth -= arrowSize + 2 * self.BorderWidth
+            
         
         painter.setPen(fgColor)
         
@@ -1138,7 +1159,11 @@ class NavigatorButton(NavigatorButtonBase):
             painter.setPen(pen)
             
         textFlags = QtCore.Qt.AlignVCenter if clipped else QtCore.Qt.AlignCenter
-        painter.drawText(textRect, textFlags, self.text())
+        if self._showMnemonic_:
+            textFlags |= QtCore.Qt.TextShowMnemonic
+            painter.drawText(textRect, textFlags, self.text())
+        else:
+            painter.drawText(textRect, textFlags, self.plainText())
         
     def enterEvent(self, evt:QtGui.QEnterEvent):
         super().enterEvent(evt)
@@ -1162,11 +1187,13 @@ class NavigatorButton(NavigatorButtonBase):
             pass
         elif evtKey == QtCore.Qt.Key_Return:
             self.navigatorButtonActivated.emit(self._url, QtCore.Qt.LeftButton, evt.modifiers())
+            super().keyPressEvent(evt)
             return
         elif evtKey == QtCore.Qt.Key_Down:
             pass
         elif evtKey == QtCore.Qt.Key_Space:
-            self.getSiblingDirs() # TODO 2023-05-08 13:18:48
+            self.slot_startSubDirsJob()
+            super().keyPressEvent(evt)
             return
         
         else:
@@ -1191,21 +1218,24 @@ class NavigatorButton(NavigatorButtonBase):
             self._hoverArrow_ = True
             self.update()
             
-            if self._subDirsMenu_ is None:
-                self.startSubDirsJob() # TODO: 2023-05-08 13:27:04
+            if not isinstance(self._subDirsMenu_, NavigatorMenu) or not qtutils.isQObjectAlive(self._subDirsMenu_):
+                self.slot_requestSubDirs()
+                
             elif self._subDirsMenu_.parent() != self:
                 self._subDirsMenu_.close()
                 self._subDirsMenu_.deleteLater()
                 self._subDirsMenu_ = None
                 
-                self.startSubDirsJob()
+                self.slot_requestSubDirs()
                 
         else:
-            if self._readSiblingDirsTimer_.isActive(): # TODO 2023-05-08 13:28:35 self._readSiblingDirsTimer_
-                self.cancelSubDirsRequest() # TODO 2023-05-08 13:29:04
+            if self._openSubDirsTimer.isActive(): 
+                self.cancelSubDirsRequest() 
                 
-            self._subDirsMenu_.deleteLater()
-            self._subDirsMenu_ = None
+            if isinstance(self._subDirsMenu_, NavigatorMenu) and qtutils.isQObjectAlive(self._subDirsMenu_):
+                self._subDirsMenu_.deleteLater()
+                self._subDirsMenu_ = None
+                
             self._hoverArrow_ = False
             self.update()
             
@@ -1216,16 +1246,19 @@ class NavigatorButton(NavigatorButtonBase):
         self.update()
         
     def mousePressEvent(self, evt:QtGui.QMouseEvent):
+        if self.isAboveArrow(round(evt.pos().x())) and evt.button() == QtCore.Qt.LeftButton:
+            # self._pressed_ = True # NOTE: 2025-01-02 01:18:34 by CMT, used in paintEvent
+            # self.update()
+            self.slot_startSubDirsJob()
+        
         super().mousePressEvent(evt)
-        if self.isAboveArrow(round(evt.pos().x())):
-            self._pressed_ = True
-            self.update()
         
     def mouseReleaseEvent(self, evt:QtGui.QMouseEvent):
         if self.isAboveArrow(round(evt.pos().x())) or evt.button() != QtCore.Qt.LeftButton:
-            self.subDirMenuRequested(evt)
-        else:
-            self.navigate.emit(self.path.as_posix())
+            # self._pressed_ = False # NOTE: 2025-01-02 01:18:34 by CMT, used in paintEvent
+            # self.update()
+            self.navigatorButtonActivated.emit(self._url_, evt.button(), evt.modifiers())
+            self.cancelSubDirsRequest()
             
         super().mouseReleaseEvent(evt)
         
@@ -1240,20 +1273,47 @@ class NavigatorButton(NavigatorButtonBase):
         if evt.angleDelta().y() != 0:
             self._wheelSteps_ = evt.angleDelta().y() / 120
             self._replaceButton_ = True
-            self.startSubDirsJob()
+            self.slot_startSubDirsJob()
             # self.getSiblingDirs()
             
         super().wheelEvent(evt)
             
     def isTextClipped(self):
         availableWidth = self.width() - 2 * self.BorderWidth
+        if len(self._subDir_) > 0:
+            availableWidth -= self.arrowWidth() - self.BorderWidth
         adjustedFont = self.font()
-        adjustedFont.setBold(self.isLeaf)
+        adjustedFont.setBold(len(self._subDir_) == 0)
         return QtGui.QFontMetrics(adjustedFont).size(QtCore.Qt.TextSingleLine, self.text()).width() >= availableWidth
         
-    def startSubDirsJob(self): # TODO 2023-05-08 13:39:57 finalize
+    def sizeHint(self) -> QtCore.QSize:
+        adjustedFont = self.font()
+        adjustedFont.setBold(len(self._subDir_) == 0)
+        fontMetric = QtGui.QFontMetrics(adjustedFont)
+        width = fontMetric.size(QtCore.Qt.TextSingleLine,
+                                self.plainText()).width() + self.arrowWidth() + 4 * self.BorderWidth
+        return QtCore.QSize(width, super().sizeHint().height())
+    
+    def activeSubDirectory(self) -> str:
+        return self._subDir_
+    
+    def setActiveSubDirectory(self, val:str):
+        self._subDir_ = val
+        self.updateGeometry()
+        self.update()
+        
+    def cancelSubDirsRequest(self):
+        self._openSubDirsTimer.stop()
+        if isinstance(self._subDirsJob_, ListDirsJob) and qtutils.isQObjectAlive(self._subDirsJob_) and self._subDirsJob_.isRunning():
+            self._subDirsJob_.quit()
+            self._subDirsJob_.deleteLater()
+            self._subDirsJob_ = None
+        # pass
+
+    @Slot()
+    def slot_startSubDirsJob(self):
         # NOTE: 2024-12-30 23:48:13
-        # this is the startSubDirsJob in KIO
+        # this is the slot_startSubDirsJob in KIO
         #
         # in KIO:
         # • if _replaceButton_ is True, the directory that this button
@@ -1281,13 +1341,11 @@ class NavigatorButton(NavigatorButtonBase):
         # frameworks -- sorry ⌣); instead, I try to keep it "sprity" through Qt's
         # QThread and Signal/Slot mechanisms.
         
-        # if not self._readSiblingDirsTimer_.isActive() and len(self._siblingDirs_) == 0:
-        #     self._readSiblingDirsTimer_.start() # TODO/FIXME 2023-05-08 13:36:13 make sure you understand what this does
-    
-        if not isinstance(self.path, pathlib.Path) or not self.path.is_dir() or not self.path.exists():
+        path = self.path()
+        if not isinstance(path, pathlib.Path) or not path.is_dir() or not path.exists():
             return
     
-        if isinstance(self._subDirsJob_, QtCore.QThread) and qtutils.isQObjectAlive(self._subdir):
+        if isinstance(self._subDirsJob_, QtCore.QThread) and qtutils.isQObjectAlive(self._subDirsJob_) and self._subDirsJob_.isRunning():
             return
     
         url = upUrl(self._url_) if self._replaceButton_ else self._url_
@@ -1298,24 +1356,86 @@ class NavigatorButton(NavigatorButtonBase):
         self._subDirsJob_ = ListDirsJob(url, self)
         self._subDirs_.clear()
         
-        self._subDirsJob_.sig_entries.connect(self._slot_addEntriesToSubdirs)
+        self._subDirsJob_.sig_entries.connect(self.slot_addEntriesToSubdirs)
         if self._replaceButton_:
-            self._subDirsJob_.finished.connect(self._slot_replaceButton)
+            self._subDirsJob_.finished.connect(self.slot_replaceButton)
         else:
-            self._subDirsJob_.finished.connect(self._slot_openSubDirsMenu)
+            self._subDirsJob_.finished.connect(self.slot_openSubDirsMenu)
             
         self._subDirsJob_.deleteLater()
         
+    @Slot(QtWidgets.QAction, QtGui.QDropEvent)
+    def slot_urlsDropped(self, action:QtWidgets.QAction, event:QtGui.QDropEvent):
+        result = action.data().toInt()
+        path = self._subDirs_[result]
+        url = QtCore.QUrl(path.as_uri())
+        self.urlsDroppedOnNavButton.emit(url, event)
+    
+    @Slot(QtWidgets.QAction, QtCore.Qt.MouseButton)
+    def slot_menuActionClicked(self, action:QtWidgets.QAction, button:QtCore.Qt.MouseButton):
+        result = action.data().toInt()
+        path = self._subDirs_[result]
+        url = QtCore.QUrl(path.as_uri())
+        self.navigatorButtonActivated.emit(url, button, QtCore.Qt.NoModifier)
+    
     @Slot()
-    def _slot_replaceButton(self):
+    def slot_statFinished(self):
+        # NOTE: 2025-01-02 00:14:19
+        # in KIO this is triggered by the result signal of a KIO::stat job
+        # part of the mechanism for resolving uris with special schemes/protocols
+        # (i.e., in relation with special KIO slaves see this module docstring)
+        # not used here (yet ?!?)
+        pass
+        
+#     @safeWrapper
+#     def subDirMenuRequested(self, evt:QtGui.QMouseEvent): # TODO/FIXME finalize
+#         if self._subDirsMenu_ is None:
+#             self._subDirsMenu_ = QtWidgets.QMenu("", self)
+#             self._subDirsMenu_.aboutToHide.connect(self.slot_menuHiding)
+#             
+#         self._subDirsMenu_.clear()
+#         
+#         if self._fileSystemModel_.hasChildren(self._fileSystemModelIndex_):
+#             subDirs = [self._fileSystemModel_.data(self._fileSystemModel_.index(row, 0, self._fileSystemModelIndex_)) for row in range(self._fileSystemModel_.rowCount(self._fileSystemModelIndex_))]
+#             # print(f"{self.__class__.__name__}.subDirMenuRequested rootIndex subDirs {subDirs}")
+#             if len(subDirs):
+#                 for k, subDir in enumerate(subDirs):
+#                     # print(f"subDir {subDir}")
+#                     action = self._subDirsMenu_.addAction(subDir)
+#                     action.setText(subDir)
+#                     action.triggered.connect(self.slot_subDirClick)
+#         
+#                 self._subDirsMenu_.popup(self.mapToGlobal(evt.pos()))
+    
+    @Slot()
+    def slot_requestSubDirs(self):
+        if not self._openSubDirsTimer.isActive() and (not isinstance(self._subDirsJob_, ListDirsJob) or not qtutils.isQObjectAlive(self._subDirsJob_)):
+            self._openSubDirsTimer.start()
+        
+    @Slot()
+    def slot_replaceButton(self):
+        if isinstance(self._subDirsJob_, ListDirsJob):
+            if qtutils.isQObjectAlive(self._subDirsJob_) and self._subDirsJob_.isRunning():
+                self._subDirsJob_.quit()
+                self._subDirsJob_.wait()
+                
+            self._subDirsJob_.deleteLater()
+            
         self._subDirsJob_ = None
         self._replaceButton_ = False
         if len(self._subDirs_) == 0:
             return
         
+        path = self.path()
+        
+        if path not in self._subDirs_:
+            print(f"{path} not in _subDirs_")
+            return
+        
+        currentIndex = self._subDirs_.index(path)
+        
         navigator = self.parent()
         assert qtutils.isQObjectAlive(navigator), f"Parent object was deleted"
-        currentIndex = self._subDirs_.index(self.path)
         targetIndex = currentIndex - self._wheelSteps_
         if targetIndex < 0:
             targetIndex = 0
@@ -1334,7 +1454,7 @@ class NavigatorButton(NavigatorButtonBase):
         self._subDirs_.clear()
         
     @Slot()
-    def _slot_openSubDirsMenu(self):
+    def slot_openSubDirsMenu(self):
         self._subDirsJob_ = None
         if len(self._subDirs_) == 0:
             return
@@ -1349,11 +1469,11 @@ class NavigatorButton(NavigatorButtonBase):
             self._subDirsMenu_.deleteLater()
             self._subDirsMenu_ = None
             
-        self._subDirsMenu_ = QtWidgets.QMenu("", self)
+        self._subDirsMenu_ = NavigatorMenu(self)
         self.initMenu(self._subDirsMenu_, 0)
     
     @Slot(list)
-    def _slot_addEntriesToSubdirs(self, entries:list[pathlib.Path]):
+    def slot_addEntriesToSubdirs(self, entries:list[pathlib.Path]):
         if len(entries) == 0:
             return
         assert all(isinstance(v, pathlib.Path) for v in entries), "Expecting a list of Path objects"
@@ -1364,48 +1484,16 @@ class NavigatorButton(NavigatorButtonBase):
         
         self._subDirs_[:] = dirEntries[:]
     
-    def cancelSubDirsRequest(self):
-        # TODO 2023-05-08 13:29:21
-        pass
+    # @Slot()
+    # def slot_subDirClick(self): 
+    #     action = self.sender()
+    #     ps = os.path.join(self.path.as_posix(), action.text())
+    #     self.navigate.emit(ps)
         
-    @safeWrapper
-    def subDirMenuRequested(self, evt:QtGui.QMouseEvent): # TODO/FIXME finalize
-        if self._subDirsMenu_ is None:
-            self._subDirsMenu_ = QtWidgets.QMenu("", self)
-            self._subDirsMenu_.aboutToHide.connect(self.slot_menuHiding)
-            
-        self._subDirsMenu_.clear()
-        
-        if self._fileSystemModel_.hasChildren(self._fileSystemModelIndex_):
-            subDirs = [self._fileSystemModel_.data(self._fileSystemModel_.index(row, 0, self._fileSystemModelIndex_)) for row in range(self._fileSystemModel_.rowCount(self._fileSystemModelIndex_))]
-            # print(f"{self.__class__.__name__}.subDirMenuRequested rootIndex subDirs {subDirs}")
-            if len(subDirs):
-                for k, subDir in enumerate(subDirs):
-                    # print(f"subDir {subDir}")
-                    action = self._subDirsMenu_.addAction(subDir)
-                    action.setText(subDir)
-                    action.triggered.connect(self.slot_subDirClick)
-        
-                self._subDirsMenu_.popup(self.mapToGlobal(evt.pos()))
-    
-    @Slot()
-    def slot_subDirClick(self): 
-        action = self.sender()
-        ps = os.path.join(self.path.as_posix(), action.text())
-        self.navigate.emit(ps)
-        
-    @Slot()
-    def slot_menuHiding(self):
-        self._pressed_ = False
-        self.update()
-        
-    @property
-    def isLeaf(self): # CMT - not used FIXME/TODO
-        return self._isLeaf_
-    
-    @isLeaf.setter
-    def isLeaf(self, value:bool): # CMT - not used FIXME/TODO
-        self._isLeaf_ = value
+    # @Slot()
+    # def slot_menuHiding(self):
+    #     self._pressed_ = False
+    #     self.update()
         
 # NOTE: 2023-05-06 22:30:40
 # We only use the "file://" protocol, so this is not needed
@@ -2689,98 +2777,3 @@ class Navigator(QtWidgets.QWidget):
     # ### END Slots
 
    
-        
-# class Navigator_old(QtWidgets.QWidget):
-#     def __init__(self, path:pathlib.Path, editMode:bool=False, recentDirs:list = list(), maxRecent:int=10,parent=None):
-#         super().__init__(parent=parent)
-#         self._path_ = path.resolve()
-#         posixpathstr = self._path_.as_posix()
-#         self._recentDirs_ = [posixpathstr]
-#         if posixpathstr in recentDirs:
-#             rd = [i for i in recentDirs if pathlib.Path(i) != self._path_]
-#         else:
-#             rd = recentDirs
-#         self._recentDirs_ = rd
-#         self._editMode_ = editMode==True
-#         self._configureUI_()
-#         
-#     def _configureUI_(self):
-#         self.bcnav = BreadCrumbsNavigator(self._path_, parent=self)
-#         self.bcnav.sig_chDirString[str].connect(self.slot_dirChange)
-#         self.bcnav.sig_switchToEditor.connect(self.slot_switchToEditor)
-#         self.editor = PathEditor(self._path_, self._recentDirs_, parent=self)
-#         self.editor.sig_chDirString[str].connect(self.slot_dirChange)
-#         self.editor.sig_switchToNavigator.connect(self.slot_switchToNavigator)
-#         self.hlayout = QtWidgets.QHBoxLayout(self)
-#         self.hlayout.setContentsMargins(0,0,0,0)
-#         self.hlayout.setSpacing(0)
-#         self.setLayout(self.hlayout)
-#         self.bcnav.setVisible(False)
-#         self.editor.setVisible(False)
-#         if self._editMode_:
-#             self.editor.setVisible(True)
-#             self.layout().addWidget(self.editor)
-#             self.bcnav.setVisible(False)
-#         else:
-#             self.bcnav.setVisible(True)
-#             self.layout().addWidget(self.bcnav)
-#             self.editor.setVisible(False)
-#         
-#     @property
-#     def recentDirs(self):
-#         return self._recentDirs_
-#     
-#     @recentDirs.setter
-#     def recentDirs(self, value:list):
-#         self._recentDirs_[:] = value
-#         
-#     @property
-#     def path(self):
-#         return self._path_
-#     
-#     @path.setter
-#     def path(self, value:pathlib.Path):
-#         self._path_ = value.resolve()
-#         signalBlockers = [QtCore.QSignalBlocker(w) for w in (self.bcnav, self.editor)]
-#         print(f"{self.__class__.__name__}.path = {self._path_}")
-#         self.bcnav.path = value
-#         self.editor.path = value
-#         
-#     @property
-#     def editMode(self):
-#         return self._editMode_
-#     
-#     @editMode.setter
-#     def editMode(self, value:bool):
-#         self._editMode_ = value==True
-#         self.update()
-#     
-#     def update(self):
-#         if self.hlayout.count() > 0:
-#             self.hlayout.takeAt(0)
-#             
-#         if self._editMode_:
-#             self.bcnav.setVisible(False)
-#             self.hlayout.addWidget(self.editor)
-#             self.editor.setVisible(True)
-#             
-#             
-#         else:
-#             self.editor.setVisible(False)
-#             self.hlayout.addWidget(self.bcnav)
-#             self.bcnav.setVisible(True)
-#             
-#         
-#     @Slot(str)
-#     def slot_dirChange(self, value):
-#         print(f"{self.__class__.__name__}.slot_dirChange value: {value}" )
-#         
-#         self.path = pathlib.Path(value)
-#         
-#     @Slot()
-#     def slot_switchToNavigator(self):
-#         self.editMode = False
-#         
-#     @Slot()
-#     def slot_switchToEditor(self):
-#         self.editMode = True
