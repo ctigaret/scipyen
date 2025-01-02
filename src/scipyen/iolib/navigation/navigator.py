@@ -132,7 +132,7 @@ from qtpy.uic import loadUiType
 
 from core import desktoputils as dutils
 from core import qtutils
-from iolib.navigator.placesmodel import PlacesModel
+from iolib.navigation.placesmodel import PlacesModel
 from core.prog import safeWrapper
 import gui.pictgui as pgui
 from gui import guiutils
@@ -225,18 +225,13 @@ class UrlNavigatorData(typing.NamedTuple):
     pos: QtCore.QPoint
     state: bytes
     
-class NavigatorSchemeCombo(QtWidgets.QWidget):
-    """Implementation of KIO KUrlNavigatorSchemeCombo"""
-    def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None):
-        super().__init__(parent=parent)
-    
 class SubDirInfo(typing.NamedTuple):
     name:str
     displayName:str
         
 
-def getSystemArchiveMimeTypes():
-    mimebd = QtCore.QMimeDatabase()
+def getSystemArchiveMimeTypes():# TODO
+    mimedb = QtCore.QMimeDatabase()
     types = [m for m in mimedb.allMimeTypes() if any(v in m.name() for v in archiveTypeStr)]
     
     return types
@@ -1496,86 +1491,74 @@ class NavigatorButton(NavigatorButtonBase):
         
         self._subDirs_[:] = dirEntries[:]
     
-    # @Slot()
-    # def slot_subDirClick(self): 
-    #     action = self.sender()
-    #     ps = os.path.join(self.path.as_posix(), action.text())
-    #     self.navigate.emit(ps)
-        
-    # @Slot()
-    # def slot_menuHiding(self):
-    #     self._pressed_ = False
-    #     self.update()
-        
 # NOTE: 2023-05-06 22:30:40
-# We only use the "file://" protocol, so this is not needed
+# We only use the "file://" protocol, so this is not needed, for now...
+# NOTE: 2025-01-02 16:02:34 but this may change
 #
-# class NavigatorProtocolCombo(NavigatorButtonBase): # TODO
-#     sig_activated = Signal()
-#     def __init__(self, protocol:str, parent=None):
-#         super().__init__(parent)
+class NavigatorProtocolCombo(NavigatorButtonBase): # TODO
+    sig_activated = Signal()
+    def __init__(self, protocol:str, parent=None):
+        super().__init__(parent)
         
 # NOTE: 2023-05-06 22:26:18
-# By design we only use the 'file://' protocol hence this is NOT needed
+# By design we only use the 'file://' protocol hence this is not needed, for now...
+# NOTE: 2025-01-02 16:02:17 but this may change
 #
-# class NavigatorSchemeCombo(NavigatorButtonBase):
-#     sig_activated = Signal(str, name="sig_activated")
-#     
-#     def __init__(self, scheme:str, parent:typing.Optional[Navigator]=None):
-#         super().__init__(parent)
-#         self._menu_ = QtWidgets.QMenu(self)
-#         self._schemes_ = list()
-#         self._categories_ = dict() # str ↦ SchemeCategory
-#         
-#         self._menu_.triggered.connect(self.setSchemeFromMenu)
-#         self.setText(scheme)
-#         self.setMenu(self._menu_)
-#         
-#     def _testProtocol_(self, scheme:str):
-#         url = QtCore.QUrl()
-#         url.setScheme(scheme)
-#         return True
-#         
-#     @Slot()
-#     def setSchemeFromMenu(self):
-#         pass # TODO
-#     
-#     @Slot(str)
-#     def setScheme(self, scheme:str):
-#         self.setText(scheme)
-#         
-#     def currentScheme(self):
-#         return self.text()
-#     
-#     def setSupportedSchemes(self, schemes:list):
-#         self._schemes_ = schemes
-#         self._menu_.clear()
-#         for scheme in schemes:
-#             action = self._menu_.addAction(scheme)
-#             action.setData(scheme)
-#             
-#     def sizeHint(self):
-#         size = super().sizeHint()
-#         width = self.fontMetrics().boundingRect(dutils.removeAcceleratorMarker(self.text())).width()
-#         width += (3 * self.BorderWidth) + ArrowSize
-#         
-#         return QtCore.QSize(width, size.height())
-#     
-#     def showEvent(self, evt:QtGui.QShowEvent):
-#         super().showEvent(evt)
-#         if not evt.spontaneous() and len(self._schemes_) == 0:
-#             protocols = [p for p in ProtocolInfo.protocols() if self._testProtocol_(p)]
-#             self._schemes_[:] = sorted(protocols)
-            
-            
-            
+class NavigatorSchemeCombo(NavigatorButtonBase):
+    """Implementation of KIO KUrlNavigatorSchemeCombo"""
+    sig_activated = Signal(str, name="sig_activated")
+    
+    def __init__(self, scheme:str, parent:typing.Optional[Navigator]=None):
+        super().__init__(parent)
+        self._menu_ = QtWidgets.QMenu(self)
+        self._schemes_ = list()
+        self._categories_ = dict() # str ↦ SchemeCategory
         
+        self._menu_.triggered.connect(self.setSchemeFromMenu)
+        self.setText(scheme)
+        self.setMenu(self._menu_)
+        
+    def _testProtocol_(self, scheme:str):
+        url = QtCore.QUrl()
+        url.setScheme(scheme)
+        return True
+        
+    @Slot()
+    def setSchemeFromMenu(self):
+        pass # TODO
+    
+    @Slot(str)
+    def setScheme(self, scheme:str):
+        self.setText(scheme)
+        
+    def currentScheme(self):
+        return self.text()
+    
+    def setSupportedSchemes(self, schemes:list):
+        self._schemes_ = schemes
+        self._menu_.clear()
+        for scheme in schemes:
+            action = self._menu_.addAction(scheme)
+            action.setData(scheme)
+            
+    def sizeHint(self):
+        size = super().sizeHint()
+        width = self.fontMetrics().boundingRect(dutils.removeAcceleratorMarker(self.text())).width()
+        width += (3 * self.BorderWidth) + ArrowSize
+        
+        return QtCore.QSize(width, size.height())
+    
+    def showEvent(self, evt:QtGui.QShowEvent):
+        super().showEvent(evt)
+        if not evt.spontaneous() and len(self._schemes_) == 0:
+            protocols = [p for p in ProtocolInfo.protocols() if self._testProtocol_(p)]
+            self._schemes_[:] = sorted(protocols)
+
 class NavigatorPlacesSelector(NavigatorButtonBase): # TODO: 2023-05-07 23:07:25 finalize
     sig_placeActivated = Signal(str, name = "sig_placeActivated")
     tabRequested = Signal()
     
-    def __init__(self, placesModel:PlacesModel, 
-                 parent:typing.Optional[QtWidgets.QWidget]=None):
+    def __init__(self, parent:Navigator, placesModel:PlacesModel):
         super().__init__(parent=parent)
         
         self._selectedItem_ = -1
@@ -1719,9 +1702,9 @@ class CoreUrlNavigator(QtCore.QObject):
         # NOTE: 2023-05-03 23:48:23
         # Originally, a list of LocationData structs.
         # Here, this is a NamedTuple with the fields "url" and "state"
-        self._history_ = list() # of LocationData
+        self._history_ = list() # of LocationData # NOTE: KIO KCoreUrlNavigatorPrivate API
         self._history_.insert(0, LocationData(url.adjusted(QtCore.QUrl.NormalizePathSegments), None))
-        self._historyIndex_ = 0
+        self._historyIndex_ = 0 # NOTE: KIO KCoreUrlNavigatorPrivate API
         
     @property
     def historyIndex(self):
@@ -1753,8 +1736,29 @@ class CoreUrlNavigator(QtCore.QObject):
         # compressed archives)
         
         if len(scheme):
-            archiveMimetypes = ProtocolInfo.archiveMimeTypes(scheme)
+            # NOTE: 2025-01-02 15:20:15
+            # until a ProtocolInfo is implemented, use "getSystemArchiveMimeTypes"
+            # defined in this module
+            # archiveMimetypes = ProtocolInfo.archiveMimeTypes(scheme)
+            archiveMimeTypes = list(map(lambda x: x.name(), getSystemArchiveMimeTypes()))
+            
+            if len(archiveMimeTypes):
+                insideCompressedPath = self.isCompressedPath(url)
+                if not insideCompressedPath:
+                    prevUrl = url
+                    parentUrl = upUrl(url)
+                    while parentUrl != prevUrl:
+                        if self.isCompressedPath(parentUrl, archiveMimeTypes):
+                            insideCompressedPath = True
+                            break;
+                        prevUrl = parentUrl
+                        parentUrl = upUrl(parentUrl)
+                if not insideCompressedPath:
+                    url.setScheme("file")
+                    firstUrlChild.setScheme("file")
+                    
 
+        # this is a LocationData
         data = self._history_[self._historyIndex_]
         
         isUrlEqual = url.matches(self.locationUrl(), QtCore.QUrl.StripTrailingSlash) or (not url.isValid() and url.matches(data.url, QtCore.QUrl.StripTrailingSlash))
@@ -1769,7 +1773,7 @@ class CoreUrlNavigator(QtCore.QObject):
             self._historyIndex_ = 0
 
         assert self._historyIndex_ == 0
-        self._history_.insert(0, LocationData(url))
+        self._history_.insert(0, LocationData(url, None)) # CAUTION: is it OK for state to be None ?!?
         
         historyMax = 100 # TODO make configurable -> link with mainWindow !!!
         
@@ -1781,13 +1785,18 @@ class CoreUrlNavigator(QtCore.QObject):
         self.historyChanged.emit()
         self.currentLocationUrlChanged.emit()
         
-    def isCompressedPath(self, path:QtCore.QUrl, archiveMimeTypes:list = list()):
+        if firstUrlChild.isValid():
+            self.urlSelectionRequested(firstUrlChild)
+        
+    def isCompressedPath(self, url:QtCore.QUrl, archiveMimeTypes:list = list()):
+        # NOTE: KIO KCoreUrlNavigatorPrivate API
         db = QtCore.QMimeDatabase()
         mime = db.mimeTypeForUrl(QtCore.QUrl(url.toString(QtCore.QUrl.StripTrailingSlash)))
         
         return any(mime.inherits(archiveType) for archiveType in archiveMimeTypes)
         
     def adjustedHistoryIndex(self, historyIndex:int):
+        # NOTE: KIO KCoreUrlNavigatorPrivate API
         historySize = len(self._history_)
         if historyIndex < 0:
             historyIndex = self._historyIndex_
@@ -1808,7 +1817,7 @@ class CoreUrlNavigator(QtCore.QObject):
         self._history_[self._historyIndex_] = newLoc
         
     @safeWrapper
-    def locationState(self, historyIndex:int = -1):
+    def locationState(self, historyIndex:int = -1) -> object:
         historyIndex = self.adjustedHistoryIndex(historyIndex)
         return self._history_[historyIndex].state
     
@@ -1840,20 +1849,30 @@ class CoreUrlNavigator(QtCore.QObject):
     
     def goUp(self):
         currentUrl = self.locationUrl()
-        
         if not currentUrl.isValid() or currentUrl.isRelative():
             return QtCore.QUrl()
         
-        u = QtCore.QUrl(currentUrl)
-        if currentUrl.hasQuery():
-            u.setQuery("")
-            return u
         
-        if currentUrl.hasFragment():
-            u.setFragment("")
-            
-            u = u.adjusted(QtCore.QUrl.StripTrailingSlash)
-            return u.adjusted(QtCore.QUrl.RemoveFilename)
+        upUrl_ = upUrl(currentUrl)
+        
+        if not currentUrl.matches(upUrl_, QtCore.QUrl.StripTrailingSlash):
+            self.setCurrentLocationUrl(upUrl_)
+            return True
+        
+        return False
+        
+        # ### BEGIN WHY ?!?
+#         u = QtCore.QUrl(currentUrl)
+#         if currentUrl.hasQuery():
+#             u.setQuery("")
+#             return u
+#         
+#         if currentUrl.hasFragment():
+#             u.setFragment("")
+#             
+#             u = u.adjusted(QtCore.QUrl.StripTrailingSlash)
+#             return u.adjusted(QtCore.QUrl.RemoveFilename)
+        # ### END WHY ?!?
         
         
 class NavigatorPathSelectorEventFilter(QtCore.QObject):
@@ -1922,7 +1941,6 @@ class Navigator(QtWidgets.QWidget):
         self._layout_.setContentsMargins(0,0,0,0)
         
         self._coreUrlNavigator_ = CoreUrlNavigator(url, self) # m_coreUrlNavigator
-        # NOTE 2025-01-02 14:47:14 working on this one
         self._coreUrlNavigator_.currentLocationUrlChanged.connect(self.slot_coreUrlNavigatorUrlChanged)
         self._coreUrlNavigator_.currentUrlAboutToChange[QtCore.QUrl].connect(self.slot_coreUrlNavigatorUrlAboutToBeChanged)
         self._coreUrlNavigator_.historySizeChanged.connect(self.historyChanged)
