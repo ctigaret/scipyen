@@ -132,7 +132,7 @@ from qtpy.uic import loadUiType
 
 from core import desktoputils as dutils
 from core import qtutils
-from core.desktoputils import PlacesModel
+from iolib.navigator.placesmodel import PlacesModel
 from core.prog import safeWrapper
 import gui.pictgui as pgui
 from gui import guiutils
@@ -193,7 +193,12 @@ class ListDirsJob(QtCore.QThread):
         self.sig_entries.emit(entries)
         # self.sig_result.emit()
         
-        
+    
+class ApplyUrlMethod(IntEnum):
+    Apply = 1
+    Tab = 2
+    ActiveTab = 4
+    NewWindow = 8
         
         
 

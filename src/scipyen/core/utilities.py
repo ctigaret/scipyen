@@ -4953,5 +4953,12 @@ def truncate_to_10_power(x):
         pw10 = 1. if abs(x) < 10. else 10. ** math.trunc(math.log(abs(x), 10.))
         return math.trunc(x/pw10) * pw10
         
-            
+def timelineDateString(year:int, month:int, day:int=0):
+    date = f"{year}-{month}"
+    if day > 0:
+        date = f"{date}-{day}"
+        
+    return date
+
+
             
