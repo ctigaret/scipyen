@@ -5,6 +5,17 @@
 
 """Utilities for Linux desktop integration
 """
+# NOTE: 2025-01-03 17:37:47
+# Command line tools for desktpp integration (since KDE Frameworks 6 has become
+# "mainstream", excutables provided by KDE below come under two flavours: 
+#   <exec_name> — for KDE Frameworks 6 & KDE Plasma 6
+#   <exec_name>5 — for KDE Frameworks 5 and KDE Plasma 5 (some applications may
+#   still deend on KDE Frameworks 5, but I think as of the time of writing,
+#   KDE Plasma 5 is on its way out in most distributions)
+#
+# • KDE:
+#   ∘ kmimetypefinder / kmimetypeinder5 
+
 # NOTE: 2020-10-24 12:11:26
 # Useful functions from os.path module ("path" is a str or a pathlib.Path object)
 # ------------------------------------------------------
@@ -362,7 +373,10 @@ def local_recent_places():
 
     
 def isFileIndexingEnabled():
-    # place holder; we don't ever use Baloo or localsearch hence this will be always False
+    # place holder; Baloo or localsearch are not used by Scipyen hence this will
+    # be False
+    # TODO - on opensource unix platforms check the functionality provided by
+    # the desktop environment under which the current Scipyen session is running.
     return False
 
 def removeReducedCJKAccMark(label:str, pos:int):
