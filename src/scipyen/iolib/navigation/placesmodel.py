@@ -43,33 +43,37 @@ except:
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
 class AdditionalRoles(IntEnum):
-    UrlRole = 0x069CD12B,
-    HiddenRole = 0x0741CAAC,
-    SetupNeededRole = 0x059A935D,
-    CapacityBarRecommendedRole = 0x1548C5C4,
-    GroupRole = 0x0a5b64ee,
-    IconNameRole = 0x00a45c00,
-    GroupHiddenRole = 0x21a4b936,
-    TeardownAllowedRole = 0x02533364,
-    EjectAllowedRole = 0x0A16AC5B,
-    TeardownOverlayRecommendedRole = 0x032EDCCE,
-    DeviceAccessibilityRole = 0x023FFD93,
+    UrlRole = 0x069CD12B
+    HiddenRole = 0x0741CAAC
+    SetupNeededRole = 0x059A935D
+    CapacityBarRecommendedRole = 0x1548C5C4
+    GroupRole = 0x0a5b64ee
+    IconNameRole = 0x00a45c00
+    GroupHiddenRole = 0x21a4b936
+    TeardownAllowedRole = 0x02533364
+    EjectAllowedRole = 0x0A16AC5B
+    TeardownOverlayRecommendedRole = 0x032EDCCE
+    DeviceAccessibilityRole = 0x023FFD93
 
-class GroupType(IntEnum):
-    PlacesType, 
-    RemoteType, 
-    RecentlySavedType,
-    SearchForType, 
-    DevicesType, 
-    RemovableDevicesType,
-    UnknownType,
-    TagsType
+class GroupType:pass
+GroupType = IntEnum("GroupType",
+                    ["PlacesType",
+                    "RemoteType",
+                    "RecentlySavedType",
+                    "SearchForType",
+                    "DevicesType",
+                    "RemovableDevicesType",
+                    "UnknownType",
+                    "TagsType"]
+                    )
 
-class DeviceAccessibility(IntEnum):
-    SetupNeeded,
-    SetupInProgress,
-    Accessible, 
-    TeardownInProgress
+class DeviceAccessibility:pass
+DeviceAccessibility = IntEnum("DeviceAccessibility",
+                                ["SetupNeeded",
+                                "SetupInProgress",
+                                "Accessible", 
+                                "TeardownInProgress"]
+                                )
 
 def stateNameForGroupType(groupType:GroupType):
     if groupType == GroupType.PlacesModel:
