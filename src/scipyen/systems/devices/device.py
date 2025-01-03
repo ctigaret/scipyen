@@ -4,6 +4,7 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 """
+Work in progress, DO NOT USE
 """
 import sys, os, typing, pathlib, functools, itertools
 from urllib.parse import urlparse, urlsplit
@@ -17,7 +18,7 @@ from core.sysutils import adapt_ui_path
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
-class DeviceType:(IntEnum):
+class DeviceType(IntEnum):
     """"""
     # NOTE: 2025-01-03 14:09:24 
     # Solid DeviceInterface::Type
@@ -35,3 +36,18 @@ class DeviceType:(IntEnum):
     Battery = 12,
     NetworkShare = 14,
     Last = 0xffff,
+    
+class Device(QtCore.QObject):
+    def __init__(self, parent:typing.Optional[QtCore.QObject]=None):
+        super().__init__(parent=parent)
+
+class DeviceInterface(QtCore.QObject):
+    def __init__(self, parent:typing.Optional[QtCore.QObject]=None):
+        super().__init__(parent=parent)
+        
+        # ### BEGIN DeviceInterfacePrivate
+        self.backendObject:QtCore.QObject = QtCore.QObject()
+        self.devicePrivate:Device = Device() # DevicePrivate
+        self._backendObject:typing.Optional[QtCore.QObject] = None
+        self._devicePrivate:typing.Optional[Device] = None
+        # ### END DeviceInterfacePrivate

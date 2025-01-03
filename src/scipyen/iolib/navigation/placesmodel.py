@@ -29,6 +29,8 @@ from core.desktoputils import (get_desktop_places, get_recent_places,
                                removeReducedCJKAccMark,
                                isFileIndexingEnabled)
 
+from systems.devices.device import Device
+
 HAS_PYXDG = False
 # HAS_XDGSPEC = False
 try:
@@ -41,17 +43,17 @@ except:
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
 class AdditionalRoles(IntEnum):
-    UrlRole : 0x069CD12B,
-    HiddenRole : 0x0741CAAC,
-    SetupNeededRole : 0x059A935D,
-    CapacityBarRecommendedRole : 0x1548C5C4,
-    GroupRole : 0x0a5b64ee,
-    IconNameRole : 0x00a45c00,
-    GroupHiddenRole : 0x21a4b936,
-    TeardownAllowedRole : 0x02533364,
-    EjectAllowedRole : 0x0A16AC5B,
-    TeardownOverlayRecommendedRole : 0x032EDCCE,
-    DeviceAccessibilityRole : 0x023FFD93,
+    UrlRole = 0x069CD12B,
+    HiddenRole = 0x0741CAAC,
+    SetupNeededRole = 0x059A935D,
+    CapacityBarRecommendedRole = 0x1548C5C4,
+    GroupRole = 0x0a5b64ee,
+    IconNameRole = 0x00a45c00,
+    GroupHiddenRole = 0x21a4b936,
+    TeardownAllowedRole = 0x02533364,
+    EjectAllowedRole = 0x0A16AC5B,
+    TeardownOverlayRecommendedRole = 0x032EDCCE,
+    DeviceAccessibilityRole = 0x023FFD93,
 
 class GroupType(IntEnum):
     PlacesType, 
@@ -126,6 +128,7 @@ def createSearchUrl(url:QtCore.QUrl):
 def findByAddress(address:str):
     places = get_desktop_places()
     return places.get(address, None)
+
 
 
 class PlacesItem(QtCore.QAbstractItemModel):
@@ -220,16 +223,94 @@ class PlacesModel(QtCore.QAbstractItemModel): # TODO/FIXME
     supportedSchemesChanged = Signal(name = "supportedSchemesChanged")
     
     def __init__(self, parent:typing.Optional[QtCore.QObject] = None):
-        super().__init__(parent)
-        self.supportedSchemes = list()
+        super().__init__(parent=parent)
         
         self.alternativeApplicationName = "" # not needed?
+        
+        # ### BEGIN KFilePlacesModelPrivate members
+        self.items:list[PlacesItem] = list()
+        self.supportedSchemes:list[str] = list()
+        # NOTE: 2025-01-03 14:51:53
+        # consider leaving out
+        self.availableDevices:list[Device] = list()
+        # consider leaving out:
+        self.setupInProgress:dict[QtCore.QObject, QtCore.QPersistentModelIndex] = dict()
+        # consider leaving out:
+        self.teardownInProgress:dict[QtCore.QObject, QtCore.QPersistentModelIndex] = dict()
+        #
+        # the following, to leave out
+        self.predicate = None # Solid::Predicate - here, a functor
+        self.bookmarkManager = None # KBookmarkManager
+        
+        # NOTE: 2025-01-03 15:20:45
+        # consider leaving out — this is related to KDE file searching framework
+        # (Baloo), specifically on whether it is configured to use file content
+        # indexing or not. Currently, Scipyen has got nothing to do with it, 
+        # therefore this is always False.
+        # (see desktoutils.isFileIndexingEnabled)
+        # 
+        # In the future, I MAY consider introducing this funcitonality - but be
+        # aware that Baloo is KDE-specific! GNOME desktop use a different
+        # framework: TinySPARQL / formerly known as "tracker", currently known
+        # as "localsearch". 
+        #
+        # The design philosophy in Scipyen is to be desktop-agnostic, and 
+        # there are quite a few file search & indexing packages there see
+        # https://www.linuxlinks.com/desktopsearchengines/
+        
+         
+        self.fileIndexingEnabled:bool = False 
+        
+        self.tags:list[str] = list()
+        self.tagsUrlBase = "tags:/"
+        self.tagsLister = None # KCoreDirLister
+        # ### END KFilePlacesModelPrivate members
+        
+    # ### BEGIN KFilePlacesModelPrivate methods
+    @classmethod
+    def ignoreMimeType(cls) -> str:
+        pass
+    
+    @classmethod
+    def internalMimeType(cls, model) -> str:
+        pass
         
     def reloadAndSignal(self):
         pass 
     
-    def loadBookmarkList(self):
+    def loadBookmarkList(self) -> list:
         pass
+    
+    def findNearestPosition(self, source:int, target:int) -> int:
+        pass
+    
+    def initDeviceList(self):
+        pass
+    
+    def deviceAdded(self, udi:str):
+        pass
+    
+    def deviceRemoved(self, udi:str):
+        pass
+    
+    def itemChanged(self, udi:str, roles:list[int]):
+        pass
+    
+    def reloadBookmarks(self):
+        pass
+    
+    def storageSetupDone(self, error, errorData, sender):
+        # void storageSetupDone(Solid::ErrorType error, const QVariant &errorData, Solid::StorageAccess *sender);
+        pass
+    
+    def storageTeardownDone(filePath:typing.Union[pathlib.Path, str], error, errorData, sender):
+        # void storageTeardownDone(const QString &filePath, Solid::ErrorType error, const QVariant &errorData, QObject *sender);
+        pass
+    
+    def isBalooUrl(self, url:QtCore.QUrl) -> bool:
+        pass
+    
+    # ### END KFilePlacesModelPrivate methods
     
     def url(self, index:QtCore.QModelIndex):
         pass

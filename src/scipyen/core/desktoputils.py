@@ -362,6 +362,7 @@ def local_recent_places():
 
     
 def isFileIndexingEnabled():
+    # place holder; we don't ever use Baloo or localsearch hence this will be always False
     return False
 
 def removeReducedCJKAccMark(label:str, pos:int):
