@@ -290,9 +290,9 @@ class PlacesModel(QtCore.QAbstractItemModel): # TODO/FIXME
     def teardownActionForIndex(self, index:QtCore.QModelIndex):
         pass
     
-#     def isDevice(self, index:QtCore.QModelIndex):
-#         pass
-#     
+    def isDevice(self, index:QtCore.QModelIndex):
+        pass
+    
 #     
 #     def ejectActionForIndex(self, index:QtCore.QModelIndex):
 #         pass
