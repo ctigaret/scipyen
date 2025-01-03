@@ -132,6 +132,7 @@ from qtpy.uic import loadUiType
 
 from core import desktoputils as dutils
 from core import qtutils
+from iolib.mavigation import placesmodel
 from iolib.navigation.placesmodel import PlacesModel
 from core.prog import safeWrapper
 import gui.pictgui as pgui
@@ -1555,30 +1556,59 @@ class NavigatorSchemeCombo(NavigatorButtonBase):
             self._schemes_[:] = sorted(protocols)
 
 class NavigatorPlacesSelector(NavigatorButtonBase): # TODO: 2023-05-07 23:07:25 finalize
-    sig_placeActivated = Signal(str, name = "sig_placeActivated")
+    placeActivated = Signal(str, name = "placeActivated")
     tabRequested = Signal()
     
     def __init__(self, parent:Navigator, placesModel:PlacesModel):
         super().__init__(parent=parent)
         
-        self._selectedItem_ = -1
-        self._placesModel_ = placesModel
+        self._selectedItem_:int = -1
+        self._placesModel_:PlacesModel = placesModel
+        # NOTE: 2025-01-02 22:55:20 next line performs the C++ code 
+        # connect(m_placesModel, &KFilePlacesModel::reloaded, this, [this] {
+        # updateSelection(m_selectedUrl);
+        # });
+        # i.e. passing a dynamically-created slot out of updateSelection(m_selectedUrl)
+        # not sure I can do that in Python, so I define the intervening Slot placeModelReloaded
+        #
+        self._placesModel_.reloaded.connect(self.placeModelReloaded)
         
-        self.setFocusPolicy(QtCore.Qt.NoFocus)
         self._placesMenu_ = QtWidgets.QMenu(self)
         self._placesMenu_.installEventFilter(self)
-        self._selectedUrl_ = QtCore.QUrl()
-        
-        self.updateMenu()
-        
-        self._placesModel_.reloaded.connect(self.updateMenu)
-        # self._placesMenu_.triggered.connect() ### use updateMenu to connect each action
-        
+        self._placesMenu_.aboutToShow.connect(self.updateMenu)
+        self._placesMenu_.triggered[QtWidgets.QAction].connect(self.placeActionActivated)
         self.setMenu(self._placesMenu_)
-        
         self.setAcceptDrops(True)
         
+#         self.setFocusPolicy(QtCore.Qt.NoFocus)
+#         self._selectedUrl_ = QtCore.QUrl()
+#         
+#         self.updateMenu()
+        
+        # self._placesMenu_.triggered.connect() ### use updateMenu to connect each action
+
+    # ### BEGIN Slots by CMT
+    @Slot()
+    def placeModelReloaded(self):
+        self.updateSelection(self._selectedUrl_)
+        
+    @Slot(QtWidgets.QAction)
+    def placeActionActivated(self, action:QtWidgets.QAction):
+        self.activatePlace(action, self.placeActivated)
+        
+    # ### END Slots by CMT
+    
+    @Slot()
     def updateMenu(self):
+        # NOTE: 2025-01-02 23:02:58
+        # CMT - facilitate garbage collection
+        # see also in KIO:
+        # // Submenus have to be deleted explicitly (QTBUG-11070)
+        # for (QObject *obj : QObjectList(m_placesMenu->children())) {
+        #     delete qobject_cast<QMenu *>(obj); // Noop for nullptr
+        # }
+        # but we cannot do it after calling clear()
+        #
         for obj in self._placesMenu_.children():
             obj.deleteLater()
             
@@ -1586,30 +1616,32 @@ class NavigatorPlacesSelector(NavigatorButtonBase): # TODO: 2023-05-07 23:07:25 
         
         self.updateSelection(self._selectedUrl_)
         
-        previousGroup = ""
-        subMenu = None
+        previousGroup:str = ""
+        subMenu:typing.Optional[QtWidgets.QMenu] = None
         
         rowCount = self._placesModel_.rowCount()
         
         for i in range(rowCount):
-            index = self._placesModel_.index(i, 0)
+            # NOTE: 2025-01-02 23:07:04
+            # here and throughout, don't mind my type annotations
+            index:QtCore.QModelIndex = self._placesModel_.index(i, 0)
             if self._placesModel_.ishidden(index):
                 continue
             
-            placeAction = QtWidgets.QAction(self._placesModel_.icon(index),
+            placeAction:QtWidgets.QAction = QtWidgets.QAction(self._placesModel_.icon(index),
                                            self._placesModel_.text(index),
                                            self._placesMenu_)
             
             placeAction.setData(i)
             
-            groupName = index.data(desktoputils.AdditionalRoles.GroupRole).toString()
+            groupName:str = index.data(placesmodel.AdditionalRoles.GroupRole).toString()
             
             if len(previousGroup) == 0:
                 previousGroup = groupName
                 
             if previousGroup != groupName:
-                subMenuAction = QtWidgets.QAction(groupName, self._placesMenu_)
-                subMenu = QtWidgets.QMenu(self._placesMenu_)
+                subMenuAction:QtWidgets.QAction = QtWidgets.QAction(groupName, self._placesMenu_)
+                subMenu:QtWidgets.QMenu = QtWidgets.QMenu(self._placesMenu_)
                 subMenu.installEventFilter(self)
                 subMenuAction.setMenu(subMenu)
                 
@@ -1625,21 +1657,34 @@ class NavigatorPlacesSelector(NavigatorButtonBase): # TODO: 2023-05-07 23:07:25 
             if i == self._selectedItem_:
                 self.setIcon(self._placesModel_.icon(index))
                 
+        # NOTE: 2025-01-02 23:17:54
+        # replaces C++ code
+        # const QModelIndex index = m_placesModel->index(m_selectedItem, 0);
+        # if (QAction *teardown = m_placesModel->teardownActionForIndex(index)) {
+        #     m_placesMenu->addSeparator();
+        # 
+        #     teardown->setParent(m_placesMenu);
+        #     m_placesMenu->addAction(teardown);
+        # }
         self.updateTeardownAction()
         
-    def updateTeardownAction(self):
-        teardownActionId = "teardownAction"
-        
-        actions = self._placesMenu_.actions()
+    def updateTeardownAction(self): # CMT
+        teardownActionId:str = "teardownAction"
+        actions:list[QtWidgets.QAction] = self._placesMenu_.actions()
         
         for action in actions:
             if action.data() == teardownActionId:
                 action.deleteLater()
                 action = None
                 
-        index = self._placesModel_.index(self._selectedItem_, 0)
+        index:QtCore.QModelIndex = self._placesModel_.index(self._selectedItem_, 0)
         
-        teardown = self._placesModel_.teardownActionForIndex(index)
+        teardown:typing.Optional[QtWidgets.QAction] = self._placesModel_.teardownActionForIndex(index)
+        
+        if isinstance(teardown, QtQidgets.QAction):
+            self._placesMenu_.addSeparator()
+            self._placesMenu_.addAction(teardown)
+        
         
     def selectedPlaceUrl(self): # TODO/FIXME finalize
         return QtCore.QUrl()
@@ -1957,7 +2002,7 @@ class Navigator(QtWidgets.QWidget):
         
         if isinstance(placesModel, PlacesModel):
             self._placesSelector_ = NavigatorPlacesSelector(placesModel, self)
-            self._placesSelector_.sig_placeActivated.connect(self.setLocationUrl)
+            self._placesSelector_.placeActivated.connect(self.setLocationUrl)
             self._placesSelector_.tabRequested.connect(self.tabRequested)
             self._placesModel_.rowsInserted.connect(self.updateContent)
             self._placesModel_.rowsRemoved.connect(self.updateContent)

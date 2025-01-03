@@ -40,6 +40,7 @@ except:
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
+class AdditionalRoles: pass # NOTE: 2025-01-02 23:36:06 this for the sole purpose of showing up in Kate Symbol browser
 AdditionalRoles = IntEnum("AdditionalRoles", 
                             {"UrlRole" : 0x069CD12B,
                             "HiddenRole" : 0x0741CAAC,
@@ -53,13 +54,15 @@ AdditionalRoles = IntEnum("AdditionalRoles",
                             "TeardownOverlayRecommendedRole" : 0x032EDCCE,
                             "DeviceAccessibilityRole" : 0x023FFD93},
                             module = __name__)
-                            
+
+class GroupType: pass # see NOTE: 2025-01-02 23:36:06
 GroupType = IntEnum ("GroupType", 
                      ["PlacesType", "RemoteType", "RecentlySavedType",
                       "SearchForType", "DevicesType", "RemovableDevicesType",
                       "UnknownType", "TagsType"],
                      module = __name__)
-                        
+
+class DeviceAccessibility: pass # see NOTE: 2025-01-02 23:36:06
 DeviceAccessibility = IntEnum("DeviceAccessibility",
                               ["SetupNeeded", "SetupInProgress", "Accessible", 
                                "TeardownInProgress"],#
@@ -124,10 +127,11 @@ def findByAddress(address:str):
     return places.get(address, None)
 
 
-class PlacesItem(QtCore.QObject):
+class PlacesItem(QtCore.QAbstractItemModel):
     """Thin port of KFilePlacesItem.
-    Has no functionality related to the Trash (Wastebin) protocol, the KDE
-    Solid framework, and special KIO protocols (e.g. kdeconnect:/, remote:/, etc.)
+    Has no, or partial, functionality related to the Trash (Wastebin) protocol, 
+    the KDE Solid framework, and special KIO protocols (e.g. kdeconnect:/, 
+    remote:/, etc.)
     
     """
     
@@ -189,7 +193,7 @@ class PlacesModel(QtCore.QAbstractItemModel): # TODO/FIXME
     
     Solid → no special handling of devices
     KBookmarks → we try to handle KDE bookmark files (*.xbel, *.xml) directly 
-                using python's xml
+                using python's xml — TODO
     
     Moreover, this implementation is READ-ONLY: one cannot use it to add/remove/
     create new "places". For this, one MUST use the tools provided by the
@@ -198,11 +202,10 @@ class PlacesModel(QtCore.QAbstractItemModel): # TODO/FIXME
     See also `get_desktop_places()` function in this module.
     
     This is partly by design (Scipyen is not meant to provide all the functionality
-    of modern navigators of the file system or the web) and partially by necessity
-    (there are no comprehensive python bindings for KDE at this time: 2023-05-01).
-    
-    Hopefully, in a not too distant future, there will be a coherent implementation
-    of Python bindings for KDE framework libraries, but I'm not holding my breadth...
+    of modern file system or internet navigators) and partially by necessity, as
+    there are no comprehensive python bindings for KDE at this time (2023-05-01)
+    and even if they were (making slow progress in 2025) they would tie Scipyen
+    to one particular desktop environment, against the overall philosophy.
     
     """
     errorMessage = Signal(str, name = "errorMessage", arguments=["message"])
@@ -281,14 +284,15 @@ class PlacesModel(QtCore.QAbstractItemModel): # TODO/FIXME
     # NOTE: 2023-05-01 13:43:24
     # ### BEGIN methods that need KDE Solid framework -- NOT IMPLEMENTED
     #
-#     def deviceForIndex(self, index:QtCore.QModelIndex):
-#         pass
-#     
+    def deviceForIndex(self, index:QtCore.QModelIndex):
+        pass
+    
+    def teardownActionForIndex(self, index:QtCore.QModelIndex):
+        pass
+    
 #     def isDevice(self, index:QtCore.QModelIndex):
 #         pass
 #     
-#     def teardownActionForIndex(self, index:QtCore.QModelIndex):
-#         pass
 #     
 #     def ejectActionForIndex(self, index:QtCore.QModelIndex):
 #         pass
