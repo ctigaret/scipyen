@@ -35,6 +35,9 @@ class CoreDirListerCache(QtCore.QObject):
     def __init__(self):
         super().__init__()
         
+    def updateDirectory(self, url:typin.Union[QtCore.QUrl, pathlib.Path]):
+        pass
+        
     
 
 

@@ -5,6 +5,7 @@
 
 """Utilities for Linux desktop integration
 """
+# ### BEGIN internal comments
 # NOTE: 2025-01-03 17:37:47
 # Command line tools for desktpp integration (since KDE Frameworks 6 has become
 # "mainstream", excutables provided by KDE below come under two flavours: 
@@ -55,6 +56,8 @@
 # Useful urllib functions
 # ------------------------
 # urllib.parse.urlparse
+
+# ### END internal comments
 
 import sys, os, pathlib, urllib, typing, warnings, subprocess, traceback
 import core.xmlutils as xmlutils
