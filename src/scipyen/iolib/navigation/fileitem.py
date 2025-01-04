@@ -28,12 +28,16 @@ class MimeTypeDetermination(IntEnum):
     NormalMimeTypeDetermination = 0
     SkipMimeTypeFromContent = 1
 
-class FileItem(QtCore.QObject):
+class FileItem():
     # NOTE: 2025-01-04 12:47:20
     # should use a pathlib.Path as backend
+    # NOTE: 2025-01-04 15:07:39
+    # doesn't use Qt Signals/Slots so no need to inherit from QObject
+    # By keeping it in the Python world I guess also removes the need to inherit 
+    # from QSharedData (KFIleItemPrivate)
     def __init__(self, parent=None):
-        super().__init__(parent)
-        
+        # ### BEGIN KFIleItemPrivate
+        # ### END KFIleItemPrivate
         self._url_:QtCore.QUrl = QtCore.QUrl()
         self._user_:str = str()
         self._group_:str = str()
