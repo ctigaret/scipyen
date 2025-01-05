@@ -27,7 +27,8 @@ from inspect import Parameter, Signature
 from functools import (singledispatch, singledispatchmethod, 
                        update_wrapper, wraps,)
 from contextlib import (contextmanager, ContextDecorator,)
-from dataclasses import (MISSING, dataclass, field, KW_ONLY)
+import dataclasses
+from dataclasses import dataclass
 
 from traitlets.utils.importstring import import_item
 from traitlets import Bunch
@@ -84,8 +85,8 @@ class AttributeSpecification:
     name:str # decriptor name
     types:typing.Union[type, typing.Tuple[type], typing.Callable] # descriptor types or predicates
     ndim:typing.Union[int, dict] = 0 # ndim (neo model), dtype
-    dtype:typing.Union[np.dtype, dict] = field(default_factory = lambda: np.dtype(float))
-    _: KW_ONLY
+    dtype:typing.Union[np.dtype, dict] = dataclasses.field(default_factory = lambda: np.dtype(float))
+    _: dataclasses.KW_ONLY
     default:typing.Any = NoData
     length:int = 0
     shape:tuple = tuple()
@@ -101,7 +102,7 @@ class AttributeSpecification:
         if not (isinstance(self.types, type)) and not (isinstance(self.types, tuple) and all(isinstance(t_, type) for t_ in self.types)):
                 raise DescriptorException(f"Incorrect type specification")
             
-        if self.default is MISSING:
+        if self.default is dataclasses.MISSING:
             if self._allow_none:
                 self.default = None
             else:
@@ -2075,15 +2076,15 @@ def resolveObject(modName, objName):
         owner = ".".join(parts[:-1])
         name = parts[-1]
         if len(owner.strip()) == 0:
-            return MISSING # no owner type/module specified - no way to resolve that
+            return dataclasses.MISSING # no owner type/module specified - no way to resolve that
         
         try:
             # specifically check for builtins
             builtins = import_item("builtins")
             owner = eval(owner, builtins.__dict__)
-            return getattr(owner, name, MISSING)
+            return getattr(owner, name, dataclasses.MISSING)
         except:
-            return MISSING
+            return dataclasses.MISSING
     
     if modName in sys.modules:
         module = sys.modules[modName]
@@ -2092,14 +2093,14 @@ def resolveObject(modName, objName):
         except:
             #traceback.print_exc()
             print(f"prog.resolveObject: objName = {objName}, module = {module}")
-            return MISSING
+            return dataclasses.MISSING
     
     else:
         rep = ".".join([modName, objName])
         try:
             return import_item(rep)
         except ModuleNotFoundError:
-            return MISSING
+            return dataclasses.MISSING
             
             
 def is_module_loaded(m:types.ModuleType):

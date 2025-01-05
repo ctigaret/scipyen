@@ -169,8 +169,8 @@ import difflib
 import re as _re
 from enum import Enum, IntEnum
 from abc import ABC
-from dataclasses import (dataclass, KW_ONLY, MISSING, field, InitVar)
-# from dataclasses import (dataclass, MISSING)
+import dataclasses
+from dataclasses import (dataclass, MISSING)
 #### END core python modules
 
 #### BEGIN 3rd party modules
@@ -773,11 +773,11 @@ class RecordingSource():
     name: str = "cell"
     adc: int = 0
     dac: typing.Optional[int] = None
-    syn: typing.Optional[typing.Union[SynapticStimulus, typing.Sequence[SynapticStimulus]]]     = field(default_factory=list)
-    auxin: typing.Optional[typing.Union[AuxiliaryInput,   typing.Sequence[AuxiliaryInput]]]     = field(default_factory=list)
-    auxout: typing.Optional[typing.Union[AuxiliaryOutput,  typing.Sequence[AuxiliaryOutput]]]   = field(default_factory=list)
-    electrodeMode: ElectrodeMode = field(default=ElectrodeMode.Null)
-    pathways: InitVar[typing.Sequence[SynapticPathway]] = tuple()
+    syn: typing.Optional[typing.Union[SynapticStimulus, typing.Sequence[SynapticStimulus]]]     = dataclasses.field(default_factory=list)
+    auxin: typing.Optional[typing.Union[AuxiliaryInput,   typing.Sequence[AuxiliaryInput]]]     = dataclasses.field(default_factory=list)
+    auxout: typing.Optional[typing.Union[AuxiliaryOutput,  typing.Sequence[AuxiliaryOutput]]]   = dataclasses.field(default_factory=list)
+    electrodeMode: ElectrodeMode = dataclasses.field(default=ElectrodeMode.Null)
+    pathways: dataclasses.InitVar[typing.Sequence[SynapticPathway]] = tuple()
     
     def __post_init__(self, pathways):
         if isinstance(pathways, (tuple, list)) and len(pathways) and all(isinstance(p, SynapticPathway) and p.adc == self.adc and p.dac == self.dac for p in pathways):
@@ -2464,7 +2464,7 @@ class SynapticPathway:
     name: str = "pathway"
     adc: int|None = None # physical index of the ADC channel used in recording this pathway
     dac: int|None = None # physical index of the DAC channel used in recording this pathway
-    stimulus: SynapticStimulus = field(default_factory = SynapticStimulus)
+    stimulus: SynapticStimulus = dataclasses.field(default_factory = SynapticStimulus)
     
     # NOTE: 2024-10-16 11:57:17
     # 'clampMode' is not needed, in a SynapticPathway, which can be recorded in
@@ -2481,18 +2481,18 @@ class SynapticPathway:
     # Therefore:
     # NOTE: 2024-10-16 13:36:07
     # add clampMode to RecordingEpisode!
-    electrode: InitVar[typing.Union[ElectrodeMode, int, str]] = ElectrodeMode.Null
+    electrode: dataclasses.InitVar[typing.Union[ElectrodeMode, int, str]] = ElectrodeMode.Null
     
-    pathType: InitVar[typing.Union[SynapticPathwayType, int, str]] = SynapticPathwayType.Null
+    pathType: dataclasses.InitVar[typing.Union[SynapticPathwayType, int, str]] = SynapticPathwayType.Null
     
-    schedule: RecordingSchedule = field(default_factory = RecordingSchedule)
+    schedule: RecordingSchedule = dataclasses.field(default_factory = RecordingSchedule)
     
     # CAUTION 2024-10-17 22:31:14 FIXME
     # these measurements MUST be mapped to the episode boundaries, so that one 
     # can easily access the measurement values during a particular episode or
     # across several apisodes of the schedule!
-    measurements: typing.Mapping[str, typing.Union[neo.IrregularlySampledSignal, IrregularlySampledDataSignal]] = field(default_factory = dict)
-    # source: RecordingSource = field(default_factory = lambda: RecordingSource())
+    measurements: typing.Mapping[str, typing.Union[neo.IrregularlySampledSignal, IrregularlySampledDataSignal]] = dataclasses.field(default_factory = dict)
+    # source: RecordingSource = dataclasses.field(default_factory = lambda: RecordingSource())
     
     def __post_init__(self, electrode:typing.Union[ElectrodeMode, int, str] = ElectrodeMode.Null,
                       pathType:typing.Union[SynapticPathwayType, int, str] = SynapticPathwayType.Null):

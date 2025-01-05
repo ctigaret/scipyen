@@ -3118,8 +3118,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             for session, line, inline in hist:
                 if sessionNo is None or sessionNo != session:
                     sessionNo = session  # cache the session
-                    sessionInfo = self.historyAccessor.get_session_info(
-                        sessionNo)
+                    sessionInfo = self.historyAccessor.get_session_info(sessionNo)
                     if isinstance(sessionInfo[1], datetime.datetime):
                         startDateTime = f"{sessionInfo[1].date().isoformat()} {sessionInfo[1].time().isoformat()}"
                     else:
@@ -3142,13 +3141,11 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
                     sessionInfoText = f"{sessionInfo[0]}"
                     # sessionItem = QtWidgets.QTreeWidgetItem(self.historyTreeWidget, [repr(sessionNo)])
-                    sessionItem = QtWidgets.QTreeWidgetItem(
-                        self.historyTreeWidget, [sessionInfoText, sessionTimes])
+                    sessionItem = QtWidgets.QTreeWidgetItem(self.historyTreeWidget, [sessionInfoText, sessionTimes])
                     # sessionItem = QtWidgets.QTreeWidgetItem(self.historyTreeWidget, [sessionInfoText, "", startDateTime, stopDateTime])
                     items.append(sessionItem)
 
-                lineItem = QtWidgets.QTreeWidgetItem(
-                    sessionItem, [repr(line), inline])
+                lineItem = QtWidgets.QTreeWidgetItem(sessionItem, [repr(line), inline])
                 items.append(lineItem)
 
             self.currentSessionTreeWidgetItem = QtWidgets.QTreeWidgetItem(
@@ -3158,30 +3155,23 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
             # NOTE: 2017-03-21 22:55:57 much better!
             # connect signals emitted by the console when processing a drop event
-            self.console.historyItemsDropped.connect(
-                self.slot_pasteHistorySelection)
+            self.console.historyItemsDropped.connect(self.slot_pasteHistorySelection)
             
-            self.console.workspaceItemsDropped.connect(
-                self.slot_pasteWorkspaceSelection)
+            self.console.workspaceItemsDropped.connect(self.slot_pasteWorkspaceSelection)
             
-            self.console.fileSystemItemsDropped.connect(
-                self.slot_openSelectedFileItems)
+            self.console.fileSystemItemsDropped.connect(self.slot_openSelectedFileItems)
             
-            self.console.loadUrls[object, bool, QtCore.QPoint].connect(
-                self.slot_loadDroppedURLs)
+            self.console.loadUrls[object, bool, QtCore.QPoint].connect(self.slot_loadDroppedURLs)
             
-            self.console.pythonFileReceived[str, QtCore.QPoint].connect(
-                self.slot_handlePythonTextFile)
+            self.console.pythonFileReceived[str, QtCore.QPoint].connect(self.slot_handlePythonTextFile)
             
             # self.console.sig_shell_msg_received[object].connect(self._slot_int_krn_shell_chnl_msg_recvd)
 
             self.historyTreeWidget.insertTopLevelItems(0, items)
             
-            self.historyTreeWidget.scrollToItem(
-                self.currentSessionTreeWidgetItem)
+            self.historyTreeWidget.scrollToItem(self.currentSessionTreeWidgetItem)
             
-            self.historyTreeWidget.setCurrentItem(
-                self.currentSessionTreeWidgetItem)
+            self.historyTreeWidget.setCurrentItem(self.currentSessionTreeWidgetItem)
 
             # NOTE: until input has been enetered at the console, this is the LAST session on record NOT the current one!
             self.currentSessionID = self.historyAccessor.get_last_session_id()
@@ -3287,8 +3277,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             # assigning a variable to a symbol bound to one of these variables
             # -- effectively "overwriting" them.
 
-            self._nonInteractiveVars_.update(
-                [i for i in self.workspace.items()])
+            self._nonInteractiveVars_.update([i for i in self.workspace.items()])
 
             # --------------------------
             # finally, customize console window title and show it
@@ -3298,8 +3287,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.console.show()
         # NOTE: 2021-10-18 11:28:25
         # The following must be called when console has become visible!
-        self.console.consoleWidget.set_pygment(
-            self.console.consoleWidget._console_pygment)
+        self.console.consoleWidget.set_pygment(self.console.consoleWidget._console_pygment)
         
 #         verstr = f"'Scipyen is using Qt {QtCore._qt_version}, neo {neo.__version__}, VIGRA {vigra.version}'"
 #         
@@ -3328,8 +3316,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             # only update history if something has indeed been executed
             if self.console is not None and self.ipkernel.shell.execution_count > self.executionCount:
                 self.executionCount = self.ipkernel.shell.execution_count
-                self._updateHistoryView_(
-                    self.executionCount-1, self.console.consoleWidget.history_tail(1)[0])
+                self._updateHistoryView_(self.executionCount-1, self.console.consoleWidget.history_tail(1)[0])
         else:
             self.workspaceModel.update()
 
@@ -3390,8 +3377,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # only update history if something has indeed been executed
         if self.console is not None and self.ipkernel.shell.execution_count > self.executionCount:
             self.executionCount = self.ipkernel.shell.execution_count
-            self._updateHistoryView_(
-                self.executionCount-1, self.console.consoleWidget.history_tail(1)[0])
+            self._updateHistoryView_(self.executionCount-1, self.console.consoleWidget.history_tail(1)[0])
             # self._updateHistoryView_(self.executionCount-1, self.console.history_tail(1)[0])
 
     def _updateHistoryView_(self, lineno, val):
@@ -3406,74 +3392,6 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         if mustUpdateSessionID:
             self.currentSessionID = self.historyAccessor.get_last_session_id()
-
-    # # NOTE: 2016-03-25 09:43:58
-    # # inspired from stock IPython/core/magic/namespaces.py
-    # # @classmethod
-    # def _listWorkspaceVars_(self, param_s=None):
-    #     '''Prepares a list of variable names to be displayed in the workspace widget.
-    #     The optional param_s argument is a str containing space-separated type names
-    #     to indicate what variable type(s) should be displayed.
-    #     DEPRECATED - functionality taken over by workspacemodel module
-    # 
-    #     '''
-    #     # NOTE: 2017-08-24 15:50:46
-    #     # special case when "_" variables are matplotlib.figure.Figure instances
-    #     # created with plt commands (functions) but NOT assigned to unbound variables
-    #     # I'm relying on pyplot's own figure manager: no two figures can have the same number
-    #     hidden_mpl_figure_names = [i for i in self.workspace.keys() if i.startswith(
-    #         "_") and isinstance(self.workspace[i], mpl.figure.Figure)]
-    # 
-    #     # print(hidden_mpl_figure_names)
-    # 
-    #     if len(hidden_mpl_figure_names) > 0:
-    #         for n in hidden_mpl_figure_names:
-    #             if hasattr(self.workspace[n], "number"):
-    #                 newVarName = "Figure%d" % (self.workspace[n].number)
-    #             else:
-    #                 p = self.workspace[n].canvas.parent()
-    #                 parents = list()
-    #                 while p is not None:
-    #                     parents.append(p)
-    #                     p = p.parent()
-    # 
-    #                 wtitle = parents[-1].windowTitle()
-    # 
-    #                 if wtitle is None or len(wtitle) == 0:
-    #                     suffix = n
-    #                 else:
-    #                     suffix = "_%s" % wtitle
-    # 
-    #                 newVarName = "figure%s" % suffix
-    # 
-    #             self.workspace[newVarName] = self.workspace[n]
-    #             self.workspace.pop(n, None)
-    # 
-    #             # cmd = "".join([newVarName, "=", n, "; del(", n, ")"])
-    #             # self.console.execute(cmd, hidden=True)
-    # 
-    #     varnames = [i for i in self.workspace
-    #                 if (not i.startswith('_') and i not in self._nonInteractiveVars_.keys() and type(i) is not types.ModuleType)]
-    # 
-    #     # NOTE: 2016-04-16 00:12:26
-    #     # why does the above NOT prevent the display of a module created at the console
-    #     # (e.g. after a call like m = types.ModuleType(), m is listed there, when
-    #     # it really shouldn't)
-    # 
-    #     # if not varnames:
-    #     # return None
-    # 
-    #     if len(varnames) > 0 and param_s is not None:
-    #         typelist = param_s.split()
-    #         if typelist:
-    #             typeset = set(typelist)
-    #             varnames = [i for i in varnames if type(
-    #                 self.workspace[i]).__name__ in typeset]
-    # 
-    #     # if not varnames:
-    #         # return None
-    # 
-    #     return varnames
 
     def removeWorkspaceSymbol(self, name: str):
         """Remove a binding from the workspace.

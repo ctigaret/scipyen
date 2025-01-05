@@ -64,7 +64,8 @@ as a group may be justified as these devices usually are communication devices
 """
 
 import io, sys, os, typing
-from dataclasses import (dataclass, KW_ONLY, MISSING, field)
+import dataclasses
+from dataclasses import dataclass
 import serial
 import serial.tools.list_ports as port_list
 import numpy as np

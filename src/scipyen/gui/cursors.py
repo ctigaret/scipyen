@@ -7,7 +7,8 @@
 """Pyqtgraph-based cursors for signal viewers
 """
 import collections, enum, numbers, typing
-from dataclasses import (dataclass, KW_ONLY, MISSING, field)
+import dataclasses
+from dataclasses import (dataclass, MISSING)
 
 from qtpy import (QtCore, QtGui, QtWidgets,) 
 from qtpy.QtCore import (Signal, Slot, )

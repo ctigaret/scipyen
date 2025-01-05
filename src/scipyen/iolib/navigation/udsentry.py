@@ -6,7 +6,7 @@
 """
 """
 import sys, os, typing, pathlib, stat
-from collections import namedtuple
+# from collections import namedtuple
 import dataclasses
 from enum import IntEnum
 from qtpy import QtCore, QtGui, QtWidgets, QtSvg

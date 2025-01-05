@@ -5,7 +5,7 @@
 
 import collections, numbers, typing, itertools
 from copy import deepcopy, copy
-from dataclasses import (dataclass, KW_ONLY, MISSING, field)
+from dataclasses import dataclass
 
 import numpy as np
 import quantities as pq
