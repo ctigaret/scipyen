@@ -158,49 +158,131 @@ class StandardFieldTypes(IntEnum):
     UDS_EXTRA               = 100 | ItemTypes.UDS_STRING
     UDS_EXTRA_END           = 140 | ItemTypes.UDS_STRING
     
-@dataclssses.dataclass
+@dataclasses.dataclass
 class Field:
-    _index_:int = dataclasses.field(default_value=0)
-    _long_:int
+    # NOTE: 2025-01-04 23:08:49
+    # LLONG_MIN is -sys.maxsize-1
+    m_index:int = dataclasses.field(default_factory = int)
+    m_long:typing.Optional[int] = dataclasses.field(default = -sys.maxsize-1)
+    m_str:typing.Optional[str] = dataclasses.field(default_factory = str)
     
-class _UDSEntryPrivate_():
+    def __init__(self, index:int, value:typing.Union[str, int]=0):
+        if not isinstance(index, int):
+            raise TypeError(f"First argument ('index') must be an int; instead, got {type(index).__name__}")
+        self.m_index = index
+        if isinstance(value, int):
+            self.m_long = value
+            self.m_str = str()
+        elif isinstance(value, str):
+            self.m_long = -sys.maxsize-1
+            self.m_str = value
+    
+class USDEntry():
+    # wraps os.stat_result
+    def __init__(self, buff:os.stat_result, name:str):
+        # NOTE: 2025-01-04 16:00:10
+        # my guess here is that QT_STATBUF is equivalent to Pyton's os.stat_result
+        # so let's go with that...
+        
+        # ### BEGIN UDSEntryPrivate attributes
+        self.storage:list[Field] = list()
+        # ### END UDSEntryPrivate attributes
+        
+    # ### BEGIN UDSEntryPrivate methods
     # void reserve(int size);
-    def reserve(self, size:int):
+    def reserve(self, size:int): 
+        # no use for this in Python - it only reserves the size of the storage vector
+        # which in Python makes no sense (storage is a list)
         pass
     
     def insert(self, udsField:int, value:typing.Union[str, int]):
+        """Appends a Field with a UDS_STRING type of index (udsField) to the internal storage.
+        Does nothing if such a field exists in the storage
+        """
         # void insert(uint udsField, const QString &value);
         # void insert(uint udsField, long long value);
-        pass
+        
+        # NOTE: 2025-01-04 23:34:08
+        # Check that the value of udsField is one of the values in 
+        # StandardFieldTypes with type ItemTypes.UDS_STRING, or slimilar
+        # ie. an int value | ItemTypes.UDS_STRING
+        #
+        # e.g.:
+        #
+        # assert(udsentry.StandardFieldTypes.UDS_ICON_NAME & udsentry.ItemTypes.UDS_STRING)
+        # >>> is OK
+        #
+        # but:
+        #
+        # assert(udsentry.StandardFieldTypes.UDS_FILE_TYPE & udsentry.ItemTypes.UDS_STRING)
+        # >>> AssertionError
+        #
+        # Same goes for 
+        # assert(3 & udsentry.ItemTypes.UDS_STRING)
+        # >>> AssertionError
+        #
+        
+        assert isinstance(udsField, int) and udsField & ItemTypes.UDS_STRING, "Expecting a StandardFieldTypes value of type ItemTypes.UDS_STRING"
+        # NOTE: skip if there is a Field in 'storage' that has this udsField value as m_index
+        # if udsField not in list(map(lambda x: x.m_index, self.storage)):
+        # if udsField not in self.fields():
+        if not self.contains(udsField):
+            assert isinstance(value, (int, str)), f"'value' expected to be an int or str; instead got {type(value).__name__}"
+            self.storage.append(Field(udsField, value))
+        # pass
     
     def replace(self, udsField:int, value:typing.Union[str, int]):
+        """Can only replace Fields with m_index of type ItemTypes.UDS_NUMBER"""
+        assert isinstance(udsField, int) and udsField & ItemTypes.UDS_NUMBER, "Expecting a StandardFieldTypes value of type ItemTypes.UDS_NUMBER"
         # void replace(uint udsField, const QString &value);
         # void replace(uint udsField, long long value);
-        pass
-    
+        
+        # check if a Field with this udsField as m_index exists in storage
+        # indexes = list(map(lambda x: x.m_index, self.storage))
+        indexes = self.fields()
+        
+        if udsField not in indexes:
+            self.storage.append(Field(udsField, value))
+            return
+        
+        ndx = indexes.index(udsField)
+        if isinstance(value, str):
+            self.storage[ndx].m_str = value
+        elif isinstance(value, int):
+            self.storage[ndx].m_long = value
+        else:
+            raise TypeError(f"'value' expected to be a str or int; instead got {type(value).__name__}")
+        
     def count(self)->int:
         # int count() const;
-        pass
+        return len(self.storage)
     
     def stringValue(self, udsField:int)->str:
         # QString stringValue(uint udsField) const;
-        pass
+        # indexes = list(map(lambda x: x.m_index, self.storage))
+        indexes = self.fields()
+        if udsField in indexes:
+            return self.storage(indexes.index(udsField)).m_str
+        return str()
     
     def numberValue(self, udsField:int, defaultValue:int = -1)->int:
         # long long numberValue(uint udsField, long long defaultValue = -1) const;
-        pass
+        indexes = list(map(lambda x: x.m_index, self.storage))
+        if udsField in indexes:
+            return self.storage(indexes.index(udsField)).m_long
+        return defaultValue
     
     def fields(self)->list[int]:
         # QList<uint> fields() const;
-        pass
+        return list(map(lambda x: x.m_index, self.storage))
     
     def contains(self, udsField:int)->bool:
         # bool contains(uint udsField) const;
-        pass
+        return udsField in self.fields()
     
     def clear(self):
         # void clear();
-        pass
+        self.storage.clear()
     
     def save(self, s:QtCore.QDataStream): # consider python's io module
         # void save(QDataStream &s) const;
@@ -221,14 +303,7 @@ class _UDSEntryPrivate_():
         #  */
         # static QString nameOfUdsField(uint field);
         pass
-
-
-class USDEntry():
-    # wraps os.stat_result
-    def __init__(self, buff:os.stat_result, name:str):
-        # NOTE: 2025-01-04 16:00:10
-        # my guess here is that QT_STATBUF is equivalent to Pyton's os.stat_result
-        # so let's go with that...
+    
+    # ### END UDSEntryPrivate methods
         
-        self._d_:_UDSEntryPrivate_ = none
     pass
