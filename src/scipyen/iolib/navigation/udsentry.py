@@ -186,14 +186,17 @@ class USDEntry():
         
         # ### BEGIN UDSEntryPrivate attributes
         self.storage:list[Field] = list()
+        self.cachedStrings:list[str] = list()
         # ### END UDSEntryPrivate attributes
         
     # ### BEGIN UDSEntryPrivate methods
     # void reserve(int size);
     def reserve(self, size:int): 
         # no use for this in Python - it only reserves the size of the storage vector
-        # which in Python makes no sense (storage is a list)
-        pass
+        # which in Python makes no sense (storage is a Python list, which is a dynamically-sized object)
+        self.storage = [None] * size
+        self.cachedStrings = [None] * size
+        # pass
     
     def insert(self, udsField:int, value:typing.Union[str, int]):
         """Appends a Field with a UDS_STRING type of index (udsField) to the internal storage.
@@ -283,18 +286,73 @@ class USDEntry():
     def clear(self):
         # void clear();
         self.storage.clear()
+        self.cachedStrings.clear()
     
-    def save(self, s:QtCore.QDataStream): # consider python's io module
+    def save(self, s:QtCore.QDataStream): 
         # void save(QDataStream &s) const;
-        pass
+        # NOTE: 2025-01-05 15:11:24
+        # PyQt5.QtCore.QDataStream has:
+        # • convenience read* & write* methods tailored for various fundamental 
+        #   data types (see their usage in this method)
+        # • methods implementing the C++ "<<" and ">>" stream operators; HOWEVER, 
+        #   these expect QByteArray data on the rhs, thus requiring 
+        #   packing/upnacking via the struct module!
+        #
+        s.writeUInt32(len(self.storage))
+        for field in self.storage:
+            uds = field.m_index
+            s.writeUInt32(uds)
+            
+            if uds & ItemTypes.UDS_STRING:
+                s.writeQString(field.m_str) # WARNING: 2025-01-05 15:08:40 writeString expects bytes; writeQString expects str !!!
+            elif uds & ItemTypes.UDS_NUMBER:
+                s.writeInt64(field.m_long) # NOTE: 2025-01-05 15:09:29 m_long is a long long i.e. a qint64 (signed 64-bit)
+            else:
+                raise ValueError(f"Found a field with an invalid type: {uds}")
     
-    def load(self, s:QtCore.QDataStream): # consider python's io module
+    def load(self, s:QtCore.QDataStream): 
         # void load(QDataStream &s);
-        pass
+        # NOTE: 2025-01-05 15:19:22 see:
+        #   NOTE: 2025-01-05 15:11:24, 
+        #   WARNING: 2025-01-05 15:08:40, 
+        #   NOTE: 2025-01-05 15:09:29
+        
+        self.clear()
+        size = s.readUInt32() # needed below...
+        self.reserve(size)
+        for k in range(size):
+            uds = s.readUInt32()
+            
+            if uds & ItemTypes.UDS_STRING:
+                val = s.readQString()
+                if val != self.cachedStrings[k]:
+                    self.cachedStrings[k] = val
+                    
+                self.insert(uds, self.cachedStrings[k])
+                
+            elif uds & ItemTypes.UDS_NUMBER:
+                val = s.readInt64()
+                self.insert(uds, val)
+                
+            else:
+                raise ValueError(f"Found a field with an invalid type: {uds}")
     
-    def debugUDSEntry(self):
+    def debugUDSEntry(self, s):
         # void debugUDSEntry(QDebug &stream) const;
-        pass
+        ret = list()
+        for field in self.storage:
+            fld = f"Field: {self.nameOfUdsField(field.m_index)} = "
+            if field.m_index & ItemTypes.UDS_STRING:
+                fld += f"{field.m_str}"
+            elif field.m_index & ItemTypes.UDS_NUMBER:
+                fld += f"{field.m_long}"
+            else:
+                raise ValueError(f"Found a field with an invalid type: {uds}")
+            
+            ret.append(fld)
+            
+        print("\n".join(ret))
+    
     @staticmethod
     def nameOfUdsField(field:int)->str:
         # /**
@@ -302,8 +360,74 @@ class USDEntry():
         #  * @return the name of the field
         #  */
         # static QString nameOfUdsField(uint field);
-        pass
-    
+        match  field:
+            case StandardFieldTypes.UDS_SIZE:
+                return "UDS_SIZE"
+            case StandardFieldTypes.UDS_SIZE_LARGE:
+                return "UDS_SIZE_LARGE"
+            case StandardFieldTypes.UDS_USER:
+                return "UDS_USER"
+            case StandardFieldTypes.UDS_ICON_NAME:
+                return "UDS_ICON_NAME"
+            case StandardFieldTypes.UDS_GROUP:
+                return "UDS_GROUP"
+            case StandardFieldTypes.UDS_NAME:
+                return "UDS_NAME"
+            case StandardFieldTypes.UDS_LOCAL_GROUP_ID:
+                return "UDS_LOCAL_GROUP_ID"
+            case StandardFieldTypes.UDS_LOCAL_USER_ID:
+                return "UDS_LOCAL_USER_ID"
+            case StandardFieldTypes.UDS_LOCAL_PATH:
+                return "UDS_LOCAL_PATH"
+            case StandardFieldTypes.UDS_HIDDEN:
+                return "UDS_HIDDEN"
+            case StandardFieldTypes.UDS_ACCESS:
+                return "UDS_ACCESS"
+            case StandardFieldTypes.UDS_MODIFICATION_TIME:
+                return "UDS_MODIFICATION_TIME"
+            case StandardFieldTypes.UDS_ACCESS_TIME:
+                return "UDS_ACCESS_TIME"
+            case StandardFieldTypes.UDS_CREATION_TIME:
+                return "UDS_CREATION_TIME"
+            case StandardFieldTypes.UDS_FILE_TYPE:
+                return "UDS_FILE_TYPE"
+            case StandardFieldTypes.UDS_LINK_DEST:
+                return "UDS_LINK_DEST"
+            case StandardFieldTypes.UDS_URL:
+                return "UDS_URL"
+            case StandardFieldTypes.UDS_MIME_TYPE:
+                return "UDS_MIME_TYPE"
+            case StandardFieldTypes.UDS_GUESSED_MIME_TYPE:
+                return "UDS_GUESSED_MIME_TYPE"
+            case StandardFieldTypes.UDS_XML_PROPERTIES:
+                return "UDS_XML_PROPERTIES"
+            case StandardFieldTypes.UDS_EXTENDED_ACL:
+                return "UDS_EXTENDED_ACL"
+            case StandardFieldTypes.UDS_ACL_STRING:
+                return "UDS_ACL_STRING"
+            case StandardFieldTypes.UDS_DEFAULT_ACL_STRING:
+                return "UDS_DEFAULT_ACL_STRING"
+            case StandardFieldTypes.UDS_DISPLAY_NAME:
+                return "UDS_DISPLAY_NAME"
+            case StandardFieldTypes.UDS_TARGET_URL:
+                return "UDS_TARGET_URL"
+            case StandardFieldTypes.UDS_DISPLAY_TYPE:
+                return "UDS_DISPLAY_TYPE"
+            case StandardFieldTypes.UDS_ICON_OVERLAY_NAMES:
+                return "UDS_ICON_OVERLAY_NAMES"
+            case StandardFieldTypes.UDS_COMMENT:
+                return "UDS_COMMENT"
+            case StandardFieldTypes.UDS_DEVICE_ID:
+                return "UDS_DEVICE_ID"
+            case StandardFieldTypes.UDS_INODE:
+                return "UDS_INODE"
+            case StandardFieldTypes.UDS_EXTRA:
+                return "UDS_EXTRA"
+            case StandardFieldTypes.UDS_EXTRA_END:
+                return "UDS_EXTRA_END"
+            case _:
+                return f"Unknown uds field {field}"
+
     # ### END UDSEntryPrivate methods
         
     pass

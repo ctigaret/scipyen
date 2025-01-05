@@ -7,7 +7,13 @@
 Original "gist" by cizixs 
 https://gist.github.com/cizixs/6211652
 """
-import io, os, struct, sys, typing
+import ctypes, io, os, struct, sys, typing
+import functools
+from functools import singledispatch
+from qtpy import QtCore, QtGui, QtWidgets, QtSvg
+from qtpy.QtCore import Signal, Slot, Property
+
+
 
 class IOManipulator(object):
     def __init__(self, function=None):
@@ -18,14 +24,47 @@ class IOManipulator(object):
 def do_endl(stream):
     if isinstance(stream.output, io.TextIOBase):
         stream.output.write('\n')
-    else:
+        stream.output.flush()
+    elif isinstance(stream.output, QtCore.QDataStream):
+        ss = struct.pack("=x")
+        stream.output.writeBytes(ss, len(ss))
+    elif isinstance(stream.output, io.IOBase):
         stream.output.write(struct.pack("=x"))
-    stream.output.flush()
+        stream.output.flush()
+    else:
+        raise TypeError(f"Invalid output stream type: {type(stream.output).__name__}")
 
 endl = IOManipulator(do_endl)
 
+# set_format(ctype:typing.Union[str, ]):
+    
+    
+
+@singledispatch
+def pack(obj, format:typing.Optional[str]=None):
+    raise NotImplementedError(f"Not implemented for {type(obj).__name__} objects")
+
+@pack.register(int)
+def _(obj:int, format:typing.Optional[str]=None):
+    if format is None:
+        format = "=i"
+    return struct.pack(format, obj)
+    
+@pack.register(float)
+def _(obj:float, format:typing.Optional[str]=None):
+    if format is None:
+        format = "=f"
+    return struct.pack(format, obj)
+
+@pack.register(str)
+def _(obj:str, format:typing.Optional[str]=None):
+    bb = bytes(obj, "utf-8")
+    if format is None:
+        format = f"={len(bb)}s"
+    return struct.pack(format, bb)
+
 class OStream(object):
-    def __init__(self, output=None):
+    def __init__(self, output:typing.Optional[typing.Union[io.IOBase, QtCore.QDataStream]]=None):
         if output is None:
             import sys
             output = sys.stdout
@@ -47,11 +86,24 @@ class OStream(object):
             if isinstance(self.output, io.TextIOBase):
                 self.output.write(self.format % thing)
                 # self.format = '%s'
+            # NOTE: 2025-01-05 14:52:34
+            # QtCore.QDataStream supports the ">>" and "<<" operators straight away
+            # but only with QtCore.QByteArray data
+            # elif isinstance(self.output, QtCore.QDataStream):
+            #     if isinstance(thing, bytes):
+            #         self.output.writeBytes(thing, len(thing))
+            #     else:
+            #         bthing = pack(thing)
+            #         self.output.writeBytes(bthing, len(bthing))
+
             else:
                 if isinstance(thing, bytes):
                     self.output.write(thing)
                 else:
-                    raise TypeError(f"Invalid thing type: {type(thing).__name__}")
+                    bthing = pack(thing)
+                    self.output.write(bthing)
+                # else:
+                #     raise TypeError(f"Invalid thing type: {type(thing).__name__}")
         return self
     
 def example_main():
