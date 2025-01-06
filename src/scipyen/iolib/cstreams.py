@@ -36,10 +36,6 @@ def do_endl(stream):
 
 endl = IOManipulator(do_endl)
 
-# set_format(ctype:typing.Union[str, ]):
-    
-    
-
 @singledispatch
 def pack(obj, format:typing.Optional[str]=None):
     raise NotImplementedError(f"Not implemented for {type(obj).__name__} objects")
@@ -86,15 +82,42 @@ class OStream(object):
             if isinstance(self.output, io.TextIOBase):
                 self.output.write(self.format % thing)
                 # self.format = '%s'
-            # NOTE: 2025-01-05 14:52:34
-            # QtCore.QDataStream supports the ">>" and "<<" operators straight away
-            # but only with QtCore.QByteArray data
-            # elif isinstance(self.output, QtCore.QDataStream):
-            #     if isinstance(thing, bytes):
-            #         self.output.writeBytes(thing, len(thing))
-            #     else:
-            #         bthing = pack(thing)
-            #         self.output.writeBytes(bthing, len(bthing))
+            elif isinstance(self.output, QtCore.QDataStream):
+                # NOTE: 2025-01-05 14:52:34
+                # QtCore.QDataStream supports the ">>" and "<<" operators straight away
+                # but only with QtCore.QByteArray data
+                # WARNING: this NOT exhaustive !!!
+                if isinstance(thing, bytes):
+                    self.output << thing
+                else:
+                    if isinstance(thing, bool):
+                        f = self.output.writeBool
+                    elif isinstance(thing, int):
+                        f = self.output.writeInt
+                    elif isinstance(thing, str):
+                        f = self.output.writeQString
+                    elif isinstance(thing, bytes):
+                        f = self.output.writeBytes
+                    elif isinstance(thing, float):
+                        f = self.output.writeFloat
+                    elif isinstance(thing, typing.Iterable):
+                        if isinstance(thing, typing.Sequence):
+                            if all(isinstance(v, str) for v in thing):
+                                f = self.output.writeQStringList
+                            else:
+                                f = self.output.writeQVariantList
+
+                        elif isinstance(thing, typing.Mapping):
+                            if all(isinstance(k, str) for k in thing.keys):
+                                f = self.output.writeQVariantMap
+                            else:
+                                f = self.output.writeQVariantHash
+                        else:
+                            f = self.output.writeQVariant
+                    else:
+                        f = self.output.writeQVariant
+
+                    f(thing)
 
             else:
                 if isinstance(thing, bytes):
@@ -102,8 +125,7 @@ class OStream(object):
                 else:
                     bthing = pack(thing)
                     self.output.write(bthing)
-                # else:
-                #     raise TypeError(f"Invalid thing type: {type(thing).__name__}")
+
         return self
     
 def example_main():

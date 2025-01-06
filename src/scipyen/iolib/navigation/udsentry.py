@@ -5,7 +5,7 @@
 
 """
 """
-import sys, os, typing, pathlib, stat
+import sys, os, typing, pathlib, stat, io
 # from collections import namedtuple
 import dataclasses
 from enum import IntEnum
@@ -14,6 +14,7 @@ from qtpy.QtCore import Signal, Slot, Property
 from qtpy.uic import loadUiType as __loadUiType__
 from core.prog import safeWrapper
 from core.sysutils import adapt_ui_path
+from . import utils
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
@@ -124,7 +125,7 @@ class StandardFieldTypes(IntEnum):
 
         UDS_EXTRA_END Extra data (used only if you specified 
             Columns/ColumnsTypes) NB: you cannot repeat this entry; use UDS_EXTRA + i until UDS_EXTRA_END. 
-"""
+    """
     UDS_SIZE                =   1 | ItemTypes.UDS_NUMBER
     UDS_SIZE_LARGE          =   2 | ItemTypes.UDS_NUMBER
     UDS_USER                =   3 | ItemTypes.UDS_STRING
@@ -133,7 +134,8 @@ class StandardFieldTypes(IntEnum):
     UDS_NAME                =   6 | ItemTypes.UDS_STRING
     UDS_LOCAL_PATH          =   7 | ItemTypes.UDS_STRING
     UDS_HIDDEN              =   8 | ItemTypes.UDS_NUMBER
-    UDS_TIME                =  11 | ItemTypes.UDS_TIME
+    UDS_ACCESS              =   9 | ItemTypes.UDS_NUMBER
+    UDS_MODIFICATION_TIME   =  10 | ItemTypes.UDS_TIME
     UDS_ACCESS_TIME         =  11 | ItemTypes.UDS_TIME
     UDS_CREATION_TIME       =  12 | ItemTypes.UDS_TIME
     UDS_FILE_TYPE           =  13 | ItemTypes.UDS_NUMBER
@@ -177,8 +179,50 @@ class Field:
             self.m_long = -sys.maxsize-1
             self.m_str = value
     
-class USDEntry():
+class UDSEntry():
     # wraps os.stat_result
+    # ### BEGIN Fields
+    UDS_STRING:int              =  ItemTypes.UDS_STRING
+    UDS_NUMBER:int              =  ItemTypes.UDS_NUMBER
+    UDS_TIME:int                =  ItemTypes.UDS_TIME
+    UDS_SIZE:int                =  StandardFieldTypes.UDS_SIZE                
+    UDS_SIZE_LARGE:int          =  StandardFieldTypes.UDS_SIZE_LARGE          
+    UDS_USER:int                =  StandardFieldTypes.UDS_USER                
+    UDS_ICON_NAME:int           =  StandardFieldTypes.UDS_ICON_NAME           
+    UDS_GROUP:int               =  StandardFieldTypes.UDS_GROUP               
+    UDS_NAME:int                =  StandardFieldTypes.UDS_NAME                
+    UDS_LOCAL_PATH:int          =  StandardFieldTypes.UDS_LOCAL_PATH          
+    UDS_HIDDEN:int              =  StandardFieldTypes.UDS_HIDDEN              
+    UDS_ACCESS:int              =  StandardFieldTypes.UDS_ACCESS
+    UDS_MODIFICATION_TIME:int   =  StandardFieldTypes.UDS_MODIFICATION_TIME
+    UDS_ACCESS_TIME:int         =  StandardFieldTypes.UDS_ACCESS_TIME         
+    UDS_CREATION_TIME:int       =  StandardFieldTypes.UDS_CREATION_TIME       
+    UDS_FILE_TYPE:int           =  StandardFieldTypes.UDS_FILE_TYPE           
+    UDS_LINK_DEST:int           =  StandardFieldTypes.UDS_LINK_DEST           
+    UDS_URL:int                 =  StandardFieldTypes.UDS_URL                 
+    UDS_MIME_TYPE:int           =  StandardFieldTypes.UDS_MIME_TYPE           
+    UDS_GUESSED_MIME_TYPE:int   =  StandardFieldTypes.UDS_GUESSED_MIME_TYPE   
+    UDS_XML_PROPERTIES:int      =  StandardFieldTypes.UDS_XML_PROPERTIES      
+    UDS_EXTENDED_ACL:int        =  StandardFieldTypes.UDS_EXTENDED_ACL        
+    UDS_ACL_STRING:int          =  StandardFieldTypes.UDS_ACL_STRING          
+    UDS_DEFAULT_ACL_STRING:int  =  StandardFieldTypes.UDS_DEFAULT_ACL_STRING  
+    UDS_DISPLAY_NAME:int        =  StandardFieldTypes.UDS_DISPLAY_NAME        
+    UDS_TARGET_URL:int          =  StandardFieldTypes.UDS_TARGET_URL          
+    UDS_DISPLAY_TYPE:int        =  StandardFieldTypes.UDS_DISPLAY_TYPE        
+    UDS_ICON_OVERLAY_NAMES:int  =  StandardFieldTypes.UDS_ICON_OVERLAY_NAMES  
+    UDS_COMMENT :int            =  StandardFieldTypes.UDS_COMMENT             
+    UDS_DEVICE_ID:int           =  StandardFieldTypes.UDS_DEVICE_ID           
+    UDS_INODE:int               =  StandardFieldTypes.UDS_INODE               
+    UDS_RECURSIVE_SIZE:int      =  StandardFieldTypes.UDS_RECURSIVE_SIZE      
+    UDS_LOCAL_USER_ID:int       =  StandardFieldTypes.UDS_LOCAL_USER_ID       
+    UDS_LOCAL_GROUP_ID:int      =  StandardFieldTypes.UDS_LOCAL_GROUP_ID      
+    UDS_EXTRA:int               =  StandardFieldTypes.UDS_EXTRA               
+    UDS_EXTRA_END:int           =  StandardFieldTypes.UDS_EXTRA_END           
+    
+    Field = Field
+    
+    # ### END   Fields
+    
     def __init__(self, buff:os.stat_result, name:str):
         # NOTE: 2025-01-04 16:00:10
         # my guess here is that QT_STATBUF is equivalent to Pyton's os.stat_result
@@ -188,57 +232,65 @@ class USDEntry():
         self.storage:list[Field] = list()
         self.cachedStrings:list[str] = list()
         # ### END UDSEntryPrivate attributes
+        if sys.platform == "win32":
+            self.reserve(8)
+        else:
+            self.reserve(10)
+            
+        self.insert(self.UDS_NAME, name)
+        self.insert(self.UDS_SIZE, buff.st_size)
+        self.insert(self.UDS_DEVICE_ID, buff.st_dev)
+        self.insert(self.UDS_INODE, buff.st_ino)
+        self.insert(self.UDS_FILE_TYPE, stat.S_IFMT(buff.st_mode)) # extract file type — does the same thing as C++ line below
+        # d->insert(UDS_FILE_TYPE, buff.st_mode & QT_STAT_MASK); // extract file type
+        self.insert(self.UDS_ACCESS, stat.S_IMODE(buff.st_mode)) # extract permissions — does the same thing as C++ line below
+        # NOTE: 2025-01-05 21:31:50 stat.S_IMODE(buff.st_mode) is theoretically the same as buff.st_mode & 0o7777 on a UNIX machine # (NOTE: octal value!!!)
+        # self.insert(self.UDS_ACCESS, buff.st_mode & 0o7777) # extract permissions — does the same thing as C++ line below
+        # d->insert(UDS_ACCESS, buff.st_mode & 07777); // extract permissions
+        self.insert(self.UDS_MODIFICATION_TIME, buff.st_mtime_ns) # time in ns as integer
+        self.insert(self.UDS_ACCESS_TIME, buff.st_atime_ns)       # time in ns as integer 
+        if sys.platform != "win32":
+        #ifndef Q_OS_WIN
+            self.insert(self.UDS_LOCAL_USER_ID,  buff.st_uid) # user  ID of the file owner — UNIX only
+            self.insert(self.UDS_LOCAL_GROUP_ID, buff.st_gid) # group ID of the file owner — UNIX only
+        #endif
         
-    # ### BEGIN UDSEntryPrivate methods
-    # void reserve(int size);
-    def reserve(self, size:int): 
-        # no use for this in Python - it only reserves the size of the storage vector
-        # which in Python makes no sense (storage is a Python list, which is a dynamically-sized object)
-        self.storage = [None] * size
-        self.cachedStrings = [None] * size
-        # pass
+    def __eq__(self, other)->bool:
+        if type(other) != type(self):
+            return False
+        
+        if self.count() != other.count():
+            return False
+        
+        for field in self.fields():
+            if not other.contains(field):
+                return False
+            
+            if field & self.UDS_STRING:
+                if self.stringValue(field) != other.stringValue(field):
+                    return False
+                
+            elif fielf & self.UDS_NUMBER:
+                if self.numberValue(field) != other.numberValue(field):
+                    return False
+                
+        return True
     
-    def insert(self, udsField:int, value:typing.Union[str, int]):
-        """Appends a Field with a UDS_STRING type of index (udsField) to the internal storage.
-        Does nothing if such a field exists in the storage
-        """
-        # void insert(uint udsField, const QString &value);
-        # void insert(uint udsField, long long value);
+    def reserve(self, size:int): 
+        # void reserve(int size);
         
-        # NOTE: 2025-01-04 23:34:08
-        # Check that the value of udsField is one of the values in 
-        # StandardFieldTypes with type ItemTypes.UDS_STRING, or slimilar
-        # ie. an int value | ItemTypes.UDS_STRING
-        #
-        # e.g.:
-        #
-        # assert(udsentry.StandardFieldTypes.UDS_ICON_NAME & udsentry.ItemTypes.UDS_STRING)
-        # >>> is OK
-        #
-        # but:
-        #
-        # assert(udsentry.StandardFieldTypes.UDS_FILE_TYPE & udsentry.ItemTypes.UDS_STRING)
-        # >>> AssertionError
-        #
-        # Same goes for 
-        # assert(3 & udsentry.ItemTypes.UDS_STRING)
-        # >>> AssertionError
-        #
-        
-        assert isinstance(udsField, int) and udsField & ItemTypes.UDS_STRING, "Expecting a StandardFieldTypes value of type ItemTypes.UDS_STRING"
-        # NOTE: skip if there is a Field in 'storage' that has this udsField value as m_index
-        # if udsField not in list(map(lambda x: x.m_index, self.storage)):
-        # if udsField not in self.fields():
-        if not self.contains(udsField):
-            assert isinstance(value, (int, str)), f"'value' expected to be an int or str; instead got {type(value).__name__}"
-            self.storage.append(Field(udsField, value))
-        # pass
+        # self.storage = [None] * size
+        self.cachedStrings = [None] * size
     
     def replace(self, udsField:int, value:typing.Union[str, int]):
-        """Can only replace Fields with m_index of type ItemTypes.UDS_NUMBER"""
-        assert isinstance(udsField, int) and udsField & ItemTypes.UDS_NUMBER, "Expecting a StandardFieldTypes value of type ItemTypes.UDS_NUMBER"
         # void replace(uint udsField, const QString &value);
         # void replace(uint udsField, long long value);
+        
+        assert isinstance(value, (int, str)), f"'value' expected to be an int or str; instead got {type(value).__name__}"
+        if isinstance(value, str):
+            assert isinstance(udsField, int) and udsField & ItemTypes.UDS_STRING, "Expecting a StandardFieldTypes value of type ItemTypes.UDS_STRING"
+        else:
+            assert isinstance(udsField, int) and udsField & ItemTypes.UDS_NUMBER, "Expecting a StandardFieldTypes value of type ItemTypes.UDS_NUMBER"
         
         # check if a Field with this udsField as m_index exists in storage
         # indexes = list(map(lambda x: x.m_index, self.storage))
@@ -258,6 +310,7 @@ class USDEntry():
         
     def count(self)->int:
         # int count() const;
+        
         return len(self.storage)
     
     def stringValue(self, udsField:int)->str:
@@ -277,7 +330,7 @@ class USDEntry():
     
     def fields(self)->list[int]:
         # QList<uint> fields() const;
-        return list(map(lambda x: x.m_index, self.storage))
+        return list(map(lambda x: x.m_index, filter(lambda x: isinstance(x, Field), self.storage)))
     
     def contains(self, udsField:int)->bool:
         # bool contains(uint udsField) const;
@@ -287,6 +340,55 @@ class USDEntry():
         # void clear();
         self.storage.clear()
         self.cachedStrings.clear()
+    
+    def fastInsert(self, field:int, value:typing.Union[str, int]):
+        self.insert(field, value)
+    
+    def isDir(self) -> bool:
+        return utils.isDirMask(self.numberValue(self.UDS_FILE_TYPE))
+    
+    def isLink(self) -> bool:
+        return len(self.stringValue(self.UDS_LINK_DEST)) > 0
+        # or:
+        # return utils.isLinkMask(self.numberValue(self.UDS_FILE_TYPE))
+
+    # ### BEGIN UDSEntryPrivate methods
+    def insert(self, udsField:int, value:typing.Union[str, int]):
+        """Appends a Field with a UDS_STRING type of index (udsField) to the internal storage.
+        Does nothing if such a field exists in the storage
+        """
+        # void insert(uint udsField, const QString &value);
+        # void insert(uint udsField, long long value);
+        
+        # NOTE: 2025-01-04 23:34:08
+        # Check that the value of udsField is one of the values in 
+        # StandardFieldTypes with type ItemTypes.UDS_STRING (for string values)
+        # or ItemTypes.UDS_STRING (for int — i.e., long long — value)
+        #
+        # e.g.:
+        #
+        # assert(udsentry.StandardFieldTypes.UDS_ICON_NAME & udsentry.ItemTypes.UDS_STRING)
+        # >>> is OK
+        #
+        # but:
+        #
+        # assert(udsentry.StandardFieldTypes.UDS_FILE_TYPE & udsentry.ItemTypes.UDS_STRING)
+        # >>> AssertionError
+        #
+        # Same goes for 
+        # assert(3 & udsentry.ItemTypes.UDS_STRING)
+        # >>> AssertionError
+        #
+        assert isinstance(value, (int, str)), f"'value' expected to be an int or str; instead got {type(value).__name__}"
+        if isinstance(value, str):
+            assert isinstance(udsField, int) and udsField & ItemTypes.UDS_STRING, "Expecting a StandardFieldTypes value of type ItemTypes.UDS_STRING"
+        else:
+            assert isinstance(udsField, int) and udsField & ItemTypes.UDS_NUMBER, "Expecting a StandardFieldTypes value of type ItemTypes.UDS_NUMBER"
+        # NOTE: skip if there is a Field in 'storage' that has this udsField value as m_index
+        # if udsField not in list(map(lambda x: x.m_index, self.storage)):
+        # if udsField not in self.fields():
+        if not self.contains(udsField):
+            self.storage.append(Field(udsField, value))
     
     def save(self, s:QtCore.QDataStream): 
         # void save(QDataStream &s) const;
@@ -337,9 +439,9 @@ class USDEntry():
             else:
                 raise ValueError(f"Found a field with an invalid type: {uds}")
     
-    def debugUDSEntry(self, s):
+    def debugUDSEntry(self, s:typing.Optional[io.TextIOBase]=None):
         # void debugUDSEntry(QDebug &stream) const;
-        ret = list()
+        ret = list("[")
         for field in self.storage:
             fld = f"Field: {self.nameOfUdsField(field.m_index)} = "
             if field.m_index & ItemTypes.UDS_STRING:
@@ -350,8 +452,12 @@ class USDEntry():
                 raise ValueError(f"Found a field with an invalid type: {uds}")
             
             ret.append(fld)
-            
-        print("\n".join(ret))
+        ret.append("]")
+        
+        if isinstance(s, io.TextIOBase):
+            print("\n".join(ret), file=s, flush=True)
+        else:
+            print("\n".join(ret), flush=True)
     
     @staticmethod
     def nameOfUdsField(field:int)->str:
@@ -429,5 +535,5 @@ class USDEntry():
                 return f"Unknown uds field {field}"
 
     # ### END UDSEntryPrivate methods
-        
-    pass
+    
+    

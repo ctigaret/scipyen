@@ -12,21 +12,34 @@ from qtpy.QtCore import Signal, Slot, Property
 from qtpy.uic import loadUiType as __loadUiType__
 from core.prog import safeWrapper
 from core.sysutils import adapt_ui_path
+from iolib.navigation.udsentry import UDSEntry
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
-class Unknown(IntEnum):
+class UnknownEnum(IntEnum):
     Unknown = -1
     
-class FileTimes(IntEnum):
-    ModificationTime = 0
-    AccessTime = 1
-    CreationTime = 2
+class FileTimes(IntEnum):pass
+    # ModificationTime = 0
+    # AccessTime = 1
+    # CreationTime = 2
     # ChangeTime = 3
     
-class MimeTypeDetermination(IntEnum):
-    NormalMimeTypeDetermination = 0
-    SkipMimeTypeFromContent = 1
+FileTimes = IntEnum("FileTimes", ["ModificationTime", "AccessTime", "CreationTime", "ChangeTime"])
+class MimeTypeDetermination(IntEnum):pass
+    # NormalMimeTypeDetermination = 0
+    # SkipMimeTypeFromContent = 1
+    
+MimeTypeDetermination = IntEnum("MimeTypeDetermination", ["NormalMimeTypeDetermination", "SkipMimeTypeFromContent"])
+    
+class HiddenEnum:pass
+HiddenEnum = IntEnum("HiddenEnum", ["Auto", "Hidden", "Shown"])
+
+class HiddenCacheEnum:pass
+HiddenCacheEnum = IntEnum("HiddenCacheEnum", ["HiddenUncached", "HiddenCached", "ShownCached"])
+
+class SlowEnum:pass
+SlowEnum = IntEnum("SlowEnum", ["SlowUnknown", "Fast", "Slow"])
 
 class FileItem():
     # NOTE: 2025-01-04 12:47:20
@@ -34,11 +47,56 @@ class FileItem():
     # NOTE: 2025-01-04 15:07:39
     # doesn't use Qt Signals/Slots so no need to inherit from QObject
     # By keeping it in the Python world I guess also removes the need to inherit 
-    # from QSharedData (KFIleItemPrivate)
-    def __init__(self, parent=None):
-        # ### BEGIN KFIleItemPrivate
-        # ### END KFIleItemPrivate
-        self._url_:QtCore.QUrl = QtCore.QUrl()
+    # from QSharedData (KFileItemPrivate)
+    
+    Unknown         = Unknown.Unknown
+    
+    Auto            = HiddenEnum.Auto
+    Hidden          = HiddenEnum.Hidden
+    Shown           = HiddenEnum.Shown
+    
+    HiddenUncached  = HiddenCacheEnum.HiddenUncached
+    HiddenCached    = HiddenCacheEnum.HiddenCached
+    ShownCached     = HiddenCacheEnum.ShownCached
+    
+    SlowUnknown     = SlowEnum.SlowUnknown
+    Fast            = SlowEnum.Fast
+    Slow            = SlowEnum.Slow
+    
+    
+    def __init__(self, entry:UDSEntry, mode:int, permissions:int,
+                 itemOrDirUrl:QtCore.QUrl, urlIsDirectory:bool,
+                 delayedMimeTypes:bool, mimeTypeDetermination:MimeTypeDetermination):
+        # ### BEGIN KFileItemPrivate
+        self._entry_:UDSEntry = entry
+        self._url_:QtCore.QUrl = itemOrDirUrl
+        self._strName_:str = str()
+        self._strText_:str = str()
+        self._iconName_:str = str()
+        self._mimeType_:str = str()
+        self._fileMode_:int = mode
+        self._permissions_:int = permissions
+        self._addACL_:bool = False
+        self._bLink_:bool = False
+        self._bIsLocalUrl_:bool = itemOrDirUrl.isLocalFile()
+        self._bMimeTypeKnown_:bool = False
+        self._delayedMimeTypes_:bool = bool(delayedMimeTypes)
+        self._useIconNameCache_:bool = False
+        self._hidden_:int = self.Auto
+        self._hiddenCache_:int = self.HiddenCached
+        self._slow_:int = self.SlowUnknown
+        self._bSkipMimeTypeFromContent_ = mimeTypeDetermination == MimeTypeDetermination.SkipMimeTypeFromContent
+        self._bInitCalled_:bool = False
+        
+        if entry.count() != 0:
+            self.readUDSEntry(not urlIsDirectory)
+        else:
+            if not urlIsDirectory:
+                self._strName_ = itemOrDirUrl.fileName()
+                self._strText_ = self._strName_
+        
+        # ### END KFileItemPrivate
+        
         self._user_:str = str()
         self._group_:str = str()
         self._isLink_:bool = False
@@ -55,13 +113,11 @@ class FileItem():
         self._isLocalFile_:bool = False
         self._text_:str = str()
         self._name_:str = str()
-        self._mimetype_:str = str()
         self._determineMimeType_:QtCore.QMimeType = QtCore.QMimeType()
         self._currentMimeType_:QtCore.QMimeType = QtCore.QMimeType()
         self._isFinalIconKnown_:bool = False
         self._isMimeTypeKnown_:bool = False
         self._mimeComment_:str = str()
-        self._iconName_:str = str()
         self._overlays_:list[str] = list()
         self._comment_:str = str()
         self._statusBarInfo_:str = str()
@@ -290,3 +346,18 @@ class FileItem():
     @isRegularFile.setter
     def isRegularFile(self, val:bool):
         self._isRegularFile_ = val == True
+
+    # ### BEGIN KFileItemPrivate methods
+    def readUDSEntry(self, urlIsDirectory:bool):
+        self._fileMode_ = self._entry_.numberValue(UDSEntry.UDS_FILE_TYPE, self.Unknown)
+        self._permissions_ = self._entry_.numberValue(UDSEntry.UDS_ACCESS, self.Unknown)
+        self._strName_ = self._entry_.stringValue(UDSEntry.UDS_NAME)
+        displayName = self._entry_.stringValue(UDSEntry.UDS_DISPLAY_NAME)
+        if len(displayName):
+            self._strText_ = displayName
+        else:
+            self._strText_ = self._strName_
+            
+        urlStr = self._entry_.stringValue(UDSEntry.UDS_URL)
+        
+    # ### END KFileItemPrivate methods
