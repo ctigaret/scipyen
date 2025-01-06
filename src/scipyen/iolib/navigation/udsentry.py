@@ -180,6 +180,15 @@ class Field:
             self.m_str = value
     
 class UDSEntry():
+    """Usage example:
+        from iolib.navigation.udsentry import UDSEntry
+        path = pathlib.Path("myFile.dat")
+        # ATTENTION : Always use absolute pathlib Path objects!
+        buff = os.stat(path.resolve())
+        entry = UDSEntry(buff, path.resolve().name)
+        entry.stringValue(entry.UDS_NAME)
+        >>> 'myFile.dat'
+    """
     # wraps os.stat_result
     # ### BEGIN Fields
     UDS_STRING:int              =  ItemTypes.UDS_STRING
@@ -318,14 +327,14 @@ class UDSEntry():
         # indexes = list(map(lambda x: x.m_index, self.storage))
         indexes = self.fields()
         if udsField in indexes:
-            return self.storage(indexes.index(udsField)).m_str
+            return self.storage[indexes.index(udsField)].m_str
         return str()
     
     def numberValue(self, udsField:int, defaultValue:int = -1)->int:
         # long long numberValue(uint udsField, long long defaultValue = -1) const;
         indexes = list(map(lambda x: x.m_index, self.storage))
         if udsField in indexes:
-            return self.storage(indexes.index(udsField)).m_long
+            return self.storage[indexes.index(udsField)].m_long
         return defaultValue
     
     def fields(self)->list[int]:
