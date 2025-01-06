@@ -1,5 +1,9 @@
-# Author: https://github.com/ipfs-shipyard/py-datastore/commits?author=adamjsawicki
-# Source: https://github.com/ipfs-shipyard/py-datastore/tree/e566d40a8ca81d8628147e255fe7830b5f928a43?tab=License-1-ov-file
+# # -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2012 Authors of py-datastore <https://github.com/ipfs-shipyard/py-datastore>
+# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
 
 import collections
 import ctypes

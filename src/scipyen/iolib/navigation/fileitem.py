@@ -14,6 +14,12 @@ from core.prog import safeWrapper
 from core.sysutils import adapt_ui_path
 from iolib.navigation.udsentry import UDSEntry
 from . import utils
+HAS_STATX = False
+try:
+    from . import statx
+    HAS_ATATX = True
+except:
+    pass
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
@@ -141,27 +147,59 @@ class _FileItem_():
             path = self._url_.adjusted(QtCore.QUrl.StripTrailingSlash).toLocalFile()
             # pathBA = QtCore.QFile.encodeName(path)
             pPath = pathlib.Path(path)
-            buff = os.stat(pPath, follow_symlinks=False)
+            
+            if HAS_STATX:
+                buff = statx.stat(pPath, follow_symlinks=False)
+            else:
+                buff = os.stat(pPath, follow_symlinks=False)
+                
             self._entry_.reserve(10)
             self._entry_.replace(UDSEntry.UDS_DEVICE_ID, buff.st_dev)
             self._entry_.replace(UDSEntry.UDS_INODE, buff.st_ino)
+            
             mode = buff.st_mode
+            
             if utils.isLinkMask(mode):
                 self._bLink_ = True
-                buff = os.stat(pPath, follow_symlinks=True)
+                
+                if HAS_STATX:
+                    buff = statx.stat(pPath, follow_symlinks=True)
+                else:
+                    buff = stat.stat(pPath, follow_symlinks=True)
+                    
                 mode = buff.st_mode
+                
             else:
                 mode = (utils.STAT_MASK - 1) | stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO
                 
-            file_type = mode & utils.STAT_MASK # meaning regular, directry, block, ...
+            file_type = mode & utils.STAT_MASK # meaning regular, directory, block, ...
             
             self._entry_.replace(UDSEntry.UDS_SIZE, buff.st_size)
             self._entry_.replace(UDSEntry.UDS_FILE_TYPE, file_type)
             self._entry_.replace(UDSEntry.UDS_ACCESS, mode & 0o7777)
-            self._entry_.replace(UDS_MODIFICATION_TIME, buff.st_mtime_ns)
-            self._entry_.replace(UDS_ACCESS_TIME, buff.st_atime_ns)
+            
+            if HAS_STATX:
+                self._entry_.replace(UDS_MODIFICATION_TIME, buff.st_mtime)
+                self._entry_.replace(UDS_ACCESS_TIME, buff.st_atime) 
+                self._entry_.replace(UDS_CREATION_TIME, buff.st_birthtime) # thank you, py_datasource authors!
+            else:
+                self._entry_.replace(UDS_MODIFICATION_TIME, int(buff.st_mtime))
+                self._entry_.replace(UDS_ACCESS_TIME, int(buff.st_atime))
+                self._entry_.replace(UDS_CREATION_TIME, int(buff.st_ctime))
                 
-        
+            if sys.platform != "win32":
+                uid = buff.st_uid
+                gid = buff.st_gid
+                self._entry_.replace(UDSEntry.UDS_LOCAL_USER_ID, uid)
+                self._entry_.replace(UDSEntry.UDS_LOCAL_GROUP_ID, gid)
+                
+            if self._fileMode_ == Unknown.Unknown:
+                self._fileMode_ = file_type
+                
+            if self._permissions_ == Unknown.Unknown:
+                self._permissions_ = mode & 0o7777
+                
+        self._bInitCalled_ = True
 
 class FileItem(_FileItem_):
     # NOTE: 2025-01-04 12:47:20

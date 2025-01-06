@@ -15,6 +15,13 @@ from qtpy.uic import loadUiType as __loadUiType__
 from core.prog import safeWrapper
 from core.sysutils import adapt_ui_path
 from . import utils
+HAS_STATX = False
+try:
+    from . import statx
+    HAS_STATX = True
+    stat_result = statx.stat_result
+except:
+    stat_result = os.stat_result
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
@@ -189,7 +196,6 @@ class UDSEntry():
         entry.stringValue(entry.UDS_NAME)
         >>> 'myFile.dat'
     """
-    # wraps os.stat_result
     # ### BEGIN Fields
     UDS_STRING:int              =  ItemTypes.UDS_STRING
     UDS_NUMBER:int              =  ItemTypes.UDS_NUMBER
@@ -232,9 +238,9 @@ class UDSEntry():
     
     # ### END   Fields
     
-    def __init__(self, buff:os.stat_result, name:str):
+    def __init__(self, buff:stat_result, name:str):
         # NOTE: 2025-01-04 16:00:10
-        # my guess here is that QT_STATBUF is equivalent to Pyton's os.stat_result
+        # my guess here is that QT_STATBUF is equivalent to Pyton's stat_result
         # so let's go with that...
         
         # ### BEGIN UDSEntryPrivate attributes
@@ -256,8 +262,20 @@ class UDSEntry():
         # NOTE: 2025-01-05 21:31:50 stat.S_IMODE(buff.st_mode) is theoretically the same as buff.st_mode & 0o7777 on a UNIX machine # (NOTE: octal value!!!)
         # self.insert(self.UDS_ACCESS, buff.st_mode & 0o7777) # extract permissions — does the same thing as C++ line below
         # d->insert(UDS_ACCESS, buff.st_mode & 07777); // extract permissions; see comments at top of utils.py
-        self.insert(self.UDS_MODIFICATION_TIME, buff.st_mtime_ns) # time in ns as integer
-        self.insert(self.UDS_ACCESS_TIME, buff.st_atime_ns)       # time in ns as integer 
+        
+        if HAS_STATX and isinstance(buff, statx.stat_result)
+            self.insert(self.UDS_MODIFICATION_TIME, buff.st_mtime)
+            self.insert(self.UDS_ACCESS_TIME, buff.st_atime)
+        else:
+            # self.insert(self.UDS_MODIFICATION_TIME, buff.st_mtime_ns) # time in ns as integer
+            self.insert(self.UDS_MODIFICATION_TIME, int(buff.st_mtime))
+            # self.insert(self.UDS_ACCESS_TIME, buff.st_atime_ns)       # time in ns as integer 
+            self.insert(self.UDS_ACCESS_TIME, int(buff.st_atime))
+            
+        # NOTE: 2025-01-06 14:13:49
+        # Incidentally, they don't seem to try & call statx here, in KIO::UDSEntry c'tor
+        # hence they don't explore creation time ?!?
+        
         if sys.platform != "win32":
         #ifndef Q_OS_WIN
             self.insert(self.UDS_LOCAL_USER_ID,  buff.st_uid) # user  ID of the file owner — UNIX only
