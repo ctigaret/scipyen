@@ -8,11 +8,13 @@ See https://pyqt.riverbankcomputing.narkive.com/4Atl8IgU/how-to-detect-if-an-obj
 solution by Giovanni Bajo
 """
 import sys, os, typing
+import datetime
 from qtpy import QtCore, QtGui, QtWidgets, QtSvg
 from qtpy.QtCore import Signal, Slot, Property
 from qtpy.uic import loadUiType as __loadUiType__
 from core.prog import safeWrapper
 from core.sysutils import adapt_ui_path
+
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
@@ -72,3 +74,14 @@ def isQObjectAlive(obj:QtCore.QObject):
         return False
     
     return True
+
+def datetime2Qt(d:datetime.datetime)->QtCore.QDateTime:
+    from core import utilities
+    
+    timeStamp = utilities.posixUTC(d)
+    return QtCore.QDateTime.fromSecsSinceEpoch(timeStamp) # converts to local time,
+
+def datetimeFromQt(d:QtCore.QDateTime)->datetime.datetime:
+    timeStamp = d.toSecsSinceEpoch()
+    return datetime.datetime.fromtimestamp(timeStamp) # converts to local time,
+    

@@ -9,7 +9,7 @@
 Various utilities
 '''
 import traceback, re, itertools, functools, time, typing, warnings, operator, inspect
-import random, math, pprint
+import random, math, pprint, datetime
 from numbers import Number
 from sys import getsizeof, stderr
 from copy import (copy, deepcopy,)
@@ -4959,6 +4959,9 @@ def timelineDateString(year:int, month:int, day:int=0):
         date = f"{date}-{day}"
         
     return date
+
+def posixUTC(d:datetime.datetime) -> float:
+    return (d - datetime.datetime(1970, 1, 1)) / datetime.timedelta(seconds=1)
 
 
             

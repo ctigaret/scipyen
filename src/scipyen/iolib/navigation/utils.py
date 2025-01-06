@@ -26,7 +26,7 @@
 # S_IFPORT = 0
 # S_IFWHT = 0
 #
-# # Names for permission bits - NOTE: these are all available in stat module
+# # Names for permission bits - NOTE: all these below are available in stat module
 # 
 # S_ISUID = 0o4000  # set UID bit
 # S_ISGID = 0o2000  # set GID bit

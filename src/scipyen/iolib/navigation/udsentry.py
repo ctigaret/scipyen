@@ -263,7 +263,7 @@ class UDSEntry():
         # self.insert(self.UDS_ACCESS, buff.st_mode & 0o7777) # extract permissions — does the same thing as C++ line below
         # d->insert(UDS_ACCESS, buff.st_mode & 07777); // extract permissions; see comments at top of utils.py
         
-        if HAS_STATX and isinstance(buff, statx.stat_result)
+        if HAS_STATX and isinstance(buff, statx.stat_result):
             self.insert(self.UDS_MODIFICATION_TIME, buff.st_mtime)
             self.insert(self.UDS_ACCESS_TIME, buff.st_atime)
         else:
