@@ -251,11 +251,11 @@ class UDSEntry():
         self.insert(self.UDS_DEVICE_ID, buff.st_dev)
         self.insert(self.UDS_INODE, buff.st_ino)
         self.insert(self.UDS_FILE_TYPE, stat.S_IFMT(buff.st_mode)) # extract file type — does the same thing as C++ line below
-        # d->insert(UDS_FILE_TYPE, buff.st_mode & QT_STAT_MASK); // extract file type
+        # d->insert(UDS_FILE_TYPE, buff.st_mode & QT_STAT_MASK); // extract file type; see comments at top of utils.py
         self.insert(self.UDS_ACCESS, stat.S_IMODE(buff.st_mode)) # extract permissions — does the same thing as C++ line below
         # NOTE: 2025-01-05 21:31:50 stat.S_IMODE(buff.st_mode) is theoretically the same as buff.st_mode & 0o7777 on a UNIX machine # (NOTE: octal value!!!)
         # self.insert(self.UDS_ACCESS, buff.st_mode & 0o7777) # extract permissions — does the same thing as C++ line below
-        # d->insert(UDS_ACCESS, buff.st_mode & 07777); // extract permissions
+        # d->insert(UDS_ACCESS, buff.st_mode & 07777); // extract permissions; see comments at top of utils.py
         self.insert(self.UDS_MODIFICATION_TIME, buff.st_mtime_ns) # time in ns as integer
         self.insert(self.UDS_ACCESS_TIME, buff.st_atime_ns)       # time in ns as integer 
         if sys.platform != "win32":

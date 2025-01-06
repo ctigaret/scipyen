@@ -5,7 +5,7 @@
 
 """
 """
-import sys, os, typing, pathliob, urllib
+import sys, os, typing, pathliob, urllib, stat
 from enum import Enum, IntEnum
 from qtpy import QtCore, QtGui, QtWidgets, QtSvg
 from qtpy.QtCore import Signal, Slot, Property
@@ -13,6 +13,7 @@ from qtpy.uic import loadUiType as __loadUiType__
 from core.prog import safeWrapper
 from core.sysutils import adapt_ui_path
 from iolib.navigation.udsentry import UDSEntry
+from . import utils
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
@@ -41,33 +42,14 @@ HiddenCacheEnum = IntEnum("HiddenCacheEnum", ["HiddenUncached", "HiddenCached", 
 class SlowEnum:pass
 SlowEnum = IntEnum("SlowEnum", ["SlowUnknown", "Fast", "Slow"])
 
-class FileItem():
-    # NOTE: 2025-01-04 12:47:20
-    # should use a pathlib.Path as backend
-    # NOTE: 2025-01-04 15:07:39
-    # doesn't use Qt Signals/Slots so no need to inherit from QObject
-    # By keeping it in the Python world I guess also removes the need to inherit 
-    # from QSharedData (KFileItemPrivate)
-    
-    Unknown         = Unknown.Unknown
-    
-    Auto            = HiddenEnum.Auto
-    Hidden          = HiddenEnum.Hidden
-    Shown           = HiddenEnum.Shown
-    
-    HiddenUncached  = HiddenCacheEnum.HiddenUncached
-    HiddenCached    = HiddenCacheEnum.HiddenCached
-    ShownCached     = HiddenCacheEnum.ShownCached
-    
-    SlowUnknown     = SlowEnum.SlowUnknown
-    Fast            = SlowEnum.Fast
-    Slow            = SlowEnum.Slow
-    
-    
-    def __init__(self, entry:UDSEntry, mode:int, permissions:int,
-                 itemOrDirUrl:QtCore.QUrl, urlIsDirectory:bool,
-                 delayedMimeTypes:bool, mimeTypeDetermination:MimeTypeDetermination):
-        # ### BEGIN KFileItemPrivate
+class _FileItem_():
+    def __init__(self, entry:UDSEntry, 
+                 mode:int, 
+                 permissions:int,
+                 itemOrDirUrl:QtCore.QUrl, 
+                 urlIsDirectory:bool,
+                 delayedMimeTypes:bool, 
+                 mimeTypeDetermination:MimeTypeDetermination):
         self._entry_:UDSEntry = entry
         self._url_:QtCore.QUrl = itemOrDirUrl
         self._strName_:str = str()
@@ -97,6 +79,117 @@ class FileItem():
                 self._strName_ = itemOrDirUrl.fileName()
                 self._strText_ = self._strName_
         
+    def readUDSEntry(self, urlIsDirectory:bool):
+        self._fileMode_ = self._entry_.numberValue(UDSEntry.UDS_FILE_TYPE, self.Unknown)
+        self._permissions_ = self._entry_.numberValue(UDSEntry.UDS_ACCESS, self.Unknown)
+        self._strName_ = self._entry_.stringValue(UDSEntry.UDS_NAME)
+        displayName = self._entry_.stringValue(UDSEntry.UDS_DISPLAY_NAME)
+        if len(displayName):
+            self._strText_ = displayName
+        else:
+            # NOTE: 2025-01-06 00:16:58
+            # here and in other places, KIO calls decodeFileName (global.h/global.cpp)
+            # which is a noop
+            self._strText_ = self._strName_ 
+            
+        urlStr = self._entry_.stringValue(UDSEntry.UDS_URL)
+        uds_url_seen = len(urlStr) > 0
+        if uds_url_seen:
+            self._url_ = QtCore.QUrl(urlStr)
+            
+            # NOTE: 2025-01-06 00:14:27
+            # this below is not the same as
+            # `self._bIsLocalUrl_ = self._url_.isLocalFile()`
+            # i.e., it does nothing when self._url_.isLocalFile() is False, given
+            # that self._bIsLocalUrl_ was already assigned to, earlier in the c'tor
+            if self._url_.isLocalFile():
+                self._bIsLocalUrl_ = True
+                
+        db = QtCore.QMimeDatabase()
+        mimeTypeStr = self._entry_.stringValue(UDSEntry.UDS_MIME_TYPE)
+        self._bMimeTypeKnown_ = len(mimeTypeStr) > 0
+        if self._bMimeTypeKnown_:
+            self._mimeType_ = db.mimeTypeForName(mimeTypeStr)
+            
+        self._guessedMimeType = self._entry_.stringValue(UDSEntry.UDS_GUESSED_MIME_TYPE)
+        self._bLink_ = len(self._entry_.stringValue(UDSEntry.UDS_LINK_DEST)) > 0
+        
+        hiddenVal = self._entry_.numberValue(UDSEntry.UDS_HIDDEN, -1)
+        self._hidden_ = self.Hidden if hiddenVal == 1 else self.Shown if hiddenVal == 1 else self.Auto
+        self._hiddenCache_ = self.HiddenUncached
+        
+        if urlIsDirectory and not uds_url_seen and len(self._strName_) > 0 and self._strName_ != ".":
+            path = self._url_.path()
+            if len(path) == 0:
+                self._utl_.setPath((pathlib.Path(path) / self._strName_).as_posix())
+                # path = "/" # FIXME: 2025-01-06 00:35:48 ?!? hmmm... should not it be os.path.sep?
+            
+        self._iconName_ = str()
+        if self._fileMode_ != self.Unknown:
+            self._bInitCalled_ =  True
+            
+    def ensureInitialized(self):
+        if not self._bInitCalled_:
+            self.init()
+            
+    def init(self):
+        self._access_ = str()
+        
+        shouldStat = self._fileMode_ == Unknown.Unknown or self._permissions_ == Unknown.Unknown or (self._entry_.count() == 0 and self._url_.isLocalFile())
+        
+        if shouldStat:
+            path = self._url_.adjusted(QtCore.QUrl.StripTrailingSlash).toLocalFile()
+            # pathBA = QtCore.QFile.encodeName(path)
+            pPath = pathlib.Path(path)
+            buff = os.stat(pPath, follow_symlinks=False)
+            self._entry_.reserve(10)
+            self._entry_.replace(UDSEntry.UDS_DEVICE_ID, buff.st_dev)
+            self._entry_.replace(UDSEntry.UDS_INODE, buff.st_ino)
+            mode = buff.st_mode
+            if utils.isLinkMask(mode):
+                self._bLink_ = True
+                buff = os.stat(pPath, follow_symlinks=True)
+                mode = buff.st_mode
+            else:
+                mode = (utils.STAT_MASK - 1) | stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO
+                
+            file_type = mode & utils.STAT_MASK # meaning regular, directry, block, ...
+            
+            self._entry_.replace(UDSEntry.UDS_SIZE, buff.st_size)
+            self._entry_.replace(UDSEntry.UDS_FILE_TYPE, file_type)
+            self._entry_.replace(UDSEntry.UDS_ACCESS, mode & 0o7777)
+            self._entry_.replace(UDS_MODIFICATION_TIME, buff.st_mtime_ns)
+            self._entry_.replace(UDS_ACCESS_TIME, buff.st_atime_ns)
+                
+        
+
+class FileItem(_FileItem_):
+    # NOTE: 2025-01-04 12:47:20
+    # should use a pathlib.Path as backend
+    # NOTE: 2025-01-04 15:07:39
+    # doesn't use Qt Signals/Slots so no need to inherit from QObject
+    # By keeping it in the Python world I guess also removes the need to inherit 
+    # from QSharedData (KFileItemPrivate)
+    
+    Unknown         = Unknown.Unknown
+    
+    Auto            = HiddenEnum.Auto
+    Hidden          = HiddenEnum.Hidden
+    Shown           = HiddenEnum.Shown
+    
+    HiddenUncached  = HiddenCacheEnum.HiddenUncached
+    HiddenCached    = HiddenCacheEnum.HiddenCached
+    ShownCached     = HiddenCacheEnum.ShownCached
+    
+    SlowUnknown     = SlowEnum.SlowUnknown
+    Fast            = SlowEnum.Fast
+    Slow            = SlowEnum.Slow
+    
+    
+    def __init__(self, entry:UDSEntry, mode:int, permissions:int,
+                 itemOrDirUrl:QtCore.QUrl, urlIsDirectory:bool,
+                 delayedMimeTypes:bool, mimeTypeDetermination:MimeTypeDetermination):
+        # ### BEGIN KFileItemPrivate
         # ### END KFileItemPrivate
         
         self._user_:str = str()
@@ -350,53 +443,4 @@ class FileItem():
         self._isRegularFile_ = val == True
 
     # ### BEGIN KFileItemPrivate methods
-    def readUDSEntry(self, urlIsDirectory:bool):
-        self._fileMode_ = self._entry_.numberValue(UDSEntry.UDS_FILE_TYPE, self.Unknown)
-        self._permissions_ = self._entry_.numberValue(UDSEntry.UDS_ACCESS, self.Unknown)
-        self._strName_ = self._entry_.stringValue(UDSEntry.UDS_NAME)
-        displayName = self._entry_.stringValue(UDSEntry.UDS_DISPLAY_NAME)
-        if len(displayName):
-            self._strText_ = displayName
-        else:
-            # NOTE: 2025-01-06 00:16:58
-            # here and in other places, KIO calls decodeFileName (global.h/global.cpp)
-            # which is a noop
-            self._strText_ = self._strName_ 
-            
-        urlStr = self._entry_.stringValue(UDSEntry.UDS_URL)
-        uds_url_seen = len(urlStr) > 0
-        if uds_url_seen:
-            self._url_ = QtCore.QUrl(urlStr)
-            
-            # NOTE: 2025-01-06 00:14:27
-            # this below is not the same as
-            # `self._bIsLocalUrl_ = self._url_.isLocalFile()`
-            # i.e., it does nothing when self._url_.isLocalFile() is False, given
-            # that self._bIsLocalUrl_ was already assigned to, earlier in the c'tor
-            if self._url_.isLocalFile():
-                self._bIsLocalUrl_ = True
-                
-        db = QtCore.QMimeDatabase()
-        mimeTypeStr = self._entry_.stringValue(UDSEntry.UDS_MIME_TYPE)
-        self._bMimeTypeKnown_ = len(mimeTypeStr) > 0
-        if self._bMimeTypeKnown_:
-            self._mimeType_ = db.mimeTypeForName(mimeTypeStr)
-            
-        self._guessedMimeType = self._entry_.stringValue(UDSEntry.UDS_GUESSED_MIME_TYPE)
-        self._bLink_ = len(self._entry_.stringValue(UDSEntry.UDS_LINK_DEST)) > 0
-        
-        hiddenVal = self._entry_.numberValue(UDSEntry.UDS_HIDDEN, -1)
-        self._hidden_ = self.Hidden if hiddenVal == 1 else self.Shown if hiddenVal == 1 else self.Auto
-        self._hiddenCache_ = self.HiddenUncached
-        
-        if urlIsDirectory and not uds_url_seen and len(self._strName_) > 0 and self._strName_ != ".":
-            path = self._url_.path()
-            if len(path) == 0:
-                self._utl_.setPath((pathlib.Path(path) / self._strName_).as_posix())
-                # path = "/" # FIXME: 2025-01-06 00:35:48 ?!? hmmm... should not it be os.path.sep?
-            
-        self._iconName_ = str()
-        if self._fileMode_ != self.Unknown:
-            self._bInitCalled_ =  True
-        
     # ### END KFileItemPrivate methods
