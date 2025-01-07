@@ -88,9 +88,9 @@ class NetworkMounts (QtCore.QObject):
         else:
             raise RuntimeError(f"Incompatible sibling of '{cls.__name__}' is already instantiated as singleton: {type(cls._instance).__name__}")
 
-    @staticmethod
-    def self() -> NM:
-        return NM._instance
+    # @staticmethod
+    # def self() -> NM:
+    #     return NM._instance
     
     @staticmethod
     def ensureTrailingSlash(path:str) -> str:

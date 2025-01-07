@@ -8,9 +8,10 @@
 import dataclasses
 import psutil
 from enum import Enum, IntEnum
+from . import networkmounts
+from iolib.navigation.networkmounts import (NetworkMounts, NetworkMountsType)
 
-class Type(IntEnum):pass
-
+class FsType(IntEnum):pass
 FsType = IntEnum("FsType", 
                  ["Unknown", 
                    "Nfs",          # NFS or other full-featured networked filesystems (autofs, subfs, cachefs, sshfs)
@@ -60,3 +61,18 @@ def typeFromName(name:str):
         return found[0].type
     
     return FsType.Other
+
+def determineFileSystemType(path:str) -> FsType:
+
+def fileSystemType(path:str) -> FsType:
+    netMounts = NetworkMounts.instance()
+    if netMounts.isSlowPath(path, NetworkMountsType.SmbPaths):
+        return FsType.Smb
+    elif netMounts.isSlowPath(path, NetworkMountsType.NfsPaths):
+        return FsType.Nfs
+    else:
+        return determineFileSystemType(path)
+        
+def fileSysteName(type:FsType) -> str:
+    pass
+    
