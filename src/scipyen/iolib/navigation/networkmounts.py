@@ -10,6 +10,8 @@ from qtpy.QtCore import Signal, Slot, Property
 
 # from core.datatypes import TypeEnum
 
+s_canonicalLinkSpacePaths = dict() # str ↦ str
+
 class NetworkMountOption(IntEnum):pass
 NetworkMountOption = IntEnum("NetworkMountOption",
                              ["LowSideEffectsOptimizations",
@@ -37,11 +39,23 @@ class NetworkMounts (QtCore.QObject):
             
         return cls._instance
     
-    def __init__(self, parent:typing.Optional[QtCore.QObject] = None):
-        super().__init__(self, parent=parent)
+    def __init__(self):
+        super().__init__(self)
         
-        self._settings:typing.Optional[QtCore.QSettings] = None
+        configLocation = pathlib.Path(QtCore.QStandardPaths.writableLocation(QtCore.QStandardPaths.ConfigLocation))
         
+        configFileName = (configLocation / "network_mounts").as_posix()
+        
+        self._settings_:QtCore.QSettings = QtCore.QSettings(configFileName,
+                                                           QtCore.QSettings.Format.IniFormat, self)
+        
+        for nmType in (NetworkMountsType.NfsPaths, NetworkMountsType.SmbPaths,
+                       NetworkMountsType.SymlinkDirectory,
+                       NetworkMountsType.SymlinkToNetworkMount):
+            typeStr = self.enumToString(nmType)
+            slowPaths = self._settings_.value(typeStr, list()).value()
+            _slowPaths = self.ensureTrailingSlashes(slowPaths):
+            self._settings_.setValue(typeStr, _slowPaths)
     
     @classmethod
     def _walk_mro(cls) -> typing.Generator[type[NM], None, None]:
@@ -79,28 +93,21 @@ class NetworkMounts (QtCore.QObject):
         return NM._instance
     
     @staticmethod
-    def ensureTrailingSlash(path:str) -> bool:
-        changed = False
+    def ensureTrailingSlash(path:str) -> str:
         if len(path) and not path.endswith(os.sep):
             path += os.sep
-            changed = True
-            
-        return changed
+        return path
     
     @staticmethod
-    def ensureTrailingSlashes(paths:list[str]) -> bool:
-        changed = False
-        for path in paths:
-            if NetworkMounts.ensureTrailingSlash(path):
-                changed = True
-                
-        return changed
-    
+    def ensureTrailingSlashes(paths:list[str]) -> list:
+        return list(map(lambda x: NetworkMounts.ensureTrailingSlash(x), paths))
+
     @staticmethod
     def getMatchingPath(path:str, slowPaths:list[str]) -> str:
         if len(slowPaths) == 0:
             return str()
-        _path = path
+        
+        _path = str(path)
         if not _path.endswith(os.sep):
             _path += os.sep
             
@@ -115,38 +122,125 @@ class NetworkMounts (QtCore.QObject):
         from core.datatypes import enum2str
         return enum2str(etype)
     
-    def isSlowPath(self, path:str, type = NetworkMountsType.Any) -> bool:
-        pass
+    def isSlowPath(self, path:str, type:NetworkMountsType = NetworkMountsType.Any) -> bool:
+        return len(self.getMatchingPath(path, self.paths(type))) > 0
 
     def isOptionEnabledForPath(self, path:str, option:NetworkMountOption) -> bool:
-        pass
+        if not self.isEnabled():
+            return False
+        
+        if not self.isSlowPath(path):
+            return False
+        
+        return self.isOptionEnabled(option, True)
     
     def isEnabled(self) -> bool:
-        pass
+        return self._settings_.value("EnableOptimizations", False).value()
     
     def setEnabled(self, val:bool):
-        pass
+        self._settings_.setValue("EnableOptimizations", val)
     
     def isOptionEnabled(option:NetworkMountOption, defaultValue:bool=False) -> bool:
-        pass
+        return self._settings_.value(self.enumToString(option), defaultValue).value()
     
     def setOption(self, option:NetworkMountOption, value:bool):
-        pass
+        self._settings_.setValue(self.enumToString(option), value)
     
     def paths(self, type:NetworkMountsType = NetworkMountsType.Any) -> list[str]:
-        pass
+        if type == NetworkMountsType.Any:
+            paths = list()
+            for nmType in (NetworkMountsType.NfsPaths, NetworkMountsType.SmbPaths,
+                       NetworkMountsType.SymlinkDirectory,
+                       NetworkMountsType.SymlinkToNetworkMount):
+                paths.extend(self._settings_.value(self.enumToString(nmType), list()).value())
+            return paths
+        else:
+            return self._settings_.value(self.enumToString(type, list())).value()
+        
+    def setPaths(self, paths:list[str], type:NetworkMountsType):
+        _paths = self.ensureTrailingSlashes(list(paths))
+        self._settings_.setValue(self.enumToString(type), _paths)
     
     def addPath(self, patr:str, type:NetworkMountsType):
-        pass
+        _path = self.ensureTrailingSlash(str(_path))
+        newPaths = self.paths(type)
+        newPaths.append(_path)
     
-    def canonicalSymlinkPath(self, patr:str) -> str:
-        pass
+    def canonicalSymlinkPath(self, path:str) -> str:
+        useCache = self.isOptionEnabled(NetworkMountOption.SymlinkPathsUseCache, True)
+        
+        if useCache:
+            if path in s_canonicalLinkSpacePaths:
+                return s_canonicalLinkSpacePaths[path]
+        
+        symlinkPath = self.getMatchingPath(path, self.paths(NetworkMountsType.SymlinkToNetworkMount))
+        
+        if len(symlinkPath):
+            if symlinkPath.endswith(os.sep):
+                symlinkPath = symlinkPath[:-1]
+                
+            pInfo = QtCore.QFileInfo(symlinkPath)
+            linkPath = str(path)
+            target = pInfo.symLinkTarget()
+            
+            if len(target) == 0: # not a symlink
+                if useCache:
+                    s_canonicalLinkSpacePaths[path] = path
+                return path
+            
+            else: # symlink
+                linkPath = linkPath.replace(symlinkPath, target)
+                if useCache:
+                    s_canonicalLinkSpacePaths[path] = linkPath
+                    
+                return linkPath
+            
+        linkSpacePath = self.getMatchingPath(path, self.paths(NetworkMountsType.SymlinkDirectory))
+        
+        if len(linkSpacePath):
+            _path = str(path)
+            if not _path.endswith(os.sep):
+                _path += os.sep
+                
+            if _path == linkSpacePath:
+                if useCache:
+                    s_canonicalLinkSpacePaths[path] = path
+                    
+                return path
+            
+            try:
+                linkIndex = path.index(os.sep, len(linkSpacePath))
+            except ValueError:
+                linkIndex = -1
+                
+            symlink = path[0:linkIndex] if linkIndex in range(len(path)) else path
+            
+            if useCache and symlink in s_canonicalLinkSpacePaths:
+                linkPath = str(path)
+                linkPath = linkPath.replace(symlink, s_canonicalLinkSpacePaths[symlink])
+                s_canonicalLinkSpacePaths[path] = linkPath
+                return linkPath
+            else:
+                link = QtCore.QFileInfo(symlink)
+                
+                if link.isSymLink():
+                    linkPath = str(path)
+                    linkPath = linkPath.replace(symlink, link.symLinkTarget())
+                    if useCache:
+                        s_canonicalLinkSpacePaths[path] = linkPath
+                    return linkPath
+                else:
+                    if useCache:
+                        s_canonicalLinkSpacePaths[path] = path
+    
+        return path
     
     def clearCache(self):
-        pass
+        if len(s_canonicalLinkSpacePaths):
+            s_canonicalLinkSpacePaths.clear()
     
     def sync(self):
-        pass
+        self._settings_.sync()
     
     
     

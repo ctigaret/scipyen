@@ -479,6 +479,7 @@ def check_type(t:typing.Union[type, typing.Sequence[type], typing.Set[type]],
     return len(t_set & ref_set) > 0 or any(issubclass(v, tuple(ref_set)) for v in t_set)
 
 def enum2str(etype:Enum) -> str:
+    """Returns the symbol (NOT the value) of the enum type"""
     enumItems = list(filter(lambda x: x[1] == etype, 
                             inspect.getmembers_static(etype, predicate = lambda x: isinstance(x, IntEnum))))
     
@@ -488,7 +489,24 @@ def enum2str(etype:Enum) -> str:
             return enumNames[0]
     
     return str()
+
+def enums2str(etypes: typing.Sequence[Enum]) -> list[str]:
+    """Like enum2str but does a single pass throughn the sequence"""
+    if len(etypes) == 0:
+        return list()
     
+    if len(etypes) == 1:
+        return enum2str(etypes[1])
+    
+    assert all(isinstance(e, type(etypes[0])) for e in etypes[1:]), f"All enum types in the sequence must be of the same type: {type(etypes[0]).__name__}"
+    
+    enumItems = list(filter(lambda x: x[1] in etypes, 
+                            inspect.getmembers_static(etypes[0], predicate = lambda x: isinstance(x, IntEnum))))
+    if len(enumItems):
+        return list(map(lambda x: x[0], enumItems))
+    
+    return list()
+        
 
 def type2str(t:type) -> str:
     if not isinstance(t, type):
