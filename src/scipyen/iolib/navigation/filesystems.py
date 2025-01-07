@@ -73,6 +73,7 @@ def fileSystemType(path:str) -> FsType:
     else:
         return determineFileSystemType(path)
         
-def fileSysteName(type:FsType) -> str:
+def fileSysteName(ftype:FsType) -> str:
+    match ftype:
     pass
     
