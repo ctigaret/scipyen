@@ -6,6 +6,7 @@
 """
 """
 import dataclasses
+import psutil
 from enum import Enum, IntEnum
 
 class Type(IntEnum):pass
@@ -52,7 +53,7 @@ fsMap = [
 
 def typeFromName(name:str):
     from core.prog import scipywarn
-    found = list(filter(lambda x: x.name == "fat", filesystem.fsMap))
+    found = list(filter(lambda x: x.name == name, fsMap))
     if len(found):
         if len(found) > 1:
             scipywarn(f"Ambiguous file system type detection for '{name}'")

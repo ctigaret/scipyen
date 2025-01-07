@@ -20,6 +20,7 @@ colorama
 termcolor
 pyserial
 pickleshare
+psutil
 #### OPTIONAL packages
 researchpy      # ✓ (pip install researchpy)
 modelspec       # ✓ (pip install modelspec)

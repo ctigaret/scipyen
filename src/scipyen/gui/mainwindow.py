@@ -388,7 +388,10 @@ has_neuron = neuron_spec is not None
 
 # END scipyen core modules
 
-
+# NOTE: 2025-01-07 12:37:46
+# part of the singleton design pattern for main window
+# see also traitlets.config.SingletonConfigurable
+SMW = typing.TypeVar("SMW", bound = "ScipyenWindow") # type variable representing the ScipyenWindow class
 
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
@@ -405,7 +408,7 @@ else:
 
 
 # BEGIN NOTE: 2022-04-07 22:39:44
-# the code below supplemets the atbel of IPython's core completer latex symbols
+# the code below supplemets the table of IPython's core completer latex symbols
 # with extra unicode characters from Julia
 # HOWEVER, Python 3 only supports a subset of these, for variable names (a.k.a
 # identifiers)
@@ -1085,8 +1088,6 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     sig_newItemsInMonitoredDir = Signal(tuple, name="sig_newItemsInMonitoredDir")
     sig_itemsRemovedFromMonitoredDir = Signal(tuple, name="sig_itemsRemovedFromMonitoredDir")
     sig_itemsChangedInMonitoredDir = Signal(tuple, name="sig_itemsChangedInMonitoredDir")
-    
-    _instance = None
 
     # TODO: 2021-11-26 17:23:45 To add:
     # saveFile, runScript, showObj, sysOpen, editor
@@ -1101,14 +1102,38 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     # class attribute
     pluginActions = []
 
+    _instance = None
+    
     @classmethod
-    def initialized(cls):
+    def _walk_mro(cls) -> typing.Generator[type[SMW], None, None]:
+        """Walk the cls.mro() for parent classes that are also singletons
+
+        For use in instance()
+        """
+        # NOTE: 2025-01-07 12:42:39
+        # see traitlets.config.SingletonConfigurable
+        for subclass in cls.mro():
+            if (
+                issubclass(cls, subclass)
+                and issubclass(subclass, SMW)
+                and subclass != SMW
+            ):
+                yield subclass
+
+    @classmethod
+    def initialized(cls:type[SMW]) -> bool:
         return hasattr(cls, "_instance" and isinstance(cls._instance, cls))
 
     @classmethod
-    def instance(cls):
-        if hasattr(cls, "_instance"):
+    def instance(cls:type[SMW], *args, **kwargs) -> SMW:
+        if cls._instance is None:
+            inst = cls(*args, **kwargs)
+            for subclass in cls._walk_mro():
+                subclass._instance = inst
+        if hasattr(cls, "_instance") and isinstance(cls._instance, cls):
             return cls._instance
+        else:
+            raise RuntimeError(f"Incompatible sibling of '{cls.__name__}' is already instantiated as singleton: {type(cls._instance).__name__}")
 
     # NOTE: 2016-04-17 16:11:56
     # argument and return variable parsing moved to _installPluginFunction_
@@ -1392,7 +1417,14 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         # print(f"slot_wrapPluginFunction in @self._inputPrompter_ {f.__module__}.{f.__name__} arg_types {arg_types} kw_args {kw_args}")
         return sw_f
-
+    
+    def __new__(cls:type[SMW], app: QtWidgets.QApplication, 
+                 parent: typing.Optional[QtWidgets.QWidget] = None, *args, **kwargs) -> SMW:
+        if not hasattr(cls, "_instance") or not isinstance(cls._instance, cls):
+            cls._instance = super(ScipyenWindow, cls).__new__(cls, app, parent, *args, **kwargs)
+            
+        return cls._instance
+    
     # @processtimefunc
     def __init__(self, app: QtWidgets.QApplication, 
                  parent: typing.Optional[QtWidgets.QWidget] = None, *args, **kwargs):
@@ -1683,7 +1715,9 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # anywhere - keep available as app-wide threadpool for various sub-apps
         self.threadpool = QtCore.QThreadPool()
 
-        self.__class__._instance = self  # FIXME: what's this for?!? - flag as singleton?
+        # NOTE: singleton design pattern
+        # see traitlets.config.SingletonConfigurable
+        self.__class__._instance = self  
 
         # NOTE: 2024-05-29 13:04:00
         # Asynchronously launch the plugin loading mechanism

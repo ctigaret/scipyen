@@ -282,7 +282,7 @@ class UDSEntry():
             self.insert(self.UDS_LOCAL_GROUP_ID, buff.st_gid) # group ID of the file owner — UNIX only
         #endif
         
-    def __eq__(self, other)->bool:
+    def __eq__(self, other) -> bool:
         if type(other) != type(self):
             return False
         
@@ -335,12 +335,12 @@ class UDSEntry():
         else:
             raise TypeError(f"'value' expected to be a str or int; instead got {type(value).__name__}")
         
-    def count(self)->int:
+    def count(self) -> int:
         # int count() const;
         
         return len(self.storage)
     
-    def stringValue(self, udsField:int)->str:
+    def stringValue(self, udsField:int) -> str:
         # QString stringValue(uint udsField) const;
         # indexes = list(map(lambda x: x.m_index, self.storage))
         indexes = self.fields()
@@ -348,18 +348,18 @@ class UDSEntry():
             return self.storage[indexes.index(udsField)].m_str
         return str()
     
-    def numberValue(self, udsField:int, defaultValue:int = -1)->int:
+    def numberValue(self, udsField:int, defaultValue:int = -1) -> int:
         # long long numberValue(uint udsField, long long defaultValue = -1) const;
         indexes = list(map(lambda x: x.m_index, self.storage))
         if udsField in indexes:
             return self.storage[indexes.index(udsField)].m_long
         return defaultValue
     
-    def fields(self)->list[int]:
+    def fields(self) -> list[int]:
         # QList<uint> fields() const;
         return list(map(lambda x: x.m_index, filter(lambda x: isinstance(x, Field), self.storage)))
     
-    def contains(self, udsField:int)->bool:
+    def contains(self, udsField:int) -> bool:
         # bool contains(uint udsField) const;
         return udsField in self.fields()
     
@@ -487,7 +487,7 @@ class UDSEntry():
             print("\n".join(ret), flush=True)
     
     @staticmethod
-    def nameOfUdsField(field:int)->str:
+    def nameOfUdsField(field:int) -> str:
         # /**
         #  * @param field numeric UDS field id
         #  * @return the name of the field

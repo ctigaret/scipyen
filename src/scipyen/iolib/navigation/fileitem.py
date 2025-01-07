@@ -10,7 +10,6 @@ import datetime
 from enum import Enum, IntEnum
 from qtpy import QtCore, QtGui, QtWidgets, QtSvg
 from qtpy.QtCore import Signal, Slot, Property
-from qtpy.uic import loadUiType as __loadUiType__
 from core.prog import safeWrapper
 from core.sysutils import adapt_ui_path
 from iolib.navigation.udsentry import UDSEntry
@@ -218,7 +217,7 @@ class _FileItem_():
                 
         self._bInitCalled_ = True
 
-    def size(self)->int:
+    def size(self) -> int:
         self.ensureInitialized()
         
         fieldVal = self._entry_.numberValue(UDSEntry.UDS_SIZE, -1)
@@ -231,14 +230,14 @@ class _FileItem_():
         
         return 0
 
-    def recursiveSize(self)->int:
+    def recursiveSize(self) -> int:
         fieldVal = self._entry_.numberValue(UDSEntry.UDS_RECURSIVE_SIZE, -1)
         if fieldVal != -1:
             return fieldVal
         return 0
     
     @staticmethod
-    def udsFieldForTime(mappedWhich:FileTimes):
+    def udsFieldForTime(mappedWhich:FileTimes) -> int:
         match mappedWhich:
             case FileTimes.ModificationTime:
                 return UDSEntry.UDS_MODIFICATION_TIME
@@ -251,7 +250,8 @@ class _FileItem_():
             
         return 0
     
-    def setTime(self, mappedWhich:FileTimes, val:typing.Union[int, QtCore.QDateTime, datetime.datetime]):
+    def setTime(self, mappedWhich:FileTimes, 
+                val:typing.Union[int, QtCore.QDateTime, datetime.datetime]):
         """val: int (seconds), QDateTime, datetime.datetime"""
         if isinstance(val, int):
             self._entry_.replace(self.udsFieldForTime(mappedWhich), val)
@@ -266,7 +266,7 @@ class _FileItem_():
         else:
             scipywarn(f"Expecting an int (UTC time stamp), QDateTime or datetime.datetime; instead, got {type(val).__name__}")
             
-    def time(self, mapedWhich:FileTimes)->QtCore.QDateTime:
+    def time(self, mapedWhich:FileTimes) -> QtCore.QDateTime:
         """Use core.utilities.datetimeFromQt to convert to datetime.datetime
         """
         self.ensureInitialized()
@@ -336,7 +336,7 @@ class _FileItem_():
                    self. _entry_.stringValue(UDSEntry.UDS_TARGET_URL) == item._entry_.stringValue(UDSEntry.UDS_TARGET_URL),
                    self._entry_.stringValue(UDSEntry.UDS_LOCAL_PATH) == item._entry_.stringValue(UDSEntry.UDS_LOCAL_PATH)))
         
-    def parsePermissions(self, perm:int)->str:
+    def parsePermissions(self, perm:int) -> str:
         # TODO: 2025-01-06 17:07:40 check against result from stat.filemode(mode)
         self.ensureInitialized()
         
@@ -411,7 +411,7 @@ class _FileItem_():
             
         return "".join(bfr)
 
-    def isSlow(self)->bool:
+    def isSlow(self) -> bool:
         if self._slow_ == self.SlowUnknown:
             path = self.localPath()
             if len(path):
@@ -504,7 +504,7 @@ class FileItem(_FileItem_):
         self._isLink_ = val == True
         
     @property
-    def isDir(self)->bool:
+    def isDir(self) -> bool:
         return self._isDir_
     
     @isDir.setter
@@ -512,7 +512,7 @@ class FileItem(_FileItem_):
         self._isDir_ = val == True
         
     @property
-    def isFile(self)->bool:
+    def isFile(self) -> bool:
         return self._isFile_
     
     @isFile.setter
@@ -520,7 +520,7 @@ class FileItem(_FileItem_):
         self._isFile_ = val == True
         
     @property
-    def isReadable(self)->bool:
+    def isReadable(self) -> bool:
         return self._isReadable_
     
     @isReadable.setter
@@ -528,7 +528,7 @@ class FileItem(_FileItem_):
         self._isReadable_ = val == True
         
     @property
-    def isWritable(self)->bool:
+    def isWritable(self) -> bool:
         return self._isWritable_
     
     @isWritable.setter
@@ -544,7 +544,7 @@ class FileItem(_FileItem_):
         self._isHidden_ = val == True
         
     @property
-    def isSlow(self)->bool:
+    def isSlow(self) -> bool:
         return self._isSlow_
     
     @isSlow.setter
@@ -552,7 +552,7 @@ class FileItem(_FileItem_):
         self._isSlow_ = val == True
         
     @property
-    def isDesktopFile(self)->bool:
+    def isDesktopFile(self) -> bool:
         return self._isDesktopFile_
     
     @isDesktopFile.setter
@@ -560,7 +560,7 @@ class FileItem(_FileItem_):
         self._isDesktopFile_ = val == True
         
     @property
-    def linkDest(self)->str:
+    def linkDest(self) -> str:
         return self._linkDest_
     
     @linkDest.setter
@@ -568,7 +568,7 @@ class FileItem(_FileItem_):
         self._linkDest_ = val
         
     @property
-    def targetUrl(self)->QtCore.QUrl:
+    def targetUrl(self) -> QtCore.QUrl:
         return self._targetUrl_
     
     @targetUrl.setter
@@ -576,7 +576,7 @@ class FileItem(_FileItem_):
         self._targetUrl_ = val
 
     @property
-    def localPath(self)->str:
+    def localPath(self) -> str:
         return self._localPath_
     
     @localPath.setter
@@ -584,7 +584,7 @@ class FileItem(_FileItem_):
         self._localPath_ = val
         
     @property
-    def isLocalFile(self)->bool:
+    def isLocalFile(self) -> bool:
         return self._isLocalFile_
     
     @isLocalFile.setter
@@ -592,7 +592,7 @@ class FileItem(_FileItem_):
         self._isLocalFile_ = val == True
         
     @property
-    def text(self)->str:
+    def text(self) -> str:
         return self._text_
         
     @text.setter
@@ -600,7 +600,7 @@ class FileItem(_FileItem_):
         self._text_ = val
         
     @property
-    def name(self)->str:
+    def name(self) -> str:
         return self._name_
     
     @name.setter
@@ -608,7 +608,7 @@ class FileItem(_FileItem_):
         self._name_ = val
         
     @property
-    def mimetype(self)->str:
+    def mimetype(self) -> str:
         return self._mimetype_
     
     @mimetype.setter
@@ -616,7 +616,7 @@ class FileItem(_FileItem_):
         self._mimetype_ = val
         
     @property
-    def determineMimeType(self)->QtCore.QMimeType:
+    def determineMimeType(self) -> QtCore.QMimeType:
         return self._determineMimeType_
     
     @determineMimeType.setter
@@ -624,7 +624,7 @@ class FileItem(_FileItem_):
         self._determineMimeType_ = val
         
     @property
-    def currentMimeType(self)->QtCore.QMimeType:
+    def currentMimeType(self) -> QtCore.QMimeType:
         return self._currentMimeType_
     
     @currentMimeType.setter
@@ -632,7 +632,7 @@ class FileItem(_FileItem_):
         self._currentMimeType_ = val
         
     @property
-    def isFinalIconKnown(self)->bool:
+    def isFinalIconKnown(self) -> bool:
         return self._isFinalIconKnown_
     
     @isFinalIconKnown.setter
@@ -640,7 +640,7 @@ class FileItem(_FileItem_):
         self._isFinalIconKnown_ = val == True
         
     @property
-    def isMimeTypeKnown(self)->bool:
+    def isMimeTypeKnown(self) -> bool:
         return self._isMimeTypeKnown_
     
     @isMimeTypeKnown.setter
@@ -648,7 +648,7 @@ class FileItem(_FileItem_):
         self._isMimeTypeKnown_ = val == True
         
     @property
-    def mimeComment(self)->str:
+    def mimeComment(self) -> str:
         return self._mimeComment_
     
     @mimeComment.setter
@@ -656,7 +656,7 @@ class FileItem(_FileItem_):
         self._mimeComment_ = val
     
     @property
-    def iconName(self)->str:
+    def iconName(self) -> str:
         return self._iconName_
     
     @iconName.setter
@@ -664,7 +664,7 @@ class FileItem(_FileItem_):
         self._iconName_ = val
         
     @property
-    def overlays(self)->list[str]:
+    def overlays(self) -> list[str]:
         return self._overlays_
     
     @overlays.setter
@@ -672,7 +672,7 @@ class FileItem(_FileItem_):
         self._overlays_ = val
         
     @property
-    def comment(self)->str:
+    def comment(self) -> str:
         return self._comment_
     
     @comment.setter
@@ -680,7 +680,7 @@ class FileItem(_FileItem_):
         self._comment_ = val
         
     @property
-    def statusBarInfo(self)->str:
+    def statusBarInfo(self) -> str:
         return self._statusBarInfo_
     
     @statusBarInfo.setter
@@ -688,7 +688,7 @@ class FileItem(_FileItem_):
         self._statusBarInfo_ = val
         
     @property
-    def isRegularFile(self)->bool:
+    def isRegularFile(self) -> bool:
         return self._isRegularFile_
     
     @isRegularFile.setter

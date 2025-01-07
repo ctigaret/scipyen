@@ -478,6 +478,18 @@ def check_type(t:typing.Union[type, typing.Sequence[type], typing.Set[type]],
     
     return len(t_set & ref_set) > 0 or any(issubclass(v, tuple(ref_set)) for v in t_set)
 
+def enum2str(etype:Enum) -> str:
+    enumItems = list(filter(lambda x: x[1] == etype, 
+                            inspect.getmembers_static(etype, predicate = lambda x: isinstance(x, IntEnum))))
+    
+    if len(enumItems):
+        enumNames = list(map(lambda x: x[0], enumItems))
+        if len(enumNames):
+            return enumNames[0]
+    
+    return str()
+    
+
 def type2str(t:type) -> str:
     if not isinstance(t, type):
         # print(f"{t} not a type")
@@ -975,33 +987,35 @@ class ScipyenDataclass:
         # print(f"### END {cls.__name__}.fromHDF5 \n\n")
         return cls(**kwargs)
     
+    
+TE = typing.TypeVar("TE", bound="TypeEnum")
 class TypeEnum(IntEnum):
     """Common ancestor for enum types used in Scipyen
     """
     
     @classmethod
-    def default(cls):
+    def default(cls) -> type[TE]:
         """Aways returns the first member of the enum class
         """
         names = list(cls.names())
         return cls[names[0]]
     
     @classmethod
-    def names(cls):
+    def names(cls) -> typing.Generator[str, None, None]:
         """Iterate through the names in TypeEnum enumeration.
         """
         for t in cls:
             yield t.name
     
     @classmethod
-    def values(cls):
+    def values(cls) -> typing.Generator[int, None, None]:
         """Iterate through the int values of TypeEnum enumeration.
         """
         for t in cls:
             yield t.value
         
     @classmethod
-    def types(cls):
+    def types(cls) -> typing.Generator[type[TE], None, None]:
         """Iterate through the elements of TypeEnum enumeration.
         Useful to quickly remember what the members of this enum are (with their
         names and values).
@@ -1014,9 +1028,9 @@ class TypeEnum(IntEnum):
             yield t
             
     @classmethod
-    def namevalue(cls, name:str):
-        """Return the value (int) for given name;
-        If name is not a valid TypeEnum name returns -1
+    def namevalue(cls, name:str) -> int:
+        """Return the value (int) corresponding to a given name;
+        WARNING If name is not a valid TypeEnum name returns -1
         """
         if name in cls.names():
             return getattr(cls, name).value
@@ -1038,7 +1052,7 @@ class TypeEnum(IntEnum):
             return False
 
     @classmethod
-    def type(cls, t):
+    def type(cls, t:typing.Union[str, int]) -> type[TE]:
         """Returns the enum type corresponding to `t`, where
         `t` can be:
         • str: the name / symbol associated with the type in the enum
@@ -1079,7 +1093,7 @@ class TypeEnum(IntEnum):
             raise TypeError("Expecting a %s, int or str; got %s instead" % (cls.__name__, type(t).__name__))
             
     @classmethod
-    def strand(cls, name1:str, name2:str):
+    def strand(cls, name1:str, name2:str) -> int:
         """ Emulates '&' operator for type names 'name1' and 'name2'.
         If neither arguments are valid names returns 0
         """
@@ -1092,7 +1106,7 @@ class TypeEnum(IntEnum):
         return val1 & val2
     
     @classmethod
-    def is_primitive_type(cls, t):
+    def is_primitive_type(cls, t) -> bool:
         """Checks if 't' is a primitive type in this types enumeration.
         
         Parameters:
@@ -1106,7 +1120,7 @@ class TypeEnum(IntEnum):
         return len(cls.primitive_component_types(t)) == 0
     
     @classmethod
-    def is_derived_type(cls, t):
+    def is_derived_type(cls, t) -> bool:
         """Checks if 't' is a compound type (i.e. derived from other type enums)
         
         Parameters:
@@ -1121,7 +1135,7 @@ class TypeEnum(IntEnum):
         #return len(cls.primitive_component_types(t)) > 0
         
     @classmethod
-    def is_composite_type(cls, t):
+    def is_composite_type(cls, t) -> bool:
         """Alias of TypeEnum.is_derived_type()
         
         Parameters:
@@ -1135,7 +1149,7 @@ class TypeEnum(IntEnum):
         return cls.is_derived_type(t)
     
     @classmethod
-    def primitive_component_types(cls, t):
+    def primitive_component_types(cls, t) -> typing.List[TE]:
         """ Returns a list of primitive TypeEnum objects that compose 't'.
         If 't' is already a primitive type, returns an empty list.
         
@@ -1161,7 +1175,7 @@ class TypeEnum(IntEnum):
         return [_t for _t in filter(lambda x: x & t, cls) if _t.value < t.value and _t.is_primitive()]
         
     @classmethod
-    def component_types(cls, t):
+    def component_types(cls, t) -> typing.List[TE]:
         """ Returns a list of TypeEnum objects that compose 't'.
         If 't' is already a primitive type, returns an empty list.
     
@@ -1191,7 +1205,7 @@ class TypeEnum(IntEnum):
         return [_t for _t in filter(lambda x: x & t, cls) if _t.value < t.value]
     
     @classmethod
-    def derived_types(cls, t):
+    def derived_types(cls, t) -> typing.List[TE]:
         """ Returns the composite TypeEnum objects where 't' participates.
         Parameters:
         -----------
@@ -1218,15 +1232,15 @@ class TypeEnum(IntEnum):
         """
         return self.is_derived_type(self)
     
-    def is_composite(self):
+    def is_composite(self) -> bool:
         """Return True if this TypeEnum object is a composite (i.e., derived) type.
         """
         return self.is_derived()
     
-    def is_primitive(self):
+    def is_primitive(self) -> bool:
         return self.is_primitive_type(self)
     
-    def primitives(self):
+    def primitives(self) -> typing.List[TE]:
         """Returns a list of primitive types used to generate this type.
         
         Compound types are generated from primitive types through the logical
@@ -1236,7 +1250,7 @@ class TypeEnum(IntEnum):
         """
         return self.primitive_component_types(self)
     
-    def components(self):
+    def components(self) -> typing.List[TE]:
         """Returns a list of components for this TypeEnum object.
         
         Compound types are generated from primitive types through the logical
@@ -1246,7 +1260,7 @@ class TypeEnum(IntEnum):
         """
         return self.component_types(self)
     
-    def includes(self, t):
+    def includes(self, t) -> bool:
         """Returns True if 't' is a component of this TypeEnum object.
         
         't' may be a primitive or a composite type.
@@ -1257,7 +1271,7 @@ class TypeEnum(IntEnum):
             
         return t in self.components()
     
-    def is_primitive_of(self, t):
+    def is_primitive_of(self, t) -> bool:
         """Returns True if this TypeEnum object is a primitive of 't'.
         
         Always returns False when this TypeEnum object is a composite (i.e., 
@@ -1267,14 +1281,14 @@ class TypeEnum(IntEnum):
             
         return self in t.primitives()
     
-    def is_component_of(self, t):
+    def is_component_of(self, t) -> bool:
         """Returns True if this TypeEnum object is a component of 't'.
         """
         t = self.type(t)
         
         return self in t.components()
     
-    def nameand(self, name:str):
+    def nameand(self, name:str) -> TE:
         """ Applies strand() to the name of this object and the argument.
         """
         return self.strand(self.name, name)
