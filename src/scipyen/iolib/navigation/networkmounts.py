@@ -54,7 +54,7 @@ class NetworkMounts (QtCore.QObject):
                        NetworkMountsType.SymlinkToNetworkMount):
             typeStr = self.enumToString(nmType)
             slowPaths = self._settings_.value(typeStr, list()).value()
-            _slowPaths = self.ensureTrailingSlashes(slowPaths):
+            _slowPaths = self.ensureTrailingSlashes(slowPaths)
             self._settings_.setValue(typeStr, _slowPaths)
     
     @classmethod

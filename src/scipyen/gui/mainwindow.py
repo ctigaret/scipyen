@@ -7917,6 +7917,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # print(f"{self.__class__.__name__}.slot_fileSystemDataChanged args {args} kwargs {kwargs}" )
         self._fileSystemChanged_ = True
 
+    @safeWrapper
     def enableDirectoryMonitor(self, directory:typing.Optional[typing.Union[str, pathlib.Path]]=None,
                              on:bool=True):
         # NOTE: 2023-09-27 18:02:22
@@ -7973,6 +7974,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             
             # NOTE: 2023-09-27 22:10:44
             # we MUST use a dict, to capture the stat of each entry at the moment of caching!!!
+            # NOTE: 2025-01-07 20:14:58 WARNING: will fail if not enough permissions !!!!
             self._monitoredDirsCache_[directory] = dict((entry, entry.stat()) for entry in directory.glob('*'))
             # self._monitoredDirsCache_[directory] = set(directory.glob('*'))
                 
@@ -8021,6 +8023,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         to emit dataChanged signal, here connected to the slot_fileSystemDataChanged.
         
         Connected to self.dirFileMonitor.directoryChanged() slot
+        
+        WARNING: Will fail if user does nto have necessary permissions on this directory
         
     """
         #print(f"{self.__class__.__name__}._slot_monitoredDirectoryContentsChanged (from dirFileMonitor) *args {args}, **kwargs {kwargs}")

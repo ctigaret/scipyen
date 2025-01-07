@@ -669,7 +669,9 @@ class FileIOGui(object):
         return dirName
     
 class FileStatChecker(QtCore.QObject):
-    """Monitors changes ot a file system file object"""
+    """Monitors changes ot a file system file object.
+        WARNING: The user needs to have read access 
+    """
     okToProcess = Signal(pathlib.Path, name="okToProcess")
     
     def __init__(self, filePath:typing.Optional[pathlib.Path] = None, 
