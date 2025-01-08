@@ -165,7 +165,7 @@ class ListDirsJob(QtCore.QThread):
     def __init__(self, path:pathlib.Path, showHidden:bool=False,
                  parent:typing.Optional[QtCore.QObject]=None):
         if not path.is_absolute():
-            p = path.resolve()
+            p = path.absolute()
         else:
             p = pathlib.Path(path)
         
@@ -339,7 +339,7 @@ def upPath(path:pathlib.Path) -> pathlib.Path:
     # NOTE: 2024-12-30 19:36:35
     # this below would resolve the current path - not what I want
     # # if not path.is_absolute():
-    # #     return path.parent.resolve()
+    # #     return path.parent.absolute()
     
     # in reality I want to resolve the parent path (i.e. the ".." in "../somepath")
     # therefore see the False branch below
@@ -347,7 +347,7 @@ def upPath(path:pathlib.Path) -> pathlib.Path:
         return pathlib.Path(path.parent)
     else:
         p = pathlib.Path("..") / path
-        return p.parent.resolve()
+        return p.parent.absolute()
     
 class SchemeCategory(IntEnum):
     CoreCategory = 0

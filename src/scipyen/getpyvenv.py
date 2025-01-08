@@ -18,7 +18,6 @@ def _parse_pyvenv_line_(x):
     k = k.replace(" ", "") # remove spaces in dict keys
     
     v = v.replace("\n", "") # remove crlf from value
-    #v = Path(v).resolve()
     
     return (k,v)
     

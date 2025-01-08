@@ -68,7 +68,7 @@ def determineFileSystemType(path:str) -> FsType:
         return FsType.Unknown
     else:
         partitions = psutil.disk_partitions(True)
-        ppath = pathlib.Path(path).resolve() # wrap in a pathlib.Path for the code below
+        ppath = pathlib.Path(path).absolute() # wrap in a pathlib.Path for the code below
                                              # and ensure this is absolute
         
         # NOTE: 2025-01-07 19:34:21

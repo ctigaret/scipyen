@@ -21,7 +21,7 @@ class BreadCrumb(QtWidgets.QWidget):
                  parentCrumb:typing.Optional[QtWidgets.QWidget]=None,
                  parent:typing.Optional[QtWidgets.QWidget]=None):
         super().__init__(parent=parent)
-        path = path.resolve()
+        path = path.absolute()
         # print(f"{self.__class__.__name__}.__init__ path = {path}")
         if not path.is_dir():
             path = path.parent
@@ -238,7 +238,7 @@ class PathEditor(QtWidgets.QWidget):
     
     def __init__(self, path:pathlib.Path, recentDirs:list = [], maxRecent:int=10, parent=None):
         super().__init__(parent=parent) 
-        self._path_ = path.resolve()
+        self._path_ = path.absolute()
         self._recentDirs_ = recentDirs
         self._maxRecent_ = maxRecent
         self._configureUI_()
@@ -301,7 +301,7 @@ class PathEditor(QtWidgets.QWidget):
         oldp = self._path_.as_posix()
         if oldp not in self.history:
             self.history.insert(0, oldp)
-        self._path_ = value.resolve()
+        self._path_ = value.absolute()
         ps = self._path_.as_posix()
         
         signalBlocker = QtCore.QSignalBlocker(self.directoryComboBox)
@@ -367,7 +367,7 @@ class PathEditor(QtWidgets.QWidget):
     @Slot(str)
     def slot_dirChange(self, value):
         hh = self.history
-        p = pathlib.Path(value).resolve().as_posix()
+        p = pathlib.Path(value).absolute().as_posix()
         
         if p not in hh:
             hh.insert(0, p)

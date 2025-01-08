@@ -57,7 +57,7 @@ SlowEnum = IntEnum("SlowEnum", ["SlowUnknown", "Fast", "Slow"])
 _FI_ = typing.TypeVar("_FI_", bound = "_FileItem_")
 FI = typing.TypeVar("FI", bound="FileItem")
 
-class _FileItem_():
+class _FileItem_:
     Unknown         = UnknownEnum.Unknown
     
     Auto            = HiddenEnum.Auto
@@ -79,18 +79,19 @@ class _FileItem_():
                  urlIsDirectory:bool,
                  delayedMimeTypes:bool, 
                  mimeTypeDetermination:MimeTypeDetermination):
+        
         self._entry_:UDSEntry = entry
-        if isinstance(itemOrDirUrl, pathlib.Path):
-            self._url_ = QtCore.QUrl(itemOrDirUrl.as_uri())
-        else:
-            self._url_:QtCore.QUrl = itemOrDirUrl
+        # if isinstance(itemOrDirUrl, pathlib.Path):
+        #     self._url_ = QtCore.QUrl(itemOrDirUrl.as_uri())
+        # else:
+        self._fileMode_:int = mode
+        self._permissions_:int = permissions
+        self._url_:QtCore.QUrl = itemOrDirUrl
         self._strName_:str = str()
         self._strText_:str = str()
         self._iconName_:str = str()
         self._strLowerCaseName:str = str()
         self._mimeType_:QtCore.QMimeType = QtCore.QMimeType()
-        self._fileMode_:int = mode
-        self._permissions_:int = permissions
         self._addACL_:bool = False
         self._bLink_:bool = False
         self._bIsLocalUrl_:bool = itemOrDirUrl.isLocalFile()
@@ -105,14 +106,16 @@ class _FileItem_():
         self._bInitCalled_:bool = False
         self._access_:str = str()
         
+        # print(f"{self.__class__.__name__}.__init__(entry with {entry.count()} fields)")
         if entry.count() != 0:
-            self.readUDSEntry(not urlIsDirectory)
+            self.readUDSEntry(urlIsDirectory)
         else:
             if not urlIsDirectory:
                 self._strName_ = itemOrDirUrl.fileName()
                 self._strText_ = self._strName_
         
     def readUDSEntry(self, urlIsDirectory:bool):
+        print(f"{self.__class__.__name__}.readUDSEntry")
         self._fileMode_ = self._entry_.numberValue(UDSEntry.UDS_FILE_TYPE, self.Unknown)
         self._permissions_ = self._entry_.numberValue(UDSEntry.UDS_ACCESS, self.Unknown)
         self._strName_ = self._entry_.stringValue(UDSEntry.UDS_NAME)
@@ -181,7 +184,8 @@ class _FileItem_():
                 else:
                     buff = os.stat(pPath, follow_symlinks=False)
                     
-                self._entry_.reserve(10)
+                self._entry_.reserve(9)
+                # self._entry_.reserve(10)
                 self._entry_.replace(UDSEntry.UDS_DEVICE_ID, buff.st_dev)
                 self._entry_.replace(UDSEntry.UDS_INODE, buff.st_ino)
                 
@@ -198,9 +202,12 @@ class _FileItem_():
                     mode = buff.st_mode
                     
                 else:
-                    mode = (utils.STAT_MASK - 1) | stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO
+                    mode = (utils.IFMT_MASK - 1) | stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO
+                    # mode = (utils.IFMT_MASK - 1) | stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO
                     
-                file_type = mode & utils.STAT_MASK # meaning regular, directory, block, ...
+                # NOTE: 2025-01-08 21:48:48
+                # this is the same as stat.S_IFMT(mode)
+                file_type = mode & utils.IFMT_MASK # meaning regular, directory, block, ...
                 
                 self._entry_.replace(UDSEntry.UDS_SIZE, buff.st_size)
                 self._entry_.replace(UDSEntry.UDS_FILE_TYPE, file_type)
@@ -356,9 +363,8 @@ class _FileItem_():
         # TODO: 2025-01-06 17:07:40 check against result from stat.filemode(mode)
         # BUG: 2025-01-08 18:45:50 FIXME:
         # • why does this keep inserting the 't' bit?
-        # • the link bit is not properly set!
         # • rw appears all over the place when it shouldn't'
-        # • the directory bit is not set!
+        # • sticky bit appears when it shouldn't
         self.ensureInitialized()
         
         bfr = ["-"]*12
@@ -509,8 +515,7 @@ class FileItem(metaclass=MultipleMeta):
             self._d_._mimeType_ = db.mimeTypeForName(mimeType)
             
     def __init__(self, path:pathlib.Path, mimeType:str, mode:int):
-        url = QtCore.QUrl(path.resolve().as_uri())
-        self.__init__(UDSEntry(), mode, int(UnknownEnum.Unknown), url, 
+        self.__init__(UDSEntry(), mode, int(UnknownEnum.Unknown), path.absolute().as_uri(), 
                         False, False, MimeTypeDetermination.NormalMimeTypeDetermination)
         
         self._d_._bMimeTypeKnown_ = len(strutils.simplify(mimeType)) > 0 
@@ -523,14 +528,15 @@ class FileItem(metaclass=MultipleMeta):
                     url, False, False, mimeTypeDetermination)
     
     def __init__(self, path:str,  mimeTypeDetermination:MimeTypeDetermination):
-        url = QtCore.QUrl(papthlib.Path(path).resolve().as_uri())
+        pp = pathlib.Path(path).absolute()
         self.__init__(UDSEntry(), int(UnknownEnum.Unknown), int(UnknownEnum.Unknown),
-                    url, False, False, mimeTypeDetermination)
+                    QtCore.QUrl(pp.as_uri()), pp.is_dir(), False, mimeTypeDetermination)
     
     def __init__(self, path:str):
-        url = QtCore.QUrl(pathlib.Path(path).resolve().as_uri())
+        pp = pathlib.Path(path).absolute()
+        url = pp.as_uri()
         self.__init__(UDSEntry(), int(UnknownEnum.Unknown), int(UnknownEnum.Unknown),
-                    url, False, False, MimeTypeDetermination.NormalMimeTypeDetermination)
+                    QtCore.QUrl(pp.as_uri()), pp.is_dir(), False, MimeTypeDetermination.NormalMimeTypeDetermination)
     
     def __init__(self, url:QtCore.QUrl):
         self.__init__(UDSEntry(), int(UnknownEnum.Unknown), int(UnknownEnum.Unknown),
@@ -543,6 +549,8 @@ class FileItem(metaclass=MultipleMeta):
                  itemOrDirUrl:QtCore.QUrl, urlIsDirectory:bool,
                  delayedMimeTypes:bool, mimeTypeDetermination:MimeTypeDetermination):
         # ### BEGIN KFileItemPrivate
+        print(f"{self.__class__.__name__}.__init__<common>:")
+        print(f"entry: {entry.count()}, mode: {mode}, permissions: {permissions}, itemOrDirUrl: {itemOrDirUrl}, urlIsDirectory: {urlIsDirectory}, delayedMimeTypes: {delayedMimeTypes}, mimeTypeDetermination: {mimeTypeDetermination})")
         self._d_ = _FileItem_(entry, mode, permissions, itemOrDirUrl, urlIsDirectory, 
                          delayedMimeTypes, mimeTypeDetermination)
         # ### END KFileItemPrivate
@@ -623,9 +631,11 @@ class FileItem(metaclass=MultipleMeta):
             
         self._d_._hiddenCache_ = self.HiddenUncached
         
-    def name(self, lowerCase:bool) -> str:
+    def name(self, lowerCase:bool=False) -> str:
         if self._d_ is None:
             return str()
+        
+        self._d_.ensureInitialized()
         
         if not lowerCase:
             return self._d_._strName_
@@ -800,7 +810,7 @@ class FileItem(metaclass=MultipleMeta):
                 return QtCore.QFile.symLinkTarget(self._d_._url_.adjusted(QtCore.QUrl.StripTrailingSlash).toLocalFile())
             else:
                 path = self._d_._url_.adjusted(QtCore.QUrl.StripTrailingSlash).toLocalFile()
-                return pathlib.Path(path).readlink()
+                return pathlib.Path(path).readlink() # or resolve()?
         return str()
     
     def targetUrl(self) -> QtCore.QUrl:
