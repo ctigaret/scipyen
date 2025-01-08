@@ -5,6 +5,7 @@
 
 """
 """
+import os, sys, pathlib
 import dataclasses
 import psutil
 from enum import Enum, IntEnum
@@ -63,10 +64,10 @@ def typeFromName(name:str):
     return FsType.Other
 
 def determineFileSystemType(path:str) -> FsType:
-    if os.platform == "win32":
+    if sys.platform == "win32":
         return FsType.Unknown
     else:
-        partitions = psutil.disk_partitions(True)_
+        partitions = psutil.disk_partitions(True)
         ppath = pathlib.Path(path).resolve() # wrap in a pathlib.Path for the code below
                                              # and ensure this is absolute
         
@@ -106,7 +107,7 @@ def determineFileSystemType(path:str) -> FsType:
         mpl, mpp = zip(*list(map(lambda x: (len(x.mountpoint), x), filter(lambda x: x.mountpoint in map(lambda p: p.as_posix(), ppath.parents), partitions))))
         # (WARNING: not checking for the unlikely case here none of the mount points are among the path's parents)
         
-        pathPartition = mpp[mpl.index(max(mpl))] # that is usually the last ekement in the list
+        pathPartition = mpp[mpl.index(max(mpl))] # that is usually the last element in the list
         return typeFromName(pathPartition.fstype)
         
     pass

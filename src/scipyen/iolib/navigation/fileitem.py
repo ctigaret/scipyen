@@ -5,7 +5,7 @@
 
 """
 """
-import sys, os, typing, pathlib, urllib, stat
+import sys, os, typing, pathlib, urllib, stat, traceback
 import datetime
 from enum import Enum, IntEnum
 from qtpy import QtCore, QtGui, QtWidgets, QtSvg
@@ -13,7 +13,7 @@ from qtpy.QtCore import Signal, Slot, Property
 from core.prog import safeWrapper
 from core.sysutils import adapt_ui_path
 from iolib.navigation.udsentry import UDSEntry
-from . import utils, filesystem
+from . import utils, filesystems
 from core import utilities
 from core.prog import scipywarn
 HAS_STATX = False
@@ -49,6 +49,9 @@ HiddenCacheEnum = IntEnum("HiddenCacheEnum", ["HiddenUncached", "HiddenCached", 
 
 class SlowEnum:pass
 SlowEnum = IntEnum("SlowEnum", ["SlowUnknown", "Fast", "Slow"])
+
+_FI_ = typing.TypeVar("_FI_", bound = "_FileItem_")
+FI = typing.TypeVar("FI", bound="FileItem")
 
 class _FileItem_():
     Unknown         = UnknownEnum.Unknown
@@ -164,57 +167,63 @@ class _FileItem_():
             # pathBA = QtCore.QFile.encodeName(path)
             pPath = pathlib.Path(path)
             
-            if HAS_STATX:
-                buff = statx.stat(pPath, follow_symlinks=False)
-            else:
-                buff = os.stat(pPath, follow_symlinks=False)
-                
-            self._entry_.reserve(10)
-            self._entry_.replace(UDSEntry.UDS_DEVICE_ID, buff.st_dev)
-            self._entry_.replace(UDSEntry.UDS_INODE, buff.st_ino)
-            
-            mode = buff.st_mode
-            
-            if utils.isLinkMask(mode):
-                self._bLink_ = True
-                
+            try:
                 if HAS_STATX:
-                    buff = statx.stat(pPath, follow_symlinks=True)
+                    buff = statx.stat(pPath, follow_symlinks=False)
                 else:
-                    buff = stat.stat(pPath, follow_symlinks=True)
+                    buff = os.stat(pPath, follow_symlinks=False)
                     
+                self._entry_.reserve(10)
+                self._entry_.replace(UDSEntry.UDS_DEVICE_ID, buff.st_dev)
+                self._entry_.replace(UDSEntry.UDS_INODE, buff.st_ino)
+                
                 mode = buff.st_mode
                 
-            else:
-                mode = (utils.STAT_MASK - 1) | stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO
+                if utils.isLinkMask(mode):
+                    self._bLink_ = True
+                    
+                    if HAS_STATX:
+                        buff = statx.stat(pPath, follow_symlinks=True)
+                    else:
+                        buff = stat.stat(pPath, follow_symlinks=True)
+                        
+                    mode = buff.st_mode
+                    
+                else:
+                    mode = (utils.STAT_MASK - 1) | stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO
+                    
+                file_type = mode & utils.STAT_MASK # meaning regular, directory, block, ...
                 
-            file_type = mode & utils.STAT_MASK # meaning regular, directory, block, ...
+                self._entry_.replace(UDSEntry.UDS_SIZE, buff.st_size)
+                self._entry_.replace(UDSEntry.UDS_FILE_TYPE, file_type)
+                self._entry_.replace(UDSEntry.UDS_ACCESS, mode & 0o7777)
+                
+                if HAS_STATX:
+                    self._entry_.replace(UDS_MODIFICATION_TIME, buff.st_mtime)
+                    self._entry_.replace(UDS_ACCESS_TIME, buff.st_atime) 
+                    self._entry_.replace(UDS_CREATION_TIME, buff.st_birthtime) # thank you, py_datasource authors!
+                else:
+                    self._entry_.replace(UDS_MODIFICATION_TIME, int(buff.st_mtime))
+                    self._entry_.replace(UDS_ACCESS_TIME, int(buff.st_atime))
+                    self._entry_.replace(UDS_CREATION_TIME, int(buff.st_ctime))
+                    
+                if sys.platform != "win32":
+                    uid = buff.st_uid
+                    gid = buff.st_gid
+                    self._entry_.replace(UDSEntry.UDS_LOCAL_USER_ID, uid)
+                    self._entry_.replace(UDSEntry.UDS_LOCAL_GROUP_ID, gid)
+                    
+                if self._fileMode_ == UnknownEnum.Unknown:
+                    self._fileMode_ = file_type
+                    
+                if self._permissions_ == UnknownEnum.Unknown:
+                    self._permissions_ = mode & 0o7777
+            except PermissionError:
+                pass
             
-            self._entry_.replace(UDSEntry.UDS_SIZE, buff.st_size)
-            self._entry_.replace(UDSEntry.UDS_FILE_TYPE, file_type)
-            self._entry_.replace(UDSEntry.UDS_ACCESS, mode & 0o7777)
-            
-            if HAS_STATX:
-                self._entry_.replace(UDS_MODIFICATION_TIME, buff.st_mtime)
-                self._entry_.replace(UDS_ACCESS_TIME, buff.st_atime) 
-                self._entry_.replace(UDS_CREATION_TIME, buff.st_birthtime) # thank you, py_datasource authors!
-            else:
-                self._entry_.replace(UDS_MODIFICATION_TIME, int(buff.st_mtime))
-                self._entry_.replace(UDS_ACCESS_TIME, int(buff.st_atime))
-                self._entry_.replace(UDS_CREATION_TIME, int(buff.st_ctime))
-                
-            if sys.platform != "win32":
-                uid = buff.st_uid
-                gid = buff.st_gid
-                self._entry_.replace(UDSEntry.UDS_LOCAL_USER_ID, uid)
-                self._entry_.replace(UDSEntry.UDS_LOCAL_GROUP_ID, gid)
-                
-            if self._fileMode_ == UnknownEnum.Unknown:
-                self._fileMode_ = file_type
-                
-            if self._permissions_ == UnknownEnum.Unknown:
-                self._permissions_ = mode & 0o7777
-                
+            except:
+                traceback.print_exc()
+
         self._bInitCalled_ = True
 
     def size(self) -> int:
@@ -281,7 +290,7 @@ class _FileItem_():
                 
         return QtCore.QDateTime() # null date time
             
-    def printCompareDebug(self, item:_FileItem_):
+    def printCompareDebug(self, item:type(_FI_)):
         otherEntry = item._entry_
         msg = list()
         msg.append(f"Comparing {self._url_} and {item._url_}")
@@ -310,7 +319,7 @@ class _FileItem_():
         
         QtCore.qDebug("\n".join(msg))
         
-    def cmp(self, item:_FileItem_) -> bool:
+    def cmp(self, item:type[_FI_]) -> bool:
         # NOTE: 2025-01-06 16:59:14
         # similar to filecmp module...might want to check against it
         if item._bInitCalled_:
@@ -415,6 +424,7 @@ class _FileItem_():
         if self._slow_ == self.SlowUnknown:
             path = self.localPath()
             if len(path):
+                fsType = filesystems.fileSystemType(path)
                 # TODO: 2025-01-06 17:41:31
                 # study https://api.kde.org/frameworks/kcoreaddons/html/kfilesystemtype_8cpp_source.html
                 # and https://api.kde.org/frameworks/kcoreaddons/html/namespaceKFileSystemType.html

@@ -171,12 +171,8 @@ class stat_result(_stat_result):
 
 
 
-def statx(
-		dirfd: int      = AT_FDCWD,
-		pathname: bytes = b"",
-		flags: int      = AT_STATX_SYNC_AS_STAT,
-		mask: int       = Mask.BASIC_STATS
-) -> struct_statx:
+def statx(dirfd: int = AT_FDCWD, pathname: bytes = b"", flags: int = AT_STATX_SYNC_AS_STAT,
+          mask: int = Mask.BASIC_STATS) -> struct_statx:
 	"""Low-level wrapper around the ``statx(2)`` Linux system call"""
 	global _error
 	if _error:

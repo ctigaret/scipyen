@@ -106,7 +106,7 @@ class StatDetail(IntEnum):
     # /// Equivalent to setting <tt>StatBasic | StatUser | StatTime | StatAcl | StatResolveSymlink</tt>
     StatDefaultDetails = StatBasic | StatUser | StatTime | StatAcl | StatResolveSymlink
     
-def getLstat(path:pathlib.Path, details:StatDetail): # not use I really need this in Python
+def getLstat(path:pathlib.Path, details:StatDetail): # not sure I really need this in Python
     pass
     
     

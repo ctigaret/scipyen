@@ -40,7 +40,7 @@ class NetworkMounts (QtCore.QObject):
         return cls._instance
     
     def __init__(self):
-        super().__init__(self)
+        super(QtCore.QObject, self).__init__()
         
         configLocation = pathlib.Path(QtCore.QStandardPaths.writableLocation(QtCore.QStandardPaths.ConfigLocation))
         
@@ -53,7 +53,10 @@ class NetworkMounts (QtCore.QObject):
                        NetworkMountsType.SymlinkDirectory,
                        NetworkMountsType.SymlinkToNetworkMount):
             typeStr = self.enumToString(nmType)
-            slowPaths = self._settings_.value(typeStr, list()).value()
+            slowPaths = self._settings_.value(typeStr, list())
+            if slowPaths is None:
+                continue
+            # print(slowPaths)
             _slowPaths = self.ensureTrailingSlashes(slowPaths)
             self._settings_.setValue(typeStr, _slowPaths)
     
@@ -66,11 +69,7 @@ class NetworkMounts (QtCore.QObject):
         # NOTE: 2025-01-07 12:42:39
         # see traitlets.config.SingletonConfigurable
         for subclass in cls.mro():
-            if (
-                issubclass(cls, subclass)
-                and issubclass(subclass, NM)
-                and subclass != NM
-            ):
+            if issubclass(cls, subclass) and issubclass(subclass, NetworkMounts) and subclass != NetworkMounts:
                 yield subclass
 
     @classmethod
@@ -78,7 +77,7 @@ class NetworkMounts (QtCore.QObject):
         return hasattr(cls, "_instance" and isinstance(cls._instance, cls))
 
     @classmethod
-    def instance(cls:type[NM]) -> NM:
+    def instance(cls:type[NM], *args, **kwargs) -> NM:
         if cls._instance is None:
             inst = cls(*args, **kwargs)
             for subclass in cls._walk_mro():
@@ -104,7 +103,7 @@ class NetworkMounts (QtCore.QObject):
 
     @staticmethod
     def getMatchingPath(path:str, slowPaths:list[str]) -> str:
-        if len(slowPaths) == 0:
+        if not isinstance(slowPaths, list) or len(slowPaths) == 0:
             return str()
         
         _path = str(path)
@@ -123,7 +122,8 @@ class NetworkMounts (QtCore.QObject):
         return enum2str(etype)
     
     def isSlowPath(self, path:str, type:NetworkMountsType = NetworkMountsType.Any) -> bool:
-        return len(self.getMatchingPath(path, self.paths(type))) > 0
+        pths = self.getMatchingPath(path, self.paths(type))
+        return isinstance(pths, list) and  len(pths) > 0
 
     def isOptionEnabledForPath(self, path:str, option:NetworkMountOption) -> bool:
         if not self.isEnabled():
@@ -146,16 +146,18 @@ class NetworkMounts (QtCore.QObject):
     def setOption(self, option:NetworkMountOption, value:bool):
         self._settings_.setValue(self.enumToString(option), value)
     
-    def paths(self, type:NetworkMountsType = NetworkMountsType.Any) -> list[str]:
-        if type == NetworkMountsType.Any:
+    def paths(self, fstype:NetworkMountsType = NetworkMountsType.Any) -> list[str]:
+        if fstype == NetworkMountsType.Any:
             paths = list()
             for nmType in (NetworkMountsType.NfsPaths, NetworkMountsType.SmbPaths,
                        NetworkMountsType.SymlinkDirectory,
                        NetworkMountsType.SymlinkToNetworkMount):
-                paths.extend(self._settings_.value(self.enumToString(nmType), list()).value())
+                pths = self._settings_.value(self.enumToString(nmType), list())
+                if pths is not None:
+                    paths.extend(pths)
             return paths
         else:
-            return self._settings_.value(self.enumToString(type, list())).value()
+            return self._settings_.value(self.enumToString(fstype), list())
         
     def setPaths(self, paths:list[str], type:NetworkMountsType):
         _paths = self.ensureTrailingSlashes(list(paths))
