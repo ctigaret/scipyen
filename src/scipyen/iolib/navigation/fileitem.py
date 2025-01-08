@@ -355,7 +355,10 @@ class _FileItem_():
     def parsePermissions(self, perm:int) -> str:
         # TODO: 2025-01-06 17:07:40 check against result from stat.filemode(mode)
         # BUG: 2025-01-08 18:45:50 FIXME:
-        # why does this keep inserting the 't' bit?
+        # • why does this keep inserting the 't' bit?
+        # • the link bit is not properly set!
+        # • rw appears all over the place when it shouldn't'
+        # • the directory bit is not set!
         self.ensureInitialized()
         
         bfr = ["-"]*12
