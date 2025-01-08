@@ -323,6 +323,14 @@ def get_int_sfx(s:str, sep:str = "_", use_re:bool=False) -> typing.Tuple[str, in
 
 def pluralize(s:str, n:int) -> str:
     return InflectEngine.plural(s, n)
+
+def simplify(s:str) -> str:
+    """Strips spaces at ends and converts inner double spaces to single spaces"""
+    s = s.strip()
+    while "  " in s:
+        s = s.replace("  ", " ")
+        
+    return s
     
 def str2symbol(s:str) -> str:
     """Returns a string that can be used as valid Python symbol (a.k.a variable name).

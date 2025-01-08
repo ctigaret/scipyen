@@ -186,7 +186,7 @@ class Field:
             self.m_long = -sys.maxsize-1
             self.m_str = value
     
-class UDSEntry():
+class UDSEntry:
     """Usage example:
         from iolib.navigation.udsentry import UDSEntry
         path = pathlib.Path("myFile.dat")
@@ -238,7 +238,7 @@ class UDSEntry():
     
     # ### END   Fields
     
-    def __init__(self, buff:stat_result, name:str):
+    def __init__(self, buff:typing.Optional[stat_result] = None, name:str = str()):
         # NOTE: 2025-01-04 16:00:10
         # my guess here is that QT_STATBUF is equivalent to Pyton's stat_result
         # so let's go with that...
@@ -253,34 +253,36 @@ class UDSEntry():
             self.reserve(10)
             
         self.insert(self.UDS_NAME, name)
-        self.insert(self.UDS_SIZE, buff.st_size)
-        self.insert(self.UDS_DEVICE_ID, buff.st_dev)
-        self.insert(self.UDS_INODE, buff.st_ino)
-        self.insert(self.UDS_FILE_TYPE, stat.S_IFMT(buff.st_mode)) # extract file type — does the same thing as C++ line below
-        # d->insert(UDS_FILE_TYPE, buff.st_mode & QT_STAT_MASK); // extract file type; see comments at top of utils.py
-        self.insert(self.UDS_ACCESS, stat.S_IMODE(buff.st_mode)) # extract permissions — does the same thing as C++ line below
-        # NOTE: 2025-01-05 21:31:50 stat.S_IMODE(buff.st_mode) is theoretically the same as buff.st_mode & 0o7777 on a UNIX machine # (NOTE: octal value!!!)
-        # self.insert(self.UDS_ACCESS, buff.st_mode & 0o7777) # extract permissions — does the same thing as C++ line below
-        # d->insert(UDS_ACCESS, buff.st_mode & 07777); // extract permissions; see comments at top of utils.py
         
-        if HAS_STATX and isinstance(buff, statx.stat_result):
-            self.insert(self.UDS_MODIFICATION_TIME, buff.st_mtime)
-            self.insert(self.UDS_ACCESS_TIME, buff.st_atime)
-        else:
-            # self.insert(self.UDS_MODIFICATION_TIME, buff.st_mtime_ns) # time in ns as integer
-            self.insert(self.UDS_MODIFICATION_TIME, int(buff.st_mtime))
-            # self.insert(self.UDS_ACCESS_TIME, buff.st_atime_ns)       # time in ns as integer 
-            self.insert(self.UDS_ACCESS_TIME, int(buff.st_atime))
+        if isinstance(buff, stat_result):
+            self.insert(self.UDS_SIZE, buff.st_size)
+            self.insert(self.UDS_DEVICE_ID, buff.st_dev)
+            self.insert(self.UDS_INODE, buff.st_ino)
+            self.insert(self.UDS_FILE_TYPE, stat.S_IFMT(buff.st_mode)) # extract file type — does the same thing as C++ line below
+            # d->insert(UDS_FILE_TYPE, buff.st_mode & QT_STAT_MASK); // extract file type; see comments at top of utils.py
+            self.insert(self.UDS_ACCESS, stat.S_IMODE(buff.st_mode)) # extract permissions — does the same thing as C++ line below
+            # NOTE: 2025-01-05 21:31:50 stat.S_IMODE(buff.st_mode) is theoretically the same as buff.st_mode & 0o7777 on a UNIX machine # (NOTE: octal value!!!)
+            # self.insert(self.UDS_ACCESS, buff.st_mode & 0o7777) # extract permissions — does the same thing as C++ line below
+            # d->insert(UDS_ACCESS, buff.st_mode & 07777); // extract permissions; see comments at top of utils.py
             
-        # NOTE: 2025-01-06 14:13:49
-        # Incidentally, they don't seem to try & call statx here, in KIO::UDSEntry c'tor
-        # hence they don't explore creation time ?!?
-        
-        if sys.platform != "win32":
-        #ifndef Q_OS_WIN
-            self.insert(self.UDS_LOCAL_USER_ID,  buff.st_uid) # user  ID of the file owner — UNIX only
-            self.insert(self.UDS_LOCAL_GROUP_ID, buff.st_gid) # group ID of the file owner — UNIX only
-        #endif
+            if HAS_STATX and isinstance(buff, statx.stat_result):
+                self.insert(self.UDS_MODIFICATION_TIME, buff.st_mtime)
+                self.insert(self.UDS_ACCESS_TIME, buff.st_atime)
+            else:
+                # self.insert(self.UDS_MODIFICATION_TIME, buff.st_mtime_ns) # time in ns as integer
+                self.insert(self.UDS_MODIFICATION_TIME, int(buff.st_mtime))
+                # self.insert(self.UDS_ACCESS_TIME, buff.st_atime_ns)       # time in ns as integer 
+                self.insert(self.UDS_ACCESS_TIME, int(buff.st_atime))
+                
+            # NOTE: 2025-01-06 14:13:49
+            # Incidentally, they don't seem to try & call statx here, in KIO::UDSEntry c'tor
+            # hence they don't explore creation time ?!?
+            
+            if sys.platform != "win32":
+            #ifndef Q_OS_WIN
+                self.insert(self.UDS_LOCAL_USER_ID,  buff.st_uid) # user  ID of the file owner — UNIX only
+                self.insert(self.UDS_LOCAL_GROUP_ID, buff.st_gid) # group ID of the file owner — UNIX only
+            #endif
         
     def __eq__(self, other) -> bool:
         if type(other) != type(self):

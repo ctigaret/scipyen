@@ -12,9 +12,11 @@ from qtpy import QtCore, QtGui, QtWidgets, QtSvg
 from qtpy.QtCore import Signal, Slot, Property
 from core.prog import safeWrapper
 from core.sysutils import adapt_ui_path
+from core import strutils
 from iolib.navigation.udsentry import UDSEntry
 from . import utils, filesystems
 from core import utilities
+from core.multimeta import MultipleMeta
 from core.prog import scipywarn
 HAS_STATX = False
 try:
@@ -25,6 +27,8 @@ except:
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
+cachedStrings = dict()
+
 class UnknownEnum(IntEnum):
     Unknown = -1
     
@@ -33,12 +37,12 @@ class FileTimes(IntEnum):pass
     # AccessTime = 1
     # CreationTime = 2
     # ChangeTime = 3
-    
 FileTimes = IntEnum("FileTimes", ["ModificationTime", "AccessTime", "CreationTime", "ChangeTime"])
+
+
 class MimeTypeDetermination(IntEnum):pass
     # NormalMimeTypeDetermination = 0
     # SkipMimeTypeFromContent = 1
-    
 MimeTypeDetermination = IntEnum("MimeTypeDetermination", ["NormalMimeTypeDetermination", "SkipMimeTypeFromContent"])
     
 class HiddenEnum:pass
@@ -76,10 +80,14 @@ class _FileItem_():
                  delayedMimeTypes:bool, 
                  mimeTypeDetermination:MimeTypeDetermination):
         self._entry_:UDSEntry = entry
-        self._url_:QtCore.QUrl = itemOrDirUrl
+        if isinstance(itemOrDirUrl, pathlib.Path):
+            self._url_ = QtCore.QUrl(itemOrDirUrl.as_uri())
+        else:
+            self._url_:QtCore.QUrl = itemOrDirUrl
         self._strName_:str = str()
         self._strText_:str = str()
         self._iconName_:str = str()
+        self._strLowerCaseName:str = str()
         self._mimeType_:QtCore.QMimeType = QtCore.QMimeType()
         self._fileMode_:int = mode
         self._permissions_:int = permissions
@@ -199,13 +207,13 @@ class _FileItem_():
                 self._entry_.replace(UDSEntry.UDS_ACCESS, mode & 0o7777)
                 
                 if HAS_STATX:
-                    self._entry_.replace(UDS_MODIFICATION_TIME, buff.st_mtime)
-                    self._entry_.replace(UDS_ACCESS_TIME, buff.st_atime) 
-                    self._entry_.replace(UDS_CREATION_TIME, buff.st_birthtime) # thank you, py_datasource authors!
+                    self._entry_.replace(UDSEntry.UDS_MODIFICATION_TIME, buff.st_mtime)
+                    self._entry_.replace(UDSEntry.UDS_ACCESS_TIME, buff.st_atime) 
+                    self._entry_.replace(UDSEntry.UDS_CREATION_TIME, buff.st_birthtime) # thank you, py_datasource authors!
                 else:
-                    self._entry_.replace(UDS_MODIFICATION_TIME, int(buff.st_mtime))
-                    self._entry_.replace(UDS_ACCESS_TIME, int(buff.st_atime))
-                    self._entry_.replace(UDS_CREATION_TIME, int(buff.st_ctime))
+                    self._entry_.replace(UDSEntry.UDS_MODIFICATION_TIME, int(buff.st_mtime))
+                    self._entry_.replace(UDSEntry.UDS_ACCESS_TIME, int(buff.st_atime))
+                    self._entry_.replace(UDSEntry.UDS_CREATION_TIME, int(buff.st_ctime))
                     
                 if sys.platform != "win32":
                     uid = buff.st_uid
@@ -259,8 +267,7 @@ class _FileItem_():
             
         return 0
     
-    def setTime(self, mappedWhich:FileTimes, 
-                val:typing.Union[int, QtCore.QDateTime, datetime.datetime]):
+    def setTime(self, mappedWhich:FileTimes, val:typing.Union[int, QtCore.QDateTime, datetime.datetime]):
         """val: int (seconds), QDateTime, datetime.datetime"""
         if isinstance(val, int):
             self._entry_.replace(self.udsFieldForTime(mappedWhich), val)
@@ -331,7 +338,7 @@ class _FileItem_():
         return all((self._strName_ == item._strName_, 
                    self._bIsLocalUrl_ == item._bIsLocalUrl_,
                    self._fileMode_ == item._fileMode_,
-                   self._persmissions_ == item._persmissions_,
+                   self._permissions_ == item._permissions_,
                    self._entry_.stringValue(UDSEntry.UDS_GROUP) == item._entry_.stringValue(UDSEntry.UDS_GROUP),
                    self._entry_.stringValue(UDSEntry.UDS_USER) == item._entry_.stringValue(UDSEntry.UDS_USER),
                    self._entry_.stringValue(UDSEntry.UDS_EXTENDED_ACL) == item._entry_.stringValue(UDSEntry.UDS_EXTENDED_ACL),
@@ -347,9 +354,11 @@ class _FileItem_():
         
     def parsePermissions(self, perm:int) -> str:
         # TODO: 2025-01-06 17:07:40 check against result from stat.filemode(mode)
+        # BUG: 2025-01-08 18:45:50 FIXME:
+        # why does this keep inserting the 't' bit?
         self.ensureInitialized()
         
-        bfr = ["_"]*12
+        bfr = ["-"]*12
         uxbit = "-"
         gxbit = "-"
         oxbit = "-"
@@ -412,11 +421,11 @@ class _FileItem_():
         bfr[8] = "w" if (perm & stat.S_IWOTH) == stat.S_IWOTH else "-"
         bfr[9] = oxbit
         
-        if self.m_entry.contains(UDSEntry.UDS_EXTENDED_ACL):
+        if self._entry_.contains(UDSEntry.UDS_EXTENDED_ACL):
             bfr[10] = '+'
-            bfr[11] = 0
+            bfr[11] = '-'
         else:
-            bfr[10] = 0
+            bfr[10] = '-'
             
         return "".join(bfr)
 
@@ -425,285 +434,712 @@ class _FileItem_():
             path = self.localPath()
             if len(path):
                 fsType = filesystems.fileSystemType(path)
-                # TODO: 2025-01-06 17:41:31
-                # study https://api.kde.org/frameworks/kcoreaddons/html/kfilesystemtype_8cpp_source.html
-                # and https://api.kde.org/frameworks/kcoreaddons/html/namespaceKFileSystemType.html
-                pass
+                self._slow_ = self.Slow if fsType in (filesystems.FsType.Nfs, filesystems.FsType.Smb) else self.Fast
+            else:
+                self._slow_ = self.Slow
                 
-        
+        return self._slow_ == self.Slow
+                
     def determineMimeTypeHelper(self, url:QtCore.QUrl):
         db = QtCore.QMimeDatabase()
         
         if self._bSkipMimeTypeFromContent_ or self.isSlow():
-            pass # TODO
+            scheme = url.scheme()
+            if scheme.startswith("http") or scheme == "mailto":
+                self._mimeType_ = db.mimeTypeForName("application/octet-streaam")
+            else:
+                self._mimeType_ = db.mimeTypeForFile(url.path(), QtCore.QMimeDatabase.MatchExtension)
+        else:
+            self._mimeType_ = db.mimeTypeForUrl(url)
+            
+    def localPath(self) -> str:
+        if self._bIsLocalUrl_:
+            return self._url_.toLocalFile()
         
+        self.ensureInitialized()
+        return self._entry_.stringValue(UDSEntry.UDS_LOCAL_PATH)
         
+class FileItem(metaclass=MultipleMeta):
+    # FIXME: 2025-01-08 18:40:39
+    # MultipleMeta has problems when an argument type is a subclass of what is 
+    # given in annotations  - FIXME tweak the MeultipleMeta class in 
+    # core.multimeta module
+    # TODO: 2025-01-08 17:59:34 methods:
+    # __eq__
+    # __le__
+    # __gt__
+    # cmp
+    # getStatusBarInfo
+    
+    
+    Unknown         = UnknownEnum.Unknown
+    
+    Auto            = HiddenEnum.Auto
+    Hidden          = HiddenEnum.Hidden
+    Shown           = HiddenEnum.Shown
+    
+    HiddenUncached  = HiddenCacheEnum.HiddenUncached
+    HiddenCached    = HiddenCacheEnum.HiddenCached
+    ShownCached     = HiddenCacheEnum.ShownCached
+    
+    SlowUnknown     = SlowEnum.SlowUnknown
+    Fast            = SlowEnum.Fast
+    Slow            = SlowEnum.Slow
+    
+    def __init__(self, entry:UDSEntry,
+                 itemOrDirUrl:QtCore.QUrl,
+                 delayedMimeTypes:bool,
+                 urlIsDirectory:bool
+                 ):
+        self.__init__(entry, int(UnknownEnum.Unknown), int(UnknownEnum.Unknown),
+                              itemOrDirUrl, urlIsDirectory, delayedMimeTypes,
+                              MimeTypeDetermination.NormalMimeTypeDetermination)
         
-class FileItem(_FileItem_):
-    # NOTE: 2025-01-04 12:47:20
-    # should use a pathlib.Path as backend
-    # NOTE: 2025-01-04 15:07:39
-    # doesn't use Qt Signals/Slots so no need to inherit from QObject
-    # By keeping it in the Python world I guess also removes the need to inherit 
-    # from QSharedData (KFileItemPrivate)
+    def __init__(self, url:QtCore.QUrl, mimeType:str, mode:int):
+        self.__init__(UDSEntry(), mode, int(UnknownEnum.Unknown), url, 
+                        False, False, MimeTypeDetermination.NormalMimeTypeDetermination)
+        
+        self._d_._bMimeTypeKnown_ = len(strutils.simplify(mimeType)) > 0 
+        
+        if self._d_._bMimeTypeKnown_:
+            db = QtCore.QMimeDatabase()
+            self._d_._mimeType_ = db.mimeTypeForName(mimeType)
+            
+    def __init__(self, path:pathlib.Path, mimeType:str, mode:int):
+        url = QtCore.QUrl(path.resolve().as_uri())
+        self.__init__(UDSEntry(), mode, int(UnknownEnum.Unknown), url, 
+                        False, False, MimeTypeDetermination.NormalMimeTypeDetermination)
+        
+        self._d_._bMimeTypeKnown_ = len(strutils.simplify(mimeType)) > 0 
+        if self._d_._bMimeTypeKnown_:
+            db = QtCore.QMimeDatabase()
+            self._d_._mimeType_ = db.mimeTypeForName(mimeType)
+            
+    def __init__(self, url:QtCore.QUrl, mimeTypeDetermination:MimeTypeDetermination):
+        self.__init__(UDSEntry(), int(UnknownEnum.Unknown), int(UnknownEnum.Unknown),
+                    url, False, False, mimeTypeDetermination)
+    
+    def __init__(self, path:str,  mimeTypeDetermination:MimeTypeDetermination):
+        url = QtCore.QUrl(papthlib.Path(path).resolve().as_uri())
+        self.__init__(UDSEntry(), int(UnknownEnum.Unknown), int(UnknownEnum.Unknown),
+                    url, False, False, mimeTypeDetermination)
+    
+    def __init__(self, path:str):
+        url = QtCore.QUrl(pathlib.Path(path).resolve().as_uri())
+        self.__init__(UDSEntry(), int(UnknownEnum.Unknown), int(UnknownEnum.Unknown),
+                    url, False, False, MimeTypeDetermination.NormalMimeTypeDetermination)
+    
+    def __init__(self, url:QtCore.QUrl):
+        self.__init__(UDSEntry(), int(UnknownEnum.Unknown), int(UnknownEnum.Unknown),
+                    url, False, False, MimeTypeDetermination.NormalMimeTypeDetermination)
+        
+    def __init__(self):
+        self._d_ = None
     
     def __init__(self, entry:UDSEntry, mode:int, permissions:int,
                  itemOrDirUrl:QtCore.QUrl, urlIsDirectory:bool,
                  delayedMimeTypes:bool, mimeTypeDetermination:MimeTypeDetermination):
         # ### BEGIN KFileItemPrivate
-        super().__init__(entry, mode, itemOrDirUrl, urlIsDirectory, 
+        self._d_ = _FileItem_(entry, mode, permissions, itemOrDirUrl, urlIsDirectory, 
                          delayedMimeTypes, mimeTypeDetermination)
         # ### END KFileItemPrivate
         
-        self._user_:str = str()
-        self._group_:str = str()
-        self._isLink_:bool = False
-        self._isDir_:bool = False
-        self._isFile_:bool = False
-        self._isReadable_:bool = False
-        self._isWritable_:bool = False
-        self._isHidden_:bool = False
-        self._isSlow_:bool = False
-        self._isDesktopFile_:bool = False
-        self._linkDest_:str = str()
-        self._targetUrl_:QtCore.QUrl = QtCore.QUrl()
-        self._localPath_:str = str()
-        self._isLocalFile_:bool = False
-        self._text_:str = str()
-        self._name_:str = str()
-        self._determineMimeType_:QtCore.QMimeType = QtCore.QMimeType()
-        self._currentMimeType_:QtCore.QMimeType = QtCore.QMimeType()
-        self._isFinalIconKnown_:bool = False
-        self._isMimeTypeKnown_:bool = False
-        self._mimeComment_:str = str()
-        self._overlays_:list[str] = list()
-        self._comment_:str = str()
-        self._statusBarInfo_:str = str()
-        self._isRegularFile_:bool = False
-
-    @property
-    def url(self) -> QtCore.QUrl:
-        return self._url_
-    
-    @url.setter
-    def url(self, val:QtCore.QUrl):
+    def refresh(self):
+        if self._d_ is None:
+            scipywarn("null item")
+            return
+        
+        self._d_._fileMode_ = self.Unknown
+        self._d_._permissions_ = self.Unknown
+        self._d_._hidden_ = self.Auto
+        self._d_._hiddenCache_ = self.HiddenUncached
+        self.refreshMimeType()
+        ####
+        # TODO: 2025-01-08 14:00:19 addACL
+        ####
+        self._d_._entry_.clear()
+        self._d_.init()
+        
+    def refreshMimeType(self):
+        if self._d_ is None:
+            return
+        
+        self._d_._mimeType_ = QtCore.QMimeType()
+        self._d_._bMimeTypeKnown_ = False
+        self._d_._iconName_ = str()
+        
+    def setDelayedMimeTypes(self, val:bool):
+        if self._d_ is None:
+            return
+        self._d_._delayedMimeTypes_ = val == True
+        
+    def setUrl(self, val:QtCore.QUrl):
         self._url_ = val
+        if self._d_ is None:
+            scipywarn("null item")
+            return
+        self._d_._url_ = url
+        self.setName(url.fileName())
+    
+    def url(self) -> QtCore.QUrl:
+        if self._d_ is None:
+            return QtCore.QUrl()
+        return self._d_._url_
 
-    @property
-    def user(self) -> str:
-        return self._user_
-    
-    @user.setter
-    def user(self, val:str):
-        self._user_ = val
+    def setLocalPath(self, val:str):
+        if self._d_ is None:
+            scipywarn("null item")
+            return 
+        self._d_._entry_.replace(UDSEntry.UDS_LOCAL_PATH, path)
         
-    @property
-    def group(self) -> str:
-        return self._group_
-    
-    @group.setter
-    def group(self, val:str):
-        self._group_ = val
+    def setLocalPath(self, val:pathlib.Path):
+        if self._d_ is None:
+            scipywarn("null item")
+            return 
+        self._d_._entry_.replace(UDSEntry.UDS_LOCAL_PATH, path.as_posix())
         
-    @property
-    def isLink(self) -> bool:
-        return self._isLink_
-    
-    @isLink.setter
-    def isLink(self, val:bool):
-        self._isLink_ = val == True
-        
-    @property
-    def isDir(self) -> bool:
-        return self._isDir_
-    
-    @isDir.setter
-    def isDir(self, val:bool):
-        self._isDir_ = val == True
-        
-    @property
-    def isFile(self) -> bool:
-        return self._isFile_
-    
-    @isFile.setter
-    def isFile(self, val:bool):
-        self._isFile_ = val == True
-        
-    @property
-    def isReadable(self) -> bool:
-        return self._isReadable_
-    
-    @isReadable.setter
-    def isReadable(self, val:bool):
-        self._isReadable_ = val == True
-        
-    @property
-    def isWritable(self) -> bool:
-        return self._isWritable_
-    
-    @isWritable.setter
-    def isWritable(self, val:bool):
-        self._isWritable_ = val == True
-        
-    @property
-    def isHidden(self) -> bool:
-        return self._isHidden_
-    
-    @isHidden.setter
-    def isHidden(self, val:bool):
-        self._isHidden_ = val == True
-        
-    @property
-    def isSlow(self) -> bool:
-        return self._isSlow_
-    
-    @isSlow.setter
-    def isSlow(self, val:bool):
-        self._isSlow_ = val == True
-        
-    @property
-    def isDesktopFile(self) -> bool:
-        return self._isDesktopFile_
-    
-    @isDesktopFile.setter
-    def isDesktopFile(self, val:bool):
-        self._isDesktopFile_ = val == True
-        
-    @property
-    def linkDest(self) -> str:
-        return self._linkDest_
-    
-    @linkDest.setter
-    def linkDest(self, val:str):
-        self._linkDest_ = val
-        
-    @property
-    def targetUrl(self) -> QtCore.QUrl:
-        return self._targetUrl_
-    
-    @targetUrl.setter
-    def targetUrl(self, val:QtCore.QUrl):
-        self._targetUrl_ = val
-
-    @property
     def localPath(self) -> str:
-        return self._localPath_
-    
-    @localPath.setter
-    def localPath(self, val:str):
-        self._localPath_ = val
+        if self._d_ is None:
+            return str()
         
-    @property
+        return self_d_.localPath()
+    
+    def setName(self, val:str):
+        if self._d_ is None:
+            scipywan("null item")
+            return
+        
+        self._d_.ensureInitialized()
+        self._d_._name_ = val
+        
+        if len(self._d_._name_):
+            self._d_._strText_ = self._d_._name_
+            
+        if self._d_._entry_.contains(UDSEntry.UDS_NAME):
+            self._d_._entry_.replace(UDSEntry.UDS_NAME, self._d_._strName_)
+            
+        self._d_._hiddenCache_ = self.HiddenUncached
+        
+    def name(self, lowerCase:bool) -> str:
+        if self._d_ is None:
+            return str()
+        
+        if not lowerCase:
+            return self._d_._strName_
+        
+        elif len(self._d_._strLowerCaseName_) == 0:
+            self._d_._strLowerCaseName = self._d_._strName_.lower()
+            
+        return self._d_._strLowerCaseName
+    
+    def user(self) -> str:
+        import pwd
+        if self._d_ is None:
+            return str()
+        
+        if self.entry().contains(UDSEntry.UDS_USER):
+            return self.entry().stringValue(UDSEntry.UDS_USER)
+        else:
+            if sys.platform != "win32":
+                uid = self.entry().numberValue(UDSEntry.UDS_LOCAL_USER_ID, -1)
+                if uid != -1:
+                    try:
+                        return pwd.getpwuid(uid).pw_name
+                    except:
+                        traceback.print_exc()
+                    return str()
+                
+            return str()
+        
+    def userId(self) -> int:
+        if self._d_ is None:
+            return -1
+        
+        return self.entry().numberValue(UDSEntry.UDS_LOCAL_USER_ID, -1)
+    
+    def group(self) -> str:
+        import grp
+        if self._d_ is None:
+            return str()
+        
+        if self.entry().contains(UDSEntry.UDS_GROUP):
+            return self.entry().numberValue(UDSEntry.UDS_GROUP)
+        else:
+            if sys.platform != "win32":
+                gid = self.entry().numberValue(UDSEntry.UDS_LOCAL_GROUP_ID, -1)
+                if gid != -1:
+                    if gid not in cachedStrings:
+                        try:
+                            groupName = grp.getgrgid(gid).gr_name
+                            cachedStrings[gid] = groupName
+                        except:
+                            return str()
+                        
+                    return cachedStrings[gid]
+                
+        return str()
+    
+    def groupId(self) -> int:
+        if self._d_ is None:
+            return -1
+        
+        return self.entry().numberValue(UDSEntry.UDS_LOCAL_GROUP_ID, -1)
+    
+    def isLink(self) -> bool:
+        if self._d_ is None:
+            return False
+        self._d_.ensureInitialized()
+        return self._d_._bLink_
+    
+    def isDir(self) -> bool:
+        if self._d_ is None:
+            return False
+        
+        if self._d_._fileMode_ != self.Unknown:
+            return utils.isDirMask(self._d_._fileMode_)
+        
+        if self._d_._bMimeTypeKnown_ and self._d_._mimeType_.isValid():
+            return self._d_._mimeType_.inherits("inode/directory")
+        
+        if self._d_._bSkipMimeTypeFromContent_:
+            return False
+        
+        self._d_.ensureInitialized()
+        if self._d_._fileMode_ == self.Unknown:
+            return False
+        
+        return utils.isDirMask(self._d_._fileMode_)
+    
+    def isFile(self) -> bool:
+        if self._d_ is None:
+            return False
+        return not self.isDir()
+        
+    def isReadable(self) -> bool:
+        if self._d_ is None:
+            return False
+        
+        self._d_.ensureInitialized()
+        
+        if self._d_._permissions_ != self.Unknown:
+            readMask = stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH
+            
+            if self._d_._permissions_ & readMask == 0:
+                return False
+            
+            if self._d_._permissions_ & readMask == readMask:
+                return True
+            
+            if sys.platform != "win32":
+                uidOfItem = self.userId()
+                if uidOfItem != -1:
+                    currentUser = os.getuid()
+                    if uidOfItem == currentUser:
+                        return stat.S_IRUSR & self._d_._permissions_ > 0
+                    gidOfItem = self.groupId()
+                    if gidOfItem != -1:
+                        groups = os.getgroupslist(os.getlogin(), os.getgid())
+                        if gidOfItem in groups:
+                            return stat.S_IRGRP & self._d_._permissions_ > 0
+                        
+                        return stat.S_IROTH & self._d_._permissions_ > 0
+                        
+            else:
+                return stat.S_IRUSR & self._d_._permissions_ > 0
+        else:
+            if self._d_._bIsLocalUrl_ and not QtCore.QFileInfo(self._d_._url_.toLocalFile()).isReadable():
+                return False
+            
+            return True
+            
+    def isHidden(self) -> bool:
+        if self._d_ is None:
+            return False
+        if self._d_._hidden_ != self.Auto:
+            return self._d_._hidden_ == self.Hidden
+        if self._d_._hiddenCache_ != self.HiddenUncached:
+            return self._d_._hidden_ == self.HiddenUncached
+        
+        fileName = self._d_._url_.fileName()
+        if len(fileName) == 0:
+            fileName = self._d_._strName_
+        
+        self._d_._hiddenCache_ = self.HiddenCached if len(fileName) > 1 and fileName.startswith('.') else self.ShownCached
+        return self._d_._hiddenCache_ == self.HiddenCached
+    
+    def setHidden(self):
+        if self._d_ is not None:
+            self._d_._hidden_ = self.Hidden
+        
+    def isSlow(self) -> bool:
+        if self._d_ is None:
+            return False
+        
+        return self._d_.isSlow()
+    
+    def isDesktopFile(self) -> bool:
+        return checkDesktopFile(self, True)
+        
+    def linkDest(self) -> str:
+        if self._d_ is None:
+            return str()
+        
+        self._d_.ensureInitialized()
+        if not self._d_._bLink_:
+            return str()
+        
+        linkStr = self._d_._entry_.stringValue(UDSEntry.UDS_LINK_DEST)
+        if len(linkStr):
+            return linkstr
+        
+        if self._d_._bIsLocalUrl_:
+            if sys.platform == "win32":
+                return QtCore.QFile.symLinkTarget(self._d_._url_.adjusted(QtCore.QUrl.StripTrailingSlash).toLocalFile())
+            else:
+                path = self._d_._url_.adjusted(QtCore.QUrl.StripTrailingSlash).toLocalFile()
+                return pathlib.Path(path).readlink()
+        return str()
+    
+    def targetUrl(self) -> QtCore.QUrl:
+        if self._d_ is None:
+            return QtCore.QUrl()
+        
+        targetUrlStr = self._d_._entry_.stringValue(UDSEntry.UDS_TARGET_URL)
+        if len(targetUrlStr):
+            return QtCore.QUrl(targetUrlStr)
+        return self.url()
+    
     def isLocalFile(self) -> bool:
-        return self._isLocalFile_
+        if self._d_ is None:
+            return False
+        return self._d_._bIsLocalUrl_
     
-    @isLocalFile.setter
-    def isLocalFile(self, val:bool):
-        self._isLocalFile_ = val == True
-        
-    @property
     def text(self) -> str:
-        return self._text_
+        if self._d_ is None:
+            return str()
+        return self._d_._strText_
         
-    @text.setter
-    def text(self, val:str):
-        self._text_ = val
+    def isWritable(self) -> bool:
+        import grp
+        if self._d_ is None:
+            return False
         
-    @property
-    def name(self) -> str:
-        return self._name_
-    
-    @name.setter
-    def name(self, val:str):
-        self._name_ = val
+        self._d_.ensureInitialized()
         
-    @property
+        if self._d_._permissions_ != self.Unknown:
+            if self._d_._permissions_ & (stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH) == 0:
+                return False
+            
+            if sys.platform != "win32":
+                uidOfItem = self.userId()
+                if uidOfItem != -1:
+                    currentUser = og.getuid()
+                    if uidOfItem == currentUser:
+                        return stat.S_IWUSR & self._d_._permissions_ > 0
+                    
+                    gidOfItem = self.groupId()
+                    if gidOfItem != -1:
+                        groups = os.getgroupslist(os.getlogin(), os.getgid())
+                        if gidOfItem in groups:
+                            return stat.S_IWGRP & self._d_._permissions_ > 0
+                        
+                        if stat.S_IWOTH * self._d_._permissions_ > 0:
+                            return True
+            else:
+                return stat.S_IWUSR & self._d_._permissions_ > 0
+            
+        else:
+            if self._d_._bIsLocalUrl_:
+                return QtCore.QFileInfo(self._s_._url_.toLocalFile()).isWritable()
+            else:
+                return False # FIXME 2025-01-08 18:13:54 TODO 
+                             # return KProtocolManager::supportsWriting(d->m_url);
+                    
     def mimetype(self) -> str:
-        return self._mimetype_
-    
-    @mimetype.setter
-    def mimetype(self, val:str):
-        self._mimetype_ = val
+        if self._d_ is None:
+            return str()
         
-    @property
+        return self.determineMimeType().name()
+    
     def determineMimeType(self) -> QtCore.QMimeType:
-        return self._determineMimeType_
-    
-    @determineMimeType.setter
-    def determineMimeType(self, val:QtCore.QMimeType):
-        self._determineMimeType_ = val
+        if self._d_ is None:
+            return QtCore.QMimeType()
         
-    @property
+        if not self._d_._mimeType_.isValid() or not self._d_._bMimeTypeKnown_:
+            db = QtCore.QMimeDatabase()
+            if self.isDir():
+                self._d_._mimeType_ = db.mimeTypeForName("inode/directory")
+            else:
+                url, isLocalUrl = self.isMostLocalUrl() # TODO
+                self._d_.determineMimeTypeHelper(url)
+                assert self._d_._mimeType_.isValid(), "Invalid mime type"
+                
+            self._d_._bMimeTypeKnown_ = True
+            
+        if self._d_._delayedMimeTypes_:
+            self._d_._delayedMimeTypes_ = False
+            self._d_._useIconNameCache_ = False
+            self.iconName() # TODO
+            
+        return self._d_._mimeType_
+    
+    def isMostLocalUrl(self) -> tuple:
+        # NOTE: MostLocalUrlResult is a tuple, here!
+        if self._d_ is None:
+            return QtCore.QUrl(), False
+        
+        localPath = self.localPath()
+        if len(localPath):
+            return QtCore.QUrl.fromLocalFile(localPath), True
+        else:
+            return self._d_._url_, self._d_._bIsLocalUrl_
+        
+    def mostLocalUrl(self, local:bool) -> tuple:
+        if self._d_ is None:
+            return tuple()
+        
+        _u, _l = self.isMostLocalUrl()
+        if local:
+            local = _l
+            
+        return _u, local
+    
     def currentMimeType(self) -> QtCore.QMimeType:
-        return self._currentMimeType_
-    
-    @currentMimeType.setter
-    def currentMimeType(self, val:QtCore.QMimeType):
-        self._currentMimeType_ = val
+        if self._d_ is None or self._d_._url_.isEmpty():
+            return QtCore.QMimeType()
         
-    @property
+        if not self._d_._mimeType_.isValid():
+            db = QtCore.QMimeDatabase()
+            if self.isDir():
+                self._d_._mimeType_ = db.mimeTypeForName("inode/directory")
+                return self._d_._mimeType_
+            
+            _url, _lurl = self.mostLocalUrl()
+            if self._d_._delayedMimeTypes_:
+                mimeTypes = db.mimeTypesForFileName(_url.path())
+                if len(mimeTypes) == 0:
+                    self._d_._mimeType_ = db.mimeTypeForName("application/octet-stream")
+                    self._d_._bMimeTypeKnown_ = False
+                else:
+                    self._d_._mimeType_ = mimeTypes[0]
+                    self._d_._bMimeTypeKnown_ = len(mimeTypes) == 1
+            else:
+                self._d_.determineMimeTypeHelper(_url)
+                self._d_._bMimeTypeKnown_ = True
+        
+        return self._d_._mimeType_
+            
     def isFinalIconKnown(self) -> bool:
-        return self._isFinalIconKnown_
+        if self._d_ is None:
+            return False
+        return self._d_._bMimeTypeKnown_ and not self._d_._delayedMimeTypes_
     
-    @isFinalIconKnown.setter
-    def isFinalIconKnown(self, val:bool):
-        self._isFinalIconKnown_ = val == True
-        
-    @property
     def isMimeTypeKnown(self) -> bool:
-        return self._isMimeTypeKnown_
+        if self._d_ is None:
+            return False
+        return self._d_._bMimeTypeKnown_ and len(self._d_._guessedMimeType)==0 # ?!? TODO check this
     
-    @isMimeTypeKnown.setter
-    def isMimeTypeKnown(self, val:bool):
-        self._isMimeTypeKnown_ = val == True
+    def comment(self) -> str:
+        if self._d_ is None:
+            return str()
         
-    @property
-    def mimeComment(self) -> str:
+        return self._d_._entry_.stringValue(UDSEntry.UDS_COMMENT)
+    
+    def overlays(self) -> list:
+        if self._d_ is None:
+            return list()
+        
+        self._d_.ensureInitialized()
+        names = self._d_._entry_.stringValue(UDSEntry.UDS_ICON_OVERLAY_NAMES)
+        namesList = list(map(lambda x: x.strip(), names.split(",")))
+        
+        if self._d_._bLink_:
+            namesList.append("emblem-symbolic-link")
+            
+        if not self.isReadable():
+            names.append("emblem-locked")
+            
+        if checkDesktopFile(self, False):
+            # TODO: 
+            # KDesktopFile cfg(localPath());
+            # const KConfigGroup group = cfg.desktopGroup();
+            # 
+            # // Add a warning emblem if this is an executable desktop file
+            # // which is untrusted.
+            # if (group.hasKey("Exec") && !KDesktopFile::isAuthorizedDesktopFile(localPath())) {
+            #     names.append(QStringLiteral("emblem-important"));
+            # }
+            pass
+        
+        if self.isHidden():
+            names.append("hidden")
+            
+        if sys.platform != "win32":
+            if self.isDir():
+                url, mlu = self.isMostLocalUrl()
+                if mlu:
+                    path = url.toLocalFile()
+                    # TODO:
+                    # if (KSambaShare::instance()->isDirectoryShared(path) || KNFSShare::instance()->isDirectoryShared(path)) {
+                    #     names.append(QStringLiteral("emblem-shared"));
+                    # }
+        return names
+    
+    def mimeComment(self) -> str:#TODO
         return self._mimeComment_
     
-    @mimeComment.setter
-    def mimeComment(self, val:str):
-        self._mimeComment_ = val
-    
-    @property
+    # @property
     def iconName(self) -> str:
         return self._iconName_
     
-    @iconName.setter
-    def iconName(self, val:str):
-        self._iconName_ = val
+    # # @iconName.setter
+    # def iconName(self, val:str):
+    #     self._iconName_ = val
         
-    @property
+    # @property
     def overlays(self) -> list[str]:
         return self._overlays_
     
-    @overlays.setter
-    def overlays(self, val:list[str]):
-        self._overlays_ = val
+    # # @overlays.setter
+    # # def overlays(self, val:typing.List[str]):
+    # def overlays(self, val:list):
+    #     self._overlays_ = val
         
-    @property
+    # @property
     def comment(self) -> str:
         return self._comment_
     
-    @comment.setter
-    def comment(self, val:str):
-        self._comment_ = val
+    # # @comment.setter
+    # def comment(self, val:str):
+    #     self._comment_ = val
         
-    @property
-    def statusBarInfo(self) -> str:
-        return self._statusBarInfo_
-    
-    @statusBarInfo.setter
-    def statusBarInfo(self, val:str):
-        self._statusBarInfo_ = val
-        
-    @property
+    # @property
     def isRegularFile(self) -> bool:
-        return self._isRegularFile_
+        if self._d_ is None:
+            return False
+        self._d_.ensureInitialized()
+        return utils.isRegFileMask(self._d_._fileMode_)
     
-    @isRegularFile.setter
-    def isRegularFile(self, val:bool):
-        self._isRegularFile_ = val == True
+    # # @isRegularFile.setter
+    # def isRegularFile(self, val:bool):
+    #     self._isRegularFile_ = val == True
+    
+    def permissionString(self) -> str:
+        if self._d_ is None:
+            return str()
+        
+        self._d_.ensureInitialized()
+        
+        if len(self._d_._access_) == 0 and self._d_._permissions_ != self.Unknown:
+            self._d_._access_ = self._d_.parsePermissions(self._d_._permissions_)
+            
+        return self._d_._access_
+        
+    
+    def permissions(self) -> int:
+        if self._d_ is None:
+            return 0
+        self._d_.ensureInitialized()
+        return self._d_._permissions_
+        
+    def mode(self) -> int:
+        if self._d_ is None:
+            return 0
+        self._d_.ensureInitialized()
+        return self._d_._fileMode_
+    
+    def suffix(self) -> str:
+        if self._d_ is None or self.isDir():
+            return str()
+        
+        pp = pathlib.Path(self._d_._strText_)
+        return pp.suffix() # TODO check if right
 
-    # ### BEGIN KFileItemPrivate methods
-    # ### END KFileItemPrivate methods
+    def size(self) -> int:
+        if self._d_ is None:
+            return 0
+        return self._d_.recursiveSize()
+    
+    def recursiveSize(self) -> int:
+        if self._d_ is None:
+            return 0
+        
+        return self._d_.recursiveSize()
+    
+    def hasExtendedACL(self) -> bool:
+        if self._d_ is None:
+            return False
+        return self.entry().contains(UDSEntry.UDS_EXTENDED_ACL)
+    
+    def ACL(self):
+        # FIXME: 2025-01-08 17:51:03 TODO
+        scipywarn("Access Control lists not yet imlemented")
+        return None
+    
+    def defaultACL(self):
+        # FIXME: 2025-01-08 17:51:03 TODO
+        scipywarn("Access Control lists not yet imlemented")
+        return None
+    
+    def entry(self) -> UDSEntry:
+        if self._d_ is None:
+            return UDSEntry()
+        self._d_.ensureInitialized()
+        return self._d_._entry_
+    
+    def isNull(self) -> bool:
+        return self._d_ is None
+    
+    def exists(self) -> bool:
+        if self._d_ is None:
+            return False
+        
+        if not self._d_._bInitCalled_:
+            scipywarn(f"FileItem: exists called when not initialized ({self._d_._url_})")
+            return False
+        
+        return self._d_._fileMode_ != self.Unknown
+    
+    def isExecutable(self) -> bool:
+        if self._d_ is None: 
+            return False
+        
+        self._d_.ensureInitialized()
+        
+        if self._d_._permissions_ == self.Unknown:
+            return False
+        
+        executableMask = stat.S_IXGRP | stat.S_IXUSR | stat.S_IXOTH
+        if self._d_._permissions_ & executableMask == 0:
+            return False
+        
+        if sys.platform == "win32":
+            return stat.S_IXUSR & self._d_._permissions_ > 0
+        else:
+            uid = self.userId()
+            if uid != -1:
+                if uid == og.getuid():
+                    return stat.S_IXUSR & self._d_._permissions_ > 0
+                
+                gid = self.groupId()
+                if gid != -1:
+                    groups = os.getgroupslist(os.getlogin(), os.getgid())
+                    if gid in groups:
+                        return stat.S_IXGRP & self._d_._permissions_ > 0
+                    return stat.S_IXOTH & self._d_._permissions_ > 0
+            else:
+                return False
+
+def checkDesktopFile(item:FileItem, detMimeType:bool):
+    if not item.isMostLocalUrl().local:
+        return False
+    
+    if not item.isRegularFile():
+        return False
+    
+    if not item.isReadable():
+        return False
+    
+    mime = item.determineMimeType() if detMimeType else item.currentMimeType()
+    
+    return mime.inherits("application/x-xdesktop")

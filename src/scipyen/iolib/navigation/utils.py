@@ -78,6 +78,8 @@
 import sys, os, stat, pathlib
 from enum import IntEnum
 
+SIZE_MAX = sys.maxsize * 2 + 1
+
 STAT_MASK = 0o170000
 
 class StatDetail(IntEnum):
