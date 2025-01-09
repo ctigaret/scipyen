@@ -203,7 +203,7 @@ class ApplyUrlMethod(IntEnum):
         
         
 
-class Navigator:
+class UrlNavigator:
     pass # fwd decl
 
 
@@ -799,7 +799,7 @@ class NavigatorButtonBase(QtWidgets.QPushButton):
 
 class NavigatorToggleButton(NavigatorButtonBase):
     _iconSize_ = 16
-    def __init__(self, parent:Navigator=None):
+    def __init__(self, parent:UrlNavigator=None):
         super().__init__(parent=parent)
         self._pixmap_ = None
         self.setCheckable(True)
@@ -875,7 +875,7 @@ class NavigatorButton(NavigatorButtonBase):
     
     def __init__(self, url:typing.Union[QtCore.QUrl, pathlib.Path], 
                  model:typing.Optional[QtWidgets.QFileSystemModel] = None,
-                 parent:typing.Optional[Navigator]=None):
+                 parent:typing.Optional[UrlNavigator]=None):
         super().__init__(parent=parent)
         self._hoverArrow_ = False
         # self._pressed_ = False # NOTE: 2025-01-02 01:20:39 by CMT for use in paintEvent
@@ -886,7 +886,7 @@ class NavigatorButton(NavigatorButtonBase):
         
         self._url_ = None
         self._subDir_ = ""  # NOTE: 2025-01-02 00:21:29 this is to be set, actually,
-                            # by code in Navigator
+                            # by code in UrlNavigator
                             # this is set when the navigator button does NOT
                             # show the active directory in the navigator!
                             
@@ -1509,7 +1509,7 @@ class NavigatorSchemeCombo(NavigatorButtonBase):
     """Implementation of KIO KUrlNavigatorSchemeCombo"""
     sig_activated = Signal(str, name="sig_activated")
     
-    def __init__(self, scheme:str, parent:typing.Optional[Navigator]=None):
+    def __init__(self, scheme:str, parent:typing.Optional[UrlNavigator]=None):
         super().__init__(parent)
         self._menu_ = QtWidgets.QMenu(self)
         self._schemes_ = list()
@@ -1559,7 +1559,7 @@ class NavigatorPlacesSelector(NavigatorButtonBase): # TODO: 2023-05-07 23:07:25 
     placeActivated = Signal(str, name = "placeActivated")
     tabRequested = Signal()
     
-    def __init__(self, parent:Navigator, placesModel:PlacesModel):
+    def __init__(self, parent:UrlNavigator, placesModel:PlacesModel):
         super().__init__(parent=parent)
         
         self._selectedItem_:int = -1
@@ -1951,8 +1951,12 @@ class NavigatorPathSelectorEventFilter(QtCore.QObject):
                     
         return QtCore.QObject.eventFilter(watched, evt)
         
+        
+class _UrlNavigator_:
+    # KUrlNavigatorPrivate
+    def __init__(self, url:QtCore.QUrl, qq: UrlNavigator, placesModel: PlacesModel)
 
-class Navigator(QtWidgets.QWidget):
+class UrlNavigator(QtWidgets.QWidget):
     """Implementation of KIO KUrlNavigator"""
     # ### BEGIN signals
     activated           = Signal(name = "activated")
@@ -2552,7 +2556,7 @@ class Navigator(QtWidgets.QWidget):
     
     @Slot(QtCore.QPoint)
     def openContextMenu(self, p:QtCore.QPoint):
-        """Navigator's context menu
+        """UrlNavigator's context menu
         Allows 
         • copy/paste of path, 
         • switching between edit mode and breadcrumb navigation mode, 

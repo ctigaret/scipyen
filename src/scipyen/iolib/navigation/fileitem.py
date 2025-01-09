@@ -868,7 +868,7 @@ class FileItem(metaclass=MultipleMeta):
                 return False # FIXME 2025-01-08 18:13:54 TODO 
                              # return KProtocolManager::supportsWriting(d->m_url);
                     
-    def mimetype(self) -> str:
+    def mimeType(self) -> str:
         if self._d_ is None:
             return str()
         
