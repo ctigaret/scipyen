@@ -115,6 +115,10 @@ b) use KDE framework - this would "tie" Scipyen into KDE too much:
 
 """
 
+# TODO: 2025-01-09 21:07:03
+# Completion -> UrlCompletion
+
+
 import typing, pathlib, functools, os, itertools
 from urllib.parse import urlparse, urlsplit
 from collections import namedtuple
@@ -203,9 +207,7 @@ class ApplyUrlMethod(IntEnum):
         
         
 
-class UrlNavigator:
-    pass # fwd decl
-
+class UrlNavigator: pass # fwd decl
 
 class LocationData(typing.NamedTuple):
     """
@@ -640,11 +642,11 @@ class UrlComboBox(QtWidgets.QComboBox):
             
         super().mousemoveEvent(evt)
                         
-    # TODO/FIXME ?
+    # TODO/FIXME ? see TODO 2025-01-09 21:05:56
     # def setCompletionObject(self, compObj:QtWidgets.QCompleter, hsig:bool):
     #     compObj.setModelSorting(QtWidgets.QCompleter.CaseSensitivelySortedModel)
                     
-class NavigatorMenu(QtWidgets.QMenu):
+class UrlNavigatorMenu(QtWidgets.QMenu):
     sig_urlDropped = Signal(QtWidgets.QAction, QtGui.QDropEvent, 
                             name="sig_urlDropped")
     sig_mouseButtonClicked = Signal(QtWidgets.QAction, QtCore.Qt.MouseButton, 
@@ -698,7 +700,7 @@ class NavigatorMenu(QtWidgets.QMenu):
             
         self._mouseMoved = True
     
-class NavigatorButtonBase(QtWidgets.QPushButton):
+class UrlNavigatorButtonBase(QtWidgets.QPushButton):
     """Common ancestor for breadcrumbs buttons
     """
     BorderWidth = 2
@@ -797,7 +799,7 @@ class NavigatorButtonBase(QtWidgets.QPushButton):
         self.active = True
         #self.setActive(true)
 
-class NavigatorToggleButton(NavigatorButtonBase):
+class UrlNavigatorToggleButton(UrlNavigatorButtonBase):
     _iconSize_ = 16
     def __init__(self, parent:UrlNavigator=None):
         super().__init__(parent=parent)
@@ -860,7 +862,7 @@ class NavigatorToggleButton(NavigatorButtonBase):
         else:
             self.setCursor(QtCore.Qt.IBeamCursor)
 
-class NavigatorButton(NavigatorButtonBase): 
+class UrlNavigatorButton(UrlNavigatorButtonBase): 
     # TODO: 2024-12-30 19:01:04 finalise me!
     # FIXME/TODO 2023-05-07 23:34:55 finalize
     navigate = Signal(str, name="navigate")
@@ -892,7 +894,7 @@ class NavigatorButton(NavigatorButtonBase):
                             
         self._subDirsJob_ = None # originally, a KIO::ListJob → here, a QThread
         self._subDirs_ = list() # of SubdirInfo → here, a list of pathlib.Path objects
-        self._subDirsMenu_ = None # NavigatorMenu 
+        self._subDirsMenu_ = None # UrlNavigatorMenu 
         
         self._openSubDirsTimer = QtCore.QTimer(self)
         self._openSubDirsTimer.setSingleShot(True)
@@ -1078,7 +1080,7 @@ class NavigatorButton(NavigatorButtonBase):
             
         if subDirsSize > maxIndex:
             menu.addSeparator()
-            subDirsMenu = NavigatorMenu("More", menu)
+            subDirsMenu = UrlNavigatorMenu("More", menu)
             self.initMenu(subDirsMenu, maxIndex)
             menu.addMenu(subDirsMenu)
         
@@ -1226,7 +1228,7 @@ class NavigatorButton(NavigatorButtonBase):
             self._hoverArrow_ = True
             self.update()
             
-            if not isinstance(self._subDirsMenu_, NavigatorMenu) or not qtutils.isQObjectAlive(self._subDirsMenu_):
+            if not isinstance(self._subDirsMenu_, UrlNavigatorMenu) or not qtutils.isQObjectAlive(self._subDirsMenu_):
                 self.slot_requestSubDirs()
                 
             elif self._subDirsMenu_.parent() != self:
@@ -1240,7 +1242,7 @@ class NavigatorButton(NavigatorButtonBase):
             if self._openSubDirsTimer.isActive(): 
                 self.cancelSubDirsRequest() 
                 
-            if isinstance(self._subDirsMenu_, NavigatorMenu) and qtutils.isQObjectAlive(self._subDirsMenu_):
+            if isinstance(self._subDirsMenu_, UrlNavigatorMenu) and qtutils.isQObjectAlive(self._subDirsMenu_):
                 self._subDirsMenu_.deleteLater()
                 self._subDirsMenu_ = None
                 
@@ -1477,7 +1479,7 @@ class NavigatorButton(NavigatorButtonBase):
             self._subDirsMenu_.deleteLater()
             self._subDirsMenu_ = None
             
-        self._subDirsMenu_ = NavigatorMenu(self)
+        self._subDirsMenu_ = UrlNavigatorMenu(self)
         self.initMenu(self._subDirsMenu_, 0)
     
     @Slot(list)
@@ -1496,7 +1498,7 @@ class NavigatorButton(NavigatorButtonBase):
 # We only use the "file://" protocol, so this is not needed, for now...
 # NOTE: 2025-01-02 16:02:34 but this may change
 #
-class NavigatorProtocolCombo(NavigatorButtonBase): # TODO
+class UrlNavigatorProtocolCombo(UrlNavigatorButtonBase): # TODO
     sig_activated = Signal()
     def __init__(self, protocol:str, parent=None):
         super().__init__(parent)
@@ -1505,7 +1507,7 @@ class NavigatorProtocolCombo(NavigatorButtonBase): # TODO
 # By design we only use the 'file://' protocol hence this is not needed, for now...
 # NOTE: 2025-01-02 16:02:17 but this may change
 #
-class NavigatorSchemeCombo(NavigatorButtonBase):
+class UrlNavigatorSchemeCombo(UrlNavigatorButtonBase):
     """Implementation of KIO KUrlNavigatorSchemeCombo"""
     sig_activated = Signal(str, name="sig_activated")
     
@@ -1555,7 +1557,7 @@ class NavigatorSchemeCombo(NavigatorButtonBase):
             protocols = [p for p in ProtocolInfo.protocols() if self._testProtocol_(p)]
             self._schemes_[:] = sorted(protocols)
 
-class NavigatorPlacesSelector(NavigatorButtonBase): # TODO: 2023-05-07 23:07:25 finalize
+class UrlNavigatorPlacesSelector(UrlNavigatorButtonBase): # TODO: 2023-05-07 23:07:25 finalize
     placeActivated = Signal(str, name = "placeActivated")
     tabRequested = Signal()
     
@@ -1692,10 +1694,10 @@ class NavigatorPlacesSelector(NavigatorButtonBase): # TODO: 2023-05-07 23:07:25 
     def selectedPlaceText(self): # TODO/FIXME finalize
         return ""
         
-class NavigatorDropDownButton(NavigatorButtonBase):
+class UrlNavigatorDropDownButton(UrlNavigatorButtonBase):
     def __init__(self, parent=None):
         super().__init__(parent)
-        # self._isDown_ = False # def'ed in NavigatorButtonBase
+        # self._isDown_ = False # def'ed in UrlNavigatorButtonBase
         
         
     def sizeHint(self):
@@ -1952,70 +1954,81 @@ class NavigatorPathSelectorEventFilter(QtCore.QObject):
         return QtCore.QObject.eventFilter(watched, evt)
         
         
-class _UrlNavigator_:
+class _UrlNavigator_(QtCore.QObject):
     # KUrlNavigatorPrivate
-    def __init__(self, url:QtCore.QUrl, qq: UrlNavigator, placesModel: PlacesModel)
-
-class UrlNavigator(QtWidgets.QWidget):
-    """Implementation of KIO KUrlNavigator"""
-    # ### BEGIN signals
-    activated           = Signal(name = "activated")
-    urlChanged          = Signal(QtCore.QUrl, name="urlChanged")
-    urlAboutToBeChanged = Signal(QtCore.QUrl, name = "urlAboutToBeChanged")
-    editableStateChanged = Signal(bool, name = "editableStateChanged")
-    historyChanged      = Signal(name = "historyChanged")
-    urlsDropped         = Signal(QtCore.QUrl, QtGui.QDropEvent, name = "urlsDropped")
-    returnPressed       = Signal(name = "returnPressed")
-    
-    # NOTE: 2023-05-07 22:03:17
-    # Scipyen's file system viewer does not support tabs
-    # tabRequested        = Signal(QtCore.QUrl, name = "tabRequested")
-    # activeTabRequested  = Signal(QtCore.QUrl, name = "activeTabRequested")
-    
-    # NOTE: 2023-05-07 22:03:37
-    # this should open the url in the system's default application
-    newWindowRequested  = Signal(QtCore.QUrl, name = "newWindowRequested")
-    urlSelectionRequested = Signal(QtCore.QUrl, name = "urlSelectionRequested")
-    # ### END signals
-    
-    def __init__(self, placesModel:typing.Optional[PlacesModel]=None,
-                 url:typing.Optional[QtCore.QUrl]=None, 
-                 parent:typing.Optional[QtWidgets.QWidget] = None):
-        super().__init__(parent=parent)
-
-        # NOTE:2023-05-03 08:14:35 
-        # ### BEGIN KUrlNavigatorPrivate API
-        self._layout_ = QtWidgets.QHBoxLayout(self)
+    def __init__(self, url:QtCore.QUrl, qq: UrlNavigator, placesModel: PlacesModel):
+        super().__init__()
+        self._supportedSchemes_:list[str] = list()
+        self._homeUrl_:typing.Optional[QtCore.QUrl] = None # do not initialize here -> 'tis the work of _coreUrlNavigator_
+        self._customProtocols_:list = list()
+        self._editable_:bool = False
+        self._active_:bool = True
+        self._showFullPath_:bool = False
+        
+        # TODO: 2025-01-09 21:43:54 ?!? why Bunch ?!? - can also use a namespace
+        # but Bunch ( in traitlets package ) most closely fits a struct
+        self._subfolderOptions_:Bunch = Bunch({"showHidden":False, "sortHiddenLast": False})
+        
+        # ### BEGIN UI Components of self._q_:UrlNavigator
+        
+        # ### BEGIN _protocols_:UrlNavigatorProtocolCombo
+        # NOTE: 2023-05-06 22:30:13
+        # We only use "file://" protocol - hence only the file:/// url scheme is
+        # supported in Scipyen, see also NOTE: 2023-05-06 22:30:13 below
+        self._protocols_:typing.Optional[UrlNavigatorProtocolCombo] = None # TODO: revisit this
+        # self._protocols_ = UrlNavigatorProtocolCombo("", self._q_)
+        # self._protocols_.sig_activated.connect(self.slotProtocolChanged)
+        # ### END   _protocols_:UrlNavigatorProtocolCombo
+        
+        self._q_:UrlNavigator = qq
+        self._layout_:QtWidgets.QHBoxLayout = QtWidgets.QHBoxLayout(self._q_)
         self._layout_.setSpacing(0)
         self._layout_.setContentsMargins(0,0,0,0)
+
+        self._coreUrlNavigator_:CoreUrlNavigator = CoreUrlNavigator(url, self._q_) # m_coreUrlNavigator
+        self._coreUrlNavigator_.currentLocationUrlChanged.connect(self._q_.slot_coreUrlNavigatorUrlChanged)
+        self._coreUrlNavigator_.currentUrlAboutToChange[QtCore.QUrl].connect(self._q_.slot_coreUrlNavigatorUrlAboutToBeChanged)
+        self._coreUrlNavigator_.historySizeChanged.connect(self._q_.historyChanged)
+        self._coreUrlNavigator_.historyIndexChanged.connect(self._q_.historyChanged)
+        self._coreUrlNavigator_.historyChanged.connect(self._q_.historyChanged)
+        self._coreUrlNavigator_.urlSelectionRequested[QtCore.QUrl].connect(self._q_.slot_coreUrlNavigatorUrlSelectionRequested)
         
-        self._coreUrlNavigator_ = CoreUrlNavigator(url, self) # m_coreUrlNavigator
-        self._coreUrlNavigator_.currentLocationUrlChanged.connect(self.slot_coreUrlNavigatorUrlChanged)
-        self._coreUrlNavigator_.currentUrlAboutToChange[QtCore.QUrl].connect(self.slot_coreUrlNavigatorUrlAboutToBeChanged)
-        self._coreUrlNavigator_.historySizeChanged.connect(self.historyChanged)
-        self._coreUrlNavigator_.historyIndexChanged.connect(self.historyChanged)
-        self._coreUrlNavigator_.historyChanged.connect(self.historyChanged)
-        self._coreUrlNavigator_.urlSelectionRequested[QtCore.QUrl].connect(self.slot_coreUrlNavigatorUrlSelectionRequested)
-        
-        self._navButtons_ = list() # list of "breadcrumb buttons" - instances of NavigatorButton
-        # NOTE: 2023-05-06 22:27:36
-        # We only support "file:" protocol for now...
-        self._supportedSchemes_ = list() # of str,
-        self._homeUrl_ = QtCore.QUrl()
-        self._customProtocols_ = list()
+        self._q_.setAutoFillBackground(False)
+
+        self._placesSelector_:typing.Optional[UrlNavigatorPlacesSelector] = None
         
         if isinstance(placesModel, PlacesModel):
-            self._placesSelector_ = NavigatorPlacesSelector(placesModel, self)
-            self._placesSelector_.placeActivated.connect(self.setLocationUrl)
-            self._placesSelector_.tabRequested.connect(self.tabRequested)
-            self._placesModel_.rowsInserted.connect(self.updateContent)
-            self._placesModel_.rowsRemoved.connect(self.updateContent)
-            self._placesModel_.dataChanged.connect(self.updateContent)
-        else:
-            self._placesSelector_ = None
+            self._placesSelector_ = UrlNavigatorPlacesSelector(placesModel, self._q_)
+            self._placesSelector_.placeActivated.connect(self._q_.slot_setLocationUrl)
+            self._placesSelector_.tabRequested.connect(self._q_.tabRequested)
+            self._placesModel_.rowsInserted.connect(self._q_.updateContent)
+            self._placesModel_.rowsRemoved.connect(self._q_.updateContent)
+            self._placesModel_.dataChanged.connect(self._q_.updateContent)
             
-        self._showPlacesSelector_ = isinstance(self._placesSelector_, PlacesModel)
-            
+        self._showPlacesSelector_:bool = isinstance(self._placesSelector_, PlacesModel)
+        
+
+        # NOTE: 2023-05-06 22:25:07
+        # by design we only support a file: protocol
+        # hence not sure I need self._schemes_
+        self._schemes_:UrlNavigatorSchemeCombo = UrlNavigatorSchemeCombo(str(), self._q_)
+        self._schemes_.activated[str].connect(self._q_.slotSchemeChanged)
+        
+        # ### BEGIN _navButtons_
+        self._navButtons_:list = list() # list of "breadcrumb buttons" - instances of UrlNavigatorButton
+        # ### END   _navButtons_
+        
+        # NOTE: 2023-05-06 22:27:36
+        # We only support "file:" protocol for now...
+        
+        # NOTE: 2023-05-07 22:59:49
+        # drops down a menu of places or parent paths
+        self._dropDownButton_:UrlNavigatorDropDownButton = UrlNavigatorDropDownButton(self)
+        self._dropDownButton_.setForegroundRole(QtGui.QPalette.WindowText)
+        self._dropDownButton_.installEventFilter(self)
+        self._dropDownButton_.clicked.connect(self.openPathSelectorMenu)
+        
+        # ### BEGIN _pathBox_:UrlComboBox
         # NOTE: 2023-05-07 23:16:43
         # the actual path combo box
         # TODO: Modify UrlComboBox code: to its QLineEdit, add extra tool buttons for:
@@ -2023,79 +2036,87 @@ class UrlNavigator(QtWidgets.QWidget):
         # • clear current text
         # • remove current text from history
         # • enable clear, undo, redo
-        self._pathBox_ = UrlComboBox(UrlComboMode.Directories, False, self)
+        self._pathBox_:UrlComboBox = UrlComboBox(UrlComboMode.Directories, True, self._q_)
+        self._pathBox_.setSizeAdjustPolicy(QtWidgets.QComboBox.AdjustToContentsOnFirstShow)
+        # self._pathBox_.setSizeAdjustPolicy(QtWidgets.QComboBox.AdjustToMinimumContentsLengthWithIcon)
+        self._pathBox_.installEventFilter(self._q_)
         
-        # NOTE: 2023-05-06 22:25:07
-        # by design we only support a file: protocol
-        # hence we do NOT need self._schemes_
-        self._schemes_ = NavigatorSchemeCombo # TODO
-        self._schemes_.activated[str].connect(self.slotSchemeChanged)
+        # ### BEGIN TODO 2025-01-09 21:05:56
+        # UrlCompletion <- Completion (KCompletion in KCompletion framework)
+        # self._urlCompletion = ...
+        # self._pathBox_.setCompletionObject(self._urlCompletion)
+        # self._pathBox_.setAutoDeleteCompletionObject(true)
+        # ### END   TODO
         
-        # NOTE: 2023-05-07 22:59:49
-        # drops down a menu of places or parent paths
-        self._dropDownButton_ = NavigatorDropDownButton(self)
-        self._dropDownButton_.setForegroundRole(QtGui.QPalette.WindowText)
-        self._dropDownButton_.installEventFilter(self)
-        self._dropDownButton_.clicked.connect(self.openPathSelectorMenu)
+        self._pathBox_.returnPreessed.connect(self._q_.slot_returnPressed)
+        self._pathBox_.urlActivated.connect(self._q_.slot_setLocationUrl)
+        self._pathBox_.editTextChanged[str].connect(self._q_.slotPathBoxChanged)
         
+        # ### END   _pathBox_:UrlComboBox
+        
+        # ### BEGIN _badgeWidgetContainer_:QtGui.QWidget
+        self._badgeWidgetContainer_:QtGui.QWidget = QtGui.QWidget(self._q_)
+        badgeLayout:QtGui.QHBoxLayout = QtGui.QHBoxLayout(self._badgeWidgetContainer_)
+        badgeLayout.setContentsMargins(0,0,0,0)
+        # ### END   _badgeWidgetContainer_:QtGui.QWidget
+        
+        # ### BEGIN _toggleEditableMode_:UrlNavigatorButton
         # NOTE: 2023-05-07 23:22:18
-        # toggled between url combo box and bread crumbs
-        self._toggleEditableMode_ = NavigatorToggleButton(self) # TODO check
-        self._toggleEditableMode_.installEventFilter(self)
+        # toggles between url combo box and bread crumbs
+        # TODO 2025-01-09 21:23:56 check UrlNavigatorButton class definition
+        self._toggleEditableMode_:UrlNavigatorToggleButton = UrlNavigatorToggleButton(self._q_)
+        self._toggleEditableMode_.installEventFilter(self._q_)
         self._toggleEditableMode_.setMinimumWidth(20)
-        self._toggleEditableMode_.toggled[bool].connect(self.slotTogleEditableButtonToggled)
-   
-        self._dropWidget_ = None
-        self._badgeWidgetContainer_ = None
+        self._toggleEditableMode_.clicked.connect(self._q_.slotToggleEditableButtonPressed) # TODO: write slot
+        # self._toggleEditableMode_.toggled[bool].connect(self.slotToggleEditableButtonToggled)
+        # ### END   _toggleEditableMode_:UrlNavigatorButton
         
-        self._editable_ = False
-        self._active_ = True
-        self._showFullPath_ = False
+        self._dropWidget_:typing.Optional[QtCore.QWidget] = None # TODO - dynamic stuff
         
-        self._subfolderOptions_ = Bunch({"showHidden":False, "sortHiddenLast": False})
-        
-        self.setAutoFillBackground(False)
-
-        # NOTE: 2023-05-06 22:30:13
-        # We only use "file://" protocol - hence only the file:// url scheme is
-        # supported in Scipyen, see also NOTE: 2023-05-06 22:30:13 below
-        # self._protocols_ = NavigatorProtocolCombo("", self)
-        # self._protocols_.sig_activated.connect(self.slotProtocolChanged)
-        self._protocols_ = None # I might revisit this
-        
-        
-        # self._pathBox_.setSizeAdjustPolicy(QtWidgets.QComboBox.AdjustToContentsOnFirstShow)
-        self._pathBox_.setSizeAdjustPolicy(QtWidgets.QComboBox.AdjustToMinimumContentsLengthWithIcon)
-        self._pathBox_.installEventFilter(self)
-        
-        if self._placesSelector_ is not None:
-            self._layout_.addwidget(self._placesSelector_)
+        if isinstance(self._placesSelector_, UrlNavigatorPlacesSelector):
+            self._layout_.addWidget(self._placesSelector_)
             
-        # self._layout_.addWidget(self._schemes_) # see NOTE: 2023-05-06 22:30:13
-        
+        self._layout_.addWidget(self._schemes_)
         self._layout_.addWidget(self._dropDownButton_)
         self._layout_.addWidget(self._pathBox_, 1)
-        self._layout_.addWidget(self._toggleEditableMode_)
+        self._layout_.addWidget(self._badgeWidgetContainer_)
+        self._layout._addWidget(self._toggleEditableMode_)
         
-        self.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-        self.customContextMenuRequested.connect(self.openContextMenu)
+        self._q_.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self._q_.customContextMenuRequested[QtCore.QPoint].connect(self._q_.slot_openContextMenu)
+   
+        # ### END   UI Components of self._q_:UrlNavigator
         
-        # ### END NavigatorPrivate API
-        
-        self.setMinimumHeight(self._pathBox_.sizeHint().height())
-        self.setMinimumWidth(100)
-        self.updateContent()
-        
-    def __del__(self):
-        self._dropDownButton_.removeEventFilter(self)
-        self._pathBox_.removeEventFilter(self)
-        self._toggleEditableMode_.removeEventFilter(self)
-        
-        for button in self._navButtons_:
-            button.removeEventFilter(self)
         
     # ### BEGIN KUrlNavigatorPrivate API
             
+    @Slot(QtCore.QUrl)
+    def slotApplyUrl(self, url:QtCore.QUrl):
+        # if (!url.isEmpty() && url.path().isEmpty() && KProtocolInfo::protocolClass(url.scheme()) == QLatin1String(":local")) {
+        #     url.setPath(QStringLiteral("/"));
+        # }
+        if not url.isEmpty() and len(url.path()) == 0:
+            url.setPath("/")
+            
+        urlStr:str = url.toString()
+        
+        urls:list[str] = [u for u in self._pathBox_.urls() if u != urlStr]
+        urls.insert(0, urlStr)
+        self._pathBox_.setUrls(urls) # TODO: use flag KUrlComboBox::RemoveBottom
+        self._q_.slot_setLocationUrl(url)
+        self._pathBox_.setUrl(self._q_.locationUrl())
+        
+    @Slot(str)
+    def checkFilters(self, text:str):
+        # TODO 2023-05-06 22:53:38
+        # KIO uses KUriFilterData
+        # need to figure out what this does and replace with simpler pythonic code
+        #
+        # for now, just return False (i.e. not wasFiltered)
+        return False
+    
+    # TODO BREAK 2025-01-09 22:47:12 TODO
+    
     def switchView(self, editable:bool):
         # KUrlNavigatorPrivate
         self._toggleEditableMode_.setFocus()
@@ -2110,7 +2131,7 @@ class UrlNavigator(QtWidgets.QWidget):
         self.requestActivation()
         self.editableStateChanged.emit(self._editable_)
         
-    def dropUrls(self, destination:QtCore.QUrl, evt:QtGui.QDropEvent, dropButton:NavigatorButton):
+    def dropUrls(self, destination:QtCore.QUrl, evt:QtGui.QDropEvent, dropButton:UrlNavigatorButton):
         # KUrlNavigatorPrivate
         if evt.mimeData().hasUrls():
             self._dropWidget_ = dropButton
@@ -2138,12 +2159,11 @@ class UrlNavigator(QtWidgets.QWidget):
         self.slotApplyUrl(QtCore.QUrl.fromUserInput(text))
         
     def appendWidget(self, widget:QtWidgets.QWidget, stretch:int=0):
-        # KUrlNavigatorPrivate
         # NOTE: 2023-05-08 11:04:33
         # CAUTION: does NOT append to self._navButtons_!!!
-        # this must eb done separately when appending a NavigatorButton, see
+        # this must be done separately when appending a UrlNavigatorButton, see
         # NOTE: 2023-05-08 11:05:23
-        self._layout_.insertWidget(self._layout_.count()-1, widget, stretch)
+        self._layout_.insertWidget(self._layout_.count()-2, widget, stretch)
         
     def retrievePlaceUrl(self): # TODO/FIXME: 2023-05-07 23:09:25
         # KUrlNavigatorPrivate
@@ -2259,7 +2279,7 @@ class UrlNavigator(QtWidgets.QWidget):
             if hasNext:
                 button = None
                 if createButton:
-                    button = NavigatorButton(self.buttonUrl(ndx), self)
+                    button = UrlNavigatorButton(self.buttonUrl(ndx), self)
                     button.installEventFilter(self)
                     button.setForegroundRole(QtGui.QPalette.WindowText)
                     button.urlsDroppedOnNavButton.connect(self._slot_dropUrls) # CMT: wraps to dropUrls
@@ -2386,6 +2406,48 @@ class UrlNavigator(QtWidgets.QWidget):
     
     # ### END KUrlNavigatorPrivate API
     
+
+
+class UrlNavigator(QtWidgets.QWidget):
+    """Implementation of KIO KUrlNavigator"""
+    # ### BEGIN signals
+    activated           = Signal(name = "activated")
+    urlChanged          = Signal(QtCore.QUrl, name="urlChanged")
+    urlAboutToBeChanged = Signal(QtCore.QUrl, name = "urlAboutToBeChanged")
+    editableStateChanged = Signal(bool, name = "editableStateChanged")
+    historyChanged      = Signal(name = "historyChanged")
+    urlsDropped         = Signal(QtCore.QUrl, QtGui.QDropEvent, name = "urlsDropped")
+    returnPressed       = Signal(name = "returnPressed")
+    
+    # NOTE: 2023-05-07 22:03:17
+    # Scipyen's file system viewer does not support tabs
+    # tabRequested        = Signal(QtCore.QUrl, name = "tabRequested")
+    # activeTabRequested  = Signal(QtCore.QUrl, name = "activeTabRequested")
+    
+    # NOTE: 2023-05-07 22:03:37
+    # this should open the url in the system's default application
+    newWindowRequested  = Signal(QtCore.QUrl, name = "newWindowRequested")
+    urlSelectionRequested = Signal(QtCore.QUrl, name = "urlSelectionRequested")
+    # ### END signals
+    
+    def __init__(self, placesModel:typing.Optional[PlacesModel]=None,
+                 url:typing.Optional[QtCore.QUrl]=None, 
+                 parent:typing.Optional[QtWidgets.QWidget] = None):
+        super().__init__(parent=parent)
+
+        # NOTE:2023-05-03 08:14:35 
+        self.setMinimumHeight(self._pathBox_.sizeHint().height())
+        self.setMinimumWidth(100)
+        self.updateContent()
+        
+    def __del__(self):
+        self._dropDownButton_.removeEventFilter(self)
+        self._pathBox_.removeEventFilter(self)
+        self._toggleEditableMode_.removeEventFilter(self)
+        
+        for button in self._navButtons_:
+            button.removeEventFilter(self)
+        
     def showFullPath(self):
         return self._showFullPath_
     
@@ -2425,9 +2487,9 @@ class UrlNavigator(QtWidgets.QWidget):
     
     def goHome(self):
         if self._homeUrl_.isEmpty() or not self._homeUrl_.isValid():
-            self.setLocationUrl(QtCore.QUrl.fromLocalFile(QtCore.QDir.homePath()))
+            self.slot_setLocationUrl(QtCore.QUrl.fromLocalFile(QtCore.QDir.homePath()))
         else:
-            self.setLocationUrl(self._homeUrl_)
+            self.slot_setLocationUrl(self._homeUrl_)
             
     def setHomeUrl(self, url:QtCore.QUrl):
         self._homeUrl_ = url
@@ -2493,7 +2555,7 @@ class UrlNavigator(QtWidgets.QWidget):
                 mimeData = clipboard.mimeData()
                 if mimeData.hasText():
                     text = mimeData.text()
-                    self.setLocationUrl(QtCore.QUrl.fromUserInput(text))
+                    self.slot_setLocationUrl(QtCore.QUrl.fromUserInput(text))
                     
         super().mouseReleaseEvent(evt)
         
@@ -2555,7 +2617,7 @@ class UrlNavigator(QtWidgets.QWidget):
     # ### BEGIN KUrlNavigatorPrivate slots
     
     @Slot(QtCore.QPoint)
-    def openContextMenu(self, p:QtCore.QPoint):
+    def slot_openContextMenu(self, p:QtCore.QPoint):
         """UrlNavigator's context menu
         Allows 
         • copy/paste of path, 
@@ -2617,7 +2679,7 @@ class UrlNavigator(QtWidgets.QWidget):
             clipboard.setMimeData(mimeData)
             
         elif activatedAction == pasteAction:
-            self.setLocationUrl(QtCore.QUrl.fromUserInput(clipboard.text()))
+            self.slot_setLocationUrl(QtCore.QUrl.fromUserInput(clipboard.text()))
             
         elif activatedAction == editAction:
             self.setUrlEditable(True)
@@ -2683,7 +2745,7 @@ class UrlNavigator(QtWidgets.QWidget):
         activatedAction = popup.exec(pos)
         if activatedAction is not None:
             url = QtCore.QUrl(activatedAction.data().toString())
-            self.setLocationUrl(url)
+            self.slot_setLocationUrl(url)
             
         if popup is not None:
             popup.deleteLater() 
@@ -2706,15 +2768,17 @@ class UrlNavigator(QtWidgets.QWidget):
             self.newWindowRequested.emit(url)
             
         elif (button & QtCore.Qt.LeftButton):
-            self.setLocationUrl(url)
+            self.slot_setLocationUrl(url)
     
     @Slot(bool)
-    def slotTogleEditableButtonToggled(self, editable:bool):
-        # KUrlNavigatorPrivate
+    def slotToggleEditableButtonToggled(self, editable:bool):
         if self._editable_:
             self.applyUncommittedUrl()
             
         self.switchView(editable)
+        
+    @Slot
+    def slotToggleEditableButtonPressed(self):pass
         
     @Slot(str)
     def slotPathBoxChanged(self, text:str):
@@ -2744,52 +2808,28 @@ class UrlNavigator(QtWidgets.QWidget):
             # current url, but the next available one in the history.
             signalBlocker = QtCore.QSignalBlocker(self._pathBox_)
             url = QtCore.QUrl(os.path.getcwd())
-            self.setLocationUrl(url)
+            self.slot_setLocationUrl(url)
             return
         # else:
             # self._schemes_.hide() # see NOTE: 2023-05-06 22:30:13
         
-    @Slot(QtCore.QUrl)
-    def slotApplyUrl(self, url:QtCore.QUrl):
-        # KUrlNavigatorPrivate
-        if not url.isEmpty() and len(url.path()) == 0:
-            url.setPath("/")
-            
-        urlStr = url.toString()
-        
-        urls = [u for u in self._pathBox_.urls() if u != urlStr]
-        urls.insert(0, urlStr)
-        
-        self.setLocationUrl(url)
-        self._pathBox_.setUrl(self.locationUrl())
-        
-    @Slot(str)
-    def slotCheckFilters(self, text:str):
-        # KUrlNavigatorPrivate
-        # TODO 2023-05-06 22:53:38
-        # KIO used KUriFilterData
-        # need to figure out what this does and replace with simpler pythonic code
-        #
-        # for now, just return False (i.e. not wasFiltered)
-        return False
     
+    # ### END KUrlNavigatorPrivate slots
+    
+    # ### BEGIN Slots
     @Slot()
-    def slotReturnPressed(self):
-        # KUrlNavigatorPrivate
+    def slot_returnPressed(self):
+        # indirection to emitting returnPressed
         self.applyUncommittedUrl()
         self.returnPressed.emit()
         
         if QtWidgets.QApplication.KeyboardModifiers() & QtCore.Qt.ControlModifier:
             self.switchToBreadcrumbMode()
             
-    
-    # ### END KUrlNavigatorPrivate slots
-    
-    # ### BEGIN Slots
     @Slot(QtCore.QUrl, QtGui.QDropEvent) # CMT
     def _slot_dropUrls(self, url:QtCore.QUrl, evt:QtGui.QDropEvent):
         button = self.sender()
-        if isinstance(button, NavigatorButton):
+        if isinstance(button, UrlNavigatorButton):
             self.dropUrls(url, evt, button)
             
     @Slot(QtCore.QUrl, QtCore.Qt.KeyboardModifiers)
@@ -2811,7 +2851,7 @@ class UrlNavigator(QtWidgets.QWidget):
             self.newWindowRequested.emit(url)
     
     @Slot(QtCore.QUrl)
-    def setLocationUrl(self, url:QtCore.QUrl):
+    def slot_setLocationUrl(self, url:QtCore.QUrl):
         self._coreUrlNavigator_.setCurrentLocationUrl(url)
         self.updateContent()
         self.requestActivation()
