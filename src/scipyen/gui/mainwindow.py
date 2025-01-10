@@ -391,7 +391,7 @@ has_neuron = neuron_spec is not None
 # NOTE: 2025-01-07 12:37:46
 # part of the singleton design pattern for main window
 # see also traitlets.config.SingletonConfigurable
-SMW = typing.TypeVar("SMW", bound = "ScipyenWindow") # type variable representing the ScipyenWindow class
+# SMW = typing.TypeVar("SMW", bound = "ScipyenWindow") # type variable representing the ScipyenWindow class
 
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
@@ -1105,7 +1105,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     _instance = None
     
     @classmethod
-    def _walk_mro(cls) -> typing.Generator[type[SMW], None, None]:
+    def _walk_mro(cls) -> typing.Generator[typing.Self, None, None]:
+    # def _walk_mro(cls) -> typing.Generator[type[SMW], None, None]:
         """Walk the cls.mro() for parent classes that are also singletons
 
         For use in instance()
@@ -1115,17 +1116,21 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         for subclass in cls.mro():
             if (
                 issubclass(cls, subclass)
-                and issubclass(subclass, SMW)
-                and subclass != SMW
+                and issubclass(subclass, typing.Self)
+                # and issubclass(subclass, SMW)
+                # and subclass != SMW
+                and subclass != typing.Self
             ):
                 yield subclass
 
     @classmethod
-    def initialized(cls:type[SMW]) -> bool:
+    def initialized(cls:typing.Self) -> bool:
+    # def initialized(cls:type[SMW]) -> bool:
         return hasattr(cls, "_instance" and isinstance(cls._instance, cls))
 
     @classmethod
-    def instance(cls:type[SMW], *args, **kwargs) -> SMW:
+    def instance(cls:typing.Self, *args, **kwargs) -> typing.Self:
+    # def instance(cls:type[SMW], *args, **kwargs) -> SMW:
         if cls._instance is None:
             inst = cls(*args, **kwargs)
             for subclass in cls._walk_mro():
@@ -1418,8 +1423,15 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # print(f"slot_wrapPluginFunction in @self._inputPrompter_ {f.__module__}.{f.__name__} arg_types {arg_types} kw_args {kw_args}")
         return sw_f
     
-    def __new__(cls:type[SMW], app: QtWidgets.QApplication, 
-                 parent: typing.Optional[QtWidgets.QWidget] = None, *args, **kwargs) -> SMW:
+    # NOTE: 2025-01-10 22:44:49 WARNING Subclassing ScipyenWindow
+    # Made this into a singleton class - such that there is only one instance
+    # alive at any time; however, this behaviour propagates to its subclasses 
+    # also (if any)
+    
+    # def __new__(cls:type[SMW], app: QtWidgets.QApplication, 
+                 # parent: typing.Optional[QtWidgets.QWidget] = None, *args, **kwargs) -> SMW:
+    def __new__(cls:typing.Self, app: QtWidgets.QApplication, 
+                 parent: typing.Optional[QtWidgets.QWidget] = None, *args, **kwargs) -> typing.Self:
         if not hasattr(cls, "_instance") or not isinstance(cls._instance, cls):
             cls._instance = super(ScipyenWindow, cls).__new__(cls, app, parent, *args, **kwargs)
             
