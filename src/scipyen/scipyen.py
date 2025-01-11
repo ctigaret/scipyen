@@ -99,27 +99,27 @@ if sys.platform == "linux":
 # then add the corresponding plugins dir to QT_PLUGINS_PATH
 # so we won't have to build qt locally anymore, by the installer
 
-if len(sys.argv) > 1:
-    if "pyqt6" in sys.argv:
-        os.environ["QT_API"] = "pyqt6"
-        os.environ["PYQTGRAPH_QT_LIB"] = "PyQt6"
-        os.environ["FORCE_QT_API"] = "1"
-        
-    elif "pyside2" in sys.argv:
-        os.environ["QT_API"] = "pyside2" # for up to Qt5
-        os.environ["PYQTGRAPH_QT_LIB"] = "PySide2"
-        os.environ["FORCE_QT_API"] = "1"
-        
-    elif "pyside6" in sys.argv:
-        os.environ["QT_API"] = "pyside6"
-        os.environ["PYQTGRAPH_QT_LIB"] = "PySide6"
-        os.environ["FORCE_QT_API"] = "1"
-        
-    else:
-        os.environ["QT_API"] = "pyqt5"
-        os.environ["PYQTGRAPH_QT_LIB"] = "PyQt5"
-        os.environ["FORCE_QT_API"] = "1"
-        
+# if len(sys.argv) > 1:
+#     if "pyqt6" in sys.argv:
+#         os.environ["QT_API"] = "pyqt6"
+#         os.environ["PYQTGRAPH_QT_LIB"] = "PyQt6"
+#         os.environ["FORCE_QT_API"] = "1"
+#         
+#     elif "pyside2" in sys.argv:
+#         os.environ["QT_API"] = "pyside2" # for up to Qt5
+#         os.environ["PYQTGRAPH_QT_LIB"] = "PySide2"
+#         os.environ["FORCE_QT_API"] = "1"
+#         
+#     elif "pyside6" in sys.argv:
+#         os.environ["QT_API"] = "pyside6"
+#         os.environ["PYQTGRAPH_QT_LIB"] = "PySide6"
+#         os.environ["FORCE_QT_API"] = "1"
+#         
+#     else:
+#         os.environ["QT_API"] = "pyqt5"
+#         os.environ["PYQTGRAPH_QT_LIB"] = "PyQt5"
+#         os.environ["FORCE_QT_API"] = "1"
+#         
 
 #import cProfile
 __version__ = "0.0.1"
@@ -337,7 +337,7 @@ def main():
             # NOTE that this good to have even when forcing the use xcb platform 
             # (see NOTE: 2024-05-04 10:14:08 above) as it conforms to the desktop
             # standards
-            app.setDesktopFileName("Scipyen")
+            app.setDesktopFileName("Scipyen_PySide6")
 
 
         # NOTE: 2023-01-08 00:48:47

@@ -171,8 +171,8 @@ confuse.yaml_util.Loader.add_constructor("tag:pq.Quantity", quantity_constructor
 # on environment variables (e.g. pyqtgraph)
 # END NOTE: 2021-01-10 13:17:58
 
-application_name = "Scipyen"
-organization_name = "Scipyen"
+application_name = "Scipyen_PySide6"
+organization_name = "Scipyen_PySide6"
 
 global scipyen_config
 scipyen_config = confuse.LazyConfig(application_name, "scipyen_defaults")
