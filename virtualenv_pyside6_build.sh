@@ -37,13 +37,11 @@ function show_help ()
     echo -e "--with_neuron\t\tInstall binary neuron python distribution from PyPI\n"
     echo -e "--build_neuron\t\tBuild neuron python locally\n"
     echo -e "--with_coreneuron\twhen '--build_neuron' is passed, build local neuron with coreneuron; by default coreneuron is not used.\n"
-    echo -e "--with_pyqt5\t\tInstall PyQt5 from PyPI\n"
-    echo -e "--build_pyqt5\t\tBuild a PyQt5 wheel locally and install it (recommended)\n"
     echo -e "--with_pyqt6\t\tInstall PyQt6 from PyPI (recommended)\n"
     echo -e "--build_pyqt6\t\tBuild a PyQt6 wheel locally and install it \n"
     echo -e "--refresh_repos\t When '--refresh_repos' is passed, local repository clones will be refreshed before rebuilding\n"
     echo -e "\tNOTE: This applies to vigra and to local neuron build only\n"
-    echo -e "--jobs=N\t\tNumber of parallel tasks during building PyQt5 and neuron; default is 4; set to 0 to disable parallel build\n"
+    echo -e "--jobs=N\t\tNumber of parallel tasks during building PyQt and neuron; default is 4; set to 0 to disable parallel build\n"
     echo -e "--reinstall=NAME\t\t\tRe-install/re-building NAME, where NAME is one of:\n"
     echo -e "\tpips, pyqt5, build_pyqt5, pyqt6, build_pyqt6, vigra, neuron, or desktopentry;\n"
     echo -e "\t(this option can be passed more than once)\n"
@@ -790,7 +788,7 @@ function make_scipyenrc ()
 # also sourced from ${HOME}/.bashrc in order for the function 'scipyact' to be
 # readily available to the user, at the console.
 #
-echo -e "\nCreating .scipyenrc\n"
+echo -e "\nCreating .scipyenrc_pyside6\n"
 
 if [[ -z "$VIRTUAL_ENV" ]] ; then
     echo -e "Not in an active environment! Goodbye!\n"
@@ -800,16 +798,17 @@ fi
 dt=`date '+%Y-%m-%d_%H-%M-%s'`
 
 py_exec=${python_exec}
-if [ -r ${HOME}/.scipyenrc ] ; then
-# make a backup copy of .scipyenrc
+if [ -r ${HOME}/.scipyenrc_pyside6 ] ; then
+# make a backup copy of .scipyenrc_pyside6
 shopt -s lastpipe
-echo "Copying ${HOME}/.scipyenrc to ${HOME}/.scipyenrc.$dt"
-cp ${HOME}/.scipyenrc ${HOME}/.scipyenrc.$dt
+echo "Copying ${HOME}/.scipyenrc_pyside6 to ${HOME}/.scipyenrc_pyside6.$dt"
+cp ${HOME}/.scipyenrc_pyside6 ${HOME}/.scipyenrc_pyside6.$dt
 fi
-cat<<END > ${HOME}/.scipyenrc
-scipyact () {
+cat<<END > ${HOME}/.scipyenrc_pyside6
+scipyact_pyside6 () {
 source ${VIRTUAL_ENV}/bin/activate
 export LD_LIBRARY_PATH=${VIRTUAL_ENV}/lib:${VIRTUAL_ENV}/lib64:$LD_LIBRARY_PATH
+export QT_API="PySide6"
 echo -e "The Python virtual environment in ${VIRTUAL_ENV} is now active.\nTo exit this environment call 'deactivate'"
 }
 END
@@ -821,7 +820,7 @@ function update_bashrc ()
 dt=`date '+%Y-%m-%d_%H-%M-%s'`
 if [ ! -r ${HOME}/.bashrc ]; then
 cat<<END > ${HOME}/.bashrc
-source ${HOME}/.scipyenrc
+source ${HOME}/.scipyenrc_pyside6
 END
 echo ".bashrc has been created in ${HOME}"
 echo "Sourcing ${HOME}/.bashrc"
@@ -829,14 +828,14 @@ source ${HOME}/.bashrc
 else
 shopt -s lastpipe
 # check if .scipyenrc is sourced from .bashrc
-cat ${HOME}/.bashrc | grep "source ${HOME}/.scipyenrc" | read source_set
+cat ${HOME}/.bashrc | grep "source ${HOME}/.scipyenrc_pyside6" | read source_set
 # echo "source_set="$source_set
 if [ -z "${source_set}" ]; then
-# .scipyenrc not sourced from .bashrc => backup .bashrc, then append a line to
-# source .scipyenrc in there
+# .scipyenrc_pyside6 not sourced from .bashrc => backup .bashrc, then append a line to
+# source .scipyenrc_pyside6 in there
 echo "Copying ${HOME}/.bashrc to ${HOME}/.bashrc.$dt"
 cp ${HOME}/.bashrc ${HOME}/.bashrc.$dt
-echo "source ${HOME}/.scipyenrc" >> ${HOME}/.bashrc
+echo "source ${HOME}/.scipyenrc_pyside6" >> ${HOME}/.bashrc
 echo ".bashrc has been modified in ${HOME}"
 echo "Sourcing ${HOME}/.bashrc"
 source ${HOME}/.bashrc
@@ -868,14 +867,14 @@ else
 fi
     
 mkdir -p ${target_dir}
-if [ -r ${target_dir}/scipyen ] ; then
+if [ -r ${target_dir}/scipyen_pyside6 ] ; then
     dt=`date '+%Y-%m-%d_%H-%M-%s'`
-    mv ${target_dir}/scipyen ${target_dir}/scipyen.$dt
+    mv ${target_dir}/scipyen_pyside6 ${target_dir}/scipyen_pyside6.$dt
 fi
 shopt -s lastpipe
 
 # if [[ `id -u` -eq 0 ]] ; then
-cat <<END > ${target_dir}/scipyen 
+cat <<END > ${target_dir}/scipyen_pyside6
 #! /bin/sh
 if [ -z \${VIRTUAL_ENV} ]; then
 source ${virtual_env}/bin/activate
@@ -904,11 +903,12 @@ if [ -r $scipyensrcdir/neuron_python/app-defaults/nrniv ] ; then
 xrdb -merge $scipyensrcdir/neuron_python/app-defaults/nrniv
 fi
 fi
+export QT_API="PySide6"
 ${python_executable} -Xfrozen_modules=off ${scipyensrcdir}/scipyen.py "\$*"
 END
 shopt -u lastpipe
-chmod +x ${target_dir}/scipyen 
-echo -e "Scipyen startup script created in ${target_dir} \n"
+chmod +x ${target_dir}/scipyen_pyside6
+echo -e "Scipyen (PySide6) startup script created in ${target_dir} \n"
 }
 
 #### Execution starts here ###
@@ -1251,14 +1251,14 @@ if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
     fi
     
     # make scripts
-#     make_scipyenrc
+    make_scipyenrc
 #     
 #     if [[ `id -u` -ne 0 ]] ; then
 #         # only update bashrc for regular users
 #         update_bashrc
 #     fi
     
-#     make_launch_script
+    make_launch_script
     
 #     make_desktop_entry
     

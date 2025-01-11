@@ -69,8 +69,9 @@ def isQObjectAlive(obj:QtCore.QObject):
         return False
     
     try:
-        obj.name()
-    except RuntimeError:
+        # obj.name()
+        obj.objectName() # pyside6
+    except:
         return False
     
     return True

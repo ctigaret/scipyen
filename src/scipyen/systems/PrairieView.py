@@ -80,10 +80,11 @@ __ui_path__ = adapt_ui_path(__module_path__, "PrairieImporter.ui")
 #__UI_PVImporterDialog__, __QDialog__ = __loadUiType__(os.path.join(__module_path__,"PVImporterDialog.ui"), from_imports=True, import_from="gui")
 # __UI_PrairieImporter, __QDialog__ = __loadUiType__(os.path.join(__module_path__, "PrairieImporter.ui"), from_imports=True, import_from="gui")
 
-if os.environ["QT_API"] in ("pyqt5", "pyside2"):
-    __UI_PrairieImporter, __QDialog__ = __loadUiType__(__ui_path__, from_imports=True, import_from="gui")
-else:
-    __UI_PrairieImporter, __QDialog__ = __loadUiType__(__ui_path__)
+__UI_PrairieImporter, __QDialog__ = __loadUiType__(__ui_path__) # PySide6
+# if os.environ["QT_API"] in ("pyqt5", "pyside2"):
+#     __UI_PrairieImporter, __QDialog__ = __loadUiType__(__ui_path__, from_imports=True, import_from="gui")
+# else:
+#     __UI_PrairieImporter, __QDialog__ = __loadUiType__(__ui_path__)
 
 
 """ NOTE: 2017-09-22 09:28:23

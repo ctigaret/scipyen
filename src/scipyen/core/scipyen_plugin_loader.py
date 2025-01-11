@@ -335,7 +335,7 @@ def find_plugins(path:typing.Union[str, pathlib.Path], scipyendir:typing.Union[s
         return
     
     if isinstance(scipyendir, pathlib.Path) and scipyendir.is_dir() and scipyendir.exists():
-        scipyendir = scipyendir.absolue()
+        scipyendir = scipyendir.absolute()
         
     elif isinstance(scipyendir, str) and len(scipyendir.strip()) and os.path.isdir(scipyendir) and os.path.exists(scipyendir):
         scipyendir = pathlib.Path(scipyendir)
@@ -358,7 +358,7 @@ def find_plugins(path:typing.Union[str, pathlib.Path], scipyendir:typing.Union[s
     
     for file_name in plugin_source_files:
         module_name = inspect.getmodulename(file_name)
-        if module_name is not None: # this will never be None, would it?
+        if module_name is not None:
             verb = False
             pluginsSpecFinder.path_map[module_name] = file_name
             if file_name in user_plugin_source_files:

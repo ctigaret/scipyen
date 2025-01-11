@@ -2836,10 +2836,11 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         client.execute(code="\n".join(init_commands), silent=True, store_history=False)
         
     def init_scipyen_gui(self,client=None):
-        if os.environ["QT_API"].lower() in ("pyqt6", "pyside6"):
-            qtgui = "qt6"
-        else:
-            qtgui = "qt5"
+        qtgui = "qt6"
+        # if os.environ["QT_API"].lower() in ("pyqt6", "pyside6"):
+        #     qtgui = "qt6"
+        # else:
+        #     qtgui = "qt5"
             
         code = f"if 'ipykernel' in shell.__class__.__module__: shell.run_line_magic('gui', '{qtgui}')"
         if client is None:
@@ -3465,7 +3466,7 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         
         #return frontend.execute(**kwargs)
 
-# NOTE: use Jupyter (IPython >= 4.x and qtconsole / qt5 by default)
+# NOTE: use Jupyter 
 class ScipyenConsoleWidget(ConsoleWidget):
     """Console widget with an in-process kernel manager.
     Uses an in-process kernel generated and managed by QtInProcessKernelManager.
@@ -3518,13 +3519,14 @@ class ScipyenConsoleWidget(ConsoleWidget):
         self.kernel_client = self.kernel_manager.client()
         self.kernel_client.start_channels()
         
-        # NOTE: 2019-08-07 16:34:58
-        # enforce qt5 backend for matplotlib
-        # see NOTE: 2019-08-07 16:34:23 
-        if os.environ["QT_API"].lower() in ("pyqt6", "pyside6"):
-            self.ipkernel.shell.run_line_magic("matplotlib", "qt6")
-        else:
-            self.ipkernel.shell.run_line_magic("matplotlib", "qt5")
+        self.ipkernel.shell.run_line_magic("matplotlib", "qt6")
+        # # NOTE: 2019-08-07 16:34:58
+        # # enforce qt5 backend for matplotlib
+        # # see NOTE: 2019-08-07 16:34:23 
+        # if os.environ["QT_API"].lower() in ("pyqt6", "pyside6"):
+        #     self.ipkernel.shell.run_line_magic("matplotlib", "qt6")
+        # else:
+        #     self.ipkernel.shell.run_line_magic("matplotlib", "qt5")
         
         self.drop_cache=None
         

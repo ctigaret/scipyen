@@ -9,7 +9,7 @@
 """
 """
 import sys, os, typing
-from qtpy import QtCore, QtGui, QtWidgets, QtSvg, QtNetwork, sip
+from qtpy import QtCore, QtGui, QtWidgets, QtSvg, QtNetwork
 from qtpy.QtCore import Signal, Slot, Property
 from qtpy.uic import loadUiType as __loadUiType__
 from core.prog import safeWrapper, scipywarn, printStyled

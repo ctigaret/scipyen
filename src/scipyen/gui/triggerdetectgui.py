@@ -44,10 +44,11 @@ from gui.signalviewer import SignalViewer
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
-if os.environ["QT_API"] in ("pyqt5", "pyside2"):
-    Ui_TriggerDetectWidget, QWidget = loadUiType(os.path.join(__module_path__, "triggerdetect.ui"), from_imports=True, import_from="gui")
-else:
-    Ui_TriggerDetectWidget, QWidget = loadUiType(os.path.join(__module_path__, "triggerdetect.ui"))
+Ui_TriggerDetectWidget, QWidget = loadUiType(os.path.join(__module_path__, "triggerdetect.ui")) # PySide6
+# if os.environ["QT_API"] in ("pyqt5", "pyside2"):
+#     Ui_TriggerDetectWidget, QWidget = loadUiType(os.path.join(__module_path__, "triggerdetect.ui"), from_imports=True, import_from="gui")
+# else:
+#     Ui_TriggerDetectWidget, QWidget = loadUiType(os.path.join(__module_path__, "triggerdetect.ui"))
 
 class TriggerDetectWidget(QWidget, Ui_TriggerDetectWidget):
     """

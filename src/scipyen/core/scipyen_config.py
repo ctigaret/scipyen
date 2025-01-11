@@ -15,7 +15,7 @@ geometry and state of Scipyen's windows (and, where applicable, their docklets),
 and other UI-related information such as the filters for file and/or variable 
 names, directory history, etc).
 
-    Because Scipyen's GUI is built using the Qt toolkit (via PyQt5) these
+    Because Scipyen's GUI is built using the Qt toolkit (via PyQt5 or PySide6) these
     settings are managed and stored using Qt toolkit QSettings framework in Qt 
     Core module.
     

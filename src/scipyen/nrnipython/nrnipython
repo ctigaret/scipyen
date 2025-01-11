@@ -7,7 +7,8 @@
 original=`realpath $0`
 location=`dirname $original`
 
-ipython --matplotlib --gui=qt5 -i $location/nrnipython.ipy -- $*
+# ipython --matplotlib --gui=qt5 -i $location/nrnipython.ipy -- $*
+ipython --matplotlib --gui=qt6 -i $location/nrnipython.ipy -- $*
 # if [ $# == "0" ]; then
 #     ipython --matplotlib --gui=qt5 -i $location/nrn-ipython.ipy
 # #     juoyter qtconsole --matplotlib --gui=qt5 -i $location/nrn-ipython.ipy

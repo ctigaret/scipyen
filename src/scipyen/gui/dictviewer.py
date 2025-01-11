@@ -5,7 +5,7 @@
 
 
 """
-Qt5-based viewer window for dict and subclasses
+Qt-based viewer window for dict and subclasses
 """
 
 #### BEGIN core python modules

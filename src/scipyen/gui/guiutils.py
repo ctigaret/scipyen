@@ -172,10 +172,11 @@ def lsqueeze(s:str, w:int):
     return s
 
 def get_current_font_metrics():
-    if os.environ["QT_API"] in ("pyqt5", "pyside2"):
-        fm = QtWidgets.QApplication.fontMetrics()
-    else:
-        fm = QtGui.QFontMetrics(QtWidgets.QApplication.instance().font())
+    fm = QtGui.QFontMetrics(QtWidgets.QApplication.instance().font()) # PySide6 API
+    # if os.environ["QT_API"] in ("pyqt5", "pyside2"):
+    #     fm = QtWidgets.QApplication.fontMetrics()
+    # else:
+    #     fm = QtGui.QFontMetrics(QtWidgets.QApplication.instance().font())
         
     return fm
         
@@ -187,19 +188,22 @@ def get_elided_text(s:str, w:int):
 def get_text_width(s:str, fm:typing.Optional[QtGui.QFontMetrics]=None, flags=QtCore.Qt.TextSingleLine, tabStops = 0, tabArray=None):
     if not isinstance(fm, QtGui.QFontMetrics):
         fm = get_current_font_metrics()
-    sz = fm.size(flags, s, tabStops=tabStops, tabArray=tabArray)
+    # sz = fm.size(flags, s, tabStops=tabStops, tabArray=tabArray)
+    sz = fm.size(flags, s, tabstops=tabStops, tabarray=tabArray) # PySide6
     return sz.width()
 
 def get_text_height(s:str, flags=QtCore.Qt.TextSingleLine, tabStops = 0, tabArray=None):
     fm = get_current_font_metrics()
     # fm = QtWidgets.QApplication.fontMetrics()
-    sz = fm.size(flags, s, tabStops=tabStops, tabArray=tabArray)
+    # sz = fm.size(flags, s, tabStops=tabStops, tabArray=tabArray)
+    sz = fm.size(flags, s, tabstops=tabStops, tabarray=tabArray) # PySide6
     return sz.height()
 
 def get_text_width_and_height(s:str, flags=QtCore.Qt.TextSingleLine, tabStops = 0, tabArray=None):
     # fm = QtWidgets.QApplication.fontMetrics()
     fm = get_current_font_metrics()
-    sz = fm.size(flags, s, tabStops=tabStops, tabArray=tabArray)
+    # sz = fm.size(flags, s, tabStops=tabStops, tabArray=tabArray)
+    sz = fm.size(flags, s, tabstops=tabStops, tabarray=tabArray) # PySide6
     return sz.width(), sz.height()
 
 def get_font_style(val:typing.Union[str, FontStyleType]) -> typing.Union[int, QtGui.QFont.Style]:

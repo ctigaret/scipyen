@@ -183,7 +183,8 @@ init_commands.extend([
     ])
 
 init_scipyen_qt_gui = [
-    "%gui qt5"
+    # "%gui qt5"
+    "%gui qt6"
     "import gui as scipyengui",
     ]
 

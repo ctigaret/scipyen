@@ -125,7 +125,8 @@ from gui.itemslistdialog import ItemsListDialog
 # needed for the new plugins framework
 __scipyen_plugin__ = None
 
-mpl.rcParams['backend']='Qt5Agg'
+# mpl.rcParams['backend']='Qt5Agg'
+mpl.rcParams['backend']='qtagg'
 
 #__viewer_info__ = {"alias": "iv", "class": "ImageViewer"}
 

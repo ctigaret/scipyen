@@ -338,7 +338,7 @@ def attributesToDict(node):
 #         # <OME> ... <OME/>; in other words, it skips the processing instructions header
 #         # (<?xml ... ?>)
 #         # 
-#         # ret is basically the result of concatenating a QStringList (NOT present in PyQt5)
+#         # ret is basically the result of concatenating a QStringList <-> a python list
 #         ret = xquery.evaluateToString() 
 #         
 #     else:

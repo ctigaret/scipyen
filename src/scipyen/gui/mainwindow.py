@@ -6,6 +6,8 @@
 """Main window for the Scipyen application
 
 CHANGELOG:
+2025-01-11 15:26:31
+    Migration to PySide6
 2020-02-17 12:57:24
     The file loaders in iolib.pictio now return the data and file metadata (where
     possible) as  distinct variables, by default. 
@@ -77,9 +79,12 @@ from collections import deque, ChainMap
 
 # BEGIN PyQtxxx and utilities for setting GUI appearance
 import qtpy
+print(f"Using {qtpy.API}")
+
+
 # print(f"In module: {__name__}: QT_API = {os.environ['QT_API']}, qtpy.API = {qtpy.API}, qtpy.API_NAME = {qtpy.API_NAME}")
 # might have to force this:
-qtpy.API = os.environ["QT_API"]
+# qtpy.API = os.environ["QT_API"]
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork,)
 from qtpy.QtCore import (Signal, Slot, Property,)
 from qtpy.uic import loadUiType
@@ -242,6 +247,7 @@ from core import scipyen_plugin_loader
 from core import scipyen_config as scipyenconf
 from core import utilities
 from core import (bgbridge, taxonbridge)
+from core import qtutils
 
 from core.basescipyen import BaseScipyenData
 
@@ -525,10 +531,10 @@ def infoSoftwareComponents() -> str:
     else:
         pyqtAPI = qtpy.API
         
-    if pyqtAPI in ("PyQt5", "PyQt6"):
+    if pyqtAPI.lower() in ("pyqt5", "pyqt6"):
         pyqtAPIver = f" {pyqtAPI} {QtCore.PYQT_VERSION_STR}, Qt {QtCore._qt_version}"
         
-    elif pyqtAPI in ("PySide2", "PySide6"):
+    elif pyqtAPI.lower() in ("pyside2", "pyside6"):
         try:
             pyside = importlib.import_module(pyqtAPI.lower())
             pyqtAPIver = f" {pyqtAPI} {pyside.__version__}, Qt {QtCore._qt_version}"
@@ -605,7 +611,7 @@ else:
 
     __UI_ScriptManagerWindow__, _ = loadUiType(os.path.join(__module_path__, "scriptmanagerwindow.ui"))
 
-    __UI_AboutLicense__, _ = loadUiType(os.path.join(__module_path__, "AboutLicense.ui"))
+    __UI_AboutLicense__, _ = loadUiType(os.path.join(__module_path__, "AboutDialog.ui"))
 
 
 class WorkspaceViewer(QtWidgets.QTableView):
@@ -1730,21 +1736,21 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # NOTE: singleton design pattern
         # see traitlets.config.SingletonConfigurable
         self.__class__._instance = self  
+        
+        self.currentVarItem = None
+        self.currentVarItemName = None
 
+        self._winFlagsCache_ = self.windowFlags()
+                
         # NOTE: 2024-05-29 13:04:00
         # Asynchronously launch the plugin loading mechanism
         self.startPluginLoad.emit()
 
-        self.currentVarItem = None
-        self.currentVarItemName = None
-        
         # if sys.platform == "win32":
         #     if isinstance(self, QtWidgets.QMainWindow):
         #         flags = self.windowFlags() | QtCore.Qt.WindowStaysOnTopHint
         #         self.setWindowFlags(flags);
         
-        self._winFlagsCache_ = self.windowFlags()
-                
 
     # BEGIN Properties
     
@@ -4936,7 +4942,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # add new viewers menu as toolbar action, too
         self.newViewersAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("window-new"), "New Viewer")
         self.newViewersAction.setMenu(self.newViewersMenu)
-        # self.newViewersActionTB = [w for w in self.newViewersAction.associatedWidgets() if isinstance(w, QtWidgets.QToolButton)][0]
+        # self.newViewersActionTB = [w for w in self.newViewersAction.associatedObjects() if isinstance(w, QtWidgets.QToolButton)][0]
         # self.newViewersActionTB.setPopupMode(QtWidgets.QToolButton.MenuButtonPopup)
         self.consolesAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("akonadiconsole"), "Consoles")
         # this one is defined in the ui file mainwindow.ui
@@ -4956,7 +4962,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         tbactions = (self.newViewersAction, self.consolesAction,
                      self.scriptsAction, self.applicationsAction)
-        if os.environ["QT_API"] in ("pyqt5", "pyside2"):
+        # if os.environ["QT_API"] in ("pyqt5", "pyside2"):
+        if qtpy.API in ("pyqt5", "pyside2"):
             tw = (w for w in itertools.chain(*(a.associatedWidgets()
                 for a in tbactions)) if w is not self.toolBar)
         else:
@@ -4966,12 +4973,12 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         for w in tw:
             w.setPopupMode(QtWidgets.QToolButton.InstantPopup)
             
-        self.tbOpen = [w for w in self.actionOpen.associatedWidgets() if isinstance(w, QtWidgets.QToolButton)][0]
+        self.tbOpen = [w for w in self.actionOpen.associatedObjects() if isinstance(w, QtWidgets.QToolButton)][0]
         
         self.tbOpen.setPopupMode(QtWidgets.QToolButton.MenuButtonPopup)
         self.tbOpen.setMenu(self.recentFilesMenu)
         
-        self.tbChDir = [w for w in self.actionChange_Working_Directory.associatedWidgets() if isinstance(w, QtWidgets.QToolButton)][0]
+        self.tbChDir = [w for w in self.actionChange_Working_Directory.associatedObjects() if isinstance(w, QtWidgets.QToolButton)][0]
         self.tbChDir.setPopupMode(QtWidgets.QToolButton.MenuButtonPopup)
         self.tbChDir.setMenu(self.recentDirectoriesMenu)
         
@@ -8364,7 +8371,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 # below)
                 viewerClasses = list(filter(lambda x: inspect.isclass(x[1]) and prog.is_class_defined_in_module(
                     x[1], module) and self._isScipyenViewerClass_(x[1]), inspect.getmembers(module)))
-                # print(f"viewer classes {viewerClasses} in module {module}")
+                print(f"{self.__class__.__name__}.slot_loadPlugins: viewer classes {viewerClasses} in module {module}")
                 for viewerClass in viewerClasses:
                     self._register_viewer_class_(*viewerClass)
                     viewers.append(viewerClass)
@@ -8455,12 +8462,14 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             menu tree)
         (c) itemText is the empty string ('') because it denotes a separator
         '''
-        parentActionLabels = [i.text().replace('&', '')
-                              for i in parent.actions()]
-        parentActionMenus = [i.menu() for i in parent.actions()]
+        isAlive = qtutils.isQObjectAlive(parent)
+        print(f"{self.__class__.__name__}._locateMenuByItemText_: parent: {type(parent).__name__} is alive: {isAlive}")
+        if isAlive:
+            parentActionLabels = [i.text().replace('&', '')  for i in parent.actions()]
+            parentActionMenus = [i.menu() for i in parent.actions()]
 
-        if itemText in parentActionLabels:
-            return parentActionMenus[parentActionLabels.index(itemText)]
+            if itemText in parentActionLabels:
+                return parentActionMenus[parentActionLabels.index(itemText)]
 
     def _installPluginFunction_(self, f: types.FunctionType, menuItemLabel: str, 
                                 parentMenu: QtWidgets.QMenu, 
@@ -8581,7 +8590,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         return newAction
     
     def installPluginMenu(self, pname, v):
-        '''Installs a GUI menu for the  plugin named pname.
+        '''Installs a GUI menu for the plugin named pname.
 
         Parameters:
         ===========
@@ -8667,14 +8676,21 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                     continue
 
                 parentMenu = self.menuBar()
+                isAlive = qtutils.isQObjectAlive(parentMenu)
+                print(f"{self.__class__.__name__}.installPluginMenu: parentMenu: {type(parentMenu).__name__} is alive: {isAlive}")
                 currentMenu = None
 
                 for item in menuPathList:
+                    print(f"{self.__class__.__name__}.installPluginMenu: item {item}; parent {type(parentMenu).__name__} is alive: {isAlive}")
                     currentMenu = self._locateMenuByItemText_(parentMenu, item)
-                    siblingActionLabels = [i.text().replace(
-                        '&', '') for i in parentMenu.actions()]
+                    
+                    if not isAlive:
+                        continue
+                    siblingActionLabels = [i.text().replace('&', '') for i in parentMenu.actions()]
                     # print(f"item {item}, siblingActionLabels: {siblingActionLabels}")
                     if currentMenu is None:
+                        cmAlive = qtutils.isQObjectAlive(currentMenu)
+                        print(f"{self.__class__.__name__}.installPluginMenu: currentMenu is alive: {isAlive}")
                         # last item is the menu item (action)
                         if item == menuPathList[-1]:
                             if item in siblingActionLabels:  # avoid name clashes
@@ -8712,20 +8728,16 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                                     newMenu = parentMenu.addMenu(item)
                                     for f in ff:
                                         if inspect.isfunction(f):
-                                            menuAction = self._installPluginFunction_(
-                                                f, f.__name__, newMenu)
+                                            menuAction = self._installPluginFunction_(f, f.__name__, newMenu)
                                             if isinstance(menuAction, QtWidgets.QAction):
-                                                pluginMenuActions.append(
-                                                    (menuAction, f))
+                                                pluginMenuActions.append((menuAction, f))
                                         else:
                                             raise TypeError(
                                                 "function object expected")
                                 else:
-                                    menuAction = self._installPluginFunction_(
-                                        ff[0], item, parentMenu)
+                                    menuAction = self._installPluginFunction_(ff[0], item, parentMenu)
                                     if isinstance(menuAction, QtWidgets.QAction):
-                                        pluginMenuActions.append(
-                                            (menuAction, ff[0]))
+                                        pluginMenuActions.append((menuAction, ff[0]))
 
                             else:
                                 raise TypeError(

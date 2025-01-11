@@ -294,11 +294,12 @@ __ui_path__ = adapt_ui_path(__module_path__,"LSCaTWindow.ui")
 # print(f"CaTanalysis.py __ui_path__ {__ui_path__}")
 
 # Form class,        Base class                                                                               package with the resources.qrc file
-if os.environ["QT_API"] in ("pyqt5", "pyside2"):
-    __UI_LSCaTWindow__, __QMainWindow__ = __loadUiType__(__ui_path__, from_imports=True, import_from="gui")
-    # __UI_LSCaTWindow__, __QMainWindow__ = __loadUiType__(os.path.join(__module_path__,"LSCaTWindow.ui"), from_imports=True, import_from="gui")
-else:
-    __UI_LSCaTWindow__, __QMainWindow__ = __loadUiType__(__ui_path__)#, import_from="gui")
+__UI_LSCaTWindow__, __QMainWindow__ = __loadUiType__(__ui_path__)#, import_from="gui") # PySide6
+# if os.environ["QT_API"] in ("pyqt5", "pyside2"):
+#     __UI_LSCaTWindow__, __QMainWindow__ = __loadUiType__(__ui_path__, from_imports=True, import_from="gui")
+#     # __UI_LSCaTWindow__, __QMainWindow__ = __loadUiType__(os.path.join(__module_path__,"LSCaTWindow.ui"), from_imports=True, import_from="gui")
+# else:
+#     __UI_LSCaTWindow__, __QMainWindow__ = __loadUiType__(__ui_path__)#, import_from="gui")
 
 def vCursor2ScanlineProjection(v, path, span=None):
     """Maps the x coordinate for a vertical cursor in linescans space (x,y) coordinates on scanline path, in scene space.
