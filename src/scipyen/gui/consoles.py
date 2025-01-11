@@ -615,10 +615,11 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
         # see sb_menu in _supplement_view_menu_
         self.scrollBarPosition = val
         
-    def _set_syntax_style(self, val): # slot for menu action
+    # def _set_syntax_style(self, val): # slot for menu action
+    def _set_syntax_style(self, val:str, checked:bool): # slot for menu action # pyside6
         """Used as slot for Syntax style menu action
         """
-        # print(f"{self.__class__.__name__}._set_syntax_style({val})")
+        print(f"{self.__class__.__name__}._set_syntax_style({val}, *args {args})")
         self.syntaxStyle = val
 
     # @Slot(str)
@@ -1181,7 +1182,8 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
         
         style_group = QtWidgets.QActionGroup(self)
         
-        actions = [QtWidgets.QAction("{}".format(s), self, triggered = partial(self._set_syntax_style, s)) for s in PYGMENT_STYLES]
+        actions = [QtWidgets.QAction("{}".format(s), self, triggered = partialmethod(self._set_syntax_style, s)) for s in PYGMENT_STYLES]
+        # actions = [QtWidgets.QAction("{}".format(s), self, triggered = partial(self._set_syntax_style, s)) for s in PYGMENT_STYLES]
         
         for action in actions:
             action.setCheckable(True)
@@ -4233,7 +4235,8 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         
     def choose_font(self):
         currentFont = self.consoleFont
-        selectedFont, ok = QtWidgets.QFontDialog.getFont(currentFont, self)
+        # selectedFont, ok = QtWidgets.QFontDialog.getFont(currentFont, self)
+        ok, selectedFont = QtWidgets.QFontDialog.getFont(currentFont, self) # pyside6
         if ok:
             self.active_frontend.font = selectedFont
         
