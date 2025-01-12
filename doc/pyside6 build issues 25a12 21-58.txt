@@ -1,0 +1,544 @@
+(pyside6env) ✘-1 cezar@Kepler:~/pyside6env/src/pyside-setup [6.8|✔]> cmake -B ../pyside-build -S ./ -DCMAKE_INSTALL_PREFIX=${VIRTUAL_EBV} -DPython_EXECUTABLE=`which python`
+-- The C compiler identification is GNU 14.2.1
+-- The CXX compiler identification is GNU 14.2.1
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/cc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- SHIBOKEN_IS_CROSS_BUILD: FALSE
+-- SHIBOKEN_BUILD_LIBS: ON
+-- SHIBOKEN_BUILD_TOOLS: ON
+-- BUILD_TESTS: ON
+-- Using Qt 6
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+-- Found Threads: TRUE
+-- Performing Test HAVE_STDATOMIC
+-- Performing Test HAVE_STDATOMIC - Success
+-- Found WrapAtomic: TRUE
+-- Found Python: /home/cezar/pyside6env/bin/python (found version "3.11.11") found components: Interpreter Development Development.Module Development.Embed
+-- Could NOT find LibEdit (missing: LibEdit_INCLUDE_DIRS LibEdit_LIBRARIES) 
+-- Found ZLIB: /usr/lib64/libz.so (found version "1.3.1")
+-- Found zstd: /usr/lib64/libzstd.so
+-- Found LibXml2: /usr/lib64/libxml2.so (found version "2.12.9")
+-- CLANG: /usr/lib64/cmake/clang, /usr/lib64/libclang.so.13 detected
+-- Found Git: /usr/bin/git (found version "2.47.1")
+-- Python_Development_FOUND:       TRUE
+-- Python_LIBRARIES:       /usr/lib64/libpython3.11.so
+-- Python_INCLUDE_DIRS:    /usr/include/python3.11
+-- Python_Interpreter_FOUND:     TRUE
+-- Python_EXECUTABLE:      /home/cezar/pyside6env/bin/python
+-- Python_VERSION:         3.11.11
+-- PYTHON_EXTENSION_SUFFIX: .cpython-311-x86_64-linux-gnu
+-- PYTHON_LIMITED_LIBRARIES: 
+-- ******************************************************
+-- ** Limited API enabled 
+-- ******************************************************
+-- PYTHON_EXTENSION_SUFFIX:      .abi3
+-- PYTHON_CONFIG_SUFFIX:         .abi3
+-- PYTHON_SHARED_LIBRARY_SUFFIX: .abi3
+-- Found LibXml2: /usr/lib64/libxml2.so (found suitable version "2.12.9", minimum required is "2.6.32")
+-- Found LibXslt: /usr/lib64/libxslt.so (found suitable version "1.1.39", minimum required is "1.1.19")
+CMake Warning at sources/shiboken6/cmake/ShibokenHelpers.cmake:880 (message):
+  Couldn't find libclang.so You will likely need to add it manually to PATH
+  to ensure the build succeeds.
+Call Stack (most recent call first):
+  sources/shiboken6/generator/CMakeLists.txt:31 (find_libclang)
+
+
+-- NUMPY not found
+-- SHIBOKEN_PYTHON_INCLUDE_DIRS computed to value: '/usr/include/python3.11'
+-- SHIBOKEN_PYTHON_LIBRARIES computed to value: ''
+CMake Warning at sources/shiboken6/cmake/ShibokenHelpers.cmake:880 (message):
+  Couldn't find libclang.so You will likely need to add it manually to PATH
+  to ensure the build succeeds.
+Call Stack (most recent call first):
+  sources/shiboken6/cmake/ShibokenHelpers.cmake:753 (find_libclang)
+  sources/shiboken6/shibokenmodule/CMakeLists.txt:13 (shiboken_get_tool_shell_wrapper)
+
+
+-- sphinx-build - found
+-- Tests will be generated using the protected hack!
+-- PYSIDE_IS_CROSS_BUILD: 
+-- Shiboken6Config: Using default python: .abi3
+-- libshiboken built for Release
+-- ******************************************************
+-- ** PySide6 Limited API enabled.
+-- ******************************************************
+-- *** computed QT_INCLUDE_DIR as /usr/include/qt6
+-- Found OpenGL: /usr/lib64/libOpenGL.so
+-- Found WrapOpenGL: TRUE
+-- Found XKB: /usr/lib64/libxkbcommon.so (found suitable version "1.7.0", minimum required is "0.5.0")
+-- Found WrapVulkanHeaders: /usr/include
+-- CORE_ABS_DIR:/usr/lib64/cmake
+-- essential module Qt6Core found (). Looked in: /usr/lib64/cmake/Qt6Core
+-- essential module Qt6Gui found (). Looked in: /usr/lib64/cmake/Qt6Gui
+-- essential module Qt6Widgets found (). Looked in: /usr/lib64/cmake/Qt6Widgets
+-- Found Cups: /usr/lib64/libcups.so (found version "2.4.11")
+-- essential module Qt6PrintSupport found (). Looked in: /usr/lib64/cmake/Qt6PrintSupport
+-- essential module Qt6Sql found (). Looked in: /usr/lib64/cmake/Qt6Sql
+-- essential module Qt6Network found (). Looked in: /usr/lib64/cmake/Qt6Network
+-- essential module Qt6Test found (). Looked in: /usr/lib64/cmake/Qt6Test
+-- essential module Qt6Concurrent found (). Looked in: /usr/lib64/cmake/Qt6Concurrent
+-- optional module Qt6DBus found (). Looked in: /usr/lib64/cmake/Qt6DBus
+-- optional module Qt6Designer found (). Looked in: /usr/lib64/cmake/Qt6Designer
+-- optional module Qt6Xml found (). Looked in: /usr/lib64/cmake/Qt6Xml
+-- optional module Qt6Help found (). Looked in: /usr/lib64/cmake/Qt6Help
+-- optional module Qt6Multimedia found (). Looked in: /usr/lib64/cmake/Qt6Multimedia
+-- optional module Qt6MultimediaWidgets found (). Looked in: /usr/lib64/cmake/Qt6MultimediaWidgets
+-- optional module Qt6OpenGL found (). Looked in: /usr/lib64/cmake/Qt6OpenGL
+-- optional module Qt6OpenGLWidgets found (). Looked in: /usr/lib64/cmake/Qt6OpenGLWidgets
+-- optional module Qt6Pdf found (). Looked in: /usr/lib64/cmake/Qt6Pdf
+-- optional module Qt6PdfWidgets found (). Looked in: /usr/lib64/cmake/Qt6PdfWidgets
+-- optional module Qt6Positioning found (). Looked in: /usr/lib64/cmake/Qt6Positioning
+-- optional module Qt6Location found (). Looked in: /usr/lib64/cmake/Qt6Location
+-- optional module Qt6NetworkAuth found (). Looked in: /usr/lib64/cmake/Qt6NetworkAuth
+-- optional module Qt6Nfc found (). Looked in: /usr/lib64/cmake/Qt6Nfc
+-- optional module Qt6Qml found (). Looked in: /usr/lib64/cmake/Qt6Qml
+-- optional module Qt6Quick found (). Looked in: /usr/lib64/cmake/Qt6Quick
+-- optional module Qt6Quick3D found (). Looked in: /usr/lib64/cmake/Qt6Quick3D
+-- optional module Qt6QuickControls2 found (). Looked in: /usr/lib64/cmake/Qt6QuickControls2
+-- optional module Qt6QuickTest found (). Looked in: /usr/lib64/cmake/Qt6QuickTest
+-- optional module Qt6QuickWidgets found (). Looked in: /usr/lib64/cmake/Qt6QuickWidgets
+-- optional module Qt6RemoteObjects found (). Looked in: /usr/lib64/cmake/Qt6RemoteObjects
+-- optional module Qt6Scxml found (). Looked in: /usr/lib64/cmake/Qt6Scxml
+-- optional module Qt6Sensors found (). Looked in: /usr/lib64/cmake/Qt6Sensors
+-- optional module Qt6SerialPort found (). Looked in: /usr/lib64/cmake/Qt6SerialPort
+-- optional module Qt6SerialBus found (). Looked in: /usr/lib64/cmake/Qt6SerialBus
+-- optional module Qt6StateMachine found (). Looked in: /usr/lib64/cmake/Qt6StateMachine
+-- optional module Qt6TextToSpeech found (). Looked in: /usr/lib64/cmake/Qt6TextToSpeech
+-- optional module Qt6Charts found (). Looked in: /usr/lib64/cmake/Qt6Charts
+-- optional module Qt6SpatialAudio found (). Looked in: /usr/lib64/cmake/Qt6SpatialAudio
+-- optional module Qt6Svg found (). Looked in: /usr/lib64/cmake/Qt6Svg
+-- optional module Qt6SvgWidgets found (). Looked in: /usr/lib64/cmake/Qt6SvgWidgets
+-- optional module Qt6DataVisualization found (). Looked in: /usr/lib64/cmake/Qt6DataVisualization
+-- optional module Qt6Graphs found (). Looked in: /usr/lib64/cmake/Qt6Graphs
+-- optional module Qt6GraphsWidgets found (). Looked in: /usr/lib64/cmake/Qt6GraphsWidgets
+-- optional module Qt6Bluetooth found (). Looked in: /usr/lib64/cmake/Qt6Bluetooth
+-- optional module Qt6UiTools found (). Looked in: /usr/lib64/cmake/Qt6UiTools
+-- optional module Qt6WebChannel found (). Looked in: /usr/lib64/cmake/Qt6WebChannel
+-- optional module Qt6WebEngineCore found (). Looked in: /usr/lib64/cmake/Qt6WebEngineCore
+-- optional module Qt6WebEngineWidgets found (). Looked in: /usr/lib64/cmake/Qt6WebEngineWidgets
+-- optional module Qt6WebEngineQuick found (). Looked in: /usr/lib64/cmake/Qt6WebEngineQuick
+-- optional module Qt6WebSockets found (). Looked in: /usr/lib64/cmake/Qt6WebSockets
+-- optional module Qt6HttpServer found (). Looked in: /usr/lib64/cmake/Qt6HttpServer
+-- optional module Qt6WebView found (). Looked in: /usr/lib64/cmake/Qt6WebView
+-- optional module Qt63DCore found (). Looked in: /usr/lib64/cmake/Qt63DCore
+-- optional module Qt63DRender found (). Looked in: /usr/lib64/cmake/Qt63DRender
+-- optional module Qt63DInput found (). Looked in: /usr/lib64/cmake/Qt63DInput
+-- optional module Qt63DLogic found (). Looked in: /usr/lib64/cmake/Qt63DLogic
+-- optional module Qt63DAnimation found (). Looked in: /usr/lib64/cmake/Qt63DAnimation
+-- optional module Qt63DExtras found (). Looked in: /usr/lib64/cmake/Qt63DExtras
+-- PySide will be generated using the protected hack!
+-- Qt6Network: Adding SSL classes
+-- Qt6Network: Adding DTLS classes
+-- Qt6Network: Dropping SCTP classes
+-- Qt6OpenGL: Adding Desktop OpenGL classes
+-- Qt6Quick: Building with OpenGL
+-- Qt6Quick3D: Building with OpenGL
+-- Qt6QuickControls2: Building with OpenGL
+-- Qt6QuickTest: Building with OpenGL
+-- Qt6QuickWidgets: Building with OpenGL
+-- Qt6Graphs: Building with OpenGL
+-- Qt63DRender: Building with OpenGL
+-- preparing tests for module 'QtCore'
+-- preparing tests for module 'QtGui'
+-- preparing tests for module 'QtWidgets'
+-- preparing tests for module 'QtPrintSupport'
+-- preparing tests for module 'QtSql'
+-- preparing tests for module 'QtNetwork'
+-- preparing tests for module 'QtTest'
+-- preparing tests for module 'QtConcurrent'
+-- preparing tests for module 'QtDBus'
+-- preparing tests for module 'QtDesigner'
+-- preparing tests for module 'QtXml'
+-- preparing tests for module 'QtHelp'
+-- preparing tests for module 'QtMultimedia'
+-- preparing tests for module 'QtMultimediaWidgets'
+-- preparing tests for module 'QtOpenGL'
+-- preparing tests for module 'QtOpenGLWidgets'
+-- preparing tests for module 'QtPdf'
+-- preparing tests for module 'QtPdfWidgets'
+-- preparing tests for module 'QtPositioning'
+-- preparing tests for module 'QtLocation'
+-- preparing tests for module 'QtNetworkAuth'
+-- preparing tests for module 'QtNfc'
+-- preparing tests for module 'QtQml'
+-- preparing tests for module 'QtQuick'
+-- preparing tests for module 'QtQuick3D'
+-- preparing tests for module 'QtQuickControls2'
+-- preparing tests for module 'QtQuickTest'
+-- preparing tests for module 'QtQuickWidgets'
+-- preparing tests for module 'QtRemoteObjects'
+-- preparing tests for module 'QtScxml'
+-- preparing tests for module 'QtSensors'
+-- preparing tests for module 'QtSerialPort'
+-- preparing tests for module 'QtSerialBus'
+-- preparing tests for module 'QtStateMachine'
+-- preparing tests for module 'QtTextToSpeech'
+-- preparing tests for module 'QtCharts'
+-- preparing tests for module 'QtSpatialAudio'
+-- preparing tests for module 'QtSvg'
+-- preparing tests for module 'QtSvgWidgets'
+-- preparing tests for module 'QtDataVisualization'
+-- preparing tests for module 'QtGraphs'
+-- preparing tests for module 'QtGraphsWidgets'
+-- preparing tests for module 'QtBluetooth'
+-- preparing tests for module 'QtUiTools'
+-- preparing tests for module 'QtWebChannel'
+-- preparing tests for module 'QtWebEngineCore'
+-- preparing tests for module 'QtWebEngineWidgets'
+-- preparing tests for module 'QtWebEngineQuick'
+-- preparing tests for module 'QtWebSockets'
+-- preparing tests for module 'QtHttpServer'
+-- preparing tests for module 'QtWebView'
+-- preparing tests for module 'Qt3DCore'
+-- preparing tests for module 'Qt3DRender'
+-- preparing tests for module 'Qt3DInput'
+-- preparing tests for module 'Qt3DLogic'
+-- preparing tests for module 'Qt3DAnimation'
+-- preparing tests for module 'Qt3DExtras'
+-- apidoc generation targets disabled due to the following reasons:
+    QT_SRC_DIR variable not set
+    BUILD_DOCS was set to FALSE (default)
+
+-- Could NOT find Qt6ExampleIconsPrivate (missing: Qt6ExampleIconsPrivate_DIR)
+CMake Warning at sources/pyside6/qtexampleicons/CMakeLists.txt:15 (find_package):
+  Found package configuration file:
+
+    /usr/lib64/cmake/Qt6/Qt6Config.cmake
+
+  but it set Qt6_FOUND to FALSE so package "Qt6" is considered to be NOT
+  FOUND.  Reason given by package:
+
+  Failed to find required Qt component "ExampleIconsPrivate".
+
+  Expected Config file at
+  "/usr/lib64/cmake/Qt6ExampleIconsPrivate/Qt6ExampleIconsPrivateConfig.cmake"
+  does NOT exist
+
+
+
+  Configuring with --debug-find-pkg=Qt6ExampleIconsPrivate might reveal
+  details why the package was not found.
+
+  Configuring with -DQT_DEBUG_FIND_PACKAGE=ON will print the values of some
+  of the path variables that find_package uses to try and find the package.
+
+
+
+-- PYSIDE_TOOLS_IS_CROSS_BUILD: 
+-- Installing tool: /home/cezar/pyside6env/src/pyside-setup/sources/pyside-tools/pyside_tool.py
+-- Installing tool: /home/cezar/pyside6env/src/pyside-setup/sources/pyside-tools/metaobjectdump.py
+-- Installing tool: /home/cezar/pyside6env/src/pyside-setup/sources/pyside-tools/project.py
+-- Installing tool: /home/cezar/pyside6env/src/pyside-setup/sources/pyside-tools/qml.py
+-- Installing tool: /home/cezar/pyside6env/src/pyside-setup/sources/pyside-tools/qtpy2cpp.py
+-- Installing tool: /home/cezar/pyside6env/src/pyside-setup/sources/pyside-tools/deploy.py
+-- Installing tool: /home/cezar/pyside6env/src/pyside-setup/sources/pyside-tools/android_deploy.py
+-- Installing tool: /home/cezar/pyside6env/src/pyside-setup/sources/pyside-tools/requirements-android.txt
+-- Installing tool: /usr/libexec/qt6/uic
+-- Installing tool: /usr/libexec/qt6/rcc
+-- Installing tool: /usr/libexec/qt6/qmltyperegistrar
+-- Installing tool: /usr/libexec/qt6/qmlimportscanner
+-- Installing tool: /usr/libexec/qt6/qmlcachegen
+-- Installing tool: /usr/lib64/qt6/bin/lrelease
+-- Installing tool: /usr/lib64/qt6/bin/lupdate
+-- Installing tool: /usr/lib64/qt6/bin/qmllint
+-- Installing tool: /usr/lib64/qt6/bin/qmlformat
+-- Installing tool: /usr/lib64/qt6/bin/qmlls
+-- Installing tool: /usr/lib64/qt6/bin/qsb
+-- Installing tool: /usr/lib64/qt6/bin/balsam
+-- Installing tool: /usr/lib64/qt6/bin/balsamui
+-- Installing tool: /usr/lib64/qt6/bin/svgtoqml
+-- Installing tool: /usr/lib64/qt6/bin/assistant
+-- Installing tool: /usr/lib64/qt6/bin/designer
+-- Installing tool: /usr/lib64/qt6/bin/linguist
+-- Installing /home/cezar/pyside6env/src/pyside-setup/sources/pyside-tools/../../tools/cross_compile_android/android_utilities.py
+-- Configuring done (5.6s)
+CMake Error at sources/pyside6/qtexampleicons/CMakeLists.txt:39 (target_link_libraries):
+  Target "QtExampleIcons" links to:
+
+    Qt::ExampleIconsPrivate
+
+  but the target was not found.  Possible reasons include:
+
+    * There is a typo in the target name.
+    * A find_package call is missing for an IMPORTED target.
+    * An ALIAS target is missing.
+
+
+
+-- Generating done (1.5s)
+CMake Generate step failed.  Build files cannot be regenerated correctly.
+(pyside6env) ✘-1 cezar@Kepler:~/pyside6env/src/pyside-setup [6.8|✔]> cd ../pyside-build/
+(pyside6env) cezar@Kepler:~/pyside6env/src/pyside-build> cmake-gui
+kf.i18n: KLocalizedString: Using an empty domain, fix the code. msgid: "Select Folder" msgid_plural: "" msgctxt: "@title:window"
+kf.i18n: KLocalizedString: Using an empty domain, fix the code. msgid: "New Folder..." msgid_plural: "" msgctxt: "@action:button"
+kf.i18n: KLocalizedString: Using an empty domain, fix the code. msgid: "New Folder..." msgid_plural: "" msgctxt: "@action:inmenu"
+kf.i18n: KLocalizedString: Using an empty domain, fix the code. msgid: "Move to Trash" msgid_plural: "" msgctxt: "@action:inmenu"
+kf.i18n: KLocalizedString: Using an empty domain, fix the code. msgid: "Delete" msgid_plural: "" msgctxt: "@action:inmenu"
+kf.i18n: KLocalizedString: Using an empty domain, fix the code. msgid: "Show Hidden Folders" msgid_plural: "" msgctxt: "@option:check"
+kf.i18n: KLocalizedString: Using an empty domain, fix the code. msgid: "Properties" msgid_plural: "" msgctxt: "@action:inmenu"
+(pyside6env) cezar@Kepler:~/pyside6env/src/pyside-build> 
+(pyside6env) cezar@Kepler:~/pyside6env/src/pyside-build> cmake-gui -B ../pyside-build S ./ -DCMAKE_INSTALL_PREFIX=${VIRTUAL_EBV} -DPython_EXECUTABLE=`which python`
+(pyside6env) cezar@Kepler:~/pyside6env/src/pyside-build> cmake-gui
+kf.i18n: KLocalizedString: Using an empty domain, fix the code. msgid: "Select Folder" msgid_plural: "" msgctxt: "@title:window"
+kf.i18n: KLocalizedString: Using an empty domain, fix the code. msgid: "New Folder..." msgid_plural: "" msgctxt: "@action:button"
+kf.i18n: KLocalizedString: Using an empty domain, fix the code. msgid: "New Folder..." msgid_plural: "" msgctxt: "@action:inmenu"
+kf.i18n: KLocalizedString: Using an empty domain, fix the code. msgid: "Move to Trash" msgid_plural: "" msgctxt: "@action:inmenu"
+kf.i18n: KLocalizedString: Using an empty domain, fix the code. msgid: "Delete" msgid_plural: "" msgctxt: "@action:inmenu"
+kf.i18n: KLocalizedString: Using an empty domain, fix the code. msgid: "Show Hidden Folders" msgid_plural: "" msgctxt: "@option:check"
+kf.i18n: KLocalizedString: Using an empty domain, fix the code. msgid: "Properties" msgid_plural: "" msgctxt: "@action:inmenu"
+(pyside6env) cezar@Kepler:~/pyside6env/src/pyside-build> cmake-gui ./
+(pyside6env) cezar@Kepler:~/pyside6env/src/pyside-build> cmake-gui ./ -DCMAKE_INSTALL_PREFIX=${VIRTUAL_EBV} -DPython_EXECUTABLE=`which python`
+(pyside6env) cezar@Kepler:~/pyside6env/src/pyside-build> cmake-gui ./ -DCMAKE_INSTALL_PREFIX=${VIRTUAL_EBV} -DPython_EXECUTABLE=`which python`
+(pyside6env) cezar@Kepler:~/pyside6env/src/pyside-build> cmake-gui ./ -DCMAKE_INSTALL_PREFIX=${VIRTUAL_EBV} -DPython_EXECUTABLE=`which python` -DQT_DEBUG_FIND_PACKAGE=ON
+kf.i18n: KLocalizedString: Using an empty domain, fix the code. msgid: "Select Folder" msgid_plural: "" msgctxt: "@title:window"
+kf.i18n: KLocalizedString: Using an empty domain, fix the code. msgid: "New Folder..." msgid_plural: "" msgctxt: "@action:button"
+kf.i18n: KLocalizedString: Using an empty domain, fix the code. msgid: "New Folder..." msgid_plural: "" msgctxt: "@action:inmenu"
+kf.i18n: KLocalizedString: Using an empty domain, fix the code. msgid: "Move to Trash" msgid_plural: "" msgctxt: "@action:inmenu"
+kf.i18n: KLocalizedString: Using an empty domain, fix the code. msgid: "Delete" msgid_plural: "" msgctxt: "@action:inmenu"
+kf.i18n: KLocalizedString: Using an empty domain, fix the code. msgid: "Show Hidden Folders" msgid_plural: "" msgctxt: "@option:check"
+kf.i18n: KLocalizedString: Using an empty domain, fix the code. msgid: "Properties" msgid_plural: "" msgctxt: "@action:inmenu"
+(pyside6env) cezar@Kepler:~/pyside6env/src/pyside-build> cmake --build ./ --parallel 4
+[  0%] Generating embed/signature_bootstrap_inc.h, embed/signature_inc.h
+[  0%] Built target apiextractor_autogen_timestamp_deps
+[  0%] Building CXX object sources/shiboken6/tests/libminimal/CMakeFiles/libminimal.dir/containeruser.cpp.o
+[  0%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/abstract.cpp.o
+[  0%] Building CXX object sources/shiboken6/tests/libsmart/CMakeFiles/libsmart.dir/smart.cpp.o
+[  0%] Building CXX object sources/shiboken6/tests/libminimal/CMakeFiles/libminimal.dir/listuser.cpp.o
+++++ Current contents of
++ /home/cezar/pyside6env/src/pyside-build/sources/shiboken6/libshiboken/embed
+    + shibokensupport
+        + __init__.py
+        + feature.py
+        + fix-complaints.py
+        + signature
+            + __init__.py
+            + errorhandler.py
+            + importhandler.py
+            + layout.py
+            + lib
+                + __init__.py
+                + enum_sig.py
+                + pyi_generator.py
+                + tool.py
+            + loader.py
+            + mapping.py
+            + parser.py
+    + signature.zip
+    + signature_bootstrap.py
+    + signature_bootstrap_inc.h
+    + signature_inc.h
+++++
+[  0%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/blackbox.cpp.o
+[  0%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/basewrapper.cpp.o
+[  0%] Building CXX object sources/shiboken6/tests/libminimal/CMakeFiles/libminimal.dir/obj.cpp.o
+[  0%] Building CXX object sources/shiboken6/tests/libminimal/CMakeFiles/libminimal.dir/spanuser.cpp.o
+[  0%] Building CXX object sources/shiboken6/tests/libminimal/CMakeFiles/libminimal.dir/typedef.cpp.o
+[  0%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/bucket.cpp.o
+[  0%] Building CXX object sources/shiboken6/tests/libsmart/CMakeFiles/libsmart.dir/stdoptionaltestbench.cpp.o
+[  0%] Linking CXX shared library libminimal.so
+[  0%] Built target libminimal
+[  0%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/bytearray.cpp.o
+[  0%] Built target qtxmltosphinxtest_autogen_timestamp_deps
+[  0%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/collector.cpp.o
+[  0%] Building CXX object sources/shiboken6/tests/libsmart/CMakeFiles/libsmart.dir/stdsharedptrtestbench.cpp.o
+[  0%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/complex.cpp.o
+[  0%] Building CXX object sources/shiboken6/tests/libsmart/CMakeFiles/libsmart.dir/stduniqueptrtestbench.cpp.o
+[  0%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/bindingmanager.cpp.o
+[  0%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/ctparam.cpp.o
+[  0%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/derived.cpp.o
+[  0%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/derivedusingct.cpp.o
+[  0%] Linking CXX shared library libsmart.so
+[  0%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/echo.cpp.o
+[  0%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/bufferprocs_py37.cpp.o
+[  0%] Built target libsmart
+[  0%] Built target PySidePlugin_autogen_timestamp_deps
+[  0%] Built target QtExampleIcons_autogen_timestamp_deps
+[  0%] Automatic MOC for target apiextractor
+[  0%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/exceptiontest.cpp.o
+[  0%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/expression.cpp.o
+[  0%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/debugfreehook.cpp.o
+[  0%] Built target apiextractor_autogen
+[  0%] Automatic MOC for target qtxmltosphinxtest
+[  0%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/gilstate.cpp.o
+[  0%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/filter.cpp.o
+[  0%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/helper.cpp.o
+[  0%] Built target qtxmltosphinxtest_autogen
+[  0%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/pep384impl.cpp.o
+[  0%] Automatic MOC for target PySidePlugin
+[  0%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/functions.cpp.o
+[  0%] Built target PySidePlugin_autogen
+[  0%] Automatic MOC for target QtExampleIcons
+[  0%] Built target QtExampleIcons_autogen
+[  0%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/sbkarrayconverter.cpp.o
+[  0%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/handle.cpp.o
+[  0%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/implicitconv.cpp.o
+[  0%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/injectcode.cpp.o
+[  0%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/sbkcontainer.cpp.o
+[  0%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/sbkconverter.cpp.o
+[  0%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/intwrapper.cpp.o
+[  0%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/listuser.cpp.o
+[  0%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/sbkcppstring.cpp.o
+[  0%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/sbkenum.cpp.o
+[  0%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/mapuser.cpp.o
+[  0%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/sbkerrors.cpp.o
+[  0%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/modifications.cpp.o
+[  0%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/sbkfeature_base.cpp.o
+[  0%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/sbkmodule.cpp.o
+[  0%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/modified_constructor.cpp.o
+[  1%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/multiple_derived.cpp.o
+[  1%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/objectmodel.cpp.o
+[  2%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/sbknumpy.cpp.o
+[  2%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/objecttype.cpp.o
+[  2%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/objecttypeholder.cpp.o
+[  2%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/objecttypelayout.cpp.o
+[  2%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/objecttypeoperators.cpp.o
+[  2%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/objectview.cpp.o
+[  2%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/oddbool.cpp.o
+[  2%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/onlycopy.cpp.o
+[  2%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/apiextractor_autogen/mocs_compilation.cpp.o
+[  2%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/abstractmetaargument.cpp.o
+[  2%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/sbksmartpointer.cpp.o
+[  2%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/overload.cpp.o
+[  2%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/overloadsort.cpp.o
+[  2%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/sbkstaticstrings.cpp.o
+[  2%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/pairuser.cpp.o
+[  2%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/pen.cpp.o
+[  2%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/sbkstring.cpp.o
+[  2%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/photon.cpp.o
+[  2%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/point.cpp.o
+[  2%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/sbktypefactory.cpp.o
+[  2%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/pointf.cpp.o
+[  2%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/abstractmetabuilder.cpp.o
+[  2%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/polygon.cpp.o
+[  2%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/shibokenbuffer.cpp.o
+[  2%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/protected.cpp.o
+[  2%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/threadstatesaver.cpp.o
+[  2%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/reference.cpp.o
+[  2%] Building CXX object sources/shiboken6/tests/qtxmltosphinxtest/CMakeFiles/qtxmltosphinxtest.dir/qtxmltosphinxtest_autogen/mocs_compilation.cpp.o
+[  2%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/voidptr.cpp.o
+[  2%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/renaming.cpp.o
+[  2%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/sample.cpp.o
+[  2%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/samplenamespace.cpp.o
+[  2%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/signature/signature.cpp.o
+[  2%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/sbkdate.cpp.o
+[  2%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/stdcomplex.cpp.o
+[  2%] Building CXX object sources/shiboken6/tests/qtxmltosphinxtest/CMakeFiles/qtxmltosphinxtest.dir/__/__/generator/qtdoc/qtxmltosphinx.cpp.o
+[  2%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/signature/signature_globals.cpp.o
+[  2%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/simplefile.cpp.o
+[  2%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/signature/signature_extend.cpp.o
+[  2%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/signature/signature_helper.cpp.o
+[  3%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/size.cpp.o
+[  3%] Linking CXX shared library libshiboken6.abi3.so
+[  3%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/snakecasetest.cpp.o
+[  3%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/sometime.cpp.o
+[  3%] Built target libshiboken
+[  3%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/str.cpp.o
+[  3%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/abstractmetabuilder_helpers.cpp.o
+[  3%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/strlist.cpp.o
+[  3%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/templateptr.cpp.o
+[  3%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/transform.cpp.o
+[  3%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/typesystypedef.cpp.o
+[  3%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/virtualmethods.cpp.o
+[  3%] Linking CXX shared library libsample.so
+[  3%] Built target libsample
+[  3%] Running AUTOMOC file extraction for target PySidePlugin
+[  3%] Running moc --collect-json for target PySidePlugin
+[  3%] Building CXX object sources/pyside6/plugins/designer/CMakeFiles/PySidePlugin.dir/PySidePlugin_autogen/mocs_compilation.cpp.o
+[  3%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/abstractmetaenum.cpp.o
+[  3%] Building CXX object sources/pyside6/plugins/designer/CMakeFiles/PySidePlugin.dir/designercustomwidgets.cpp.o
+[  3%] Building CXX object sources/shiboken6/tests/qtxmltosphinxtest/CMakeFiles/qtxmltosphinxtest.dir/__/__/ApiExtractor/codesniphelpers.cpp.o
+[  3%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/abstractmetafield.cpp.o
+[  3%] Building CXX object sources/shiboken6/tests/qtxmltosphinxtest/CMakeFiles/qtxmltosphinxtest.dir/__/__/ApiExtractor/textstream.cpp.o
+[  3%] Linking CXX shared module libPySidePlugin.so
+[  3%] Built target PySidePlugin
+[  3%] Building CXX object sources/shiboken6/tests/qtxmltosphinxtest/CMakeFiles/qtxmltosphinxtest.dir/qtxmltosphinxtest.cpp.o
+[  3%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/abstractmetafunction.cpp.o
+[  3%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/abstractmetalang.cpp.o
+[  3%] Linking CXX executable qtxmltosphinxtest
+[  3%] Built target qtxmltosphinxtest
+[  3%] Built target pysidetest_autogen_timestamp_deps
+[  3%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/abstractmetatype.cpp.o
+[  3%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/addedfunction.cpp.o
+[  3%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/anystringview_helpers.cpp.o
+[  3%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/apiextractor.cpp.o
+[  4%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/apiextractorresult.cpp.o
+[  4%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/classdocumentation.cpp.o
+[  4%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/codesnip.cpp.o
+[  4%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/codesniphelpers.cpp.o
+[  4%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/conditionalstreamreader.cpp.o
+[  4%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/customconversion.cpp.o
+[  4%] Building CXX object sources/pyside6/qtexampleicons/CMakeFiles/QtExampleIcons.dir/QtExampleIcons_autogen/mocs_compilation.cpp.o
+[  4%] Building C object sources/pyside6/qtexampleicons/CMakeFiles/QtExampleIcons.dir/module.c.o
+/home/cezar/pyside6env/src/pyside-setup/sources/pyside6/qtexampleicons/module.c:4:10: fatal error: Python.h: No such file or directory
+    4 | #include <Python.h>
+      |          ^~~~~~~~~~
+compilation terminated.
+gmake[2]: *** [sources/pyside6/qtexampleicons/CMakeFiles/QtExampleIcons.dir/build.make:99: sources/pyside6/qtexampleicons/CMakeFiles/QtExampleIcons.dir/module.c.o] Error 1
+gmake[1]: *** [CMakeFiles/Makefile2:14809: sources/pyside6/qtexampleicons/CMakeFiles/QtExampleIcons.dir/all] Error 2
+gmake[1]: *** Waiting for unfinished jobs....
+[  4%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/documentation.cpp.o
+[  4%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/dotview.cpp.o
+[  4%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/enclosingclassmixin.cpp.o
+[  4%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/fileout.cpp.o
+[  4%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/include.cpp.o
+[  4%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/messages.cpp.o
+[  4%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/modifications.cpp.o
+[  4%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/optionsparser.cpp.o
+[  4%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/predefined_templates.cpp.o
+[  4%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/propertyspec.cpp.o
+[  4%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/pymethoddefentry.cpp.o
+[  4%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/reporthandler.cpp.o
+[  4%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/sourcelocation.cpp.o
+[  4%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/textstream.cpp.o
+[  4%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/typedatabase.cpp.o
+[  4%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/typeparser.cpp.o
+[  4%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/typesystem.cpp.o
+[  4%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/typesystemparser.cpp.o
+[  4%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/xmlutils.cpp.o
+[  4%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/clangparser/clangbuilder.cpp.o
+[  5%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/clangparser/clangdebugutils.cpp.o
+[  5%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/clangparser/clangparser.cpp.o
+[  5%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/clangparser/clangutils.cpp.o
+[  5%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/clangparser/compilersupport.cpp.o
+[  5%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/parser/codemodel.cpp.o
+[  5%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/parser/enumvalue.cpp.o
+[  5%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/parser/typeinfo.cpp.o
+[  5%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/xmlutils_libxslt.cpp.o
+[  5%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/docparser.cpp.o
+[  5%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/doxygenparser.cpp.o
+[  5%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/qtdocparser.cpp.o
+[  5%] Linking CXX static library ../../../tests/libapiextractor.a
+[  5%] Built target apiextractor
+gmake: *** [Makefile:136: all] Error 2
+(pyside6env) cezar@Kepler:~/pyside6env/src/pyside-build> cmake-gui ./ -DCMAKE_INSTALL_PREFIX=${VIRTUAL_EBV} -DPython_EXECUTABLE=`which python` -DQT_DEBUG_FIND_PACKAGE=ON
+This plugin supports grabbing the mouse only for popup windows
+This plugin supports grabbing the mouse only for popup windows
+This plugin supports grabbing the mouse only for popup windows
+This plugin supports grabbing the mouse only for popup windows
+kf.service.services: The desktop entry file "/usr/share/applications/YaST2/org.opensuse.yast.GPMC.desktop" has Type= "Application" but also has a X-KDE-Library key. This works for now, but makes user-preference handling difficult, so support for this might be removed at some point. Consider splitting it into two desktop files.
+kf.service.services: The desktop entry file "/usr/share/applications/colorhug-docs.desktop" has Type= "Link" instead of "Application" or "Service"
+kf.service.sycoca: Invalid Service :  "/usr/share/applications/colorhug-docs.desktop"
+kf.kio.core: Failed to lock recently used
+kf.kio.core: Failed to add to recently used bookmark file
+This plugin supports grabbing the mouse only for popup windows
+This plugin supports grabbing the mouse only for popup windows
+kf.i18n: KLocalizedString: Using an empty domain, fix the code. msgid: "&Yes" msgid_plural: "" msgctxt: "@action:button"
+kf.i18n: KLocalizedString: Using an empty domain, fix the code. msgid: "&No" msgid_plural: "" msgctxt: "@action:button"
+(pyside6env) cezar@Kepler:~/pyside6env/src/pyside-build> export PATH=$PATH:/usr/lib64
+(pyside6env) cezar@Kepler:~/pyside6env/src/pyside-build> cmake-gui ./ -DCMAKE_INSTALL_PREFIX=${VIRTUAL_EBV} -DPython_EXECUTABLE=`which python` -DQT_DEBUG_FIND_PACKAGE=ON -DCLANG_LIBRARY=/usr/lib64/libcla
+libclang-cpp.so       libclang-cpp.so.15    libclang-cpp.so.18.1  libclang.so.13        libclastfm.so.0.0.0
+libclang-cpp.so.13    libclang-cpp.so.16    libclang-cpp.so.19.1  libclang.so.19.1.6    
+libclang-cpp.so.14    libclang-cpp.so.17    libclang.so           libclastfm.so.0       
+(pyside6env) cezar@Kepler:~/pyside6env/src/pyside-build> cmake-gui ./ -DCMAKE_INSTALL_PREFIX=${VIRTUAL_EBV} -DPython_EXECUTABLE=`which python` -DQT_DEBUG_FIND_PACKAGE=ON -DCLANG_LIBRARY=/usr/lib64/libclang-cpp.so.19.1 
+This plugin supports grabbing the mouse only for popup windows
+This plugin supports grabbing the mouse only for popup windows
+(pyside6env) cezar@Kepler:~/pyside6env/src/pyside-build> 

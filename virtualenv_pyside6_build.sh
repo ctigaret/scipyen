@@ -10,6 +10,48 @@
 # Distributed under GNU GPL License v.2
 #
 
+# WARNING 2025-01-12 21:09:06 IF YOU WANT TO BUILD PySide6 FROM SOURCES ON LINUX:
+# -------------------------------------------------------------------------------
+#
+# Operating System: openSUSE Tumbleweed 20250109
+# KDE Plasma Version: 6.2.5
+# KDE Frameworks Version: 6.9.0
+# Qt Version: 6.8.1
+#
+# to build pyside6 from sources (Linux):
+# 1. install ALL development packages for Qt6, make sure you also install
+#   the Qt ExampleIcons module (provides QtExamplesIconsPrivate);
+#   on openSUSE Tumbleweed 20250109 the package required is 
+#   'qt6-exampleicons-devel-static'
+#
+# 2. Install Shiboken & Ninja
+#
+# 3. Create the virtual environment (python3, ideally >= 3.10)
+#
+# 4. Activate the environment, cd to its top directory
+#
+# 5. Set up clang as described here:
+#  https://doc.qt.io/qtforpython-6/building_from_source/linux.html#setting-up-clang
+#
+#   NOTE:  even though you may find your own distro is providing clang, there
+#   might be issues with Shiboken's cmake files that prevent locating the 
+#   appropriate (system-provided) libclang.so library. Therefore, best stick with
+#   the instructions provided at the web link above.
+#
+# 
+# 6. create a 'src' subdirectory, clone the pyside6 repo as described here:
+# https://doc.qt.io/qtforpython-6/building_from_source/linux.html#getting-the-source
+#
+# at configuration stage remember to pass the python headers for YOUR python version, e.g.:
+# /usr/include/python3.11
+#
+# cmake -B ../pyside-build -S ./ -DCMAKE_INSTALL_PREFIX=${VIRTUAL_ENV} -DPython_EXECUTABLE=`which python` -DCMAKE_CXX_FLAGS=-I/usr/include/python3.11 -DCMAKE_C_FLAGS=-I/usr/include/python3.11
+#
+# also remember to pip install shiboken6 module in the virtual environment
+
+
+
+
 function showinstalldoc () 
 {
     glowexec=`which glow`
@@ -159,13 +201,14 @@ function makevirtenv ()
     #
     
     if [ -d $virtual_env ] ; then 
-        # virtual environment directory apparently found
+        # found putative virtual environment directory
         if [ -a $virtual_env/pyvenv.cfg ] ; then 
-            # and has pyvenv.cfg => check if pyvenv.cfg is what is expected to be
+            # which contains a file named 'pyvenv.cfg' =>
+            # check if pyvenv.cfg is what is expected to be
             aa=`cat $virtual_env/pyvenv.cfg | grep "virtualenv"`
             if [ -n "$aa" ] ; then 
-                # and pyvenv.cfg defines a vitualenv variable -> OK so far
-                # => check for bin subdirerctory
+                # and pyvenv.cfg defines a 'virtualenv' variable -> OK so far
+                # => check for bin subdirectory
                 if [ ! -d $virtual_env/bin ] ; then
                     # bin subdirectory missing -> BAD!!!
                     echo -e "$virtual_env/ does not look like a virtual environment directory. Goodbye!\n"
