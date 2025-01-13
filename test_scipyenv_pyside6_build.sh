@@ -136,7 +136,73 @@ function dopyside6 ()
 
     # NOTE 2025-01-13 16:34:26 trying setuptools - WARNING use qtpaths6 below, on
     # Tumbleweed!!!
-    python setup.py install --qtpaths=`which qtpaths6` --build-tests --ignore-git --parallel=8
+    qtpaths_exec=`which qtpaths6`
+    python setup.py build --qtpaths=${qtpaths_exec} --build-tests --ignore-git --parallel=8
+    python setup.py install --prefix=${VIRTUAL_ENV} --qtpaths=${qtpaths_exec} --build-tests --ignore-git --parallel=8
+    
+    
+}
+
+function dovigra ()
+{
+    if [[ -z "$VIRTUAL_ENV" ]] ; then
+        echo -e "Not in an active environment! Goodbye!\n"
+        exit 1
+    fi
+    
+    if [ ! -r ${VIRTUAL_ENV}/.vigradone ] || [[ $reinstall_vigra -gt 0 ]]; then
+        mkdir -p ${VIRTUAL_ENV}/src && cd $VIRTUAL_ENV/src
+        
+        findcmake
+        
+        vigra_src=$VIRTUAL_ENV/src/vigra
+        vigra_build=$VIRTUAL_ENV/src/vigra-build
+        
+        if [ ! -r ${vigra_src} ] ; then
+            echo -e "Cloning vigra git repository...\n"
+            git clone https://github.com/ukoethe/vigra.git
+            if [[ $? -ne 0 ]] ; then
+                echo -e "Cannot clone vigra git repository. Goodbye!\n"
+                exit 1
+            fi
+            
+        else
+            # refresh the gir repo...
+            if [[ $refresh_git_repos -gt 0 ]] ; then
+                echo -e "Refreshing vigra git repository...\n"
+                cd ${vigra_src}
+                git pull
+                cd ..
+            fi
+        fi
+          
+        if [ -d ${vigra_build} ] ; then
+            rm -fr ${vigra_build}
+        fi
+        
+        echo -e "Creating vigra build tree outside the source tree\n"
+        mkdir -p vigra-build && cd vigra-build
+        
+        $cmake_binary -DPython_INCLUDE_DIRS=$(python -c "import sysconfig; print(sysconfig.get_paths()['include'])") \
+                      -DPython_LIBRARIES=$(python -c "import distutils.sysconfig as sysconfig; print(sysconfig.get_config_var('LIBDIR'))") \
+                      -DPython_EXECUTABLE:FILEPATH=`which python` \
+                      -DCMAKE_INSTALL_PREFIX=$VIRTUAL_ENV -DCMAKE_SKIP_INSTALL_RPATH=1 -DCMAKE_SKIP_RPATH=1 -DWITH_BOOST_GRAPH=1 -DWITH_BOOST_THREAD=1 -DWITH_HDF5=1 -DWITH_OPENEXR=1 -DWITH_VIGRANUMPY=1 -DLIB_SUFFIX=64 ../vigra
+#         $cmake_binary -DPYTHON_INCLUDE_DIRS=$(python -c "import sysconfig; print(sysconfig.get_paths()['include'])") \
+#                       -DPYTHON_LIBRARIES=$(python -c "import distutils.sysconfig as sysconfig; print(sysconfig.get_config_var('LIBDIR'))") \
+#                       -DPYTHON_EXECUTABLE:FILEPATH=`which python` \
+#                       -DCMAKE_INSTALL_PREFIX=$VIRTUAL_ENV -DCMAKE_SKIP_INSTALL_RPATH=1 -DCMAKE_SKIP_RPATH=1 -DWITH_BOOST_GRAPH=1 -DWITH_BOOST_THREAD=1 -DWITH_HDF5=1 -DWITH_OPENEXR=1 -DWITH_VIGRANUMPY=1 -DLIB_SUFFIX=64 ../vigra
+#         $cmake_binary -DPYTHON_INCLUDE_DIR=$(python -c "from distutils.sysconfig import get_python_inc; print(get_python_inc())") -DPYTHON_LIBRARY=$(python -c "import distutils.sysconfig as sysconfig; print(sysconfig.get_config_var('LIBDIR'))") -DPYTHON_EXECUTABLE:FILEPATH=`which python` -DCMAKE_INSTALL_PREFIX=$VIRTUAL_ENV -DCMAKE_SKIP_INSTALL_RPATH=1 -DCMAKE_SKIP_RPATH=1 -DWITH_BOOST_GRAPH=1 -DWITH_BOOST_THREAD=1 -DWITH_HDF5=1 -DWITH_OPENEXR=1 -DWITH_VIGRANUMPY=1 -DLIB_SUFFIX=64 ../vigra
+        
+        make && make install
+        
+        if [[ $? -ne 0 ]] ; then
+            echo -e "Cannot build vigra; check console output. Bailing out. Goodbye!\n"
+            exit 1
+        else
+            echo "VIGRA installed on "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.vigradone
+            echo -e "\n\n=====================\n# Building vigra DONE!\n=====================\n\n"
+        fi
+    fi
     
     
 }
@@ -388,7 +454,7 @@ if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
     installpipreqs_stage1
     dopyside6
     installpipreqs_stage2
-    dovigra
+#     dovigra
     
 fi
     
