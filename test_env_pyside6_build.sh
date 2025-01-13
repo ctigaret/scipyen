@@ -535,8 +535,4 @@ if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
     installpipreqs_stage2
     dovigra
     
-    if [[ $? -ne 0 ]] ; then
-        echo -e "Could not install pip requirements; check the console for messages. Goodbye!\n"
-        exit 1
-    fi
     
