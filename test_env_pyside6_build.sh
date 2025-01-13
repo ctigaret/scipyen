@@ -41,7 +41,7 @@
 # also remember to pip install shiboken6 module in the virtual environment - not really ?!?
 
 
-function dopyqt6 ()
+function dopyside6 ()
 {
     if [[ -z "$VIRTUAL_ENV" ]] ; then
         echo -e "Not in an active environment! Goodbye!\n"
@@ -94,247 +94,51 @@ function dopyqt6 ()
     exit 1
     fi
     
-    mkdir -p ${VIRTUAL_ENV}/src/pyside-build
-    
-    py_includes=/usr/include/python${major}.${minor}
-    
-    cmake -B  ${VIRTUAL_ENV}/src/pyside-build -S  ${VIRTUAL_ENV}/src/pyside-setup -DCMAKE_INSTALL_PREFIX=${VIRTUAL_ENV} -DPython_EXECUTABLE=`which python` -DCMAKE_CXX_FLAGS=-I${py_includes} -DCMAKE_C_FLAGS=-I${py_includes}
-#     cmake -B ../pyside-build -S ./ -DCMAKE_INSTALL_PREFIX=${VIRTUAL_ENV} -DPython_EXECUTABLE=`which python` -DCMAKE_CXX_FLAGS=-I/usr/include/python3.11 -DCMAKE_C_FLAGS=-I/usr/include/python3.11
-    
-    
-    if [[ $? -ne 0 ]] ; then
-    echo -e "Could not configure PySide6 build. Bailing out. Goodbye!\n"
-    exit 1
-    fi
-    
-    cmake --build ${VIRTUAL_ENV}/src/pyside-build --parallel ${njobs}
-    
-    if [[ $? -ne 0 ]] ; then
-    echo -e "Could not build PySide6 Bailing out. Goodbye!\n"
-    exit 1
-    fi
-    
-    
-#     if [[ $build_pyqt6 -gt 0 ]] ; then
-#         
-#         findqmake6
-#         
-#         if [ `pwd` != "$VIRTUAL_ENV"/src ]; then
-#             echo -e "Not inside $VIRTUAL_ENV/src - goodbye\n"
-#             exit 1
-#         fi
-#         
-#         # NOTE: 2023-06-25 10:56:34 
-#         # when we are root, make sure to use the virtual environment's python 
-#         # executable here
-#         if [[ `id -u` -eq 0 ]] ; then
-#             py_exec="$VIRTUAL_ENV/bin/${python_exec}"
-#             sip_wheel_exec="$VIRTUAL_ENV/bin/sip-wheel"
-#         else
-#             py_exec=${python_exec}
-#             sip_wheel_exec=sip-wheel
-#         fi
-#         
-#         echo "Using ${py_exec} as `whoami` to build PyQt6"
-#         
-#         # NOTE: locate_pyqt6_src.py uses distlib to locate the (latest) source 
-#         # archive (i.e., the sdist) of PyQt6 - its file name typically ends with
-#         # .tar.gz
-#         pyqt6_src_url=`${py_exec} $installscriptdir/locate_pyqt6_src.py`
-#         pyqt6_src=`basename $pyqt6_src_url`
-#         
-#         pyqt6_src_dir=${pyqt6_src%.tar.gz}
-#         
-#         echo "PyQt6 source is in "${pyqt6_src_dir}
-#         
-#         # NOTE: the sdist might have been downloaded alreay - so check this first
-#         # before actually downloading
-#         if [ ! -r ${pyqt6_src} ] ; then
-#             wget ${pyqt6_src_url} && tar xzf ${pyqt6_src} 
-# 
-#             if [[ $? -ne 0 ]] ; then
-#             echo -e "Cannot obtain the PyQt6 source. Bailing out. Goodbye!\n"
-#             exit 1
-#             fi
-#         else
-#             if [ -d ${pyqt6_src_dir} ] ; then
-#                 rm -fr ${pyqt6_src_dir}
-#             fi
-#             tar xzf ${pyqt6_src}
-#         fi
-#         
-#         # NOTE: good practice is to create an out-of-source build tree, » ...
-#         pyqt6_build_dir="PyQt6-build"
-#         
-#         # NOTE: clear build dir if it exists -- best to start fresh
-#         if [ -d ${pyqt6_build_dir} ] ; then
-#             rm -fr ${pyqt6_build_dir}
-#         fi
-#         mkdir -p ${pyqt6_build_dir}
-#         
-#         # NOTE: » ... but run the build process INSIDE the expanded sdist dir
-#         # this is because sip-wheel will get extra options from there :)
-#         cd ${pyqt6_src_dir}
-#         
-#         echo "Generating PyQt6 wheel in "$(pwd)"..."
-#         
-#         # NOTE: 2023-03-23 14:03:48 - enable parallel jobs - to change, either:
-#         # • change the value of the --jobs option (e.g. half the number of 
-#         # cores in your system seems to be a good choice), or
-#         # • remove the --jobs option altogether
-#         if [[ $njobs -gt 0 ]] ; then
-#             ${sip_wheel_exec} --qmake=${qmake6_binary} --confirm-license --jobs $njobs --qt-shared --verbose --build-dir ../PyQt6-build --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --pep484-pyi
-#         else
-#             ${sip_wheel_exec} --qmake=${qmake6_binary} --confirm-license --qt-shared --verbose --build-dir ../PyQt6-build --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --pep484-pyi
-#         fi
-# 
-#         if [[ $? -ne 0 ]] ; then
-#             echo -e "sip Cannot build a PyQt6 wheel. Bailing out. Goodbye!\n"
-#             echo -e "You might want to upgrade sip and PyQt6-sip in this environment\n"
-#             echo -e " by calling \n\n"
-#             echo -e "pip install --upgrade sip\n"
-#             echo -e "pip install --upgrade PyQt6-sip\n\n"
-#             echo -e "Then run this script again"
-#             exit 1
-#         fi
-#         
-#         # NOTE: check is a wheel file has been produced; the filename typically
-#         # ends in .whl » if found then call pip to install it inside the 
-#         # environment ⟶ IT WORKS!
-#         wheel_file=`ls | grep whl`
-#         if [ -z ${wheel_file} ] ; then
-#             echo -e "No wheel file found in "$(pwd)" - goodbye!\n"
-#             exit 1
-#         else
-#             ${py_exec} -m pip install --force-reinstall ${wheel_file}
-#             
-#             if [[ $? -ne 0 ]] ; then
-#                 echo -e "Cannot install the PyQt6 wheel; check console output. Goodbye!\n"
-#                 exit 1
-#             else
-#                 echo "PyQt6 built and installed "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.pyqt6done
-#                 echo -e "\n\n=====================\n# Pyqt6 installed!\n=====================\n\n"
-#                 
-# #                 echo -e "\n\n Installing PyQtDataVisualization\n\n"
-# #                 # NOTE: WARNING: 2023-07-19 00:12:27 avoid this !!!! 
-# #                 pip install PyQtDataVisualization
-#             fi
-#         fi
-#     else
-#         pip install pyqt6
+    # NOTE: the below breaks is --parallel is set; when not set it flags up 
+    # see
+#     [ 31%] Built target QtCore
+#     PySide6/__init__.py: Unable to import Shiboken from /home/cezar/scipyenv_pyside6_build/src/pyside-build/sources/pyside6, /home/cezar/scipyenv_pyside6_build/src/pyside-build/sources/shiboken6, /home/cezar/scipyenv_pyside6_build/src/pyside-setup/sources/pyside6/PySide6/support, /usr/lib64/python311.zip, /usr/lib64/python3.11, /usr/lib64/python3.11/lib-dynload, /home/cezar/scipyenv_pyside6_build/lib64/python3.11/site-packages, /home/cezar/scipyenv_pyside6_build/lib/python3.11/site-packages
+#     Traceback (most recent call last):
+#     File "/home/cezar/scipyenv_pyside6_build/src/pyside-setup/sources/pyside6/PySide6/QtCore/../support/generate_pyi.py", line 94, in <module>
+#         generate_all_pyi(outpath, options=options)
+#     File "/home/cezar/scipyenv_pyside6_build/src/pyside-setup/sources/pyside6/PySide6/QtCore/../support/generate_pyi.py", line 38, in generate_all_pyi
+#         import PySide6
+#     File "/home/cezar/scipyenv_pyside6_build/src/pyside-build/sources/pyside6/PySide6/__init__.py", line 140, in <module>
+#         _setupQtDirectories()
+#     File "/home/cezar/scipyenv_pyside6_build/src/pyside-build/sources/pyside6/PySide6/__init__.py", line 66, in _setupQtDirectories
+#         from shiboken6 import Shiboken
+#     ModuleNotFoundError: No module named 'shiboken6'
+#     gmake[2]: *** [sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore_pyi.dir/build.make:70: sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore_pyi] Error 1
+#     gmake[1]: *** [CMakeFiles/Makefile2:8724: sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore_pyi.dir/all] Error 2
+#     gmake: *** [Makefile:136: all] Error 2
+#     
+#     mkdir -p ${VIRTUAL_ENV}/src/pyside-build
+#     
+#     py_includes=/usr/include/python${major}.${minor}
+#     
+#     cmake -B  ${VIRTUAL_ENV}/src/pyside-build -S  ${VIRTUAL_ENV}/src/pyside-setup -DCMAKE_INSTALL_PREFIX=${VIRTUAL_ENV} -DPython_EXECUTABLE=`which python` -DCMAKE_CXX_FLAGS=-I${py_includes} -DCMAKE_C_FLAGS=-I${py_includes}
+# #     cmake -B ../pyside-build -S ./ -DCMAKE_INSTALL_PREFIX=${VIRTUAL_ENV} -DPython_EXECUTABLE=`which python` -DCMAKE_CXX_FLAGS=-I/usr/include/python3.11 -DCMAKE_C_FLAGS=-I/usr/include/python3.11
+#     
+#     
+#     if [[ $? -ne 0 ]] ; then
+#     echo -e "Could not configure PySide6 build. Bailing out. Goodbye!\n"
+#     exit 1
 #     fi
-    
-#     if [ ! -r ${VIRTUAL_ENV}/.pyqt6done ] || [[ $reinstall_pyqt6 -gt 0 ]]; then
-#         if [[ $build_pyqt6 -gt 0 ]] ; then
-#             mkdir -p ${VIRTUAL_ENV}/src && cd ${VIRTUAL_ENV}/src
-#             
-#             findqmake6
-#             
-#             if [ `pwd` != "$VIRTUAL_ENV"/src ]; then
-#                 echo -e "Not inside $VIRTUAL_ENV/src - goodbye\n"
-#                 exit 1
-#             fi
-#             
-#             # NOTE: 2023-06-25 10:56:34 
-#             # when we are root, make sure to use the virtual environment's python 
-#             # executable here
-#             if [[ `id -u` -eq 0 ]] ; then
-#                 py_exec="$VIRTUAL_ENV/bin/${python_exec}"
-#                 sip_wheel_exec="$VIRTUAL_ENV/bin/sip-wheel"
-#             else
-#                 py_exec=${python_exec}
-#                 sip_wheel_exec=sip-wheel
-#             fi
-#             
-#             echo "Using ${py_exec} as `whoami` to build PyQt6"
-#             
-#             # NOTE: locate_pyqt6_src.py uses distlib to locate the (latest) source 
-#             # archive (i.e., the sdist) of PyQt6 - its file name typically ends with
-#             # .tar.gz
-#             pyqt6_src_url=`${py_exec} $installscriptdir/locate_pyqt6_src.py`
-#             pyqt6_src=`basename $pyqt6_src_url`
-#             
-#             pyqt6_src_dir=${pyqt6_src%.tar.gz}
-#             
-#             echo "PyQt6 source is in "${pyqt6_src_dir}
-#             
-#             # NOTE: the sdist might have been downloaded alreay - so check this first
-#             # before actually downloading
-#             if [ ! -r ${pyqt6_src} ] ; then
-#                 wget ${pyqt6_src_url} && tar xzf ${pyqt6_src} 
-# 
-#                 if [[ $? -ne 0 ]] ; then
-#                 echo -e "Cannot obtain the PyQt6 source. Bailing out. Goodbye!\n"
-#                 exit 1
-#                 fi
-#             else
-#                 if [ -d ${pyqt6_src_dir} ] ; then
-#                     rm -fr ${pyqt6_src_dir}
-#                 fi
-#                 tar xzf ${pyqt6_src}
-#             fi
-#             
-#             # NOTE: good practice is to create an out-of-source build tree, » ...
-#             pyqt6_build_dir="PyQt6-build"
-#             
-#             # NOTE: clear build dir if it exists -- best to start fresh
-#             if [ -d ${pyqt6_build_dir} ] ; then
-#                 rm -fr ${pyqt6_build_dir}
-#             fi
-#             mkdir -p ${pyqt6_build_dir}
-#             
-#             # NOTE: » ... but run the build process INSIDE the expanded sdist dir
-#             # this is because sip-wheel will get extra options from there :)
-#             cd ${pyqt6_src_dir}
-#             
-#             echo "Generating PyQt6 wheel in "$(pwd)"..."
-#             
-#             # NOTE: 2023-03-23 14:03:48 - enable parallel jobs - to change, either:
-#             # • change the value of the --jobs option (e.g. half the number of 
-#             # cores in your system seems to be a good choice), or
-#             # • remove the --jobs option altogether
-#             if [[ $njobs -gt 0 ]] ; then
-#                 ${sip_wheel_exec} --qmake=${qmake6_binary} --confirm-license --jobs $njobs --qt-shared --verbose --build-dir ../PyQt6-build --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --pep484-pyi
-#             else
-#                 ${sip_wheel_exec} --qmake=${qmake6_binary} --confirm-license --qt-shared --verbose --build-dir ../PyQt6-build --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --pep484-pyi
-#             fi
-# 
-#             if [[ $? -ne 0 ]] ; then
-#                 echo -e "sip Cannot build a PyQt6 wheel. Bailing out. Goodbye!\n"
-#                 echo -e "You might want to upgrade sip and PyQt6-sip in this environment\n"
-#                 echo -e " by calling \n\n"
-#                 echo -e "pip install --upgrade sip\n"
-#                 echo -e "pip install --upgrade PyQt6-sip\n\n"
-#                 echo -e "Then run this script again"
-#                 exit 1
-#             fi
-#             
-#             # NOTE: check is a wheel file has been produced; the filename typically
-#             # ends in .whl » if found then call pip to install it inside the 
-#             # environment ⟶ IT WORKS!
-#             wheel_file=`ls | grep whl`
-#             if [ -z ${wheel_file} ] ; then
-#                 echo -e "No wheel file found in "$(pwd)" - goodbye!\n"
-#                 exit 1
-#             else
-#                 ${py_exec} -m pip install --force-reinstall ${wheel_file}
-#                 
-#                 if [[ $? -ne 0 ]] ; then
-#                     echo -e "Cannot install the PyQt6 wheel; check console output. Goodbye!\n"
-#                     exit 1
-#                 else
-#                     echo "PyQt6 built and installed "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.pyqt6done
-#                     echo -e "\n\n=====================\n# Pyqt6 installed!\n=====================\n\n"
-#                     
-#     #                 echo -e "\n\n Installing PyQtDataVisualization\n\n"
-#     #                 # NOTE: WARNING: 2023-07-19 00:12:27 avoid this !!!! 
-#     #                 pip install PyQtDataVisualization
-#                 fi
-#             fi
-#         else
-#             pip install pyqt6
-#         fi
+#     
+#     # what is you leave out --parallel?
+#     cmake --build ${VIRTUAL_ENV}/src/pyside-build 
+# #     cmake --build ${VIRTUAL_ENV}/src/pyside-build --parallel ${njobs}
+#     
+#     if [[ $? -ne 0 ]] ; then
+#     echo -e "Could not build PySide6 Bailing out. Goodbye!\n"
+#     exit 1
 #     fi
+
+    # NOTE 2025-01-13 16:34:26 trying setuptools - WARNING use qtpaths6 below, on
+    # Tumbleweed!!!
+    python setup.py install --qtpaths=`which qtpaths6` --build-tests --ignore-git --parallel=8
+    
+    
 }
 
 function get_pyver ()
@@ -582,7 +386,7 @@ if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
     
     # install pip requirements NOTE: 2023-06-25 10:55:09 FIXME how to pass the virtualenv python to builder when run as root?
     installpipreqs_stage1
-    dopyqt6
+    dopyside6
     installpipreqs_stage2
     dovigra
     

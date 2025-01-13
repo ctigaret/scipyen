@@ -1,0 +1,1411 @@
+✔ cezar@BrukerLinux:~/scipyenv_pyside6_build/src/pyside-setup [6.8|✔ ]> source ../../bin/activate
+(scipyenv_pyside6_build) ✔ cezar@BrukerLinux:~/scipyenv_pyside6_build/src/pyside-setup [6.8|✔ ]> function get_pyver ()
+> {
+> declare -a ver_array
+> ver_array=( `python3 --version` )
+> pyver=${ver_array[1]}
+> oldifs=$IFS
+> IFS=. 
+> read major minor micro <<EOF
+> ${pyver##*-}
+> EOF
+> IFS=$oldifs
+> }
+(scipyenv_pyside6_build) ✔ cezar@BrukerLinux:~/scipyenv_pyside6_build/src/pyside-setup [6.8|✔ ]> get_pyver
+(scipyenv_pyside6_build) ✔ cezar@BrukerLinux:~/scipyenv_pyside6_build/src/pyside-setup [6.8|✔ ]> njobs=4
+(scipyenv_pyside6_build) ✔ cezar@BrukerLinux:~/scipyenv_pyside6_build/src/pyside-setup [6.8|✔ ]> export LLVM_INSTALL_DIR=${VIRTUAL_ENV}/libclang
+(scipyenv_pyside6_build) ✔ cezar@BrukerLinux:~/scipyenv_pyside6_build/src/pyside-setup [6.8|✔ ]> py_includes=/usr/include/python${major}.${minor}
+(scipyenv_pyside6_build) ✔ cezar@BrukerLinux:~/scipyenv_pyside6_build/src/pyside-setup [6.8|✔ ]> echo ${py_includes}/usr/include/python3.11
+(scipyenv_pyside6_build) ✔ cezar@BrukerLinux:~/scipyenv_pyside6_build/src/pyside-setup [6.8|✔ ]> cmake -B  ${VIRTUAL_ENV}/src/pyside-build -S  ${VIRTUAL_ENV}/src/pyside-setup -DCMAKE_INSTALL_PREFIX=${VIRTUAL_ENV} -DPython_EXECUTABLE=`which python` -DCMAKE_CXX_FLAGS=-I${py_includes} -DCMAKE_C_FLAGS=-I${py_includes}
+-- The C compiler identification is GNU 14.2.1
+-- The CXX compiler identification is GNU 14.2.1
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/cc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- SHIBOKEN_IS_CROSS_BUILD: FALSE
+-- SHIBOKEN_BUILD_LIBS: ON
+-- SHIBOKEN_BUILD_TOOLS: ON
+-- BUILD_TESTS: ON
+-- Using Qt 6
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+-- Found Threads: TRUE
+-- Performing Test HAVE_STDATOMIC
+-- Performing Test HAVE_STDATOMIC - Success
+-- Found WrapAtomic: TRUE
+-- Found Python: /home/cezar/scipyenv_pyside6_build/bin/python (found version "3.11.11") found components: Interpreter Development Development.Module Development.Embed
+-- CLANG: /home/cezar/scipyenv_pyside6_build/libclang/lib/cmake/clang, /home/cezar/scipyenv_pyside6_build/libclang/lib/libclang.so.18.1.5 detected
+-- Found Git: /usr/bin/git (found version "2.47.1")
+-- Python_Development_FOUND:       TRUE
+-- Python_LIBRARIES:       /usr/lib64/libpython3.11.so
+-- Python_INCLUDE_DIRS:    /usr/include/python3.11
+-- Python_Interpreter_FOUND:     TRUE
+-- Python_EXECUTABLE:      /home/cezar/scipyenv_pyside6_build/bin/python
+-- Python_VERSION:         3.11.11
+-- PYTHON_EXTENSION_SUFFIX: .cpython-311-x86_64-linux-gnu
+-- PYTHON_LIMITED_LIBRARIES: 
+-- ******************************************************
+-- ** Limited API enabled 
+-- ******************************************************
+-- PYTHON_EXTENSION_SUFFIX:      .abi3
+-- PYTHON_CONFIG_SUFFIX:         .abi3
+-- PYTHON_SHARED_LIBRARY_SUFFIX: .abi3
+-- Found LibXml2: /usr/lib64/libxml2.so (found suitable version "2.12.9", minimum required is "2.6.32")
+-- Found LibXslt: /usr/lib64/libxslt.so (found suitable version "1.1.39", minimum required is "1.1.19")
+-- NUMPY not found
+-- SHIBOKEN_PYTHON_INCLUDE_DIRS computed to value: '/usr/include/python3.11'
+-- SHIBOKEN_PYTHON_LIBRARIES computed to value: ''
+-- sphinx-build - found
+-- Tests will be generated using the protected hack!
+-- PYSIDE_IS_CROSS_BUILD: 
+-- Shiboken6Config: Using default python: .abi3
+-- libshiboken built for Release
+-- ******************************************************
+-- ** PySide6 Limited API enabled.
+-- ******************************************************
+-- *** computed QT_INCLUDE_DIR as /usr/include/qt6
+-- Found OpenGL: /usr/lib64/libOpenGL.so
+-- Found WrapOpenGL: TRUE
+-- Found XKB: /usr/lib64/libxkbcommon.so (found suitable version "1.7.0", minimum required is "0.5.0")
+-- Found WrapVulkanHeaders: /usr/include
+-- CORE_ABS_DIR:/usr/lib64/cmake
+-- essential module Qt6Core found (). Looked in: /usr/lib64/cmake/Qt6Core
+-- essential module Qt6Gui found (). Looked in: /usr/lib64/cmake/Qt6Gui
+-- essential module Qt6Widgets found (). Looked in: /usr/lib64/cmake/Qt6Widgets
+-- Found Cups: /usr/lib64/libcups.so (found version "2.4.11")
+-- essential module Qt6PrintSupport found (). Looked in: /usr/lib64/cmake/Qt6PrintSupport
+-- essential module Qt6Sql found (). Looked in: /usr/lib64/cmake/Qt6Sql
+-- essential module Qt6Network found (). Looked in: /usr/lib64/cmake/Qt6Network
+-- essential module Qt6Test found (). Looked in: /usr/lib64/cmake/Qt6Test
+-- essential module Qt6Concurrent found (). Looked in: /usr/lib64/cmake/Qt6Concurrent
+-- optional module Qt6DBus found (). Looked in: /usr/lib64/cmake/Qt6DBus
+-- optional module Qt6Designer found (). Looked in: /usr/lib64/cmake/Qt6Designer
+-- optional module Qt6Xml found (). Looked in: /usr/lib64/cmake/Qt6Xml
+-- optional module Qt6Help found (). Looked in: /usr/lib64/cmake/Qt6Help
+-- optional module Qt6Multimedia found (). Looked in: /usr/lib64/cmake/Qt6Multimedia
+-- optional module Qt6MultimediaWidgets found (). Looked in: /usr/lib64/cmake/Qt6MultimediaWidgets
+-- optional module Qt6OpenGL found (). Looked in: /usr/lib64/cmake/Qt6OpenGL
+-- optional module Qt6OpenGLWidgets found (). Looked in: /usr/lib64/cmake/Qt6OpenGLWidgets
+-- optional module Qt6Pdf found (). Looked in: /usr/lib64/cmake/Qt6Pdf
+-- optional module Qt6PdfWidgets found (). Looked in: /usr/lib64/cmake/Qt6PdfWidgets
+-- optional module Qt6Positioning found (). Looked in: /usr/lib64/cmake/Qt6Positioning
+-- optional module Qt6Location found (). Looked in: /usr/lib64/cmake/Qt6Location
+-- optional module Qt6NetworkAuth found (). Looked in: /usr/lib64/cmake/Qt6NetworkAuth
+-- optional module Qt6Nfc found (). Looked in: /usr/lib64/cmake/Qt6Nfc
+-- optional module Qt6Qml found (). Looked in: /usr/lib64/cmake/Qt6Qml
+-- optional module Qt6Quick found (). Looked in: /usr/lib64/cmake/Qt6Quick
+-- optional module Qt6Quick3D found (). Looked in: /usr/lib64/cmake/Qt6Quick3D
+-- optional module Qt6QuickControls2 found (). Looked in: /usr/lib64/cmake/Qt6QuickControls2
+-- optional module Qt6QuickTest found (). Looked in: /usr/lib64/cmake/Qt6QuickTest
+-- optional module Qt6QuickWidgets found (). Looked in: /usr/lib64/cmake/Qt6QuickWidgets
+-- optional module Qt6RemoteObjects found (). Looked in: /usr/lib64/cmake/Qt6RemoteObjects
+-- optional module Qt6Scxml found (). Looked in: /usr/lib64/cmake/Qt6Scxml
+-- optional module Qt6Sensors found (). Looked in: /usr/lib64/cmake/Qt6Sensors
+-- optional module Qt6SerialPort found (). Looked in: /usr/lib64/cmake/Qt6SerialPort
+-- optional module Qt6SerialBus found (). Looked in: /usr/lib64/cmake/Qt6SerialBus
+-- optional module Qt6StateMachine found (). Looked in: /usr/lib64/cmake/Qt6StateMachine
+-- optional module Qt6TextToSpeech found (). Looked in: /usr/lib64/cmake/Qt6TextToSpeech
+-- optional module Qt6Charts found (). Looked in: /usr/lib64/cmake/Qt6Charts
+-- optional module Qt6SpatialAudio found (). Looked in: /usr/lib64/cmake/Qt6SpatialAudio
+-- optional module Qt6Svg found (). Looked in: /usr/lib64/cmake/Qt6Svg
+-- optional module Qt6SvgWidgets found (). Looked in: /usr/lib64/cmake/Qt6SvgWidgets
+-- optional module Qt6DataVisualization found (). Looked in: /usr/lib64/cmake/Qt6DataVisualization
+-- optional module Qt6Graphs found (). Looked in: /usr/lib64/cmake/Qt6Graphs
+-- optional module Qt6GraphsWidgets found (). Looked in: /usr/lib64/cmake/Qt6GraphsWidgets
+-- optional module Qt6Bluetooth found (). Looked in: /usr/lib64/cmake/Qt6Bluetooth
+-- optional module Qt6UiTools found (). Looked in: /usr/lib64/cmake/Qt6UiTools
+-- optional module Qt6WebChannel found (). Looked in: /usr/lib64/cmake/Qt6WebChannel
+-- optional module Qt6WebEngineCore found (). Looked in: /usr/lib64/cmake/Qt6WebEngineCore
+-- optional module Qt6WebEngineWidgets found (). Looked in: /usr/lib64/cmake/Qt6WebEngineWidgets
+-- optional module Qt6WebEngineQuick found (). Looked in: /usr/lib64/cmake/Qt6WebEngineQuick
+-- optional module Qt6WebSockets found (). Looked in: /usr/lib64/cmake/Qt6WebSockets
+-- optional module Qt6HttpServer found (). Looked in: /usr/lib64/cmake/Qt6HttpServer
+-- optional module Qt6WebView found (). Looked in: /usr/lib64/cmake/Qt6WebView
+-- optional module Qt63DCore found (). Looked in: /usr/lib64/cmake/Qt63DCore
+-- optional module Qt63DRender found (). Looked in: /usr/lib64/cmake/Qt63DRender
+-- optional module Qt63DInput found (). Looked in: /usr/lib64/cmake/Qt63DInput
+-- optional module Qt63DLogic found (). Looked in: /usr/lib64/cmake/Qt63DLogic
+-- optional module Qt63DAnimation found (). Looked in: /usr/lib64/cmake/Qt63DAnimation
+-- optional module Qt63DExtras found (). Looked in: /usr/lib64/cmake/Qt63DExtras
+-- PySide will be generated using the protected hack!
+-- Qt6Network: Adding SSL classes
+-- Qt6Network: Adding DTLS classes
+-- Qt6Network: Dropping SCTP classes
+-- Qt6OpenGL: Adding Desktop OpenGL classes
+-- Qt6Quick: Building with OpenGL
+-- Qt6Quick3D: Building with OpenGL
+-- Qt6QuickControls2: Building with OpenGL
+-- Qt6QuickTest: Building with OpenGL
+-- Qt6QuickWidgets: Building with OpenGL
+-- Qt6Graphs: Building with OpenGL
+-- Qt63DRender: Building with OpenGL
+-- preparing tests for module 'QtCore'
+-- preparing tests for module 'QtGui'
+-- preparing tests for module 'QtWidgets'
+-- preparing tests for module 'QtPrintSupport'
+-- preparing tests for module 'QtSql'
+-- preparing tests for module 'QtNetwork'
+-- preparing tests for module 'QtTest'
+-- preparing tests for module 'QtConcurrent'
+-- preparing tests for module 'QtDBus'
+-- preparing tests for module 'QtDesigner'
+-- preparing tests for module 'QtXml'
+-- preparing tests for module 'QtHelp'
+-- preparing tests for module 'QtMultimedia'
+-- preparing tests for module 'QtMultimediaWidgets'
+-- preparing tests for module 'QtOpenGL'
+-- preparing tests for module 'QtOpenGLWidgets'
+-- preparing tests for module 'QtPdf'
+-- preparing tests for module 'QtPdfWidgets'
+-- preparing tests for module 'QtPositioning'
+-- preparing tests for module 'QtLocation'
+-- preparing tests for module 'QtNetworkAuth'
+-- preparing tests for module 'QtNfc'
+-- preparing tests for module 'QtQml'
+-- preparing tests for module 'QtQuick'
+-- preparing tests for module 'QtQuick3D'
+-- preparing tests for module 'QtQuickControls2'
+-- preparing tests for module 'QtQuickTest'
+-- preparing tests for module 'QtQuickWidgets'
+-- preparing tests for module 'QtRemoteObjects'
+-- preparing tests for module 'QtScxml'
+-- preparing tests for module 'QtSensors'
+-- preparing tests for module 'QtSerialPort'
+-- preparing tests for module 'QtSerialBus'
+-- preparing tests for module 'QtStateMachine'
+-- preparing tests for module 'QtTextToSpeech'
+-- preparing tests for module 'QtCharts'
+-- preparing tests for module 'QtSpatialAudio'
+-- preparing tests for module 'QtSvg'
+-- preparing tests for module 'QtSvgWidgets'
+-- preparing tests for module 'QtDataVisualization'
+-- preparing tests for module 'QtGraphs'
+-- preparing tests for module 'QtGraphsWidgets'
+-- preparing tests for module 'QtBluetooth'
+-- preparing tests for module 'QtUiTools'
+-- preparing tests for module 'QtWebChannel'
+-- preparing tests for module 'QtWebEngineCore'
+-- preparing tests for module 'QtWebEngineWidgets'
+-- preparing tests for module 'QtWebEngineQuick'
+-- preparing tests for module 'QtWebSockets'
+-- preparing tests for module 'QtHttpServer'
+-- preparing tests for module 'QtWebView'
+-- preparing tests for module 'Qt3DCore'
+-- preparing tests for module 'Qt3DRender'
+-- preparing tests for module 'Qt3DInput'
+-- preparing tests for module 'Qt3DLogic'
+-- preparing tests for module 'Qt3DAnimation'
+-- preparing tests for module 'Qt3DExtras'
+-- apidoc generation targets disabled due to the following reasons:
+    QT_SRC_DIR variable not set
+    BUILD_DOCS was set to FALSE (default)
+
+-- PYSIDE_TOOLS_IS_CROSS_BUILD: 
+-- Installing tool: /home/cezar/scipyenv_pyside6_build/src/pyside-setup/sources/pyside-tools/pyside_tool.py
+-- Installing tool: /home/cezar/scipyenv_pyside6_build/src/pyside-setup/sources/pyside-tools/metaobjectdump.py
+-- Installing tool: /home/cezar/scipyenv_pyside6_build/src/pyside-setup/sources/pyside-tools/project.py
+-- Installing tool: /home/cezar/scipyenv_pyside6_build/src/pyside-setup/sources/pyside-tools/qml.py
+-- Installing tool: /home/cezar/scipyenv_pyside6_build/src/pyside-setup/sources/pyside-tools/qtpy2cpp.py
+-- Installing tool: /home/cezar/scipyenv_pyside6_build/src/pyside-setup/sources/pyside-tools/deploy.py
+-- Installing tool: /home/cezar/scipyenv_pyside6_build/src/pyside-setup/sources/pyside-tools/android_deploy.py
+-- Installing tool: /home/cezar/scipyenv_pyside6_build/src/pyside-setup/sources/pyside-tools/requirements-android.txt
+-- Installing tool: /usr/libexec/qt6/uic
+-- Installing tool: /usr/libexec/qt6/rcc
+-- Installing tool: /usr/libexec/qt6/qmltyperegistrar
+-- Installing tool: /usr/libexec/qt6/qmlimportscanner
+-- Installing tool: /usr/libexec/qt6/qmlcachegen
+-- Installing tool: /usr/lib64/qt6/bin/lrelease
+-- Installing tool: /usr/lib64/qt6/bin/lupdate
+-- Installing tool: /usr/lib64/qt6/bin/qmllint
+-- Installing tool: /usr/lib64/qt6/bin/qmlformat
+-- Installing tool: /usr/lib64/qt6/bin/qmlls
+-- Installing tool: /usr/lib64/qt6/bin/qsb
+-- Installing tool: /usr/lib64/qt6/bin/balsam
+-- Installing tool: /usr/lib64/qt6/bin/balsamui
+-- Installing tool: /usr/lib64/qt6/bin/svgtoqml
+-- Installing tool: /usr/lib64/qt6/bin/assistant
+-- Installing tool: /usr/lib64/qt6/bin/designer
+-- Installing tool: /usr/lib64/qt6/bin/linguist
+-- Installing /home/cezar/scipyenv_pyside6_build/src/pyside-setup/sources/pyside-tools/../../tools/cross_compile_android/android_utilities.py
+-- Configuring done (4.6s)
+-- Generating done (1.1s)
+-- Build files have been written to: /home/cezar/scipyenv_pyside6_build/src/pyside-build
+(scipyenv_pyside6_build) ✔ cezar@BrukerLinux:~/scipyenv_pyside6_build/src/pyside-setup [6.8|✔ ]> cmake --build ${VIRTUAL_ENV}/src/pyside-build
+[  0%] Built target apiextractor_autogen_timestamp_deps
+[  0%] Automatic MOC for target apiextractor
+[  0%] Built target apiextractor_autogen
+[  0%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/apiextractor_autogen/mocs_compilation.cpp.o
+[  0%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/abstractmetaargument.cpp.o
+[  0%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/abstractmetabuilder.cpp.o
+[  0%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/abstractmetabuilder_helpers.cpp.o
+[  0%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/abstractmetaenum.cpp.o
+[  0%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/abstractmetafield.cpp.o
+[  0%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/abstractmetafunction.cpp.o
+[  0%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/abstractmetalang.cpp.o
+[  0%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/abstractmetatype.cpp.o
+[  0%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/addedfunction.cpp.o
+[  0%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/anystringview_helpers.cpp.o
+[  0%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/apiextractor.cpp.o
+[  1%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/apiextractorresult.cpp.o
+[  1%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/classdocumentation.cpp.o
+[  1%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/codesnip.cpp.o
+[  1%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/codesniphelpers.cpp.o
+[  1%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/conditionalstreamreader.cpp.o
+[  1%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/customconversion.cpp.o
+[  1%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/documentation.cpp.o
+[  1%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/dotview.cpp.o
+[  1%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/enclosingclassmixin.cpp.o
+[  1%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/fileout.cpp.o
+[  1%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/include.cpp.o
+[  1%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/messages.cpp.o
+[  1%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/modifications.cpp.o
+[  1%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/optionsparser.cpp.o
+[  1%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/predefined_templates.cpp.o
+[  1%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/propertyspec.cpp.o
+[  1%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/pymethoddefentry.cpp.o
+[  1%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/reporthandler.cpp.o
+[  1%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/sourcelocation.cpp.o
+[  1%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/textstream.cpp.o
+[  1%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/typedatabase.cpp.o
+[  1%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/typeparser.cpp.o
+[  1%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/typesystem.cpp.o
+[  1%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/typesystemparser.cpp.o
+[  1%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/xmlutils.cpp.o
+[  1%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/clangparser/clangbuilder.cpp.o
+[  2%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/clangparser/clangdebugutils.cpp.o
+[  2%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/clangparser/clangparser.cpp.o
+[  2%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/clangparser/clangutils.cpp.o
+[  2%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/clangparser/compilersupport.cpp.o
+[  2%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/parser/codemodel.cpp.o
+[  2%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/parser/enumvalue.cpp.o
+[  2%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/parser/typeinfo.cpp.o
+[  2%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/xmlutils_libxslt.cpp.o
+[  2%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/docparser.cpp.o
+[  2%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/doxygenparser.cpp.o
+[  2%] Building CXX object sources/shiboken6/ApiExtractor/CMakeFiles/apiextractor.dir/qtdocparser.cpp.o
+[  2%] Linking CXX static library ../../../tests/libapiextractor.a
+[  2%] Built target apiextractor
+[  2%] Built target testabstractmetaclass_autogen_timestamp_deps
+[  2%] Automatic MOC for target testabstractmetaclass
+[  2%] Built target testabstractmetaclass_autogen
+[  2%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testabstractmetaclass.dir/testabstractmetaclass_autogen/mocs_compilation.cpp.o
+[  3%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testabstractmetaclass.dir/testabstractmetaclass.cpp.o
+[  3%] Linking CXX executable testabstractmetaclass
+[  3%] Built target testabstractmetaclass
+[  3%] Built target testabstractmetatype_autogen_timestamp_deps
+[  3%] Automatic MOC for target testabstractmetatype
+[  3%] Built target testabstractmetatype_autogen
+[  3%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testabstractmetatype.dir/testabstractmetatype_autogen/mocs_compilation.cpp.o
+[  3%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testabstractmetatype.dir/testabstractmetatype.cpp.o
+[  3%] Linking CXX executable testabstractmetatype
+[  3%] Built target testabstractmetatype
+[  3%] Built target testaddfunction_autogen_timestamp_deps
+[  3%] Automatic MOC for target testaddfunction
+[  3%] Built target testaddfunction_autogen
+[  3%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testaddfunction.dir/testaddfunction_autogen/mocs_compilation.cpp.o
+[  3%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testaddfunction.dir/testaddfunction.cpp.o
+[  3%] Linking CXX executable testaddfunction
+[  3%] Built target testaddfunction
+[  3%] Built target testarrayargument_autogen_timestamp_deps
+[  3%] Automatic MOC for target testarrayargument
+[  3%] Built target testarrayargument_autogen
+[  3%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testarrayargument.dir/testarrayargument_autogen/mocs_compilation.cpp.o
+[  3%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testarrayargument.dir/testarrayargument.cpp.o
+[  3%] Linking CXX executable testarrayargument
+[  3%] Built target testarrayargument
+[  3%] Built target testcodeinjection_autogen_timestamp_deps
+[  3%] Automatic MOC for target testcodeinjection
+[  3%] Built target testcodeinjection_autogen
+[  3%] Automatic RCC for testcodeinjection.qrc
+[  3%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testcodeinjection.dir/testcodeinjection_autogen/mocs_compilation.cpp.o
+[  3%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testcodeinjection.dir/testcodeinjection.cpp.o
+[  3%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testcodeinjection.dir/testcodeinjection_autogen/EWIEGA46WW/qrc_testcodeinjection.cpp.o
+[  3%] Linking CXX executable testcodeinjection
+[  3%] Built target testcodeinjection
+[  3%] Built target testcontainer_autogen_timestamp_deps
+[  3%] Automatic MOC for target testcontainer
+[  3%] Built target testcontainer_autogen
+[  3%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testcontainer.dir/testcontainer_autogen/mocs_compilation.cpp.o
+[  3%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testcontainer.dir/testcontainer.cpp.o
+[  3%] Linking CXX executable testcontainer
+[  3%] Built target testcontainer
+[  3%] Built target testconversionoperator_autogen_timestamp_deps
+[  3%] Automatic MOC for target testconversionoperator
+[  3%] Built target testconversionoperator_autogen
+[  3%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testconversionoperator.dir/testconversionoperator_autogen/mocs_compilation.cpp.o
+[  3%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testconversionoperator.dir/testconversionoperator.cpp.o
+[  3%] Linking CXX executable testconversionoperator
+[  4%] Built target testconversionoperator
+[  4%] Built target testconversionruletag_autogen_timestamp_deps
+[  4%] Automatic MOC for target testconversionruletag
+[  4%] Built target testconversionruletag_autogen
+[  4%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testconversionruletag.dir/testconversionruletag_autogen/mocs_compilation.cpp.o
+[  4%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testconversionruletag.dir/testconversionruletag.cpp.o
+[  4%] Linking CXX executable testconversionruletag
+[  4%] Built target testconversionruletag
+[  4%] Built target testctorinformation_autogen_timestamp_deps
+[  4%] Automatic MOC for target testctorinformation
+[  4%] Built target testctorinformation_autogen
+[  4%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testctorinformation.dir/testctorinformation_autogen/mocs_compilation.cpp.o
+[  4%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testctorinformation.dir/testctorinformation.cpp.o
+[  4%] Linking CXX executable testctorinformation
+[  4%] Built target testctorinformation
+[  4%] Built target testdroptypeentries_autogen_timestamp_deps
+[  4%] Automatic MOC for target testdroptypeentries
+[  4%] Built target testdroptypeentries_autogen
+[  4%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testdroptypeentries.dir/testdroptypeentries_autogen/mocs_compilation.cpp.o
+[  4%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testdroptypeentries.dir/testdroptypeentries.cpp.o
+[  4%] Linking CXX executable testdroptypeentries
+[  4%] Built target testdroptypeentries
+[  4%] Built target testdtorinformation_autogen_timestamp_deps
+[  4%] Automatic MOC for target testdtorinformation
+[  4%] Built target testdtorinformation_autogen
+[  4%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testdtorinformation.dir/testdtorinformation_autogen/mocs_compilation.cpp.o
+[  4%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testdtorinformation.dir/testdtorinformation.cpp.o
+[  4%] Linking CXX executable testdtorinformation
+[  4%] Built target testdtorinformation
+[  4%] Built target testenum_autogen_timestamp_deps
+[  4%] Automatic MOC for target testenum
+[  4%] Built target testenum_autogen
+[  4%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testenum.dir/testenum_autogen/mocs_compilation.cpp.o
+[  4%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testenum.dir/testenum.cpp.o
+[  4%] Linking CXX executable testenum
+[  5%] Built target testenum
+[  5%] Built target testextrainclude_autogen_timestamp_deps
+[  5%] Automatic MOC for target testextrainclude
+[  5%] Built target testextrainclude_autogen
+[  5%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testextrainclude.dir/testextrainclude_autogen/mocs_compilation.cpp.o
+[  5%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testextrainclude.dir/testextrainclude.cpp.o
+[  5%] Linking CXX executable testextrainclude
+[  5%] Built target testextrainclude
+[  5%] Built target testfunctiontag_autogen_timestamp_deps
+[  5%] Automatic MOC for target testfunctiontag
+[  5%] Built target testfunctiontag_autogen
+[  5%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testfunctiontag.dir/testfunctiontag_autogen/mocs_compilation.cpp.o
+[  5%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testfunctiontag.dir/testfunctiontag.cpp.o
+[  5%] Linking CXX executable testfunctiontag
+[  5%] Built target testfunctiontag
+[  5%] Built target testimplicitconversions_autogen_timestamp_deps
+[  5%] Automatic MOC for target testimplicitconversions
+[  5%] Built target testimplicitconversions_autogen
+[  5%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testimplicitconversions.dir/testimplicitconversions_autogen/mocs_compilation.cpp.o
+[  5%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testimplicitconversions.dir/testimplicitconversions.cpp.o
+[  5%] Linking CXX executable testimplicitconversions
+[  5%] Built target testimplicitconversions
+[  5%] Built target testinserttemplate_autogen_timestamp_deps
+[  5%] Automatic MOC for target testinserttemplate
+[  5%] Built target testinserttemplate_autogen
+[  5%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testinserttemplate.dir/testinserttemplate_autogen/mocs_compilation.cpp.o
+[  5%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testinserttemplate.dir/testinserttemplate.cpp.o
+[  5%] Linking CXX executable testinserttemplate
+[  5%] Built target testinserttemplate
+[  5%] Built target testmodifyfunction_autogen_timestamp_deps
+[  5%] Automatic MOC for target testmodifyfunction
+[  5%] Built target testmodifyfunction_autogen
+[  5%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testmodifyfunction.dir/testmodifyfunction_autogen/mocs_compilation.cpp.o
+[  5%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testmodifyfunction.dir/testmodifyfunction.cpp.o
+[  5%] Linking CXX executable testmodifyfunction
+[  5%] Built target testmodifyfunction
+[  5%] Built target testmultipleinheritance_autogen_timestamp_deps
+[  5%] Automatic MOC for target testmultipleinheritance
+[  5%] Built target testmultipleinheritance_autogen
+[  5%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testmultipleinheritance.dir/testmultipleinheritance_autogen/mocs_compilation.cpp.o
+[  5%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testmultipleinheritance.dir/testmultipleinheritance.cpp.o
+[  5%] Linking CXX executable testmultipleinheritance
+[  5%] Built target testmultipleinheritance
+[  5%] Built target testnamespace_autogen_timestamp_deps
+[  5%] Automatic MOC for target testnamespace
+[  5%] Built target testnamespace_autogen
+[  5%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testnamespace.dir/testnamespace_autogen/mocs_compilation.cpp.o
+[  5%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testnamespace.dir/testnamespace.cpp.o
+[  5%] Linking CXX executable testnamespace
+[  5%] Built target testnamespace
+[  5%] Built target testnestedtypes_autogen_timestamp_deps
+[  6%] Automatic MOC for target testnestedtypes
+[  6%] Built target testnestedtypes_autogen
+[  6%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testnestedtypes.dir/testnestedtypes_autogen/mocs_compilation.cpp.o
+[  6%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testnestedtypes.dir/testnestedtypes.cpp.o
+[  6%] Linking CXX executable testnestedtypes
+[  6%] Built target testnestedtypes
+[  6%] Built target testnumericaltypedef_autogen_timestamp_deps
+[  6%] Automatic MOC for target testnumericaltypedef
+[  6%] Built target testnumericaltypedef_autogen
+[  6%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testnumericaltypedef.dir/testnumericaltypedef_autogen/mocs_compilation.cpp.o
+[  6%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testnumericaltypedef.dir/testnumericaltypedef.cpp.o
+[  6%] Linking CXX executable testnumericaltypedef
+[  6%] Built target testnumericaltypedef
+[  6%] Built target testprimitivetypetag_autogen_timestamp_deps
+[  6%] Automatic MOC for target testprimitivetypetag
+[  6%] Built target testprimitivetypetag_autogen
+[  6%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testprimitivetypetag.dir/testprimitivetypetag_autogen/mocs_compilation.cpp.o
+[  6%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testprimitivetypetag.dir/testprimitivetypetag.cpp.o
+[  6%] Linking CXX executable testprimitivetypetag
+[  6%] Built target testprimitivetypetag
+[  6%] Built target testrefcounttag_autogen_timestamp_deps
+[  6%] Automatic MOC for target testrefcounttag
+[  6%] Built target testrefcounttag_autogen
+[  6%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testrefcounttag.dir/testrefcounttag_autogen/mocs_compilation.cpp.o
+[  6%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testrefcounttag.dir/testrefcounttag.cpp.o
+[  6%] Linking CXX executable testrefcounttag
+[  6%] Built target testrefcounttag
+[  6%] Built target testreferencetopointer_autogen_timestamp_deps
+[  6%] Automatic MOC for target testreferencetopointer
+[  6%] Built target testreferencetopointer_autogen
+[  6%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testreferencetopointer.dir/testreferencetopointer_autogen/mocs_compilation.cpp.o
+[  6%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testreferencetopointer.dir/testreferencetopointer.cpp.o
+[  6%] Linking CXX executable testreferencetopointer
+[  6%] Built target testreferencetopointer
+[  6%] Built target testremovefield_autogen_timestamp_deps
+[  6%] Automatic MOC for target testremovefield
+[  6%] Built target testremovefield_autogen
+[  6%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testremovefield.dir/testremovefield_autogen/mocs_compilation.cpp.o
+[  6%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testremovefield.dir/testremovefield.cpp.o
+[  6%] Linking CXX executable testremovefield
+[  6%] Built target testremovefield
+[  6%] Built target testremoveimplconv_autogen_timestamp_deps
+[  6%] Automatic MOC for target testremoveimplconv
+[  6%] Built target testremoveimplconv_autogen
+[  6%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testremoveimplconv.dir/testremoveimplconv_autogen/mocs_compilation.cpp.o
+[  6%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testremoveimplconv.dir/testremoveimplconv.cpp.o
+[  6%] Linking CXX executable testremoveimplconv
+[  7%] Built target testremoveimplconv
+[  7%] Built target testremoveoperatormethod_autogen_timestamp_deps
+[  7%] Automatic MOC for target testremoveoperatormethod
+[  7%] Built target testremoveoperatormethod_autogen
+[  7%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testremoveoperatormethod.dir/testremoveoperatormethod_autogen/mocs_compilation.cpp.o
+[  7%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testremoveoperatormethod.dir/testremoveoperatormethod.cpp.o
+[  7%] Linking CXX executable testremoveoperatormethod
+[  7%] Built target testremoveoperatormethod
+[  7%] Built target testresolvetype_autogen_timestamp_deps
+[  7%] Automatic MOC for target testresolvetype
+[  7%] Built target testresolvetype_autogen
+[  7%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testresolvetype.dir/testresolvetype_autogen/mocs_compilation.cpp.o
+[  7%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testresolvetype.dir/testresolvetype.cpp.o
+[  7%] Linking CXX executable testresolvetype
+[  7%] Built target testresolvetype
+[  7%] Built target testreverseoperators_autogen_timestamp_deps
+[  7%] Automatic MOC for target testreverseoperators
+[  7%] Built target testreverseoperators_autogen
+[  7%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testreverseoperators.dir/testreverseoperators_autogen/mocs_compilation.cpp.o
+[  7%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testreverseoperators.dir/testreverseoperators.cpp.o
+[  7%] Linking CXX executable testreverseoperators
+[  7%] Built target testreverseoperators
+[  7%] Built target testtemplates_autogen_timestamp_deps
+[  7%] Automatic MOC for target testtemplates
+[  7%] Built target testtemplates_autogen
+[  7%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testtemplates.dir/testtemplates_autogen/mocs_compilation.cpp.o
+[  7%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testtemplates.dir/testtemplates.cpp.o
+[  7%] Linking CXX executable testtemplates
+[  7%] Built target testtemplates
+[  7%] Built target testtoposort_autogen_timestamp_deps
+[  7%] Automatic MOC for target testtoposort
+[  7%] Built target testtoposort_autogen
+[  7%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testtoposort.dir/testtoposort_autogen/mocs_compilation.cpp.o
+[  7%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testtoposort.dir/testtoposort.cpp.o
+[  7%] Linking CXX executable testtoposort
+[  8%] Built target testtoposort
+[  8%] Built target testvaluetypedefaultctortag_autogen_timestamp_deps
+[  8%] Automatic MOC for target testvaluetypedefaultctortag
+[  8%] Built target testvaluetypedefaultctortag_autogen
+[  8%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testvaluetypedefaultctortag.dir/testvaluetypedefaultctortag_autogen/mocs_compilation.cpp.o
+[  8%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testvaluetypedefaultctortag.dir/testvaluetypedefaultctortag.cpp.o
+[  8%] Linking CXX executable testvaluetypedefaultctortag
+[  8%] Built target testvaluetypedefaultctortag
+[  8%] Built target testvoidarg_autogen_timestamp_deps
+[  8%] Automatic MOC for target testvoidarg
+[  8%] Built target testvoidarg_autogen
+[  8%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testvoidarg.dir/testvoidarg_autogen/mocs_compilation.cpp.o
+[  8%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testvoidarg.dir/testvoidarg.cpp.o
+[  8%] Linking CXX executable testvoidarg
+[  8%] Built target testvoidarg
+[  8%] Built target testtyperevision_autogen_timestamp_deps
+[  8%] Automatic MOC for target testtyperevision
+[  8%] Built target testtyperevision_autogen
+[  8%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testtyperevision.dir/testtyperevision_autogen/mocs_compilation.cpp.o
+[  8%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testtyperevision.dir/testtyperevision.cpp.o
+[  8%] Linking CXX executable testtyperevision
+[  8%] Built target testtyperevision
+[  8%] Built target testmodifydocumentation_autogen_timestamp_deps
+[  8%] Automatic MOC for target testmodifydocumentation
+[  8%] Built target testmodifydocumentation_autogen
+[  9%] Automatic RCC for testmodifydocumentation.qrc
+[  9%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testmodifydocumentation.dir/testmodifydocumentation_autogen/mocs_compilation.cpp.o
+[  9%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testmodifydocumentation.dir/testmodifydocumentation.cpp.o
+[  9%] Building CXX object sources/shiboken6/ApiExtractor/tests/CMakeFiles/testmodifydocumentation.dir/testmodifydocumentation_autogen/EWIEGA46WW/qrc_testmodifydocumentation.cpp.o
+[  9%] Linking CXX executable testmodifydocumentation
+[  9%] Built target testmodifydocumentation
+[  9%] Built target shiboken6_autogen_timestamp_deps
+[  9%] Automatic MOC for target shiboken6
+[  9%] Built target shiboken6_autogen
+[  9%] Building CXX object sources/shiboken6/generator/CMakeFiles/shiboken6.dir/shiboken6_autogen/mocs_compilation.cpp.o
+[  9%] Building CXX object sources/shiboken6/generator/CMakeFiles/shiboken6.dir/defaultvalue.cpp.o
+[  9%] Building CXX object sources/shiboken6/generator/CMakeFiles/shiboken6.dir/generator.cpp.o
+[  9%] Building CXX object sources/shiboken6/generator/CMakeFiles/shiboken6.dir/generatorcontext.cpp.o
+[  9%] Building CXX object sources/shiboken6/generator/CMakeFiles/shiboken6.dir/main.cpp.o
+[  9%] Building CXX object sources/shiboken6/generator/CMakeFiles/shiboken6.dir/shiboken/cppgenerator.cpp.o
+[  9%] Building CXX object sources/shiboken6/generator/CMakeFiles/shiboken6.dir/shiboken/cppgenerator_container.cpp.o
+[  9%] Building CXX object sources/shiboken6/generator/CMakeFiles/shiboken6.dir/shiboken/cppgenerator_smartpointer.cpp.o
+[  9%] Building CXX object sources/shiboken6/generator/CMakeFiles/shiboken6.dir/shiboken/generatorargument.cpp.o
+[  9%] Building CXX object sources/shiboken6/generator/CMakeFiles/shiboken6.dir/shiboken/headergenerator.cpp.o
+[  9%] Building CXX object sources/shiboken6/generator/CMakeFiles/shiboken6.dir/shiboken/overloaddata.cpp.o
+[  9%] Building CXX object sources/shiboken6/generator/CMakeFiles/shiboken6.dir/shiboken/shibokengenerator.cpp.o
+[  9%] Building CXX object sources/shiboken6/generator/CMakeFiles/shiboken6.dir/qtdoc/qtdocgenerator.cpp.o
+[  9%] Building CXX object sources/shiboken6/generator/CMakeFiles/shiboken6.dir/qtdoc/qtxmltosphinx.cpp.o
+[  9%] Linking CXX executable shiboken6
+[  9%] Built target shiboken6
+[  9%] Generating embed/signature_bootstrap_inc.h, embed/signature_inc.h
+++++ Current contents of
++ /home/cezar/scipyenv_pyside6_build/src/pyside-build/sources/shiboken6/libshiboken/embed
+    + shibokensupport
+        + __init__.py
+        + feature.py
+        + fix-complaints.py
+        + signature
+            + __init__.py
+            + errorhandler.py
+            + importhandler.py
+            + layout.py
+            + lib
+                + __init__.py
+                + enum_sig.py
+                + pyi_generator.py
+                + tool.py
+            + loader.py
+            + mapping.py
+            + parser.py
+    + signature.zip
+    + signature_bootstrap.py
+    + signature_bootstrap_inc.h
+    + signature_inc.h
+++++
+[  9%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/basewrapper.cpp.o
+[  9%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/bindingmanager.cpp.o
+[  9%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/bufferprocs_py37.cpp.o
+[  9%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/debugfreehook.cpp.o
+[  9%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/gilstate.cpp.o
+[  9%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/helper.cpp.o
+[  9%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/pep384impl.cpp.o
+[  9%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/sbkarrayconverter.cpp.o
+[  9%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/sbkcontainer.cpp.o
+[  9%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/sbkconverter.cpp.o
+[  9%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/sbkcppstring.cpp.o
+[  9%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/sbkenum.cpp.o
+[  9%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/sbkerrors.cpp.o
+[  9%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/sbkfeature_base.cpp.o
+[  9%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/sbkmodule.cpp.o
+[ 10%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/sbknumpy.cpp.o
+[ 10%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/sbksmartpointer.cpp.o
+[ 10%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/sbkstaticstrings.cpp.o
+[ 10%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/sbkstring.cpp.o
+[ 10%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/sbktypefactory.cpp.o
+[ 10%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/shibokenbuffer.cpp.o
+[ 10%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/threadstatesaver.cpp.o
+[ 10%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/voidptr.cpp.o
+[ 10%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/signature/signature.cpp.o
+[ 10%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/signature/signature_globals.cpp.o
+[ 10%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/signature/signature_extend.cpp.o
+[ 10%] Building CXX object sources/shiboken6/libshiboken/CMakeFiles/libshiboken.dir/signature/signature_helper.cpp.o
+[ 10%] Linking CXX shared library libshiboken6.abi3.so
+[ 10%] Built target libshiboken
+[ 10%] Running generator for 'Shiboken'...
+qt.shiboken: (shiboken) CLANG v0.64, builtins includes directory: /home/cezar/scipyenv_pyside6_build/libclang/lib/clang/18/include
+(shiboken) clang_parseTranslationUnit2(0x0, cmd[10]=-isystem/home/cezar/scipyenv_pyside6_build/libclang/lib/clang/18/include -isystem/usr/include/c++/14 -isystem/usr/include/c++/14/x86_64-suse-linux -isystem/usr/include/c++/14/backward -fPIC -Wno-constant-logical-operand -x c++ -std=c++17 /tmp/nothing_wobziY.hpp)
+(shiboken)   [63ms] Generated class model (0).                                  [OK]
+(shiboken)   [63ms] Generated enum model (0).                                   [OK]
+(shiboken)   [63ms] Generated namespace model (0).                              [OK]
+(shiboken)   [63ms] Resolved typedefs (0).                                      [OK]
+(shiboken)   [63ms] Fixed class inheritance.                                    [OK]
+(shiboken)   [63ms] Checked for inconsistencies in class model.                 [OK]
+(shiboken)   [64ms] Checked for inconsistencies in typesystem (60).             [OK]
+(shiboken)   [64ms] Checked for inconsistencies in function modifications.      [OK]
+(shiboken)   [64ms] Wrote log files.                                            [OK]
+qt.shiboken: (shiboken) No C++ classes found!
+(shiboken)   [71ms] Ran Source generator.                                       [WARNING]
+(shiboken)   [71ms] Ran Header generator.                                       [OK]
+Done, (shiboken) 71ms, 1 warnings
+[ 10%] Built target shibokenmodule_generator
+[ 10%] Building CXX object sources/shiboken6/shibokenmodule/CMakeFiles/shibokenmodule.dir/Shiboken/shiboken_module_wrapper.cpp.o
+[ 10%] Linking CXX shared module ../Shiboken.abi3.so
+[ 10%] Built target shibokenmodule
+[ 10%] Building CXX object sources/shiboken6/tests/libminimal/CMakeFiles/libminimal.dir/containeruser.cpp.o
+[ 10%] Building CXX object sources/shiboken6/tests/libminimal/CMakeFiles/libminimal.dir/listuser.cpp.o
+[ 10%] Building CXX object sources/shiboken6/tests/libminimal/CMakeFiles/libminimal.dir/obj.cpp.o
+[ 10%] Building CXX object sources/shiboken6/tests/libminimal/CMakeFiles/libminimal.dir/spanuser.cpp.o
+[ 10%] Building CXX object sources/shiboken6/tests/libminimal/CMakeFiles/libminimal.dir/typedef.cpp.o
+[ 10%] Linking CXX shared library libminimal.so
+[ 10%] Built target libminimal
+[ 10%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/abstract.cpp.o
+[ 10%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/blackbox.cpp.o
+[ 10%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/bucket.cpp.o
+[ 10%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/bytearray.cpp.o
+[ 10%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/collector.cpp.o
+[ 10%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/complex.cpp.o
+[ 10%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/ctparam.cpp.o
+[ 10%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/derived.cpp.o
+[ 10%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/derivedusingct.cpp.o
+[ 10%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/echo.cpp.o
+[ 10%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/exceptiontest.cpp.o
+[ 10%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/expression.cpp.o
+[ 10%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/filter.cpp.o
+[ 10%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/functions.cpp.o
+[ 10%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/handle.cpp.o
+[ 10%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/implicitconv.cpp.o
+[ 10%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/injectcode.cpp.o
+[ 10%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/intwrapper.cpp.o
+[ 10%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/listuser.cpp.o
+[ 10%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/mapuser.cpp.o
+[ 10%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/modifications.cpp.o
+[ 10%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/modified_constructor.cpp.o
+[ 11%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/multiple_derived.cpp.o
+[ 11%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/objectmodel.cpp.o
+[ 11%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/objecttype.cpp.o
+[ 11%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/objecttypeholder.cpp.o
+[ 11%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/objecttypelayout.cpp.o
+[ 11%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/objecttypeoperators.cpp.o
+[ 11%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/objectview.cpp.o
+[ 11%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/oddbool.cpp.o
+[ 11%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/onlycopy.cpp.o
+[ 11%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/overload.cpp.o
+[ 11%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/overloadsort.cpp.o
+[ 11%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/pairuser.cpp.o
+[ 11%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/pen.cpp.o
+[ 11%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/photon.cpp.o
+[ 11%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/point.cpp.o
+[ 11%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/pointf.cpp.o
+[ 11%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/polygon.cpp.o
+[ 11%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/protected.cpp.o
+[ 11%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/reference.cpp.o
+[ 11%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/renaming.cpp.o
+[ 11%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/sample.cpp.o
+[ 11%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/samplenamespace.cpp.o
+[ 11%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/sbkdate.cpp.o
+[ 11%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/stdcomplex.cpp.o
+[ 11%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/simplefile.cpp.o
+[ 12%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/size.cpp.o
+[ 12%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/snakecasetest.cpp.o
+[ 12%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/sometime.cpp.o
+[ 12%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/str.cpp.o
+[ 12%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/strlist.cpp.o
+[ 12%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/templateptr.cpp.o
+[ 12%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/transform.cpp.o
+[ 12%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/typesystypedef.cpp.o
+[ 12%] Building CXX object sources/shiboken6/tests/libsample/CMakeFiles/libsample.dir/virtualmethods.cpp.o
+[ 12%] Linking CXX shared library libsample.so
+[ 12%] Built target libsample
+[ 12%] Building CXX object sources/shiboken6/tests/libsmart/CMakeFiles/libsmart.dir/smart.cpp.o
+[ 12%] Building CXX object sources/shiboken6/tests/libsmart/CMakeFiles/libsmart.dir/stdoptionaltestbench.cpp.o
+[ 12%] Building CXX object sources/shiboken6/tests/libsmart/CMakeFiles/libsmart.dir/stdsharedptrtestbench.cpp.o
+[ 12%] Building CXX object sources/shiboken6/tests/libsmart/CMakeFiles/libsmart.dir/stduniqueptrtestbench.cpp.o
+[ 12%] Linking CXX shared library libsmart.so
+[ 12%] Built target libsmart
+[ 12%] Building CXX object sources/shiboken6/tests/libother/CMakeFiles/libother.dir/number.cpp.o
+[ 12%] Building CXX object sources/shiboken6/tests/libother/CMakeFiles/libother.dir/otherderived.cpp.o
+[ 12%] Building CXX object sources/shiboken6/tests/libother/CMakeFiles/libother.dir/othermultiplederived.cpp.o
+[ 13%] Building CXX object sources/shiboken6/tests/libother/CMakeFiles/libother.dir/otherobjecttype.cpp.o
+[ 13%] Building CXX object sources/shiboken6/tests/libother/CMakeFiles/libother.dir/othertypesystypedef.cpp.o
+[ 13%] Building CXX object sources/shiboken6/tests/libother/CMakeFiles/libother.dir/smartptrtester.cpp.o
+[ 13%] Linking CXX shared library libother.so
+[ 13%] Built target libother
+[ 13%] Running generator for 'minimal' test binding...
+qt.shiboken: (minimal) CLANG v0.64, builtins includes directory: /home/cezar/scipyenv_pyside6_build/libclang/lib/clang/18/include
+(minimal) clang_parseTranslationUnit2(0x0, cmd[11]=-isystem/home/cezar/scipyenv_pyside6_build/libclang/lib/clang/18/include -isystem/usr/include/c++/14 -isystem/usr/include/c++/14/x86_64-suse-linux -isystem/usr/include/c++/14/backward -fPIC -Wno-constant-logical-operand -x c++ -std=c++17 -I/home/cezar/scipyenv_pyside6_build/src/pyside-setup/sources/shiboken6/tests/libminimal /tmp/global_UnRihR.hpp)
+(minimal)  [292ms] Generated class model (7).                                  [OK]
+(minimal)  [292ms] Generated enum model (0).                                   [OK]
+(minimal)  [292ms] Generated namespace model (0).                              [OK]
+(minimal)  [293ms] Resolved typedefs (2).                                      [OK]
+(minimal)  [293ms] Fixed class inheritance.                                    [OK]
+(minimal)  [293ms] Checked for inconsistencies in class model.                 [OK]
+(minimal)  [293ms] Checked for inconsistencies in typesystem (79).             [OK]
+(minimal)  [293ms] Checked for inconsistencies in function modifications.      [OK]
+(minimal)  [294ms] Wrote log files.                                            [OK]
+(minimal)  [307ms] Ran Source generator.                                       [OK]
+(minimal)  [308ms] Ran Header generator.                                       [OK]
+Done, (minimal) 308ms
+[ 13%] Built target minimal_generator
+[ 13%] Building CXX object sources/shiboken6/tests/minimalbinding/CMakeFiles/minimal.dir/minimal/minimal_module_wrapper.cpp.o
+/home/cezar/scipyenv_pyside6_build/src/pyside-build/sources/shiboken6/tests/minimalbinding/minimal/minimal_module_wrapper.cpp: In function ‘PyObject* PyInit_minimal()’:
+/home/cezar/scipyenv_pyside6_build/src/pyside-build/sources/shiboken6/tests/minimalbinding/minimal/minimal_module_wrapper.cpp:1122:5: warning: ‘SbkminimalTypes’ is deprecated [-Wdeprecated-declarations]
+ 1122 |     SbkminimalTypes = reinterpret_cast<PyTypeObject **>(cppApi);
+      |     ^~~~~~~~~~~~~~~
+/home/cezar/scipyenv_pyside6_build/src/pyside-build/sources/shiboken6/tests/minimalbinding/minimal/minimal_module_wrapper.cpp:27:16: note: declared here
+   27 | PyTypeObject **SbkminimalTypes = nullptr;
+      |                ^~~~~~~~~~~~~~~
+[ 13%] Building CXX object sources/shiboken6/tests/minimalbinding/CMakeFiles/minimal.dir/minimal/containeruser_wrapper.cpp.o
+[ 13%] Building CXX object sources/shiboken6/tests/minimalbinding/CMakeFiles/minimal.dir/minimal/obj_wrapper.cpp.o
+[ 13%] Building CXX object sources/shiboken6/tests/minimalbinding/CMakeFiles/minimal.dir/minimal/val_wrapper.cpp.o
+[ 13%] Building CXX object sources/shiboken6/tests/minimalbinding/CMakeFiles/minimal.dir/minimal/listuser_wrapper.cpp.o
+[ 13%] Building CXX object sources/shiboken6/tests/minimalbinding/CMakeFiles/minimal.dir/minimal/spanuser_wrapper.cpp.o
+[ 13%] Building CXX object sources/shiboken6/tests/minimalbinding/CMakeFiles/minimal.dir/minimal/minbooluser_wrapper.cpp.o
+[ 14%] Linking CXX shared module minimal.abi3.so
+[ 14%] Built target minimal
+[ 14%] Running generator for 'sample' test binding...
+qt.shiboken: (sample) CLANG v0.64, builtins includes directory: /home/cezar/scipyenv_pyside6_build/libclang/lib/clang/18/include
+(sample) clang_parseTranslationUnit2(0x0, cmd[11]=-isystem/home/cezar/scipyenv_pyside6_build/libclang/lib/clang/18/include -isystem/usr/include/c++/14 -isystem/usr/include/c++/14/x86_64-suse-linux -isystem/usr/include/c++/14/backward -fPIC -Wno-constant-logical-operand -x c++ -std=c++17 -I/home/cezar/scipyenv_pyside6_build/src/pyside-setup/sources/shiboken6/tests/libsample /tmp/global_PVnLIk.hpp)
+qt.shiboken: (sample) /home/cezar/scipyenv_pyside6_build/src/pyside-setup/sources/shiboken6/tests/libsample/expression.h:18: Enum 'Expression::Operation' (class: Expression) does not have a type entry (type systems: sample)
+(sample) [1142ms] Generated class model (128).                                [WARNING]
+(sample) [1142ms] Generated enum model (5).                                   [OK]
+qt.shiboken: (sample) /home/cezar/scipyenv_pyside6_build/src/pyside-setup/sources/shiboken6/tests/libsample/handle.h:10: namespace 'Foo' does not have a type entry (type systems: sample)
+(sample) [1142ms] Generated namespace model (7).                              [WARNING]
+qt.shiboken: (sample) /home/cezar/scipyenv_pyside6_build/src/pyside-setup/sources/shiboken6/tests/libsample/objecttype.h:135: skipping private function 'std::list::iterator<ObjectType *> ObjectType::findChildByName(const Str&)', unmatched return type 'std::list::iterator<ObjectType *>': Unable to translate type "std::list::iterator<ObjectType *>": Cannot find type entry for "std::list::iterator".
+qt.shiboken: (sample) /home/cezar/scipyenv_pyside6_build/src/pyside-setup/sources/shiboken6/tests/libsample/stdcomplex.h:48: skipping private function 'void StdComplex::StdComplex(const StdComplex::Impl&)', unmatched type 'const StdComplex::Impl&' in parameter #1 "impl": Unable to translate type "const StdComplex::Impl&": Cannot find type entry for "std::complex".
+(sample) [1157ms] Resolved typedefs (139).                                    [WARNING]
+(sample) [1158ms] Fixed class inheritance.                                    [OK]
+(sample) [1162ms] Checked for inconsistencies in class model.                 [OK]
+qt.shiboken: (sample) /home/cezar/scipyenv_pyside6_build/src/pyside-setup/sources/shiboken6/tests/samplebinding/typesystem_sample.xml:531: Global function 'mathSum(int,int)' is specified in typesystem, but not defined. This could potentially lead to compilation errors.
+qt.shiboken: (sample) /home/cezar/scipyenv_pyside6_build/src/pyside-setup/sources/shiboken6/tests/samplebinding/typesystem_sample.xml:470: enum 'SampleNamespace::DerivedFromNamespace::SampleNamespace' is specified in typesystem, but not declared.
+qt.shiboken: (sample) /home/cezar/scipyenv_pyside6_build/src/pyside-setup/sources/shiboken6/tests/libsample/stdcomplex.h:53: skipping public function 'std::ostream& StdComplex::operator<<(std::ostream&,const StdComplex&)', unmatched return type 'std::ostream&': Unable to translate type "std::ostream&": Cannot find type entry for "std::ostream".
+(sample) [1164ms] Checked for inconsistencies in typesystem (564).            [WARNING]
+(sample) [1165ms] Checked for inconsistencies in function modifications.      [OK]
+(sample) [1166ms] Wrote log files.                                            [OK]
+qt.shiboken: (sample) /home/cezar/scipyenv_pyside6_build/src/pyside-setup/sources/shiboken6/tests/libsample/functions.h:54: There's no user provided way (conversion rule, argument removal, custom code, etc) to handle the primitive return type 'const int *' in function 'acceptIntReturnPtr(int x)'.
+(sample) [1289ms] Ran Source generator.                                       [WARNING]
+(sample) [1299ms] Ran Header generator.                                       [OK]
+Done, (sample) 1299ms, 8 warnings (6 known issues)
+[ 14%] Built target sample_generator
+[ 14%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/abstractmodifications_wrapper.cpp.o
+[ 14%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/abstract_wrapper.cpp.o
+/home/cezar/scipyenv_pyside6_build/src/pyside-build/sources/shiboken6/tests/samplebinding/sample/abstract_wrapper.cpp: In member function ‘virtual void AbstractWrapper::hideFunction(HideType*)’:
+/home/cezar/scipyenv_pyside6_build/src/pyside-build/sources/shiboken6/tests/samplebinding/sample/abstract_wrapper.cpp:84:49: warning: unused parameter ‘arg’ [-Wunused-parameter]
+   84 | void AbstractWrapper::hideFunction(::HideType * arg)
+      |                                    ~~~~~~~~~~~~~^~~
+[ 14%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/arraymodifytest_wrapper.cpp.o
+[ 14%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/base1_wrapper.cpp.o
+[ 14%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/base2_wrapper.cpp.o
+[ 14%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/base3_wrapper.cpp.o
+[ 14%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/base4_wrapper.cpp.o
+[ 15%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/base5_wrapper.cpp.o
+[ 15%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/base6_wrapper.cpp.o
+[ 15%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/blackbox_wrapper.cpp.o
+[ 15%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/brush_wrapper.cpp.o
+[ 15%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/bytearray_wrapper.cpp.o
+[ 15%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/bucket_wrapper.cpp.o
+[ 15%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/classwithfunctionpointer_wrapper.cpp.o
+[ 15%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/collector_wrapper.cpp.o
+[ 15%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/comparisontester_wrapper.cpp.o
+[ 15%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/color_wrapper.cpp.o
+[ 15%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/ctorconvrule_wrapper.cpp.o
+[ 15%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/customoverloadsequence_wrapper.cpp.o
+[ 15%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/cvlistuser_wrapper.cpp.o
+[ 15%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/cvvaluetype_wrapper.cpp.o
+[ 15%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/sbkdate_wrapper.cpp.o
+[ 15%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/deleteddefaultctor_wrapper.cpp.o
+[ 15%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/derived_wrapper.cpp.o
+[ 15%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/derivedusingct_wrapper.cpp.o
+[ 15%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/derived_someinnerclass_wrapper.cpp.o
+[ 15%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/echo_wrapper.cpp.o
+[ 15%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/event_wrapper.cpp.o
+[ 15%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/expression_wrapper.cpp.o
+[ 15%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/exceptiontest_wrapper.cpp.o
+[ 15%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/friendofonlycopy_wrapper.cpp.o
+[ 15%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/handleholder_wrapper.cpp.o
+[ 15%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/implicitconv_wrapper.cpp.o
+[ 16%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/implicitbase_wrapper.cpp.o
+[ 16%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/implicittarget_wrapper.cpp.o
+[ 16%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/intarray2_wrapper.cpp.o
+[ 16%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/intarray3_wrapper.cpp.o
+[ 16%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/intlist_wrapper.cpp.o
+[ 16%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/sortedoverload_wrapper.cpp.o
+[ 16%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/intwrapper_wrapper.cpp.o
+[ 16%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/injectcode_wrapper.cpp.o
+[ 16%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/listuser_wrapper.cpp.o
+[ 16%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/mapuser_wrapper.cpp.o
+[ 16%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/mderived1_wrapper.cpp.o
+[ 16%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/mderived2_wrapper.cpp.o
+[ 16%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/mderived3_wrapper.cpp.o
+[ 16%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/mderived4_wrapper.cpp.o
+[ 16%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/mderived5_wrapper.cpp.o
+[ 16%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/modelindex_wrapper.cpp.o
+[ 16%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/modifications_wrapper.cpp.o
+[ 16%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/modifiedconstructor_wrapper.cpp.o
+[ 16%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/noimplicitconversion_wrapper.cpp.o
+[ 16%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/nondefaultctor_wrapper.cpp.o
+[ 16%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/objectmodel_wrapper.cpp.o
+[ 16%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/objecttype_wrapper.cpp.o
+[ 16%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/objecttypebyvalue_wrapper.cpp.o
+[ 16%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/objecttypeholder_wrapper.cpp.o
+[ 16%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/objecttypederived_wrapper.cpp.o
+[ 17%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/objecttypelayout_wrapper.cpp.o
+[ 17%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/objecttypeptrlist_wrapper.cpp.o
+[ 17%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/objecttypeoperators_wrapper.cpp.o
+[ 17%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/objectview_wrapper.cpp.o
+[ 17%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/objtypereference_wrapper.cpp.o
+[ 17%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/oddbooluser_wrapper.cpp.o
+[ 17%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/onlycopy_wrapper.cpp.o
+[ 17%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/otherbase_wrapper.cpp.o
+[ 17%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/overload_wrapper.cpp.o
+[ 17%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/overload2_wrapper.cpp.o
+[ 17%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/pairuser_wrapper.cpp.o
+[ 17%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/pen_wrapper.cpp.o
+[ 17%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/persistentmodelindex_wrapper.cpp.o
+[ 17%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/photon_wrapper.cpp.o
+[ 17%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/photon_base_wrapper.cpp.o
+[ 17%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/photon_valueidentity_wrapper.cpp.o
+[ 17%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/photon_valueduplicator_wrapper.cpp.o
+[ 17%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/point_wrapper.cpp.o
+[ 17%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/pointerholder_wrapper.cpp.o
+[ 17%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/pointf_wrapper.cpp.o
+[ 17%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/pointvaluelist_wrapper.cpp.o
+[ 17%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/polygon_wrapper.cpp.o
+[ 17%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/primitivestructpointerholder_wrapper.cpp.o
+[ 17%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/privatector_wrapper.cpp.o
+[ 17%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/privatedtor_wrapper.cpp.o
+[ 18%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/protectedenumclass_wrapper.cpp.o
+[ 18%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/protectednonpolymorphic_wrapper.cpp.o
+[ 18%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/protectedpolymorphic_wrapper.cpp.o
+[ 18%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/protectedpolymorphicdaughter_wrapper.cpp.o
+[ 18%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/protectedpolymorphicgranddaughter_wrapper.cpp.o
+[ 18%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/protectedproperty_wrapper.cpp.o
+[ 18%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/protectedvirtualdestructor_wrapper.cpp.o
+[ 18%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/rect_wrapper.cpp.o
+[ 18%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/rectf_wrapper.cpp.o
+[ 18%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/reference_wrapper.cpp.o
+[ 18%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/referentmodelindex_wrapper.cpp.o
+[ 18%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/toberenamedvalue_wrapper.cpp.o
+[ 18%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/removednamespace1_objectoninvisiblenamespace_wrapper.cpp.o
+[ 18%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/renameduser_wrapper.cpp.o
+[ 18%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/sample_module_wrapper.cpp.o
+/home/cezar/scipyenv_pyside6_build/src/pyside-build/sources/shiboken6/tests/samplebinding/sample/sample_module_wrapper.cpp: In function ‘PyObject* PyInit_sample()’:
+/home/cezar/scipyenv_pyside6_build/src/pyside-build/sources/shiboken6/tests/samplebinding/sample/sample_module_wrapper.cpp:5120:5: warning: ‘SbksampleTypes’ is deprecated [-Wdeprecated-declarations]
+ 5120 |     SbksampleTypes = reinterpret_cast<PyTypeObject **>(cppApi);
+      |     ^~~~~~~~~~~~~~
+/home/cezar/scipyenv_pyside6_build/src/pyside-build/sources/shiboken6/tests/samplebinding/sample/sample_module_wrapper.cpp:46:16: note: declared here
+   46 | PyTypeObject **SbksampleTypes = nullptr;
+      |                ^~~~~~~~~~~~~~
+[ 18%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/sample_wrapper.cpp.o
+[ 18%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/sample_sample_wrapper.cpp.o
+[ 18%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/samplenamespace_wrapper.cpp.o
+[ 18%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/samplenamespace_ctparam_wrapper.cpp.o
+[ 18%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/samplenamespace_inlinenamespace_classwithininlinenamespace_wrapper.cpp.o
+[ 18%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/samplenamespace_someclass_someinnerclass_okthisisrecursiveenough_wrapper.cpp.o
+[ 18%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/samplenamespace_someclass_someinnerclass_wrapper.cpp.o
+[ 18%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/samplenamespace_someclass_someotherinnerclass_wrapper.cpp.o
+[ 18%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/samplenamespace_someclass_wrapper.cpp.o
+[ 18%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/samplenamespace_derivedfromnamespace_wrapper.cpp.o
+[ 18%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/stdcomplex_wrapper.cpp.o
+[ 19%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/simplefile_wrapper.cpp.o
+[ 19%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/size_wrapper.cpp.o
+[ 19%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/sizef_wrapper.cpp.o
+[ 19%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/snakecasetest_wrapper.cpp.o
+[ 19%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/snakecasederivedtest_wrapper.cpp.o
+[ 19%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/sonofmderived1_wrapper.cpp.o
+[ 19%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/spaceshipcomparisontester_wrapper.cpp.o
+[ 19%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/str_wrapper.cpp.o
+[ 19%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/strlist_wrapper.cpp.o
+[ 19%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/time_wrapper.cpp.o
+[ 19%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/templateptr_wrapper.cpp.o
+[ 19%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/unremovednamespace_wrapper.cpp.o
+[ 19%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/valuewithunitdoubleinch_wrapper.cpp.o
+[ 19%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/valuewithunitdoublemillimeter_wrapper.cpp.o
+[ 19%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/valuewithunituser_wrapper.cpp.o
+[ 19%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/virtualdaughter_wrapper.cpp.o
+[ 19%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/virtualdaughter2_wrapper.cpp.o
+[ 19%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/virtualfinaldaughter_wrapper.cpp.o
+[ 19%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/virtualdtor_wrapper.cpp.o
+[ 19%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/virtualmethods_wrapper.cpp.o
+[ 19%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/voidholder_wrapper.cpp.o
+[ 19%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/valueandvirtual_wrapper.cpp.o
+[ 19%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/filter_wrapper.cpp.o
+[ 19%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/data_wrapper.cpp.o
+[ 19%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/intersection_wrapper.cpp.o
+[ 20%] Building CXX object sources/shiboken6/tests/samplebinding/CMakeFiles/sample.dir/sample/union_wrapper.cpp.o
+[ 20%] Linking CXX shared module sample.abi3.so
+[ 20%] Built target sample
+[ 20%] Running generator for 'smart' test binding...
+qt.shiboken: (smart) CLANG v0.64, builtins includes directory: /home/cezar/scipyenv_pyside6_build/libclang/lib/clang/18/include
+(smart) clang_parseTranslationUnit2(0x0, cmd[11]=-isystem/home/cezar/scipyenv_pyside6_build/libclang/lib/clang/18/include -isystem/usr/include/c++/14 -isystem/usr/include/c++/14/x86_64-suse-linux -isystem/usr/include/c++/14/backward -fPIC -Wno-constant-logical-operand -x c++ -std=c++17 -I/home/cezar/scipyenv_pyside6_build/src/pyside-setup/sources/shiboken6/tests/libsmart /tmp/global_dVGpoz.hpp)
+(smart)  [527ms] Generated class model (16).                                 [OK]
+(smart)  [527ms] Generated enum model (0).                                   [OK]
+(smart)  [527ms] Generated namespace model (6).                              [OK]
+qt.shiboken: (smart) /usr/include/c++/14/memory:148: skipping public function 'void std::declare_no_pointers(char*,std::size_t)', unmatched type 'std::size_t' in parameter #2: Unable to translate type "std::size_t": Cannot find type entry for "std::size_t".
+qt.shiboken: (smart) /usr/include/c++/14/memory:152: skipping public function 'void std::undeclare_no_pointers(char*,std::size_t)', unmatched type 'std::size_t' in parameter #2: Unable to translate type "std::size_t": Cannot find type entry for "std::size_t".
+qt.shiboken: (smart) /usr/include/c++/14/optional:85: skipping public field 'std::nullopt' with unmatched type 'std::nullopt_t'
+qt.shiboken: (smart) /usr/include/c++/14/optional:737: skipping public function 'void std::optional::optional<_Tp>(std::nullopt_t)', unmatched type 'std::nullopt_t' in parameter #1: Unable to translate type "std::nullopt_t": Cannot find type entry for "std::nullopt_t".
+qt.shiboken: (smart) /usr/include/c++/14/optional:829: skipping public function 'optional<_Tp>& std::optional::operator=(std::nullopt_t)', unmatched type 'std::nullopt_t' in parameter #1: Unable to translate type "std::nullopt_t": Cannot find type entry for "std::nullopt_t".
+(smart)  [530ms] Resolved typedefs (128).                                    [WARNING]
+(smart)  [530ms] Fixed class inheritance.                                    [OK]
+(smart)  [530ms] Checked for inconsistencies in class model.                 [OK]
+(smart)  [531ms] Checked for inconsistencies in typesystem (206).            [OK]
+(smart)  [531ms] Checked for inconsistencies in function modifications.      [OK]
+qt.shiboken: (smart) Synthesizing "std::optional::optional(_Tp pointee)"...
+qt.shiboken: (smart) Synthesizing smart pointer "std::shared_ptr"...
+qt.shiboken: (smart) Synthesizing "std::shared_ptr::shared_ptr(T *pointee)"...
+qt.shiboken: (smart) Synthesizing "std::shared_ptr::shared_ptr()"...
+qt.shiboken: (smart) Synthesizing "std::shared_ptr::reset(T *pointee)"...
+qt.shiboken: (smart) Synthesizing "std::shared_ptr::reset()"...
+qt.shiboken: (smart) Synthesizing "std::shared_ptr::get() const"...
+qt.shiboken: (smart) Synthesizing "std::shared_ptr::use_count() const"...
+qt.shiboken: (smart) Synthesizing "std::shared_ptr::operator bool() const"...
+qt.shiboken: (smart) Synthesizing smart pointer "std::unique_ptr"...
+qt.shiboken: (smart) Synthesizing "std::unique_ptr::unique_ptr(T *pointee)"...
+qt.shiboken: (smart) Synthesizing "std::unique_ptr::unique_ptr()"...
+qt.shiboken: (smart) Synthesizing "std::unique_ptr::reset(T *pointee)"...
+qt.shiboken: (smart) Synthesizing "std::unique_ptr::reset()"...
+qt.shiboken: (smart) Synthesizing "std::unique_ptr::get() const"...
+qt.shiboken: (smart) Synthesizing "std::unique_ptr::operator bool() const"...
+(smart)  [531ms] Wrote log files.                                            [WARNING]
+(smart)  [548ms] Ran Source generator.                                       [OK]
+(smart)  [550ms] Ran Header generator.                                       [OK]
+Done, (smart) 550ms, 21 warnings
+[ 20%] Built target smart_generator
+[ 20%] Building CXX object sources/shiboken6/tests/smartbinding/CMakeFiles/smart.dir/smart/smart_module_wrapper.cpp.o
+/home/cezar/scipyenv_pyside6_build/src/pyside-build/sources/shiboken6/tests/smartbinding/smart/smart_module_wrapper.cpp: In function ‘PyObject* PyInit_smart()’:
+/home/cezar/scipyenv_pyside6_build/src/pyside-build/sources/shiboken6/tests/smartbinding/smart/smart_module_wrapper.cpp:187:5: warning: ‘SbksmartTypes’ is deprecated [-Wdeprecated-declarations]
+  187 |     SbksmartTypes = reinterpret_cast<PyTypeObject **>(cppApi);
+      |     ^~~~~~~~~~~~~
+/home/cezar/scipyenv_pyside6_build/src/pyside-build/sources/shiboken6/tests/smartbinding/smart/smart_module_wrapper.cpp:24:16: note: declared here
+   24 | PyTypeObject **SbksmartTypes = nullptr;
+      |                ^~~~~~~~~~~~~
+[ 20%] Building CXX object sources/shiboken6/tests/smartbinding/CMakeFiles/smart.dir/smart/obj_wrapper.cpp.o
+[ 20%] Building CXX object sources/shiboken6/tests/smartbinding/CMakeFiles/smart.dir/smart/integer_wrapper.cpp.o
+[ 21%] Building CXX object sources/shiboken6/tests/smartbinding/CMakeFiles/smart.dir/smart/sharedptr_obj_wrapper.cpp.o
+[ 21%] Building CXX object sources/shiboken6/tests/smartbinding/CMakeFiles/smart.dir/smart/sharedptr_integer_wrapper.cpp.o
+[ 21%] Building CXX object sources/shiboken6/tests/smartbinding/CMakeFiles/smart.dir/smart/registry_wrapper.cpp.o
+[ 21%] Building CXX object sources/shiboken6/tests/smartbinding/CMakeFiles/smart.dir/smart/smart_integer2_wrapper.cpp.o
+[ 21%] Building CXX object sources/shiboken6/tests/smartbinding/CMakeFiles/smart.dir/smart/sharedptr_integer2_wrapper.cpp.o
+[ 21%] Building CXX object sources/shiboken6/tests/smartbinding/CMakeFiles/smart.dir/smart/stdsharedptrtestbench_wrapper.cpp.o
+[ 21%] Building CXX object sources/shiboken6/tests/smartbinding/CMakeFiles/smart.dir/smart/stdsharedptrvirtualmethodtester_wrapper.cpp.o
+[ 21%] Building CXX object sources/shiboken6/tests/smartbinding/CMakeFiles/smart.dir/smart/std_shared_ptr_double_wrapper.cpp.o
+[ 21%] Building CXX object sources/shiboken6/tests/smartbinding/CMakeFiles/smart.dir/smart/std_shared_ptr_integer_wrapper.cpp.o
+[ 21%] Building CXX object sources/shiboken6/tests/smartbinding/CMakeFiles/smart.dir/smart/std_shared_ptr_int_wrapper.cpp.o
+[ 21%] Building CXX object sources/shiboken6/tests/smartbinding/CMakeFiles/smart.dir/smart/std_shared_ptr_std_string_wrapper.cpp.o
+[ 21%] Building CXX object sources/shiboken6/tests/smartbinding/CMakeFiles/smart.dir/smart/std_wrapper.cpp.o
+[ 21%] Building CXX object sources/shiboken6/tests/smartbinding/CMakeFiles/smart.dir/smart/std_optional_int_wrapper.cpp.o
+[ 21%] Building CXX object sources/shiboken6/tests/smartbinding/CMakeFiles/smart.dir/smart/std_optional_integer_wrapper.cpp.o
+[ 21%] Building CXX object sources/shiboken6/tests/smartbinding/CMakeFiles/smart.dir/smart/std_unique_ptr_integer_wrapper.cpp.o
+[ 21%] Building CXX object sources/shiboken6/tests/smartbinding/CMakeFiles/smart.dir/smart/std_unique_ptr_integer2_wrapper.cpp.o
+[ 21%] Building CXX object sources/shiboken6/tests/smartbinding/CMakeFiles/smart.dir/smart/std_unique_ptr_int_wrapper.cpp.o
+[ 21%] Building CXX object sources/shiboken6/tests/smartbinding/CMakeFiles/smart.dir/smart/stdoptionaltestbench_wrapper.cpp.o
+[ 21%] Building CXX object sources/shiboken6/tests/smartbinding/CMakeFiles/smart.dir/smart/stduniqueptrtestbench_wrapper.cpp.o
+[ 21%] Building CXX object sources/shiboken6/tests/smartbinding/CMakeFiles/smart.dir/smart/stduniqueptrvirtualmethodtester_wrapper.cpp.o
+[ 21%] Building CXX object sources/shiboken6/tests/smartbinding/CMakeFiles/smart.dir/smart/test_wrapper.cpp.o
+[ 21%] Linking CXX shared module smart.abi3.so
+[ 21%] Built target smart
+[ 21%] Running generator for 'other' test binding...
+qt.shiboken: (other) Duplicate type entry: 'SharedPtr'
+qt.shiboken: (other) /home/cezar/scipyenv_pyside6_build/src/pyside-setup/sources/shiboken6/tests/otherbinding/typesystem_other.xml:14:46: Warning: Duplicate type entry: 'SharedPtr'.
+qt.shiboken: (other) CLANG v0.64, builtins includes directory: /home/cezar/scipyenv_pyside6_build/libclang/lib/clang/18/include
+(other) clang_parseTranslationUnit2(0x0, cmd[14]=-isystem/home/cezar/scipyenv_pyside6_build/libclang/lib/clang/18/include -isystem/usr/include/c++/14 -isystem/usr/include/c++/14/x86_64-suse-linux -isystem/usr/include/c++/14/backward -fPIC -Wno-constant-logical-operand -x c++ -std=c++17 -I/home/cezar/scipyenv_pyside6_build/src/pyside-setup/sources/shiboken6/tests -I/home/cezar/scipyenv_pyside6_build/src/pyside-setup/sources/shiboken6/tests/libsample -I/home/cezar/scipyenv_pyside6_build/src/pyside-setup/sources/shiboken6/tests/libsmart -I/home/cezar/scipyenv_pyside6_build/src/pyside-setup/sources/shiboken6/tests/libother /tmp/global_RYPMWz.hpp)
+(other) [1010ms] Generated class model (145).                                [WARNING]
+(other) [1010ms] Generated enum model (5).                                   [OK]
+qt.shiboken: (other) /home/cezar/scipyenv_pyside6_build/src/pyside-setup/sources/shiboken6/tests/libsample/handle.h:10: namespace 'Foo' does not have a type entry (type systems: other, sample, smart)
+(other) [1010ms] Generated namespace model (13).                             [WARNING]
+qt.shiboken: (other) /home/cezar/scipyenv_pyside6_build/src/pyside-setup/sources/shiboken6/tests/libsample/objecttype.h:135: skipping private function 'std::list::iterator<ObjectType *> ObjectType::findChildByName(const Str&)', unmatched return type 'std::list::iterator<ObjectType *>': Unable to translate type "std::list::iterator<ObjectType *>": Cannot find type entry for "std::list::iterator".
+qt.shiboken: (other) /home/cezar/scipyenv_pyside6_build/src/pyside-setup/sources/shiboken6/tests/libsample/stdcomplex.h:48: skipping private function 'void StdComplex::StdComplex(const StdComplex::Impl&)', unmatched type 'const StdComplex::Impl&' in parameter #1 "impl": Unable to translate type "const StdComplex::Impl&": Cannot find type entry for "std::complex".
+qt.shiboken: (other) /home/cezar/scipyenv_pyside6_build/src/pyside-setup/sources/shiboken6/tests/libother/smartptrtester.h:21: skipping public function 'void SmartPtrTester::fiddleInt(const SharedPtr<int>&)', unmatched type 'const SharedPtr<int>&' in parameter #1: Cannot find instantiation of smart pointer type for "const SharedPtr<int>&".
+qt.shiboken: (other) /usr/include/c++/14/optional:737: skipping public function 'void std::optional::optional<_Tp>(std::nullopt_t)', unmatched type 'std::nullopt_t' in parameter #1: Unable to translate type "std::nullopt_t": Cannot find type entry for "std::nullopt_t".
+qt.shiboken: (other) /usr/include/c++/14/optional:829: skipping public function 'optional<_Tp>& std::optional::operator=(std::nullopt_t)', unmatched type 'std::nullopt_t' in parameter #1: Unable to translate type "std::nullopt_t": Cannot find type entry for "std::nullopt_t".
+(other) [1031ms] Resolved typedefs (139).                                    [WARNING]
+(other) [1031ms] Fixed class inheritance.                                    [OK]
+(other) [1037ms] Checked for inconsistencies in class model.                 [OK]
+qt.shiboken: (other) /home/cezar/scipyenv_pyside6_build/src/pyside-setup/sources/shiboken6/tests/libsample/stdcomplex.h:53: skipping public function 'std::ostream& StdComplex::operator<<(std::ostream&,const StdComplex&)', unmatched return type 'std::ostream&': Unable to translate type "std::ostream&": Cannot find type entry for "std::ostream".
+(other) [1038ms] Checked for inconsistencies in typesystem (598).            [WARNING]
+(other) [1038ms] Checked for inconsistencies in function modifications.      [OK]
+qt.shiboken: (other) Synthesizing smart pointer "SharedPtr"...
+qt.shiboken: (other) Synthesizing "SharedPtr::SharedPtr(T *pointee)"...
+qt.shiboken: (other) Synthesizing "SharedPtr::SharedPtr()"...
+qt.shiboken: (other) Synthesizing "SharedPtr::data() const"...
+qt.shiboken: (other) Synthesizing "SharedPtr::useCount() const"...
+qt.shiboken: (other) Synthesizing "SharedPtr::isNull() const"...
+qt.shiboken: (other) Synthesizing "std::optional::optional(_Tp pointee)"...
+qt.shiboken: (other) Synthesizing smart pointer "std::shared_ptr"...
+qt.shiboken: (other) Synthesizing "std::shared_ptr::shared_ptr(T *pointee)"...
+qt.shiboken: (other) Synthesizing "std::shared_ptr::shared_ptr()"...
+qt.shiboken: (other) Synthesizing "std::shared_ptr::reset(T *pointee)"...
+qt.shiboken: (other) Synthesizing "std::shared_ptr::reset()"...
+qt.shiboken: (other) Synthesizing "std::shared_ptr::get() const"...
+qt.shiboken: (other) Synthesizing "std::shared_ptr::use_count() const"...
+qt.shiboken: (other) Synthesizing "std::shared_ptr::operator bool() const"...
+qt.shiboken: (other) Synthesizing smart pointer "std::unique_ptr"...
+qt.shiboken: (other) Synthesizing "std::unique_ptr::unique_ptr(T *pointee)"...
+qt.shiboken: (other) Synthesizing "std::unique_ptr::unique_ptr()"...
+qt.shiboken: (other) Synthesizing "std::unique_ptr::reset(T *pointee)"...
+qt.shiboken: (other) Synthesizing "std::unique_ptr::reset()"...
+qt.shiboken: (other) Synthesizing "std::unique_ptr::get() const"...
+qt.shiboken: (other) Synthesizing "std::unique_ptr::operator bool() const"...
+(other) [1041ms] Wrote log files.                                            [WARNING]
+(other) [1051ms] Ran Source generator.                                       [OK]
+(other) [1052ms] Ran Header generator.                                       [OK]
+Done, (other) 1052ms, 31 warnings (5 known issues)
+[ 21%] Built target other_generator
+[ 21%] Building CXX object sources/shiboken6/tests/otherbinding/CMakeFiles/other.dir/other/extendsnoimplicitconversion_wrapper.cpp.o
+[ 21%] Building CXX object sources/shiboken6/tests/otherbinding/CMakeFiles/other.dir/other/number_wrapper.cpp.o
+[ 21%] Building CXX object sources/shiboken6/tests/otherbinding/CMakeFiles/other.dir/other/otherderived_wrapper.cpp.o
+[ 21%] Building CXX object sources/shiboken6/tests/otherbinding/CMakeFiles/other.dir/other/othermultiplederived_wrapper.cpp.o
+[ 21%] Building CXX object sources/shiboken6/tests/otherbinding/CMakeFiles/other.dir/other/otherobjecttype_wrapper.cpp.o
+[ 21%] Building CXX object sources/shiboken6/tests/otherbinding/CMakeFiles/other.dir/other/othervaluewithunituser_wrapper.cpp.o
+[ 21%] Building CXX object sources/shiboken6/tests/otherbinding/CMakeFiles/other.dir/other/sharedptr_str_wrapper.cpp.o
+[ 21%] Building CXX object sources/shiboken6/tests/otherbinding/CMakeFiles/other.dir/other/smartptrtester_wrapper.cpp.o
+[ 21%] Building CXX object sources/shiboken6/tests/otherbinding/CMakeFiles/other.dir/other/other_module_wrapper.cpp.o
+/home/cezar/scipyenv_pyside6_build/src/pyside-build/sources/shiboken6/tests/otherbinding/other/other_module_wrapper.cpp: In function ‘PyObject* PyInit_other()’:
+/home/cezar/scipyenv_pyside6_build/src/pyside-build/sources/shiboken6/tests/otherbinding/other/other_module_wrapper.cpp:205:5: warning: ‘SbkotherTypes’ is deprecated [-Wdeprecated-declarations]
+  205 |     SbkotherTypes = reinterpret_cast<PyTypeObject **>(cppApi);
+      |     ^~~~~~~~~~~~~
+/home/cezar/scipyenv_pyside6_build/src/pyside-build/sources/shiboken6/tests/otherbinding/other/other_module_wrapper.cpp:26:16: note: declared here
+   26 | PyTypeObject **SbkotherTypes = nullptr;
+      |                ^~~~~~~~~~~~~
+[ 21%] Building CXX object sources/shiboken6/tests/otherbinding/CMakeFiles/other.dir/other/valuewithunitintinch_wrapper.cpp.o
+[ 21%] Building CXX object sources/shiboken6/tests/otherbinding/CMakeFiles/other.dir/other/valuewithunitintmillimeter_wrapper.cpp.o
+[ 21%] Linking CXX shared module other.abi3.so
+[ 21%] Built target other
+[ 21%] Building CXX object sources/shiboken6/tests/dumpcodemodel/CMakeFiles/dumpcodemodel.dir/main.cpp.o
+[ 21%] Linking CXX executable dumpcodemodel
+[ 21%] Built target dumpcodemodel
+[ 21%] Built target qtxmltosphinxtest_autogen_timestamp_deps
+[ 21%] Automatic MOC for target qtxmltosphinxtest
+[ 21%] Built target qtxmltosphinxtest_autogen
+[ 21%] Building CXX object sources/shiboken6/tests/qtxmltosphinxtest/CMakeFiles/qtxmltosphinxtest.dir/qtxmltosphinxtest_autogen/mocs_compilation.cpp.o
+[ 21%] Building CXX object sources/shiboken6/tests/qtxmltosphinxtest/CMakeFiles/qtxmltosphinxtest.dir/__/__/generator/qtdoc/qtxmltosphinx.cpp.o
+[ 21%] Building CXX object sources/shiboken6/tests/qtxmltosphinxtest/CMakeFiles/qtxmltosphinxtest.dir/__/__/ApiExtractor/codesniphelpers.cpp.o
+[ 21%] Building CXX object sources/shiboken6/tests/qtxmltosphinxtest/CMakeFiles/qtxmltosphinxtest.dir/__/__/ApiExtractor/textstream.cpp.o
+[ 21%] Building CXX object sources/shiboken6/tests/qtxmltosphinxtest/CMakeFiles/qtxmltosphinxtest.dir/qtxmltosphinxtest.cpp.o
+[ 21%] Linking CXX executable qtxmltosphinxtest
+[ 21%] Built target qtxmltosphinxtest
+[ 21%] Built target pyside6_autogen_timestamp_deps
+[ 21%] Automatic MOC for target pyside6
+[ 21%] Built target pyside6_autogen
+[ 21%] Generating qrc_libpyside.cpp
+[ 21%] Building CXX object sources/pyside6/libpyside/CMakeFiles/pyside6.dir/pyside6_autogen/mocs_compilation.cpp.o
+[ 21%] Building CXX object sources/pyside6/libpyside/CMakeFiles/pyside6.dir/class_property.cpp.o
+[ 21%] Building CXX object sources/pyside6/libpyside/CMakeFiles/pyside6.dir/dynamicqmetaobject.cpp.o
+[ 21%] Building CXX object sources/pyside6/libpyside/CMakeFiles/pyside6.dir/dynamicslot.cpp.o
+[ 21%] Building CXX object sources/pyside6/libpyside/CMakeFiles/pyside6.dir/feature_select.cpp.o
+[ 21%] Building CXX object sources/pyside6/libpyside/CMakeFiles/pyside6.dir/signalmanager.cpp.o
+[ 21%] Building CXX object sources/pyside6/libpyside/CMakeFiles/pyside6.dir/pysideclassdecorator.cpp.o
+[ 21%] Building CXX object sources/pyside6/libpyside/CMakeFiles/pyside6.dir/pysideclassinfo.cpp.o
+[ 22%] Building CXX object sources/pyside6/libpyside/CMakeFiles/pyside6.dir/pysideqenum.cpp.o
+[ 22%] Building CXX object sources/pyside6/libpyside/CMakeFiles/pyside6.dir/pysideqslotobject_p.cpp.o
+[ 22%] Building CXX object sources/pyside6/libpyside/CMakeFiles/pyside6.dir/pysidemetafunction.cpp.o
+[ 22%] Building CXX object sources/pyside6/libpyside/CMakeFiles/pyside6.dir/pysidesignal.cpp.o
+[ 22%] Building CXX object sources/pyside6/libpyside/CMakeFiles/pyside6.dir/pysideslot.cpp.o
+[ 22%] Building CXX object sources/pyside6/libpyside/CMakeFiles/pyside6.dir/pysideproperty.cpp.o
+[ 22%] Building CXX object sources/pyside6/libpyside/CMakeFiles/pyside6.dir/pysideweakref.cpp.o
+[ 22%] Building CXX object sources/pyside6/libpyside/CMakeFiles/pyside6.dir/pyside.cpp.o
+[ 22%] Building CXX object sources/pyside6/libpyside/CMakeFiles/pyside6.dir/pyside_numpy.cpp.o
+[ 22%] Building CXX object sources/pyside6/libpyside/CMakeFiles/pyside6.dir/pysidestaticstrings.cpp.o
+[ 22%] Building CXX object sources/pyside6/libpyside/CMakeFiles/pyside6.dir/qobjectconnect.cpp.o
+[ 22%] Building CXX object sources/pyside6/libpyside/CMakeFiles/pyside6.dir/qrc_libpyside.cpp.o
+[ 22%] Linking CXX shared library libpyside6.abi3.so
+[ 22%] Built target pyside6
+[ 22%] Building CXX object sources/pyside6/libpysideqml/CMakeFiles/pyside6qml.dir/pysideqml.cpp.o
+[ 22%] Building CXX object sources/pyside6/libpysideqml/CMakeFiles/pyside6qml.dir/pysideqmlattached.cpp.o
+[ 22%] Building CXX object sources/pyside6/libpysideqml/CMakeFiles/pyside6qml.dir/pysideqmlforeign.cpp.o
+[ 22%] Building CXX object sources/pyside6/libpysideqml/CMakeFiles/pyside6qml.dir/pysideqmlextended.cpp.o
+[ 22%] Building CXX object sources/pyside6/libpysideqml/CMakeFiles/pyside6qml.dir/pysideqmlregistertype.cpp.o
+[ 22%] Building CXX object sources/pyside6/libpysideqml/CMakeFiles/pyside6qml.dir/pysideqmlmetacallerror.cpp.o
+[ 22%] Building CXX object sources/pyside6/libpysideqml/CMakeFiles/pyside6qml.dir/pysideqmllistproperty.cpp.o
+[ 22%] Building CXX object sources/pyside6/libpysideqml/CMakeFiles/pyside6qml.dir/pysideqmlnamedelement.cpp.o
+[ 22%] Building CXX object sources/pyside6/libpysideqml/CMakeFiles/pyside6qml.dir/pysideqmluncreatable.cpp.o
+[ 22%] Building CXX object sources/pyside6/libpysideqml/CMakeFiles/pyside6qml.dir/pysideqmltypeinfo.cpp.o
+[ 22%] Linking CXX shared library libpyside6qml.abi3.so
+[ 22%] Built target pyside6qml
+[ 22%] Built target uiplugin_autogen_timestamp_deps
+[ 23%] Automatic MOC for target uiplugin
+[ 23%] Built target uiplugin_autogen
+[ 23%] Building CXX object sources/pyside6/plugins/uitools/CMakeFiles/uiplugin.dir/uiplugin_autogen/mocs_compilation.cpp.o
+[ 23%] Building CXX object sources/pyside6/plugins/uitools/CMakeFiles/uiplugin.dir/customwidgets.cpp.o
+[ 23%] Building CXX object sources/pyside6/plugins/uitools/CMakeFiles/uiplugin.dir/customwidget.cpp.o
+[ 23%] Linking CXX static library libuiplugin.a
+[ 23%] Built target uiplugin
+[ 23%] Built target PySidePlugin_autogen_timestamp_deps
+[ 23%] Automatic MOC for target PySidePlugin
+[ 23%] Built target PySidePlugin_autogen
+[ 23%] Running AUTOMOC file extraction for target PySidePlugin
+[ 23%] Running moc --collect-json for target PySidePlugin
+[ 23%] Building CXX object sources/pyside6/plugins/designer/CMakeFiles/PySidePlugin.dir/PySidePlugin_autogen/mocs_compilation.cpp.o
+[ 23%] Building CXX object sources/pyside6/plugins/designer/CMakeFiles/PySidePlugin.dir/designercustomwidgets.cpp.o
+[ 23%] Linking CXX shared module libPySidePlugin.so
+[ 23%] Built target PySidePlugin
+[ 23%] Running generator for QtCore...
+qt.shiboken: (core) CLANG v0.64, builtins includes directory: /home/cezar/scipyenv_pyside6_build/libclang/lib/clang/18/include
+(core) clang_parseTranslationUnit2(0x0, cmd[17]=-isystem/home/cezar/scipyenv_pyside6_build/libclang/lib/clang/18/include -isystem/usr/include/c++/14 -isystem/usr/include/c++/14/x86_64-suse-linux -isystem/usr/include/c++/14/backward -fPIC -Wno-constant-logical-operand -x c++ -std=c++17 -I/home/cezar/scipyenv_pyside6_build/src/pyside-setup/sources/pyside6/PySide6 -I/usr/lib64/qt6/mkspecs/linux-g++ -I/usr/include/qt6 -I/usr/include/qt6/QtCore "-DQT_ANNOTATE_ACCESS_SPECIFIER(a)=__attribute__((annotate(#a)))" "-DQT_ANNOTATE_CLASS(type,...)=static_assert(sizeof(#__VA_ARGS__),#type);" -DQSIMD_H /tmp/QtCore_global_QOBECT.hpp)
+qt.shiboken: (core) /usr/include/qt6/QtCore/qoperatingsystemversion.h:160: Enum 'QOperatingSystemVersion::OSType' (class: QOperatingSystemVersion) does not have a type entry (type systems: PySide6.QtCore)
+(core) [4701ms] Generated class model (626).                                [WARNING]
+(core) [4701ms] Generated enum model (6).                                   [OK]
+qt.shiboken: (core) /usr/include/qt6/QtCore/qnamespace.h:1595: Scoped enum 'Qt::Initialization' (class: Qt) does not have a type entry (type systems: PySide6.QtCore)
+(core) [4704ms] Generated namespace model (186).                            [WARNING]
+qt.shiboken: (core) /usr/include/qt6/QtCore/qobject.h:142: Stripping last argument of bool QObject::moveToThread(QThread*,Qt::Disambiguated_t) (QT6_DECL_NEW_OVERLOAD_TAIL).
+qt.shiboken: (core) /usr/include/qt6/QtCore/qdir.h:154: Stripping last argument of qsizetype QDir::count(Qt::Disambiguated_t) (QT6_DECL_NEW_OVERLOAD_TAIL).
+(core) [4859ms] Resolved typedefs (195).                                    [WARNING]
+(core) [4860ms] Fixed class inheritance.                                    [OK]
+(core) [4899ms] Checked for inconsistencies in class model.                 [OK]
+(core) [4984ms] Checked for inconsistencies in typesystem (3774).           [OK]
+(core) [4991ms] Checked for inconsistencies in function modifications.      [OK]
+(core) [5000ms] Wrote log files.                                            [OK]
+qt.shiboken: (core) /usr/include/qt6/QtCore/qtextboundaryfinder.h:44: There's no user provided way (conversion rule, argument removal, custom code, etc) to handle the primitive type 'unsigned char *' of argument 3 in function 'QTextBoundaryFinder::QTextBoundaryFinder(QTextBoundaryFinder::BoundaryType type, QStringView str, unsigned char *buffer, qsizetype bufferSize)'.
+qt.shiboken: (core) /usr/include/qt6/QtCore/qstringconverter.h:119: There's no user provided way (conversion rule, argument removal, custom code, etc) to handle the primitive return type 'QChar *' in function 'QStringDecoder::appendToBuffer(QChar *out, QByteArrayView ba)'.
+qt.shiboken: (core) /usr/include/qt6/QtCore/qstringconverter.h:119: There's no user provided way (conversion rule, argument removal, custom code, etc) to handle the primitive type 'QChar *' of argument 1 in function 'QStringDecoder::appendToBuffer(QChar *out, QByteArrayView ba)'.
+qt.shiboken: (core) /usr/include/qt6/QtCore/qrandom.h:36: There's no user provided way (conversion rule, argument removal, custom code, etc) to handle the primitive type 'const quint32 *' of argument 1 in function 'QRandomGenerator::QRandomGenerator(const quint32 *begin, const quint32 *end)'.
+qt.shiboken: (core) /usr/include/qt6/QtCore/qrandom.h:36: There's no user provided way (conversion rule, argument removal, custom code, etc) to handle the primitive type 'const quint32 *' of argument 2 in function 'QRandomGenerator::QRandomGenerator(const quint32 *begin, const quint32 *end)'.
+qt.shiboken: (core) /usr/include/qt6/QtCore/qrandom.h:32: There's no user provided way (conversion rule, argument removal, custom code, etc) to handle the primitive type 'const quint32 *' of argument 1 in function 'QRandomGenerator::QRandomGenerator(const quint32 *seedBuffer, qsizetype len)'.
+qt.shiboken: (core) /usr/include/qt6/QtCore/qrandom.h:234: There's no user provided way (conversion rule, argument removal, custom code, etc) to handle the primitive type 'const quint32 *' of argument 1 in function 'QRandomGenerator64::QRandomGenerator64(const quint32 *begin, const quint32 *end)'.
+qt.shiboken: (core) /usr/include/qt6/QtCore/qrandom.h:234: There's no user provided way (conversion rule, argument removal, custom code, etc) to handle the primitive type 'const quint32 *' of argument 2 in function 'QRandomGenerator64::QRandomGenerator64(const quint32 *begin, const quint32 *end)'.
+qt.shiboken: (core) /usr/include/qt6/QtCore/qrandom.h:228: There's no user provided way (conversion rule, argument removal, custom code, etc) to handle the primitive type 'const quint32 *' of argument 1 in function 'QRandomGenerator64::QRandomGenerator64(const quint32 *seedBuffer, qsizetype len)'.
+qt.shiboken: (core) /usr/include/qt6/QtCore/qmetatype.h:709: There's no user provided way (conversion rule, argument removal, custom code, etc) to handle the primitive type 'int *' of argument 4 in function 'QMetaType::compare(const void *lhs, const void *rhs, int typeId, int *result)'.
+qt.shiboken: (core) /usr/include/qt6/QtCore/qmetatype.h:728: There's no user provided way (conversion rule, argument removal, custom code, etc) to handle the primitive type 'int *' of argument 4 in function 'QMetaType::equals(const void *lhs, const void *rhs, int typeId, int *result)'.
+qt.shiboken: (core) /usr/include/qt6/QtCore/qlocale.h:962: There's no user provided way (conversion rule, argument removal, custom code, etc) to handle the primitive type 'bool *' of argument 2 in function 'QLocale::toULong(const QString &s, bool *ok) const'.
+qt.shiboken: (core) /usr/include/qt6/QtCore/qtextstream.h:109: There's no user provided way (conversion rule, argument removal, custom code, etc) to handle the primitive type 'QString *' of argument 1 in function 'QTextStream::readLineInto(QString *line, qint64 maxlen)'.
+qt.shiboken: (core) /usr/include/qt6/QtCore/qprocess.h:135: There's no user provided way (conversion rule, argument removal, custom code, etc) to handle the primitive type 'qint64 *' of argument 1 in function 'QProcess::startDetached(qint64 *pid)'.
+qt.shiboken: (core) /usr/include/qt6/QtCore/qfile.h:214: There's no user provided way (conversion rule, argument removal, custom code, etc) to handle the primitive type 'QString *' of argument 2 in function 'QFile::moveToTrash(const QString &fileName, QString *pathInTrash)'.
+qt.shiboken: (core) /usr/include/qt6/QtCore/qcollator.h:76: There's no user provided way (conversion rule, argument removal, custom code, etc) to handle the primitive type 'const QChar *' of argument 1 in function 'QCollator::compare(const QChar *s1, qsizetype len1, const QChar *s2, qsizetype len2) const'.
+qt.shiboken: (core) /usr/include/qt6/QtCore/qcollator.h:76: There's no user provided way (conversion rule, argument removal, custom code, etc) to handle the primitive type 'const QChar *' of argument 3 in function 'QCollator::compare(const QChar *s1, qsizetype len1, const QChar *s2, qsizetype len2) const'.
+qt.shiboken: (core) /usr/include/qt6/QtCore/qcborstreamreader.h:64: There's no user provided way (conversion rule, argument removal, custom code, etc) to handle the primitive type 'const quint8 *' of argument 1 in function 'QCborStreamReader::QCborStreamReader(const quint8 *data, qsizetype len)'.
+qt.shiboken: (core) /usr/include/qt6/QtCore/qcborstreamreader.h:74: There's no user provided way (conversion rule, argument removal, custom code, etc) to handle the primitive type 'const quint8 *' of argument 1 in function 'QCborStreamReader::addData(const quint8 *data, qsizetype len)'.
+qt.shiboken: (core) /usr/include/qt6/QtCore/qcborvalue.h:241: There's no user provided way (conversion rule, argument removal, custom code, etc) to handle the primitive type 'const quint8 *' of argument 1 in function 'QCborValue::fromCbor(const quint8 *data, qsizetype len, QCborParserError *error)'.
+qt.shiboken: (core) /usr/include/qt6/QtCore/qbitarray.h:133: There's no user provided way (conversion rule, argument removal, custom code, etc) to handle the primitive type 'bool *' of argument 2 in function 'QBitArray::toUInt32(QSysInfo::Endian endianness, bool *ok) const'.
+qt.shiboken: (core) /usr/include/qt6/QtCore/qabstracteventdispatcher.h:81: There's no user provided way (conversion rule, argument removal, custom code, etc) to handle the primitive type 'qintptr *' of argument 3 in function 'QAbstractEventDispatcher::filterNativeEvent(const QByteArray &eventType, void *message, qintptr *result)'.
+(core)     [5s] Ran Source generator.                                       [WARNING]
+(core)     [5s] Ran Header generator.                                       [OK]
+Done, (core) 5s, 26 warnings (669 known issues)
+[ 23%] Built target QtCore_generator
+[ 23%] Built target QtCore_autogen_timestamp_deps
+[ 23%] Automatic MOC for target QtCore
+[ 23%] Built target QtCore_autogen
+[ 23%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/QtCore_autogen/mocs_compilation.cpp.o
+[ 23%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qabstractanimation_wrapper.cpp.o
+[ 23%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qabstracteventdispatcher_timerinfo_wrapper.cpp.o
+[ 23%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qabstracteventdispatcher_wrapper.cpp.o
+[ 23%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qabstractitemmodel_wrapper.cpp.o
+[ 23%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qabstractlistmodel_wrapper.cpp.o
+[ 23%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qabstractnativeeventfilter_wrapper.cpp.o
+[ 23%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qabstractproxymodel_wrapper.cpp.o
+[ 23%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qabstracttablemodel_wrapper.cpp.o
+[ 23%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qanimationgroup_wrapper.cpp.o
+[ 23%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qbasicmutex_wrapper.cpp.o
+[ 23%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qbasictimer_wrapper.cpp.o
+[ 23%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qbitarray_wrapper.cpp.o
+[ 23%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qbuffer_wrapper.cpp.o
+[ 23%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qbytearray_frombase64result_wrapper.cpp.o
+[ 24%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qbytearray_wrapper.cpp.o
+[ 24%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qbytearraymatcher_wrapper.cpp.o
+[ 24%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qcalendar_systemid_wrapper.cpp.o
+[ 24%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qcalendar_wrapper.cpp.o
+[ 24%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qcalendar_yearmonthday_wrapper.cpp.o
+[ 24%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qcborarray_wrapper.cpp.o
+[ 24%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qcborerror_wrapper.cpp.o
+[ 24%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qcbormap_wrapper.cpp.o
+[ 24%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qcborparsererror_wrapper.cpp.o
+[ 24%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qcborstreamreader_wrapper.cpp.o
+[ 24%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qcborstreamwriter_wrapper.cpp.o
+[ 24%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qcborstringresultbytearray_wrapper.cpp.o
+[ 24%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qcborstringresultstring_wrapper.cpp.o
+[ 24%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qcborvalue_wrapper.cpp.o
+[ 24%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qchildevent_wrapper.cpp.o
+[ 24%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qcollator_wrapper.cpp.o
+[ 24%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qcollatorsortkey_wrapper.cpp.o
+[ 24%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qcommandlineoption_wrapper.cpp.o
+[ 24%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qcommandlineparser_wrapper.cpp.o
+[ 24%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qconcatenatetablesproxymodel_wrapper.cpp.o
+[ 24%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qcoreapplication_wrapper.cpp.o
+[ 24%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qcryptographichash_wrapper.cpp.o
+[ 24%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qdatastream_wrapper.cpp.o
+[ 24%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qdate_wrapper.cpp.o
+[ 24%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qdatetime_wrapper.cpp.o
+[ 25%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qdeadlinetimer_wrapper.cpp.o
+[ 25%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qdir_wrapper.cpp.o
+[ 25%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qdiriterator_wrapper.cpp.o
+[ 25%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qdirlisting_wrapper.cpp.o
+[ 25%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qdirlisting_direntry_wrapper.cpp.o
+[ 25%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qdynamicpropertychangeevent_wrapper.cpp.o
+[ 25%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qeasingcurve_wrapper.cpp.o
+[ 25%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qelapsedtimer_wrapper.cpp.o
+[ 25%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qevent_wrapper.cpp.o
+[ 25%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qeventloop_wrapper.cpp.o
+[ 25%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qfactoryinterface_wrapper.cpp.o
+[ 25%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qfile_wrapper.cpp.o
+[ 25%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qfiledevice_wrapper.cpp.o
+[ 25%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qfileinfo_wrapper.cpp.o
+[ 25%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qfileselector_wrapper.cpp.o
+[ 25%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qfilesystemwatcher_wrapper.cpp.o
+[ 25%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qfutureinterfacebase_wrapper.cpp.o
+[ 25%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qgenericargument_wrapper.cpp.o
+[ 25%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qgenericreturnargument_wrapper.cpp.o
+[ 25%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qhashseed_wrapper.cpp.o
+[ 25%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qidentityproxymodel_wrapper.cpp.o
+[ 25%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qiodevice_wrapper.cpp.o
+[ 25%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qiodevicebase_wrapper.cpp.o
+[ 25%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qitemselection_wrapper.cpp.o
+[ 25%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qitemselectionmodel_wrapper.cpp.o
+[ 25%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qitemselectionrange_wrapper.cpp.o
+[ 26%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qjsonarray_wrapper.cpp.o
+[ 26%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qjsondocument_wrapper.cpp.o
+[ 26%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qjsonparseerror_wrapper.cpp.o
+[ 26%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qjsonvalue_wrapper.cpp.o
+[ 26%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qkeycombination_wrapper.cpp.o
+[ 26%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qlibrary_wrapper.cpp.o
+[ 26%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qlibraryinfo_wrapper.cpp.o
+[ 26%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qline_wrapper.cpp.o
+[ 26%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qlinef_wrapper.cpp.o
+[ 26%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qlocale_wrapper.cpp.o
+[ 26%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qlockfile_wrapper.cpp.o
+[ 26%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qloggingcategory_wrapper.cpp.o
+[ 26%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qmargins_wrapper.cpp.o
+[ 26%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qmarginsf_wrapper.cpp.o
+[ 26%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qmessageauthenticationcode_wrapper.cpp.o
+[ 26%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qmessagelogcontext_wrapper.cpp.o
+[ 26%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qmetaclassinfo_wrapper.cpp.o
+[ 26%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qmetaenum_wrapper.cpp.o
+[ 26%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qmetamethod_wrapper.cpp.o
+[ 26%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qmetaobject_connection_wrapper.cpp.o
+[ 26%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qmetaobject_wrapper.cpp.o
+[ 26%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qmetaproperty_wrapper.cpp.o
+[ 26%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qmetatype_wrapper.cpp.o
+[ 26%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qmimedata_wrapper.cpp.o
+[ 26%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qmimedatabase_wrapper.cpp.o
+[ 27%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qmimetype_wrapper.cpp.o
+[ 27%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qmodelindex_wrapper.cpp.o
+[ 27%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qmodelroledata_wrapper.cpp.o
+[ 27%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qmodelroledataspan_wrapper.cpp.o
+[ 27%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qmutex_wrapper.cpp.o
+[ 27%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qnativeipckey_wrapper.cpp.o
+[ 27%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qobject_wrapper.cpp.o
+[ 27%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qoperatingsystemversion_wrapper.cpp.o
+[ 27%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qoperatingsystemversionbase_wrapper.cpp.o
+[ 27%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qparallelanimationgroup_wrapper.cpp.o
+[ 27%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qpauseanimation_wrapper.cpp.o
+[ 27%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qpersistentmodelindex_wrapper.cpp.o
+[ 27%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qpluginloader_wrapper.cpp.o
+[ 27%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qpoint_wrapper.cpp.o
+[ 27%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qpointf_wrapper.cpp.o
+[ 27%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qprocess_wrapper.cpp.o
+[ 27%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qprocessenvironment_wrapper.cpp.o
+[ 27%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qpropertyanimation_wrapper.cpp.o
+[ 27%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qrandomgenerator64_wrapper.cpp.o
+[ 27%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qrandomgenerator_wrapper.cpp.o
+[ 27%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qreadlocker_wrapper.cpp.o
+[ 27%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qreadwritelock_wrapper.cpp.o
+[ 27%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qrect_wrapper.cpp.o
+[ 27%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qrectf_wrapper.cpp.o
+[ 27%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qrecursivemutex_wrapper.cpp.o
+[ 28%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qregularexpression_wrapper.cpp.o
+[ 28%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qregularexpressionmatch_wrapper.cpp.o
+[ 28%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qregularexpressionmatchiterator_wrapper.cpp.o
+[ 28%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qresource_wrapper.cpp.o
+[ 28%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qrunnable_wrapper.cpp.o
+[ 28%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qsavefile_wrapper.cpp.o
+[ 28%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qsemaphore_wrapper.cpp.o
+[ 28%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qsemaphorereleaser_wrapper.cpp.o
+[ 28%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qsequentialanimationgroup_wrapper.cpp.o
+[ 28%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qsettings_wrapper.cpp.o
+[ 28%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qsignalblocker_wrapper.cpp.o
+[ 28%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qsignalmapper_wrapper.cpp.o
+[ 28%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qsize_wrapper.cpp.o
+[ 28%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qsizef_wrapper.cpp.o
+[ 28%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qsocketdescriptor_wrapper.cpp.o
+[ 28%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qsocketnotifier_wrapper.cpp.o
+[ 28%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qsortfilterproxymodel_wrapper.cpp.o
+[ 28%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qstandardpaths_wrapper.cpp.o
+[ 28%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qstorageinfo_wrapper.cpp.o
+[ 28%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qstringconverter_wrapper.cpp.o
+[ 28%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qstringconverterbase_state_wrapper.cpp.o
+[ 28%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qstringconverterbase_wrapper.cpp.o
+[ 28%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qstringdecoder_wrapper.cpp.o
+[ 28%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qstringencoder_wrapper.cpp.o
+[ 28%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qstringlistmodel_wrapper.cpp.o
+[ 28%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qsysinfo_wrapper.cpp.o
+[ 29%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qsystemsemaphore_wrapper.cpp.o
+[ 29%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qt_wrapper.cpp.o
+[ 29%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qtcorehelper_qdirlistingiterator_wrapper.cpp.o
+[ 29%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qtcorehelper_qgenericargumentholder_wrapper.cpp.o
+[ 29%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qtcorehelper_qgenericreturnargumentholder_wrapper.cpp.o
+[ 29%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qtcorehelper_qiopipe_wrapper.cpp.o
+[ 29%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qtcorehelper_qmutexlocker_wrapper.cpp.o
+[ 29%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qtemporarydir_wrapper.cpp.o
+[ 29%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qtemporaryfile_wrapper.cpp.o
+[ 29%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qtextboundaryfinder_wrapper.cpp.o
+[ 29%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qtextstream_wrapper.cpp.o
+[ 29%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qtextstreammanipulator_wrapper.cpp.o
+[ 29%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qthread_wrapper.cpp.o
+[ 29%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qthreadpool_wrapper.cpp.o
+[ 29%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qtime_wrapper.cpp.o
+[ 29%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qtimeline_wrapper.cpp.o
+[ 29%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qtimer_wrapper.cpp.o
+[ 29%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qtimerevent_wrapper.cpp.o
+[ 29%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qtimezone_offsetdata_wrapper.cpp.o
+[ 29%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qtimezone_wrapper.cpp.o
+[ 29%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qtranslator_wrapper.cpp.o
+[ 29%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qtransposeproxymodel_wrapper.cpp.o
+[ 29%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qurl_wrapper.cpp.o
+[ 29%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qurlquery_wrapper.cpp.o
+[ 29%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/quuid_wrapper.cpp.o
+[ 30%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qvariantanimation_wrapper.cpp.o
+[ 30%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qversionnumber_wrapper.cpp.o
+[ 30%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qwaitcondition_wrapper.cpp.o
+[ 30%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qwritelocker_wrapper.cpp.o
+[ 30%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qxmlstreamattribute_wrapper.cpp.o
+[ 30%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qxmlstreamattributes_wrapper.cpp.o
+[ 30%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qxmlstreamentitydeclaration_wrapper.cpp.o
+[ 30%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qxmlstreamentityresolver_wrapper.cpp.o
+[ 30%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qxmlstreamnamespacedeclaration_wrapper.cpp.o
+[ 30%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qxmlstreamnotationdeclaration_wrapper.cpp.o
+[ 30%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qxmlstreamreader_wrapper.cpp.o
+[ 30%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qxmlstreamwriter_wrapper.cpp.o
+[ 30%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qprocess_unixprocessparameters_wrapper.cpp.o
+[ 30%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qtcore_module_wrapper.cpp.o
+/home/cezar/scipyenv_pyside6_build/src/pyside-build/sources/pyside6/PySide6/QtCore/PySide6/QtCore/qtcore_module_wrapper.cpp: In function ‘void Enum_PythonToCpp_QtMsgType(PyObject*, void*)’:
+/home/cezar/scipyenv_pyside6_build/src/pyside-build/sources/pyside6/PySide6/QtCore/PySide6/QtCore/qtcore_module_wrapper.cpp:2798:21: warning: ‘QtSystemMsg’ is deprecated: Use QtCriticalMsg instead. [-Wdeprecated-declarations]
+ 2798 |     case QtMsgType::QtSystemMsg:
+      |                     ^~~~~~~~~~~
+In file included from /usr/include/qt6/QtCore/qglobal.h:49,
+                 from /usr/include/qt6/QtCore/qiodevicebase.h:7,
+                 from /usr/include/qt6/QtCore/qtextstream.h:7,
+                 from /usr/include/qt6/QtCore/qdebug.h:13,
+                 from /usr/include/qt6/QtCore/QDebug:1,
+                 from /home/cezar/scipyenv_pyside6_build/src/pyside-build/sources/pyside6/PySide6/QtCore/PySide6/QtCore/qtcore_module_wrapper.cpp:18:
+/usr/include/qt6/QtCore/qlogging.h:37:5: note: declared here
+   37 |     QtSystemMsg Q_DECL_ENUMERATOR_DEPRECATED_X("Use QtCriticalMsg instead.") = QtCriticalMsg
+      |     ^~~~~~~~~~~
+/home/cezar/scipyenv_pyside6_build/src/pyside-build/sources/pyside6/PySide6/QtCore/PySide6/QtCore/qtcore_module_wrapper.cpp:2798:21: warning: ‘QtSystemMsg’ is deprecated: Use QtCriticalMsg instead. [-Wdeprecated-declarations]
+ 2798 |     case QtMsgType::QtSystemMsg:
+      |                     ^~~~~~~~~~~
+/usr/include/qt6/QtCore/qlogging.h:37:5: note: declared here
+   37 |     QtSystemMsg Q_DECL_ENUMERATOR_DEPRECATED_X("Use QtCriticalMsg instead.") = QtCriticalMsg
+      |     ^~~~~~~~~~~
+/home/cezar/scipyenv_pyside6_build/src/pyside-build/sources/pyside6/PySide6/QtCore/PySide6/QtCore/qtcore_module_wrapper.cpp: In function ‘PyObject* PyInit_QtCore()’:
+/home/cezar/scipyenv_pyside6_build/src/pyside-build/sources/pyside6/PySide6/QtCore/PySide6/QtCore/qtcore_module_wrapper.cpp:6936:28: warning: ‘QtSystemMsg’ is deprecated: Use QtCriticalMsg instead. [-Wdeprecated-declarations]
+ 6936 |         uint8_t(QtMsgType::QtSystemMsg)    //  0x02  2
+      |                            ^~~~~~~~~~~
+/usr/include/qt6/QtCore/qlogging.h:37:5: note: declared here
+   37 |     QtSystemMsg Q_DECL_ENUMERATOR_DEPRECATED_X("Use QtCriticalMsg instead.") = QtCriticalMsg
+      |     ^~~~~~~~~~~
+/home/cezar/scipyenv_pyside6_build/src/pyside-build/sources/pyside6/PySide6/QtCore/PySide6/QtCore/qtcore_module_wrapper.cpp:6936:28: warning: ‘QtSystemMsg’ is deprecated: Use QtCriticalMsg instead. [-Wdeprecated-declarations]
+ 6936 |         uint8_t(QtMsgType::QtSystemMsg)    //  0x02  2
+      |                            ^~~~~~~~~~~
+/usr/include/qt6/QtCore/qlogging.h:37:5: note: declared here
+   37 |     QtSystemMsg Q_DECL_ENUMERATOR_DEPRECATED_X("Use QtCriticalMsg instead.") = QtCriticalMsg
+      |     ^~~~~~~~~~~
+[ 30%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qbluetoothpermission_wrapper.cpp.o
+[ 30%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qcalendarpermission_wrapper.cpp.o
+[ 30%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qcamerapermission_wrapper.cpp.o
+[ 30%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qcontactspermission_wrapper.cpp.o
+[ 30%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qlocationpermission_wrapper.cpp.o
+[ 30%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qmicrophonepermission_wrapper.cpp.o
+[ 30%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qpermission_wrapper.cpp.o
+[ 30%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/PySide6/QtCore/qsharedmemory_wrapper.cpp.o
+[ 30%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/glue/qeasingcurve_glue.cpp.o
+[ 30%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/glue/core_snippets.cpp.o
+[ 30%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/glue/qtcorehelper.cpp.o
+[ 30%] Building CXX object sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore.dir/glue/qiopipe.cpp.o
+[ 31%] Linking CXX shared module ../QtCore.abi3.so
+[ 31%] Built target QtCore
+PySide6/__init__.py: Unable to import Shiboken from /home/cezar/scipyenv_pyside6_build/src/pyside-build/sources/pyside6, /home/cezar/scipyenv_pyside6_build/src/pyside-build/sources/shiboken6, /home/cezar/scipyenv_pyside6_build/src/pyside-setup/sources/pyside6/PySide6/support, /usr/lib64/python311.zip, /usr/lib64/python3.11, /usr/lib64/python3.11/lib-dynload, /home/cezar/scipyenv_pyside6_build/lib64/python3.11/site-packages, /home/cezar/scipyenv_pyside6_build/lib/python3.11/site-packages
+Traceback (most recent call last):
+  File "/home/cezar/scipyenv_pyside6_build/src/pyside-setup/sources/pyside6/PySide6/QtCore/../support/generate_pyi.py", line 94, in <module>
+    generate_all_pyi(outpath, options=options)
+  File "/home/cezar/scipyenv_pyside6_build/src/pyside-setup/sources/pyside6/PySide6/QtCore/../support/generate_pyi.py", line 38, in generate_all_pyi
+    import PySide6
+  File "/home/cezar/scipyenv_pyside6_build/src/pyside-build/sources/pyside6/PySide6/__init__.py", line 140, in <module>
+    _setupQtDirectories()
+  File "/home/cezar/scipyenv_pyside6_build/src/pyside-build/sources/pyside6/PySide6/__init__.py", line 66, in _setupQtDirectories
+    from shiboken6 import Shiboken
+ModuleNotFoundError: No module named 'shiboken6'
+gmake[2]: *** [sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore_pyi.dir/build.make:70: sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore_pyi] Error 1
+gmake[1]: *** [CMakeFiles/Makefile2:8724: sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore_pyi.dir/all] Error 2
+gmake: *** [Makefile:136: all] Error 2
+(scipyenv_pyside6_build) ✘-2 cezar@BrukerLinux:~/scipyenv_pyside6_build/src/pyside-setup [6.8|✔ ]> 
