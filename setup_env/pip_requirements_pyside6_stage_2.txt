@@ -1,0 +1,23 @@
+# -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2025 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+#
+
+qtpy
+qdarkstyle ; sys_platform == 'win32'
+pyqtdarktheme
+jupyter
+jupyter_cms
+jupyter_qtconsole_colorschemes
+jupyterlab
+jupyterlab-pygments
+jupyterlab-server
+jupyterlab-widgets
+jupyterthemes
+qtconsole
+matplotlib
+matplotlib-inline
+nuitka
+pyqtgraph
+qimage2ndarray

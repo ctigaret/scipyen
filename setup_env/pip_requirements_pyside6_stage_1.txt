@@ -47,7 +47,6 @@ Jinja2
 MarkupSafe
 Pillow
 PyLEMS
-qtpy
 pywayland ; sys_platform == "linux"
 # required to build PyQt5/6 locally using the host's Qt stack
 # PyQt-builder ; sys_platform == 'linux'
@@ -58,12 +57,10 @@ pywayland ; sys_platform == "linux"
 # Pyqt6-sip ; sys_platform == 'linux'
 # PyQt6 ; sys_platform == 'win32'         # on Windows run 'pip install PyQt5'; on Unix must build  - see INSTALL file
 #pyside2
-pyside6
+# pyside6
 dbus-python ; sys_platform == "linux"
-qdarkstyle ; sys_platform == 'win32'
 qasync
 aiohttp
-pyqtdarktheme
 PyWavelets
 # QtPy # already insatlled by jupyter
 SecretStorage
@@ -124,15 +121,6 @@ jeepney
 joblib
 #jsonlib
 jsonschema
-jupyter
-jupyter_cms
-jupyter_qtconsole_colorschemes
-jupyterlab
-jupyterlab-pygments
-jupyterlab-server
-jupyterlab-widgets
-jupyterthemes
-qtconsole
 keyring
 kiwisolver
 langcodes
@@ -144,8 +132,6 @@ libNeuroML
 lxml
 marisa-trie # installed by taxoniq but useful if taxoniq is omitted; may not be available on win32 platform
 matlab_kernel
-matplotlib
-matplotlib-inline
 metakernel
 modelspec
 more-itertools
@@ -166,7 +152,6 @@ nodejs
 nose            
 notebook
 notebook_shim
-nuitka
 numpy           
 octave_kernel
 pandas
@@ -188,14 +173,12 @@ pymongo
 pyneuroml       # optional
 pyparsing
 #pyqt5-tools ; sys_platform == 'win32'
-pyqtgraph
 pyserial
 pytest
 python-magic
 pytz
 pywin32 ; sys_platform == 'win32'
 pyxdg
-qimage2ndarray
 ravenclaw
 rdflib
 readme-renderer
