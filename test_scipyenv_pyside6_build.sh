@@ -94,52 +94,21 @@ function dopyside6 ()
     exit 1
     fi
     
-    # NOTE: the below breaks is --parallel is set; when not set it flags up 
-    # see
-#     [ 31%] Built target QtCore
-#     PySide6/__init__.py: Unable to import Shiboken from /home/cezar/scipyenv_pyside6_build/src/pyside-build/sources/pyside6, /home/cezar/scipyenv_pyside6_build/src/pyside-build/sources/shiboken6, /home/cezar/scipyenv_pyside6_build/src/pyside-setup/sources/pyside6/PySide6/support, /usr/lib64/python311.zip, /usr/lib64/python3.11, /usr/lib64/python3.11/lib-dynload, /home/cezar/scipyenv_pyside6_build/lib64/python3.11/site-packages, /home/cezar/scipyenv_pyside6_build/lib/python3.11/site-packages
-#     Traceback (most recent call last):
-#     File "/home/cezar/scipyenv_pyside6_build/src/pyside-setup/sources/pyside6/PySide6/QtCore/../support/generate_pyi.py", line 94, in <module>
-#         generate_all_pyi(outpath, options=options)
-#     File "/home/cezar/scipyenv_pyside6_build/src/pyside-setup/sources/pyside6/PySide6/QtCore/../support/generate_pyi.py", line 38, in generate_all_pyi
-#         import PySide6
-#     File "/home/cezar/scipyenv_pyside6_build/src/pyside-build/sources/pyside6/PySide6/__init__.py", line 140, in <module>
-#         _setupQtDirectories()
-#     File "/home/cezar/scipyenv_pyside6_build/src/pyside-build/sources/pyside6/PySide6/__init__.py", line 66, in _setupQtDirectories
-#         from shiboken6 import Shiboken
-#     ModuleNotFoundError: No module named 'shiboken6'
-#     gmake[2]: *** [sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore_pyi.dir/build.make:70: sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore_pyi] Error 1
-#     gmake[1]: *** [CMakeFiles/Makefile2:8724: sources/pyside6/PySide6/QtCore/CMakeFiles/QtCore_pyi.dir/all] Error 2
-#     gmake: *** [Makefile:136: all] Error 2
-#     
-#     mkdir -p ${VIRTUAL_ENV}/src/pyside-build
-#     
-#     py_includes=/usr/include/python${major}.${minor}
-#     
-#     cmake -B  ${VIRTUAL_ENV}/src/pyside-build -S  ${VIRTUAL_ENV}/src/pyside-setup -DCMAKE_INSTALL_PREFIX=${VIRTUAL_ENV} -DPython_EXECUTABLE=`which python` -DCMAKE_CXX_FLAGS=-I${py_includes} -DCMAKE_C_FLAGS=-I${py_includes}
-# #     cmake -B ../pyside-build -S ./ -DCMAKE_INSTALL_PREFIX=${VIRTUAL_ENV} -DPython_EXECUTABLE=`which python` -DCMAKE_CXX_FLAGS=-I/usr/include/python3.11 -DCMAKE_C_FLAGS=-I/usr/include/python3.11
-#     
-#     
-#     if [[ $? -ne 0 ]] ; then
-#     echo -e "Could not configure PySide6 build. Bailing out. Goodbye!\n"
-#     exit 1
-#     fi
-#     
-#     # what is you leave out --parallel?
-#     cmake --build ${VIRTUAL_ENV}/src/pyside-build 
-# #     cmake --build ${VIRTUAL_ENV}/src/pyside-build --parallel ${njobs}
-#     
-#     if [[ $? -ne 0 ]] ; then
-#     echo -e "Could not build PySide6 Bailing out. Goodbye!\n"
-#     exit 1
-#     fi
-
     # NOTE 2025-01-13 16:34:26 trying setuptools - WARNING use qtpaths6 below, on
     # Tumbleweed!!!
     qtpaths_exec=`which qtpaths6`
     python setup.py build --qtpaths=${qtpaths_exec} --build-tests --ignore-git --parallel=8
+    if [[ $? -ne 0 ]] ; then
+    echo -e "Cannot build PySide6 for Qt $pyside6_qtver. Bailing out. Goodbye!\n"
+    exit 1
+    fi
+    
     python setup.py install --prefix=${VIRTUAL_ENV} --qtpaths=${qtpaths_exec} --build-tests --ignore-git --parallel=8
     
+    if [[ $? -ne 0 ]] ; then
+    echo -e "Cannot install PySide6 for Qt $pyside6_qtver. Bailing out. Goodbye!\n"
+    exit 1
+    fi
     
 }
 
