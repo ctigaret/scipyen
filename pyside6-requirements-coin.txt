@@ -1,0 +1,12 @@
+# pip>=24.2 # provided by virtualenv
+setuptools==72.1.0 # provided by virtualenv
+# importlib_metadata>=6 # duplicate below
+importlib_resources>=5.10.2
+packaging>=24
+ordered-set>=3.1.1
+# more_itertools>=8.8 # provided by my own pip_requirements
+jaraco.text>=3.7
+importlib_metadata>=6 # duplicate 
+tomli>=2.0.1
+wheel>=0.43.0 # provided by virtualenv
+platformdirs >= 2.6.2

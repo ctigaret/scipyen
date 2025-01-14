@@ -215,7 +215,7 @@ sniffio
 spacy
 spacy-legacy
 spacy-loggers
-sphinx          
+sphinx
 sphinx_rtd_theme
 srsly
 stack-data
