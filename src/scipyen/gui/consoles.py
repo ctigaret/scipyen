@@ -507,7 +507,7 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
             
     def guiSetScrollBack(self):
         value, ok = QtWidgets.QInputDialog.getInt(self, "Scrollback size (lines)", "Number of scrollback lines (-1 for unlimited)",
-                                             value = self.scrollBackSize, min = -1)
+                                             value = self.scrollBackSize, minValue = -1)
         if ok:
             self.scrollBackSize = value
         
@@ -619,7 +619,7 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
     def _set_syntax_style(self, val:str, checked:bool): # slot for menu action # pyside6
         """Used as slot for Syntax style menu action
         """
-        print(f"{self.__class__.__name__}._set_syntax_style({val}, *args {args})")
+        print(f"{self.__class__.__name__}._set_syntax_style({val}, {checked})")
         self.syntaxStyle = val
 
     # @Slot(str)
