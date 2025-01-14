@@ -10,6 +10,75 @@
 # Distributed under GNU GPL License v.2
 #
 
+# ATTENTION: openSUSE Tumbleweed PySide6 pacjage DOES NOT provide pyside6-uic tool!
+
+# WARNING 2025-01-12 21:09:06 IF YOU WANT TO BUILD PySide6 FROM SOURCES ON LINUX:
+# -------------------------------------------------------------------------------
+# ATTENTION: 2025-01-14 13:41:36 
+# Does NOT work on openSUSE Tumbleweed, I guess it requires patches (take a look
+# at https://build.opensuse.org/package/show/openSUSE:Factory/python3-pyside6 )
+#
+# NOTE: 2025-01-14 13:42:04
+# trying a NEW strategy:
+# 1) install packages system-wide (CAUTION: as of openSUSE Tumbleweed 20250112, 
+#     pyside6 paackages are only avaliable for python 3.11 and for Qt 6.8 - this
+#     means that: 
+#       1.1) your virtual environment MUST use python 3.11
+#       1.2) the GUI will be based on Qt 6.8
+#
+# python311-pyside6 - Python bindings for Qt 6
+#                     Python bindings for the Qt cross-platform application and 
+#                     UI framework.
+# 
+# 
+# python311-pyside6-devel - Development files for python311-pyside6
+#                           Python bindings for the Qt cross-platform application 
+#                           and UI framework
+# 
+# python311-shiboken6 - Python bindings for Qt 6
+#                       Python bindings for the Qt cross-platform application and
+#                       UI framework.
+#
+# python311-shiboken6-devel - Development files for python311-shiboken6
+#                             Python bindings for the Qt cross-platform application 
+#                             and UI framework
+#
+# optionally - not tested/used in Scipyen:
+#
+# python311-superqt - Missing widgets and components for PyQt/PySide
+#                     superqt provides a variety of widgets that are not included
+#                     in the native QtWidgets module, including multihandle (range) 
+#                     sliders, comboboxes, and more.
+#
+# python311-QtAwesome - FontAwesome icons in PyQt and PySide applications
+#                       QtAwesome enables iconic fonts such as Font Awesome and
+#                       Elusive Icons in PyQt and PySide applications.
+#                       It is a port to Python - PyQt / PySide of the QtAwesome 
+#                       C++ library by Rick Blommers.
+#
+# 2) create a virtual environment WITH ACCESS TO SYSTEM-SITE PACKAGES!
+#   WARNING: Not easily suitable for deploying the environment
+#   WARNING: attempts to uninstall system-site packages will fail; they will be
+#   overridden by packages installed in the virtual environment!
+#
+# 3) BEFORE launching anything that uses Qt for Python, set the environment
+#       varibale QT_API to "pyside6":
+#
+#   export QT_API="pyside6"
+#
+# 4) to check that this works, launch jupyter qtconsole and test that qtpy is
+# using PySide6 as Qt API:
+#
+# $> jupyter qtconsole
+#
+# then , inside Jupyter QtConsole, run:
+# import qtpy
+# qtpy.API
+#   >>> "pyside6"
+
+
+
+
 function showinstalldoc () 
 {
     glowexec=`which glow`
@@ -170,45 +239,44 @@ function makevirtenv ()
             if [ -n "$aa" ] ; then 
                 echo -e "pyvenv.cfg looks OK\n"
                 # and pyvenv.cfg defines a 'virtualenv' variable -> OK so far
-                echo -r "Checking for environment activation script..."
-                # => check for bin subdirectory
-                if [ ! -d $virtual_env/bin ] ; then
-                    # bin subdirectory missing -> BAD!!!
-                    echo -e "$virtual_env/ does not look like a virtual environment directory. Goodbye!\n"
-                    exit 1
+                usesyssite=`cat $virtual_env/pyvenv.cfg | grep "include-system-site-packages = true"`
+                echo -e "Checking if the evironment is using system-site packages..."
+                if [ -n "$usesyssite" ] ; then
+                    echo -e "The evironment appears to use system-site packages...\n"
+                    echo -r "Checking for environment activation script..."
+                    # => check for bin subdirectory
+                    if [ ! -d $virtual_env/bin ] ; then
+                        # bin subdirectory missing -> BAD!!!
+                        echo -e "$virtual_env/ does not look like a virtual environment directory. Goodbye!\n"
+                        exit 1
+                    fi
+                    if [ ! -r $virtual_env/bin ] ; then
+                        # bin subdirectory not readable -> BAD!!!
+                        echo -e "$virtual_env/ does not look like a virtual environment directory. Goodbye!\n"
+                        exit 1
+                    fi
+                    
+                    echo -e "Activation script found; sourcing it...\n"
+                    
+                    # so far so good; try and activate the virtual environment
+                    source $virtual_env/bin/activate
+                    
+                    if [[ -z ${VIRTUAL_ENV} ]]; then
+                        # failed to activate => bail out
+                        echo -r "Cannot activate a virtual environment from  $virtual_env . Goodbye!\n"
+                        exit 1
+                    fi
+                    
+                    python_executable=`which python3`
+                    
+                    echo -e "Virtual environment ${virtual_env} is activated and will use ${python_executable}\n"
+                    
+                    must_create_env=0
+                
+                else
+                    echo -e "The environment DOES NOT use system site packages; must recreate it"
+                    must_create_env=1
                 fi
-                if [ ! -r $virtual_env/bin ] ; then
-                    # bin subdirectory not readable -> BAD!!!
-                    echo -e "$virtual_env/ does not look like a virtual environment directory. Goodbye!\n"
-                    exit 1
-                fi
-                
-                echo -e "Activation script found; sourcing it...\n"
-                
-                # so far so good; try and activate the virtual environment
-                source $virtual_env/bin/activate
-                
-                if [[ -z ${VIRTUAL_ENV} ]]; then
-                    # failed to activate => bail out
-                    echo -r "Cannot activate a virtual environment from  $virtual_env . Goodbye!\n"
-                    exit 1
-                fi
-                
-                python_executable=`which python3`
-                
-                echo -e "Virtual environment ${virtual_env} is activated and will use ${python_executable}\n"
-                
-                must_create_env=0
-                
-#                 usesyssite=`cat $virtual_env/pyvenv.cfg | grep "include-system-site-packages = true"`
-#                 echo -e "Checking if the evironment is using system-site packages..."
-#                 if [ -n "$usesyssite" ] ; then
-#                     echo -e "The evironment appears to use system-site packages...\n"
-#                 
-#                 else
-#                     echo -e "The environment DOES NOT use system site packages; must recreate it"
-#                     must_create_env=1
-#                 fi
             else
                 echo -e "$virtual_env/ does not look like a virtual environment directory. Goodbye!\n"
                 exit 1
@@ -218,8 +286,7 @@ function makevirtenv ()
     fi
     
     if [ $must_create_env -eq 1 ] ; then
-        ${python_executable} -m virtualenv --clear --python ${python_executable} $virtual_env
-#         ${python_executable} -m virtualenv --clear --system-site-packages --python ${python_executable} $virtual_env
+        ${python_executable} -m virtualenv --clear --system-site-packages --python ${python_executable} $virtual_env
         
         if [[ $? -ne 0 ]] ; then
             # the above attempt failed => bail out

@@ -51,15 +51,15 @@ qtpy
 pywayland ; sys_platform == "linux"
 # ### BEGIN PyQt5 stuff
 # # required to build PyQt5/6 locally using the host's Qt stack
-# PyQt-builder ; sys_platform == 'linux'
+PyQt-builder ; sys_platform == 'linux'
 # # required to build PyQt5 locally using the host's Qt stack
-# Pyqt5-sip ; sys_platform == 'linux'
-# PyQt5 ; sys_platform == 'win32'         # on Windows run 'pip install PyQt5'; on Unix must build  - see INSTALL file
+Pyqt5-sip ; sys_platform == 'linux'
+PyQt5 ; sys_platform == 'win32'         # on Windows run 'pip install PyQt5'; on Unix must build  - see INSTALL file
 # ### END   PyQt5 stuff
 # ### BEGIN PyQt6 stuff
-# # required to build PyQt6 locally using the host's Qt stack
-# Pyqt6-sip ; sys_platform == 'linux'
-# PyQt6 ; sys_platform == 'win32'         # on Windows run 'pip install PyQt5'; on Unix must build  - see INSTALL file
+# required to build PyQt6 locally using the host's Qt stack
+Pyqt6-sip ; sys_platform == 'linux'
+PyQt6 ; sys_platform == 'win32'         # on Windows run 'pip install PyQt5'; on Unix must build  - see INSTALL file
 # ### END   PyQt6 stuff
 # ### BEGIN PySide6 stuff
 pyside6

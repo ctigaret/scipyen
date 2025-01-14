@@ -5,7 +5,72 @@
 
 # WARNING 2025-01-12 21:09:06 IF YOU WANT TO BUILD PySide6 FROM SOURCES ON LINUX:
 # -------------------------------------------------------------------------------
+# ATTENTION: 2025-01-14 13:41:36 
+# Does NOT work on openSUSE Tumbleweed, I guess it requires patches (take a look
+# at https://build.opensuse.org/package/show/openSUSE:Factory/python3-pyside6 )
 #
+# NOTE: 2025-01-14 13:42:04
+# trying a NEW strategy:
+# 1) install packages system-wide (CAUTION: as of openSUSE Tumbleweed 20250112, 
+#     pyside6 paackages are only avaliable for python 3.11 and for Qt 6.8 - this
+#     means that: 
+#       1.1) your virtual environment MUST use python 3.11
+#       1.2) the GUI will be based on Qt 6.8
+#
+# python311-pyside6 - Python bindings for Qt 6
+#                     Python bindings for the Qt cross-platform application and 
+#                     UI framework.
+# 
+# 
+# python311-pyside6-devel - Development files for python311-pyside6
+#                           Python bindings for the Qt cross-platform application 
+#                           and UI framework
+# 
+# python311-shiboken6 - Python bindings for Qt 6
+#                       Python bindings for the Qt cross-platform application and
+#                       UI framework.
+#
+# python311-shiboken6-devel - Development files for python311-shiboken6
+#                             Python bindings for the Qt cross-platform application 
+#                             and UI framework
+#
+# optionally - not tested/used in Scipyen:
+#
+# python311-superqt - Missing widgets and components for PyQt/PySide
+#                     superqt provides a variety of widgets that are not included
+#                     in the native QtWidgets module, including multihandle (range) 
+#                     sliders, comboboxes, and more.
+#
+# python311-QtAwesome - FontAwesome icons in PyQt and PySide applications
+#                       QtAwesome enables iconic fonts such as Font Awesome and
+#                       Elusive Icons in PyQt and PySide applications.
+#                       It is a port to Python - PyQt / PySide of the QtAwesome 
+#                       C++ library by Rick Blommers.
+#
+# 2) create a virtual environment WITH ACCESS TO SYSTEM-SITE PACKAGES!
+#   WARNING: Not easily suitable for deploying the environment
+#   WARNING: attempts to uninstall system-site packages will fail; they will be
+#   overridden by packages installed in the virtual environment!
+#
+# 3) BEFORE launching anything that uses Qt for Python, set the environment
+#       varibale QT_API to "pyside6":
+#
+#   export QT_API="pyside6"
+#
+# 4) to check that this works, launch jupyter qtconsole and test that qtpy is
+# using PySide6 as Qt API:
+#
+# $> jupyter qtconsole
+#
+# then , inside Jupyter QtConsole, run:
+# import qtpy
+# qtpy.API
+#   >>> "pyside6"
+
+
+
+
+# 
 # Operating System: openSUSE Tumbleweed 20250109
 # KDE Plasma Version: 6.2.5
 # KDE Frameworks Version: 6.9.0
@@ -41,76 +106,76 @@
 # also remember to pip install shiboken6 module in the virtual environment - not really ?!?
 
 
-function dopyside6 ()
-{
-    if [[ -z "$VIRTUAL_ENV" ]] ; then
-        echo -e "Not in an active environment! Goodbye!\n"
-        exit 1
-    fi
-    
-    cd ${VIRTUAL_ENV}
-
-    wget https://download.qt.io/development_releases/prebuilt/libclang/$libclang_arc
-    if [[ $? -ne 0 ]] ; then
-    echo -e "Cannot retrieve prebult libclang. Bailing out. Goodbye!\n"
-    exit 1
-    fi
-    
-    7z x $libclang_arc
-    
-    if [[ $? -ne 0 ]] ; then
-    echo -e "Cannot extract prebult libclang. Bailing out. Goodbye!\n"
-    exit 1
-    fi
-    
-    export LLVM_INSTALL_DIR=${VIRTUAL_ENV}/libclang
-    
-    mkdir -p ${VIRTUAL_ENV}/src && cd ${VIRTUAL_ENV}/src
-    
-    git clone https://code.qt.io/pyside/pyside-setup
-    
-    if [[ $? -ne 0 ]] ; then
-    echo -e "Cannot clone pyqside6 repository. Bailing out. Goodbye!\n"
-    exit 1
-    fi
-    
-    cd pyside-setup && git checkout $pyside6_qtver
-    
-    if [[ $? -ne 0 ]] ; then
-    echo -e "Cannot checkout branch $pyside6_qtver. Bailing out. Goodbye!\n"
-    exit 1
-    fi
-    
-    pip install -r requirements.txt
-    if [[ $? -ne 0 ]] ; then
-    echo -e "Cannot install pip requirements for PySide ($pyside6_qtver). Bailing out. Goodbye!\n"
-    exit 1
-    fi
-    
-    
-    pip install -r requirements-doc.txt
-    if [[ $? -ne 0 ]] ; then
-    echo -e "Cannot install pip documentation requirements for PySide ($pyside6_qtver). Bailing out. Goodbye!\n"
-    exit 1
-    fi
-    
-    # NOTE 2025-01-13 16:34:26 trying setuptools - WARNING use qtpaths6 below, on
-    # Tumbleweed!!!
-    qtpaths_exec=`which qtpaths6`
-    python setup.py build --qtpaths=${qtpaths_exec} --build-tests --ignore-git --parallel=8
-    if [[ $? -ne 0 ]] ; then
-    echo -e "Cannot build PySide6 for Qt $pyside6_qtver. Bailing out. Goodbye!\n"
-    exit 1
-    fi
-    
-    python setup.py install --prefix=${VIRTUAL_ENV} --qtpaths=${qtpaths_exec} --build-tests --ignore-git --parallel=8
-    
-    if [[ $? -ne 0 ]] ; then
-    echo -e "Cannot install PySide6 for Qt $pyside6_qtver. Bailing out. Goodbye!\n"
-    exit 1
-    fi
-    
-}
+# function dopyside6 ()
+# {
+#     if [[ -z "$VIRTUAL_ENV" ]] ; then
+#         echo -e "Not in an active environment! Goodbye!\n"
+#         exit 1
+#     fi
+#     
+#     cd ${VIRTUAL_ENV}
+# 
+#     wget https://download.qt.io/development_releases/prebuilt/libclang/$libclang_arc
+#     if [[ $? -ne 0 ]] ; then
+#     echo -e "Cannot retrieve prebult libclang. Bailing out. Goodbye!\n"
+#     exit 1
+#     fi
+#     
+#     7z x $libclang_arc
+#     
+#     if [[ $? -ne 0 ]] ; then
+#     echo -e "Cannot extract prebult libclang. Bailing out. Goodbye!\n"
+#     exit 1
+#     fi
+#     
+#     export LLVM_INSTALL_DIR=${VIRTUAL_ENV}/libclang
+#     
+#     mkdir -p ${VIRTUAL_ENV}/src && cd ${VIRTUAL_ENV}/src
+#     
+#     git clone https://code.qt.io/pyside/pyside-setup
+#     
+#     if [[ $? -ne 0 ]] ; then
+#     echo -e "Cannot clone pyqside6 repository. Bailing out. Goodbye!\n"
+#     exit 1
+#     fi
+#     
+#     cd pyside-setup && git checkout $pyside6_qtver
+#     
+#     if [[ $? -ne 0 ]] ; then
+#     echo -e "Cannot checkout branch $pyside6_qtver. Bailing out. Goodbye!\n"
+#     exit 1
+#     fi
+#     
+#     pip install -r requirements.txt
+#     if [[ $? -ne 0 ]] ; then
+#     echo -e "Cannot install pip requirements for PySide ($pyside6_qtver). Bailing out. Goodbye!\n"
+#     exit 1
+#     fi
+#     
+#     
+#     pip install -r requirements-doc.txt
+#     if [[ $? -ne 0 ]] ; then
+#     echo -e "Cannot install pip documentation requirements for PySide ($pyside6_qtver). Bailing out. Goodbye!\n"
+#     exit 1
+#     fi
+#     
+#     # NOTE 2025-01-13 16:34:26 trying setuptools - WARNING use qtpaths6 below, on
+#     # Tumbleweed!!!
+#     qtpaths_exec=`which qtpaths6`
+#     ${python_executable} setup.py build --qtpaths=${qtpaths_exec} --build-tests --ignore-git --parallel=8
+#     if [[ $? -ne 0 ]] ; then
+#     echo -e "Cannot build PySide6 for Qt $pyside6_qtver. Bailing out. Goodbye!\n"
+#     exit 1
+#     fi
+#     
+#     ${python_executable} setup.py install --prefix=${VIRTUAL_ENV} --qtpaths=${qtpaths_exec} --build-tests --ignore-git --parallel=8
+#     
+#     if [[ $? -ne 0 ]] ; then
+#     echo -e "Cannot install PySide6 for Qt $pyside6_qtver. Bailing out. Goodbye!\n"
+#     exit 1
+#     fi
+#     
+# }
 
 function dovigra ()
 {
@@ -323,7 +388,7 @@ function makevirtenv ()
         fi
     else
         # putative virtual environment directory not found => need to generate one
-        ${python_executable} -m virtualenv --python ${python_executable} $virtual_env
+        ${python_executable} -m virtualenv  --python ${python_executable} $virtual_env
         
         if [[ $? -ne 0 ]] ; then
             # the above attempt failed => bail out
@@ -346,7 +411,8 @@ function makevirtenv ()
         # just cache this for the rest of this script
         python_executable=`which python3`
         
-        echo -e "Virtual environment at ${VIRTUAL_ENV} activated; python executable is ${python_executable}\n"
+        echo -e "Virtual environment at ${VIRTUAL_ENV} activated\n"
+        echo -e "Python executable is ${python_executable}\n"
         
     fi
     
@@ -356,7 +422,12 @@ function makevirtenv ()
 #### Execution starts here ###
 
 SECONDS=0
-get_pyver
+
+major=3
+minor=11
+python_exec="python${major}.${minor}"
+
+# get_pyver # not needed anymore - fix this to python3.11
 
 install_dir=${HOME}
 virtual_env_pfx="scipyenv_pyside6_build" #.$pyver"
@@ -378,51 +449,72 @@ libclang_arc=libclang-release_18.1.5-based-linux-Rhel8.6-gcc10.3-x86_64.7z
 
 echo -e "Will install in ${install_dir}" 
 
-if ! [ -v VIRTUAL_ENV ] ; then
-    virtual_env=${install_dir}/${virtual_env_pfx}
-    python_exec="python${major}.${minor}"
-else
-    virtual_env=$VIRTUAL_ENV
-    python_exec=$VIRTUAL_ENV/bin/"python${major}"
-fi
+# if ! [ -v VIRTUAL_ENV ] ; then
+#     virtual_env=${install_dir}/${virtual_env_pfx}
+#     python_exec="python${major}.${minor}"
+# else
+#     virtual_env=$VIRTUAL_ENV
+#     python_exec=$VIRTUAL_ENV/bin/"python${major}"
+# fi
 
-if [[ `id -u ` -eq 0 ]] ; then
-#     echo "running as root"
-    python_executable=`which ${python_exec}`;
-else
-    python_executable=${python_exec}
-fi
+python_executable=`which ${python_exec}`
 
+# if [[ `id -u ` -eq 0 ]] ; then
+# #     echo "running as root"
+#     python_executable=`which ${python_exec}`;
+# else
+#     python_executable=${python_exec}
+# fi
+
+virtual_env=${install_dir}/${virtual_env_pfx}
 echo -e "virtual_env is ${virtual_env}"
 echo -e "python executable: ${python_executable}"
 
-if ! [ -v VIRTUAL_ENV ] ; then
-# NOTE: 2023-06-25 20:57:31 
-# these two MUST be run
-makevirtenv
-# upgrade_virtualenv && makevirtenv
+${python_executable} -m virtualenv --clear --system-site-packages  --python ${python_executable} $virtual_env
+
+if [[ $? -ne 0 ]] ; then
+    echo -e "\nCould not create a virtual environment. Goodbye!\n"
+    exit 1
+fi
+
+echo -e "Activating virtual environment in ${virtual_env}\n"
+
+source ${virtual_env}/bin/activate
+
+if [[ $? -ne 0 ]] ; then
+    echo -e "\nCould not activate the virtual environment in ${virtual_env}. Goodbye!\n"
+    exit 1
 else
     virtual_env=$VIRTUAL_ENV
 fi
-if [[ $? -ne 0 ]] ; then
-    echo -e "\nCould not create and/or activate a virtual environment. Goodbye!\n"
-    exit 1
-fi
 
-# verify that the newly created virtual environment is active
-if [[ -z "$VIRTUAL_ENV" ]] ; then
-    echo -e "Not in an active environment! Goodbye!\n"
-    exit 1
-fi
+# if ! [ -v VIRTUAL_ENV ] ; then
+# # NOTE: 2023-06-25 20:57:31 
+# # these two MUST be run
+# 
+# # NOTE: 2025-01-14 13:59:16 overwrites current environment directory
+# # will use system-site packages and python3.11
+# 
+# # upgrade_virtualenv && makevirtenv
+# else
+#     virtual_env=$VIRTUAL_ENV
+# fi
+# 
+# # verify that the newly created virtual environment is active
+# if [[ -z "$VIRTUAL_ENV" ]] ; then
+#     echo -e "Not in an active environment! Goodbye!\n"
+#     exit 1
+# fi
 
 if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
+    echo -e "Virtual environment ${VIRTUAL_ENV} is activated\n"
     echo -e "Checking for, or making 'src' directory inside $VIRTUAL_ENV ...\n"
     
     mkdir -p "$VIRTUAL_ENV/src" && cd "$VIRTUAL_ENV/src"
     
     # install pip requirements NOTE: 2023-06-25 10:55:09 FIXME how to pass the virtualenv python to builder when run as root?
 #     installpipreqs_stage1
-    dopyside6
+#     dopyside6
 #     installpipreqs_stage2
 #     dovigra
     
