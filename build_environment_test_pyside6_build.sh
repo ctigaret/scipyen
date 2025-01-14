@@ -417,12 +417,13 @@ fi
 
 if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
     echo -e "Checking for, or making 'src' directory inside $VIRTUAL_ENV ...\n"
+    
     mkdir -p "$VIRTUAL_ENV/src" && cd "$VIRTUAL_ENV/src"
     
     # install pip requirements NOTE: 2023-06-25 10:55:09 FIXME how to pass the virtualenv python to builder when run as root?
-    installpipreqs_stage1
+#     installpipreqs_stage1
     dopyside6
-    installpipreqs_stage2
+#     installpipreqs_stage2
 #     dovigra
     
 fi
