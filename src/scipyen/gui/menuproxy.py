@@ -22,25 +22,27 @@ class MenuProxy(QtWidgets.QProxyStyle):
     alertShown = False
 
     def useMenuHack(self, element, opt, widget):
-        if (element in (self.CT_MenuBarItem, self.CE_MenuBarItem) and
-            isinstance(widget, QtWidgets.QMenuBar) and
-            opt.icon and not opt.icon.isNull() and opt.text):
-                if not self.alertShown:
-                    if widget.isNativeMenuBar():
-                        return False
-                        # NOTE: 2024-09-27 22:31:42
-                        # this warning is not needed
-                        # this will probably not be shown...
-                    #     print('WARNING: menubar items with icons and text not supported for native menu bars')
-                    styleName = self.baseStyle().objectName()
-                    # NOTE: 2024-09-27 22:32:39 TODO
-                    # this warning likely not needed, either
-                    # if not 'windows' in styleName and styleName != 'fusion':
-                    #     return False
-                        # print('WARNING: menubar items with icons and text not supported for "{}" style'.format(
-                        #     styleName))
-                    self.alertShown = True
-                return True
+        if all(hasattr(self, mbi) for mbi in ("CT_MenuBarItem", "CE_MenuBarItem")):
+            # adapt for switching FROM FROM QtLight QtDark QtAuto - they loose the above attributes
+            if (element in (self.CT_MenuBarItem, self.CE_MenuBarItem) and
+                isinstance(widget, QtWidgets.QMenuBar) and
+                opt.icon and not opt.icon.isNull() and opt.text):
+                    if not self.alertShown:
+                        if widget.isNativeMenuBar():
+                            return False
+                            # NOTE: 2024-09-27 22:31:42
+                            # this warning is not needed
+                            # this will probably not be shown...
+                        #     print('WARNING: menubar items with icons and text not supported for native menu bars')
+                        styleName = self.baseStyle().objectName()
+                        # NOTE: 2024-09-27 22:32:39 TODO
+                        # this warning likely not needed, either
+                        # if not 'windows' in styleName and styleName != 'fusion':
+                        #     return False
+                            # print('WARNING: menubar items with icons and text not supported for "{}" style'.format(
+                            #     styleName))
+                        self.alertShown = True
+                    return True
         return False
 
     def sizeFromContents(self, content, opt, size, widget=None):

@@ -50,6 +50,7 @@ function define_vars()
     pyside6_qtver_major="6"
     pyside6_qtver_minor="8"
     pyside6_qtver_micro="0"
+    pyside_remote_url_base=https://download.qt.io/snapshots/ci/pyside/$pyside6_qtver_major.$pyside6_qtver_minor.$pyside6_qtver_micro
     libclang_arc=libclang-release_18.1.5-based-linux-Rhel8.6-gcc10.3-x86_64.7z
 
 

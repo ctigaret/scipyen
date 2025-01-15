@@ -21,7 +21,7 @@
 #
 # install ninja
 #
- ATTENTION: 2025-01-14 13:41:36 
+# ATTENTION: 2025-01-14 13:41:36 
 # Does NOT work on openSUSE Tumbleweed, I guess it requires patches (take a look
 # at https://build.opensuse.org/package/show/openSUSE:Factory/python3-pyside6 )
 
@@ -130,13 +130,24 @@
 function define_vars()
 {
     get_pyver
-    virtual_env_pfx="scipyenv_pyside6_build" #.$pyver"
+    python_major=3
+    python_minor=11
+    python_micro=11
+    python_exec="python${python_major}.${python_minor}"
+    virtual_env_stem="scipyenv"
+    virtual_env_qt_binding="pyside6"
+    virtual_env_qt_binding_source="build"
+    virtual_env_bnd=${virtual_env_qt_binding}_${virtual_env_qt_binding_source}
+    virtual_env_pfx=${virtual_env_stem}_${virtual_env_bnd}
+    activate_cmd="scipyact_"${virtual_env_bnd}
+    launch_script="scipyen"_${virtual_env_bnd}
+    desktop_file="Scipyen".$virtual_env_bnd".desktop"
+    rcfile=${HOME}/.${virtual_env_pfx}_rc
     install_dir=${HOME}
     realscript=`realpath $0`
     scipyendir=`dirname "$realscript"`
     docdir=${scipyendir}/doc
     installauxdir=${scipyendir}/setup_env
-    installscriptdir=${scipyendir}/setup_env
     scipyensrcdir=${scipyendir}/src/scipyen
     pipreqsfile1="pip_requirements_pyside6_stage_1.txt"
     pipreqsfile2="pip_requirements_pyside6_stage_2.txt"
@@ -153,9 +164,22 @@ function define_vars()
     reinstall_desktop=0
     refresh_git_repos=0
     make_dist=0
-    pyside6_qtver="6.8"
     libclang_arc=libclang-release_18.1.5-based-linux-Rhel8.6-gcc10.3-x86_64.7z
-
+    pyside6_qtver_major="6"
+    pyside6_qtver_minor="8"
+    pyside6_qtver_micro="1"
+    pyside6_qtver_nano="1"
+    pyside6_ver_triad=${pyside6_qtver_major}.${pyside6_qtver_minor}.${pyside6_qtver_micro}
+    pyside6_ver_quad=${pyside6_qtver_major}.${pyside6_qtver_minor}.${pyside6_qtver_micro}.${pyside6_qtver_nano}
+    cp_ver="cp39"
+    abiver="abi3"
+    shiboken_remote_url_base=https://download.qt.io/official_releases/QtForPython/shiboken6
+    shiboken_generator_remote_url_base=https://download.qt.io/official_releases/QtForPython/shiboken6-generator
+    pyside6_remote_url_base=https://download.qt.io/official_releases/QtForPython/pyside6
+    # NOTE: 2025-01-15 13:38:09 ATTENTION:
+    # Browse online the remote url bases listed above and CHECK that the specified
+    # architecture below actually exists !
+    this_arch="manylinux_2_28_x86_64" # alternatives: "manylinux_2_39_aarch64" "macosx_12_0_universal2" "win_amd64" 
 
 
     must_create_env=1
@@ -187,35 +211,23 @@ function dopyside6 ()
     export LLVM_INSTALL_DIR=${VIRTUAL_ENV}/libclang
     
     mkdir -p ${VIRTUAL_ENV}/src && cd ${VIRTUAL_ENV}/src
+    shiboken6_generator=${shiboken_generator_remote_url_base}/shiboken6_generator-${pyside6_ver_quad}-${cp_ver}-${abiver}-${this_arch}.whl
+    shiboken6=${shiboken_remote_url_base}/shiboken6_generator-${pyside6_ver_quad}-${cp_ver}-${abiver}-${this_arch}.whl
+#     pyside6_examples=https://download.qt.io/snapshots/ci/pyside/6.8.1/c53d373017c8a94235ce02792a28ea2740fb92b4/pyside6/PySide6_Examples-6.8.1-cp39-abi3-manylinux_2_28_x86_64.whl
+#     pyside6_essentials=https://download.qt.io/snapshots/ci/pyside/6.8.1/c53d373017c8a94235ce02792a28ea2740fb92b4/pyside6/PySide6_Essentials-6.8.1-cp39-abi3-manylinux_2_28_x86_64.whl
+#     pyside6_addons=https://download.qt.io/snapshots/ci/pyside/6.8.1/c53d373017c8a94235ce02792a28ea2740fb92b4/pyside6/PySide6_Addons-6.8.1-cp39-abi3-manylinux_2_28_x86_64.whl
+#     pyside6=https://download.qt.io/snapshots/ci/pyside/6.8.1/c53d373017c8a94235ce02792a28ea2740fb92b4/pyside6/PySide6-6.8.1-cp39-abi3-manylinux_2_28_x86_64.whl
+
+    pyside6_src_archive_stem=pyside-setup-everywhere-src-${pyside6_ver_quad}
+    pyside6_src_archive=${pyside6_src_archive_stem}.tar.xz
+    pyside6_src_url=${pyside6_remote_url_base}/PySide6-${pyside6_ver_triad}-src/${pyside6_src_archive}
     
-    git clone https://code.qt.io/pyside/pyside-setup
-    
-    if [[ $? -ne 0 ]] ; then
-    echo -e "Cannot clone pyqside6 repository. Bailing out. Goodbye!\n"
-    exit 1
-    fi
-    
-    cd pyside-setup && git checkout $pyside6_qtver
-    
-    if [[ $? -ne 0 ]] ; then
-    echo -e "Cannot checkout branch $pyside6_qtver. Bailing out. Goodbye!\n"
-    exit 1
-    fi
-    
-#     pip install -r requirements.txt
-    pip install -r ${scipyendir}/pyside6_requirements.txt
-    if [[ $? -ne 0 ]] ; then
-    echo -e "Cannot install pip requirements for PySide ($pyside6_qtver). Bailing out. Goodbye!\n"
-    exit 1
-    fi
-    
-    
-    pip install -r requirements-doc.txt
-    if [[ $? -ne 0 ]] ; then
-    echo -e "Cannot install pip documentation requirements for PySide ($pyside6_qtver). Bailing out. Goodbye!\n"
-    exit 1
-    fi
-    
+    # first, install shiboken6 & shiboken6-generator
+    ${python_executable} -m pip install $shiboken6_generator
+    ${python_executable} -m pip install $shiboken6
+    pip install -r ${VIRTUAL_ENV}/pyside6_requirements.txt
+    pip install -r ${VIRTUAL_ENV}/pyside6_requirements_doc.txt
+
     # NOTE 2025-01-13 16:34:26 trying setuptools - WARNING use qtpaths6 below, on
     # Tumbleweed!!!
     qtpaths_exec=`which qtpaths6`
@@ -224,11 +236,49 @@ function dopyside6 ()
     # on openSUSE Tumbleweed I think needs this in order to find uic, moc, rcc:
     export PATH=$PATH:`${qtpaths_exec} --query QT_HOST_LIBEXECS`
     
+    
+    # download and extract the pyside6 source
+    cd ${VIRTUAL_ENV}
+    mkdir -p src && cd ${VIRTUAL_ENV}/src
+    wget ${pyside6_src_url} && tar xxf ${pyside6_src_archive} && cd ${pyside6_src_archive_stem}
+    
+    
+# ### BEGIN fails to build from git clone
+#     
+#     git clone https://code.qt.io/pyside/pyside-setup
+#     
+#     if [[ $? -ne 0 ]] ; then
+#     echo -e "Cannot clone pyqside6 repository. Bailing out. Goodbye!\n"
+#     exit 1
+#     fi
+#     
+#     cd pyside-setup && git checkout $pyside6_qtver
+#     
+#     if [[ $? -ne 0 ]] ; then
+#     echo -e "Cannot checkout branch $pyside6_qtver. Bailing out. Goodbye!\n"
+#     exit 1
+#     fi
+#     
+# #     pip install -r requirements.txt
+#     pip install -r ${scipyendir}/pyside6_requirements.txt
+#     if [[ $? -ne 0 ]] ; then
+#     echo -e "Cannot install pip requirements for PySide ($pyside6_qtver). Bailing out. Goodbye!\n"
+#     exit 1
+#     fi
+#     
+#     
+#     pip install -r requirements-doc.txt
+#     if [[ $? -ne 0 ]] ; then
+#     echo -e "Cannot install pip documentation requirements for PySide ($pyside6_qtver). Bailing out. Goodbye!\n"
+#     exit 1
+#     fi
+    
 #     ${python_executable} setup.py build --qtpaths=${qtpaths_exec} --build-tests --ignore-git --parallel=8
 #     if [[ $? -ne 0 ]] ; then
 #     echo -e "Cannot build PySide6 for Qt $pyside6_qtver. Bailing out. Goodbye!\n"
 #     exit 1
 #     fi
+# ### END   fails to build from git clone
     
     ${python_executable} setup.py install   --prefix=${VIRTUAL_ENV} \
                                             --qtpaths=${qtpaths_exec} \
@@ -309,6 +359,62 @@ function dovigra ()
     fi
     
     
+}
+
+function findcmake ()
+{
+    cmake_binary=`which cmake`
+    if [ -z "$cmake_binary" ] ; then
+        echo -e "Cannot build vigra without cmake. Goodbye!\n"
+        exit 1
+    fi
+    
+}
+
+function findqmake ()
+{
+    # Identifes which qmake is there available on the platform.
+    # 
+    # Since Linux dsitributions currently provide both Qt5 and Qt6, their respective
+    # qmake tools bear different names.
+    #
+    # Not sure this is as generic as possible across the Linux distributions...
+    #
+    
+    qmake_binary=`which qmake`
+    if [ -z "$qmake_binary" ] ; then
+        qmake_binary=`which qmake-qt5`
+    fi
+    
+    if [ -z "$qmake_binary" ] ; then
+        read -e -p "Enter a full path to qmake (or qmake-qt5): " qmake_binary
+    fi
+    
+    if [ -z "$qmake_binary" ] ; then
+        echo -e "Cannot build Pyqt5 without qmake. Goodbye!\n"
+        exit 1
+    fi
+    
+    echo "using qmake: ${qmake_binary}"
+}
+
+function findqmake6 ()
+{
+    qmake6_binary=`which qmake6`
+    if [ -z "$qmake6_binary" ] ; then
+        qmake6_binary=`which qmake-qt6`
+    fi
+    
+    if [ -z "$qmake6_binary" ] ; then
+        read -e -p "Enter a full path to qmake6 (or qmake-qt6): " qmake6_binary
+    fi
+    
+    if [ -z "$qmake6_binary" ] ; then
+        echo -e "Cannot build PyQt6 without qmake6. Goodbye!\n"
+        exit 1
+    fi
+    
+    echo "using qmake: ${qmake6_binary}"
 }
 
 function get_pyver ()
@@ -397,6 +503,232 @@ function installpipreqs_stage2()
     fi
 }
 
+function main()
+{
+
+# makes a virtual environment and activates it
+if ! [ -v VIRTUAL_ENV ] ; then
+# NOTE: 2023-06-25 20:57:31 
+# these two MUST be run
+    overwrite_env=1
+    makevirtenv
+    if [[ $? -ne 0 ]] ; then
+        echo -e "\nCould not create and/or activate a virtual environment. Goodbye!\n"
+        exit 1
+    fi
+else
+    virtual_env=$VIRTUAL_ENV
+fi
+
+# verify that the newly created virtual environment is active
+if [[ -z "$VIRTUAL_ENV" ]] ; then
+    echo -e "Not in an active environment! Goodbye!\n"
+    exit 1
+fi
+
+# exit
+
+if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
+    echo -e "Checking for, or making 'src' directory inside $VIRTUAL_ENV ...\n"
+    mkdir -p "$VIRTUAL_ENV/src" && cd "$VIRTUAL_ENV/src"
+    
+    # install pip requirements NOTE: 2023-06-25 10:55:09 FIXME how to pass the virtualenv python to builder when run as root?
+    installpipreqs_stage1
+    dopyside6
+    installpipreqs_stage2
+    
+    if [[ $? -ne 0 ]] ; then
+        echo -e "Could not install pip requirements; check the console for messages. Goodbye!\n"
+        exit 1
+    fi
+    
+    # build vigra NOTE: 2023-06-25 10:55:09 FIXME how to pass the virtualenv python to builder when run as root?
+#     dovigra
+    
+    # build neuron NOTE: 2023-06-25 10:55:09 FIXME how to pass the virtualenv python to builder when run as root?
+#     if [ $install_neuron -ne 0 ] ; then
+#         doneuron
+#     fi
+    
+#     if  [ $install_fenicsx -ne 0 ] ; then
+#         dofenicsx
+#     fi
+    
+    # make scripts
+    make_scipyenrc
+#     
+#     if [[ `id -u` -ne 0 ]] ; then
+#         # only update bashrc for regular users
+#         update_bashrc
+#     fi
+    
+    make_launch_script
+    
+#     update_bashrc
+    
+#     make_desktop_entry
+    
+    # NOTE: install console color schemes
+    cd $scipyendir/src/scipyen/gui/scipyen_console_styles
+    pip install .
+    cd $scipyendir
+    
+fi
+}
+
+function make_desktop_entry ()
+{
+if [ ! -r ${VIRTUAL_ENV}/.desktopdone ] || [[ $reinstall_desktop -gt 0 ]] ; then
+if [[ `id -u` -eq 0 ]] ; then
+target_dir=/usr/local/bin
+else
+target_dir=${HOME}/bin
+fi
+tmpfiledir=$(mktemp -d)
+# tmpfile=${tmpfiledir}/cezartigaret-Scipyen.desktop
+tmpfile=${tmpfiledir}/Scipyen.desktop
+# script=${target_dir}/scipyen
+script=${launch_script}
+echo -e "Script to execute: ${script}"
+cat<<END > ${tmpfile}
+[Desktop Entry]
+Type=Application
+Name[en_GB]=Scipyen
+Name=Scipyen
+Comment[en_GB]=Scientific Python Environment for Neurophysiology
+Comment=Scientific Python Environment for Neurophysiology
+GenericName[en_GB]=Scientific Python Environment for Neurophysiology
+GenericName=Scientific Python Environment for Neurophysiology
+Icon=pythonbackend
+Categories=Science;Utilities;
+Exec=${script}
+MimeType=
+Path=
+StartupNotify=true
+Terminal=true
+TerminalOptions=\s
+X-DBUS-ServiceName=
+X-DBUS-StartupType=
+X-KDE-SubstituteUID=false
+X-KDE-Username=
+END
+xdg-desktop-menu install --novendor ${tmpfile}
+if [[ $? -ne 0 ]] ; then
+echo -e "Installation of Scipyen application file failed\n"
+exit 1
+fi
+# NOTE: 2023-05-02 15:25:50 this below installs an Icon on the desktop
+xdg-desktop-icon install --novendor ${tmpfile}
+if [[ $? -ne 0 ]] ; then
+echo -e "Installation of Scipyen Desktop file failed\n"
+exit 1
+fi
+echo "Scipyen Desktop file has been installed "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.desktopdone
+echo -e "Scipyen Desktop file has been installed \n"
+fi
+}
+
+function make_launch_script () 
+{
+    # force the use of XCB platform abstraction plugin in Qt
+if [[ `id -u` -eq 0 ]] ; then
+    target_dir=/usr/local/bin
+else
+    target_dir=${HOME}/bin
+fi
+    
+mkdir -p ${target_dir}
+if [ -r ${target_dir}/${launch_script} ] ; then
+    dt=`date '+%Y-%m-%d_%H-%M-%s'`
+    mv ${target_dir}/${launch_script} ${target_dir}/${launch_script}.$dt
+fi
+shopt -s lastpipe
+
+# if [[ `id -u` -eq 0 ]] ; then
+cat <<END > ${target_dir}/${launch_script}
+#! /bin/sh
+if [ -z \${VIRTUAL_ENV} ]; then
+source ${virtual_env}/bin/activate
+fi
+git -C $scipyendir rev-parse 2>/dev/null;
+if [[ \$? -eq 0 ]]; then
+branch=\`git -C ${scipyendir} branch --show-current\`
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+echo -e "${RED}WARNING:${NC} Running ${GREEN}\${branch}${NC} branch of local scipyen git repository in ${BLUE}$scipyendir${NC} with status:"
+git -C $scipyendir status --short --branch
+fi
+echo -e "\nUsing Python environment in ${VIRTUAL_ENV}\n"
+if [ -z \$BROWSER ]; then
+if [ -a \$VIRTUAL_ENV/bin/browser ]; then
+source \$VIRTUAL_ENV/bin/browser
+fi
+fi
+export LD_LIBRARY_PATH=${VIRTUAL_ENV}/lib:${VIRTUAL_ENV}/lib64:\${LD_LIBRARY_PATH}
+export OUTDATED_IGNORE=1
+a=\`which xrdb\` # do we have xrdb to read the X11 resources? (on Unix almost surely yes)
+if [ \$0 == 0 ] ; then
+if [ -r $scipyensrcdir/neuron_python/app-defaults/nrniv ] ; then
+xrdb -merge $scipyensrcdir/neuron_python/app-defaults/nrniv
+fi
+fi
+export QT_API="PySide6"
+${python_executable} -Xfrozen_modules=off ${scipyensrcdir}/scipyen.py "\$*"
+END
+shopt -u lastpipe
+chmod +x ${target_dir}/${launch_script}
+echo -e "Scipyen (PySide6) startup script created in ${target_dir} \n"
+}
+
+function make_scipyenrc () 
+{
+# When the installer script is run as regular user, it will create 
+# ${HOME}/.scipeynrc which allows activation of the virtual python environment
+# used to run Scipyen.
+#
+# The .scipyenrc script NEEDS TO BE SOURCED (in bash); this is done automatically
+# by the Scipyen launch bash script ('scipyen'); for convenience, this script is
+# also sourced from ${HOME}/.bashrc in order for the function 'scipyact' to be
+# readily available to the user, at the console.
+#
+
+
+echo -e "\nCreating ${rcfile} file... \n"
+
+if [[ -z "$VIRTUAL_ENV" ]] ; then
+    echo -e "Not in an active environment! Goodbye!\n"
+    exit 1
+fi
+
+dt=`date '+%Y-%m-%d_%H-%M-%s'`
+
+py_exec=${python_exec}
+if [ -r ${rcfile} ] ; then
+# make a backup copy of .scipyenrc_pyside6
+shopt -s lastpipe
+echo "Copying ${rcfile} to ${rcfile}.$dt"
+cp ${rcfile} ${rcfile}.$dt
+fi
+cat<<END > ${rcfile}
+${activate_cmd} () {
+source ${VIRTUAL_ENV}/bin/activate
+export LD_LIBRARY_PATH=${VIRTUAL_ENV}/lib:${VIRTUAL_ENV}/lib64:$LD_LIBRARY_PATH
+export QT_API="PySide6"
+echo -e "The Python virtual environment in ${VIRTUAL_ENV} is now active.\nTo exit this environment call 'deactivate'"
+}
+END
+# # # # cat<<END > ${rcfile}
+# # # # scipyact_pyside6 () {
+# # # # source ${VIRTUAL_ENV}/bin/activate
+# # # # export LD_LIBRARY_PATH=${VIRTUAL_ENV}/lib:${VIRTUAL_ENV}/lib64:$LD_LIBRARY_PATH
+# # # # export QT_API="PySide6"
+# # # # echo -e "The Python virtual environment in ${VIRTUAL_ENV} is now active.\nTo exit this environment call 'deactivate'"
+# # # # }
+# # # # END
+shopt -u lastpipe
+}
 
 function makevirtenv ()
 {
@@ -417,8 +749,8 @@ function makevirtenv ()
     #
     
 #     must_create_env=1
-    
-    if [ -d $virtual_env ] ; then 
+
+    if [ -d $virtual_env -a $overwrite_env -eq 0 ] ; then 
         echo -e "Found putative virtual environment directory: ${virtual_env}\n"
         echo -e "Checking if the directory hosts a virtual python evironment..."
         if [ -a $virtual_env/pyvenv.cfg ] ; then 
@@ -508,44 +840,122 @@ function makevirtenv ()
     
 }
 
+function show_help ()
+{
+    echo -e "\n***                                                         ***"
+    echo -e "* Virtual Python environment installation script for Scipyen. *"
+    echo -e "***                                                         ***\n"
+    echo -e "(C) 2023 Cezar M. Tigaret "
+    echo -e "<cezar tigaret at gmail com> , <tigaretc at cardiff ac uk>"
+    echo -e "\nInstructions:"
+    echo -e "============\n"
+    echo -e "Run 'sh install.sh' without options for a fully automated installation, using built-in defaults.\n"
+    echo -e "Options:"
+    echo -e "========\n"
+    echo -e "--install_dir=DIR\tSpecify where the virtual environment will be created (default is ${HOME})\n"
+    echo -e "--environment=NAME\tCustom name for the virtual environment (default is ${virtual_env})\n"
+    echo -e "--with_neuron\t\tInstall binary neuron python distribution from PyPI\n"
+    echo -e "--build_neuron\t\tBuild neuron python locally\n"
+    echo -e "--with_coreneuron\twhen '--build_neuron' is passed, build local neuron with coreneuron; by default coreneuron is not used.\n"
+    echo -e "--refresh_repos\t When '--refresh_repos' is passed, local repository clones will be refreshed before rebuilding\n"
+    echo -e "\tNOTE: This applies to vigra and to local neuron build only\n"
+    echo -e "--jobs=N\t\tNumber of parallel tasks during building PyQt and neuron; default is 4; set to 0 to disable parallel build\n"
+    echo -e "--reinstall=NAME\t\t\tRe-install/re-building NAME, where NAME is one of:\n"
+    echo -e "\tpips, vigra, neuron, or desktopentry;\n"
+    echo -e "\t(this option can be passed more than once)\n"
+    echo -e "--install=NAME\t\t Alias to --reinstall option above; use it to "
+    echo -e "\tinstall optional libraries AFTER building Scipyen's virtual environment\n "
+    echo -e "--about\t\t\tDisplay Install.md at the console (requires the program 'glow')\n"
+    echo -e "--dist\t\t\tCreates a binary Scipyen diwstribution using PyInstaller. Requires that a virtual environment has already been built using this script.\n"
+    echo -e "-h | -? | --help \tShow this help message and quit\n"
+    echo -e "\nFor details, execute install.sh --about\n"
+    echo -e "\n"
+    echo -e "When run with the virtual Python environment already activated,\n"
+    echo -e "the script will use the current virtual environment to perform \n"
+    echo -e "(re)installations. WARNING: Make sure you activate the appropriate\n"
+    echo -e "Python environment for this !\n"
+   
+}
+
+function showinstalldoc () 
+{
+    glowexec=`which glow`
+    if [ -n $glowexec ] ; then
+        glow -p $docdir/Install.md
+    else
+        cat $docdir/Install.md
+    fi
+}
+
+function update_bashrc () 
+{
+dt=`date '+%Y-%m-%d_%H-%M-%s'`
+if [ ! -r ${HOME}/.bashrc ]; then
+cat<<END > ${HOME}/.bashrc
+source ${rcfile}
+END
+echo ".bashrc has been created in ${HOME}"
+echo "Sourcing ${HOME}/.bashrc"
+source ${HOME}/.bashrc
+else
+shopt -s lastpipe
+# check if .scipyenrc is sourced from .bashrc
+cat ${HOME}/.bashrc | grep "source ${rcfile}" | read source_set
+# echo "source_set="$source_set
+if [ -z "${source_set}" ]; then
+# ${rcfile} not sourced from .bashrc => backup .bashrc, then append a line to
+# source ${rcfile} in there
+echo "Copying ${HOME}/.bashrc to ${HOME}/.bashrc.$dt"
+cp ${HOME}/.bashrc ${HOME}/.bashrc.$dt
+echo "source ${rcfile}" >> ${HOME}/.bashrc
+echo ".bashrc has been modified in ${HOME}"
+echo "Sourcing ${HOME}/.bashrc"
+source ${HOME}/.bashrc
+fi
+shopt -u lastpipe
+fi
+}
 
 #### Execution starts here ###
 
 SECONDS=0
-
-major=3
-minor=11
-python_exec="python${major}.${minor}"
-
-# get_pyver # not needed anymore - fix this to python3.11
-
-install_dir=${HOME}
-virtual_env_pfx="scipyenv_pyside6_build" #.$pyver"
-realscript=`realpath $0`
-scipyendir=`dirname "$realscript"`
-docdir=${scipyendir}/doc
-installauxdir=${scipyendir}/setup_env
-docdir=${scipyendir}/doc
-pipreqsfile1="pip_requirements_pyside6_stage_1.txt"
-pipreqsfile2="pip_requirements_pyside6_stage_2.txt"
-scipyensrcdir=${scipyendir}/src/scipyen
-pyside6_qtver="6.8"
-njobs=4
-
+define_vars
 install_dir=`realpath ${install_dir}`
 
-# stored in ~/src/for scipyen/libclang cache
-# 
-#     https://download.qt.io/development_releases/prebuilt/libclang/libclang-release_19.1.6-based-linux-Rhel8.8-gcc10.3-x86_64.7z
-#     https://download.qt.io/development_releases/prebuilt/libclang/libclang-release_18.1.7-based-linux-Rhel8.6-gcc10.3-x86_64.7z
-# >   https://download.qt.io/development_releases/prebuilt/libclang/libclang-release_18.1.5-based-linux-Rhel8.6-gcc10.3-x86_64.7z
-
-libclang_arc=libclang-release_18.1.5-based-linux-Rhel8.6-gcc10.3-x86_64.7z
+if [ -d ${install_dir} ]; then
+    if ! [ -w ${install_dir} ]; then
+        echo -e "You do not have permission to install in ${install_dir}.\nPlease choose a location to create the virtual environment where you have permissions"
+        exit 1
+    fi
+    
+else
+    updir=`dirname ${install_dir}`
+    
+    if ! [ -w ${updir} ]; then
+        echo -e "You do not have permission to create ${install_dir}"
+        exit 1
+    fi
+    
+    mkdir ${install_dir}
+    
+fi
 
 
 echo -e "Will install in ${install_dir}" 
 
-python_executable=`which ${python_exec}`
+# echo "python major": $major
+# echo "python minor": $minor
+# echo "python micro": $micro
+
+if ! [ -v VIRTUAL_ENV ] ; then
+    virtual_env=${install_dir}/${virtual_env_pfx}
+    python_exec="python${major}.${minor}"
+else
+    virtual_env=$VIRTUAL_ENV
+    python_exec=$VIRTUAL_ENV/bin/"python${major}"
+fi
+
+python_executable=${python_exec}
 
 # if [[ `id -u ` -eq 0 ]] ; then
 # #     echo "running as root"
@@ -554,42 +964,11 @@ python_executable=`which ${python_exec}`
 #     python_executable=${python_exec}
 # fi
 
-virtual_env=${install_dir}/${virtual_env_pfx}
 echo -e "virtual_env is ${virtual_env}"
 echo -e "python executable: ${python_executable}"
 
-${python_executable} -m virtualenv --clear --python ${python_executable} $virtual_env
+main
 
-if [[ $? -ne 0 ]] ; then
-    echo -e "\nCould not create a virtual environment. Goodbye!\n"
-    exit 1
-fi
-
-echo -e "Activating virtual environment in ${virtual_env}\n"
-
-source ${virtual_env}/bin/activate
-
-if [[ $? -ne 0 ]] ; then
-    echo -e "\nCould not activate the virtual environment in ${virtual_env}. Goodbye!\n"
-    exit 1
-else
-    virtual_env=$VIRTUAL_ENV
-fi
-
-if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
-    echo -e "Virtual environment ${VIRTUAL_ENV} is activated\n"
-    echo -e "Checking for, or making 'src' directory inside $VIRTUAL_ENV ...\n"
-    
-    mkdir -p "$VIRTUAL_ENV/src" && cd "$VIRTUAL_ENV/src"
-    
-    # install pip requirements NOTE: 2023-06-25 10:55:09 FIXME how to pass the virtualenv python to builder when run as root?
-    installpipreqs_stage1
-#     dopyside6
-    installpipreqs_stage2
-#     dovigra
-    
-fi
-    
 t=$SECONDS
 
 days=$(( t/86400 ))
