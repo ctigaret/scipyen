@@ -195,7 +195,7 @@ function dopyside6 ()
     cd ${VIRTUAL_ENV}
 
 #     wget https://download.qt.io/development_releases/prebuilt/libclang/$libclang_arc
-    cp ~/src/for\ scipyen/pyside\ saga/libclang\ cache/$libclang_arc ./
+    cp ~/src/for\ scipyen/pyside6/libclang/$libclang_arc ./
     if [[ $? -ne 0 ]] ; then
     echo -e "Cannot retrieve prebult libclang. Bailing out. Goodbye!\n"
     exit 1
