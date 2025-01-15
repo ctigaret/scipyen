@@ -135,6 +135,7 @@ function define_vars()
     realscript=`realpath $0`
     scipyendir=`dirname "$realscript"`
     docdir=${scipyendir}/doc
+    installauxdir=${scipyendir}/setup_env
     installscriptdir=${scipyendir}/setup_env
     scipyensrcdir=${scipyendir}/src/scipyen
     pipreqsfile1="pip_requirements_pyside6_stage_1.txt"

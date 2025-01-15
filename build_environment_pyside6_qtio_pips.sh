@@ -15,7 +15,7 @@ function define_vars()
     get_pyver
     virtual_env_stem="scipyenv"
     virtual_env_qt_binding="pyside6"
-    virtual_env_qt_binding_source="pypi_pip"
+    virtual_env_qt_binding_source="qtio_pip"
     virtual_env_bnd=${virtual_env_qt_binding}_${virtual_env_qt_binding_source}
     virtual_env_pfx=${virtual_env_stem}_${virtual_env_bnd}
     activate_cmd="scipyact_"${virtual_env_bnd}
@@ -205,7 +205,28 @@ function doneuron ()
 
 function dopyside6()
 {
-    pip install pyside6
+    shiboken6_generator=https://download.qt.io/snapshots/ci/pyside/6.8.1/c53d373017c8a94235ce02792a28ea2740fb92b4/pyside6/shiboken6_generator-6.8.1-cp39-abi3-manylinux_2_28_x86_64.whl
+    shiboken6=https://download.qt.io/snapshots/ci/pyside/6.8.1/c53d373017c8a94235ce02792a28ea2740fb92b4/pyside6/shiboken6-6.8.1-cp39-abi3-manylinux_2_28_x86_64.whl
+    pyside6_examples=https://download.qt.io/snapshots/ci/pyside/6.8.1/c53d373017c8a94235ce02792a28ea2740fb92b4/pyside6/PySide6_Examples-6.8.1-cp39-abi3-manylinux_2_28_x86_64.whl
+    pyside6_essentials=https://download.qt.io/snapshots/ci/pyside/6.8.1/c53d373017c8a94235ce02792a28ea2740fb92b4/pyside6/PySide6_Essentials-6.8.1-cp39-abi3-manylinux_2_28_x86_64.whl
+    pyside6_addons=https://download.qt.io/snapshots/ci/pyside/6.8.1/c53d373017c8a94235ce02792a28ea2740fb92b4/pyside6/PySide6_Addons-6.8.1-cp39-abi3-manylinux_2_28_x86_64.whl
+    pyside6=https://download.qt.io/snapshots/ci/pyside/6.8.1/c53d373017c8a94235ce02792a28ea2740fb92b4/pyside6/PySide6-6.8.1-cp39-abi3-manylinux_2_28_x86_64.whl
+    
+    ${python_executable} -m pip install $shiboken6_generator
+    ${python_executable} -m pip install $shiboken6
+    ${python_executable} -m pip install $pyside6_examples
+    ${python_executable} -m pip install $pyside6_essentials
+    ${python_executable} -m pip install $pyside6_addons
+    ${python_executable} -m pip install $pyside6
+    
+#     pip install shiboken6==$pyside6_qtver_major.$pyside6_qtver_minor.$pyside6_qtver_micro
+#     pip install --index-url=https://download.qt.io/snapshots/ci/pyside/$pyside6_qtver_major.$pyside6_qtver_minor/latest shiboken6 --trusted-host download.qt.io
+#     pip install --index-url=https://download.qt.io/snapshots/ci/pyside/$pyside6_qtver_major.$pyside6_qtver_minor/latest shiboken6_generator --trusted-host download.qt.io
+#     pip install --index-url=https://download.qt.io/snapshots/ci/pyside/$pyside6_qtver_major.$pyside6_qtver_minor/latest pyside6 --trusted-host download.qt.io
+#     pip install --index-url=https://download.qt.io/snapshots/ci/pyside/$pyside6_qtver_major.$pyside6_qtver_minor/latest pyside6_addons --trusted-host download.qt.io
+#     pip install --index-url=https://download.qt.io/snapshots/ci/pyside/$pyside6_qtver_major.$pyside6_qtver_minor/latest pyside6_essentials --trusted-host download.qt.io
+#     pip install --index-url=https://download.qt.io/snapshots/ci/pyside/$pyside6_qtver_major.$pyside6_qtver_minor/latest pyside6_examples --trusted-host download.qt.io
+
 }
 
 function dovigra ()
@@ -484,8 +505,8 @@ if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
     
     # install pip requirements NOTE: 2023-06-25 10:55:09 FIXME how to pass the virtualenv python to builder when run as root?
     dopyside6
-#     installpipreqs_stage1
-#     installpipreqs_stage2
+    installpipreqs_stage1
+    installpipreqs_stage2
     
     if [[ $? -ne 0 ]] ; then
         echo -e "Could not install pip requirements; check the console for messages. Goodbye!\n"
@@ -493,7 +514,7 @@ if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
     fi
     
     # build vigra NOTE: 2023-06-25 10:55:09 FIXME how to pass the virtualenv python to builder when run as root?
-#     dovigra
+    dovigra
     
     # build neuron NOTE: 2023-06-25 10:55:09 FIXME how to pass the virtualenv python to builder when run as root?
     if [ $install_neuron -ne 0 ] ; then
@@ -537,7 +558,8 @@ fi
 tmpfiledir=$(mktemp -d)
 # tmpfile=${tmpfiledir}/cezartigaret-Scipyen.desktop
 tmpfile=${tmpfiledir}/Scipyen.desktop
-script=${target_dir}/scipyen
+# script=${target_dir}/scipyen
+script=${launch_script}
 echo -e "Script to execute: ${script}"
 cat<<END > ${tmpfile}
 [Desktop Entry]
