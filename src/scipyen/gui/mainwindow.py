@@ -8459,6 +8459,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # via Qt signal/slot mechanism (main window emits startPluginLoad at end of __init__)
         # dw = os.walk(path)
 
+    @safeWrapper
     def _locateMenuByItemText_(self, parent, itemText):
         '''
         Looks for (and returns) a QMenu labeled with itemText,
@@ -8472,25 +8473,38 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             menu tree)
         (c) itemText is the empty string ('') because it denotes a separator
         '''
-        isAlive = qtutils.isQObjectAlive(parent)
-        # print(f"{self.__class__.__name__}._locateMenuByItemText_: parent: {type(parent).__name__} is alive: {isAlive}")
-        if isAlive:
-            if not isinstance(parent, QtWidgets.QMenuBar):
-                print(f"{self.__class__.__name__}._locateMenuByItemText_ item: {itemText} in parent menu {parent.title()}")
-            else:
-                print(f"{self.__class__.__name__}._locateMenuByItemText_ {itemText} in menu bar")
-                
-            parentActionLabels = [i.text().replace('&', '')  for i in parent.actions()]
-            parentActionMenus = [i.menu() for i in parent.actions()]
-
-            if itemText in parentActionLabels:
-                ndx = parentActionLabels.index(itemText)
-                print(f"\t → {printStyled('Found', 'yellow')} {itemText} at index {ndx}")
-                return parentActionMenus[parentActionLabels.index(itemText)]
-            
+        if not isinstance(parent, QtWidgets.QMenuBar):
+            print(f"{self.__class__.__name__}._locateMenuByItemText_ item: {itemText} in parent menu {parent.title()}")
         else:
-            pmsg = printStyled(f"In {self.__class__.__name__}._locateMenuByItemText_ (itemText = '{itemText}'):", "yellow")
-            scipywarn("\n".join([pmsg, "The C++ object for parent is dead or has been deleted"]))
+            print(f"{self.__class__.__name__}._locateMenuByItemText_ {itemText} in menu bar")
+            
+        parentActionLabels = [i.text().replace('&', '')  for i in parent.actions()]
+        parentActionMenus = [i.menu() for i in parent.actions()]
+
+        if itemText in parentActionLabels:
+            ndx = parentActionLabels.index(itemText)
+            print(f"\t → {printStyled('Found', 'yellow')} {itemText} at index {ndx}")
+            return parentActionMenus[ndx]
+        
+#         isAlive = qtutils.isQObjectAlive(parent)
+#         # print(f"{self.__class__.__name__}._locateMenuByItemText_: parent: {type(parent).__name__} is alive: {isAlive}")
+#         if isAlive:
+#             if not isinstance(parent, QtWidgets.QMenuBar):
+#                 print(f"{self.__class__.__name__}._locateMenuByItemText_ item: {itemText} in parent menu {parent.title()}")
+#             else:
+#                 print(f"{self.__class__.__name__}._locateMenuByItemText_ {itemText} in menu bar")
+#                 
+#             parentActionLabels = [i.text().replace('&', '')  for i in parent.actions()]
+#             parentActionMenus = [i.menu() for i in parent.actions()]
+# 
+#             if itemText in parentActionLabels:
+#                 ndx = parentActionLabels.index(itemText)
+#                 print(f"\t → {printStyled('Found', 'yellow')} {itemText} at index {ndx}")
+#                 return parentActionMenus[parentActionLabels.index(itemText)]
+#             
+#         else:
+#             pmsg = printStyled(f"In {self.__class__.__name__}._locateMenuByItemText_ (itemText = '{itemText}'):", "yellow")
+#             scipywarn("\n".join([pmsg, "The C++ object for parent is dead or has been deleted"]))
 
     def _installPluginFunction_(self, f: types.FunctionType, menuItemLabel: str, 
                                 parentMenu: QtWidgets.QMenu, 
@@ -8601,6 +8615,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # created on the stack!
         
         newAction = QtWidgets.QAction(menuItemLabel, self)
+        
         if isinstance(before, QtWidgets.QAction):
             parentMenu.insertAction(before, newAction)
         else:
@@ -8620,6 +8635,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         return newAction
     
+    @safeWrapper
     def installPluginMenu(self, pname, v):
         '''Installs a GUI menu for the plugin named pname.
 
@@ -8773,17 +8789,18 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                             continue
 
                     else:
-                        cmAlive = qtutils.isQObjectAlive(currentMenu)
-                        if not cmAlive:
-                            pmsg = printStyled(f"Skipping the item {item} for plugin {pname}", "yellow")
-                            msg = "\n".join([f"{self.__class__.__name__}.installPluginMenu:",
-                                   f"\t{pmsg} ",
-                                   f"\twith path: '{v[0]}',\n\tand menu ↦ function mapping:\n\t\t{v[1]}",
-                                   "\tbecause the C++ object for currentMenu is dead or has been deleted",
-                                   ])
-                            scipywarn(msg)
-                            continue
                         parentMenu = currentMenu
+                        # cmAlive = qtutils.isQObjectAlive(currentMenu)
+                        # if not cmAlive:
+                        #     pmsg = printStyled(f"Skipping the item {item} for plugin {pname}", "yellow")
+                        #     msg = "\n".join([f"{self.__class__.__name__}.installPluginMenu:",
+                        #            f"\t{pmsg} ",
+                        #            f"\twith path: '{v[0]}',\n\tand menu ↦ function mapping:\n\t\t{v[1]}",
+                        #            "\tbecause the C++ object for currentMenu is dead or has been deleted",
+                        #            ])
+                        #     scipywarn(msg)
+                        #     continue
+                        # parentMenu = currentMenu
         else:
             # the plugin's init_scipyen_plugin function does not advertise a
             # menupath ⇒ use the plugin module name as submenu of a canonical

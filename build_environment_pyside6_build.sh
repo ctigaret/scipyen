@@ -208,7 +208,6 @@ function dopyside6 ()
     exit 1
     fi
     
-    export LLVM_INSTALL_DIR=${VIRTUAL_ENV}/libclang
     
     mkdir -p ${VIRTUAL_ENV}/src && cd ${VIRTUAL_ENV}/src
     shiboken6_generator=${shiboken_generator_remote_url_base}/shiboken6_generator-${pyside6_ver_quad}-${cp_ver}-${abiver}-${this_arch}.whl
@@ -222,19 +221,15 @@ function dopyside6 ()
     pyside6_src_archive=${pyside6_src_archive_stem}.${pyside6_qtver_micro}.tar.xz
     pyside6_src_url=${pyside6_remote_url_base}/PySide6-${pyside6_ver_triad}-src/${pyside6_src_archive}
     
-    # first, install shiboken6 & shiboken6-generator
-    ${python_executable} -m pip install $shiboken6_generator
-    ${python_executable} -m pip install $shiboken6
     pip install -r ${scipyendir}/pyside6-requirements.txt
     pip install -r ${scipyendir}/pyside6-requirements-doc.txt
+    ${python_executable} -m pip install $shiboken6
+    ${python_executable} -m pip install $shiboken6_generator
 
     # NOTE 2025-01-13 16:34:26 trying setuptools - WARNING use qtpaths6 below, on
     # Tumbleweed!!!
     qtpaths_exec=`which qtpaths6`
     
-    # NOTE: 2025-01-14 22:51:38
-    # on openSUSE Tumbleweed I think needs this in order to find uic, moc, rcc:
-    export PATH=$PATH:`${qtpaths_exec} --query QT_HOST_LIBEXECS`
     
     
     # download and extract the pyside6 source
@@ -280,8 +275,13 @@ function dopyside6 ()
 #     fi
 # ### END   fails to build from git clone
     
+    export LLVM_INSTALL_DIR=${VIRTUAL_ENV}/libclang
+    # NOTE: 2025-01-14 22:51:38
+    # on openSUSE Tumbleweed I think needs this in order to find uic, moc, rcc:
+    export PATH=$PATH:`${qtpaths_exec} --query QT_HOST_LIBEXECS`
     ${python_executable} setup.py install   --prefix=${VIRTUAL_ENV} \
                                             --qtpaths=${qtpaths_exec} \
+                                            --shiboken-host-path=${VIRTUAL_ENV}/lib64/python3.11/site-packages/ \
                                             --build-tests \
                                             --ignore-git \
                                             --parallel=8\
@@ -510,7 +510,7 @@ function main()
 if ! [ -v VIRTUAL_ENV ] ; then
 # NOTE: 2023-06-25 20:57:31 
 # these two MUST be run
-    overwrite_env=1
+    overwrite_env=0
     makevirtenv
     if [[ $? -ne 0 ]] ; then
         echo -e "\nCould not create and/or activate a virtual environment. Goodbye!\n"
@@ -533,7 +533,7 @@ if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
     mkdir -p "$VIRTUAL_ENV/src" && cd "$VIRTUAL_ENV/src"
     
     # install pip requirements NOTE: 2023-06-25 10:55:09 FIXME how to pass the virtualenv python to builder when run as root?
-    installpipreqs_stage1
+#     installpipreqs_stage1
     dopyside6
     installpipreqs_stage2
     
