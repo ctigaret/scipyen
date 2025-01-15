@@ -212,21 +212,21 @@ function dopyside6 ()
     
     mkdir -p ${VIRTUAL_ENV}/src && cd ${VIRTUAL_ENV}/src
     shiboken6_generator=${shiboken_generator_remote_url_base}/shiboken6_generator-${pyside6_ver_quad}-${cp_ver}-${abiver}-${this_arch}.whl
-    shiboken6=${shiboken_remote_url_base}/shiboken6_generator-${pyside6_ver_quad}-${cp_ver}-${abiver}-${this_arch}.whl
+    shiboken6=${shiboken_remote_url_base}/shiboken6-${pyside6_ver_quad}-${cp_ver}-${abiver}-${this_arch}.whl
 #     pyside6_examples=https://download.qt.io/snapshots/ci/pyside/6.8.1/c53d373017c8a94235ce02792a28ea2740fb92b4/pyside6/PySide6_Examples-6.8.1-cp39-abi3-manylinux_2_28_x86_64.whl
 #     pyside6_essentials=https://download.qt.io/snapshots/ci/pyside/6.8.1/c53d373017c8a94235ce02792a28ea2740fb92b4/pyside6/PySide6_Essentials-6.8.1-cp39-abi3-manylinux_2_28_x86_64.whl
 #     pyside6_addons=https://download.qt.io/snapshots/ci/pyside/6.8.1/c53d373017c8a94235ce02792a28ea2740fb92b4/pyside6/PySide6_Addons-6.8.1-cp39-abi3-manylinux_2_28_x86_64.whl
 #     pyside6=https://download.qt.io/snapshots/ci/pyside/6.8.1/c53d373017c8a94235ce02792a28ea2740fb92b4/pyside6/PySide6-6.8.1-cp39-abi3-manylinux_2_28_x86_64.whl
 
-    pyside6_src_archive_stem=pyside-setup-everywhere-src-${pyside6_ver_quad}
-    pyside6_src_archive=${pyside6_src_archive_stem}.tar.xz
+    pyside6_src_archive_stem=pyside-setup-everywhere-src-${pyside6_ver_triad}
+    pyside6_src_archive=${pyside6_src_archive_stem}.${pyside6_qtver_micro}.tar.xz
     pyside6_src_url=${pyside6_remote_url_base}/PySide6-${pyside6_ver_triad}-src/${pyside6_src_archive}
     
     # first, install shiboken6 & shiboken6-generator
     ${python_executable} -m pip install $shiboken6_generator
     ${python_executable} -m pip install $shiboken6
-    pip install -r ${VIRTUAL_ENV}/pyside6_requirements.txt
-    pip install -r ${VIRTUAL_ENV}/pyside6_requirements_doc.txt
+    pip install -r ${scipyendir}/pyside6-requirements.txt
+    pip install -r ${scipyendir}/pyside6-requirements-doc.txt
 
     # NOTE 2025-01-13 16:34:26 trying setuptools - WARNING use qtpaths6 below, on
     # Tumbleweed!!!
