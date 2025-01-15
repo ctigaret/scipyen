@@ -127,6 +127,38 @@
 #
 # also remember to pip install shiboken6 module in the virtual environment - not really ?!?
 
+function define_vars()
+{
+    get_pyver
+    virtual_env_pfx="scipyenv_pyside6_build" #.$pyver"
+    install_dir=${HOME}
+    realscript=`realpath $0`
+    scipyendir=`dirname "$realscript"`
+    docdir=${scipyendir}/doc
+    installscriptdir=${scipyendir}/setup_env
+    scipyensrcdir=${scipyendir}/src/scipyen
+    pipreqsfile1="pip_requirements_pyside6_stage_1.txt"
+    pipreqsfile2="pip_requirements_pyside6_stage_2.txt"
+    using_python=""
+    install_neuron=0
+    use_pypi_neuron=1
+    use_core_neuron=0
+    install_fenicsx=0
+    njobs=4
+    reinstall_vigra=0
+    reinstall_neuron=0
+    reinstall_fenicsx=0
+    reinstall_pips=0
+    reinstall_desktop=0
+    refresh_git_repos=0
+    make_dist=0
+    pyside6_qtver="6.8"
+    libclang_arc=libclang-release_18.1.5-based-linux-Rhel8.6-gcc10.3-x86_64.7z
+
+
+
+    must_create_env=1
+}
 
 function dopyside6 ()
 {
@@ -138,7 +170,7 @@ function dopyside6 ()
     cd ${VIRTUAL_ENV}
 
 #     wget https://download.qt.io/development_releases/prebuilt/libclang/$libclang_arc
-    cp ~/src/for\ scipyen/libclang\ cache/$libclang_arc ./
+    cp ~/src/for\ scipyen/pyside\ saga/libclang\ cache/$libclang_arc ./
     if [[ $? -ne 0 ]] ; then
     echo -e "Cannot retrieve prebult libclang. Bailing out. Goodbye!\n"
     exit 1
@@ -371,95 +403,107 @@ function makevirtenv ()
     #
     echo -e "Trying to create/use virtual environment ${virtual_env} in ${install_dir} using ${using_python}\n"
     
-    # NOTE: 2025-01-14 21:21:03
-    # recreate the whole environment, for now...
+    # Checks if the environment directory exists and that it does belong to a
+    # virtual python environment:
+    # 1) it contains a file named "pyenv.cfg" defining a "virtualenv" variable
+    # 2) contains a "bin" directory with "activate" script which can be sourced 
+    #   to generate — among other things — a VIRTUAL_ENV environment variable
+    # If such directory does NOT exist then tries to create a virtual environment
+    # using virtualenv package (NOT python's standard library venv !!!)
+    # 
+    # If either was successful then activates the environment for the script to
+    # proceed with installation of dependencies in this environment
+    #
     
-    ${python_executable} -m virtualenv --create --python ${python_executable} $virtual_env
+#     must_create_env=1
+    
+    if [ -d $virtual_env ] ; then 
+        echo -e "Found putative virtual environment directory: ${virtual_env}\n"
+        echo -e "Checking if the directory hosts a virtual python evironment..."
+        if [ -a $virtual_env/pyvenv.cfg ] ; then 
+            echo -e "The file pyvenv.cfg was found in ${virtual_env} — OK\n"
+            # which contains a file named 'pyvenv.cfg' =>
+            # check if pyvenv.cfg is what is expected to be
+            echo -e "Checking if pyvenv.cfg defines a virtual environment..."
+            aa=`cat $virtual_env/pyvenv.cfg | grep "virtualenv"`
+            if [ -n "$aa" ] ; then 
+                echo -e "pyvenv.cfg looks OK\n"
+                # and pyvenv.cfg defines a 'virtualenv' variable -> OK so far
+                echo -r "Checking for environment activation script..."
+                # => check for bin subdirectory
+                if [ ! -d $virtual_env/bin ] ; then
+                    # bin subdirectory missing -> BAD!!!
+                    echo -e "$virtual_env/ does not look like a virtual environment directory. Goodbye!\n"
+                    exit 1
+                fi
+                if [ ! -r $virtual_env/bin ] ; then
+                    # bin subdirectory not readable -> BAD!!!
+                    echo -e "$virtual_env/ does not look like a virtual environment directory. Goodbye!\n"
+                    exit 1
+                fi
+                
+                echo -e "Activation script found; sourcing it...\n"
+                
+                # so far so good; try and activate the virtual environment
+                source $virtual_env/bin/activate
+                
+                if [[ -z ${VIRTUAL_ENV} ]]; then
+                    # failed to activate => bail out
+                    echo -r "Cannot activate a virtual environment from  $virtual_env . Goodbye!\n"
+                    exit 1
+                fi
+                
+                python_executable=`which python3`
+                
+                echo -e "Virtual environment ${virtual_env} is activated and will use ${python_executable}\n"
+                
+                must_create_env=0
+                
+#                 usesyssite=`cat $virtual_env/pyvenv.cfg | grep "include-system-site-packages = true"`
+#                 echo -e "Checking if the evironment is using system-site packages..."
+#                 if [ -n "$usesyssite" ] ; then
+#                     echo -e "The evironment appears to use system-site packages...\n"
+#                 
+#                 else
+#                     echo -e "The environment DOES NOT use system site packages; must recreate it"
+#                     must_create_env=1
+#                 fi
+            else
+                echo -e "$virtual_env/ does not look like a virtual environment directory. Goodbye!\n"
+                exit 1
+            fi 
+        fi
+        
+    fi
+    
+    if [ $must_create_env -eq 1 ] ; then
+        ${python_executable} -m virtualenv --clear --python ${python_executable} $virtual_env
+#         ${python_executable} -m virtualenv --clear --system-site-packages --python ${python_executable} $virtual_env
+        
+        if [[ $? -ne 0 ]] ; then
+            # the above attempt failed => bail out
+            echo -e "Could NOT create a virtual environment at ${virtual_env}. Bailing out...\n"
+            exit 1
+        fi
 
-# ### BEGIN do NOT remove 
-#     # Checks if the environment directory exists and that it does belong to a
-#     # virtual python environment:
-#     # 1) it contains a file named "pyenv.cfg" defining a "virtualenv" variable
-#     # 2) contains a "bin" directory with "activate" script which can be sourced 
-#     #   to generate — among other things — a VIRTUAL_ENV environment variable
-#     # If such directory does NOT exist then tries to create a virtual environment
-#     # using virtualenv package (NOT python's standard library venv !!!)
-#     # 
-#     # If either was successful then activates the environment for the script to
-#     # proceed with installation of dependencies in this environment
-#     #
-#     
-#     if [ -d $virtual_env ] ; then 
-#         # found putative virtual environment directory
-#         if [ -a $virtual_env/pyvenv.cfg ] ; then 
-#             # which contains a file named 'pyvenv.cfg' =>
-#             # check if pyvenv.cfg is what is expected to be
-#             aa=`cat $virtual_env/pyvenv.cfg | grep "virtualenv"`
-#             if [ -n "$aa" ] ; then 
-#                 # and pyvenv.cfg defines a 'virtualenv' variable -> OK so far
-#                 # => check for bin subdirectory
-#                 if [ ! -d $virtual_env/bin ] ; then
-#                     # bin subdirectory missing -> BAD!!!
-#                     echo -e "$virtual_env/ does not look like a virtual environment directory. Goodbye!\n"
-#                     exit 1
-#                 fi
-#                 if [ ! -r $virtual_env/bin ] ; then
-#                     # bin subdirectory not readable -> BAD!!!
-#                     echo -e "$virtual_env/ does not look like a virtual environment directory. Goodbye!\n"
-#                     exit 1
-#                 fi
-#                 
-#                 echo -e "Virtual environment found; activating it...\n"
-#                 
-#                 # so far so good; try and activate the virtual environment
-#                 source $virtual_env/bin/activate
-#                 
-#                 if [[ -z ${VIRTUAL_ENV} ]]; then
-#                     # failed to activate => bail out
-#                     echo -r "Cannot activate a virtual environment from  $virtual_env . Goodbye!\n"
-#                     exit 1
-#                 fi
-#                 
-#                 python_executable=`which python3`
-#                 
-#                 echo -e "Virtual environment activated and will use ${python_executable}\n"
-#                 
-#             else
-#                 echo -e "$virtual_env/ does not look like a virtual environment directory. Goodbye!\n"
-#                 exit 1
-#             fi 
-#         fi
-#     else
-#         # putative virtual environment directory not found => need to generate one
-#         ${python_executable} -m virtualenv  --python ${python_executable} $virtual_env
-#         
-#         if [[ $? -ne 0 ]] ; then
-#             # the above attempt failed => bail out
-#             echo -e "Could NOT create a virtual environment at ${virtual_env}. Bailing out...\n"
-#             exit 1
-#         fi
-# 
-#         echo -e "Virtual environment created at ${virtual_env}\n"
-#         echo -e "Activating the virtual environment\n"
-# 
-#         # so far so good:  virtual environment directory tree created, now try
-#         # to activate it
-#         source $virtual_env/bin/activate
-#         
-#         if [[ $? -ne 0 ]] ; then
-#             echo -e "Could NOT activate the virtual environment at ${virtual_env}. Bailing out...\n"
-#             exit 1
-#         fi
-#         
-#         # just cache this for the rest of this script
-#         python_executable=`which python3`
-#         
-#         echo -e "Virtual environment at ${VIRTUAL_ENV} activated\n"
-#         echo -e "Python executable is ${python_executable}\n"
-#         
-#     fi
-#
-# ### END  do NOT remove 
+        echo -e "Virtual environment created at ${virtual_env}\n"
+        echo -e "Activating the virtual environment\n"
+
+        # so far so good:  virtual environment directory tree created, now try
+        # to activate it
+        source $virtual_env/bin/activate
+        
+        if [[ $? -ne 0 ]] ; then
+            echo -e "Could NOT activate the virtual environment at ${virtual_env}. Bailing out...\n"
+            exit 1
+        fi
+        
+        # just cache this for the rest of this script
+        python_executable=`which python3`
+        
+        echo -e "Virtual environment at ${VIRTUAL_ENV} activated; python executable is ${python_executable}\n"
+        
+    fi
     
 }
 
@@ -500,14 +544,6 @@ libclang_arc=libclang-release_18.1.5-based-linux-Rhel8.6-gcc10.3-x86_64.7z
 
 echo -e "Will install in ${install_dir}" 
 
-# if ! [ -v VIRTUAL_ENV ] ; then
-#     virtual_env=${install_dir}/${virtual_env_pfx}
-#     python_exec="python${major}.${minor}"
-# else
-#     virtual_env=$VIRTUAL_ENV
-#     python_exec=$VIRTUAL_ENV/bin/"python${major}"
-# fi
-
 python_executable=`which ${python_exec}`
 
 # if [[ `id -u ` -eq 0 ]] ; then
@@ -539,24 +575,6 @@ else
     virtual_env=$VIRTUAL_ENV
 fi
 
-# if ! [ -v VIRTUAL_ENV ] ; then
-# # NOTE: 2023-06-25 20:57:31 
-# # these two MUST be run
-# 
-# # NOTE: 2025-01-14 13:59:16 overwrites current environment directory
-# # will use system-site packages and python3.11
-# 
-# # upgrade_virtualenv && makevirtenv
-# else
-#     virtual_env=$VIRTUAL_ENV
-# fi
-# 
-# # verify that the newly created virtual environment is active
-# if [[ -z "$VIRTUAL_ENV" ]] ; then
-#     echo -e "Not in an active environment! Goodbye!\n"
-#     exit 1
-# fi
-
 if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
     echo -e "Virtual environment ${VIRTUAL_ENV} is activated\n"
     echo -e "Checking for, or making 'src' directory inside $VIRTUAL_ENV ...\n"
@@ -564,9 +582,9 @@ if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
     mkdir -p "$VIRTUAL_ENV/src" && cd "$VIRTUAL_ENV/src"
     
     # install pip requirements NOTE: 2023-06-25 10:55:09 FIXME how to pass the virtualenv python to builder when run as root?
-#     installpipreqs_stage1
+    installpipreqs_stage1
 #     dopyside6
-#     installpipreqs_stage2
+    installpipreqs_stage2
 #     dovigra
     
 fi

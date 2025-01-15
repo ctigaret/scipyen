@@ -10,393 +10,59 @@
 # Distributed under GNU GPL License v.2
 #
 
-function showinstalldoc () 
+function define_vars()
 {
-    glowexec=`which glow`
-    if [ -n $glowexec ] ; then
-        glow -p $docdir/Install.md
-    else
-        cat $docdir/Install.md
-    fi
+    get_pyver
+    virtual_env_pfx="scipyenv_pyside6_build" #.$pyver"
+    install_dir=${HOME}
+    realscript=`realpath $0`
+    scipyendir=`dirname "$realscript"`
+    docdir=${scipyendir}/doc
+    installscriptdir=${scipyendir}/setup_env
+    scipyensrcdir=${scipyendir}/src/scipyen
+    pipreqsfile1="pip_requirements_pyside6_stage_1.txt"
+    pipreqsfile2="pip_requirements_pyside6_stage_2.txt"
+    using_python=""
+    install_neuron=0
+    use_pypi_neuron=1
+    use_core_neuron=0
+    install_fenicsx=0
+    njobs=4
+    reinstall_vigra=0
+    reinstall_neuron=0
+    reinstall_fenicsx=0
+    reinstall_pips=0
+    reinstall_desktop=0
+    refresh_git_repos=0
+    make_dist=0
+    pyside6_qtver="6.8"
+    libclang_arc=libclang-release_18.1.5-based-linux-Rhel8.6-gcc10.3-x86_64.7z
+
+
+
+    must_create_env=1
 }
 
-function show_help ()
-{
-    echo -e "\n***                                                         ***"
-    echo -e "* Virtual Python environment installation script for Scipyen. *"
-    echo -e "***                                                         ***\n"
-    echo -e "(C) 2023 Cezar M. Tigaret "
-    echo -e "<cezar tigaret at gmail com> , <tigaretc at cardiff ac uk>"
-    echo -e "\nInstructions:"
-    echo -e "============\n"
-    echo -e "Run 'sh install.sh' without options for a fully automated installation, using built-in defaults.\n"
-    echo -e "Options:"
-    echo -e "========\n"
-    echo -e "--install_dir=DIR\tSpecify where the virtual environment will be created (default is ${HOME})\n"
-    echo -e "--environment=NAME\tCustom name for the virtual environment (default is ${virtual_env})\n"
-    echo -e "--with_neuron\t\tInstall binary neuron python distribution from PyPI\n"
-    echo -e "--build_neuron\t\tBuild neuron python locally\n"
-    echo -e "--with_coreneuron\twhen '--build_neuron' is passed, build local neuron with coreneuron; by default coreneuron is not used.\n"
-    echo -e "--refresh_repos\t When '--refresh_repos' is passed, local repository clones will be refreshed before rebuilding\n"
-    echo -e "\tNOTE: This applies to vigra and to local neuron build only\n"
-    echo -e "--jobs=N\t\tNumber of parallel tasks during building PyQt and neuron; default is 4; set to 0 to disable parallel build\n"
-    echo -e "--reinstall=NAME\t\t\tRe-install/re-building NAME, where NAME is one of:\n"
-    echo -e "\tpips, vigra, neuron, or desktopentry;\n"
-    echo -e "\t(this option can be passed more than once)\n"
-    echo -e "--install=NAME\t\t Alias to --reinstall option above; use it to "
-    echo -e "\tinstall optional libraries AFTER building Scipyen's virtual environment\n "
-    echo -e "--about\t\t\tDisplay Install.md at the console (requires the program 'glow')\n"
-    echo -e "--dist\t\t\tCreates a binary Scipyen diwstribution using PyInstaller. Requires that a virtual environment has already been built using this script.\n"
-    echo -e "-h | -? | --help \tShow this help message and quit\n"
-    echo -e "\nFor details, execute install.sh --about\n"
-    echo -e "\n"
-    echo -e "When run with the virtual Python environment already activated,\n"
-    echo -e "the script will use the current virtual environment to perform \n"
-    echo -e "(re)installations. WARNING: Make sure you activate the appropriate\n"
-    echo -e "Python environment for this !\n"
-   
-}
-
-function findqmake ()
-{
-    # Identifes which qmake is there available on the platform.
-    # 
-    # Since Linux dsitributions currently provide both Qt5 and Qt6, their respective
-    # qmake tools bear different names.
-    #
-    # Not sure this is as generic as possible across the Linux distributions...
-    #
-    
-    qmake_binary=`which qmake`
-    if [ -z "$qmake_binary" ] ; then
-        qmake_binary=`which qmake-qt5`
-    fi
-    
-    if [ -z "$qmake_binary" ] ; then
-        read -e -p "Enter a full path to qmake (or qmake-qt5): " qmake_binary
-    fi
-    
-    if [ -z "$qmake_binary" ] ; then
-        echo -e "Cannot build Pyqt5 without qmake. Goodbye!\n"
-        exit 1
-    fi
-    
-    echo "using qmake: ${qmake_binary}"
-}
-
-function findqmake6 ()
-{
-    qmake6_binary=`which qmake6`
-    if [ -z "$qmake6_binary" ] ; then
-        qmake6_binary=`which qmake-qt6`
-    fi
-    
-    if [ -z "$qmake6_binary" ] ; then
-        read -e -p "Enter a full path to qmake6 (or qmake-qt6): " qmake6_binary
-    fi
-    
-    if [ -z "$qmake6_binary" ] ; then
-        echo -e "Cannot build PyQt6 without qmake6. Goodbye!\n"
-        exit 1
-    fi
-    
-    echo "using qmake: ${qmake6_binary}"
-}
-
-function findcmake ()
-{
-    cmake_binary=`which cmake`
-    if [ -z "$cmake_binary" ] ; then
-        echo -e "Cannot build vigra without cmake. Goodbye!\n"
-        exit 1
-    fi
-    
-}
-
-function upgrade_virtualenv ()
-{
-    havevenv=`${python_executable} -m virtualenv --version`
-    echo "havevenv = ${havevenv}"
-    if [ -z $"havevenv" ] ; then
-        echo -e "Scipyen requires virtualenv.\n"
-        if [[ `id -u ` -eq 0 ]] ; then
-            echo -e "To install virtualenv please use the software manager of your distribution,"
-            echo -e "or run this script as regular user (which will install virtualenv locally).\n"
-            echo -e "\nQuitting, for now..."
-            exit 1
-        fi
-        echo -e "Installing virtualenv locally...\n"
-        ${python_executable} -m pip install --user virtualenv
-#         python3 -m pip install --user virtualenv
-    else
-        if [[ `id -u ` -eq 0 ]] ; then
-            echo -e "Skipping the upgrade of virtualenv as root. Please use the software manager of your distribution to upgrade if needed.\n"
-        else
-            echo -e "Upgrading virtualenv locally...\n"
-            ${python_executable} -m pip install --user --upgrade virtualenv
-        fi
-    fi
-}
-
-function makevirtenv ()
-{
-    # Generates if necessary, then activates the virtual environment for Scipyen.
-    #
-    echo -e "Trying to create/use virtual environment ${virtual_env} in ${install_dir} using ${using_python}\n"
-    
-    # Checks if the environment directory exists and that it does belong to a
-    # virtual python environment:
-    # 1) it contains a file named "pyenv.cfg" defining a "virtualenv" variable
-    # 2) contains a "bin" directory with "activate" script which can be sourced 
-    #   to generate — among other things — a VIRTUAL_ENV environment variable
-    # If such directory does NOT exist then tries to create a virtual environment
-    # using virtualenv package (NOT python's standard library venv !!!)
-    # 
-    # If either was successful then activates the environment for the script to
-    # proceed with installation of dependencies in this environment
-    #
-    
-#     must_create_env=1
-    
-    if [ -d $virtual_env ] ; then 
-        echo -e "Found putative virtual environment directory: ${virtual_env}\n"
-        echo -e "Checking if the directory hosts a virtual python evironment..."
-        if [ -a $virtual_env/pyvenv.cfg ] ; then 
-            echo -e "The file pyvenv.cfg was found in ${virtual_env} — OK\n"
-            # which contains a file named 'pyvenv.cfg' =>
-            # check if pyvenv.cfg is what is expected to be
-            echo -e "Checking if pyvenv.cfg defines a virtual environment..."
-            aa=`cat $virtual_env/pyvenv.cfg | grep "virtualenv"`
-            if [ -n "$aa" ] ; then 
-                echo -e "pyvenv.cfg looks OK\n"
-                # and pyvenv.cfg defines a 'virtualenv' variable -> OK so far
-                echo -r "Checking for environment activation script..."
-                # => check for bin subdirectory
-                if [ ! -d $virtual_env/bin ] ; then
-                    # bin subdirectory missing -> BAD!!!
-                    echo -e "$virtual_env/ does not look like a virtual environment directory. Goodbye!\n"
-                    exit 1
-                fi
-                if [ ! -r $virtual_env/bin ] ; then
-                    # bin subdirectory not readable -> BAD!!!
-                    echo -e "$virtual_env/ does not look like a virtual environment directory. Goodbye!\n"
-                    exit 1
-                fi
-                
-                echo -e "Activation script found; sourcing it...\n"
-                
-                # so far so good; try and activate the virtual environment
-                source $virtual_env/bin/activate
-                
-                if [[ -z ${VIRTUAL_ENV} ]]; then
-                    # failed to activate => bail out
-                    echo -r "Cannot activate a virtual environment from  $virtual_env . Goodbye!\n"
-                    exit 1
-                fi
-                
-                python_executable=`which python3`
-                
-                echo -e "Virtual environment ${virtual_env} is activated and will use ${python_executable}\n"
-                
-                must_create_env=0
-                
-#                 usesyssite=`cat $virtual_env/pyvenv.cfg | grep "include-system-site-packages = true"`
-#                 echo -e "Checking if the evironment is using system-site packages..."
-#                 if [ -n "$usesyssite" ] ; then
-#                     echo -e "The evironment appears to use system-site packages...\n"
-#                 
-#                 else
-#                     echo -e "The environment DOES NOT use system site packages; must recreate it"
-#                     must_create_env=1
-#                 fi
-            else
-                echo -e "$virtual_env/ does not look like a virtual environment directory. Goodbye!\n"
-                exit 1
-            fi 
-        fi
-        
-    fi
-    
-    if [ $must_create_env -eq 1 ] ; then
-        ${python_executable} -m virtualenv --clear --python ${python_executable} $virtual_env
-#         ${python_executable} -m virtualenv --clear --system-site-packages --python ${python_executable} $virtual_env
-        
-        if [[ $? -ne 0 ]] ; then
-            # the above attempt failed => bail out
-            echo -e "Could NOT create a virtual environment at ${virtual_env}. Bailing out...\n"
-            exit 1
-        fi
-
-        echo -e "Virtual environment created at ${virtual_env}\n"
-        echo -e "Activating the virtual environment\n"
-
-        # so far so good:  virtual environment directory tree created, now try
-        # to activate it
-        source $virtual_env/bin/activate
-        
-        if [[ $? -ne 0 ]] ; then
-            echo -e "Could NOT activate the virtual environment at ${virtual_env}. Bailing out...\n"
-            exit 1
-        fi
-        
-        # just cache this for the rest of this script
-        python_executable=`which python3`
-        
-        echo -e "Virtual environment at ${VIRTUAL_ENV} activated; python executable is ${python_executable}\n"
-        
-    fi
-    
-}
-
-function installpipreqs ()
-{
-    # installs pip packaged listed in pip_requirements
-    # assumes (and therefore REQUIRES) that the virtual environment is active
-    if [[ -z "$VIRTUAL_ENV" ]] ; then
-        echo -e "Not in an active environment! Goodbye!\n"
-        exit 1
-    fi
-    
-    if [ ! -r ${VIRTUAL_ENV}/.pipdone ] || [[ $reinstall_pips -gt 0 ]] ; then
-        # NOTE: since around Jan 2023 sklearn has been deprecated in favour of 
-        # scikit-learn, such that an error message is issued whenever pip tries
-        # to install sklearn.
-        # HOWEVER, a LARGE number of packages still list sklearn among their 
-        # dependencies, yet pip has no way to check this BEFORE installing them.
-        #
-        # Until all of them catch up with this, we circumvent the error message
-        # by setting up the environment variable below
-        # For details please see https://pypi.org/project/sklearn/
-        #
-        export SKLEARN_ALLOW_DEPRECATED_SKLEARN_PACKAGE_INSTALL=True 
-        
-        echo -e "Using ${python_executable} as `whoami` to install PyPI packages\n"
-        
-        ${python_executable} -m pip install -r "$installscriptdir"/pip_requirements_pyside6.txt
-        
-        if [[ $? -ne 0 ]] ; then
-            echo -e "Cannot install required packages from PyPI. Bailing out. Goodbye!\n"
-            exit 1
-        else
-            echo "pip packages installed on "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.pipdone
-            echo -e "\n\n=====================\n# PyPI packages installed.\n=====================\n\n"
-        fi
-    fi
-}
-
-function dovigra ()
+function dofenicsx ()
 {
     if [[ -z "$VIRTUAL_ENV" ]] ; then
         echo -e "Not in an active environment! Goodbye!\n"
         exit 1
     fi
+    if [[ `id -u` -eq 0 ]] ; then
+        py_exec="$VIRTUAL_ENV/bin/${python_exec}"
+        sip_wheel_exec="$VIRTUAL_ENV/bin/sip-wheel"
+    else
+        py_exec=${python_exec}
+        sip_wheel_exec=sip-wheel
+    fi
     
-    if [ ! -r ${VIRTUAL_ENV}/.vigradone ] || [[ $reinstall_vigra -gt 0 ]]; then
+    if [ ! -r ${VIRTUAL_ENV}/.fenicsxdone ] || [[ $reinstall_fenicsx -gt 0 ]]; then
         mkdir -p ${VIRTUAL_ENV}/src && cd $VIRTUAL_ENV/src
         
         findcmake
         
-        vigra_src=$VIRTUAL_ENV/src/vigra
-        vigra_build=$VIRTUAL_ENV/src/vigra-build
-        
-        if [ ! -r ${vigra_src} ] ; then
-            echo -e "Cloning vigra git repository...\n"
-            git clone https://github.com/ukoethe/vigra.git
-            if [[ $? -ne 0 ]] ; then
-                echo -e "Cannot clone vigra git repository. Goodbye!\n"
-                exit 1
-            fi
-            
-        else
-            # refresh the gir repo...
-            if [[ $refresh_git_repos -gt 0 ]] ; then
-                echo -e "Refreshing vigra git repository...\n"
-                cd ${vigra_src}
-                git pull
-                cd ..
-            fi
-        fi
-          
-        if [ -d ${vigra_build} ] ; then
-            rm -fr ${vigra_build}
-        fi
-        
-        echo -e "Creating vigra build tree outside the source tree\n"
-        mkdir -p vigra-build && cd vigra-build
-        
-        $cmake_binary -DPython_INCLUDE_DIRS=$(python -c "import sysconfig; print(sysconfig.get_paths()['include'])") \
-                      -DPython_LIBRARIES=$(python -c "import distutils.sysconfig as sysconfig; print(sysconfig.get_config_var('LIBDIR'))") \
-                      -DPython_EXECUTABLE:FILEPATH=`which python` \
-                      -DCMAKE_INSTALL_PREFIX=$VIRTUAL_ENV -DCMAKE_SKIP_INSTALL_RPATH=1 -DCMAKE_SKIP_RPATH=1 -DWITH_BOOST_GRAPH=1 -DWITH_BOOST_THREAD=1 -DWITH_HDF5=1 -DWITH_OPENEXR=1 -DWITH_VIGRANUMPY=1 -DLIB_SUFFIX=64 ../vigra
-#         $cmake_binary -DPYTHON_INCLUDE_DIRS=$(python -c "import sysconfig; print(sysconfig.get_paths()['include'])") \
-#                       -DPYTHON_LIBRARIES=$(python -c "import distutils.sysconfig as sysconfig; print(sysconfig.get_config_var('LIBDIR'))") \
-#                       -DPYTHON_EXECUTABLE:FILEPATH=`which python` \
-#                       -DCMAKE_INSTALL_PREFIX=$VIRTUAL_ENV -DCMAKE_SKIP_INSTALL_RPATH=1 -DCMAKE_SKIP_RPATH=1 -DWITH_BOOST_GRAPH=1 -DWITH_BOOST_THREAD=1 -DWITH_HDF5=1 -DWITH_OPENEXR=1 -DWITH_VIGRANUMPY=1 -DLIB_SUFFIX=64 ../vigra
-#         $cmake_binary -DPYTHON_INCLUDE_DIR=$(python -c "from distutils.sysconfig import get_python_inc; print(get_python_inc())") -DPYTHON_LIBRARY=$(python -c "import distutils.sysconfig as sysconfig; print(sysconfig.get_config_var('LIBDIR'))") -DPYTHON_EXECUTABLE:FILEPATH=`which python` -DCMAKE_INSTALL_PREFIX=$VIRTUAL_ENV -DCMAKE_SKIP_INSTALL_RPATH=1 -DCMAKE_SKIP_RPATH=1 -DWITH_BOOST_GRAPH=1 -DWITH_BOOST_THREAD=1 -DWITH_HDF5=1 -DWITH_OPENEXR=1 -DWITH_VIGRANUMPY=1 -DLIB_SUFFIX=64 ../vigra
-        
-        make && make install
-        
-        if [[ $? -ne 0 ]] ; then
-            echo -e "Cannot build vigra; check console output. Bailing out. Goodbye!\n"
-            exit 1
-        else
-            echo "VIGRA installed on "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.vigradone
-            echo -e "\n\n=====================\n# Building vigra DONE!\n=====================\n\n"
-        fi
     fi
-    
-    
-}
-
-function make_desktop_entry ()
-{
-if [ ! -r ${VIRTUAL_ENV}/.desktopdone ] || [[ $reinstall_desktop -gt 0 ]] ; then
-if [[ `id -u` -eq 0 ]] ; then
-target_dir=/usr/local/bin
-else
-target_dir=${HOME}/bin
-fi
-tmpfiledir=$(mktemp -d)
-# tmpfile=${tmpfiledir}/cezartigaret-Scipyen.desktop
-tmpfile=${tmpfiledir}/Scipyen.desktop
-script=${target_dir}/scipyen
-echo -e "Script to execute: ${script}"
-cat<<END > ${tmpfile}
-[Desktop Entry]
-Type=Application
-Name[en_GB]=Scipyen
-Name=Scipyen
-Comment[en_GB]=Scientific Python Environment for Neurophysiology
-Comment=Scientific Python Environment for Neurophysiology
-GenericName[en_GB]=Scientific Python Environment for Neurophysiology
-GenericName=Scientific Python Environment for Neurophysiology
-Icon=pythonbackend
-Categories=Science;Utilities;
-Exec=${script}
-MimeType=
-Path=
-StartupNotify=true
-Terminal=true
-TerminalOptions=\s
-X-DBUS-ServiceName=
-X-DBUS-StartupType=
-X-KDE-SubstituteUID=false
-X-KDE-Username=
-END
-xdg-desktop-menu install --novendor ${tmpfile}
-if [[ $? -ne 0 ]] ; then
-echo -e "Installation of Scipyen application file failed\n"
-exit 1
-fi
-# NOTE: 2023-05-02 15:25:50 this below installs an Icon on the desktop
-xdg-desktop-icon install --novendor ${tmpfile}
-if [[ $? -ne 0 ]] ; then
-echo -e "Installation of Scipyen Desktop file failed\n"
-exit 1
-fi
-echo "Scipyen Desktop file has been installed "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.desktopdone
-echo -e "Scipyen Desktop file has been installed \n"
-fi
 }
 
 function doneuron ()
@@ -527,93 +193,130 @@ function doneuron ()
     fi
 }
 
-function dofenicsx ()
+function dopyside6()
+{
+    pip install --index-url=https://download.qt.io/snapshots/ci/pyside/$pyside6_qtver/latest pyside6 --trusted-host download.qt.io
+
+}
+
+function dovigra ()
 {
     if [[ -z "$VIRTUAL_ENV" ]] ; then
         echo -e "Not in an active environment! Goodbye!\n"
         exit 1
     fi
-    if [[ `id -u` -eq 0 ]] ; then
-        py_exec="$VIRTUAL_ENV/bin/${python_exec}"
-        sip_wheel_exec="$VIRTUAL_ENV/bin/sip-wheel"
-    else
-        py_exec=${python_exec}
-        sip_wheel_exec=sip-wheel
-    fi
     
-    if [ ! -r ${VIRTUAL_ENV}/.fenicsxdone ] || [[ $reinstall_fenicsx -gt 0 ]]; then
+    if [ ! -r ${VIRTUAL_ENV}/.vigradone ] || [[ $reinstall_vigra -gt 0 ]]; then
         mkdir -p ${VIRTUAL_ENV}/src && cd $VIRTUAL_ENV/src
         
         findcmake
         
+        vigra_src=$VIRTUAL_ENV/src/vigra
+        vigra_build=$VIRTUAL_ENV/src/vigra-build
+        
+        if [ ! -r ${vigra_src} ] ; then
+            echo -e "Cloning vigra git repository...\n"
+            git clone https://github.com/ukoethe/vigra.git
+            if [[ $? -ne 0 ]] ; then
+                echo -e "Cannot clone vigra git repository. Goodbye!\n"
+                exit 1
+            fi
+            
+        else
+            # refresh the gir repo...
+            if [[ $refresh_git_repos -gt 0 ]] ; then
+                echo -e "Refreshing vigra git repository...\n"
+                cd ${vigra_src}
+                git pull
+                cd ..
+            fi
+        fi
+          
+        if [ -d ${vigra_build} ] ; then
+            rm -fr ${vigra_build}
+        fi
+        
+        echo -e "Creating vigra build tree outside the source tree\n"
+        mkdir -p vigra-build && cd vigra-build
+        
+        $cmake_binary -DPython_INCLUDE_DIRS=$(python -c "import sysconfig; print(sysconfig.get_paths()['include'])") \
+                      -DPython_LIBRARIES=$(python -c "import distutils.sysconfig as sysconfig; print(sysconfig.get_config_var('LIBDIR'))") \
+                      -DPython_EXECUTABLE:FILEPATH=`which python` \
+                      -DCMAKE_INSTALL_PREFIX=$VIRTUAL_ENV -DCMAKE_SKIP_INSTALL_RPATH=1 -DCMAKE_SKIP_RPATH=1 -DWITH_BOOST_GRAPH=1 -DWITH_BOOST_THREAD=1 -DWITH_HDF5=1 -DWITH_OPENEXR=1 -DWITH_VIGRANUMPY=1 -DLIB_SUFFIX=64 ../vigra
+#         $cmake_binary -DPYTHON_INCLUDE_DIRS=$(python -c "import sysconfig; print(sysconfig.get_paths()['include'])") \
+#                       -DPYTHON_LIBRARIES=$(python -c "import distutils.sysconfig as sysconfig; print(sysconfig.get_config_var('LIBDIR'))") \
+#                       -DPYTHON_EXECUTABLE:FILEPATH=`which python` \
+#                       -DCMAKE_INSTALL_PREFIX=$VIRTUAL_ENV -DCMAKE_SKIP_INSTALL_RPATH=1 -DCMAKE_SKIP_RPATH=1 -DWITH_BOOST_GRAPH=1 -DWITH_BOOST_THREAD=1 -DWITH_HDF5=1 -DWITH_OPENEXR=1 -DWITH_VIGRANUMPY=1 -DLIB_SUFFIX=64 ../vigra
+#         $cmake_binary -DPYTHON_INCLUDE_DIR=$(python -c "from distutils.sysconfig import get_python_inc; print(get_python_inc())") -DPYTHON_LIBRARY=$(python -c "import distutils.sysconfig as sysconfig; print(sysconfig.get_config_var('LIBDIR'))") -DPYTHON_EXECUTABLE:FILEPATH=`which python` -DCMAKE_INSTALL_PREFIX=$VIRTUAL_ENV -DCMAKE_SKIP_INSTALL_RPATH=1 -DCMAKE_SKIP_RPATH=1 -DWITH_BOOST_GRAPH=1 -DWITH_BOOST_THREAD=1 -DWITH_HDF5=1 -DWITH_OPENEXR=1 -DWITH_VIGRANUMPY=1 -DLIB_SUFFIX=64 ../vigra
+        
+        make && make install
+        
+        if [[ $? -ne 0 ]] ; then
+            echo -e "Cannot build vigra; check console output. Bailing out. Goodbye!\n"
+            exit 1
+        else
+            echo "VIGRA installed on "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.vigradone
+            echo -e "\n\n=====================\n# Building vigra DONE!\n=====================\n\n"
+        fi
     fi
+    
+    
 }
 
-function make_scipyenrc () 
+function findcmake ()
 {
-# When the installer script is run as regular user, it will create 
-# ${HOME}/.scipeynrc which allows activation of the virtual python environment
-# used to run Scipyen.
-#
-# The .scipyenrc script NEEDS TO BE SOURCED (in bash); this is done automatically
-# by the Scipyen launch bash script ('scipyen'); for convenience, this script is
-# also sourced from ${HOME}/.bashrc in order for the function 'scipyact' to be
-# readily available to the user, at the console.
-#
-echo -e "\nCreating .scipyenrc_pyside6\n"
-
-if [[ -z "$VIRTUAL_ENV" ]] ; then
-    echo -e "Not in an active environment! Goodbye!\n"
-    exit 1
-fi
-
-dt=`date '+%Y-%m-%d_%H-%M-%s'`
-
-py_exec=${python_exec}
-if [ -r ${HOME}/.scipyenrc_pyside6 ] ; then
-# make a backup copy of .scipyenrc_pyside6
-shopt -s lastpipe
-echo "Copying ${HOME}/.scipyenrc_pyside6 to ${HOME}/.scipyenrc_pyside6.$dt"
-cp ${HOME}/.scipyenrc_pyside6 ${HOME}/.scipyenrc_pyside6.$dt
-fi
-cat<<END > ${HOME}/.scipyenrc_pyside6
-scipyact_pyside6 () {
-source ${VIRTUAL_ENV}/bin/activate
-export LD_LIBRARY_PATH=${VIRTUAL_ENV}/lib:${VIRTUAL_ENV}/lib64:$LD_LIBRARY_PATH
-export QT_API="PySide6"
-echo -e "The Python virtual environment in ${VIRTUAL_ENV} is now active.\nTo exit this environment call 'deactivate'"
-}
-END
-shopt -u lastpipe
+    cmake_binary=`which cmake`
+    if [ -z "$cmake_binary" ] ; then
+        echo -e "Cannot build vigra without cmake. Goodbye!\n"
+        exit 1
+    fi
+    
 }
 
-function update_bashrc () 
+function findqmake ()
 {
-dt=`date '+%Y-%m-%d_%H-%M-%s'`
-if [ ! -r ${HOME}/.bashrc ]; then
-cat<<END > ${HOME}/.bashrc
-source ${HOME}/.scipyenrc_pyside6
-END
-echo ".bashrc has been created in ${HOME}"
-echo "Sourcing ${HOME}/.bashrc"
-source ${HOME}/.bashrc
-else
-shopt -s lastpipe
-# check if .scipyenrc is sourced from .bashrc
-cat ${HOME}/.bashrc | grep "source ${HOME}/.scipyenrc_pyside6" | read source_set
-# echo "source_set="$source_set
-if [ -z "${source_set}" ]; then
-# .scipyenrc_pyside6 not sourced from .bashrc => backup .bashrc, then append a line to
-# source .scipyenrc_pyside6 in there
-echo "Copying ${HOME}/.bashrc to ${HOME}/.bashrc.$dt"
-cp ${HOME}/.bashrc ${HOME}/.bashrc.$dt
-echo "source ${HOME}/.scipyenrc_pyside6" >> ${HOME}/.bashrc
-echo ".bashrc has been modified in ${HOME}"
-echo "Sourcing ${HOME}/.bashrc"
-source ${HOME}/.bashrc
-fi
-shopt -u lastpipe
-fi
+    # Identifes which qmake is there available on the platform.
+    # 
+    # Since Linux dsitributions currently provide both Qt5 and Qt6, their respective
+    # qmake tools bear different names.
+    #
+    # Not sure this is as generic as possible across the Linux distributions...
+    #
+    
+    qmake_binary=`which qmake`
+    if [ -z "$qmake_binary" ] ; then
+        qmake_binary=`which qmake-qt5`
+    fi
+    
+    if [ -z "$qmake_binary" ] ; then
+        read -e -p "Enter a full path to qmake (or qmake-qt5): " qmake_binary
+    fi
+    
+    if [ -z "$qmake_binary" ] ; then
+        echo -e "Cannot build Pyqt5 without qmake. Goodbye!\n"
+        exit 1
+    fi
+    
+    echo "using qmake: ${qmake_binary}"
+}
+
+function findqmake6 ()
+{
+    qmake6_binary=`which qmake6`
+    if [ -z "$qmake6_binary" ] ; then
+        qmake6_binary=`which qmake-qt6`
+    fi
+    
+    if [ -z "$qmake6_binary" ] ; then
+        read -e -p "Enter a full path to qmake6 (or qmake-qt6): " qmake6_binary
+    fi
+    
+    if [ -z "$qmake6_binary" ] ; then
+        echo -e "Cannot build PyQt6 without qmake6. Goodbye!\n"
+        exit 1
+    fi
+    
+    echo "using qmake: ${qmake6_binary}"
 }
 
 function get_pyver ()
@@ -627,6 +330,241 @@ read major minor micro <<EOF
 ${pyver##*-}
 EOF
 IFS=$oldifs
+}
+
+function installpipreqs_stage1 ()
+{
+    # installs pip packaged listed in pip_requirements
+    # assumes (and therefore REQUIRES) that the virtual environment is active
+    if [[ -z "$VIRTUAL_ENV" ]] ; then
+        echo -e "Not in an active environment! Goodbye!\n"
+        exit 1
+    fi
+    
+    # NOTE: since around Jan 2023 sklearn has been deprecated in favour of 
+    # scikit-learn, such that an error message is issued whenever pip tries
+    # to install sklearn.
+    # HOWEVER, a LARGE number of packages still list sklearn among their 
+    # dependencies, yet pip has no way to check this BEFORE installing them.
+    #
+    # Until all of them catch up with this, we circumvent the error message
+    # by setting up the environment variable below
+    # For details please see https://pypi.org/project/sklearn/
+    #
+    export SKLEARN_ALLOW_DEPRECATED_SKLEARN_PACKAGE_INSTALL=True 
+    
+    echo -e "Using ${python_executable} as `whoami` to install PyPI packages\n"
+    
+    ${python_executable} -m pip install -r "$installauxdir"/"$pipreqsfile1"
+    
+    if [[ $? -ne 0 ]] ; then
+        echo -e "Cannot install required packages from PyPI (stage 1). Bailing out. Goodbye!\n"
+        exit 1
+    else
+        echo "pip packages installed on "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.pipdone
+        echo -e "\n\n=====================\n# PyPI packages installed.\n=====================\n\n"
+    fi
+    
+#     if [ ! -r ${VIRTUAL_ENV}/.pipdone ] || [[ $reinstall_pips -gt 0 ]] ; then
+#         # NOTE: since around Jan 2023 sklearn has been deprecated in favour of 
+#         # scikit-learn, such that an error message is issued whenever pip tries
+#         # to install sklearn.
+#         # HOWEVER, a LARGE number of packages still list sklearn among their 
+#         # dependencies, yet pip has no way to check this BEFORE installing them.
+#         #
+#         # Until all of them catch up with this, we circumvent the error message
+#         # by setting up the environment variable below
+#         # For details please see https://pypi.org/project/sklearn/
+#         #
+#         export SKLEARN_ALLOW_DEPRECATED_SKLEARN_PACKAGE_INSTALL=True 
+#         
+#         echo -e "Using ${python_executable} as `whoami` to install PyPI packages\n"
+#         
+#         ${python_executable} -m pip install -r "$installauxdir"/"$pipreqsfile"
+#         
+#         if [[ $? -ne 0 ]] ; then
+#             echo -e "Cannot install required packages from PyPI. Bailing out. Goodbye!\n"
+#             exit 1
+#         else
+#             echo "pip packages installed on "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.pipdone
+#             echo -e "\n\n=====================\n# PyPI packages installed.\n=====================\n\n"
+#         fi
+#     fi
+}
+
+function installpipreqs_stage2()
+{
+    ${python_executable} -m pip install -r "$installauxdir"/"$pipreqsfile2"
+    
+    if [[ $? -ne 0 ]] ; then
+        echo -e "Cannot install required packages from PyPI (stage 2). Bailing out. Goodbye!\n"
+        exit 1
+    else
+        echo "pip packages installed on "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.pipdone
+        echo -e "\n\n=====================\n# PyPI packages installed.\n=====================\n\n"
+    fi
+}
+
+function installpipreqs ()
+{
+    # installs pip packaged listed in pip_requirements
+    # assumes (and therefore REQUIRES) that the virtual environment is active
+    if [[ -z "$VIRTUAL_ENV" ]] ; then
+        echo -e "Not in an active environment! Goodbye!\n"
+        exit 1
+    fi
+    
+    if [ ! -r ${VIRTUAL_ENV}/.pipdone ] || [[ $reinstall_pips -gt 0 ]] ; then
+        # NOTE: since around Jan 2023 sklearn has been deprecated in favour of 
+        # scikit-learn, such that an error message is issued whenever pip tries
+        # to install sklearn.
+        # HOWEVER, a LARGE number of packages still list sklearn among their 
+        # dependencies, yet pip has no way to check this BEFORE installing them.
+        #
+        # Until all of them catch up with this, we circumvent the error message
+        # by setting up the environment variable below
+        # For details please see https://pypi.org/project/sklearn/
+        #
+        export SKLEARN_ALLOW_DEPRECATED_SKLEARN_PACKAGE_INSTALL=True 
+        
+        echo -e "Using ${python_executable} as `whoami` to install PyPI packages\n"
+        
+        ${python_executable} -m pip install -r "$installscriptdir"/pip_requirements_pyside6.txt
+        
+        if [[ $? -ne 0 ]] ; then
+            echo -e "Cannot install required packages from PyPI. Bailing out. Goodbye!\n"
+            exit 1
+        else
+            echo "pip packages installed on "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.pipdone
+            echo -e "\n\n=====================\n# PyPI packages installed.\n=====================\n\n"
+        fi
+    fi
+}
+
+function main()
+{
+
+# makes a virtual environment and activates it
+if ! [ -v VIRTUAL_ENV ] ; then
+# NOTE: 2023-06-25 20:57:31 
+# these two MUST be run
+    makevirtenv
+    if [[ $? -ne 0 ]] ; then
+        echo -e "\nCould not create and/or activate a virtual environment. Goodbye!\n"
+        exit 1
+    fi
+else
+    virtual_env=$VIRTUAL_ENV
+fi
+
+
+
+
+# verify that the newly created virtual environment is active
+if [[ -z "$VIRTUAL_ENV" ]] ; then
+    echo -e "Not in an active environment! Goodbye!\n"
+    exit 1
+fi
+
+# exit
+
+if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
+    echo -e "Checking for, or making 'src' directory inside $VIRTUAL_ENV ...\n"
+    mkdir -p "$VIRTUAL_ENV/src" && cd "$VIRTUAL_ENV/src"
+    
+    # install pip requirements NOTE: 2023-06-25 10:55:09 FIXME how to pass the virtualenv python to builder when run as root?
+    installpipreqs_stage1
+    dopyside6
+    installpipreqs_stage2
+    
+    if [[ $? -ne 0 ]] ; then
+        echo -e "Could not install pip requirements; check the console for messages. Goodbye!\n"
+        exit 1
+    fi
+    
+    # build vigra NOTE: 2023-06-25 10:55:09 FIXME how to pass the virtualenv python to builder when run as root?
+    dovigra
+    
+    # build neuron NOTE: 2023-06-25 10:55:09 FIXME how to pass the virtualenv python to builder when run as root?
+    if [ $install_neuron -ne 0 ] ; then
+        doneuron
+    fi
+    
+    if  [ $install_fenicsx -ne 0 ] ; then
+        dofenicsx
+    fi
+    
+    # make scripts
+    make_scipyenrc
+#     
+#     if [[ `id -u` -ne 0 ]] ; then
+#         # only update bashrc for regular users
+#         update_bashrc
+#     fi
+    
+    make_launch_script
+    
+#     update_bashrc
+    
+#     make_desktop_entry
+    
+    # NOTE: install console color schemes
+    cd $scipyendir/src/scipyen/gui/scipyen_console_styles
+    pip install .
+    cd $scipyendir
+    
+fi
+}
+
+function make_desktop_entry ()
+{
+if [ ! -r ${VIRTUAL_ENV}/.desktopdone ] || [[ $reinstall_desktop -gt 0 ]] ; then
+if [[ `id -u` -eq 0 ]] ; then
+target_dir=/usr/local/bin
+else
+target_dir=${HOME}/bin
+fi
+tmpfiledir=$(mktemp -d)
+# tmpfile=${tmpfiledir}/cezartigaret-Scipyen.desktop
+tmpfile=${tmpfiledir}/Scipyen.desktop
+script=${target_dir}/scipyen
+echo -e "Script to execute: ${script}"
+cat<<END > ${tmpfile}
+[Desktop Entry]
+Type=Application
+Name[en_GB]=Scipyen
+Name=Scipyen
+Comment[en_GB]=Scientific Python Environment for Neurophysiology
+Comment=Scientific Python Environment for Neurophysiology
+GenericName[en_GB]=Scientific Python Environment for Neurophysiology
+GenericName=Scientific Python Environment for Neurophysiology
+Icon=pythonbackend
+Categories=Science;Utilities;
+Exec=${script}
+MimeType=
+Path=
+StartupNotify=true
+Terminal=true
+TerminalOptions=\s
+X-DBUS-ServiceName=
+X-DBUS-StartupType=
+X-KDE-SubstituteUID=false
+X-KDE-Username=
+END
+xdg-desktop-menu install --novendor ${tmpfile}
+if [[ $? -ne 0 ]] ; then
+echo -e "Installation of Scipyen application file failed\n"
+exit 1
+fi
+# NOTE: 2023-05-02 15:25:50 this below installs an Icon on the desktop
+xdg-desktop-icon install --novendor ${tmpfile}
+if [[ $? -ne 0 ]] ; then
+echo -e "Installation of Scipyen Desktop file failed\n"
+exit 1
+fi
+echo "Scipyen Desktop file has been installed "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.desktopdone
+echo -e "Scipyen Desktop file has been installed \n"
+fi
 }
 
 function make_launch_script () 
@@ -683,14 +621,263 @@ chmod +x ${target_dir}/scipyen_pyside6
 echo -e "Scipyen (PySide6) startup script created in ${target_dir} \n"
 }
 
+function make_scipyenrc () 
+{
+# When the installer script is run as regular user, it will create 
+# ${HOME}/.scipeynrc which allows activation of the virtual python environment
+# used to run Scipyen.
+#
+# The .scipyenrc script NEEDS TO BE SOURCED (in bash); this is done automatically
+# by the Scipyen launch bash script ('scipyen'); for convenience, this script is
+# also sourced from ${HOME}/.bashrc in order for the function 'scipyact' to be
+# readily available to the user, at the console.
+#
+echo -e "\nCreating .scipyenrc_pyside6\n"
+
+if [[ -z "$VIRTUAL_ENV" ]] ; then
+    echo -e "Not in an active environment! Goodbye!\n"
+    exit 1
+fi
+
+dt=`date '+%Y-%m-%d_%H-%M-%s'`
+
+py_exec=${python_exec}
+if [ -r ${HOME}/.scipyenrc_pyside6 ] ; then
+# make a backup copy of .scipyenrc_pyside6
+shopt -s lastpipe
+echo "Copying ${HOME}/.scipyenrc_pyside6 to ${HOME}/.scipyenrc_pyside6.$dt"
+cp ${HOME}/.scipyenrc_pyside6 ${HOME}/.scipyenrc_pyside6.$dt
+fi
+cat<<END > ${HOME}/.scipyenrc_pyside6
+scipyact_pyside6 () {
+source ${VIRTUAL_ENV}/bin/activate
+export LD_LIBRARY_PATH=${VIRTUAL_ENV}/lib:${VIRTUAL_ENV}/lib64:$LD_LIBRARY_PATH
+export QT_API="PySide6"
+echo -e "The Python virtual environment in ${VIRTUAL_ENV} is now active.\nTo exit this environment call 'deactivate'"
+}
+END
+shopt -u lastpipe
+}
+
+function makevirtenv ()
+{
+    # Generates if necessary, then activates the virtual environment for Scipyen.
+    #
+    echo -e "Trying to create/use virtual environment ${virtual_env} in ${install_dir} using ${using_python}\n"
+    
+    # Checks if the environment directory exists and that it does belong to a
+    # virtual python environment:
+    # 1) it contains a file named "pyenv.cfg" defining a "virtualenv" variable
+    # 2) contains a "bin" directory with "activate" script which can be sourced 
+    #   to generate — among other things — a VIRTUAL_ENV environment variable
+    # If such directory does NOT exist then tries to create a virtual environment
+    # using virtualenv package (NOT python's standard library venv !!!)
+    # 
+    # If either was successful then activates the environment for the script to
+    # proceed with installation of dependencies in this environment
+    #
+    
+#     must_create_env=1
+    
+    if [ -d $virtual_env ] ; then 
+        echo -e "Found putative virtual environment directory: ${virtual_env}\n"
+        echo -e "Checking if the directory hosts a virtual python evironment..."
+        if [ -a $virtual_env/pyvenv.cfg ] ; then 
+            echo -e "The file pyvenv.cfg was found in ${virtual_env} — OK\n"
+            # which contains a file named 'pyvenv.cfg' =>
+            # check if pyvenv.cfg is what is expected to be
+            echo -e "Checking if pyvenv.cfg defines a virtual environment..."
+            aa=`cat $virtual_env/pyvenv.cfg | grep "virtualenv"`
+            if [ -n "$aa" ] ; then 
+                echo -e "pyvenv.cfg looks OK\n"
+                # and pyvenv.cfg defines a 'virtualenv' variable -> OK so far
+                echo -r "Checking for environment activation script..."
+                # => check for bin subdirectory
+                if [ ! -d $virtual_env/bin ] ; then
+                    # bin subdirectory missing -> BAD!!!
+                    echo -e "$virtual_env/ does not look like a virtual environment directory. Goodbye!\n"
+                    exit 1
+                fi
+                if [ ! -r $virtual_env/bin ] ; then
+                    # bin subdirectory not readable -> BAD!!!
+                    echo -e "$virtual_env/ does not look like a virtual environment directory. Goodbye!\n"
+                    exit 1
+                fi
+                
+                echo -e "Activation script found; sourcing it...\n"
+                
+                # so far so good; try and activate the virtual environment
+                source $virtual_env/bin/activate
+                
+                if [[ -z ${VIRTUAL_ENV} ]]; then
+                    # failed to activate => bail out
+                    echo -r "Cannot activate a virtual environment from  $virtual_env . Goodbye!\n"
+                    exit 1
+                fi
+                
+                python_executable=`which python3`
+                
+                echo -e "Virtual environment ${virtual_env} is activated and will use ${python_executable}\n"
+                
+                must_create_env=0
+                
+#                 usesyssite=`cat $virtual_env/pyvenv.cfg | grep "include-system-site-packages = true"`
+#                 echo -e "Checking if the evironment is using system-site packages..."
+#                 if [ -n "$usesyssite" ] ; then
+#                     echo -e "The evironment appears to use system-site packages...\n"
+#                 
+#                 else
+#                     echo -e "The environment DOES NOT use system site packages; must recreate it"
+#                     must_create_env=1
+#                 fi
+            else
+                echo -e "$virtual_env/ does not look like a virtual environment directory. Goodbye!\n"
+                exit 1
+            fi 
+        fi
+        
+    fi
+    
+    if [ $must_create_env -eq 1 ] ; then
+        ${python_executable} -m virtualenv --clear --python ${python_executable} $virtual_env
+#         ${python_executable} -m virtualenv --clear --system-site-packages --python ${python_executable} $virtual_env
+        
+        if [[ $? -ne 0 ]] ; then
+            # the above attempt failed => bail out
+            echo -e "Could NOT create a virtual environment at ${virtual_env}. Bailing out...\n"
+            exit 1
+        fi
+
+        echo -e "Virtual environment created at ${virtual_env}\n"
+        echo -e "Activating the virtual environment\n"
+
+        # so far so good:  virtual environment directory tree created, now try
+        # to activate it
+        source $virtual_env/bin/activate
+        
+        if [[ $? -ne 0 ]] ; then
+            echo -e "Could NOT activate the virtual environment at ${virtual_env}. Bailing out...\n"
+            exit 1
+        fi
+        
+        # just cache this for the rest of this script
+        python_executable=`which python3`
+        
+        echo -e "Virtual environment at ${VIRTUAL_ENV} activated; python executable is ${python_executable}\n"
+        
+    fi
+    
+}
+
+function show_help ()
+{
+    echo -e "\n***                                                         ***"
+    echo -e "* Virtual Python environment installation script for Scipyen. *"
+    echo -e "***                                                         ***\n"
+    echo -e "(C) 2023 Cezar M. Tigaret "
+    echo -e "<cezar tigaret at gmail com> , <tigaretc at cardiff ac uk>"
+    echo -e "\nInstructions:"
+    echo -e "============\n"
+    echo -e "Run 'sh install.sh' without options for a fully automated installation, using built-in defaults.\n"
+    echo -e "Options:"
+    echo -e "========\n"
+    echo -e "--install_dir=DIR\tSpecify where the virtual environment will be created (default is ${HOME})\n"
+    echo -e "--environment=NAME\tCustom name for the virtual environment (default is ${virtual_env})\n"
+    echo -e "--with_neuron\t\tInstall binary neuron python distribution from PyPI\n"
+    echo -e "--build_neuron\t\tBuild neuron python locally\n"
+    echo -e "--with_coreneuron\twhen '--build_neuron' is passed, build local neuron with coreneuron; by default coreneuron is not used.\n"
+    echo -e "--refresh_repos\t When '--refresh_repos' is passed, local repository clones will be refreshed before rebuilding\n"
+    echo -e "\tNOTE: This applies to vigra and to local neuron build only\n"
+    echo -e "--jobs=N\t\tNumber of parallel tasks during building PyQt and neuron; default is 4; set to 0 to disable parallel build\n"
+    echo -e "--reinstall=NAME\t\t\tRe-install/re-building NAME, where NAME is one of:\n"
+    echo -e "\tpips, vigra, neuron, or desktopentry;\n"
+    echo -e "\t(this option can be passed more than once)\n"
+    echo -e "--install=NAME\t\t Alias to --reinstall option above; use it to "
+    echo -e "\tinstall optional libraries AFTER building Scipyen's virtual environment\n "
+    echo -e "--about\t\t\tDisplay Install.md at the console (requires the program 'glow')\n"
+    echo -e "--dist\t\t\tCreates a binary Scipyen diwstribution using PyInstaller. Requires that a virtual environment has already been built using this script.\n"
+    echo -e "-h | -? | --help \tShow this help message and quit\n"
+    echo -e "\nFor details, execute install.sh --about\n"
+    echo -e "\n"
+    echo -e "When run with the virtual Python environment already activated,\n"
+    echo -e "the script will use the current virtual environment to perform \n"
+    echo -e "(re)installations. WARNING: Make sure you activate the appropriate\n"
+    echo -e "Python environment for this !\n"
+   
+}
+
+function showinstalldoc () 
+{
+    glowexec=`which glow`
+    if [ -n $glowexec ] ; then
+        glow -p $docdir/Install.md
+    else
+        cat $docdir/Install.md
+    fi
+}
+
+function update_bashrc () 
+{
+dt=`date '+%Y-%m-%d_%H-%M-%s'`
+if [ ! -r ${HOME}/.bashrc ]; then
+cat<<END > ${HOME}/.bashrc
+source ${HOME}/.scipyenrc_pyside6
+END
+echo ".bashrc has been created in ${HOME}"
+echo "Sourcing ${HOME}/.bashrc"
+source ${HOME}/.bashrc
+else
+shopt -s lastpipe
+# check if .scipyenrc is sourced from .bashrc
+cat ${HOME}/.bashrc | grep "source ${HOME}/.scipyenrc_pyside6" | read source_set
+# echo "source_set="$source_set
+if [ -z "${source_set}" ]; then
+# .scipyenrc_pyside6 not sourced from .bashrc => backup .bashrc, then append a line to
+# source .scipyenrc_pyside6 in there
+echo "Copying ${HOME}/.bashrc to ${HOME}/.bashrc.$dt"
+cp ${HOME}/.bashrc ${HOME}/.bashrc.$dt
+echo "source ${HOME}/.scipyenrc_pyside6" >> ${HOME}/.bashrc
+echo ".bashrc has been modified in ${HOME}"
+echo "Sourcing ${HOME}/.bashrc"
+source ${HOME}/.bashrc
+fi
+shopt -u lastpipe
+fi
+}
+
+function upgrade_virtualenv ()
+{
+    havevenv=`${python_executable} -m virtualenv --version`
+    echo "havevenv = ${havevenv}"
+    if [ -z $"havevenv" ] ; then
+        echo -e "Scipyen requires virtualenv.\n"
+        if [[ `id -u ` -eq 0 ]] ; then
+            echo -e "To install virtualenv please use the software manager of your distribution,"
+            echo -e "or run this script as regular user (which will install virtualenv locally).\n"
+            echo -e "\nQuitting, for now..."
+            exit 1
+        fi
+        echo -e "Installing virtualenv locally...\n"
+        ${python_executable} -m pip install --user virtualenv
+#         python3 -m pip install --user virtualenv
+    else
+        if [[ `id -u ` -eq 0 ]] ; then
+            echo -e "Skipping the upgrade of virtualenv as root. Please use the software manager of your distribution to upgrade if needed.\n"
+        else
+            echo -e "Upgrading virtualenv locally...\n"
+            ${python_executable} -m pip install --user --upgrade virtualenv
+        fi
+    fi
+}
+
+
 #### Execution starts here ###
 
 # start_time=`date +%s`
 SECONDS=0
-get_pyver
+define_vars
 
 # virtual_env="testenv"
-virtual_env_pfx="scipyenv_pyside6" #.$pyver"
 
 # virtual_env_pfx="scipyenv_test" #.$pyver"
 # install_dir=$HOME
@@ -703,38 +890,6 @@ virtual_env_pfx="scipyenv_pyside6" #.$pyver"
 # qdbus_python_dir=
 
 
-install_dir=${HOME}
-# if [[ `id -u ` -eq 0 ]] ; then
-# install_dir="/usr/local"
-# else
-# install_dir=${HOME}
-# fi
-realscript=`realpath $0`
-scipyendir=`dirname "$realscript"`
-docdir=${scipyendir}/doc
-installscriptdir=${scipyendir}/setup_env
-scipyensrcdir=${scipyendir}/src/scipyen
-using_python=""
-install_neuron=0
-use_pypi_neuron=1
-use_core_neuron=0
-with_pyqt5=0
-with_pyqt6=1
-build_pyqt5=0
-build_pyqt6=0
-install_fenicsx=0
-njobs=4
-reinstall_pyqt5=0
-reinstall_pyqt6=0
-reinstall_vigra=0
-reinstall_neuron=0
-reinstall_fenicsx=0
-reinstall_pips=0
-reinstall_desktop=0
-refresh_git_repos=0
-make_dist=0
-
-must_create_env=1
 
 for i in "$@" ; do
     case $i in
@@ -958,85 +1113,21 @@ else
     python_exec=$VIRTUAL_ENV/bin/"python${major}"
 fi
 
-if [[ `id -u ` -eq 0 ]] ; then
-#     echo "running as root"
-    python_executable=`which ${python_exec}`;
-else
-    python_executable=${python_exec}
-fi
+python_executable=${python_exec}
+
+# if [[ `id -u ` -eq 0 ]] ; then
+# #     echo "running as root"
+#     python_executable=`which ${python_exec}`;
+# else
+#     python_executable=${python_exec}
+# fi
 
 echo -e "virtual_env is ${virtual_env}"
 echo -e "python executable: ${python_executable}"
 
-
-# makes a virtual environment and activates it
-if ! [ -v VIRTUAL_ENV ] ; then
-# NOTE: 2023-06-25 20:57:31 
-# these two MUST be run
-makevirtenv
-# upgrade_virtualenv && makevirtenv
-else
-    virtual_env=$VIRTUAL_ENV
-fi
+main
 
 
-if [[ $? -ne 0 ]] ; then
-    echo -e "\nCould not create and/or activate a virtual environment. Goodbye!\n"
-    exit 1
-fi
-
-# verify that the newly created virtual environment is active
-if [[ -z "$VIRTUAL_ENV" ]] ; then
-    echo -e "Not in an active environment! Goodbye!\n"
-    exit 1
-fi
-
-# exit
-
-if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
-    echo -e "Checking for, or making 'src' directory inside $VIRTUAL_ENV ...\n"
-    mkdir -p "$VIRTUAL_ENV/src" && cd "$VIRTUAL_ENV/src"
-    
-    # install pip requirements NOTE: 2023-06-25 10:55:09 FIXME how to pass the virtualenv python to builder when run as root?
-    installpipreqs
-    
-    if [[ $? -ne 0 ]] ; then
-        echo -e "Could not install pip requirements; check the console for messages. Goodbye!\n"
-        exit 1
-    fi
-    
-    # build vigra NOTE: 2023-06-25 10:55:09 FIXME how to pass the virtualenv python to builder when run as root?
-    dovigra
-    
-    # build neuron NOTE: 2023-06-25 10:55:09 FIXME how to pass the virtualenv python to builder when run as root?
-    if [ $install_neuron -ne 0 ] ; then
-        doneuron
-    fi
-    
-    if  [ $install_fenicsx -ne 0 ] ; then
-        dofenicsx
-    fi
-    
-    # make scripts
-    make_scipyenrc
-#     
-#     if [[ `id -u` -ne 0 ]] ; then
-#         # only update bashrc for regular users
-#         update_bashrc
-#     fi
-    
-    make_launch_script
-    
-#     update_bashrc
-    
-#     make_desktop_entry
-    
-    # NOTE: install console color schemes
-    cd $scipyendir/src/scipyen/gui/scipyen_console_styles
-    pip install .
-    cd $scipyendir
-    
-fi
 
 t=$SECONDS
 

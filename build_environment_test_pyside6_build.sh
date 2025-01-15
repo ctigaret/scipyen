@@ -106,76 +106,76 @@
 # also remember to pip install shiboken6 module in the virtual environment - not really ?!?
 
 
-# function dopyside6 ()
-# {
-#     if [[ -z "$VIRTUAL_ENV" ]] ; then
-#         echo -e "Not in an active environment! Goodbye!\n"
-#         exit 1
-#     fi
-#     
-#     cd ${VIRTUAL_ENV}
-# 
-#     wget https://download.qt.io/development_releases/prebuilt/libclang/$libclang_arc
-#     if [[ $? -ne 0 ]] ; then
-#     echo -e "Cannot retrieve prebult libclang. Bailing out. Goodbye!\n"
-#     exit 1
-#     fi
-#     
-#     7z x $libclang_arc
-#     
-#     if [[ $? -ne 0 ]] ; then
-#     echo -e "Cannot extract prebult libclang. Bailing out. Goodbye!\n"
-#     exit 1
-#     fi
-#     
-#     export LLVM_INSTALL_DIR=${VIRTUAL_ENV}/libclang
-#     
-#     mkdir -p ${VIRTUAL_ENV}/src && cd ${VIRTUAL_ENV}/src
-#     
-#     git clone https://code.qt.io/pyside/pyside-setup
-#     
-#     if [[ $? -ne 0 ]] ; then
-#     echo -e "Cannot clone pyqside6 repository. Bailing out. Goodbye!\n"
-#     exit 1
-#     fi
-#     
-#     cd pyside-setup && git checkout $pyside6_qtver
-#     
-#     if [[ $? -ne 0 ]] ; then
-#     echo -e "Cannot checkout branch $pyside6_qtver. Bailing out. Goodbye!\n"
-#     exit 1
-#     fi
-#     
-#     pip install -r requirements.txt
-#     if [[ $? -ne 0 ]] ; then
-#     echo -e "Cannot install pip requirements for PySide ($pyside6_qtver). Bailing out. Goodbye!\n"
-#     exit 1
-#     fi
-#     
-#     
-#     pip install -r requirements-doc.txt
-#     if [[ $? -ne 0 ]] ; then
-#     echo -e "Cannot install pip documentation requirements for PySide ($pyside6_qtver). Bailing out. Goodbye!\n"
-#     exit 1
-#     fi
-#     
-#     # NOTE 2025-01-13 16:34:26 trying setuptools - WARNING use qtpaths6 below, on
-#     # Tumbleweed!!!
-#     qtpaths_exec=`which qtpaths6`
-#     ${python_executable} setup.py build --qtpaths=${qtpaths_exec} --build-tests --ignore-git --parallel=8
-#     if [[ $? -ne 0 ]] ; then
-#     echo -e "Cannot build PySide6 for Qt $pyside6_qtver. Bailing out. Goodbye!\n"
-#     exit 1
-#     fi
-#     
-#     ${python_executable} setup.py install --prefix=${VIRTUAL_ENV} --qtpaths=${qtpaths_exec} --build-tests --ignore-git --parallel=8
-#     
-#     if [[ $? -ne 0 ]] ; then
-#     echo -e "Cannot install PySide6 for Qt $pyside6_qtver. Bailing out. Goodbye!\n"
-#     exit 1
-#     fi
-#     
-# }
+function dopyside6 ()
+{
+    if [[ -z "$VIRTUAL_ENV" ]] ; then
+        echo -e "Not in an active environment! Goodbye!\n"
+        exit 1
+    fi
+    
+    cd ${VIRTUAL_ENV}
+
+    wget https://download.qt.io/development_releases/prebuilt/libclang/$libclang_arc
+    if [[ $? -ne 0 ]] ; then
+    echo -e "Cannot retrieve prebult libclang. Bailing out. Goodbye!\n"
+    exit 1
+    fi
+    
+    7z x $libclang_arc
+    
+    if [[ $? -ne 0 ]] ; then
+    echo -e "Cannot extract prebult libclang. Bailing out. Goodbye!\n"
+    exit 1
+    fi
+    
+    export LLVM_INSTALL_DIR=${VIRTUAL_ENV}/libclang
+    
+    mkdir -p ${VIRTUAL_ENV}/src && cd ${VIRTUAL_ENV}/src
+    
+    git clone https://code.qt.io/pyside/pyside-setup
+    
+    if [[ $? -ne 0 ]] ; then
+    echo -e "Cannot clone pyqside6 repository. Bailing out. Goodbye!\n"
+    exit 1
+    fi
+    
+    cd pyside-setup && git checkout $pyside6_qtver
+    
+    if [[ $? -ne 0 ]] ; then
+    echo -e "Cannot checkout branch $pyside6_qtver. Bailing out. Goodbye!\n"
+    exit 1
+    fi
+    
+    pip install -r requirements.txt
+    if [[ $? -ne 0 ]] ; then
+    echo -e "Cannot install pip requirements for PySide ($pyside6_qtver). Bailing out. Goodbye!\n"
+    exit 1
+    fi
+    
+    
+    pip install -r requirements-doc.txt
+    if [[ $? -ne 0 ]] ; then
+    echo -e "Cannot install pip documentation requirements for PySide ($pyside6_qtver). Bailing out. Goodbye!\n"
+    exit 1
+    fi
+    
+    # NOTE 2025-01-13 16:34:26 trying setuptools - WARNING use qtpaths6 below, on
+    # Tumbleweed!!!
+    qtpaths_exec=`which qtpaths6`
+    ${python_executable} setup.py build --qtpaths=${qtpaths_exec} --build-tests --ignore-git --parallel=8
+    if [[ $? -ne 0 ]] ; then
+    echo -e "Cannot build PySide6 for Qt $pyside6_qtver. Bailing out. Goodbye!\n"
+    exit 1
+    fi
+    
+    ${python_executable} setup.py install --prefix=${VIRTUAL_ENV} --qtpaths=${qtpaths_exec} --build-tests --ignore-git --parallel=8
+    
+    if [[ $? -ne 0 ]] ; then
+    echo -e "Cannot install PySide6 for Qt $pyside6_qtver. Bailing out. Goodbye!\n"
+    exit 1
+    fi
+    
+}
 
 function dovigra ()
 {
