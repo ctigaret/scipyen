@@ -2112,10 +2112,30 @@ class _UrlNavigator_(QtCore.QObject):
         # KIO uses KUriFilterData
         # need to figure out what this does and replace with simpler pythonic code
         #
-        # for now, just return False (i.e. not wasFiltered)
-        return False
+        # for now, just return None
+        return 
     
-    # TODO BREAK 2025-01-09 22:47:12 TODO
+    @Slot()
+    def slorReturnPressed(self):
+        # NOTE: 2025-01-17 23:21:55 no support for Tabs
+        # therefore either apply url here or open platform's default appliuation
+        keyboardModifiers = QtWidgets.QApplication.keyboardModifiers()
+        
+        if int(keyboardModifiers & QtCore.Qt.ShiftModifier):
+            self.applyUncommittedUrl(ApplyUrlMethod.NewWindow) # -> open in application
+        else:
+            self.applyUncommittedUrl(ApplyUrlMethod.Apply) # navigate here
+            
+        # if int(leyboardModifiers & QtCore.Qt.AltModifier):
+        #     if int(keyboardModifiers & QtCore.Qt.ShiftModifier):
+        #         self.applyUncommittedUrl(ApplyUrlMethod.Tab)
+        #     else:
+        #         self.applyUncommittedUrl(ApplyUrlMethod.ActiveTab)
+        # elif int(keyboardModifiers & QtCore.Qt.ShiftModifier):
+        #     self.applyUncommittedUrl(ApplyUrlMethod.NewWindow)
+        # else:
+        #     self.applyUncommittedUrl(ApplyUrlMethod.Apply)
+                
     
     def switchView(self, editable:bool):
         # KUrlNavigatorPrivate
@@ -2137,13 +2157,14 @@ class _UrlNavigator_(QtCore.QObject):
             self._dropWidget_ = dropButton
             self.urlsDropped.emit(destination, evt)
             
-    def applyUncommittedUrl(self):
+    def applyUncommittedUrl(self, method:ApplyUrlMethod):
         # KUrlNavigatorPrivate
+        # NOTE: 2025-01-17 23:19:20
+        # About method - we don't support Tabs in filesystem viewer
+        # but we can launch the platform's file manager when method is NewWindow,
+        # or "Tab"# do nothing for ActiveTab
         text = self._pathBox_.currentText().strip()
         url = self.locationUrl()
-        # if url.isEmpty() and len(text) > 0:
-            # if self.slotCheckFilters(text):
-            #     return
         
         if text.startswith('/'):
             url.setPath(text)
