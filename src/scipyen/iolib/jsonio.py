@@ -258,7 +258,7 @@ def makeFuncStub(function:typing.Optional[typing.Union[CALLABLE_TYPES + (str, )]
     stub["signature"] = sig
     return stub
 
-def makeJSONStub(o):
+def makeJSONStub(o) -> tuple: # (str, dict)
     if isinstance(o, type):
         header = "python_type"
         ret = {"type_name":     o.__qualname__,
@@ -305,7 +305,7 @@ def makeH5PyVlenDtype(name):
     return h5py.vlen_dtype(name)
 
 @singledispatch
-def object2JSON(o):
+def object2JSON(o) -> dict:
     from core.datatypes import is_namedtuple
     #print("object2JSON<>", type(o))
     hdr, ret = makeJSONStub(o)
@@ -705,7 +705,7 @@ def _(o:pq.Quantity):
     
     return {hdr:ret}
     
-def dtype2JSON(d):
+def dtype2JSON(d) -> dict:
     """Delegates to json converter for h5py, pandas or numpy (in this order)
     Also required as intermediate for recurdive call in numpyDtype2JSON.
     """
@@ -748,7 +748,7 @@ def numpyDtype2JSON(d:np.dtype) -> dict:
     
     return {hdr:ret}
 
-def h5pyDtype2JSON(d):
+def h5pyDtype2JSON(d) -> dict:
     """Checks if d is a special h5py dtype.
     Returns a json representation (dict) if d is a h5py special dtype, or None.
     """
@@ -789,7 +789,7 @@ def h5pyDtype2JSON(d):
     ret["factory"]=factory
     return {hdr:ret}
             
-def pandasDtype2JSON(d):
+def pandasDtype2JSON(d) -> dict:
     """Checks if d is a pandas extension dtype (for standard pandas extensions)
     Returns a json representation (either str or dict) if d is a pandas extension
     dtype; returns None otherwise.
@@ -980,7 +980,7 @@ def pandasDtype2JSON(d):
     #elif isinstance(s, dict): # for recarrays, h5py, pandas
         #return np.dtype(s) 
 
-def decode_hook(dct):
+def decode_hook(dct) -> typing.Any:
     """ Almost complete round trip for a subset of Python types - read side.
     
     Implemented types:
@@ -1101,15 +1101,15 @@ def dump(obj, fp, *args, **kwargs):
     #kwargs["cls"] = CustomEncoder
     json.dump(obj,fp, *args, **kwargs)
     
-def dumps(obj, *args, **kwargs):
+def dumps(obj, *args, **kwargs) -> str:
     kwargs["default"] = object2JSON
     return json.dumps(obj, *args, **kwargs)
 
-def load(fp, *args, **kwargs):
+def load(fp, *args, **kwargs) -> typing.Any:
     ret = json.load(fp, *args, **kwargs)
     return json2python(ret)
         
-def loads(s):
+def loads(s) -> typing.Any:
     ret = json.loads(s)
     return json2python(ret)
     
@@ -1120,7 +1120,7 @@ def load(filename):
         
     return ret
 
-def json2python(jsonobj):
+def json2python(jsonobj:typing.Union[list, tuple, dict]) -> typing.Any:
     """Restores a Python object from it JSON representation.
     
     WARNING: Functions, and, with a few exceptions, types and method objects 
@@ -1373,7 +1373,7 @@ def json2python(jsonobj):
             
     return ret
     
-def kernelFromJSON(kernelcoords:list, *args, **kwargs):
+def kernelFromJSON(kernelcoords:list, *args, **kwargs) -> object:
     from imaging.vigrautils import kernelfromarray
     xy = np.array(kernelcoords)
     return kernelfromarray(xy)

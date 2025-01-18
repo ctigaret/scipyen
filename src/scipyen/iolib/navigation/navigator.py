@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-FileCopyrightText: 2025 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
@@ -138,6 +138,7 @@ from core import desktoputils as dutils
 from core import qtutils
 from iolib.mavigation import placesmodel
 from iolib.navigation.placesmodel import PlacesModel
+from iolib.navigation.protocols import ProtocolInfo # TODO
 from core.prog import safeWrapper
 import gui.pictgui as pgui
 from gui import guiutils
@@ -1956,6 +1957,7 @@ class NavigatorPathSelectorEventFilter(QtCore.QObject):
         
 class _UrlNavigator_(QtCore.QObject):
     # KUrlNavigatorPrivate
+    _sig_switchToBreadCrumbMode = Signal(name="_sig_switchToBreadCrumbMode")
     def __init__(self, url:QtCore.QUrl, qq: UrlNavigator, placesModel: PlacesModel):
         super().__init__()
         self._supportedSchemes_:list[str] = list()
@@ -1964,6 +1966,8 @@ class _UrlNavigator_(QtCore.QObject):
         self._editable_:bool = False
         self._active_:bool = True
         self._showFullPath_:bool = False
+        
+        self._sig_switchToBreadCrumbMode.connect(self.switchToBreadcrumbMode)
         
         # TODO: 2025-01-09 21:43:54 ?!? why Bunch ?!? - can also use a namespace
         # but Bunch ( in traitlets package ) most closely fits a struct
@@ -2092,6 +2096,7 @@ class _UrlNavigator_(QtCore.QObject):
             
     @Slot(QtCore.QUrl)
     def slotApplyUrl(self, url:QtCore.QUrl):
+        # TODO 2025-01-18 11:10:53 ProtocolInfo
         # if (!url.isEmpty() && url.path().isEmpty() && KProtocolInfo::protocolClass(url.scheme()) == QLatin1String(":local")) {
         #     url.setPath(QStringLiteral("/"));
         # }
@@ -2116,15 +2121,18 @@ class _UrlNavigator_(QtCore.QObject):
         return 
     
     @Slot()
-    def slorReturnPressed(self):
+    def slotReturnPressed(self):
         # NOTE: 2025-01-17 23:21:55 no support for Tabs
         # therefore either apply url here or open platform's default appliuation
         keyboardModifiers = QtWidgets.QApplication.keyboardModifiers()
         
         if int(keyboardModifiers & QtCore.Qt.ShiftModifier):
             self.applyUncommittedUrl(ApplyUrlMethod.NewWindow) # -> open in application
+        elif int(KeyboardModifiers & QtCore.Qt.ControlModifier):
+            self._sig_switchToBreadCrumbMode.emit()
         else:
             self.applyUncommittedUrl(ApplyUrlMethod.Apply) # navigate here
+            self._q_.returnPressed.emit()
             
         # if int(leyboardModifiers & QtCore.Qt.AltModifier):
         #     if int(keyboardModifiers & QtCore.Qt.ShiftModifier):
@@ -2136,6 +2144,15 @@ class _UrlNavigator_(QtCore.QObject):
         # else:
         #     self.applyUncommittedUrl(ApplyUrlMethod.Apply)
                 
+    @Slot(str)
+    def slotSchemeChanged(self, scheme:str):
+        if not self._editable_:
+            return
+        url = QtCore.QUrl()
+        url.setScheme(scheme)
+        
+        # TODO: 2025-01-18 10:12:51
+        # they use KProtocolInfo.protocolClass(scheme) - factory for a Protocl.Info
     
     def switchView(self, editable:bool):
         # KUrlNavigatorPrivate
@@ -2192,6 +2209,7 @@ class _UrlNavigator_(QtCore.QObject):
         currentUrl.setPath("")
         return currentUrl
     
+    @Slot()
     def switchToBreadcrumbMode(self):
         # KUrlNavigatorPrivate
         self.setUrlEditable(False)
