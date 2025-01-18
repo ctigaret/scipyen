@@ -1102,7 +1102,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     # class attribute
     pluginActions = []
 
-    _instance = None
+    _instance = None # NOTE: Singleton design pattern
     
     @classmethod
     def _walk_mro(cls) -> typing.Generator[typing.Self, None, None]:
@@ -1428,8 +1428,6 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     # alive at any time; however, this behaviour propagates to its subclasses 
     # also (if any)
     
-    # def __new__(cls:type[SMW], app: QtWidgets.QApplication, 
-                 # parent: typing.Optional[QtWidgets.QWidget] = None, *args, **kwargs) -> SMW:
     def __new__(cls:typing.Self, app: QtWidgets.QApplication, 
                  parent: typing.Optional[QtWidgets.QWidget] = None, *args, **kwargs) -> typing.Self:
         if not hasattr(cls, "_instance") or not isinstance(cls._instance, cls):

@@ -138,7 +138,7 @@ from core import desktoputils as dutils
 from core import qtutils
 from iolib.mavigation import placesmodel
 from iolib.navigation.placesmodel import PlacesModel
-from iolib.navigation.protocols import ProtocolInfo # TODO
+# from iolib.navigation.protocols import ProtocolInfo # TODO
 from core.prog import safeWrapper
 import gui.pictgui as pgui
 from gui import guiutils
@@ -2152,7 +2152,7 @@ class _UrlNavigator_(QtCore.QObject):
         url.setScheme(scheme)
         
         # TODO: 2025-01-18 10:12:51
-        # they use KProtocolInfo.protocolClass(scheme) - factory for a Protocl.Info
+        # they use KProtocolInfo.protocolClass(scheme) - factory for a ProtocolInfo
     
     def switchView(self, editable:bool):
         # KUrlNavigatorPrivate

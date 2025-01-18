@@ -42,9 +42,9 @@ class ExtraField:
         self.type:ExtraFieldType = type
     
 
-class ProtocolInfo:
+class _ProtocolInfo_:
     def __init__(self, name:str, exec:str, jsonobj:dict): # CAUTION dict in place of QJsonObject (not available in PyQt5)
-        # KProtocolInfoPrivate API
+        # ### BEGIN KProtocolInfoPrivate API
         self._name = name
         self._exec = exec
         
@@ -157,15 +157,95 @@ class ProtocolInfo:
             
             self._proxyProtocol = jsonobj.get("ProxiedBy", "")
             
-        
-        
-            
-        
-        
-            
-            
-        # TODO: 2025-01-18 11:26:43 finalize me
+        # ### END   KProtocolInfoPrivate API
+
+class ProtocolInfoFactory: # pass # TODO 2025-01-18 12:18:35 write me - singleton class!
+    _instance = None # NOTE: Singleton design pattern
     
+    def __new__(cls:typing.Self, app: QtWidgets.QApplication, 
+                 parent: typing.Optional[QtWidgets.QWidget] = None, *args, **kwargs) -> typing.Self:
+        # NOTE: Singleton design pattern
+        if not hasattr(cls, "_instance") or not isinstance(cls._instance, cls):
+            cls._instance = super(ProtocolInfoFactory, cls).__new__(cls, app, parent, *args, **kwargs)
+            
+        return cls._instance
+    
+    def __init__(self):
+        self._cacheDirty:bool = True
+        self._mutex:QtCore.QMutex = QtCore.QMutex()
+        self._cache:dict = dict() # mapping str ↦ _ProtocolInfo_
+        
+    def __del__(self):
+        locker = QtCore.QMutexLocker(self._mutex)
+        self._cache.clear()
+        
+    @classmethod
+    def _walk_mro(cls) -> typing.Generator[typing.Self, None, None]: # NOTE: Singleton design pattern
+        for subclass in cls.mro():
+            if (
+                issubclass(cls, subclass)
+                and issubclass(subclass, typing.Self)
+                and subclass != typing.Self
+            ):
+                yield subclass
+                
+    @classmethod
+    def initialized(cls:typing.Self) -> bool: # NOTE: Singleton design pattern
+        return hasattr(cls, "_instance" and isinstance(cls._instance, cls))
+    
+    @classmethod
+    def instance(cls:typing.Self, *args, **kwargs) -> typing.Self: # NOTE: Singleton design pattern
+        if cls._instance is None:
+            inst = cls(*args, **kwargs)
+            for subclass in cls._walk_mro():
+                subclass._instance = inst
+        if hasattr(cls, "_instance") and isinstance(cls._instance, cls):
+            return cls._instance
+        else:
+            raise RuntimeError(f"Incompatible sibling of '{cls.__name__}' is already instantiated as singleton: {type(cls._instance).__name__}")
+
+    @staticmethod
+    def self() -> typing.Self:
+        return _instance
+    
+    def protocols(self) -> list:
+        """Returns a list of names of cached protocols"""
+        locker = QtCore.QMutexLocker(self._mutex)
+        self.fillCache()
+        return list(self._cache.keys())
+    
+    def allProtocols(self) -> list:
+        """Returns a list of cached protocols"""
+        locker = QtCore.QMutexLocker(self._mutex)
+        self.fillCache()
+        return list(self._cache.values())
+    
+    def findProtocol(self, protocol:str, updateCacheIfNotFound:bool) -> _ProtocolInfo_:
+        assert len(protocol) > 0 and protocol.startswith(":")
+        
+        locker = QtCore.QMutexLocker(self._mutex)
+        filled = self.fillCache()
+        
+        info = self._cache.get(protocol, None)
+        
+        if info is None and not filled and updateCacheIfNotFound:
+            scipywarn(f"Refilling ProtocolInfoFactory cache in the hope to find {protocol}")
+            self._cacheDirty = True
+            self.fillCache()
+            info = self._cache.get(protocol, None)
+            
+        return info
+        
+    def fillCache(self) -> bool:
+        assert not self._mutex.tryLock()
+        if not self._cacheDirty:
+            return False
+        
+        self._cache.clear()
+        
+        
+
+class ProtocolInfo:
     @staticmethod
     def protocols() -> list:
         pass
@@ -265,5 +345,3 @@ class ProtocolInfo:
     def proxiedBy(protocol:str) -> str:
         pass
     
-    
-class ProtocolInfoFactory:pass # TODO 2025-01-18 12:18:35 write me - singleton class!
