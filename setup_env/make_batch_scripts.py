@@ -5,7 +5,7 @@
 
 
 import os, sys, pathlib, subprocess, traceback, shutil, tempfile
-if sys.platform != "win32":
+if not sys.platform.startswith("win32"):
     raise EnvironmentError(f"This script cannot run on {sys.platform}")
 import winreg
 try:
@@ -388,7 +388,7 @@ def main():
     print(f"To activate the virtual environment just call {env_activation} script at a new command prompt")
 
 if __name__ == "__main__":
-    if sys.platform == "win32":
+    if sys.platform.startswith("win32"):
         main()
     else:
         raise EnvironmentError(f"This script cannot run on {sys.platform} platform")

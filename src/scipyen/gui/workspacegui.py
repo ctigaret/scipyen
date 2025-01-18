@@ -554,7 +554,7 @@ class FileIOGui(object):
             if len(targetDir.strip()) == 0 or not os.path.isdir(targetDir):
                 targetDir = os.getcwd()
                 
-        if sys.platform == "win32":
+        if sys.platform.startswith("win32"):
             options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
             kw = {"options":options}
         else:
@@ -620,7 +620,7 @@ class FileIOGui(object):
             if len(targetDir.strip()) == 0 or not os.path.isdir(targetDir):
                 targetDir = os.getcwd()
                 
-        if sys.platform == "win32":
+        if sys.platform.startswith("win32"):
             options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
             kw = {"options":options}
         else:
@@ -640,7 +640,7 @@ class FileIOGui(object):
     
     @safeWrapper
     def chooseDirectory(self, caption:typing.Optional[str]=None,targetDir:typing.Optional[str]=None):
-        if sys.platform == "win32":
+        if sys.platform.startswith("win32"):
             options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
             kw = {"options":options}
         else:
@@ -655,7 +655,7 @@ class FileIOGui(object):
 
     @staticmethod
     def chooseDirectory_static(obj:typing.Optional[QtWidgets.QWidget]=None, caption:typing.Optional[str]=None,targetDir:typing.Optional[str]=None):
-        if sys.platform == "win32":
+        if sys.platform.startswith("win32"):
             options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
             kw = {"options":options}
         else:

@@ -531,7 +531,7 @@ class UDSEntry:
         # so let's go with that...
         self._d_ = _UDSEntryPrivate_()
         
-        if sys.platform == "win32":
+        if sys.platform.startswith("win32"):
             self._d_.reserve(8)
         else:
             self._d_.reserve(10)
@@ -563,7 +563,7 @@ class UDSEntry:
             # Incidentally, they don't seem to try & call statx here, in KIO::UDSEntry c'tor
             # hence they don't explore creation time ?!?
             
-            if sys.platform != "win32":
+            if not sys.platform.startswith("win32"):
             #ifndef Q_OS_WIN
                 self._d_.insert(self.UDS_LOCAL_USER_ID,  buff.st_uid) # user  ID of the file owner — UNIX only
                 self._d_.insert(self.UDS_LOCAL_GROUP_ID, buff.st_gid) # group ID of the file owner — UNIX only

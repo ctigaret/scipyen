@@ -186,7 +186,7 @@ def is_hidden(filepath:typing.Union[str, pathlib.Path]):
         name = filepath.name
         filepath = str(filepath)
     
-    if sys.platform == "win32":
+    if sys.platform.startswith("win32"):
         try:
             attrs = ctypes.windll.kernel32.GetFileAttributesW(filepath)
             assert attrs != -1
@@ -196,10 +196,10 @@ def is_hidden(filepath:typing.Union[str, pathlib.Path]):
             
         return result
     
-    elif sys.platform == "linux":
+    elif sys.platform.startswith("linux"):
         return name.startswith(".")
     
-    elif sys.platform == "darwin":
+    elif sys.platform.startswith("darwin"):
         # NOTE: 2022-05-01 23:05:40 TODO:
         # check ~/src/Python/OS X hidden files.py downloaded from
         # http://pastebin.com/aCUwTumB
@@ -275,7 +275,7 @@ def loadImageFile(fileName:str, asVolume:bool=False, suppress_cpp_warnings=False
     '''    
     # NOTE: 2021-11-30 11:46:12
     # suppress warnings from vigra impex
-    if sys.platform == "win32":
+    if sys.platform.startswith("win32"):
         nFrames = vigra.impex.numberImages(fileName)
         
         if nFrames > 1:
@@ -1758,7 +1758,7 @@ def getMimeAndFileType(fileName:typing.Union[str, pathlib.Path]):
 
     # 1.2) try the system "file" command - only available on Linux/UNIX
     if file_type is None:
-        if sys.platform == "linux":
+        if sys.platform.startswith("linux"):
             try:
                 # if os.path.isfile(fileName):
                 if fileName.is_file():

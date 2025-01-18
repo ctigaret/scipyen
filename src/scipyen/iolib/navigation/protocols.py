@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-import typing, pathlib, functools, os, itertools
+import typing, pathlib, functools, os, itertools, sys
 import datetime
 import json
 from functools import (singledispatch, singledispatchmethod)
@@ -51,19 +51,19 @@ class _ProtocolInfo_:
         self._isSourceProtocol:bool     = jsonobj.get("source", True)
         self._supportsPermissions:bool  = jsonobj.get("permissions", True)
         self._isHelperProtocol:bool     = jsonobj.get("helper", False)
-        self._supportsreading:bool      = jsonobj.get("reading", False)
-        self._supportsWriting:bool      = jsonobj.get("writing", False)
-        self._supportsMakeDir:bool      = jsonobj.get("makedir", False)
-        self._supportsDeleting:bool     = jsonobj.get("deleting", False)
-        self._supportsLinking:bool      = jsonobj.get("linking", False)
-        self._supportsMoving:bool       = jsonobj.get("moving", False)
-        self._supportsOpening:bool      = jsonobj.get("opening", False)
-        self._supportsTruncating:bool   = jsonobj.get("truncating", False)
-        self._canCopyFromFile:bool      = jsonobj.get("copyFromFile", False)
-        self._canCopyToFile:bool        = jsonobj.get("copyToFile", False)
-        self._canRenameFromFile:bool    = jsonobj.get("renameFromFile", False)
-        self._canRenameToFile:bool      = jsonobj.get("renameToFile", False)
-        self._canDeleteRecursive:bool   = jsonobj.get("deleteRecursive", False)
+        self._supportsreading:bool      = jsonobj.get("reading", True)
+        self._supportsWriting:bool      = jsonobj.get("writing", True)
+        self._supportsMakeDir:bool      = jsonobj.get("makedir", True)
+        self._supportsDeleting:bool     = jsonobj.get("deleting", True)
+        self._supportsLinking:bool      = jsonobj.get("linking", True)
+        self._supportsMoving:bool       = jsonobj.get("moving", True)
+        self._supportsOpening:bool      = jsonobj.get("opening", True)
+        self._supportsTruncating:bool   = jsonobj.get("truncating", True)
+        self._canCopyFromFile:bool      = jsonobj.get("copyFromFile", True)
+        self._canCopyToFile:bool        = jsonobj.get("copyToFile", True)
+        self._canRenameFromFile:bool    = jsonobj.get("renameFromFile", True)
+        self._canRenameToFile:bool      = jsonobj.get("renameToFile", True)
+        self._canDeleteRecursive:bool   = jsonobj.get("deleteRecursive", True)
 
         self._fileNameUsedForCopying:FileNameUsedForCopying = FileNameUsedForCopying.FromUrl
         
@@ -205,7 +205,7 @@ class ProtocolInfoFactory: # pass # TODO 2025-01-18 12:18:35 write me - singleto
             raise RuntimeError(f"Incompatible sibling of '{cls.__name__}' is already instantiated as singleton: {type(cls._instance).__name__}")
 
     @staticmethod
-    def self() -> typing.Self:
+    def instance() -> typing.Self: # originally self()...
         return _instance
     
     def protocols(self) -> list:
@@ -236,19 +236,31 @@ class ProtocolInfoFactory: # pass # TODO 2025-01-18 12:18:35 write me - singleto
             
         return info
         
-    def fillCache(self) -> bool:
+    def fillCache(self) -> bool: 
+        # TODO 2025-01-18 22:42:33 FIXME
+        # - requires a stand-in for KPluginMetaData
         assert not self._mutex.tryLock()
         if not self._cacheDirty:
             return False
         
         self._cache.clear()
+        if sys.platform.startswith("win32"):
+            worker = "cmd /c start '' "
+        elif sys.platform.startswith("darwin"):
+            worker = "open -n"
+        else:
+            worker = "xdg-open"
+            
+        self._cache[":local"] = _ProtocolInfo_(":local", worker, dict())
         
+        self._cacheDirty =  False
+        return True
         
-
 class ProtocolInfo:
     @staticmethod
     def protocols() -> list:
-        pass
+        return ProtocolInfoFactory.instance().protocols()
+        
     
     @singledispatchmethod
     @staticmethod
@@ -291,14 +303,19 @@ class ProtocolInfo:
     
     @isFilterProtocol.register(QtCore.QUrl)
     def _(url:QtCore.QUrl) -> bool:
-        pass
+        return self.isFilterProtocol(url.scheme())
     
     @isFilterProtocol.register(str)
-    def _(url:str) -> bool:
-        pass
+    def _(protocol:str) -> bool:
+        prot = ProtocolInfoFactory.instance().findProtocol(protocol)
+        if not isinstance(prot, _ProtocolInfo_):
+            return False
+        
+        return not prot._isSourceProtocol
     
     @staticmethod
     def icon(protocol:str) -> str:
+        prot = ProtocolInfoFactory.instance().findProtocol(protocol)
         pass
     
     @staticmethod

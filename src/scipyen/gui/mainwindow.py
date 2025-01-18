@@ -126,7 +126,7 @@ try:
     hasQDarkStyle = True
 except:
     hasQDarkStyle = False
-# if sys.platform == "win32":
+# if sys.platform.startswith("win32"):
 
 # END qdarkstyle
 
@@ -373,7 +373,7 @@ has_neuron = neuron_spec is not None
 
 # BEGIN GUI themes according to platform (incomplete...)
 
-# if sys.platform == "linux":
+# if sys.platform.startswith("linux"):
 # END
 
 # BEGIN scipyen core modules
@@ -1488,7 +1488,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # a mapping of plugin_module ↦ {plugin_module_function ↦ QtWidgets.QAction}
         self._ui_plugins_ = dict()
         
-        self._userenv_varname_ = "USERPROFILE" if sys.platform == "win32" else "HOME"
+        self._userenv_varname_ = "USERPROFILE" if sys.platform.startswith("win32") else "HOME"
         self._user_home_ = os.getenv(self._userenv_varname_)
         
         # NOTE: 2024-05-29 13:07:37
@@ -1601,7 +1601,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.setupUi(self)
 
         # WindowManager.__init__(self, parent=self)
-        if sys.platform == "win32":
+        if sys.platform.startswith("win32"):
             WorkspaceGuiMixin.__init__(self, parent=None)  # , settings=settings)
             self.scriptsManager = ScriptManager(parent=None)
         else:
@@ -1736,7 +1736,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.currentVarItem = None
         self.currentVarItemName = None
         
-        # if sys.platform == "win32":
+        # if sys.platform.startswith("win32"):
         #     if isinstance(self, QtWidgets.QMainWindow):
         #         flags = self.windowFlags() | QtCore.Qt.WindowStaysOnTopHint
         #         self.setWindowFlags(flags);
@@ -2000,7 +2000,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             QtGui.QIcon.setThemeName("breeze-dark")
 
 
-        if sys.platform == "win32":
+        if sys.platform.startswith("win32"):
             if hasQDarkTheme:
                 QtGui.QIcon.setThemeName("breeze-dark")
 
@@ -2894,7 +2894,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             # NOTE: 2021-01-30 13:52:58
             # there is no running ExternalIPython instance
             if isinstance(new, str) and new in ("connection", "neuron_ext"):
-                if sys.platform == "win32":
+                if sys.platform.startswith("win32"):
                     options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
                     kw = {"options":options}
                 else:
@@ -4698,7 +4698,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         #         win[1].close()
 
         # see NOTE: 2024-04-17 11:53:29 in scipyenviewer.py
-        if sys.platform == "win32" or os.getenv("XDG_SESSION_TYPE").lower() == "wayland":
+        if sys.platform.startswith("win32") or os.getenv("XDG_SESSION_TYPE").lower() == "wayland":
             QtWidgets.QApplication.closeAllWindows()
         # QtWidgets.QApplication.closeAllWindows()
             
@@ -4745,7 +4745,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         if hasQDarkTheme:
             self._available_Qt_style_names_.extend(f"Qt{v.capitalize()}" for v in qdarktheme.get_themes())
             
-        # if sys.platform == "win32" and hasQDarkStyle:
+        # if sys.platform.startswith("win32") and hasQDarkStyle:
         #     self._available_Qt_style_names_.append("Dark Style")
         # elif hasQDarkTheme:
         #     self._available_Qt_style_names_.extend(f"Qt{v.capitalize()}" for v in qdarktheme.get_themes())
@@ -5153,7 +5153,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @Slot()
     @safeWrapper
     def slot_goToHomeDir(self):
-        if sys.platform == "win32":
+        if sys.platform.startswith("win32"):
             self.slot_changeDirectory(os.environ['USERPROFILE'])
         else:
             self.slot_changeDirectory(os.environ['HOME'])
@@ -5195,9 +5195,9 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     def slot_openCurrentDirInSystemTerminal(self):
         dest = str(pathlib.Path(self.currentDir))
         terminal = desktoputils.get_system_terminal_executable()
-        if sys.platform == "win32":
+        if sys.platform.startswith("win32"):
             subprocess.run(["start", terminal, "/k", "pushd", dest], shell=True)
-        elif sys.platform == "linux":
+        elif sys.platform.startswith("linux"):
             # subprocess.run(["xterm", "-e", "'cd", dest, "&&", "/bin/bash'"], shell=True)
             if terminal == "konsole":
                 subprocess.run([terminal, "--subprocess", "--workdir", dest], shell=True)
@@ -5800,7 +5800,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         if targetDir is None or (isinstance(targetDir, str) and len(targetDir.strip()) == 0) or not os.path.exists(targetDir):
             targetDir = os.getenv(
-                "USERPROFILE") if sys.platform == "win32" else os.getenv("HOME")
+                "USERPROFILE") if sys.platform.startswith("win32") else os.getenv("HOME")
 
         if targetDir is not None and targetDir != "" and os.path.exists(targetDir):
             if os.path.isfile(targetDir):
@@ -5814,7 +5814,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             
             # print(f"{self.__class__.__name__}.slot_changeDirectory targetDir = {targetDir}")
 
-            if sys.platform == "win32":
+            if sys.platform.startswith("win32"):
                 targetDir = targetDir.replace("\\", "/")
                 targetDir = rf"{targetDir}"
 
@@ -5822,7 +5822,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
             if self.ipkernel is not None and self.shell is not None and self.console is not None:
                 # print(''.join(["cd '", targetDir, "'"]))
-                # if sys.platform == "linux":
+                # if sys.platform.startswith("linux"):
                 # self.console.execute(''.join(["cd '", targetDir, "'"]), hidden=True)
                 # else:
                 # self.console.execute(''.join(["os.chdir('", targetDir, "')"]), hidden=False)
@@ -6232,7 +6232,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     def slot_pastePythonScript(self, fileName=None):
         if not isinstance(fileName, str) or len(fileName) == 0:
             targetDir = self.recentDirectories[0]
-            if sys.platform == "win32":
+            if sys.platform.startswith("win32"):
                 options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
                 kw = {"options":options}
             else:
@@ -6282,7 +6282,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     def slot_runPythonScript(self, fileName=None):
         if not isinstance(fileName, str) or len(fileName) == 0:
             targetDir = self.recentDirectories[0]
-            if sys.platform == "win32":
+            if sys.platform.startswith("win32"):
                 options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
                 kw = {"options":options}
             else:
@@ -6394,7 +6394,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     def slot_selectWorkDir(self, *args):
         targetDir = self.recentDirectories[0]
         caption = "Select Working Directory"
-        if sys.platform == "win32":
+        if sys.platform.startswith("win32"):
             options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
             kw = {"options":options}
         else:
@@ -6587,7 +6587,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
                 targetDir = self.recentDirectories[0]
 
-                if sys.platform == "win32":
+                if sys.platform.startswith("win32"):
                     options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
                     kw = {"options":options}
                 else:
@@ -6626,7 +6626,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 fileFilt = ';;'.join(fileFilters)
                 targetDir = self.recentDirectories[0]
 
-                if sys.platform == "win32":
+                if sys.platform.startswith("win32"):
                     options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
                     kw = {"options":options}
                 else:
@@ -6707,7 +6707,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         targetDir = self.recentDirectories[0]
 
-        if sys.platform == "win32":
+        if sys.platform.startswith("win32"):
             options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
             kw = {"options":options}
         else:
@@ -7379,7 +7379,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             else:
                 fname = os.path.splitext(fileName)[0]
 
-                if sys.platform == "win32":
+                if sys.platform.startswith("win32"):
                     cmd = f'run -i -n -t "{fname}"'
                 else:
                     cmd = f"run -i -n -t '{fname}'"
@@ -7462,7 +7462,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     def _slot_set_Users_Plugins_directory(self):
         targetDir = self._user_plugins_dir
         caption = "Select users plugins top directory"
-        if sys.platform == "win32":
+        if sys.platform.startswith("win32"):
             options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
             kw = {"options":options}
         else:
@@ -7614,7 +7614,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         filename = "".join([varname, ".csv"])
 
-        if sys.platform == "win32":
+        if sys.platform.startswith("win32"):
             options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
             kw = {"options":options}
         else:

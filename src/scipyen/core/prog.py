@@ -1229,7 +1229,7 @@ def _myshowarning(msg:WarningMessage):#, category, filename, lineno, file=None, 
             # warnings get lost
             return
     category = msg.category.__name__
-    if sys.platform == "win32":
+    if sys.platform.startswith("win32"):
         s =  f"In {msg.filename}, line {msg.lineno}: \n{category} {msg.message}\n"
     else:
         s =  f"In {msg.filename}, line {msg.lineno}: \n\x1b[0;33m{category}\x1b[0m: {msg.message}\n"

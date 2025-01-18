@@ -222,7 +222,7 @@ class _FileItem_:
                     self._entry_.replace(UDSEntry.UDS_ACCESS_TIME, int(buff.st_atime))
                     self._entry_.replace(UDSEntry.UDS_CREATION_TIME, int(buff.st_ctime))
                     
-                if sys.platform != "win32":
+                if not sys.platform.startswith("win32"):
                     uid = buff.st_uid
                     gid = buff.st_gid
                     self._entry_.replace(UDSEntry.UDS_LOCAL_USER_ID, uid)
@@ -404,7 +404,7 @@ class _FileItem_:
         elif self._fileMode_ != self.Unknown:
             if utils.isDirMask(self._fileMode_):
                 bfr[0] = "d"
-            elif sys.platform != "win32":
+            elif not sys.platform.startswith("win32"):
                 if stat.S_ISSOCK(self._fileMode_):
                     bfr[0] = "s"
                 elif stat.S_ISCHR(self._fileMode_):
@@ -653,7 +653,7 @@ class FileItem(metaclass=MultipleMeta):
         if self.entry().contains(UDSEntry.UDS_USER):
             return self.entry().stringValue(UDSEntry.UDS_USER)
         else:
-            if sys.platform != "win32":
+            if not sys.platform.startswith("win32"):
                 uid = self.entry().numberValue(UDSEntry.UDS_LOCAL_USER_ID, -1)
                 if uid != -1:
                     try:
@@ -678,7 +678,7 @@ class FileItem(metaclass=MultipleMeta):
         if self.entry().contains(UDSEntry.UDS_GROUP):
             return self.entry().numberValue(UDSEntry.UDS_GROUP)
         else:
-            if sys.platform != "win32":
+            if not sys.platform.startswith("win32"):
                 gid = self.entry().numberValue(UDSEntry.UDS_LOCAL_GROUP_ID, -1)
                 if gid != -1:
                     if gid not in cachedStrings:
@@ -743,7 +743,7 @@ class FileItem(metaclass=MultipleMeta):
             if self._d_._permissions_ & readMask == readMask:
                 return True
             
-            if sys.platform != "win32":
+            if not sys.platform.startswith("win32"):
                 uidOfItem = self.userId()
                 if uidOfItem != -1:
                     currentUser = os.getuid()
@@ -806,7 +806,7 @@ class FileItem(metaclass=MultipleMeta):
             return linkstr
         
         if self._d_._bIsLocalUrl_:
-            if sys.platform == "win32":
+            if sys.platform.startswith("win32"):
                 return QtCore.QFile.symLinkTarget(self._d_._url_.adjusted(QtCore.QUrl.StripTrailingSlash).toLocalFile())
             else:
                 path = self._d_._url_.adjusted(QtCore.QUrl.StripTrailingSlash).toLocalFile()
@@ -843,7 +843,7 @@ class FileItem(metaclass=MultipleMeta):
             if self._d_._permissions_ & (stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH) == 0:
                 return False
             
-            if sys.platform != "win32":
+            if not sys.platform.startswith("win32"):
                 uidOfItem = self.userId()
                 if uidOfItem != -1:
                     currentUser = og.getuid()
@@ -987,7 +987,7 @@ class FileItem(metaclass=MultipleMeta):
         if self.isHidden():
             names.append("hidden")
             
-        if sys.platform != "win32":
+        if not sys.platform.startswith("win32"):
             if self.isDir():
                 url, mlu = self.isMostLocalUrl()
                 if mlu:
@@ -1126,7 +1126,7 @@ class FileItem(metaclass=MultipleMeta):
         if self._d_._permissions_ & executableMask == 0:
             return False
         
-        if sys.platform == "win32":
+        if sys.platform.startswith("win32"):
             return stat.S_IXUSR & self._d_._permissions_ > 0
         else:
             uid = self.userId()

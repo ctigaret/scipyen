@@ -227,7 +227,7 @@ def DataFiles(topdir, ext, **kw):
 
 def getQt5PluginsDir():
     # NOTE: on windows this is qtpaths; on SuSE this is qtpaths-qt5
-    if sys.platform == "win32":
+    if sys.platform.startswith("win32"):
         qtpaths_exec = "qtpaths"
     else:
         qtpaths_exec = "qtpaths-qt5"
@@ -433,7 +433,7 @@ if os.path.isdir(os.path.join(mydir, ".git")):
                         
 host_name=""
 platform = sys.platform
-if platform == "win32":
+if platform.startswith("win32"):
     datas.append((os.path.join(scipyen_dir, "install", "make_app_link.ps1"), "."))
     datas.append((os.path.join(scipyen_dir, "install", "pythonbackend.ico"), "."))
 else:
@@ -471,7 +471,7 @@ bundlepath = os.path.join(distpath, product)
 # ------------------------------------
 #
 
-# if sys.platform == "linux":
+# if sys.platform.startswith("linux"):
 #     # add a system-wide installation script
 #     desktoptempdir = tempfile.mkdtemp()
 #     desktop_file_name = os.path.join(desktoptempdir, f"Scipyen_app{gitsfx}.desktop")
@@ -645,7 +645,7 @@ options = [
     ('O', None, 'OPTION')
     ]
 
-if sys.platform == "win32":
+if sys.platform.startswith("win32"):
     exe = EXE(
         pyz,
         a.scripts,
@@ -718,5 +718,5 @@ print(f"\n\nDuration: {dd} days, {hh} hours, {mm} minutes and {dt} seconds")
 #     shutil.rmtree(desktoptempdir)
 #     
 # # app_location =
-# if sys.platform == "linux":
+# if sys.platform.startswith("linux"):
 #     print(f"To install system-wide, run {os.path.join(product, '_internal', 'dist_install.sh')}.")

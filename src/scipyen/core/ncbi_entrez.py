@@ -8,7 +8,7 @@
 import os, sys, traceback, typing
 from iolib import pictio as pio
 
-_home = os.environ["USERPROFILE"] if sys.platform == "win32" else os.environ["HOME"]
+_home = os.environ["USERPROFILE"] if sys.platform.startswith("win32") else os.environ["HOME"]
 
 api_key_file = os.path.join(_home, "NCBI_API_key")
 

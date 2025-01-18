@@ -18,7 +18,7 @@ intensity  = 100
 # this is the COM port mapped to the USB connection of CoolLED pE 1 & 2 on
 # Bruker PC !!!
 
-if sys.platform == "win32":
+if sys.platform.startswith("win32"):
     port_name = "COM3"
 else:
     # NOTE: 2024-02-24 19:03:38

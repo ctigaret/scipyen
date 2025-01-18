@@ -64,7 +64,7 @@ def typeFromName(name:str):
     return FsType.Other
 
 def determineFileSystemType(path:str) -> FsType:
-    if sys.platform == "win32":
+    if sys.platform.startswith("win32"):
         return FsType.Unknown
     else:
         partitions = psutil.disk_partitions(True)

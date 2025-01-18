@@ -1157,7 +1157,7 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
         So it is up to the user of the ExternalConsoleWindow instance to take care
         of that - see ExternalIPython.init_qt_elements()
         """
-        ctrl = "Meta" if sys.platform == 'darwin' else "Ctrl"
+        ctrl = "Meta" if sys.platform.startswith('darwin') else "Ctrl"
         kernel_menu_separators = [a for a in self.kernel_menu.actions() if a.isSeparator()]
         
         self.initialize_neuron_act = QtWidgets.QAction("S&tart NEURON in current Kernel",
@@ -1175,7 +1175,7 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
             self.add_menu_action(self.kernel_menu, self.initialize_neuron_act)
             
     def _supplement_view_menu_(self):
-        ctrl = "Meta" if sys.platform == 'darwin' else "Ctrl"
+        ctrl = "Meta" if sys.platform.startswith('darwin') else "Ctrl"
         
         self.syntax_style_menu.clear()
         
@@ -1287,7 +1287,7 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
         
     def create_tab_with_existing_kernel(self, code=None, **kwargs):
         """create a new frontend attached to an external kernel in a new tab"""
-        if sys.platform == "win32":
+        if sys.platform.startswith("win32"):
             options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
             kw = {"options":options}
         else:
@@ -2827,7 +2827,7 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         #print("ExternalIPython.init_qt_elements connection_file =", self.widget.kernel_client.connection_file)
 
         # Ignore on OSX, where there is always a menu bar
-        if sys.platform != 'darwin' and self.hide_menubar:
+        if not sys.platform.startswith('darwin') and self.hide_menubar:
             self.window.menuBar().setVisible(False)
 
         self.window.setWindowTitle('External Scipyen Console')
@@ -4053,7 +4053,7 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         self.loadSettings()
         
     def _configureUI_(self):
-        ctrl = "Meta" if sys.platform == 'darwin' else "Ctrl"
+        ctrl = "Meta" if sys.platform.startswith('darwin') else "Ctrl"
         menuBar = self.menuBar()
         self.file_menu = menuBar.addMenu("File")
         

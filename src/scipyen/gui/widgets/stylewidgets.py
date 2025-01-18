@@ -667,7 +667,7 @@ class BrushComboBox(QtWidgets.QComboBox):
         customGradientBrushIndices = [k for k, (name,value) in enumerate(self._styles.items()) if isinstance(value, QtGui.QGradient) or name == "Gradient..."]
         
         if index in customTextureBrushIndices:
-            if sys.platform == "win32":
+            if sys.platform.startswith("win32"):
                 options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
                 kw = {"options":options}
             else:

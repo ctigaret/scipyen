@@ -512,7 +512,7 @@ class XMLViewer(ScipyenViewer):
         if self._docModel_.domDocument.isNull():
             return
         
-        if sys.platform == "win32":
+        if sys.platform.startswith("win32"):
             options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
             kw = {"options":options}
         else:

@@ -4930,7 +4930,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         #targetDir = self._scipyenWindow_.recentDirectories[0]
         targetDir = self._scipyenWindow_.currentDir
         
-        if sys.platform == "win32":
+        if sys.platform.startswith("win32"):
             options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
             kw = {"options":options}
         else:
@@ -4968,7 +4968,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         targetDir = self._scipyenWindow_.currentDir
 
-        if sys.platform == "win32":
+        if sys.platform.startswith("win32"):
             options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
             kw = {"options":options}
         else:
@@ -5731,7 +5731,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         ephysFilesFilter = ";;".join(["Axon files (*.abf)", "Pickle files (*.pkl)"])
         
 
-        if sys.platform == "win32":
+        if sys.platform.startswith("win32"):
             options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
             kw = {"options":options}
         else:
@@ -7451,7 +7451,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                     filename = "".join(namelist)
                     
 
-                    if sys.platform == "win32":
+                    if sys.platform.startswith("win32"):
                         options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
                         kw = {"options":options}
                     else:
@@ -7683,7 +7683,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         fileFilter = "Pickle files (*.pkl)"
             
 
-        if sys.platform == "win32":
+        if sys.platform.startswith("win32"):
             options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
             kw = {"options":options}
         else:
@@ -9306,7 +9306,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         fileFilter = "Pickle files (*.pkl)"
             
 
-        if sys.platform == "win32":
+        if sys.platform.startswith("win32"):
             options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
             kw = {"options":options}
         else:

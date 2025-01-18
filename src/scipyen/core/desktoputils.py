@@ -87,6 +87,115 @@ except:
     # except:
     #     pass
     
+def get_wm():
+    """Retrieves the name of the window manager, on Linux platforms.
+    On any other platforms returns None.
+    Somewhat redundant to get_desktop()
+    """
+    # NOTE: 2023-01-07 16:08:36
+    # From
+    # https://stackoverflow.com/questions/3333243/how-can-i-check-with-python-which-window-manager-is-running
+    if not sys.platform.startswith("linux"):
+        return
+    
+    # wmctrl = which("wmctrl")
+    wmctrl = shutil.which("wmctrl")
+    
+    if len(wmctrl):
+        wmctrl = os.path.basename(wmctrl)
+        
+        out = subprocess.run([wmctrl, "-m"], text=True,
+                             stdout=subprocess.PIPE,
+                             stderr =subprocess.PIPE)
+        
+        if len(out.stdout) == 0:
+            print(out.stderr)
+            return
+        
+        wmname = [s for s in out.stdout.split("\n") if s.startswith("Name: ")]
+        
+        if len(wmname):
+            return wmname[0].strip("Name: ")
+        
+    else:
+        inxi = shutil.which("inxi")
+        if len(inxi):
+            inxi = os.path.basename(inxi)
+            out = subprocess.run([inxi, "-Sxx", "-y", "1", "--indents", "0"],
+                                 text=True,
+                                 stdout = subprocess.PIPE,
+                                 stderr = subprocess.PIPE)
+            
+            if len(out.stdout) == 0:
+                print(out.stderr)
+                return
+            
+            inxiout = dict(filter(lambda x: len(x) == 2, (tuple(s.split(": ")) for s in out.stdout.split("\n"))))
+            
+            if len(inxiout) == 0:
+                return
+            
+            desktop = inxiout.get("Desktop", None)
+            tk = inxiout.get("tk", None)
+            wm = inxiout.get("wm", None)
+            
+            return wm
+
+def get_desktop(what:str="desktop"):
+    """Somewhat redundant to get_wm()
+    """
+    if sys.platform.startswith("linux"):
+        if what == "wm":
+            return os.environ.get("WINDOWMANAGER", None)
+        
+        elif what == "session":
+            return os.environ.get("XDG_SESSION_TYPE", None)
+        
+        else:
+            return os.environ.get("XDG_CURRENT_DESKTOP", os.environ.get("XDG_SESSION_DESKTOP", None))
+                
+    else:
+        return sys.platform
+
+def get_dbus_service_names(what:str="session"):
+    """
+    what: one of "session", "system"
+    """
+    if not has_qtdbus:
+        scipywarn("No QtDBus on this platform")
+        return
+    
+    if platform.system() != "Linux":
+        return
+    
+    if not isinstance(what, str):
+        raise TypeError(f"Expecting a str; instead, got {type(what).__name__}")
+    
+    if what == "system":
+        busConnection = QtDBus.QDBusConnection.systemBus()
+    else:
+        busConnection = QtDBus.QDBusConnection.sessionBus()
+        
+    return busConnection.interface().registeredServiceNames().value()
+    
+def is_kde_x11():
+    if platform.system() != "Linux":
+        return False
+    
+    return get_desktop("session").lower() == "x11" and get_desktop() == "KDE"
+
+def is_kde_wayland():
+    if platform.system() != "Linux":
+        return False
+    
+    return get_desktop("session").lower() == "wayland" and get_desktop() == "KDE"
+
+def is_kde():
+    if platform.system() != "Linux":
+        return False
+    
+    return get_desktop("session").lower() in ("x11", "wayland") and get_desktop() == "KDE"
+
 def get_local_filesystem_places():
     """
     Get special directories (KDE Plasma5 specific)
@@ -137,11 +246,15 @@ def get_system_terminal_executable():
     #
     #   on windows: powershell, wt, cmd
     #   on linux:   xterm, konsole, gnome-terminal, qterminal, lxterminal, rxvt, rxvt-unicode. 
-    if sys.platform == "win32":
+    if sys.platform.startswith("win32"):
         return "cmd"
-    elif sys.platform == "linux":
-        return "konsole" # MY OWN default, for now
-        # return "xterm" # good default, for now
+    elif sys.platform.startswith("linux"):
+        if os.getenv("XDG_SESSION_DESKTOP").startswith("KDE"):
+            return "konsole" # MY OWN default, for now
+        else:
+            return "xterm"
+    elif sys.platform.startswith("darwin"):
+        return "/System/Applications/Utilities/Terminal.app"
     else:
         warnings.warn(f"{sys.platform} platform is not yet supported")
         
@@ -184,7 +297,7 @@ def get_desktop_places():
     # advanced Linux dekstop environments) the file `recently-used.xbel` in the 
     # same location should be used (TODO).      
     
-    if sys.platform == "linux" and HAS_PYXDG:
+    if sys.platform.startswith("linux") and HAS_PYXDG:
         places = pio.loadXMLFile(os.path.join(xdg.BaseDirectory.xdg_data_home, "user-places.xbel"))
             
         if "xbel" not in places.documentElement.tagName.lower():
@@ -320,7 +433,7 @@ def get_recent_places():
     
     ret = dict()
     
-    if sys.platform == "linux" and HAS_PYXDG:
+    if sys.platform.startswith("linux") and HAS_PYXDG:
         places = pio.loadXMLFile(os.path.join(xdg.BaseDirectory.xdg_data_home, "recently-used.xbel"))
             
         if "xbel" not in places.documentElement.tagName.lower():

@@ -108,7 +108,7 @@ b) use KDE framework - this would "tie" Scipyen into KDE too much:
     TODO: contemplate calling kioclient OR kioclient5 (depends on the XDG_DESKTOP_SESSION)
             /usr/libexec/kf5/kioexec OR
             /usr/libexec/kf6/kioexec
-    (filter these out so that they only show for sys.platform == "linux")
+    (filter these out so that they only show for sys.platform.startswith("linux"))
 
 
 
@@ -970,7 +970,7 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
             # #   TODO: contemplate calling kioclient OR kioclient5 (depends on the XDG_DESKTOP_SESSION)
             # #           /usr/libexec/kf5/kioexec OR
             # #           /usr/libexec/kf6/kioexec
-            # #   TODO: filter these out so that they only show for sys.platform == "linux"
+            # #   TODO: filter these out so that they only show for sys.platform.startswith("linux")
             # #
             # self._pendingTextChange_ = True
             # # starts a KIO job via 
@@ -2224,7 +2224,7 @@ class _UrlNavigator_(QtCore.QObject):
         
         if len(path):
             if ndx == 0:
-                if sys.platform == "win32":
+                if sys.platform.startswith("win32"):
                     path = path[:2] if len(path) > 1 else QtCore.QDir.rootPath()
                 else:
                     path = "/"
@@ -2426,7 +2426,7 @@ class _UrlNavigator_(QtCore.QObject):
         
         if len(text) == 0:
             if currentUrl.isLocalFile():
-                if sys.platform == "win32":
+                if sys.platform.startswith("win32"):
                     text = currentUrl.path()[:2] if len(currentUrl.path()) > 1 else QtCore.QDir.rootPath()
                 else:
                     text = "/"

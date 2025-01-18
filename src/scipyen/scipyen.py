@@ -55,7 +55,7 @@ else:
         
 
 
-if sys.platform == "linux":
+if sys.platform.startswith("linux"):
     # NOTE: 2024-05-04 10:14:08
     # forcing xcb platform when running on Wayland, in Linux, because we want to
     # restore window sizes and positions from Scipyen.conf (Wayland does not allow
@@ -147,7 +147,7 @@ if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
 else:
     # NOTE: 2024-05-02 10:24:48
     # running from a locally built environment under Windows
-    if sys.platform == "win32" and sys.version_info.minor >= 9:
+    if sys.platform.startswith("win32") and sys.version_info.minor >= 9:
         if "CONDA_DEFAULT_ENV" not in os.environ:
             raise OSError("On windows platform, unbundled Scipyen must be run inside a conda environment")
 
@@ -200,7 +200,7 @@ mpath = pathlib.Path(__module_path__)
 # this should extend the availability for Qt icons globally, in this Scipyen session
 themePaths = QtGui.QIcon.themeSearchPaths()
 fbPaths = QtGui.QIcon.fallbackSearchPaths()
-if sys.platform == "linux":
+if sys.platform.startswith("linux"):
     themePaths.extend(IconTheme.icondirs)
     fbPaths.extend(IconTheme.icondirs)
     
@@ -224,7 +224,7 @@ QtGui.QIcon.setFallbackSearchPaths(fbPaths)
 #
 # On linux we rely on platform plugins (which also get bundled when
 # building a pyinstaller bundle, as per scipyen.spec)
-if sys.platform == "win32":
+if sys.platform.startswith("win32"):
     if hasQDarkTheme:
         # qdarktheme.setup_theme("auto")
         qdarktheme.enable_hi_dpi()
@@ -259,7 +259,7 @@ if sys.platform == "win32":
         # until then, on Windows we will have to put up with the qt-svg messages
         # for now...
         
-elif sys.platform == "darwin":
+elif sys.platform.startswith("darwin"):
     windowColor = QtWidgets.QApplication.palette().color(QtGui.QPalette.Window)
     _,_,v,_ = windowColor.getHsv()
     if v > 128:
@@ -314,7 +314,7 @@ def main():
     # NOTE: 2021-08-17 10:02:20
     # this does not prevent crashes when exiting NEURON - leave here so
     # that we know we tried and didn't work
-    #if sys.platform == "linux":
+    #if sys.platform.startswith("linux"):
         #import subprocess
         #compl = subprocess.run(["xrdb", "-merge", os.path.join(__module_path__, "neuron_python",  "app-defaults", "nrniv")])
         #print("xrdb: ", compl.returncode)
@@ -326,11 +326,11 @@ def main():
         app = QtWidgets.QApplication(sys.argv)
         
             
-        if sys.platform == "win32":
+        if sys.platform.startswith("win32"):
             if hasQDarkTheme:
                 qdarktheme.setup_theme("auto")
                 
-        elif sys.platform == "linux":
+        elif sys.platform.startswith("linux"):
             # NOTE: 2024-05-04 10:16:33
             # reuired on Wayland so that the window manager decorates the windows
             # with the appropriate icon instead of using the generic Wayland one.
