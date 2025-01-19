@@ -25,7 +25,7 @@ from core import qtutils
 from core.prog import (scipywarn, safeWrapper)
 
 class ProtocolType(IntEnum):pass
-ProtocolType = IntEnum("ProtocolType", ["T_STREAM", "T_FILESYSTEM"
+ProtocolType = IntEnum("ProtocolType", ["T_STREAM", "T_FILESYSTEM",
                                         "T_NONE", "T_ERROR"])
 
 class FileNameUsedForCopying(IntEnum):pass
@@ -70,7 +70,7 @@ class _ProtocolInfo_:
         fnu = jsonobj.get("fileNameUsedForCopying", "Name")
         if fnu == "Name":
             self._fileNameUsedForCopying = FileNameUsedForCopying.Name
-        elif fnu = "DisplayName":
+        elif fnu == "DisplayName":
             self._fileNameUsedForCopying = FileNameUsedForCopying.DisplayName
             
         self._listing:list = list()
@@ -87,7 +87,7 @@ class _ProtocolInfo_:
         
         self._archiveMimeTypes:list = list()
         tmp = jsonobj.get("archiveMimetype", "[]")
-        if all(isinstance(v, str) for v in tmp) all(c in tmp for c in ("[", "]")) and tmp.startswith("[") and tmp.endswith("]"):
+        if all(isinstance(v, str) for v in tmp) and all(c in tmp for c in ("[", "]")) and tmp.startswith("[") and tmp.endswith("]"):
             self._archiveMimeTypes = json.loads(tmp)
             
         self._icon:str = jsonobj.get("icon", "")
@@ -98,7 +98,7 @@ class _ProtocolInfo_:
         
         self._maxWorkersPerHost:int = jsonobj.get("maxInstancesPerHost", 1)
         
-        self._inputType:ProtocolType = ProtocolType."T_FILESYSTEM"
+        self._inputType:ProtocolType = ProtocolType.T_FILESYSTEM
         
         tmp = jsonobj.get("input", "")
         
@@ -129,13 +129,13 @@ class _ProtocolInfo_:
             self._protClass = ":" + self._protClass
             
         tmp = jsonobj.get("ExtraNames", "[]")
-        if all(isinstance(v, str) for v in tmp) all(c in tmp for c in ("[", "]")) and tmp.startswith("[") and tmp.endswith("]"):
+        if all(isinstance(v, str) for v in tmp) and all(c in tmp for c in ("[", "]")) and tmp.startswith("[") and tmp.endswith("]"):
             extraNames = json.loads(tmp)
         else:
             extraNames = list()
             
         tmp = jsonobj.get("ExtraTypes", "[]")
-        if all(isinstance(v, str) for v in tmp) all(c in tmp for c in ("[", "]")) and tmp.startswith("[") and tmp.endswith("]"):
+        if all(isinstance(v, str) for v in tmp) and all(c in tmp for c in ("[", "]")) and tmp.startswith("[") and tmp.endswith("]"):
             extraTypes = json.loads(tmp)
         else:
             extraTypes = list()
@@ -152,7 +152,7 @@ class _ProtocolInfo_:
         
         self._capabilities:list = list()
         tmp = jsonobj.get("Capabilities", "[]")
-        if all(isinstance(v, str) for v in tmp) all(c in tmp for c in ("[", "]")) and tmp.startswith("[") and tmp.endswith("]"):
+        if all(isinstance(v, str) for v in tmp) and all(c in tmp for c in ("[", "]")) and tmp.startswith("[") and tmp.endswith("]"):
             self._capabilities = json.loads(tmp)
             
             self._proxyProtocol = jsonobj.get("ProxiedBy", "")
@@ -162,11 +162,10 @@ class _ProtocolInfo_:
 class ProtocolInfoFactory: # pass # TODO 2025-01-18 12:18:35 write me - singleton class!
     _instance = None # NOTE: Singleton design pattern
     
-    def __new__(cls:typing.Self, app: QtWidgets.QApplication, 
-                 parent: typing.Optional[QtWidgets.QWidget] = None, *args, **kwargs) -> typing.Self:
+    def __new__(cls:typing.Self, *args, **kwargs) -> typing.Self:
         # NOTE: Singleton design pattern
         if not hasattr(cls, "_instance") or not isinstance(cls._instance, cls):
-            cls._instance = super(ProtocolInfoFactory, cls).__new__(cls, app, parent, *args, **kwargs)
+            cls._instance = super(ProtocolInfoFactory, cls).__new__(cls, *args, **kwargs)
             
         return cls._instance
     
@@ -174,6 +173,7 @@ class ProtocolInfoFactory: # pass # TODO 2025-01-18 12:18:35 write me - singleto
         self._cacheDirty:bool = True
         self._mutex:QtCore.QMutex = QtCore.QMutex()
         self._cache:dict = dict() # mapping str ↦ _ProtocolInfo_
+        self._instance = self
         
     def __del__(self):
         locker = QtCore.QMutexLocker(self._mutex)
@@ -206,7 +206,7 @@ class ProtocolInfoFactory: # pass # TODO 2025-01-18 12:18:35 write me - singleto
 
     @staticmethod
     def instance() -> typing.Self: # originally self()...
-        return _instance
+        return ProtocolInfoFactory._instance
     
     def protocols(self) -> list:
         """Returns a list of names of cached protocols"""
@@ -260,7 +260,8 @@ class ProtocolInfoFactory: # pass # TODO 2025-01-18 12:18:35 write me - singleto
 class ProtocolInfo:
     @staticmethod
     def protocols() -> list:
-        return ProtocolInfoFactory.instance().protocols()
+        pfact = ProtocolInfoFactory()
+        return pfact.instance().protocols()
         
     
     @singledispatchmethod
