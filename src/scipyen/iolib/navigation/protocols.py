@@ -348,7 +348,7 @@ class ProtocolInfo:
     @staticmethod
     def protocolClass(protocol:str) -> str:
         prot = ProtocolInfoFactory.instance().findProtocol(protocol) # TODO
-        if prot it None:
+        if prot is None:
             return ""
         return ":local" # NOTE: 2025-01-18 23:44:33 for now
         return prot._protClass
