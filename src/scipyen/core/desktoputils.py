@@ -69,6 +69,14 @@ from functools import (singledispatch, singledispatchmethod)
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg,)
 from qtpy.QtCore import (Signal, Slot, Property,)
 
+from qtpy import (QtCore, QtWidgets, QtGui)
+has_qtdbus = False
+try:
+    from qtpy import QtDBus
+    has_qtdbus = False
+except:
+    pass
+
 # desktop integration - according to freedesktop.org (XDG)
 # ATTENTION: DO NOT install xdg as it will mess up pyxdg
 # install pyxdg instead !!!

@@ -221,7 +221,8 @@ class ProtocolInfoFactory: # pass # TODO 2025-01-18 12:18:35 write me - singleto
         return list(self._cache.values())
     
     def findProtocol(self, protocol:str, updateCacheIfNotFound:bool) -> _ProtocolInfo_:
-        assert len(protocol) > 0 and protocol.startswith(":")
+        if len(protocol) == 0 or not protocol.startswith(":"):
+            return
         
         locker = QtCore.QMutexLocker(self._mutex)
         filled = self.fillCache()
@@ -315,6 +316,8 @@ class ProtocolInfo:
     
     @staticmethod
     def icon(protocol:str) -> str:
+        # TODO 2025-01-18 23:45:06
+        # see how I can bypass all this and use desktoputils
         prot = ProtocolInfoFactory.instance().findProtocol(protocol)
         pass
     
@@ -344,7 +347,11 @@ class ProtocolInfo:
     
     @staticmethod
     def protocolClass(protocol:str) -> str:
-        pass
+        prot = ProtocolInfoFactory.instance().findProtocol(protocol) # TODO
+        if prot it None:
+            return ""
+        return ":local" # NOTE: 2025-01-18 23:44:33 for now
+        return prot._protClass
     
     @staticmethod
     def showFilePreview(protocol:str) -> bool:

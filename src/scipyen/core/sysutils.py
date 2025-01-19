@@ -7,18 +7,10 @@
 """
 import os, sys, subprocess, shutil, platform, pathlib
 from shutil import which
-from core.desktoputils import (get_wm, get_desktop, get_dbus_service_names, 
-                               is_kde_x11, is_kde_wayland, is_kde)
+# from core.desktoputils import (get_wm, get_desktop, get_dbus_service_names, 
+#                                is_kde_x11, is_kde_wayland, is_kde)
 
-from qtpy import (QtCore, QtWidgets, QtGui)
-has_qtdbus = False
-try:
-    from qtpy import QtDBus
-    has_qtdbus = False
-except:
-    pass
-
-from qtpy.QtCore import (Signal, Slot, Property,)
+# from qtpy.QtCore import (Signal, Slot, Property,)
 
 def adapt_ui_path(module_path, uifile):
     return os.path.join(module_path, uifile)

@@ -2153,6 +2153,9 @@ class _UrlNavigator_(QtCore.QObject):
         
         # TODO: 2025-01-18 10:12:51
         # they use KProtocolInfo.protocolClass(scheme) - factory for a ProtocolInfo
+        # currently, my implementation ALWAYS returns ":local"
+        
+        self._pathBox_.setEditUrl(url)
     
     def switchView(self, editable:bool):
         # KUrlNavigatorPrivate
