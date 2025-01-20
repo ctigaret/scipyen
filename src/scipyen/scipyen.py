@@ -34,7 +34,8 @@ if isinstance(my_conda_env, str) and len(my_conda_env.strip()):
         scipywarn("Scipyen should be run in its own conda environment.\n")
         
 elif isinstance(my_virtualenv, str) and len(my_virtualenv.strip()):
-    print(f"Scipyen is running in the virtualenv environment {my_virtualenv}\n")
+    pass # OK
+    # print(f"Scipyen is running in the virtualenv environment {my_virtualenv}\n")
     
 else:
     raise RuntimeError("Scipyen must be run in a virtualenv virtual Python environment or a conda environment\n")
