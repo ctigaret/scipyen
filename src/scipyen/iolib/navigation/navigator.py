@@ -196,6 +196,7 @@ class ListDirsJob(QtCore.QThread):
         QtCore.QThread.__init__(self, parent=parent)
         
     def run(self):
+        # print(f"{self.__class__.__name__}.run called")
         filters = QtCore.QDir.Dirs | QtCore.QDir.NoDotAndDotDot | QtCore.QDir.CaseSensitive
         if self.showHidden:
             filters |= QtCore.QDir.Hidden
@@ -391,6 +392,8 @@ class UrlComboOverLoadResolving(IntEnum):
     
 class UrlComboBox(QtWidgets.QComboBox):
     """Implementation of KIO KUrlComboBox"""
+    # TODO/FIXME: 2025-01-20 22:48:00
+    # finalize completer - currently not working
     urlActivated = Signal(QtCore.QUrl, name="urlActivated")
     returnPressed = Signal(name="returnPressed")
     
@@ -666,7 +669,7 @@ class UrlComboBox(QtWidgets.QComboBox):
             drag.setMimeData(mime)
             drag.exec()
             
-        super().mousemoveEvent(evt)
+        super().mouseMoveEvent(evt)
                         
     # TODO/FIXME ? see TODO 2025-01-09 21:05:56
     # def setCompletionObject(self, compObj:QtWidgets.QCompleter, hsig:bool):
@@ -675,12 +678,19 @@ class UrlComboBox(QtWidgets.QComboBox):
 class UrlNavigatorMenu(QtWidgets.QMenu):
     sig_urlDropped = Signal(QtWidgets.QAction, QtGui.QDropEvent, 
                             name="sig_urlDropped")
-    sig_mouseButtonClicked = Signal(QtWidgets.QAction, QtCore.Qt.MouseButton, 
-                                    name="sig_mouseButtonClicked")
-    def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None):
-        super().__init__(parent=parent)
+    mouseButtonClicked = Signal(QtWidgets.QAction, QtCore.Qt.MouseButton, 
+                                    name="mouseButtonClicked")
+    def __init__(self, title:typing.Optional[str] = None, parent:typing.Optional[QtWidgets.QWidget] = None):
+        if isinstance(title, QtWidgets.QWidget):
+            parent = title
+            title = None
+        if isinstance(title, str):
+            super().__init__(title, parent)
+        else:
+            assert(isinstance(parent, (QtWidgets.QWidget, type(None))))
+            super().__init__(parent=parent)
         self._initialMousePosition = QtGui.QCursor.pos()
-        self._mouseMoved = False
+        self._mouseMoved_ = False
         self.setAcceptDrops(True)
         self.setMouseTracking(True)
         
@@ -706,26 +716,26 @@ class UrlNavigatorMenu(QtWidgets.QMenu):
             self.sig_urlDropped.emit(action, evt)
     
     def mouseMoveEvent(self, evt:QtGui.QMouseEvent):
-        if not self._mouseMoved:
-            moveDistance = self.maptoGlobal(evt.pos()) - self._initialMousePosition
-            self._mouseMoved = moveDistance.manhattanLength() >= QtWidgets.QApplication.startDragDistance()
+        if not self._mouseMoved_:
+            moveDistance = self.mapToGlobal(evt.pos()) - self._initialMousePosition
+            self._mouseMoved_ = moveDistance.manhattanLength() >= QtWidgets.QApplication.startDragDistance()
             
-        if self._mouseMoved:
+        if self._mouseMoved_:
             super().mouseMoveEvent(evt)
     
     def mouseReleaseEvent(self, evt:QtGui.QMouseEvent):
         btn = evt.button()
         
-        if self._mouseMoved or btn != QtCore.Qt.LeftButton:
+        if self._mouseMoved_ or btn != QtCore.Qt.LeftButton:
             action = self.actionAt(evt.pos())
             if action is not None:
-                self.sig_mouseButtonClicked.emit(action, btn)
-                self.setActiveAction(QWidgets.QAction())
+                self.mouseButtonClicked.emit(action, btn)
+                self.setActiveAction(None)
                 
             super().mouseReleaseEvent(evt)
             
-        self._mouseMoved = True
-    
+        self._mouseMoved_ = True
+        
 class UrlNavigatorButtonBase(QtWidgets.QPushButton):
     """Common ancestor for breadcrumbs buttons
     """
@@ -903,6 +913,7 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         self._replaceButton_ = False
         self._showMnemonic_ = False
         self._wheelSteps_ = 0
+        self._mousePressPos_ = QtCore.QPoint()
         
         self._url_ = None
         self._subDir_ = ""  # NOTE: 2025-01-02 00:21:29 this is to be set, actually,
@@ -1043,8 +1054,8 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
     
     def isAboveArrow(self, x:int) -> bool:
         leftToRight = self.layoutDirection() == QtCore.Qt.LeftToRight
-        if x >= self.width() - self.arrowWidth():
-            return leftToRight
+        if leftToRight:
+            return x >= self.width() - self.arrowWidth()
         else:
             return x < self.arrowWidth()
         
@@ -1070,16 +1081,18 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
             self.setMinimumWidth(minWidth)
             
     def initMenu(self, menu: QtWidgets.QMenu, startIndex:int):
-        menu.sig_mouseButtonClicked.connect(self.slot_menuActionClicked)
+        # print(f"{self.__class__.__name__}<{self.plainText()}>.initMenu({menu}, {startIndex})")
+        menu.mouseButtonClicked.connect(self.slot_menuActionClicked)
         menu.sig_urlDropped.connect(self.slot_urlsDropped)
-        menu.triggered.connect(self.slot_menuActionClicked)
+        menu.triggered.connect(self.slot_menuActionTriggered)
         menu.setLayoutDirection(QtCore.Qt.LeftToRight)
         
         maxIndex = startIndex + 30  # (max 30 items shown in the menu)
-        subDirsSize = len(self._subDirs_)
-        lastIndex = min(subDirsSize - 1, maxIndex)
+        nSubDirs = len(self._subDirs_)
+        # print(f"\tnSubDirs = {nSubDirs}")
+        lastIndex = min(nSubDirs - 1, maxIndex)
         
-        subDirsNames = list(map(lambda x: x.name), self._subDirs_[startIndex : lastIndex])
+        subDirsNames = list(map(lambda x: x.name, self._subDirs_[startIndex : lastIndex]))
         
         subDirsActions = list(map(lambda x: QtWidgets.QAction(guiutils.csqueeze(x.replace('&', '&&'), 60), self), subDirsNames))
 
@@ -1096,7 +1109,7 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
             subDirsActions[k].setData(i)
             menu.addAction(subDirsActions[k])
             
-        if subDirsSize > maxIndex:
+        if nSubDirs > maxIndex:
             menu.addSeparator()
             subDirsMenu = UrlNavigatorMenu("More", menu)
             self.initMenu(subDirsMenu, maxIndex)
@@ -1200,7 +1213,7 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         if self.isTextClipped():
             self.setToolTip(self.plainText())
             
-        evt.accept()
+        # evt.accept()
             
     def leaveEvent(self, evt:QtCore.QEvent):
         # if self.__class__.__name__ == "UrlNavigatorButton":
@@ -1216,7 +1229,7 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
             self.update()
             
         # self.update()
-        evt.accept()
+        # evt.accept()
             
     def keyPressEvent(self, evt:QtGui.QKeyEvent):
         evtKey = evt.key()
@@ -1284,25 +1297,28 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         self.update()
         
     def mousePressEvent(self, evt:QtGui.QMouseEvent):
-        if self.isAboveArrow(round(evt.pos().x())) and evt.button() == QtCore.Qt.LeftButton:
+        # if self.isAboveArrow(round(evt.pos().x())) and evt.button() == QtCore.Qt.LeftButton:
+        if self.isAboveArrow(evt.pos().x()) and evt.button() == QtCore.Qt.LeftButton:
             # self._pressed_ = True # NOTE: 2025-01-02 01:18:34 by CMT, used in paintEvent
             # self.update()
+            self._mousePressPos_ = evt.pos()
             self.slot_startSubDirsJob()
         
         super().mousePressEvent(evt)
         
     def mouseReleaseEvent(self, evt:QtGui.QMouseEvent):
-        if self.isAboveArrow(round(evt.pos().x())) or evt.button() != QtCore.Qt.LeftButton:
+        if not self.isAboveArrow(round(evt.pos().x())) or evt.button() != QtCore.Qt.LeftButton:
             # self._pressed_ = False # NOTE: 2025-01-02 01:18:34 by CMT, used in paintEvent
             # self.update()
             self.navigatorButtonActivated.emit(self._url_, evt.button(), evt.modifiers())
             self.cancelSubDirsRequest()
-            
+
         super().mouseReleaseEvent(evt)
         
     def mouseMoveEvent(self, evt:QtGui.QMouseEvent):
         super().mouseMoveEvent(evt)
-        hoverArrow = self.isAboveArrow(round(evt.pos().x()))
+        # hoverArrow = self.isAboveArrow(round(evt.pos().x()))
+        hoverArrow = self.isAboveArrow(evt.pos().x())
         if hoverArrow != self._hoverArrow_:
             self._hoverArrow_ = hoverArrow
             self.update()
@@ -1351,6 +1367,7 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
 
     @Slot()
     def slot_startSubDirsJob(self):
+        # print(f"{self.__class__.__name__}.slot_startSubDirsJob invoked")
         # NOTE: 2024-12-30 23:48:13
         # this is the slot_startSubDirsJob in KIO
         #
@@ -1412,22 +1429,25 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         self.urlsDroppedOnNavButton.emit(url, event)
     
     @Slot(QtWidgets.QAction)
-    def slot_menuActionClicked(self, action:QtWidgets.QAction):
-        mouseButtons = QtWidgets.QApplication.mouseButtons()
-        result = action.data().toInt()
+    def slot_menuActionTriggered(self, action:QtWidgets.QAction):
+        # mouseButtons = QtWidgets.QApplication.mouseButtons()
+        # result = action.data().toInt()    # NOTE: 2025-01-20 21:36:48
+        result = action.data()              # in PyQt5 this is already an int
         path = self._subDirs_[result]
         url = QtCore.QUrl(path.as_uri())
-        self.navigatorButtonActivated.emit(url, mouseButtons, QtCore.Qt.NoModifier)
+        self.navigatorButtonActivated.emit(url, QtCore.Qt.LeftButton, QtCore.Qt.NoModifier)
     
     @Slot(QtWidgets.QAction, QtCore.Qt.MouseButton)
-    def slot_menuActionClicked6(self, action:QtWidgets.QAction, button:QtCore.Qt.MouseButton):
-        result = action.data().toInt()
+    def slot_menuActionClicked(self, action:QtWidgets.QAction, button:QtCore.Qt.MouseButton):
+        # result = action.data().toInt()
+        result = action.data() # NOTE: 2025-01-20 22:12:33 see NOTE: 2025-01-20 21:36:48
         path = self._subDirs_[result]
         url = QtCore.QUrl(path.as_uri())
         self.navigatorButtonActivated.emit(url, button, QtCore.Qt.NoModifier)
     
     @Slot()
     def slot_statFinished(self):
+        print(f"{self.__class__.__name__}.slot_statFinished invoked")
         # NOTE: 2025-01-02 00:14:19
         # in KIO this is triggered by the result signal of a KIO::stat job
         # part of the mechanism for resolving uris with special schemes/protocols
@@ -1457,6 +1477,7 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
     
     @Slot()
     def slot_requestSubDirs(self):
+        # print(f"{self.__class__.__name__}.slot_requestSubDirs invoked")
         if not self._openSubDirsTimer.isActive() and (not isinstance(self._subDirsJob_, ListDirsJob) or not qtutils.isQObjectAlive(self._subDirsJob_)):
             self._openSubDirsTimer.start()
         
@@ -1503,6 +1524,7 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         
     @Slot()
     def slot_openSubDirsMenu(self):
+        # print(f"{self.__class__.__name__}<{self.plainText()}>.slot_openSubDirsMenu invoked")
         self._subDirsJob_ = None
         if len(self._subDirs_) == 0:
             return
@@ -1517,8 +1539,11 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
             self._subDirsMenu_.deleteLater()
             self._subDirsMenu_ = None
             
-        self._subDirsMenu_ = UrlNavigatorMenu(self)
+        self._subDirsMenu_ = UrlNavigatorMenu(parent=self)
         self.initMenu(self._subDirsMenu_, 0)
+        # self._subDirsMenu_.popup(self._mousePressPos_)
+        self._subDirsMenu_.popup(self.mapToGlobal(QtCore.QPoint(0,0)))
+        # self._subDirsMenu_.exec()
     
     @Slot(list)
     def slot_addEntriesToSubdirs(self, entries:list[pathlib.Path]):
@@ -1809,7 +1834,7 @@ class CoreUrlNavigator(QtCore.QObject):
         return self.locationUrl()
     
     def setCurrentLocationUrl(self, newUrl:QtCore.QUrl):
-        print(f"{self.__class__.__name__}.setCurrentLocationUrl({newUrl})")
+        # print(f"{self.__class__.__name__}.setCurrentLocationUrl({newUrl})")
         if newUrl == self.locationUrl():
             return
         
@@ -2217,7 +2242,7 @@ class _UrlNavigator_(QtCore.QObject):
         
         popup = QtWidgets.QMenu(self._nav_)
         
-        popupFilter = NavigatorPathSelectorEventFilter(popup)
+        popupFilter = NavigatorPathSelectorEventFilter(popup) # FIXME
         popupFilter.tabRequested.connect(self.tabRequested) # FIXME -- ? we don't use tab navigation
         popup.installEventFilter(popupFilter)
         
@@ -2537,8 +2562,10 @@ class _UrlNavigator_(QtCore.QObject):
     def updateContent(self):
         # KUrlNavigatorPrivate  
         currentUrl = self._nav_.locationUrl()
-        print(f"{self.__class__.__name__}.updateContent(): currentUrl = {currentUrl}")
+        # print(f"{self.__class__.__name__}.updateContent(): currentUrl = {currentUrl}")
         # print(f"\tself._placesSelector_ {self._placesSelector_}")
+        # WARNING: 2025-01-20 22:32:18 temporary -- FIXME
+        # TODO: Implement places selector
         if self._placesSelector_ is not None:
             self._placesSelector_.updateSelection(currentUrl)
             
@@ -2580,7 +2607,7 @@ class _UrlNavigator_(QtCore.QObject):
             if not placeUrl.isValid():
                 placeUrl = self.retrievePlaceUrl()
                 
-            print(f"\tplaceUrl =  {placeUrl}")
+            # print(f"\tplaceUrl =  {placeUrl}")
             placePath = trailingSlashRemoved(placeUrl.path())
             
             startIndex = placePath.count('/')
@@ -2588,11 +2615,11 @@ class _UrlNavigator_(QtCore.QObject):
             self.updateButtons(startIndex)
             
     def updateButtons(self, startIndex:int): # NOTE: 2023-05-08 11:05:23 FIXME
-        print(f"{self.__class__.__name__}.updateButtons({startIndex}):")
+        # print(f"{self.__class__.__name__}.updateButtons({startIndex}):")
         # KUrlNavigatorPrivate  
         currentUrl = self._nav_.locationUrl() # NOTE 2025-01-20 11:31:01 this must NOT be modified 
                                               # see NOTE: 2025-01-20 11:31:36
-        print(f"\tcurrentUrl: {currentUrl}")
+        # print(f"\tcurrentUrl: {currentUrl}")
         if not currentUrl.isValid():
             return
         
@@ -2607,7 +2634,7 @@ class _UrlNavigator_(QtCore.QObject):
         hasNext = True # this flags whether there should be another button
         
         pathParts = pathlib.Path(path).parts
-        print(f"\tpathParts = {pathParts}: {len(pathParts)} elements")
+        # print(f"\tpathParts = {pathParts}: {len(pathParts)} elements")
         
         # _k_ = 0
         
@@ -2826,8 +2853,14 @@ class _UrlNavigator_(QtCore.QObject):
 
 class UrlNavigator(QtWidgets.QWidget):
     """Implementation of KIO KUrlNavigator"""
+    # TODO: BUG 2025-01-20 22:52:07 FIXME
+    # after switching FROM editing to navigation the button labels are invisible -- why?!?
     # ### BEGIN signals
     activated           = Signal(name = "activated")
+    
+    # ATTENTION: 2025-01-20 22:20:07
+    # connect this signal (urlChanged) to an appropriate slot in ScipyenWindow or
+    # the filesystemModel/fileSystemViewer in ScipyenWindow
     urlChanged          = Signal(QtCore.QUrl, name="urlChanged")
     urlAboutToBeChanged = Signal(QtCore.QUrl, name = "urlAboutToBeChanged")
     editableStateChanged = Signal(bool, name = "editableStateChanged")
@@ -2967,9 +3000,12 @@ class UrlNavigator(QtWidgets.QWidget):
     @Slot(QtCore.QUrl)
     def setLocationUrl(self, url:QtCore.QUrl):
         if url != self.locationUrl():
-            print(f"Slot {self.__class__.__name__}.setLocationUrl({url})")
+            # print(f"Slot {self.__class__.__name__}.setLocationUrl({url})")
             self._nav_p_._coreUrlNavigator_.setCurrentLocationUrl(url)
-            self._nav_p_.updateContent()
+            # WARNING 2025-01-20 22:44:08 temporary FIXME
+            # TODO implement places selector
+            # self._nav_p_.updateContent()
+            self.setShowFullPath(True)  
             self.requestActivation()
     
     @Slot()
