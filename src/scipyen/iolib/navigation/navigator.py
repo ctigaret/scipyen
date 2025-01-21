@@ -408,6 +408,9 @@ class UrlComboBox(QtWidgets.QComboBox):
         
         self.setEditable(rw==True)
         self.lineEdit().setCompleter(self._completer_)
+        self.lineEdit().setClearButtonEnabled(True)
+        self.lineEdit().undoAvailable=True
+        self.lineEdit().redoAvailable=True
         self._dirIcon_ = QtGui.QIcon.fromTheme("folder")
         self._opendirIcon_ = QtGui.QIcon.fromTheme("folder-open")
         self._mode_ = mode
@@ -1112,9 +1115,7 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         
         subDirsActions = list(map(lambda x: QtWidgets.QAction(guiutils.csqueeze(x.replace('&', '&&'), 60), self), subDirsNames))
 
-        # if self.path in self._subDirs_:
         if self._subDir_ in subDirsNames:
-            # currentIndex = self._subDirs_.index(self.path)
             currentIndex = subDirsNames.index(self._subDir_)
             font = QtGui.QFont(subDirsActions[currentIndex].font())
             font.setBold(True)
@@ -1450,7 +1451,10 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         # mouseButtons = QtWidgets.QApplication.mouseButtons()
         # result = action.data().toInt()    
         # NOTE: 2025-01-20 21:36:48
-        # in PyQt5 this is already an int, see NOTE: 2025-01-21 09:04:14
+        # in PyQt5 this is already an int, see also
+        #   NOTE: 2025-01-21 09:04:14 (UrlNavigatorButton.initMenu)
+        #   NOTE: 2025-01-21 16:43:02
+        #   NOTE: 2025-01-21 16:45:50
         result = action.data()              
         path = self._subDirs_[result]
         url = QtCore.QUrl(path.as_uri())
@@ -1463,9 +1467,10 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         # NOTE: 2025-01-21 09:06:45 see NOTE: 2025-01-21 08:59:29
         # result = action.data().toInt()
         # NOTE: 2025-01-20 22:12:33 see 
-        #   NOTE: 2025-01-20 21:36:48 and
+        #   NOTE: 2025-01-20 21:36:48 
         #   NOTE: 2025-01-21 09:04:14
-        # 
+        #   NOTE: 2025-01-21 16:45:50
+        #
         # this is the index of the subirectory (pointed to by the action) in the
         # self._subDirs_ list
         result = action.data() 
@@ -1603,21 +1608,16 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         
         self._subDirs_[:] = dirEntries[:]
     
-# NOTE: 2023-05-06 22:30:40
-# We only use the "file://" protocol, so this is not needed, for now...
-# NOTE: 2025-01-02 16:02:34 but this may change
-#
-class UrlNavigatorProtocolCombo(UrlNavigatorButtonBase): # TODO
-    sig_activated = Signal()
-    def __init__(self, protocol:str, parent=None):
-        super().__init__(parent)
-        
 # NOTE: 2023-05-06 22:26:18
 # By design we only use the 'file://' protocol hence this is not needed, for now...
 # NOTE: 2025-01-02 16:02:17 but this may change
 #
 class UrlNavigatorSchemeCombo(UrlNavigatorButtonBase):
-    """Implementation of KIO KUrlNavigatorSchemeCombo"""
+    """Implementation of KIO KUrlNavigatorSchemeCombo
+    """
+    # NOTE: 2025-01-21 16:34:28
+    # was UrlNavigatorProtocolCombo
+    
     activated = Signal(str, name="activated")
     
     def __init__(self, scheme:str, parent:typing.Optional[UrlNavigator]=None):
@@ -2038,7 +2038,7 @@ class UrlNavigatorPathSelectorEventFilter(QtCore.QObject):
     
 class _UrlNavigator_(QtCore.QObject):
     # KUrlNavigatorPrivate
-    _sig_switchToBreadCrumbMode = Signal(name="_sig_switchToBreadCrumbMode")
+    # _sig_switchToBreadCrumbMode = Signal(name="_sig_switchToBreadCrumbMode")
     def __init__(self, url:QtCore.QUrl, qq: UrlNavigator, placesModel: PlacesModel):
         # print(f"{self.__class__.__name__}.__init__: url = {url}")
         super().__init__()
@@ -2049,24 +2049,13 @@ class _UrlNavigator_(QtCore.QObject):
         self._active_:bool = True
         self._showFullPath_:bool = False
         
-        self._sig_switchToBreadCrumbMode.connect(self.switchToBreadcrumbMode)
+        # self._sig_switchToBreadCrumbMode.connect(self.switchToBreadcrumbMode)
         
         # TODO: 2025-01-09 21:43:54 ?!? why Bunch ?!? - can also use a namespace
         # but Bunch ( in traitlets package ) most closely fits a struct
         self._subfolderOptions_:Bunch = Bunch({"showHidden":False, "sortHiddenLast": False})
         
         # ### BEGIN UI Components of self._nav_:UrlNavigator
-        
-        # ### BEGIN _protocols_:UrlNavigatorProtocolCombo
-        # NOTE: 2023-05-06 22:30:13
-        # We only use "file://" protocol - hence only the file:/// url scheme is
-        # supported in Scipyen, see also NOTE: 2023-05-06 22:30:13 below
-        # NOTE: 2025-01-19 09:58:19
-        # in kf6 KIO remaed to _schemes_
-        # self._protocols_:typing.Optional[UrlNavigatorProtocolCombo] = None # TODO: revisit this
-        # self._protocols_ = UrlNavigatorProtocolCombo("", self._nav_)
-        # self._protocols_.sig_activated.connect(self.slotProtocolChanged)
-        # ### END   _protocols_:UrlNavigatorProtocolCombo
         
         self._nav_:UrlNavigator = qq
         self._nav_.setAutoFillBackground(False)
@@ -2096,25 +2085,43 @@ class _UrlNavigator_(QtCore.QObject):
             
         self._showPlacesSelector_:bool = isinstance(self._placesSelector_, PlacesModel)
 
+        # ### BEGIN _schemes_: UrlNavigatorSchemeCombo (was UrlNavigatorProtocolCombo)
         # NOTE: 2023-05-06 22:25:07
         # by design we only support a file: protocol
         # hence not sure I need self._schemes_
+        # ### BEGIN _protocols_:UrlNavigatorProtocolCombo
+        # NOTE: 2023-05-06 22:30:13
+        # We only use "file://" protocol - hence only the file:/// url scheme is
+        # supported in Scipyen, see also NOTE: 2023-05-06 22:30:13 below
+        # NOTE: 2025-01-19 09:58:19
+        # in kf6 KIO renamed to _schemes_
+        # self._protocols_:typing.Optional[UrlNavigatorProtocolCombo] = None # TODO: revisit this
+        # self._protocols_ = UrlNavigatorProtocolCombo("", self._nav_)
+        # self._protocols_.sig_activated.connect(self.slotProtocolChanged)
+        # ### END   _protocols_:UrlNavigatorProtocolCombo
         self._schemes_:UrlNavigatorSchemeCombo = UrlNavigatorSchemeCombo(str(), self._nav_)
         self._schemes_.activated[str].connect(self._nav_.slotSchemeChanged)
+        
+        # FIXME: 2025-01-21 14:40:32 temporary
+        # TODO: finish up UrlNavigatorSchemeCombo
+        self._schemes_.setVisible(False) 
+        
+        # ### END   _schemes_: UrlNavigatorSchemeCombo
         
         # ### BEGIN _navButtons_
         self._navButtons_:list = list() # list of "breadcrumb buttons" - instances of UrlNavigatorButton
         # ### END   _navButtons_
         
-        # NOTE: 2023-05-06 22:27:36
-        # We only support "file:" protocol for now...
         
+        # ### BEGIN drop down button - for "upward overspill" path elements
         # NOTE: 2023-05-07 22:59:49
-        # drops down a menu of places or parent paths
+        # drops down a menu of places or parent paths when they're  not to be 
+        # shown directly as breadcrumbs
         self._dropDownButton_:UrlNavigatorDropDownButton = UrlNavigatorDropDownButton(self._nav_)
         self._dropDownButton_.setForegroundRole(QtGui.QPalette.WindowText)
         self._dropDownButton_.installEventFilter(self._nav_)
         self._dropDownButton_.clicked.connect(self.openPathSelectorMenu)
+        # ### END   drop down button - for "upward overspill" path elements
         
         # ### BEGIN _pathBox_:UrlComboBox
         # NOTE: 2023-05-07 23:16:43
@@ -2129,20 +2136,21 @@ class _UrlNavigator_(QtCore.QObject):
         # self._pathBox_.setSizeAdjustPolicy(QtWidgets.QComboBox.AdjustToMinimumContentsLengthWithIcon)
         self._pathBox_.installEventFilter(self._nav_)
         
-        # ### BEGIN TODO 2025-01-09 21:05:56
+        # ### BEGIN TODO 2025-01-09 21:05:56 implement completion
         # UrlCompletion <- Completion (KCompletion in KCompletion framework)
         # self._urlCompletion = ...
         # self._pathBox_.setCompletionObject(self._urlCompletion)
         # self._pathBox_.setAutoDeleteCompletionObject(true)
         # ### END   TODO
         
-        self._pathBox_.returnPressed.connect(self.slotReturnPressed)
+        # self._pathBox_.returnPressed.connect(self.slotReturnPressed)
+        self._pathBox_.returnPressed.connect(self._nav_.slot_returnPressed)
         self._pathBox_.urlActivated.connect(self._nav_.setLocationUrl)
         self._pathBox_.editTextChanged[str].connect(self.slotPathBoxChanged)
         
         # ### END   _pathBox_:UrlComboBox
         
-        # ### BEGIN _badgeWidgetContainer_:QtGui.QWidget
+        # ### BEGIN _badgeWidgetContainer_:QtGui.QWidget - what's that for ?!?
         self._badgeWidgetContainer_:QtWidgets.QWidget = QtWidgets.QWidget(self._nav_)
         badgeLayout:QtWidgets.QHBoxLayout = QtWidgets.QHBoxLayout(self._badgeWidgetContainer_)
         badgeLayout.setContentsMargins(0,0,0,0)
@@ -2151,14 +2159,15 @@ class _UrlNavigator_(QtCore.QObject):
         # ### BEGIN _toggleEditableMode_:UrlNavigatorButton
         # NOTE: 2023-05-07 23:22:18
         # toggles between url combo box and bread crumbs
-        # TODO 2025-01-09 21:23:56 check UrlNavigatorButton class definition
         self._toggleEditableMode_:UrlNavigatorToggleButton = UrlNavigatorToggleButton(self._nav_)
         self._toggleEditableMode_.installEventFilter(self._nav_)
         self._toggleEditableMode_.setMinimumWidth(20)
         self._toggleEditableMode_.clicked.connect(self.slotToggleEditableButtonPressed)
         # ### END   _toggleEditableMode_:UrlNavigatorButton
         
+        # ### BEGIN _dropWidget_ - what's that for ?!?
         self._dropWidget_:typing.Optional[QtCore.QWidget] = None # TODO - dynamic stuff
+        # ### END   _dropWidget_
         
         if isinstance(self._placesSelector_, UrlNavigatorPlacesSelector):
             self._layout_.addWidget(self._placesSelector_)
@@ -2171,8 +2180,6 @@ class _UrlNavigator_(QtCore.QObject):
         
         self._nav_.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self._nav_.customContextMenuRequested[QtCore.QPoint].connect(self.openContextMenu)
-   
-        self._schemes_.setVisible(False) # FIXME: 2025-01-21 14:40:32 temporary
         
         # ### END   UI Components of self._nav_:UrlNavigator
         
@@ -2212,8 +2219,10 @@ class _UrlNavigator_(QtCore.QObject):
         
         if int(keyboardModifiers & QtCore.Qt.ShiftModifier):
             self.applyUncommittedUrl(ApplyUrlMethod.NewWindow) # -> open in application
+            
         elif int(keyboardModifiers & QtCore.Qt.ControlModifier):
             self._sig_switchToBreadCrumbMode.emit()
+            
         else:
             self.applyUncommittedUrl(ApplyUrlMethod.Apply) # navigate here
             self._nav_.returnPressed.emit()
@@ -2258,12 +2267,6 @@ class _UrlNavigator_(QtCore.QObject):
         
         dirName = ""
         
-#         popup = QtWidgets.QMenu(self._nav_)
-#         
-#         popupFilter = UrlNavigatorPathSelectorEventFilter(popup) # FIXME
-#         popupFilter.tabRequested.connect(self._nav_.tabRequested) # FIXME -- ? we don't use tab navigation
-#         popup.installEventFilter(popupFilter)
-        
         placeUrl = self.retrievePlaceUrl()
         
         ndx = placeUrl.path().count('/')
@@ -2283,7 +2286,6 @@ class _UrlNavigator_(QtCore.QObject):
         
         k = 0
         while len(dirName) > 0:
-            # print(f"{self.__class__.__name__}.openPathSelectorMenu: dirName = {dirName}, spacer: {len(spacer)}")
             text = spacer + dirName
             # action = QtWidgets.QAction(text, popup)
             currentUrl = self.buttonUrl(ndx)
@@ -2319,13 +2321,25 @@ class _UrlNavigator_(QtCore.QObject):
                 popup.addSeparator()
             else:
                 action = QtWidgets.QAction(key, popup)
-                action.setData(val.toString())
+                # NOTE: 2025-01-21 16:45:50
+                # val is a QtCore.QUrl;
+                # the action stores its string in data (in Qt a QVariant, but in
+                # PyQt5 the conversion is done "behind the scenes")
+                action.setData(val.toString()) 
+                popup.addAction(action)
             
         pos = self._nav_.mapToGlobal(self._dropDownButton_.geometry().bottomRight())
-        print(f"{self.__class__.__name__}.openPathSelectorMenu: pos = {pos}")
+        # print(f"{self.__class__.__name__}.openPathSelectorMenu: pos = {pos}")
         activatedAction = popup.exec(pos)
         if activatedAction is not None:
-            url = QtCore.QUrl(activatedAction.data().toString())
+            # NOTE: 2025-01-21 16:43:02
+            # in PyQt5, action data is NOT a QVariant (or rather the QVariant on
+            # Qt side is already converted to the python type behind the scenes;
+            # see also:
+            #   NOTE: 2025-01-20 21:36:48 
+            #   NOTE: 2025-01-21 16:45:50
+            url = QtCore.QUrl(activatedAction.data()) 
+            # url = QtCore.QUrl(activatedAction.data().toString())
             self._nav_.setLocationUrl(url)
             
         if popup is not None:
@@ -2878,12 +2892,6 @@ class _UrlNavigator_(QtCore.QObject):
 class UrlNavigator(QtWidgets.QWidget):
     """Implementation of KIO KUrlNavigator
     """
-    # TODO: BUG 2025-01-20 22:52:07 FIXME
-    # after switching FROM editing to navigation the button labels are invisible -- why?!?
-    
-    # NOTE: 2025-01-21 15:43:43 gone some way into fixing the above
-    # but still buggy
-        
         
     # ### BEGIN signals
     #
@@ -3170,14 +3178,32 @@ class UrlNavigator(QtWidgets.QWidget):
         
     
     # ### BEGIN Slots
-#     @Slot()
-#     def slot_returnPressed(self):
-#         # indirection to emitting returnPressed
-#         self.applyUncommittedUrl()
-#         self.returnPressed.emit()
-#         
-#         if QtWidgets.QApplication.KeyboardModifiers() & QtCore.Qt.ControlModifier:
-#             self.switchToBreadcrumbMode()
+    @Slot()
+    def slot_returnPressed(self):
+        # NOTE: 2025-01-17 23:21:55 no support for Tabs
+        # therefore either apply url here or open platform's default appliuation
+        keyboardModifiers = QtWidgets.QApplication.keyboardModifiers()
+        
+        if int(keyboardModifiers & QtCore.Qt.ShiftModifier):
+            self._nav_p_.applyUncommittedUrl(ApplyUrlMethod.NewWindow) # -> open in application
+            
+        elif int(keyboardModifiers & QtCore.Qt.ControlModifier):
+            self._nav_p_.switchToBreadcrumbMode()
+            self._nav_p_.updateButtonVisibility()
+            # self._sig_switchToBreadCrumbMode.emit()
+            
+        else:
+            self._nav_p_.applyUncommittedUrl(ApplyUrlMethod.Apply) # navigate here
+            self._nav_p_.switchToBreadcrumbMode()
+            self._nav_p_.updateButtonVisibility()
+            # self._nav_.returnPressed.emit()
+            
+        # indirection to emitting returnPressed
+        # self.applyUncommittedUrl()
+        self.returnPressed.emit()
+        
+        # if QtWidgets.QApplication.KeyboardModifiers() & QtCore.Qt.ControlModifier:
+        #     self.switchToBreadcrumbMode()
             
     @Slot(QtCore.QUrl, QtGui.QDropEvent) # CMT
     def _slot_dropUrls(self, url:QtCore.QUrl, evt:QtGui.QDropEvent):
