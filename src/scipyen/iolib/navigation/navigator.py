@@ -1698,7 +1698,7 @@ class UrlNavigatorPlacesSelector(UrlNavigatorButtonBase): # TODO: 2023-05-07 23:
         
         # self._placesMenu_.triggered.connect() ### use updateMenu to connect each action
 
-    # ### BEGIN Slots by CMT
+    # ### BEGIN Slots by CMT - TODO: 2025-01-21 17:25:38 revisit this
     @Slot()
     def placeModelReloaded(self):
         self.updateSelection(self._selectedUrl_)
@@ -1795,7 +1795,6 @@ class UrlNavigatorPlacesSelector(UrlNavigatorButtonBase): # TODO: 2023-05-07 23:
         if isinstance(teardown, QtQidgets.QAction):
             self._placesMenu_.addSeparator()
             self._placesMenu_.addAction(teardown)
-        
         
     def selectedPlaceUrl(self): # TODO/FIXME finalize
         return QtCore.QUrl()
@@ -3271,4 +3270,8 @@ class UrlNavigator(QtWidgets.QWidget):
     
     # ### END Slots
 
-   
+    # ### BEGIN New methods by CMT
+    # ### END   New methods by CMT
+    
+    def lineEdit(self) -> QtWidgets.QLineEdit():
+        return self._nav_p_._pathBox_

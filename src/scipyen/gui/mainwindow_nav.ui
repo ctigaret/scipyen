@@ -737,32 +737,7 @@ NOTE: you can click anywhere in the row to select</string>
       </layout>
      </item>
      <item row="1" column="0">
-      <widget class="QComboBox" name="navigationWidget">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="acceptDrops">
-        <bool>true</bool>
-       </property>
-       <property name="toolTip">
-        <string>Type path or drop a directory here or click arrow to select from recent directories.</string>
-       </property>
-       <property name="statusTip">
-        <string>Type path or drop a directory here or click arrow to select from recent directories.</string>
-       </property>
-       <property name="whatsThis">
-        <string>Type path or drop a directory here or click arrow to select from recent directories.</string>
-       </property>
-       <property name="editable">
-        <bool>true</bool>
-       </property>
-       <property name="sizeAdjustPolicy">
-        <enum>QComboBox::AdjustToMinimumContentsLengthWithIcon</enum>
-       </property>
-      </widget>
+      <widget class="UrlNavigator" name="navigationWidget" native="true"/>
      </item>
      <item row="2" column="0">
       <layout class="QVBoxLayout" name="verticalLayout">
@@ -1337,6 +1312,14 @@ NOTE: you can click anywhere in the row to select</string>
    </property>
   </action>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>UrlNavigator</class>
+   <extends>QWidget</extends>
+   <header location="global">navigator.py</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
  <resources/>
  <connections/>
 </ui>

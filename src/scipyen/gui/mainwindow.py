@@ -588,10 +588,12 @@ def infoSoftwareComponents() -> str:
     
     return "\n".join(txt)
 
+_mainwindow_ui_file = "mainwindow.ui"
+# _mainwindow_ui_file = "mainwindow_nav.ui"
 
 if os.environ["QT_API"] in ("pyqt5", "pyside2"):
     # Form class,        Base class
-    __UI_MainWindow__, __QMainWindow__ = loadUiType(os.path.join(__module_path__, "mainwindow.ui"), 
+    __UI_MainWindow__, __QMainWindow__ = loadUiType(os.path.join(__module_path__, _mainwindow_ui_file), 
                                                     from_imports=True, import_from="gui")
 
     __UI_ScriptManagerWindow__, _ = loadUiType(os.path.join(__module_path__, "scriptmanagerwindow.ui"), 
@@ -601,7 +603,7 @@ if os.environ["QT_API"] in ("pyqt5", "pyside2"):
                                         from_imports=True, import_from="gui")
 else:
     # Form class,        Base class
-    __UI_MainWindow__, __QMainWindow__ = loadUiType(os.path.join(__module_path__, "mainwindow.ui"))
+    __UI_MainWindow__, __QMainWindow__ = loadUiType(os.path.join(__module_path__, _mainwindow_ui_file))
 
     __UI_ScriptManagerWindow__, _ = loadUiType(os.path.join(__module_path__, "scriptmanagerwindow.ui"))
 
@@ -5013,29 +5015,30 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.dirFileMonitor.directoryChanged.connect(self._slot_monitoredDirectoryContentsChanged)
         # self.dirFileMonitor.fileChanged.connect(self._slot_monitoredFileChanged)
         
-        self.directoryComboBox.lineEdit().setClearButtonEnabled(True)
+        if isinstance(self.navigationWidget, QtWidgets.QComboBox):
+            self.navigationWidget.lineEdit().setClearButtonEnabled(True)
 
-        self.removeRecentDirFromListAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("edit-delete"),
-                                                               "Remove this path from list",
-                                                               self.directoryComboBox.lineEdit())
+        # self.removeRecentDirFromListAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("edit-delete"),
+        #                                                        "Remove this path from list",
+        #                                                        self.navigationWidget.lineEdit())
+        # 
+        # self.removeRecentDirFromListAction.setToolTip("Remove this path from history")
+        # 
+        # self.removeRecentDirFromListAction.triggered.connect(self.slot_removeDirFromHistory)
 
-        self.removeRecentDirFromListAction.setToolTip("Remove this path from history")
+        # self.clearRecentDirListAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("final_activity"),
+        #                                                   "Clear history of visited paths",
+        #                                                   self.navigationWidget.lineEdit())
+        # 
+        # self.clearRecentDirListAction.setToolTip("Clear history of visited paths")
+        # 
+        # self.clearRecentDirListAction.triggered.connect(self.slot_clearRecentDirList)
 
-        self.removeRecentDirFromListAction.triggered.connect(self.slot_removeDirFromHistory)
+        # self.navigationWidget.lineEdit().addAction(self.removeRecentDirFromListAction,
+        #                                             QtWidgets.QLineEdit.TrailingPosition)
 
-        self.clearRecentDirListAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("final_activity"),
-                                                          "Clear history of visited paths",
-                                                          self.directoryComboBox.lineEdit())
-
-        self.clearRecentDirListAction.setToolTip("Clear history of visited paths")
-
-        self.clearRecentDirListAction.triggered.connect(self.slot_clearRecentDirList)
-
-        self.directoryComboBox.lineEdit().addAction(self.removeRecentDirFromListAction,
-                                                    QtWidgets.QLineEdit.TrailingPosition)
-
-        # self.directoryComboBox.activated[str].connect(self.slot_chDirString)
-        self.directoryComboBox.textActivated[str].connect(self.slot_chDirString)
+        # self.navigationWidget.activated[str].connect(self.slot_chDirString)
+        self.navigationWidget.textActivated[str].connect(self.slot_chDirString)
 
         self.fileSystemFilter.lineEdit().setClearButtonEnabled(True)
 
@@ -5288,12 +5291,12 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 clearAction.triggered.connect(self._clearRecentFiles_)
 
     def _refreshRecentDirsComboBox_(self):
-        self.directoryComboBox.clear()
+        self.navigationWidget.clear()
         if len(self._recentDirectories) > 0:
             for item in self._recentDirectories:
-                self.directoryComboBox.addItem(item)
+                self.navigationWidget.addItem(item)
 
-        self.directoryComboBox.setCurrentIndex(0)
+        self.navigationWidget.setCurrentIndex(0)
 
     def _clearRecentFiles_(self):
         self._recentFiles.clear()
@@ -5651,24 +5654,24 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.commandFinderComboBox.removeItem(currentNdx)
         self.commandFinderComboBox.lineEdit().setClearButtonEnabled(True)
 
-    @Slot()
-    @safeWrapper
-    def slot_removeDirFromHistory(self):
-        signalBlocker = QtCore.QSignalBlocker(self.directoryComboBox)
-        currentNdx = self.directoryComboBox.currentIndex()
-        dirTxt = self.directoryComboBox.itemText(currentNdx)
-        if dirTxt in self.recentDirectories:
-            self.recentDirectories.remove(dirTxt)
+    # @Slot()
+    # @safeWrapper
+    # def slot_removeDirFromHistory(self):
+    #     signalBlocker = QtCore.QSignalBlocker(self.navigationWidget)
+    #     currentNdx = self.navigationWidget.currentIndex()
+    #     dirTxt = self.navigationWidget.itemText(currentNdx)
+    #     if dirTxt in self.recentDirectories:
+    #         self.recentDirectories.remove(dirTxt)
+    # 
+    #     self.navigationWidget.removeItem(currentNdx)
+    #     self.navigationWidget.lineEdit().setClearButtonEnabled(True)
 
-        self.directoryComboBox.removeItem(currentNdx)
-        self.directoryComboBox.lineEdit().setClearButtonEnabled(True)
-
-    @Slot()
-    @safeWrapper
-    def slot_clearRecentDirList(self):
-        signalBlocker = QtCore.QSignalBlocker(self.directoryComboBox)
-        self._clearRecentDirectories_()
-        self.directoryComboBox.clear()
+    # @Slot()
+    # @safeWrapper
+    # def slot_clearRecentDirList(self):
+    #     signalBlocker = QtCore.QSignalBlocker(self.navigationWidget)
+    #     self._clearRecentDirectories_()
+    #     self.navigationWidget.clear()
 
     @Slot()
     @safeWrapper
