@@ -54,7 +54,7 @@ if start_gui:
     ## NOTE: 2021-02-04 18:00:07
     ## On linux, prevent KDE or other DEs theming from overriding the resources 
     ## (colors etc) in the InterViews GUI
-    #if sys.platform == "linux":
+    #if sys.platform.startswith("linux"):
         #import subprocess
         #compl = subprocess.run(["xrdb", "-merge", os.path.join(__module_path__, "app-defaults", "nrniv")])
         #print("xrdb: ", compl.returncode)

@@ -9,7 +9,7 @@ import os, sys
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
-if sys.platform == "win32":
+if sys.platform.startswith("win32"):
     scipyenvdir = os.getenv("VIRTUAL_ENV")
     if scipyenvdir is None:
         sys.exit("You are NOT inside a virtual Python environment")

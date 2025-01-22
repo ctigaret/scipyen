@@ -114,7 +114,7 @@ class MatrixViewer(ScipyenViewer):
         if self._data_ is None:
             return
         
-        if sys.platform == "win32":
+        if sys.platform.startswith("win32"):
             options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
             kw = {"options":options}
         else:

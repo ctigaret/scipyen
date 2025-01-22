@@ -137,14 +137,14 @@ class CoolLEDpE12():
     # A? queries trigger mode: sending A? gets trigger mode in response; one of AZ, A+ A- A* AX
     # C? queries LAM channels status (all channels if you wait long enough)
 
-    def __init__(self, port:str = "COM3" if sys.platform == "win32" else "/dev/serial/by-id/usb-CoolLED_precisExcite_1154-if00", 
+    def __init__(self, port:str = "COM3" if sys.platform.startswith("win32") else "/dev/serial/by-id/usb-CoolLED_precisExcite_1154-if00", 
                  baudrate:int = 9600, parity:str = serial.PARITY_NONE, stopbits:int = 1, 
                  timeout:float = 1e-4, xonxoff:int = 0, verbose:int = 1,
                  inter_byte_timeout:float = 0.0):
         """
         Default parameter values are:
 
-            port:str = "COM3" if sys.platform == "win32" else "/dev/serial/by-id/usb-CoolLED_precisExcite_1154-if00"
+            port:str = "COM3" if sys.platform.startswith("win32") else "/dev/serial/by-id/usb-CoolLED_precisExcite_1154-if00"
             baudrate:int = 9600
             xonxoff: int = 0
             parity:str = serial.PARITY_NONE
@@ -730,7 +730,7 @@ class CoolLEDpE12():
         self.currentChannel = val
     
         
-def device(port:str = "COM3" if sys.platform == "win32" else "/dev/serial/by-id/usb-CoolLED_precisExcite_1154-if00",
+def device(port:str = "COM3" if sys.platform.startswith("win32") else "/dev/serial/by-id/usb-CoolLED_precisExcite_1154-if00",
                  baudrate:int = 9600, parity:str = serial.PARITY_NONE, stopbits:int = 1,
                  timeout:float = 1e-4, xonxoff:int = 0, verbose:int = 1,
                  inter_byte_timeout:float = 0.0):

@@ -97,7 +97,7 @@ class InputFile(FileDialog):
         
     def browse(self):
 
-        if sys.platform == "win32":
+        if sys.platform.startswith("win32"):
             options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
             kw = {"options":options}
         else:
@@ -125,7 +125,7 @@ class OutputFile(FileDialog):
         self.filebrowser.clicked.connect(self.browse)
         
     def browse(self):
-        if sys.platform == "win32":
+        if sys.platform.startswith("win32"):
             options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
             kw = {"options":options}
         else:

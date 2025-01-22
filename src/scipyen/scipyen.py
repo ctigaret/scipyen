@@ -34,7 +34,8 @@ if isinstance(my_conda_env, str) and len(my_conda_env.strip()):
         scipywarn("Scipyen should be run in its own conda environment.\n")
         
 elif isinstance(my_virtualenv, str) and len(my_virtualenv.strip()):
-    print(f"Scipyen is running in the virtualenv environment {my_virtualenv}\n")
+    pass # OK
+    # print(f"Scipyen is running in the virtualenv environment {my_virtualenv}\n")
     
 else:
     raise RuntimeError("Scipyen must be run in a virtualenv virtual Python environment or a conda environment\n")
@@ -55,7 +56,7 @@ else:
         
 
 
-if sys.platform == "linux":
+if sys.platform.startswith("linux"):
     # NOTE: 2024-05-04 10:14:08
     # forcing xcb platform when running on Wayland, in Linux, because we want to
     # restore window sizes and positions from Scipyen.conf (Wayland does not allow
@@ -147,7 +148,7 @@ if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
 else:
     # NOTE: 2024-05-02 10:24:48
     # running from a locally built environment under Windows
-    if sys.platform == "win32" and sys.version_info.minor >= 9:
+    if sys.platform.startswith("win32") and sys.version_info.minor >= 9:
         if "CONDA_DEFAULT_ENV" not in os.environ:
             raise OSError("On windows platform, unbundled Scipyen must be run inside a conda environment")
 
@@ -200,7 +201,7 @@ mpath = pathlib.Path(__module_path__)
 # this should extend the availability for Qt icons globally, in this Scipyen session
 themePaths = QtGui.QIcon.themeSearchPaths()
 fbPaths = QtGui.QIcon.fallbackSearchPaths()
-if sys.platform == "linux":
+if sys.platform.startswith("linux"):
     themePaths.extend(IconTheme.icondirs)
     fbPaths.extend(IconTheme.icondirs)
     
@@ -224,7 +225,7 @@ QtGui.QIcon.setFallbackSearchPaths(fbPaths)
 #
 # On linux we rely on platform plugins (which also get bundled when
 # building a pyinstaller bundle, as per scipyen.spec)
-if sys.platform == "win32":
+if sys.platform.startswith("win32"):
     if hasQDarkTheme:
         # qdarktheme.setup_theme("auto")
         qdarktheme.enable_hi_dpi()
@@ -259,7 +260,7 @@ if sys.platform == "win32":
         # until then, on Windows we will have to put up with the qt-svg messages
         # for now...
         
-elif sys.platform == "darwin":
+elif sys.platform.startswith("darwin"):
     windowColor = QtWidgets.QApplication.palette().color(QtGui.QPalette.Window)
     _,_,v,_ = windowColor.getHsv()
     if v > 128:
@@ -307,14 +308,18 @@ class MyProxyStyle(QtWidgets.QProxyStyle):
         return super().styleHint(hint, *args, **kwargs)
 
 def main():
-    import gui.mainwindow as mainwindow
+    # NOTE: 2025-01-22 08:57:15 
+    # this must be executed AFTER the QApplication is initialized.
+    # See NOTE: 2025-01-22 08:56:42
+    # see also WARNING: 2025-01-22 08:55:40 in gui.mainwindow
+    # import gui.mainwindow as mainwindow
     # print(f"Using {os.environ['QT_API']} for GUI and {os.environ['PYQTGRAPH_QT_LIB']} for PyQtGraph\n")
     faulthandler.enable()
     
     # NOTE: 2021-08-17 10:02:20
     # this does not prevent crashes when exiting NEURON - leave here so
     # that we know we tried and didn't work
-    #if sys.platform == "linux":
+    #if sys.platform.startswith("linux"):
         #import subprocess
         #compl = subprocess.run(["xrdb", "-merge", os.path.join(__module_path__, "neuron_python",  "app-defaults", "nrniv")])
         #print("xrdb: ", compl.returncode)
@@ -324,13 +329,16 @@ def main():
         # BEGIN 
         # 1. create the pyqt5 app
         app = QtWidgets.QApplication(sys.argv)
+        # NOTE: 2025-01-22 08:56:42
+        # this needs to be here in prder ot initialize navigator widgets
+        import gui.mainwindow as mainwindow
         
             
-        if sys.platform == "win32":
+        if sys.platform.startswith("win32"):
             if hasQDarkTheme:
                 qdarktheme.setup_theme("auto")
                 
-        elif sys.platform == "linux":
+        elif sys.platform.startswith("linux"):
             # NOTE: 2024-05-04 10:16:33
             # reuired on Wayland so that the window manager decorates the windows
             # with the appropriate icon instead of using the generic Wayland one.

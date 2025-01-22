@@ -30,7 +30,7 @@ from core.utilities import safeWrapper
 from .workspacegui import (WorkspaceGuiMixin, saveWindowSettings, loadWindowSettings)
 from gui.widgets.spinboxslider import SpinBoxSlider
 from gui.workspacemodel import WorkspaceModel
-from core import sysutils
+from core import sysutils, desktoputils
 from iolib import pictio as pio
 from pandas import NA
 
@@ -202,7 +202,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         """
         # print(f"ScipyenViewer<{self.__class__.__name__}>.__init__ data: {type(data).__name__}")
         # print(f"ScipyenViewer<{self.__class__.__name__}>.__init__")
-        if sys.platform == "win32" or os.name == "nt" or platform.uname().system == "Windows":
+        if sys.platform.startswith("win32") or os.name == "nt" or platform.uname().system == "Windows":
             parent = None
             
         # NOTE: 2024-04-17 11:53:29
@@ -210,7 +210,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         # session
         # >>> NOTE <<< you still get the "qt.qpa.wayland: Wayland does not support QWindow::requestActivate()"
         # warnings at the system console, though ⌢
-        elif sys.platform == "linux" and os.getenv("XDG_SESSION_TYPE").lower() == "wayland":
+        elif sys.platform.startswith("linux") and os.getenv("XDG_SESSION_TYPE").lower() == "wayland":
             parent = None
             
         super().__init__(parent)
@@ -268,7 +268,8 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             # NOTE: 2024-11-08 09:44:58
             # accomodate wayland sessions (eveb when run with QT_QPA_PLATFORM=xcb,
             # the session reported by QApplication is wayland if the WM is using wayland)
-            if sysutils.is_kde() and has_qdbus:
+            # if sysutils.is_kde() and has_qdbus:
+            if desktoputils.is_kde() and has_qdbus:
                 appMenuServiceNames = list(name for name in QtDBus.QDBusConnection.sessionBus().interface().registeredServiceNames().value() if "AppMenu" in name)
                 
                 if len(appMenuServiceNames):
@@ -323,7 +324,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         self._app_menu_ = self.getAppMenu()
         
     #def mousePressEvent(self, evt):
-        #if sys.platform == "win32":
+        #if sys.platform.startswith("win32"):
             #self.activateWindow()
         #super().mousePressEvent(evt)
 

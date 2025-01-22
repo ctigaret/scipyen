@@ -4396,7 +4396,7 @@ anything else       anything else       ❌
         else:
             raise ValueError("Unsupported export file format %s" % file_format)
         
-        if sys.platform == "win32":
+        if sys.platform.startswith("win32"):
             options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
             kw = {"options":options}
         else:

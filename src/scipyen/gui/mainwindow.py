@@ -126,7 +126,7 @@ try:
     hasQDarkStyle = True
 except:
     hasQDarkStyle = False
-# if sys.platform == "win32":
+# if sys.platform.startswith("win32"):
 
 # END qdarkstyle
 
@@ -350,7 +350,7 @@ from .workspacegui import (WorkspaceGuiMixin, DirectoryObserver)
 from .workspacemodel import WorkspaceModel
                     
 
-from iolib import h5io, jsonio, network
+from iolib import h5io, jsonio, network, navigation
 from iolib import pictio as pio
 
 
@@ -373,7 +373,7 @@ has_neuron = neuron_spec is not None
 
 # BEGIN GUI themes according to platform (incomplete...)
 
-# if sys.platform == "linux":
+# if sys.platform.startswith("linux"):
 # END
 
 # BEGIN scipyen core modules
@@ -588,10 +588,20 @@ def infoSoftwareComponents() -> str:
     
     return "\n".join(txt)
 
+# BUG: 2025-01-22 00:01:41 FIXME:
+# WARNING: 2025-01-22 08:55:40 RESOLVED
+# in scipyen.py by impporting this module AFTER the QApplication is initialized
+# see NOTE: 2025-01-22 08:56:42
+# QWidget: Must construct a QApplication before a QWidget
+from iolib.navigation import navigator
+
+_mainwindow_ui_file = "mainwindow_nav.ui"
+# _mainwindow_ui_file = "mainwindow.ui"
+
 
 if os.environ["QT_API"] in ("pyqt5", "pyside2"):
     # Form class,        Base class
-    __UI_MainWindow__, __QMainWindow__ = loadUiType(os.path.join(__module_path__, "mainwindow.ui"), 
+    __UI_MainWindow__, __QMainWindow__ = loadUiType(os.path.join(__module_path__, _mainwindow_ui_file), 
                                                     from_imports=True, import_from="gui")
 
     __UI_ScriptManagerWindow__, _ = loadUiType(os.path.join(__module_path__, "scriptmanagerwindow.ui"), 
@@ -601,7 +611,7 @@ if os.environ["QT_API"] in ("pyqt5", "pyside2"):
                                         from_imports=True, import_from="gui")
 else:
     # Form class,        Base class
-    __UI_MainWindow__, __QMainWindow__ = loadUiType(os.path.join(__module_path__, "mainwindow.ui"))
+    __UI_MainWindow__, __QMainWindow__ = loadUiType(os.path.join(__module_path__, _mainwindow_ui_file))
 
     __UI_ScriptManagerWindow__, _ = loadUiType(os.path.join(__module_path__, "scriptmanagerwindow.ui"))
 
@@ -1074,6 +1084,8 @@ class AboutDialog(QtWidgets.QDialog, __UI_AboutLicense__):
 class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     ''' Main pict GUI window
     '''
+    # from iolib.navigation import navigator
+
     # TODO:2024-05-19 10:59:43
     # finalize workspacegui.DirectoryObserver and inherit from it
     # see NOTE: 2024-05-19 10:58:13 TODO in gui/workspacegui.py
@@ -1102,7 +1114,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     # class attribute
     pluginActions = []
 
-    _instance = None
+    _instance = None # NOTE: Singleton design pattern
     
     @classmethod
     def _walk_mro(cls) -> typing.Generator[typing.Self, None, None]:
@@ -1428,8 +1440,6 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     # alive at any time; however, this behaviour propagates to its subclasses 
     # also (if any)
     
-    # def __new__(cls:type[SMW], app: QtWidgets.QApplication, 
-                 # parent: typing.Optional[QtWidgets.QWidget] = None, *args, **kwargs) -> SMW:
     def __new__(cls:typing.Self, app: QtWidgets.QApplication, 
                  parent: typing.Optional[QtWidgets.QWidget] = None, *args, **kwargs) -> typing.Self:
         if not hasattr(cls, "_instance") or not isinstance(cls._instance, cls):
@@ -1490,7 +1500,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # a mapping of plugin_module ↦ {plugin_module_function ↦ QtWidgets.QAction}
         self._ui_plugins_ = dict()
         
-        self._userenv_varname_ = "USERPROFILE" if sys.platform == "win32" else "HOME"
+        self._userenv_varname_ = "USERPROFILE" if sys.platform.startswith("win32") else "HOME"
         self._user_home_ = os.getenv(self._userenv_varname_)
         
         # NOTE: 2024-05-29 13:07:37
@@ -1603,7 +1613,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.setupUi(self)
 
         # WindowManager.__init__(self, parent=self)
-        if sys.platform == "win32":
+        if sys.platform.startswith("win32"):
             WorkspaceGuiMixin.__init__(self, parent=None)  # , settings=settings)
             self.scriptsManager = ScriptManager(parent=None)
         else:
@@ -1738,7 +1748,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.currentVarItem = None
         self.currentVarItemName = None
         
-        # if sys.platform == "win32":
+        # if sys.platform.startswith("win32"):
         #     if isinstance(self, QtWidgets.QMainWindow):
         #         flags = self.windowFlags() | QtCore.Qt.WindowStaysOnTopHint
         #         self.setWindowFlags(flags);
@@ -2002,7 +2012,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             QtGui.QIcon.setThemeName("breeze-dark")
 
 
-        if sys.platform == "win32":
+        if sys.platform.startswith("win32"):
             if hasQDarkTheme:
                 QtGui.QIcon.setThemeName("breeze-dark")
 
@@ -2082,8 +2092,19 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         if len(self._recentDirectories) == 0:
             self._recentDirectories.appendleft(os.getcwd())
 
-        self.slot_changeDirectory(
-            self._recentDirectories[0])  # alse refreshes gui
+        if isinstance(self.navigator, navigator.UrlNavigator):
+            path = pathlib.Path(self._recentDirectories[0])
+            if not path.is_dir():
+                path = pathlib.Path(self._user_home_)
+            if not path.is_absolute():
+                path = path.resolve()
+                
+            url = QtCore.QUrl(path.as_uri())
+            self.navigator.setLocationUrl(url)
+            self.navigator.urlChanged.emit(url)
+        else:
+            self.slot_changeDirectory(self._recentDirectories[0])  # alse refreshes gui
+            
 
     @property
     def fileSystemFilterHistory(self):
@@ -2896,7 +2917,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             # NOTE: 2021-01-30 13:52:58
             # there is no running ExternalIPython instance
             if isinstance(new, str) and new in ("connection", "neuron_ext"):
-                if sys.platform == "win32":
+                if sys.platform.startswith("win32"):
                     options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
                     kw = {"options":options}
                 else:
@@ -4700,7 +4721,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         #         win[1].close()
 
         # see NOTE: 2024-04-17 11:53:29 in scipyenviewer.py
-        if sys.platform == "win32" or os.getenv("XDG_SESSION_TYPE").lower() == "wayland":
+        if sys.platform.startswith("win32") or os.getenv("XDG_SESSION_TYPE").lower() == "wayland":
             QtWidgets.QApplication.closeAllWindows()
         # QtWidgets.QApplication.closeAllWindows()
             
@@ -4713,8 +4734,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     # @processtimefunc
     def loadSettings(self):
         """Overrides ScipyenConfigurable.loadSettings()"""
-        super(WorkspaceGuiMixin, self).loadSettings(
-        )  # inherited from ScipyenConfigurable
+        super(WorkspaceGuiMixin, self).loadSettings()  # inherited from ScipyenConfigurable
 
     def loadWindowSettings(self):
         # print("%s.loadWindowSettings" % self.__class__.__name__)
@@ -4747,7 +4767,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         if hasQDarkTheme:
             self._available_Qt_style_names_.extend(f"Qt{v.capitalize()}" for v in qdarktheme.get_themes())
             
-        # if sys.platform == "win32" and hasQDarkStyle:
+        # if sys.platform.startswith("win32") and hasQDarkStyle:
         #     self._available_Qt_style_names_.append("Dark Style")
         # elif hasQDarkTheme:
         #     self._available_Qt_style_names_.extend(f"Qt{v.capitalize()}" for v in qdarktheme.get_themes())
@@ -5015,29 +5035,32 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.dirFileMonitor.directoryChanged.connect(self._slot_monitoredDirectoryContentsChanged)
         # self.dirFileMonitor.fileChanged.connect(self._slot_monitoredFileChanged)
         
-        self.directoryComboBox.lineEdit().setClearButtonEnabled(True)
+        if isinstance(self.navigator, QtWidgets.QComboBox):
+            self.navigator.lineEdit().setClearButtonEnabled(True)
+            self.navigator.textActivated[str].connect(self.slot_chDirString)
+        elif isinstance(self.navigator, navigator.UrlNavigator):
+            self.navigator.urlChanged[QtCore.QUrl].connect(self.slot_chDirUrl)
 
-        self.removeRecentDirFromListAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("edit-delete"),
-                                                               "Remove this path from list",
-                                                               self.directoryComboBox.lineEdit())
+        # self.removeRecentDirFromListAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("edit-delete"),
+        #                                                        "Remove this path from list",
+        #                                                        self.navigator.lineEdit())
+        # 
+        # self.removeRecentDirFromListAction.setToolTip("Remove this path from history")
+        # 
+        # self.removeRecentDirFromListAction.triggered.connect(self.slot_removeDirFromHistory)
 
-        self.removeRecentDirFromListAction.setToolTip("Remove this path from history")
+        # self.clearRecentDirListAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("final_activity"),
+        #                                                   "Clear history of visited paths",
+        #                                                   self.navigator.lineEdit())
+        # 
+        # self.clearRecentDirListAction.setToolTip("Clear history of visited paths")
+        # 
+        # self.clearRecentDirListAction.triggered.connect(self.slot_clearRecentDirList)
 
-        self.removeRecentDirFromListAction.triggered.connect(self.slot_removeDirFromHistory)
+        # self.navigator.lineEdit().addAction(self.removeRecentDirFromListAction,
+        #                                             QtWidgets.QLineEdit.TrailingPosition)
 
-        self.clearRecentDirListAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("final_activity"),
-                                                          "Clear history of visited paths",
-                                                          self.directoryComboBox.lineEdit())
-
-        self.clearRecentDirListAction.setToolTip("Clear history of visited paths")
-
-        self.clearRecentDirListAction.triggered.connect(self.slot_clearRecentDirList)
-
-        self.directoryComboBox.lineEdit().addAction(self.removeRecentDirFromListAction,
-                                                    QtWidgets.QLineEdit.TrailingPosition)
-
-        # self.directoryComboBox.activated[str].connect(self.slot_chDirString)
-        self.directoryComboBox.textActivated[str].connect(self.slot_chDirString)
+        # self.navigator.activated[str].connect(self.slot_chDirString)
 
         self.fileSystemFilter.lineEdit().setClearButtonEnabled(True)
 
@@ -5155,7 +5178,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @Slot()
     @safeWrapper
     def slot_goToHomeDir(self):
-        if sys.platform == "win32":
+        if sys.platform.startswith("win32"):
             self.slot_changeDirectory(os.environ['USERPROFILE'])
         else:
             self.slot_changeDirectory(os.environ['HOME'])
@@ -5197,9 +5220,9 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     def slot_openCurrentDirInSystemTerminal(self):
         dest = str(pathlib.Path(self.currentDir))
         terminal = desktoputils.get_system_terminal_executable()
-        if sys.platform == "win32":
+        if sys.platform.startswith("win32"):
             subprocess.run(["start", terminal, "/k", "pushd", dest], shell=True)
-        elif sys.platform == "linux":
+        elif sys.platform.startswith("linux"):
             # subprocess.run(["xterm", "-e", "'cd", dest, "&&", "/bin/bash'"], shell=True)
             if terminal == "konsole":
                 subprocess.run([terminal, "--subprocess", "--workdir", dest], shell=True)
@@ -5290,12 +5313,15 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 clearAction.triggered.connect(self._clearRecentFiles_)
 
     def _refreshRecentDirsComboBox_(self):
-        self.directoryComboBox.clear()
-        if len(self._recentDirectories) > 0:
-            for item in self._recentDirectories:
-                self.directoryComboBox.addItem(item)
+        if isinstance(self.navigator, QtWidgets.QComboBox):
+            self.navigator.clear()
+            if len(self._recentDirectories) > 0:
+                for item in self._recentDirectories:
+                    self.navigator.addItem(item)
 
-        self.directoryComboBox.setCurrentIndex(0)
+            self.navigator.setCurrentIndex(0)
+        # else:
+        #     pass
 
     def _clearRecentFiles_(self):
         self._recentFiles.clear()
@@ -5653,24 +5679,24 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.commandFinderComboBox.removeItem(currentNdx)
         self.commandFinderComboBox.lineEdit().setClearButtonEnabled(True)
 
-    @Slot()
-    @safeWrapper
-    def slot_removeDirFromHistory(self):
-        signalBlocker = QtCore.QSignalBlocker(self.directoryComboBox)
-        currentNdx = self.directoryComboBox.currentIndex()
-        dirTxt = self.directoryComboBox.itemText(currentNdx)
-        if dirTxt in self.recentDirectories:
-            self.recentDirectories.remove(dirTxt)
+    # @Slot()
+    # @safeWrapper
+    # def slot_removeDirFromHistory(self):
+    #     signalBlocker = QtCore.QSignalBlocker(self.navigator)
+    #     currentNdx = self.navigator.currentIndex()
+    #     dirTxt = self.navigator.itemText(currentNdx)
+    #     if dirTxt in self.recentDirectories:
+    #         self.recentDirectories.remove(dirTxt)
+    # 
+    #     self.navigator.removeItem(currentNdx)
+    #     self.navigator.lineEdit().setClearButtonEnabled(True)
 
-        self.directoryComboBox.removeItem(currentNdx)
-        self.directoryComboBox.lineEdit().setClearButtonEnabled(True)
-
-    @Slot()
-    @safeWrapper
-    def slot_clearRecentDirList(self):
-        signalBlocker = QtCore.QSignalBlocker(self.directoryComboBox)
-        self._clearRecentDirectories_()
-        self.directoryComboBox.clear()
+    # @Slot()
+    # @safeWrapper
+    # def slot_clearRecentDirList(self):
+    #     signalBlocker = QtCore.QSignalBlocker(self.navigator)
+    #     self._clearRecentDirectories_()
+    #     self.navigator.clear()
 
     @Slot()
     @safeWrapper
@@ -5770,12 +5796,28 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         """
         if self.fileSystemModel.isDir(ndx):
             # if this is a directory then chdir to it
-            self.slot_changeDirectory(self.fileSystemModel.filePath(ndx))
+            if isinstance(self.navigator, navigator.UrlNavigator):
+                path = pathlib.Path(self.fileSystemModel.filePath(ndx))
+                if not path.is_dir():
+                    scipywarn(f"The path {printStyled(path, 'yellow')} does not exist. is it a mount point or a remote place?")
+                    return
+
+                # print(f"{self.__class__.__name__}.slot_fileSystemItemActivated: path = {path}")
+                url = QtCore.QUrl(path.as_uri())
+                self.navigator.setLocationUrl(url)
+                self.navigator.urlChanged.emit(url)
+            else:
+                self.slot_changeDirectory(self.fileSystemModel.filePath(ndx))
 
         else:
             self.loadFiles([self.fileSystemModel.filePath(ndx)], 
                            self._openSelectedFileItemsThreaded)
             
+    @Slot(QtCore.QUrl)
+    @safeWrapper
+    def slot_chDirUrl(self, val:QtCore.QUrl):
+        s = val.path()
+        self.slot_chDirString(s)
 
     @Slot(str)
     @safeWrapper
@@ -5802,7 +5844,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         if targetDir is None or (isinstance(targetDir, str) and len(targetDir.strip()) == 0) or not os.path.exists(targetDir):
             targetDir = os.getenv(
-                "USERPROFILE") if sys.platform == "win32" else os.getenv("HOME")
+                "USERPROFILE") if sys.platform.startswith("win32") else os.getenv("HOME")
 
         if targetDir is not None and targetDir != "" and os.path.exists(targetDir):
             if os.path.isfile(targetDir):
@@ -5816,7 +5858,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             
             # print(f"{self.__class__.__name__}.slot_changeDirectory targetDir = {targetDir}")
 
-            if sys.platform == "win32":
+            if sys.platform.startswith("win32"):
                 targetDir = targetDir.replace("\\", "/")
                 targetDir = rf"{targetDir}"
 
@@ -5824,7 +5866,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
             if self.ipkernel is not None and self.shell is not None and self.console is not None:
                 # print(''.join(["cd '", targetDir, "'"]))
-                # if sys.platform == "linux":
+                # if sys.platform.startswith("linux"):
                 # self.console.execute(''.join(["cd '", targetDir, "'"]), hidden=True)
                 # else:
                 # self.console.execute(''.join(["os.chdir('", targetDir, "')"]), hidden=False)
@@ -6234,7 +6276,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     def slot_pastePythonScript(self, fileName=None):
         if not isinstance(fileName, str) or len(fileName) == 0:
             targetDir = self.recentDirectories[0]
-            if sys.platform == "win32":
+            if sys.platform.startswith("win32"):
                 options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
                 kw = {"options":options}
             else:
@@ -6284,7 +6326,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     def slot_runPythonScript(self, fileName=None):
         if not isinstance(fileName, str) or len(fileName) == 0:
             targetDir = self.recentDirectories[0]
-            if sys.platform == "win32":
+            if sys.platform.startswith("win32"):
                 options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
                 kw = {"options":options}
             else:
@@ -6396,7 +6438,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     def slot_selectWorkDir(self, *args):
         targetDir = self.recentDirectories[0]
         caption = "Select Working Directory"
-        if sys.platform == "win32":
+        if sys.platform.startswith("win32"):
             options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
             kw = {"options":options}
         else:
@@ -6589,7 +6631,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
                 targetDir = self.recentDirectories[0]
 
-                if sys.platform == "win32":
+                if sys.platform.startswith("win32"):
                     options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
                     kw = {"options":options}
                 else:
@@ -6628,7 +6670,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 fileFilt = ';;'.join(fileFilters)
                 targetDir = self.recentDirectories[0]
 
-                if sys.platform == "win32":
+                if sys.platform.startswith("win32"):
                     options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
                     kw = {"options":options}
                 else:
@@ -6709,7 +6751,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         targetDir = self.recentDirectories[0]
 
-        if sys.platform == "win32":
+        if sys.platform.startswith("win32"):
             options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
             kw = {"options":options}
         else:
@@ -7381,7 +7423,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             else:
                 fname = os.path.splitext(fileName)[0]
 
-                if sys.platform == "win32":
+                if sys.platform.startswith("win32"):
                     cmd = f'run -i -n -t "{fname}"'
                 else:
                     cmd = f"run -i -n -t '{fname}'"
@@ -7464,7 +7506,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     def _slot_set_Users_Plugins_directory(self):
         targetDir = self._user_plugins_dir
         caption = "Select users plugins top directory"
-        if sys.platform == "win32":
+        if sys.platform.startswith("win32"):
             options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
             kw = {"options":options}
         else:
@@ -7616,7 +7658,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         filename = "".join([varname, ".csv"])
 
-        if sys.platform == "win32":
+        if sys.platform.startswith("win32"):
             options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
             kw = {"options":options}
         else:

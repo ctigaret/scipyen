@@ -268,7 +268,7 @@ class TableEditor(ScipyenViewer):
             targetDir  = os.path.join(targetDir, 
                                  self._docTitle_) + ".csv"
             
-        if sys.platform == "win32":
+        if sys.platform.startswith("win32"):
             options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
             kw = {"options":options}
         else:

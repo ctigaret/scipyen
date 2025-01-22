@@ -169,6 +169,7 @@ import numpy.ma as ma
 import quantities as pq
 import pandas as pd
 import h5py
+import neo
 from core.vigra_patches import vigra
 from traitlets.utils.importstring import import_item
 from traitlets import Bunch
@@ -179,6 +180,9 @@ from core.prog import (signature2Dict, resolveObject, ArgumentError, CALLABLE_TY
 # NOTE: 2021-12-25 15:45:55
 # unfortunately, orjson does not expose supported numpy types so we need to
 # hardcode these here
+
+neo_major, neo_minor, neo_micro = map(lambda x: int(x), neo.__version__.split("."))
+pq_major, pq_minor, pq_micro = map(lambda x: int(x), pq.__version__.split("."))
 
 JSON_NUMPY_TYPES = (np.float64, np.float32, np.int64, np.int32, np.int8, 
                       np.uint64, np.uint32, np.uint8, np.uintp, np.intp, 
@@ -258,7 +262,7 @@ def makeFuncStub(function:typing.Optional[typing.Union[CALLABLE_TYPES + (str, )]
     stub["signature"] = sig
     return stub
 
-def makeJSONStub(o):
+def makeJSONStub(o) -> tuple: # (str, dict)
     if isinstance(o, type):
         header = "python_type"
         ret = {"type_name":     o.__qualname__,
@@ -305,7 +309,7 @@ def makeH5PyVlenDtype(name):
     return h5py.vlen_dtype(name)
 
 @singledispatch
-def object2JSON(o):
+def object2JSON(o) -> dict:
     from core.datatypes import is_namedtuple
     #print("object2JSON<>", type(o))
     hdr, ret = makeJSONStub(o)
@@ -705,7 +709,7 @@ def _(o:pq.Quantity):
     
     return {hdr:ret}
     
-def dtype2JSON(d):
+def dtype2JSON(d) -> dict:
     """Delegates to json converter for h5py, pandas or numpy (in this order)
     Also required as intermediate for recurdive call in numpyDtype2JSON.
     """
@@ -748,7 +752,7 @@ def numpyDtype2JSON(d:np.dtype) -> dict:
     
     return {hdr:ret}
 
-def h5pyDtype2JSON(d):
+def h5pyDtype2JSON(d) -> dict:
     """Checks if d is a special h5py dtype.
     Returns a json representation (dict) if d is a h5py special dtype, or None.
     """
@@ -789,7 +793,7 @@ def h5pyDtype2JSON(d):
     ret["factory"]=factory
     return {hdr:ret}
             
-def pandasDtype2JSON(d):
+def pandasDtype2JSON(d) -> dict:
     """Checks if d is a pandas extension dtype (for standard pandas extensions)
     Returns a json representation (either str or dict) if d is a pandas extension
     dtype; returns None otherwise.
@@ -980,7 +984,7 @@ def pandasDtype2JSON(d):
     #elif isinstance(s, dict): # for recarrays, h5py, pandas
         #return np.dtype(s) 
 
-def decode_hook(dct):
+def decode_hook(dct) -> typing.Any:
     """ Almost complete round trip for a subset of Python types - read side.
     
     Implemented types:
@@ -1101,15 +1105,15 @@ def dump(obj, fp, *args, **kwargs):
     #kwargs["cls"] = CustomEncoder
     json.dump(obj,fp, *args, **kwargs)
     
-def dumps(obj, *args, **kwargs):
+def dumps(obj, *args, **kwargs) -> str:
     kwargs["default"] = object2JSON
     return json.dumps(obj, *args, **kwargs)
 
-def load(fp, *args, **kwargs):
+def load(fp, *args, **kwargs) -> typing.Any:
     ret = json.load(fp, *args, **kwargs)
     return json2python(ret)
         
-def loads(s):
+def loads(s) -> typing.Any:
     ret = json.loads(s)
     return json2python(ret)
     
@@ -1120,7 +1124,7 @@ def load(filename):
         
     return ret
 
-def json2python(jsonobj):
+def json2python(jsonobj:typing.Union[list, tuple, dict]) -> typing.Any:
     """Restores a Python object from it JSON representation.
     
     WARNING: Functions, and, with a few exceptions, types and method objects 
@@ -1356,7 +1360,24 @@ def json2python(jsonobj):
                             
                         return ma.array(arr, mask=mask) # see NOTE: 2021-12-27 23:25:50
                 
-                #print("obj_factory", obj_factory)
+                elif isinstance(obj_factory, type):
+                    if pq.UnitQuantity in inspect.getmro(obj_factory):
+                        # NOTE: 2025-01-22 10:17:54
+                        # check if the unit quantity is already registered, to avoid
+                        # clashes especially since quantities 0.16.1
+                        if isinstance(obj_factory_args[0], str):
+                            try:
+                                return pq.unitquantity.unit_registry[obj_factory_args[0]]
+                            except:
+                                # NOTE: 2025-01-22 10:10:15
+                                # this will register a new untt quantity
+                                return obj_factory(*obj_factory_args, **obj_factory_kwargs)
+                                
+#                         
+#                 print(f"jsonio.json2python: obj_factory {obj_factory}(")
+#                 print(f"\tobj_factory_args {obj_factory_args},")
+#                 print(f"\tobj_factory_kwargs {obj_factory_kwargs})")
+                
                 return obj_factory(*obj_factory_args, **obj_factory_kwargs)
             
             else:
@@ -1373,7 +1394,7 @@ def json2python(jsonobj):
             
     return ret
     
-def kernelFromJSON(kernelcoords:list, *args, **kwargs):
+def kernelFromJSON(kernelcoords:list, *args, **kwargs) -> object:
     from imaging.vigrautils import kernelfromarray
     xy = np.array(kernelcoords)
     return kernelfromarray(xy)
