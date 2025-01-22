@@ -1405,6 +1405,9 @@ class ScanDataMetadataAdapter(AttributeAdapter):
         from gui import pictgui as pgui
         from systems.PrairieView import PVSequenceType
         
+        if value is None: # FIXME: 2025-01-22 21:07:36
+            return
+        
         # print(f"{self.__class__.__name__}._parse_metadata_ value = \n{value}")
         
         # NOTE: 2024-08-13 20:23:14
