@@ -3706,6 +3706,9 @@ def _(entity:h5py.Dataset, target_class:type, attrs:dict, cache:dict=dict()):
             
         elif target_class in (bytes, bytearray):
             v = dataset2string(entity)
+            # print(f"objectFromEntity: target_class = {target_class}, entity = {entity}, v = {v} ({type(v).__name__}), {v.startswith('b')}")
+            if not v.startswith('b'):
+                v = f"b{v}"
             obj = bytes.fromhex(v) if len(v) else bytes()
             
             if target_class == bytearray:
