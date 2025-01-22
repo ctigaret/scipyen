@@ -35,6 +35,8 @@ from core.neoepoch import Epoch, _new_Epoch
 # print(f"_new_Epoch: {_new_Epoch.__name__} in {_new_Epoch.__module__}")
 from core.prog import (safeWrapper, signature2Dict, SpecFinder)
 
+neo_major, neo_minor, neo_micro = map(lambda x: int(x), neo.__version__.split("."))
+
 # #neo.io.axonio.AxonRawIO = _axonrawio.AxonRawIO_v1
 
 original ={"neo.core.analogsignal._new_AnalogSignalArray": neo.core.analogsignal._new_AnalogSignalArray,
@@ -114,10 +116,18 @@ def _patch_new_neo(original_f, *args, **kwargs):
         var[annotations_index] = dict()
             
     # print(f" {Fore.YELLOW}{original_f.__name__}{Style.RESET_ALL} will be called with {len(var)} arguments:")
-    # for k in range(len(var)):
-    #     arg_name = f" ({sig_named[k]})" #if k in sig.named else ""
-    #     print(f"  {k}: {var[k]}{arg_name}")
-            
+    for k in range(len(var)):
+        # NOTE: 2025-01-22 09:36:57 since neo 0.14.0
+        if neo_minor > 13:
+            if neo_minor < 15:
+                if sig_named[k] == "copy":
+                    var[k] = None
+                    
+        # arg_name = f" ({sig_named[k]})" #if k in sig.named else ""
+        # print(f"  {k}: {var[k]}{arg_name}")
+    if neo_minor > 14: # 'copy' argument will be removed in neo 0.15.0
+        var.pop("copy", None)
+        
     try:
         return original_f(*var)
     except Exception as e:

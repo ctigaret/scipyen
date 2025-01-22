@@ -589,11 +589,14 @@ def infoSoftwareComponents() -> str:
     return "\n".join(txt)
 
 # BUG: 2025-01-22 00:01:41 FIXME:
+# WARNING: 2025-01-22 08:55:40 RESOLVED
+# in scipyen.py by impporting this module AFTER the QApplication is initialized
+# see NOTE: 2025-01-22 08:56:42
 # QWidget: Must construct a QApplication before a QWidget
-# from iolib.navigation import navigator
+from iolib.navigation import navigator
 
-# _mainwindow_ui_file = "mainwindow_nav.ui"
-_mainwindow_ui_file = "mainwindow.ui"
+_mainwindow_ui_file = "mainwindow_nav.ui"
+# _mainwindow_ui_file = "mainwindow.ui"
 
 
 if os.environ["QT_API"] in ("pyqt5", "pyside2"):
@@ -2089,8 +2092,19 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         if len(self._recentDirectories) == 0:
             self._recentDirectories.appendleft(os.getcwd())
 
-        self.slot_changeDirectory(
-            self._recentDirectories[0])  # alse refreshes gui
+        if isinstance(self.navigator, navigator.UrlNavigator):
+            path = pathlib.Path(self._recentDirectories[0])
+            if not path.is_dir():
+                path = pathlib.Path(self._user_home_)
+            if not path.is_absolute():
+                path = path.resolve()
+                
+            url = QtCore.QUrl(path.as_uri())
+            self.navigator.setLocationUrl(url)
+            self.navigator.urlChanged.emit(url)
+        else:
+            self.slot_changeDirectory(self._recentDirectories[0])  # alse refreshes gui
+            
 
     @property
     def fileSystemFilterHistory(self):
@@ -4720,8 +4734,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     # @processtimefunc
     def loadSettings(self):
         """Overrides ScipyenConfigurable.loadSettings()"""
-        super(WorkspaceGuiMixin, self).loadSettings(
-        )  # inherited from ScipyenConfigurable
+        super(WorkspaceGuiMixin, self).loadSettings()  # inherited from ScipyenConfigurable
 
     def loadWindowSettings(self):
         # print("%s.loadWindowSettings" % self.__class__.__name__)
@@ -5785,6 +5798,11 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             # if this is a directory then chdir to it
             if isinstance(self.navigator, navigator.UrlNavigator):
                 path = pathlib.Path(self.fileSystemModel.filePath(ndx))
+                if not path.is_dir():
+                    scipywarn(f"The path {printStyled(path, 'yellow')} does not exist. is it a mount point or a remote place?")
+                    return
+
+                # print(f"{self.__class__.__name__}.slot_fileSystemItemActivated: path = {path}")
                 url = QtCore.QUrl(path.as_uri())
                 self.navigator.setLocationUrl(url)
                 self.navigator.urlChanged.emit(url)

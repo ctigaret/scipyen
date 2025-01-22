@@ -60,6 +60,7 @@
 # ### END internal comments
 
 import sys, os, pathlib, urllib, typing, warnings, subprocess, traceback
+import platform
 import core.xmlutils as xmlutils
 import iolib.pictio as pio
 import xml.etree.ElementTree as ET

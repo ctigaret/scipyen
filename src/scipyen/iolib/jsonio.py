@@ -180,6 +180,9 @@ from core.prog import (signature2Dict, resolveObject, ArgumentError, CALLABLE_TY
 # unfortunately, orjson does not expose supported numpy types so we need to
 # hardcode these here
 
+neo_major, neo_minor, neo_micro = map(lambda x: int(x), neo.__version__.split(.))
+pq_major, pq_minor, pq_micro = map(lambda x: int(x), pq.__version__.split(.))
+
 JSON_NUMPY_TYPES = (np.float64, np.float32, np.int64, np.int32, np.int8, 
                       np.uint64, np.uint32, np.uint8, np.uintp, np.intp, 
                       np.datetime64)
@@ -1356,7 +1359,24 @@ def json2python(jsonobj:typing.Union[list, tuple, dict]) -> typing.Any:
                             
                         return ma.array(arr, mask=mask) # see NOTE: 2021-12-27 23:25:50
                 
-                #print("obj_factory", obj_factory)
+                elif isinstance(obj_factory, type):
+                    if pq.UnitQuantity in inspect.getmro(obj_factory):
+                        # NOTE: 2025-01-22 10:17:54
+                        # check if the unit quantity is already registered, to avoid
+                        # clashes especially since quantities 0.16.1
+                        if isinstance(obj_factory_args[0], str):
+                            try:
+                                return pq.unitquantity.unit_registry[obj_factory_args[0]]
+                            except:
+                                # NOTE: 2025-01-22 10:10:15
+                                # this will register a new untt quantity
+                                return obj_factory(*obj_factory_args, **obj_factory_kwargs)
+                                
+#                         
+#                 print(f"jsonio.json2python: obj_factory {obj_factory}(")
+#                 print(f"\tobj_factory_args {obj_factory_args},")
+#                 print(f"\tobj_factory_kwargs {obj_factory_kwargs})")
+                
                 return obj_factory(*obj_factory_args, **obj_factory_kwargs)
             
             else:

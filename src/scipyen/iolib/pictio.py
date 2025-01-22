@@ -49,7 +49,11 @@ import pandas as pd
 import h5py
 from core.vigra_patches import vigra
 import neo
-if neo.__version__ >= '0.13.0':
+
+neo_major, neo_minor, neo_micro = map(lambda x: int(x), neo.__version__.split(.))
+pq_major, pq_minor, pq_micro = map(lambda x: int(x), pq.__version__.split(.))
+
+if neo_minor >= 13:
     from neo.core.objectlist import ObjectList as NeoObjectList
     
 else:

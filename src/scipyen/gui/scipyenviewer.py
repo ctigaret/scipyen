@@ -30,7 +30,7 @@ from core.utilities import safeWrapper
 from .workspacegui import (WorkspaceGuiMixin, saveWindowSettings, loadWindowSettings)
 from gui.widgets.spinboxslider import SpinBoxSlider
 from gui.workspacemodel import WorkspaceModel
-from core import sysutils
+from core import sysutils, desktoputils
 from iolib import pictio as pio
 from pandas import NA
 
@@ -268,7 +268,8 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             # NOTE: 2024-11-08 09:44:58
             # accomodate wayland sessions (eveb when run with QT_QPA_PLATFORM=xcb,
             # the session reported by QApplication is wayland if the WM is using wayland)
-            if sysutils.is_kde() and has_qdbus:
+            # if sysutils.is_kde() and has_qdbus:
+            if desktoputils.is_kde() and has_qdbus:
                 appMenuServiceNames = list(name for name in QtDBus.QDBusConnection.sessionBus().interface().registeredServiceNames().value() if "AppMenu" in name)
                 
                 if len(appMenuServiceNames):

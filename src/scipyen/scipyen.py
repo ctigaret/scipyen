@@ -308,7 +308,11 @@ class MyProxyStyle(QtWidgets.QProxyStyle):
         return super().styleHint(hint, *args, **kwargs)
 
 def main():
-    import gui.mainwindow as mainwindow
+    # NOTE: 2025-01-22 08:57:15 
+    # this must be executed AFTER the QApplication is initialized.
+    # See NOTE: 2025-01-22 08:56:42
+    # see also WARNING: 2025-01-22 08:55:40 in gui.mainwindow
+    # import gui.mainwindow as mainwindow
     # print(f"Using {os.environ['QT_API']} for GUI and {os.environ['PYQTGRAPH_QT_LIB']} for PyQtGraph\n")
     faulthandler.enable()
     
@@ -325,6 +329,9 @@ def main():
         # BEGIN 
         # 1. create the pyqt5 app
         app = QtWidgets.QApplication(sys.argv)
+        # NOTE: 2025-01-22 08:56:42
+        # this needs to be here in prder ot initialize navigator widgets
+        import gui.mainwindow as mainwindow
         
             
         if sys.platform.startswith("win32"):
