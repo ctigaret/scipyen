@@ -595,8 +595,8 @@ def infoSoftwareComponents() -> str:
 # QWidget: Must construct a QApplication before a QWidget
 from iolib.navigation import navigator
 
-_mainwindow_ui_file = "mainwindow_nav.ui"
-# _mainwindow_ui_file = "mainwindow.ui"
+# _mainwindow_ui_file = "mainwindow_nav.ui"
+_mainwindow_ui_file = "mainwindow.ui"
 
 
 if os.environ["QT_API"] in ("pyqt5", "pyside2"):
@@ -2053,7 +2053,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             self._recentDirectories.clear()
             self._recentDirectories.extend(keep)
             self._refreshRecentDirectoriesMenu_()
-            self._refreshRecentDirsComboBox_()
+            # self._refreshRecentDirsComboBox_()
             
 
     @property
@@ -2161,7 +2161,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.viewFilesFilterToolBtn.setChecked(self._showFilesFilter)
         
     @property
-    def currentDir(self):
+    def currentDir(self) -> str | pathlib.Path:
         return self.currentDirectory
     
     @currentDir.setter
@@ -2169,12 +2169,43 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.currentDirectory = value
 
     @property
-    def currentDirectory(self):
+    def currentDirectory(self) -> str | pathlib.Path:
         return self._currentDir_
     
     @currentDirectory.setter
     def currentDirectory(self, value:typing.Union[str, pathlib.Path]):
         self._currentDir_ = value
+        
+    @property
+    def currentLocation(self) -> QtCore.QUrl:
+        """URL of the current location (as shown in the navigator)
+        CAUTION: currently this is the same as the url of the current directory
+        but in the future it may point to a non-local file system location
+        (as support is being implemented — WORK IN PROGRESS) 
+        Therefore it always pays to check the result!
+        """
+        # normally, this should be the same location as pointed to by
+        # self._currentDir_, EXCEPT when the url is a remote one — WORK IN PROGRESS
+        return self.navigator.locationUrl()
+        
+    @property
+    def currentUrl(self) -> QtCore.QUrl:
+        """
+        URL of the current (working) file system directory.
+        CAUTION: In the (unlikely) situaiton the self._curentDir_ attribute is
+        NOT properly set, it will return the URL opf the location of the 
+        navigator — WORK IN PROGRESS
+        Therefore it always pays to check the result!
+        """
+        if isinstance(self._currentDir_, str):
+            return QtCore.QUrl(pathlib.Path(self._currentDir_).as_uri())
+        
+        elif isinstance(self._currentDir_, pathlib.Path):
+            return QtCore.QUrl(self._currentDir_.as_uri())
+        
+        else:
+            return self.currentLocation
+        
         
     @property
     def monitoredDirectories(self):
@@ -3425,7 +3456,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             self._setRecentDirectory_(self.cwd)
             self._updateFileSystemView_(self.cwd, False)
             self._resizeFileColumn_()
-            self._refreshRecentDirsComboBox_()
+            # self._refreshRecentDirsComboBox_()
 
     def slot_updateHistory(self):
         """ Slot to update the history tree widget once a command has been entered at the console
@@ -5035,11 +5066,12 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.dirFileMonitor.directoryChanged.connect(self._slot_monitoredDirectoryContentsChanged)
         # self.dirFileMonitor.fileChanged.connect(self._slot_monitoredFileChanged)
         
-        if isinstance(self.navigator, QtWidgets.QComboBox):
-            self.navigator.lineEdit().setClearButtonEnabled(True)
-            self.navigator.textActivated[str].connect(self.slot_chDirString)
-        elif isinstance(self.navigator, navigator.UrlNavigator):
-            self.navigator.urlChanged[QtCore.QUrl].connect(self.slot_chDirUrl)
+        self.navigator.urlChanged[QtCore.QUrl].connect(self.slot_chDirUrl)
+        # if isinstance(self.navigator, QtWidgets.QComboBox):
+        #     self.navigator.lineEdit().setClearButtonEnabled(True)
+        #     self.navigator.textActivated[str].connect(self.slot_chDirString)
+        # elif isinstance(self.navigator, navigator.UrlNavigator):
+        #     self.navigator.urlChanged[QtCore.QUrl].connect(self.slot_chDirUrl)
 
         # self.removeRecentDirFromListAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("edit-delete"),
         #                                                        "Remove this path from list",
@@ -5312,16 +5344,17 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                     "Clear Recent Files List")
                 clearAction.triggered.connect(self._clearRecentFiles_)
 
-    def _refreshRecentDirsComboBox_(self):
-        if isinstance(self.navigator, QtWidgets.QComboBox):
-            self.navigator.clear()
-            if len(self._recentDirectories) > 0:
-                for item in self._recentDirectories:
-                    self.navigator.addItem(item)
-
-            self.navigator.setCurrentIndex(0)
-        # else:
-        #     pass
+    # def _refreshRecentDirsComboBox_(self):
+    #     if isinstance(self.navigator, QtWidgets.QComboBox):
+    #         self.navigator.clear()
+    #         if len(self._recentDirectories) > 0:
+    #             for item in self._recentDirectories:
+    #                 self.navigator.addItem(item)
+    # 
+    #         self.navigator.setCurrentIndex(0)
+    #     # else:
+    #     #     pass
+        
 
     def _clearRecentFiles_(self):
         self._recentFiles.clear()
@@ -5329,7 +5362,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
     def _refreshRecentDirs_(self):
         self._refreshRecentDirectoriesMenu_()
-        self._refreshRecentDirsComboBox_()
+        # self._refreshRecentDirsComboBox_()
 
     def _refreshRecentDirectoriesMenu_(self):
         self.recentDirectoriesMenu.clear()
