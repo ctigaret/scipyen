@@ -350,7 +350,7 @@ from .workspacegui import (WorkspaceGuiMixin, DirectoryObserver)
 from .workspacemodel import WorkspaceModel
                     
 
-from iolib import h5io, jsonio, network
+from iolib import h5io, jsonio, network, navigation
 from iolib import pictio as pio
 
 
@@ -588,8 +588,13 @@ def infoSoftwareComponents() -> str:
     
     return "\n".join(txt)
 
-_mainwindow_ui_file = "mainwindow.ui"
+# BUG: 2025-01-22 00:01:41 FIXME:
+# QWidget: Must construct a QApplication before a QWidget
+# from iolib.navigation import navigator
+
 # _mainwindow_ui_file = "mainwindow_nav.ui"
+_mainwindow_ui_file = "mainwindow.ui"
+
 
 if os.environ["QT_API"] in ("pyqt5", "pyside2"):
     # Form class,        Base class
@@ -1076,6 +1081,8 @@ class AboutDialog(QtWidgets.QDialog, __UI_AboutLicense__):
 class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     ''' Main pict GUI window
     '''
+    # from iolib.navigation import navigator
+
     # TODO:2024-05-19 10:59:43
     # finalize workspacegui.DirectoryObserver and inherit from it
     # see NOTE: 2024-05-19 10:58:13 TODO in gui/workspacegui.py
@@ -5015,12 +5022,15 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.dirFileMonitor.directoryChanged.connect(self._slot_monitoredDirectoryContentsChanged)
         # self.dirFileMonitor.fileChanged.connect(self._slot_monitoredFileChanged)
         
-        if isinstance(self.navigationWidget, QtWidgets.QComboBox):
-            self.navigationWidget.lineEdit().setClearButtonEnabled(True)
+        if isinstance(self.navigator, QtWidgets.QComboBox):
+            self.navigator.lineEdit().setClearButtonEnabled(True)
+            self.navigator.textActivated[str].connect(self.slot_chDirString)
+        elif isinstance(self.navigator, navigator.UrlNavigator):
+            self.navigator.urlChanged[QtCore.QUrl].connect(self.slot_chDirUrl)
 
         # self.removeRecentDirFromListAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("edit-delete"),
         #                                                        "Remove this path from list",
-        #                                                        self.navigationWidget.lineEdit())
+        #                                                        self.navigator.lineEdit())
         # 
         # self.removeRecentDirFromListAction.setToolTip("Remove this path from history")
         # 
@@ -5028,17 +5038,16 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         # self.clearRecentDirListAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("final_activity"),
         #                                                   "Clear history of visited paths",
-        #                                                   self.navigationWidget.lineEdit())
+        #                                                   self.navigator.lineEdit())
         # 
         # self.clearRecentDirListAction.setToolTip("Clear history of visited paths")
         # 
         # self.clearRecentDirListAction.triggered.connect(self.slot_clearRecentDirList)
 
-        # self.navigationWidget.lineEdit().addAction(self.removeRecentDirFromListAction,
+        # self.navigator.lineEdit().addAction(self.removeRecentDirFromListAction,
         #                                             QtWidgets.QLineEdit.TrailingPosition)
 
-        # self.navigationWidget.activated[str].connect(self.slot_chDirString)
-        self.navigationWidget.textActivated[str].connect(self.slot_chDirString)
+        # self.navigator.activated[str].connect(self.slot_chDirString)
 
         self.fileSystemFilter.lineEdit().setClearButtonEnabled(True)
 
@@ -5291,12 +5300,15 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 clearAction.triggered.connect(self._clearRecentFiles_)
 
     def _refreshRecentDirsComboBox_(self):
-        self.navigationWidget.clear()
-        if len(self._recentDirectories) > 0:
-            for item in self._recentDirectories:
-                self.navigationWidget.addItem(item)
+        if isinstance(self.navigator, QtWidgets.QComboBox):
+            self.navigator.clear()
+            if len(self._recentDirectories) > 0:
+                for item in self._recentDirectories:
+                    self.navigator.addItem(item)
 
-        self.navigationWidget.setCurrentIndex(0)
+            self.navigator.setCurrentIndex(0)
+        # else:
+        #     pass
 
     def _clearRecentFiles_(self):
         self._recentFiles.clear()
@@ -5657,21 +5669,21 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     # @Slot()
     # @safeWrapper
     # def slot_removeDirFromHistory(self):
-    #     signalBlocker = QtCore.QSignalBlocker(self.navigationWidget)
-    #     currentNdx = self.navigationWidget.currentIndex()
-    #     dirTxt = self.navigationWidget.itemText(currentNdx)
+    #     signalBlocker = QtCore.QSignalBlocker(self.navigator)
+    #     currentNdx = self.navigator.currentIndex()
+    #     dirTxt = self.navigator.itemText(currentNdx)
     #     if dirTxt in self.recentDirectories:
     #         self.recentDirectories.remove(dirTxt)
     # 
-    #     self.navigationWidget.removeItem(currentNdx)
-    #     self.navigationWidget.lineEdit().setClearButtonEnabled(True)
+    #     self.navigator.removeItem(currentNdx)
+    #     self.navigator.lineEdit().setClearButtonEnabled(True)
 
     # @Slot()
     # @safeWrapper
     # def slot_clearRecentDirList(self):
-    #     signalBlocker = QtCore.QSignalBlocker(self.navigationWidget)
+    #     signalBlocker = QtCore.QSignalBlocker(self.navigator)
     #     self._clearRecentDirectories_()
-    #     self.navigationWidget.clear()
+    #     self.navigator.clear()
 
     @Slot()
     @safeWrapper
@@ -5771,12 +5783,23 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         """
         if self.fileSystemModel.isDir(ndx):
             # if this is a directory then chdir to it
-            self.slot_changeDirectory(self.fileSystemModel.filePath(ndx))
+            if isinstance(self.navigator, navigator.UrlNavigator):
+                path = pathlib.Path(self.fileSystemModel.filePath(ndx))
+                url = QtCore.QUrl(path.as_uri())
+                self.navigator.setLocationUrl(url)
+                self.navigator.urlChanged.emit(url)
+            else:
+                self.slot_changeDirectory(self.fileSystemModel.filePath(ndx))
 
         else:
             self.loadFiles([self.fileSystemModel.filePath(ndx)], 
                            self._openSelectedFileItemsThreaded)
             
+    @Slot(QtCore.QUrl)
+    @safeWrapper
+    def slot_chDirUrl(self, val:QtCore.QUrl):
+        s = val.path()
+        self.slot_chDirString(s)
 
     @Slot(str)
     @safeWrapper

@@ -120,8 +120,9 @@ b) use KDE framework - this would "tie" Scipyen into KDE too much:
 
 
 import typing, pathlib, functools, os, itertools, sys, traceback
+from functools import singledispatch, singledispatchmethod
 from urllib.parse import urlparse, urlsplit
-from collections import namedtuple
+from collections import namedtuple, deque
 from dataclasses import MISSING
 from enum import Enum, IntEnum
 try:
@@ -133,7 +134,7 @@ except:
 from traitlets.utils.bunch import Bunch
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg)
 from qtpy.QtCore import (Signal, Slot, Property,)
-from qtpy.uic import loadUiType
+# from qtpy.uic import loadUiType
 
 from core import desktoputils as dutils
 from core import qtutils
@@ -141,7 +142,7 @@ from iolib.navigation import placesmodel
 from iolib.navigation.placesmodel import PlacesModel
 from iolib.navigation.protocols import ProtocolInfo # TODO
 from core.prog import safeWrapper
-import gui.pictgui as pgui
+# import gui.pictgui as pgui
 from gui import guiutils
 from iolib import pictio
 
@@ -223,7 +224,7 @@ class LocationData:
     """
     Encapsulates location data
     """
-    # KCoreUrlNavigator API`
+    # KCoreUrlNavigator API
     def __init__(self, url:QtCore.QUrl, state:typing.Optional[typing.Any] = None):
         self.url:QtCore.QUrl = url
         self.state:object = state
@@ -231,6 +232,18 @@ class LocationData:
         
     def __repr__(self):
         return f"LocationData url = {self.url}, state = {self.state}"
+    
+    def __eq__(self, other:typing.Self):
+        # ret = self.url.matches(other.url, QtCore.QUrl.StripTrailingSlash)
+        ret = self.hasSameUrl(other)
+        
+        if ret:
+            ret &= self.state == other.state
+            
+        return ret
+    
+    def hasSameUrl(self, other:typing.Self):
+        return self.url.adjusted(QtCore.QUrl.StripTrailingSlash) == other.url.adjusted(QtCore.QUrl.StripTrailingSlash)
     
 class UrlNavigatorData(typing.NamedTuple):
     """
@@ -278,6 +291,34 @@ def firstChildUrl(lastUrl:QtCore.QUrl, currentUrl:QtCore.QUrl):
     res = QtCore.QUrl(lastUrl)
     res.setPath(path3)
     return res
+    
+@singledispatch
+def pathToLocation(o:typing.Any, state:typing.Optional[QtCore.QByteArray]=None):
+    raise NotImplementedError
+
+@pathToLocation.register(str)
+def _(o:str, state:typing.Optional[QtCore.QByteArray]=None) -> LocationData:
+    path = pathlib.Path(o)
+    return LocationData(QtCore.QUrl(path.as_uri()), state)
+    # if path.is_dir() and path.is_absolute():
+    #     return LocationData(QtCore.QUrl(path.as_uri()), state)
+    # else:
+    #     raise ValueError(f"{o} is not an absolute path to existing directory")
+    
+@pathToLocation.register(pathlib.Path)
+def _(o:pathlib.Path, state:typing.Optional[QtCore.QByteArray]=None) -> LocationData:
+    return LocationData(QtCore.QUrl(path.as_uri()), state)
+    # if o.is_dir() and o.is_absolute():
+    #     return LocationData(QtCore.QUrl(path.as_uri()), state)
+    # else:
+    #     raise ValueError(f"{o} is not an absolute path to existing directory")
+
+@pathToLocation.register(QtCore.QUrl)
+def _(o:QtCore.QUrl, state:typing.Optional[QtCore.QByteArray]=None) -> LocationData:
+    # if not url.isLocalFile() or url.isRelative() or not pathlib.Path(o.path()).is_dir():
+    #     raise ValueError(f"{o} is not an absolute path to existing directory")
+    
+    return LocationData(o, state)
     
 def findProtocol(protocol:str):
     assert len(protocol) > 0
@@ -395,6 +436,10 @@ class UrlComboBox(QtWidgets.QComboBox):
     """Implementation of KIO KUrlComboBox"""
     # TODO/FIXME: 2025-01-20 22:48:00
     # finalize completer - currently not working
+    # TODO/FIXME: 2025-01-21 23:27:58
+    # finalize merging with recent directories from ScipyenWindow - currently not working
+    # see attempts at:
+    # NOTE/FIXME 2025-01-21 23:28:51 TODO
     urlActivated = Signal(QtCore.QUrl, name="urlActivated")
     returnPressed = Signal(name="returnPressed")
     
@@ -1860,6 +1905,7 @@ class CoreUrlNavigator(QtCore.QObject):
         # Originally, a list of LocationData structs.
         # Here, this is a NamedTuple with the fields "url" and "state"
         self._history_ = list() # of LocationData # NOTE: KIO KCoreUrlNavigatorPrivate API
+        self._oldSessionsHistory_ = list() # CMT 2025-01-21 22:47:42
         self._history_.insert(0, LocationData(adjUrl, None))
         # self._history_.insert(0, LocationData(url, None))
         self._historyIndex_ = 0 # NOTE: KIO KCoreUrlNavigatorPrivate API
@@ -1930,12 +1976,12 @@ class CoreUrlNavigator(QtCore.QObject):
             self._historyIndex_ = 0
 
         assert self._historyIndex_ == 0
-        self._history_.insert(0, LocationData(url, None)) # CAUTION: is it OK for state to be None ?!?
+        self._history_.insert(0, LocationData(url.adjusted(QtCore.QUrl.StripTrailingSlash), None)) # CAUTION: is it OK for state to be None ?!?
         
         historyMax = 100 # TODO make configurable -> link with mainWindow !!!
         
         if len(self._history_) > historyMax:
-            self._history_[0:historyMax] = []
+            self._history_[historyMax:] = []
             
         self.historyIndexChanged.emit()
         self.historySizeChanged.emit()
@@ -2198,6 +2244,12 @@ class _UrlNavigator_(QtCore.QObject):
         
         urls:list[str] = [u for u in self._pathBox_.urls() if u != urlStr]
         urls.insert(0, urlStr)
+        # ### BEGIN NOTE/FIXME 2025-01-21 23:28:51 TODO
+        # oldUrls = list(filter(lambda x: x not in urls, map(lambda x: x.url.path(), self._coreUrlNavigator_._oldSessionsHistory_)))
+        oldUrls = list(filter(lambda x: x not in urls, map(lambda x: x.url.toString(QtCore.QUrl.StripTrailingSlash), self._coreUrlNavigator_._oldSessionsHistory_)))
+        urls.extend(oldUrls)
+        # ### END   NOTE/FIXME 2025-01-21 23:28:51 TODO
+            
         self._pathBox_.setUrls(urls) # TODO: use flag KUrlComboBox::RemoveBottom
         self._nav_.setLocationUrl(url)
         self._pathBox_.setUrl(self._nav_.locationUrl())
@@ -3271,7 +3323,30 @@ class UrlNavigator(QtWidgets.QWidget):
     # ### END Slots
 
     # ### BEGIN New methods by CMT
-    # ### END   New methods by CMT
-    
     def lineEdit(self) -> QtWidgets.QLineEdit():
         return self._nav_p_._pathBox_
+    
+    @singledispatchmethod
+    def addLocationHistory(self, obj:typing.Any):
+        raise NotImplementedError
+    
+    @addLocationHistory.register(str)
+    @addLocationHistory.register(QtCore.QUrl)
+    @addLocationHistory.register(pathlib.Path)
+    def _(self, loc:typing.Union[str, QtCore.QUrl, pathlib.Path]):
+        location = pathToLocation(loc)
+        
+        if location not in self._nav_p_._coreUrlNavigator_._oldSessionsHistory_:
+            self._nav_p_._coreUrlNavigator_._oldSessionsHistory_.append(pathToLocation(loc))
+        
+    @addLocationHistory.register(list)
+    @addLocationHistory.register(deque)
+    def _(self, loc:typing.Union[list, deque]):
+        # add mainwindows recentDirectories:
+        try:
+            locations = list(filter(lambda x: x not in self._nav_p_._coreUrlNavigator_._oldSessionsHistory_, map(lambda x: pathToLocation(x), loc)))
+            self._nav_p_._coreUrlNavigator_._oldSessionsHistory_.extend(locations)
+        except:
+            traceback.print_exc()
+        
+    # ### END   New methods by CMT

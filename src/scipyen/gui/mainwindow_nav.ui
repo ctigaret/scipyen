@@ -737,7 +737,7 @@ NOTE: you can click anywhere in the row to select</string>
       </layout>
      </item>
      <item row="1" column="0">
-      <widget class="UrlNavigator" name="navigationWidget" native="true"/>
+      <widget class="UrlNavigator" name="navigator" native="true"/>
      </item>
      <item row="2" column="0">
       <layout class="QVBoxLayout" name="verticalLayout">
@@ -1316,7 +1316,7 @@ NOTE: you can click anywhere in the row to select</string>
   <customwidget>
    <class>UrlNavigator</class>
    <extends>QWidget</extends>
-   <header location="global">navigator.py</header>
+   <header location="global">iolib.navigation.navigator</header>
    <container>1</container>
   </customwidget>
  </customwidgets>
