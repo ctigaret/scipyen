@@ -1541,9 +1541,9 @@ def loadXML(fileName:typing.Union[str, pathlib.Path]) -> object:
     return loadXMLFile(fileName)
 
 def loadXMLFile(fileName:typing.Union[str, pathlib.Path]) -> object:
-    fileName = pathlib.Path(fileName)
+    filePath = pathlib.Path(fileName)
     # if os.path.isfile(fileName):
-    if fileName.is_file():
+    if filePath.is_file():
         ret = xmlutils.xml.dom.minidom.parse(fileName)
         # augument with a text node called "document_filesource"
         #print("loadXMLFile: doc path",  os.path.dirname(fileName))

@@ -66,6 +66,7 @@ import iolib.pictio as pio
 import xml.etree.ElementTree as ET
 from enum import Enum, IntEnum
 from functools import (singledispatch, singledispatchmethod)
+from traitlets.utils.bunch import Bunch
 
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg,)
 from qtpy.QtCore import (Signal, Slot, Property,)
@@ -77,6 +78,18 @@ try:
     has_qtdbus = False
 except:
     pass
+
+SCHEMAS = ("file", "recentlyused", "remote", "search", "tags", "timeline", "trash")
+
+class DesktopPlace(Bunch):
+    """Stand-in for PlacesItem - use in the absence of PlacesModel
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+class PlacesMap(dict):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
 # desktop integration - according to freedesktop.org (XDG)
 # ATTENTION: DO NOT install xdg as it will mess up pyxdg
@@ -205,18 +218,22 @@ def is_kde():
     
     return get_desktop("session").lower() in ("x11", "wayland") and get_desktop() == "KDE"
 
-def get_local_filesystem_places():
+def get_local_filesystem_places(placesDict:typing.Optional[dict]=None) -> dict:
     """
     Get special directories (KDE Plasma5 specific)
     """
-    ret = get_desktop_places()
+    if not isinstance(placesDict, dict):
+        placesDict = get_desktop_places()
     
-    if len(ret):
-        result = dict((k,v) for k,v in ret.items() if not k.startswith("file:///"))
+    filterFunc = lambda x: not x.startswith("file") if isinstance(x, str) else not x.scheme().startswith("file") if isinstance(x, QtCore.QUrl) else False
+    
+    if len(placesDict):
+        # result = dict((k,v) for k,v in ret.items() if not k.startswith("file:///"))
+        result = dict((k,v) for k,v in placesDict.items() if not filterFunc(k))
         
         return result
     
-    return ret
+    return placesDict
 
 def get_my_desktop_session():
     env = dict((k,v) for k,v in os.environ.items() if any(s in k.lower() for s in ("desktop", "session", "xdg")))
@@ -268,7 +285,7 @@ def get_system_terminal_executable():
         warnings.warn(f"{sys.platform} platform is not yet supported")
         
         
-def get_desktop_places():
+def get_desktop_places(schema:typing.Optional[str]=None, as_qUrls:bool=False) -> PlacesMap:
     """Collect user places as defined in the freedesktop.org XDG framework.
     Useful for Linux desktops that comply with XDG (e.g. KDE, GNOME, XFCE, LXDE, etc).
     
@@ -295,7 +312,13 @@ def get_desktop_places():
     
     
     """
-    
+    if isinstance(schema, str) and schema not in SCHEMAS:
+        schema = None
+        
+    elif isinstance(schema, bool):
+        as_qUrls = schema = True
+        schema = None
+        
     ret = dict()
     
     # NOTE: 2023-05-01 13:38:10 TODO
@@ -349,12 +372,20 @@ def get_desktop_places():
             else:
                 app = None
             
-            ret[place_url] = {"name": place_name, 
+            # NOTE: 2025-01-22 11:41:26 apply schema filter if any
+            if isinstance(schema, str) and len(schema):
+                if not place_url.startswith(schema):
+                    continue
+                
+            if as_qUrls:
+                place_url = QtCore.QUrl(place_url)
+                
+            ret[place_url] = DesktopPlace({"name": place_name, 
                               "url": place_url,
                               "icon": place_icon_name, # can be a system icon name or a path/file name
                               "system":is_system_place == "true",
                               "hidden":is_hidden == "true",
-                              "app":app}
+                              "app":app})
     else:
         skippedLocs = ["FontsLocation","TempLocation", "RuntimeLocation", 
                        "CacheLocation", "ConfigLocation", "GenericDataLocation", 
@@ -369,9 +400,9 @@ def get_desktop_places():
             place_url = f"file://{stdlocs[0]}"
             place_name = QtCore.QStandardPaths.displayName(v)
             loc_icon = "user-home" if place_name == "Home" else f"folder-{place_name.lower()}"
-            ret[place_url] = {"name": place_name, "url": place_url, "icon": loc_icon,"system":False, "hidden": False, "app":None}
+            ret[place_url] = DesktopPlace({"name": place_name, "url": place_url, "icon": loc_icon,"system":False, "hidden": False, "app":None})
         
-    return ret
+    return PlacesMap(ret)
 
 def iconNameForUrl(url:QtCore.QUrl):
     if len(url.scheme()) == 0:
@@ -586,8 +617,55 @@ def removeAcceleratorMarker(label:str):
                 
     return label
     
+def desktopPlaceUrl(p:DesktopPlace) -> QtCore.QUrl:
+    if not isinstance(p, DesktopPlace):
+        raise TypeError(f"Expecting a DesktopPlace; instead, got {type(p).__name__}")
+    url = p.url
+    return url if isinstance(url, QtCore.QUrl) else QtCore.QUrl(url)
         
+def closestUrl(url:QtCore.QUrl, places:typing.Optional[PlacesMap]=None) -> QtCore.QUrl:
+    schema = url.scheme()
+    if not isinstance(places, PlacesMap):
+        places = get_desktop_places(schema) #, True)
         
+    if len(places) == 0:
+        return url
+    
+    uPath = pathlib.Path(url.path()).resolve()
+    
+    urlToPath = lambda x: pathlib.Path(x.strip(schema+":")) if isinstance(x, str) else pathlib.Path(x.path())
+    pathLen = lambda x: len(x.path()) if isinstance(x, QtCore.QUrl) else len(x.strip(schema+":"))
+    
+    foundPlaces = list(reversed(sorted(list(filter(lambda x: uPath.is_relative_to(urlToPath(x["url"]).resolve()), places.values())), key = lambda x: pathLen(x["url"]))))
+    
+    toUrl = lambda x: x if isinstance(x, QtCore.QUrl) else QtCore.QUrl(x)
+    
+    return toUrl(foundPlaces[0]["url"]) if len(foundPlaces) else url
+        
+    
+def closestPlace(url:QtCore.QUrl, places:typing.Optional[PlacesMap]=None) -> DesktopPlace:
+    schema = url.scheme()
+    if not isinstance(places, PlacesMap):
+        places = get_desktop_places(schema) #, True)
+        
+    fallback = DesktopPlace(name=None, url = url, icon = iconNameForUrl(url), system=False, hidden=False, app=None)
+        
+    if len(places) == 0:
+        return fallback
+    
+    uPath = pathlib.Path(url.path()).resolve()
+    
+    urlToPath = lambda x: pathlib.Path(x.strip(schema+":")) if isinstance(x, str) else pathlib.Path(x.path())
+    pathLen = lambda x: len(x.path()) if isinstance(x, QtCore.QUrl) else len(x.strip(schema+":"))
+    
+    foundPlaces = list(reversed(sorted(list(filter(lambda x: uPath.is_relative_to(urlToPath(x["url"]).resolve()), places.values())), key = lambda x: pathLen(x["url"]))))
+    
+    # toUrl = lambda x: x if isinstance(x, QtCore.QUrl) else QtCore.QUrl(x)
+    
+    return foundPlaces[0] if len(foundPlaces) else fallback
+        
+    
+    
 
      
     

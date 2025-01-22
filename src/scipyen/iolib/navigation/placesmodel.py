@@ -27,7 +27,7 @@ from core.desktoputils import (get_desktop_places, get_recent_places,
                                get_local_filesystem_places,
                                removeAcceleratorMarker,
                                removeReducedCJKAccMark,
-                               isFileIndexingEnabled)
+                               isFileIndexingEnabled, DesktopPlace, PlacesMap)
 
 from systems.devices.device import Device
 
@@ -132,8 +132,6 @@ def createSearchUrl(url:QtCore.QUrl):
 def findByAddress(address:str):
     places = get_desktop_places()
     return places.get(address, None)
-
-
 
 class PlacesItem(QtCore.QAbstractItemModel):
     """Thin port of KFilePlacesItem.
