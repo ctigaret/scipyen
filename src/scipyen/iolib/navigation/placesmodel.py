@@ -233,7 +233,6 @@ class PlacesModel(QtCore.QAbstractItemModel): # TODO/FIXME
         
         # ### BEGIN KFilePlacesModelPrivate members
         self.items:list[PlacesItem] = list()
-        self.supportedSchemes:list[str] = list()
         # NOTE: 2025-01-03 14:51:53
         # consider leaving out
         self.availableDevices:list[Device] = list()
@@ -242,6 +241,8 @@ class PlacesModel(QtCore.QAbstractItemModel): # TODO/FIXME
         # consider leaving out:
         self.teardownInProgress:dict[QtCore.QObject, QtCore.QPersistentModelIndex] = dict()
         #
+        self.supportedSchemes:list[str] = list()
+        
         # the following, to leave out
         self.predicate = None # Solid::Predicate - here, a functor
         self.bookmarkManager = None # KBookmarkManager
@@ -273,110 +274,111 @@ class PlacesModel(QtCore.QAbstractItemModel): # TODO/FIXME
     # ### BEGIN KFilePlacesModelPrivate methods
     @classmethod
     def ignoreMimeType(cls) -> str:
-        pass
+        return "application/x-kfileplacesmodel-ignore"
+        # return "application/octet-stream"
     
     @classmethod
     def internalMimeType(cls, model) -> str:
-        pass
+        return f"application/x-kfileplacesmodel-{id(model)}"
         
-    def reloadAndSignal(self):
+    def reloadAndSignal(self): # TODO
         pass 
     
-    def loadBookmarkList(self) -> list:
+    def loadBookmarkList(self) -> list: # TODO 
         pass
     
-    def findNearestPosition(self, source:int, target:int) -> int:
+    def findNearestPosition(self, source:int, target:int) -> int: # TODO
         pass
     
-    def initDeviceList(self):
+    def initDeviceList(self): # TODO
         pass
     
-    def deviceAdded(self, udi:str):
+    def deviceAdded(self, udi:str): # TODO
         pass
     
-    def deviceRemoved(self, udi:str):
+    def deviceRemoved(self, udi:str): # TODO
         pass
     
-    def itemChanged(self, udi:str, roles:list[int]):
+    def itemChanged(self, udi:str, roles:list[int]): # TODO
         pass
     
-    def reloadBookmarks(self):
+    def reloadBookmarks(self): # TODO
         pass
     
-    def storageSetupDone(self, error, errorData, sender):
+    def storageSetupDone(self, error, errorData, sender): # TODO
         # void storageSetupDone(Solid::ErrorType error, const QVariant &errorData, Solid::StorageAccess *sender);
         pass
     
-    def storageTeardownDone(filePath:typing.Union[pathlib.Path, str], error, errorData, sender):
+    def storageTeardownDone(filePath:typing.Union[pathlib.Path, str], error, errorData, sender): # TODO
         # void storageTeardownDone(const QString &filePath, Solid::ErrorType error, const QVariant &errorData, QObject *sender);
         pass
     
-    def isBalooUrl(self, url:QtCore.QUrl) -> bool:
+    def isBalooUrl(self, url:QtCore.QUrl) -> bool: # TODO
         pass
     
     # ### END KFilePlacesModelPrivate methods
     
-    def url(self, index:QtCore.QModelIndex):
+    def url(self, index:QtCore.QModelIndex): # TODO
         pass
     
-    def setupNeeded(self, index:QtCore.QModelIndex):
+    def setupNeeded(self, index:QtCore.QModelIndex): # TODO
         pass
     
-    def isTearDownAllowed(self, index:QtCore.QModelIndex):
+    def isTearDownAllowed(self, index:QtCore.QModelIndex): # TODO
         pass
     
-    def isEjectAllowed(self, index:QtCore.QModelIndex):
+    def isEjectAllowed(self, index:QtCore.QModelIndex): # TODO
         pass
         
-    def isTearDownOverlayRecommended(self, index:QtCore.QModelIndex):
+    def isTearDownOverlayRecommended(self, index:QtCore.QModelIndex): # TODO
         pass
     
-    def deviceAccessibility(self, index:QtCore.QModelIndex):
+    def deviceAccessibility(self, index:QtCore.QModelIndex): # TODO
         pass
     
-    def icon(self, index:QtCore.QModelIndex):
+    def icon(self, index:QtCore.QModelIndex): # TODO
         pass
     
-    def text(self, index:QtCore.QModelIndex):
+    def text(self, index:QtCore.QModelIndex): # TODO
         pass
     
-    def ishidden(self, index:QtCore.QModelIndex):
+    def ishidden(self, index:QtCore.QModelIndex): # TODO
         pass
     
     @singledispatchmethod
-    def isGroupHidden(self, val):
+    def isGroupHidden(self, val): # TODO
         pass
     
     @isGroupHidden.register
-    def _(self, val:GroupType):
+    def _(self, val:GroupType): # TODO
         pass
     
     @isGroupHidden.register
-    def _(self, val:QtCore.QModelIndex):
+    def _(self, val:QtCore.QModelIndex): # TODO
         pass
     
-    def bookmarkForIndex(self, index:QtCore.QModelIndex):
+    def bookmarkForIndex(self, index:QtCore.QModelIndex): # TODO
         pass
     
-    def bookmarkForUrl(self, searchUrl:QtCore.QUrl):
+    def bookmarkForUrl(self, searchUrl:QtCore.QUrl): # TODO
         pass
     
-    def groupType(self, index:QtCore.QModelIndex):
+    def groupType(self, index:QtCore.QModelIndex): # TODO
         pass
     
-    def groupIndexes(self, groupType:GroupType):
+    def groupIndexes(self, groupType:GroupType): # TODO
         pass
     
     # NOTE: 2023-05-01 13:43:24
     # ### BEGIN methods that need KDE Solid framework -- NOT IMPLEMENTED
     #
-    def deviceForIndex(self, index:QtCore.QModelIndex):
+    def deviceForIndex(self, index:QtCore.QModelIndex): # TODO
         pass
     
-    def teardownActionForIndex(self, index:QtCore.QModelIndex):
+    def teardownActionForIndex(self, index:QtCore.QModelIndex): # TODO
         pass
     
-    def isDevice(self, index:QtCore.QModelIndex):
+    def isDevice(self, index:QtCore.QModelIndex): # TODO
         pass
     
 #     
@@ -395,73 +397,73 @@ class PlacesModel(QtCore.QAbstractItemModel): # TODO/FIXME
     #
     # ### END methods that need KDE Solid framework
     
-    def addPlace(self, test:str, url:QtCore.QUrl, iconName:str, appName:str="", after:typing.Optional[QtCore.QModelIndex] = None):
+    def addPlace(self, test:str, url:QtCore.QUrl, iconName:str, appName:str="", after:typing.Optional[QtCore.QModelIndex] = None): # TODO
         pass
     
-    def editPlace(self, index:QtCore.QModelIndex, test:str, url:url, iconName:str = "", appName:str = ""):
+    def editPlace(self, index:QtCore.QModelIndex, test:str, url:url, iconName:str = "", appName:str = ""): # TODO
         pass
     
-    def removePlace(self, index:QtCore.QModelIndex):
+    def removePlace(self, index:QtCore.QModelIndex): # TODO
         pass
     
-    def setPlaceHidden(self, index:QtCore.QModelIndex, hidden:bool):
+    def setPlaceHidden(self, index:QtCore.QModelIndex, hidden:bool): # TODO
         pass
     
-    def setGroupHidden(self, groupType:GroupType,hidden:bool):
+    def setGroupHidden(self, groupType:GroupType,hidden:bool): # TODO
         pass
     
-    def movePlace(itemRow:int, row:int):
+    def movePlace(itemRow:int, row:int): # TODO
         pass
     
-    def hiddenCount(self):
+    def hiddenCount(self): # TODO
         pass
     
-    def data(self, index:QtCore.QModelIndex, role:int):
+    def data(self, index:QtCore.QModelIndex, role:int): # TODO
         pass
     
-    def index(self, row:int, column:int, parent:QtCore.QModelIndex = QtCore.QModelIndex()):
+    def index(self, row:int, column:int, parent:QtCore.QModelIndex = QtCore.QModelIndex()): # TODO
         pass
     
-    def parent(self, child:QtCore.QModelIndex):
+    def parent(self, child:QtCore.QModelIndex): # TODO
         pass
     
-    def roleNames(self):
+    def roleNames(self): # TODO
         pass
     
-    def rowCount(self, parent:QtCore.QModelIndex = QtCore.QModelIndex()):
+    def rowCount(self, parent:QtCore.QModelIndex = QtCore.QModelIndex()): # TODO
         pass
     
-    def columnCount(self, parent:QtCore.QModelIndex = QtCore.QModelIndex()):
+    def columnCount(self, parent:QtCore.QModelIndex = QtCore.QModelIndex()): # TODO
         pass
     
-    def closestItem(self, url:QtCore.QUrl):
+    def closestItem(self, url:QtCore.QUrl): # TODO
         pass
     
-    def supportedDropActions(self):
+    def supportedDropActions(self): # TODO
         pass
     
-    def flags(self, index:QtCore.QModelIndex):
+    def flags(self, index:QtCore.QModelIndex): # TODO
         pass
     
-    def mimeTypes(self):
+    def mimeTypes(self): # TODO
         pass
     
-    def mimeData(self, indexes:list):
+    def mimeData(self, indexes:list): # TODO
         pass
     
-    def dropMimeData(self, data:QtCore.QMimeData, action:QtCore.Qt.DropAction, row:int, column:int, parent:QtCore.QModelIndex):
+    def dropMimeData(self, data:QtCore.QMimeData, action:QtCore.Qt.DropAction, row:int, column:int, parent:QtCore.QModelIndex): # TODO
         pass
     
-    def refresh(self):
+    def refresh(self): # TODO
         pass
     
-    def convertedUrl(self, url:QtCore.QUrl):
+    def convertedUrl(self, url:QtCore.QUrl): # TODO
         pass
     
-    def setSupportedSchemes(self, schemes:list):
+    def setSupportedSchemes(self, schemes:list): # TODO
         pass
     
-    def supportedSchemes(self):
+    def supportedSchemes(self): # TODO
         pass
     
 

@@ -169,6 +169,7 @@ import numpy.ma as ma
 import quantities as pq
 import pandas as pd
 import h5py
+import neo
 from core.vigra_patches import vigra
 from traitlets.utils.importstring import import_item
 from traitlets import Bunch
@@ -180,8 +181,8 @@ from core.prog import (signature2Dict, resolveObject, ArgumentError, CALLABLE_TY
 # unfortunately, orjson does not expose supported numpy types so we need to
 # hardcode these here
 
-neo_major, neo_minor, neo_micro = map(lambda x: int(x), neo.__version__.split(.))
-pq_major, pq_minor, pq_micro = map(lambda x: int(x), pq.__version__.split(.))
+neo_major, neo_minor, neo_micro = map(lambda x: int(x), neo.__version__.split("."))
+pq_major, pq_minor, pq_micro = map(lambda x: int(x), pq.__version__.split("."))
 
 JSON_NUMPY_TYPES = (np.float64, np.float32, np.int64, np.int32, np.int8, 
                       np.uint64, np.uint32, np.uint8, np.uintp, np.intp, 
