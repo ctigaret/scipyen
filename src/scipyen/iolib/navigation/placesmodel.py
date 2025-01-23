@@ -27,7 +27,7 @@ from core.desktoputils import (get_desktop_places, get_recent_places,
                                get_local_filesystem_places,
                                removeAcceleratorMarker,
                                removeReducedCJKAccMark,
-                               isFileIndexingEnabled, DesktopPlace, PlacesMap)
+                               isFileIndexingEnabled, DEPlace, PlacesMap)
 
 from systems.devices.device import Device
 

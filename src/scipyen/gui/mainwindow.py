@@ -5466,26 +5466,6 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             
             if target_dir and os.path.isdir(target_dir):
                 self.slot_changeDirectory(target_dir)
-            # for url in urls:
-            #     if url.isValid():
-            #         if url.isRelative() or url.isLocalFile():
-            #             path = url.path()
-            #             if os.path.isdir(path):
-            #                 self.slot_changeDirectory(path)
-            # 
-            #             elif os.path.isfile(path):
-            #                 if chdirs:
-            #                     self.slot_changeDirectory(
-            #                         os.path.dirname(path))
-            # 
-            #                 self.loadFile(path)
-            # 
-            #             else:
-            #                 warnings.warn(
-            #                     "ScipyenWindow.slot_loadDroppedURLs: I don't know how to handle %s" % path)
-            #         else:
-            #             warnings.warn(
-            #                 "ScipyenWindow.slot_loadDroppedURLs: Remote URLs not yet supported", NotImplemented)
 
     @Slot(QtCore.QPoint)
     @safeWrapper

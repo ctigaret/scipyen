@@ -60,6 +60,7 @@
 # ### END internal comments
 
 import sys, os, pathlib, urllib, typing, warnings, subprocess, traceback
+import inspect
 import platform
 import core.xmlutils as xmlutils
 import iolib.pictio as pio
@@ -81,7 +82,89 @@ except:
 
 SCHEMAS = ("file", "recentlyused", "remote", "search", "tags", "timeline", "trash")
 
-class DesktopPlace(Bunch):
+hiddenLocs = ["TempLocation", "RuntimeLocation", 
+                "CacheLocation", "ConfigLocation", "GenericDataLocation", 
+                "GenericCacheLocation", "GenericConfigLocation", 
+                "AppDataLocation", "AppConfigLocation","AppLocalDataLocation",
+                "DataLocation","ApplicationsLocation", "RuntimeLocation"]
+        
+systemLocs = ["FontsLocation","RuntimeLocation", "TempLocation"]
+
+def standardIconName(locationName:str, all_folders:bool=False) -> str:
+    ln = locationName.lower()
+    if "desktop" in ln:
+        return "folder-desktop" if all_folders else "user-desktop"
+    elif "documents" in ln:
+        return "folder-documents"
+    elif "applications" in ln:
+        return "folder-appimage"
+    elif "music" in ln:
+        return "folder-music"
+    elif "movies" in ln:
+        return "folder-videos"
+    elif "pictures" in ln:
+        return "folder-pictures"
+    elif "temp" in ln:
+        return "folder-temp"
+    elif "cache" in ln:
+        return "folder-temp"
+    elif "runtime" in ln:
+        return "folder-temp"
+    elif "home" in ln:
+        return "user-home"
+    elif "data" in ln:
+        return "folder-database"
+    elif "config" in ln:
+        return "folder-log"
+    elif "download" in ln:
+        return "folder-download"
+    elif "pulic" in ln:
+        return "folder-public"
+    else:
+        return "folder"
+
+def isUnixHiddenLocation(p:typing.Union[pathlib.Path, QtCore.QUrl, str]) -> bool:
+    if isinstance(p, str):
+        if "//" in p: # remove the url sheme
+            if "file://" in p:
+                p = p[7:]
+            else:
+                raise ValueError("Expecting a local path")
+        p = pathlib.Path(p).resolve()
+        
+    elif isinstance(p, QtCore.QUrl):
+        if p.scheme() != "file":
+            raise ValueError("Expecting a local path url")
+        
+        p = pathlib.Path(p.path()).resolve
+        
+    elif not isinstance(p, pathlib.Path):
+        raise TypeError(f"Expecting a path string, Url or ")
+    
+    return any(v.startswith(".") for v in p.parts)
+
+def isUnixSystemLocation(p:typing.Union[pathlib.Path, QtCore.QUrl, str]) -> bool:
+    if isinstance(p, str):
+        if "//" in p: # remove the url sheme
+            if "file://" in p:
+                p = p[7:]
+            else:
+                raise ValueError("Expecting a local path")
+        p = pathlib.Path(p).resolve()
+        
+    elif isinstance(p, QtCore.QUrl):
+        if p.scheme() != "file":
+            raise ValueError("Expecting a local path url")
+        
+        p = pathlib.Path(p.path()).resolve
+        
+    elif not isinstance(p, pathlib.Path):
+        raise TypeError(f"Expecting a path string, Url or ")
+
+    return any((p.is_block_device(), p.is_char_device(), p.is_fifo(), p.is_mount(),
+               p.is_reserved(), p.is_socket()))
+
+class DEPlace(Bunch):
     """Stand-in for PlacesItem - use in the absence of PlacesModel
     """
     def __init__(self, *args, **kwargs):
@@ -90,6 +173,58 @@ class DesktopPlace(Bunch):
 class PlacesMap(dict):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+class StandardLocationInfo:
+    def __init__(self, location: QtCore.QStandardPaths.StandardLocation):
+        self._location_ = location
+        self._paths_ = QtCore.QStandardPaths.standardLocations(location)
+        self._name_ = QtCore.QStandardPaths.displayName(location)
+        self._iconName_ = standardIconName(self._name_)
+        self._system_ = location in systemLocs or any(isUnixSystemLocation(v) for v in self._paths_)
+        self._hidden_ = location in hiddenLocs or any(isUnixHiddenLocation(v) for v in self._paths_)
+        
+    def __repr__(self) -> str:
+        ret = f"{self.__class__.__name__}: name: {self._name_}, icon: {self._iconName_}"
+        ret += f" system: {self._system_}, hidden: {self._hidden_},\n\twith paths:"
+        
+        ret = [ret]
+        
+        for p in self._paths_:
+            ret.append(f"\t{p}")
+
+        return "\n".join(ret)
+    
+    @property
+    def paths(self) -> list:
+        return self._paths_
+        
+    @property
+    def location(self)->QtCore.QStandardPaths.StandardLocation:
+        return self._location_
+    
+    @property
+    def iconName(self) -> str:
+        return self._iconName_
+    
+    @property
+    def name(self) -> str:
+        return self._name_
+    
+    @property
+    def system(self) -> bool:
+        return self._system_
+    
+    @property
+    def hidden(self) -> bool:
+        return self._hidden_
+    
+StandardDesktopLocations = tuple(sorted(inspect.getmembers(QtCore.QStandardPaths, 
+                                                           predicate = lambda x: isinstance(x, QtCore.QStandardPaths.StandardLocation)),
+                                        key = lambda x: x[1]))
+
+
+
+StandardDesktopLocationInfos = tuple(map(lambda x: StandardLocationInfo(getattr(QtCore.QStandardPaths, x[0])), StandardDesktopLocations))
 
 # desktop integration - according to freedesktop.org (XDG)
 # ATTENTION: DO NOT install xdg as it will mess up pyxdg
@@ -284,8 +419,19 @@ def get_system_terminal_executable():
     else:
         warnings.warn(f"{sys.platform} platform is not yet supported")
         
+def get_standard_desktop_places(as_qUrls:bool=False, all_folder_icons:bool=False) -> PlacesMap:
+    locations = tuple(map(lambda x: StandardLocationInfo(getattr(QtCore.QStandardPaths, x[0]), standardIconName(x[0], all_folder_icons)), StandardDesktopLocations))
+    ret = PlacesMap()
+    for loc in locations:
+        place_url = f"file://{loc.paths[0]}"
+        if as_qUrls:
+            place_url = QtCore.QUrl(place_url)
+        ret[place_url] = DEPlace({"name": loc.name, "url": place_url, "icon": loc.iconName, "system":loc.system, "hidden": loc.hidden})
         
-def get_desktop_places(schema:typing.Optional[str]=None, as_qUrls:bool=False) -> PlacesMap:
+    return ret
+    
+def get_desktop_places(schema:typing.Optional[str]=None, as_qUrls:bool=False, all_folder_icons:bool=False,
+                       include_hidden:bool=False, include_system:bool=True) -> PlacesMap:
     """Collect user places as defined in the freedesktop.org XDG framework.
     Useful for Linux desktops that comply with XDG (e.g. KDE, GNOME, XFCE, LXDE, etc).
     
@@ -319,7 +465,8 @@ def get_desktop_places(schema:typing.Optional[str]=None, as_qUrls:bool=False) ->
         as_qUrls = schema = True
         schema = None
         
-    ret = dict()
+    ret = PlacesMap()
+    stdPlaces = get_standard_desktop_places(as_qUrls, all_folder_icons)
     
     # NOTE: 2023-05-01 13:38:10 TODO
     # below we are using the file `user-places.xbel` located in 
@@ -332,77 +479,84 @@ def get_desktop_places(schema:typing.Optional[str]=None, as_qUrls:bool=False) ->
     if sys.platform.startswith("linux") and HAS_PYXDG:
         places = pio.loadXMLFile(os.path.join(xdg.BaseDirectory.xdg_data_home, "user-places.xbel"))
             
-        if "xbel" not in places.documentElement.tagName.lower():
-            return ret
+        if "xbel" in places.documentElement.tagName.lower():
         
-        bookmarks = places.getElementsByTagName("bookmark")
-        
-        for b in places.getElementsByTagName("bookmark"):
-            place_name = b.getElementsByTagName("title")[0].childNodes[0].data
-            place_url = b.getAttribute("href")
+            bookmarks = places.getElementsByTagName("bookmark")
             
-            if len(place_name) == 0 or len(place_url) == 0:
-                continue
-            
-            info_node = b.getElementsByTagName("info")[0]
-            info_metadata_nodes = info_node.getElementsByTagName("metadata")
-            
-            place_icon_name = info_metadata_nodes[0].getElementsByTagName("bookmark:icon")[0].getAttribute("name")
-            
-            systemitem_nodes = info_metadata_nodes[1].getElementsByTagName("isSystemItem")
-            hidden_nodes = info_metadata_nodes[1].getElementsByTagName("isHidden")
-            app_nodes = info_metadata_nodes[1].getElementsByTagName("OnlyInApp")
-            
-            if len(systemitem_nodes):
-                is_system_place = systemitem_nodes[0].childNodes[0].data == "true"
-            else:
-                is_system_place=False
+            for b in places.getElementsByTagName("bookmark"):
+                place_name = b.getElementsByTagName("title")[0].childNodes[0].data
+                place_url = b.getAttribute("href")
                 
-            if len(hidden_nodes):
-                is_hidden = hidden_nodes[0].childNodes[0].data == "true"
-            else:
-                is_hidden = False
-                
-            if len(app_nodes):
-                app_info = app_nodes[0].childNodes
-                if len(app_info):
-                    app = app_info[0].data
-                else:
-                    app = None
-            else:
-                app = None
-            
-            # NOTE: 2025-01-22 11:41:26 apply schema filter if any
-            if isinstance(schema, str) and len(schema):
-                if not place_url.startswith(schema):
+                if len(place_name) == 0 or len(place_url) == 0:
                     continue
                 
-            if as_qUrls:
-                place_url = QtCore.QUrl(place_url)
+                info_node = b.getElementsByTagName("info")[0]
+                info_metadata_nodes = info_node.getElementsByTagName("metadata")
                 
-            ret[place_url] = DesktopPlace({"name": place_name, 
-                              "url": place_url,
-                              "icon": place_icon_name, # can be a system icon name or a path/file name
-                              "system":is_system_place == "true",
-                              "hidden":is_hidden == "true",
-                              "app":app})
-    else:
-        skippedLocs = ["FontsLocation","TempLocation", "RuntimeLocation", 
-                       "CacheLocation", "ConfigLocation", "GenericDataLocation", 
-                       "GenericCacheLocation", "GenericConfigLocation", 
-                       "AppDataLocation", "AppConfigLocation","AppLocalDataLocation",
-                       "DataLocation","ApplicationsLocation"]
-        
-        locs = dict(sorted([(x, n) for x, n in vars(QtCore.QStandardPaths).items() if isinstance(n, QtCore.QStandardPaths.StandardLocation) and not any(v in x for v in skippedLocs)], key=lambda i:i[1]))
-        
-        for k,v in locs.items():
-            stdlocs = QtCore.QStandardPaths.standardLocations(v)
-            place_url = f"file://{stdlocs[0]}"
-            place_name = QtCore.QStandardPaths.displayName(v)
-            loc_icon = "user-home" if place_name == "Home" else f"folder-{place_name.lower()}"
-            ret[place_url] = DesktopPlace({"name": place_name, "url": place_url, "icon": loc_icon,"system":False, "hidden": False, "app":None})
-        
-    return PlacesMap(ret)
+                place_icon_name = info_metadata_nodes[0].getElementsByTagName("bookmark:icon")[0].getAttribute("name")
+                
+                systemitem_nodes = info_metadata_nodes[1].getElementsByTagName("isSystemItem")
+                hidden_nodes = info_metadata_nodes[1].getElementsByTagName("isHidden")
+                app_nodes = info_metadata_nodes[1].getElementsByTagName("OnlyInApp")
+                
+                if len(systemitem_nodes):
+                    is_system_place = systemitem_nodes[0].childNodes[0].data.lower() == "true"
+                else:
+                    is_system_place=False
+                    
+                if not include_system and is_system_place:
+                    continue
+                    
+                if len(hidden_nodes):
+                    is_hidden = hidden_nodes[0].childNodes[0].data.lower() == "true"
+                else:
+                    is_hidden = False
+                    
+                if not include_hidden and is_hidden:
+                    continue
+                
+                    
+                if len(app_nodes):
+                    app_info = app_nodes[0].childNodes
+                    if len(app_info):
+                        app = app_info[0].data
+                    else:
+                        app = None
+                else:
+                    app = None
+                
+                # NOTE: 2025-01-22 11:41:26 apply schema filter if any
+                if isinstance(schema, str) and len(schema):
+                    if not place_url.startswith(schema):
+                        continue
+                    
+                if as_qUrls:
+                    place_url = QtCore.QUrl(place_url)
+                    
+                ret[place_url] = DEPlace({"name": place_name, 
+                                "url": QtCore.QUrl(place_url), # always as QUrl regardless os as_qUrls
+                                "icon": place_icon_name, # can be a system icon name or a path/file name
+                                "system":is_system_place,
+                                "hidden":is_hidden,
+                                "app":app})
+                
+    for url in stdPlaces:
+        if as_qUrls:
+            if not any(url.matches(x, QtCore.QUrl.StripTraliningSlash) for x in ret):
+                ret[url] = stdPlaces[url]
+        else:
+            if pathlib.Path(url) not in [pathlib.Path(x) for x in ret]:
+                ret[url] = stdPlaces[url]
+                
+    return ret
+
+def iconForStandardPath(localdirectory:str) -> str:
+    icons = list(map(lambda x: x.iconName, filter(lambda x: localdirectory in x.paths, StandardDesktopLocationInfos)))
+    
+    if len(icons):
+        return icons[0]
+    
+    return "folder"
 
 def iconNameForUrl(url:QtCore.QUrl):
     if len(url.scheme()) == 0:
@@ -617,9 +771,9 @@ def removeAcceleratorMarker(label:str):
                 
     return label
     
-def desktopPlaceUrl(p:DesktopPlace) -> QtCore.QUrl:
-    if not isinstance(p, DesktopPlace):
-        raise TypeError(f"Expecting a DesktopPlace; instead, got {type(p).__name__}")
+def desktopPlaceUrl(p:DEPlace) -> QtCore.QUrl:
+    if not isinstance(p, DEPlace):
+        raise TypeError(f"Expecting a DEPlace; instead, got {type(p).__name__}")
     url = p.url
     return url if isinstance(url, QtCore.QUrl) else QtCore.QUrl(url)
         
@@ -643,12 +797,12 @@ def closestUrl(url:QtCore.QUrl, places:typing.Optional[PlacesMap]=None) -> QtCor
     return toUrl(foundPlaces[0]["url"]) if len(foundPlaces) else url
         
     
-def closestPlace(url:QtCore.QUrl, places:typing.Optional[PlacesMap]=None) -> DesktopPlace:
+def closestPlace(url:QtCore.QUrl, places:typing.Optional[PlacesMap]=None) -> DEPlace:
     schema = url.scheme()
     if not isinstance(places, PlacesMap):
         places = get_desktop_places(schema) #, True)
         
-    fallback = DesktopPlace(name=None, url = url, icon = iconNameForUrl(url), system=False, hidden=False, app=None)
+    fallback = DEPlace(name=None, url = url, icon = iconNameForUrl(url), system=False, hidden=False, app=None)
         
     if len(places) == 0:
         return fallback
