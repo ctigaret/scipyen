@@ -90,10 +90,10 @@ hiddenLocs = ["TempLocation", "RuntimeLocation",
         
 systemLocs = ["FontsLocation","RuntimeLocation", "TempLocation"]
 
-def standardIconName(locationName:str, all_folders:bool=False) -> str:
+def standardIconName(locationName:str, all_folder_icons:bool=False) -> str:
     ln = locationName.lower()
     if "desktop" in ln:
-        return "folder-desktop" if all_folders else "user-desktop"
+        return "folder-desktop" if all_folder_icons else "user-desktop"
     elif "documents" in ln:
         return "folder-documents"
     elif "applications" in ln:
@@ -175,11 +175,11 @@ class PlacesMap(dict):
         super().__init__(*args, **kwargs)
 
 class StandardLocationInfo:
-    def __init__(self, location: QtCore.QStandardPaths.StandardLocation):
+    def __init__(self, location: QtCore.QStandardPaths.StandardLocation, all_folder_icons:bool=False):
         self._location_ = location
         self._paths_ = QtCore.QStandardPaths.standardLocations(location)
         self._name_ = QtCore.QStandardPaths.displayName(location)
-        self._iconName_ = standardIconName(self._name_)
+        self._iconName_ = standardIconName(self._name_, all_folder_icons)
         self._system_ = location in systemLocs or any(isUnixSystemLocation(v) for v in self._paths_)
         self._hidden_ = location in hiddenLocs or any(isUnixHiddenLocation(v) for v in self._paths_)
         

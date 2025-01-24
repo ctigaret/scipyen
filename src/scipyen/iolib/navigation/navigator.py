@@ -139,7 +139,10 @@ from qtpy.QtCore import (Signal, Slot, Property,)
 from core import desktoputils as dutils
 from core import qtutils
 from iolib.navigation import placesmodel
-from iolib.navigation.placesmodel import PlacesModel
+
+# NOTE: 2025-01-24 21:25:12 CMT
+# to reinstante when PlacesModel/PlacesSelector are finalized
+# from iolib.navigation.placesmodel import PlacesModel
 from iolib.navigation.protocols import ProtocolInfo # TODO
 from core.prog import safeWrapper
 # import gui.pictgui as pgui
@@ -164,6 +167,8 @@ SpecialProtocols = ("desktop", "trash")
 SupportedProtocols = Protocols
 
 ArrowSize = 10
+
+class PlacesModel: pass # NOTE: 2025-01-24 21:26:32 remove this when placesmodel module is finalized
 
 class ListDirsJob(QtCore.QThread):
     sig_entries = Signal(list, name="sig_entries")
@@ -2084,7 +2089,7 @@ class UrlNavigatorPathSelectorEventFilter(QtCore.QObject):
 class _UrlNavigator_(QtCore.QObject):
     # KUrlNavigatorPrivate
     # _sig_switchToBreadCrumbMode = Signal(name="_sig_switchToBreadCrumbMode")
-    def __init__(self, url:QtCore.QUrl, qq: UrlNavigator, placesModel: PlacesModel):
+    def __init__(self, url:QtCore.QUrl, qq: UrlNavigator, placesModel:typing.Optional[PlacesModel]=None):
         # print(f"{self.__class__.__name__}.__init__: url = {url}")
         super().__init__()
         self._supportedSchemes_:list[str] = list()
@@ -2093,6 +2098,9 @@ class _UrlNavigator_(QtCore.QObject):
         self._editable_:bool = False
         self._active_:bool = True
         self._showFullPath_:bool = False
+        
+        # NOTE: 2025-01-24 21:21:11 CMT
+        self._closestPlace_ = None
         
         # self._sig_switchToBreadCrumbMode.connect(self.switchToBreadcrumbMode)
         
@@ -2120,15 +2128,17 @@ class _UrlNavigator_(QtCore.QObject):
         
         self._placesSelector_:typing.Optional[UrlNavigatorPlacesSelector] = None
         
-        if isinstance(placesModel, PlacesModel):
-            self._placesSelector_ = UrlNavigatorPlacesSelector(placesModel, self._nav_)
-            self._placesSelector_.placeActivated.connect(self._nav_.setLocationUrl)
-            self._placesSelector_.tabRequested.connect(self._nav_.tabRequested)
-            self._placesModel_.rowsInserted.connect(self._nav_.updateContent)
-            self._placesModel_.rowsRemoved.connect(self._nav_.updateContent)
-            self._placesModel_.dataChanged.connect(self._nav_.updateContent)
+        # ### BEGIN CMT reinstate this once placesmodel module is finalized
+        # if isinstance(placesModel, PlacesModel):
+        #     self._placesSelector_ = UrlNavigatorPlacesSelector(placesModel, self._nav_)
+        #     self._placesSelector_.placeActivated.connect(self._nav_.setLocationUrl)
+        #     self._placesSelector_.tabRequested.connect(self._nav_.tabRequested)
+        #     self._placesModel_.rowsInserted.connect(self._nav_.updateContent)
+        #     self._placesModel_.rowsRemoved.connect(self._nav_.updateContent)
+        #     self._placesModel_.dataChanged.connect(self._nav_.updateContent)
             
-        self._showPlacesSelector_:bool = isinstance(self._placesSelector_, PlacesModel)
+        # self._showPlacesSelector_:bool = isinstance(self._placesSelector_, PlacesModel)
+        # ### END   CMT reinstate this once placesmodel module is finalized
 
         # ### BEGIN _schemes_: UrlNavigatorSchemeCombo (was UrlNavigatorProtocolCombo)
         # NOTE: 2023-05-06 22:25:07
@@ -2214,8 +2224,10 @@ class _UrlNavigator_(QtCore.QObject):
         self._dropWidget_:typing.Optional[QtCore.QWidget] = None # TODO - dynamic stuff
         # ### END   _dropWidget_
         
-        if isinstance(self._placesSelector_, UrlNavigatorPlacesSelector):
-            self._layout_.addWidget(self._placesSelector_)
+        # ### BEGIN CMT 2025-01-24 21:28:34 reinstate this when placesmodel module is finalized
+        # if isinstance(self._placesSelector_, UrlNavigatorPlacesSelector):
+        #     self._layout_.addWidget(self._placesSelector_)
+        # ### END   CMT 2025-01-24 21:28:34 reinstate this when placesmodel module is finalized
             
         self._layout_.addWidget(self._schemes_)
         self._layout_.addWidget(self._dropDownButton_)
@@ -2657,6 +2669,9 @@ class _UrlNavigator_(QtCore.QObject):
     def updateContent(self):
         # KUrlNavigatorPrivate  
         currentUrl = self._nav_.locationUrl()
+        
+        # NOTE: 2025-01-24 21:22:27 CMT
+        self._closestPlace_ = dutils.closestPlace(currentUrl)
         # print(f"{self.__class__.__name__}.updateContent(): currentUrl = {currentUrl}")
         # print(f"\tself._placesSelector_ {self._placesSelector_}")
         # WARNING: 2025-01-20 22:32:18 temporary -- FIXME
@@ -2695,10 +2710,17 @@ class _UrlNavigator_(QtCore.QObject):
             
             placeUrl = QtCore.QUrl()
             
-            if self._placesSelector_ is not None and not self._showFullPath_:
-                placeUrl = self._placesSelector_.selectedPlaceUrl()
+            # ### BEGIN NOTE: 2025-01-24 21:18:58 CMT reinstate this once there will be a PlacesModel/PlacesSelector
+            # if self._placesSelector_ is not None and not self._showFullPath_:
+            #     placeUrl = self._placesSelector_.selectedPlaceUrl()
             # else:
             #     placeUrl = currentUrl
+            # ### END   NOTE: 2025-01-24 21:18:58 CMT reinstate this once there will be a PlacesModel/PlacesSelector
+                
+            if not self._showFullPath_ and isinstance(self._closestPlace_, dutils.DEPlace):
+                placeUrl = self._closestPlace_.url
+            else:
+                placeUrl = currentUrl
                 
             if not placeUrl.isValid():
                 placeUrl = self.retrievePlaceUrl()
@@ -2913,8 +2935,13 @@ class _UrlNavigator_(QtCore.QObject):
         # KUrlNavigatorPrivate
         text = ""
         
-        if self._placesSelector_ is not None and not self._showFullPath_:
-            text = self._placesSelector_.selectedPlaceText()
+        # ### BEGIN NOTE: 2025-01-24 21:38:14 CMT reinstate this once placesmodel module is finalized
+        # if self._placesSelector_ is not None and not self._showFullPath_:
+        #     text = self._placesSelector_.selectedPlaceText()
+        # ### END   NOTE: 2025-01-24 21:38:14 CMT reinstate this once placesmodel module is finalized
+            
+        if isinstance(self._closestPlace_, dutils.DEPlace) and not self._showFullPath_:
+            text = self._closestPlace_.name
             
         currentUrl = self._nav_.locationUrl()
         
@@ -3007,7 +3034,7 @@ class UrlNavigator(QtWidgets.QWidget):
     # verify CoreUrlNavigator code
     @safeWrapper
     def saveLocationState(self, state:QtCore.QByteArray):
-        print(f"{self.__class__.__name__}.saveLocationState({state})")
+        # print(f"{self.__class__.__name__}.saveLocationState({state})")
         currentState = self._nav_p_._coreUrlNavigator_.locationState()
         self._nav_p_._coreUrlNavigator_.saveLocationState(currentState)
         
@@ -3028,9 +3055,12 @@ class UrlNavigator(QtWidgets.QWidget):
     
     def goHome(self):
         if not isinstance(self._nav_p_._homeUrl_, QtCore.QUrl) or self.d_._homeUrl_.isEmpty() or not self._nav_p_._homeUrl_.isValid():
-            self.setLocationUrl(QtCore.QUrl.fromLocalFile(QtCore.QDir.homePath()))
+            url = QtCore.QUrl.fromLocalFile(QtCore.QDir.homePath())
         else:
-            self.setLocationUrl(self._nav_p_._homeUrl_)
+            url = self._nav_p_._homeUrl_
+            
+        self.setLocationUrl(url)
+        self.urlChanged.emit(url)
             
     def setHomeUrl(self, url:QtCore.QUrl):
         self._nav_p_._homeUrl_ = url

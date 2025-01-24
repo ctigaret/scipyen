@@ -183,9 +183,10 @@ class PlacesItem(QtCore.QAbstractItemModel):
 class PlacesModel: # fwd declaration for PlacesModelPrivate
     pass 
 
-class PlacesModelPrivate: # not really needed !
-    def __init__(self, qq:PlacesModel):
-        self.qq = qq
+class PlacesModelPrivate(QtCore.QObject): # not really needed !
+    def __init__(self, qq:PlacesModel, parent=None):
+        super().__init__(parent)
+        self.model = qq
         # self.tags = list() # of str - not sure I need this
         self.supportedSchemes = list()
         
