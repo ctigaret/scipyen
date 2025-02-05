@@ -3,6 +3,19 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
+# TODO 2025-02-05 14:49:07
+# when show full path is OFF show places panel (prepend to the navigator buttons)
+# hide when show full path is ON
+# -- make this an option (checkable menu item) & and Gui configurable one
+# -- aslo make showing full path a configurable option
+
+# BUG 2025-02-05 14:50:50 FIXME - FIXED see NOTE: 2025-02-05 15:06:38
+# toggling show full path to ON shows only the crumb for the root file system 
+# instead of creating the full array of crumbs (yet when editing, the correc
+# path is shown); toggling back to OFF reverts to the expected behaviour
+#
+
+
 """
 About special protocols (KIO slaves) in KDE:
 NOTE: A list of available protocols can be seen in KDE gui via the Dolphin file
@@ -2710,25 +2723,39 @@ class _UrlNavigator_(QtCore.QObject):
             
             placeUrl = QtCore.QUrl()
             
-            # ### BEGIN NOTE: 2025-01-24 21:18:58 CMT reinstate this once there will be a PlacesModel/PlacesSelector
+            # ### BEGIN NOTE: 2025-01-24 21:18:58 CMT reinstate this once 
+            # a PlacesModel/PlacesSelector become available
             # if self._placesSelector_ is not None and not self._showFullPath_:
             #     placeUrl = self._placesSelector_.selectedPlaceUrl()
             # else:
             #     placeUrl = currentUrl
             # ### END   NOTE: 2025-01-24 21:18:58 CMT reinstate this once there will be a PlacesModel/PlacesSelector
                 
+            # print(f"{self.__class__.__name__}.updateContent: showFullPath: {self._showFullPath_}")
             if not self._showFullPath_ and isinstance(self._closestPlace_, dutils.DEPlace):
                 placeUrl = self._closestPlace_.url
             else:
+                # print(f"\tcurrentUrl = {currentUrl}")
                 placeUrl = currentUrl
                 
+            # print(f"\tplaceUrl =  {placeUrl}")
+            
             if not placeUrl.isValid():
                 placeUrl = self.retrievePlaceUrl()
                 
-            # print(f"\tplaceUrl =  {placeUrl}")
+            # print(f"\tvalid placeUrl =  {placeUrl}")
             placePath = trailingSlashRemoved(placeUrl.path())
+            # print(f"\tplacePath =  {placePath}")
             
             startIndex = placePath.count('/')
+            # print(f"\tstartIndex =  {startIndex}")
+            
+            # NOTE: 2025-02-05 15:06:38
+            # RE BUG 2025-02-05 14:50:50 FIXME:
+            # the following forces redraw of all buttons when full path must be
+            # shown
+            if self._showFullPath_:
+                startIndex = 0
             
             self.updateButtons(startIndex)
             
