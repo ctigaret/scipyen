@@ -133,6 +133,8 @@ def findByAddress(address:str):
     places = get_desktop_places()
     return places.get(address, None)
 
+class PlacesModel:pass
+
 class PlacesItem(QtCore.QAbstractItemModel):
     """Thin port of KFilePlacesItem.
     Has no, or partial, functionality related to the Trash (Wastebin) protocol, 
@@ -141,14 +143,72 @@ class PlacesItem(QtCore.QAbstractItemModel):
     
     """
     
-    # itemChanged = Signal(str, name="itemChanged")
+    itemChanged = Signal(str, list, name="itemChanged") # str, list[int]
     
-    def __init__(self, address:str, parent):
+    def __init__(self, address:str, udi:str, parent:PlacesModel):
         super().__init__(parent)
-        self._isAccessible_ = False
-        self._groupName_ = ""
         self._bookmark_ = findByAddress(address) # may be None!
+        self._manager_ = None # TODO
+        self._folderIsEmpty_:bool = True
+        self._isCdrom_:bool = False
+        self._isAccessible_:bool = False
+        self._isTearDownAllowed_:bool = False
+        self._isTearDownOverlayRecommended_:bool = False
+        self._isTearDownInProgress_:bool = False
+        self._isSetupInProgress_:bool = False
+        self._isEjectionInProgress_:bool = False
+        self._isReadOnly_:bool = False
+        self._text_:str = str()
         
+        # NOTE: 2025-02-05 22:42:58 TODO
+        # ### BEGIN all these below are Solid framework
+        self._device_ = None # TODO 
+        self._access_ = None # TODO
+        self._volume_ = None  # TODO
+        self._drive_ = None  # TODO
+        self._block_ = None # TODO
+        self._opticalDrive_ = None  # TODO
+        self._disc_ = None # TODO
+        self._player_ = None  # TODO
+        self._networkShare_ = None # TODO
+        # ### END   all these below are Solid framework
+        
+        self._deviceIconName_:str = str()
+        self._emblems_:list[str] = list()
+        self._backingFile_:str = str()
+        self._groupType_:GroupType = GroupType.UnknownType
+        self._groupName_:str = str()
+        self._deviceDisplayName_:str = str()
+        
+        
+        
+    def id(self):
+        pass
+    
+    def isDevice(self) -> bool: # TODO
+        pass
+    
+    def deviceAccessibility(self) -> DeviceAccessibility: # TODO
+        pass
+        
+    def isTearDownAllowed(self) -> bool: # TODO
+        pass
+    
+    def isTearDownOverlayRecommended(self) -> bool: # TODO
+        pass
+    
+    def bookmark(self): # TODO
+        pass
+    
+    def setBookmark(self, bookmark): # TODO
+        pass
+    
+    def device(self): # TODO
+        pass
+    
+    def groupType(self) -> GroupType: # TODO
+        pass
+    
     def data(self, role:int):
         if role == AdditionalRoles.GroupRole:
             return self._groupName_
@@ -179,16 +239,67 @@ class PlacesItem(QtCore.QAbstractItemModel):
         """
         self._bookmark_ = bookmark
         
+    def isHidden(self) -> bool: # TODO
+        pass
+    
+    def setHidden(self) -> bool: # TODO
+        pass
+    
+    def hasSupportedScheme(self, schemes:list[str]) -> bool: # TODO
+        pass
+    
+    @Slot()
+    def onAccesibilityChanged(self, val:bool): # TODO
+        pass
+    
+    # NOTE: 2025-02-05 21:59:23 TODO:
+    # the following three static methods:
+    # check if Scipyen is running in an XDG-compliant
+    # if it does, then use XDG utlities (see core.desktoputils module )
+    #   • for this I need to understand wkat KBookmarkManager does
+    #       and implement this via pyxdg
+    # otherwise, do nothing
+    
+    @staticmethod
+    def createSystemBookmark(*args, **kwargs): # TODO
+        pass
+    
+    @staticmethod
+    def createDeviceBookmark(*args, **kwargs): # TODO
+        pass
+    
+    @staticmethod
+    def createTagBookmark(*args, **kwargs): # TODO
+        pass
+    
+    def bookmarkData(self): # TODO
+        pass
+    
+    def deviceData(self): # TODO
+        pass
+    
+    def iconNameForBookmark(self, bookmark): # TODO
+        pass
+    
+    @staticmethod
+    def generateNewId() -> str: # TODO
+        pass
+    
+    def updateDeviceInfo(self, udi:str): # TODO
+        pass
+    
+    
+        
             
 class PlacesModel: # fwd declaration for PlacesModelPrivate
     pass 
 
-class PlacesModelPrivate(QtCore.QObject): # not really needed !
-    def __init__(self, qq:PlacesModel, parent=None):
-        super().__init__(parent)
-        self.model = qq
-        # self.tags = list() # of str - not sure I need this
-        self.supportedSchemes = list()
+# class PlacesModelPrivate(QtCore.QObject): # not really needed !
+#     def __init__(self, qq:PlacesModel, parent=None):
+#         super().__init__(parent)
+#         self.model = qq
+#         # self.tags = list() # of str - not sure I need this
+#         self.supportedSchemes = list()
         
     
 class PlacesModel(QtCore.QAbstractItemModel): # TODO/FIXME
@@ -417,14 +528,28 @@ class PlacesModel(QtCore.QAbstractItemModel): # TODO/FIXME
     def hiddenCount(self): # TODO
         pass
     
-    def data(self, index:QtCore.QModelIndex, role:int): # TODO
+    def data(self, index:QtCore.QModelIndex, role:int): 
+        if not index.isValid():
+            return QtCore.QVariant(None)
+        
+        item = index.internalPointer()
+        if role == AdditionalRoles.GroupHiddenRole:
+            return self.isGroupHidden(item.groupType())
         pass
     
-    def index(self, row:int, column:int, parent:QtCore.QModelIndex = QtCore.QModelIndex()): # TODO
-        pass
+    def index(self, row:int, column:int, parent:QtCore.QModelIndex = QtCore.QModelIndex()):
+        if row < 0 or column != 0 or row >= len(items):
+            # return an invalid index when row or column are out of range
+            return QtCore.QModelIndex() 
+        
+        if parent.isValid():
+            return QtCore.QModelIndex()
+        
+        # methid inherited from QAbstractItemModel
+        return self.createIndex(row, column, self.items[row])
     
-    def parent(self, child:QtCore.QModelIndex): # TODO
-        pass
+    def parent(self, child:QtCore.QModelIndex):
+        return QtCore.QModelIndex()
     
     def roleNames(self): # TODO
         pass

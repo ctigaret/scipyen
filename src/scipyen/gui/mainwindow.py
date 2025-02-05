@@ -1904,6 +1904,24 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             val = self._default_scipyen_user_plugins_dir
             
         self._user_plugins_dir = val
+        
+    @property
+    def showFullNavigatorPath(self)-> bool:
+        return self.navigator.showFullPath()
+    
+    @markConfigurable("ShowFullNavigatorPath", "Qt")
+    @showFullNavigatorPath.setter
+    def showFullNavigatorPath(self, value:bool):
+        self.navigator.setShowFullPath(value is True)
+        
+    @property
+    def navigatorEditable(self)->bool:
+        return self.navigator.isUrlEditable()
+    
+    @markConfigurable("NavigatorIsEditable", "Qt")
+    @navigatorEditable.setter
+    def navigatorEditable(self, value:bool):
+        self.navigator.setUrlEditable(value is True)
 
     @property
     def consoleDocked(self):
@@ -5077,32 +5095,6 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         else:
             target = os.environ['HOME']
         self.navigator.setHomeUrl(QtCore.QUrl(pathlib.Path(target).as_uri()))
-        # if isinstance(self.navigator, QtWidgets.QComboBox):
-        #     self.navigator.lineEdit().setClearButtonEnabled(True)
-        #     self.navigator.textActivated[str].connect(self.slot_chDirString)
-        # elif isinstance(self.navigator, navigator.UrlNavigator):
-        #     self.navigator.urlChanged[QtCore.QUrl].connect(self.slot_chDirUrl)
-
-        # self.removeRecentDirFromListAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("edit-delete"),
-        #                                                        "Remove this path from list",
-        #                                                        self.navigator.lineEdit())
-        # 
-        # self.removeRecentDirFromListAction.setToolTip("Remove this path from history")
-        # 
-        # self.removeRecentDirFromListAction.triggered.connect(self.slot_removeDirFromHistory)
-
-        # self.clearRecentDirListAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("final_activity"),
-        #                                                   "Clear history of visited paths",
-        #                                                   self.navigator.lineEdit())
-        # 
-        # self.clearRecentDirListAction.setToolTip("Clear history of visited paths")
-        # 
-        # self.clearRecentDirListAction.triggered.connect(self.slot_clearRecentDirList)
-
-        # self.navigator.lineEdit().addAction(self.removeRecentDirFromListAction,
-        #                                             QtWidgets.QLineEdit.TrailingPosition)
-
-        # self.navigator.activated[str].connect(self.slot_chDirString)
 
         self.fileSystemFilter.lineEdit().setClearButtonEnabled(True)
 
