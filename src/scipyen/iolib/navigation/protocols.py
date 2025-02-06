@@ -43,11 +43,10 @@ class ExtraField:
     
 
 class _ProtocolInfo_:
-    def __init__(self, name:str, exec:str, jsonobj:dict): # CAUTION dict in place of QJsonObject (not available in PyQt5)
+    def __init__(self, name:str, exec_str:str, jsonobj:dict): # CAUTION dict in place of QJsonObject (not available in PyQt5)
         # ### BEGIN KProtocolInfoPrivate API
-        self._name = name
-        self._exec = exec
-        
+        self._name_ = name
+        self._exec_ = exec_str
         self._isSourceProtocol:bool     = jsonobj.get("source", True)
         self._supportsPermissions:bool  = jsonobj.get("permissions", True)
         self._isHelperProtocol:bool     = jsonobj.get("helper", False)
@@ -64,50 +63,56 @@ class _ProtocolInfo_:
         self._canRenameFromFile:bool    = jsonobj.get("renameFromFile", True)
         self._canRenameToFile:bool      = jsonobj.get("renameToFile", True)
         self._canDeleteRecursive:bool   = jsonobj.get("deleteRecursive", True)
-
-        self._fileNameUsedForCopying:FileNameUsedForCopying = FileNameUsedForCopying.FromUrl
         
+        self._inputType_:ProtocolType = ProtocolType.T_FILESYSTEM
+        self._outputType_:ProtocolType = ProtocolType.T_FILESYSTEM
+        
+        # ATTENTION: jsonobj here is, in fact, a dict
+        # default is FileNameUsedForCopying.FromUrl
         fnu = jsonobj.get("fileNameUsedForCopying", "Name")
+        self._fileNameUsedForCopying_:FileNameUsedForCopying = FileNameUsedForCopying.FromUrl
+        
         if fnu == "Name":
-            self._fileNameUsedForCopying = FileNameUsedForCopying.Name
+            self._fileNameUsedForCopying_ = FileNameUsedForCopying.Name
         elif fnu == "DisplayName":
-            self._fileNameUsedForCopying = FileNameUsedForCopying.DisplayName
+            self._fileNameUsedForCopying_ = FileNameUsedForCopying.DisplayName
             
-        self._listing:list = list()
+        self._listing_:list = list()
         tmp = jsonobj.get("listing", "[]")
         if all(isinstance(v, str) for v in tmp) and all(c in tmp for c in ("[", "]")) and tmp.startswith("[") and tmp.endswith("]"):
-            self._listing = json.loads(tmp)
+            self._listing_ = json.loads(tmp)
             
-        if len(self._listing) == 1 and self._listing[0].lower() == "false":
-            self._listing.clear()
+        if len(self._listing_) == 1 and self._listing_[0].lower() == "false":
+            self._listing_.clear()
             
-        self._supportsListing:bool = len(self._listing) > 0
-        self._defaultMimeType:str = jsonobj.get("defaultMimeType", str())
-        self._determineMimetypeFromExtension:bool = jsonobj.get("determineMimetypeFromExtension", True)
+        self._supportsListing_:bool = len(self._listing_) > 0
         
-        self._archiveMimeTypes:list = list()
+        self._defaultMimeType_:str = jsonobj.get("defaultMimeType", str())
+        
+        self._determineMimetypeFromExtension_:bool = jsonobj.get("determineMimetypeFromExtension", True)
+        
+        self._archiveMimeTypes_:list = list()
         tmp = jsonobj.get("archiveMimetype", "[]")
         if all(isinstance(v, str) for v in tmp) and all(c in tmp for c in ("[", "]")) and tmp.startswith("[") and tmp.endswith("]"):
-            self._archiveMimeTypes = json.loads(tmp)
+            self._archiveMimeTypes_ = json.loads(tmp)
             
-        self._icon:str = jsonobj.get("icon", "")
+        self._icon_:str = jsonobj.get("icon", "")
         
-        self._config:str = jsonobj.get("config", self._name)
+        self._config_:str = jsonobj.get("config", self._name_)
         
-        self._maxWorkers:int = jsonobj.get("maxInstances", 1)
+        self._maxWorkers_:int = jsonobj.get("maxInstances", 1)
         
-        self._maxWorkersPerHost:int = jsonobj.get("maxInstancesPerHost", 1)
+        self._maxWorkersPerHost_:int = jsonobj.get("maxInstancesPerHost", 1)
         
-        self._inputType:ProtocolType = ProtocolType.T_FILESYSTEM
         
         tmp = jsonobj.get("input", "")
         
         if tmp  == "filesystem":
-            self._inputType = ProtocolType.T_FILESYSTEM
+            self._inputType_ = ProtocolType.T_FILESYSTEM
         elif tmp == "stream":
-            self._inputType = ProtocolType.T_STREAM
+            self._inputType_ = ProtocolType.T_STREAM
         else:
-            self._inputType = ProtocolType.T_NONE
+            self._inputType_ = ProtocolType.T_NONE
             
         self._outputType:ProtocolType = ProtocolType.T_FILESYSTEM
         
@@ -146,16 +151,16 @@ class _ProtocolInfo_:
             if len(extraNames) == len(extraTypes):
                 self._extraFields = list(map(lambda x: ExtraField(x[0], toMetaType(x[1])), zip(extraNames, extraTypes)))
             else:
-                scipywarn(f"Malformed JSON protocol file for protocol {self._name}; number of ExtraNames fields should match the number of ExtraTypes fields")
+                scipywarn(f"Malformed JSON protocol file for protocol {self._name_}; number of ExtraNames fields should match the number of ExtraTypes fields")
         
         self._showPreviews:bool = jsonobj.get("ShowPreviews", self._protClass == ":local")
         
-        self._capabilities:list = list()
+        self._capabilities_:list = list()
         tmp = jsonobj.get("Capabilities", "[]")
         if all(isinstance(v, str) for v in tmp) and all(c in tmp for c in ("[", "]")) and tmp.startswith("[") and tmp.endswith("]"):
-            self._capabilities = json.loads(tmp)
+            self._capabilities_ = json.loads(tmp)
             
-            self._proxyProtocol = jsonobj.get("ProxiedBy", "")
+            self._proxyProtocol_ = jsonobj.get("ProxiedBy", "")
             
         # ### END   KProtocolInfoPrivate API
 

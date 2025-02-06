@@ -27,7 +27,11 @@ from core.desktoputils import (get_desktop_places, get_recent_places,
                                get_local_filesystem_places,
                                removeAcceleratorMarker,
                                removeReducedCJKAccMark,
-                               isFileIndexingEnabled, DEPlace, PlacesMap)
+                               isFileIndexingEnabled, 
+                               DEPlace, 
+                               PlacesMap)
+
+from iolib.navigation.dirlister import DirLister
 
 from systems.devices.device import Device
 
@@ -75,7 +79,7 @@ DeviceAccessibility = IntEnum("DeviceAccessibility",
                                 "TeardownInProgress"]
                                 )
 
-def stateNameForGroupType(groupType:GroupType):
+def stateNameForGroupType(groupType:GroupType) -> str:
     if groupType == GroupType.PlacesModel:
         return "GroupState-Places-IsHidden"
     elif groupType == GroupType.RemoteType:
@@ -90,7 +94,7 @@ def stateNameForGroupType(groupType:GroupType):
         return "GroupState-Tags-IsHidden"
     else:
         return ""
-
+    
 def createTimelineUrl(url:QtCore.QUrl):
     timelinePrefix = "timeline:/"
     path = url.toDisplayString(QtCore.QUrl.PreferLocalFile)
@@ -117,6 +121,9 @@ def createTimelineUrl(url:QtCore.QUrl):
     return timelineUrl
         
 def createSearchUrl(url:QtCore.QUrl):
+    # NOTE: 2025-02-06 21:25:50
+    # I guess I won't be using this much, as it relates to desktop file search & indexing
+    # utilities
     path = url.toDisplayString(QtCore.QUrl.PreferLocalFile)
     validSearchPaths = ["/documents", "/images", "/audio", "/videos"]
     searchUrl = QtCore.QUrl()
@@ -133,9 +140,11 @@ def findByAddress(address:str):
     places = get_desktop_places()
     return places.get(address, None)
 
-class PlacesModel:pass
+class PlacesModel:
+    # fwd declaration for PlacesItem
+    pass
 
-class PlacesItem(QtCore.QAbstractItemModel):
+class PlacesItem(QtCore.QObject):
     """Thin port of KFilePlacesItem.
     Has no, or partial, functionality related to the Trash (Wastebin) protocol, 
     the KDE Solid framework, and special KIO protocols (e.g. kdeconnect:/, 
@@ -295,19 +304,18 @@ class PlacesItem(QtCore.QAbstractItemModel):
         
         return True  # TODO
     
+class _PlacesModel_(QtCore.QObject):
+    # KFilePlacesModelPrivate API
+    def __init__(self, model:PlacesModel, parent:typing.Optional[QtCore.QObject] = None):
+        super().__init__(parent)
+        self._model_ = model
+        self.fileIndexingEnabled = isFileIndexingEnabled() # imported from desktoputils
+        self.tagLister = DirLister()
+        
+        
+    def ignoreMimeType(self):
+        pass
     
-        
-            
-class PlacesModel: # fwd declaration for PlacesModelPrivate
-    pass 
-
-# class PlacesModelPrivate(QtCore.QObject): # not really needed !
-#     def __init__(self, qq:PlacesModel, parent=None):
-#         super().__init__(parent)
-#         self.model = qq
-#         # self.tags = list() # of str - not sure I need this
-#         self.supportedSchemes = list()
-        
     
 class PlacesModel(QtCore.QAbstractItemModel): # TODO/FIXME
     """
@@ -369,7 +377,7 @@ class PlacesModel(QtCore.QAbstractItemModel): # TODO/FIXME
         # (Baloo), specifically on whether it is configured to use file content
         # indexing or not. Currently, Scipyen has got nothing to do with it, 
         # therefore this is always False.
-        # (see desktoutils.isFileIndexingEnabled)
+        # (see desktoputils.isFileIndexingEnabled)
         # 
         # In the future, I MAY consider introducing this funcitonality - but be
         # aware that Baloo is KDE-specific! GNOME desktop use a different
@@ -381,7 +389,7 @@ class PlacesModel(QtCore.QAbstractItemModel): # TODO/FIXME
         # https://www.linuxlinks.com/desktopsearchengines/
         
          
-        self.fileIndexingEnabled:bool = False 
+        # self.fileIndexingEnabled:bool = False 
         
         self.tags:list[str] = list()
         self.tagsUrlBase = "tags:/"

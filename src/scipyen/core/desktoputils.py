@@ -687,6 +687,7 @@ def isFileIndexingEnabled():
     # be False
     # TODO - on opensource unix platforms check the functionality provided by
     # the desktop environment under which the current Scipyen session is running.
+    # Then use desktop-specific file search & indexing utilities/tools
     return False
 
 def removeReducedCJKAccMark(label:str, pos:int):
