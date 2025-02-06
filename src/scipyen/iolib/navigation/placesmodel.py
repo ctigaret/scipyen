@@ -180,7 +180,7 @@ class PlacesItem(QtCore.QAbstractItemModel):
         self._groupName_:str = str()
         self._deviceDisplayName_:str = str()
         
-        
+        self.updateDeviceInfo(udi)
         
     def id(self):
         pass
@@ -285,8 +285,15 @@ class PlacesItem(QtCore.QAbstractItemModel):
     def generateNewId() -> str: # TODO
         pass
     
-    def updateDeviceInfo(self, udi:str): # TODO
-        pass
+    # NOTE: 2025-02-06 00:00:59 TODO
+    # create Device class as a shim implementing (partially) some
+    # functionality from Solid framework
+    # In the end, all storage devices resolve to a path of some sort...
+    def updateDeviceInfo(self, udi:str) -> bool: # TODO
+        if self._device_.udi() == udi:
+            return False
+        
+        return True  # TODO
     
     
         
