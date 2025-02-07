@@ -14,4 +14,7 @@ from core.sysutils import adapt_ui_path
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
-class DirLister:pass
+# NOTE: 2025-02-07 10:27:28 TODO
+class DirLister:
+    def __init__(self, model):
+        self.model = model

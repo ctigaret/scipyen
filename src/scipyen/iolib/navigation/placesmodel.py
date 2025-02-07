@@ -306,16 +306,121 @@ class PlacesItem(QtCore.QObject):
     
 class _PlacesModel_(QtCore.QObject):
     # KFilePlacesModelPrivate API
+    # NOTE: 2025-02-07 10:21:46
+    # the following static methods are defined elsewhere:
+    # isFileIndexingEnabled ↦ core.desktoputils
+    # timelineDateString ↦ core.utilities
+    # createTimelineUrl, createSearchUrl ↦ this module
+    
+    tagsUrlBase = "tags:/"
+    
     def __init__(self, model:PlacesModel, parent:typing.Optional[QtCore.QObject] = None):
         super().__init__(parent)
-        self._model_ = model
+        self.model = model
         self.fileIndexingEnabled = isFileIndexingEnabled() # imported from desktoputils
-        self.tagLister = DirLister()
+        # ### BEGIN 2025-02-07 08:46:21 WARNING not all QObject are hashable
+        self.setupInProgress:dict[QtCore.QObject, QtCore.QPersistentModelIndex] = dict()
+        self.teardownInProgress:dict[QtCore.QObject, QtCore.QPersistentModelIndex] = dict()
+        # ### END   2025-02-07 08:46:21 WARNING not all QObject are hashable
+        self.supportedSchemes:list[str] = list()
+
+        # ### BEGIN 2025-02-07 08:49:10 CAUTION bookmarks
+        # depends on Solid, KBookmarkManager
+        self.predicate = None # Solid::Predicate - here, a functor
         
+        # NOTE: 2025-02-07 16:21:50 TODO:
+        # workaround for this
+        self.bookmarkManager = None # KBookmarkManager
+        # ### END   2025-02-07 08:49:10 CAUTION bookmarks
+
+        # ### BEGIN NOTE: 2025-01-03 15:20:45 file search & indexing
+        # This is related to KDE file searching framework (Baloo), specifically 
+        # on whether it is configured to use file content indexing or not. 
+        # Currently, Scipyen has got nothing to do with it, therefore it is set
+        # to False.
+        #
+        # see NOTE 2025-02-07 08:59:18 TODO in
+        # core.desktoputils.isFileIndexingEnabled
+        # 
+        # In the future, I MAY consider introducing this functionality - but be
+        # aware that Baloo is KDE-specific! GNOME desktop use a different
+        # framework: TinySPARQL / formerly known as "tracker", currently known
+        # as "localsearch". 
+        #
+        # The design philosophy in Scipyen is to be desktop-agnostic, and 
+        # there are quite a few file search & indexing packages there see
+        # https://www.linuxlinks.com/desktopsearchengines/
+        #
+        # see NOTE 2025-02-07 08:59:18 TODO in core.desktoputils
+        #
         
-    def ignoreMimeType(self):
+        self.fileIndexingEnabled:bool = False 
+        
+        # ### END   NOTE: 2025-01-03 15:20:45 file search & indexing
+        
+        # ### BEGIN 2025-02-07 16:20:19 Tags protocol - KDE-specific — skip
+        
+        # self.tags:list[str] = list()
+        # self.tagLister = DirLister(self.model) # TODO see iolib.navigation.dirlister
+        # ### END   2025-02-07 16:20:19 Tags protocol - KDE-specific
+        
+#     @staticmethod
+#     def ignoreMimeType() -> str:
+#         pass
+#     
+#     @staticmethod
+#     def internalMimeType(model:PlacesModel) -> str:
+#         pass
+    
+    @classmethod
+    def ignoreMimeType(cls) -> str:
+        return "application/x-kfileplacesmodel-ignore"
+        # return "application/octet-stream"
+    
+    @classmethod
+    def internalMimeType(cls, model) -> str:
+        return f"application/x-kfileplacesmodel-{id(model)}"
+        
+    def reloadAndSignal(self):
         pass
     
+    def loadBookmarkList(self) -> list: # TODP
+        # return a list of PlacesItem
+        pass
+    
+    def findNearestPosition(self, source:int, target:int) -> int: # TODO
+        pass
+    
+    def initDeviceList(self): # TODO
+        pass
+    
+    def deviceAdded(self, udi:str): # TODO
+        pass
+    
+    def deviceRemoved(self, udi:str): # TODO
+        pass
+    
+    def itemChanged(self, udi:str, roles:list[int]): # TODO
+        pass
+    
+    def reloadBookmarks(self): # TODO
+        pass
+    
+    def storageSetupDone(self, error, errorData, sender): # TODO
+        # void storageSetupDone(Solid::ErrorType error, const QVariant &errorData, Solid::StorageAccess *sender);
+        pass
+    
+    def storageTeardownDone(filePath:typing.Union[pathlib.Path, str], error, errorData, sender): # TODO
+        # void storageTeardownDone(const QString &filePath, Solid::ErrorType error, const QVariant &errorData, QObject *sender);
+        pass
+    
+    # ### BEGIN file search & indexing
+    # see NOTE: 2025-01-03 15:20:45 
+    # see NOTE 2025-02-07 08:59:18 TODO in core.desktoputils
+    def isBalooUrl(self, url:QtCore.QUrl) -> bool: 
+        scheme = url.scheme()
+        return scheme in ("timeline", "search")
+    # ### END   file search & indexing
     
 class PlacesModel(QtCore.QAbstractItemModel): # TODO/FIXME
     """
@@ -361,88 +466,13 @@ class PlacesModel(QtCore.QAbstractItemModel): # TODO/FIXME
         # NOTE: 2025-01-03 14:51:53
         # consider leaving out
         self.availableDevices:list[Device] = list()
-        # consider leaving out:
-        self.setupInProgress:dict[QtCore.QObject, QtCore.QPersistentModelIndex] = dict()
-        # consider leaving out:
-        self.teardownInProgress:dict[QtCore.QObject, QtCore.QPersistentModelIndex] = dict()
         #
-        self.supportedSchemes:list[str] = list()
-        
-        # the following, to leave out
-        self.predicate = None # Solid::Predicate - here, a functor
-        self.bookmarkManager = None # KBookmarkManager
-        
-        # NOTE: 2025-01-03 15:20:45
-        # consider leaving out — this is related to KDE file searching framework
-        # (Baloo), specifically on whether it is configured to use file content
-        # indexing or not. Currently, Scipyen has got nothing to do with it, 
-        # therefore this is always False.
-        # (see desktoputils.isFileIndexingEnabled)
-        # 
-        # In the future, I MAY consider introducing this funcitonality - but be
-        # aware that Baloo is KDE-specific! GNOME desktop use a different
-        # framework: TinySPARQL / formerly known as "tracker", currently known
-        # as "localsearch". 
-        #
-        # The design philosophy in Scipyen is to be desktop-agnostic, and 
-        # there are quite a few file search & indexing packages there see
-        # https://www.linuxlinks.com/desktopsearchengines/
-        
-         
-        # self.fileIndexingEnabled:bool = False 
         
         self.tags:list[str] = list()
         self.tagsUrlBase = "tags:/"
         self.tagsLister = None # KCoreDirLister
         # ### END KFilePlacesModelPrivate members
         
-    # ### BEGIN KFilePlacesModelPrivate methods
-    @classmethod
-    def ignoreMimeType(cls) -> str:
-        return "application/x-kfileplacesmodel-ignore"
-        # return "application/octet-stream"
-    
-    @classmethod
-    def internalMimeType(cls, model) -> str:
-        return f"application/x-kfileplacesmodel-{id(model)}"
-        
-    def reloadAndSignal(self): # TODO
-        pass 
-    
-    def loadBookmarkList(self) -> list: # TODO 
-        pass
-    
-    def findNearestPosition(self, source:int, target:int) -> int: # TODO
-        pass
-    
-    def initDeviceList(self): # TODO
-        pass
-    
-    def deviceAdded(self, udi:str): # TODO
-        pass
-    
-    def deviceRemoved(self, udi:str): # TODO
-        pass
-    
-    def itemChanged(self, udi:str, roles:list[int]): # TODO
-        pass
-    
-    def reloadBookmarks(self): # TODO
-        pass
-    
-    def storageSetupDone(self, error, errorData, sender): # TODO
-        # void storageSetupDone(Solid::ErrorType error, const QVariant &errorData, Solid::StorageAccess *sender);
-        pass
-    
-    def storageTeardownDone(filePath:typing.Union[pathlib.Path, str], error, errorData, sender): # TODO
-        # void storageTeardownDone(const QString &filePath, Solid::ErrorType error, const QVariant &errorData, QObject *sender);
-        pass
-    
-    def isBalooUrl(self, url:QtCore.QUrl) -> bool: # TODO
-        pass
-    
-    # ### END KFilePlacesModelPrivate methods
-    
     def url(self, index:QtCore.QModelIndex): # TODO
         pass
     

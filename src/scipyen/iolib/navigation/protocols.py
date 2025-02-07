@@ -44,25 +44,24 @@ class ExtraField:
 
 class _ProtocolInfo_:
     def __init__(self, name:str, exec_str:str, jsonobj:dict): # CAUTION dict in place of QJsonObject (not available in PyQt5)
-        # ### BEGIN KProtocolInfoPrivate API
         self._name_ = name
         self._exec_ = exec_str
-        self._isSourceProtocol:bool     = jsonobj.get("source", True)
-        self._supportsPermissions:bool  = jsonobj.get("permissions", True)
-        self._isHelperProtocol:bool     = jsonobj.get("helper", False)
-        self._supportsreading:bool      = jsonobj.get("reading", True)
-        self._supportsWriting:bool      = jsonobj.get("writing", True)
-        self._supportsMakeDir:bool      = jsonobj.get("makedir", True)
-        self._supportsDeleting:bool     = jsonobj.get("deleting", True)
-        self._supportsLinking:bool      = jsonobj.get("linking", True)
-        self._supportsMoving:bool       = jsonobj.get("moving", True)
-        self._supportsOpening:bool      = jsonobj.get("opening", True)
-        self._supportsTruncating:bool   = jsonobj.get("truncating", True)
-        self._canCopyFromFile:bool      = jsonobj.get("copyFromFile", True)
-        self._canCopyToFile:bool        = jsonobj.get("copyToFile", True)
-        self._canRenameFromFile:bool    = jsonobj.get("renameFromFile", True)
-        self._canRenameToFile:bool      = jsonobj.get("renameToFile", True)
-        self._canDeleteRecursive:bool   = jsonobj.get("deleteRecursive", True)
+        self._isSourceProtocol_:bool     = jsonobj.get("source", True)
+        self._supportsPermissions_:bool  = jsonobj.get("permissions", True)
+        self._isHelperProtocol_:bool     = jsonobj.get("helper", False)
+        self._supportsReading_:bool      = jsonobj.get("reading", True)
+        self._supportsWriting_:bool      = jsonobj.get("writing", True)
+        self._supportsMakeDir_:bool      = jsonobj.get("makedir", True)
+        self._supportsDeleting_:bool     = jsonobj.get("deleting", True)
+        self._supportsLinking_:bool      = jsonobj.get("linking", True)
+        self._supportsMoving_:bool       = jsonobj.get("moving", True)
+        self._supportsOpening_:bool      = jsonobj.get("opening", True)
+        self._supportsTruncating_:bool   = jsonobj.get("truncating", True)
+        self._canCopyFromFile_:bool      = jsonobj.get("copyFromFile", True)
+        self._canCopyToFile_:bool        = jsonobj.get("copyToFile", True)
+        self._canRenameFromFile_:bool    = jsonobj.get("renameFromFile", True)
+        self._canRenameToFile_:bool      = jsonobj.get("renameToFile", True)
+        self._canDeleteRecursive_:bool   = jsonobj.get("deleteRecursive", True)
         
         self._inputType_:ProtocolType = ProtocolType.T_FILESYSTEM
         self._outputType_:ProtocolType = ProtocolType.T_FILESYSTEM
@@ -71,7 +70,6 @@ class _ProtocolInfo_:
         # default is FileNameUsedForCopying.FromUrl
         fnu = jsonobj.get("fileNameUsedForCopying", "Name")
         self._fileNameUsedForCopying_:FileNameUsedForCopying = FileNameUsedForCopying.FromUrl
-        
         if fnu == "Name":
             self._fileNameUsedForCopying_ = FileNameUsedForCopying.Name
         elif fnu == "DisplayName":
@@ -106,7 +104,6 @@ class _ProtocolInfo_:
         
         
         tmp = jsonobj.get("input", "")
-        
         if tmp  == "filesystem":
             self._inputType_ = ProtocolType.T_FILESYSTEM
         elif tmp == "stream":
@@ -114,24 +111,23 @@ class _ProtocolInfo_:
         else:
             self._inputType_ = ProtocolType.T_NONE
             
-        self._outputType:ProtocolType = ProtocolType.T_FILESYSTEM
-        
+        self._outputType_:ProtocolType = ProtocolType.T_FILESYSTEM
         tmp = jsonobj.get("output", "")
         if tmp  == "filesystem":
-            self._outputType = ProtocolType.T_FILESYSTEM
+            self._outputType_ = ProtocolType.T_FILESYSTEM
         elif tmp == "stream":
-            self._outputType = ProtocolType.T_STREAM
+            self._outputType_ = ProtocolType.T_STREAM
         else:
-            self._outputType = ProtocolType.T_NONE
+            self._outputType_ = ProtocolType.T_NONE
         
-        self._docPath:str = jsonobj.get("X-DocPath", "")
+        self._docPath_:str = jsonobj.get("X-DocPath", "")
         
-        if len(self._docPath) == 0:
-            self._docPath = jsonobj.get("DocPath", "")
+        if len(self._docPath_) == 0:
+            self._docPath_ = jsonobj.get("DocPath", "")
             
-        self._protClass:str = jsonobj.get("Class", "").lower()
-        if not self._protClass.startswith(":"):
-            self._protClass = ":" + self._protClass
+        self._protClass_:str = jsonobj.get("Class", "").lower()
+        if not self._protClass_.startswith(":"):
+            self._protClass_ = ":" + self._protClass_
             
         tmp = jsonobj.get("ExtraNames", "[]")
         if all(isinstance(v, str) for v in tmp) and all(c in tmp for c in ("[", "]")) and tmp.startswith("[") and tmp.endswith("]"):
@@ -149,41 +145,40 @@ class _ProtocolInfo_:
         
         if len(extraNames) > 0:
             if len(extraNames) == len(extraTypes):
-                self._extraFields = list(map(lambda x: ExtraField(x[0], toMetaType(x[1])), zip(extraNames, extraTypes)))
+                self._extraFields_ = list(map(lambda x: ExtraField(x[0], toMetaType(x[1])), zip(extraNames, extraTypes)))
             else:
                 scipywarn(f"Malformed JSON protocol file for protocol {self._name_}; number of ExtraNames fields should match the number of ExtraTypes fields")
         
-        self._showPreviews:bool = jsonobj.get("ShowPreviews", self._protClass == ":local")
+        self._showPreviews_:bool = jsonobj.get("ShowPreviews", self._protClass_ == ":local")
         
         self._capabilities_:list = list()
         tmp = jsonobj.get("Capabilities", "[]")
         if all(isinstance(v, str) for v in tmp) and all(c in tmp for c in ("[", "]")) and tmp.startswith("[") and tmp.endswith("]"):
             self._capabilities_ = json.loads(tmp)
             
-            self._proxyProtocol_ = jsonobj.get("ProxiedBy", "")
+        self._proxyProtocol_ = jsonobj.get("ProxiedBy", "")
             
-        # ### END   KProtocolInfoPrivate API
-
 class ProtocolInfoFactory: # pass # TODO 2025-01-18 12:18:35 write me - singleton class!
-    _instance = None # NOTE: Singleton design pattern
+    __instance__ = None # NOTE: Singleton design pattern
     
     def __new__(cls:typing.Self, *args, **kwargs) -> typing.Self:
         # NOTE: Singleton design pattern
-        if not hasattr(cls, "_instance") or not isinstance(cls._instance, cls):
-            cls._instance = super(ProtocolInfoFactory, cls).__new__(cls, *args, **kwargs)
+        if not hasattr(cls, "__instance__") or not isinstance(cls.__instance__, cls):
+            cls.__instance__ = super(ProtocolInfoFactory, cls).__new__(cls, *args, **kwargs)
             
-        return cls._instance
+        return cls.__instance__
     
     def __init__(self):
-        self._cacheDirty:bool = True
-        self._mutex:QtCore.QMutex = QtCore.QMutex()
-        self._cache:dict = dict() # mapping str ↦ _ProtocolInfo_
-        self._instance = self
+        self._cacheDirty_:bool = True
+        self._mutex_:QtCore.QMutex = QtCore.QMutex()
+        self._cache_:dict = dict() # mapping str ↦ _ProtocolInfo_
+        self.__instance__ = self # NOTE: Singleton design pattern
         
     def __del__(self):
-        locker = QtCore.QMutexLocker(self._mutex)
-        self._cache.clear()
+        locker = QtCore.QMutexLocker(self._mutex_)
+        self._cache_.clear()
         
+    # ### BEGIN NOTE: 2025-02-07 14:30:06 Singleton design pattern
     @classmethod
     def _walk_mro(cls) -> typing.Generator[typing.Self, None, None]: # NOTE: Singleton design pattern
         for subclass in cls.mro():
@@ -196,60 +191,62 @@ class ProtocolInfoFactory: # pass # TODO 2025-01-18 12:18:35 write me - singleto
                 
     @classmethod
     def initialized(cls:typing.Self) -> bool: # NOTE: Singleton design pattern
-        return hasattr(cls, "_instance" and isinstance(cls._instance, cls))
+        return hasattr(cls, "__instance__" and isinstance(cls.__instance__, cls))
     
     @classmethod
     def instance(cls:typing.Self, *args, **kwargs) -> typing.Self: # NOTE: Singleton design pattern
-        if cls._instance is None:
+        if cls.__instance__ is None:
             inst = cls(*args, **kwargs)
             for subclass in cls._walk_mro():
-                subclass._instance = inst
-        if hasattr(cls, "_instance") and isinstance(cls._instance, cls):
-            return cls._instance
+                subclass.__instance__ = inst
+        if hasattr(cls, "__instance__") and isinstance(cls.__instance__, cls):
+            return cls.__instance__
         else:
-            raise RuntimeError(f"Incompatible sibling of '{cls.__name__}' is already instantiated as singleton: {type(cls._instance).__name__}")
+            raise RuntimeError(f"Incompatible sibling of '{cls.__name__}' is already instantiated as singleton: {type(cls.__instance__).__name__}")
 
     @staticmethod
-    def instance() -> typing.Self: # originally self()...
-        return ProtocolInfoFactory._instance
+    def instance() -> typing.Self: # originally self()... in kprotocolinfofactory.cpp
+        return ProtocolInfoFactory.__instance__
+    
+    # ### END   NOTE: 2025-02-07 14:30:06 Singleton design pattern
     
     def protocols(self) -> list:
         """Returns a list of names of cached protocols"""
-        locker = QtCore.QMutexLocker(self._mutex)
+        locker = QtCore.QMutexLocker(self._mutex_)
         self.fillCache()
-        return list(self._cache.keys())
+        return list(self._cache_.keys())
     
     def allProtocols(self) -> list:
         """Returns a list of cached protocols"""
-        locker = QtCore.QMutexLocker(self._mutex)
+        locker = QtCore.QMutexLocker(self._mutex_)
         self.fillCache()
-        return list(self._cache.values())
+        return list(self._cache_.values())
     
     def findProtocol(self, protocol:str, updateCacheIfNotFound:bool) -> _ProtocolInfo_:
         if len(protocol) == 0 or not protocol.startswith(":"):
             return
         
-        locker = QtCore.QMutexLocker(self._mutex)
+        locker = QtCore.QMutexLocker(self._mutex_)
         filled = self.fillCache()
         
-        info = self._cache.get(protocol, None)
+        info = self._cache_.get(protocol, None)
         
         if info is None and not filled and updateCacheIfNotFound:
             scipywarn(f"Refilling ProtocolInfoFactory cache in the hope to find {protocol}")
-            self._cacheDirty = True
+            self._cacheDirty_ = True
             self.fillCache()
-            info = self._cache.get(protocol, None)
+            info = self._cache_.get(protocol, None)
             
         return info
         
     def fillCache(self) -> bool: 
         # TODO 2025-01-18 22:42:33 FIXME
         # - requires a stand-in for KPluginMetaData
-        assert not self._mutex.tryLock()
-        if not self._cacheDirty:
+        assert not self._mutex_.tryLock()
+        if not self._cacheDirty_:
             return False
         
-        self._cache.clear()
+        self._cache_.clear()
         if sys.platform.startswith("win32"):
             worker = "cmd /c start '' "
         elif sys.platform.startswith("darwin"):
@@ -257,9 +254,10 @@ class ProtocolInfoFactory: # pass # TODO 2025-01-18 12:18:35 write me - singleto
         else:
             worker = "xdg-open"
             
-        self._cache[":local"] = _ProtocolInfo_(":local", worker, dict())
+        # c'tor for+ProtocolInfo_: name:str, exec_str:str, jsonobj:dict'
+        self._cache_[":local"] = _ProtocolInfo_(":local", worker, dict())
         
-        self._cacheDirty =  False
+        self._cacheDirty_ =  False
         return True
         
 class ProtocolInfo:
@@ -267,7 +265,6 @@ class ProtocolInfo:
     def protocols() -> list:
         pfact = ProtocolInfoFactory()
         return pfact.instance().protocols()
-        
     
     @singledispatchmethod
     @staticmethod
@@ -314,17 +311,30 @@ class ProtocolInfo:
     
     @isFilterProtocol.register(str)
     def _(protocol:str) -> bool:
-        prot = ProtocolInfoFactory.instance().findProtocol(protocol)
-        if not isinstance(prot, _ProtocolInfo_):
+        pinfo = ProtocolInfoFactory.instance().findProtocol(protocol)
+        if not isinstance(pinfo, _ProtocolInfo_):
             return False
         
-        return not prot._isSourceProtocol
+        return not pinfo._isSourceProtocol_
     
     @staticmethod
     def icon(protocol:str) -> str:
         # TODO 2025-01-18 23:45:06
-        # see how I can bypass all this and use desktoputils
-        prot = ProtocolInfoFactory.instance().findProtocol(protocol)
+        # relies on KService framework, specifically on KApplicationTrader
+        # that identifies a "service" used for that application
+        # see how I can bypass all this and use desktoputils -> go back and
+        # check ProtocolInfoFactory.fillCache
+        
+        # what KF6 does:
+        # 1) use ProtocolInfoFactory to get a _ProtocolInfo_ object (pinfo) from 
+        #     its cache, using the protocol mentioned in 'protocol'
+        # 2) if no _ProtocolInfo_ is found (pinfo is None): 
+        #   figure out a service for the specified protocol:
+        #       use KService KApplicationTrader to query the preferredService for the
+        #       f"x-scheme-handler/{protocol}" string
+        #
+        # 3) once a valid protocol info is found, just get its icon name
+        pinfo = ProtocolInfoFactory.instance().findProtocol(protocol)
         pass
     
     @staticmethod
@@ -357,7 +367,7 @@ class ProtocolInfo:
         if prot is None:
             return ""
         return ":local" # NOTE: 2025-01-18 23:44:33 for now
-        return prot._protClass
+        return prot._protClass_
     
     @staticmethod
     def showFilePreview(protocol:str) -> bool:
