@@ -166,12 +166,20 @@ def isUnixSystemLocation(p:typing.Union[pathlib.Path, QtCore.QUrl, str]) -> bool
 
 class DEPlace(Bunch):
     """Stand-in for PlacesItem - use in UrlNavigator in the absence of PlacesModel
-        Or as backend to PalcesItem
+        Or as backend to PlacesItem
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
+class DEBookmark(Bunch):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
 class PlacesMap(dict):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+class BookmarksMap(dict):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -435,8 +443,7 @@ def get_desktop_places(schema:typing.Optional[str]=None,
                        as_qUrls:bool=False, 
                        all_folder_icons:bool=False,
                        include_hidden:bool=False, 
-                       include_system:bool=True,
-                       recently_used:bool=False) -> PlacesMap:
+                       include_system:bool=True) -> PlacesMap:
     """Collect user places as defined in the freedesktop.org XDG framework.
     Useful for Linux desktops that comply with XDG (e.g. KDE, GNOME, XFCE, LXDE, etc).
     
@@ -444,11 +451,7 @@ def get_desktop_places(schema:typing.Optional[str]=None,
     Returns:
     ========
 
-    A mapping of url (str) ↦ {"name"    ↦ descriptive name (str), 
-                              "icon"    ↦ icon theme name (str),
-                              "system"  ↦ is this a system place? (bool, default False),
-                              "hidden"  ↦ is this a hidden place? (bool, default False),
-                              "app"     ↦ None (for now)}
+    A mapping of url (str) ↦ DEPlace
 
     If the `pyxdg` module is installed, the function will parse the file
     `user-places.xbel` located in the xdg.BaseDirectory.xdg_data_home directory.
@@ -474,37 +477,38 @@ def get_desktop_places(schema:typing.Optional[str]=None,
     stdPlaces = get_standard_desktop_places(as_qUrls, all_folder_icons)
     
     # NOTE: 2023-05-01 13:38:10 TODO
-    # below we are using the file `user-places.xbel` located in 
+    # below we are using the file `user-places.xbel` or `recently-used.xbel` located in 
     # `xdg.BaseDirectory.xdg_data_home`
     #
     
-    # structure:
-    # <xbel version="1.0" xmlns:bookmark="http://www.freedesktop.org/standards/desktop-bookmarks" xmlns:mime="http://www.freedesktop.org/standards/shared-mime-info"
-    # <bookmark href="file:///home/cezar/Documents/Reprints/Neuropsychiatric%20illness/16p11.2%20CNV/Arbogast%20Herault%202016%20Reciprocal%20effects%20on%20neurocognitive%20and%20metabolic%20phenotypes%20in%20mouse%20models%20of%2016p11.2%20del%20dup%20syndromes/Arbogast%20Herault%202016%20SI.odt" added="2025-01-16T08:48:16.246000Z" modified="2025-01-17T09:08:28.782000Z" visited="2025-01-17T09:08:28.782000Z">
-    #     <info>
-    #     <metadata owner="http://freedesktop.org">
-    #         <mime:mime-type type="application/vnd.oasis.opendocument.text"/>
-    #         <bookmark:applications>
-    #         <bookmark:application name="libreoffice-writer" exec="libreoffice --writer %u" modified="2025-01-17T09:08:28.782000Z" count="3"/>
-    #         </bookmark:applications>
-    #     </metadata>
-    #     </info>
+    # structure -- user-places.xbel:
+    # <xbel xmlns:bookmark="http://www.freedesktop.org/standards/desktop-bookmarks" xmlns:kdepriv="http://www.kde.org/kdepriv" xmlns:mime="http://www.freedesktop.org/standards/shared-mime-info">
+    # <bookmark href="file:///home/cezar">
+    # <title>Home</title>
+    # <info>
+    # <metadata owner="http://freedesktop.org">
+    #     <bookmark:icon name="user-home"/>
+    # </metadata>
+    # <metadata owner="http://www.kde.org">
+    #     <ID>1569705899/0</ID>
+    #     <isSystemItem>true</isSystemItem>
+    #     <IsHidden>false</IsHidden>
+    # </metadata>
+    # </info>
     # </bookmark>
     # </xbel>
     
-    
     if sys.platform.startswith("linux") and HAS_PYXDG:
-        xbel = "recently-used.xbel" if recently_used else "user-places.xbel"
+        xbel = "user-places.xbel"
         places = pio.loadXMLFile(os.path.join(xdg.BaseDirectory.xdg_data_home, xbel))
         # places = pio.loadXMLFile(os.path.join(xdg.BaseDirectory.xdg_data_home, "user-places.xbel"))
             
         if "xbel" in places.documentElement.tagName.lower():
-        
-            bookmarks = places.getElementsByTagName("bookmark")
+            bookmark_nodes = places.getElementsByTagName("bookmark")
             
-            for b in places.getElementsByTagName("bookmark"):
-                place_name = b.getElementsByTagName("title")[0].childNodes[0].data
+            for b in bookmark_nodes:
                 place_url = b.getAttribute("href")
+                place_name = b.getElementsByTagName("title")[0].childNodes[0].data
                 
                 if len(place_name) == 0 or len(place_url) == 0:
                     continue
@@ -569,6 +573,105 @@ def get_desktop_places(schema:typing.Optional[str]=None,
                 
     return ret
 
+def get_recent_places(schema:typing.Optional[str]=None, 
+                       as_qUrls:bool=False) -> BookmarksMap:
+    """Collect recent places as defined in the freedesktop.org XDG framework.
+    Useful for Linux desktops that comply with XDG (e.g. KDE, GNOME, XFCE, LXDE, etc).
+    
+    
+    Returns:
+    ========
+
+    A mapping of url (str) ↦ {"name"    ↦ descriptive name (str), 
+                              "icon"    ↦ icon theme name (str),
+                              "system"  ↦ is this a system place? (bool, default False),
+                              "hidden"  ↦ is this a hidden place? (bool, default False),
+                              "app"     ↦ None (for now)}
+
+    If the `pyxdg` module is installed, the function will parse the file
+    `user-places.xbel` located in the xdg.BaseDirectory.xdg_data_home directory.
+    
+    Otherwise, the function relies on the QtCore.QStandardPaths to build a 
+    generic list of "places".
+    
+    NOTE: Not all these places will be useful in Scipyen. 
+
+    In particular, the places relating to specific IO protocols and KDE Solid 
+    devices should be filterd out of the results (e.g., see get_local_filesystem_places).
+    
+    
+    """
+    if isinstance(schema, str) and schema not in SCHEMAS:
+        schema = None
+        
+    elif isinstance(schema, bool):
+        as_qUrls = schema = True
+        schema = None
+        
+    ret = BookmarksMap()
+    # stdPlaces = get_standard_desktop_places(as_qUrls, all_folder_icons)
+    
+    # NOTE: 2023-05-01 13:38:10 TODO
+    # below we are using the file `user-places.xbel` or `recently-used.xbel` located in 
+    # `xdg.BaseDirectory.xdg_data_home`
+    #
+    
+    # structure -- recently-used.xbel:
+    # <xbel version="1.0" xmlns:bookmark="http://www.freedesktop.org/standards/desktop-bookmarks" xmlns:mime="http://www.freedesktop.org/standards/shared-mime-info"
+    # <bookmark href="file:///home/cezar/Documents/Reprints/Neuropsychiatric%20illness/16p11.2%20CNV/Arbogast%20Herault%202016%20Reciprocal%20effects%20on%20neurocognitive%20and%20metabolic%20phenotypes%20in%20mouse%20models%20of%2016p11.2%20del%20dup%20syndromes/Arbogast%20Herault%202016%20SI.odt" added="2025-01-16T08:48:16.246000Z" modified="2025-01-17T09:08:28.782000Z" visited="2025-01-17T09:08:28.782000Z">
+    #     <info>
+    #     <metadata owner="http://freedesktop.org">
+    #         <mime:mime-type type="application/vnd.oasis.opendocument.text"/>
+    #         <bookmark:applications>
+    #         <bookmark:application name="libreoffice-writer" exec="libreoffice --writer %u" modified="2025-01-17T09:08:28.782000Z" count="3"/>
+    #         </bookmark:applications>
+    #     </metadata>
+    #     </info>
+    # </bookmark>
+    # </xbel>
+    
+    
+    if sys.platform.startswith("linux") and HAS_PYXDG:
+        xbel = "recently-used.xbel"
+        places = pio.loadXMLFile(os.path.join(xdg.BaseDirectory.xdg_data_home, xbel))
+        # places = pio.loadXMLFile(os.path.join(xdg.BaseDirectory.xdg_data_home, "user-places.xbel"))
+            
+        if "xbel" in places.documentElement.tagName.lower():
+            bookmark_nodes = places.getElementsByTagName("bookmark")
+            
+            for b in bookmark_nodes:
+                bookmark = DEBookmark()
+                url = b.getAttribute("href")
+                    
+                if len(url) == 0:
+                    continue
+                
+                if as_qUrls:
+                    url = QtCore.QUrl(url)
+                    
+                bookmark["url"] = url
+                
+                info_node = b.getElementsByTagName("info")[0]
+                info_metadata_nodes = info_node.getElementsByTagName("metadata")
+                mime = info_metadata_nodes[0].getElementsByTagName("mime:mime-type")[0].childNodes[0].data
+                bookmark["mime"] = mime
+                
+                bookmark_application_node = info_metadata_nodes[0].getElementsByTagName("bookmark:applications")
+                bookmark_applications = bookmark_application_node.getElementsByTagName("bookrmark:application")
+                
+                bookmark["applications"] = list()
+                for ba in bookmark_applications:
+                    app = Bunch()
+                    app["exec_str"] = ba.getAttribute("exec")
+                    app["count"] = ba.getAttribute("count")
+                    app["name"] = ba.getAttribute("name")
+                    app["modified"] = ba.getAttribute("modified")
+                    bookmark["applications"].append(app)
+                    
+            ret[url] = bookmark
+                
+    return ret
+
 def iconForStandardPath(localdirectory:str) -> str:
     icons = list(map(lambda x: x.iconName, filter(lambda x: localdirectory in x.paths, StandardDesktopLocationQtInfos)))
     
@@ -622,16 +725,6 @@ def iconNameForUrl(url:QtCore.QUrl):
         
     return iconName
 
-def get_recent_places(schema:typing.Optional[str]=None, 
-                       as_qUrls:bool=False, 
-                       all_folder_icons:bool=False,
-                       include_hidden:bool=False, 
-                       include_system:bool=True) -> PlacesMap:
-    return get_desktop_places(schema, as_qUrls, all_folder_icons,
-                              include_hidden, include_system,
-                              True)
-
-# def get_recent_places():
 #     """
 #     Get recently viewed places in the underlying desktop environment.
 #     
