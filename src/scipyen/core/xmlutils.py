@@ -64,7 +64,6 @@ from functools import singledispatch
 # add XMl text viewer, schema viewer and xquery editor
 
 # 2016-08-16 09:30:07
-# NOTE FIXME QtXml is not actively maintained anymore in Qt >= 5.5
 from qtpy import (QtCore, QtWidgets, QtXml, QtGui, )
 from qtpy.QtCore import (Signal, Slot, )
 # NOTE: use Python re instead of QRegExp
@@ -500,7 +499,7 @@ def parseDOMNode(domnode):
         # i.e. domnode.childNodes should return a list of one Element object
         # which can be retrieved by domnode.documentElement
         if not domnode.hasChildNodes():
-            print("Empty XMl node!")
+            # print("Empty XMl node!")
             return None
 
         domelement = domnode.documentElement # this is the root element of the document

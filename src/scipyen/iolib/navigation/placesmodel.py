@@ -4,6 +4,8 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 """
+TODO: 2025-02-08 22:43:42 
+Do away with DEPlace and DEBookmark, use bookmarks.Bookmark instead (but finalise that first)
 """
 import sys, os, pathlib, urllib, typing, warnings, subprocess, traceback
 import core.xmlutils as xmlutils

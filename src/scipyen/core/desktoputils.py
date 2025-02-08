@@ -64,10 +64,12 @@ import inspect
 import platform
 import core.xmlutils as xmlutils
 import iolib.pictio as pio
-import xml.etree.ElementTree as ET
 from enum import Enum, IntEnum
 from functools import (singledispatch, singledispatchmethod)
 from traitlets.utils.bunch import Bunch
+# import xml.etree.ElementTree as ET
+from xml.dom import minidom
+
 
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg,)
 from qtpy.QtCore import (Signal, Slot, Property,)
