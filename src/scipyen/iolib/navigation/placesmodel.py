@@ -28,8 +28,8 @@ from core.desktoputils import (get_desktop_places, get_recent_places,
                                removeAcceleratorMarker,
                                removeReducedCJKAccMark,
                                isFileIndexingEnabled, 
-                               DEPlace, 
-                               PlacesMap)
+                               DEPlace, PlacesMap,
+                               DEBookmark, BookmarksMap)
 
 from iolib.navigation.dirlister import DirLister
 
@@ -136,8 +136,10 @@ def createSearchUrl(url:QtCore.QUrl):
     
     return searchUrl
 
-def findByAddress(address:str):
-    places = get_desktop_places()
+def findByAddress(address:typing.Union[str, QtCore.QUrl]):
+    places = get_desktop_places(asQurl=isinstance(address, QtCore.QUrl))
+    if address not in places:
+        places = get_recent_places(asQurl=isinstance(address, QtCore.QUrl))
     return places.get(address, None)
 
 class PlacesModel:
@@ -154,9 +156,9 @@ class PlacesItem(QtCore.QObject):
     
     itemChanged = Signal(str, list, name="itemChanged") # str, list[int]
     
-    def __init__(self, address:str, udi:str, parent:PlacesModel):
+    def __init__(self, manager, address:str, udi:str, parent:PlacesModel):
         super().__init__(parent)
-        self._bookmark_ = findByAddress(address) # may be None!
+        self._bookmark_:typing.Optional[typing.Union[DEPlace, DEBookmark]] = findByAddress(address) # may be None!
         self._manager_ = None # TODO
         self._folderIsEmpty_:bool = True
         self._isCdrom_:bool = False
@@ -206,9 +208,6 @@ class PlacesItem(QtCore.QObject):
     def isTearDownOverlayRecommended(self) -> bool: # TODO
         pass
     
-    def bookmark(self): # TODO
-        pass
-    
     def setBookmark(self, bookmark): # TODO
         pass
     
@@ -231,19 +230,11 @@ class PlacesItem(QtCore.QObject):
         else:
             return self._text_
        
-    def bookmark(self):
+    def bookmark(self) -> DEPlace | DEBookmark | None:
         return self._bookmark_
     
-    def setBookmark(self, bookmark:dict):
-        """A bookmark, IN THIS CONTEXT, is a dict as returned by get_desktop_places()
-        The two important data are:
-        • the bookmark URL
-        • the bookrmark name
-    
-        For now it is recommended to use the subset of places that point to
-        physical paths in the file system (e.g., not remote:/ trash:/, or any other
-        KIO protocol, and neither a device as defined in the Solid framework, and
-        defined by a unique device identifier - or UDI - and a UUID)
+    def setBookmark(self, bookmark:typing.Optional[typing.Union[DEPlace,DEBookmark]]):
+        """
     
         """
         self._bookmark_ = bookmark
@@ -330,6 +321,25 @@ class _PlacesModel_(QtCore.QObject):
         
         # NOTE: 2025-02-07 16:21:50 TODO:
         # workaround for this
+        # NOTE 2025-02-08 10:05:39 TODO
+        # crate BookmarkMonitor class (Object) where "user-places.xbel" and "recently-used.xbel"
+        # are monitored for change using QtCore.QFileSystemWatcher
+        #
+        # Scipyen is NOT intended to be able to alter these: recently visited
+        # directories and recently opened files are managed independently of
+        # the Desktop environment. 
+        # However, the intention here is that Scipyen SHOULD be aware of changes
+        # in Desktop "places" and "recently used" stuff as made available by
+        # Desktop apps & tools, so that the "Places" panel in the navigator can
+        # be updated accordingly.
+        
+        # NOTE: 2025-02-08 14:25:00 TODO
+        # In a similar vein I must find a "slim" and straightforward solution
+        # to capture desktop notification related to hotpluggable devices and their
+        # dynamic mount points...
+        
+        
+        # desktoputils.BookmarksMap
         self.bookmarkManager = None # KBookmarkManager
         # ### END   2025-02-07 08:49:10 CAUTION bookmarks
 

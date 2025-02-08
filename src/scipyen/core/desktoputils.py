@@ -76,7 +76,7 @@ from qtpy import (QtCore, QtWidgets, QtGui)
 has_qtdbus = False
 try:
     from qtpy import QtDBus
-    has_qtdbus = False
+    has_qtdbus = True
 except:
     pass
 
@@ -327,11 +327,11 @@ def get_dbus_service_names(what:str="session"):
     """
     what: one of "session", "system"
     """
-    if not has_qtdbus:
-        scipywarn("No QtDBus on this platform")
+    if platform.system() != "Linux":
         return
     
-    if platform.system() != "Linux":
+    if not has_qtdbus:
+        scipywarn("No QtDBus on this platform")
         return
     
     if not isinstance(what, str):
@@ -428,25 +428,28 @@ def get_system_terminal_executable():
     else:
         warnings.warn(f"{sys.platform} platform is not yet supported")
         
-def get_standard_desktop_places(as_qUrls:bool=False, all_folder_icons:bool=False) -> PlacesMap:
+def get_standard_desktop_places(asQUrl:bool=False, all_folder_icons:bool=False) -> PlacesMap:
+    """Platform-independent Desktop places.
+    These are defined in the Qt toolkit
+    """
     locations = tuple(map(lambda x: StandardLocationInfo(getattr(QtCore.QStandardPaths, x[0]), standardIconName(x[0], all_folder_icons)), StandardDesktopLocationsQt))
     ret = PlacesMap()
     for loc in locations:
         place_url = f"file://{loc.paths[0]}"
-        if as_qUrls:
+        if asQUrl:
             place_url = QtCore.QUrl(place_url)
         ret[place_url] = DEPlace({"name": loc.name, "url": place_url, "icon": loc.iconName, "system":loc.system, "hidden": loc.hidden})
         
     return ret
     
 def get_desktop_places(schema:typing.Optional[str]=None, 
-                       as_qUrls:bool=False, 
+                       asQUrl:bool=False, 
                        all_folder_icons:bool=False,
                        include_hidden:bool=False, 
-                       include_system:bool=True) -> PlacesMap:
+                       include_system:bool=True,
+                       intKeys:bool=False) -> PlacesMap:
     """Collect user places as defined in the freedesktop.org XDG framework.
-    Useful for Linux desktops that comply with XDG (e.g. KDE, GNOME, XFCE, LXDE, etc).
-    
+    Useful for xdg-compliant Linux desktops.
     
     Returns:
     ========
@@ -466,15 +469,19 @@ def get_desktop_places(schema:typing.Optional[str]=None,
     
     
     """
+    # NOTE: 2025-02-08 10:07:51 TODO:
+    # This is static: whenever a place, or the places repository, is altered
+    # this won't be captured until a new Scipyen session is launched.
+    
     if isinstance(schema, str) and schema not in SCHEMAS:
         schema = None
         
     elif isinstance(schema, bool):
-        as_qUrls = schema = True
+        asQUrl = schema = True
         schema = None
         
     ret = PlacesMap()
-    stdPlaces = get_standard_desktop_places(as_qUrls, all_folder_icons)
+    stdPlaces = get_standard_desktop_places(asQUrl, all_folder_icons)
     
     # NOTE: 2023-05-01 13:38:10 TODO
     # below we are using the file `user-places.xbel` or `recently-used.xbel` located in 
@@ -500,13 +507,15 @@ def get_desktop_places(schema:typing.Optional[str]=None,
     
     if sys.platform.startswith("linux") and HAS_PYXDG:
         xbel = "user-places.xbel"
-        places = pio.loadXMLFile(os.path.join(xdg.BaseDirectory.xdg_data_home, xbel))
-        # places = pio.loadXMLFile(os.path.join(xdg.BaseDirectory.xdg_data_home, "user-places.xbel"))
-            
+        xbel_file = os.path.join(xdg.BaseDirectory.xdg_data_home, xbel)
+        if not os.path.exists(xbel_file):
+            return ret
+        places = pio.loadXMLFile(xbel_file)
+
         if "xbel" in places.documentElement.tagName.lower():
             bookmark_nodes = places.getElementsByTagName("bookmark")
             
-            for b in bookmark_nodes:
+            for k,b in enumerate(bookmark_nodes):
                 place_url = b.getAttribute("href")
                 place_name = b.getElementsByTagName("title")[0].childNodes[0].data
                 
@@ -553,18 +562,20 @@ def get_desktop_places(schema:typing.Optional[str]=None,
                     if not place_url.startswith(schema):
                         continue
                     
-                if as_qUrls:
-                    place_url = QtCore.QUrl(place_url)
+                key = k if intKeys else QtCore.QUrl(place_url) if asQUrl else place_url
+                # if asQUrl:
+                    # place_url = QtCore.QUrl(place_url)
                     
-                ret[place_url] = DEPlace({"name": place_name, 
-                                "url": QtCore.QUrl(place_url), # always as QUrl regardless os as_qUrls
+                    
+                ret[key] = DEPlace({"name": place_name, 
+                                "url": QtCore.QUrl(place_url), # always as QUrl regardless of asQUrl
                                 "icon": place_icon_name, # can be a system icon name or a path/file name
                                 "system":is_system_place,
                                 "hidden":is_hidden,
                                 "app":app})
                 
     for url in stdPlaces:
-        if as_qUrls:
+        if asQUrl:
             if not any(url.matches(x, QtCore.QUrl.StripTraliningSlash) for x in ret):
                 ret[url] = stdPlaces[url]
         else:
@@ -573,16 +584,15 @@ def get_desktop_places(schema:typing.Optional[str]=None,
                 
     return ret
 
-def get_recent_places(schema:typing.Optional[str]=None, 
-                       as_qUrls:bool=False) -> BookmarksMap:
+def get_recent_places(asQUrl:bool=False,
+                       intKeys:bool=True) -> BookmarksMap:
     """Collect recent places as defined in the freedesktop.org XDG framework.
     Useful for Linux desktops that comply with XDG (e.g. KDE, GNOME, XFCE, LXDE, etc).
-    
     
     Returns:
     ========
 
-    A mapping of url (str) ↦ {"name"    ↦ descriptive name (str), 
+    A mapping of url (str | int) ↦ {"name"    ↦ descriptive name (str), 
                               "icon"    ↦ icon theme name (str),
                               "system"  ↦ is this a system place? (bool, default False),
                               "hidden"  ↦ is this a hidden place? (bool, default False),
@@ -601,15 +611,14 @@ def get_recent_places(schema:typing.Optional[str]=None,
     
     
     """
-    if isinstance(schema, str) and schema not in SCHEMAS:
-        schema = None
-        
-    elif isinstance(schema, bool):
-        as_qUrls = schema = True
-        schema = None
+    # NOTE: 2025-02-08 10:07:51 TODO:
+    # This is static: whenever a bookmark, or the bookmarks repository, is altered
+    # this won't be captured until a new Scipyen session is launched.
+    
+    
+    import datetime
         
     ret = BookmarksMap()
-    # stdPlaces = get_standard_desktop_places(as_qUrls, all_folder_icons)
     
     # NOTE: 2023-05-01 13:38:10 TODO
     # below we are using the file `user-places.xbel` or `recently-used.xbel` located in 
@@ -633,42 +642,67 @@ def get_recent_places(schema:typing.Optional[str]=None,
     
     if sys.platform.startswith("linux") and HAS_PYXDG:
         xbel = "recently-used.xbel"
-        places = pio.loadXMLFile(os.path.join(xdg.BaseDirectory.xdg_data_home, xbel))
-        # places = pio.loadXMLFile(os.path.join(xdg.BaseDirectory.xdg_data_home, "user-places.xbel"))
+        xbel_file = os.path.join(xdg.BaseDirectory.xdg_data_home, xbel)
+        if not os.path.exists(xbel_file):
+            return ret
+        places = pio.loadXMLFile(xbel_file)
             
         if "xbel" in places.documentElement.tagName.lower():
             bookmark_nodes = places.getElementsByTagName("bookmark")
+            if len(bookmark_nodes) == 0:
+                return ret
             
-            for b in bookmark_nodes:
+            for k,b in enumerate(bookmark_nodes):
                 bookmark = DEBookmark()
                 url = b.getAttribute("href")
                     
                 if len(url) == 0:
                     continue
                 
-                if as_qUrls:
-                    url = QtCore.QUrl(url)
+                # if asQUrl:
+                #     url = QtCore.QUrl(url)
                     
-                bookmark["url"] = url
+                bookmark["url"] = QtCore.QUrl(url) # always convert this to QUrl
+                bookmark["added"] = datetime.datetime.fromisoformat(b.getAttribute("added"))
+                bookmark["modified"] = datetime.datetime.fromisoformat(b.getAttribute("modified"))
+                bookmark["visited"] = datetime.datetime.fromisoformat(b.getAttribute("visited"))
                 
-                info_node = b.getElementsByTagName("info")[0]
+                
+                info_nodes = b.getElementsByTagName("info")
+                
+                if len(info_nodes) == 0:
+                    continue
+                
+                info_node = info_nodes[0]
+                
                 info_metadata_nodes = info_node.getElementsByTagName("metadata")
-                mime = info_metadata_nodes[0].getElementsByTagName("mime:mime-type")[0].childNodes[0].data
-                bookmark["mime"] = mime
                 
+                if len(info_metadata_nodes) == 0:
+                    continue
+                
+                info_metadata_node = info_metadata_nodes[0]
+                
+                mime_nodes = info_metadata_node.getElementsByTagName("mime:mime-type")
+                
+                if len(mime_nodes) == 0:
+                    continue
+                
+                bookmark["mime-type"] = mime_nodes[0].getAttribute("type").replace("&apos", "")
                 bookmark_application_node = info_metadata_nodes[0].getElementsByTagName("bookmark:applications")
-                bookmark_applications = bookmark_application_node.getElementsByTagName("bookrmark:application")
+                bookmark_applications = bookmark_application_node[0].getElementsByTagName("bookmark:application")
                 
                 bookmark["applications"] = list()
                 for ba in bookmark_applications:
                     app = Bunch()
-                    app["exec_str"] = ba.getAttribute("exec")
+                    app["name"] = ba.getAttribute("name").replace("&apos", "")
+                    app["exec_str"] = ba.getAttribute("exec").replace("&apos", "")
+                    # app["exec_str"] = ba.getAttribute("exec").replace("&apos", "'")
+                    app["modified"] = datetime.datetime.fromisoformat(ba.getAttribute("modified"))
                     app["count"] = ba.getAttribute("count")
-                    app["name"] = ba.getAttribute("name")
-                    app["modified"] = ba.getAttribute("modified")
                     bookmark["applications"].append(app)
-                    
-            ret[url] = bookmark
+                
+                key = k if intKeys else QtCore.QUrl(url) if asQUrl else url
+                ret[key] = bookmark
                 
     return ret
 
@@ -966,8 +1000,76 @@ def closestPlace(url:QtCore.QUrl, places:typing.Optional[PlacesMap]=None) -> DEP
     
     return foundPlaces[0] if len(foundPlaces) else fallback
         
+class PlacesMonitor(QtCore.QObject):
+    __instance__ = None # NOTE: Singleton design pattern
+    sig_placesChanged = Signal(name="sig_placesChanged")
+    sig_bookmarksChanged = Signal(name="sig_bookmarksChanged")
     
+    def __new__(cls:typing.Self, *args, **kwargs) -> typing.Self:
+        # NOTE: Singleton design pattern
+        if not hasattr(cls, "__instance__") or not isinstance(cls.__instance__, cls):
+            cls.__instance__ = super(PlacesMonitor, cls).__new__(cls, *args, **kwargs)
+            
+        return cls.__instance__
     
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        
+        self.placesWatcher = QtCore.QFileSystemMonitor(parent=self)
+        self.bookmarksWatcher = QtCore.QFileSystemMonitor(parent=self)
+        
+        self.setupWatcher()
+        self.__instance__ = self
+        
+    @classmethod
+    def _walk_mro(cls) -> typing.Generator[typing.Self, None, None]: # NOTE: Singleton design pattern
+        for subclass in cls.mro():
+            if (
+                issubclass(cls, subclass)
+                and issubclass(subclass, typing.Self)
+                and subclass != typing.Self
+            ):
+                yield subclass
+                
+    @classmethod
+    def initialized(cls:typing.Self) -> bool: # NOTE: Singleton design pattern
+        return hasattr(cls, "__instance__" and isinstance(cls.__instance__, cls))
+    
+    @classmethod
+    def instance(cls:typing.Self, *args, **kwargs) -> typing.Self: # NOTE: Singleton design pattern
+        if cls.__instance__ is None:
+            inst = cls(*args, **kwargs)
+            for subclass in cls._walk_mro():
+                subclass.__instance__ = inst
+        if hasattr(cls, "__instance__") and isinstance(cls.__instance__, cls):
+            return cls.__instance__
+        else:
+            raise RuntimeError(f"Incompatible sibling of '{cls.__name__}' is already instantiated as singleton: {type(cls.__instance__).__name__}")
+
+    @staticmethod
+    def instance() -> typing.Self: # originally self()... in kprotocolinfofactory.cpp
+        return ProtocolInfoFactory.__instance__
+    
+    def setupWatcher(self):
+        if sys.platform.startswith("linux") and HAS_PYXDG:
+            user_xbel = os.path.join(xdg.BaseDirectory.xdg_data_home, "user-places.xbel")
+            recents_xbel = os.path.join(xdg.BaseDirectory.xdg_data_home, "recently-used.xbel")
+        
+            if os.path.exists(user_xbel):
+                self.placesWatcher.addPath(user_xbel)
+                self.placesWatcher.fileChanged.connect(self.slot_placesChanged)
+                
+            if os.path.exists(recents_xbel):
+                self.bookmarksWatcher.addPath(recents_xbel)
+                self.bookmarksWatcher.fileChanged.connect(self.slot_bookmarksChanged)
+        
+    @Slot()
+    def slot_placesChanged(self):
+        self.sig_placesChanged.emit()
+        
+    @Slot()
+    def slot_bookmarksChanged(self):
+        self.sig_bookmarksChanged.emit()
 
      
     

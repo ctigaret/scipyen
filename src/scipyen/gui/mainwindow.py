@@ -1118,11 +1118,11 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     
     @classmethod
     def _walk_mro(cls) -> typing.Generator[typing.Self, None, None]:
-    # def _walk_mro(cls) -> typing.Generator[type[SMW], None, None]:
         """Walk the cls.mro() for parent classes that are also singletons
 
         For use in instance()
         """
+        # NOTE: Singleton design pattern
         # NOTE: 2025-01-07 12:42:39
         # see traitlets.config.SingletonConfigurable
         for subclass in cls.mro():
@@ -1137,12 +1137,12 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
     @classmethod
     def initialized(cls:typing.Self) -> bool:
-    # def initialized(cls:type[SMW]) -> bool:
+        # NOTE: Singleton design pattern
         return hasattr(cls, "_instance" and isinstance(cls._instance, cls))
 
     @classmethod
     def instance(cls:typing.Self, *args, **kwargs) -> typing.Self:
-    # def instance(cls:type[SMW], *args, **kwargs) -> SMW:
+        # NOTE: Singleton design pattern
         if cls._instance is None:
             inst = cls(*args, **kwargs)
             for subclass in cls._walk_mro():

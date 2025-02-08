@@ -2102,7 +2102,8 @@ class UrlNavigatorPathSelectorEventFilter(QtCore.QObject):
 class _UrlNavigator_(QtCore.QObject):
     # KUrlNavigatorPrivate
     # _sig_switchToBreadCrumbMode = Signal(name="_sig_switchToBreadCrumbMode")
-    def __init__(self, url:QtCore.QUrl, qq: UrlNavigator, placesModel:typing.Optional[PlacesModel]=None):
+    def __init__(self, url:QtCore.QUrl, qq: UrlNavigator, 
+                 placesModel:typing.Optional[PlacesModel]=None):
         # print(f"{self.__class__.__name__}.__init__: url = {url}")
         super().__init__()
         self._supportedSchemes_:list[str] = list()
