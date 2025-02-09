@@ -70,9 +70,10 @@ Work in progress, DO NOT USE
 # OK, now I need to understand what does Solid provide to the KIO
 # --------------
 
-import sys, os, typing, pathlib, functools, itertools
+import sys, os, typing, pathlib, functools, itertools, traceback
 from urllib.parse import urlparse, urlsplit
 from collections import namedtuple
+from abc import ABCMeta, abstractmethod
 from enum import Enum, IntEnum
 from qtpy import QtCore, QtGui, QtWidgets, QtSvg
 from qtpy.QtCore import Signal, Slot, Property
@@ -90,7 +91,7 @@ except:
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
-class DeviceType(IntEnum):
+class DeviceInterfaceType(IntEnum):
     """"""
     # NOTE: 2025-01-03 14:09:24 
     # Solid DeviceInterface::Type
@@ -109,10 +110,176 @@ class DeviceType(IntEnum):
     NetworkShare = 14,
     Last = 0xffff,
     
-class Device(QtCore.QObject):
-    def __init__(self, parent:typing.Optional[QtCore.QObject]=None):
+class _ManagerBase_:
+    def __init__(self):
+        self._backends_:list = list()
+        
+    def __del__(self):
+        self._backends_.clear()
+        
+    def managerBackends(self)->list:
+        return self._backends_
+        
+    def loadBackends(self):
+        solidFakeXml = os.environ.get("SOLID_FAKEHW")
+        if isinstance(solidFakeXml, str) and len(solidFakeXml) > 0:
+            pass # TODO backends/FakeManager
+        else:
+            pass # TODO backends/FstabManager
+        
+        # TODO: backends/IMobileManager
+        # TODO: backends/IOKitManager
+        # TODO: backends/UDevManager
+        
+        solidDisableUdisks2 = os.environ.get("SOLID_DISABLE_UDISKS2")
+        if not isinstance(solidDisableUdisks2, str) or len(solidDisableUdisks2) == 0:
+            pass # TODO backends/Udisks2Manager
+        
+        # solidDisableUpower # skip this
+        
+        if sys.platform == "win32":
+            pass # TODO backends/WinDeviceManager
+        
+        
+class DeviceNotifier(QtCore.QObject):
+    # singleton design pattern
+    __instance__:typing.Optional[typing.Self] = None
+    deviceAdded = Signal(str, name="deviceAdded") # parameters is an udi
+    deviceRemoved = Signal(str, name="deviceRemoved") # parameters is an udi
+    
+    def __new__(cls:typing.Self, *args, **kwargs) -> typing.Self:
+        if not hasattr(cls, "__instance__") or not isinstance(cls.__instance__, cls):
+            cls.__instance__ = super(DeviceNotifier, cls).__new__(cls, *args, **kwargs)
+            
+        return cls.__instance__
+    
+    def __init__(self, parent:typing.Optional[QtCore.QObject] = None):
         super().__init__(parent=parent)
+        self.__instance__ = self
+    
+    @classmethod
+    def _walk_mro(cls) -> typing.Generator[typing.Self, None, None]: # NOTE: Singleton design pattern
+        for subclass in cls.mro():
+            if (
+                issubclass(cls, subclass)
+                and issubclass(subclass, typing.Self)
+                and subclass != typing.Self
+            ):
+                yield subclass
+                
+    @classmethod
+    def initialized(cls:typing.Self) -> bool: # NOTE: Singleton design pattern
+        return hasattr(cls, "__instance__" and isinstance(cls.__instance__, cls))
+    
+    @classmethod
+    def instance(cls:typing.Self, *args, **kwargs) -> typing.Self: # NOTE: Singleton design pattern
+        if cls.__instance__ is None:
+            inst = cls(*args, **kwargs)
+            for subclass in cls._walk_mro():
+                subclass.__instance__ = inst
+        if hasattr(cls, "__instance__") and isinstance(cls.__instance__, cls):
+            return cls.__instance__
+        else:
+            raise RuntimeError(f"Incompatible sibling of '{cls.__name__}' is already instantiated as singleton: {type(cls.__instance__).__name__}")
 
+    # @staticmethod
+    # def instance():
+    #     pass
+    
+class _DeviceManager_: pass
+
+class _Device_(QtCore.QObject):
+    def __init__(self, udi:str):
+        super().__init__()
+        self._udi_ = udi
+        self._backendObject_ = None
+        self._ifaces_ = dict()
+        
+    def __del__(self):
+        self.setBackendObject(None)
+        
+    @Slot(QtCore.QObject)
+    def slot_k_destroyed(self, o:QtCore.QObject):
+        self.setBackendObject(None)
+        
+    def setBackendObject(self, o=None):
+        if self._backendObject_ is not None:
+            self._backendObject_.data.disconnect(self)
+        self._backendObject_ = o
+        
+        if o is not None:
+            o.destroyed.connect(self.slot_k_destroyed)
+            
+        if len(self._ifaces_) > 0:
+            self._ifaces_.clear()
+            self.deleteLater()
+            
+    def interface(self, devtype:DeviceInterfaceType) -> DeviceInterface | None:
+        return self._ifaces_.get(devtype, None)
+    
+    def setInterface(self, devtype:DeviceInterfaceType, interface:DeviceInterface):
+        self._ifaces_[devtype] = interface
+            
+class _DeviceManager_(DeviceNotifier, _ManagerBase_):
+    def __init__(self):
+        super(DeviceNotifier, self).__init__()
+        self._nullDevice_ = _Device_("")
+        self.loadBackends()
+        backends = self.managerBackends()
+        for backend in backends:
+            pass # TODO
+        
+    @Slot(str)
+    def _k_deviceAdded(self, udi:str):
+        pass
+    
+    @Slot(str)
+    def _k_deviceRemoved(self, udi:str):
+        pass
+    
+    @Slot(QtCore.QObject)
+    def _k_destroyed(self, o:QtCore.QObject):
+        pass
+        
+
+class DeviceManagerStorage:
+    def __init__(self):
+        self._storage_ = None
+        
+    def managerBackends(self) -> list():
+        pass
+    
+    def notifier(self) -> DeviceNotifier:
+        pass
+    
+    def ensureManagerCreated(self):
+        pass
+    
+    
+class DeviceManager(QtCore.QObject):
+    # abstract base class
+    deviceAdded = Signal(str, name="deviceAdded") # parameter is the udi
+    deviceRemoved = Signal(str, name="deviceRemoved") # parameter is the udi
+    
+    def __init__(self, parent:typing.Optional[QtCore.QObject] = None):
+        super().__init__(parent=parent)
+        
+    @abstractmethod
+    def udiPrefix() -> str:
+        pass
+    
+    @abstractmethod
+    def supportedInterfaces(sel) -> set:
+        pass
+    
+    @abstractmethod
+    def allDevices(self) -> list[str]:
+        return list()
+    
+    @abstractmethod
+    def devicesFromQuery(self, parentUdi:str, ):
+        pass
+        
 class DeviceInterface(QtCore.QObject):
     def __init__(self, parent:typing.Optional[QtCore.QObject]=None):
         super().__init__(parent=parent)
@@ -123,3 +290,10 @@ class DeviceInterface(QtCore.QObject):
         self._backendObject:typing.Optional[QtCore.QObject] = None
         self._devicePrivate:typing.Optional[Device] = None
         # ### END DeviceInterfacePrivate
+
+        
+    
+class Device():
+    def __init__(self, device :typing.Optional[typing.Self]=None):
+        pass
+        

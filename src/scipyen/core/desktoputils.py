@@ -1048,9 +1048,9 @@ class PlacesMonitor(QtCore.QObject):
         else:
             raise RuntimeError(f"Incompatible sibling of '{cls.__name__}' is already instantiated as singleton: {type(cls.__instance__).__name__}")
 
-    @staticmethod
-    def instance() -> typing.Self: # originally self()... in kprotocolinfofactory.cpp
-        return ProtocolInfoFactory.__instance__
+    # @staticmethod
+    # def getSelf() -> typing.Self: # originally self()... in kprotocolinfofactory.cpp
+    #     return ProtocolInfoFactory.__instance__
     
     def setupWatcher(self):
         if sys.platform.startswith("linux") and HAS_PYXDG:
