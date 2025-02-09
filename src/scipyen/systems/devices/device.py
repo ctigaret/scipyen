@@ -182,11 +182,9 @@ class DeviceNotifier(QtCore.QObject):
         else:
             raise RuntimeError(f"Incompatible sibling of '{cls.__name__}' is already instantiated as singleton: {type(cls.__instance__).__name__}")
 
-    # @staticmethod
-    # def instance():
-    #     pass
-    
 class _DeviceManager_: pass
+class DeviceInterface: pass
+class Device: pass
 
 class _Device_(QtCore.QObject):
     def __init__(self, udi:str):
@@ -198,13 +196,19 @@ class _Device_(QtCore.QObject):
     def __del__(self):
         self.setBackendObject(None)
         
+    def udi(self) -> str:
+        return self._udi_
+        
     @Slot(QtCore.QObject)
     def slot_k_destroyed(self, o:QtCore.QObject):
         self.setBackendObject(None)
         
+    def backendObject(self):
+        return self._backendObject_
+    
     def setBackendObject(self, o=None):
         if self._backendObject_ is not None:
-            self._backendObject_.data.disconnect(self)
+            self._backendObject_.disconnect(self)
         self._backendObject_ = o
         
         if o is not None:
@@ -222,12 +226,30 @@ class _Device_(QtCore.QObject):
             
 class _DeviceManager_(DeviceNotifier, _ManagerBase_):
     def __init__(self):
+        super(_ManagerBase_, self).__init__()
         super(DeviceNotifier, self).__init__()
         self._nullDevice_ = _Device_("")
+        # NOTE: 2025-02-09 22:51:23
+        # should I use weakref as _devicesMap_ values, here ?!?
+        self._devicesMap_ = dict() # str ↦ _Device_
+        self._reverseMap_ = dict() # QObject ↦ str
+            
         self.loadBackends()
+        backends = self.managerBackends() # _ManagerBase_
+        for backend in backends:
+            backend.deviceAdded.connect(self._k_deviceAdded)
+            backend.deviceRemoved.connect(self._k_deviceRemoved)
+            # pass # TODO
+        
+    def __del__(self):
         backends = self.managerBackends()
         for backend in backends:
-            pass # TODO
+            backend.deviceAdded.disconnect(self._k_deviceAdded)
+            backend.deviceRemoved.disconnect(self._k_deviceRemoved)
+            
+        # NOTE: 2025-02-09 22:51:23
+        # should I use weakref as _devicesMap_ values, here ?!?
+        self._devicesMap_.clear()
         
     @Slot(str)
     def _k_deviceAdded(self, udi:str):
@@ -240,7 +262,9 @@ class _DeviceManager_(DeviceNotifier, _ManagerBase_):
     @Slot(QtCore.QObject)
     def _k_destroyed(self, o:QtCore.QObject):
         pass
-        
+    
+    def createBackendObject(self, udi:str) -> Device:
+        pass
 
 class DeviceManagerStorage:
     def __init__(self):

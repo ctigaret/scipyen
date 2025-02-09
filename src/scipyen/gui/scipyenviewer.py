@@ -14,12 +14,12 @@ from traitlets import Bunch
 
 from qtpy import (QtCore, QtWidgets, QtGui)
 
-has_qdbus = False
+has_qtdbus = False
 try:
     from qtpy import QtDBus
-    has_qdbus = True
+    has_qtdbus = True
 except:
-    has_qdbus = False
+    has_qtdbus = False
     
 from qtpy.QtCore import (Signal, Slot, Property,)
 
@@ -264,12 +264,12 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         # if not QtWidgets.qApp.testAttribute(QtCore.Qt.AA_DontUseNativeMenuBar):
         if not QtWidgets.QApplication.instance().testAttribute(QtCore.Qt.AA_DontUseNativeMenuBar):
             # if "startplasma" in sysutils.get_desktop() or "KDE" in sysutils.get_desktop("desktop"):
-            # if sysutils.is_kde_x11() and has_qdbus:
+            # if sysutils.is_kde_x11() and has_qtdbus:
             # NOTE: 2024-11-08 09:44:58
             # accomodate wayland sessions (eveb when run with QT_QPA_PLATFORM=xcb,
             # the session reported by QApplication is wayland if the WM is using wayland)
-            # if sysutils.is_kde() and has_qdbus:
-            if desktoputils.is_kde() and has_qdbus:
+            # if sysutils.is_kde() and has_qtdbus:
+            if desktoputils.is_kde() and has_qtdbus:
                 appMenuServiceNames = list(name for name in QtDBus.QDBusConnection.sessionBus().interface().registeredServiceNames().value() if "AppMenu" in name)
                 
                 if len(appMenuServiceNames):
