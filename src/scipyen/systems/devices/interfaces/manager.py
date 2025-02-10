@@ -16,6 +16,7 @@ from core.sysutils import adapt_ui_path
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
 class DeviceManager(QtCore.QObject, ABCMeta):
+    from systems.devices.device import DeviceInterfaceType
     # abstract base class
     deviceAdded = Signal(str, name="deviceAdded") # parameter is the udi
     deviceRemoved = Signal(str, name="deviceRemoved") # parameter is the udi
@@ -28,7 +29,7 @@ class DeviceManager(QtCore.QObject, ABCMeta):
         pass
     
     @abstractmethod
-    def supportedInterfaces(sel) -> set:
+    def supportedInterfaces(sel) -> set[DeviceInterfaceType]:
         pass
     
     @abstractmethod

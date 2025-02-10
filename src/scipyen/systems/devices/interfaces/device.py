@@ -69,10 +69,7 @@ class Device(QtCore.QObject):
     def createDeviceInterface(self, devtype:DeviceInterfaceType) -> QtCore.QObject:
         pass
     
-    # def registerAction(self, actionName:str, dest:QtCore.QObject,
-    #                    requestSlot:Slot, doneSlot:Slot):
-    def registerAction(self, actionName:str,
-                       requestSlot:Slot, doneSlot:Slot):
+    def registerAction(self, actionName:str, requestSlot:Slot, doneSlot:Slot):
         if has_qtdbus:
             # NOTE: 2025-02-09 23:33:01
             # QDBusConnection.connect(service:str, path:str, interface:str,
@@ -95,8 +92,7 @@ class Device(QtCore.QObject):
             signal = QtDBus.QDBusMessage.createSignal(path, interface, name)
             QtDBus.QDBusConnection.sessionBus().send(signal)
             
-    def broadCastActionDone(self, actionName:str, error:int,
-                            errorString:str = ""):
+    def broadCastActionDone(self, actionName:str, error:int, errorString:str = ""):
         if has_qtdbus:
             path = self.deviceDBusPath()
             interface = "org.Scipyen.Device"
@@ -104,7 +100,6 @@ class Device(QtCore.QObject):
             signal = QtDBus.QDBusMessage.createSignal(path, interface, name) << errorString
             QtDBus.QDBusConnection.sessionBus().send(signal)
             
-    
     def deviceDBusPath(self) -> str:
         encodedUdi = QtCore.QByteArray(self.udi().encode()).toPercentEncoding(QtCore.QByteArray(), b".~-", "_")
         return f"/org/Scipyen/Device_{bytearray(encodedUdi).decode()}"

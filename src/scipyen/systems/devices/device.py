@@ -304,16 +304,6 @@ class DeviceManager(QtCore.QObject):
     def devicesFromQuery(self, parentUdi:str, ):
         pass
         
-class DeviceInterface(QtCore.QObject):
-    def __init__(self, parent:typing.Optional[QtCore.QObject]=None):
-        super().__init__(parent=parent)
-        
-        # ### BEGIN DeviceInterfacePrivate
-        self.backendObject:QtCore.QObject = QtCore.QObject()
-        self.devicePrivate:Device = Device() # DevicePrivate
-        self._backendObject:typing.Optional[QtCore.QObject] = None
-        self._devicePrivate:typing.Optional[Device] = None
-        # ### END DeviceInterfacePrivate
 
         
     
