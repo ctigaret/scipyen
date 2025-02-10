@@ -6,6 +6,8 @@
 """
 Work in progress, DO NOT USE
 """
+# NOTE: 2025-02-10 17:40:56 solid/devices/frontend/device
+
 # TODO 2025-02-06 11:42:09 Devices access in Scipyen
 # Consider:
 # • Linux: pyserial, pyusb, pyudev
@@ -91,24 +93,24 @@ except:
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
-class DeviceInterfaceType(IntEnum):
-    """"""
-    # NOTE: 2025-01-03 14:09:24 
-    # Solid DeviceInterface::Type
-    Unknown = 0,
-    GenericInterface = 1,
-    Processor = 2,
-    Block = 3,
-    StorageAccess = 4,
-    StorageDrive = 5,
-    OpticalDrive = 6,
-    StorageVolume = 7,
-    OpticalDisc = 8,
-    Camera = 9,
-    PortableMediaPlayer = 10,
-    Battery = 12,
-    NetworkShare = 14,
-    Last = 0xffff,
+# class DeviceInterfaceType(IntEnum):
+#     """"""
+#     # NOTE: 2025-01-03 14:09:24 
+#     # Solid DeviceInterface::Type
+#     Unknown = 0,
+#     GenericInterface = 1,
+#     Processor = 2,
+#     Block = 3,
+#     StorageAccess = 4,
+#     StorageDrive = 5,
+#     OpticalDrive = 6,
+#     StorageVolume = 7,
+#     OpticalDisc = 8,
+#     Camera = 9,
+#     PortableMediaPlayer = 10,
+#     Battery = 12,
+#     NetworkShare = 14,
+#     Last = 0xffff,
     
 class _ManagerBase_:
     def __init__(self):
@@ -187,11 +189,13 @@ class DeviceInterface: pass
 class Device: pass
 
 class _Device_(QtCore.QObject):
+    from systems.devices.interface.device import Device as IFaceDevice
+    from systems.devices.deviceinterface import (DeviceInterfaceType, DeviceInterface)
     def __init__(self, udi:str):
         super().__init__()
-        self._udi_ = udi
-        self._backendObject_ = None
-        self._ifaces_ = dict()
+        self._udi_:str = udi
+        self._backendObject_:typing.Optional[IFaceDevice] = None # interfaces.device.Device
+        self._ifaces_:dict = dict() # DeviceInterfaceType ↦ DeviceInterface
         
     def __del__(self):
         self.setBackendObject(None)
@@ -203,10 +207,10 @@ class _Device_(QtCore.QObject):
     def slot_k_destroyed(self, o:QtCore.QObject):
         self.setBackendObject(None)
         
-    def backendObject(self):
+    def backendObject(self) -> IFaceDevice | None:
         return self._backendObject_
     
-    def setBackendObject(self, o=None):
+    def setBackendObject(self, o:typing.Optional[IFaceDevice]=None):
         if self._backendObject_ is not None:
             self._backendObject_.disconnect(self)
         self._backendObject_ = o
@@ -214,7 +218,7 @@ class _Device_(QtCore.QObject):
         if o is not None:
             o.destroyed.connect(self.slot_k_destroyed)
             
-        if len(self._ifaces_) > 0:
+        if len(self._ifaces_) > 0: # why this ?!?
             self._ifaces_.clear()
             self.deleteLater()
             
@@ -224,90 +228,24 @@ class _Device_(QtCore.QObject):
     def setInterface(self, devtype:DeviceInterfaceType, interface:DeviceInterface):
         self._ifaces_[devtype] = interface
             
-class _DeviceManager_(DeviceNotifier, _ManagerBase_):
-    def __init__(self):
-        super(_ManagerBase_, self).__init__()
-        super(DeviceNotifier, self).__init__()
-        self._nullDevice_ = _Device_("")
-        # NOTE: 2025-02-09 22:51:23
-        # should I use weakref as _devicesMap_ values, here ?!?
-        self._devicesMap_ = dict() # str ↦ _Device_
-        self._reverseMap_ = dict() # QObject ↦ str
-            
-        self.loadBackends()
-        backends = self.managerBackends() # _ManagerBase_
-        for backend in backends:
-            backend.deviceAdded.connect(self._k_deviceAdded)
-            backend.deviceRemoved.connect(self._k_deviceRemoved)
-            # pass # TODO
-        
-    def __del__(self):
-        backends = self.managerBackends()
-        for backend in backends:
-            backend.deviceAdded.disconnect(self._k_deviceAdded)
-            backend.deviceRemoved.disconnect(self._k_deviceRemoved)
-            
-        # NOTE: 2025-02-09 22:51:23
-        # should I use weakref as _devicesMap_ values, here ?!?
-        self._devicesMap_.clear()
-        
-    @Slot(str)
-    def _k_deviceAdded(self, udi:str):
-        pass
-    
-    @Slot(str)
-    def _k_deviceRemoved(self, udi:str):
-        pass
-    
-    @Slot(QtCore.QObject)
-    def _k_destroyed(self, o:QtCore.QObject):
-        pass
-    
-    def createBackendObject(self, udi:str) -> Device:
-        pass
-
-class DeviceManagerStorage:
-    def __init__(self):
-        self._storage_ = None
-        
-    def managerBackends(self) -> list():
-        pass
-    
-    def notifier(self) -> DeviceNotifier:
-        pass
-    
-    def ensureManagerCreated(self):
-        pass
-    
-    
-class DeviceManager(QtCore.QObject):
-    # abstract base class
-    deviceAdded = Signal(str, name="deviceAdded") # parameter is the udi
-    deviceRemoved = Signal(str, name="deviceRemoved") # parameter is the udi
-    
-    def __init__(self, parent:typing.Optional[QtCore.QObject] = None):
-        super().__init__(parent=parent)
-        
-    @abstractmethod
-    def udiPrefix() -> str:
-        pass
-    
-    @abstractmethod
-    def supportedInterfaces(sel) -> set:
-        pass
-    
-    @abstractmethod
-    def allDevices(self) -> list[str]:
-        return list()
-    
-    @abstractmethod
-    def devicesFromQuery(self, parentUdi:str, ):
-        pass
-        
-
-        
     
 class Device():
-    def __init__(self, device :typing.Optional[typing.Self]=None):
+    from systems.devices.devicemanager import (DeviceManagerStorage, DeviceManager)
+    from systems.devices.predicate import Predicate # TODO: 2025-02-10 18:30:03 needs done
+    def __init__(self, device:typing.Optional[typing.Self]=None):
+        pass
+    
+    @classmethod
+    def allDevices(cls) -> list[typing.Self]:
+        # NOTE: 2025-02-10 18:04:38 TODO 
+        # needs DeviceManager and DeviceManagerStorage
+        pass
+    
+    @classmethod
+    def listFromQuery(cls, predicate:typing.Union[str, Predicate], parentUdi:str) -> list[typing.Self]:
+        pass
+    
+    @classmethod
+    def listFromType(cls, devtype:DeviceInterfaceType, parentUdi:str) -> list[typing.Self]:
         pass
         
