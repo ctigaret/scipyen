@@ -35,7 +35,7 @@ from core.desktoputils import (get_desktop_places, get_recent_places,
 
 from iolib.navigation.dirlister import DirLister
 
-from systems.devices.device import Device
+# from systems.devices.device import Device
 
 HAS_PYXDG = False
 # HAS_XDGSPEC = False

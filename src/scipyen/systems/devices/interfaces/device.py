@@ -24,7 +24,7 @@ from core.prog import safeWrapper
 from core.sysutils import adapt_ui_path
 
 class Device(QtCore.QObject):
-    from systems.devices.device import DeviceInterfaceType
+    from systems.devices.deviceinterface import DeviceInterfaceType
     
     def __init__(self, parent:typing.Optional[QtCore.QObject]=None):
         super().__init__(parent=parent)
@@ -42,7 +42,7 @@ class Device(QtCore.QObject):
         pass
     
     @abstractmethod
-    def product(self) 0> str:
+    def product(self) -> str:
         pass
     
     @abstractmethod

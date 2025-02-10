@@ -6,7 +6,7 @@
 """
 Work in progress, DO NOT USE
 """
-# NOTE: 2025-02-10 17:40:56 solid/devices/frontend/device
+# NOTE: 2025-02-10 17:40:56 solid/devices/frontend/...
 
 # TODO 2025-02-06 11:42:09 Devices access in Scipyen
 # Consider:
@@ -82,6 +82,7 @@ from qtpy.QtCore import Signal, Slot, Property
 from qtpy.uic import loadUiType as __loadUiType__
 from core.prog import safeWrapper
 from core.sysutils import adapt_ui_path
+from core.datatypes import TypeEnum
 
 __HAS_PYUDEV__ = False
 
@@ -93,26 +94,15 @@ except:
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
-# class DeviceInterfaceType(IntEnum):
-#     """"""
-#     # NOTE: 2025-01-03 14:09:24 
-#     # Solid DeviceInterface::Type
-#     Unknown = 0,
-#     GenericInterface = 1,
-#     Processor = 2,
-#     Block = 3,
-#     StorageAccess = 4,
-#     StorageDrive = 5,
-#     OpticalDrive = 6,
-#     StorageVolume = 7,
-#     OpticalDisc = 8,
-#     Camera = 9,
-#     PortableMediaPlayer = 10,
-#     Battery = 12,
-#     NetworkShare = 14,
-#     Last = 0xffff,
+class DeviceNotifier:pass # NOTE 2025-02-10 21:21:44 discard once finalised
+class _DeviceManager_: pass
+class _DeviceInterface_: pass
+class DeviceInterface: pass
+class _Device_: pass
+class Device: pass
     
 class _ManagerBase_:
+    from systems.devices.interfaces.device import Device as IFaceDevice
     def __init__(self):
         self._backends_:list = list()
         
@@ -123,6 +113,8 @@ class _ManagerBase_:
         return self._backends_
         
     def loadBackends(self):
+        # NOTE: 2025-02-10 22:45:55
+        # a backend is a interfaces object!
         solidFakeXml = os.environ.get("SOLID_FAKEHW")
         if isinstance(solidFakeXml, str) and len(solidFakeXml) > 0:
             pass # TODO backends/FakeManager
@@ -142,6 +134,24 @@ class _ManagerBase_:
         if sys.platform == "win32":
             pass # TODO backends/WinDeviceManager
         
+class DeviceManagerStorage:
+    def __init__(self):
+        self._storage_:typing.Optional[_DeviceManager_] = None
+        
+    def managerBackends(self) -> list():
+        self.ensureManagerCreated()
+        return self._storage_.managerBackends()
+    
+    def notifier(self) -> DeviceNotifier:
+        # actually returns a _DeviceManager_, which is a DeviceNotifier
+        self.ensureManagerCreated()
+        return self._storage_
+    
+    def ensureManagerCreated(self):
+        if not isinstance(self._storage_, _DeviceManager_):
+            self._storage_ = _DeviceManager_() # hmmm...
+    
+global globalDeviceStorage = DeviceManagerStorage()
         
 class DeviceNotifier(QtCore.QObject):
     # singleton design pattern
@@ -184,13 +194,234 @@ class DeviceNotifier(QtCore.QObject):
         else:
             raise RuntimeError(f"Incompatible sibling of '{cls.__name__}' is already instantiated as singleton: {type(cls.__instance__).__name__}")
 
-class _DeviceManager_: pass
-class DeviceInterface: pass
-class Device: pass
+
+class _DeviceManager_(DeviceNotifier, _ManagerBase_):
+    def __init__(self):
+        super(_ManagerBase_, self).__init__()
+        super(DeviceNotifier, self).__init__()
+        self._nullDevice_ = _Device_("")
+        # NOTE: 2025-02-09 22:51:23
+        # should I use weakref as _devicesMap_ values, here ?!?
+        self._devicesMap_ = dict() # udi:str ↦ _Device_
+        self._reverseMap_ = dict() # QObject ↦ udi:str
+            
+        self.loadBackends() # def in _ManagerBase_
+        
+        backends = self.managerBackends() # list[_ManagerBase_.IFaceDevice] WARNING
+        
+        for backend in backends:
+            backend.deviceAdded.connect(self._k_deviceAdded)
+            backend.deviceRemoved.connect(self._k_deviceRemoved)
+            # pass # TODO
+        
+    def __del__(self):
+        backends = self.managerBackends()
+        for backend in backends:
+            backend.deviceAdded.disconnect(self._k_deviceAdded)
+            backend.deviceRemoved.disconnect(self._k_deviceRemoved)
+            
+        # NOTE: 2025-02-09 22:51:23
+        # should I use weakref as _devicesMap_ values, here ?!?
+        self._devicesMap_.clear()
+        
+    @Slot(str)
+    def _k_deviceAdded(self, udi:str):
+        if udi in self._devicesMap_:
+            dev = self._devicesMap_[udi]
+            
+            if dev and dev.backendObject() is None:
+                dev.setBackendObject(self.createBackendObject(udi))
+                assert dev.backendObject() is not None
+                
+        self.deviceAdded.emit(udi)
+    
+    @Slot(str)
+    def _k_deviceRemoved(self, udi:str):
+        if udi in self._devicesMap_:
+            dev = self._devicesMap_[udi]
+            
+            if dev:
+                dev.setBackendObject(None)
+                
+        self.deviceRemoved.emit(udi)
+    
+    @Slot(QtCore.QObject)
+    def _k_destroyed(self, o:QtCore.QObject):
+        udi = self._reverseMap_.pop(o, None)
+        if isinstance(udi, str) and len(udi):
+            self._devicesMap_.pop(udi)
+    
+    def createBackendObject(self, udi:str) -> _ManagerBase_.IFaceDevice | None:
+        backends = globalDeviceStorage.managerBackends()
+        for backend in backends:
+            if not udi.startsWith(backend.udiPrefix()):
+                continue
+            
+            iface = backend.createDevice(udi) # FIXME 2025-02-10 22:44:30 this is interfaces.manager!
+            
+            return iface
+    
+    def findRegisteredDevice(self, udi:str) -> _Device_:
+        if len(udi) == 0:
+            return self._nullDevice_
+        
+        elif udi in self._devicesMap_:
+            return self._devicesMap_[udi]
+        
+        else:
+            iface = self.createBackendObject(udi)
+            devData = _Device_(udi)
+            devData.setBackendObject(iface)
+            self._devicesMap_[udi] = devData
+            self._reverseMap_[deviceData] = udi
+            devData.destroyed.connect(self._k_destroyed)
+            return devData
+
+    
+class DeviceManager(QtCore.QObject):
+    # abstract base class
+    deviceAdded = Signal(str, name="deviceAdded") # parameter is the udi
+    deviceRemoved = Signal(str, name="deviceRemoved") # parameter is the udi
+    
+    def __init__(self, parent:typing.Optional[QtCore.QObject] = None):
+        super().__init__(parent=parent)
+        
+    @abstractmethod
+    def udiPrefix() -> str:
+        pass
+    
+    @abstractmethod
+    def supportedInterfaces(sel) -> set:
+        pass
+    
+    @abstractmethod
+    def allDevices(self) -> list[str]:
+        return list()
+    
+    @abstractmethod
+    def devicesFromQuery(self, parentUdi:str, ):
+        pass
+    
+        
+class DeviceInterfaceType(TypeEnum):
+    """"""
+    # NOTE: 2025-01-03 14:09:24 
+    # Solid DeviceInterface::Type
+    Unknown = 0,
+    GenericInterface = 1,
+    Processor = 2,
+    Block = 3,
+    StorageAccess = 4,
+    StorageDrive = 5,
+    OpticalDrive = 6,
+    StorageVolume = 7,
+    OpticalDisc = 8,
+    Camera = 9,
+    PortableMediaPlayer = 10,
+    Battery = 12,
+    NetworkShare = 14,
+    Last = 0xffff,
+    
+# class _Device_:pass # CAUTION - remove if importing, below
+
+class _DeviceInterface_:
+    from systems.devices.device import (_Device_, Device)
+    def __init__(self):
+        super().__init__()
+        self._devicePrivate_:typing.Optional[_Device_] = None
+        self._backend_:typing.Optional[QtCore.QObject] = None
+        
+    def backendObject(self) -> QtCore.QObject:
+        return self._backend_ # in Solid this is equiv to a python weakref?
+    
+    def setBackendObject(self, o:QtCore.QObject):
+        self._backend_ = o
+    
+    def devicePrivate(self) -> _Device_:
+        return self._devicePrivate_
+    
+    def setDevicePrivate(self, dev:_Device_):
+        self._devicePrivate_ = dev
+
+class DeviceInterface(QtCore.QObject):
+    def __init__(self, dd:_DeviceInterface_, backendObject:QtCore.QObject,
+                 parent:typing.Optional[QtCore.QObject]=None):
+        super().__init__(parent=parent)
+        self._d_:_DeviceInterface_ = dd
+        self._d_.setBackendObject(backendObject)
+        
+    def __del__(self):
+        self._d_.backendObject().deleteLater()
+        self._d_ = None
+        
+    @staticmethod
+    def deviceInterfaceype() -> DeviceInterfaceType:
+        return DeviceInterfaceType.Unknown
+        
+    def isValid(self) -> bool:
+        return self._d_.backendObject() is not None
+    
+    def typeToString(self, type:DeviceInterfaceType) -> str:
+        return type.name()
+        
+    def stringToType(self, type:str) -> DeviceInterfaceType:
+        return DeviceInterfaceType.namevalue(type)
+    
+    def typeDescription(self, type:DeviceInterfaceType):
+        match (type):
+            case DeviceInterfaceType.DeviceInterfaceType.Unknown:
+                return "Unknown"
+            case DeviceInterfaceType.DeviceInterfaceType.GenericInterface:
+                return "Generic Interface"
+                # return tr("Generic Interface", "Generic Interface device type");
+            case DeviceInterfaceType.Processor:
+                return "Processor"
+                # return tr("Processor", "Processor device type");
+            case DeviceInterfaceType.Block:
+                return "Block Device"
+                # return tr("Block", "Block device type");
+            case DeviceInterfaceType.StorageAccess:
+                return "Storage Access Device"
+                # return tr("Storage Access", "Storage Access device type");
+            case DeviceInterfaceType.StorageDrive:
+                return "Storage Drive"
+                # return tr("Storage Drive", "Storage Drive device type");
+            case DeviceInterfaceType.OpticalDrive:
+                return "Optical Drive"
+                # return tr("Optical Drive", "Optical Drive device type");
+            case DeviceInterfaceType.StorageVolume:
+                return "Storage Volume"
+                # return tr("Storage Volume", "Storage Volume device type");
+            case DeviceInterfaceType.OpticalDisc:
+                return "Optical Disc"
+                # return tr("Optical Disc", "Optical Disc device type");
+            case DeviceInterfaceType.Camera:
+                return "Camera"
+                # return tr("Camera", "Camera device type");
+            case DeviceInterfaceType.PortableMediaPlayer:
+                return "Portable Media Player"
+                # return tr("Portable Media Player", "Portable Media Player device type");
+            case DeviceInterfaceType.Battery:
+                return "Battery"
+                # return tr("Battery", "Battery device type");
+            case DeviceInterfaceType.NetworkShare:
+                return "Network Share"
+                # return tr("Network Share", "Network Share device type");
+            case DeviceInterfaceType.Last:
+                return str()
+                # return QString();
+                
+            case _:
+                return str()
+            
+        return str()
+        # return QString();
+        
+
 
 class _Device_(QtCore.QObject):
-    from systems.devices.interface.device import Device as IFaceDevice
-    from systems.devices.deviceinterface import (DeviceInterfaceType, DeviceInterface)
+    from systems.devices.interfaces.device import Device as IFaceDevice
+    # from systems.devices.deviceinterface import (DeviceInterfaceType, DeviceInterface)
     def __init__(self, udi:str):
         super().__init__()
         self._udi_:str = udi
@@ -230,9 +461,23 @@ class _Device_(QtCore.QObject):
             
     
 class Device():
-    from systems.devices.devicemanager import (DeviceManagerStorage, DeviceManager)
+    # from systems.devices.devicemanager import (DeviceManagerStorage, DeviceManager)
     from systems.devices.predicate import Predicate # TODO: 2025-02-10 18:30:03 needs done
-    def __init__(self, device:typing.Optional[typing.Self]=None):
+    # from systems.devices.deviceinterface import (DeviceInterface, DeviceInterfaceType)
+    DevIface = typing.TypeVar("DevIFace", bound="DeviceInterface")
+
+
+    def __init__(self, device_or_udi:typing.Union[typing.Self, str]=""):
+        self._d_:typing.optional[_Device_] = None
+         if isinstance(device_or_udi, str):
+            manager = _DeviceManager_(DeviceNotifier.instance())
+             self._d_ = manager.findRegisteredDevice(device_or_udi)
+             
+         elif isinstance(device_or_udi, self.__class__):
+             self._d_ = device_or_udi._d_ # I think this is what's intended
+             
+    
+    def __eq__(self, other:typing.Self):
         pass
     
     @classmethod
@@ -242,10 +487,55 @@ class Device():
         pass
     
     @classmethod
+    def listFromType(cls, devtype:DeviceInterfaceType, parentUdi:str) -> list[typing.Self]:
+        pass
+
+    @classmethod
     def listFromQuery(cls, predicate:typing.Union[str, Predicate], parentUdi:str) -> list[typing.Self]:
         pass
     
     @classmethod
-    def listFromType(cls, devtype:DeviceInterfaceType, parentUdi:str) -> list[typing.Self]:
+    def storageAccessFromPath(cls, path:str) -> typing.Self:
         pass
-        
+    
+    def isValid(self) -> bool:
+        pass
+    
+    def udi(self) -> str:
+        pass
+    
+    def parentUdi(self) -> str:
+        pass
+    
+    def parent(self) -> typing.Self:
+        pass
+    
+    def vendor(self) -> str:
+        pass
+    
+    def product(self) -> str:
+        pass
+    
+    def icon(self) -> str:
+        pass
+    
+    def emblems(self) -> list[str]:
+        pass
+    
+    def displayName(self) -> str:
+        pass
+    
+    def description(self) -> str:
+        pass
+    
+    def isDeviceInterface(self, type:DeviceInterfaceType) -> bool:
+        pass
+    
+    def asDeviceInterface(self, type:DeviceInterfaceType) -> DeviceInterface:
+        pass
+    
+    # def as(self, type:DeviceInterfaceType) -> DevIface:
+    #     return self.asDeviceInterface(type)
+    
+    # def is(self, type:DeviceInterfaceType) -> bool:
+    #     returnn self.isDeviceInterface(type)
