@@ -1245,7 +1245,7 @@ def safe_identity_test(x:object, y:object, idcheck:bool=True,
         try:
             ret &= x.__eq__(y)
         except: 
-            traceback.print_exc()
+            # traceback.print_exc()
             # print(f"in hasattr __eq__: x is {type(x)} and y is {type(y)}")
             ret = False
                 

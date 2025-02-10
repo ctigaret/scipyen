@@ -190,6 +190,8 @@ pyparsing
 #pyqt5-tools ; sys_platform == 'win32'
 pyqtgraph
 pyserial
+pyudev ; sys_platform == 'linux'
+pyusb
 pytest
 python-magic
 pytz

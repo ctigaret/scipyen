@@ -4,6 +4,8 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 """
+TODO: 2025-02-08 22:43:42 
+Do away with DEPlace and DEBookmark, use bookmarks.Bookmark instead (but finalise that first)
 """
 import sys, os, pathlib, urllib, typing, warnings, subprocess, traceback
 import core.xmlutils as xmlutils
@@ -27,7 +29,11 @@ from core.desktoputils import (get_desktop_places, get_recent_places,
                                get_local_filesystem_places,
                                removeAcceleratorMarker,
                                removeReducedCJKAccMark,
-                               isFileIndexingEnabled, DEPlace, PlacesMap)
+                               isFileIndexingEnabled, 
+                               DEPlace, PlacesMap,
+                               DEBookmark, BookmarksMap)
+
+from iolib.navigation.dirlister import DirLister
 
 from systems.devices.device import Device
 
@@ -75,7 +81,7 @@ DeviceAccessibility = IntEnum("DeviceAccessibility",
                                 "TeardownInProgress"]
                                 )
 
-def stateNameForGroupType(groupType:GroupType):
+def stateNameForGroupType(groupType:GroupType) -> str:
     if groupType == GroupType.PlacesModel:
         return "GroupState-Places-IsHidden"
     elif groupType == GroupType.RemoteType:
@@ -90,7 +96,7 @@ def stateNameForGroupType(groupType:GroupType):
         return "GroupState-Tags-IsHidden"
     else:
         return ""
-
+    
 def createTimelineUrl(url:QtCore.QUrl):
     timelinePrefix = "timeline:/"
     path = url.toDisplayString(QtCore.QUrl.PreferLocalFile)
@@ -117,6 +123,9 @@ def createTimelineUrl(url:QtCore.QUrl):
     return timelineUrl
         
 def createSearchUrl(url:QtCore.QUrl):
+    # NOTE: 2025-02-06 21:25:50
+    # I guess I won't be using this much, as it relates to desktop file search & indexing
+    # utilities
     path = url.toDisplayString(QtCore.QUrl.PreferLocalFile)
     validSearchPaths = ["/documents", "/images", "/audio", "/videos"]
     searchUrl = QtCore.QUrl()
@@ -129,11 +138,17 @@ def createSearchUrl(url:QtCore.QUrl):
     
     return searchUrl
 
-def findByAddress(address:str):
-    places = get_desktop_places()
+def findByAddress(address:typing.Union[str, QtCore.QUrl]):
+    places = get_desktop_places(asQurl=isinstance(address, QtCore.QUrl))
+    if address not in places:
+        places = get_recent_places(asQurl=isinstance(address, QtCore.QUrl))
     return places.get(address, None)
 
-class PlacesItem(QtCore.QAbstractItemModel):
+class PlacesModel:
+    # fwd declaration for PlacesItem
+    pass
+
+class PlacesItem(QtCore.QObject):
     """Thin port of KFilePlacesItem.
     Has no, or partial, functionality related to the Trash (Wastebin) protocol, 
     the KDE Solid framework, and special KIO protocols (e.g. kdeconnect:/, 
@@ -141,14 +156,69 @@ class PlacesItem(QtCore.QAbstractItemModel):
     
     """
     
-    # itemChanged = Signal(str, name="itemChanged")
+    itemChanged = Signal(str, list, name="itemChanged") # str, list[int]
     
-    def __init__(self, address:str, parent):
+    def __init__(self, manager, address:str, udi:str, parent:PlacesModel):
         super().__init__(parent)
-        self._isAccessible_ = False
-        self._groupName_ = ""
-        self._bookmark_ = findByAddress(address) # may be None!
+        self._bookmark_:typing.Optional[typing.Union[DEPlace, DEBookmark]] = findByAddress(address) # may be None!
+        self._manager_ = None # TODO
+        self._folderIsEmpty_:bool = True
+        self._isCdrom_:bool = False
+        self._isAccessible_:bool = False
+        self._isTearDownAllowed_:bool = False
+        self._isTearDownOverlayRecommended_:bool = False
+        self._isTearDownInProgress_:bool = False
+        self._isSetupInProgress_:bool = False
+        self._isEjectionInProgress_:bool = False
+        self._isReadOnly_:bool = False
+        self._text_:str = str()
         
+        # NOTE: 2025-02-05 22:42:58 TODO
+        # ### BEGIN all these below are Solid framework
+        self._device_ = None # TODO 
+        self._access_ = None # TODO
+        self._volume_ = None  # TODO
+        self._drive_ = None  # TODO
+        self._block_ = None # TODO
+        self._opticalDrive_ = None  # TODO
+        self._disc_ = None # TODO
+        self._player_ = None  # TODO
+        self._networkShare_ = None # TODO
+        # ### END   all these below are Solid framework
+        
+        self._deviceIconName_:str = str()
+        self._emblems_:list[str] = list()
+        self._backingFile_:str = str()
+        self._groupType_:GroupType = GroupType.UnknownType
+        self._groupName_:str = str()
+        self._deviceDisplayName_:str = str()
+        
+        self.updateDeviceInfo(udi)
+        
+    def id(self):
+        pass
+    
+    def isDevice(self) -> bool: # TODO
+        pass
+    
+    def deviceAccessibility(self) -> DeviceAccessibility: # TODO
+        pass
+        
+    def isTearDownAllowed(self) -> bool: # TODO
+        pass
+    
+    def isTearDownOverlayRecommended(self) -> bool: # TODO
+        pass
+    
+    def setBookmark(self, bookmark): # TODO
+        pass
+    
+    def device(self): # TODO
+        pass
+    
+    def groupType(self) -> GroupType: # TODO
+        pass
+    
     def data(self, role:int):
         if role == AdditionalRoles.GroupRole:
             return self._groupName_
@@ -162,33 +232,207 @@ class PlacesItem(QtCore.QAbstractItemModel):
         else:
             return self._text_
        
-    def bookmark(self):
+    def bookmark(self) -> DEPlace | DEBookmark | None:
         return self._bookmark_
     
-    def setBookmark(self, bookmark:dict):
-        """A bookmark, IN THIS CONTEXT, is a dict as returned by get_desktop_places()
-        The two important data are:
-        • the bookmark URL
-        • the bookrmark name
-    
-        For now it is recommended to use the subset of places that point to
-        physical paths in the file system (e.g., not remote:/ trash:/, or any other
-        KIO protocol, and neither a device as defined in the Solid framework, and
-        defined by a unique device identifier - or UDI - and a UUID)
+    def setBookmark(self, bookmark:typing.Optional[typing.Union[DEPlace,DEBookmark]]):
+        """
     
         """
         self._bookmark_ = bookmark
         
-            
-class PlacesModel: # fwd declaration for PlacesModelPrivate
-    pass 
-
-class PlacesModelPrivate: # not really needed !
-    def __init__(self, qq:PlacesModel):
-        self.qq = qq
-        # self.tags = list() # of str - not sure I need this
-        self.supportedSchemes = list()
+    def isHidden(self) -> bool: # TODO
+        pass
+    
+    def setHidden(self) -> bool: # TODO
+        pass
+    
+    def hasSupportedScheme(self, schemes:list[str]) -> bool: # TODO
+        pass
+    
+    @Slot()
+    def onAccesibilityChanged(self, val:bool): # TODO
+        pass
+    
+    # NOTE: 2025-02-05 21:59:23 TODO:
+    # the following three static methods:
+    # check if Scipyen is running in an XDG-compliant
+    # if it does, then use XDG utlities (see core.desktoputils module )
+    #   • for this I need to understand wkat KBookmarkManager does
+    #       and implement this via pyxdg
+    # otherwise, do nothing
+    
+    @staticmethod
+    def createSystemBookmark(*args, **kwargs): # TODO
+        pass
+    
+    @staticmethod
+    def createDeviceBookmark(*args, **kwargs): # TODO
+        pass
+    
+    @staticmethod
+    def createTagBookmark(*args, **kwargs): # TODO
+        pass
+    
+    def bookmarkData(self): # TODO
+        pass
+    
+    def deviceData(self): # TODO
+        pass
+    
+    def iconNameForBookmark(self, bookmark): # TODO
+        pass
+    
+    @staticmethod
+    def generateNewId() -> str: # TODO
+        pass
+    
+    # NOTE: 2025-02-06 00:00:59 TODO
+    # create Device class as a shim implementing (partially) some
+    # functionality from Solid framework
+    # In the end, all storage devices resolve to a path of some sort...
+    def updateDeviceInfo(self, udi:str) -> bool: # TODO
+        if self._device_.udi() == udi:
+            return False
         
+        return True  # TODO
+    
+class _PlacesModel_(QtCore.QObject):
+    # KFilePlacesModelPrivate API
+    # NOTE: 2025-02-07 10:21:46
+    # the following static methods are defined elsewhere:
+    # isFileIndexingEnabled ↦ core.desktoputils
+    # timelineDateString ↦ core.utilities
+    # createTimelineUrl, createSearchUrl ↦ this module
+    
+    tagsUrlBase = "tags:/"
+    
+    def __init__(self, model:PlacesModel, parent:typing.Optional[QtCore.QObject] = None):
+        super().__init__(parent)
+        self.model = model
+        self.fileIndexingEnabled = isFileIndexingEnabled() # imported from desktoputils
+        # ### BEGIN 2025-02-07 08:46:21 WARNING not all QObject are hashable
+        self.setupInProgress:dict[QtCore.QObject, QtCore.QPersistentModelIndex] = dict()
+        self.teardownInProgress:dict[QtCore.QObject, QtCore.QPersistentModelIndex] = dict()
+        # ### END   2025-02-07 08:46:21 WARNING not all QObject are hashable
+        self.supportedSchemes:list[str] = list()
+
+        # ### BEGIN 2025-02-07 08:49:10 CAUTION bookmarks
+        # depends on Solid, KBookmarkManager
+        self.predicate = None # Solid::Predicate - here, a functor
+        
+        # NOTE: 2025-02-07 16:21:50 TODO:
+        # workaround for this
+        # NOTE 2025-02-08 10:05:39 TODO
+        # crate BookmarkMonitor class (Object) where "user-places.xbel" and "recently-used.xbel"
+        # are monitored for change using QtCore.QFileSystemWatcher
+        #
+        # Scipyen is NOT intended to be able to alter these: recently visited
+        # directories and recently opened files are managed independently of
+        # the Desktop environment. 
+        # However, the intention here is that Scipyen SHOULD be aware of changes
+        # in Desktop "places" and "recently used" stuff as made available by
+        # Desktop apps & tools, so that the "Places" panel in the navigator can
+        # be updated accordingly.
+        
+        # NOTE: 2025-02-08 14:25:00 TODO
+        # In a similar vein I must find a "slim" and straightforward solution
+        # to capture desktop notification related to hotpluggable devices and their
+        # dynamic mount points...
+        
+        
+        # desktoputils.BookmarksMap
+        self.bookmarkManager = None # KBookmarkManager
+        # ### END   2025-02-07 08:49:10 CAUTION bookmarks
+
+        # ### BEGIN NOTE: 2025-01-03 15:20:45 file search & indexing
+        # This is related to KDE file searching framework (Baloo), specifically 
+        # on whether it is configured to use file content indexing or not. 
+        # Currently, Scipyen has got nothing to do with it, therefore it is set
+        # to False.
+        #
+        # see NOTE 2025-02-07 08:59:18 TODO in
+        # core.desktoputils.isFileIndexingEnabled
+        # 
+        # In the future, I MAY consider introducing this functionality - but be
+        # aware that Baloo is KDE-specific! GNOME desktop use a different
+        # framework: TinySPARQL / formerly known as "tracker", currently known
+        # as "localsearch". 
+        #
+        # The design philosophy in Scipyen is to be desktop-agnostic, and 
+        # there are quite a few file search & indexing packages there see
+        # https://www.linuxlinks.com/desktopsearchengines/
+        #
+        # see NOTE 2025-02-07 08:59:18 TODO in core.desktoputils
+        #
+        
+        self.fileIndexingEnabled:bool = False 
+        
+        # ### END   NOTE: 2025-01-03 15:20:45 file search & indexing
+        
+        # ### BEGIN 2025-02-07 16:20:19 Tags protocol - KDE-specific — skip
+        
+        # self.tags:list[str] = list()
+        # self.tagLister = DirLister(self.model) # TODO see iolib.navigation.dirlister
+        # ### END   2025-02-07 16:20:19 Tags protocol - KDE-specific
+        
+#     @staticmethod
+#     def ignoreMimeType() -> str:
+#         pass
+#     
+#     @staticmethod
+#     def internalMimeType(model:PlacesModel) -> str:
+#         pass
+    
+    @classmethod
+    def ignoreMimeType(cls) -> str:
+        return "application/x-kfileplacesmodel-ignore"
+        # return "application/octet-stream"
+    
+    @classmethod
+    def internalMimeType(cls, model) -> str:
+        return f"application/x-kfileplacesmodel-{id(model)}"
+        
+    def reloadAndSignal(self):
+        pass
+    
+    def loadBookmarkList(self) -> list: # TODP
+        # return a list of PlacesItem
+        pass
+    
+    def findNearestPosition(self, source:int, target:int) -> int: # TODO
+        pass
+    
+    def initDeviceList(self): # TODO
+        pass
+    
+    def deviceAdded(self, udi:str): # TODO
+        pass
+    
+    def deviceRemoved(self, udi:str): # TODO
+        pass
+    
+    def itemChanged(self, udi:str, roles:list[int]): # TODO
+        pass
+    
+    def reloadBookmarks(self): # TODO
+        pass
+    
+    def storageSetupDone(self, error, errorData, sender): # TODO
+        # void storageSetupDone(Solid::ErrorType error, const QVariant &errorData, Solid::StorageAccess *sender);
+        pass
+    
+    def storageTeardownDone(filePath:typing.Union[pathlib.Path, str], error, errorData, sender): # TODO
+        # void storageTeardownDone(const QString &filePath, Solid::ErrorType error, const QVariant &errorData, QObject *sender);
+        pass
+    
+    # ### BEGIN file search & indexing
+    # see NOTE: 2025-01-03 15:20:45 
+    # see NOTE 2025-02-07 08:59:18 TODO in core.desktoputils
+    def isBalooUrl(self, url:QtCore.QUrl) -> bool: 
+        scheme = url.scheme()
+        return scheme in ("timeline", "search")
+    # ### END   file search & indexing
     
 class PlacesModel(QtCore.QAbstractItemModel): # TODO/FIXME
     """
@@ -234,88 +478,13 @@ class PlacesModel(QtCore.QAbstractItemModel): # TODO/FIXME
         # NOTE: 2025-01-03 14:51:53
         # consider leaving out
         self.availableDevices:list[Device] = list()
-        # consider leaving out:
-        self.setupInProgress:dict[QtCore.QObject, QtCore.QPersistentModelIndex] = dict()
-        # consider leaving out:
-        self.teardownInProgress:dict[QtCore.QObject, QtCore.QPersistentModelIndex] = dict()
         #
-        self.supportedSchemes:list[str] = list()
-        
-        # the following, to leave out
-        self.predicate = None # Solid::Predicate - here, a functor
-        self.bookmarkManager = None # KBookmarkManager
-        
-        # NOTE: 2025-01-03 15:20:45
-        # consider leaving out — this is related to KDE file searching framework
-        # (Baloo), specifically on whether it is configured to use file content
-        # indexing or not. Currently, Scipyen has got nothing to do with it, 
-        # therefore this is always False.
-        # (see desktoutils.isFileIndexingEnabled)
-        # 
-        # In the future, I MAY consider introducing this funcitonality - but be
-        # aware that Baloo is KDE-specific! GNOME desktop use a different
-        # framework: TinySPARQL / formerly known as "tracker", currently known
-        # as "localsearch". 
-        #
-        # The design philosophy in Scipyen is to be desktop-agnostic, and 
-        # there are quite a few file search & indexing packages there see
-        # https://www.linuxlinks.com/desktopsearchengines/
-        
-         
-        self.fileIndexingEnabled:bool = False 
         
         self.tags:list[str] = list()
         self.tagsUrlBase = "tags:/"
         self.tagsLister = None # KCoreDirLister
         # ### END KFilePlacesModelPrivate members
         
-    # ### BEGIN KFilePlacesModelPrivate methods
-    @classmethod
-    def ignoreMimeType(cls) -> str:
-        return "application/x-kfileplacesmodel-ignore"
-        # return "application/octet-stream"
-    
-    @classmethod
-    def internalMimeType(cls, model) -> str:
-        return f"application/x-kfileplacesmodel-{id(model)}"
-        
-    def reloadAndSignal(self): # TODO
-        pass 
-    
-    def loadBookmarkList(self) -> list: # TODO 
-        pass
-    
-    def findNearestPosition(self, source:int, target:int) -> int: # TODO
-        pass
-    
-    def initDeviceList(self): # TODO
-        pass
-    
-    def deviceAdded(self, udi:str): # TODO
-        pass
-    
-    def deviceRemoved(self, udi:str): # TODO
-        pass
-    
-    def itemChanged(self, udi:str, roles:list[int]): # TODO
-        pass
-    
-    def reloadBookmarks(self): # TODO
-        pass
-    
-    def storageSetupDone(self, error, errorData, sender): # TODO
-        # void storageSetupDone(Solid::ErrorType error, const QVariant &errorData, Solid::StorageAccess *sender);
-        pass
-    
-    def storageTeardownDone(filePath:typing.Union[pathlib.Path, str], error, errorData, sender): # TODO
-        # void storageTeardownDone(const QString &filePath, Solid::ErrorType error, const QVariant &errorData, QObject *sender);
-        pass
-    
-    def isBalooUrl(self, url:QtCore.QUrl) -> bool: # TODO
-        pass
-    
-    # ### END KFilePlacesModelPrivate methods
-    
     def url(self, index:QtCore.QModelIndex): # TODO
         pass
     
@@ -416,14 +585,28 @@ class PlacesModel(QtCore.QAbstractItemModel): # TODO/FIXME
     def hiddenCount(self): # TODO
         pass
     
-    def data(self, index:QtCore.QModelIndex, role:int): # TODO
+    def data(self, index:QtCore.QModelIndex, role:int): 
+        if not index.isValid():
+            return QtCore.QVariant(None)
+        
+        item = index.internalPointer()
+        if role == AdditionalRoles.GroupHiddenRole:
+            return self.isGroupHidden(item.groupType())
         pass
     
-    def index(self, row:int, column:int, parent:QtCore.QModelIndex = QtCore.QModelIndex()): # TODO
-        pass
+    def index(self, row:int, column:int, parent:QtCore.QModelIndex = QtCore.QModelIndex()):
+        if row < 0 or column != 0 or row >= len(items):
+            # return an invalid index when row or column are out of range
+            return QtCore.QModelIndex() 
+        
+        if parent.isValid():
+            return QtCore.QModelIndex()
+        
+        # methid inherited from QAbstractItemModel
+        return self.createIndex(row, column, self.items[row])
     
-    def parent(self, child:QtCore.QModelIndex): # TODO
-        pass
+    def parent(self, child:QtCore.QModelIndex):
+        return QtCore.QModelIndex()
     
     def roleNames(self): # TODO
         pass

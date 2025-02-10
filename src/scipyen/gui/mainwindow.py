@@ -1118,11 +1118,11 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     
     @classmethod
     def _walk_mro(cls) -> typing.Generator[typing.Self, None, None]:
-    # def _walk_mro(cls) -> typing.Generator[type[SMW], None, None]:
         """Walk the cls.mro() for parent classes that are also singletons
 
         For use in instance()
         """
+        # NOTE: Singleton design pattern
         # NOTE: 2025-01-07 12:42:39
         # see traitlets.config.SingletonConfigurable
         for subclass in cls.mro():
@@ -1137,12 +1137,12 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
     @classmethod
     def initialized(cls:typing.Self) -> bool:
-    # def initialized(cls:type[SMW]) -> bool:
+        # NOTE: Singleton design pattern
         return hasattr(cls, "_instance" and isinstance(cls._instance, cls))
 
     @classmethod
     def instance(cls:typing.Self, *args, **kwargs) -> typing.Self:
-    # def instance(cls:type[SMW], *args, **kwargs) -> SMW:
+        # NOTE: Singleton design pattern
         if cls._instance is None:
             inst = cls(*args, **kwargs)
             for subclass in cls._walk_mro():
@@ -1904,6 +1904,24 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             val = self._default_scipyen_user_plugins_dir
             
         self._user_plugins_dir = val
+        
+    @property
+    def showFullNavigatorPath(self)-> bool:
+        return self.navigator.showFullPath()
+    
+    @markConfigurable("ShowFullNavigatorPath", "Qt")
+    @showFullNavigatorPath.setter
+    def showFullNavigatorPath(self, value:bool):
+        self.navigator.setShowFullPath(value is True)
+        
+    @property
+    def navigatorEditable(self)->bool:
+        return self.navigator.isUrlEditable()
+    
+    @markConfigurable("NavigatorIsEditable", "Qt")
+    @navigatorEditable.setter
+    def navigatorEditable(self, value:bool):
+        self.navigator.setUrlEditable(value is True)
 
     @property
     def consoleDocked(self):
@@ -4917,8 +4935,13 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # self.menuFile.insertMenu(self.actionOpen, self.recentFilesMenu)
         self.menuFile.insertMenu(self.menuImport.menuAction(), self.recentFilesMenu)
 
-        self.recentDirectoriesMenu = QtWidgets.QMenu("Recent Working Directories", self)
+        # NOTE: 2025-01-24 22:22:20 switch to UrlNavigatorMenu
+        # self.recentDirectoriesMenu = QtWidgets.QMenu("Recent Working Directories", self)
+        self.recentDirectoriesMenu = navigator.UrlNavigatorMenu("Recent Working Directories", self)
+        self.recentDirectoriesMenu.mouseButtonClicked.connect(self.slot_recentDirActivated)
+        # self.recentDirectoriesMenu.setLayoutDirection(QtCore.Qt.LeftToRight)
         self.recentDirectoriesMenu.setIcon(QtGui.QIcon.fromTheme("folder-open-recent"))
+        
         self.menuFile.insertMenu(self.actionReload_Plugins, self.recentDirectoriesMenu)
         self.menuFile.insertSeparator(self.actionReload_Plugins)
 
@@ -5067,32 +5090,11 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # self.dirFileMonitor.fileChanged.connect(self._slot_monitoredFileChanged)
         
         self.navigator.urlChanged[QtCore.QUrl].connect(self.slot_chDirUrl)
-        # if isinstance(self.navigator, QtWidgets.QComboBox):
-        #     self.navigator.lineEdit().setClearButtonEnabled(True)
-        #     self.navigator.textActivated[str].connect(self.slot_chDirString)
-        # elif isinstance(self.navigator, navigator.UrlNavigator):
-        #     self.navigator.urlChanged[QtCore.QUrl].connect(self.slot_chDirUrl)
-
-        # self.removeRecentDirFromListAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("edit-delete"),
-        #                                                        "Remove this path from list",
-        #                                                        self.navigator.lineEdit())
-        # 
-        # self.removeRecentDirFromListAction.setToolTip("Remove this path from history")
-        # 
-        # self.removeRecentDirFromListAction.triggered.connect(self.slot_removeDirFromHistory)
-
-        # self.clearRecentDirListAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("final_activity"),
-        #                                                   "Clear history of visited paths",
-        #                                                   self.navigator.lineEdit())
-        # 
-        # self.clearRecentDirListAction.setToolTip("Clear history of visited paths")
-        # 
-        # self.clearRecentDirListAction.triggered.connect(self.slot_clearRecentDirList)
-
-        # self.navigator.lineEdit().addAction(self.removeRecentDirFromListAction,
-        #                                             QtWidgets.QLineEdit.TrailingPosition)
-
-        # self.navigator.activated[str].connect(self.slot_chDirString)
+        if sys.platform.startswith("win32"):
+            target = os.environ['USERPROFILE']
+        else:
+            target = os.environ['HOME']
+        self.navigator.setHomeUrl(QtCore.QUrl(pathlib.Path(target).as_uri()))
 
         self.fileSystemFilter.lineEdit().setClearButtonEnabled(True)
 
@@ -5210,36 +5212,75 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @Slot()
     @safeWrapper
     def slot_goToHomeDir(self):
-        if sys.platform.startswith("win32"):
-            self.slot_changeDirectory(os.environ['USERPROFILE'])
-        else:
-            self.slot_changeDirectory(os.environ['HOME'])
+        self.navigator.goHome()
+#         if sys.platform.startswith("win32"):
+#             target = os.environ['USERPROFILE']
+#         else:
+#             target = os.environ['HOME']
+#             
+#         if isinstance(self.navigator, navigator.UrlNavigator):
+#             url = QtCore.QUrl(pathlib.Path(target).resolve().as_uri())
+#             self.navigator.setLocationUrl(url)
+#             self.navigator.urlChanged.emit(url)
+#         else:
+#             self.slot_changeDirectory(target)
+            
+            
+        # if sys.platform.startswith("win32"):
+        #     self.slot_changeDirectory(os.environ['USERPROFILE'])
+        # else:
+            # self.slot_changeDirectory(os.environ['HOME'])
 
     @Slot()
     @safeWrapper
     def slot_goToParentDir(self):
-        # print(self.currentDir)
-        if self.currentDir is None:
-            self.slot_changeDirectory()
-        else:
-            self.slot_changeDirectory(os.path.dirname(
-                os.path.abspath(self.currentDir)))
+        self.navigator.goUp()
+#         # print(self.currentDir)
+#         if self.currentDir is None:
+#             target = pathlib.Path.cwd().parent
+#             
+#         else:
+#             target = pathlib.Path(self.currentDir).resolve().parent
+#             
+#         if isinstance(self.navigator, navigator.UrlNavigator):
+#             url = QtCore.QUrl(target.as_uri())
+#             self.navigator.setLocationUrl(url)
+#             self.navigator.urlChanged.emit(url)
+#         else:
+#             self.slot_changeDirectory(target.as_posix)
+            
+        # if self.currentDir is None:
+        #     self.slot_changeDirectory()
+        # else:
+        #     self.slot_changeDirectory(os.path.dirname(os.path.abspath(self.currentDir)))
 
     @Slot()
     @safeWrapper
     def slot_goToPrevDir(self):
-        if len(self.navPrevDir) > 0:
-            self.navNextDir.appendleft(self.navPrevDir[0])
-            prevDir = self.navPrevDir.popleft()
-            self.slot_changeDirectory(prevDir)
+        self.navigator.goBack()
+        # if len(self.navPrevDir) > 0:
+        #     self.navNextDir.appendleft(self.navPrevDir[0])
+        #     prevDir = self.navPrevDir.popleft()
+        #     if isinstance(self.navigator, navigator.UrlNavigator):
+        #         url = QtCore.QUrl(pathlib.Path(prevDir).resolve().as_uri())
+        #         self.navigator.setLocationUrl(url)
+        #         self.navigator.urlChanged.emit(url)
+        #     else:
+        #         self.slot_changeDirectory(prevDir)
 
     @Slot()
     @safeWrapper
     def slot_goToNextDir(self):
-        if len(self.navNextDir) > 0:
-            self.navPrevDir.appendleft(self.navNextDir[0])
-            nextDir = self.navNextDir.popleft()
-            self.slot_changeDirectory(nextDir)
+        self.navigator.goForward()
+        # if len(self.navNextDir) > 0:
+        #     self.navPrevDir.appendleft(self.navNextDir[0])
+        #     nextDir = self.navNextDir.popleft()
+        #     if isinstance(self.navigator, navigator.UrlNavigator):
+        #         url = QtCore.QUrl(pathlib.Path(nextDir).resolve().as_uri())
+        #         self.navigator.setLocationUrl(url)
+        #         self.navigator.urlChanged.emit(url)
+        #     else:
+        #         self.slot_changeDirectory(nextDir)
 
     @Slot()
     @safeWrapper
@@ -5374,17 +5415,50 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 clearDirAction.triggered.connect(self._clearRecentDirectories_)
                 self.recentDirectoriesMenu.addSeparator()
                 
-            for item in self.recentDirectories:
-                action = self.recentDirectoriesMenu.addAction(item)
-                action.setText(item)
-                action.triggered.connect(self.slot_changeDirectory)
+            self._initRecentDirsMenu_(self.recentDirectoriesMenu, 0)
+                
+            # for item in self.recentDirectories:
+            #     action = self.recentDirectoriesMenu.addAction(item)
+            #     action.setText(item)
+            #     # action.triggered.connect(self.slot_changeDirectory)
+            #     action.triggered.connect(self.slot_changeLocation)
 
-            if self._maxRecentDirectories <= 10:
-                self.recentDirectoriesMenu.addSeparator()
-                clearDirAction = self.recentDirectoriesMenu.addAction(QtGui.QIcon.fromTheme("edit-clear-history"),
-                    "Clear Recent Directories List")
-                clearDirAction.triggered.connect(self._clearRecentDirectories_)
+            # if self._maxRecentDirectories <= 10:
+            #     self.recentDirectoriesMenu.addSeparator()
+            #     clearDirAction = self.recentDirectoriesMenu.addAction(QtGui.QIcon.fromTheme("edit-clear-history"),
+            #         "Clear Recent Directories List")
+            #     clearDirAction.triggered.connect(self._clearRecentDirectories_)
+                
+    def _initRecentDirsMenu_(self, menu: QtWidgets.QMenu, startIndex:int):
+        from gui import guiutils
+        menu.setLayoutDirection(QtCore.Qt.LeftToRight)
+        maxIndex = startIndex + 30
+        nDirs = len(self._recentDirectories)
+        lastIndex = min(nDirs-1, maxIndex)
+        
+        dirsNames = list(self._recentDirectories)[startIndex : lastIndex]
+        
+        dirsActions = list(map(lambda x: QtWidgets.QAction(guiutils.csqueeze(x.replace('&', '&&'), 60), self), dirsNames))
 
+        if self.currentDirectory in dirsNames:
+            currentIndex = dirsNames.index(self.currentDirectory)
+            font = QtGui.QFont(dirsActions[currentIndex].font())
+            font.setBold(True)
+            dirsActions[currentIndex].setFont(font)
+            
+        for k,i in enumerate(range(startIndex, lastIndex)):
+            dirsActions[k].setData(i)
+            dirsActions[k].setText(dirsNames[k])
+            # dirsActions[k].triggered.connect(self.slot_changeLocation)
+            menu.addAction(dirsActions[k])
+            
+        if nDirs > maxIndex:
+            menu.addSeparator()
+            nextDirsMenu = navigator.UrlNavigatorMenu("More", menu)
+            nextDirsMenu.mouseButtonClicked.connect(self.slot_recentDirActivated)
+            self._initRecentDirsMenu_(nextDirsMenu, maxIndex)
+            menu.addMenu(nextDirsMenu)
+        
     def _clearRecentDirectories_(self):
         self._recentDirectories.clear()
         self._refreshRecentDirs_()
@@ -5841,10 +5915,34 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             target = val
         # print("ScipyenWindow.slot_chDirString: \nval = %s; \nprotocol = %s; \ntarget = %s" % (val, protocol, target))
         self.slot_changeDirectory(target)
+        
+    @Slot(QtWidgets.QAction, QtCore.Qt.MouseButton)
+    def slot_recentDirActivated(self, action:QtWidgets.QAction, button:QtCore.Qt.MouseButton):
+        result = action.data() 
+        path = pathlib.Path(self._recentDirectories[result]).resolve()   # the path to the subdirectory pointed to by the action
+        url = QtCore.QUrl(path.as_uri())
+        self.navigator.setLocationUrl(url)
+        self.navigator.urlChanged.emit(url)
+        # self.navigatorButtonActivated.emit(url, button, QtCore.Qt.NoModifier)
+        
+        
+    @Slot(str)
+    def slot_changeLocation(self, targetDir):
+        print(f"{self.__class__.__name__}.slot_changeLocation: targetDir = {targetDir}")
+        if targetDir is None:
+            return
+        
+        if isinstance(self.navigator, navigator.UrlNavigator):
+            url = QtCore.QUrl(pathlib.Path(targetDir).resolve().as_uri())
+            self.navigator.setLocationUrl(url)
+            self.navigator.urlChanged.emit(url)
+        else:
+            self.slot_changeDirectory(targetDir)
 
     @Slot()
     @safeWrapper
-    def slot_changeDirectory(self, targetDir=None):
+    def slot_changeDirectory(self, targetDir:str=None):
+        """Convergence for all directory navigation in ScipyenWindow"""
         # print(f"MainWindow.slot_changeDirectory(targetDir = {targetDir})")
         if targetDir is None:
             if isinstance(self.sender(), QtWidgets.QAction):
@@ -5890,8 +5988,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 # self.console.execute(''.join(["cd '", targetDir, "'"]), hidden=True if sys.platform=="linux" else False)
 
             if self.external_console:
-                self.external_console.execute(
-                    "".join(["os.chdir('", targetDir, "')"]))
+                self.external_console.execute("".join(["os.chdir('", targetDir, "')"]))
 
             self._setRecentDirectory_(targetDir)
 
@@ -6230,13 +6327,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     def slot_systemOpenParentFolder(self, fileName):
         if isinstance(fileName, str):
             if os.path.exists(fileName):
-                QtGui.QDesktopServices.openUrl(QtCore.QUrl(
-                    "file://%s" % os.path.dirname(fileName)))
-                # if os.path.isfile(fileName):
-                # QtGui.QDesktopServices.openUrl(QtCore.QUrl("file://%s" % os.path.dirname(fileName)))
-
-                # else:
-                # QtGui.QDesktopServices.openUrl(QtCore.QUrl("file://%s" % fileName))
+                QtGui.QDesktopServices.openUrl(QtCore.QUrl("file://%s" % os.path.dirname(fileName)))
 
         elif isinstance(fileName, QtCore.QUrl) and fileName.isValid() and fileName.isLocalFile():
             if fileName.isRelative():

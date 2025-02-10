@@ -151,7 +151,7 @@ def csqueeze(s:str, w:int):
     """Returns text elided to the right
     """
     if len(s) > w and w > 3:
-        part = (w-3)/2
+        part = (w-3)//2
         return s[0:part] + "..."
     return s
 

@@ -115,6 +115,10 @@ echo
 echo Installing octave kernel
 call mamba install --prefix %env_name% -y octave_kernel || goto eof
 echo
+REM Tis probably already provided by mambaforge
+echo Installing pywin32
+call mamba install --prefix %env_name% -y pywin32 || goto eof
+
 echo Installing PyInstaller
 call mamba install --prefix %env_name% -y pyinstaller || goto eof
 
