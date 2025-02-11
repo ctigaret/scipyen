@@ -75,7 +75,7 @@ Work in progress, DO NOT USE
 import sys, os, typing, pathlib, functools, itertools, traceback
 from urllib.parse import urlparse, urlsplit
 from collections import namedtuple
-from abc import ABCMeta, abstractmethod
+from abc import abstractmethod
 from enum import Enum, IntEnum
 from qtpy import QtCore, QtGui, QtWidgets, QtSvg
 from qtpy.QtCore import Signal, Slot, Property
@@ -94,22 +94,25 @@ except:
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
-class DeviceNotifier:pass # NOTE 2025-02-10 21:21:44 discard once finalised
+class DeviceNotifier: pass # NOTE 2025-02-10 21:21:44 discard once finalised
 class _DeviceManager_: pass
 class _DeviceInterface_: pass
 class DeviceInterface: pass
 class _Device_: pass
 class Device: pass
+
+IFaceDevice = typing.TypeVar("IFaceDevice")
+IFaceDeviceManager = typing.TypeVar("IFaceDeviceManager")
     
 class _ManagerBase_:
-    from systems.devices.interfaces.device import Device as IFaceDevice
+    # from systems.devices.interfaces.device import Device as IFaceDevice
     def __init__(self):
-        self._backends_:list = list()
+        self._backends_:list[IFaceDeviceManager] = list()
         
     def __del__(self):
         self._backends_.clear()
         
-    def managerBackends(self)->list:
+    def managerBackends(self)->list[IFaceDeviceManager]:
         return self._backends_
         
     def loadBackends(self):
@@ -143,7 +146,7 @@ class DeviceManagerStorage:
         return self._storage_.managerBackends()
     
     def notifier(self) -> DeviceNotifier:
-        # actually returns a _DeviceManager_, which is a DeviceNotifier
+        # returns a _DeviceManager_, which is a DeviceNotifier
         self.ensureManagerCreated()
         return self._storage_
     
@@ -151,7 +154,8 @@ class DeviceManagerStorage:
         if not isinstance(self._storage_, _DeviceManager_):
             self._storage_ = _DeviceManager_() # hmmm...
     
-global globalDeviceStorage = DeviceManagerStorage()
+global globalDeviceStorage
+globalDeviceStorage = DeviceManagerStorage()
         
 class DeviceNotifier(QtCore.QObject):
     # singleton design pattern
@@ -183,17 +187,29 @@ class DeviceNotifier(QtCore.QObject):
     def initialized(cls:typing.Self) -> bool: # NOTE: Singleton design pattern
         return hasattr(cls, "__instance__" and isinstance(cls.__instance__, cls))
     
-    @classmethod
-    def instance(cls:typing.Self, *args, **kwargs) -> typing.Self: # NOTE: Singleton design pattern
-        if cls.__instance__ is None:
-            inst = cls(*args, **kwargs)
-            for subclass in cls._walk_mro():
-                subclass.__instance__ = inst
-        if hasattr(cls, "__instance__") and isinstance(cls.__instance__, cls):
-            return cls.__instance__
-        else:
-            raise RuntimeError(f"Incompatible sibling of '{cls.__name__}' is already instantiated as singleton: {type(cls.__instance__).__name__}")
+    @staticmethod
+    def instance() -> typing.Self: # NOTE: Singleton design pattern
+        return globalDeviceStorage.notifier()
+        # if cls.__instance__ is None:
+        #     inst = cls(*args, **kwargs)
+        #     for subclass in cls._walk_mro():
+        #         subclass.__instance__ = inst
+        # if hasattr(cls, "__instance__") and isinstance(cls.__instance__, cls):
+        #     return cls.__instance__
+        # else:
+        #     raise RuntimeError(f"Incompatible sibling of '{cls.__name__}' is already instantiated as singleton: {type(cls.__instance__).__name__}")
 
+    # @classmethod
+    # def instance(cls:typing.Self, *args, **kwargs) -> typing.Self: # NOTE: Singleton design pattern
+    #     if cls.__instance__ is None:
+    #         inst = cls(*args, **kwargs)
+    #         for subclass in cls._walk_mro():
+    #             subclass.__instance__ = inst
+    #     if hasattr(cls, "__instance__") and isinstance(cls.__instance__, cls):
+    #         return cls.__instance__
+    #     else:
+    #         raise RuntimeError(f"Incompatible sibling of '{cls.__name__}' is already instantiated as singleton: {type(cls.__instance__).__name__}")
+    # 
 
 class _DeviceManager_(DeviceNotifier, _ManagerBase_):
     def __init__(self):
@@ -212,7 +228,6 @@ class _DeviceManager_(DeviceNotifier, _ManagerBase_):
         for backend in backends:
             backend.deviceAdded.connect(self._k_deviceAdded)
             backend.deviceRemoved.connect(self._k_deviceRemoved)
-            # pass # TODO
         
     def __del__(self):
         backends = self.managerBackends()
@@ -251,7 +266,7 @@ class _DeviceManager_(DeviceNotifier, _ManagerBase_):
         if isinstance(udi, str) and len(udi):
             self._devicesMap_.pop(udi)
     
-    def createBackendObject(self, udi:str) -> _ManagerBase_.IFaceDevice | None:
+    def createBackendObject(self, udi:str) -> IFaceDevice | None:
         backends = globalDeviceStorage.managerBackends()
         for backend in backends:
             if not udi.startsWith(backend.udiPrefix()):
@@ -277,7 +292,6 @@ class _DeviceManager_(DeviceNotifier, _ManagerBase_):
             devData.destroyed.connect(self._k_destroyed)
             return devData
 
-    
 class DeviceManager(QtCore.QObject):
     # abstract base class
     deviceAdded = Signal(str, name="deviceAdded") # parameter is the udi
@@ -302,7 +316,6 @@ class DeviceManager(QtCore.QObject):
     def devicesFromQuery(self, parentUdi:str, ):
         pass
     
-        
 class DeviceInterfaceType(TypeEnum):
     """"""
     # NOTE: 2025-01-03 14:09:24 
@@ -325,7 +338,7 @@ class DeviceInterfaceType(TypeEnum):
 # class _Device_:pass # CAUTION - remove if importing, below
 
 class _DeviceInterface_:
-    from systems.devices.device import (_Device_, Device)
+    # from systems.devices.device import (_Device_, Device)
     def __init__(self):
         super().__init__()
         self._devicePrivate_:typing.Optional[_Device_] = None
@@ -420,7 +433,7 @@ class DeviceInterface(QtCore.QObject):
 
 
 class _Device_(QtCore.QObject):
-    from systems.devices.interfaces.device import Device as IFaceDevice
+    # from systems.devices.interfaces.device import Device as IFaceDevice
     # from systems.devices.deviceinterface import (DeviceInterfaceType, DeviceInterface)
     def __init__(self, udi:str):
         super().__init__()
@@ -459,7 +472,6 @@ class _Device_(QtCore.QObject):
     def setInterface(self, devtype:DeviceInterfaceType, interface:DeviceInterface):
         self._ifaces_[devtype] = interface
             
-    
 class Device():
     # from systems.devices.devicemanager import (DeviceManagerStorage, DeviceManager)
     from systems.devices.predicate import Predicate # TODO: 2025-02-10 18:30:03 needs done
@@ -469,11 +481,11 @@ class Device():
 
     def __init__(self, device_or_udi:typing.Union[typing.Self, str]=""):
         self._d_:typing.optional[_Device_] = None
-         if isinstance(device_or_udi, str):
-            manager = _DeviceManager_(DeviceNotifier.instance())
-             self._d_ = manager.findRegisteredDevice(device_or_udi)
+        if isinstance(device_or_udi, str):
+            manager = _DeviceManager_.instance()
+            self._d_ = manager.findRegisteredDevice(device_or_udi)
              
-         elif isinstance(device_or_udi, self.__class__):
+        elif isinstance(device_or_udi, self.__class__):
              self._d_ = device_or_udi._d_ # I think this is what's intended
              
     
@@ -482,9 +494,14 @@ class Device():
     
     @classmethod
     def allDevices(cls) -> list[typing.Self]:
-        # NOTE: 2025-02-10 18:04:38 TODO 
-        # needs DeviceManager and DeviceManagerStorage
-        pass
+        devList = list()
+        backends = globalDeviceStorage.managerBackends()
+        for backend in backends:
+            udis = backend.allDevices()
+            for udi in udis:
+                devList.append(cls(udi))
+        
+        return devList
     
     @classmethod
     def listFromType(cls, devtype:DeviceInterfaceType, parentUdi:str) -> list[typing.Self]:
@@ -492,6 +509,7 @@ class Device():
 
     @classmethod
     def listFromQuery(cls, predicate:typing.Union[str, Predicate], parentUdi:str) -> list[typing.Self]:
+        # TODO: 2025-02-11 12:49:24 Predicate
         pass
     
     @classmethod
@@ -539,3 +557,7 @@ class Device():
     
     # def is(self, type:DeviceInterfaceType) -> bool:
     #     returnn self.isDeviceInterface(type)
+
+
+from systems.devices.interfaces.device import Device as IFaceDevice
+from systems.devices.interfaces.device import DeviceManager as IFaceDeviceManager
