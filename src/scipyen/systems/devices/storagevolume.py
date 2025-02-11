@@ -18,7 +18,9 @@ from core.prog import safeWrapper
 from core.sysutils import adapt_ui_path
 from core.datatypes import TypeEnum
 
-DevIFace = typing.TypeVar("DevIFace")
+from systems.devices import device
+from systems.devices.device import DeviceInterface as DevIFace
+from systems.devices.device import DeviceInterfaceType as DevIFaceType
 
 class UsageType(TypeEnum):
     Other = 0
@@ -28,6 +30,38 @@ class UsageType(TypeEnum):
     Raid = 4
     encrypted = 5
     
+class StorageVolume(DevIFace):
+    def __init__(self, dd:typing.Optional[_StorageVolume_]=None,
+                 backendObject:typing.Optional[QtCore.QObject] = None):
+        if not isinstance(dd, _StorageVolume_):
+            dd = _StorageVolume_()
+            
+        if isinstance(backendObject, QtCore.QObject):
+            super().__init__(dd, backendObject)
+        else:
+            super().__init__()
+
+    def isIgnored(self) -> bool:
+        # Q_D(const StorageVolume);
+        #                   Type,                   Object,             Default, Method        
+        # return_SOLID_CALL(Ifaces::StorageVolume *, d->backendObject(), true, isIgnored());
+        # casts d->backendObject() to a Ifaces::StorageVolume, calls its isIgnored() and returns the result
+        # if casting fails, returns True (i.e., is ignored)
+        #
+        # Now, self._d_ is devices.device._DeviceInterface_, and its 
+        # backend object (QObject) is cast to a devices.interfaces.DeviceInterface
+        o = self._d_.backendObject()
+        
+        if isinstance(o, DevIFace:
+            return o.isIgnored()
+                
+        return False
+        
+        
+    @staticmethod
+    def deviceInterfaceType() -> DevIFaceType:
+        return DevIFaceType.StorageVolume
     
     
-from systems.devices.device import DeviceInterface as DevIFace
+    
+    

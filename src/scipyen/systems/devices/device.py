@@ -269,10 +269,11 @@ class _DeviceManager_(DeviceNotifier, _ManagerBase_):
     def createBackendObject(self, udi:str) -> IFaceDevice | None:
         backends = globalDeviceStorage.managerBackends()
         for backend in backends:
+            # backend is a devices.interfaces.device.DeviceManager
             if not udi.startsWith(backend.udiPrefix()):
                 continue
             
-            iface = backend.createDevice(udi) # FIXME 2025-02-10 22:44:30 this is interfaces.manager!
+            iface = backend.createDevice(udi) # a devices.interfaces.device.DeviceInterface (QObject)
             
             return iface
     
@@ -284,7 +285,7 @@ class _DeviceManager_(DeviceNotifier, _ManagerBase_):
             return self._devicesMap_[udi]
         
         else:
-            iface = self.createBackendObject(udi)
+            iface = self.createBackendObject(udi) # and IFaceDevice
             devData = _Device_(udi)
             devData.setBackendObject(iface)
             self._devicesMap_[udi] = devData
@@ -357,14 +358,17 @@ class _DeviceInterface_:
         self._devicePrivate_ = dev
 
 class DeviceInterface(QtCore.QObject):
-    def __init__(self, dd:_DeviceInterface_, backendObject:QtCore.QObject,
+    def __init__(self, dd:typing.Optional[_DeviceInterface_]=None, 
+                 backendObject:typing.Optional[QtCore.QObject] = None,
                  parent:typing.Optional[QtCore.QObject]=None):
         super().__init__(parent=parent)
         self._d_:_DeviceInterface_ = dd
-        self._d_.setBackendObject(backendObject)
+        if isinstance(self._d_, _DeviceInterface_) and isinstance(backendObject, QtCore.QObject):
+            self._d_.setBackendObject(backendObject)
         
     def __del__(self):
-        self._d_.backendObject().deleteLater()
+        if isinstance(self._d_, _DeviceInterface_) and isinstance(backendObject, QtCore.QObject):
+            self._d_.backendObject().deleteLater()
         self._d_ = None
         
     @staticmethod
@@ -372,15 +376,24 @@ class DeviceInterface(QtCore.QObject):
         return DeviceInterfaceType.Unknown
         
     def isValid(self) -> bool:
-        return self._d_.backendObject() is not None
+        if isinstance(self._d_, _DeviceInterface_) and isinstance(backendObject, QtCore.QObject):
+            return self._d_.backendObject() is not None
+        else:
+            return False
     
-    def typeToString(self, type:DeviceInterfaceType) -> str:
+    @staticmethod
+    def typeToString(type:DeviceInterfaceType) -> str:
+    # def typeToString(self, type:DeviceInterfaceType) -> str:
         return type.name()
         
-    def stringToType(self, type:str) -> DeviceInterfaceType:
+    @staticmethod
+    def stringToType(type:str) -> DeviceInterfaceType:
+    # def stringToType(self, type:str) -> DeviceInterfaceType:
         return DeviceInterfaceType.namevalue(type)
     
-    def typeDescription(self, type:DeviceInterfaceType):
+    @staticmethod
+    def typeDescription(type:DeviceInterfaceType):
+    # def typeDescription(self, type:DeviceInterfaceType):
         match (type):
             case DeviceInterfaceType.DeviceInterfaceType.Unknown:
                 return "Unknown"

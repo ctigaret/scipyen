@@ -14,12 +14,15 @@ from enum import Enum, IntEnum
 from qtpy import QtCore, QtGui, QtWidgets, QtSvg
 from qtpy.QtCore import Signal, Slot, Property
 from qtpy.uic import loadUiType as __loadUiType__
+
 has_qtdbus = False
 try:
     from qtpy import QtDBus
     has_qtdbus = True
 except:
     pass
+
+from core.datatypes import TypeEnum
 from core.prog import safeWrapper
 from core.sysutils import adapt_ui_path
 
@@ -56,6 +59,10 @@ class DeviceManager(QtCore.QObject):
     @abstractmethod
     def devicesFromQuery(self, parentUdi:str, 
                          type:DevIType = DevITypeUnknown) -> list[str]:
+        pass
+    
+    @abstractmethod
+    def createDevice(self, udi:str) -> QtCore.QObject:
         pass
     
 class GenericInterface(QtCore.QObject):
@@ -224,7 +231,7 @@ class StorageVolume(Block):
         pass
     
     @abstractmethod
-    def usage(self) -> StoVolUseType:
+    def usage(self) -> TypeEnum: #StoVolUseType:
         pass
     
     @abstractmethod
@@ -243,6 +250,6 @@ class StorageVolume(Block):
     def encryptedContainerUdi() -> str:
         pass
     
-from systems.devices.storagevolume import UsageType as StoVolUseType
+# from systems.devices.storagevolume import UsageType as StoVolUseType
 from systems.devices.device import DeviceInterfaceType as DevIType
 DevITypeUnknown = DevIType.Unknown
