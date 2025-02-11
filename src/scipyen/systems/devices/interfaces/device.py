@@ -69,6 +69,9 @@ class GenericInterface(QtCore.QObject):
     propertyChanged = Signal(dict, name="propertyChanged") # emits dict[str, int]
     conditionRaised = Signal(str, str, name="conditionRaised") # emits condition, reason
     
+    def __init__(self):
+        super().__init__()
+    
     @abstractmethod
     def property(self, key:str) -> object:
         pass
@@ -163,7 +166,7 @@ class Device(QtCore.QObject):
         return f"/org/Scipyen/Device_{bytearray(encodedUdi).decode()}"
     
 class StorageAccess(DeviceInterface):
-    from systems.devices.ns import ErrorType
+    from systems.devices.errors import ErrorType
     repairRequested = Signal(str, name="repairRequested", arguments=["udi"]) # emits an udi:str
     repairDone = Signal(ErrorType, object, str, name = "repairDone", arguments=["error", "resultData", "udi"])
     teardownRequested = Signal(str, name="teardownRequested", arguments=["udi"])
@@ -171,6 +174,9 @@ class StorageAccess(DeviceInterface):
     teardownDone = Signal(ErrorType, object, str, name="teardownDone", arguments=["error", "resultData", "udi"])
     setupDone = Signal(ErrorType, object, str, name="setupDone", arguments=["error", "resultData", "udi"])
     accessibilityChanged = Signal(bool, str, name="accessibilityChanged", arguments=["accessible", "udi"])
+    
+    def __init__(self):
+        super().__init__()
     
     @abstractmethod
     def isAccessible(self) -> bool:
@@ -213,6 +219,9 @@ class StorageAccess(DeviceInterface):
         return False
     
 class Block(DeviceInterface):
+    def __init__(self):
+        super().__init__()
+    
     @abstractmethod
     def deviceMajor(self) -> int:
         pass
@@ -226,6 +235,9 @@ class Block(DeviceInterface):
         pass
     
 class StorageVolume(Block):
+    def __init__(self):
+        super().__init__()
+    
     @abstractmethod
     def isIgnored(self) -> bool:
         pass

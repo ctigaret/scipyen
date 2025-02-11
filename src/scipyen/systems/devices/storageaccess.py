@@ -34,41 +34,42 @@ class UsageType(TypeEnum):
     Raid = 4
     encrypted = 5
     
-class _StorageVolume_(_DeviceInterface_):
+class _StorageAccess_(_DeviceInterface_):
     def __init__(self):
         super().__init__()
         
-class _StorageVolumeMultiMeta_(type(DeviceInterface), MultipleMeta): 
+class _StorageAccessMultiMeta_(type(DeviceInterface), MultipleMeta): 
     """Enables constructor overloading"""
     pass
     
-class StorageVolume(DeviceInterface, metaclass = _StorageVolumeMultiMeta_):
+class StorageAccess(DeviceInterface, metaclass = _StorageAccessMultiMeta_):
+    from systems.devices.errors import ErrorType
     def __init__(self, backendObject:QtCore.QObject):
-        super().__init__(_StorageVolume_(), backendObject)
+        super().__init__(_StorageAccess_(), backendObject)
+        self._accessible_:bool = False
+        self._filePath_:str = str()
         self._ignored_:bool = True
-        self._usage_:UsageType = UsageType.Unused
-        self._fsType_:str = str()
-        self._label_:str = str()
-        self._uuid_:str = str()
-        self._size_:int = 0
+        self._encrypted_:bool = False
         
-    def __init__(self, dd:_StorageVolume_, backendObject:QtCore.QObject):
+        # TODO 2025-02-11 23:36:09
+        # backendObject.setupDone[ErrorType, object, str].connect(self.setupDone)
+        
+        
+    def __init__(self, dd:_StorageAccess_, backendObject:QtCore.QObject):
         # initializes super()._d_ i.e. DeviceInterface._d_, which is a _DeviceInterface_
         super().__init__(dd, backendObject) 
+        self._accessible_:bool = False
+        self._filePath_:str = str()
         self._ignored_:bool = True
-        self._usage_:UsageType = UsageType.Unused
-        self._fsType_:str = str()
-        self._label_:str = str()
-        self._uuid_:str = str()
-        self._size_:int = 0
+        self._encrypted_:bool = False
 
     def isIgnored(self) -> bool:
         from systems.devices.interfaces.device import DeviceInterface as IfaceDevIFace
-        # Q_D(const StorageVolume);
+        # Q_D(const StorageAccess);
         #                   Type,                   Object,             Default, Method        
-        # return_SOLID_CALL(Ifaces::StorageVolume *, d->backendObject(), true, isIgnored());
+        # return_SOLID_CALL(Ifaces::StorageAccess *, d->backendObject(), true, isIgnored());
         # Here, Solid casts d->backendObject() to a 
-        # Ifaces::StorageVolume <- Ifaces::Block <- Ifaces::DeviceInterface
+        # Ifaces::StorageAccess <- Ifaces::Block <- Ifaces::DeviceInterface
         # then calls its isIgnored() and returns the result
         # if casting fails, returns True (i.e., is ignored)
         #
@@ -82,15 +83,13 @@ class StorageVolume(DeviceInterface, metaclass = _StorageVolumeMultiMeta_):
         o = self._d_.backendObject() # expected a systems.devices.interfaces.DeviceInterface
         print(f"{self.__class__.__name__} o is a {type(o).__name__}")
         if isinstance(o, IfaceDevIFace):
-            self._ignored_ = o.isIgnored() # Method parameter of return_SOLID_CALL macro
-        else:
-            self._ignored_ = True
-            
-        return self._ignored_ # Default parameter of return_SOLID_CALL macro
+            return o.isIgnored() # Method parameter of return_SOLID_CALL macro
+                
+        return True # Default parameter of return_SOLID_CALL macro
         
     @staticmethod
     def deviceInterfaceType() -> DeviceInterfaceType:
-        return DeviceInterfaceType.StorageVolume
+        return DeviceInterfaceType.StorageAccess
     
     def usage(self) -> UsageType:
         # NOTE: 2025-02-11 23:09:16
@@ -98,11 +97,9 @@ class StorageVolume(DeviceInterface, metaclass = _StorageVolumeMultiMeta_):
         o = self._d_.backendObject() # expected a systems.devices.interfaces.DeviceInterface
         print(f"{self.__class__.__name__} o is a {type(o).__name__}")
         if isinstance(o, IfaceDevIFace):
-            self._usage_ = o.usage()
-        else:
-            self._usage = UsageType.Unused
-            
-        return self._usage_
+            return o.usage()
+        
+        return UsageType.Unused
     
     def fsType(self) -> str:
         # NOTE: 2025-02-11 23:09:16
@@ -110,11 +107,9 @@ class StorageVolume(DeviceInterface, metaclass = _StorageVolumeMultiMeta_):
         o = self._d_.backendObject() # expected a systems.devices.interfaces.DeviceInterface
         print(f"{self.__class__.__name__} o is a {type(o).__name__}")
         if isinstance(o, IfaceDevIFace):
-            self._fsType_ = o.fsType()
-        else:
-            self._fsType_ = str()
-            
-        return self._fsType_
+            return o.fsType()
+        
+        return str()
         
     def label(self) -> str:
         # NOTE: 2025-02-11 23:09:16
@@ -122,11 +117,9 @@ class StorageVolume(DeviceInterface, metaclass = _StorageVolumeMultiMeta_):
         o = self._d_.backendObject() # expected a systems.devices.interfaces.DeviceInterface
         print(f"{self.__class__.__name__} o is a {type(o).__name__}")
         if isinstance(o, IfaceDevIFace):
-            self._label_ = o.label()
-        else:
-            self._label_ = str()
-            
-        return self._label_
+            return o.label()
+        
+        return str()
         
     def uuid(self) -> str:
         # NOTE: 2025-02-11 23:09:16
@@ -134,11 +127,9 @@ class StorageVolume(DeviceInterface, metaclass = _StorageVolumeMultiMeta_):
         o = self._d_.backendObject() # expected a systems.devices.interfaces.DeviceInterface
         print(f"{self.__class__.__name__} o is a {type(o).__name__}")
         if isinstance(o, IfaceDevIFace):
-            self._uuid_ = o.uuid().lower()
-        else:
-            self._uuid_ = str()
-            
-        return self._uuid_
+            return o.uuid().lower()
+        
+        return str()
         
     def size(self) -> int:
         # NOTE: 2025-02-11 23:09:16
@@ -146,11 +137,9 @@ class StorageVolume(DeviceInterface, metaclass = _StorageVolumeMultiMeta_):
         o = self._d_.backendObject() # expected a systems.devices.interfaces.DeviceInterface
         print(f"{self.__class__.__name__} o is a {type(o).__name__}")
         if isinstance(o, IfaceDevIFace):
-            self._size_ = o.size()
-        else:
-            self._size_ = 0
+            return o.size()
         
-        return self._size_
+        return 0
     
     def encryptedContainer(self) -> Device:
         iface = self._d_.backendObject() # remember: a devices.interfaces.DeviceInterface

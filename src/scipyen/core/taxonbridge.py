@@ -21,7 +21,7 @@ class Taxon:
         return
         
     
-# from core.ncbi_entrez import list_databases
+# from ncbi.ncbi_entrez import list_databases
 
 hasTaxoniq = False
 try:

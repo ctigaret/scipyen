@@ -358,8 +358,8 @@ class _DeviceInterface_:
         self._devicePrivate_ = dev
 
 class DeviceInterface(QtCore.QObject):
-    def __init__(self, dd:typing.Optional[_DeviceInterface_]=None, 
-                 backendObject:typing.Optional[QtCore.QObject] = None,
+    def __init__(self, dd:_DeviceInterface_, 
+                 backendObject:QtCore.QObject,
                  parent:typing.Optional[QtCore.QObject]=None):
         super().__init__(parent=parent)
         self._d_:_DeviceInterface_ = dd
