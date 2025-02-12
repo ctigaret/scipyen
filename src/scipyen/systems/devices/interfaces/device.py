@@ -262,6 +262,9 @@ class StorageVolume(Block):
     def encryptedContainerUdi() -> str:
         pass
     
+class StorageDrive(Block):
+    pass # TODO 2025-02-12 16:40:42 see Solid::Ifaces
+    
 # from systems.devices.storagevolume import UsageType as StoVolUseType
 from systems.devices.device import DeviceInterfaceType as DevIType
 DevITypeUnknown = DevIType.Unknown

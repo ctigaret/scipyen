@@ -100,7 +100,7 @@ class StorageVolume(DeviceInterface, metaclass = _StorageVolumeMultiMeta_):
         if isinstance(o, IfaceDevIFace):
             self._usage_ = o.usage()
         else:
-            self._usage = UsageType.Unused
+            self._usage = UsageType.Unused # Default parameter of return_SOLID_CALL macro
             
         return self._usage_
     

@@ -187,13 +187,17 @@ class DeviceNotifier(QtCore.QObject):
     def initialized(cls:typing.Self) -> bool: # NOTE: Singleton design pattern
         return hasattr(cls, "__instance__" and isinstance(cls.__instance__, cls))
     
-    @staticmethod
-    def instance() -> typing.Self: # NOTE: Singleton design pattern
-        return globalDeviceStorage.notifier()
-        # if cls.__instance__ is None:
-        #     inst = cls(*args, **kwargs)
-        #     for subclass in cls._walk_mro():
-        #         subclass.__instance__ = inst
+    @classmethod
+    def instance(cls) -> typing.Self: # NOTE: Singleton design pattern
+        # return globalDeviceStorage.notifier()
+        if not hasattr(cls, "__instance__") or not isinstance(cls.__instance__, cls):
+            cls.__instance__ = globalDeviceStorage.notifier()
+            if cls.__instance__ is None:
+                inst = cls(*args, **kwargs)
+                for subclass in cls._walk_mro():
+                    subclass.__instance__ = inst
+                    
+        return cls.__instance__
         # if hasattr(cls, "__instance__") and isinstance(cls.__instance__, cls):
         #     return cls.__instance__
         # else:
