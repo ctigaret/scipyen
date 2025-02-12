@@ -1056,6 +1056,13 @@ class TypeEnum(IntEnum):
         return -1
     
     @classmethod
+    def stringToType(cls, name:str) -> int:
+        """Return the value (int) corresponding to a given name;
+        WARNING If name is not a valid TypeEnum name returns -1
+        """
+        return cls.namevalue(name)
+    
+    @classmethod
     def __contains__(cls, value) -> bool:
         if isinstance(value, cls):
             return value in cls.types()

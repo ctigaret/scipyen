@@ -26,14 +26,6 @@ from core.datatypes import TypeEnum
 from systems.devices import device
 from systems.devices.device import (_DeviceInterface_, DeviceInterface, DeviceInterfaceType, Device)
 
-class UsageType(TypeEnum):
-    Other = 0
-    Unused = 1
-    FileSystem = 1
-    PartitionTable = 3
-    Raid = 4
-    encrypted = 5
-    
 class _StorageAccess_(_DeviceInterface_):
     def __init__(self):
         super().__init__()

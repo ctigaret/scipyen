@@ -26,133 +26,113 @@ from core.datatypes import TypeEnum
 from systems.devices import device
 from systems.devices.device import (_DeviceInterface_, DeviceInterface, DeviceInterfaceType, Device)
 
-class UsageType(TypeEnum):
-    Other = 0
-    Unused = 1
-    FileSystem = 1
-    PartitionTable = 3
-    Raid = 4
-    encrypted = 5
+class Bus: pass
+Bus = TypeEnum("Bus", ["Ide", "Usb", "Ieee1394", "Scsi", "Sata", "Platform"])
     
-class _StorageVolume_(_DeviceInterface_):
+class DriveType:pass
+DriveType = TypeEnum("DriveType", ["HardDisk", "CdromDrive", "Floppy", "Tape", 
+                                   "CompactFlash", "MemoryStick", "SmartMedia", "SdMmc", "Xd"])
+    
+class _StorageDrive_(_DeviceInterface_):
     def __init__(self):
         super().__init__()
         
-class _StorageVolumeMultiMeta_(type(DeviceInterface), MultipleMeta): 
+class _StorageDriveMultiMeta_(type(DeviceInterface), MultipleMeta): 
     """Enables constructor overloading"""
     pass
     
-class StorageVolume(DeviceInterface, metaclass = _StorageVolumeMultiMeta_):
+class StorageDrive(DeviceInterface, metaclass = _StorageDriveMultiMeta_):
     def __init__(self, backendObject:QtCore.QObject):
-        super().__init__(_StorageVolume_(), backendObject)
-        self._ignored_:bool = True
-        self._usage_:UsageType = UsageType.Unused
-        self._fsType_:str = str()
-        self._label_:str = str()
-        self._uuid_:str = str()
+        super().__init__(_StorageDrive_(), backendObject)
+        self._bus_:Bus = Bus.Ide
+        self._driveType_:DriveType = DriveType.HardDisk
+        self._removable_:bool = False
+        self._hotpluggable_:bool = False
+        self._inUse_:bool = False
         self._size_:int = 0
+        self._timeDetected_:QtCore.QDateTime = QtCore.QDateTime()
+        self._timeMediaDetected_:QtCore.QDateTime = QtCore.QDateTime()
         
-    def __init__(self, dd:_StorageVolume_, backendObject:QtCore.QObject):
+    def __init__(self, dd:_StorageDrive_, backendObject:QtCore.QObject):
         # initializes super()._d_ i.e. DeviceInterface._d_, which is a _DeviceInterface_
         super().__init__(dd, backendObject) 
-        self._ignored_:bool = True
-        self._usage_:UsageType = UsageType.Unused
-        self._fsType_:str = str()
-        self._label_:str = str()
-        self._uuid_:str = str()
+        self._bus_:Bus = Bus.Platform
+        self._driveType_:DriveType = DriveType.HardDisk
+        self._removable_:bool = False
+        self._hotpluggable_:bool = False
+        self._inUse_:bool = False
         self._size_:int = 0
-
-    def isIgnored(self) -> bool:
-        from systems.devices.interfaces.device import DeviceInterface as IfaceDevIFace
-        # Q_D(const StorageVolume);
-        #                   Type,                   Object,             Default, Method        
-        # return_SOLID_CALL(Ifaces::StorageVolume *, d->backendObject(), true, isIgnored());
-        # Here, Solid casts d->backendObject() to a 
-        # Ifaces::StorageVolume <- Ifaces::Block <- Ifaces::DeviceInterface
-        # then calls its isIgnored() and returns the result
-        # if casting fails, returns True (i.e., is ignored)
-        #
-        # Now, self inherits from systems.devices.device.DeviceInterface ⟹
-        # self._d_ is a devices.device._DeviceInterface_; its backend object 
-        # (QObject); Solid, casts this backend object, here, to a 
-        # devices.interfaces.DeviceInterface aliases here to IfaceDevIFace
+        self._timeDetected_:QtCore.QDateTime = QtCore.QDateTime()
+        self._timeMediaDetected_:QtCore.QDateTime = QtCore.QDateTime()
+        
+    def bus(self) -> Bus:
+        from systems.devices.interfaces.device import StorageDrive as IfaceStorageDrive
         
         # NOTE: 2025-02-11 22:30:02
         # while still using PyQt5 could try and use sip.cast
         o = self._d_.backendObject() # expected a systems.devices.interfaces.DeviceInterface
         print(f"{self.__class__.__name__} o is a {type(o).__name__}")
-        if isinstance(o, IfaceDevIFace):
-            self._ignored_ = o.isIgnored() # Method parameter of return_SOLID_CALL macro
+        if isinstance(o, IfaceStorageDrive):
+            self.self._bus_ = o.bus() # Method parameter of return_SOLID_CALL macro
         else:
-            self._ignored_ = True
+            self._bus_ = Bus.Platform
             
-        return self._ignored_ # Default parameter of return_SOLID_CALL macro
+        return self._bus_ # Default parameter of return_SOLID_CALL macro
         
     @staticmethod
     def deviceInterfaceType() -> DeviceInterfaceType:
-        return DeviceInterfaceType.StorageVolume
+        return DeviceInterfaceType.StorageDrive
     
-    def usage(self) -> UsageType:
+    def driveType(self) -> DriveType:
         # NOTE: 2025-02-11 23:09:16
         # see NOTE: 2025-02-11 22:30:02
         o = self._d_.backendObject() # expected a systems.devices.interfaces.DeviceInterface
         print(f"{self.__class__.__name__} o is a {type(o).__name__}")
-        if isinstance(o, IfaceDevIFace):
-            self._usage_ = o.usage()
+        if isinstance(o, IfaceStorageDrive):
+            self._driveType_ = o.driveType()
         else:
-            self._usage_ = UsageType.Unused # Default parameter of return_SOLID_CALL macro
+            self._driveType_ = DriveType.HardDisk  # Default parameter of return_SOLID_CALL macro
             
-        return self._usage_
+        return self._driveType_
     
-    def fsType(self) -> str:
+    def isRemovable(self) -> bool:
         # NOTE: 2025-02-11 23:09:16
         # see NOTE: 2025-02-11 22:30:02
         o = self._d_.backendObject() # expected a systems.devices.interfaces.DeviceInterface
         print(f"{self.__class__.__name__} o is a {type(o).__name__}")
-        if isinstance(o, IfaceDevIFace):
-            self._fsType_ = o.fsType()
+        if isinstance(o, IfaceStorageDrive):
+            self._removable_ = o.isRemovable()
         else:
-            self._fsType_ = str()
+            self._removable_ = False
             
-        return self._fsType_
+        return self._removable_
         
-    def label(self) -> str:
+    def isHotPluggable(self) -> str:
         # NOTE: 2025-02-11 23:09:16
         # see NOTE: 2025-02-11 22:30:02
         o = self._d_.backendObject() # expected a systems.devices.interfaces.DeviceInterface
         print(f"{self.__class__.__name__} o is a {type(o).__name__}")
-        if isinstance(o, IfaceDevIFace):
-            self._label_ = o.label()
+        if isinstance(o, IfaceStorageDrive):
+            self._hotpluggable_ = o.isHotPluggable()
         else:
-            self._label_ = str()
+            self._hotpluggable_ = False
             
-        return self._label_
-        
-    def uuid(self) -> str:
-        # NOTE: 2025-02-11 23:09:16
-        # see NOTE: 2025-02-11 22:30:02
-        o = self._d_.backendObject() # expected a systems.devices.interfaces.DeviceInterface
-        print(f"{self.__class__.__name__} o is a {type(o).__name__}")
-        if isinstance(o, IfaceDevIFace):
-            self._uuid_ = o.uuid().lower()
-        else:
-            self._uuid_ = str()
-            
-        return self._uuid_
+        return self._hotpluggable_
         
     def size(self) -> int:
         # NOTE: 2025-02-11 23:09:16
         # see NOTE: 2025-02-11 22:30:02
         o = self._d_.backendObject() # expected a systems.devices.interfaces.DeviceInterface
         print(f"{self.__class__.__name__} o is a {type(o).__name__}")
-        if isinstance(o, IfaceDevIFace):
+        if isinstance(o, IfaceStorageDrive):
             self._size_ = o.size()
         else:
             self._size_ = 0
         
         return self._size_
     
-    def encryptedContainer(self) -> Device:
+    def isInUse(self) -> bool: # TODO
+        p = Predicate(DeviceInterfaceType.StorageAccess)
         iface = self._d_.backendObject() # remember: a devices.interfaces.DeviceInterface
         if iface is not None:
             return Device(iface.encryptedContainerUdi())

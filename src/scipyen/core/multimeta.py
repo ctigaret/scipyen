@@ -125,6 +125,8 @@ class MultipleMeta(type):
     
 
 class MultipleMetaAdapter(type):
+    # NOTE: 2025-02-12 21:37:20
+    # not used yet - worth a try
     metadic = {}
     
     @staticmethod
@@ -158,6 +160,7 @@ class MultipleMetaAdapter(type):
         return lambda n,b,d: _generatemetaclass(b,metas,priority)(n,b,d)
     
 
+# ### BEGIN multiple dispatch examples - ATTENTION Do NOT delete
 # # Some example classes that use multiple dispatch
 # class Spam(metaclass=MultipleMeta):
 #     def bar(self, x:int, y:int):
@@ -193,3 +196,5 @@ class MultipleMetaAdapter(type):
 #     # Get today's date
 #     e = Date()
 #     print(e.year, e.month, e.day)
+#
+# ### END   multiple dispatch examples - ATTENTION Do NOT delete

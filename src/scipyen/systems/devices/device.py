@@ -73,6 +73,7 @@ Work in progress, DO NOT USE
 # --------------
 
 import sys, os, typing, pathlib, functools, itertools, traceback
+from copy impot (copy, deepcopy)
 from urllib.parse import urlparse, urlsplit
 from collections import namedtuple
 from abc import abstractmethod
@@ -83,6 +84,7 @@ from qtpy.uic import loadUiType as __loadUiType__
 from core.prog import safeWrapper
 from core.sysutils import adapt_ui_path
 from core.datatypes import TypeEnum
+from core.multimeta import MultipleMeta
 
 __HAS_PYUDEV__ = False
 
@@ -100,6 +102,7 @@ class _DeviceInterface_: pass
 class DeviceInterface: pass
 class _Device_: pass
 class Device: pass
+class DevicePredicate: pass
 
 IFaceDevice = typing.TypeVar("IFaceDevice")
 IFaceDeviceManager = typing.TypeVar("IFaceDeviceManager")
@@ -491,7 +494,6 @@ class _Device_(QtCore.QObject):
             
 class Device():
     # from systems.devices.devicemanager import (DeviceManagerStorage, DeviceManager)
-    from systems.devices.predicate import Predicate # TODO: 2025-02-10 18:30:03 needs done
     # from systems.devices.deviceinterface import (DeviceInterface, DeviceInterfaceType)
     DevIface = typing.TypeVar("DevIFace", bound="DeviceInterface")
 
@@ -525,8 +527,8 @@ class Device():
         pass
 
     @classmethod
-    def listFromQuery(cls, predicate:typing.Union[str, Predicate], parentUdi:str) -> list[typing.Self]:
-        # TODO: 2025-02-11 12:49:24 Predicate
+    def listFromQuery(cls, predicate:typing.Union[str, DevicePredicate], parentUdi:str) -> list[typing.Self]:
+        # TODO: 2025-02-11 12:49:24 DevicePredicate
         pass
     
     @classmethod
@@ -575,6 +577,151 @@ class Device():
     # def is(self, type:DeviceInterfaceType) -> bool:
     #     returnn self.isDeviceInterface(type)
 
+# class _DevicePredicateMultiMeta_(type(DeviceInterface), MultipleMeta): 
+#     """Enables constructor overloading"""
+#     pass
 
+class DevicePredicate(MutipleMeta):
+    ComparisonOperator = TypeEnum("ComparisonOperator", ["Equals", "Mask"])
+    Type = TypeEnum("Type", ["PropertyCheck", "Conjunction", "Disjunction", "InterfaceCheck"])
+    
+    class Private:
+        def __init__(self):
+            self._isValid_:bool = False
+            self._type_:DevicePredicate.Type = DevicePredicate.Type.PropertyCheck
+            self._compOperator_:DevicePredicate.ComparisonOperator = DevicePredicate.ComparisonOperator.Equals
+            self._operand1_:typing.Optional[typing.Self] = None
+            self._operand1_:typing.Optional[typing.Self] = None
+            self._ifaceType_:DeviceInterfaceType.Unknown
+            self._property_:str = str()
+            self._value_:object = None
+    
+    def __init__(self):
+        self._d_ = self.Private()
+        
+    def __init__(self, other:typing.Self):
+        self._d_ = deepcopy(other._d_)
+        
+    def __init__(self, ifaceType:DeviceInterfaceType, prop:str, value:object,compOperator: typing.Self.ComparisonOperator):
+        self._d_ = self.Private()
+        self._d_._isValid_ = True
+        self._d_._ifaceType_ = ifaceType
+        self._d_._property_ = prop
+        self._d_._value_ = value
+        self._d_._compOperator_ = compOperator
+        
+    def __init__(self, ifaceName:str, prop:str, value:object, compOperator: typing.Self.ComparisonOperator):
+        self._d_ = self.Private()
+        ifaceType = DeviceInterfaceType.stringToType(ifaceName) 
+        if ifaceType != -1:
+            self._d_._isValid_ = True
+            self._d_._ifaceType_ = ifaceType
+            self._d_._property_ = prop
+            self._d_._value_ = value
+            self._d_._compOperator_ = compOperator
+            
+    def __init__(self, ifaceType:DeviceInterfaceType):
+        self._d_ = self.Private()
+        self._d_._isValid_ = True
+        self._d_._type_ = self.Type.InterfaceCheck
+        self._d_._ifaceType_ = ifaceType
+        
+    def __init__(self, ifaceName:str):
+        self._d_ = self.Private()
+        ifaceType = DeviceInterfaceType.stringToType(ifaceName)
+        if ifaceType != -1:
+            self._d_._isValid_ = True
+            self._d_._type_ = self.Type.InterfaceCheck
+            self._d_._ifaceType_ = ifaceType
+            
+    def __del__(self):
+        if self._d_._type_ != self.Type.PropertyCheck and self._d_._type_ != self.Type.InterfaceCheck:
+            self._d_._operand1_ = None
+            self._d_._operand2_ = None
+            
+        self._d_ = None
+        
+    def __and__(self, other:typing.Self):
+        result = typing.Self()
+        result._d_._isValid_ = True
+        result._d_.type_ = self.Type.Conjunction
+        
+        # CAUTION 2025-02-12 22:20:58
+        result_d_._operand1_ = deepcopy(self)
+        result_d_._operand2_ = deepcopy(other)
+        
+        return result
+    
+    def __iand__(self, other:typing.Self):
+        self = self & other
+        return self
+    
+    def __or__(self, other:typing.Self):
+        result = typing.Self()
+        result._d_._isValid_ = True
+        result._d_.type_ = self.Type.Disjunction
+        
+        # CAUTION 2025-02-12 22:20:58
+        result_d_._operand1_ = deepcopy(self)
+        result_d_._operand2_ = deepcopy(other)
+        
+        return result
+    
+    def __ior__(self, other:typing.Self):
+        self = self | other
+        return self
+        
+    def copy(self) -> typing.Self: 
+        # ? use as assignment operator (operator= in C++)
+        self._d_._isValid_ = other._d_._isValid_
+        self._d_._type_ = other._d._type_
+        
+        if self._d_._type_ != self.Type.PropertyCheck and self._d_._type_ != self.Type.InterfaceCheck:
+            self._d_._operand1_ = deepcopy(other._d_._operand1_)
+            self._d_._operand2_ = deepcopy(other._d_._operand2_)
+        else:
+            self._d_._ifaceType_ = deepcopy(other._d_._ifaceType_)
+            self._d_._property_ = deepcopy(other._d_._property_)
+            self._d_._value_ = deepcopy(other._d_._value_)
+            self._d_._compOperator_ = deepcopy(other._d_._compOperator_)
+            
+        return self
+    
+    def isValid(self) -> bool:
+        return self._d_._isValid_
+    
+    def matches(self, device:Device) -> bool:
+        if not self._d_._isValid_:
+            return False
+        
+        match (self._d_._type_):
+            case self.Type.Disjunction:
+                return self._d_._operand1_.matches(device) or self._d_._operand2_.matches(device)
+            case self.Type.Conjunction
+                return self._d_._operand1_.matches(device) and self._d_._operand2_.matches(device)
+            case self.Type.PropertyCheck:
+                iface = device.asDeviceInterface(self._d_._ifaceType_)
+                if iface is not None:
+                    index = iface.metaObject().indexOfProperty(self._d_._property_)
+                    if index  == -1:
+                        return False # ?!?
+                    metaProp = iface.metaObject().property(index)
+                    value = metaProp.read(iface) if metaProp.isReadable() else None 
+                    expected = self._d_._value_
+                    if metaProp.isEnumType() and isinstance(expected, str):
+                        pass
+                        # metaEnum
+                    pass # TODO
+                    
+            case self.Type.InterfaceCheck:
+                return device.isDeviceInterface(self._d_._ifaceType_)
+            case _:
+                return False
+            
+            return False
+            
+    
+        
+    
 from systems.devices.interfaces.device import Device as IFaceDevice
 from systems.devices.interfaces.device import DeviceManager as IFaceDeviceManager
