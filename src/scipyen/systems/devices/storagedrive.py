@@ -24,7 +24,7 @@ from core.sysutils import adapt_ui_path
 from core.datatypes import TypeEnum
 
 from systems.devices import device
-from systems.devices.device import (_DeviceInterface_, DeviceInterface, DeviceInterfaceType, Device)
+from systems.devices.device import (_DeviceInterface_, DeviceInterface, DeviceInterfaceType, Device, DevicePredicate)
 
 class Bus: pass
 Bus = TypeEnum("Bus", ["Ide", "Usb", "Ieee1394", "Scsi", "Sata", "Platform"])
@@ -42,6 +42,7 @@ class _StorageDriveMultiMeta_(type(DeviceInterface), MultipleMeta):
     pass
     
 class StorageDrive(DeviceInterface, metaclass = _StorageDriveMultiMeta_):
+    from systems.devices.interfaces.device import StorageDrive as IfaceStorageDrive
     def __init__(self, backendObject:QtCore.QObject):
         super().__init__(_StorageDrive_(), backendObject)
         self._bus_:Bus = Bus.Ide
@@ -66,13 +67,13 @@ class StorageDrive(DeviceInterface, metaclass = _StorageDriveMultiMeta_):
         self._timeMediaDetected_:QtCore.QDateTime = QtCore.QDateTime()
         
     def bus(self) -> Bus:
-        from systems.devices.interfaces.device import StorageDrive as IfaceStorageDrive
+        # from systems.devices.interfaces.device import StorageDrive as IfaceStorageDrive
         
         # NOTE: 2025-02-11 22:30:02
         # while still using PyQt5 could try and use sip.cast
         o = self._d_.backendObject() # expected a systems.devices.interfaces.DeviceInterface
-        print(f"{self.__class__.__name__} o is a {type(o).__name__}")
-        if isinstance(o, IfaceStorageDrive):
+        # print(f"{self.__class__.__name__} o is a {type(o).__name__}")
+        if isinstance(o, self.IfaceStorageDrive):
             self.self._bus_ = o.bus() # Method parameter of return_SOLID_CALL macro
         else:
             self._bus_ = Bus.Platform
@@ -84,11 +85,12 @@ class StorageDrive(DeviceInterface, metaclass = _StorageDriveMultiMeta_):
         return DeviceInterfaceType.StorageDrive
     
     def driveType(self) -> DriveType:
+        # from systems.devices.interfaces.device import StorageDrive as IfaceStorageDrive
         # NOTE: 2025-02-11 23:09:16
         # see NOTE: 2025-02-11 22:30:02
         o = self._d_.backendObject() # expected a systems.devices.interfaces.DeviceInterface
-        print(f"{self.__class__.__name__} o is a {type(o).__name__}")
-        if isinstance(o, IfaceStorageDrive):
+        # print(f"{self.__class__.__name__} o is a {type(o).__name__}")
+        if isinstance(o, self.IfaceStorageDrive):
             self._driveType_ = o.driveType()
         else:
             self._driveType_ = DriveType.HardDisk  # Default parameter of return_SOLID_CALL macro
@@ -96,11 +98,12 @@ class StorageDrive(DeviceInterface, metaclass = _StorageDriveMultiMeta_):
         return self._driveType_
     
     def isRemovable(self) -> bool:
+        # from systems.devices.interfaces.device import StorageDrive as IfaceStorageDrive
         # NOTE: 2025-02-11 23:09:16
         # see NOTE: 2025-02-11 22:30:02
         o = self._d_.backendObject() # expected a systems.devices.interfaces.DeviceInterface
-        print(f"{self.__class__.__name__} o is a {type(o).__name__}")
-        if isinstance(o, IfaceStorageDrive):
+        # print(f"{self.__class__.__name__} o is a {type(o).__name__}")
+        if isinstance(o, self.IfaceStorageDrive):
             self._removable_ = o.isRemovable()
         else:
             self._removable_ = False
@@ -108,11 +111,12 @@ class StorageDrive(DeviceInterface, metaclass = _StorageDriveMultiMeta_):
         return self._removable_
         
     def isHotPluggable(self) -> str:
+        # from systems.devices.interfaces.device import StorageDrive as IfaceStorageDrive
         # NOTE: 2025-02-11 23:09:16
         # see NOTE: 2025-02-11 22:30:02
         o = self._d_.backendObject() # expected a systems.devices.interfaces.DeviceInterface
-        print(f"{self.__class__.__name__} o is a {type(o).__name__}")
-        if isinstance(o, IfaceStorageDrive):
+        # print(f"{self.__class__.__name__} o is a {type(o).__name__}")
+        if isinstance(o, self.IfaceStorageDrive):
             self._hotpluggable_ = o.isHotPluggable()
         else:
             self._hotpluggable_ = False
@@ -120,11 +124,12 @@ class StorageDrive(DeviceInterface, metaclass = _StorageDriveMultiMeta_):
         return self._hotpluggable_
         
     def size(self) -> int:
+        # from systems.devices.interfaces.device import StorageDrive as IfaceStorageDrive
         # NOTE: 2025-02-11 23:09:16
         # see NOTE: 2025-02-11 22:30:02
         o = self._d_.backendObject() # expected a systems.devices.interfaces.DeviceInterface
-        print(f"{self.__class__.__name__} o is a {type(o).__name__}")
-        if isinstance(o, IfaceStorageDrive):
+        # print(f"{self.__class__.__name__} o is a {type(o).__name__}")
+        if isinstance(o, self.IfaceStorageDrive):
             self._size_ = o.size()
         else:
             self._size_ = 0
@@ -132,7 +137,7 @@ class StorageDrive(DeviceInterface, metaclass = _StorageDriveMultiMeta_):
         return self._size_
     
     def isInUse(self) -> bool: # TODO
-        p = Predicate(DeviceInterfaceType.StorageAccess)
+        p = DevicePredicate(DeviceInterfaceType.StorageAccess)
         iface = self._d_.backendObject() # remember: a devices.interfaces.DeviceInterface
         if iface is not None:
             return Device(iface.encryptedContainerUdi())

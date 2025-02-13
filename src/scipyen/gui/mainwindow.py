@@ -3469,11 +3469,31 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
     @Slot()
     def slot_updateCwd(self):
+        """Connected to console.executed signal
+        Makes sure that a cd (change directory) command run at the console
+        is reflected in throughout Scipyen.
+        """
+        # NOTE: 2025-02-13 14:32:40 WARNING
+        # do NOT call slot_changeDirectory here -> circular loop!
         if self.cwd != os.getcwd():
-            self.cwd = os.getcwd()
+            oldCwd = self.cwd
+            newCwd = os.getcwd()
+            self.cwd = newCwd
+            # NOTE: 2025-02-13 14:38:57
+            # update the navigator
+            try:
+                self.navPrevDir.appendleft(oldCwd)
+
+            except:
+                pass
+            
+            url = QtCore.QUrl(pathlib.Path(newCwd).resolve().as_uri())
+            # sigBlock = QtCore.QSignalBlocker(self.navigator) # not needed; just don't emit navigator.urlChanged
+            self.navigator.setLocationUrl(url)
+            
             self._setRecentDirectory_(self.cwd)
             self._updateFileSystemView_(self.cwd, False)
-            self._resizeFileColumn_()
+            # self._resizeFileColumn_()
             # self._refreshRecentDirsComboBox_()
 
     def slot_updateHistory(self):
@@ -5417,18 +5437,6 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 
             self._initRecentDirsMenu_(self.recentDirectoriesMenu, 0)
                 
-            # for item in self.recentDirectories:
-            #     action = self.recentDirectoriesMenu.addAction(item)
-            #     action.setText(item)
-            #     # action.triggered.connect(self.slot_changeDirectory)
-            #     action.triggered.connect(self.slot_changeLocation)
-
-            # if self._maxRecentDirectories <= 10:
-            #     self.recentDirectoriesMenu.addSeparator()
-            #     clearDirAction = self.recentDirectoriesMenu.addAction(QtGui.QIcon.fromTheme("edit-clear-history"),
-            #         "Clear Recent Directories List")
-            #     clearDirAction.triggered.connect(self._clearRecentDirectories_)
-                
     def _initRecentDirsMenu_(self, menu: QtWidgets.QMenu, startIndex:int):
         from gui import guiutils
         menu.setLayoutDirection(QtCore.Qt.LeftToRight)
@@ -6007,19 +6015,6 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             
             self.sig_changedDirectory.emit(targetDir)
             
-            # print(f"{self.__class__.__name__}.slot_changeDirectory targetDir = {targetDir}")
-            
-            # NOTE: 2023-09-27 21:03:16
-            # DEPRECATED: directory navigation and monitoring are now independent
-            # of each other
-            #
-            # if os.path.isdir(self.currentDirectory):
-            #     with os.scandir(self.currentDirectory) as dirIt:
-            #         dirItems = dict((entry.name, entry.stat(follow_symlinks=False)) for entry in dirIt if os.path.lexists(entry.name))
-            #         # dirItems = dict((entry.name, entry.stat()) for entry in dirIt if os.path.lexists(entry.name))
-            #         self._monitoredDirsCache_.clear()
-            #         self._monitoredDirsCache_.update(dirItems)
-               
 
     def _slot_workdirChangedInConsole(self, targetDir):
         self._updateFileSystemView_(targetDir, cd=True)
