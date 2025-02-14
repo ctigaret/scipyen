@@ -26,13 +26,6 @@ from core.datatypes import TypeEnum
 from systems.devices import device
 from systems.devices.device import (_DeviceInterface_, DeviceInterface, DeviceInterfaceType, Device, DevicePredicate)
 
-class Bus: pass
-Bus = TypeEnum("Bus", ["Ide", "Usb", "Ieee1394", "Scsi", "Sata", "Platform"])
-    
-class DriveType:pass
-DriveType = TypeEnum("DriveType", ["HardDisk", "CdromDrive", "Floppy", "Tape", 
-                                   "CompactFlash", "MemoryStick", "SmartMedia", "SdMmc", "Xd"])
-    
 class _StorageDrive_(_DeviceInterface_):
     def __init__(self):
         super().__init__()
@@ -43,10 +36,13 @@ class _StorageDriveMultiMeta_(type(DeviceInterface), MultipleMeta):
     
 class StorageDrive(DeviceInterface, metaclass = _StorageDriveMultiMeta_):
     from systems.devices.interfaces.device import StorageDrive as IfaceStorageDrive
+    Bus = TypeEnum("Bus", ["Ide", "Usb", "Ieee1394", "Scsi", "Sata", "Platform"])
+    DriveType = TypeEnum("DriveType", ["HardDisk", "CdromDrive", "Floppy", "Tape", 
+                                    "CompactFlash", "MemoryStick", "SmartMedia", "SdMmc", "Xd"])
     def __init__(self, backendObject:QtCore.QObject):
         super().__init__(_StorageDrive_(), backendObject)
-        self._bus_:Bus = Bus.Ide
-        self._driveType_:DriveType = DriveType.HardDisk
+        self._bus_:self.Bus = self.Bus.Ide
+        self._driveType_:self.DriveType = self.DriveType.HardDisk
         self._removable_:bool = False
         self._hotpluggable_:bool = False
         self._inUse_:bool = False
@@ -57,8 +53,8 @@ class StorageDrive(DeviceInterface, metaclass = _StorageDriveMultiMeta_):
     def __init__(self, dd:_StorageDrive_, backendObject:QtCore.QObject):
         # initializes super()._d_ i.e. DeviceInterface._d_, which is a _DeviceInterface_
         super().__init__(dd, backendObject) 
-        self._bus_:Bus = Bus.Platform
-        self._driveType_:DriveType = DriveType.HardDisk
+        self._bus_:self.Bus = self.Bus.Platform
+        self._driveType_:self.DriveType = self.DriveType.HardDisk
         self._removable_:bool = False
         self._hotpluggable_:bool = False
         self._inUse_:bool = False
@@ -76,7 +72,7 @@ class StorageDrive(DeviceInterface, metaclass = _StorageDriveMultiMeta_):
         if isinstance(o, self.IfaceStorageDrive):
             self.self._bus_ = o.bus() # Method parameter of return_SOLID_CALL macro
         else:
-            self._bus_ = Bus.Platform
+            self._bus_ = self.Bus.Platform
             
         return self._bus_ # Default parameter of return_SOLID_CALL macro
         
@@ -93,7 +89,7 @@ class StorageDrive(DeviceInterface, metaclass = _StorageDriveMultiMeta_):
         if isinstance(o, self.IfaceStorageDrive):
             self._driveType_ = o.driveType()
         else:
-            self._driveType_ = DriveType.HardDisk  # Default parameter of return_SOLID_CALL macro
+            self._driveType_ = self.DriveType.HardDisk  # Default parameter of return_SOLID_CALL macro
             
         return self._driveType_
     

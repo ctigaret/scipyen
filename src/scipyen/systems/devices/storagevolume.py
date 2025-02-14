@@ -26,14 +26,6 @@ from core.datatypes import TypeEnum
 from systems.devices import device
 from systems.devices.device import (_DeviceInterface_, DeviceInterface, DeviceInterfaceType, Device)
 
-class UsageType(TypeEnum):
-    Other = 0
-    Unused = 1
-    FileSystem = 1
-    PartitionTable = 3
-    Raid = 4
-    encrypted = 5
-    
 class _StorageVolume_(_DeviceInterface_):
     def __init__(self):
         super().__init__()
@@ -44,10 +36,18 @@ class _StorageVolumeMultiMeta_(type(DeviceInterface), MultipleMeta):
     
 class StorageVolume(DeviceInterface, metaclass = _StorageVolumeMultiMeta_):
     from systems.devices.interfaces.device import DeviceInterface as IfaceDevIFace
+    class UsageType(TypeEnum):
+        Other = 0
+        Unused = 1
+        FileSystem = 1
+        PartitionTable = 3
+        Raid = 4
+        encrypted = 5
+        
     def __init__(self, backendObject:QtCore.QObject):
         super().__init__(_StorageVolume_(), backendObject)
         self._ignored_:bool = True
-        self._usage_:UsageType = UsageType.Unused
+        self._usage_:self.UsageType = self.UsageType.Unused
         self._fsType_:str = str()
         self._label_:str = str()
         self._uuid_:str = str()
@@ -57,7 +57,7 @@ class StorageVolume(DeviceInterface, metaclass = _StorageVolumeMultiMeta_):
         # initializes super()._d_ i.e. DeviceInterface._d_, which is a _DeviceInterface_
         super().__init__(dd, backendObject) 
         self._ignored_:bool = True
-        self._usage_:UsageType = UsageType.Unused
+        self._usage_:self.UsageType = self.UsageType.Unused
         self._fsType_:str = str()
         self._label_:str = str()
         self._uuid_:str = str()
@@ -101,7 +101,7 @@ class StorageVolume(DeviceInterface, metaclass = _StorageVolumeMultiMeta_):
         if isinstance(o, self.IfaceDevIFace):
             self._usage_ = o.usage()
         else:
-            self._usage_ = UsageType.Unused # Default parameter of return_SOLID_CALL macro
+            self._usage_ = self.UsageType.Unused # Default parameter of return_SOLID_CALL macro
             
         return self._usage_
     

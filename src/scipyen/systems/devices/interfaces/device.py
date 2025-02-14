@@ -85,8 +85,6 @@ class GenericInterface(QtCore.QObject):
         pass
     
 class Device(QtCore.QObject):
-    # from systems.devices.device import DeviceInterfaceType
-    
     def __init__(self, parent:typing.Optional[QtCore.QObject]=None):
         super().__init__(parent=parent)
     
@@ -235,6 +233,7 @@ class Block(DeviceInterface):
         pass
     
 class StorageVolume(Block):
+    from systems.devices.storagevolume import StorageVolume as StorageVolumeFrontend
     def __init__(self):
         super().__init__()
     
@@ -243,7 +242,7 @@ class StorageVolume(Block):
         pass
     
     @abstractmethod
-    def usage(self) -> TypeEnum: #StoVolUseType:
+    def usage(self) -> StorageVolumeFrontend.UsageType
         pass
     
     @abstractmethod
@@ -263,7 +262,135 @@ class StorageVolume(Block):
         pass
     
 class StorageDrive(Block):
-    pass # TODO 2025-02-12 16:40:42 see Solid::Ifaces
+    from systems.devices.storagedrive import StorageDrive as StorageDriveFrontend
+    def __init__(self):
+        super().__init__()
+        
+    @abstractmethod
+    def bus(self) -> StorageDriveFrontend.Bus:
+        pass
+    
+    @abstractmethod
+    def driveType(self) -> StorageDriveFrontend.DeviceType:
+        pass
+    
+    @abstractmethod
+    def isRemovable(self) -> bool:
+        pass
+    
+    @abstractmethod
+    def isHotPluggable(self) -> bool:
+        pass
+    
+    @abstractmethod
+    def size(self) -> int:
+        pass
+    
+    @abstractmethod
+    def timeDetected(self) -> QtCore.QDateTime:
+        pass
+    
+    @abstractmethod
+    def timeMediaDetected(self) -> QtCore.QDateTime:
+        pass
+    
+class Battery(DeviceInterface):
+    presentStateChanged = Signal(bool, str, name="presentStateChanged", arguments = ["newState", "udi"])
+    chargePercentChanged = Signal(int, str, name="chargePercentChanged", arguments = ["value", "udi"])
+    capacityChanged = Signal(int, str, name="capacityChanged", arguments = ["value", "udi"])
+    cycleCountChanged = Signal(int, str, name="cycleCountChanged", arguments = ["value", "udi"])
+    powerSupplyStateChanged = Signal(bool, str, name="powerSupplyStateChanged", arguments = ["newState", "udi"])
+    chargeStateChanged = Signal(int, str, name="chargeStateChanged", arguments = ["newState", "udi"])
+    timeToEmptyChanged = Signal(int, str, name="timeToEmptyChanged", arguments = ["time", "udi"])
+    timeToFullChanged = Signal(int, str, name="timeToFullChanged", arguments = ["time", "udi"])
+    energyChanged = Signal(float, str, name="energyChanged", arguments = ["energy", "udi"])
+    energyFullChanged = Signal(float, str, name="energyFullChanged", arguments = ["energy", "udi"])
+    energyFullDesignChanged = Signal(float, str, name="energyFullDesignChanged", arguments = ["energy", "udi"])
+    energyRateChanged = Signal(float, str, name="energyRateChanged", arguments = ["energyRate", "udi"])
+    voltageChanged = Signal(float, str, name="voltageChanged", arguments = ["voltage", "udi"])
+    temperatureChanged = Signal(float, str, name="temperatureChanged", arguments = ["temperature", "udi"])
+    remainingTimeChanged = Signal(int, str, name="remainingTimeChanged", arguments = ["time", "udi"])
+    
+    
+    def __init__(self):
+        super().__init__()
+        
+    @abstractmethod
+    def isPresent(self) -> bool:
+        pass
+    
+    @abstractmethod
+    def type(): # TODO: devices/battery (for BatteryType)
+        pass
+        
+    @abstractmethod
+    def chargePercent(self) ->int:
+        pass
+    
+    @abstractmethod
+    def capacity(self) -> int:
+        pass
+    
+    @abstractmethod
+    def cycleCount(self) -> int:
+        pass
+    
+    @abstractmethod
+    def isRechargeable(self) -> bool:
+        pass
+        
+    @abstractmethod
+    def isPowerSupply(self) -> bool:
+        pass
+    
+    @abstractmethod
+    def chargeState(self): # TODO: devices/battery (for ChargeState)
+        pass
+    
+    @abstractmethod
+    def timeToEmpty(self) -> int:
+        # time in s until empty
+        pass
+    
+    @abstractmethod
+    def timeToFull(self) -> int:
+        pass
+    
+    @abstractmethod
+    def technology(self): # TODO: devices/battery (for Technology)
+        pass 
+    
+    @abstractmethod
+    def energy(self) -> float:
+        pass
+    
+    @abstractmethod
+    def energyFull(self) -> float:
+        pass
+    
+    @abstractmethod
+    def energyFullDesign(self) -> float:
+        pass
+    
+    @abstractmethod
+    def energyRate(self) -> float:
+        pass
+    
+    @abstractmethod
+    def voltage(self) -> float:
+        pass
+    
+    @abstractmethod
+    def temperature(self) -> float:
+        pass
+    
+    @abstractmethod
+    def serial(self) -> str:
+        pass
+    
+    @abstractmethod
+    def remainingTime(self) -> int:
+        pass
     
 # from systems.devices.storagevolume import UsageType as StoVolUseType
 from systems.devices.device import DeviceInterfaceType as DevIType
