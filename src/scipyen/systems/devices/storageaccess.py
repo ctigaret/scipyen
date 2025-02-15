@@ -23,8 +23,7 @@ from core.multimeta import MultipleMeta
 from core.sysutils import adapt_ui_path
 from core.datatypes import TypeEnum
 
-from systems.devices import device
-from systems.devices.device import (_DeviceInterface_, DeviceInterface, DeviceInterfaceType, Device)
+from systems.devices.deviceinterface import (_DeviceInterface_, DeviceInterface)
 
 class _StorageAccess_(_DeviceInterface_):
     def __init__(self):
@@ -36,7 +35,7 @@ class _StorageAccessMultiMeta_(type(DeviceInterface), MultipleMeta):
     
 class StorageAccess(DeviceInterface, metaclass = _StorageAccessMultiMeta_):
     from systems.devices.errors import ErrorType
-    from systems.devices.interfaces.device import DeviceInterface as IfaceDevIFace
+    from systems.devices.interfaces.deviceinterface import DeviceInterface as IfaceDeviceInterface
     
     accessibilityChanged = Signal(bool, str, name="accessibilityChanged", arguments=["accessible", "udi"])
     setupDone = Signal(ErrorType, object, str, name="setupDone", arguments=["error", "errorData", "udi"])
@@ -48,23 +47,15 @@ class StorageAccess(DeviceInterface, metaclass = _StorageAccessMultiMeta_):
     
     def __init__(self, backendObject:QtCore.QObject):
         super().__init__(_StorageAccess_(), backendObject)
-        self._accessible_:bool = False
-        self._filePath_:str = str()
-        self._ignored_:bool = True
-        self._encrypted_:bool = False
-        
-        backendObject.setupDone[ErrorType, object, str].connect(self.setupDone)
-        backendObject.teardownDone[ErrorType, object, str].connect(self.teardownDone)
-        backendObject.setupRequested[str].connect(self.setupRequested)
-        backendObject.teardownRequested[str].connect(self.teardownRequested)
-        backendObject.accessibilityChanged[bool, str].connect(self.accessibilityChanged)
-        
-        backendObject.repairRequested[str].connect(self.repairRequested)
-        backendObject.repairDone[ErrorType, object, str].connect(self.repairDone)
+        self._finalizeInit_()
         
     def __init__(self, dd:_StorageAccess_, backendObject:QtCore.QObject):
         # initializes super()._d_ i.e. DeviceInterface._d_, which is a _DeviceInterface_
         super().__init__(dd, backendObject) 
+        self._finalizeInit_()
+        
+
+    def _finalizeInit_(self):
         self._accessible_:bool = False
         self._filePath_:str = str()
         self._ignored_:bool = True
@@ -80,7 +71,7 @@ class StorageAccess(DeviceInterface, metaclass = _StorageAccessMultiMeta_):
         backendObject.repairDone[ErrorType, object, str].connect(self.repairDone)
 
     def isIgnored(self) -> bool:
-        # from systems.devices.interfaces.device import DeviceInterface as IfaceDevIFace
+        # from systems.devices.interfaces.device import DeviceInterface as IfaceDeviceInterface
         # Q_D(const StorageAccess);
         #                   Type,                   Object,             Default, Method        
         # return_SOLID_CALL(Ifaces::StorageAccess *, d->backendObject(), true, isIgnored());
@@ -92,21 +83,16 @@ class StorageAccess(DeviceInterface, metaclass = _StorageAccessMultiMeta_):
         # Now, self inherits from systems.devices.device.DeviceInterface ⟹
         # self._d_ is a devices.device._DeviceInterface_; its backend object 
         # (QObject); Solid, casts this backend object, here, to a 
-        # devices.interfaces.DeviceInterface aliases here to IfaceDevIFace
+        # devices.interfaces.DeviceInterface aliases here to IfaceDeviceInterface
         
         # NOTE: 2025-02-11 22:30:02
         # while still using PyQt5 could try and use sip.cast
         o = self._d_.backendObject() # expected a systems.devices.interfaces.DeviceInterface
-        # print(f"{self.__class__.__name__} o is a {type(o).__name__}")
-        if isinstance(o, self.IfaceDevIFace):
-            self._ignored_ = o.isIgnored() # Method parameter of return_SOLID_CALL macro
-        else:
-            self._ignored_ = True # Default parameter of return_SOLID_CALL macro
-            
+        self._ignored_ = o.isIgnored() if isinstance(o, self.IfaceDeviceInterface) else True
         return self._ignored_
         
     def isEncrypted(self) -> bool:
-        # from systems.devices.interfaces.device import DeviceInterface as IfaceDevIFace
+        # from systems.devices.interfaces.device import DeviceInterface as IfaceDeviceInterface
         # Q_D(const StorageAccess);
         #                   Type,                   Object,             Default, Method        
         # return_SOLID_CALL(Ifaces::StorageAccess *, d->backendObject(), true, isIgnored());
@@ -118,89 +104,49 @@ class StorageAccess(DeviceInterface, metaclass = _StorageAccessMultiMeta_):
         # Now, self inherits from systems.devices.device.DeviceInterface ⟹
         # self._d_ is a devices.device._DeviceInterface_; its backend object 
         # (QObject); Solid, casts this backend object, here, to a 
-        # devices.interfaces.DeviceInterface aliases here to IfaceDevIFace
+        # devices.interfaces.DeviceInterface aliases here to IfaceDeviceInterface
         
         # NOTE: 2025-02-11 22:30:02
         # while still using PyQt5 could try and use sip.cast
         o = self._d_.backendObject() # expected a systems.devices.interfaces.DeviceInterface
-        # print(f"{self.__class__.__name__} o is a {type(o).__name__}")
-        if isinstance(o, self.IfaceDevIFace):
-            self._encrypted_ = o.isIgnored() # Method parameter of return_SOLID_CALL macro
-        else:
-            self._encrypted_ = False # Default parameter of return_SOLID_CALL macro
-            
+        self._encrypted_ = o.isIgnored() if isinstance(o, self.IfaceDeviceInterface) else False
         return self._encrypted_
         
     @staticmethod
-    def deviceInterfaceType() -> DeviceInterfaceType:
-        return DeviceInterfaceType.StorageAccess
+    def deviceInterfaceType() -> DeviceInterface.Type:
+        return DeviceInterface.Type.StorageAccess
     
     def isAccessible(self) -> bool:
         o = self._d_.backendObject() # expected a systems.devices.interfaces.DeviceInterface
-        # print(f"{self.__class__.__name__} o is a {type(o).__name__}")
-        if isinstance(o, self.IfaceDevIFace):
-            self._accessible_ = o.isAccessible() # Method parameter of return_SOLID_CALL macro
-        else:
-            self._accessible_ = False
-                    
+        self._accessible_ = o.isAccessible() if isinstance(o, self.IfaceDeviceInterface) else False
         return self._accessible_ # Default parameter of return_SOLID_CALL macro
     
     def filePath(self) -> str:
         o = self._d_.backendObject() # expected a systems.devices.interfaces.DeviceInterface
-        # print(f"{self.__class__.__name__} o is a {type(o).__name__}")
-        if isinstance(o, self.IfaceDevIFace):
-            self._filePath_ = o.filePath() # Method parameter of return_SOLID_CALL macro
-        else:
-            self._filePath_ = str()
-                    
+        self._filePath_ = o.filePath() if isinstance(o, self.IfaceDeviceInterface) else str()
         return self._filePath_ # Default parameter of return_SOLID_CALL macro
     
     def setup(self) -> bool:
         o = self._d_.backendObject() # expected a systems.devices.interfaces.DeviceInterface
-        # print(f"{self.__class__.__name__} o is a {type(o).__name__}")
-        if isinstance(o, self.IfaceDevIFace):
-            return o.setup() # Method parameter of return_SOLID_CALL macro
-        else:
-            return False
+        return o.setup() if isinstance(o, self.IfaceDeviceInterface) else False # Method parameter of return_SOLID_CALL macro
     
     def teardown(self) -> bool:
         o = self._d_.backendObject() # expected a systems.devices.interfaces.DeviceInterface
-        # print(f"{self.__class__.__name__} o is a {type(o).__name__}")
-        if isinstance(o, self.IfaceDevIFace):
-            return o.teardown() # Method parameter of return_SOLID_CALL macro
-        else:
-            return False
+        return o.teardown() if isinstance(o, self.IfaceDeviceInterface) else False
         
     def canCheck(self) -> bool:
         o = self._d_.backendObject() # expected a systems.devices.interfaces.DeviceInterface
-        # print(f"{self.__class__.__name__} o is a {type(o).__name__}")
-        if isinstance(o, self.IfaceDevIFace):
-            return o.canCheck() # Method parameter of return_SOLID_CALL macro
-        else:
-            return False
-        
+        return o.canCheck() if isinstance(o, self.IfaceDeviceInterface) else False
     
     def check(self) -> bool:
         o = self._d_.backendObject() # expected a systems.devices.interfaces.DeviceInterface
-        # print(f"{self.__class__.__name__} o is a {type(o).__name__}")
-        if isinstance(o, self.IfaceDevIFace):
-            return o.check() # Method parameter of return_SOLID_CALL macro
-        else:
-            return False
+        return o.check() if isinstance(o, self.IfaceDeviceInterface) else False
         
     def canRepair(self) -> bool:
         o = self._d_.backendObject() # expected a systems.devices.interfaces.DeviceInterface
-        # print(f"{self.__class__.__name__} o is a {type(o).__name__}")
-        if isinstance(o, self.IfaceDevIFace):
-            return o.canRepair() # Method parameter of return_SOLID_CALL macro
-        else:
-            return False
+        return o.canRepair() if isinstance(o, self.IfaceDeviceInterface) else False
         
     def repair(self) -> bool:
         o = self._d_.backendObject() # expected a systems.devices.interfaces.DeviceInterface
-        # print(f"{self.__class__.__name__} o is a {type(o).__name__}")
-        if isinstance(o, self.IfaceDevIFace):
-            return o.repair() # Method parameter of return_SOLID_CALL macro
-        else:
-            return False
+        return o.repair() if isinstance(o, self.IfaceDeviceInterface) else False
         

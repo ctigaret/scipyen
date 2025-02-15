@@ -32,7 +32,7 @@ class _Battery_(_DeviceInterface_):
 
 
 class Battery(DeviceInterface):
-    from systems.devices.interfaces.device import DeviceInterface as IfaceDevIFace
+    from systems.devices.interfaces.device import DeviceInterface as IfaceDeviceInterface
     from systems.devices.interfaces.device import Battery as IfaceBattery
     BatteryType = TypeEnum("BatteryType", ["UnknownBattery",
         "PdaBattery",
@@ -84,6 +84,21 @@ class Battery(DeviceInterface):
         self._type_ = self.BatteryType.UnknownBattery
         self._chargePercent_:int = 0
         self._capacity_:int = 100
+        self._cycleCount_:int = -1
+        self._isRechargeable_:bool = False
+        self._isPowerSupply_:bool = True
+        self._chargeState_:self.ChargeState = self.ChargeState.NoCharge
+        self._timeToEmpty_:int = 0
+        self._timeToFull_:int = 0
+        self._technology_:self.Technology = self.Technology.UnknownTechnology
+        self._energy_:float = 0.0
+        self._energyFull_:float = 0.0
+        self._energyFullDesign_:float = 0.0
+        self._energyRate_:float = 0.0
+        self._voltage_:float = 0.0
+        self._temperature_:float = 0.0
+        self._serial_:str = str()
+        self._remainingTime_:int =-1
         
         backendObject.presentStateChanged(int, str).connect(self.presentStateChanged)
         backendObject.chargePercentChanged(int, str).connect.(self.chargePercentChanged)
@@ -107,68 +122,95 @@ class Battery(DeviceInterface):
     
     def isPresent(self) -> bool: 
         o = self._d_.backendObject()
-        # if isinstance(o, self.IfaceDevIFace):
-        if isinstance(o, IfaceBattery):
-            self._isPresent_ = o.isPresent()
-        else:
-            self._isPresent_ = False
-            
+        # if isinstance(o, self.IfaceDeviceInterface):
+        self._isPresent_ = o.isPresent() if isinstance(o, IfaceBattery) else False
         return self._isPresent_
 
     def type(self) -> BatteryType: 
         o = self._d_.backendObject()
-        # if isinstance(o, self.IfaceDevIFace):
-        if isinstance(o, self.IfaceBattery):
-            self._type_ = o.type()
-        else:
-            self._type_ = self.BatteryType.UnknownBattery
-            
+        # if isinstance(o, self.IfaceDeviceInterface):
+        self._type_ = o.type() if isinstance(o, self.IfaceBattery) else self.BatteryType.UnknownBattery
         return self._type_
 
     def chargePercent(self) -> int:
         o = self._d_.backendObject()
-        if isinstance(o, self.IfaceBattery):
-            self._chargePercent_ = o.chargePercent()
-        else:
-            self._chargePercent_ = 0
-            
+        self._chargePercent_ = o.chargePercent() if isinstance(o, self.IfaceBattery) else 0
         return self._chargePercent_
 
     def capacity(self) -> int:
         o = self._d_.backendObject()
-        if isinstance(o, self.IfaceBattery):
-            self._capacity_ = o.capacity()
-        else:
-            self._capacity_ = 100
-        
+        self._capacity_ = o.capacity() if isinstance(o, self.IfaceBattery) else 100
+        return self._capacity_
 
-    def cycleCount(self) -> int: pass # TODO
+    def cycleCount(self) -> int:
+        o = self._d_.backendObject()
+        self._cycleCount_ = o.cycleCount() if isinstance(o, self.IfaceBattery) else -1
+        return self._cycleCount_
 
-    def isRechargeable(self) -> bool: pass # TODO
+    def isRechargeable(self) -> bool:
+        o = self._d_.backendObject()
+        self._isRechargeable_ = o.isRechargeable() if isinstance(o, self.IfaceBattery) else False
+        return self._isRechargeable_
     
-    def isPowerSupply(self) -> bool: pass # TODO
+    def isPowerSupply(self) -> bool: 
+        o = self._d_.backendObject()
+        self._isPowerSupply_ = o.isPowerSupply() if isinstance(o, self.IfaceBattery) else True
+        return self._isPowerSupply_
     
-    def chargeState(self) -> ChargeState: pass  # TODO
+    def chargeState(self) -> ChargeState: 
+        o = self._d_.backendObject()
+        self._chargeState_ = o.chargeState() if isinstance(o, self.IfaceBattery) else self.ChargeState.NoCharge
+        return self._chargeState_
+    
+    def timeToEmpty(self) -> int:
+        o = self._d_.backendObject()
+        self._timeToEmpty_ = o.timeToEmpty() if isinstance(o, self.IfaceBattery) else 0
+        return self._timeToEmpty_
 
-    def timeToEmpty(self) -> int: pass # TODO
+    def timeToFull(self) -> int: 
+        o = self._d_.backendObject()
+        self._timeToFull_ = o.timeToFull() if isinstance(o, self.IfaceBattery) else 0
+        return self._timeToFull_
 
-    def timeToFull(self) -> int: pass # TODO
+    def technology(self) -> Technology:
+        o = self._d_.backendObject()
+        self._technology_ = o.technology() if isinstance(o, self.IfaceBattery) else self.Technology.UnknownTechnology
+        return self._technology_
 
-    def technology(self) -> Technology: pass # TODO
+    def energy(self) -> float:
+        o = self._d_.backendObject()
+        self._energy_ = o.energy() if isinstance(o, self.IfaceBattery) else 0.0
+        return self._energy_
 
-    def energy(self) -> float: pass # TODO
+    def energyFull(self) -> float:
+        o = self._d_.backendObject()
+        self._energyFull_ = o.energyFull() if isinstance(o, self.IfaceBattery) else 0.0
+        return self._energyFull_
 
-    def energyFull(self) -> float: pass # TODO
+    def energyFullDesign(self) -> float:
+        o = self._d_.backendObject()
+        self._energyFullDesign_ = o.energyFullDesign() if isinstance(o, self.IfaceBattery) else 0.0
+        return self._energyFullDesign_
 
-    def energyFullDesign(self) -> float: pass # TODO
+    def energyRate(self) -> float:
+        o = self._d_.backendObject()
+        self._energyRate_ = o.energyRate()if isinstance(o, self.IfaceBattery) else 0.0
+        return self._energyRate_
 
-    def energyRate(self) -> float: pass # TODO
+    def voltage(self) -> float:
+        o = self._d_.backendObject()
+        self._voltage_ = o.voltage() if isinstance(o, self.IfaceBattery) else 0.0
+        return self._voltage_
 
-    def voltage(self) -> float: pass # TODO
+    def serial(self) -> str:
+        o = self._d_.backendObject()
+        self._serial_ = o.serial() if isinstance(o, self.IfaceBattery) else str()
+        return self._serial_
 
-    def serial(self) -> str: pass  # TODO
-
-    def remainingTime(self) -> str: pass # TODO
+    def remainingTime(self) -> str:
+        o = self._d_.backendObject()
+        self._remainingTime_ = o.remainingTime() if isinstance(o, self.IfaceBattery) else -1
+        return self._remainingTime_
 
 
     
