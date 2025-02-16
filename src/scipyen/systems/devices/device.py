@@ -101,14 +101,16 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 # class _DeviceManager_: pass
 # class _DeviceInterface_: pass
 # class DeviceInterface: pass
-class _Device_: pass
-class Device: pass
-class DeviceInterface: pass
+# class _Device_: pass
+
+from systems.devices.deviceinterface import (_DeviceInterface_, DeviceInterface)
+
 class Predicate: pass
 class DeviceManagerStorage: pass
 
-IFaceDevice = typing.TypeVar("IFaceDevice")
-IFaceDeviceManager = typing.TypeVar("IFaceDeviceManager")
+IfaceDevice = typing.TypeVar("IfaceDevice")
+IfaceDevIface = typing.TypeVar("IfaceDevIface")
+IfaceDeviceManager = typing.TypeVar("IfaceDeviceManager")
 DevIFaceType = typing.TypeVar("DevIFaceType")
 
     
@@ -116,12 +118,12 @@ global globalDeviceStorage
 globalDeviceStorage = DeviceManagerStorage()
         
 class _Device_(QtCore.QObject):
-    # from systems.devices.interfaces.device import Device as IFaceDevice
+    # from systems.devices.interfaces.device import Device as IfaceDevice
     def __init__(self, udi:str):
         super().__init__()
         self._udi_:str = udi
-        self._backendObject_:typing.Optional[IFaceDevice] = None # interfaces.device.Device
-        self._ifaces_:dict = dict() # DeviceInterfaceType ↦ DeviceInterface
+        self._backendObject_:typing.Optional[QtCore.QObject] = None # interfaces.device.Device
+        self._ifaces_:dict = dict() # DeviceInterface.Type ↦ IfaceDevIface
         
     def __del__(self):
         self.setBackendObject(None)
@@ -130,28 +132,28 @@ class _Device_(QtCore.QObject):
         return self._udi_
         
     @Slot(QtCore.QObject)
-    def slot_k_destroyed(self, o:QtCore.QObject):
+    def _k_destroyed(self, o:QtCore.QObject):
         self.setBackendObject(None)
         
-    def backendObject(self) -> IFaceDevice | None:
+    def backendObject(self) -> IfaceDevice | None:
         return self._backendObject_
     
-    def setBackendObject(self, o:typing.Optional[IFaceDevice]=None):
+    def setBackendObject(self, o:typing.Optional[QtCore.QObject]=None):
         if self._backendObject_ is not None:
             self._backendObject_.disconnect(self)
         self._backendObject_ = o
         
         if o is not None:
-            o.destroyed.connect(self.slot_k_destroyed)
+            o.destroyed.connect(self._k_destroyed)
             
         if len(self._ifaces_) > 0: # why this ?!?
             self._ifaces_.clear()
             self.deleteLater()
             
-    def interface(self, devtype:DevIFaceType) -> DeviceInterface | None:
+    def interface(self, devtype:DeviceInterface.Type) -> DeviceInterface | None:
         return self._ifaces_.get(devtype, None)
     
-    def setInterface(self, devtype:DevIFaceType, interface:DeviceInterface):
+    def setInterface(self, devtype:DeviceInterface.Type, interface:DeviceInterface):
         self._ifaces_[devtype] = interface
             
 class Device():
@@ -247,5 +249,5 @@ globalDeviceStorage = DeviceManagerStorage()
 from systems.devices.deviceinterface import DeviceInterface
 DevIFaceType = DeviceInterface.Type
 from systems.devices.predicate import Predicate
-from systems.devices.interfaces.device import Device as IFaceDevice
-from systems.devices.interfaces.devicemanager import DeviceManager as IFaceDeviceManager
+from systems.devices.interfaces.device import Device as IfaceDevice
+from systems.devices.interfaces.devicemanager import DeviceManager as IfaceDeviceManager

@@ -14,19 +14,17 @@ from enum import Enum, IntEnum
 from qtpy import QtCore, QtGui, QtWidgets, QtSvg
 from qtpy.QtCore import Signal, Slot, Property
 
-class GenericInterface(QtCore.QObject):
-    propertyChanged = Signal(dict, name="propertyChanged", arguments=["changes"]) # emits dict[str, int]
-    conditionRaised = Signal(str, str, name="conditionRaised", arguments=["condition", "reason"]) # emits condition, reason
-    
+from systems.devices.interfaces.deviceinterface import DeviceInterface
+
+class Camera(DeviceInterface):
     def __init__(self):
         super().__init__()
-    
+        
     @abstractmethod
-    def getProperty(self, key:str) -> QtCore.QVariant: pass
-    
+    def supportedProtocols(self, protocol:str = str()) -> list[str]: pass
+
     @abstractmethod
-    def allProperties(self) -> dict: pass # str ↦ QVariant
-    
+    def supportedDrivers(self) -> list[str]: pass
+
     @abstractmethod
-    def propertyExists(self, key:str) -> bool: pass
-    
+    def driverHandle(self, driver:str) -> QtCore.QVariant: pass

@@ -13,20 +13,22 @@ from abc import abstractmethod
 from enum import Enum, IntEnum
 from qtpy import QtCore, QtGui, QtWidgets, QtSvg
 from qtpy.QtCore import Signal, Slot, Property
+from core.datatypes import TypeEnum
 
-class GenericInterface(QtCore.QObject):
-    propertyChanged = Signal(dict, name="propertyChanged", arguments=["changes"]) # emits dict[str, int]
-    conditionRaised = Signal(str, str, name="conditionRaised", arguments=["condition", "reason"]) # emits condition, reason
-    
+from systems.devices.interfaces.deviceinterface import DeviceInterface
+
+class Processor(DeviceInterface):
     def __init__(self):
         super().__init__()
-    
+        
     @abstractmethod
-    def getProperty(self, key:str) -> QtCore.QVariant: pass
-    
+    def number(self) -> int: pass
+
     @abstractmethod
-    def allProperties(self) -> dict: pass # str ↦ QVariant
-    
+    def maxSpeed(self) -> int: pass
+
     @abstractmethod
-    def propertyExists(self, key:str) -> bool: pass
-    
+    def canChangeFrequency(self) -> bool : pass
+
+    @abstractmethod
+    def instructionSets(self) -> TypeEnum : pass

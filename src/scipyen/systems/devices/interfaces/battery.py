@@ -14,6 +14,8 @@ from enum import Enum, IntEnum
 from qtpy import QtCore, QtGui, QtWidgets, QtSvg
 from qtpy.QtCore import Signal, Slot, Property
 
+from systems.devices.interfaces.deviceinterface import DeviceInterface
+
 class Battery(DeviceInterface):
     presentStateChanged = Signal(bool, str, name="presentStateChanged", arguments = ["newState", "udi"])
     chargePercentChanged = Signal(int, str, name="chargePercentChanged", arguments = ["value", "udi"])
@@ -39,7 +41,7 @@ class Battery(DeviceInterface):
         pass
     
     @abstractmethod
-    def type(): # TODO: devices/battery (for BatteryType)
+    def type():
         pass
         
     @abstractmethod
@@ -63,7 +65,7 @@ class Battery(DeviceInterface):
         pass
     
     @abstractmethod
-    def chargeState(self): # TODO: devices/battery (for ChargeState)
+    def chargeState(self):
         pass
     
     @abstractmethod
@@ -76,7 +78,7 @@ class Battery(DeviceInterface):
         pass
     
     @abstractmethod
-    def technology(self): # TODO: devices/battery (for Technology)
+    def technology(self):
         pass 
     
     @abstractmethod

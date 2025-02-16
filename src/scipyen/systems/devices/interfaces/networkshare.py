@@ -14,19 +14,15 @@ from enum import Enum, IntEnum
 from qtpy import QtCore, QtGui, QtWidgets, QtSvg
 from qtpy.QtCore import Signal, Slot, Property
 
-class GenericInterface(QtCore.QObject):
-    propertyChanged = Signal(dict, name="propertyChanged", arguments=["changes"]) # emits dict[str, int]
-    conditionRaised = Signal(str, str, name="conditionRaised", arguments=["condition", "reason"]) # emits condition, reason
-    
+from systems.devices.interfaces.deviceinterface import DeviceInterface
+
+class NetworkShare(DeviceInterface):
+    from systems.devices.networkshare import NetworkShare as FendNetworkShare
     def __init__(self):
         super().__init__()
-    
+        
     @abstractmethod
-    def getProperty(self, key:str) -> QtCore.QVariant: pass
-    
+    def type(self) -> FendNetworkShare.ShareType: pass
+
     @abstractmethod
-    def allProperties(self) -> dict: pass # str ↦ QVariant
-    
-    @abstractmethod
-    def propertyExists(self, key:str) -> bool: pass
-    
+    def url(self) -> QtCoreQUrl : pass

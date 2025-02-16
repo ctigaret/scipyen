@@ -15,19 +15,17 @@ from qtpy import QtCore, QtGui, QtWidgets, QtSvg
 from qtpy.QtCore import Signal, Slot, Property
 
 from systems.devices.interfaces.deviceinterface import DeviceInterface
+
 class Block(DeviceInterface):
     def __init__(self):
         super().__init__()
     
     @abstractmethod
-    def deviceMajor(self) -> int:
-        pass
+    def deviceMajor(self) -> int: pass
     
     @abstractmethod
-    def deviceMinor(self) -> int:
-        pass
+    def deviceMinor(self) -> int: pass
     
     @abstractmethod
-    def device(self) -> str:
-        pass
+    def device(self) -> str: pass
     

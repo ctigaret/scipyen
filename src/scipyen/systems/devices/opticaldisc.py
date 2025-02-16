@@ -15,18 +15,10 @@ from qtpy import QtCore, QtGui, QtWidgets, QtSvg
 from qtpy.QtCore import Signal, Slot, Property
 from qtpy.uic import loadUiType as __loadUiType__
 from core.prog import safeWrapper
-# ATTENTION: 2025-02-11 22:13:57 
-# see NOTE: 2025-02-11 22:28:54 and NOTE: 2025-02-11 22:46:31
-# in core/multimeta.py
-# for workaround the metaclass conflict for subclasses of QObject and multimeta.MultipleMeta
-from core.multimeta import MultipleMeta
-# from core.sysutils import adapt_ui_path
 from core.datatypes import TypeEnum
 
 from systems.devices.storagevolume import (StorageVolume, _StorageVolume_)
 from systems.devices.deviceinterface import (_DeviceInterface_, DeviceInterface)
-
-# class IfaceOpticalDisc:pass
 
 class _OpticalDisc_ (_StorageVolume_):
     def __init__(self):
