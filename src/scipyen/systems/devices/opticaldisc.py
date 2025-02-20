@@ -17,8 +17,8 @@ from qtpy.uic import loadUiType as __loadUiType__
 from core.prog import safeWrapper
 from core.datatypes import TypeEnum
 
-from systems.devices.storagevolume import (StorageVolume, _StorageVolume_)
 from systems.devices.deviceinterface import (_DeviceInterface_, DeviceInterface)
+from systems.devices.storagevolume import (StorageVolume, _StorageVolume_)
 
 class _OpticalDisc_ (_StorageVolume_):
     def __init__(self):

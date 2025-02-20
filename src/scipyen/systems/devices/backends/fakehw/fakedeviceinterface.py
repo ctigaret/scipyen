@@ -13,21 +13,21 @@ from abc import abstractmethod
 from enum import Enum, IntEnum
 from qtpy import QtCore, QtGui, QtWidgets, QtSvg
 from qtpy.QtCore import Signal, Slot, Property
+from qtpy.uic import loadUiType as __loadUiType__
+from core.prog import safeWrapper
+# ATTENTION: 2025-02-11 22:13:57 
+# see NOTE: 2025-02-11 22:28:54 and NOTE: 2025-02-11 22:46:31
+# in core/multimeta.py
+# for workaround the metaclass conflict for subclasses of QObject and multimeta.MultipleMeta
+from core.multimeta import MultipleMeta
+# from core.sysutils import adapt_ui_path
+from core.datatypes import TypeEnum
+
+# TODO
 
 from systems.devices.interfaces.deviceinterface import DeviceInterface
 
-class FendNetworkShare: pass
-class FendNetworkShareType: pass
-class NetworkShare(DeviceInterface):
-    from systems.devices.networkshare import NetworkShare as FendNetworkShare
-    def __init__(self):
-        super().__init__()
-        
-    @abstractmethod
-    def type(self) -> FendNetworkShareType: pass
+class FakeDevice:pass
 
-    @abstractmethod
-    def url(self) -> QtCoreQUrl : pass
-
-from systems.devices.networkshare import NetworkShare as FendNetworkShare
-FendNetworkShareType = FendNetworkShare.ShareType
+class FakeDeviceInterface (QtCore.Qobject, DeviceInterface):
+    def __init__(self): pass

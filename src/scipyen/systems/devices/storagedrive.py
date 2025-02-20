@@ -37,6 +37,7 @@ class _StorageDriveMultiMeta_(type(DeviceInterface), MultipleMeta):
     
 class StorageDrive(DeviceInterface, metaclass = _StorageDriveMultiMeta_):
     Bus = TypeEnum("Bus", ["Ide", "Usb", "Ieee1394", "Scsi", "Sata", "Platform"])
+    
     DriveType = TypeEnum("DriveType", ["HardDisk", "CdromDrive", "Floppy", "Tape", 
                                     "CompactFlash", "MemoryStick", "SmartMedia", "SdMmc", "Xd"])
     def __init__(self, backendObject:QtCore.QObject):
@@ -97,36 +98,43 @@ class StorageDrive(DeviceInterface, metaclass = _StorageDriveMultiMeta_):
         # NOTE: 2025-02-11 23:09:16
         # see NOTE: 2025-02-11 22:30:02
         o = self._d_.backendObject() # expected a systems.devices.interfaces.DeviceInterface
-        if isinstance(o, IfaceStorageDrive):
-            self._removable_ = o.isRemovable()
-        else:
-            self._removable_ = False
-            
+        self._removable_ = o.isRemovable() if isinstance(o, IfaceStorageDrive) else False
         return self._removable_
+        
+        # if isinstance(o, IfaceStorageDrive):
+        #     self._removable_ = o.isRemovable()
+        # else:
+        #     self._removable_ = False
+            
         
     def isHotPluggable(self) -> str:
         from systems.devices.interfaces.storagedrive import StorageDrive as IfaceStorageDrive
         # NOTE: 2025-02-11 23:09:16
         # see NOTE: 2025-02-11 22:30:02
         o = self._d_.backendObject() # expected a systems.devices.interfaces.DeviceInterface
-        if isinstance(o, IfaceStorageDrive):
-            self._hotpluggable_ = o.isHotPluggable()
-        else:
-            self._hotpluggable_ = False
-            
+        self._hotpluggable_ = o.isHotPluggable() if isinstance(o, IfaceStorageDrive) else False
         return self._hotpluggable_
+#         if isinstance(o, IfaceStorageDrive):
+#             self._hotpluggable_ = o.isHotPluggable()
+#         else:
+#             self._hotpluggable_ = False
+#             
+#         return self._hotpluggable_
         
     def size(self) -> int:
         from systems.devices.interfaces.storagedrive import StorageDrive as IfaceStorageDrive
         # NOTE: 2025-02-11 23:09:16
         # see NOTE: 2025-02-11 22:30:02
         o = self._d_.backendObject() # expected a systems.devices.interfaces.DeviceInterface
-        if isinstance(o, IfaceStorageDrive):
-            self._size_ = o.size()
-        else:
-            self._size_ = 0
-        
+        self._size_ = o.size() if isinstance(o, IfaceStorageDrive) else 0
         return self._size_
+            
+#         if isinstance(o, IfaceStorageDrive):
+#             self._size_ = o.size()
+#         else:
+#             self._size_ = 0
+#         
+#         return self._size_
     
     def isInUse(self) -> bool: # TODO
         from systems.devices.device import Device
