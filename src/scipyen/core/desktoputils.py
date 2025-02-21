@@ -590,7 +590,7 @@ def get_desktop_places(schema:typing.Optional[str]=None,
                 
                 # NOTE: 2025-01-22 11:41:26 apply schema filter if any
                 if isinstance(schema, str) and len(schema):
-                    if not place_url.startswith(schema):
+                    if not place_uri.startswith(schema):
                         continue
                     
                 key = QtCore.QUrl(place_uri) if asQUrl else place_uri
