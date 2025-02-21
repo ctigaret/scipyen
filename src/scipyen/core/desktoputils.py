@@ -591,19 +591,25 @@ def get_desktop_places(schema:typing.Optional[str]=None,
                                         "hidden":is_hidden,
                                         "app":app})
 
-    for key in stdPlaces:
-        place = stdPlaces[key]
-        if isinstance(key, QtCore.QUrl):
-            matghingKeys
+    for key, place in stdPlaces.items():
         if key in ret:
-            ret[key].
-    for url in stdPlaces:
-        if asQUrl:
-            if not any(url.matches(x, QtCore.QUrl.StripTrailingSlash) for x in ret):
-                ret[url] = stdPlaces[url]
+            if place.name not in ret[key].name_aliases:
+                ret[key].name_aliases.append(place.name)
+
         else:
-            if pathlib.Path(url) not in [pathlib.Path(x) for x in ret]:
-                ret[url] = stdPlaces[url]
+            ret[key] = stdPlaces[key]
+            # if isinstance(key, QtCore.QUrl):
+            #     matchingKeys = list(filter(lambda x: key.matches(x, QtCore.QUrl.StripTrailingSlash), ret.keys()))
+            #     if len(matchingKeys):
+
+
+    # for url in stdPlaces:
+    #     if asQUrl:
+    #         if not any(url.matches(x, QtCore.QUrl.StripTrailingSlash) for x in ret):
+    #             ret[url] = stdPlaces[url]
+    #     else:
+    #         if pathlib.Path(url) not in [pathlib.Path(x) for x in ret]:
+    #             ret[url] = stdPlaces[url]
 
     return ret
 
