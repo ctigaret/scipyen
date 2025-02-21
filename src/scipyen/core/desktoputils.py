@@ -184,6 +184,9 @@ class DEBookmark(Bunch):
 class PlacesMap(dict):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+    def closestPlace(self, pathOrUrl:typing.Union[str, pathlib.Path, QtCore.QUrl]):
+        pass # TODO
         
 class BookmarksMap(dict):
     def __init__(self, *args, **kwargs):
@@ -434,26 +437,38 @@ def get_system_terminal_executable():
     else:
         warnings.warn(f"{sys.platform} platform is not yet supported")
         
-def get_standard_desktop_places(asQUrl:bool=False, all_folder_icons:bool=False,
-                                intKeys:bool=False) -> PlacesMap:
+# def get_standard_desktop_places(asQUrl:bool=False, all_folder_icons:bool=False,
+#                                 intKeys:bool=False) -> PlacesMap:
+def get_standard_desktop_places(asQUrl:bool=False, all_folder_icons:bool=False) -> PlacesMap:
     """Platform-independent Desktop places.
     These are defined in the Qt toolkit
     """
     locations = tuple(map(lambda x: StandardLocationInfo(getattr(QtCore.QStandardPaths, x[0]), standardIconName(x[0], all_folder_icons)), StandardDesktopLocationsQt))
     ret = PlacesMap()
     for k, loc in enumerate(locations):
-        place_url = f"file://{loc.paths[0]}"
-        if intKeys:
-            key = k
-        elif asQUrl:
-            key = QtCore.QUrl(place_url)
+        if len(loc.paths) == 0:
+            continue
+
+        place_uris = list(map(lambda x: pathlib.Path(x).resolve().as_uri(), loc.paths))
+        place_uri = place_uris[0]
+
+        additional_urls = list(map(lambda x: QtCore.QUrl(x), place_uris[1:])) if len(place_uris) > 1 else list()
+
+        # place_url = f"file://{loc.paths[0]}"
+
+        # place_url = pathlib.Path(loc.paths[0]).as_uri()
+
+        if asQUrl:
+            key = QtCore.QUrl(place_uri)
         else:
-            key = place_url
+            key = place_uri
 
         if key in ret:
             ret[key].name_aliases.append(loc.name)
+            ret[key].additional_urls.extend(additional_urls)
         else:
-            ret[key] = DEPlace({"name": loc.name, "name_aliases": list(), "url": QtCore.QUrl(place_url), "icon": loc.iconName, "system":loc.system, "hidden": loc.hidden})
+            ret[key] = DEPlace({"name": loc.name, "name_aliases": list(), "additional_urls": additional_urls,
+                                "url": QtCore.QUrl(place_uri), "icon": loc.iconName, "system":loc.system, "hidden": loc.hidden})
         
     return ret
     
@@ -532,10 +547,10 @@ def get_desktop_places(schema:typing.Optional[str]=None,
             bookmark_nodes = places.getElementsByTagName("bookmark")
             
             for k,b in enumerate(bookmark_nodes):
-                place_url = b.getAttribute("href")
+                place_uri = b.getAttribute("href")
                 place_name = b.getElementsByTagName("title")[0].childNodes[0].data
                 
-                if len(place_name) == 0 or len(place_url) == 0:
+                if len(place_name) == 0 or len(place_uri) == 0:
                     continue
                 
                 info_node = b.getElementsByTagName("info")[0]
@@ -578,7 +593,7 @@ def get_desktop_places(schema:typing.Optional[str]=None,
                     if not place_url.startswith(schema):
                         continue
                     
-                key = k if intKeys else QtCore.QUrl(place_url) if asQUrl else place_url
+                key = QtCore.QUrl(place_uri) if asQUrl else place_uri
                 # if asQUrl:
                     # place_url = QtCore.QUrl(place_url)
 
@@ -587,7 +602,8 @@ def get_desktop_places(schema:typing.Optional[str]=None,
                 else:
                     ret[key] = DEPlace({"name": place_name,
                                         "name_aliases": list(),
-                                        "url": QtCore.QUrl(place_url), # always as QUrl regardless of asQUrl
+                                        "additional_urls" : list(),
+                                        "url": QtCore.QUrl(place_uri), # always as QUrl regardless of asQUrl
                                         "icon": place_icon_name, # can be a system icon name or a path/file name
                                         "system":is_system_place,
                                         "hidden":is_hidden,
@@ -1038,20 +1054,43 @@ def closestPlace(url:QtCore.QUrl, places:typing.Optional[PlacesMap]=None) -> DEP
 
     # print(f"\tuPath = {uPath})")
 
-    pathLen = lambda x: len(x.path()) if isinstance(x, QtCore.QUrl) else len(x.strip(schema+"://"))
+    # BUG 2025-02-21 16:37:21 FIXME:
+    # given a local Windows uri e..g. uri = 'C:/Users/xxx/Desktop' - a python string:
+    # path = pathlib.Path(uri).resolve() -> WindowsPath('C:/Users/cezar/Desktop')
+    # its uri is:
+    # path.as_uri() -> 'file:///C:/Users/xxx/Desktop'
+    #
+    # create a QUrl:
+    # url = QtCore.QUrl(path.as_uri()) -> PyQt5.QtCore.QUrl('file:///C:/Users/cezar/Desktop')
+    #
+    # so far so good; but then:
+    #
+    # url.path() -> '/C:/Users/xxx/Desktop' WARNING initial slash unnecessary
+    #  this creates:
+    #  pathlib.Path(url.path()) -> WindowsPath('/C:/Users/cezar/Desktop') BUG ?
+    #  pathlib.Path(url.path()).resolve() -> WindowsPath('C:Users/cezar/Desktop')
+    #
+    # however:
+    # url.toString() -> 'file:///C:/Users/cezar/Desktop'
+
+
+
+    pathLen = lambda x: len(x.path()) if isinstance(x, QtCore.QUrl) else len(x.strip(schema+"://")) if isinstance(x, str) else len(x.resolve().as_posix())
 
     # placeKeys = list(map(urlToPath, places.keys()))
     #
-    # placeUrls = list(map(lambda x: urlToPath(x.url), places.values()))
+    placeUrls = list(map(lambda x: urlToPath(x.url), places.values()))
 
 
-    relatives = list(filter(lambda x: uPath.is_relative_to(urlToPath(x.url)), places.values()))
+
+    # relatives = list(filter(lambda x: uPath.is_relative_to(urlToPath(x.url)), places.values()))
 
     # print(f"relatives = {relatives}")
     
-    foundPlaces = list(reversed(sorted(list(filter(lambda x: uPath.is_relative_to(urlToPath(x["url"])), places.values())), key = lambda x: pathLen(x["url"]))))
+    foundPlaces = list(reversed(sorted(list(filter(lambda x: (uPath.as_posix() == x.as_posix() or uPath.is_relative_to(x)), placeUrls)), key = lambda x: pathLen(x))))
+    # foundPlaces = list(reversed(sorted(list(filter(lambda x:  uPath.is_relative_to(urlToPath(x["url"])), places.values())), key = lambda x: pathLen(x["url"]))))
     
-    # print(f"\tfoundPlaces = {foundPlaces}")
+    print(f"\tfoundPlaces = {foundPlaces}")
 
     # toUrl = lambda x: x if isinstance(x, QtCore.QUrl) else QtCore.QUrl(x)
     

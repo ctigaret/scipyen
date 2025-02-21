@@ -2691,7 +2691,7 @@ class _UrlNavigator_(QtCore.QObject):
     
     def updateContent(self):
         # KUrlNavigatorPrivate  
-        print(f"{self.__class__.__name__}.updateContent")
+        print(f"\n{self.__class__.__name__}.updateContent")
         currentUrl = self._nav_.locationUrl()
         print(f"\tcurrentUrl = {currentUrl}")
         
