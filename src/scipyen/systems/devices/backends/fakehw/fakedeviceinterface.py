@@ -23,11 +23,17 @@ from core.multimeta import MultipleMeta
 # from core.sysutils import adapt_ui_path
 from core.datatypes import TypeEnum
 
-# TODO
-
 from systems.devices.interfaces.deviceinterface import DeviceInterface
 
 class FakeDevice:pass
 
 class FakeDeviceInterface (QtCore.Qobject, DeviceInterface):
-    def __init__(self): pass
+    def __init__(self, device:FakeDevice):
+        super().__init__(device)
+        self._device_ = device
+        
+    def fakeDevice(self) -> FakeDevice:
+        return self._device_
+    
+from systems.devices.backends.fakehw.fakedevice import FakeDevice
+

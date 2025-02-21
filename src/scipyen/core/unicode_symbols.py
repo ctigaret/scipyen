@@ -15,7 +15,11 @@ unicode_input = dict()
 
 with open(os.path.join(__module_path__,"unicode_input_table")) as src:
     while True:
-        l = src.readline()
+        l = str()
+        try:
+            l = src.readline()
+        except:
+            traceback.print_exc()
         if len(l) == 0:
             break
         items = l.split("\t")
