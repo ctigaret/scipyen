@@ -5911,6 +5911,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @Slot(QtCore.QUrl)
     @safeWrapper
     def slot_chDirUrl(self, val:QtCore.QUrl):
+        print(f"{self.__class__.__name__}.slot_chDirUrl({val})")
         s = val.path()
         self.slot_chDirString(s)
 

@@ -163,8 +163,12 @@ def isUnixSystemLocation(p:typing.Union[pathlib.Path, QtCore.QUrl, str]) -> bool
     elif not isinstance(p, pathlib.Path):
         raise TypeError(f"Expecting a path string, Url or ")
 
-    return any((p.is_block_device(), p.is_char_device(), p.is_fifo(), p.is_mount(),
-               p.is_reserved(), p.is_socket()))
+    if sys.platform == "win32":
+        return any((p.is_block_device(), p.is_char_device(), p.is_fifo(),
+                p.is_reserved(), p.is_socket()))
+    else:
+        return any((p.is_block_device(), p.is_char_device(), p.is_fifo(), p.is_mount(),
+                p.is_reserved(), p.is_socket()))
 
 class DEPlace(Bunch):
     """Stand-in for PlacesItem - use in UrlNavigator in the absence of PlacesModel
@@ -982,11 +986,13 @@ def closestUrl(url:QtCore.QUrl, places:typing.Optional[PlacesMap]=None) -> QtCor
         
     
 def closestPlace(url:QtCore.QUrl, places:typing.Optional[PlacesMap]=None) -> DEPlace:
+    print(f"{__name__}.closestPlace({url}, {places})")
     schema = url.scheme()
     if not isinstance(places, PlacesMap):
         places = get_desktop_places(schema) #, True)
         
-    fallback = DEPlace(name=None, url = url, icon = iconNameForUrl(url), system=False, hidden=False, app=None)
+    fallback = DEPlace(name=str(), url = url, icon = iconNameForUrl(url), system=False, hidden=False, app=None)
+    # fallback = DEPlace(name=None, url = url, icon = iconNameForUrl(url), system=False, hidden=False, app=None)
         
     if len(places) == 0:
         return fallback

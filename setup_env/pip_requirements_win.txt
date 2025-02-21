@@ -25,6 +25,8 @@ pyserial
 pickleshare
 hdf5view
 psutil
+treelib
+shapely
 
 #### OPTIONAL packages
 researchpy      # ✓ (pip install researchpy)
