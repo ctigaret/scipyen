@@ -5,7 +5,7 @@
 
 
 # FIXME/TODO 2022-10-23 21:59:40
-import os, csv, unicodedata
+import os, csv, unicodedata, traceback
 import IPython.core.completer as completer
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
