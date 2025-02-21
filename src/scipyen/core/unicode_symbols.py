@@ -5,7 +5,7 @@
 
 
 # FIXME/TODO 2022-10-23 21:59:40
-import os, csv, unicodedata, traceback
+import os, csv, unicodedata, traceback, codecs
 import IPython.core.completer as completer
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
@@ -13,7 +13,8 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
 unicode_input = dict()
 
-with open(os.path.join(__module_path__,"unicode_input_table")) as src:
+# with open(os.path.join(__module_path__,"unicode_input_table")) as src:
+with codecs.open(os.path.join(__module_path__,"unicode_input_table"), 'r', encoding="utf-8", errors="ignore") as src:
     while True:
         l = str()
         try:
