@@ -447,6 +447,8 @@ def get_standard_desktop_places(asQUrl:bool=False, all_folder_icons:bool=False,
             key = k
         elif asQUrl:
             key = QtCore.QUrl(place_url)
+        else:
+            key = place_url
 
         if key in ret:
             ret[key].name_aliases.append(loc.name)
