@@ -2736,7 +2736,7 @@ class _UrlNavigator_(QtCore.QObject):
             
             placeUrl = QtCore.QUrl()
 
-            if sys.platform.startswith("win32"):
+            if sys.platform.startswith("win32"): # ?!?
                 placeUrl = currentUrl
             
             # ### BEGIN NOTE: 2025-01-24 21:18:58 CMT reinstate this once 
@@ -2751,7 +2751,6 @@ class _UrlNavigator_(QtCore.QObject):
             if not self._showFullPath_ and isinstance(self._closestPlace_, dutils.DEPlace):
                 placeUrl = self._closestPlace_.url
             else:
-                # print(f"\tcurrentUrl = {currentUrl}")
                 placeUrl = currentUrl
                 
             print(f"\tplaceUrl =  {placeUrl}")

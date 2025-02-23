@@ -62,6 +62,8 @@
 import sys, os, pathlib, urllib, typing, warnings, subprocess, traceback
 import inspect
 import platform
+import dataclasses
+from dataclasses import dataclass
 import core.xmlutils as xmlutils
 import iolib.pictio as pio
 from enum import Enum, IntEnum
@@ -170,12 +172,29 @@ def isUnixSystemLocation(p:typing.Union[pathlib.Path, QtCore.QUrl, str]) -> bool
         return any((p.is_block_device(), p.is_char_device(), p.is_fifo(), p.is_mount(),
                 p.is_reserved(), p.is_socket()))
 
-class DEPlace(Bunch):
+# class DEPlace(Bunch):
+#     """Stand-in for PlacesItem - use in UrlNavigator in the absence of PlacesModel
+#         Or as backend to PlacesItem
+#     """
+#     def __init__(self, *args, **kwargs):
+#         super().__init__(*args, **kwargs)
+        
+@dataclass
+class DEPlace():
     """Stand-in for PlacesItem - use in UrlNavigator in the absence of PlacesModel
         Or as backend to PlacesItem
     """
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    name:str
+    url:QtCore.QUrl
+    name_aliases:list[str] = dataclasses.field(default_factory=list)
+    additional_urls:list[QtCore.QUrl] = dataclasses.field(default_factory=list)
+    icon:str = dataclasses.field(default_factory=str)
+    system:bool = dataclasses.field(default=False)
+    hidden:bool = dataclasses.field(default=False)
+    app:typing.Optional[str] = dataclasses.field(default_factory=str)
+    
+    def urlPath(self) -> pathlib.Path:
+        return urlToPath(self.url)
         
 class DEBookmark(Bunch):
     def __init__(self, *args, **kwargs):
@@ -184,9 +203,25 @@ class DEBookmark(Bunch):
 class PlacesMap(dict):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        
+    
+    # def closestPlace(self, url:QtCore.QUrl)
 
-    def closestPlace(self, pathOrUrl:typing.Union[str, pathlib.Path, QtCore.QUrl]):
-        pass # TODO
+#     @singledispatchmethod
+#     def closestPlace(self, x:typing.Any) -> DEPlace:
+#         raise NotImplementedError(f"Method is not implemented for objects of type {type(x).__name__}")
+#         
+#     @closestPlace.register(str)
+#     def _(self, x:str) -> DEPlace:
+#         pass
+# 
+#     @closestPlace.register(pathlib.Path)
+#     def _(self, x:pathlib.Path) -> DEPlace:
+#         pass
+#     
+#     @closestPlace.register(QtCore.QUrl)
+#     def _(self, x:QtCore.QUrl) -> DEPlace:
+#         pass
         
 class BookmarksMap(dict):
     def __init__(self, *args, **kwargs):
@@ -467,8 +502,10 @@ def get_standard_desktop_places(asQUrl:bool=False, all_folder_icons:bool=False) 
             ret[key].name_aliases.append(loc.name)
             ret[key].additional_urls.extend(additional_urls)
         else:
-            ret[key] = DEPlace({"name": loc.name, "name_aliases": list(), "additional_urls": additional_urls,
-                                "url": QtCore.QUrl(place_uri), "icon": loc.iconName, "system":loc.system, "hidden": loc.hidden})
+            ret[key] = DEPlace(loc.name, QtCore.QUrl(place_uri), additional_urls = additional_urls,
+                                icon = loc.iconName, system = loc.system, hidden = loc.hidden)
+            # ret[key] = DEPlace({"name": loc.name, "name_aliases": list(), "additional_urls": additional_urls,
+            #                     "url": QtCore.QUrl(place_uri), "icon": loc.iconName, "system":loc.system, "hidden": loc.hidden})
         
     return ret
     
@@ -584,9 +621,9 @@ def get_desktop_places(schema:typing.Optional[str]=None,
                     if len(app_info):
                         app = app_info[0].data
                     else:
-                        app = None
+                        app = str()
                 else:
-                    app = None
+                    app = str()
                 
                 # NOTE: 2025-01-22 11:41:26 apply schema filter if any
                 if isinstance(schema, str) and len(schema):
@@ -600,14 +637,19 @@ def get_desktop_places(schema:typing.Optional[str]=None,
                 if key in ret and isinstance(ret[key], DEPlace):
                     ret[key].name_aliases.append(place_name)
                 else:
-                    ret[key] = DEPlace({"name": place_name,
-                                        "name_aliases": list(),
-                                        "additional_urls" : list(),
-                                        "url": QtCore.QUrl(place_uri), # always as QUrl regardless of asQUrl
-                                        "icon": place_icon_name, # can be a system icon name or a path/file name
-                                        "system":is_system_place,
-                                        "hidden":is_hidden,
-                                        "app":app})
+                    ret[key] = DEPlace(place_name, QtCore.QUrl(place_uri), # always as QUrl regardless of asQUrl
+                                        icon = place_icon_name, # can be a system icon name or a path/file name
+                                        system = is_system_place,
+                                        hidden = is_hidden,
+                                        app = app)
+                    # ret[key] = DEPlace({"name": place_name,
+                    #                     "url": QtCore.QUrl(place_uri), # always as QUrl regardless of asQUrl
+                    #                     "name_aliases": list(),
+                    #                     "additional_urls" : list(),
+                    #                     "icon": place_icon_name, # can be a system icon name or a path/file name
+                    #                     "system":is_system_place,
+                    #                     "hidden":is_hidden,
+                    #                     "app":app})
 
     for key, place in stdPlaces.items():
         if key in ret:
@@ -1031,66 +1073,19 @@ def closestPlace(url:QtCore.QUrl, places:typing.Optional[PlacesMap]=None) -> DEP
     # ensure only local paths are dealt with, here
     # print(f"{__name__}.closestPlace({url}, {places})")
     schema = url.scheme()
-    # urlToPath = lambda x: pathlib.Path(x.strip(schema+"://")).resolve() if isinstance(x, str) else pathlib.Path(x.path()).resolve()
-    urlToPath = lambda x: pathlib.Path(x).resolve() if isinstance(x, str) else pathlib.Path(x.path()).resolve()
     if not isinstance(places, PlacesMap):
         places = get_desktop_places(schema) #, True)
 
-    fallback = DEPlace(name=str(), name_aliases = list(), url = url, icon = iconNameForUrl(url), system=False, hidden=False, app=None)
-    # fallback = DEPlace(name=None, url = url, icon = iconNameForUrl(url), system=False, hidden=False, app=None)
+    fallback = DEPlace(str(), url, icon = iconNameForUrl(url))#, app=None)
 
     if len(places) == 0:
         return fallback
 
-    uPath = pathlib.Path(url.path()).resolve()
-
-    # if sys.platform.startswith("win32"):
-    #     # NOTE 2025-02-21 13:47:21
-    #     # deal with bad url -> path conversion in Windows (extra slash before the drive part)
-    #
-    #     uPathStr = uPath.as_posix()
-    #     if uPathStr.startswith("/"):
-    #         uPath = pathlib.Path(uPathStr[1:])
-
-    # print(f"\tuPath = {uPath})")
-
-    # BUG 2025-02-21 16:37:21 FIXME:
-    # given a local Windows uri e..g. uri = 'C:/Users/xxx/Desktop' - a python string:
-    # path = pathlib.Path(uri).resolve() -> WindowsPath('C:/Users/cezar/Desktop')
-    # its uri is:
-    # path.as_uri() -> 'file:///C:/Users/xxx/Desktop'
-    #
-    # create a QUrl:
-    # url = QtCore.QUrl(path.as_uri()) -> PyQt5.QtCore.QUrl('file:///C:/Users/cezar/Desktop')
-    #
-    # so far so good; but then:
-    #
-    # url.path() -> '/C:/Users/xxx/Desktop' WARNING initial slash unnecessary
-    #  this creates:
-    #  pathlib.Path(url.path()) -> WindowsPath('/C:/Users/cezar/Desktop') BUG ?
-    #  pathlib.Path(url.path()).resolve() -> WindowsPath('C:Users/cezar/Desktop')
-    #
-    # however:
-    # url.toString() -> 'file:///C:/Users/cezar/Desktop'
-
-
-
-    pathLen = lambda x: len(x.path()) if isinstance(x, QtCore.QUrl) else len(x.strip(schema+"://")) if isinstance(x, str) else len(x.resolve().as_posix())
-
-    # placeKeys = list(map(urlToPath, places.keys()))
-    #
-    placeUrls = list(map(lambda x: urlToPath(x.url), places.values()))
-
-
-
-    # relatives = list(filter(lambda x: uPath.is_relative_to(urlToPath(x.url)), places.values()))
-
-    # print(f"relatives = {relatives}")
+    pathForUrl = urlToPath(url)
     
-    foundPlaces = list(reversed(sorted(list(filter(lambda x: (uPath.as_posix() == x.as_posix() or uPath.is_relative_to(x)), placeUrls)), key = lambda x: pathLen(x))))
-    # foundPlaces = list(reversed(sorted(list(filter(lambda x:  uPath.is_relative_to(urlToPath(x["url"])), places.values())), key = lambda x: pathLen(x["url"]))))
+    foundPlaces = list(reversed(sorted(filter(lambda x: pathForUrl == x.urlPath() or pathForUrl.is_relative_to(x.urlPath()) or x.urlPath().is_relative_to(pathForUrl), places.values()), key = lambda x: pathLen(x.url))))
     
-    print(f"\tfoundPlaces = {foundPlaces}")
+    # print(f"\tfoundPlaces = {foundPlaces}")
 
     # toUrl = lambda x: x if isinstance(x, QtCore.QUrl) else QtCore.QUrl(x)
     
@@ -1169,4 +1164,33 @@ class PlacesMonitor(QtCore.QObject):
 
      
     
+@singledispatch
+def pathLen(x:typing.Any) -> int:
+    raise NotImplementedError(f"Method is not implemented for objects of type {type(x).__name__}")
+
+@pathLen.register(pathlib.Path)
+def _(x:pathlib.Path) -> int:
+    return len(x.resolve().as_posix())
+
+@pathLen.register(str)
+def _(x:str) -> int:
+    s = x[x.index("://")+3:] # remove schema
+    return len(s)
+
+@pathLen.register(QtCore.QUrl)
+def _(x:QtCore.QUrl) -> int:
+    return len(x.path())
+
+@singledispatch
+def urlToPath(x:typing.Any) -> pathlib.Path:
+    raise NotImplementedError(f"Method is not implemented for objects of type {type(x).__name__}")
+    
+@urlToPath.register(str)
+def _(x:str) -> pathlib.Path:
+    s = x[x.index("://")+3:] # remove schema
+    return pathlib.Path(x).resolve()
+    
+@urlToPath.register(QtCore.QUrl)
+def _(x:QtCore.QUrl) -> pathlib.Path:
+    return pathlib.Path(x.path()).resolve()
     
