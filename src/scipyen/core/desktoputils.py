@@ -1082,8 +1082,12 @@ def closestPlace(url:QtCore.QUrl, places:typing.Optional[PlacesMap]=None) -> DEP
         return fallback
 
     pathForUrl = urlToPath(url)
+
+    predicate1 = lambda x: pathForUrl == x.urlPath()
+    predicate2 = lambda x: pathForUrl == x.urlPath() or pathForUrl.is_relative_to(x.urlPath())
+    predicate3 = lambda x: pathForUrl == x.urlPath() or pathForUrl.is_relative_to(x.urlPath()) or x.urlPath().is_relative_to(pathForUrl)
     
-    foundPlaces = list(reversed(sorted(filter(lambda x: pathForUrl == x.urlPath() or pathForUrl.is_relative_to(x.urlPath()) or x.urlPath().is_relative_to(pathForUrl), places.values()), key = lambda x: pathLen(x.url))))
+    foundPlaces = list(reversed(sorted(filter(predicate2, places.values()), key = lambda x: pathLen(x.url))))
     
     # print(f"\tfoundPlaces = {foundPlaces}")
 
