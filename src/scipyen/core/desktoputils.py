@@ -1188,13 +1188,39 @@ def _(x:QtCore.QUrl) -> int:
 @singledispatch
 def urlToPath(x:typing.Any) -> pathlib.Path:
     raise NotImplementedError(f"Method is not implemented for objects of type {type(x).__name__}")
-    
+
 @urlToPath.register(str)
 def _(x:str) -> pathlib.Path:
-    s = x[x.index("://")+3:] # remove schema
+    if "://" in x:
+        s = x[x.index("://")+3:] # remove schema
     return pathlib.Path(x).resolve()
-    
+
 @urlToPath.register(QtCore.QUrl)
 def _(x:QtCore.QUrl) -> pathlib.Path:
     return pathlib.Path(x.path()).resolve()
+
+# @singledispatch
+# def pathToQUrl(x:typing.Any) -> QtCore.QUrl:
+#     raise NotImplementedError(f"Method is not implemented for objects of type {type(x).__name__}")
+#
+# @pathToQUrl.register(pathlib.Path)
+# def _(x:pathlib.Path) -> QtCore.QUrl:
+#     drive = x.drive
+#     if len(drive) > 1 and drive.endswith(":"): # Windows path
+#         ppath = x.as_posix()[len(drive):]
+#         upath = f"file:///{drive}/{ppath}"
+#         return QtCore.QUrl(upath)
+#     else:
+#         return QtCore.QUrl(x)
+
+def pathToQUrl(x:pathlib.Path) -> QtCore.QUrl:
+    drive = x.drive
+    if len(drive) > 1 and drive.endswith(":"): # Windows path
+        ppath = x.as_posix()[len(drive):]
+        upath = f"file:///{drive}/{ppath}"
+        return QtCore.QUrl(upath)
+    else:
+        return QtCore.QUrl(x)
+
+
     

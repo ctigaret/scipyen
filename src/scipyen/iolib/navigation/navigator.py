@@ -367,9 +367,9 @@ def removeTrailingPath(path:str):
 
 def trailingSlashRemoved(path:str):
     path = removeTrailingPath(path)
-    if sys.platform.startswith("win32"):
-        if path.startswith("/"):
-            path = path[1:]
+    # if sys.platform.startswith("win32"):
+    #     if path.startswith("/"):
+    #         path = path[1:]
     return path
 
 def appendSlashToPath(url:QtCore.QUrl):
@@ -2654,14 +2654,16 @@ class _UrlNavigator_(QtCore.QObject):
             
         url = QtCore.QUrl(self._nav_.locationUrl()) # see NOTE 2025-01-20 11:31:01
                                                     # and NOTE: 2025-01-20 11:31:36
-        path:str = url.path()
-        
-        print(f"\tpath = {path} ({type(path).__name__}), ndx = {ndx}")
+        print(f"\tlocation url is {url}")
+        # path:str = url.path()
+        path:str = dutils.urlToPath(url).as_posix()
 
-        if sys.platform.startswith("win32"):
-            if path.startswith("/"):
-                path = path[1:]
-                print(f"\tpath win32 = {path} ({type(path).__name__}), ndx = {ndx}")
+        print(f"\tpath = {path} ({type(path).__name__}), ndx = {ndx}")
+        #
+        # if sys.platform.startswith("win32"):
+        #     if path.startswith("/"):
+        #         path = path[1:]
+        #         print(f"\tpath win32 = {path} ({type(path).__name__}), ndx = {ndx}")
         
         if len(path):
             if ndx == 0:
@@ -2675,7 +2677,7 @@ class _UrlNavigator_(QtCore.QObject):
                 path = "/".join(pathParts[:ndx+1])
                 # path = "/".join(pathParts[ndx:])
                 
-        print(f"\tsetting path '{path}' for url")
+        print(f"\tsetting path '{path}' for url: {url}")
         url.setPath(path)
         
         # print(f"\treturns url: {url}")
@@ -2759,7 +2761,8 @@ class _UrlNavigator_(QtCore.QObject):
                 placeUrl = self.retrievePlaceUrl()
                 
             print(f"\tvalid placeUrl =  {placeUrl}")
-            placePath = trailingSlashRemoved(placeUrl.path())
+            # placePath = trailingSlashRemoved(placeUrl.path())
+            placePath = trailingSlashRemoved(dutils.urlToPath(placeUrl.path()).as_posix())
             print(f"\tplacePath =  {placePath}")
 
             startIndex = placePath.count('/')
@@ -2849,7 +2852,7 @@ class _UrlNavigator_(QtCore.QObject):
                     button = self._navButtons_[btn_ndx]
                     # button = self._navButtons_[ndx-startIndex]
                     urlForButton = self.buttonUrl(ndx)
-                    print(f"\t\tsetting the url '{urlForButton}' at ndx {ndx} for existing button at [btn_ndx]")
+                    print(f"\t\tsetting the url '{urlForButton}' at ndx {ndx} for existing button at [{btn_ndx}]")
                     button.setUrl(urlForButton)
                     if ndx == len(pathParts)-1:
                         button.setActiveSubDirectory("")
