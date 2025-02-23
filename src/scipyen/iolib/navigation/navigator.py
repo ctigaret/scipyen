@@ -3107,7 +3107,7 @@ class UrlNavigator(QtWidgets.QWidget):
         return self._nav_p_._coreUrlNavigator_.goUp()
     
     def goHome(self):
-        if not isinstance(self._nav_p_._homeUrl_, QtCore.QUrl) or self.d_._homeUrl_.isEmpty() or not self._nav_p_._homeUrl_.isValid():
+        if not isinstance(self._nav_p_._homeUrl_, QtCore.QUrl) or self._nav_p_._homeUrl_.isEmpty() or not self._nav_p_._homeUrl_.isValid():
             url = QtCore.QUrl.fromLocalFile(QtCore.QDir.homePath())
         else:
             url = self._nav_p_._homeUrl_
