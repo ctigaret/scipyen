@@ -1199,7 +1199,7 @@ def _(x:str) -> pathlib.Path:
 def _(x:QtCore.QUrl) -> pathlib.Path:
     pathStr = x.path()
     if sys.platform.startswith("win32"):
-        if pathStr.startsWith("/"):
+        if pathStr.startswith("/"):
             pathStr = pathStr[1:]
     return pathlib.Path(pathStr).resolve()
     # return pathlib.Path(x.path())
