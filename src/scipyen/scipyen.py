@@ -25,6 +25,8 @@ conda_env_prefix = os.environ.get("CONDA_PREFIX", None)
 
 my_virtualenv = os.environ.get("VIRTUAL_ENV", None)
 
+print(f"scipyen module: {__file__}")
+
 if isinstance(my_conda_env, str) and len(my_conda_env.strip()):
     conda_env_prefix = os.environ.get("CONDA_PREFIX", None)
             

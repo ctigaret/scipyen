@@ -1197,7 +1197,12 @@ def _(x:str) -> pathlib.Path:
 
 @urlToPath.register(QtCore.QUrl)
 def _(x:QtCore.QUrl) -> pathlib.Path:
-    return pathlib.Path(x.path()).resolve()
+    pathStr = x.path()
+    if sys.platform.startswith("win32"):
+        if pathStr.startsWith("/"):
+            pathStr = pathStr[1:]
+    return pathlib.Path(pathStr).resolve()
+    # return pathlib.Path(x.path())
 
 # @singledispatch
 # def pathToQUrl(x:typing.Any) -> QtCore.QUrl:
