@@ -2669,22 +2669,24 @@ class _UrlNavigator_(QtCore.QObject):
         
         # if len(path):
         newPathStr = "/"
-
+        
         if dutils.pathStrLen(path):
-            if ndx == 0:
-                if sys.platform.startswith("win32"):
+            if sys.platform.startswith("win32"):
+                if ndx == 0:
                     newPathStr = "file:///" + path.drive
-                    # path = path[:2] if len(path) > 1 else QtCore.QDir.rootPath()
                 else:
-                    newPathStr = "file:///"
-                    # newPathStr = "/"
-
+                    newPath = pathlib.Path.joinpath(*list(map(lambda x: pathlib.Path(x), pathParts[:ndx+1])))
+                    newPathStr = "file:///" + newPath.as_posix()
             else:
-                # pathParts = path.split("/")
-                newPath = pathlib.Path.joinpath(*list(map(lambda x: pathlib.Path(x), pathParts[:ndx+1])))
-                newPathStr = "file:///" + newPath.as_posix()
-                # newPathStr = "/".join(pathParts[:ndx+1])
-                # path = "/".join(pathParts[ndx:])
+                if ndx == 0:
+                    newPathStr = "/"
+
+                else:
+                    # pathParts = path.split("/")
+                    newPath = pathlib.Path.joinpath(*list(map(lambda x: pathlib.Path(x), pathParts[:ndx+1])))
+                    newPathStr = "/".join(pathParts[:ndx+1])
+
+                    # path = "/".join(pathParts[ndx:])
                 
         print(f"\tsetting path '{newPathStr}' for url: {url}")
         # url.setPath(path)
