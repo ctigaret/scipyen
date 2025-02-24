@@ -880,6 +880,48 @@ cat <<END > ${target_dir}/scipyen
 if [ -z \${VIRTUAL_ENV} ]; then
 source ${virtual_env}/bin/activate
 fi
+if [ -z \$BROWSER ]; then
+if [ -a \$VIRTUAL_ENV/bin/browser ]; then
+source \$VIRTUAL_ENV/bin/browser
+fi
+fi
+export LD_LIBRARY_PATH=${VIRTUAL_ENV}/lib:${VIRTUAL_ENV}/lib64:\${LD_LIBRARY_PATH}
+export OUTDATED_IGNORE=1
+a=\`which xrdb\` # do we have xrdb to read the X11 resources? (on Unix almost surely yes)
+if [ \$0 == 0 ] ; then
+if [ -r $scipyensrcdir/neuron_python/app-defaults/nrniv ] ; then
+xrdb -merge $scipyensrcdir/neuron_python/app-defaults/nrniv
+fi
+fi
+${python_executable} -Xfrozen_modules=off ${scipyensrcdir}/scipyen.py "\$*"
+END
+shopt -u lastpipe
+chmod +x ${target_dir}/scipyen 
+echo -e "Scipyen startup script created in ${target_dir} \n"
+}
+
+function make_launch_script_old () 
+{
+    # force the use of XCB platform abstraction plugin in Qt
+if [[ `id -u` -eq 0 ]] ; then
+    target_dir=/usr/local/bin
+else
+    target_dir=${HOME}/bin
+fi
+    
+mkdir -p ${target_dir}
+if [ -r ${target_dir}/scipyen ] ; then
+    dt=`date '+%Y-%m-%d_%H-%M-%s'`
+    mv ${target_dir}/scipyen ${target_dir}/scipyen.$dt
+fi
+shopt -s lastpipe
+
+# if [[ `id -u` -eq 0 ]] ; then
+cat <<END > ${target_dir}/scipyen 
+#! /bin/sh
+if [ -z \${VIRTUAL_ENV} ]; then
+source ${virtual_env}/bin/activate
+fi
 git -C $scipyendir rev-parse 2>/dev/null;
 if [[ \$? -eq 0 ]]; then
 branch=\`git -C ${scipyendir} branch --show-current\`
