@@ -157,7 +157,7 @@ from iolib.navigation import placesmodel
 # to reinstante when PlacesModel/PlacesSelector are finalized
 # from iolib.navigation.placesmodel import PlacesModel
 from iolib.navigation.protocols import ProtocolInfo # TODO
-from core.prog import safeWrapper
+from core.prog import (safeWrapper, printStyled)
 # import gui.pictgui as pgui
 from gui import guiutils
 from iolib import pictio
@@ -2647,7 +2647,7 @@ class _UrlNavigator_(QtCore.QObject):
         self._nav_.setUrlEditable(False)
         
     def buttonUrl(self, ndx:int) -> QtCore.QUrl:
-        # print(f"{self.__class__.__name__}.buttonUrl: ndx = {ndx}")
+        print(f"{self.__class__.__name__}.buttonUrl: ndx = {ndx}")
         # KUrlNavigatorPrivate
         if ndx < 0:
             ndx = 0
@@ -2656,7 +2656,9 @@ class _UrlNavigator_(QtCore.QObject):
                                                     # and NOTE: 2025-01-20 11:31:36
         # print(f"\tlocation url is {url}")
         # path:str = url.path()
-        path:str = dutils.urlToPath(url).as_posix()
+        # path:str = dutils.urlToPath(url).as_posix()
+        path:pathlib.Path = dutils.urlToPath(url)
+        pathParts = path.parts
 
         # print(f"\tpath = {path} ({type(path).__name__}), ndx = {ndx}")
         #
@@ -2665,20 +2667,28 @@ class _UrlNavigator_(QtCore.QObject):
         #         path = path[1:]
         #         print(f"\tpath win32 = {path} ({type(path).__name__}), ndx = {ndx}")
         
-        if len(path):
+        # if len(path):
+        newPathStr = "/"
+
+        if dutils.pathStrLen(path):
             if ndx == 0:
                 if sys.platform.startswith("win32"):
-                    path = path[:2] if len(path) > 1 else QtCore.QDir.rootPath()
+                    newPathStr = "file:///" + path.drive
+                    # path = path[:2] if len(path) > 1 else QtCore.QDir.rootPath()
                 else:
-                    path = "/"
-                    
+                    newPathStr = "file:///"
+                    # newPathStr = "/"
+
             else:
-                pathParts = path.split("/")
-                path = "/".join(pathParts[:ndx+1])
+                # pathParts = path.split("/")
+                newPath = pathlib.Path.joinpath(*list(map(lambda x: pathlib.Path(x), pathParts[:ndx+1])))
+                newPathStr = "file:///" + newPath.as_posix()
+                # newPathStr = "/".join(pathParts[:ndx+1])
                 # path = "/".join(pathParts[ndx:])
                 
-        # print(f"\tsetting path '{path}' for url: {url}")
-        url.setPath(path)
+        print(f"\tsetting path '{newPathStr}' for url: {url}")
+        # url.setPath(path)
+        url.setPath(newPathStr)
         
         # print(f"\treturns url: {url}")
         return url
@@ -2693,13 +2703,13 @@ class _UrlNavigator_(QtCore.QObject):
     
     def updateContent(self):
         # KUrlNavigatorPrivate  
-        print(f"\n{self.__class__.__name__}.updateContent")
+        # print(f"\n{self.__class__.__name__}.updateContent")
         currentUrl = self._nav_.locationUrl()
-        print(f"\tcurrentUrl = {currentUrl}")
+        # print(f"\tcurrentUrl = {currentUrl}")
         
         # NOTE: 2025-01-24 21:22:27 CMT
         self._closestPlace_ = dutils.closestPlace(currentUrl)
-        print(f"\tself._closestPlace_ {self._closestPlace_}")
+        # print(f"\tself._closestPlace_ {self._closestPlace_}")
         # print(f"{self.__class__.__name__}.updateContent(): currentUrl = {currentUrl}")
         # print(f"\tself._placesSelector_ {self._placesSelector_}")
         # WARNING: 2025-01-20 22:32:18 temporary -- FIXME
@@ -2707,7 +2717,7 @@ class _UrlNavigator_(QtCore.QObject):
         if self._placesSelector_ is not None:
             self._placesSelector_.updateSelection(currentUrl)
             
-        print(f"\tself._editable_ {self._editable_}")
+        # print(f"\tself._editable_ {self._editable_}")
         if self._editable_:
             # self._schemes_.hide() # see NOTE: 2023-05-06 22:30:13
             self._dropDownButton_.hide()
@@ -2755,14 +2765,14 @@ class _UrlNavigator_(QtCore.QObject):
             else:
                 placeUrl = currentUrl
                 
-            print(f"\tplaceUrl =  {placeUrl}")
+            # print(f"\tplaceUrl =  {placeUrl}")
             
             if not placeUrl.isValid():
                 placeUrl = self.retrievePlaceUrl()
                 
-            print(f"\tvalid placeUrl =  {placeUrl}")
+            # print(f"\tvalid placeUrl =  {placeUrl}")
             # placePath = trailingSlashRemoved(placeUrl.path())
-            placePath = dutils.urlToPath(placeUrl.path())
+            placePath = dutils.urlToPath(placeUrl)
             placePathStr = trailingSlashRemoved(placePath.as_posix())
 
             if sys.platform.startswith("win32"):
@@ -2771,12 +2781,10 @@ class _UrlNavigator_(QtCore.QObject):
             else:
                 drive = ""
 
-            print(f"\tplacePath =  {placePathStr}")
-
-
+            # print(f"\tplacePathStr =  {placePathStr}")
 
             startIndex = placePathStr.count('/')
-            print(f"\tstartIndex =  {startIndex}")
+            # print(f"\tstartIndex =  {startIndex}")
             
             # NOTE: 2025-02-05 15:06:38
             # RE BUG 2025-02-05 14:50:50 FIXME:
@@ -2788,20 +2796,21 @@ class _UrlNavigator_(QtCore.QObject):
             self.updateButtons(startIndex)
             
     def updateButtons(self, startIndex:int): # NOTE: 2023-05-08 11:05:23 FIXME
-        # print(f"{self.__class__.__name__}.updateButtons({startIndex}):")
+        print(f"{self.__class__.__name__}.updateButtons({startIndex}):")
         # KUrlNavigatorPrivate  
         currentUrl = self._nav_.locationUrl() # NOTE 2025-01-20 11:31:01 this must NOT be modified 
                                               # see NOTE: 2025-01-20 11:31:36
-        # print(f"\tcurrentUrl: {currentUrl}")
+        print(f"\tcurrentUrl: {currentUrl}")
         if not currentUrl.isValid():
             return
         
-        path = currentUrl.path()
+        # path = currentUrl.path()
+        path = dutils.urlToPath(currentUrl)
         # print(f"\tpath = {path}")
 
-        if sys.platform.startswith("win32"):
-            if path.startswith("/"):
-                path = path[1:]
+        # if sys.platform.startswith("win32"):
+        #     if path.startswith("/"):
+        #         path = path[1:]
         
         oldButtonCount = len(self._navButtons_)
         # print(f"\toldButtonCount = {oldButtonCount}")
@@ -2810,7 +2819,8 @@ class _UrlNavigator_(QtCore.QObject):
         
         hasNext = True # this flags whether there should be another button
         
-        pathParts = pathlib.Path(path).parts
+        pathParts = path.parts
+        # pathParts = pathlib.Path(path).parts
         # print(f"\tpathParts = {pathParts}: {len(pathParts)} elements")
         
         _k_ = 0
@@ -2841,10 +2851,10 @@ class _UrlNavigator_(QtCore.QObject):
             if hasNext:
                 button = None
                 if createButton:
-                    # print(f"\t\t**creating button**")
+                    print(f"\t\t{printStyled('**creating button**', color='red')}")
                     # print(f"\t\tgetting the url for a new button:")
                     urlForButton = self.buttonUrl(ndx)
-                    # print(f"\t\tcreating button with url: {urlForButton}")
+                    print(f"\t\tcreating button with url: {urlForButton}")
                     button = UrlNavigatorButton(urlForButton, None, self._nav_)
                     button.installEventFilter(self._nav_)
                     button.setForegroundRole(QtGui.QPalette.WindowText)
@@ -2858,7 +2868,7 @@ class _UrlNavigator_(QtCore.QObject):
 
                 else:
                     btn_ndx = ndx-startIndex
-                    # print(f"\t\t**reusing button** {btn_ndx}")
+                    print(f"\t\t{printStyled('**reusing button**', color='yellow')} {btn_ndx}")
                     button = self._navButtons_[btn_ndx]
                     # button = self._navButtons_[ndx-startIndex]
                     urlForButton = self.buttonUrl(ndx)

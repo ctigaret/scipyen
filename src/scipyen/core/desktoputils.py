@@ -1048,24 +1048,24 @@ def desktopPlaceUrl(p:DEPlace) -> QtCore.QUrl:
     url = p.url
     return url if isinstance(url, QtCore.QUrl) else QtCore.QUrl(url)
         
-def closestUrl(url:QtCore.QUrl, places:typing.Optional[PlacesMap]=None) -> QtCore.QUrl:
-    schema = url.scheme()
-    if not isinstance(places, PlacesMap):
-        places = get_desktop_places(schema) #, True)
-        
-    if len(places) == 0:
-        return url
-    
-    uPath = pathlib.Path(url.path()).resolve()
-    
-    urlToPath = lambda x: pathlib.Path(x.strip(schema+":")) if isinstance(x, str) else pathlib.Path(x.path())
-    pathLen = lambda x: len(x.path()) if isinstance(x, QtCore.QUrl) else len(x.strip(schema+":"))
-    
-    foundPlaces = list(reversed(sorted(list(filter(lambda x: uPath.is_relative_to(urlToPath(x["url"]).resolve()), places.values())), key = lambda x: pathLen(x["url"]))))
-    
-    toUrl = lambda x: x if isinstance(x, QtCore.QUrl) else QtCore.QUrl(x)
-    
-    return toUrl(foundPlaces[0]["url"]) if len(foundPlaces) else url
+# def closestUrl(url:QtCore.QUrl, places:typing.Optional[PlacesMap]=None) -> QtCore.QUrl:
+#     schema = url.scheme()
+#     if not isinstance(places, PlacesMap):
+#         places = get_desktop_places(schema) #, True)
+#
+#     if len(places) == 0:
+#         return url
+#
+#     uPath = pathlib.Path(url.path()).resolve()
+#
+#     urlToPath = lambda x: pathlib.Path(x.strip(schema+":")) if isinstance(x, str) else pathlib.Path(x.path())
+#     pathStrLen = lambda x: len(x.path()) if isinstance(x, QtCore.QUrl) else len(x.strip(schema+":"))
+#
+#     foundPlaces = list(reversed(sorted(list(filter(lambda x: uPath.is_relative_to(urlToPath(x["url"]).resolve()), places.values())), key = lambda x: pathStrLen(x["url"]))))
+#
+#     toUrl = lambda x: x if isinstance(x, QtCore.QUrl) else QtCore.QUrl(x)
+#
+#     return toUrl(foundPlaces[0]["url"]) if len(foundPlaces) else url
         
     
 def closestPlace(url:QtCore.QUrl, places:typing.Optional[PlacesMap]=None) -> DEPlace:
@@ -1087,7 +1087,7 @@ def closestPlace(url:QtCore.QUrl, places:typing.Optional[PlacesMap]=None) -> DEP
     predicate2 = lambda x: pathForUrl == x.urlPath() or pathForUrl.is_relative_to(x.urlPath())
     predicate3 = lambda x: pathForUrl == x.urlPath() or pathForUrl.is_relative_to(x.urlPath()) or x.urlPath().is_relative_to(pathForUrl)
     
-    foundPlaces = list(reversed(sorted(filter(predicate2, places.values()), key = lambda x: pathLen(x.url))))
+    foundPlaces = list(reversed(sorted(filter(predicate2, places.values()), key = lambda x: pathStrLen(x.url))))
     
     # print(f"\tfoundPlaces = {foundPlaces}")
 
@@ -1166,22 +1166,24 @@ class PlacesMonitor(QtCore.QObject):
     def slot_bookmarksChanged(self):
         self.sig_bookmarksChanged.emit()
 
-     
-    
+
+def pathLen(x:pathlib.Path) -> int:
+    return len(x.parts)
+
 @singledispatch
-def pathLen(x:typing.Any) -> int:
+def pathStrLen(x:typing.Any) -> int:
     raise NotImplementedError(f"Method is not implemented for objects of type {type(x).__name__}")
 
-@pathLen.register(pathlib.Path)
+@pathStrLen.register(pathlib.Path)
 def _(x:pathlib.Path) -> int:
     return len(x.resolve().as_posix())
 
-@pathLen.register(str)
+@pathStrLen.register(str)
 def _(x:str) -> int:
     s = x[x.index("://")+3:] # remove schema
     return len(s)
 
-@pathLen.register(QtCore.QUrl)
+@pathStrLen.register(QtCore.QUrl)
 def _(x:QtCore.QUrl) -> int:
     return len(x.path())
 
