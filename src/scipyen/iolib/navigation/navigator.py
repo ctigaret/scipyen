@@ -2812,8 +2812,6 @@ class _UrlNavigator_(QtCore.QObject):
             # print(f"\tplacePathStr =  {placePathStr}")
 
             startIndex = placePathStr.count('/')
-            if len(drive):
-                startIndex -= 1
             print(f"\tstartIndex =  {startIndex}")
 
             # NOTE: 2025-02-05 15:06:38
@@ -2918,6 +2916,9 @@ class _UrlNavigator_(QtCore.QObject):
                         button.setActiveSubDirectory("")
                     
                 if isFirstButton:
+                    # NOTE: 2025-02-25 17:59:51
+                    # responsible for displaying the name of the closest
+                    # place in the button, when NOT showing the full path
                     textForFirstButton = self.firstButtonText()
                     # print(f"\t\tsetting the text '{textForFirstButton}' for the first button")
                     button.setText(textForFirstButton)
@@ -3047,22 +3048,28 @@ class _UrlNavigator_(QtCore.QObject):
                     
     def firstButtonText(self):
         # KUrlNavigatorPrivate
+        print(f"{self.__class__.__name__}.firstButtonText")
         text = ""
-        
+
         # ### BEGIN NOTE: 2025-01-24 21:38:14 CMT reinstate this once placesmodel module is finalized
         # if self._placesSelector_ is not None and not self._showFullPath_:
         #     text = self._placesSelector_.selectedPlaceText()
         # ### END   NOTE: 2025-01-24 21:38:14 CMT reinstate this once placesmodel module is finalized
-            
+
         if isinstance(self._closestPlace_, dutils.DEPlace) and not self._showFullPath_:
             text = self._closestPlace_.name
-            
+
+        print(f"\ttext from closest place = {text}")
+
         currentUrl = self._nav_.locationUrl()
         
         if len(text) == 0:
             if currentUrl.isLocalFile():
                 if sys.platform.startswith("win32"):
-                    text = currentUrl.path()[:2] if len(currentUrl.path()) > 1 else QtCore.QDir.rootPath()
+                    urlPath = dutils.urlToPath(currentUrl)
+                    drive = urlPath.drive
+                    text = drive if len(drive) else QtCore.QDir.rootPath()
+                    # text = currentUrl.path()[:2] if len(currentUrl.path()) > 1 else QtCore.QDir.rootPath()
                 else:
                     text = "/"
                     
