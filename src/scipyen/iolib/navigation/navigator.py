@@ -2673,10 +2673,18 @@ class _UrlNavigator_(QtCore.QObject):
         if dutils.pathStrLen(path):
             if sys.platform.startswith("win32"):
                 if ndx == 0:
-                    newPathStr = "file:///" + path.drive
+                    # newPathStr = "file:///" + path.drive
+                    return QtCore.QUrl.fromLocalFile(path.drive)
                 else:
                     newPath = pathlib.Path.joinpath(*list(map(lambda x: pathlib.Path(x), pathParts[:ndx+1])))
-                    newPathStr = "file:///" + newPath.as_posix()
+                    if newPath.is_absolute():
+                        newUrl = QtCore.QUrl(newPath.as_uri())
+                    else:
+                        newUrl = QtCore.QUrl.fromLocalFile(newPath.as_posix())
+
+                    return newUrl
+
+                    # newPathStr = "file:///" + newPath.as_posix()
             else:
                 if ndx == 0:
                     newPathStr = "/"
@@ -2687,11 +2695,13 @@ class _UrlNavigator_(QtCore.QObject):
                     newPathStr = "/".join(pathParts[:ndx+1])
 
                     # path = "/".join(pathParts[ndx:])
-                
-        print(f"\tsetting path '{newPathStr}' for url: {url}")
+                print(f"\tsetting path '{newPathStr}' for url: {url}")
+                url.setPath(newPathStr)
+                return url
+
         # url.setPath(path)
-        url.setPath(newPathStr)
-        
+        # url.setPath(newPathStr)
+
         # print(f"\treturns url: {url}")
         return url
     
@@ -2827,14 +2837,14 @@ class _UrlNavigator_(QtCore.QObject):
         
         _k_ = 0
         
-        # print(f"\tndx = {ndx}, startIndex = {startIndex}, hasNext = {hasNext}")
-        # print(f"\twhile hasNext BEGIN\n\n")
+        print(f"\tndx = {ndx}, startIndex = {startIndex}, hasNext = {hasNext}")
+        print(f"\twhile hasNext BEGIN\n\n")
         
         while hasNext:
-            # print(f"\t\t_k_ = {_k_}:")
+            print(f"\t\t_k_ = {_k_}:")
             createButton = ((ndx - startIndex) >= oldButtonCount)
             isFirstButton = (ndx == startIndex)
-            # print(f"\t\tcreateButton = {createButton}, isFirstButton = {isFirstButton}")
+            print(f"\t\tcreateButton = {createButton}, isFirstButton = {isFirstButton}")
             
             # if ndx >= len(pathParts):
             # if ndx >= len(pathParts) - 1:
