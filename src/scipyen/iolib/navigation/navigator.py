@@ -1032,7 +1032,7 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
 
     # def setUrl(self, url:typing.Union[QtCore.QUrl, pathlib.Path]):
     def setUrl(self, url:QtCore.QUrl):
-        print(f"{self.__class__.__name__}.setUrl({url})")
+        # print(f"{self.__class__.__name__}.setUrl({url})")
         self._url_ = url
 #         if isinstance(url, pathlib.Path):
 #             if not url.is_dir() or not url.exists():
@@ -1089,7 +1089,7 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
             # btnText = self._url_.fileName().replace('&', '&&')
             btnPath = dutils.urlToPath(self._url_)
             btnText = btnPath.parts[-1]
-            print(f"\tbtnPath: {btnPath} -> btnText = {btnText}")
+            # print(f"\tbtnPath: {btnPath} -> btnText = {btnText}")
             if sys.platform.startswith("win32"):
                 pass
             self.setText(btnText)
