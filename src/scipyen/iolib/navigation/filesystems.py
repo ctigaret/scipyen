@@ -5,12 +5,15 @@
 
 """
 """
-import os, sys, pathlib
+import os, sys, pathlib, traceback, typing
 import dataclasses
 import psutil
+from functools import (singledispatch, singledispatchmethod)
 from enum import Enum, IntEnum
-from . import networkmounts
-from iolib.navigation.networkmounts import (NetworkMounts, NetworkMountsType)
+from qtpy import QtCore
+
+# from . import networkmounts
+# from iolib.navigation.networkmounts import (NetworkMounts, NetworkMountsType)
 
 class FsType(IntEnum):pass
 FsType = IntEnum("FsType", 
@@ -121,7 +124,7 @@ def fileSystemType(path:str) -> FsType:
     else:
         return determineFileSystemType(path)
         
-def fileSysteName(ftype:FsType) -> str:
+def fileSystemName(ftype:FsType) -> str:
     # TODO 2025-01-07 19:03:57
     # figure out translations - what context here?
     match ftype:
@@ -155,4 +158,90 @@ def fileSysteName(ftype:FsType) -> str:
         case _:
             return "Unknown"
 
-    
+def pathLen(x:pathlib.Path) -> int:
+    return len(x.parts)
+
+@singledispatch
+def pathStrLen(x:typing.Any) -> int:
+    raise NotImplementedError(f"Method is not implemented for objects of type {type(x).__name__}")
+
+@pathStrLen.register(pathlib.Path)
+def _(x:pathlib.Path) -> int:
+    return len(x.resolve().as_posix())
+
+@pathStrLen.register(str)
+def _(x:str) -> int:
+    s = x[x.index("://")+3:] # remove schema
+    return len(s)
+
+@pathStrLen.register(QtCore.QUrl)
+def _(x:QtCore.QUrl) -> int:
+    return len(x.path())
+
+@singledispatch
+def urlToPath(x:typing.Any) -> pathlib.Path:
+    raise NotImplementedError(f"Method is not implemented for objects of type {type(x).__name__}")
+
+@urlToPath.register(str)
+def _(x:str) -> pathlib.Path:
+    if "://" in x:
+        s = x[x.index("://")+3:] # remove schema
+    return pathlib.Path(x).resolve()
+
+@urlToPath.register(QtCore.QUrl)
+def _(x:QtCore.QUrl) -> pathlib.Path:
+    pathStr = x.path()
+    if sys.platform.startswith("win32"):
+        if pathStr.startswith("/"):
+            pathStr = pathStr[1:]
+            path = pathlib.Path(pathStr)
+            if pathLen(path) == 1 and path.as_posix().endswith(":"):
+                # this looks like a Windows drive string
+                return path
+
+    return pathlib.Path(pathStr).resolve()
+
+def pathToQUrl(x:pathlib.Path) -> QtCore.QUrl:
+    drive = x.drive
+    if len(drive) > 1 and drive.endswith(":"): # Windows path
+        ppath = x.as_posix()[len(drive):]
+        upath = f"file:///{drive}/{ppath}"
+        return QtCore.QUrl(upath)
+    else:
+        return QtCore.QUrl(x)
+
+def get_windows_drives() -> list[str] | None:
+    """Lists available drives in Windows"""
+    # NOTE 2025-02-25 10:59:57
+    # Thans to https://stackoverflow.com/questions/827371/is-there-a-way-to-list-all-the-available-windows-drives
+    # (RichieHindle)
+
+    isWin=sys.platform.startswith("win32")
+    if isWin:
+        try:
+            from ctypes import windll
+            import string
+            isWin=True
+        except:
+            isWin=False
+            pass
+
+    if not isWin:
+        scipywarn("get_windows_drives() function is not supported on non-Windows platforms")
+        return
+
+    drives = []
+    bitmask = windll.kernel32.GetLogicalDrives()
+
+    for letter in string.ascii_uppercase:
+        if bitmask & 1:
+            drives.append(letter)
+        bitmask >>= 1
+
+    return drives
+
+def get_disk_partitions(physical_only:bool=False) -> list:
+    return psutil.disk_partitions(all=physical_only)
+
+
+

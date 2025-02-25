@@ -77,6 +77,10 @@ from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg,)
 from qtpy.QtCore import (Signal, Slot, Property,)
 
 from qtpy import (QtCore, QtWidgets, QtGui)
+
+from iolib.navigation.filesystems import (pathStrLen, pathStrLen,
+                                          pathToQUrl, urlToPath)
+
 has_qtdbus = False
 try:
     from qtpy import QtDBus
@@ -652,7 +656,7 @@ def get_desktop_places(schema:typing.Optional[str]=None,
                     #                     "app":app})
 
     elif sys.platform.startswith("win32"):
-        drives = list(map(lambda x: f"{x}:", get_windows_drives()))
+        pass
 
     for key, place in stdPlaces.items():
         if key in ret:
@@ -1168,105 +1172,3 @@ class PlacesMonitor(QtCore.QObject):
     @Slot()
     def slot_bookmarksChanged(self):
         self.sig_bookmarksChanged.emit()
-
-def get_windows_drives() -> list[str] | None:
-    """Lists available drives in Windows"""
-    # NOTE 2025-02-25 10:59:57
-    # Thans to https://stackoverflow.com/questions/827371/is-there-a-way-to-list-all-the-available-windows-drives
-    # (RichieHindle)
-
-    isWin=sys.platform.startswith("win32")
-    if isWin:
-        try:
-            from ctypes import windll
-            import string
-            isWin=True
-        except:
-            isWin=False
-            pass
-
-    if not isWin:
-        scipywarn("get_windows_drives() function is not supported on non-Windows platforms")
-        return
-
-    drives = []
-    bitmask = windll.kernel32.GetLogicalDrives()
-
-    for letter in string.ascii_uppercase:
-        if bitmask & 1:
-            drives.append(letter)
-        bitmask >>= 1
-
-    return drives
-
-
-def pathLen(x:pathlib.Path) -> int:
-    return len(x.parts)
-
-@singledispatch
-def pathStrLen(x:typing.Any) -> int:
-    raise NotImplementedError(f"Method is not implemented for objects of type {type(x).__name__}")
-
-@pathStrLen.register(pathlib.Path)
-def _(x:pathlib.Path) -> int:
-    return len(x.resolve().as_posix())
-
-@pathStrLen.register(str)
-def _(x:str) -> int:
-    s = x[x.index("://")+3:] # remove schema
-    return len(s)
-
-@pathStrLen.register(QtCore.QUrl)
-def _(x:QtCore.QUrl) -> int:
-    return len(x.path())
-
-@singledispatch
-def urlToPath(x:typing.Any) -> pathlib.Path:
-    raise NotImplementedError(f"Method is not implemented for objects of type {type(x).__name__}")
-
-@urlToPath.register(str)
-def _(x:str) -> pathlib.Path:
-    if "://" in x:
-        s = x[x.index("://")+3:] # remove schema
-    return pathlib.Path(x).resolve()
-
-@urlToPath.register(QtCore.QUrl)
-def _(x:QtCore.QUrl) -> pathlib.Path:
-    pathStr = x.path()
-    if sys.platform.startswith("win32"):
-        if pathStr.startswith("/"):
-            pathStr = pathStr[1:]
-            path = pathlib.Path(pathStr)
-            if pathLen(path) == 1 and path.as_posix().endswith(":"):
-                # this looks like a Windows drive string
-                return path
-
-    return pathlib.Path(pathStr).resolve()
-    # return pathlib.Path(x.path())
-
-
-# @singledispatch
-# def pathToQUrl(x:typing.Any) -> QtCore.QUrl:
-#     raise NotImplementedError(f"Method is not implemented for objects of type {type(x).__name__}")
-#
-# @pathToQUrl.register(pathlib.Path)
-# def _(x:pathlib.Path) -> QtCore.QUrl:
-#     drive = x.drive
-#     if len(drive) > 1 and drive.endswith(":"): # Windows path
-#         ppath = x.as_posix()[len(drive):]
-#         upath = f"file:///{drive}/{ppath}"
-#         return QtCore.QUrl(upath)
-#     else:
-#         return QtCore.QUrl(x)
-
-def pathToQUrl(x:pathlib.Path) -> QtCore.QUrl:
-    drive = x.drive
-    if len(drive) > 1 and drive.endswith(":"): # Windows path
-        ppath = x.as_posix()[len(drive):]
-        upath = f"file:///{drive}/{ppath}"
-        return QtCore.QUrl(upath)
-    else:
-        return QtCore.QUrl(x)
-
-
-    

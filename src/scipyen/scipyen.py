@@ -60,7 +60,7 @@ try:
                 local, remote = branches.split("...")
                 local = printStyled(local, color="green")
                 remote = printStyled(remote, color="red")
-                msg = f"{printStyled('WARNING', color='yellow')} Running {local} branch of the local Scipyen git repository in {printStyled(repoDir.as_posix(), color='blue')}, with status:"
+                msg = f"{printStyled('WARNING:', color='yellow')} Running {local} branch of the local Scipyen git repository in {printStyled(repoDir.as_posix(), color='blue')}, with status:"
                 result[0] = "## "+local+"..."+remote
                 if len(result) > 1:
                     for k in range(1,len(result)):
