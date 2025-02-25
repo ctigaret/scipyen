@@ -5929,7 +5929,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @Slot(QtCore.QUrl)
     @safeWrapper
     def slot_chDirUrl(self, val:QtCore.QUrl):
-        print(f"{self.__class__.__name__}.slot_chDirUrl({val})")
+        # print(f"{self.__class__.__name__}.slot_chDirUrl({val})")
         path = desktoputils.urlToPath(val)
         s = path.as_posix()
         self.slot_chDirString(s)
@@ -5937,7 +5937,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @Slot(str)
     @safeWrapper
     def slot_chDirString(self, val):
-        print(f"{self.__class__.__name__}.slot_chDirString({val})")
+        # print(f"{self.__class__.__name__}.slot_chDirString({val})")
         if "://" in val:
             protocol, target = val.split("://")
         else:

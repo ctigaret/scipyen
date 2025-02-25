@@ -1075,7 +1075,7 @@ def desktopPlaceUrl(p:DEPlace) -> QtCore.QUrl:
 #     return toUrl(foundPlaces[0]["url"]) if len(foundPlaces) else url
         
     
-def closestPlace(url:QtCore.QUrl, places:typing.Optional[PlacesMap]=None) -> DEPlace:
+def closestPlace(url:QtCore.QUrl, places:typing.Optional[PlacesMap]=None) -> DEPlace | None:
     # TODO 2025-02-21 13:48:06
     # ensure only local paths are dealt with, here
     # print(f"{__name__}.closestPlace({url}, {places})")
@@ -1083,7 +1083,7 @@ def closestPlace(url:QtCore.QUrl, places:typing.Optional[PlacesMap]=None) -> DEP
     if not isinstance(places, PlacesMap):
         places = get_desktop_places(schema) #, True)
 
-    fallback = DEPlace(str(), url, icon = iconNameForUrl(url))#, app=None)
+    # fallback = DEPlace(str(), url, icon = iconNameForUrl(url))#, app=None)
 
     if len(places) == 0:
         return fallback
@@ -1100,7 +1100,7 @@ def closestPlace(url:QtCore.QUrl, places:typing.Optional[PlacesMap]=None) -> DEP
 
     # toUrl = lambda x: x if isinstance(x, QtCore.QUrl) else QtCore.QUrl(x)
     
-    return foundPlaces[0] if len(foundPlaces) else fallback
+    return foundPlaces[0] if len(foundPlaces) else None
         
 class PlacesMonitor(QtCore.QObject):
     __instance__ = None # NOTE: Singleton design pattern

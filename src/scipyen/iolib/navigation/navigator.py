@@ -217,7 +217,7 @@ class ListDirsJob(QtCore.QThread):
         QtCore.QThread.__init__(self, parent=parent)
         
     def run(self):
-        # print(f"{self.__class__.__name__}.run called")
+        print(f"{self.__class__.__name__}.run called; self.path = {self.path}")
         filters = QtCore.QDir.Dirs | QtCore.QDir.NoDotAndDotDot | QtCore.QDir.CaseSensitive
         if self.showHidden:
             filters |= QtCore.QDir.Hidden
@@ -1032,15 +1032,8 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
 
     # def setUrl(self, url:typing.Union[QtCore.QUrl, pathlib.Path]):
     def setUrl(self, url:QtCore.QUrl):
-        # print(f"{self.__class__.__name__}.setUrl({url})")
+        print(f"{self.__class__.__name__}.setUrl({url})")
         self._url_ = url
-#         if isinstance(url, pathlib.Path):
-#             if not url.is_dir() or not url.exists():
-#                 raise ValueError(f"Path {url.as_posix()} is inexistent")
-#
-#             self._url_ = QtCore.QUrl(url.as_uri())
-#         else:
-#             self._url_ = url
 
         # NOTE: 2023-05-08 18:06:14 KIO original
         # protocolBlackList = {"nfs", "fish", "ftp", "sftp", "smb", "webdav", "mtp", "http", "https"}
@@ -1089,7 +1082,7 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
             # btnText = self._url_.fileName().replace('&', '&&')
             btnPath = dutils.urlToPath(self._url_)
             btnText = btnPath.parts[-1]
-            # print(f"\tbtnPath: {btnPath} -> btnText = {btnText}")
+            print(f"\tbtnPath: {btnPath} -> btnText = {btnText}")
             if sys.platform.startswith("win32"):
                 pass
             self.setText(btnText)
@@ -1099,7 +1092,8 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         return self._url_
     
     def path(self) -> typing.Optional[pathlib.Path]:
-        return pathlib.Path(self.url().path()) if self.url().isLocalFile else None
+        return dutils.urlToPath(self.url()) if self.url().isLocalFile else None
+        # return pathlib.Path(self.url().path()) if self.url().isLocalFile else None
         
     def setText(self, text):
         adjustedText = text
@@ -1462,7 +1456,7 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
 
     @Slot()
     def slot_startSubDirsJob(self):
-        print(f"{self.__class__.__name__}.slot_startSubDirsJob invoked")
+        # print(f"{self.__class__.__name__}.slot_startSubDirsJob invoked")
         
         # NOTE: 2024-12-30 23:48:13
         # this is the slot_startSubDirsJob in KIO
@@ -1590,7 +1584,7 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
     
     @Slot()
     def slot_requestSubDirs(self):
-        print(f"{self.__class__.__name__}.slot_requestSubDirs invoked")
+        # print(f"{self.__class__.__name__}.slot_requestSubDirs invoked")
         if not self._openSubDirsTimer.isActive() and (not isinstance(self._subDirsJob_, ListDirsJob) or not qtutils.isQObjectAlive(self._subDirsJob_)):
             self._openSubDirsTimer.start()
         
@@ -2731,10 +2725,9 @@ class _UrlNavigator_(QtCore.QObject):
     
     def updateContent(self):
         # KUrlNavigatorPrivate  
-        # print(f"\n{self.__class__.__name__}.updateContent")
+        print(f"\n{self.__class__.__name__}.updateContent")
         currentUrl = self._nav_.locationUrl()
-        # print(f"\tcurrentUrl = {currentUrl}")
-        
+
         # NOTE: 2025-01-24 21:22:27 CMT
         self._closestPlace_ = dutils.closestPlace(currentUrl)
         # print(f"\tself._closestPlace_ {self._closestPlace_}")
@@ -2744,60 +2737,58 @@ class _UrlNavigator_(QtCore.QObject):
         # TODO: Implement places selector
         if self._placesSelector_ is not None:
             self._placesSelector_.updateSelection(currentUrl)
-            
+
         # print(f"\tself._editable_ {self._editable_}")
         if self._editable_:
             # self._schemes_.hide() # see NOTE: 2023-05-06 22:30:13
             self._dropDownButton_.hide()
             self._badgeWidgetContainer_.hide()
-            
+
             self.deleteButtons() # clear the breadcrumbs
-            
+
             self._toggleEditableMode_.setSizePolicy(QtWidgets.QSizePolicy.Fixed,
                                                     QtWidgets.QSizePolicy.Preferred)
-            
+
             self._nav_.setSizePolicy(QtWidgets.QSizePolicy.Minimum,
                                     QtWidgets.QSizePolicy.Fixed)
-            
+
             self._pathBox_.show()
             self._pathBox_.setUrl(currentUrl)
-            
+
         else:
             self._pathBox_.hide()
             # self._dropDownButton_.show()
             self._badgeWidgetContainer_.show()
-            
+
             # self._schemes_.hide() # see NOTE: 2023-05-06 22:30:13
             self._toggleEditableMode_.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
                                                     QtWidgets.QSizePolicy.Preferred)
-            
+
             self._nav_.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
                                     QtWidgets.QSizePolicy.Fixed)
-            
+
             placeUrl = QtCore.QUrl()
 
             if sys.platform.startswith("win32"): # ?!?
                 placeUrl = currentUrl
-            
-            # ### BEGIN NOTE: 2025-01-24 21:18:58 CMT reinstate this once 
+
+            # ### BEGIN NOTE: 2025-01-24 21:18:58 CMT reinstate this once
             # a PlacesModel/PlacesSelector become available
             # if self._placesSelector_ is not None and not self._showFullPath_:
             #     placeUrl = self._placesSelector_.selectedPlaceUrl()
             # else:
             #     placeUrl = currentUrl
             # ### END   NOTE: 2025-01-24 21:18:58 CMT reinstate this once there will be a PlacesModel/PlacesSelector
-                
-            # print(f"{\tshowFullPath: {self._showFullPath_}")
+
             if not self._showFullPath_ and isinstance(self._closestPlace_, dutils.DEPlace):
                 placeUrl = self._closestPlace_.url
             else:
                 placeUrl = currentUrl
-                
-            # print(f"\tplaceUrl =  {placeUrl}")
-            
+
+
             if not placeUrl.isValid():
                 placeUrl = self.retrievePlaceUrl()
-                
+
             # print(f"\tvalid placeUrl =  {placeUrl}")
             # placePath = trailingSlashRemoved(placeUrl.path())
             placePath = dutils.urlToPath(placeUrl)
@@ -2809,16 +2800,22 @@ class _UrlNavigator_(QtCore.QObject):
             else:
                 drive = ""
 
-            # print(f"\tplacePathStr =  {placePathStr}\n\tdrive = {drive}")
 
             startIndex = placePathStr.count('/')
-            # print(f"\tstartIndex =  {startIndex}")
+            print(f"\tshowFullPath: {self._showFullPath_}, closestPlace: {self._closestPlace_}")
+            print(f"\tcurrentUrl = {currentUrl}, placeUrl = {placeUrl}, placePathStr =  {placePathStr}, drive = {drive}, startIndex =  {startIndex}")
+
+            # # if sys.platform.startswith("win32"):
+            # #     startIndex = len(placePath.parts)
+            # # else:
+            # #     startIndex = placePathStr.count('/')
+            # # print(f"\tstartIndex =  {startIndex}")
 
             # NOTE: 2025-02-05 15:06:38
             # RE BUG 2025-02-05 14:50:50 FIXME:
             # the following forces redraw of all buttons when full path must be
             # shown
-            if self._showFullPath_:
+            if self._showFullPath_ or not isinstance(self._closestPlace_, dutils.DEPlace):
                 startIndex = 0
             
             self.updateButtons(startIndex)
@@ -2857,7 +2854,7 @@ class _UrlNavigator_(QtCore.QObject):
         
         pathParts = path.parts
         # pathParts = pathlib.Path(path).parts
-        # print(f"\tpathParts = {pathParts} ({len(pathParts)} elements)")
+        print(f"\tpathParts = {pathParts} ({len(pathParts)} elements)")
         
         _k_ = 0
         
@@ -2865,24 +2862,24 @@ class _UrlNavigator_(QtCore.QObject):
         # print(f"\twhile hasNext BEGIN\n\n")
         
         while hasNext:
-            # print(f"\t\t_k_ = {_k_}:")
+            print(f"\t\t_k_ = {_k_}, ndx = {ndx}:")
+            if ndx >= len(pathParts): # reached end of pathParts
+                # print(f"\t\t{ndx} >= {len(pathParts)} -> while haxNext BREAK")
+                break
+            
             createButton = ((ndx - startIndex) >= oldButtonCount)
             isFirstButton = (ndx == startIndex)
-            # print(f"\t\tcreateButton = {createButton}, isFirstButton = {isFirstButton}")
+            print(f"\t\tcreateButton = {createButton}, isFirstButton = {isFirstButton}")
 
             # if ndx >= len(pathParts):
             # if ndx >= len(pathParts) - 1:
             #     hasNext = False
 
-            if ndx >= len(pathParts): # reached end of pathParts
-                # print(f"\t\t{ndx} >= {len(pathParts)} -> while haxNext BREAK")
-                break
-            
             dirName = pathParts[ndx] # directory currently pointed to by the button
             # NOTE: when ndx < len(parParts)-1, ndx+1 should be the active subdirectory
             # and the one pointed to by the next button
             
-            # print(f"\t\tdirName = {dirName}")
+            print(f"\t\tdirName = {dirName}")
 
             hasNext = isFirstButton or len(dirName) > 0
             
