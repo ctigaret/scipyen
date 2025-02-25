@@ -1028,7 +1028,7 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
 # #         # ### END CMT 2023-05-08 17:56:23
 
     def setUrl(self, url:typing.Union[QtCore.QUrl, pathlib.Path]): 
-        print(f"{self.__class__.__name__}.setUrl({url}:{type(url).__name__})")
+        print(f"{self.__class__.__name__}.setUrl({url}: {type(url).__name__})")
         if isinstance(url, pathlib.Path):
             if not url.is_dir() or not url.exists():
                 raise ValueError(f"Path {url.as_posix()} is inexistent")
@@ -1046,7 +1046,8 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         
         # supportedProtocols = {"file", "desktop"}
         
-        startTextResolving = self._url_.isValid() and not self._url_.isLocalFile() and self._url_.scheme() not in SupportedProtocols
+        startTextResolving = self._url_.isValid() and not self._url_.isLocalFile() and self._url_.scheme() in SupportedProtocols
+        # startTextResolving = self._url_.isValid() and not self._url_.isLocalFile() and self._url_.scheme() not in SupportedProtocols
         
         if startTextResolving:
             # NOTE: 2024-12-30 17:31:41
@@ -1080,7 +1081,13 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
             # # ### END
             
         else:
-            self.setText(self._url_.fileName().replace('&', '&&'))
+            btnText = self._url_.fileName().replace('&', '&&')
+            btnText2 = dutils.urlToPath(self._url_)
+            print(f"\tbtnText: {btnText}, btnText2: {btnText2}")
+            if sys.platform.startswith("win32"):
+                pass
+            self.setText(btnText)
+            # self.setText(self._url_.fileName().replace('&', '&&'))
             
     def url(self) -> QtCore.QUrl:
         return self._url_

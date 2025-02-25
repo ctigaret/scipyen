@@ -651,6 +651,9 @@ def get_desktop_places(schema:typing.Optional[str]=None,
                     #                     "hidden":is_hidden,
                     #                     "app":app})
 
+    elif sys.platform.startswith("win32"):
+        drives = list(map(lambda x: f"{x}:", get_windows_drives()))
+
     for key, place in stdPlaces.items():
         if key in ret:
             if place.name not in ret[key].name_aliases:
@@ -1166,6 +1169,36 @@ class PlacesMonitor(QtCore.QObject):
     def slot_bookmarksChanged(self):
         self.sig_bookmarksChanged.emit()
 
+def get_windows_drives() -> list[str] | None:
+    """Lists available drives in Windows"""
+    # NOTE 2025-02-25 10:59:57
+    # Thans to https://stackoverflow.com/questions/827371/is-there-a-way-to-list-all-the-available-windows-drives
+    # (RichieHindle)
+
+    isWin=sys.platform.startswith("win32")
+    if isWin:
+        try:
+            from ctypes import windll
+            import string
+            isWin=True
+        except:
+            isWin=False
+            pass
+
+    if not isWin:
+        scipywarn("get_windows_drives() function is not supported on non-Windows platforms")
+        return
+
+    drives = []
+    bitmask = windll.kernel32.GetLogicalDrives()
+
+    for letter in string.ascii_uppercase:
+        if bitmask & 1:
+            drives.append(letter)
+        bitmask >>= 1
+
+    return drives
+
 
 def pathLen(x:pathlib.Path) -> int:
     return len(x.parts)
@@ -1203,8 +1236,14 @@ def _(x:QtCore.QUrl) -> pathlib.Path:
     if sys.platform.startswith("win32"):
         if pathStr.startswith("/"):
             pathStr = pathStr[1:]
+            path = pathlib.Path(pathStr)
+            if pathLen(path) == 1 and path.as_posix().endswith(":"):
+                # this looks like a Windows drive string
+                return path
+
     return pathlib.Path(pathStr).resolve()
     # return pathlib.Path(x.path())
+
 
 # @singledispatch
 # def pathToQUrl(x:typing.Any) -> QtCore.QUrl:
