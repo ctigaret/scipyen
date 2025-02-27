@@ -210,7 +210,7 @@ def pathToQUrl(x:pathlib.Path) -> QtCore.QUrl:
     else:
         return QtCore.QUrl(x)
 
-def get_windows_drives() -> list[str] | None:
+def get_windows_drive_letters() -> list[str] | None:
     """Lists available drives in Windows"""
     # NOTE 2025-02-25 10:59:57
     # Thans to https://stackoverflow.com/questions/827371/is-there-a-way-to-list-all-the-available-windows-drives
@@ -227,8 +227,8 @@ def get_windows_drives() -> list[str] | None:
             pass
 
     if not isWin:
-        scipywarn("get_windows_drives() function is not supported on non-Windows platforms")
-        return
+        # scipywarn("get_windows_drives() function is not supported on non-Windows platforms")
+        return get_disk_partitions()
 
     drives = []
     bitmask = windll.kernel32.GetLogicalDrives()
@@ -240,8 +240,40 @@ def get_windows_drives() -> list[str] | None:
 
     return drives
 
-def get_disk_partitions(physical_only:bool=False) -> list:
-    return psutil.disk_partitions(all=physical_only)
+def get_disk_partitions(physical_only:bool=False, fixed_only:bool=False) -> list:
+    partitions = psutil.disk_partitions(all=not physical_only)
+
+
+    if sys.platform.startswith("win32"):
+        if fixed_only:
+            partitions = list(filter(lambda x: "fixed" in x.opts, paritions))
+        return list(filter(lambda x: len(x.fstype) > 0, partitions))
+
+    return partitions
+
+def mountpoints(physical_only:bool=False, fixed_only:bool=False) -> list:
+    p = get_disk_partitions(physical_only, fixed_only)
+
+    return list(map(lambda x: x.mountpoint, p))
+
+def deviceNames(physical_only:bool=False, fixed_only:bool=False) -> list:
+    return list(map(lambda x: x.device, get_disk_partitions(physical_only, fixed_only)))
+
+def networkFolders():
+    p = get_disk_partitions(False)
+
+    if sys.platform.startswith("win32"):
+        return list(filter(lambda x: "remote" in x.opts, p))
+
+    scipywarn("networkFolders function is not supported on non-Windows platforms")
+    return p
+
+def fsTypes():
+    from core.utilities import unique
+    return sorted(unique(list(map(lambda x: x.fstype, get_disk_partitions(False)))))
+
+
+
 
 
 

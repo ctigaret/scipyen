@@ -78,6 +78,7 @@ from qtpy.QtCore import (Signal, Slot, Property,)
 
 from qtpy import (QtCore, QtWidgets, QtGui)
 
+from iolib.navigation import filesystems
 from iolib.navigation.filesystems import (pathStrLen, pathStrLen,
                                           pathToQUrl, urlToPath)
 
@@ -493,10 +494,6 @@ def get_standard_desktop_places(asQUrl:bool=False, all_folder_icons:bool=False) 
 
         additional_urls = list(map(lambda x: QtCore.QUrl(x), place_uris[1:])) if len(place_uris) > 1 else list()
 
-        # place_url = f"file://{loc.paths[0]}"
-
-        # place_url = pathlib.Path(loc.paths[0]).as_uri()
-
         if asQUrl:
             key = QtCore.QUrl(place_uri)
         else:
@@ -508,9 +505,7 @@ def get_standard_desktop_places(asQUrl:bool=False, all_folder_icons:bool=False) 
         else:
             ret[key] = DEPlace(loc.name, QtCore.QUrl(place_uri), additional_urls = additional_urls,
                                 icon = loc.iconName, system = loc.system, hidden = loc.hidden)
-            # ret[key] = DEPlace({"name": loc.name, "name_aliases": list(), "additional_urls": additional_urls,
-            #                     "url": QtCore.QUrl(place_uri), "icon": loc.iconName, "system":loc.system, "hidden": loc.hidden})
-        
+
     return ret
     
 def get_desktop_places(schema:typing.Optional[str]=None, 
@@ -656,7 +651,16 @@ def get_desktop_places(schema:typing.Optional[str]=None,
                     #                     "app":app})
 
     elif sys.platform.startswith("win32"):
-        pass
+        getIcon = lambda x: "folder-remote-symbolic" if "remote" in x.opts else "drive-harddisk-symbolic"
+
+        drivePlaces = sorted(list(map(lambda x: DEPlace(pathlib.Path(x.mountpoint).as_uri(), QtCore.QUrl(pathlib.Path(x.mountpoint).as_uri()), icon=getIcon(x)),
+                               filesystems.get_disk_partitions())), key = lambda x: x.name)
+
+        if asQUrl:
+            stdPlaces.update(dict(map(lambda x: (x.url, x), drivePlaces)))
+        else:
+            stdPlaces.update(dict(map(lambda x: (x.name, x), drivePlaces)))
+
 
     for key, place in stdPlaces.items():
         if key in ret:
@@ -665,18 +669,6 @@ def get_desktop_places(schema:typing.Optional[str]=None,
 
         else:
             ret[key] = stdPlaces[key]
-            # if isinstance(key, QtCore.QUrl):
-            #     matchingKeys = list(filter(lambda x: key.matches(x, QtCore.QUrl.StripTrailingSlash), ret.keys()))
-            #     if len(matchingKeys):
-
-
-    # for url in stdPlaces:
-    #     if asQUrl:
-    #         if not any(url.matches(x, QtCore.QUrl.StripTrailingSlash) for x in ret):
-    #             ret[url] = stdPlaces[url]
-    #     else:
-    #         if pathlib.Path(url) not in [pathlib.Path(x) for x in ret]:
-    #             ret[url] = stdPlaces[url]
 
     return ret
 

@@ -1549,7 +1549,7 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         # self._subDirs_ list
         result = action.data() 
         path = self._subDirs_[result]   # the path to the subdirectory pointed to by the action
-        url = QtCore.QUrl(path.as_uri())
+        url = QtCore.QUrl(path.absolute().as_uri())
         self.navigatorButtonActivated.emit(url, button, QtCore.Qt.NoModifier)
     
     @Slot()
