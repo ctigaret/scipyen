@@ -221,12 +221,21 @@ class ListDirsJob(QtCore.QThread):
         filters = QtCore.QDir.Dirs | QtCore.QDir.NoDotAndDotDot | QtCore.QDir.CaseSensitive
         if self.showHidden:
             filters |= QtCore.QDir.Hidden
-            
-        qDir = QtCore.QDir(self.path.as_posix(), "*", 
+
+        p = self.path.as_posix()
+
+        if sys.platform.startswith("win32"):
+            p += "\\"
+
+        # qDir = QtCore.QDir(self.path.as_posix(), "*",
+        qDir = QtCore.QDir(p, "*",
                            QtCore.QDir.Name | QtCore.QDir.DirsFirst, filters)
-        self.entries = list(map(lambda x: self.path / x, qDir.entryList()))
+        if sys.platform.startswith("win32"):
+            self.entries = list(map(lambda x: pathlib.Path(os.path.join(p, x)), qDir.entryList()))
+        else:
+            self.entries = list(map(lambda x: self.path / x, qDir.entryList()))
+        print(f"\tentries: {self.entries}")
         self.sig_entries.emit(self.entries)
-        # self.sig_result.emit()
         
     
 class ApplyUrlMethod(IntEnum):
@@ -1181,9 +1190,15 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         # them in a submenu (overspill)
         #
         maxIndex = startIndex + 30  # (max 30 items shown in the menu)
+
+        subDirs = sorted(self._subDirs_)
+
         nSubDirs = len(self._subDirs_)
+
+
         # print(f"\tnSubDirs = {nSubDirs}")
-        lastIndex = min(nSubDirs - 1, maxIndex)
+        # lastIndex = min(nSubDirs - 1, maxIndex)
+        lastIndex = min(nSubDirs, maxIndex)
         
         subDirsNames = list(map(lambda x: x.name, self._subDirs_[startIndex : lastIndex]))
         
@@ -1550,9 +1565,11 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         result = action.data() 
         buttonPath = self.path()
         path = pictio.concatPaths(buttonPath, self._subDirs_[result])   # the path to the subdirectory pointed to by the action
+        print(f"{self.__class__.__name__}.slot_menuActionClicked: path = {path}")
+        print()
         url = QtCore.QUrl(path.absolute().as_uri())
         self.navigatorButtonActivated.emit(url, button, QtCore.Qt.NoModifier)
-    
+
     @Slot()
     def slot_statFinished(self):
         print(f"{self.__class__.__name__}.slot_statFinished invoked")
@@ -1673,7 +1690,7 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         # NOTE: 2025-01-21 08:53:03
         # Connected to the  ListDirsJob.sig_entries Signal.
         
-        print(f"{self.__class__.__name__}.slot_addEntriesToSubdirs")
+        # print(f"{self.__class__.__name__}.slot_addEntriesToSubdirs")
 
         if len(entries) == 0:
             return
@@ -1683,8 +1700,8 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         if len(dirEntries) == 0:
             return
         
-        self._subDirs_[:] = dirEntries[:]
-        print(f"\tsubDirs: {self._subDirs_}")
+        self._subDirs_[:] = sorted(dirEntries[:])
+        # print(f"\tsubDirs: {self._subDirs_}")
 
     
 # NOTE: 2023-05-06 22:26:18
