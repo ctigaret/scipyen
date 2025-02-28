@@ -2726,6 +2726,7 @@ class _UrlNavigator_(QtCore.QObject):
     def updateContent(self):
         # KUrlNavigatorPrivate  
         print(f"\n{self.__class__.__name__}.updateContent")
+        print(f"\teditable: {self._editable_}")
         currentUrl = self._nav_.locationUrl()
 
         # NOTE: 2025-01-24 21:22:27 CMT

@@ -653,7 +653,9 @@ def get_desktop_places(schema:typing.Optional[str]=None,
     elif sys.platform.startswith("win32"):
         getIcon = lambda x: "folder-remote-symbolic" if "remote" in x.opts else "drive-harddisk-symbolic"
 
-        drivePlaces = sorted(list(map(lambda x: DEPlace(pathlib.Path(x.mountpoint).as_uri(), QtCore.QUrl(pathlib.Path(x.mountpoint).as_uri()), icon=getIcon(x)),
+        # drivePlaces = sorted(list(map(lambda x: DEPlace(pathlib.Path(x.mountpoint).as_uri(), QtCore.QUrl(pathlib.Path(x.mountpoint).as_uri()), icon=getIcon(x)),
+        #                        filesystems.get_disk_partitions())), key = lambda x: x.name)
+        drivePlaces = sorted(list(map(lambda x: DEPlace(x.mountpoint.replace("\\", ""), QtCore.QUrl(pathlib.Path(x.mountpoint).as_uri()), icon=getIcon(x)),
                                filesystems.get_disk_partitions())), key = lambda x: x.name)
 
         if asQUrl:
