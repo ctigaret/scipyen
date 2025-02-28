@@ -1032,7 +1032,7 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
 
     # def setUrl(self, url:typing.Union[QtCore.QUrl, pathlib.Path]):
     def setUrl(self, url:QtCore.QUrl):
-        print(f"{self.__class__.__name__}.setUrl({url})")
+        # print(f"{self.__class__.__name__}.setUrl({url})")
         self._url_ = url
 
         # NOTE: 2023-05-08 18:06:14 KIO original
@@ -1082,7 +1082,7 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
             # btnText = self._url_.fileName().replace('&', '&&')
             btnPath = dutils.urlToPath(self._url_)
             btnText = btnPath.parts[-1]
-            print(f"\tbtnPath: {btnPath} -> btnText = {btnText}")
+            # print(f"\tbtnPath: {btnPath} -> btnText = {btnText}")
             if sys.platform.startswith("win32"):
                 pass
             self.setText(btnText)
@@ -1463,7 +1463,7 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         #
         # in KIO:
         # • if _replaceButton_ is True, the directory that this button
-        # points to will have changed to one of its siblings; thypically this
+        # points to will have changed to one of its siblings; typically this
         # is triggered by a wheel event, which should result in "scrolling" 
         # through the sibling directories
         #
@@ -1548,7 +1548,8 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         # this is the index of the subirectory (pointed to by the action) in the
         # self._subDirs_ list
         result = action.data() 
-        path = self._subDirs_[result]   # the path to the subdirectory pointed to by the action
+        buttonPath = self.path()
+        path = pictio.concatPaths(buttonPath, self._subDirs_[result])   # the path to the subdirectory pointed to by the action
         url = QtCore.QUrl(path.absolute().as_uri())
         self.navigatorButtonActivated.emit(url, button, QtCore.Qt.NoModifier)
     
@@ -1672,6 +1673,8 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         # NOTE: 2025-01-21 08:53:03
         # Connected to the  ListDirsJob.sig_entries Signal.
         
+        print(f"{self.__class__.__name__}.slot_addEntriesToSubdirs")
+
         if len(entries) == 0:
             return
         assert all(isinstance(v, pathlib.Path) for v in entries), "Expecting a list of Path objects"
@@ -1681,6 +1684,8 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
             return
         
         self._subDirs_[:] = dirEntries[:]
+        print(f"\tsubDirs: {self._subDirs_}")
+
     
 # NOTE: 2023-05-06 22:26:18
 # By design we only use the 'file://' protocol hence this is not needed, for now...
@@ -2464,19 +2469,24 @@ class _UrlNavigator_(QtCore.QObject):
             self._nav_.urlsDropped.emit(destination, evt)
             
     def applyUncommittedUrl(self, method:ApplyUrlMethod):
+        # print(f"\{self.__class__.__name__}.applyUncommittedUrl")
         # KUrlNavigatorPrivate
         # NOTE: 2025-01-17 23:19:20
         # About method - we don't support Tabs in filesystem viewer
         # but we can launch the platform's file manager when method is NewWindow,
         # or "Tab"# do nothing for ActiveTab
         text = self._pathBox_.currentText().strip()
+        # print(f"\ttext = {text}")
         url = self._nav_.locationUrl()
-        
+
+        # print(f"\tcurrent url = {url}")
         if text.startswith('/'):
             url.setPath(text)
         else:
-            url.setPath(pictio.concatPaths(url.path(), text).as_posix())
-            
+            # url.setPath(pictio.concatPaths(url.path(), text).as_posix())
+            url.setPath(pictio.concatPaths(dutils.urlToPath(url).as_posix(), text).as_uri())
+
+        # print(f"\tnew url = {url}")
         if os.path.isdir(url.path()):
             self.slotApplyUrl(url)
             return
@@ -2725,8 +2735,8 @@ class _UrlNavigator_(QtCore.QObject):
     
     def updateContent(self):
         # KUrlNavigatorPrivate  
-        print(f"\n{self.__class__.__name__}.updateContent")
-        print(f"\teditable: {self._editable_}")
+        # print(f"\n{self.__class__.__name__}.updateContent")
+        # print(f"\teditable: {self._editable_}")
         currentUrl = self._nav_.locationUrl()
 
         # NOTE: 2025-01-24 21:22:27 CMT
@@ -2755,6 +2765,7 @@ class _UrlNavigator_(QtCore.QObject):
 
             self._pathBox_.show()
             self._pathBox_.setUrl(currentUrl)
+            # print(f"\tself._pathBox_.urls: {self._pathBox_.urls()}")
 
         else:
             self._pathBox_.hide()
@@ -2803,8 +2814,8 @@ class _UrlNavigator_(QtCore.QObject):
 
 
             startIndex = placePathStr.count('/')
-            print(f"\tshowFullPath: {self._showFullPath_}, closestPlace: {self._closestPlace_}")
-            print(f"\tcurrentUrl = {currentUrl}, placeUrl = {placeUrl}, placePathStr =  {placePathStr}, drive = {drive}, startIndex =  {startIndex}")
+            # print(f"\tshowFullPath: {self._showFullPath_}, closestPlace: {self._closestPlace_}")
+            # print(f"\tcurrentUrl = {currentUrl}, placeUrl = {placeUrl}, placePathStr =  {placePathStr}, drive = {drive}, startIndex =  {startIndex}")
 
             # # if sys.platform.startswith("win32"):
             # #     startIndex = len(placePath.parts)
@@ -2855,7 +2866,7 @@ class _UrlNavigator_(QtCore.QObject):
         
         pathParts = path.parts
         # pathParts = pathlib.Path(path).parts
-        print(f"\tpathParts = {pathParts} ({len(pathParts)} elements)")
+        # print(f"\tpathParts = {pathParts} ({len(pathParts)} elements)")
         
         _k_ = 0
         
@@ -2863,14 +2874,14 @@ class _UrlNavigator_(QtCore.QObject):
         # print(f"\twhile hasNext BEGIN\n\n")
         
         while hasNext:
-            print(f"\t\t_k_ = {_k_}, ndx = {ndx}:")
+            # print(f"\t\t_k_ = {_k_}, ndx = {ndx}:")
             if ndx >= len(pathParts): # reached end of pathParts
                 # print(f"\t\t{ndx} >= {len(pathParts)} -> while haxNext BREAK")
                 break
             
             createButton = ((ndx - startIndex) >= oldButtonCount)
             isFirstButton = (ndx == startIndex)
-            print(f"\t\tcreateButton = {createButton}, isFirstButton = {isFirstButton}")
+            # print(f"\t\tcreateButton = {createButton}, isFirstButton = {isFirstButton}")
 
             # if ndx >= len(pathParts):
             # if ndx >= len(pathParts) - 1:
@@ -2880,7 +2891,7 @@ class _UrlNavigator_(QtCore.QObject):
             # NOTE: when ndx < len(parParts)-1, ndx+1 should be the active subdirectory
             # and the one pointed to by the next button
             
-            print(f"\t\tdirName = {dirName}")
+            # print(f"\t\tdirName = {dirName}")
 
             hasNext = isFirstButton or len(dirName) > 0
             
