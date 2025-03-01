@@ -2126,6 +2126,7 @@ class UrlNavigatorPathSelectorEventFilter(QtCore.QObject):
             action = menu.activeAction()
             if action is not None:
                 url = QtCore.QUrl(action.data().toString())
+                print(f"{self.__class__.__name__}.eventFilter: url = {url}")
                 if url.isValid():
                     menu.close()
                     self.tabRequested.emit(url)
@@ -2370,30 +2371,45 @@ class _UrlNavigator_(QtCore.QObject):
     @Slot()
     def openPathSelectorMenu(self):
         # KUrlNavigatorPrivate
+        # NOTE: 2025-03-01 17:25:21
+        # called by navigator drop down button
         if len(self._navButtons_) == 0:
             return
-        
+        print(f"{self.__class__.__name__}.openPathSelectorMenu")
+
         firstVisibleUrl = self._navButtons_[0].url()
-        
+        print(f"\tfirstVisibleUrl = {firstVisibleUrl}")
+
         spacer = ""
-        
+
         dirName = ""
-        
+
         placeUrl = self.retrievePlaceUrl()
-        
+        print(f"\tplaceUrl = {placeUrl}")
+
+
         ndx = placeUrl.path().count('/')
-        
+
         myPath = self._coreUrlNavigator_.locationUrl(self._coreUrlNavigator_.historyIndex()).path()
+        print(f"\tmyPath = {myPath}")
         pathParts = pathlib.Path(myPath).parts
+        # BUG 2025-03-01 17:35:21 FIXME
+        # on windows this si something like
+        #  pathParts = ('\\', 'C:', 'Users')
+        print(f"\tpathParts = {pathParts}")
         if ndx < len(pathParts):
             dirName = pathParts[ndx]
-            
+
+        print(f"\t dirName = {dirName}")
+
         if len(dirName) == 0:
             if placeUrl.isLocalFile():
                 dirName = "This PC" if sys.platform.startswith("win32") else "/"
             else:
                 dirName = placeUrl.toDisplayString()
-                
+
+        print(f"\t dirName = {dirName}")
+
         dirActionsDataMap = dict()
         
         k = 0
