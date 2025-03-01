@@ -2385,28 +2385,32 @@ class _UrlNavigator_(QtCore.QObject):
         dirName = ""
 
         placeUrl = self.retrievePlaceUrl()
-        print(f"\tplaceUrl = {placeUrl}")
 
+        placePath = dutils.urlToPath(placeUrl)
 
-        ndx = placeUrl.path().count('/')
+        print(f"\tplaceUrl = {placeUrl}, placePath = {placePath}, as posix: {placePath.as_posix()}")
 
-        myPath = self._coreUrlNavigator_.locationUrl(self._coreUrlNavigator_.historyIndex()).path()
+        # ndx = placeUrl.path().count('/')
+        ndx = placePath.as_posix().count('/')
+
+        # myPath = self._coreUrlNavigator_.locationUrl(self._coreUrlNavigator_.historyIndex()).path()
+        # pathParts = pathlib.Path(myPath).parts
+        myPath = dutils.urlToPath(self._coreUrlNavigator_.locationUrl(self._coreUrlNavigator_.historyIndex()))
+        pathParts = myPath.parts
         print(f"\tmyPath = {myPath}")
-        pathParts = pathlib.Path(myPath).parts
-        # BUG 2025-03-01 17:35:21 FIXME
-        # on windows this si something like
-        #  pathParts = ('\\', 'C:', 'Users')
-        print(f"\tpathParts = {pathParts}")
+        print(f"\tpathParts = {pathParts}; ndx = {ndx}")
         if ndx < len(pathParts):
             dirName = pathParts[ndx]
 
-        print(f"\t dirName = {dirName}")
+        print(f"\tdirName = {dirName}")
 
         if len(dirName) == 0:
             if placeUrl.isLocalFile():
                 dirName = "This PC" if sys.platform.startswith("win32") else "/"
             else:
                 dirName = placeUrl.toDisplayString()
+
+
 
         print(f"\t dirName = {dirName}")
 
@@ -2418,11 +2422,13 @@ class _UrlNavigator_(QtCore.QObject):
             # action = QtWidgets.QAction(text, popup)
             currentUrl = self.buttonUrl(ndx)
             dirActionsDataMap[text] = currentUrl
-            
+
             if currentUrl == firstVisibleUrl:
                 dirActionsDataMap[MISSING] = None
                 # popup.addSeparator()
-                
+
+            print(f"\t\tndx = {ndx}, text = {text}. currentUrl = {currentUrl}, is first visible = {currentUrl == firstVisibleUrl}")
+
             # action.setData(currentUrl.toString())
             ndx += 1
             # if ndx >= len(pathParts):
