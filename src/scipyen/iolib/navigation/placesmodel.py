@@ -155,7 +155,6 @@ class PlacesItem(QtCore.QObject):
     remote:/, etc.)
     
     """
-    
     itemChanged = Signal(str, list, name="itemChanged") # str, list[int]
     
     def __init__(self, manager, address:str, udi:str, parent:PlacesModel):

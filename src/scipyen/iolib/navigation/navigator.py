@@ -192,7 +192,6 @@ class ListDirsJob(QtCore.QThread):
         
         if isinstance(path, QtCore.QUrl):
             path = dutils.urlToPath(path)
-            # path = pathlib.Path(path.path())
             
         elif isinstance(path, str):
             path = pathlib.Path(path)
@@ -217,7 +216,6 @@ class ListDirsJob(QtCore.QThread):
         QtCore.QThread.__init__(self, parent=parent)
         
     def run(self):
-        # print(f"{self.__class__.__name__}.run called; self.path = {self.path}")
         filters = QtCore.QDir.Dirs | QtCore.QDir.NoDotAndDotDot | QtCore.QDir.CaseSensitive
         if self.showHidden:
             filters |= QtCore.QDir.Hidden
@@ -227,27 +225,23 @@ class ListDirsJob(QtCore.QThread):
         if sys.platform.startswith("win32"):
             p += "\\"
 
-        # qDir = QtCore.QDir(self.path.as_posix(), "*",
         qDir = QtCore.QDir(p, "*",
                            QtCore.QDir.Name | QtCore.QDir.DirsFirst, filters)
         if sys.platform.startswith("win32"):
             self.entries = list(map(lambda x: pathlib.Path(os.path.join(p, x)), qDir.entryList()))
         else:
             self.entries = list(map(lambda x: self.path / x, qDir.entryList()))
-        # print(f"\tentries: {self.entries}")
+
         self.sig_entries.emit(self.entries)
-        
     
 class ApplyUrlMethod(IntEnum):
     Apply = 1
     Tab = 2
     ActiveTab = 4
     NewWindow = 8
-        
 
 class UrlNavigator: pass # fwd decl
 
-# class LocationData(typing.NamedTuple):
 class LocationData:
     """
     Encapsulates location data
@@ -256,13 +250,11 @@ class LocationData:
     def __init__(self, url:QtCore.QUrl, state:typing.Optional[typing.Any] = None):
         self.url:QtCore.QUrl = url
         self.state:object = state
-        # print(f"{self.__class__.__name__}.__init__ url = {self.url}, state = {self.state}")
         
     def __repr__(self):
         return f"LocationData url = {self.url}, state = {self.state}"
     
     def __eq__(self, other:typing.Self):
-        # ret = self.url.matches(other.url, QtCore.QUrl.StripTrailingSlash)
         ret = self.hasSameUrl(other)
         
         if ret:
@@ -336,16 +328,9 @@ def _(o:str, state:typing.Optional[QtCore.QByteArray]=None) -> LocationData:
 @pathToLocation.register(pathlib.Path)
 def _(o:pathlib.Path, state:typing.Optional[QtCore.QByteArray]=None) -> LocationData:
     return LocationData(QtCore.QUrl(path.as_uri()), state)
-    # if o.is_dir() and o.is_absolute():
-    #     return LocationData(QtCore.QUrl(path.as_uri()), state)
-    # else:
-    #     raise ValueError(f"{o} is not an absolute path to existing directory")
 
 @pathToLocation.register(QtCore.QUrl)
 def _(o:QtCore.QUrl, state:typing.Optional[QtCore.QByteArray]=None) -> LocationData:
-    # if not url.isLocalFile() or url.isRelative() or not pathlib.Path(o.path()).is_dir():
-    #     raise ValueError(f"{o} is not an absolute path to existing directory")
-    
     return LocationData(o, state)
     
 def findProtocol(protocol:str):
@@ -357,8 +342,6 @@ def isAbsoluteLocalPath(path:str):
         return False
     plpath = pathlib.Path(path)
     return plpath.is_absolute()
-    # NOTE: 2023-05-08 17:49:03 use pathlib
-    # return not path.startswith(':') and QtCore.QDir.isAbsolutePath(path)
 
 def appendSlash(path:str):
     if len(path) == 0:
@@ -377,9 +360,6 @@ def removeTrailingPath(path:str):
 
 def trailingSlashRemoved(path:str):
     path = removeTrailingPath(path)
-    # if sys.platform.startswith("win32"):
-    #     if path.startswith("/"):
-    #         path = path[1:]
     return path
 
 def appendSlashToPath(url:QtCore.QUrl):
@@ -414,14 +394,9 @@ def upUrl(url:QtCore.QUrl):
     
     if url.hasFragment():
         u.setFragment("")
-#         
-#     if url.isRelative():
-#         u = QtCore.QUrl(upPath(pathlib.Path(u.path())).as_posix())
     
     return u.adjusted(QtCore.QUrl.StripTrailingSlash).adjusted(QtCore.QUrl.RemoveFilename)
     
-    # return u.adjusted(QtCore.QUrl.RemoveFilename)
-
 def upPath(path:pathlib.Path) -> pathlib.Path:
     # NOTE: 2024-12-30 19:36:35
     # this below would resolve the current path - not what I want
@@ -628,7 +603,6 @@ class UrlComboBox(QtWidgets.QComboBox):
         uu = QtCore.QUrl()
         
         for u in urls:
-            # if u.isEmpty():
             if len(u)==0:
                 continue
             
@@ -657,9 +631,8 @@ class UrlComboBox(QtWidgets.QComboBox):
         for k, v in self.itemMapper.items():
             # if urlToInsert == v.toString(QtCore.QUrl.StripTrailingSlash):
             # WARNING: 2025-01-19 20:20:46
-            # v is a UrlComboItem huich , here is a namedtuple
+            # v is a UrlComboItem which here is a namedtuple
             if urlToInsert == v.url.toString(QtCore.QUrl.StripTrailingSlash):
-                # self.setCurrentItem(k)
                 self.setCurrentIndex(k) # NOTE: 2025-01-19 20:22:50 self inherits QComboBox !!!
                 
                 if self._mode_ == UrlComboMode.Directories:
@@ -1548,11 +1521,9 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         #   NOTE: 2025-01-21 16:45:50
         #
         # this is the index of the subirectory (pointed to by the action) in the
-        # self._subDirs_ list
         result = action.data() 
         buttonPath = self.path()
         path = pictio.concatPaths(buttonPath, self._subDirs_[result])   # the path to the subdirectory pointed to by the action
-        # print(f"{self.__class__.__name__}.slot_menuActionClicked: path = {path}")
         print()
         url = QtCore.QUrl(path.absolute().as_uri())
         self.navigatorButtonActivated.emit(url, button, QtCore.Qt.NoModifier)
@@ -1567,29 +1538,8 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         # not used here (yet ?!?)
         pass
         
-#     @safeWrapper
-#     def subDirMenuRequested(self, evt:QtGui.QMouseEvent): # TODO/FIXME finalize
-#         if self._subDirsMenu_ is None:
-#             self._subDirsMenu_ = QtWidgets.QMenu("", self)
-#             self._subDirsMenu_.aboutToHide.connect(self.slot_menuHiding)
-#             
-#         self._subDirsMenu_.clear()
-#         
-#         if self._fileSystemModel_.hasChildren(self._fileSystemModelIndex_):
-#             subDirs = [self._fileSystemModel_.data(self._fileSystemModel_.index(row, 0, self._fileSystemModelIndex_)) for row in range(self._fileSystemModel_.rowCount(self._fileSystemModelIndex_))]
-#             # print(f"{self.__class__.__name__}.subDirMenuRequested rootIndex subDirs {subDirs}")
-#             if len(subDirs):
-#                 for k, subDir in enumerate(subDirs):
-#                     # print(f"subDir {subDir}")
-#                     action = self._subDirsMenu_.addAction(subDir)
-#                     action.setText(subDir)
-#                     action.triggered.connect(self.slot_subDirClick)
-#         
-#                 self._subDirsMenu_.popup(self.mapToGlobal(evt.pos()))
-    
     @Slot()
     def slot_requestSubDirs(self):
-        # print(f"{self.__class__.__name__}.slot_requestSubDirs invoked")
         if not self._openSubDirsTimer.isActive() and (not isinstance(self._subDirsJob_, ListDirsJob) or not qtutils.isQObjectAlive(self._subDirsJob_)):
             self._openSubDirsTimer.start()
         
@@ -1610,7 +1560,6 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         path = self.path()
         
         if path not in self._subDirs_:
-            print(f"{path} not in _subDirs_")
             return
         
         currentIndex = self._subDirs_.index(path)
@@ -1643,7 +1592,6 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         # is established from within slot_startSubDirsJob when self._replaceButton_ 
         # is False; see NOTE: 2024-12-30 23:48:13
         
-        # print(f"{self.__class__.__name__}<{self.plainText()}>.slot_openSubDirsMenu invoked")
         self._subDirsJob_ = None
         if len(self._subDirs_) == 0:
             return
@@ -1675,7 +1623,6 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
                 pos = self.parent().mapToGlobal(self.parent()._nav_p_._navButtons_[buttonIndex+1].geometry().bottomLeft())
         
         self._subDirsMenu_.popup(pos)
-        # self._subDirsMenu_.popup(self.mapToGlobal(QtCore.QPoint(0,0)))
     
     @Slot(list)
     def slot_addEntriesToSubdirs(self, entries:list[pathlib.Path]):
@@ -1684,8 +1631,6 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         """
         # NOTE: 2025-01-21 08:53:03
         # Connected to the  ListDirsJob.sig_entries Signal.
-        
-        # print(f"{self.__class__.__name__}.slot_addEntriesToSubdirs")
 
         if len(entries) == 0:
             return
@@ -1696,7 +1641,6 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
             return
         
         self._subDirs_[:] = sorted(dirEntries[:])
-        # print(f"\tsubDirs: {self._subDirs_}")
 
     
 # NOTE: 2023-05-06 22:26:18
@@ -3312,16 +3256,13 @@ class UrlNavigator(QtWidgets.QWidget):
         elif int(keyboardModifiers & QtCore.Qt.ControlModifier):
             self._nav_p_.switchToBreadcrumbMode()
             self._nav_p_.updateButtonVisibility()
-            # self._sig_switchToBreadCrumbMode.emit()
             
         else:
             self._nav_p_.applyUncommittedUrl(ApplyUrlMethod.Apply) # navigate here
             self._nav_p_.switchToBreadcrumbMode()
             self._nav_p_.updateButtonVisibility()
-            # self._nav_.returnPressed.emit()
             
         # indirection to emitting returnPressed
-        # self.applyUncommittedUrl()
         self.returnPressed.emit()
         
         # if QtWidgets.QApplication.KeyboardModifiers() & QtCore.Qt.ControlModifier:
