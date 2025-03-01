@@ -1681,7 +1681,15 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         # populates the menu with subdirectory entries
         self.initMenu(self._subDirsMenu_, 0)
         
-        self._subDirsMenu_.popup(self.mapToGlobal(QtCore.QPoint(0,0)))
+        pos = self.mapToGlobal(QtCore.QPoint(0,0))
+        
+        if self.parent().__class__.__name__ == "UrlNavigator":
+            buttonIndex = self.parent()._nav_p_._navButtons_.index(self)
+            if buttonIndex < len(self.parent()._nav_p_._navButtons_):
+                pos = self.parent().mapToGlobal(self.parent()._nav_p_._navButtons_[buttonIndex+1].geometry().bottomLeft())
+        
+        self._subDirsMenu_.popup(pos)
+        # self._subDirsMenu_.popup(self.mapToGlobal(QtCore.QPoint(0,0)))
     
     @Slot(list)
     def slot_addEntriesToSubdirs(self, entries:list[pathlib.Path]):
@@ -2411,59 +2419,9 @@ class _UrlNavigator_(QtCore.QObject):
             else:
                 text = " " * k + part
             currentUrl = self.buttonUrl(k)
-            dirActionsDataMap[text] = currentUrl
             if currentUrl == firstVisibleUrl:
                 dirActionsDataMap[MISSING] = None
-                
-            
-#             
-#             
-#         
-#         print(f"\tmyPath = {myPath}")
-#         print(f"\tpathParts = {pathParts}; ndx = {ndx}")
-#         if ndx < len(pathParts):
-#             dirName = pathParts[ndx]
-# 
-#         print(f"\tdirName = {dirName}")
-# 
-#         if len(dirName) == 0:
-#             if placeUrl.isLocalFile():
-#                 dirName = "This PC" if sys.platform.startswith("win32") else "/"
-#             else:
-#                 dirName = placeUrl.toDisplayString()
-# 
-# 
-# 
-#         print(f"\t dirName = {dirName}")
-# 
-#         
-#         k = 0
-#         while len(dirName) > 0:
-#             text = spacer + dirName
-#             # action = QtWidgets.QAction(text, popup)
-#             currentUrl = self.buttonUrl(ndx)
-#             dirActionsDataMap[text] = currentUrl
-# 
-#             if currentUrl == firstVisibleUrl:
-#                 dirActionsDataMap[MISSING] = None
-#                 # popup.addSeparator()
-# 
-#             print(f"\t\tndx = {ndx}, text = {text}. currentUrl = {currentUrl}, is first visible = {currentUrl == firstVisibleUrl}")
-# 
-#             # action.setData(currentUrl.toString())
-#             ndx += 1
-#             # if ndx >= len(pathParts):
-#             #     break
-#             
-#             k+=2
-#             spacer = " " * k
-#             
-#             if ndx < len(pathParts):
-#                 dirName = pathParts[ndx]
-#             else:
-#                 dirName = ""
-                
-        # print(f"{self.__class__.__name__}.openPathSelectorMenu: dirActionsDataMap = {dirActionsDataMap}")
+            dirActionsDataMap[text] = currentUrl
         
         popup = QtWidgets.QMenu(self._nav_)
         
@@ -2732,35 +2690,20 @@ class _UrlNavigator_(QtCore.QObject):
         self._nav_.setUrlEditable(False)
         
     def buttonUrl(self, ndx:int) -> QtCore.QUrl:
-        # print(f"{self.__class__.__name__}.buttonUrl: ndx = {ndx}")
         # KUrlNavigatorPrivate
         if ndx < 0:
             ndx = 0
             
         url = QtCore.QUrl(self._nav_.locationUrl()) # see NOTE 2025-01-20 11:31:01
                                                     # and NOTE: 2025-01-20 11:31:36
-        # print(f"\tlocation url is {url}")
-        # path:str = url.path()
-        # path:str = dutils.urlToPath(url).as_posix()
         path:pathlib.Path = dutils.urlToPath(url)
         pathParts = path.parts
 
-        # print(f"\tpathParts = {pathParts}")
-
-        # print(f"\tpath = {path} ({type(path).__name__}), ndx = {ndx}")
-        #
-        # if sys.platform.startswith("win32"):
-        #     if path.startswith("/"):
-        #         path = path[1:]
-        #         print(f"\tpath win32 = {path} ({type(path).__name__}), ndx = {ndx}")
-        
-        # if len(path):
         newPathStr = "/"
         
         if dutils.pathStrLen(path):
             if sys.platform.startswith("win32"):
                 if ndx == 0:
-                    # newPathStr = "file:///" + path.drive
                     return QtCore.QUrl.fromLocalFile(path.drive)
                 else:
                     newPath = pathlib.Path.joinpath(*list(map(lambda x: pathlib.Path(x), pathParts[:ndx+1])))
@@ -2771,18 +2714,14 @@ class _UrlNavigator_(QtCore.QObject):
 
                     return newUrl
 
-                    # newPathStr = "file:///" + newPath.as_posix()
             else:
                 if ndx == 0:
                     newPathStr = "/"
 
                 else:
-                    # pathParts = path.split("/")
                     newPath = pathlib.Path.joinpath(*list(map(lambda x: pathlib.Path(x), pathParts[:ndx+1])))
                     newPathStr = "/".join(pathParts[:ndx+1])
 
-                    # path = "/".join(pathParts[ndx:])
-                # print(f"\tsetting path '{newPathStr}' for url: {url}")
                 url.setPath(newPathStr)
                 return url
 
