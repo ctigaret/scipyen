@@ -1566,14 +1566,14 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         result = action.data() 
         buttonPath = self.path()
         path = pictio.concatPaths(buttonPath, self._subDirs_[result])   # the path to the subdirectory pointed to by the action
-        print(f"{self.__class__.__name__}.slot_menuActionClicked: path = {path}")
+        # print(f"{self.__class__.__name__}.slot_menuActionClicked: path = {path}")
         print()
         url = QtCore.QUrl(path.absolute().as_uri())
         self.navigatorButtonActivated.emit(url, button, QtCore.Qt.NoModifier)
 
     @Slot()
     def slot_statFinished(self):
-        print(f"{self.__class__.__name__}.slot_statFinished invoked")
+        # print(f"{self.__class__.__name__}.slot_statFinished invoked")
         # NOTE: 2025-01-02 00:14:19
         # in KIO this is triggered by the result signal of a KIO::stat job
         # part of the mechanism for resolving uris with special schemes/protocols
