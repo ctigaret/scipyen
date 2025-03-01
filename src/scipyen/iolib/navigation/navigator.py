@@ -2378,31 +2378,38 @@ class _UrlNavigator_(QtCore.QObject):
         
         dirActionsDataMap = dict()
         
-        print(f"{self.__class__.__name__}.openPathSelectorMenu:")
+        # print(f"{self.__class__.__name__}.openPathSelectorMenu:")
 
         firstVisibleUrl = self._navButtons_[0].url()
-        print(f"\tfirstVisibleUrl = {firstVisibleUrl}")
+        # print(f"\tfirstVisibleUrl = {firstVisibleUrl}")
 
         spacer = ""
 
         dirName = ""
 
-        placeUrl = self.retrievePlaceUrl()
+        drive = ""
 
-        placePath = dutils.urlToPath(placeUrl)
+        # placeUrl = self.retrievePlaceUrl()
 
-        print(f"\tplaceUrl = {placeUrl}, placePath = {placePath}, as posix: {placePath.as_posix()}")
+        # placePath = dutils.urlToPath(placeUrl)
+
+        # print(f"\tplaceUrl = {placeUrl}, placePath = {placePath}, as posix: {placePath.as_posix()}")
 
         # ndx = placeUrl.path().count('/')
-        ndx = placePath.as_posix().count('/')
+        # ndx = placePath.as_posix().count('/')
 
         # myPath = self._coreUrlNavigator_.locationUrl(self._coreUrlNavigator_.historyIndex()).path()
         # pathParts = pathlib.Path(myPath).parts
         myPath = dutils.urlToPath(self._coreUrlNavigator_.locationUrl(self._coreUrlNavigator_.historyIndex()))
         pathParts = myPath.parts
+        if sys.platform.startswith("win32"):
+            drive = myPath.drive
         
         for k, part in enumerate(pathParts):
-            text = " " * k + part
+            if k == 0 and sys.platform.startswith("win32"):
+                text = drive
+            else:
+                text = " " * k + part
             currentUrl = self.buttonUrl(k)
             dirActionsDataMap[text] = currentUrl
             if currentUrl == firstVisibleUrl:
