@@ -990,12 +990,10 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
                  parent:typing.Optional[UrlNavigator]=None):
         super().__init__(parent=parent)
         self._hoverArrow_ = False
-        # self._pressed_ = False # NOTE: 2025-01-02 01:20:39 by CMT for use in paintEvent
         self._pendingTextChange_ = False
         self._replaceButton_ = False
         self._showMnemonic_ = False
         self._wheelSteps_:int = 0
-        # self._mousePressPos_ = QtCore.QPoint()
         
         self._url_ = None
         self._subDir_ = ""  # NOTE: 2025-01-02 00:21:29 this is to be set, actually,
@@ -1014,7 +1012,6 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         
         self.setAcceptDrops(True)
         self.setUrl(url)
-        # self.setUrl(QtCore.QUrl(url.as_uri()) if isinstance(url, pathlib.Path) else url)
         self.setMouseTracking(True)
         
         self.pressed.connect(self.slot_requestSubDirs)
@@ -1033,16 +1030,8 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         else:
             self._fileSystemModel_ = model
             self._fileSystemModelIndex_ = self._fileSystemModel_.index(self.path.as_posix())
-# # 
-# #         # self.frameStyleOptions = QtWidgets.QStyleOptionFrame()
-# #         # self.frameStyleOptions.initFrom(self)
-# #         # self.frameStyleOptions.
-# #         
-# #         # ### END CMT 2023-05-08 17:56:23
 
-    # def setUrl(self, url:typing.Union[QtCore.QUrl, pathlib.Path]):
     def setUrl(self, url:QtCore.QUrl):
-        # print(f"{self.__class__.__name__}.setUrl({url})")
         self._url_ = url
 
         # NOTE: 2023-05-08 18:06:14 KIO original
@@ -1089,14 +1078,11 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
             # # ### END
             
         else:
-            # btnText = self._url_.fileName().replace('&', '&&')
             btnPath = dutils.urlToPath(self._url_)
             btnText = btnPath.parts[-1]
-            # print(f"\tbtnPath: {btnPath} -> btnText = {btnText}")
             if sys.platform.startswith("win32"):
                 pass
             self.setText(btnText)
-            # self.setText(self._url_.fileName().replace('&', '&&'))
             
     def url(self) -> QtCore.QUrl:
         return self._url_
@@ -2397,17 +2383,6 @@ class _UrlNavigator_(QtCore.QObject):
 
         drive = ""
 
-        # placeUrl = self.retrievePlaceUrl()
-
-        # placePath = dutils.urlToPath(placeUrl)
-
-        # print(f"\tplaceUrl = {placeUrl}, placePath = {placePath}, as posix: {placePath.as_posix()}")
-
-        # ndx = placeUrl.path().count('/')
-        # ndx = placePath.as_posix().count('/')
-
-        # myPath = self._coreUrlNavigator_.locationUrl(self._coreUrlNavigator_.historyIndex()).path()
-        # pathParts = pathlib.Path(myPath).parts
         myPath = dutils.urlToPath(self._coreUrlNavigator_.locationUrl(self._coreUrlNavigator_.historyIndex()))
         pathParts = myPath.parts
         if sys.platform.startswith("win32"):
@@ -2442,7 +2417,6 @@ class _UrlNavigator_(QtCore.QObject):
                 popup.addAction(action)
             
         pos = self._nav_.mapToGlobal(self._dropDownButton_.geometry().bottomRight())
-        # print(f"{self.__class__.__name__}.openPathSelectorMenu: pos = {pos}")
         activatedAction = popup.exec(pos)
         if activatedAction is not None:
             # NOTE: 2025-01-21 16:43:02
@@ -2452,7 +2426,6 @@ class _UrlNavigator_(QtCore.QObject):
             #   NOTE: 2025-01-20 21:36:48 
             #   NOTE: 2025-01-21 16:45:50
             url = QtCore.QUrl(activatedAction.data()) 
-            # url = QtCore.QUrl(activatedAction.data().toString())
             self._nav_.setLocationUrl(url)
             
         if popup is not None:
@@ -2488,30 +2461,24 @@ class _UrlNavigator_(QtCore.QObject):
             self._nav_.urlsDropped.emit(destination, evt)
             
     def applyUncommittedUrl(self, method:ApplyUrlMethod):
-        # print(f"\{self.__class__.__name__}.applyUncommittedUrl")
         # KUrlNavigatorPrivate
         # NOTE: 2025-01-17 23:19:20
         # About method - we don't support Tabs in filesystem viewer
         # but we can launch the platform's file manager when method is NewWindow,
         # or "Tab"# do nothing for ActiveTab
         text = self._pathBox_.currentText().strip()
-        # print(f"\ttext = {text}")
         url = self._nav_.locationUrl()
 
-        # print(f"\tcurrent url = {url}, text = {text}")
         if text.startswith('/'):
             url.setPath(text)
         else:
-            # url.setPath(pictio.concatPaths(url.path(), text).as_posix())
             newPath = pictio.concatPaths(dutils.urlToPath(url).as_posix(), text)
-            # print(f"\tnewPath = {newPath}")
             if sys.platform.startswith("win32") and not newPath.is_absolute() and dutils.pathLen(newPath) == 1:
                 drive = newPath.drive
                 url.setPath("file://" + drive + "/")
             else:
                 url.setPath(newPath.as_uri())
 
-        # print(f"\tnew url = {url}")
         if os.path.isdir(url.path()):
             self.slotApplyUrl(url)
             return
@@ -2681,7 +2648,6 @@ class _UrlNavigator_(QtCore.QObject):
         # and mess up the actual location url (see NOTE 2025-01-20 11:31:01)
         url = QtCore.QUrl(self._nav_.locationUrl()) # to avoid modifying the underlining location url, 
         url.setPath("") # - why this !?!            # <- when calling this 
-        # print(f"{self.__class__.__name__}.retrievePlaceUrl: currentUrl = {currentUrl}")
         return url
     
     @Slot()
@@ -2725,10 +2691,6 @@ class _UrlNavigator_(QtCore.QObject):
                 url.setPath(newPathStr)
                 return url
 
-        # url.setPath(path)
-        # url.setPath(newPathStr)
-
-        # print(f"\treturns url: {url}")
         return url
     
     def deleteButtons(self):
@@ -2741,21 +2703,16 @@ class _UrlNavigator_(QtCore.QObject):
     
     def updateContent(self):
         # KUrlNavigatorPrivate  
-        # print(f"\n{self.__class__.__name__}.updateContent")
-        # print(f"\teditable: {self._editable_}")
         currentUrl = self._nav_.locationUrl()
 
         # NOTE: 2025-01-24 21:22:27 CMT
         self._closestPlace_ = dutils.closestPlace(currentUrl)
-        # print(f"\tself._closestPlace_ {self._closestPlace_}")
-        # print(f"{self.__class__.__name__}.updateContent(): currentUrl = {currentUrl}")
         # print(f"\tself._placesSelector_ {self._placesSelector_}")
         # WARNING: 2025-01-20 22:32:18 temporary -- FIXME
         # TODO: Implement places selector
         if self._placesSelector_ is not None:
             self._placesSelector_.updateSelection(currentUrl)
 
-        # print(f"\tself._editable_ {self._editable_}")
         if self._editable_:
             # self._schemes_.hide() # see NOTE: 2023-05-06 22:30:13
             self._dropDownButton_.hide()
@@ -2771,11 +2728,10 @@ class _UrlNavigator_(QtCore.QObject):
 
             self._pathBox_.show()
             self._pathBox_.setUrl(currentUrl)
-            # print(f"\tself._pathBox_.urls: {self._pathBox_.urls()}")
 
         else:
             self._pathBox_.hide()
-            # self._dropDownButton_.show()
+            # self._dropDownButton_.show() # NOTE: 2025-03-01 22:27:12 always shown
             self._badgeWidgetContainer_.show()
 
             # self._schemes_.hide() # see NOTE: 2023-05-06 22:30:13
@@ -2807,8 +2763,6 @@ class _UrlNavigator_(QtCore.QObject):
             if not placeUrl.isValid():
                 placeUrl = self.retrievePlaceUrl()
 
-            # print(f"\tvalid placeUrl =  {placeUrl}")
-            # placePath = trailingSlashRemoved(placeUrl.path())
             placePath = dutils.urlToPath(placeUrl)
             placePathStr = trailingSlashRemoved(placePath.as_posix())
 
@@ -2820,14 +2774,6 @@ class _UrlNavigator_(QtCore.QObject):
 
 
             startIndex = placePathStr.count('/')
-            # print(f"\tshowFullPath: {self._showFullPath_}, closestPlace: {self._closestPlace_}")
-            # print(f"\tcurrentUrl = {currentUrl}, placeUrl = {placeUrl}, placePathStr =  {placePathStr}, drive = {drive}, startIndex =  {startIndex}")
-
-            # # if sys.platform.startswith("win32"):
-            # #     startIndex = len(placePath.parts)
-            # # else:
-            # #     startIndex = placePathStr.count('/')
-            # # print(f"\tstartIndex =  {startIndex}")
 
             # NOTE: 2025-02-05 15:06:38
             # RE BUG 2025-02-05 14:50:50 FIXME:
@@ -2839,17 +2785,13 @@ class _UrlNavigator_(QtCore.QObject):
             self.updateButtons(startIndex)
             
     def updateButtons(self, startIndex:int): # NOTE: 2023-05-08 11:05:23 FIXME
-        # print(f"{self.__class__.__name__}.updateButtons({startIndex}):")
         # KUrlNavigatorPrivate  
         currentUrl = self._nav_.locationUrl() # NOTE 2025-01-20 11:31:01 this must NOT be modified 
                                               # see NOTE: 2025-01-20 11:31:36
-        # print(f"\tcurrentUrl: {currentUrl}")
         if not currentUrl.isValid():
             return
         
-        # path = currentUrl.path()
         path = dutils.urlToPath(currentUrl)
-        # print(f"\tpath = {path} ({type(path).__name__})")
 
         pathStr = trailingSlashRemoved(path.as_posix())
 
@@ -2859,73 +2801,46 @@ class _UrlNavigator_(QtCore.QObject):
         else:
             drive = ""
 
-        # if sys.platform.startswith("win32"):
-        #     if path.startswith("/"):
-        #         path = path[1:]
-        
         oldButtonCount = len(self._navButtons_)
-        # print(f"\toldButtonCount = {oldButtonCount}")
         
         ndx = startIndex
         
         hasNext = True # this flags whether there should be another button
         
         pathParts = path.parts
-        # pathParts = pathlib.Path(path).parts
-        # print(f"\tpathParts = {pathParts} ({len(pathParts)} elements)")
         
         _k_ = 0
         
-        # print(f"\tndx = {ndx}, startIndex = {startIndex}, hasNext = {hasNext}")
-        # print(f"\twhile hasNext BEGIN\n\n")
-        
         while hasNext:
-            # print(f"\t\t_k_ = {_k_}, ndx = {ndx}:")
             if ndx >= len(pathParts): # reached end of pathParts
-                # print(f"\t\t{ndx} >= {len(pathParts)} -> while haxNext BREAK")
                 break
             
             createButton = ((ndx - startIndex) >= oldButtonCount)
             isFirstButton = (ndx == startIndex)
-            # print(f"\t\tcreateButton = {createButton}, isFirstButton = {isFirstButton}")
-
-            # if ndx >= len(pathParts):
-            # if ndx >= len(pathParts) - 1:
-            #     hasNext = False
 
             dirName = pathParts[ndx] # directory currently pointed to by the button
             # NOTE: when ndx < len(parParts)-1, ndx+1 should be the active subdirectory
             # and the one pointed to by the next button
             
-            # print(f"\t\tdirName = {dirName}")
-
             hasNext = isFirstButton or len(dirName) > 0
             
             if hasNext:
                 button = None
                 if createButton:
-                    # print(f"\t\t{printStyled('**creating button**', color='red')}")
-                    # print(f"\t\tgetting the url for a new button:")
                     urlForButton = self.buttonUrl(ndx)
-                    # print(f"\t\tcreating button with url: {urlForButton}")
                     button = UrlNavigatorButton(urlForButton, None, self._nav_)
                     button.installEventFilter(self._nav_)
                     button.setForegroundRole(QtGui.QPalette.WindowText)
                     button.urlsDroppedOnNavButton.connect(self._nav_._slot_dropUrls) # CMT: wraps to dropUrls
-                    # button.navigatorButtonActivated.connect(self._slot_navigatorButtonActivated)
                     button.navigatorButtonActivated.connect(self.slotNavigatorButtonClicked)
                     button.finishedTextResolving.connect(self.updateButtonVisibility)
 
-                    # print(f"\t\tappending the new button")
                     self.appendWidget(button)
 
                 else:
                     btn_ndx = ndx-startIndex
-                    # print(f"\t\t{printStyled('**reusing button**', color='yellow')} {btn_ndx}")
                     button = self._navButtons_[btn_ndx]
-                    # button = self._navButtons_[ndx-startIndex]
                     urlForButton = self.buttonUrl(ndx)
-                    # print(f"\t\tsetting the url '{urlForButton}' at ndx {ndx} for existing button at [{btn_ndx}]")
                     button.setUrl(urlForButton)
                     if ndx == len(pathParts)-1:
                         button.setActiveSubDirectory("")
@@ -2935,11 +2850,9 @@ class _UrlNavigator_(QtCore.QObject):
                     # responsible for displaying the name of the closest
                     # place in the button, when NOT showing the full path
                     textForFirstButton = self.firstButtonText()
-                    # print(f"\t\tsetting the text '{textForFirstButton}' for the first button")
                     button.setText(textForFirstButton)
                     
                 
-                # print(f"\t\tsetting the button active state")
                 button.setActive(self._nav_.isActive())
                 
                 if createButton:
@@ -2952,21 +2865,13 @@ class _UrlNavigator_(QtCore.QObject):
                     
             ndx += 1
             if ndx < len(pathParts):
-                # print(f"\t\tset active subdirectory '{pathParts[ndx]}' for button {ndx}")
                 button.setActiveSubDirectory(pathParts[ndx])
             
             _k_ += 1
-            # ndx += 1
-            # print(f"\t\thasNext = {hasNext}")
-        
-            # print(f"\t\tdirName = {dirName}, hasNext = {hasNext}")
+
             if not hasNext:
-                # print(f"\t\tnot hasNext -> BREAK")
                 break
             
-            # print("\t\t>>>NEXT STEP<<<\n\n")
-            
-        # print(f"\twhile hasNext END -> _k_ = {_k_}")
         newButtonCount = ndx - startIndex
         
         if newButtonCount < oldButtonCount:
