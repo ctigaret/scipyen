@@ -217,7 +217,7 @@ class ListDirsJob(QtCore.QThread):
         QtCore.QThread.__init__(self, parent=parent)
         
     def run(self):
-        print(f"{self.__class__.__name__}.run called; self.path = {self.path}")
+        # print(f"{self.__class__.__name__}.run called; self.path = {self.path}")
         filters = QtCore.QDir.Dirs | QtCore.QDir.NoDotAndDotDot | QtCore.QDir.CaseSensitive
         if self.showHidden:
             filters |= QtCore.QDir.Hidden
@@ -234,7 +234,7 @@ class ListDirsJob(QtCore.QThread):
             self.entries = list(map(lambda x: pathlib.Path(os.path.join(p, x)), qDir.entryList()))
         else:
             self.entries = list(map(lambda x: self.path / x, qDir.entryList()))
-        print(f"\tentries: {self.entries}")
+        # print(f"\tentries: {self.entries}")
         self.sig_entries.emit(self.entries)
         
     
@@ -993,7 +993,7 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         self._pendingTextChange_ = False
         self._replaceButton_ = False
         self._showMnemonic_ = False
-        self._wheelSteps_ = 0
+        self._wheelSteps_:int = 0
         # self._mousePressPos_ = QtCore.QPoint()
         
         self._url_ = None
@@ -1429,7 +1429,7 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
             
     def wheelEvent(self, evt:QtGui.QWheelEvent):
         if evt.angleDelta().y() != 0:
-            self._wheelSteps_ = evt.angleDelta().y() / 120
+            self._wheelSteps_ = evt.angleDelta().y() // 120
             self._replaceButton_ = True
             self.slot_startSubDirsJob()
             # self.getSiblingDirs()
