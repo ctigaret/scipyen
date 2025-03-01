@@ -369,6 +369,7 @@ def main():
         
             
         if sys.platform.startswith("win32"):
+            # pass
             if hasQDarkTheme:
                 qdarktheme.setup_theme("auto")
                 

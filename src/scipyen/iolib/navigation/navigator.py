@@ -713,7 +713,8 @@ class UrlComboBox(QtWidgets.QComboBox):
         x0 = QtWidgets.QStyle.visualRect(self.layoutDirection(), 
                                          self.rect(),
                                          self.style().subControlRect(QtWidgets.QStyle.CC_ComboBox,
-                                                                     None,
+                                                                     comboOpt,
+                                                                     # None,
                                                                      QtWidgets.QStyle.SC_ComboBoxEditField,
                                                                      self)).x()
         frameWidth = self.style().pixelMetric(QtWidgets.QStyle.PM_DefaultFrameWidth,
@@ -2218,7 +2219,7 @@ class _UrlNavigator_(QtCore.QObject):
         
         # ### BEGIN drop down button - for "upward overspill" path elements
         # NOTE: 2023-05-07 22:59:49
-        # drops down a menu of places or parent paths when they're  not to be 
+        # drops down a menu of places or parent paths when they're not to be
         # shown directly as breadcrumbs
         self._dropDownButton_:UrlNavigatorDropDownButton = UrlNavigatorDropDownButton(self._nav_)
         self._dropDownButton_.setForegroundRole(QtGui.QPalette.WindowText)
@@ -2389,7 +2390,7 @@ class _UrlNavigator_(QtCore.QObject):
             
         if len(dirName) == 0:
             if placeUrl.isLocalFile():
-                dirName = "/"
+                dirName = "This PC" if sys.platform.startswith("win32") else "/"
             else:
                 dirName = placeUrl.toDisplayString()
                 
@@ -2496,12 +2497,18 @@ class _UrlNavigator_(QtCore.QObject):
         # print(f"\ttext = {text}")
         url = self._nav_.locationUrl()
 
-        # print(f"\tcurrent url = {url}")
+        # print(f"\tcurrent url = {url}, text = {text}")
         if text.startswith('/'):
             url.setPath(text)
         else:
             # url.setPath(pictio.concatPaths(url.path(), text).as_posix())
-            url.setPath(pictio.concatPaths(dutils.urlToPath(url).as_posix(), text).as_uri())
+            newPath = pictio.concatPaths(dutils.urlToPath(url).as_posix(), text)
+            # print(f"\tnewPath = {newPath}")
+            if sys.platform.startswith("win32") and not newPath.is_absolute() and dutils.pathLen(newPath) == 1:
+                drive = newPath.drive
+                url.setPath("file://" + drive + "/")
+            else:
+                url.setPath(newPath.as_uri())
 
         # print(f"\tnew url = {url}")
         if os.path.isdir(url.path()):

@@ -79,7 +79,7 @@ from qtpy.QtCore import (Signal, Slot, Property,)
 from qtpy import (QtCore, QtWidgets, QtGui)
 
 from iolib.navigation import filesystems
-from iolib.navigation.filesystems import (pathStrLen, pathStrLen,
+from iolib.navigation.filesystems import (pathStrLen, pathLen,
                                           pathToQUrl, urlToPath)
 
 has_qtdbus = False
@@ -661,7 +661,8 @@ def get_desktop_places(schema:typing.Optional[str]=None,
         if asQUrl:
             stdPlaces.update(dict(map(lambda x: (x.url, x), drivePlaces)))
         else:
-            stdPlaces.update(dict(map(lambda x: (x.name, x), drivePlaces)))
+            stdPlaces.update(dict(map(lambda x: ("file://"+x.url.path(), x), drivePlaces)))
+            # stdPlaces.update(dict(map(lambda x: (x.name, x), drivePlaces)))
 
 
     for key, place in stdPlaces.items():
