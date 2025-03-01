@@ -2375,7 +2375,10 @@ class _UrlNavigator_(QtCore.QObject):
         # called by navigator drop down button
         if len(self._navButtons_) == 0:
             return
-        print(f"{self.__class__.__name__}.openPathSelectorMenu")
+        
+        dirActionsDataMap = dict()
+        
+        print(f"{self.__class__.__name__}.openPathSelectorMenu:")
 
         firstVisibleUrl = self._navButtons_[0].url()
         print(f"\tfirstVisibleUrl = {firstVisibleUrl}")
@@ -2397,50 +2400,61 @@ class _UrlNavigator_(QtCore.QObject):
         # pathParts = pathlib.Path(myPath).parts
         myPath = dutils.urlToPath(self._coreUrlNavigator_.locationUrl(self._coreUrlNavigator_.historyIndex()))
         pathParts = myPath.parts
-        print(f"\tmyPath = {myPath}")
-        print(f"\tpathParts = {pathParts}; ndx = {ndx}")
-        if ndx < len(pathParts):
-            dirName = pathParts[ndx]
-
-        print(f"\tdirName = {dirName}")
-
-        if len(dirName) == 0:
-            if placeUrl.isLocalFile():
-                dirName = "This PC" if sys.platform.startswith("win32") else "/"
-            else:
-                dirName = placeUrl.toDisplayString()
-
-
-
-        print(f"\t dirName = {dirName}")
-
-        dirActionsDataMap = dict()
         
-        k = 0
-        while len(dirName) > 0:
-            text = spacer + dirName
-            # action = QtWidgets.QAction(text, popup)
-            currentUrl = self.buttonUrl(ndx)
+        for k, part in enumerate(pathParts):
+            text = " " * k + part
+            currentUrl = self.buttonUrl(k)
             dirActionsDataMap[text] = currentUrl
-
             if currentUrl == firstVisibleUrl:
                 dirActionsDataMap[MISSING] = None
-                # popup.addSeparator()
-
-            print(f"\t\tndx = {ndx}, text = {text}. currentUrl = {currentUrl}, is first visible = {currentUrl == firstVisibleUrl}")
-
-            # action.setData(currentUrl.toString())
-            ndx += 1
-            # if ndx >= len(pathParts):
-            #     break
+                
             
-            k+=2
-            spacer = " " * k
-            
-            if ndx < len(pathParts):
-                dirName = pathParts[ndx]
-            else:
-                dirName = ""
+#             
+#             
+#         
+#         print(f"\tmyPath = {myPath}")
+#         print(f"\tpathParts = {pathParts}; ndx = {ndx}")
+#         if ndx < len(pathParts):
+#             dirName = pathParts[ndx]
+# 
+#         print(f"\tdirName = {dirName}")
+# 
+#         if len(dirName) == 0:
+#             if placeUrl.isLocalFile():
+#                 dirName = "This PC" if sys.platform.startswith("win32") else "/"
+#             else:
+#                 dirName = placeUrl.toDisplayString()
+# 
+# 
+# 
+#         print(f"\t dirName = {dirName}")
+# 
+#         
+#         k = 0
+#         while len(dirName) > 0:
+#             text = spacer + dirName
+#             # action = QtWidgets.QAction(text, popup)
+#             currentUrl = self.buttonUrl(ndx)
+#             dirActionsDataMap[text] = currentUrl
+# 
+#             if currentUrl == firstVisibleUrl:
+#                 dirActionsDataMap[MISSING] = None
+#                 # popup.addSeparator()
+# 
+#             print(f"\t\tndx = {ndx}, text = {text}. currentUrl = {currentUrl}, is first visible = {currentUrl == firstVisibleUrl}")
+# 
+#             # action.setData(currentUrl.toString())
+#             ndx += 1
+#             # if ndx >= len(pathParts):
+#             #     break
+#             
+#             k+=2
+#             spacer = " " * k
+#             
+#             if ndx < len(pathParts):
+#                 dirName = pathParts[ndx]
+#             else:
+#                 dirName = ""
                 
         # print(f"{self.__class__.__name__}.openPathSelectorMenu: dirActionsDataMap = {dirActionsDataMap}")
         
