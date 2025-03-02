@@ -1837,11 +1837,64 @@ class UrlNavigatorPlacesSelector(UrlNavigatorButtonBase): # TODO: 2023-05-07 23:
     def selectedPlaceText(self): # TODO/FIXME finalize
         return ""
         
+class PlacesButton(UrlNavigatorButtonBase):
+    # NOTE: 2025-03-02 08:57:09
+    # by CMT - stand-in for a Places selector / places model
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setToolTip("Jump to another place")
+    
+    def sizeHint(self):
+        size = super().sizeHint()
+        size.setWidth(int(size.height() / 2))
+        return size
+        
+    def keyPressEvent(evt:QtGui.QKeyEvent):
+        if evt.key() == QtCore.Qt.Key_Down:
+            self.clicked.emit()
+            
+        else:
+            super().keyPressEvent(evt)
+    
+    def paintEvent(self, evt:QtGui.QPaintEvent):
+        painter = QtGui.QPainter(self)
+        self.drawHoverBackground(painter)
+        fgColor = QtGui.QColor(self.foregroundColor())
+        
+        if self.layoutDirection() == QtCore.Qt.LeftToRight:
+            icon = QtGui.QIcon.fromTheme("overflow-menu-right")#, "menu_new")
+        else:
+            icon = QtGui.QIcon.fromTheme("overflow-menu-left")#, "menu_new")
+        
+        rect = self.rect()
+        pixmap = icon.pixmap(min(rect.width(), rect.height()), QtGui.QIcon.Normal, QtGui.QIcon.On)
+        
+        option = QtWidgets.QStyleOption()
+        option.initFrom(self)
+        option.rect = QtCore.QRect(0,0, int(self.width()), int(self.height()))
+        option.palette = self.palette()
+        option.palette.setColor(QtGui.QPalette.Text, fgColor)
+        option.palette.setColor(QtGui.QPalette.WindowText, fgColor)
+        option.palette.setColor(QtGui.QPalette.ButtonText, fgColor)
+        
+        self.style().drawItemPixmap(painter, 
+                                    rect, 
+                                    QtCore.Qt.AlignHCenter | QtCore.Qt.AlignVCenter,
+                                    pixmap)
+        
+        # if self._isDown_:
+        #     # self._isDown_ def'ed in superclass
+        #     self.style().drawPrimitive(QtWidgets.QStyle.PE_IndicatorArrowDown, option, painter, self)
+        # else:
+        #     if self.layoutDirection() == QtCore.Qt.LeftToRight:
+        #         self.style().drawPrimitive(QtWidgets.QStyle.PE_IndicatorArrowRight, option, painter, self)
+        #     else:
+        #         self.style().drawPrimitive(QtWidgets.QStyle.PE_IndicatorArrowLeft, option, painter, self)
+        
 class UrlNavigatorDropDownButton(UrlNavigatorButtonBase):
     def __init__(self, parent=None):
         super().__init__(parent)
         # self._isDown_ = False # def'ed in UrlNavigatorButtonBase
-        
         
     def sizeHint(self):
         size = super().sizeHint()
@@ -2116,6 +2169,16 @@ class _UrlNavigator_(QtCore.QObject):
         
         self._placesSelector_:typing.Optional[UrlNavigatorPlacesSelector] = None
         
+        # NOTE: 2025-03-02 09:28:53
+        # ### BEGIN stand-in for places selector
+        #
+        self._placesButton_:PlacesButton = PlacesButton(self._nav_)
+        self._placesButton_.setForegroundRole(QtGui.QPalette.WindowText)
+        self._placesButton_.installEventFilter(self._nav_)
+        self._placesButton_.clicked.connect(self.openPlaceSelectorMenu)
+        #
+        # ### END   stand-in for places selector
+        
         # ### BEGIN CMT reinstate this once placesmodel module is finalized
         # if isinstance(placesModel, PlacesModel):
         #     self._placesSelector_ = UrlNavigatorPlacesSelector(placesModel, self._nav_)
@@ -2217,6 +2280,7 @@ class _UrlNavigator_(QtCore.QObject):
         #     self._layout_.addWidget(self._placesSelector_)
         # ### END   CMT 2025-01-24 21:28:34 reinstate this when placesmodel module is finalized
             
+        self._layout_.addWidget(self._placesButton_)
         self._layout_.addWidget(self._schemes_)
         self._layout_.addWidget(self._dropDownButton_)
         self._layout_.addWidget(self._pathBox_, 1)
@@ -2306,6 +2370,84 @@ class _UrlNavigator_(QtCore.QObject):
         
         self._pathBox_.setEditUrl(url)
     
+    @Slot()
+    def openPlaceSelectorMenu(self):
+        # NOTE: 2025-03-02 09:12:16
+        # called by clicked signal of the PlacesButton (NOT in KIO)
+        if len(self._navButtons_) == 0:
+            return
+        
+        places = dutils.get_desktop_places("file") # I only use file:// locations, for now, but see below
+        
+        # TODO 2025-03-02 09:13:39 
+        # implement other protocols as well:
+        # on KDE: remote, timeline, etc, resolving to a directory in a file system
+        # on Windows: network "shares" NOT mapped to a drive letter, bookmarks
+        # (also as long as they resolve to a directory in a file system)
+        
+        actionsDataMap = dict()
+        
+        for placeLoc, place in places.items():
+            text = place.name
+            actionsDataMap[text] = place.url
+            
+        popup = QtWidgets.QMenu(self._nav_)
+        
+        popupFilter = UrlNavigatorPathSelectorEventFilter(popup) 
+        popupFilter.tabRequested.connect(self._nav_.slot_pathSelectorEventFilterTabRequested) # FIXME -- ? we don't use tab navigation
+        popup.installEventFilter(popupFilter)
+        
+        # TODO 2025-03-02 10:12:05 FIXME:
+        # create a PlacesMenu - trimmed down version of UrlNavigatorMenu, i.e.
+        #                       without drag&drop funcitonality
+        # then use the initMenu paradigm of UrlNavigatorButton to break down the
+        # places into overflow menu
+        #
+        # NOTE: _init_placesMenu_ already written; just need to adapt this method
+        # (openPlaceSelectorMenu)
+        
+        for key, val in actionsDataMap.items():
+            action = QtWidgets.QAction(key, popup)
+            action.setData(val.toString())
+            if val == self._nav_.locationUrl():
+                font = QtGui.QFont(action.font())
+                font.setBold(True)
+                action.setFont(font)
+            popup.addAction(action)
+        
+        pos = self._nav_.mapToGlobal(self._dropDownButton_.geometry().bottomRight())
+        activatedAction = popup.exec(pos)
+        if activatedAction is not None:
+            # NOTE: 2025-03-02 09:27:45
+            # see NOTE: 2025-01-21 16:43:02
+            url = QtCore.QUrl(activatedAction.data()) 
+            self._nav_.setLocationUrl(url)
+            
+        if popup is not None:
+            popup.deleteLater() 
+            
+    def _init_placesMenu_(self, menu:QtWidgets.QMenu, actionsMap:dict, startIndex:int):
+        maxIndex = startIndex + 30 # (max 30 items shown in the menu)
+        nItems = len(actionsMap)
+        lastIndex = min(nItems, maxIndex)
+        
+        for k, (key, val) in enumerate(actionsMap.items()):
+            if k in range(startIndex, lastIndex):
+                action = QtWidgets.QAction(key, popup)
+                action.setData(val.toString())
+                if val == self._nav_.locationUrl():
+                    font = QtGui.QFont(action.font())
+                    font.setBold(True)
+                    action.setFont(font)
+                popup.addAction(action)
+                
+        if nItems > maxIndex:
+            popup.addSeparator()
+            subMenu = QtWidgets.QMenu("More", self._nav_) 
+            self._init_placesMenu_(subMenu, maxIndex)
+            popup.addMenu(subMenu)
+
+        
     @Slot()
     def openPathSelectorMenu(self):
         # KUrlNavigatorPrivate
@@ -2659,6 +2801,7 @@ class _UrlNavigator_(QtCore.QObject):
 
         if self._editable_:
             # self._schemes_.hide() # see NOTE: 2023-05-06 22:30:13
+            self._placesButton_.hide()
             self._dropDownButton_.hide()
             self._badgeWidgetContainer_.hide()
 
