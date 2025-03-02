@@ -151,14 +151,8 @@ from qtpy.QtCore import (Signal, Slot, Property,)
 
 from core import desktoputils as dutils
 from core import qtutils
-from iolib.navigation import placesmodel
 
-# NOTE: 2025-01-24 21:25:12 CMT
-# to reinstante when PlacesModel/PlacesSelector are finalized
-# from iolib.navigation.placesmodel import PlacesModel
-from iolib.navigation.protocols import ProtocolInfo # TODO
 from core.prog import (safeWrapper, printStyled)
-# import gui.pictgui as pgui
 from gui import guiutils
 from iolib import pictio
 
@@ -181,7 +175,7 @@ SupportedProtocols = Protocols
 
 ArrowSize = 10
 
-class PlacesModel: pass # NOTE: 2025-01-24 21:26:32 remove this when placesmodel module is finalized
+# class PlacesModel: pass # NOTE: 2025-01-24 21:26:32 remove this when placesmodel module is finalized
 
 class ListDirsJob(QtCore.QThread):
     sig_entries = Signal(list, name="sig_entries")
@@ -1652,202 +1646,66 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         self._subDirs_[:] = sorted(dirEntries[:])
 
     
-# NOTE: 2023-05-06 22:26:18
-# By design we only use the 'file://' protocol hence this is not needed, for now...
-# NOTE: 2025-01-02 16:02:17 but this may change
-#
-class UrlNavigatorSchemeCombo(UrlNavigatorButtonBase):
-    """Implementation of KIO KUrlNavigatorSchemeCombo
-    """
-    # NOTE: 2025-01-21 16:34:28
-    # was UrlNavigatorProtocolCombo
-    
-    activated = Signal(str, name="activated")
-    
-    def __init__(self, scheme:str, parent:typing.Optional[UrlNavigator]=None):
-        super().__init__(parent)
-        self._menu_ = QtWidgets.QMenu(self)
-        self._schemes_ = list()
-        self._categories_ = dict() # str ↦ SchemeCategory
-        
-        self._menu_.triggered.connect(self.setSchemeFromMenu)
-        self.setText(scheme)
-        self.setMenu(self._menu_)
-        
-    def _testProtocol_(self, scheme:str):
-        url = QtCore.QUrl()
-        url.setScheme(scheme)
-        return True
-        
-    @Slot()
-    def setSchemeFromMenu(self):
-        pass # TODO
-    
-    @Slot(str)
-    def setScheme(self, scheme:str):
-        self.setText(scheme)
-        
-    def currentScheme(self):
-        return self.text()
-    
-    def setSupportedSchemes(self, schemes:list):
-        self._schemes_ = schemes
-        self._menu_.clear()
-        for scheme in schemes:
-            action = self._menu_.addAction(scheme)
-            action.setData(scheme)
-            
-    def sizeHint(self):
-        size = super().sizeHint()
-        width = self.fontMetrics().boundingRect(dutils.removeAcceleratorMarker(self.text())).width()
-        width += (3 * self.BorderWidth) + ArrowSize
-        
-        return QtCore.QSize(width, size.height())
-    
-    def showEvent(self, evt:QtGui.QShowEvent):
-        super().showEvent(evt)
-        if not evt.spontaneous() and len(self._schemes_) == 0:
-            protocols = [p for p in ProtocolInfo.protocols() if self._testProtocol_(p)]
-            self._schemes_[:] = sorted(protocols)
-
-class UrlNavigatorPlacesSelector(UrlNavigatorButtonBase): # TODO: 2023-05-07 23:07:25 finalize
-    placeActivated = Signal(str, name = "placeActivated")
-    tabRequested = Signal()
-    
-    def __init__(self, parent:UrlNavigator, placesModel:PlacesModel):
-        super().__init__(parent=parent)
-        
-        self._selectedItem_:int = -1
-        self._placesModel_:PlacesModel = placesModel
-        # NOTE: 2025-01-02 22:55:20 next line performs the C++ code 
-        # connect(m_placesModel, &KFilePlacesModel::reloaded, this, [this] {
-        # updateSelection(m_selectedUrl);
-        # });
-        # i.e. passing a dynamically-created slot out of updateSelection(m_selectedUrl)
-        # not sure I can do that in Python, so I define the intervening Slot placeModelReloaded
-        #
-        self._placesModel_.reloaded.connect(self.placeModelReloaded)
-        
-        self._placesMenu_ = QtWidgets.QMenu(self)
-        self._placesMenu_.installEventFilter(self)
-        self._placesMenu_.aboutToShow.connect(self.updateMenu)
-        self._placesMenu_.triggered[QtWidgets.QAction].connect(self.placeActionActivated)
-        self.setMenu(self._placesMenu_)
-        self.setAcceptDrops(True)
-        
-#         self.setFocusPolicy(QtCore.Qt.NoFocus)
-#         self._selectedUrl_ = QtCore.QUrl()
+# # NOTE: 2023-05-06 22:26:18
+# # By design we only use the 'file://' protocol hence this is not needed, for now...
+# # NOTE: 2025-01-02 16:02:17 but this may change
+# #
+# class UrlNavigatorSchemeCombo(UrlNavigatorButtonBase):
+#     """Implementation of KIO KUrlNavigatorSchemeCombo
+#     """
+#     # NOTE: 2025-01-21 16:34:28
+#     # was UrlNavigatorProtocolCombo
+#     
+#     activated = Signal(str, name="activated")
+#     
+#     def __init__(self, scheme:str, parent:typing.Optional[UrlNavigator]=None):
+#         super().__init__(parent)
+#         self._menu_ = QtWidgets.QMenu(self)
+#         self._schemes_ = list()
+#         self._categories_ = dict() # str ↦ SchemeCategory
 #         
-#         self.updateMenu()
-        
-        # self._placesMenu_.triggered.connect() ### use updateMenu to connect each action
+#         self._menu_.triggered.connect(self.setSchemeFromMenu)
+#         self.setText(scheme)
+#         self.setMenu(self._menu_)
+#         
+#     def _testProtocol_(self, scheme:str):
+#         url = QtCore.QUrl()
+#         url.setScheme(scheme)
+#         return True
+#         
+#     @Slot()
+#     def setSchemeFromMenu(self):
+#         pass # TODO
+#     
+#     @Slot(str)
+#     def setScheme(self, scheme:str):
+#         self.setText(scheme)
+#         
+#     def currentScheme(self):
+#         return self.text()
+#     
+#     def setSupportedSchemes(self, schemes:list):
+#         self._schemes_ = schemes
+#         self._menu_.clear()
+#         for scheme in schemes:
+#             action = self._menu_.addAction(scheme)
+#             action.setData(scheme)
+#             
+#     def sizeHint(self):
+#         size = super().sizeHint()
+#         width = self.fontMetrics().boundingRect(dutils.removeAcceleratorMarker(self.text())).width()
+#         width += (3 * self.BorderWidth) + ArrowSize
+#         
+#         return QtCore.QSize(width, size.height())
+#     
+#     def showEvent(self, evt:QtGui.QShowEvent):
+#         super().showEvent(evt)
+#         if not evt.spontaneous() and len(self._schemes_) == 0:
+#             protocols = [p for p in ProtocolInfo.protocols() if self._testProtocol_(p)]
+#             self._schemes_[:] = sorted(protocols)
 
-    # ### BEGIN Slots by CMT - TODO: 2025-01-21 17:25:38 revisit this
-    @Slot()
-    def placeModelReloaded(self):
-        self.updateSelection(self._selectedUrl_)
-        
-    @Slot(QtWidgets.QAction)
-    def placeActionActivated(self, action:QtWidgets.QAction):
-        self.activatePlace(action, self.placeActivated)
-        
-    # ### END Slots by CMT
-    
-    @Slot()
-    def updateMenu(self):
-        # NOTE: 2025-01-02 23:02:58
-        # CMT - facilitate garbage collection
-        # see also in KIO:
-        # // Submenus have to be deleted explicitly (QTBUG-11070)
-        # for (QObject *obj : QObjectList(m_placesMenu->children())) {
-        #     delete qobject_cast<QMenu *>(obj); // Noop for nullptr
-        # }
-        # but we cannot do it after calling clear()
-        #
-        for obj in self._placesMenu_.children():
-            obj.deleteLater()
-            
-        self._placesMenu_.clear()
-        
-        self.updateSelection(self._selectedUrl_)
-        
-        previousGroup:str = ""
-        subMenu:typing.Optional[QtWidgets.QMenu] = None
-        
-        rowCount = self._placesModel_.rowCount()
-        
-        for i in range(rowCount):
-            # NOTE: 2025-01-02 23:07:04
-            # here and throughout, don't mind my type annotations
-            index:QtCore.QModelIndex = self._placesModel_.index(i, 0)
-            if self._placesModel_.ishidden(index):
-                continue
-            
-            placeAction:QtWidgets.QAction = QtWidgets.QAction(self._placesModel_.icon(index),
-                                           self._placesModel_.text(index),
-                                           self._placesMenu_)
-            
-            placeAction.setData(i)
-            
-            groupName:str = index.data(placesmodel.AdditionalRoles.GroupRole).toString()
-            
-            if len(previousGroup) == 0:
-                previousGroup = groupName
-                
-            if previousGroup != groupName:
-                subMenuAction:QtWidgets.QAction = QtWidgets.QAction(groupName, self._placesMenu_)
-                subMenu:QtWidgets.QMenu = QtWidgets.QMenu(self._placesMenu_)
-                subMenu.installEventFilter(self)
-                subMenuAction.setMenu(subMenu)
-                
-                self._placesMenu_.addAction(subMenuAction)
-                
-                previousGroup = groupName
-                
-            if isinstance(subMenu, QtWidgets.QMenu):
-                subMenu.addAction(placeAction)
-            else:
-                self._placesMenu_.addAction(placeAction)
-                
-            if i == self._selectedItem_:
-                self.setIcon(self._placesModel_.icon(index))
-                
-        # NOTE: 2025-01-02 23:17:54
-        # replaces C++ code
-        # const QModelIndex index = m_placesModel->index(m_selectedItem, 0);
-        # if (QAction *teardown = m_placesModel->teardownActionForIndex(index)) {
-        #     m_placesMenu->addSeparator();
-        # 
-        #     teardown->setParent(m_placesMenu);
-        #     m_placesMenu->addAction(teardown);
-        # }
-        self.updateTeardownAction()
-        
-    def updateTeardownAction(self): # CMT
-        teardownActionId:str = "teardownAction"
-        actions:list[QtWidgets.QAction] = self._placesMenu_.actions()
-        
-        for action in actions:
-            if action.data() == teardownActionId:
-                action.deleteLater()
-                action = None
-                
-        index:QtCore.QModelIndex = self._placesModel_.index(self._selectedItem_, 0)
-        
-        teardown:typing.Optional[QtWidgets.QAction] = self._placesModel_.teardownActionForIndex(index)
-        
-        if isinstance(teardown, QtQidgets.QAction):
-            self._placesMenu_.addSeparator()
-            self._placesMenu_.addAction(teardown)
-        
-    def selectedPlaceUrl(self): # TODO/FIXME finalize
-        return QtCore.QUrl()
-    
-    def selectedPlaceText(self): # TODO/FIXME finalize
-        return ""
-    
 class PlacesMenu(QtWidgets.QMenu):
-    # emulate UrlNavigatorMenu w/o D&D
+    # UrlNavigatorMenu w/o D&D
     mouseButtonClicked = Signal(QtWidgets.QAction, QtCore.Qt.MouseButton, 
                                     name="mouseButtonClicked")
     
@@ -1898,14 +1756,7 @@ class PlacesButton(UrlNavigatorButtonBase):
         self.drawHoverBackground(painter)
         fgColor = QtGui.QColor(self.foregroundColor())
         
-        # if self.layoutDirection() == QtCore.Qt.LeftToRight:
-        #     icon = QtGui.QIcon.fromTheme("overflow-menu-right")#, "menu_new")
-        # else:
-        #     icon = QtGui.QIcon.fromTheme("overflow-menu-left")#, "menu_new")
-        
-        # rect = self.rect()
         pixmap = self._icon_.pixmap(min(self.width(), self.height()), QtGui.QIcon.Normal, QtGui.QIcon.On)
-        # pixmap = self._icon_.pixmap(max(rect.width(), rect.height()), QtGui.QIcon.Normal, QtGui.QIcon.On)
         
         option = QtWidgets.QStyleOption()
         option.initFrom(self)
@@ -1974,7 +1825,6 @@ class PlacesButton(UrlNavigatorButtonBase):
         assert qtutils.isQObjectAlive(navigator), f"Parent object was deleted"
         menu.mouseButtonClicked.connect(self.slot_menuActionClicked) # mouse activation of menu entry
         menu.triggered.connect(self.slot_menuActionTriggered) # keybard activation of menu entry
-        # menu.sig_urlDropped.connect(self.slot_urlsDropped) # drag'ndrop not yet implemented
         menu.setLayoutDirection(QtCore.Qt.LeftToRight)
 
         maxIndex = startIndex + nItems # (max 10 places shown in the menu)
@@ -2011,7 +1861,6 @@ class PlacesButton(UrlNavigatorButtonBase):
         url = QtCore.QUrl(action.data())
         navigator.setLocationUrl(url)
         
-      
 class UrlNavigatorDropDownButton(UrlNavigatorButtonBase):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -2071,9 +1920,7 @@ class CoreUrlNavigator(QtCore.QObject):
         self._history_ = list() # of LocationData # NOTE: KIO KCoreUrlNavigatorPrivate API
         self._oldSessionsHistory_ = list() # CMT 2025-01-21 22:47:42
         self._history_.insert(0, LocationData(adjUrl, None))
-        # self._history_.insert(0, LocationData(url, None))
         self._historyIndex_ = 0 # NOTE: KIO KCoreUrlNavigatorPrivate API
-        # print(f"{self.__class__.__name__}.__init__: url = {url}, adjUrl = {adjUrl}, history: {self._history_}")
         
     def historyIndex(self):
         return self._historyIndex_
@@ -2089,7 +1936,6 @@ class CoreUrlNavigator(QtCore.QObject):
         return self.locationUrl()
     
     def setCurrentLocationUrl(self, newUrl:QtCore.QUrl):
-        # print(f"{self.__class__.__name__}.setCurrentLocationUrl({newUrl})")
         if newUrl == self.locationUrl():
             return
         
@@ -2249,8 +2095,9 @@ class UrlNavigatorPathSelectorEventFilter(QtCore.QObject):
 class _UrlNavigator_(QtCore.QObject):
     # KUrlNavigatorPrivate
     # _sig_switchToBreadCrumbMode = Signal(name="_sig_switchToBreadCrumbMode")
-    def __init__(self, url:QtCore.QUrl, qq: UrlNavigator, 
-                 placesModel:typing.Optional[PlacesModel]=None):
+    # def __init__(self, url:QtCore.QUrl, qq: UrlNavigator, 
+    #              placesModel:typing.Optional[PlacesModel]=None):
+    def __init__(self, url:QtCore.QUrl, qq: UrlNavigator):
         # print(f"{self.__class__.__name__}.__init__: url = {url}")
         super().__init__()
         self._supportedSchemes_:list[str] = list()
@@ -2288,50 +2135,22 @@ class _UrlNavigator_(QtCore.QObject):
         self._coreUrlNavigator_.historyChanged.connect(self._nav_._slot_historyChanged)
         self._coreUrlNavigator_.urlSelectionRequested[QtCore.QUrl].connect(self._nav_.slot_coreUrlNavigatorUrlSelectionRequested)
         
-        self._placesSelector_:typing.Optional[UrlNavigatorPlacesSelector] = None
-        
         # NOTE: 2025-03-02 09:28:53
         # ### BEGIN stand-in for places selector
         #
         self._placesButton_:PlacesButton = PlacesButton(self._nav_)
         self._placesButton_.setForegroundRole(QtGui.QPalette.WindowText)
         self._placesButton_.installEventFilter(self._nav_)
-        # self._placesButton_.clicked.connect(self.openPlaceSelectorMenu)
         #
         # ### END   stand-in for places selector
         
-        # ### BEGIN CMT reinstate this once placesmodel module is finalized
-        # if isinstance(placesModel, PlacesModel):
-        #     self._placesSelector_ = UrlNavigatorPlacesSelector(placesModel, self._nav_)
-        #     self._placesSelector_.placeActivated.connect(self._nav_.setLocationUrl)
-        #     self._placesSelector_.tabRequested.connect(self._nav_.tabRequested)
-        #     self._placesModel_.rowsInserted.connect(self._nav_.updateContent)
-        #     self._placesModel_.rowsRemoved.connect(self._nav_.updateContent)
-        #     self._placesModel_.dataChanged.connect(self._nav_.updateContent)
-            
-        # self._showPlacesSelector_:bool = isinstance(self._placesSelector_, PlacesModel)
-        # ### END   CMT reinstate this once placesmodel module is finalized
-
-        # ### BEGIN _schemes_: UrlNavigatorSchemeCombo (was UrlNavigatorProtocolCombo)
-        # NOTE: 2023-05-06 22:25:07
-        # by design we only support a file: protocol
-        # hence not sure I need self._schemes_
-        # ### BEGIN _protocols_:UrlNavigatorProtocolCombo
-        # NOTE: 2023-05-06 22:30:13
-        # We only use "file://" protocol - hence only the file:/// url scheme is
-        # supported in Scipyen, see also NOTE: 2023-05-06 22:30:13 below
-        # NOTE: 2025-01-19 09:58:19
-        # in kf6 KIO renamed to _schemes_
-        # self._protocols_:typing.Optional[UrlNavigatorProtocolCombo] = None # TODO: revisit this
-        # self._protocols_ = UrlNavigatorProtocolCombo("", self._nav_)
-        # self._protocols_.sig_activated.connect(self.slotProtocolChanged)
-        # ### END   _protocols_:UrlNavigatorProtocolCombo
-        self._schemes_:UrlNavigatorSchemeCombo = UrlNavigatorSchemeCombo(str(), self._nav_)
-        self._schemes_.activated[str].connect(self._nav_.slotSchemeChanged)
-        
-        # FIXME: 2025-01-21 14:40:32 temporary
-        # TODO: finish up UrlNavigatorSchemeCombo
-        self._schemes_.setVisible(False) 
+        # ### BEGIN  _schemes_: UrlNavigatorSchemeCombo
+#         self._schemes_:UrlNavigatorSchemeCombo = UrlNavigatorSchemeCombo(str(), self._nav_)
+#         self._schemes_.activated[str].connect(self._nav_.slotSchemeChanged)
+#         
+#         # FIXME: 2025-01-21 14:40:32 temporary
+#         # TODO: finish up UrlNavigatorSchemeCombo
+#         self._schemes_.setVisible(False) 
         
         # ### END   _schemes_: UrlNavigatorSchemeCombo
         
@@ -2402,7 +2221,6 @@ class _UrlNavigator_(QtCore.QObject):
         # ### END   CMT 2025-01-24 21:28:34 reinstate this when placesmodel module is finalized
             
         self._layout_.addWidget(self._placesButton_)
-        self._layout_.addWidget(self._schemes_)
         self._layout_.addWidget(self._dropDownButton_)
         self._layout_.addWidget(self._pathBox_, 1)
         self._layout_.addWidget(self._badgeWidgetContainer_)
@@ -2791,20 +2609,6 @@ class _UrlNavigator_(QtCore.QObject):
         """
         # KUrlNavigatorPrivate
         if len(text) == 0:
-            # NOTE: 2023-05-07 22:45:45
-            # in the KIO framework this would trigger a selection of scheme from
-            # the available schemes (e.g., from file:/ to desktop:/, or any other
-            # scheme supported by the installed KDE frameworks plugins)
-            #
-            # scheme = self._nav_.locationUrl().scheme()
-            # if len(self._supportedSchemes_) != 1:
-            #     self._schemes_.show()
-            #
-            # This is outside Scipyen's scope therefore I guess it is safe to
-            # resture the current url here (for now).
-            #
-            # See also NOTE: 2023-05-06 22:30:13
-            #
             # FIXME/TODO: 2023-05-07 22:52:54
             # the line editor of the url combo box will eventually contain 
             # editing tool buttons for example, to remove current text from
@@ -2814,8 +2618,6 @@ class _UrlNavigator_(QtCore.QObject):
             url = QtCore.QUrl(pathlib.Path.cwd().as_uri())
             self._nav_.setLocationUrl(url)
             return
-        # else:
-            # self._schemes_.hide() # see NOTE: 2023-05-06 22:30:13
         
     def appendWidget(self, widget:QtWidgets.QWidget, stretch:int=0):
         # NOTE: 2023-05-08 11:04:33
@@ -2893,11 +2695,10 @@ class _UrlNavigator_(QtCore.QObject):
         # print(f"\tself._placesSelector_ {self._placesSelector_}")
         # WARNING: 2025-01-20 22:32:18 temporary -- FIXME
         # TODO: Implement places selector
-        if self._placesSelector_ is not None:
-            self._placesSelector_.updateSelection(currentUrl)
+        # if self._placesSelector_ is not None:
+        #     self._placesSelector_.updateSelection(currentUrl)
 
         if self._editable_:
-            # self._schemes_.hide() # see NOTE: 2023-05-06 22:30:13
             self._placesButton_.hide()
             self._dropDownButton_.hide()
             self._badgeWidgetContainer_.hide()
@@ -2929,7 +2730,6 @@ class _UrlNavigator_(QtCore.QObject):
                 
             # self._dropDownButton_.show() # NOTE: 2025-03-01 22:27:12 always shown
 
-            # self._schemes_.hide() # see NOTE: 2023-05-06 22:30:13
             self._toggleEditableMode_.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
                                                     QtWidgets.QSizePolicy.Preferred)
 
@@ -3098,12 +2898,6 @@ class _UrlNavigator_(QtCore.QObject):
         
         availableWidth -= self._badgeWidgetContainer_.width()
         
-        if self._placesSelector_ is not None and self._placesSelector_.isVisible():
-            availableWidth -= self._placesSelector_.width()
-            
-        if self._schemes_ is not None and self._schemes_.isVisible():
-            availableWidth -= self._schemes_.width()
-            
         requiredButtonWidth = sum(map(lambda x: int(x.minimumWidth()), self._navButtons_))
         
         if requiredButtonWidth > availableWidth:
@@ -3234,18 +3028,20 @@ class UrlNavigator(QtWidgets.QWidget):
     # ### END signals
     
     # ### BEGIN __init__ UrlNavigator c'tor 
-    def __init__(self, placesModel:typing.Optional[PlacesModel]=None,
-                 url:typing.Optional[QtCore.QUrl]=None, 
+    # def __init__(self, placesModel:typing.Optional[PlacesModel]=None,
+    #              url:typing.Optional[QtCore.QUrl]=None, 
+    #              parent:typing.Optional[QtWidgets.QWidget] = None):
+    def __init__(self, url:typing.Optional[QtCore.QUrl]=None, 
                  parent:typing.Optional[QtWidgets.QWidget] = None):
-        if isinstance(placesModel, QtCore.QUrl):
-            if isinstance(url, QtWidgets.QWidget):
-                parent = url
-            url = placesModel
-            placesModel = None
+        # if isinstance(placesModel, QtCore.QUrl):
+        #     if isinstance(url, QtWidgets.QWidget):
+        #         parent = url
+        #     url = placesModel
+        #     placesModel = None
         
         super().__init__(parent=parent)
         
-        self._nav_p_ = _UrlNavigator_(url, self, placesModel)
+        self._nav_p_ = _UrlNavigator_(url, self)#, placesModel)
 
         # NOTE:2023-05-03 08:14:35 
         self.setMinimumHeight(self._nav_p_._pathBox_.sizeHint().height())
@@ -3337,19 +3133,19 @@ class UrlNavigator(QtWidgets.QWidget):
     def isActive(self) -> bool:
         return self._nav_p_._active_
     
-    def setPlacesSelectorVisible(self, visible:bool):
-        if visible == self._nav_p_._showPlacesSelector_:
-            return
+#     def setPlacesSelectorVisible(self, visible:bool):
+#         if visible == self._nav_p_._showPlacesSelector_:
+#             return
+#         
+#         if visible and self._nav_p_._placesSelector_ is None:
+#             # places selector is None when no places model is available
+#             return
+#         
+#         self._nav_p_._showPlacesSelector_ = visible
+#         self.__d_._placesSelector_.setVisible(visible)
         
-        if visible and self._nav_p_._placesSelector_ is None:
-            # places selector is None when no places model is available
-            return
-        
-        self._nav_p_._showPlacesSelector_ = visible
-        self.__d_._placesSelector_.setVisible(visible)
-        
-    def isPlacesSelectorVisible(self) -> bool:
-        return self._nav_p_._showPlacesSelector_
+    # def isPlacesSelectorVisible(self) -> bool:
+    #     return self._nav_p_._showPlacesSelector_
     
     def uncommittedUrl(self) -> QtCore.QUrl:
         pass # TODO/FIXME implement KUriFilter functionality
@@ -3448,7 +3244,6 @@ class UrlNavigator(QtWidgets.QWidget):
     
     def setCustomProtocols(self, protocols:typing.List[str]):
         self._nav_p_._customProtocols_[:] = [protocols]
-        # self._schemes_.setCustomProtocols(self._customProtocols_) # TODO/FIXME
         
     def customProtocols(self):
         return self._nav_p_._customProtocols_

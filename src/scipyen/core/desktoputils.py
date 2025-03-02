@@ -177,13 +177,6 @@ def isUnixSystemLocation(p:typing.Union[pathlib.Path, QtCore.QUrl, str]) -> bool
         return any((p.is_block_device(), p.is_char_device(), p.is_fifo(), p.is_mount(),
                 p.is_reserved(), p.is_socket()))
 
-# class DEPlace(Bunch):
-#     """Stand-in for PlacesItem - use in UrlNavigator in the absence of PlacesModel
-#         Or as backend to PlacesItem
-#     """
-#     def __init__(self, *args, **kwargs):
-#         super().__init__(*args, **kwargs)
-        
 @dataclass
 class DEPlace():
     """Stand-in for PlacesItem - use in UrlNavigator in the absence of PlacesModel
@@ -210,24 +203,6 @@ class PlacesMap(dict):
         super().__init__(*args, **kwargs)
         
     
-    # def closestPlace(self, url:QtCore.QUrl)
-
-#     @singledispatchmethod
-#     def closestPlace(self, x:typing.Any) -> DEPlace:
-#         raise NotImplementedError(f"Method is not implemented for objects of type {type(x).__name__}")
-#         
-#     @closestPlace.register(str)
-#     def _(self, x:str) -> DEPlace:
-#         pass
-# 
-#     @closestPlace.register(pathlib.Path)
-#     def _(self, x:pathlib.Path) -> DEPlace:
-#         pass
-#     
-#     @closestPlace.register(QtCore.QUrl)
-#     def _(self, x:QtCore.QUrl) -> DEPlace:
-#         pass
-        
 class BookmarksMap(dict):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -607,87 +582,97 @@ def get_desktop_places(schema:typing.Optional[str]=None,
     # </bookmark>
     # </xbel>
 
+    getIcon = lambda x: "folder-remote-symbolic" if "remote" in x.opts else "drive-harddisk-symbolic"
 
     if sys.platform.startswith("linux") and HAS_PYXDG:
         xbel = "user-places.xbel"
         xbel_file = os.path.join(xdg.BaseDirectory.xdg_data_home, xbel)
-        if not os.path.exists(xbel_file):
-            return ret
-        places = pio.loadXMLFile(xbel_file)
+        # if not os.path.exists(xbel_file):
+        #     return ret
+        if os.path.exists(xbel_file):
+            places = pio.loadXMLFile(xbel_file)
 
-        if "xbel" in places.documentElement.tagName.lower():
-            bookmark_nodes = places.getElementsByTagName("bookmark")
-            
-            for k,b in enumerate(bookmark_nodes):
-                place_uri = b.getAttribute("href")
-                place_name = b.getElementsByTagName("title")[0].childNodes[0].data
+            if "xbel" in places.documentElement.tagName.lower():
+                bookmark_nodes = places.getElementsByTagName("bookmark")
                 
-                if len(place_name) == 0 or len(place_uri) == 0:
-                    continue
-                
-                info_node = b.getElementsByTagName("info")[0]
-                info_metadata_nodes = info_node.getElementsByTagName("metadata")
-                
-                place_icon_name = info_metadata_nodes[0].getElementsByTagName("bookmark:icon")[0].getAttribute("name")
-                
-                systemitem_nodes = info_metadata_nodes[1].getElementsByTagName("isSystemItem")
-                hidden_nodes = info_metadata_nodes[1].getElementsByTagName("isHidden")
-                app_nodes = info_metadata_nodes[1].getElementsByTagName("OnlyInApp")
-                
-                if len(systemitem_nodes):
-                    is_system_place = systemitem_nodes[0].childNodes[0].data.lower() == "true"
-                else:
-                    is_system_place=False
+                for k,b in enumerate(bookmark_nodes):
+                    place_uri = b.getAttribute("href")
+                    place_name = b.getElementsByTagName("title")[0].childNodes[0].data
                     
-                if not include_system and is_system_place:
-                    continue
-                    
-                if len(hidden_nodes):
-                    is_hidden = hidden_nodes[0].childNodes[0].data.lower() == "true"
-                else:
-                    is_hidden = False
-                    
-                if not include_hidden and is_hidden:
-                    continue
-                
-                    
-                if len(app_nodes):
-                    app_info = app_nodes[0].childNodes
-                    if len(app_info):
-                        app = app_info[0].data
-                    else:
-                        app = str()
-                else:
-                    app = str()
-                
-                # NOTE: 2025-01-22 11:41:26 apply schema filter if any
-                if isinstance(schema, str) and len(schema):
-                    if not place_uri.startswith(schema):
+                    if len(place_name) == 0 or len(place_uri) == 0:
                         continue
                     
-                key = QtCore.QUrl(place_uri) if asQUrl else place_uri
-                # if asQUrl:
-                    # place_url = QtCore.QUrl(place_url)
+                    info_node = b.getElementsByTagName("info")[0]
+                    info_metadata_nodes = info_node.getElementsByTagName("metadata")
+                    
+                    place_icon_name = info_metadata_nodes[0].getElementsByTagName("bookmark:icon")[0].getAttribute("name")
+                    
+                    systemitem_nodes = info_metadata_nodes[1].getElementsByTagName("isSystemItem")
+                    hidden_nodes = info_metadata_nodes[1].getElementsByTagName("isHidden")
+                    app_nodes = info_metadata_nodes[1].getElementsByTagName("OnlyInApp")
+                    
+                    if len(systemitem_nodes):
+                        is_system_place = systemitem_nodes[0].childNodes[0].data.lower() == "true"
+                    else:
+                        is_system_place=False
+                        
+                    if not include_system and is_system_place:
+                        continue
+                        
+                    if len(hidden_nodes):
+                        is_hidden = hidden_nodes[0].childNodes[0].data.lower() == "true"
+                    else:
+                        is_hidden = False
+                        
+                    if not include_hidden and is_hidden:
+                        continue
+                    
+                        
+                    if len(app_nodes):
+                        app_info = app_nodes[0].childNodes
+                        if len(app_info):
+                            app = app_info[0].data
+                        else:
+                            app = str()
+                    else:
+                        app = str()
+                    
+                    # NOTE: 2025-01-22 11:41:26 apply schema filter if any
+                    if isinstance(schema, str) and len(schema):
+                        if not place_uri.startswith(schema):
+                            continue
+                        
+                    key = QtCore.QUrl(place_uri) if asQUrl else place_uri
+                    # if asQUrl:
+                        # place_url = QtCore.QUrl(place_url)
 
-                if key in ret and isinstance(ret[key], DEPlace):
-                    ret[key].name_aliases.append(place_name)
-                else:
-                    ret[key] = DEPlace(place_name, QtCore.QUrl(place_uri), # always as QUrl regardless of asQUrl
-                                        icon = place_icon_name, # can be a system icon name or a path/file name
-                                        system = is_system_place,
-                                        hidden = is_hidden,
-                                        app = app)
-                    # ret[key] = DEPlace({"name": place_name,
-                    #                     "url": QtCore.QUrl(place_uri), # always as QUrl regardless of asQUrl
-                    #                     "name_aliases": list(),
-                    #                     "additional_urls" : list(),
-                    #                     "icon": place_icon_name, # can be a system icon name or a path/file name
-                    #                     "system":is_system_place,
-                    #                     "hidden":is_hidden,
-                    #                     "app":app})
+                    if key in ret and isinstance(ret[key], DEPlace):
+                        ret[key].name_aliases.append(place_name)
+                    else:
+                        ret[key] = DEPlace(place_name, QtCore.QUrl(place_uri), # always as QUrl regardless of asQUrl
+                                            icon = place_icon_name, # can be a system icon name or a path/file name
+                                            system = is_system_place,
+                                            hidden = is_hidden,
+                                            app = app)
+                        # ret[key] = DEPlace({"name": place_name,
+                        #                     "url": QtCore.QUrl(place_uri), # always as QUrl regardless of asQUrl
+                        #                     "name_aliases": list(),
+                        #                     "additional_urls" : list(),
+                        #                     "icon": place_icon_name, # can be a system icon name or a path/file name
+                        #                     "system":is_system_place,
+                        #                     "hidden":is_hidden,
+                        #                     "app":app})
+
+        # TODO: 2025-03-02 22:23:06 FIXME
+        # install diskinfo from pypi (for Linux only) and use that to get persistent names
+        drivePlaces = sorted(list(map(lambda x: DEPlace(x.device.replace("/dev/", ""), QtCore.QUrl(pathlib.Path(x.mountpoint).as_uri()), icon=getIcon(x)),
+                               list(filter(lambda x: "/run/media/" in x.mountpoint, filesystems.get_disk_partitions())))), key = lambda x: x.name)
+        if asQUrl:
+            ret.update(dict(map(lambda x: (x.url, x), drivePlaces)))
+        else:
+            ret.update(dict(map(lambda x: ("file://"+x.url.path(), x), drivePlaces)))
 
     elif sys.platform.startswith("win32"):
-        getIcon = lambda x: "folder-remote-symbolic" if "remote" in x.opts else "drive-harddisk-symbolic"
 
         # drivePlaces = sorted(list(map(lambda x: DEPlace(pathlib.Path(x.mountpoint).as_uri(), QtCore.QUrl(pathlib.Path(x.mountpoint).as_uri()), icon=getIcon(x)),
         #                        filesystems.get_disk_partitions())), key = lambda x: x.name)

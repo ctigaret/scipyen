@@ -1084,7 +1084,6 @@ class AboutDialog(QtWidgets.QDialog, __UI_AboutLicense__):
 class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     ''' Main pict GUI window
     '''
-    # from iolib.navigation import navigator
 
     # TODO:2024-05-19 10:59:43
     # finalize workspacegui.DirectoryObserver and inherit from it
@@ -3506,7 +3505,6 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 pass
             
             url = QtCore.QUrl(pathlib.Path(newCwd).resolve().as_uri())
-            # sigBlock = QtCore.QSignalBlocker(self.navigator) # not needed; just don't emit navigator.urlChanged
             self.navigator.setLocationUrl(url)
             
             self._setRecentDirectory_(self.cwd)
