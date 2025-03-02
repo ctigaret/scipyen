@@ -1843,11 +1843,17 @@ class PlacesButton(UrlNavigatorButtonBase):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setToolTip("Jump to another place")
+        # self._icon_ = QtGui.QIcon.fromTheme("overflow-menu-right")#, "menu_new")
+        self._icon_ = QtGui.QIcon.fromTheme("computer-symbolic")#, "menu_new")
     
     def sizeHint(self):
         size = super().sizeHint()
-        size.setWidth(int(size.height() / 2))
+        # size.setWidth(int(size.height() / 2))
+        size.setWidth(int(size.height() * 2/3))
         return size
+    
+    def setIcon(self, icon:QtGui.QIcon):
+        self._icon_ = icon
         
     def keyPressEvent(evt:QtGui.QKeyEvent):
         if evt.key() == QtCore.Qt.Key_Down:
@@ -1861,13 +1867,14 @@ class PlacesButton(UrlNavigatorButtonBase):
         self.drawHoverBackground(painter)
         fgColor = QtGui.QColor(self.foregroundColor())
         
-        if self.layoutDirection() == QtCore.Qt.LeftToRight:
-            icon = QtGui.QIcon.fromTheme("overflow-menu-right")#, "menu_new")
-        else:
-            icon = QtGui.QIcon.fromTheme("overflow-menu-left")#, "menu_new")
+        # if self.layoutDirection() == QtCore.Qt.LeftToRight:
+        #     icon = QtGui.QIcon.fromTheme("overflow-menu-right")#, "menu_new")
+        # else:
+        #     icon = QtGui.QIcon.fromTheme("overflow-menu-left")#, "menu_new")
         
-        rect = self.rect()
-        pixmap = icon.pixmap(min(rect.width(), rect.height()), QtGui.QIcon.Normal, QtGui.QIcon.On)
+        # rect = self.rect()
+        pixmap = self._icon_.pixmap(min(self.width(), self.height()), QtGui.QIcon.Normal, QtGui.QIcon.On)
+        # pixmap = self._icon_.pixmap(max(rect.width(), rect.height()), QtGui.QIcon.Normal, QtGui.QIcon.On)
         
         option = QtWidgets.QStyleOption()
         option.initFrom(self)
@@ -1878,7 +1885,7 @@ class PlacesButton(UrlNavigatorButtonBase):
         option.palette.setColor(QtGui.QPalette.ButtonText, fgColor)
         
         self.style().drawItemPixmap(painter, 
-                                    rect, 
+                                    self.rect(),
                                     QtCore.Qt.AlignHCenter | QtCore.Qt.AlignVCenter,
                                     pixmap)
         
@@ -2817,9 +2824,20 @@ class _UrlNavigator_(QtCore.QObject):
             self._pathBox_.setUrl(currentUrl)
 
         else:
-            self._pathBox_.hide()
-            # self._dropDownButton_.show() # NOTE: 2025-03-01 22:27:12 always shown
+            self._pathBox_.hide() 
             self._badgeWidgetContainer_.show()
+            self._placesButton_.show()
+            
+            falllbackIcon = QtGui.QIcon.fromTheme("computer-symbolic")
+            icon = QtGui.QIcon()
+            
+            if isinstance(self._closestPlace_, dutils.DEPlace) and len(self._closestPlace_.icon):
+                icon = QtGui.QIcon.fromTheme(self._closestPlace_.icon)
+                
+            self._placesButton_.setIcon(icon if not icon.isNull() else fallbackIcon)
+            self._placesButton_.update()
+                
+            # self._dropDownButton_.show() # NOTE: 2025-03-01 22:27:12 always shown
 
             # self._schemes_.hide() # see NOTE: 2023-05-06 22:30:13
             self._toggleEditableMode_.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
