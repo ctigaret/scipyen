@@ -107,5 +107,5 @@ mamba install --prefix $HOME/scipyenv -y pyinstaller
 echo Installing additional PyPI packages
 pip install -r setup_env/pip_requirements_macos.txt
 
-
+make_launch_script
 
