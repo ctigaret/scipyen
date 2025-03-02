@@ -261,7 +261,9 @@ QtGui.QIcon.setFallbackSearchPaths(fbPaths)
 # building a pyinstaller bundle, as per scipyen.spec)
 if sys.platform.startswith("win32"):
     if hasQDarkTheme:
-        # qdarktheme.setup_theme("auto")
+        # qdarktheme.setup_theme("auto") # NOTE: 2025-03-02 20:52:51
+                                         # this MUST be called after the initlization of the QApplication
+                                         # see NOTE: 2025-03-02 20:53:09 below
         qdarktheme.enable_hi_dpi()
         QtGui.QIcon.setThemeName("breeze-dark")
     else:
@@ -371,7 +373,8 @@ def main():
         if sys.platform.startswith("win32"):
             # pass
             if hasQDarkTheme:
-                qdarktheme.setup_theme("auto")
+                qdarktheme.setup_theme("auto") # NOTE: 2025-03-02 20:53:09
+                                               # now, this can be called
                 
         elif sys.platform.startswith("linux"):
             # NOTE: 2024-05-04 10:16:33

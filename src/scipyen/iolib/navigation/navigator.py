@@ -2918,7 +2918,7 @@ class _UrlNavigator_(QtCore.QObject):
             self._badgeWidgetContainer_.show()
             self._placesButton_.show()
             
-            falllbackIcon = QtGui.QIcon.fromTheme("computer-symbolic")
+            fallbackIcon = QtGui.QIcon.fromTheme("computer-symbolic")
             icon = QtGui.QIcon()
             
             if isinstance(self._closestPlace_, dutils.DEPlace) and len(self._closestPlace_.icon):

@@ -59,7 +59,7 @@
 
 # ### END internal comments
 
-import sys, os, pathlib, urllib, typing, warnings, subprocess, traceback
+import sys, os, pathlib, urllib, typing, warnings, subprocess, traceback, json
 import inspect
 import platform
 import dataclasses
@@ -371,6 +371,42 @@ def get_desktop(what:str="desktop"):
                 
     else:
         return sys.platform
+
+def get_cloud_storage_path(service_name):
+    """Retrieves the local path for a specified cloud storage service.
+    WARNING: Work in progress, DO NOT USE
+    Original code at https://tech-champion.com/programming/python-programming/finding-your-onedrive-path-in-python-a-practical-guide/"""
+    config_paths = {
+        "onedrive": ["%APPDATA%\\OneDrive\\config.json", "%LOCALAPPDATA%\\OneDrive\\config.json"],
+        "dropbox": ["%APPDATA%\\Dropbox\\config.json", "~/.dropbox/config.json"]  #Example for Dropbox, adjust as needed
+    }
+
+    if service_name not in config_paths:
+        scipywarn("Service not supported")
+        return
+
+    for path in config_paths[service_name]:
+        expanded_path = os.path.expandvars(path)
+        if os.path.exists(expanded_path):
+            try:
+                with open(expanded_path, "r") as f:
+                    config_data = json.load(f)
+                    ret = config_data.get("local_path", "Path not found in config")
+                    if ret == "Path not found in config":
+                        scipywarn(ret)
+                        return
+                    return ret
+            except json.JSONDecodeError:
+                scipywarn("Invalid JSON in config file")
+                return
+            except Exception as e:
+                scipywarn(f"Error reading config file: {e}")
+                return
+    scipywarn("Configuration file not found")
+    return
+
+# print(get_cloud_storage_path("onedrive"))
+# print(get_cloud_storage_path("dropbox"))
 
 def get_dbus_service_names(what:str="session"):
     """
@@ -1050,26 +1086,6 @@ def desktopPlaceUrl(p:DEPlace) -> QtCore.QUrl:
     url = p.url
     return url if isinstance(url, QtCore.QUrl) else QtCore.QUrl(url)
         
-# def closestUrl(url:QtCore.QUrl, places:typing.Optional[PlacesMap]=None) -> QtCore.QUrl:
-#     schema = url.scheme()
-#     if not isinstance(places, PlacesMap):
-#         places = get_desktop_places(schema) #, True)
-#
-#     if len(places) == 0:
-#         return url
-#
-#     uPath = pathlib.Path(url.path()).resolve()
-#
-#     urlToPath = lambda x: pathlib.Path(x.strip(schema+":")) if isinstance(x, str) else pathlib.Path(x.path())
-#     pathStrLen = lambda x: len(x.path()) if isinstance(x, QtCore.QUrl) else len(x.strip(schema+":"))
-#
-#     foundPlaces = list(reversed(sorted(list(filter(lambda x: uPath.is_relative_to(urlToPath(x["url"]).resolve()), places.values())), key = lambda x: pathStrLen(x["url"]))))
-#
-#     toUrl = lambda x: x if isinstance(x, QtCore.QUrl) else QtCore.QUrl(x)
-#
-#     return toUrl(foundPlaces[0]["url"]) if len(foundPlaces) else url
-        
-    
 def closestPlace(url:QtCore.QUrl, places:typing.Optional[PlacesMap]=None) -> DEPlace | None:
     # TODO 2025-02-21 13:48:06
     # ensure only local paths are dealt with, here
@@ -1085,11 +1101,13 @@ def closestPlace(url:QtCore.QUrl, places:typing.Optional[PlacesMap]=None) -> DEP
 
     pathForUrl = urlToPath(url)
 
-    predicate1 = lambda x: pathForUrl == x.urlPath()
-    predicate2 = lambda x: pathForUrl == x.urlPath() or pathForUrl.is_relative_to(x.urlPath())
-    predicate3 = lambda x: pathForUrl == x.urlPath() or pathForUrl.is_relative_to(x.urlPath()) or x.urlPath().is_relative_to(pathForUrl)
-    
-    foundPlaces = list(reversed(sorted(filter(predicate2, places.values()), key = lambda x: pathStrLen(x.url))))
+    # predicate1 = lambda x: pathForUrl == x.urlPath()
+    predicate = lambda x: pathForUrl == x.urlPath() or pathForUrl.is_relative_to(x.urlPath())
+    # if sys.platform.startswith("win32"):
+    #     predicate = lambda x: pathForUrl == x.urlPath() or pathForUrl.is_relative_to(x.urlPath()) or len(pathForUrl.parts) == len*()
+
+
+    foundPlaces = list(reversed(sorted(filter(predicate, places.values()), key = lambda x: pathStrLen(x.url))))
     
     # print(f"\tfoundPlaces = {foundPlaces}")
 

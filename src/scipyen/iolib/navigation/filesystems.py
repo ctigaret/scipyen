@@ -195,9 +195,14 @@ def _(x:QtCore.QUrl) -> pathlib.Path:
         if pathStr.startswith("/"):
             pathStr = pathStr[1:]
             path = pathlib.Path(pathStr)
-            if pathLen(path) == 1 and path.as_posix().endswith(":"):
+            if pathLen(path) == 1: # figure out and path for windows drive
+                if path.as_posix().endswith(":/"):
+                    path = pathlib.Path(path.as_posix()[:-1])
+                    return path
+
+                if path.as_posix().endswith(":"):
                 # this looks like a Windows drive string
-                return path
+                    return path
 
     return pathlib.Path(pathStr).resolve()
 
