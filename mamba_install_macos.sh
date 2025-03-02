@@ -8,8 +8,43 @@
 echo -e "WARNING this script is NOT customized; edit before running"
 echo -e "\tthen run from the root scipyen directory (i.e. root of the git tree)"
 
-mamba create -y --prefix $HOME/scipyenv
-mamba activate $HOME/scipyenv
+realscript=`realpath $0`
+scipyendir=`dirname "$realscript"`
+docdir=${scipyendir}/doc
+installscriptdir=${scipyendir}/setup_env
+scipyensrcdir=${scipyendir}/src/scipyen
+mambaenv=$HOME/scipyenv
+
+
+function make_launch_script ()
+{
+    # force the use of XCB platform abstraction plugin in Qt
+target_dir=${HOME}/bin
+
+mkdir -p ${target_dir}
+if [ -r ${target_dir}/scipyen ] ; then
+    dt=`date '+%Y-%m-%d_%H-%M-%s'`
+    mv ${target_dir}/scipyen ${target_dir}/scipyen.$dt
+fi
+shopt -s lastpipe
+
+# if [[ `id -u` -eq 0 ]] ; then
+cat <<END > ${target_dir}/scipyen
+#! /bin/sh
+mamba activate ${mambaenv}
+export OUTDATED_IGNORE=1
+a=\`which xrdb\` # do we have xrdb to read the X11 resources? (on Unix almost surely yes)
+python3 -Xfrozen_modules=off ${scipyensrcdir}/scipyen.py "\$*"
+END
+shopt -u lastpipe
+chmod +x ${target_dir}/scipyen
+echo -e "Scipyen startup script created in ${target_dir} \n"
+}
+
+
+mamba create -y --prefix $mambaenv
+
+mamba activate $mambaenv
 
 mamba config --add channels conda-forge # not needed on recent miniforge versions
 
@@ -70,12 +105,7 @@ echo Installing PyInstaller
 mamba install --prefix $HOME/scipyenv -y pyinstaller
 
 echo Installing additional PyPI packages
-pip install -r doc/install/pip_requirements.txt
-
-# powershell -ExecutionPolicy Bypass -File %mydir%\make_link.ps1 %mydir%
-# echo Scipyen can now be launched from the desktop icon
+pip install -r setup_env/pip_requirements_macos.txt
 
 
-# :eof
-# rem  endlocal
 
