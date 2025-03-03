@@ -747,22 +747,13 @@ def get_desktop_places(schema:typing.Optional[str]=None,
                         deviceLabel = f"{partitionSize} {symbol} Removable Media"
                 else:
                     deviceLabel = place.name
-                    
+
+                place.name = deviceLabel
                 
     elif sys.platform.startswith("win32"):
 
-        # drivePlaces = sorted(list(map(lambda x: DEPlace(pathlib.Path(x.mountpoint).as_uri(), QtCore.QUrl(pathlib.Path(x.mountpoint).as_uri()), icon=getIcon(x)),
-        #                        filesystems.get_disk_partitions())), key = lambda x: x.name)
         drivePlaces = sorted(list(map(lambda x: DEPlace(x.mountpoint.replace("\\", ""), QtCore.QUrl(pathlib.Path(x.mountpoint).as_uri()), icon=getIcon(x)),
                                filesystems.get_disk_partitions())), key = lambda x: x.name)
-        # if len(drivePlaces):
-        #     if nSeparators == 0:
-        #         ret["separator"] = DEPlace.separator()
-        #     else:
-        #         ret[f"separator_{nSeparators}"] = DEPlace.separator()
-        #     nSeparators +=1
-                
-            # stdPlaces.update(dict(map(lambda x: ("file://"+x.url.path(), x), drivePlaces)))
             
     # add standard places, but:
     # avoid the duplicates - including those with a different name but with urls
@@ -787,7 +778,7 @@ def get_desktop_places(schema:typing.Optional[str]=None,
         nSeparators +=1
         
         for place in drivePlaces:
-            place.name = deviceLabel
+            # place.name = deviceLabel
             ret["file://"+place.url.path()] = place
         
     return ret
