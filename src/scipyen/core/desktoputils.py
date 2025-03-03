@@ -78,7 +78,7 @@ from qtpy.QtCore import (Signal, Slot, Property,)
 
 from qtpy import (QtCore, QtWidgets, QtGui)
 
-import pyudev
+# import pyudev
 import quantities as pq
 import numpy as np
 
@@ -599,79 +599,81 @@ def get_desktop_places(schema:typing.Optional[str]=None,
 
     getIcon = lambda x: "folder-remote-symbolic" if "remote" in x.opts else "drive-harddisk-symbolic"
 
-    if sys.platform.startswith("linux") and HAS_PYXDG:
-        xbel = "user-places.xbel"
-        xbel_file = os.path.join(xdg.BaseDirectory.xdg_data_home, xbel)
-        # if not os.path.exists(xbel_file):
-        #     return ret
-        if os.path.exists(xbel_file):
-            xbel_places = pio.loadXMLFile(xbel_file)
+    if sys.platform.startswith("linux"):
+        import pyudev
+        if HAS_PYXDG:
+            xbel = "user-places.xbel"
+            xbel_file = os.path.join(xdg.BaseDirectory.xdg_data_home, xbel)
+            # if not os.path.exists(xbel_file):
+            #     return ret
+            if os.path.exists(xbel_file):
+                xbel_places = pio.loadXMLFile(xbel_file)
 
-            if "xbel" in xbel_places.documentElement.tagName.lower():
-                bookmark_nodes = xbel_places.getElementsByTagName("bookmark")
-                
-                if isinstance(schema, str) and len(schema):
-                    bookmark_nodes = list(filter(lambda x: x.getAttribute("href").startswith(schema), bookmark_nodes))
-                
-                
-                for k,b in enumerate(bookmark_nodes):
-                    place_uri = b.getAttribute("href")
-                    # NOTE: 2025-01-22 11:41:26 apply schema filter if any
-                    # print(f"place_uri: {place_uri}")
-                    # if isinstance(schema, str) and len(schema) and not place_uri.startswith(schema):
-                    #     continue
+                if "xbel" in xbel_places.documentElement.tagName.lower():
+                    bookmark_nodes = xbel_places.getElementsByTagName("bookmark")
+                    
+                    if isinstance(schema, str) and len(schema):
+                        bookmark_nodes = list(filter(lambda x: x.getAttribute("href").startswith(schema), bookmark_nodes))
+                    
+                    
+                    for k,b in enumerate(bookmark_nodes):
+                        place_uri = b.getAttribute("href")
+                        # NOTE: 2025-01-22 11:41:26 apply schema filter if any
+                        # print(f"place_uri: {place_uri}")
+                        # if isinstance(schema, str) and len(schema) and not place_uri.startswith(schema):
+                        #     continue
+                            
+                        place_name = b.getElementsByTagName("title")[0].childNodes[0].data
                         
-                    place_name = b.getElementsByTagName("title")[0].childNodes[0].data
-                    
-                    if len(place_name) == 0 or len(place_uri) == 0:
-                        continue
-                    
-                    info_node = b.getElementsByTagName("info")[0]
-                    info_metadata_nodes = info_node.getElementsByTagName("metadata")
-                    
-                    place_icon_name = info_metadata_nodes[0].getElementsByTagName("bookmark:icon")[0].getAttribute("name")
-                    
-                    systemitem_nodes = info_metadata_nodes[1].getElementsByTagName("isSystemItem")
-                    hidden_nodes = info_metadata_nodes[1].getElementsByTagName("isHidden")
-                    app_nodes = info_metadata_nodes[1].getElementsByTagName("OnlyInApp")
-                    
-                    if len(systemitem_nodes):
-                        is_system_place = systemitem_nodes[0].childNodes[0].data.lower() == "true"
-                    else:
-                        is_system_place=False
+                        if len(place_name) == 0 or len(place_uri) == 0:
+                            continue
                         
-                    if not include_system and is_system_place:
-                        continue
+                        info_node = b.getElementsByTagName("info")[0]
+                        info_metadata_nodes = info_node.getElementsByTagName("metadata")
                         
-                    if len(hidden_nodes):
-                        is_hidden = hidden_nodes[0].childNodes[0].data.lower() == "true"
-                    else:
-                        is_hidden = False
+                        place_icon_name = info_metadata_nodes[0].getElementsByTagName("bookmark:icon")[0].getAttribute("name")
                         
-                    if not include_hidden and is_hidden:
-                        continue
+                        systemitem_nodes = info_metadata_nodes[1].getElementsByTagName("isSystemItem")
+                        hidden_nodes = info_metadata_nodes[1].getElementsByTagName("isHidden")
+                        app_nodes = info_metadata_nodes[1].getElementsByTagName("OnlyInApp")
+                        
+                        if len(systemitem_nodes):
+                            is_system_place = systemitem_nodes[0].childNodes[0].data.lower() == "true"
+                        else:
+                            is_system_place=False
+                            
+                        if not include_system and is_system_place:
+                            continue
+                            
+                        if len(hidden_nodes):
+                            is_hidden = hidden_nodes[0].childNodes[0].data.lower() == "true"
+                        else:
+                            is_hidden = False
+                            
+                        if not include_hidden and is_hidden:
+                            continue
 
-                    if len(app_nodes):
-                        app_info = app_nodes[0].childNodes
-                        if len(app_info):
-                            app = app_info[0].data
+                        if len(app_nodes):
+                            app_info = app_nodes[0].childNodes
+                            if len(app_info):
+                                app = app_info[0].data
+                            else:
+                                app = str()
                         else:
                             app = str()
-                    else:
-                        app = str()
+                            
+                        place_url = QtCore.QUrl(place_uri)
                         
-                    place_url = QtCore.QUrl(place_uri)
-                    
-                    key = place_uri
+                        key = place_uri
 
-                    if key in ret and isinstance(ret[key], DEPlace):
-                        ret[key].name_aliases.append(place_name)
-                    else:
-                        ret[key] = DEPlace(place_name, place_url, # always as QUrl regardless of asQUrl
-                                            icon = place_icon_name, # can be a system icon name or a path/file name
-                                            system = is_system_place,
-                                            hidden = is_hidden,
-                                            app = app)
+                        if key in ret and isinstance(ret[key], DEPlace):
+                            ret[key].name_aliases.append(place_name)
+                        else:
+                            ret[key] = DEPlace(place_name, place_url, # always as QUrl regardless of asQUrl
+                                                icon = place_icon_name, # can be a system icon name or a path/file name
+                                                system = is_system_place,
+                                                hidden = is_hidden,
+                                                app = app)
 
         # create desktop places for non-standard partitions or removable media
         context = pyudev.Context()
