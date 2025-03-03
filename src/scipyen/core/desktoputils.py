@@ -673,40 +673,37 @@ def get_desktop_places(schema:typing.Optional[str]=None,
                                             hidden = is_hidden,
                                             app = app)
 
-        # TODO: 2025-03-02 22:23:06 FIXME
-        # install diskinfo from pypi (for Linux only) and use that to get persistent names
-        # HOWEVER: ATTENTION diskinfo does NOT give information on mounted paritions of
-        # hotpluggable disks; it only supplies too devices of those disks!
+        # create desktop places for non-standard partitions or removable media
+        context = pyudev.Context()
+        devices = list(context.list_devices(subsystem="block", DEVTYPE="partition"))
+        
         drivePlaces = sorted(list(map(lambda x: DEPlace(x.device.replace("/dev/", ""), QtCore.QUrl(pathlib.Path(x.mountpoint).as_uri()), icon=getIcon(x)),
                                list(filter(lambda x: "/run/media/" in x.mountpoint, filesystems.get_disk_partitions())))), key = lambda x: x.name)
         
-        if len(drivePlaces):
-            if nSeparators == 0:
-                ret["separator"] = DEPlace.separator()
-            else:
-                ret[f"separator_{nSeparators}"] = DEPlace.separator()
-            nSeparators +=1
-                
-            context = pyudev.Context()
-            devices = list(context.list_devices(subsystem="block", DEVTYPE="partition"))
+        # check for custom (fixed) partitions mounts outside /run/media, and add them
+        extraPartitions = list(filter(lambda x: x.device in list(map(lambda d: d.get("DEVNAME"), devices)) and x.device.replace("/dev/", "") not in list(map(lambda p: p.name, drivePlaces)), filesystems.get_disk_partitions()))
+        if len(extraPartitions):
+            extraPlaces = sorted(list(map(lambda x: DEPlace(x.device.replace("/dev/", ""),
+                                                            QtCore.QUrl(pathlib.Path(x.mountpoint).as_uri()),
+                                                            icon = getIcon(x)), extraPartitions)))
+            drivePlaces = extraPlaces + drivePlaces
             
-            # check for custom (fixed) partitions mounts outside /run/media, and add them
-            extraPartitions = list(filter(lambda x: x.device in list(map(lambda d: d.get("DEVNAME"), devices)) and x.device.replace("/dev/", "") not in list(map(lambda p: p.name, drivePlaces)), filesystems.get_disk_partitions()))
-            if len(extraPartitions):
-                extraPlaces = sorted(list(map(lambda x: DEPlace(x.device.replace("/dev/", ""),
-                                                                QtCore.QUrl(pathlib.Path(x.mountpoint).as_uri()),
-                                                                icon = getIcon(x)), extraPartitions)))
-                drivePlaces = extraPlaces + drivePlaces
+        if len(drivePlaces):
+            # if nSeparators == 0:
+            #     ret["separator"] = DEPlace.separator()
+            # else:
+            #     ret[f"separator_{nSeparators}"] = DEPlace.separator()
+            # nSeparators +=1
                 
             for place in drivePlaces:
                 devicesForPlace = list(filter(lambda x: x.sys_name == place.name, devices))
                 if len(devicesForPlace) == 0:
-                    # not found in paritions -> also check for mounted optical disks
+                    # not found in partitions -> also check for mounted optical disks
                     disks = list(context.list_devices().match_property("DEVTYPE", "disk"))
                     devicesForPlace = list(filter(lambda x: x.sys_name == place.name, disks))
                     
                 if len(devicesForPlace):
-                    # check for device type, change pplace icon if necessary
+                    # check for device type, change place icon if necessary
                     if devicesForPlace[0].get("ID_CDROM") is not None:
                         place.icon = "drive-optical-symbolic"
                     elif devicesForPlace[0].get("ID_USB_TYPE") is not None:
@@ -749,35 +746,26 @@ def get_desktop_places(schema:typing.Optional[str]=None,
                 else:
                     deviceLabel = place.name
                     
-                place.name = deviceLabel
-                ret["file://"+place.url.path()] = place
                 
-            # ret.update(dict(map(lambda x: ("file://"+x.url.path(), x), drivePlaces)))
-        # if asQUrl:
-        #     ret.update(dict(map(lambda x: (x.url, x), drivePlaces)))
-        # else:
-        #     ret.update(dict(map(lambda x: ("file://"+x.url.path(), x), drivePlaces)))
-
     elif sys.platform.startswith("win32"):
 
         # drivePlaces = sorted(list(map(lambda x: DEPlace(pathlib.Path(x.mountpoint).as_uri(), QtCore.QUrl(pathlib.Path(x.mountpoint).as_uri()), icon=getIcon(x)),
         #                        filesystems.get_disk_partitions())), key = lambda x: x.name)
         drivePlaces = sorted(list(map(lambda x: DEPlace(x.mountpoint.replace("\\", ""), QtCore.QUrl(pathlib.Path(x.mountpoint).as_uri()), icon=getIcon(x)),
                                filesystems.get_disk_partitions())), key = lambda x: x.name)
-        if len(drivePlaces):
-            if nSeparators == 0:
-                ret["separator"] = DEPlace.separator()
-            else:
-                ret[f"separator_{nSeparators}"] = DEPlace.separator()
-            nSeparators +=1
+        # if len(drivePlaces):
+        #     if nSeparators == 0:
+        #         ret["separator"] = DEPlace.separator()
+        #     else:
+        #         ret[f"separator_{nSeparators}"] = DEPlace.separator()
+        #     nSeparators +=1
                 
-            stdPlaces.update(dict(map(lambda x: ("file://"+x.url.path(), x), drivePlaces)))
-        # if asQUrl:
-        #     stdPlaces.update(dict(map(lambda x: (x.url, x), drivePlaces)))
-        # else:
-        #     stdPlaces.update(dict(map(lambda x: ("file://"+x.url.path(), x), drivePlaces)))
-            # stdPlaces.update(dict(map(lambda x: (x.name, x), drivePlaces)))
-
+            # stdPlaces.update(dict(map(lambda x: ("file://"+x.url.path(), x), drivePlaces)))
+            
+    # add standard places, but:
+    # avoid the duplicates - including those with a different name but with urls
+    # pointing to the same resolved physical path
+    ret_paths = list(map(lambda x: urlToPath(x.url), ret.values()))
 
     for key, place in stdPlaces.items():
         if key in ret:
@@ -785,8 +773,21 @@ def get_desktop_places(schema:typing.Optional[str]=None,
                 ret[key].name_aliases.append(place.name)
 
         else:
-            ret[key] = stdPlaces[key]
+            stdPlace = stdPlaces[key]
+            if urlToPath(stdPlace.url) not in ret_paths:
+                ret[key] = stdPlaces[key]
 
+    if len(drivePlaces):
+        if nSeparators == 0:
+            ret["separator"] = DEPlace.separator()
+        else:
+            ret[f"separator_{nSeparators}"] = DEPlace.separator()
+        nSeparators +=1
+        
+        for place in drivePlaces:
+            place.name = deviceLabel
+            ret["file://"+place.url.path()] = place
+        
     return ret
 
 # def get_recent_places(asQUrl:bool=False,
