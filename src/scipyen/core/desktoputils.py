@@ -681,13 +681,13 @@ def get_desktop_places(schema:typing.Optional[str]=None,
         
         drivePlaces = sorted(list(map(lambda x: DEPlace(x.device.replace("/dev/", ""), QtCore.QUrl(pathlib.Path(x.mountpoint).as_uri()), icon=getIcon(x)),
                                list(filter(lambda x: "/run/media/" in x.mountpoint, filesystems.get_disk_partitions())))), key = lambda x: x.name)
-        
+        ret_paths = list(map(lambda x: urlToPath(x.url), ret.values()))
         # check for custom (fixed) partitions mounts outside /run/media, and add them
         extraPartitions = list(filter(lambda x: x.device in list(map(lambda d: d.get("DEVNAME"), devices)) and x.device.replace("/dev/", "") not in list(map(lambda p: p.name, drivePlaces)), filesystems.get_disk_partitions()))
         if len(extraPartitions):
             extraPlaces = sorted(list(map(lambda x: DEPlace(x.device.replace("/dev/", ""),
                                                             QtCore.QUrl(pathlib.Path(x.mountpoint).as_uri()),
-                                                            icon = getIcon(x)), extraPartitions)), key = lambda x: x.name)
+                                                            icon = getIcon(x)), filter(lambda x: x.mountpoint != "/" and not any(v in x.mountpoint for v in ("/efi", "/var", "/usr", "/usr/local","/srv", ".snapshot", "/home", "/boot")) , extraPartitions))), key = lambda x: x.name)
             drivePlaces = extraPlaces + drivePlaces
             
         if len(drivePlaces):
@@ -714,6 +714,8 @@ def get_desktop_places(schema:typing.Optional[str]=None,
                     # check for device label, change place name if necessary
                     deviceLabel = devicesForPlace[0].get("ID_FS_LABEL", "unlabeled partition")
                     if deviceLabel == "unlabeled partition":
+                        if place.name == "File System Root":
+                            continue # don't overwrite this
                         partitionSize = int(devicesForPlace[0].get("ID_FS_SIZE")) * pq.byte
                         pwr = np.log10(partitionSize.magnitude)
                         if pwr < 3:
