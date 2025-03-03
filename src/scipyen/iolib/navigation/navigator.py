@@ -1789,7 +1789,10 @@ class PlacesButton(UrlNavigatorButtonBase):
         
         for placeLoc, place in places.items():
             text = place.name
-            actionsDataMap[text] = place.url
+            if placeLoc.startswith("separator"):
+                actionsDataMap[text] = "separator"
+            else:
+                actionsDataMap[text] = place.url
             
         navigator = self.parent()
         assert qtutils.isQObjectAlive(navigator), f"Parent object was deleted"
@@ -1837,11 +1840,15 @@ class PlacesButton(UrlNavigatorButtonBase):
                     menu.addSeparator()
                 else:
                     action = QtWidgets.QAction(key, menu)
-                    action.setData(val.toString())
-                    if val == navigator.locationUrl():
-                        font = QtGui.QFont(action.font())
-                        font.setBold(True)
-                        action.setFont(font)
+                    if isinstance(val, QtCore.QUrl):
+                        action.setData(val.toString())
+                        if val == navigator.locationUrl():
+                            font = QtGui.QFont(action.font())
+                            font.setBold(True)
+                            action.setFont(font)
+                    else:
+                        action.setSeparator(True)
+                        
                     menu.addAction(action)
                 
         if nAvailableItems > maxIndex:
