@@ -47,6 +47,8 @@ mamba activate $mambaenv
 
 mamba config --add channels conda-forge # not needed on recent miniforge versions
 
+conda install conda-forge::pyqt
+mamba install --prefix $mambaenv -y qtpy
 mamba install --prefix $mambaenv -y jupyter
 mamba install --prefix $mambaenv -y jupyterthemes
 mamba install --prefix $mambaenv -y numpy
@@ -69,7 +71,8 @@ mamba install --prefix $mambaenv -y quantities
 echo Installing python-neo
 mamba install --prefix $mambaenv -y python-neo
 echo Installing vigra
-mamba install --prefix $mambaenv -y -c conda-forge vigra
+#mamba install --prefix $mambaenv -y -c conda-forge vigra
+conda install conda-forge::vigra
 echo Installing cmocean
 mamba install --prefix $mambaenv -y cmocean
 echo Installing confuse
