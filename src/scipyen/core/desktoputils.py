@@ -687,7 +687,7 @@ def get_desktop_places(schema:typing.Optional[str]=None,
         if len(extraPartitions):
             extraPlaces = sorted(list(map(lambda x: DEPlace(x.device.replace("/dev/", ""),
                                                             QtCore.QUrl(pathlib.Path(x.mountpoint).as_uri()),
-                                                            icon = getIcon(x)), extraPartitions)))
+                                                            icon = getIcon(x)), extraPartitions)), key = lambda x: x.name)
             drivePlaces = extraPlaces + drivePlaces
             
         if len(drivePlaces):
