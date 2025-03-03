@@ -21,6 +21,8 @@ termcolor
 pyserial
 pickleshare
 psutil
+treelib
+shapely
 #### OPTIONAL packages
 researchpy      # ✓ (pip install researchpy)
 modelspec       # ✓ (pip install modelspec)

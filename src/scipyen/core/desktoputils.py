@@ -59,9 +59,11 @@
 
 # ### END internal comments
 
-import sys, os, pathlib, urllib, typing, warnings, subprocess, traceback
+import sys, os, pathlib, urllib, typing, warnings, subprocess, traceback, json
 import inspect
 import platform
+import dataclasses
+from dataclasses import dataclass
 import core.xmlutils as xmlutils
 import iolib.pictio as pio
 from enum import Enum, IntEnum
@@ -75,6 +77,15 @@ from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg,)
 from qtpy.QtCore import (Signal, Slot, Property,)
 
 from qtpy import (QtCore, QtWidgets, QtGui)
+
+import pyudev
+import quantities as pq
+import numpy as np
+
+from iolib.navigation import filesystems
+from iolib.navigation.filesystems import (pathStrLen, pathLen,
+                                          pathToQUrl, urlToPath)
+
 has_qtdbus = False
 try:
     from qtpy import QtDBus
@@ -163,15 +174,36 @@ def isUnixSystemLocation(p:typing.Union[pathlib.Path, QtCore.QUrl, str]) -> bool
     elif not isinstance(p, pathlib.Path):
         raise TypeError(f"Expecting a path string, Url or ")
 
-    return any((p.is_block_device(), p.is_char_device(), p.is_fifo(), p.is_mount(),
-               p.is_reserved(), p.is_socket()))
+    if sys.platform == "win32":
+        return any((p.is_block_device(), p.is_char_device(), p.is_fifo(),
+                p.is_reserved(), p.is_socket()))
+    else:
+        return any((p.is_block_device(), p.is_char_device(), p.is_fifo(), p.is_mount(),
+                p.is_reserved(), p.is_socket()))
 
-class DEPlace(Bunch):
+@dataclass
+class DEPlace():
     """Stand-in for PlacesItem - use in UrlNavigator in the absence of PlacesModel
         Or as backend to PlacesItem
     """
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    name:str
+    url:QtCore.QUrl
+    name_aliases:list[str] = dataclasses.field(default_factory=list)
+    additional_urls:list[QtCore.QUrl] = dataclasses.field(default_factory=list)
+    icon:str = dataclasses.field(default_factory=str)
+    system:bool = dataclasses.field(default=False)
+    hidden:bool = dataclasses.field(default=False)
+    app:typing.Optional[str] = dataclasses.field(default_factory=str)
+    
+    def urlPath(self) -> pathlib.Path:
+        return urlToPath(self.url)
+    
+    @classmethod
+    def separator(cls):
+        return cls("separator", QtCore.QUrl())
+    
+    def isSeparator(self):
+        return "separator" in self.name.lower() and self.url == QtCore.QUrl()
         
 class DEBookmark(Bunch):
     def __init__(self, *args, **kwargs):
@@ -181,6 +213,7 @@ class PlacesMap(dict):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
+    
 class BookmarksMap(dict):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -325,6 +358,42 @@ def get_desktop(what:str="desktop"):
     else:
         return sys.platform
 
+def get_cloud_storage_path(service_name):
+    """Retrieves the local path for a specified cloud storage service.
+    WARNING: Work in progress, DO NOT USE
+    Original code at https://tech-champion.com/programming/python-programming/finding-your-onedrive-path-in-python-a-practical-guide/"""
+    config_paths = {
+        "onedrive": ["%APPDATA%\\OneDrive\\config.json", "%LOCALAPPDATA%\\OneDrive\\config.json"],
+        "dropbox": ["%APPDATA%\\Dropbox\\config.json", "~/.dropbox/config.json"]  #Example for Dropbox, adjust as needed
+    }
+
+    if service_name not in config_paths:
+        scipywarn("Service not supported")
+        return
+
+    for path in config_paths[service_name]:
+        expanded_path = os.path.expandvars(path)
+        if os.path.exists(expanded_path):
+            try:
+                with open(expanded_path, "r") as f:
+                    config_data = json.load(f)
+                    ret = config_data.get("local_path", "Path not found in config")
+                    if ret == "Path not found in config":
+                        scipywarn(ret)
+                        return
+                    return ret
+            except json.JSONDecodeError:
+                scipywarn("Invalid JSON in config file")
+                return
+            except Exception as e:
+                scipywarn(f"Error reading config file: {e}")
+                return
+    scipywarn("Configuration file not found")
+    return
+
+# print(get_cloud_storage_path("onedrive"))
+# print(get_cloud_storage_path("dropbox"))
+
 def get_dbus_service_names(what:str="session"):
     """
     what: one of "session", "system"
@@ -430,22 +499,40 @@ def get_system_terminal_executable():
     else:
         warnings.warn(f"{sys.platform} platform is not yet supported")
         
-def get_standard_desktop_places(asQUrl:bool=False, all_folder_icons:bool=False) -> PlacesMap:
+# def get_standard_desktop_places(asQUrl:bool=False, all_folder_icons:bool=False,
+#                                 intKeys:bool=False) -> PlacesMap:
+# def get_standard_desktop_places(asQUrl:bool=False, all_folder_icons:bool=False) -> PlacesMap:
+def get_standard_desktop_places(all_folder_icons:bool=False) -> PlacesMap:
     """Platform-independent Desktop places.
     These are defined in the Qt toolkit
     """
     locations = tuple(map(lambda x: StandardLocationInfo(getattr(QtCore.QStandardPaths, x[0]), standardIconName(x[0], all_folder_icons)), StandardDesktopLocationsQt))
     ret = PlacesMap()
-    for loc in locations:
-        place_url = f"file://{loc.paths[0]}"
-        if asQUrl:
-            place_url = QtCore.QUrl(place_url)
-        ret[place_url] = DEPlace({"name": loc.name, "url": place_url, "icon": loc.iconName, "system":loc.system, "hidden": loc.hidden})
-        
+    for k, loc in enumerate(locations):
+        if len(loc.paths) == 0:
+            continue
+
+        place_uris = list(map(lambda x: pathlib.Path(x).resolve().as_uri(), loc.paths))
+        place_uri = place_uris[0]
+
+        additional_urls = list(map(lambda x: QtCore.QUrl(x), place_uris[1:])) if len(place_uris) > 1 else list()
+
+        # if asQUrl:
+        #     key = QtCore.QUrl(place_uri)
+        # else:
+        #     key = place_uri
+        key = place_uri
+
+        if key in ret:
+            ret[key].name_aliases.append(loc.name)
+            ret[key].additional_urls.extend(additional_urls)
+        else:
+            ret[key] = DEPlace(loc.name, QtCore.QUrl(place_uri), additional_urls = additional_urls,
+                                icon = loc.iconName, system = loc.system, hidden = loc.hidden)
+
     return ret
     
 def get_desktop_places(schema:typing.Optional[str]=None, 
-                       asQUrl:bool=False, 
                        all_folder_icons:bool=False,
                        include_hidden:bool=False, 
                        include_system:bool=True,
@@ -475,15 +562,18 @@ def get_desktop_places(schema:typing.Optional[str]=None,
     # This is static: whenever a place, or the places repository, is altered
     # this won't be captured until a new Scipyen session is launched.
     
+    nSeparators = 0
+    
     if isinstance(schema, str) and schema not in SCHEMAS:
         schema = None
         
-    elif isinstance(schema, bool):
-        asQUrl = schema = True
-        schema = None
+    # elif isinstance(schema, bool):
+    #     asQUrl = schema = True
+    #     schema = None
         
     ret = PlacesMap()
-    stdPlaces = get_standard_desktop_places(asQUrl, all_folder_icons)
+    stdPlaces = get_standard_desktop_places(all_folder_icons)
+    # stdPlaces = get_standard_desktop_places(asQUrl, all_folder_icons)
     
     # NOTE: 2023-05-01 13:38:10 TODO
     # below we are using the file `user-places.xbel` or `recently-used.xbel` located in 
@@ -506,88 +596,202 @@ def get_desktop_places(schema:typing.Optional[str]=None,
     # </info>
     # </bookmark>
     # </xbel>
-    
+
+    getIcon = lambda x: "folder-remote-symbolic" if "remote" in x.opts else "drive-harddisk-symbolic"
+
     if sys.platform.startswith("linux") and HAS_PYXDG:
         xbel = "user-places.xbel"
         xbel_file = os.path.join(xdg.BaseDirectory.xdg_data_home, xbel)
-        if not os.path.exists(xbel_file):
-            return ret
-        places = pio.loadXMLFile(xbel_file)
+        # if not os.path.exists(xbel_file):
+        #     return ret
+        if os.path.exists(xbel_file):
+            xbel_places = pio.loadXMLFile(xbel_file)
 
-        if "xbel" in places.documentElement.tagName.lower():
-            bookmark_nodes = places.getElementsByTagName("bookmark")
-            
-            for k,b in enumerate(bookmark_nodes):
-                place_url = b.getAttribute("href")
-                place_name = b.getElementsByTagName("title")[0].childNodes[0].data
+            if "xbel" in xbel_places.documentElement.tagName.lower():
+                bookmark_nodes = xbel_places.getElementsByTagName("bookmark")
                 
-                if len(place_name) == 0 or len(place_url) == 0:
-                    continue
-                
-                info_node = b.getElementsByTagName("info")[0]
-                info_metadata_nodes = info_node.getElementsByTagName("metadata")
-                
-                place_icon_name = info_metadata_nodes[0].getElementsByTagName("bookmark:icon")[0].getAttribute("name")
-                
-                systemitem_nodes = info_metadata_nodes[1].getElementsByTagName("isSystemItem")
-                hidden_nodes = info_metadata_nodes[1].getElementsByTagName("isHidden")
-                app_nodes = info_metadata_nodes[1].getElementsByTagName("OnlyInApp")
-                
-                if len(systemitem_nodes):
-                    is_system_place = systemitem_nodes[0].childNodes[0].data.lower() == "true"
-                else:
-                    is_system_place=False
-                    
-                if not include_system and is_system_place:
-                    continue
-                    
-                if len(hidden_nodes):
-                    is_hidden = hidden_nodes[0].childNodes[0].data.lower() == "true"
-                else:
-                    is_hidden = False
-                    
-                if not include_hidden and is_hidden:
-                    continue
-                
-                    
-                if len(app_nodes):
-                    app_info = app_nodes[0].childNodes
-                    if len(app_info):
-                        app = app_info[0].data
-                    else:
-                        app = None
-                else:
-                    app = None
-                
-                # NOTE: 2025-01-22 11:41:26 apply schema filter if any
                 if isinstance(schema, str) and len(schema):
-                    if not place_url.startswith(schema):
+                    bookmark_nodes = list(filter(lambda x: x.getAttribute("href").startswith(schema), bookmark_nodes))
+                
+                
+                for k,b in enumerate(bookmark_nodes):
+                    place_uri = b.getAttribute("href")
+                    # NOTE: 2025-01-22 11:41:26 apply schema filter if any
+                    # print(f"place_uri: {place_uri}")
+                    # if isinstance(schema, str) and len(schema) and not place_uri.startswith(schema):
+                    #     continue
+                        
+                    place_name = b.getElementsByTagName("title")[0].childNodes[0].data
+                    
+                    if len(place_name) == 0 or len(place_uri) == 0:
                         continue
                     
-                key = k if intKeys else QtCore.QUrl(place_url) if asQUrl else place_url
-                # if asQUrl:
-                    # place_url = QtCore.QUrl(place_url)
+                    info_node = b.getElementsByTagName("info")[0]
+                    info_metadata_nodes = info_node.getElementsByTagName("metadata")
                     
+                    place_icon_name = info_metadata_nodes[0].getElementsByTagName("bookmark:icon")[0].getAttribute("name")
                     
-                ret[key] = DEPlace({"name": place_name, 
-                                "url": QtCore.QUrl(place_url), # always as QUrl regardless of asQUrl
-                                "icon": place_icon_name, # can be a system icon name or a path/file name
-                                "system":is_system_place,
-                                "hidden":is_hidden,
-                                "app":app})
+                    systemitem_nodes = info_metadata_nodes[1].getElementsByTagName("isSystemItem")
+                    hidden_nodes = info_metadata_nodes[1].getElementsByTagName("isHidden")
+                    app_nodes = info_metadata_nodes[1].getElementsByTagName("OnlyInApp")
+                    
+                    if len(systemitem_nodes):
+                        is_system_place = systemitem_nodes[0].childNodes[0].data.lower() == "true"
+                    else:
+                        is_system_place=False
+                        
+                    if not include_system and is_system_place:
+                        continue
+                        
+                    if len(hidden_nodes):
+                        is_hidden = hidden_nodes[0].childNodes[0].data.lower() == "true"
+                    else:
+                        is_hidden = False
+                        
+                    if not include_hidden and is_hidden:
+                        continue
+
+                    if len(app_nodes):
+                        app_info = app_nodes[0].childNodes
+                        if len(app_info):
+                            app = app_info[0].data
+                        else:
+                            app = str()
+                    else:
+                        app = str()
+                        
+                    place_url = QtCore.QUrl(place_uri)
+                    
+                    key = place_uri
+
+                    if key in ret and isinstance(ret[key], DEPlace):
+                        ret[key].name_aliases.append(place_name)
+                    else:
+                        ret[key] = DEPlace(place_name, place_url, # always as QUrl regardless of asQUrl
+                                            icon = place_icon_name, # can be a system icon name or a path/file name
+                                            system = is_system_place,
+                                            hidden = is_hidden,
+                                            app = app)
+
+        # TODO: 2025-03-02 22:23:06 FIXME
+        # install diskinfo from pypi (for Linux only) and use that to get persistent names
+        # HOWEVER: ATTENTION diskinfo does NOT give information on mounted paritions of
+        # hotpluggable disks; it only supplies too devices of those disks!
+        drivePlaces = sorted(list(map(lambda x: DEPlace(x.device.replace("/dev/", ""), QtCore.QUrl(pathlib.Path(x.mountpoint).as_uri()), icon=getIcon(x)),
+                               list(filter(lambda x: "/run/media/" in x.mountpoint, filesystems.get_disk_partitions())))), key = lambda x: x.name)
+        
+        if len(drivePlaces):
+            if nSeparators == 0:
+                ret["separator"] = DEPlace.separator()
+            else:
+                ret[f"separator_{nSeparators}"] = DEPlace.separator()
+            nSeparators +=1
                 
-    for url in stdPlaces:
-        if asQUrl:
-            if not any(url.matches(x, QtCore.QUrl.StripTraliningSlash) for x in ret):
-                ret[url] = stdPlaces[url]
+            context = pyudev.Context()
+            devices = list(context.list_devices(subsystem="block", DEVTYPE="partition"))
+            
+            # check for custom (fixed) partitions mounts outside /run/media, and add them
+            extraPartitions = list(filter(lambda x: x.device in list(map(lambda d: d.get("DEVNAME"), devices)) and x.device.replace("/dev/", "") not in list(map(lambda p: p.name, drivePlaces)), filesystems.get_disk_partitions()))
+            if len(extraPartitions):
+                extraPlaces = sorted(list(map(lambda x: DEPlace(x.device.replace("/dev/", ""),
+                                                                QtCore.QUrl(pathlib.Path(x.mountpoint).as_uri()),
+                                                                icon = getIcon(x)), extraPartitions)))
+                drivePlaces = extraPlaces + drivePlaces
+                
+            for place in drivePlaces:
+                devicesForPlace = list(filter(lambda x: x.sys_name == place.name, devices))
+                if len(devicesForPlace) == 0:
+                    # not found in paritions -> also check for mounted optical disks
+                    disks = list(context.list_devices().match_property("DEVTYPE", "disk"))
+                    devicesForPlace = list(filter(lambda x: x.sys_name == place.name, disks))
+                    
+                if len(devicesForPlace):
+                    # check for device type, change pplace icon if necessary
+                    if devicesForPlace[0].get("ID_CDROM") is not None:
+                        place.icon = "drive-optical-symbolic"
+                    elif devicesForPlace[0].get("ID_USB_TYPE") is not None:
+                        place.icon = "drive-removable-media-usb-symbolic"
+                        
+                    # check for device label, change place name if necessary
+                    deviceLabel = devicesForPlace[0].get("ID_FS_LABEL", "unlabeled partition")
+                    if deviceLabel == "unlabeled partition":
+                        partitionSize = int(devicesForPlace[0].get("ID_FS_SIZE")) * pq.byte
+                        pwr = np.log10(partitionSize.magnitude)
+                        if pwr < 3:
+                            partitionSize = partitionSize.magnitude.round(1)
+                            symbol = "bytes"
+                        elif pwr < 6:
+                            partitionSize = partitionSize.rescale(pq.KiB).magnitude.round(1)
+                            symbol = "KiB"
+                        elif pwr < 9:
+                            partitionSize = partitionSize.rescale(pq.MiB).magnitude.round(1)
+                            symbol = "MiB"
+                        elif pwr < 12:
+                            partitionSize = partitionSize.rescale(pq.GiB).magnitude.round(1)
+                            symbol = "GiB"
+                        elif pwr < 15:
+                            partitionSize = partitionSize.rescale(pq.TiB).magnitude.round(1)
+                            symbol = "TiB"
+                        elif pwr < 19:
+                            partitionSize = partitionSize.rescale(pq.PiB).magnitude.round(1)
+                            symbol = "PiB"
+                        elif pwr < 22:
+                            partitionSize = partitionSize.rescale(pq.EiB).magnitude.round(1)
+                            symbol = "EiB"
+                        elif pwr < 25:
+                            partitionSize = partitionSize.rescale(pq.ZiB).magnitude.round(1)
+                            symbol = "ZiB"
+                        else:
+                            partitionSize = partitionSize.rescale(pq.YiB).magnitude.round(1)
+                            symbol = "YiB"
+                            
+                        deviceLabel = f"{partitionSize} {symbol} Removable Media"
+                else:
+                    deviceLabel = place.name
+                    
+                place.name = deviceLabel
+                ret["file://"+place.url.path()] = place
+                
+            # ret.update(dict(map(lambda x: ("file://"+x.url.path(), x), drivePlaces)))
+        # if asQUrl:
+        #     ret.update(dict(map(lambda x: (x.url, x), drivePlaces)))
+        # else:
+        #     ret.update(dict(map(lambda x: ("file://"+x.url.path(), x), drivePlaces)))
+
+    elif sys.platform.startswith("win32"):
+
+        # drivePlaces = sorted(list(map(lambda x: DEPlace(pathlib.Path(x.mountpoint).as_uri(), QtCore.QUrl(pathlib.Path(x.mountpoint).as_uri()), icon=getIcon(x)),
+        #                        filesystems.get_disk_partitions())), key = lambda x: x.name)
+        drivePlaces = sorted(list(map(lambda x: DEPlace(x.mountpoint.replace("\\", ""), QtCore.QUrl(pathlib.Path(x.mountpoint).as_uri()), icon=getIcon(x)),
+                               filesystems.get_disk_partitions())), key = lambda x: x.name)
+        if len(drivePlaces):
+            if nSeparators == 0:
+                ret["separator"] = DEPlace.separator()
+            else:
+                ret[f"separator_{nSeparators}"] = DEPlace.separator()
+            nSeparators +=1
+                
+            stdPlaces.update(dict(map(lambda x: ("file://"+x.url.path(), x), drivePlaces)))
+        # if asQUrl:
+        #     stdPlaces.update(dict(map(lambda x: (x.url, x), drivePlaces)))
+        # else:
+        #     stdPlaces.update(dict(map(lambda x: ("file://"+x.url.path(), x), drivePlaces)))
+            # stdPlaces.update(dict(map(lambda x: (x.name, x), drivePlaces)))
+
+
+    for key, place in stdPlaces.items():
+        if key in ret:
+            if place.name not in ret[key].name_aliases:
+                ret[key].name_aliases.append(place.name)
+
         else:
-            if pathlib.Path(url) not in [pathlib.Path(x) for x in ret]:
-                ret[url] = stdPlaces[url]
-                
+            ret[key] = stdPlaces[key]
+
     return ret
 
-def get_recent_places(asQUrl:bool=False,
-                       intKeys:bool=True) -> BookmarksMap:
+# def get_recent_places(asQUrl:bool=False,
+#                        intKeys:bool=True) -> BookmarksMap:
+def get_recent_places(intKeys:bool=True) -> BookmarksMap:
     """Collect recent places as defined in the freedesktop.org XDG framework.
     Useful for Linux desktops that comply with XDG (e.g. KDE, GNOME, XFCE, LXDE, etc).
     
@@ -961,46 +1165,34 @@ def desktopPlaceUrl(p:DEPlace) -> QtCore.QUrl:
     url = p.url
     return url if isinstance(url, QtCore.QUrl) else QtCore.QUrl(url)
         
-def closestUrl(url:QtCore.QUrl, places:typing.Optional[PlacesMap]=None) -> QtCore.QUrl:
+def closestPlace(url:QtCore.QUrl, places:typing.Optional[PlacesMap]=None) -> DEPlace | None:
+    # TODO 2025-02-21 13:48:06
+    # ensure only local paths are dealt with, here
+    # print(f"{__name__}.closestPlace({url}, {places})")
     schema = url.scheme()
     if not isinstance(places, PlacesMap):
         places = get_desktop_places(schema) #, True)
-        
-    if len(places) == 0:
-        return url
-    
-    uPath = pathlib.Path(url.path()).resolve()
-    
-    urlToPath = lambda x: pathlib.Path(x.strip(schema+":")) if isinstance(x, str) else pathlib.Path(x.path())
-    pathLen = lambda x: len(x.path()) if isinstance(x, QtCore.QUrl) else len(x.strip(schema+":"))
-    
-    foundPlaces = list(reversed(sorted(list(filter(lambda x: uPath.is_relative_to(urlToPath(x["url"]).resolve()), places.values())), key = lambda x: pathLen(x["url"]))))
-    
-    toUrl = lambda x: x if isinstance(x, QtCore.QUrl) else QtCore.QUrl(x)
-    
-    return toUrl(foundPlaces[0]["url"]) if len(foundPlaces) else url
-        
-    
-def closestPlace(url:QtCore.QUrl, places:typing.Optional[PlacesMap]=None) -> DEPlace:
-    schema = url.scheme()
-    if not isinstance(places, PlacesMap):
-        places = get_desktop_places(schema) #, True)
-        
-    fallback = DEPlace(name=None, url = url, icon = iconNameForUrl(url), system=False, hidden=False, app=None)
-        
+
+    # fallback = DEPlace(str(), url, icon = iconNameForUrl(url))#, app=None)
+
     if len(places) == 0:
         return fallback
+
+    pathForUrl = urlToPath(url)
+
+    # predicate1 = lambda x: pathForUrl == x.urlPath()
+    predicate = lambda x: pathForUrl == x.urlPath() or pathForUrl.is_relative_to(x.urlPath())
+    # if sys.platform.startswith("win32"):
+    #     predicate = lambda x: pathForUrl == x.urlPath() or pathForUrl.is_relative_to(x.urlPath()) or len(pathForUrl.parts) == len*()
+
+
+    foundPlaces = list(reversed(sorted(filter(predicate, places.values()), key = lambda x: pathStrLen(x.url))))
     
-    uPath = pathlib.Path(url.path()).resolve()
-    
-    urlToPath = lambda x: pathlib.Path(x.strip(schema+":")) if isinstance(x, str) else pathlib.Path(x.path())
-    pathLen = lambda x: len(x.path()) if isinstance(x, QtCore.QUrl) else len(x.strip(schema+":"))
-    
-    foundPlaces = list(reversed(sorted(list(filter(lambda x: uPath.is_relative_to(urlToPath(x["url"]).resolve()), places.values())), key = lambda x: pathLen(x["url"]))))
-    
+    # print(f"\tfoundPlaces = {foundPlaces}")
+
     # toUrl = lambda x: x if isinstance(x, QtCore.QUrl) else QtCore.QUrl(x)
     
-    return foundPlaces[0] if len(foundPlaces) else fallback
+    return foundPlaces[0] if len(foundPlaces) else None
         
 class PlacesMonitor(QtCore.QObject):
     __instance__ = None # NOTE: Singleton design pattern
@@ -1072,7 +1264,3 @@ class PlacesMonitor(QtCore.QObject):
     @Slot()
     def slot_bookmarksChanged(self):
         self.sig_bookmarksChanged.emit()
-
-     
-    
-    

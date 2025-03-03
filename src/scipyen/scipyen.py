@@ -18,7 +18,7 @@ import faulthandler, warnings
 import xdg
 from xdg import IconTheme
 
-from core.prog import scipywarn
+from core.prog import scipywarn, printStyled
 
 my_conda_env = os.environ.get("CONDA_DEFAULT_ENV", None)
 conda_env_prefix = os.environ.get("CONDA_PREFIX", None)
@@ -27,19 +27,53 @@ my_virtualenv = os.environ.get("VIRTUAL_ENV", None)
 
 if isinstance(my_conda_env, str) and len(my_conda_env.strip()):
     conda_env_prefix = os.environ.get("CONDA_PREFIX", None)
-            
-    print(f"Scipyen is running in the conda environment {my_conda_env} (located at {conda_env_prefix})\n")
+
+    if my_conda_env == conda_env_prefix:
+        print(f"Scipyen is running in the conda environment {printStyled(my_conda_env, color='yellow')}\n")
+    else:
+        print(f"Scipyen is running in the conda environment {printStyled(my_conda_env, color='yellow')} (located at {printStyled(conda_env_prefix, color='green')})\n")
     
     if my_conda_env == "base":
         scipywarn("Scipyen should be run in its own conda environment.\n")
         
 elif isinstance(my_virtualenv, str) and len(my_virtualenv.strip()):
-    pass # OK
-    # print(f"Scipyen is running in the virtualenv environment {my_virtualenv}\n")
+    # pass # OK
+    print(f"Scipyen is running in the virtualenv environment {printStyled(my_virtualenv, color='yellow')}\n")
     
 else:
     raise RuntimeError("Scipyen must be run in a virtualenv virtual Python environment or a conda environment\n")
 
+try:
+    # print(f"scipyen module: {__file__}")
+    moduleFilePath = pathlib.Path(__file__)
+    moduleDir = moduleFilePath.parent
+    if moduleDir.name == "scipyen":
+        srcDir = moduleDir.parent
+        if srcDir.name == "src":
+            repoDir = srcDir.parent
+            gitTest = subprocess.run(["git", "-C", repoDir.as_posix(), "status", "--short", "--branch"], capture_output=True)
+
+            if gitTest.returncode == 0:
+                result = gitTest.stdout.decode().split("\n")
+                brComp = result[0]
+                head, branches = brComp.split("## ")
+                local, remote = branches.split("...")
+                local = printStyled(local, color="green")
+                remote = printStyled(remote, color="red")
+                msg = f"{printStyled('WARNING:', color='yellow')} Running {local} branch of the local Scipyen git repository in {printStyled(repoDir.as_posix(), color='blue')}, with status:"
+                result[0] = "## "+local+"..."+remote
+                if len(result) > 1:
+                    for k in range(1,len(result)):
+                        s = result[k]
+                        head = printStyled(s[:2], color="red")
+                        fileName = s[2:]
+                        result[k] = head+fileName
+
+                result.insert(0, msg)
+                print("\n".join(result))
+except:
+    traceback.print_exc()
+    pass
 
 # print(f"Argv: {sys.argv}")
 
@@ -227,7 +261,9 @@ QtGui.QIcon.setFallbackSearchPaths(fbPaths)
 # building a pyinstaller bundle, as per scipyen.spec)
 if sys.platform.startswith("win32"):
     if hasQDarkTheme:
-        # qdarktheme.setup_theme("auto")
+        # qdarktheme.setup_theme("auto") # NOTE: 2025-03-02 20:52:51
+                                         # this MUST be called after the initlization of the QApplication
+                                         # see NOTE: 2025-03-02 20:53:09 below
         qdarktheme.enable_hi_dpi()
         QtGui.QIcon.setThemeName("breeze-dark")
     else:
@@ -335,8 +371,10 @@ def main():
         
             
         if sys.platform.startswith("win32"):
+            # pass
             if hasQDarkTheme:
-                qdarktheme.setup_theme("auto")
+                qdarktheme.setup_theme("auto") # NOTE: 2025-03-02 20:53:09
+                                               # now, this can be called
                 
         elif sys.platform.startswith("linux"):
             # NOTE: 2024-05-04 10:16:33

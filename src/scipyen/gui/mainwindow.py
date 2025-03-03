@@ -5,30 +5,30 @@
 
 """Main window for the Scipyen application
 
-CHANGELOG:
-2020-02-17 12:57:24
-    The file loaders in iolib.pictio now return the data and file metadata (where
-    possible) as  distinct variables, by default. 
-    This is reflected in the MainWindow by populating the workspace with more variables
-    than might be expected:
-    1) file data (named after the file name)
-    2) extra variables, named after the file name with the suffix "_var_n", where 
-    "n" is an integral counter (>=1) indicating the order of the variable in the
-    tuple returned by the file loader.
-    
-    In particular:
-        opening an axon binary file with iolib.pictio.loadAxonFile creates three
-        variables in the workspace: 
-            1) the data, named after the file
-            2) a dictionary of axon metadata, named after the file with suffix "_var_1" appended
-            3) a list of neo.Segments representing the protocol waveforms 
-                (as stored inside the file), named after the file with suffix "_var_2" appended
-                
-    It may seem unelegant, but I have taken this decision to create the posibility
-    to inspect the "metadata" stored by 3rd party software as standard.
-        
 
 """
+# CHANGELOG:
+# 2020-02-17 12:57:24
+#     The file loaders in iolib.pictio now return the data and file metadata (where
+#     possible) as  distinct variables, by default.
+#     This is reflected in the MainWindow by populating the workspace with more variables
+#     than might be expected:
+#     1) file data (named after the file name)
+#     2) extra variables, named after the file name with the suffix "_var_n", where
+#     "n" is an integral counter (>=1) indicating the order of the variable in the
+#     tuple returned by the file loader.
+#
+#     In particular:
+#         opening an axon binary file with iolib.pictio.loadAxonFile creates three
+#         variables in the workspace:
+#             1) the data, named after the file
+#             2) a dictionary of axon metadata, named after the file with suffix "_var_1" appended
+#             3) a list of neo.Segments representing the protocol waveforms
+#                 (as stored inside the file), named after the file with suffix "_var_2" appended
+#
+#     It may seem unelegant, but I have taken this decision to create the posibility
+#     to inspect the "metadata" stored by 3rd party software as standard.
+#
 # TODO breadcrumbs navigation for the file system model & tree.
 # TODO enable drag&drop from history to outside of the Scipyen (e.g.
 # a text editor, desktop file manager etc)
@@ -1084,7 +1084,6 @@ class AboutDialog(QtWidgets.QDialog, __UI_AboutLicense__):
 class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     ''' Main pict GUI window
     '''
-    # from iolib.navigation import navigator
 
     # TODO:2024-05-19 10:59:43
     # finalize workspacegui.DirectoryObserver and inherit from it
@@ -1113,6 +1112,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
     # class attribute
     pluginActions = []
+
+    defaultShellCacheSize = 10000
 
     _instance = None # NOTE: Singleton design pattern
     
@@ -1957,6 +1958,21 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     def maxRecentFiles(self, val: int):
         if isinstance(val, int) and val >= 0:
             self._maxRecentFiles = val
+
+    @property
+    def shellCacheSize(self) -> int:
+        return self.shell.cache_size
+
+    @markConfigurable("ShellCacheSize")
+    @shellCacheSize.setter
+    def shellCacheSize(self, val:int):
+        if val < 20:
+            val = 0
+
+        if val < 0:
+            val = self.defaultShellCacheSize
+
+        self.shell.cache_size = val
 
     @property
     def guiStyle(self):
@@ -3214,6 +3230,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
             self.ipkernel = self.console.consoleWidget.ipkernel
             self.shell = self.ipkernel.shell
+            self.shell.cache_size = self.defaultShellCacheSize
             self.stdout = self.ipkernel.stdout
 
             # this is always 1 immediately after initialization
@@ -3469,11 +3486,30 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
     @Slot()
     def slot_updateCwd(self):
+        """Connected to console.executed signal
+        Makes sure that a cd (change directory) command run at the console
+        is reflected in throughout Scipyen.
+        """
+        # NOTE: 2025-02-13 14:32:40 WARNING
+        # do NOT call slot_changeDirectory here -> circular loop!
         if self.cwd != os.getcwd():
-            self.cwd = os.getcwd()
+            oldCwd = self.cwd
+            newCwd = os.getcwd()
+            self.cwd = newCwd
+            # NOTE: 2025-02-13 14:38:57
+            # update the navigator
+            try:
+                self.navPrevDir.appendleft(oldCwd)
+
+            except:
+                pass
+            
+            url = QtCore.QUrl(pathlib.Path(newCwd).resolve().as_uri())
+            self.navigator.setLocationUrl(url)
+            
             self._setRecentDirectory_(self.cwd)
             self._updateFileSystemView_(self.cwd, False)
-            self._resizeFileColumn_()
+            # self._resizeFileColumn_()
             # self._refreshRecentDirsComboBox_()
 
     def slot_updateHistory(self):
@@ -5417,18 +5453,6 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 
             self._initRecentDirsMenu_(self.recentDirectoriesMenu, 0)
                 
-            # for item in self.recentDirectories:
-            #     action = self.recentDirectoriesMenu.addAction(item)
-            #     action.setText(item)
-            #     # action.triggered.connect(self.slot_changeDirectory)
-            #     action.triggered.connect(self.slot_changeLocation)
-
-            # if self._maxRecentDirectories <= 10:
-            #     self.recentDirectoriesMenu.addSeparator()
-            #     clearDirAction = self.recentDirectoriesMenu.addAction(QtGui.QIcon.fromTheme("edit-clear-history"),
-            #         "Clear Recent Directories List")
-            #     clearDirAction.triggered.connect(self._clearRecentDirectories_)
-                
     def _initRecentDirsMenu_(self, menu: QtWidgets.QMenu, startIndex:int):
         from gui import guiutils
         menu.setLayoutDirection(QtCore.Qt.LeftToRight)
@@ -5903,12 +5927,15 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @Slot(QtCore.QUrl)
     @safeWrapper
     def slot_chDirUrl(self, val:QtCore.QUrl):
-        s = val.path()
+        # print(f"{self.__class__.__name__}.slot_chDirUrl({val})")
+        path = desktoputils.urlToPath(val)
+        s = path.as_posix()
         self.slot_chDirString(s)
 
     @Slot(str)
     @safeWrapper
     def slot_chDirString(self, val):
+        # print(f"{self.__class__.__name__}.slot_chDirString({val})")
         if "://" in val:
             protocol, target = val.split("://")
         else:
@@ -6007,19 +6034,6 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             
             self.sig_changedDirectory.emit(targetDir)
             
-            # print(f"{self.__class__.__name__}.slot_changeDirectory targetDir = {targetDir}")
-            
-            # NOTE: 2023-09-27 21:03:16
-            # DEPRECATED: directory navigation and monitoring are now independent
-            # of each other
-            #
-            # if os.path.isdir(self.currentDirectory):
-            #     with os.scandir(self.currentDirectory) as dirIt:
-            #         dirItems = dict((entry.name, entry.stat(follow_symlinks=False)) for entry in dirIt if os.path.lexists(entry.name))
-            #         # dirItems = dict((entry.name, entry.stat()) for entry in dirIt if os.path.lexists(entry.name))
-            #         self._monitoredDirsCache_.clear()
-            #         self._monitoredDirsCache_.update(dirItems)
-               
 
     def _slot_workdirChangedInConsole(self, targetDir):
         self._updateFileSystemView_(targetDir, cd=True)
