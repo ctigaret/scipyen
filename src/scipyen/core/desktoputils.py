@@ -598,6 +598,8 @@ def get_desktop_places(schema:typing.Optional[str]=None,
     # </xbel>
 
     getIcon = lambda x: "folder-remote-symbolic" if "remote" in x.opts else "drive-harddisk-symbolic"
+    
+    partitions = filesystems.get_disk_partitions()
 
     if sys.platform.startswith("linux"):
         import pyudev
@@ -676,46 +678,99 @@ def get_desktop_places(schema:typing.Optional[str]=None,
                                                 app = app)
 
         # create desktop places for non-standard partitions or removable media
+        # NOTE: 2025-03-03 21:14:26 FIXME/TODO
+        # this is quite contrived because it seeks to avoid adding places ot btrfs snapshots and other 
+        # paritions such as /boot/EFI
+        # -> must streamline this !
         context = pyudev.Context()
         devices = list(context.list_devices(subsystem="block", DEVTYPE="partition"))
+        disks = list(context.list_devices().match_property("DEVTYPE", "disk"))
         
-        drivePlaces = sorted(list(map(lambda x: DEPlace(x.device.replace("/dev/", ""), QtCore.QUrl(pathlib.Path(x.mountpoint).as_uri()), icon=getIcon(x)),
-                               list(filter(lambda x: "/run/media/" in x.mountpoint, filesystems.get_disk_partitions())))), key = lambda x: x.name)
+        drivePlaces = sorted(list(map(lambda x: DEPlace(x.device.replace("/dev/", ""), 
+                                                        QtCore.QUrl(pathlib.Path(x.mountpoint).as_uri()), 
+                                                        icon=getIcon(x)),
+                               list(filter(lambda x: "/run/media/" in x.mountpoint, partitions)))), key = lambda x: x.name)
         ret_paths = list(map(lambda x: urlToPath(x.url), ret.values()))
+        
         # check for custom (fixed) partitions mounts outside /run/media, and add them
-        extraPartitions = list(filter(lambda x: x.device in list(map(lambda d: d.get("DEVNAME"), devices)) and x.device.replace("/dev/", "") not in list(map(lambda p: p.name, drivePlaces)), filesystems.get_disk_partitions()))
+        #
+        # I need partitions because the pyudev does NOT offer information about
+        # where is the device mounted in the file system, while psutil does.
+        # This is needed to capture mounted removable media (I'm sure Solid
+        # framework does a much better job than this)
+        #
+        # The down side is that it also includes partitions that are NOT needed, such as
+        # /boot/EFI
+        # various btrfs snapshots
+        #
+        # filter: select a "partition" where the value of the 'device' attribute 
+        # exists in the list of device names in 'devices' (not in 'disks' because we end up with all the 'loop' devices) 
+        # but is absent from the list of drivePlaces names
+        #
+        # we will search for the parition among the mountpoint in 'disks' to capture
+        # any inserted oprical disc
+        
+        partitionPredicate = lambda x:  x.device in list(map(lambda d: d.get("DEVNAME"), devices)) and \
+                                        x.device.replace("/dev/", "") not in list(map(lambda p: p.name, drivePlaces)) and \
+                                        "subvol" not in x.opts and "boot" not in x.mountpoint
+        
+        # non-standard partitions - typically user-defined
+        # NOTE: 2025-03-03 22:25:12
+        # these might not be necessary, as they can always be accessed from the root filesystem
+        # through their mount point 😃
+        #
+        extraPartitions = list(filter(partitionPredicate, partitions))
         if len(extraPartitions):
             extraPlaces = sorted(list(map(lambda x: DEPlace(x.device.replace("/dev/", ""),
                                                             QtCore.QUrl(pathlib.Path(x.mountpoint).as_uri()),
-                                                            icon = getIcon(x)), filter(lambda x: x.mountpoint != "/" and not any(v in x.mountpoint for v in ("/efi", "/var", "/usr", "/usr/local","/srv", ".snapshot", "/home", "/boot")) , extraPartitions))), key = lambda x: x.name)
+                                                            icon = getIcon(x)), extraPartitions)), key = lambda x: x.name)
             drivePlaces = extraPlaces + drivePlaces
             
         if len(drivePlaces):
-            # if nSeparators == 0:
-            #     ret["separator"] = DEPlace.separator()
-            # else:
-            #     ret[f"separator_{nSeparators}"] = DEPlace.separator()
-            # nSeparators +=1
-                
             for place in drivePlaces:
+                # print(f"\nplace: {place}")
+                deviceLabel = place.name
+                
+                # find the device for this place, in 'devices'
                 devicesForPlace = list(filter(lambda x: x.sys_name == place.name, devices))
                 if len(devicesForPlace) == 0:
-                    # not found in partitions -> also check for mounted optical disks
-                    disks = list(context.list_devices().match_property("DEVTYPE", "disk"))
+                    # a device for the place was not found -> also check in disks - contains mounted optical media
                     devicesForPlace = list(filter(lambda x: x.sys_name == place.name, disks))
                     
+                
                 if len(devicesForPlace):
+                    # a udev device for this place was found
+                    placeDevice = devicesForPlace[0]
+                    # print(f"\tfound placeDevice: {placeDevice}")
+                    deviceName = placeDevice.get("DEVNAME")
+                    # print(f"\tdeviceName: {deviceName}")
+                    
+                    # get the partition for this device, in the list of extra partitions, if found
+                    partitionsForDevice = list(filter(lambda x: x.device == deviceName, extraPartitions))
+                    
+                    if len(partitionsForDevice):
+                        partitionForDevice = partitionsForDevice[0]
+                        # print(f"\t\tpartitionForDevice: {partitionForDevice}")
+                        # partitionMountPointUrl = QtCore.QUrl("file://" + partitionForDevice.mountpoint)
+                        partitionMountPointUrl = QtCore.QUrl(pathlib.Path(partitionForDevice.mountpoint).as_uri())
+                        # print(f"\t\t partitionMountPointUrl: {partitionMountPointUrl}")
+                        if partitionMountPointUrl == place.url:
+                            continue
+                        
                     # check for device type, change place icon if necessary
-                    if devicesForPlace[0].get("ID_CDROM") is not None:
+                    mediaType = "Internal Drive"
+                    if placeDevice.get("ID_CDROM") is not None:
                         place.icon = "drive-optical-symbolic"
-                    elif devicesForPlace[0].get("ID_USB_TYPE") is not None:
+                        mediaType = "Removable Media"
+                        
+                    elif placeDevice.get("ID_USB_TYPE") is not None:
                         place.icon = "drive-removable-media-usb-symbolic"
+                        mediaType = "Removable Media"
                         
                     # check for device label, change place name if necessary
-                    deviceLabel = devicesForPlace[0].get("ID_FS_LABEL", "unlabeled partition")
+                    deviceLabel = placeDevice.get("ID_FS_LABEL", "unlabeled partition")
+                    # print(f"\t\tdeviceLabel: {deviceLabel}")
                     if deviceLabel == "unlabeled partition":
-                        if place.name == "File System Root":
-                            continue # don't overwrite this
                         partitionSize = int(devicesForPlace[0].get("ID_FS_SIZE")) * pq.byte
                         pwr = np.log10(partitionSize.magnitude)
                         if pwr < 3:
@@ -746,16 +801,15 @@ def get_desktop_places(schema:typing.Optional[str]=None,
                             partitionSize = partitionSize.rescale(pq.YiB).magnitude.round(1)
                             symbol = "YiB"
                             
-                        deviceLabel = f"{partitionSize} {symbol} Removable Media"
-                else:
-                    deviceLabel = place.name
+                        deviceLabel = f"{partitionSize} {symbol} {mediaType}"
 
                 place.name = deviceLabel
                 
     elif sys.platform.startswith("win32"):
-
-        drivePlaces = sorted(list(map(lambda x: DEPlace(x.mountpoint.replace("\\", ""), QtCore.QUrl(pathlib.Path(x.mountpoint).as_uri()), icon=getIcon(x)),
-                               filesystems.get_disk_partitions())), key = lambda x: x.name)
+        drivePlaces = sorted(list(map(lambda x: DEPlace(x.mountpoint.replace("\\", ""), 
+                                                        QtCore.QUrl(pathlib.Path(x.mountpoint).as_uri()), 
+                                                        icon=getIcon(x)),
+                               partitions)), key = lambda x: x.name)
             
     # add standard places, but:
     # avoid the duplicates - including those with a different name but with urls
@@ -772,17 +826,23 @@ def get_desktop_places(schema:typing.Optional[str]=None,
             if urlToPath(stdPlace.url) not in ret_paths:
                 ret[key] = stdPlaces[key]
 
+    dd = dict()
     if len(drivePlaces):
+        for place in drivePlaces:
+            key = "file://"+place.url.path()
+            # place.name = deviceLabel
+            if key not in ret:
+                dd[key] = place
+                
+    if len(dd):
         if nSeparators == 0:
             ret["separator"] = DEPlace.separator()
         else:
             ret[f"separator_{nSeparators}"] = DEPlace.separator()
         nSeparators +=1
         
-        for place in drivePlaces:
-            # place.name = deviceLabel
-            ret["file://"+place.url.path()] = place
-        
+        for key, val in dd.items():
+            ret[key] = val
     return ret
 
 # def get_recent_places(asQUrl:bool=False,
