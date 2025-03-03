@@ -199,8 +199,10 @@ class DEPlace():
         return urlToPath(self.url)
     
     @classmethod
-    def separator(cls):
-        return cls("separator", QtCore.QUrl())
+    def separator(cls, name:typing.Optional[str]=None):
+        if not isinstance(name, str) or len(name.strip()) == 0:
+            name == "separator"
+        return cls(name, QtCore.QUrl())
     
     def isSeparator(self):
         return "separator" in self.name.lower() and self.url == QtCore.QUrl()
@@ -721,10 +723,10 @@ def get_desktop_places(schema:typing.Optional[str]=None,
         #
         extraPartitions = list(filter(partitionPredicate, partitions))
         if len(extraPartitions):
-            extraPlaces = sorted(list(map(lambda x: DEPlace(x.device.replace("/dev/", ""),
+            internalDrives = sorted(list(map(lambda x: DEPlace(x.device.replace("/dev/", ""),
                                                             QtCore.QUrl(pathlib.Path(x.mountpoint).as_uri()),
                                                             icon = getIcon(x)), extraPartitions)), key = lambda x: x.name)
-            drivePlaces = extraPlaces + drivePlaces
+            drivePlaces = internalDrives + drivePlaces
             
         if len(drivePlaces):
             for place in drivePlaces:
@@ -741,21 +743,19 @@ def get_desktop_places(schema:typing.Optional[str]=None,
                 if len(devicesForPlace):
                     # a udev device for this place was found
                     placeDevice = devicesForPlace[0]
-                    # print(f"\tfound placeDevice: {placeDevice}")
                     deviceName = placeDevice.get("DEVNAME")
-                    # print(f"\tdeviceName: {deviceName}")
+                    # print(f"\tfound device: {placeDevice} (name: {deviceName}) for place: {place}")
                     
                     # get the partition for this device, in the list of extra partitions, if found
                     partitionsForDevice = list(filter(lambda x: x.device == deviceName, extraPartitions))
                     
                     if len(partitionsForDevice):
                         partitionForDevice = partitionsForDevice[0]
-                        # print(f"\t\tpartitionForDevice: {partitionForDevice}")
                         # partitionMountPointUrl = QtCore.QUrl("file://" + partitionForDevice.mountpoint)
                         partitionMountPointUrl = QtCore.QUrl(pathlib.Path(partitionForDevice.mountpoint).as_uri())
-                        # print(f"\t\t partitionMountPointUrl: {partitionMountPointUrl}")
-                        if partitionMountPointUrl == place.url:
-                            continue
+                        # print(f"\t\tpartition: {partitionForDevice} with mount point url: {partitionMountPointUrl}")
+                        if partitionMountPointUrl in list(map(lambda x: x.url, drivePlaces)):
+                            deviceName = f"{deviceName.replace('/dev/', '')} ({partitionForDevice.mountpoint})"
                         
                     # check for device type, change place icon if necessary
                     mediaType = "Internal Drive"
@@ -801,7 +801,16 @@ def get_desktop_places(schema:typing.Optional[str]=None,
                             partitionSize = partitionSize.rescale(pq.YiB).magnitude.round(1)
                             symbol = "YiB"
                             
-                        deviceLabel = f"{partitionSize} {symbol} {mediaType}"
+                        if mediaType == "Internal Drive":
+                            deviceLabel = f"{deviceName} {partitionSize} {symbol} {mediaType}"
+                        else:
+                            deviceLabel = f"{partitionSize} {symbol} {mediaType}"
+                            
+                    else:
+                        if mediaType == "Internal Drive":
+                            deviceLabel += f": {deviceName} {partitionSize} {symbol} {mediaType}"
+                        else:
+                            deviceLabel += f": {partitionSize} {symbol} {mediaType}"
 
                 place.name = deviceLabel
                 
@@ -836,9 +845,9 @@ def get_desktop_places(schema:typing.Optional[str]=None,
                 
     if len(dd):
         if nSeparators == 0:
-            ret["separator"] = DEPlace.separator()
+            ret["separator"] = DEPlace.separator("Devices")
         else:
-            ret[f"separator_{nSeparators}"] = DEPlace.separator()
+            ret[f"separator_{nSeparators}"] = DEPlace.separator("Devices")
         nSeparators +=1
         
         for key, val in dd.items():
