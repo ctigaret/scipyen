@@ -1833,13 +1833,16 @@ class PlacesButton(UrlNavigatorButtonBase):
         
         for k, (key, val) in enumerate(actionsMap.items()):
             if k in range(startIndex, lastIndex):
-                action = QtWidgets.QAction(key, menu)
-                action.setData(val.toString())
-                if val == navigator.locationUrl():
-                    font = QtGui.QFont(action.font())
-                    font.setBold(True)
-                    action.setFont(font)
-                menu.addAction(action)
+                if key.lower().startswith("separator"):
+                    menu.addSeparator()
+                else:
+                    action = QtWidgets.QAction(key, menu)
+                    action.setData(val.toString())
+                    if val == navigator.locationUrl():
+                        font = QtGui.QFont(action.font())
+                        font.setBold(True)
+                        action.setFont(font)
+                    menu.addAction(action)
                 
         if nAvailableItems > maxIndex:
             menu.addSeparator()

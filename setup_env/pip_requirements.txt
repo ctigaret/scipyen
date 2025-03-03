@@ -182,6 +182,7 @@ preshed; sys_platform == "linux"
 prometheus-client
 prompt-toolkit
 psutil
+diskinfo; sys_platform == "linux"
 pyabf
 pylmeasure      # optional
 pymongo
