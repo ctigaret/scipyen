@@ -458,7 +458,7 @@ mn = f"{now.minute}"
 sc = f"{now.second}"
 build_sfx = f"{year}{month}{day}_{hr}_{mn}_{sc}"
 
-debug_sfx = "debug" if compile_options.debug else "_"
+debug_sfx = "debug" if compile_options.debug else ""
 
 product = "_".join(["scipyen", gitsfx, platform, host_name, debug_sfx, build_sfx])
 # product = f"scipyen{gitsfx}_{platform}_{host_name}{debug_sfx}"
