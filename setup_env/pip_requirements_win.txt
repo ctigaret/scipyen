@@ -16,7 +16,7 @@
 pyabf           # ✓ (pip install pyabf) - no conda package, use upip
 imreg-dft       # ✓ (pip install imgreg-dft)
 nixio           # ✓ (pip install nixio)
-# python-magic    # ✓ (pip install python-magic)
+python-magic    # ✓ (pip install python-magic)
 # pyqtdarktheme
 # colorama
 # termcolor

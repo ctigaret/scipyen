@@ -44,7 +44,7 @@ echo:
 call mamba install --prefix %env_name% -y -c conda-forge biopython brainglobe-atlasapi napari brainglobe-napari-io brainglobe-segmentation brainrender-napari || goto eof
 echo:
 echo Installing vigra
-call mamba install --prefix %env_name% -y -c conda-forge vigra researchpy pyserial termcolor termcolor2 colorama python-magic pickleshare shapely pywnb scikit-bio scikit-learn scikit-image|| goto eof
+call mamba install --prefix %env_name% -y -c conda-forge vigra researchpy pyserial termcolor termcolor2 colorama pickleshare shapely pywnb scikit-bio scikit-learn scikit-image|| goto eof
 rem  rem  echo:
 rem  rem  echo Installing numpy
 rem  rem  call mamba install --prefix %env_name% -y numpy || goto eof
