@@ -108,25 +108,24 @@ except:
 # END About QStyle plugins
 
 # BEGIN pyqtdarktheme - recommended for Windows
-hasQDarkTheme = False
-try:
-    import qdarktheme
-    hasQDarkTheme = True
-except:
-    pass
+# hasQDarkTheme = False
+# try:
+#     import qdarktheme
+#     hasQDarkTheme = True
+# except:
+#     pass
 
 # END pyqtdarktheme
 
 # BEGIN qdarkstyle is another possibility (for windows)
 # based entirely on style sheets
-hasQDarkStyle = False
+# hasQDarkStyle = False
 
-try:
-    import qdarkstyle
-    hasQDarkStyle = True
-except:
-    hasQDarkStyle = False
-# if sys.platform.startswith("win32"):
+# try:
+#     import qdarkstyle
+#     hasQDarkStyle = True
+# except:
+#     hasQDarkStyle = False
 
 # END qdarkstyle
 
@@ -2037,18 +2036,25 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # the case where PyQt5 was pulled from pypi or conda channel, vs having
         # been built locally?
         
+        # QtCore.QCoreApplication.instance().property("_qdarktheme_use_setup_style") is True:
+
+
         # themePaths = QtGui.QIcon.themeSearchPaths()
+        # WARNING: 2025-03-04 10:42:14
+        # does NOT report correctly when using qdarktheme!
         windowColor = QtWidgets.QApplication.palette().color(QtGui.QPalette.Window)
         _,_,v,_ = windowColor.getHsv()
-        if v > 128:
-            QtGui.QIcon.setThemeName("breeze")
-        else:
-            QtGui.QIcon.setThemeName("breeze-dark")
+        themeName="breeze" if v > 128 else "breeze-dark"
+        QtGui.QIcon.setThemeName(themeName)
+        # if v > 128:
+        #     QtGui.QIcon.setThemeName("breeze")
+        # else:
+        #     QtGui.QIcon.setThemeName("breeze-dark")
 
 
-        if sys.platform.startswith("win32"):
-            if hasQDarkTheme:
-                QtGui.QIcon.setThemeName("breeze-dark")
+        # if sys.platform.startswith("win32"):
+        #     if hasQDarkTheme:
+        #         QtGui.QIcon.setThemeName("breeze-dark")
 
     @property
     def scriptManagerAutoLaunch(self):
@@ -4845,12 +4851,12 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # NOTE: 2023-03-29 14:08:58 CT - selecting bb10 bright & dark styles crashes the GUI - not sure why
         self._available_Qt_style_names_ = [
             s for s in QtWidgets.QStyleFactory.keys() if not s.startswith("bb10")]
-        if hasQDarkStyle:
-            self._available_Qt_style_names_.append("QDarkStyle Dark")
-            self._available_Qt_style_names_.append("QDarkStyle Light")
-            
-        if hasQDarkTheme:
-            self._available_Qt_style_names_.extend(f"Qt{v.capitalize()}" for v in qdarktheme.get_themes())
+#         if hasQDarkStyle:
+#             self._available_Qt_style_names_.append("QDarkStyle Dark")
+#             self._available_Qt_style_names_.append("QDarkStyle Light")
+#
+#         if hasQDarkTheme:
+#             self._available_Qt_style_names_.extend(f"Qt{v.capitalize()}" for v in qdarktheme.get_themes())
             
         # if sys.platform.startswith("win32") and hasQDarkStyle:
         #     self._available_Qt_style_names_.append("Dark Style")
@@ -7585,39 +7591,39 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             # self.app.setStyle(QtWidgets.QApplication.style())
             # self._current_GUI_style_name = "Default"
         else:
-            if hasQDarkTheme and val.startswith("Qt"):
-                #theme = val.replace("PyQtDarkTheme_", "")
-                theme = val.replace("Qt", "").lower()
-                qdarktheme.setup_theme(theme)
-            elif hasQDarkStyle and val.startswith("QDarkStyle"):
-                if val == "QDarkstyle Dark":
-                    self.app.setStyleSheet(qdarkstyle.load_stylesheet(palette = qdarkstyle.dark.palette.DarkPalette))
-                else:
-                    self.app.setStyleSheet(qdarkstyle.load_stylesheet(palette = qdarkstyle.light.palette.LightPalette))
-                    
-                styleProxy = MenuProxy(QtWidgets.QApplication.style())
-                self.app.setStyle(styleProxy)
-            else:
-                qtStyle = QtWidgets.QStyleFactory.create(val)
-                qtPalette = qtStyle.standardPalette()
-                styleProxy = MenuProxy(qtStyle)
-                
-                # NOTE: 2024-09-26 14:54:59 HACK 
-                # remove traces of qdarktheme from the app
-                # undoes the HACK in qdarktheme.setup_theme
-                qdarkstyleprop = "_qdarktheme_use_setup_style"
-                props = self.app.dynamicPropertyNames()
-                if qdarkstyleprop in (bytes(p).decode() for p in props):
-                    self.app.setProperty(qdarkstyleprop, False)
-                
-                self.app.setPalette(qtPalette)
-                self.app.setStyle(styleProxy)
-                
-                
-                
-                # NOTE: 2024-09-26 17:14:32
-                # quick hack to restore palette
-        
+            qtStyle = QtWidgets.QStyleFactory.create(val)
+            qtPalette = qtStyle.standardPalette()
+            styleProxy = MenuProxy(qtStyle)
+            self.app.setPalette(qtPalette)
+            self.app.setStyle(styleProxy)
+#             if hasQDarkTheme and val.startswith("Qt"):
+#                 #theme = val.replace("PyQtDarkTheme_", "")
+#                 theme = val.replace("Qt", "").lower()
+#                 qdarktheme.setup_theme(theme)
+#             elif hasQDarkStyle and val.startswith("QDarkStyle"):
+#                 if val == "QDarkstyle Dark":
+#                     self.app.setStyleSheet(qdarkstyle.load_stylesheet(palette = qdarkstyle.dark.palette.DarkPalette))
+#                 else:
+#                     self.app.setStyleSheet(qdarkstyle.load_stylesheet(palette = qdarkstyle.light.palette.LightPalette))
+#
+#                 styleProxy = MenuProxy(QtWidgets.QApplication.style())
+#                 self.app.setStyle(styleProxy)
+#             else:
+#                 qtStyle = QtWidgets.QStyleFactory.create(val)
+#                 qtPalette = qtStyle.standardPalette()
+#                 styleProxy = MenuProxy(qtStyle)
+#
+#                 # NOTE: 2024-09-26 14:54:59 HACK
+#                 # remove traces of qdarktheme from the app
+#                 # undoes the HACK in qdarktheme.setup_theme
+#                 qdarkstyleprop = "_qdarktheme_use_setup_style"
+#                 props = self.app.dynamicPropertyNames()
+#                 if qdarkstyleprop in (bytes(p).decode() for p in props):
+#                     self.app.setProperty(qdarkstyleprop, False)
+#
+                # self.app.setPalette(qtPalette)
+                # self.app.setStyle(styleProxy)
+
             
     @Slot()
     @safeWrapper

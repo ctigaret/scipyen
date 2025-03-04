@@ -207,12 +207,12 @@ from core.prog import scipywarn
 if os.environ["QT_API"] == "pyside2":
     scipywarn("PySide2 support is not fully implemented; expect trouble")
 
-hasQDarkTheme = False
-try:
-    import qdarktheme
-    hasQDarkTheme = True
-except:
-    pass
+# hasQDarkTheme = False
+# try:
+#     import qdarktheme
+#     hasQDarkTheme = True
+# except:
+#     pass
 
 
 # NOTE: 2023-09-28 22:12:25 
@@ -260,49 +260,60 @@ QtGui.QIcon.setFallbackSearchPaths(fbPaths)
 # On linux we rely on platform plugins (which also get bundled when
 # building a pyinstaller bundle, as per scipyen.spec)
 if sys.platform.startswith("win32"):
-    if hasQDarkTheme:
-        # qdarktheme.setup_theme("auto") # NOTE: 2025-03-02 20:52:51
-                                         # this MUST be called after the initlization of the QApplication
-                                         # see NOTE: 2025-03-02 20:53:09 below
-        qdarktheme.enable_hi_dpi()
-        QtGui.QIcon.setThemeName("breeze-dark")
-    else:
-        windowColor = QtWidgets.QApplication.palette().color(QtGui.QPalette.Window)
-        _,_,v,_ = windowColor.getHsv()
-        if v > 128:
-            QtGui.QIcon.setThemeName("breeze")
-        else:
-            QtGui.QIcon.setThemeName("breeze-dark")
-            
+    windowColor = QtWidgets.QApplication.palette().color(QtGui.QPalette.Window)
+    _,_,v,_ = windowColor.getHsv()
+    themeName="breeze" if v > 128 else "breeze-dark"
+    # print(f"windowColor HSV: {v} -> themeName: {themeName}")
+
+    QtGui.QIcon.setThemeName(themeName)
+    # if hasQDarkTheme:
+    #     # qdarktheme.setup_theme("auto") # NOTE: 2025-03-02 20:52:51
+    #                                      # this MUST be called after the initlization of the QApplication
+    #                                      # see NOTE: 2025-03-02 20:53:09 below
+    #     qdarktheme.enable_hi_dpi()
+    #     QtGui.QIcon.setThemeName("breeze-dark")
+    # else:
+    #     windowColor = QtWidgets.QApplication.palette().color(QtGui.QPalette.Window)
+    #     _,_,v,_ = windowColor.getHsv()
+    #     themeName="breeze" if v > 128 else "breeze-dark"
+    #     # print(f"windowColor HSV: {v} -> themeName: {themeName}")
+    #
+    #     QtGui.QIcon.setThemeName(themeName)
+
+        # if v > 128:
+        #     QtGui.QIcon.setThemeName("breeze")
+        # else:
+        #     QtGui.QIcon.setThemeName("breeze-dark")
+
         # FIXME 2023-09-28 23:22:31 BUG
-        # github merry-go-round replaces svg symbolic links (linux) with 
-        # simple text files containing the name of the target - this causes 
+        # github merry-go-round replaces svg symbolic links (linux) with
+        # simple text files containing the name of the target - this causes
         # the qt-svg plugin to sill out tons of error messages
         # TODO: either
         # 1) figure out how to ignore these symbolic links on Windows
         # 2) figure out how to ignore the qt-svg error messages
         #
-        # I prefer the first option; a contrived solution is to store on git hub
-        # an archive of the icon directories, and ignore the icons directories in 
+        # I would prefer the first option; a contrived solution is to store on git hub
+        # an archive of the icon directories, and ignore the icons directories in
         # .gitignore
         # unfortunately, this means that after each git pull we'd have to manually
-        # expand these directory, onse something has changed
+        # expand these directory, once something has changed
         #
         # 3) incorporate these icons in qrc and resources.py files
-        # the problem with that is that the py and qrc files sizes easily 
+        # the problem with that is that the py and qrc files sizes easily
         # get over the file size limit in github, unless I somehow break down
         # these into a qrc/py resource files for each subdirectory - brrr...
         #
         # until then, on Windows we will have to put up with the qt-svg messages
         # for now...
-        
+
 elif sys.platform.startswith("darwin"):
     windowColor = QtWidgets.QApplication.palette().color(QtGui.QPalette.Window)
     _,_,v,_ = windowColor.getHsv()
-    if v > 128:
-        QtGui.QIcon.setThemeName("breeze")
-    else:
-        QtGui.QIcon.setThemeName("breeze-dark")
+    themeName="breeze" if v > 128 else "breeze-dark"
+    # print(f"windowColor HSV: {v} -> themeName: {themeName}")
+
+    QtGui.QIcon.setThemeName(themeName)
     
         
 #### END 3rd party modules
@@ -368,22 +379,23 @@ def main():
         # NOTE: 2025-01-22 08:56:42
         # this needs to be here in prder ot initialize navigator widgets
         import gui.mainwindow as mainwindow
-        
-            
-        if sys.platform.startswith("win32"):
-            # pass
-            if hasQDarkTheme:
-                qdarktheme.setup_theme("auto") # NOTE: 2025-03-02 20:53:09
-                                               # now, this can be called
-                
-        elif sys.platform.startswith("linux"):
-            # NOTE: 2024-05-04 10:16:33
-            # reuired on Wayland so that the window manager decorates the windows
-            # with the appropriate icon instead of using the generic Wayland one.
-            # NOTE that this good to have even when forcing the use xcb platform 
-            # (see NOTE: 2024-05-04 10:14:08 above) as it conforms to the desktop
-            # standards
-            app.setDesktopFileName("Scipyen")
+
+        app.setDesktopFileName("Scipyen")
+
+#         if sys.platform.startswith("win32"):
+#             # pass
+#             if hasQDarkTheme:
+#                 qdarktheme.setup_theme("auto") # NOTE: 2025-03-02 20:53:09
+#                                                # now, this can be called
+#
+#         elif sys.platform.startswith("linux"):
+#             # NOTE: 2024-05-04 10:16:33
+#             # reuired on Wayland so that the window manager decorates the windows
+#             # with the appropriate icon instead of using the generic Wayland one.
+#             # NOTE that this good to have even when forcing the use xcb platform
+#             # (see NOTE: 2024-05-04 10:14:08 above) as it conforms to the desktop
+#             # standards
+#             app.setDesktopFileName("Scipyen")
 
 
         # NOTE: 2023-01-08 00:48:47
