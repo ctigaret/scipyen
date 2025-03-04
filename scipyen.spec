@@ -447,6 +447,8 @@ else:
     if pout.returncode == 0:
         host_name = pout.stdout.strip("\n")
 
+datas.append((os.path.join(scipyen_dir, "src", "scipyen", "core", "unicode_input_table.py"), "core"))
+
 # print(f"host_name = {host_name}; platform = {platform}")
 
 now = datetime.datetime.now()
