@@ -33,3 +33,21 @@ researchpy      # ✓ (pip install researchpy)
 modelspec       # ✓ (pip install modelspec)
 gnuplot_kernel  # ✓ (pip install gnuplot_kernel)
 #neuron          # ∅ (does not install)
+
+# NOTE: since 2024-11-19 22:04:24
+ncbi-taxonomist # will also install entrezpy
+entrez-utils
+biopython
+taxoniq
+allensdk
+pynwb
+swick
+### NOTE: thiese below will also install:
+### brainglobe-atlasapi, brainglobe-space, brainglobe-utils,
+brainglobe-workflows
+### cellfinder, cellfinder[napari], morphapi
+napari[all]
+brainglobe
+brainrender
+brainglobe-segmentation
+scikit-bio
