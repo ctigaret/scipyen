@@ -436,6 +436,9 @@ platform = sys.platform
 if platform.startswith("win32"):
     datas.append((os.path.join(scipyen_dir, "setup_env", "make_app_link.ps1"), "."))
     datas.append((os.path.join(scipyen_dir, "setup_env", "pythonbackend.ico"), "."))
+    pout = subprocess.run(["hostname"], encoding="utf-8", capture_output=True)
+    if pout.returncode == 0:
+        host_name = pout.stdout.strip("\n")
 else:
     uname = subprocess.run(["uname", "-ms"], encoding="utf-8", capture_output=True)
     if uname.returncode==0:
