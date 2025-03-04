@@ -767,40 +767,40 @@ def get_desktop_places(schema:typing.Optional[str]=None,
                         place.icon = "drive-removable-media-usb-symbolic"
                         mediaType = "Removable Media"
                         
+                    partitionSize = int(devicesForPlace[0].get("ID_FS_SIZE")) * pq.byte
+                    pwr = np.log10(partitionSize.magnitude)
+                    if pwr < 3:
+                        partitionSize = partitionSize.magnitude.round(1)
+                        symbol = "bytes"
+                    elif pwr < 6:
+                        partitionSize = partitionSize.rescale(pq.KiB).magnitude.round(1)
+                        symbol = "KiB"
+                    elif pwr < 9:
+                        partitionSize = partitionSize.rescale(pq.MiB).magnitude.round(1)
+                        symbol = "MiB"
+                    elif pwr < 12:
+                        partitionSize = partitionSize.rescale(pq.GiB).magnitude.round(1)
+                        symbol = "GiB"
+                    elif pwr < 15:
+                        partitionSize = partitionSize.rescale(pq.TiB).magnitude.round(1)
+                        symbol = "TiB"
+                    elif pwr < 19:
+                        partitionSize = partitionSize.rescale(pq.PiB).magnitude.round(1)
+                        symbol = "PiB"
+                    elif pwr < 22:
+                        partitionSize = partitionSize.rescale(pq.EiB).magnitude.round(1)
+                        symbol = "EiB"
+                    elif pwr < 25:
+                        partitionSize = partitionSize.rescale(pq.ZiB).magnitude.round(1)
+                        symbol = "ZiB"
+                    else:
+                        partitionSize = partitionSize.rescale(pq.YiB).magnitude.round(1)
+                        symbol = "YiB"
+                        
                     # check for device label, change place name if necessary
                     deviceLabel = placeDevice.get("ID_FS_LABEL", "unlabeled partition")
                     # print(f"\t\tdeviceLabel: {deviceLabel}")
                     if deviceLabel == "unlabeled partition":
-                        partitionSize = int(devicesForPlace[0].get("ID_FS_SIZE")) * pq.byte
-                        pwr = np.log10(partitionSize.magnitude)
-                        if pwr < 3:
-                            partitionSize = partitionSize.magnitude.round(1)
-                            symbol = "bytes"
-                        elif pwr < 6:
-                            partitionSize = partitionSize.rescale(pq.KiB).magnitude.round(1)
-                            symbol = "KiB"
-                        elif pwr < 9:
-                            partitionSize = partitionSize.rescale(pq.MiB).magnitude.round(1)
-                            symbol = "MiB"
-                        elif pwr < 12:
-                            partitionSize = partitionSize.rescale(pq.GiB).magnitude.round(1)
-                            symbol = "GiB"
-                        elif pwr < 15:
-                            partitionSize = partitionSize.rescale(pq.TiB).magnitude.round(1)
-                            symbol = "TiB"
-                        elif pwr < 19:
-                            partitionSize = partitionSize.rescale(pq.PiB).magnitude.round(1)
-                            symbol = "PiB"
-                        elif pwr < 22:
-                            partitionSize = partitionSize.rescale(pq.EiB).magnitude.round(1)
-                            symbol = "EiB"
-                        elif pwr < 25:
-                            partitionSize = partitionSize.rescale(pq.ZiB).magnitude.round(1)
-                            symbol = "ZiB"
-                        else:
-                            partitionSize = partitionSize.rescale(pq.YiB).magnitude.round(1)
-                            symbol = "YiB"
-                            
                         if mediaType == "Internal Drive":
                             deviceLabel = f"{deviceName} {partitionSize} {symbol} {mediaType}"
                         else:
