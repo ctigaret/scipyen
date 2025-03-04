@@ -434,8 +434,8 @@ if os.path.isdir(os.path.join(mydir, ".git")):
 host_name=""
 platform = sys.platform
 if platform.startswith("win32"):
-    datas.append((os.path.join(scipyen_dir, "install", "make_app_link.ps1"), "."))
-    datas.append((os.path.join(scipyen_dir, "install", "pythonbackend.ico"), "."))
+    datas.append((os.path.join(scipyen_dir, "setup_env", "make_app_link.ps1"), "."))
+    datas.append((os.path.join(scipyen_dir, "setup_env", "pythonbackend.ico"), "."))
 else:
     uname = subprocess.run(["uname", "-ms"], encoding="utf-8", capture_output=True)
     if uname.returncode==0:
@@ -662,7 +662,7 @@ if sys.platform.startswith("win32"):
         target_arch=None,
         codesign_identity=None,
         entitlements_file=None,
-        icon=os.path.join(scipyen_dir, "install","pythonbackend.ico"),
+        icon=os.path.join(scipyen_dir, "setup_env","pythonbackend.ico"),
         options = options
     )
 else:
