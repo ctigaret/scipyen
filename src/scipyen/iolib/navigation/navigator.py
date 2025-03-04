@@ -1835,6 +1835,10 @@ class PlacesButton(UrlNavigatorButtonBase):
         lastIndex = min(nAvailableItems, maxIndex)
         
         for k, (key, val) in enumerate(actionsMap.items()):
+            if k == 0:
+                action0 = QtWidgets.QAction("Places", menu)
+                action0.setSeparator(True)
+                menu.addAction(action0)
             if k in range(startIndex, lastIndex):
                 if key.lower().startswith("separator"):
                     menu.addSeparator()
