@@ -1835,7 +1835,7 @@ class PlacesButton(UrlNavigatorButtonBase):
         lastIndex = min(nAvailableItems, maxIndex)
         
         for k, (key, val) in enumerate(actionsMap.items()):
-            if k == 0:
+            if k == 0:# and sys.platform.startswith("linux"):
                 action0 = QtWidgets.QAction("Places", menu)
                 action0.setSeparator(True)
                 menu.addAction(action0)
