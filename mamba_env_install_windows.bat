@@ -20,6 +20,7 @@ echo Activating mamba environment %env_name%
 call mamba activate %env_name% || goto eof
 call mamba config --add channels conda-forge || goto eof
 rem  call mamba install --prefix %env_name% -y --file %conda_reqs%
+rem  goto restart
 echo:
 echo Installing jupyter qtconsole jupyterthemes matplotlib
 call mamba install --prefix %env_name% -y jupyter qtconsole jupyterthemes || goto eof
@@ -42,6 +43,7 @@ rem  echo Installing matplotlib
 rem  call mamba install --prefix %env_name% -y matplotlib || goto eof
 echo:
 call mamba install --prefix %env_name% -y -c conda-forge biopython brainglobe-atlasapi napari brainglobe-napari-io brainglobe-segmentation brainrender-napari || goto eof
+:restart
 echo:
 echo Installing vigra
 call mamba install --prefix %env_name% -y -c conda-forge vigra researchpy pyserial termcolor termcolor2 colorama pickleshare shapely pynwb scikit-bio scikit-learn scikit-image|| goto eof
