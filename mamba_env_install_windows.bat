@@ -11,7 +11,7 @@ rem  setlocal enabledelayedexpansion enableextensions
 set mypath=%0
 set mydir=%~dp0
 rem Leave THIS LINE HERE; jus comment out or change the goto label
-goto make_desktop_shortcut
+rem  goto make_desktop_shortcut
 set pip_reqs=%mydir%\setup_env\pip_requirements_win.txt
 :create_env
 set default_env_path="c:\scipyenv"
