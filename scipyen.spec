@@ -52,9 +52,17 @@ bash script
 import io, os, sys, subprocess, shutil, tempfile, typing, pathlib, traceback
 import argparse
 import string, datetime, importlib, inspect, itertools, time
+import colorama
 from PyInstaller.utils.hooks import (collect_data_files, collect_submodules, 
                                      collect_all)
 from PyInstaller.building.datastruct import Tree
+
+def printStyled(s:str, color:str='yellow', bright:bool=True):
+    c = getattr(colorama.Fore, color.upper())
+    pre = f"{c}{colorama.Style.BRIGHT}" if bright else c
+    return f"{pre}{s}{colorama.Style.RESET_ALL}"
+
+
 
 start_time = time.perf_counter()
 
@@ -114,7 +122,7 @@ if not myfile.is_absolute():
 # we are bundling from, and what is the local status of that branch
 mydir = myfile.parents[0]
 
-print(f"\nWARNING: External IPython consoles - including NEURON - are NOT yet supported by the bundled Scipyen\n\n")
+print(f"\n{printStyled('WARNING:', color='yellow')} External IPython consoles - including NEURON - are NOT yet supported by the bundled Scipyen\n\n")
 
 #def datafile(path, strip_path=True):
     #parts = path.split('/')
@@ -637,7 +645,7 @@ a = Analysis(
     runtime_hooks=[os.path.join(scipyen_dir, 'src','scipyen','__pyinstaller', 'rthooks','pyi_rth_typeguard.py'),
                    # os.path.join(scipyen_dir, 'src','scipyen','__pyinstaller', 'rthooks','pyi_rth_gui.py'), # these just added manually to hiddenimports, above
                    ],
-    excludes=["OpenGL", "torch", "nuitka"],
+    excludes=["OpenGL", "torch", "nuitka", "PySide6"],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
