@@ -603,8 +603,10 @@ qt5plugins_toc = getQt5Plugins(qt5plugins_dir)
 # print(f"\ndatas = {datas}\n")
 
 hiddenimports.extend(['gui.widgets',
+                      'gui.widgets.basescipyendatawidget',
                       'gui.widgets.metadatawidget',
-                      'gui.widgets.modelfitting_ui'])
+                      'gui.widgets.modelfitting_ui',
+                      ])
 
 plugin_hidden_imports, plugin_toc = collect_internal_scipyen_plugins(scipyen_dir)
 # pt_txt = '\n'.join([f"{k}: {i}" for k,i in enumerate(plugin_toc)])
