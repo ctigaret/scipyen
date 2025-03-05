@@ -20,6 +20,8 @@ dependencies:
   - more-itertools
   - ipyparallel
   # - conda-forge::dbus-python # linux, osx
+  - conda-forge::pywin32
+  - conda-forge::
   - conda-forge::jupyter_cms
   - conda-forge::jupyter_qtconsole_colorschemes
   - conda-forge::biopython
@@ -65,4 +67,5 @@ dependencies:
       - nixio==1.5.4
       - pyabf==2.3.8
       - python-magic==0.4.27
+      - winshell
 

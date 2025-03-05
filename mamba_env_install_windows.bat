@@ -10,8 +10,9 @@ echo and must be run from a mamba (Microforge) prompt launched as administrator
 rem  setlocal enabledelayedexpansion enableextensions
 set mypath=%0
 set mydir=%~dp0
+rem Leave THIS LINE HERE; jus comment out or change the goto label
+goto make_desktop_shortcut
 set pip_reqs=%mydir%\setup_env\pip_requirements_win.txt
-rem  goto install_own_console_styles
 :create_env
 set default_env_path="c:\scipyenv"
 set /P env_path="Enter the full path name of the new environment (no spaces, please, default is: %default_env_path%): "
@@ -35,6 +36,7 @@ cd %mydir%  || goto eof
 echo:
 echo Creating batch scripts
 powershell -ExecutionPolicy Bypass -File %mydir%\setup_env\make_scipyen_batch_scripts.ps1 || goto eof
+:make_desktop_shortcut
 echo:
 echo Creating desktop link
 powershell -ExecutionPolicy Bypass -File %mydir%\setup_env\make_link.ps1 %mydir%  || goto eof
