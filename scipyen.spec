@@ -159,9 +159,9 @@ if hasTaxoniq:
         hasNCBIRefseqAccessionOffsets=True
         
     if hasNCBIGenbankAccessionOffsets:
-        ncbi_accession_offsets_file = [(pathlib.Path(accession_ofsets.db).as_posix(), "ncbi_genbank_accession_offsets")]
+        ncbi_accession_offsets_file = [(pathlib.Path(accession_offsets.db).as_posix(), "ncbi_genbank_accession_offsets")]
     elif hasNCBIRefseqAccessionOffsets:
-        ncbi_accession_offsets_file = [(pathlib.Path(accession_ofsets.db).as_posix(), "ncbi_refseq_accession_offsets")]
+        ncbi_accession_offsets_file = [(pathlib.Path(accession_offsets.db).as_posix(), "ncbi_refseq_accession_offsets")]
     else:
         ncbi_accession_offsets_file = list()
         

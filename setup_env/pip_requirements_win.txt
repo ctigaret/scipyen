@@ -35,10 +35,10 @@ gnuplot_kernel  # ✓ (pip install gnuplot_kernel)
 #neuron          # ∅ (does not install)
 
 # NOTE: since 2024-11-19 22:04:24
-# ncbi-taxonomist # will also install entrezpy
+ncbi-taxonomist # will also install entrezpy
 # entrez-utils
 # biopython
-# taxoniq
+taxoniq
 # allensdk
 # pynwb
 # swick
