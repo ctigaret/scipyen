@@ -84,7 +84,87 @@ try:
     hasNeuron = True
 except:
     hasNeuron = False
+    
+hasTaxoniq = False
+hasNCBITaxonDB=False
+hasNCBIGenbankAccession=False
+hasNCBIRefseqAccession=False
+hasNCBIGenbankAccessionLengths=False
+hasNCBIRefseqAccessionLengths=False
+hasNCBIGenbankAccessionOffsets=False
+hasNCBIRefseqAccessionOffsets=False
+    
+try: 
+    import taxoniq
+    hasTaxoniq = True
+except:
+    hasTaxoniq = False
 
+if hasTaxoniq:
+    try:
+        import ncbi_taxon_db
+        hasNCBITaxonDB=True
+    except:
+        hasNCBITaxonDB=False
+        
+    if hasNCBITaxonDB:
+        ncbi_taxon_db_dir_path = pathlib.Path(ncbi_taxon_db.db_dir)
+        
+        ncbi_taxon_db_files = list(map(lambda x: (x.as_posix(), "ncbi_taxon_db"),
+                                       itertools.chain(ncbi_taxon_db_dir_path.glob("*marisa"),
+                                                       ncbi_taxon_db_dir_path.glob("*zstd"),))
+        
+    else:
+        ncbi_taxon_db_files = list()
+    
+    try:
+        import ncbi_genbank_accession_db as accession_db
+        hasNCBIGenbankAccession=True
+        hasNCBIRefseqAccession=False
+    except ImportError:
+        import ncbi_refseq_accession_db as accession_db
+        hasNCBIGenbankAccession=False
+        hasNCBIRefseqAccession=True
+        
+    if hasNCBIGenbankAccession:
+        ncbi_accession_db_file = [(pathlib.Path(accession_db.db).as_posix(), "ncbi_genbank_accession_db")]
+    elif hasNCBIRefseqAccession:
+        ncbi_accession_db_file = [(pathlib.Path(accession_db.db).as_posix(), "ncbi_refseq_accession_db")]
+    else:
+        ncbi_accession_db_file = list()
+        
+    try:
+        import ncbi_genbank_accession_lengths as accession_lengths
+        hasNCBIGenbankAccessionLengths=True
+        hasNCBIRefseqAccessionLengths=False
+    except ImportError:
+        import ncbi_refseq_accession_lengths as accession_lengths
+        hasNCBIGenbankAccessionLengths=False
+        hasNCBIRefseqAccessionLengths=True
+        
+    if hasNCBIGenbankAccessionLengths:
+        ncbi_accession_lengths_file = [(pathlib.Path(accession_lengths.db).as_posix(), "ncbi_genbank_accession_lengths")]
+    elif hasNCBIRefseqAccessionLengths:
+        ncbi_accession_lengths_file = [(pathlib.Path(accession_lengths.db).as_posix(), "ncbi_refseq_accession_lengths")]
+    else:
+        ncbi_accession_lengths_file = list()
+        
+    try:
+        import ncbi_genbank_accession_offsets as accession_offsets
+        hasNCBIGenbankAccessionOffsets=True
+        hasNCBIRefseqAccessionOffsets=False
+    except ImportError:
+        import ncbi_refseq_accession_offsets as accession_offsets
+        hasNCBIGenbankAccessionOffsets=False
+        hasNCBIRefseqAccessionOffsets=True
+        
+    if hasNCBIGenbankAccessionOffsets:
+        ncbi_accession_offsets_file = [(pathlib.Path(accession_ofsets.db).as_posix(), "ncbi_genbank_accession_offsets")]
+    elif hasNCBIRefseqAccessionOffsets:
+        ncbi_accession_offsets_file = [(pathlib.Path(accession_ofsets.db).as_posix(), "ncbi_refseq_accession_offsets")]
+    else:
+        ncbi_accession_offsets_file = list()
+        
 # print(f"argv: {sys.argv}")
 # print(f"orig_argv: {sys.orig_argv}")
 
@@ -460,6 +540,10 @@ else:
         host_name = pout.stdout.strip("\n")
 
 datas.append((os.path.join(scipyen_dir, "src", "scipyen", "core", "unicode_input_table.py"), "core"))
+datas.extend(ncbi_taxon_db_files)
+datas.extend(ncbi_accession_db_file)
+datas.extend(ncbi_accession_lengths_file)
+datas.extend(ncbi_accession_offsets_file)
 
 # print(f"host_name = {host_name}; platform = {platform}")
 
