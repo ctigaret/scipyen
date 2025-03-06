@@ -112,7 +112,7 @@ if hasTaxoniq:
         
         ncbi_taxon_db_files = list(map(lambda x: (x.as_posix(), "ncbi_taxon_db"),
                                        itertools.chain(ncbi_taxon_db_dir_path.glob("*marisa"),
-                                                       ncbi_taxon_db_dir_path.glob("*zstd"),))
+                                                       ncbi_taxon_db_dir_path.glob("*zstd"),)))
         
     else:
         ncbi_taxon_db_files = list()
