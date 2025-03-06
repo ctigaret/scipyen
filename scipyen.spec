@@ -52,9 +52,17 @@ bash script
 import io, os, sys, subprocess, shutil, tempfile, typing, pathlib, traceback
 import argparse
 import string, datetime, importlib, inspect, itertools, time
+import colorama
 from PyInstaller.utils.hooks import (collect_data_files, collect_submodules, 
                                      collect_all)
 from PyInstaller.building.datastruct import Tree
+
+def printStyled(s:str, color:str='yellow', bright:bool=True):
+    c = getattr(colorama.Fore, color.upper())
+    pre = f"{c}{colorama.Style.BRIGHT}" if bright else c
+    return f"{pre}{s}{colorama.Style.RESET_ALL}"
+
+
 
 start_time = time.perf_counter()
 
@@ -114,7 +122,7 @@ if not myfile.is_absolute():
 # we are bundling from, and what is the local status of that branch
 mydir = myfile.parents[0]
 
-print(f"\nWARNING: External IPython consoles - including NEURON - are NOT yet supported by the bundled Scipyen\n\n")
+print(f"\n{printStyled('WARNING:', color='yellow')} External IPython consoles - including NEURON - are NOT yet supported by the bundled Scipyen\n\n")
 
 #def datafile(path, strip_path=True):
     #parts = path.split('/')
@@ -434,8 +442,11 @@ if os.path.isdir(os.path.join(mydir, ".git")):
 host_name=""
 platform = sys.platform
 if platform.startswith("win32"):
-    datas.append((os.path.join(scipyen_dir, "install", "make_app_link.ps1"), "."))
-    datas.append((os.path.join(scipyen_dir, "install", "pythonbackend.ico"), "."))
+    datas.append((os.path.join(scipyen_dir, "setup_env", "make_app_link.ps1"), "."))
+    datas.append((os.path.join(scipyen_dir, "setup_env", "pythonbackend.ico"), "."))
+    pout = subprocess.run(["hostname"], encoding="utf-8", capture_output=True)
+    if pout.returncode == 0:
+        host_name = pout.stdout.strip("\n")
 else:
     uname = subprocess.run(["uname", "-ms"], encoding="utf-8", capture_output=True)
     if uname.returncode==0:
@@ -443,6 +454,8 @@ else:
     pout = subprocess.run(["hostname"], encoding="utf-8", capture_output=True)
     if pout.returncode == 0:
         host_name = pout.stdout.strip("\n")
+
+datas.append((os.path.join(scipyen_dir, "src", "scipyen", "core", "unicode_input_table.py"), "core"))
 
 # print(f"host_name = {host_name}; platform = {platform}")
 
@@ -455,7 +468,7 @@ mn = f"{now.minute}"
 sc = f"{now.second}"
 build_sfx = f"{year}{month}{day}_{hr}_{mn}_{sc}"
 
-debug_sfx = "debug" if compile_options.debug else "_"
+debug_sfx = "debug" if compile_options.debug else ""
 
 product = "_".join(["scipyen", gitsfx, platform, host_name, debug_sfx, build_sfx])
 # product = f"scipyen{gitsfx}_{platform}_{host_name}{debug_sfx}"
@@ -590,8 +603,10 @@ qt5plugins_toc = getQt5Plugins(qt5plugins_dir)
 # print(f"\ndatas = {datas}\n")
 
 hiddenimports.extend(['gui.widgets',
+                      'gui.widgets.basescipyendatawidget',
                       'gui.widgets.metadatawidget',
-                      'gui.widgets.modelfitting_ui'])
+                      'gui.widgets.modelfitting_ui',
+                      ])
 
 plugin_hidden_imports, plugin_toc = collect_internal_scipyen_plugins(scipyen_dir)
 # pt_txt = '\n'.join([f"{k}: {i}" for k,i in enumerate(plugin_toc)])
@@ -632,7 +647,7 @@ a = Analysis(
     runtime_hooks=[os.path.join(scipyen_dir, 'src','scipyen','__pyinstaller', 'rthooks','pyi_rth_typeguard.py'),
                    # os.path.join(scipyen_dir, 'src','scipyen','__pyinstaller', 'rthooks','pyi_rth_gui.py'), # these just added manually to hiddenimports, above
                    ],
-    excludes=["OpenGL", "torch", "nuitka"],
+    excludes=["OpenGL", "torch", "nuitka", "PySide6"],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
@@ -662,7 +677,7 @@ if sys.platform.startswith("win32"):
         target_arch=None,
         codesign_identity=None,
         entitlements_file=None,
-        icon=os.path.join(scipyen_dir, "install","pythonbackend.ico"),
+        icon=os.path.join(scipyen_dir, "setup_env","pythonbackend.ico"),
         options = options
     )
 else:

@@ -133,7 +133,7 @@ except:
 
 # BEGIN jupyter, ipython, qtconsole et al
 from jupyter_client.session import Message
-from IPython.display import set_matplotlib_formats
+# from IPython.display import set_matplotlib_formats
 from IPython.core.history import HistoryAccessor
 from jupyter_core.paths import jupyter_runtime_dir
 from qtconsole.svg import save_svg, svg_to_clipboard, svg_to_image

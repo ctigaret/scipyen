@@ -1,45 +1,71 @@
+# created manually on 2025-03-05 00:31:03
+# to use, call mamba env create --prefix <your chosen location> --file <this file>
+# but PLEASE avoid long pathnames and avoid empty spaces in the pathnames
+# (make it easy for yourself)
 name: scipyenv
 channels:
   - conda-forge
 dependencies:
   - python==3.11
-  - more-itertools
+  - pip
+  - sphinx
+  - isodate
+  - cmasher
   - confuse
   - pyxdg
-  - python-magic
-  - dill
-  - dbus-python
-  - pyinstaller
-  - pyserial
-  - inflect
   - jupyter
   - qtconsole
   - jupyterthemes
-  - jupyter_qtconsole_colorschemes
-  - qimage2ndarray
-  - numpy
   - matplotlib
-  - scipy
+  - more-itertools
+  - ipyparallel
+  # - conda-forge::dbus-python # linux, osx
+  - conda-forge::pywin32
+  - conda-forge::
+  - conda-forge::jupyter_cms
+  - conda-forge::jupyter_qtconsole_colorschemes
+  - conda-forge::biopython
+  - conda-forge::brainglobe-atlasapi
+  - conda-forge::napari
+  - conda-forge::brainglobe-napari-io
+  - conda-forge::brainglobe-segmentation
+  - conda-forge::brainrender-napari
+  - conda-forge::vigra
+  - conda-forge::researchpy
+  - conda-forge::pyserial
+  - conda-forge::termcolor
+  - conda-forge::termcolor2
+  - conda-forge::colorama
+  - conda-forge::pickleshare
+  - conda-forge::shapely
+  - conda-forge::pynwb
+  - conda-forge::scikit-bio
+  - conda-forge::scikit-learn
+  - conda-forge::scikit-image
+  - conda-forge::pandas-flavor
   - sympy
+  - pyqtgraph
+  - qimage2ndarray
   - quantities
   - python-neo
-  - h5py
-  - pyqtgraph
-  - PyWavelets
-  - pandas
-  - pandas-flavor
-  - seaborn
   - cmocean
+  - inflect
+  - seaborn
   - pingouin
-  - bokeh
-  - scikit-image
-  - scikit-learn
-  - shapely
-  - sphinx
-  - cmasher
-  - isodate
-  - termcolor
-  - termcolor2
-  - ipyparallel
-  - vigra
+  - dill
+  - libNeuroML
+  - matlab_kernel
+  - octave_kernel
+  # - python-magic
+  - pyinstaller
+  - pip:
+      - cattrs==24.1.2
+      - gnuplot-kernel==0.4.1
+      - hdf5view==0.2.3
+      - imreg-dft==2.0.0
+      - modelspec==0.3.6
+      - nixio==1.5.4
+      - pyabf==2.3.8
+      - python-magic==0.4.27
+      - winshell
 

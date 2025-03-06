@@ -14,7 +14,7 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 unicode_input = dict()
 
 # with open(os.path.join(__module_path__,"unicode_input_table")) as src:
-with codecs.open(os.path.join(__module_path__,"unicode_input_table"), 'r', encoding="utf-8", errors="ignore") as src:
+with codecs.open(os.path.join(__module_path__,"unicode_input_table.py"), 'r', encoding="utf-8", errors="ignore") as src:
     while True:
         l = str()
         try:

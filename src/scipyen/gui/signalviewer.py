@@ -1228,10 +1228,20 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @markConfigurable("LeftAxisLabelWrapMode", "qt")
     @leftLabelWrapMode.setter
     def leftLabelWrapMode(self, val:str):
+        fallback = "WordWrap"
         if not isinstance(val, str):
-            raise TypeError(f"Expecting a str; instead got {type(val).__name__}")
+            val=fallback
+            # raise TypeError(f"Expecting a str; instead got {type(val).__name__}")
         if not hasattr(QtGui.QTextOption.WrapMode, val):
-            raise ValueError(f"Invalid wrap mode {val}")
+            try:
+                wrModes = dict((k,v) for k,v in vars(QtGui.QTextOption).items() if isinstance(v, QtGui.QTextOption.WrapMode))
+                if val not in vrModes:
+                    val = fallback
+
+            except:
+                val = fallback
+
+            # raise ValueError(f"Invalid wrap mode {val}")
         
         self._leftLabelWrapMode_ = val
         

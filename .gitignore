@@ -10,3 +10,5 @@ kate.project.*
 .kateproject
 # Ignore dynaconf secret files
 .secrets.*
+*.egg-info*
+dist

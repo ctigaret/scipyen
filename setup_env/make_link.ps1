@@ -18,7 +18,9 @@ $shell = New-Object -ComObject WScript.Shell
 if ($myWindowsPrincipal.IsInRole($adminRole))
 {
     $desktop=$shell.SpecialFolders.Item("AllUsersDesktop")
-    $wdir=$shell.SpecialFolders.Item("AllUsersDesktop")
+    $wdir=Join-Path -Path $Home -ChildPath "Documents"
+#     $wdir=$shell.SpecialFolders.Item("AllUsersDesktop")
+    $wdir="%HOMEPATH%"
 }
 else
 {

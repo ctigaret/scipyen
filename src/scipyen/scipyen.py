@@ -39,9 +39,11 @@ if isinstance(my_conda_env, str) and len(my_conda_env.strip()):
 elif isinstance(my_virtualenv, str) and len(my_virtualenv.strip()):
     # pass # OK
     print(f"Scipyen is running in the virtualenv environment {printStyled(my_virtualenv, color='yellow')}\n")
-    
+
+elif getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+    print(f"Scipyen is running in a {printStyled('PyInstaller bundle', color='yellow')}\n")
 else:
-    raise RuntimeError("Scipyen must be run in a virtualenv virtual Python environment or a conda environment\n")
+    raise RuntimeError("Scipyen must be run in a virtualenv virtual Python environment, a conda environment, or a PyInstaller bundle\n")
 
 try:
     # print(f"scipyen module: {__file__}")
