@@ -57,6 +57,10 @@ from PyInstaller.utils.hooks import (collect_data_files, collect_submodules,
                                      collect_all)
 from PyInstaller.building.datastruct import Tree
 
+if sys.platform == "linux":
+    sys.setrecursionlimit(sys.getrecursionlimit() * 5)
+
+
 def printStyled(s:str, color:str='yellow', bright:bool=True):
     c = getattr(colorama.Fore, color.upper())
     pre = f"{c}{colorama.Style.BRIGHT}" if bright else c
