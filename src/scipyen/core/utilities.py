@@ -3133,13 +3133,13 @@ def reverse_mapping_lookup(x:dict, y:typing.Any) -> typing.Optional[typing.Union
     #from .traitcontainers import (DataBag, Bunch, )
     #from collections import OrderedDict
     
-    vals = list(x.values()) # bypass the errors raise when comparing np.arrays
+    vals = list(filter(lambda o: isinstance(o, type(y)), x.values())) # bypass the errors raise when comparing np.arrays
     
     if any(isinstance(v, (np.ndarray, pd.DataFrame, pd.Series, pd.Index)) for v in vals) or isinstance(y, (np.ndarray, pd.DataFrame, pd.Series, pd.Index)):
         testincluded = any(safe_identity_test(y,v) for v in vals)
         
     else:
-        testincluded = y in x.values()
+        testincluded = y in vals
     
     if testincluded:
         ret = [name for name, val in x.items() if safe_identity_test(y, val)]
@@ -3147,11 +3147,6 @@ def reverse_mapping_lookup(x:dict, y:typing.Any) -> typing.Optional[typing.Union
         
         return tuple(ret)
         
-#         if len(ret) == 1:
-#             return ret[0]
-#         
-#         elif len(ret) > 1:
-#             return tuple(ret)
     else:
         return tuple()
     
