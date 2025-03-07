@@ -642,10 +642,14 @@ datas.extend(yamltoc)
 # I think the next line below ('collect_all') is better than trying to see what
 # can be tweaked in hook-pygments.py / hook-pkg_resources.py
 jqc_datas, jqc_binaries, jqc_hiddenimports = collect_all("jupyter_qtconsole_colorschemes")
+scs_datas, scs_binaries, scs_hiddenimport = collect_all("scipyen_console_styles")
 # print(f"jqc_hiddenimports = {jqc_hiddenimports}")
 datas.extend(jqc_datas)
+datas.extend(scs_datas)
 binaries.extend(jqc_binaries)
+binaries.extend(scs_binaries)
 hiddenimports.extend(jqc_hiddenimports)
+hiddenimports.extend(scs_hiddenimports)
 
 # NOTE: 2023-06-29 08:32:55
 # try as above for jupyter_client (needed because "local-provisioner" issues 
