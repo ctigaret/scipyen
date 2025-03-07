@@ -54,7 +54,7 @@ import argparse
 import string, datetime, importlib, inspect, itertools, time
 import colorama
 from PyInstaller.utils.hooks import (collect_data_files, collect_submodules, 
-                                     collect_all)
+                                     collect_all, copy_metadata, collect_entry_point)
 from PyInstaller.building.datastruct import Tree
 
 if sys.platform == "linux":
@@ -539,6 +539,11 @@ datas.extend(ncbi_taxon_db_files)
 datas.extend(ncbi_accession_db_file)
 datas.extend(ncbi_accession_lengths_file)
 datas.extend(ncbi_accession_offsets_file)
+pygments_styles_data, pygments_styles_hiddenimports = collect_entry_point("pygments.styles")
+datas.extend(copy_metadata("scipyen_console_styles"))
+datas.extend(pygments_styles_data)
+hiddenimports.extend(pygments_styles_hiddenimports)
+
 
 # print(f"host_name = {host_name}; platform = {platform}")
 
@@ -642,14 +647,15 @@ datas.extend(yamltoc)
 # I think the next line below ('collect_all') is better than trying to see what
 # can be tweaked in hook-pygments.py / hook-pkg_resources.py
 jqc_datas, jqc_binaries, jqc_hiddenimports = collect_all("jupyter_qtconsole_colorschemes")
-scs_datas, scs_binaries, scs_hiddenimports = collect_all("scipyen_console_styles")
 # print(f"jqc_hiddenimports = {jqc_hiddenimports}")
 datas.extend(jqc_datas)
-datas.extend(scs_datas)
 binaries.extend(jqc_binaries)
-binaries.extend(scs_binaries)
 hiddenimports.extend(jqc_hiddenimports)
-hiddenimports.extend(scs_hiddenimports)
+
+# scs_datas, scs_binaries, scs_hiddenimports = collect_all("scipyen_console_styles")
+# datas.extend(scs_datas)
+# binaries.extend(scs_binaries)
+# hiddenimports.extend(scs_hiddenimports)
 
 # NOTE: 2023-06-29 08:32:55
 # try as above for jupyter_client (needed because "local-provisioner" issues 
