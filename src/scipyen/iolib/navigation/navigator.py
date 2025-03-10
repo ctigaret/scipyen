@@ -1836,25 +1836,36 @@ class PlacesButton(UrlNavigatorButtonBase):
         lastIndex = min(nAvailableItems, maxIndex)
         
         for k, (key, val) in enumerate(actionsMap.items()):
-            if k == 0:# and sys.platform.startswith("linux"):
-                action0 = QtWidgets.QAction("Places", menu)
-                action0.setSeparator(True)
-                menu.addAction(action0)
-            if k in range(startIndex, lastIndex):
-                if key.lower().startswith("separator"):
-                    menu.addSeparator()
-                else:
-                    action = QtWidgets.QAction(key, menu)
-                    if isinstance(val, QtCore.QUrl):
-                        action.setData(val.toString())
-                        if val == navigator.locationUrl():
-                            font = QtGui.QFont(action.font())
-                            font.setBold(True)
-                            action.setFont(font)
-                    else:
-                        action.setSeparator(True)
-                        
-                    menu.addAction(action)
+            action = QtWidgets.QAction(key, menu)
+            if isinstance(val, QtCore.QUrl):
+                action.setData(val.toString())
+                if val == navigator.locationUrl():
+                    font = QtGui.QFont(action.font())
+                    font.setBold(True)
+                    action.setFont(font)
+            else:
+                action.setSeparator(True)
+                
+            menu.addAction(action)
+#             if k == 0:# and sys.platform.startswith("linux"):
+#                 action0 = QtWidgets.QAction("Places", menu)
+#                 action0.setSeparator(True)
+#                 menu.addAction(action0)
+#             if k in range(startIndex, lastIndex):
+#                 if key.lower().startswith("separator"):
+#                     menu.addSeparator()
+#                 else:
+#                     action = QtWidgets.QAction(key, menu)
+#                     if isinstance(val, QtCore.QUrl):
+#                         action.setData(val.toString())
+#                         if val == navigator.locationUrl():
+#                             font = QtGui.QFont(action.font())
+#                             font.setBold(True)
+#                             action.setFont(font)
+#                     else:
+#                         action.setSeparator(True)
+#                         
+#                     menu.addAction(action)
                 
         if nAvailableItems > maxIndex:
             menu.addSeparator()

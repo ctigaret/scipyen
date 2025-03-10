@@ -194,6 +194,7 @@ class DEPlace():
     system:bool = dataclasses.field(default=False)
     hidden:bool = dataclasses.field(default=False)
     app:typing.Optional[str] = dataclasses.field(default_factory=str)
+    separator:bool = dataclasses.field(default=False)
     
     def urlPath(self) -> pathlib.Path:
         return urlToPath(self.url)
@@ -202,10 +203,11 @@ class DEPlace():
     def separator(cls, name:typing.Optional[str]=None):
         if not isinstance(name, str) or len(name.strip()) == 0:
             name == "separator"
-        return cls(name, QtCore.QUrl())
+        return cls(name, QtCore.QUrl(), separator=True)
     
     def isSeparator(self):
-        return "separator" in self.name.lower() and self.url == QtCore.QUrl()
+        return self.separator
+        # return "separator" in self.name.lower() and self.url == QtCore.QUrl()
         
 class DEBookmark(Bunch):
     def __init__(self, *args, **kwargs):
@@ -501,9 +503,6 @@ def get_system_terminal_executable():
     else:
         warnings.warn(f"{sys.platform} platform is not yet supported")
         
-# def get_standard_desktop_places(asQUrl:bool=False, all_folder_icons:bool=False,
-#                                 intKeys:bool=False) -> PlacesMap:
-# def get_standard_desktop_places(asQUrl:bool=False, all_folder_icons:bool=False) -> PlacesMap:
 def get_standard_desktop_places(all_folder_icons:bool=False) -> PlacesMap:
     """Platform-independent Desktop places.
     These are defined in the Qt toolkit
@@ -575,6 +574,8 @@ def get_desktop_places(schema:typing.Optional[str]=None,
     #     schema = None
         
     ret = PlacesMap()
+    ret["separator"] = DEPlace.separator("Places")
+    nSeparators += 1
     stdPlaces = get_standard_desktop_places(all_folder_icons)
     # stdPlaces = get_standard_desktop_places(asQUrl, all_folder_icons)
     
@@ -678,7 +679,8 @@ def get_desktop_places(schema:typing.Optional[str]=None,
                                                 icon = place_icon_name, # can be a system icon name or a path/file name
                                                 system = is_system_place,
                                                 hidden = is_hidden,
-                                                app = app)
+                                                app = app,
+                                                separator = False)
 
         # create desktop places for non-standard partitions or removable media
         # NOTE: 2025-03-03 21:14:26 FIXME/TODO
@@ -689,10 +691,15 @@ def get_desktop_places(schema:typing.Optional[str]=None,
         devices = list(context.list_devices(subsystem="block", DEVTYPE="partition"))
         disks = list(context.list_devices().match_property("DEVTYPE", "disk"))
         
-        drivePlaces = sorted(list(map(lambda x: DEPlace(x.device.replace("/dev/", ""), 
+        lbl = "Removable Disks" if sys.platform.startswith("win32") else "Removable Devices"
+        rmDriveSep = DEPlace.separator(lbl)
+        
+        drivePlaces = [rmDriveSep] + sorted(list(map(lambda x: DEPlace(x.device.replace("/dev/", ""), 
                                                         QtCore.QUrl(pathlib.Path(x.mountpoint).as_uri()), 
-                                                        icon=getIcon(x)),
+                                                        icon=getIcon(x), separator=False),
                                list(filter(lambda x: "/run/media/" in x.mountpoint, partitions)))), key = lambda x: x.name)
+        
+        
         ret_paths = list(map(lambda x: urlToPath(x.url), ret.values()))
         
         # check for custom (fixed) partitions mounts outside /run/media, and add them
@@ -722,98 +729,105 @@ def get_desktop_places(schema:typing.Optional[str]=None,
         # these might not be necessary, as they can always be accessed from the root filesystem
         # through their mount point 😃
         #
-        extraPartitions = list(filter(partitionPredicate, partitions))
-        if len(extraPartitions):
-            internalDrives = sorted(list(map(lambda x: DEPlace(x.device.replace("/dev/", ""),
+        fixedPartitions = list(filter(partitionPredicate, partitions))
+        internalDrivePlaces = list()
+        if len(fixedPartitions):
+            lbl = "Fixed Disks" if sys.platform.startswith("win32") else "Devices"
+            fpDevSep = DEPlace.separator(lbl)
+            internalDrivePlaces = [fpDevSep] + sorted(list(map(lambda x: DEPlace(x.device.replace("/dev/", ""),
                                                             QtCore.QUrl(pathlib.Path(x.mountpoint).as_uri()),
-                                                            icon = getIcon(x)), extraPartitions)), key = lambda x: x.name)
-            drivePlaces = internalDrives + drivePlaces
-            
+                                                            icon = getIcon(x), separator=False), fixedPartitions)), key = lambda x: x.name)
+            drivePlaces = internalDrivePlaces + drivePlaces
+                
         if len(drivePlaces):
+            # curateDevicePlacesUnix(drivePlaces)
             for place in drivePlaces:
+                if not place.isSeparator():
+                    # print(f"found separator: {place.name}")
+                    # continue
                 # print(f"\nplace: {place}")
-                deviceLabel = place.name
-                
-                # find the device for this place, in 'devices'
-                devicesForPlace = list(filter(lambda x: x.sys_name == place.name, devices))
-                if len(devicesForPlace) == 0:
-                    # a device for the place was not found -> also check in disks - contains mounted optical media
-                    devicesForPlace = list(filter(lambda x: x.sys_name == place.name, disks))
+                    deviceLabel = place.name
                     
-                
-                if len(devicesForPlace):
-                    # a udev device for this place was found
-                    placeDevice = devicesForPlace[0]
-                    deviceName = placeDevice.get("DEVNAME")
-                    # print(f"\tfound device: {placeDevice} (name: {deviceName}) for place: {place}")
+                    # find the device for this place, in 'devices'
+                    devicesForPlace = list(filter(lambda x: x.sys_name == place.name, devices))
+                    if len(devicesForPlace) == 0:
+                        # a device for the place was not found -> also check in disks - contains mounted optical media
+                        devicesForPlace = list(filter(lambda x: x.sys_name == place.name, disks))
+                        
                     
-                    # get the partition for this device, in the list of extra partitions, if found
-                    partitionsForDevice = list(filter(lambda x: x.device == deviceName, extraPartitions))
-                    
-                    if len(partitionsForDevice):
-                        partitionForDevice = partitionsForDevice[0]
-                        # partitionMountPointUrl = QtCore.QUrl("file://" + partitionForDevice.mountpoint)
-                        partitionMountPointUrl = QtCore.QUrl(pathlib.Path(partitionForDevice.mountpoint).as_uri())
-                        # print(f"\t\tpartition: {partitionForDevice} with mount point url: {partitionMountPointUrl}")
-                        if partitionMountPointUrl in list(map(lambda x: x.url, drivePlaces)):
-                            deviceName = f"{deviceName.replace('/dev/', '')} ({partitionForDevice.mountpoint})"
+                    if len(devicesForPlace):
+                        # a udev device for this place was found
+                        placeDevice = devicesForPlace[0]
+                        deviceName = placeDevice.get("DEVNAME")
+                        # print(f"\tfound device: {placeDevice} (name: {deviceName}) for place: {place}")
                         
-                    # check for device type, change place icon if necessary
-                    mediaType = "Internal Drive"
-                    if placeDevice.get("ID_CDROM") is not None:
-                        place.icon = "drive-optical-symbolic"
-                        mediaType = "Removable Media"
+                        # get the partition for this device, in the list of extra partitions, if found
+                        partitionsForDevice = list(filter(lambda x: x.device == deviceName, fixedPartitions))
                         
-                    elif placeDevice.get("ID_USB_TYPE") is not None:
-                        place.icon = "drive-removable-media-usb-symbolic"
-                        mediaType = "Removable Media"
-                        
-                    partitionSize = int(devicesForPlace[0].get("ID_FS_SIZE")) * pq.byte
-                    pwr = np.log10(partitionSize.magnitude)
-                    if pwr < 3:
-                        partitionSize = partitionSize.magnitude.round(1)
-                        symbol = "bytes"
-                    elif pwr < 6:
-                        partitionSize = partitionSize.rescale(pq.KiB).magnitude.round(1)
-                        symbol = "KiB"
-                    elif pwr < 9:
-                        partitionSize = partitionSize.rescale(pq.MiB).magnitude.round(1)
-                        symbol = "MiB"
-                    elif pwr < 12:
-                        partitionSize = partitionSize.rescale(pq.GiB).magnitude.round(1)
-                        symbol = "GiB"
-                    elif pwr < 15:
-                        partitionSize = partitionSize.rescale(pq.TiB).magnitude.round(1)
-                        symbol = "TiB"
-                    elif pwr < 19:
-                        partitionSize = partitionSize.rescale(pq.PiB).magnitude.round(1)
-                        symbol = "PiB"
-                    elif pwr < 22:
-                        partitionSize = partitionSize.rescale(pq.EiB).magnitude.round(1)
-                        symbol = "EiB"
-                    elif pwr < 25:
-                        partitionSize = partitionSize.rescale(pq.ZiB).magnitude.round(1)
-                        symbol = "ZiB"
-                    else:
-                        partitionSize = partitionSize.rescale(pq.YiB).magnitude.round(1)
-                        symbol = "YiB"
-                        
-                    # check for device label, change place name if necessary
-                    deviceLabel = placeDevice.get("ID_FS_LABEL", "unlabeled partition")
-                    # print(f"\t\tdeviceLabel: {deviceLabel}")
-                    if deviceLabel == "unlabeled partition":
-                        if mediaType == "Internal Drive":
-                            deviceLabel = f"{deviceName} {partitionSize} {symbol} {mediaType}"
-                        else:
-                            deviceLabel = f"{partitionSize} {symbol} {mediaType}"
+                        if len(partitionsForDevice):
+                            partitionForDevice = partitionsForDevice[0]
+                            # partitionMountPointUrl = QtCore.QUrl("file://" + partitionForDevice.mountpoint)
+                            partitionMountPointUrl = QtCore.QUrl(pathlib.Path(partitionForDevice.mountpoint).as_uri())
+                            # print(f"\t\tpartition: {partitionForDevice} with mount point url: {partitionMountPointUrl}")
+                            if partitionMountPointUrl in list(map(lambda x: x.url, drivePlaces)):
+                                deviceName = f"{deviceName.replace('/dev/', '')} ({partitionForDevice.mountpoint})"
                             
-                    else:
-                        if mediaType == "Internal Drive":
-                            deviceLabel += f": {deviceName} {partitionSize} {symbol} {mediaType}"
+                        # check for device type, change place icon if necessary
+                        mediaType = "Internal Drive"
+                        if placeDevice.get("ID_CDROM") is not None:
+                            place.icon = "drive-optical-symbolic"
+                            mediaType = "Removable Media"
+                            
+                        elif placeDevice.get("ID_USB_TYPE") is not None:
+                            place.icon = "drive-removable-media-usb-symbolic"
+                            mediaType = "Removable Media"
+                            
+                        partitionSize = int(devicesForPlace[0].get("ID_FS_SIZE")) * pq.byte
+                        pwr = np.log10(partitionSize.magnitude)
+                        if pwr < 3:
+                            partitionSize = partitionSize.magnitude.round(1)
+                            symbol = "bytes"
+                        elif pwr < 6:
+                            partitionSize = partitionSize.rescale(pq.KiB).magnitude.round(1)
+                            symbol = "KiB"
+                        elif pwr < 9:
+                            partitionSize = partitionSize.rescale(pq.MiB).magnitude.round(1)
+                            symbol = "MiB"
+                        elif pwr < 12:
+                            partitionSize = partitionSize.rescale(pq.GiB).magnitude.round(1)
+                            symbol = "GiB"
+                        elif pwr < 15:
+                            partitionSize = partitionSize.rescale(pq.TiB).magnitude.round(1)
+                            symbol = "TiB"
+                        elif pwr < 19:
+                            partitionSize = partitionSize.rescale(pq.PiB).magnitude.round(1)
+                            symbol = "PiB"
+                        elif pwr < 22:
+                            partitionSize = partitionSize.rescale(pq.EiB).magnitude.round(1)
+                            symbol = "EiB"
+                        elif pwr < 25:
+                            partitionSize = partitionSize.rescale(pq.ZiB).magnitude.round(1)
+                            symbol = "ZiB"
                         else:
-                            deviceLabel += f": {partitionSize} {symbol} {mediaType}"
+                            partitionSize = partitionSize.rescale(pq.YiB).magnitude.round(1)
+                            symbol = "YiB"
+                            
+                        # check for device label, change place name if necessary
+                        deviceLabel = placeDevice.get("ID_FS_LABEL", "unlabeled partition")
+                        # print(f"\t\tdeviceLabel: {deviceLabel}")
+                        if deviceLabel == "unlabeled partition":
+                            if mediaType == "Internal Drive":
+                                deviceLabel = f"{deviceName} {partitionSize} {symbol} {mediaType}"
+                            else:
+                                deviceLabel = f"{partitionSize} {symbol} {mediaType}"
+                                
+                        else:
+                            if mediaType == "Internal Drive":
+                                deviceLabel += f": {deviceName} {partitionSize} {symbol} {mediaType}"
+                            else:
+                                deviceLabel += f": {partitionSize} {symbol} {mediaType}"
 
-                place.name = deviceLabel
+                    place.name = deviceLabel
                 
     elif sys.platform.startswith("win32"):
         drivePlaces = sorted(list(map(lambda x: DEPlace(x.mountpoint.replace("\\", ""), 
@@ -839,20 +853,38 @@ def get_desktop_places(schema:typing.Optional[str]=None,
     dd = dict()
     if len(drivePlaces):
         for place in drivePlaces:
-            key = "file://"+place.url.path()
-            # place.name = deviceLabel
-            if key not in ret:
-                dd[key] = place
+            if place.isSeparator():
+                print(f"found separator place: {place.name}")
+                if nSeparators == 0:
+                    ret["separator"] = place
+                else:
+                    ret[f"separator_{nSeparators}"] = place
+                nSeparators += 1
+            else:
+                key = "file://"+place.url.path()
+                # place.name = deviceLabel
+                if key not in ret:
+                    ret[key] = place
                 
-    if len(dd):
-        if nSeparators == 0:
-            ret["separator"] = DEPlace.separator("Devices")
-        else:
-            ret[f"separator_{nSeparators}"] = DEPlace.separator("Devices")
-        nSeparators +=1
-        
-        for key, val in dd.items():
-            ret[key] = val
+    # for key, val in dd.items():
+    #     if val.isSeparator():
+    #         if nSeparators == 0:
+    #             ret["separator"] = val
+    #         else:
+    #             ret[f"separator_{nSeparators}"] = val
+    #         nSeparators += 1
+    #     else:
+    #         ret[key] = val
+            
+#     if len(dd):
+#         # if nSeparators == 0:
+#         #     ret["separator"] = DEPlace.separator("Devices")
+#         # else:
+#         #     ret[f"separator_{nSeparators}"] = DEPlace.separator("Devices")
+#         # nSeparators +=1
+#         
+#         for key, val in dd.items():
+#             ret[key] = val
     return ret
 
 # def get_recent_places(asQUrl:bool=False,
