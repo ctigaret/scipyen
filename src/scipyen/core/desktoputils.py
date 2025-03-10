@@ -514,7 +514,8 @@ def get_standard_desktop_places(all_folder_icons:bool=False) -> PlacesMap:
         if len(loc.paths) == 0:
             continue
 
-        place_uris = list(map(lambda x: pathlib.Path(x).resolve().as_uri(), loc.paths))
+        # place_uris = list(map(lambda x: pathlib.Path(x).resolve().as_uri(), loc.paths))
+        place_uris = list(map(lambda x: pathlib.Path(x).absolute().as_uri(), loc.paths))
         place_uri = place_uris[0]
 
         additional_urls = list(map(lambda x: QtCore.QUrl(x), place_uris[1:])) if len(place_uris) > 1 else list()
