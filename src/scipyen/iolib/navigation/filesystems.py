@@ -167,7 +167,7 @@ def pathStrLen(x:typing.Any) -> int:
 
 @pathStrLen.register(pathlib.Path)
 def _(x:pathlib.Path) -> int:
-    return len(x.resolve().as_posix())
+    return len(x.absolute().as_posix())
 
 @pathStrLen.register(str)
 def _(x:str) -> int:
@@ -186,7 +186,7 @@ def urlToPath(x:typing.Any) -> pathlib.Path:
 def _(x:str) -> pathlib.Path:
     if "://" in x:
         s = x[x.index("://")+3:] # remove schema
-    return pathlib.Path(x).resolve()
+    return pathlib.Path(x).absolute()
 
 @urlToPath.register(QtCore.QUrl)
 def _(x:QtCore.QUrl) -> pathlib.Path:
@@ -204,7 +204,7 @@ def _(x:QtCore.QUrl) -> pathlib.Path:
                 # this looks like a Windows drive string
                     return path
 
-    return pathlib.Path(pathStr).resolve()
+    return pathlib.Path(pathStr).absolute()
 
 def pathToQUrl(x:pathlib.Path) -> QtCore.QUrl:
     drive = x.drive

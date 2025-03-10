@@ -2136,8 +2136,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             path = pathlib.Path(self._recentDirectories[0])
             if not path.is_dir():
                 path = pathlib.Path(self._user_home_)
-            if not path.is_absolute():
-                path = path.resolve()
+            # if not path.is_absolute():
+            #     path = path.absolute()
                 
             url = QtCore.QUrl(path.as_uri())
             self.navigator.setLocationUrl(url)
@@ -3510,7 +3510,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             except:
                 pass
             
-            url = QtCore.QUrl(pathlib.Path(newCwd).resolve().as_uri())
+            # url = QtCore.QUrl(pathlib.Path(newCwd).resolve().as_uri())
+            url = QtCore.QUrl(pathlib.Path(newCwd).absolute().as_uri())
             self.navigator.setLocationUrl(url)
             
             self._setRecentDirectory_(self.cwd)
@@ -5283,6 +5284,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 #             
 #         else:
 #             target = pathlib.Path(self.currentDir).resolve().parent
+#             target = pathlib.Path(self.currentDir).absolute().parent
 #             
 #         if isinstance(self.navigator, navigator.UrlNavigator):
 #             url = QtCore.QUrl(target.as_uri())
@@ -5952,25 +5954,25 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @Slot(QtWidgets.QAction, QtCore.Qt.MouseButton)
     def slot_recentDirActivated(self, action:QtWidgets.QAction, button:QtCore.Qt.MouseButton):
         result = action.data() 
-        path = pathlib.Path(self._recentDirectories[result]).resolve()   # the path to the subdirectory pointed to by the action
+        path = pathlib.Path(self._recentDirectories[result]).absolute() #.resolve()   # the path to the subdirectory pointed to by the action
         url = QtCore.QUrl(path.as_uri())
         self.navigator.setLocationUrl(url)
         self.navigator.urlChanged.emit(url)
         # self.navigatorButtonActivated.emit(url, button, QtCore.Qt.NoModifier)
         
         
-    @Slot(str)
-    def slot_changeLocation(self, targetDir):
-        print(f"{self.__class__.__name__}.slot_changeLocation: targetDir = {targetDir}")
-        if targetDir is None:
-            return
-        
-        if isinstance(self.navigator, navigator.UrlNavigator):
-            url = QtCore.QUrl(pathlib.Path(targetDir).resolve().as_uri())
-            self.navigator.setLocationUrl(url)
-            self.navigator.urlChanged.emit(url)
-        else:
-            self.slot_changeDirectory(targetDir)
+#     @Slot(str)
+#     def slot_changeLocation(self, targetDir):
+#         # print(f"{self.__class__.__name__}.slot_changeLocation: targetDir = {targetDir}")
+#         if targetDir is None:
+#             return
+#         
+#         if isinstance(self.navigator, navigator.UrlNavigator):
+#             url = QtCore.QUrl(pathlib.Path(targetDir).resolve().as_uri())
+#             self.navigator.setLocationUrl(url)
+#             self.navigator.urlChanged.emit(url)
+#         else:
+#             self.slot_changeDirectory(targetDir)
 
     @Slot()
     @safeWrapper
@@ -6116,6 +6118,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @Slot(int)
     @safeWrapper
     def _slot_prairieViewImportGuiDone(self, value):
+        # TODO 2025-03-10 17:47:21 
+        # move to a PV loader in systems, an out of ScipyenWindow code
         # if value == QtWidgets.QDialog.Accepted:
         if value:
             dlg = self.sender()

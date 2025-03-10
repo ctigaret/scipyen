@@ -404,6 +404,7 @@ def upPath(path:pathlib.Path) -> pathlib.Path:
     else:
         p = pathlib.Path("..") / path
         return p.parent.absolute()
+        # return p.parent
     
 class SchemeCategory(IntEnum):
     CoreCategory = 0
@@ -1950,6 +1951,7 @@ class CoreUrlNavigator(QtCore.QObject):
         return self.locationUrl()
     
     def setCurrentLocationUrl(self, newUrl:QtCore.QUrl):
+        # print(f"{self.__class__.__name__}.setCurrentLocationUrl({newUrl})")
         if newUrl == self.locationUrl():
             return
         
@@ -3166,11 +3168,17 @@ class UrlNavigator(QtWidgets.QWidget):
     
     @Slot(QtCore.QUrl)
     def setLocationUrl(self, url:QtCore.QUrl):
+        # print(f"{self.__class__.__name__}.setLocationUrl({url})")
         if url != self.locationUrl():
             # print(f"Slot {self.__class__.__name__}.setLocationUrl({url})")
             self._nav_p_._coreUrlNavigator_.setCurrentLocationUrl(url)
             # WARNING 2025-01-20 22:44:08 temporary FIXME
             # TODO implement places selector
+            # NOTE: 2025-03-10 17:51:34 
+            # implemented independently of a "PlacesSelector" class 
+            # TODO 2025-03-10 17:52:28
+            # revisit the PlacesSelector class once I have a more complete
+            # Solid-like implementation in navigator_s branch 
             self._nav_p_.updateContent()
             # self.setShowFullPath(True)  
             # self.requestActivation()
