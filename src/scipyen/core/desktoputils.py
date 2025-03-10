@@ -850,11 +850,11 @@ def get_desktop_places(schema:typing.Optional[str]=None,
             if urlToPath(stdPlace.url) not in ret_paths:
                 ret[key] = stdPlaces[key]
 
-    dd = dict()
+    # dd = dict()
     if len(drivePlaces):
         for place in drivePlaces:
             if place.isSeparator():
-                print(f"found separator place: {place.name}")
+                # print(f"found separator place: {place.name}")
                 if nSeparators == 0:
                     ret["separator"] = place
                 else:
