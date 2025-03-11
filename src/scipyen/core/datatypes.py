@@ -823,8 +823,7 @@ class DoseDescriptor:
 @dataclass
 class ScipyenDataclass:
     """An 'enhanced' dataclass, ancestor of Scipyen data classes.
-    
-    
+
     WARNING: to derive (i.e. create a subclass) from ScipyenDataclass follow the 
     steps below:
 

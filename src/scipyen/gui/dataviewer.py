@@ -473,10 +473,19 @@ class DataViewer(ScipyenViewer):
                 
                 item_paths.append(expr)
                 
+        elif dataclasses.is_dataclass(self._data_):
+            for item in items:
+                item_path = self._get_path_for_item_(item)
+                expr = NestedFinder.paths2expression(self._data_, item_path)
+                if len(top_title.strip()) > 0 and top_title != ".":
+                    expr = top_title+expr
+                item_paths.append(expr)
+                
         return item_paths
         
     @safeWrapper
     def exportPathsToClipboard(self, item_paths):
+        # print(f"{self.__class__.__name__}.exportPathsToClipboard({item_paths})")
         if self._scipyenWindow_ is None:
             return
         
@@ -648,7 +657,7 @@ class DataViewer(ScipyenViewer):
     @safeWrapper
     def _parse_item_(self, item):
         item_name = item.text(0)
-        
+        # print(f"{self.__class__.__name__}._parse_item_({item}): item_name = {item_name}")
         if len(item_name.strip()) == 0:
             return None
         
@@ -678,7 +687,7 @@ class DataViewer(ScipyenViewer):
             (which must exist in the namespace where eval() is called)
             
         
-        When as_expression if False:
+        When as_expression is False:
         
             returns a list of item names that compose the indexing path with
             increasing nesting depth.
@@ -702,6 +711,8 @@ class DataViewer(ScipyenViewer):
             parent = parent.parent()
 
         item_path.reverse()
+        
+        # print(f"{self.__class__.__name__}._get_path_for_item_({item}): item_path = {item_path}")
         
         return item_path
     
@@ -731,7 +742,7 @@ class DataViewer(ScipyenViewer):
         
         for item in items:
             path = self._get_path_for_item_(item)
-            #print("\n_export_data_items_ path", path)
+            # print(f"{self.__class__.__name__}_export_data_items_ path", path)
             
             if len(path) == 0:
                 continue
@@ -766,6 +777,12 @@ class DataViewer(ScipyenViewer):
             if self.treeWidget.has_dynamic_private:
                 if isinstance(src, (tuple, list, deque)) and isinstance(path[-1], int):
                     objs = src[path-1]
+                elif dataclasses.is_dataclass(src):
+                    o = src
+                    for p in path:
+                        o = getattr(o, p, None)
+                        
+                    objs = [o]
                 else:
                     objs = [getattr(src, str(path[-1]), None)]
             else:

@@ -26,6 +26,7 @@ from itertools import chain
 import collections
 import collections.abc
 from collections import deque, OrderedDict
+import dataclasses
 from dataclasses import MISSING
 import numpy as np
 import neo
@@ -1772,6 +1773,9 @@ class NestedFinder(object):
                 return ""
                 
             return "[%s]" % aexpr
+        
+        elif dataclasses.is_dataclass(src):
+            return f".{ndx}"
             
         else:
             if isinstance(ndx, int):
@@ -1842,6 +1846,8 @@ class NestedFinder(object):
                 elif isinstance(src, (np.ndarray, pd.Index)):
                     yield src[ndx]
                     
+                elif dataclasses.is_dataclass(src):
+                    yield getattr(src, ndx, None)
                 else:
                     yield src
             
