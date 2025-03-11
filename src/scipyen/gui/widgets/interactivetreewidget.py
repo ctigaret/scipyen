@@ -1,6 +1,17 @@
+# -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2025 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
+"""
+"""
+# TODO: 2025-03-10 23:21:21
+# implement editing function, where applicable
+# NEEDS proxy editor widgets
 from __future__ import print_function
 
 import os, warnings, types, traceback, itertools, inspect, dataclasses, numbers
+import enum
 from collections import deque
 from dataclasses import MISSING
 import math
@@ -161,10 +172,19 @@ class InteractiveTreeWidget(DataTreeWidget):
                     target.setSelected(True)
                     self.scrollTo(index, QtWidgets.QAbstractItemView.PositionAtCenter)
                     
-    def _parse_data_(self, data):
+    def _parse_dataclass(self, data) -> tuple:
+        datafields = dataclasses.fields(data)
+        return dict(map(lambda x: (x.name, getattr(data, x.name)), datafields))
+    
+    def _parse_data_(self, data) -> tuple:
         mro = inspect.getmro(type(data))
         if all(t not in self._supported_data_types_ for t in mro) and not inspect.isroutine(data) and data is not None:
-            return  datatypes.inspect_members(data, self.predicate), True
+            if dataclasses.is_dataclass(data):
+                return self._parse_dataclass(data), True
+            elif isinstance(data, enum.Enum):
+                return data, True
+            else:
+                return datatypes.inspect_members(data, self.predicate), True
         else:
             return data, False
         
@@ -339,7 +359,7 @@ class InteractiveTreeWidget(DataTreeWidget):
         from pyqtgraph.widgets.DataTreeWidget import HAVE_METAARRAY
         from collections import OrderedDict
         #from pyqtgraph.python2_3 import asUnicode
-        from core.datatypes import is_namedtuple
+        from core.datatypes import (is_namedtuple, TypeEnum)
         
 #         print(f"{self.__class__.__name__}.parse data is a {type(data).__name__}")
 #         
@@ -472,7 +492,22 @@ class InteractiveTreeWidget(DataTreeWidget):
                 # NOTE: 2022-12-30 14:26:46
                 # Descending into the data's members is too prone for infinite recurson.
                 # Hence, we STOP here (i.e. at first level).
-                desc = str(data)
+                # NOTE: 2025-03-10 23:08:04
+                # support for dataclasses — descend into their fields as if they were a dict
+                if dataclasses.is_dataclass(data):
+                    datafields = dataclasses.fields(data)
+                    # dataname = getattr(data, "name", "") 
+                    # if len(dataname.strip()) == 0:
+                    #     lbl = f"<{data.__class__.__name__}> object"
+                    # else:
+                    #     lbl = f"<{data.__class__.__name__}> object ({dataname})"
+                    lbl = f"<{data.__class__.__name__}> object"
+                    desc = " ".join([lbl, "with", f"{len(datafields)} fields"])
+                    children = OrderedDict(map(lambda x: (x.name, getattr(data, x.name)), datafields))
+                elif isinstance(data, enum.Enum):
+                    desc = f"{data} ({data.name})"
+                else:
+                    desc = str(data)
                 
             return typeStr, desc, children, widget, typeTip 
         

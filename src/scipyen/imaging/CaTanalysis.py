@@ -278,7 +278,7 @@ import ephys.ephys as ephys
 # Unfortunately, there are plenty of dependencies on scandata, in Scipyen, including:
 # iolib/h5io, (for hdf5 export/import)
 # systems/PrairieView (which generates ScanData objects)
-# gui.dictviewer (for inspecting the ScanData object structure)
+# gui.dataviewer (for inspecting the ScanData object structure)
 # 
 # This makes it hard to completely extricate scandata and other CaT analysis stuff
 # from the main Scipyeh code tree — but not impossible.

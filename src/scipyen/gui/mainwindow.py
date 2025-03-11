@@ -333,7 +333,7 @@ from . import tableeditor as te
 from . import signalviewer as sv
 from . import matrixviewer as matview
 from . import imageviewer as iv
-from . import dictviewer as dv
+from . import dataviewer as dv
 
 from .consoles import styles, pstyles
 from .cursors import (SignalCursor, SignalCursorTypes,DataCursor, 

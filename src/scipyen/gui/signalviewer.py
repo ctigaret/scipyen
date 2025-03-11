@@ -212,7 +212,7 @@ from gui import quickdialog as qd
 from gui import scipyen_colormaps as colormaps
 
 from gui.scipyenviewer import (ScipyenViewer, ScipyenFrameViewer,Bunch)
-from gui.dictviewer import (InteractiveTreeWidget, DataViewer,)
+from gui.dataviewer import (InteractiveTreeWidget, DataViewer,)
 from gui.cursors import (DataCursor, SignalCursor, SignalCursorTypes, cursors2epoch)
 from gui.widgets.colorwidgets import ColorSelectionWidget, quickColorDialog
 from gui.pictgui import GuiWorker
@@ -909,7 +909,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         """
         self.setupUi(self)
-        from gui.dictviewer import DataViewer
+        from gui.dataviewer import DataViewer
         
         # NOTE: 2021-11-13 23:24:12
         # signal/slot connections & UI for pg.PlotItem objects are configured in
@@ -4181,7 +4181,7 @@ anything else       anything else       ❌
             return
         
         # NOTE: 2022-03-04 10:05:14
-        # annotations viewer is dictviewer.InteractiveTreeWidget
+        # annotations viewer is dataviewer.InteractiveTreeWidget
         indexList = self.annotationsViewer.selectedIndexes()
         
         if len(indexList) == 0:

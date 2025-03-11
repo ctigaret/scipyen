@@ -39,7 +39,7 @@ class MatrixViewer(ScipyenViewer):
     On its way to deprecation -- use TableEditor (see below)
     
     See also:
-    * gui.dictviewer.SimpleTableWidget
+    * gui.dataviewer.SimpleTableWidget
     * gui.tableeditor.TableEditorWidget for extended functionality
     
     """
