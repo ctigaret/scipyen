@@ -83,7 +83,7 @@ fi
 workdir=${destination}/build
 distdir=${destination}/dist
 
-echo $0: $"debug: "$debug
+# echo $0: $"debug: "$debug
 
 export PYTHONHASHSEED=1
 
