@@ -2,6 +2,9 @@
 # to use, call mamba env create --prefix <your chosen location> --file <this file>
 # but PLEASE avoid long pathnames and avoid empty spaces in the pathnames
 # (make it easy for yourself)
+#
+# NOTE: 2025-03-11 19:28:07
+# you MAY change the value for "name", below and dependencies - python (e.g. 3.12)
 name: scipyenv
 channels:
   - conda-forge
@@ -21,7 +24,7 @@ dependencies:
   - ipyparallel
   # - conda-forge::dbus-python # linux, osx
   - conda-forge::pywin32
-  - conda-forge::
+  # - conda-forge::
   - conda-forge::jupyter_cms
   - conda-forge::jupyter_qtconsole_colorschemes
   - conda-forge::biopython
