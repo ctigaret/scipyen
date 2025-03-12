@@ -1353,197 +1353,6 @@ def fromHDF5(entity:typing.Union[h5py.Group, h5py.Dataset], cache:dict=dict()):
     
     obj = objectFromEntity(entity, target_class, attrs, cache)
     
-#     if isinstance(entity, h5py.Dataset):
-#         # NOTE: 2022-10-06 11:57:32
-#         # for now, this code branch applies ONLY to "stand-alone" datasets, and 
-#         # not to data sets that are children of groups encapsulating more 
-#         # specialized objects such a neo signal etc
-#         # hence these will be dealt with in the "group" branch below; don't
-#         # call fromHDF5 on the children datsets there!
-#         if entity.shape is None or len(entity.shape) == 0: 
-#             # no axes imply no Dataset dimscales either
-#             # most likely a scalar and therefore we attempt to instantiate
-#             # one as such
-#             # print(f"target_class {target_class}")
-#             if target_class == bool:
-#                 obj = target_class(entity)
-#                 
-#             elif target_class == str:
-#                 obj = dataset2string(entity)
-#                 
-#             elif target_class == pathlib.Path:
-#                 data = dataet2string(entity)
-#                 obj = pathlib.Path(data)
-#                 
-#             elif target_class in (bytes, bytearray):
-#                 v = dataset2string(entity)
-#                 obj = bytes.fromhex(v) if len(v) else bytes()
-#                 
-#                 if target_class == bytearray:
-#                     obj = bytearray(obj)
-#                 
-#             elif target_class is taxonbridge.Taxon:
-#                 # return the scientific name if cannot instantiate, although the
-#                 # shim in taxonbridge should work
-#                 data = dataset2string(entity)
-#                 try:
-#                     obj = target_class(scientific_name = data)
-#                 except:
-#                     traceback.print_exc()
-#                     return data
-#                 
-#             elif target_class is bgbridge.BrainGlobeAtlas:
-#                 data = dataset2string(entity)
-#                 try:
-#                     obj = target_class(data, check_latest=False)
-#                 except:
-#                     traceback.print_exc()
-#                     return data
-#             
-#             elif target_class == datetime.timedelta:
-#                 days = int(attrs.get("days", 0))
-#                 microseconds = int(attrs.get("microseconds", 0))
-#                 seconds = int(attrs.get("seconds", 0))
-#                 obj = target_class(days=days, seconds=seconds, microseconds=microseconds)
-#                 
-#             elif target_class in (datetime.date, datetime.time, datetime.datetime):
-#                 try:
-#                     val = dataset2string(entity)
-#                     # print(f"val {val} decoded {val.decode()}")
-#                     obj = target_class.fromisoformat(val)
-#                 except Exception as e:
-#                     traceback.print_exc()
-#                     raise
-#                 
-#             elif any(k in inspect.getmro(target_class) for k in (int, float, complex)):
-#                 # NOTE: 2022-10-08 13:20:20
-#                 # numpy scalar types (e.g. numpy.float64 etc) are subclasses of
-#                 # these 
-#                 obj = target_class(entity[()])
-#                 
-#             elif target_class == pq.Quantity:
-#                 units = attrs.get("units", pq.dimensionless)
-#                 data = np.array(entity)
-#                 obj = data*units
-#                 
-#             else:
-#                 try:
-#                     obj = entity[()] # shouldn't get here but keep in case I've messed/missed smthng
-#                 except:
-#                     obj = target_class
-#                     traceback.print_exc()
-#                     # raise
-#             
-#         else:
-#             if target_class == pq.Quantity:
-#                 units = attrs.get("units", pq.dimensionless)
-#                 data = np.array(entity)
-#                 obj = data*units
-#                 
-#             elif target_class == np.ndarray:
-#                 obj = np.array(entity)
-#                 
-#             elif target_class in (vigra.filters.Kernel1D, vigra.filters.Kernel2D):
-#                 data = np.array(entity)
-#                 obj = vu.kernelfromarray(data)
-#                 
-#             else:
-#                 if enum.Enum in inspect.getmro(target_class):
-#                     data = entity[()]
-#                     obj = target_class(data)
-#                 else:
-#                     obj = target_class # for now
-#             
-#     else: # entity is a group
-#         # NOTE: 2022-10-06 13:50:07
-#         # some specialized arrray-like data objects (e.g. neo DataObject etc)
-#         # are encapsulatd in h5py Group and store their actual array data in 
-#         # h5py Dataset children of this Group;
-#         # therefore, we parse these datasets HERE instead of calling fromHDF5
-#         # recursively as we do for Groups storing regular python collections!
-#         
-#         if target_class == vigra.VigraArray:
-#             obj = group2VigraArray(entity, cache)
-#             
-#         elif target_class == bgbridge.Structure:
-#             data = dict(map(lambda k: (k, fromHDF5(entity[k], cache)), entity.keys()))
-#             obj = bgbridge.Structure(dict=data)
-#             
-#         else:
-#             mro = inspect.getmro(target_class)
-#             # print(f"\target_class {target_class} MRO: {mro}")
-#             if dict in mro:
-#                 obj = target_class()
-#                 for k in entity.keys():
-#                     if k.endswith("_key"):
-#                         # custom dict keys
-#                         key_value_grp = entity[k]
-#                         # exepect two entities: "key" and "value"
-#                         key = fromHDF5(key_value_grp["key"], {})
-#                         value = fromHDF5(key_value_grp["value"], cache)
-#                         obj[key] = value
-#                     else:
-#                         # regular (sane) case of dict with str keys
-#                         obj[k] = fromHDF5(entity[k], cache)
-#                         
-#                 # print(f"fromHDF5 {obj.__class__.__name__}: {obj}")
-#                     
-#             # elif any(k in mro for k in (list, NeoObjectList)):
-#             elif list in mro:
-#                 obj = target_class()
-#                 for k in entity.keys():
-#                     o = fromHDF5(entity[k], cache)
-#                     obj.append(o)
-#                     
-#             elif tuple in mro:
-#                 obj = list()
-#                 for k in entity.keys():
-#                     o = fromHDF5(entity[k], cache)
-#                     obj.append(o)
-#                     
-#                 obj = tuple(obj)
-#                 
-#                     
-#             elif neo.core.baseneo.BaseNeo in inspect.getmro(target_class):
-#                 obj = group2neo(entity, target_class, cache)
-#                 
-#             elif target_class == neo.core.spiketrainlist.SpikeTrainList:
-#                 items = list()
-#                 for k in entity.keys():
-#                     o = fromHDF5(entity[k], cache)
-#                     items.append(o)
-#                     
-#                 obj = target_class(items = tuple(items))
-#                 
-#             elif target_class == NeoObjectList:
-#                 items = list()
-#                 item_types = list()
-#                 for k in entity.keys():
-#                     o = fromHDF5(entity[k], cache)
-#                     items.append(o)
-#                     item_types.append(type(o))
-#                     
-#                 # print(f"\tcontained types -> {item_types}")
-#                     
-#                 obj = target_class(item_types)
-#                 obj.extend(items)
-#                 
-#             elif target_class in (pd.DataFrame, pd.Series):
-#                 # TODO multi-index types, groupings ?!?
-#                 data = np.array(entity["data"]) # a structarray
-#                 
-#                 # names of the data fields; 
-#                 #"index" should aleready be there and represents the original
-#                 # index of the original DataFrame stored here...
-#                 names = [n for n in data.dtype.names if n != "index"]
-#                 
-#                 obj = target_class(data[names], index = data["index"])
-#                     
-#             else:
-#                 # TODO:
-#                 # vigra.VigraArray (follow the model for neo DataObject)
-#                 obj = target_class # for now
-            
     cache[entity] = obj
     
     # print(f"fromHDF5: obj = {obj}")
@@ -3660,7 +3469,6 @@ def _(obj:neo.core.container.Container, group, attrs, name, compression, chunks,
     
 def read_hdf5(h5file:h5py.File):
     ret = dict((k, fromHDF5(i)) for k,i in h5file.items())
-    # print(f"\nread_hdf5: ret = {ret}\n")
     if len(ret)==1:
         return [v for v in ret.values()][0]
     
@@ -3683,7 +3491,6 @@ def _(entity:h5py.Dataset, target_class:type, attrs:dict, cache:dict=dict()):
         # no axes imply no Dataset dimscales either
         # most likely a scalar and therefore we attempt to instantiate
         # one as such
-        # print(f"target_class {target_class}")
         if target_class == type(None):
             obj = None
             
@@ -3695,7 +3502,6 @@ def _(entity:h5py.Dataset, target_class:type, attrs:dict, cache:dict=dict()):
             
         elif target_class == bool:
             obj = target_class(entity[()])
-            # print(f"h5io.objectFromEntity({target_class}): {obj}")
             
         elif target_class == str:
             obj = dataset2string(entity)
@@ -3706,9 +3512,6 @@ def _(entity:h5py.Dataset, target_class:type, attrs:dict, cache:dict=dict()):
             
         elif target_class in (bytes, bytearray):
             v = dataset2string(entity)
-            # print(f"objectFromEntity: target_class = {target_class}, entity = {entity}, v = {v} ({type(v).__name__}), {v.startswith('b')}")
-            if not v.startswith('b'):
-                v = f"b{v}"
             obj = bytes.fromhex(v) if len(v) else bytes()
             
             if target_class == bytearray:

@@ -1010,10 +1010,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
             # allow the use of blocks read from ABF before 2023-09-20 23:26:08
             digHolds = info_dict["sections"]["EpochSection"].get("nEpochDigitalOutput", None) # 3,2,1,0,7,6,5,4
     
-            # if isinstance(digHolds, list) and len(digHolds) == self._nDigitalOutputs_:
             if isinstance(digHolds, list) and len(digHolds) == self._nDACChannels_:
                 digHolds = list(map(bool, digHolds))
-                # if self._nDigitalOutputs_ == 8:
                 if self._nDACChannels_ == 8:
                     digHolds = list(reversed(digHolds[:4])) + list(reversed(digHolds[4:]))
                     
@@ -1023,7 +1021,6 @@ class ABFProtocol(ElectrophysiologyProtocol):
                 self._digHoldingValue_ = digHolds
                 
             else:
-                # self._digHoldingValue_ = [False] * self._nDigitalOutputs_
                 self._digHoldingValue_ = [False] * self._nDACChannels_
                 
             self._digUseLastEpochHolding_ = bool(info_dict["protocol"]["nDigitalInterEpisode"])
@@ -1036,7 +1033,6 @@ class ABFProtocol(ElectrophysiologyProtocol):
             # ### END   digital outputs information
             
             # NOTE: 2024-03-08 22:33:34 see NOTE: 2024-03-08 22:32:29
-            # self._acquisitionMode_ = ABFAcquisitionMode.type(info_dict["protocol"]["nOperationMode"])
             self._acquisitionMode_ = ABFAcquisitionMode(info_dict["protocol"]["nOperationMode"])
             self._nSweeps_ = info_dict["protocol"]["lEpisodesPerRun"]
             self._nRuns_   = info_dict["protocol"]["lRunsPerTrial"]
@@ -1068,7 +1064,6 @@ class ABFProtocol(ElectrophysiologyProtocol):
             self._activeDACChannel_ = kwargs.get("activeDACChannel", 0)
             self._hasAltDacOutState_ = kwargs.get("hasAltDacOutState", False)
             
-            # self._nDigitalOutputs_ = kwargs.get("nDigitalOutputs", 0)
             self._nTotalDigitalOutputs_ = kwargs.get("nTotalDigitalOutputs", 0)
             self._nDigitalEnable_ = kwargs.get("nDigitalEnable", 0)
             self._nSynchronizedDigitalOutputs_ = kwargs.get("nSynchronizedDigitalOutputs", 0)
@@ -1135,10 +1130,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
             for e in o.epochs:
                 ret.append(f"    {e.__repr__()}")
             
-        # ret += [o.__repr__() for o in self.DACs]
         ret.append(f"• {self.nTotalDigitalOutputs} Logical digital outputs for {self.nDIGChannels} physical DIG channels")
-        # ret.append(f" ∘ {self.nSychronizedDigitalOutChannels} synchronized digital channels")
-        # ret.append(f" ∘ {self.nAlternateDigitalOutputs} alternate digital channels ")
         ret.append(f" ∘ Digital train active logic High: {self.digitalTrainActiveLogic}")
         ret.append(f" ∘ Digital holding {self.digitalHolding}, ; using last epoch holding: {self.digitalUseLastEpochHolding} ")
         ret.append(f"• Acquisition mode: {self.acquisitionMode.name}")
@@ -1171,9 +1163,6 @@ class ABFProtocol(ElectrophysiologyProtocol):
         
         properties = inspect.getmembers_static(self, lambda x: isinstance(x, property))
         
-        # selfProp = getattr(self, p[0])
-        # otherProp = getattr(other, p[0])
-        
         #  NOTE: 2024-10-01 19:17:40
         # ths below suffers from the fact that the == operator checks the IDs
         # I guess e need to override that in the appropriate classes
@@ -1190,15 +1179,12 @@ class ABFProtocol(ElectrophysiologyProtocol):
                 # with the index of the distinct DAC)
                 if self.getDAC(k) != other.getDAC(k): 
                     return False
-            # ret = all(self.getDAC(d) == other.getDAC(d) for d in range(self.nDACChannels))
-            # ret = all(all(np.all(self.getDAC(d).getEpochsTable(s) == other.getDAC(d).getEpochsTable(s)) for s in range(self.nSweeps)) for d in range(self.nDACChannels))
                     
         if ret:
             for k in range(self.nADCChannels):
                 # NOTE: Return after first iteration showing distinct ADCs
                 if self.getADC(k) != other.getADC(k):
                     return False
-            # ret = all(self.getADC(c) == other.getADC(c) for c in range(self.nADCChannels))
             
         return ret
     
@@ -1226,11 +1212,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
     def toHDF5(self, group:h5py.Group, name:str, oname:str, compression, chunks, track_order,
                        entity_cache) -> h5py.Group:
         """Encodes this ABFProtocol as a HDF5 Group"""
-        
-        # print(f"{self.__class__.__name__}.toHDF5: group = {group}, name = {name}, oname = {oname}")
         target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
-        # print(f"\ttarget_name = {target_name}")
-        # print(f"\tobj_attrs {obj_attrs}")
         
         
         cached_entity = h5io.getCachedEntity(entity_cache, self)
@@ -1240,19 +1222,6 @@ class ABFProtocol(ElectrophysiologyProtocol):
         
         
         attrs = dict()
-#         for n in ("_nADCChannels_", "_nDACChannels_", "_activeDACChannel_",
-#                   "_hasAltDacOutState_", "_hasAltDigOutState_",
-#                   "_nDigitalOutputs_", "_nTotalDigitalOutputs_",
-#                   "_nSynchronizedDigitalOutputs_", "_digTrainActiveHi_",
-#                   "_digHolding_", "_digHoldingValue_","_digUseLastEpochHolding_",
-#                   "_acquisitionMode_", "_nSweeps_", "_nRuns_", "_nTrials_",
-#                   "_nTotalDataPoints_", "_nDataPointsPerSweep_",
-#                   "_samplingRate_", "_sweepInterval_", 
-#                   "_averaging_", "_averageWeighting_", 
-#                   "_protocolFile_","_sourceHash_", "_sourceId_", 
-#                   "_fileOrigin_",
-#                   ):
-#             
         for n in ("_nADCChannels_", "_nDACChannels_", "_activeDACChannel_",
                   "_hasAltDacOutState_", "_hasAltDigOutState_",
                   "_nTotalDigitalOutputs_", "_nSynchronizedDigitalOutputs_", 
@@ -1272,16 +1241,9 @@ class ABFProtocol(ElectrophysiologyProtocol):
         objattrs = h5io.makeAttrDict(**attrs)
 
         obj_attrs.update(objattrs)
-        # objattrs = h5io.makeAttrDict(**obj_attrs)
-        
-        # print(f"{self.__class__.__name__}.toHDF5:")
-        # print(f"\tobj_attrs: {obj_attrs}")
-        # print(f"\tobjattrs: {objattrs}")
         
         inputs = self._inputs_
         outputs = self._outputs_
-        
-        # entity_name = name if (isinstance(name, str) and len(name.strip())) else oname if (isinstance(oname, str) and len(oname.strip())) else strutils.str2symbol(self.name)
         
         if isinstance(name, str) and len(name.strip()):
             target_name = name

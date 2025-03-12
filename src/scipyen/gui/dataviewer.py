@@ -201,6 +201,8 @@ class DataViewer(ScipyenViewer):
         
         self.treeWidget.customContextMenuRequested[QtCore.QPoint].connect(self.slot_customContextMenuRequested)
         
+        # NOTE: 2025-03-12 13:25:01 treeWidget ultimately inherits from QTreeWidget
+        # and itemDoubleClicked is a Signal emitted by QTreeWidget
         self.treeWidget.itemDoubleClicked[QtWidgets.QTreeWidgetItem, int].connect(self.slot_itemDoubleClicked)
         
         self.setCentralWidget(self.treeWidget)
@@ -312,13 +314,6 @@ class DataViewer(ScipyenViewer):
             w.setEnabled(False)
         self._populate_tree_widget_()
             
-        #if self.treeWidget.topLevelItemCount() == 1:
-            #self.treeWidget.topLevelItem(0).setText(0, top_title)
-            
-        # for k in range(self.treeWidget.topLevelItemCount()):
-        #     self._collapse_expand_Recursive(self.treeWidget.topLevelItem(k), current=False)
-            #self._collapseRecursive_(self.treeWidget.topLevelItem(k), collapseCurrent=False)
-
     @Slot(QtWidgets.QTreeWidgetItem, int)
     @safeWrapper
     def slot_itemDoubleClicked(self, item, column):
@@ -326,6 +321,8 @@ class DataViewer(ScipyenViewer):
         if self._scipyenWindow_ is None:
             return
         
+        # editor = self.treeWidget.openPersistentEditor(item, column)
+        # print(f"{self.__class__.__name__}.slot_itemDoubleClicked: editor = {editor}")
         item_path = list()
         item_path.append(item.text(0))
         
