@@ -29,7 +29,7 @@ function show_help ()
     echo -e "<cezar tigaret at gmail com> , <tigaretc at cardiff ac uk>"
     echo -e "\nInstructions:"
     echo -e "============\n"
-    echo -e "Run 'sh install.sh' without options for a fully automated installation, using built-in defaults.\n"
+    echo -e "Run 'sh $0' without options for a fully automated installation, using built-in defaults.\n"
     echo -e "Options:"
     echo -e "========\n"
     echo -e "--install_dir=DIR\tSpecify where the virtual environment will be created (default is ${HOME})\n"
@@ -52,7 +52,7 @@ function show_help ()
     echo -e "--about\t\t\tDisplay Install.md at the console (requires the program 'glow')\n"
     echo -e "--dist\t\t\tCreates a binary Scipyen diwstribution using PyInstaller. Requires that a virtual environment has already been built using this script.\n"
     echo -e "-h | -? | --help \tShow this help message and quit\n"
-    echo -e "\nFor details, execute install.sh --about\n"
+    echo -e "\nFor details, execute $0 --about\n"
     echo -e "\n"
     echo -e "When run with the virtual Python environment already activated,\n"
     echo -e "the script will use the current virtual environment to perform \n"
@@ -1276,9 +1276,13 @@ if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
     
     # NOTE: we need at least pyqt5; on Linux we build the wheel from scratch unless
     # specifically requested
-    dopyqt5
     
-    dopyqt6 
+    # NOTE/BUG 2025-03-12 00:37:03 FIXME
+    # after upgrading platform OS (with full migration to python3.13)
+    # the PyQt5 build has issues with xcb and wayland plugins (i.e., they're not found)
+    dopyqt5 
+    
+#     dopyqt6 
     
     # build vigra NOTE: 2023-06-25 10:55:09 FIXME how to pass the virtualenv python to builder when run as root?
     dovigra

@@ -12,13 +12,13 @@ set mypath=%0
 set mydir=%~dp0
 rem Leave THIS LINE HERE; jus comment out or change the goto label
 rem  goto make_desktop_shortcut
-set pip_reqs=%mydir%\setup_env\pip_requirements_win.txt
+rem  set pip_reqs=%mydir%\setup_env\pip_requirements_win.txt
 :create_env
 set default_env_path="c:\scipyenv"
 set /P env_path="Enter the full path name of the new environment (no spaces, please, default is: %default_env_path%): "
 if [%env_path%] equ [] set env_path=%default_env_path%
 echo Creating mamba environment %env_path%
-call mamba env create --prefix %env_path% --file scipyenv.yml
+call mamba env create --prefix %env_path% --file mambaprojects\win32\scipyenv.yml
 rem  call mamba create -y --prefix %env_path% python=3.11 || goto eof
 :activate_env
 echo:
@@ -26,8 +26,8 @@ echo Activating mamba environment %env_path%
 call mamba activate %env_path% || goto eof
 :install_pips
 echo:
-echo Installing additional PyPI packages
-call pip install -r %pip_reqs% || goto eof
+rem  echo Installing additional PyPI packages
+rem  call pip install -r %pip_reqs% || goto eof
 :install_own_console_styles
 cd %mydir%\src\scipyen\gui\scipyen_console_styles || goto eof
 call pip install .  || goto eof
