@@ -31,7 +31,7 @@ function show_help ()
     echo -e "\tthis will include installing an activation script for the environmment \n"
 }
 
-if [ ( -z ${VIRTUAL_ENV} ) | ( -z ${CONDA_PREFX} ) ]; then
+if [  -z ${VIRTUAL_ENV}  |  -z ${CONDA_PREFX}  ]; then
     if [ -a $HOME/.scipyenrc ] ; then
         source $HOME/.scipyenrc && scipyact
     else
