@@ -230,7 +230,7 @@ function makevirtenv ()
     
 }
 
-function installpipreqs ()
+function installpipreqs_part1 ()
 {
     # installs pip packaged listed in pip_requirements
     # assumes (and therefore REQUIRES) that the virtual environment is active
@@ -239,7 +239,7 @@ function installpipreqs ()
         exit 1
     fi
     
-    if [ ! -r ${VIRTUAL_ENV}/.pipdone ] || [[ $reinstall_pips -gt 0 ]] ; then
+    if [ ! -r ${VIRTUAL_ENV}/.pips1_done ] || [[ $reinstall_pips -gt 0 ]] ; then
         # NOTE: since around Jan 2023 sklearn has been deprecated in favour of 
         # scikit-learn, such that an error message is issued whenever pip tries
         # to install sklearn.
@@ -254,13 +254,48 @@ function installpipreqs ()
         
         echo -e "Using ${python_executable} as `whoami` to install PyPI packages\n"
         
-        ${python_executable} -m pip install -r "$installscriptdir"/pip_requirements.txt
+        ${python_executable} -m pip install -r "$installscriptdir"/pip_requirements_linux_1.txt
         
         if [[ $? -ne 0 ]] ; then
             echo -e "Cannot install required packages from PyPI. Bailing out. Goodbye!\n"
             exit 1
         else
-            echo "pip packages installed on "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.pipdone
+            echo "pip packages installed on "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.pips1_done
+            echo -e "\n\n=====================\n# PyPI packages installed.\n=====================\n\n"
+        fi
+    fi
+}
+function installpipreqs_part2 ()
+{
+    # installs pip packaged listed in pip_requirements
+    # assumes (and therefore REQUIRES) that the virtual environment is active
+    if [[ -z "$VIRTUAL_ENV" ]] ; then
+        echo -e "Not in an active environment! Goodbye!\n"
+        exit 1
+    fi
+    
+    if [ ! -r ${VIRTUAL_ENV}/.pips2_done ] || [[ $reinstall_pips -gt 0 ]] ; then
+        # NOTE: since around Jan 2023 sklearn has been deprecated in favour of 
+        # scikit-learn, such that an error message is issued whenever pip tries
+        # to install sklearn.
+        # HOWEVER, a LARGE number of packages still list sklearn among their 
+        # dependencies, yet pip has no way to check this BEFORE installing them.
+        #
+        # Until all of them catch up with this, we circumvent the error message
+        # by setting up the environment variable below
+        # For details please see https://pypi.org/project/sklearn/
+        #
+        export SKLEARN_ALLOW_DEPRECATED_SKLEARN_PACKAGE_INSTALL=True 
+        
+        echo -e "Using ${python_executable} as `whoami` to install PyPI packages\n"
+        
+        ${python_executable} -m pip install -r "$installscriptdir"/pip_requirements_linux_2.txt
+        
+        if [[ $? -ne 0 ]] ; then
+            echo -e "Cannot install required packages from PyPI. Bailing out. Goodbye!\n"
+            exit 1
+        else
+            echo "pip packages installed on "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.pips2_done
             echo -e "\n\n=====================\n# PyPI packages installed.\n=====================\n\n"
         fi
     fi
@@ -284,7 +319,7 @@ function dopyqt5 ()
     fi
     
 #     if [ ! -r ${VIRTUAL_ENV}/.pyqt5done ] || [[ $reinstall_pyqt5 -gt 0 ]] || [[ $build_pyqt5 -gt 0 ]] ; then
-    if [ ! -r ${VIRTUAL_ENV}/.pyqt5done ] || [[ $reinstall_pyqt5 -gt 0 ]] ; then
+    if [ ! -r ${VIRTUAL_ENV}/.pyqt5build_done ] || [[ $reinstall_pyqt5 -gt 0 ]] ; then
         if [[ $build_pyqt5 -gt 0 ]] ; then
             mkdir -p ${VIRTUAL_ENV}/src && cd ${VIRTUAL_ENV}/src
             
@@ -381,7 +416,7 @@ function dopyqt5 ()
                     echo -e "Cannot install the PyQt5 wheel; check console output. Goodbye!\n"
                     exit 1
                 else
-                    echo "PyQt5 built and installed "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.pyqt5done
+                    echo "PyQt5 built and installed "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.pyqt5build_done
                     echo -e "\n\n=====================\n# Pyqt5 installed!\n=====================\n\n"
                 fi
             fi
@@ -521,7 +556,7 @@ function dovigra ()
         exit 1
     fi
     
-    if [ ! -r ${VIRTUAL_ENV}/.vigradone ] || [[ $reinstall_vigra -gt 0 ]]; then
+    if [ ! -r ${VIRTUAL_ENV}/.vigra_done ] || [[ $reinstall_vigra -gt 0 ]]; then
         mkdir -p ${VIRTUAL_ENV}/src && cd $VIRTUAL_ENV/src
         
         findcmake
@@ -558,11 +593,6 @@ function dovigra ()
                       -DPython_LIBRARIES=$(python -c "import distutils.sysconfig as sysconfig; print(sysconfig.get_config_var('LIBDIR'))") \
                       -DPython_EXECUTABLE:FILEPATH=`which python` \
                       -DCMAKE_INSTALL_PREFIX=$VIRTUAL_ENV -DCMAKE_SKIP_INSTALL_RPATH=1 -DCMAKE_SKIP_RPATH=1 -DWITH_BOOST_GRAPH=1 -DWITH_BOOST_THREAD=1 -DWITH_HDF5=1 -DWITH_OPENEXR=1 -DWITH_VIGRANUMPY=1 -DLIB_SUFFIX=64 ../vigra
-#         $cmake_binary -DPYTHON_INCLUDE_DIRS=$(python -c "import sysconfig; print(sysconfig.get_paths()['include'])") \
-#                       -DPYTHON_LIBRARIES=$(python -c "import distutils.sysconfig as sysconfig; print(sysconfig.get_config_var('LIBDIR'))") \
-#                       -DPYTHON_EXECUTABLE:FILEPATH=`which python` \
-#                       -DCMAKE_INSTALL_PREFIX=$VIRTUAL_ENV -DCMAKE_SKIP_INSTALL_RPATH=1 -DCMAKE_SKIP_RPATH=1 -DWITH_BOOST_GRAPH=1 -DWITH_BOOST_THREAD=1 -DWITH_HDF5=1 -DWITH_OPENEXR=1 -DWITH_VIGRANUMPY=1 -DLIB_SUFFIX=64 ../vigra
-#         $cmake_binary -DPYTHON_INCLUDE_DIR=$(python -c "from distutils.sysconfig import get_python_inc; print(get_python_inc())") -DPYTHON_LIBRARY=$(python -c "import distutils.sysconfig as sysconfig; print(sysconfig.get_config_var('LIBDIR'))") -DPYTHON_EXECUTABLE:FILEPATH=`which python` -DCMAKE_INSTALL_PREFIX=$VIRTUAL_ENV -DCMAKE_SKIP_INSTALL_RPATH=1 -DCMAKE_SKIP_RPATH=1 -DWITH_BOOST_GRAPH=1 -DWITH_BOOST_THREAD=1 -DWITH_HDF5=1 -DWITH_OPENEXR=1 -DWITH_VIGRANUMPY=1 -DLIB_SUFFIX=64 ../vigra
         
         make && make install
         
@@ -570,7 +600,7 @@ function dovigra ()
             echo -e "Cannot build vigra; check console output. Bailing out. Goodbye!\n"
             exit 1
         else
-            echo "VIGRA installed on "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.vigradone
+            echo "VIGRA installed on "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.vigra_done
             echo -e "\n\n=====================\n# Building vigra DONE!\n=====================\n\n"
         fi
     fi
@@ -580,7 +610,7 @@ function dovigra ()
 
 function make_desktop_entry ()
 {
-if [ ! -r ${VIRTUAL_ENV}/.desktopdone ] || [[ $reinstall_desktop -gt 0 ]] ; then
+if [ ! -r ${VIRTUAL_ENV}/.desktop_done ] || [[ $reinstall_desktop -gt 0 ]] ; then
 if [[ `id -u` -eq 0 ]] ; then
 target_dir=/usr/local/bin
 else
@@ -624,7 +654,7 @@ if [[ $? -ne 0 ]] ; then
 echo -e "Installation of Scipyen Desktop file failed\n"
 exit 1
 fi
-echo "Scipyen Desktop file has been installed "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.desktopdone
+echo "Scipyen Desktop file has been installed "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.desktop_done
 echo -e "Scipyen Desktop file has been installed \n"
 fi
 }
@@ -861,11 +891,7 @@ IFS=$oldifs
 function make_launch_script () 
 {
     # force the use of XCB platform abstraction plugin in Qt
-if [[ `id -u` -eq 0 ]] ; then
-    target_dir=/usr/local/bin
-else
-    target_dir=${HOME}/bin
-fi
+target_dir=${HOME}/bin
     
 mkdir -p ${target_dir}
 if [ -r ${target_dir}/scipyen ] ; then
@@ -874,7 +900,6 @@ if [ -r ${target_dir}/scipyen ] ; then
 fi
 shopt -s lastpipe
 
-# if [[ `id -u` -eq 0 ]] ; then
 cat <<END > ${target_dir}/scipyen 
 #! /bin/sh
 if [ -z \${VIRTUAL_ENV} ]; then
@@ -900,67 +925,71 @@ chmod +x ${target_dir}/scipyen
 echo -e "Scipyen startup script created in ${target_dir} \n"
 }
 
-function make_launch_script_old () 
-{
-    # force the use of XCB platform abstraction plugin in Qt
-if [[ `id -u` -eq 0 ]] ; then
-    target_dir=/usr/local/bin
-else
-    target_dir=${HOME}/bin
-fi
-    
-mkdir -p ${target_dir}
-if [ -r ${target_dir}/scipyen ] ; then
-    dt=`date '+%Y-%m-%d_%H-%M-%s'`
-    mv ${target_dir}/scipyen ${target_dir}/scipyen.$dt
-fi
-shopt -s lastpipe
-
+# function make_launch_script_old () 
+# {
+#     # force the use of XCB platform abstraction plugin in Qt
 # if [[ `id -u` -eq 0 ]] ; then
-cat <<END > ${target_dir}/scipyen 
-#! /bin/sh
-if [ -z \${VIRTUAL_ENV} ]; then
-source ${virtual_env}/bin/activate
-fi
-git -C $scipyendir rev-parse 2>/dev/null;
-if [[ \$? -eq 0 ]]; then
-branch=\`git -C ${scipyendir} branch --show-current\`
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-NC='\033[0m'
-echo -e "${RED}WARNING:${NC} Running ${GREEN}\${branch}${NC} branch of local scipyen git repository in ${BLUE}$scipyendir${NC} with status:"
-git -C $scipyendir status --short --branch
-fi
-echo -e "\nUsing Python environment in ${VIRTUAL_ENV}\n"
-if [ -z \$BROWSER ]; then
-if [ -a \$VIRTUAL_ENV/bin/browser ]; then
-source \$VIRTUAL_ENV/bin/browser
-fi
-fi
-export LD_LIBRARY_PATH=${VIRTUAL_ENV}/lib:${VIRTUAL_ENV}/lib64:\${LD_LIBRARY_PATH}
-export OUTDATED_IGNORE=1
-a=\`which xrdb\` # do we have xrdb to read the X11 resources? (on Unix almost surely yes)
-if [ \$0 == 0 ] ; then
-if [ -r $scipyensrcdir/neuron_python/app-defaults/nrniv ] ; then
-xrdb -merge $scipyensrcdir/neuron_python/app-defaults/nrniv
-fi
-fi
-${python_executable} -Xfrozen_modules=off ${scipyensrcdir}/scipyen.py "\$*"
-END
-shopt -u lastpipe
-chmod +x ${target_dir}/scipyen 
-echo -e "Scipyen startup script created in ${target_dir} \n"
-}
+#     target_dir=/usr/local/bin
+# else
+#     target_dir=${HOME}/bin
+# fi
+#     
+# mkdir -p ${target_dir}
+# if [ -r ${target_dir}/scipyen ] ; then
+#     dt=`date '+%Y-%m-%d_%H-%M-%s'`
+#     mv ${target_dir}/scipyen ${target_dir}/scipyen.$dt
+# fi
+# shopt -s lastpipe
+# 
+# # if [[ `id -u` -eq 0 ]] ; then
+# cat <<END > ${target_dir}/scipyen 
+# #! /bin/sh
+# if [ -z \${VIRTUAL_ENV} ]; then
+# source ${virtual_env}/bin/activate
+# fi
+# git -C $scipyendir rev-parse 2>/dev/null;
+# if [[ \$? -eq 0 ]]; then
+# branch=\`git -C ${scipyendir} branch --show-current\`
+# RED='\033[0;31m'
+# GREEN='\033[0;32m'
+# BLUE='\033[0;34m'
+# NC='\033[0m'
+# echo -e "${RED}WARNING:${NC} Running ${GREEN}\${branch}${NC} branch of local scipyen git repository in ${BLUE}$scipyendir${NC} with status:"
+# git -C $scipyendir status --short --branch
+# fi
+# echo -e "\nUsing Python environment in ${VIRTUAL_ENV}\n"
+# if [ -z \$BROWSER ]; then
+# if [ -a \$VIRTUAL_ENV/bin/browser ]; then
+# source \$VIRTUAL_ENV/bin/browser
+# fi
+# fi
+# export LD_LIBRARY_PATH=${VIRTUAL_ENV}/lib:${VIRTUAL_ENV}/lib64:\${LD_LIBRARY_PATH}
+# export OUTDATED_IGNORE=1
+# a=\`which xrdb\` # do we have xrdb to read the X11 resources? (on Unix almost surely yes)
+# if [ \$0 == 0 ] ; then
+# if [ -r $scipyensrcdir/neuron_python/app-defaults/nrniv ] ; then
+# xrdb -merge $scipyensrcdir/neuron_python/app-defaults/nrniv
+# fi
+# fi
+# ${python_executable} -Xfrozen_modules=off ${scipyensrcdir}/scipyen.py "\$*"
+# END
+# shopt -u lastpipe
+# chmod +x ${target_dir}/scipyen 
+# echo -e "Scipyen startup script created in ${target_dir} \n"
+# }
 
 #### Execution starts here ###
-
+if [[ `id -u` -eq 0 ]] ; then
+echo -e "This script MUST be run as regular user, NOT as root!"
+exit 1
+fi
 # start_time=`date +%s`
 SECONDS=0
 get_pyver
 
 # virtual_env="testenv"
-virtual_env_pfx="scipyenv" #.$pyver"
+virtual_env_pfx="scipyenv"
+# virtual_env_pfx="scipyenv.$pyver"
 # virtual_env_pfx="scipyenv_test" #.$pyver"
 # install_dir=$HOME
 # pyqt5_version=5.15.9
@@ -988,13 +1017,16 @@ install_neuron=0
 use_pypi_neuron=1
 use_core_neuron=0
 with_pyqt5=1
+build_pyqt5=1
+reinstall_pyqt5=0
 with_pyqt6=0
-build_pyqt5=0
+reinstall_pyqt6=0
 build_pyqt6=0
+with_pyside6=0
+build_pyside6=0
+reinstall_pyside6=0
 install_fenicsx=0
 njobs=4
-reinstall_pyqt5=0
-reinstall_pyqt6=0
 reinstall_vigra=0
 reinstall_neuron=0
 reinstall_fenicsx=0
@@ -1022,21 +1054,55 @@ for i in "$@" ; do
         --with_pyqt5)
         with_pyqt5=1
         build_pyqt5=0 
+        with_pyqt6=0
+        build_pyqt6=0
+        with_pyside6=0
+        build_pyside6=0
         shift
         ;;
         --with_pyqt6)
         with_pyqt6=1
         build_pyqt6=0 
+        with_pyqt5=0
+        build_pyqt5=0 
+        with_pyside6=0
+        build_pyside6=0
+        shift
+        ;;
+        --with_pyside6)
+        with_pyqt6=0
+        build_pyqt6=0 
+        with_pyqt5=0
+        build_pyqt5=0 
+        with_pyside6=1
+        build_pyside6=0
         shift
         ;;
         --build_pyqt5)
         with_pyqt5=1
         build_pyqt5=1
+        with_pyqt6=0
+        build_pyqt6=0
+        with_pyside6=0
+        build_pyside6=0
         shift
         ;;
         --build_pyqt6)
         with_pyqt6=1
         build_pyqt6=1
+        with_pyqt5=0
+        build_pyqt5=0 
+        with_pyside6=0
+        build_pyside6=0
+        shift
+        ;;
+        --build_pyside6)
+        with_pyqt6=0
+        build_pyqt6=0
+        with_pyqt5=0
+        build_pyqt5=0 
+        with_pyside6=1
+        build_pyside6=1
         shift
         ;;
         --with_coreneuron)
@@ -1070,18 +1136,46 @@ for i in "$@" ; do
             pyqt5)
             reinstall_pyqt5=1
             build_pyqt5=0
+            reinstall_pyqt6=0
+            build_pyqt6=0
+            reinstall_pyside6=0
+            build_pyside6=0
             ;;
             build_pyqt5)
             reinstall_pyqt5=1
             build_pyqt5=1
+            reinstall_pyqt6=0
+            build_pyqt6=0
+            reinstall_pyside6=0
+            build_pyside6=0
             ;;
             pyqt6)
             reinstall_pyqt6=1
             build_pyqt6=0
             ;;
             build_pyqt6)
+            reinstall_pyqt5=0
+            build_pyqt5=0
             reinstall_pyqt6=1
             build_pyqt6=1
+            reinstall_pyside6=0
+            build_pyside6=0
+            ;;
+            pyside6)
+            reinstall_pyqt5=0
+            build_pyqt5=0
+            reinstall_pyqt6=0
+            build_pyqt6=0
+            reinstall_pyside6=1
+            build_pyside6=0
+            ;;
+            build_pyside6)
+            reinstall_pyqt5=0
+            build_pyqt5=0
+            reinstall_pyqt6=0
+            build_pyqt6=0
+            reinstall_pyside6=1
+            build_pyside6=1
             ;;
             vigra)
             reinstall_vigra=1
@@ -1114,57 +1208,57 @@ for i in "$@" ; do
             ;;
         esac
         ;;
-        --install=*)
-        reinstall="${i#*=}"
-        shift
-        case $reinstall in
-            pyqt5)
-            reinstall_pyqt5=1
-            build_pyqt5=1
-            ;;
-            PyQt5)
-            reinstall_pyqt5=1
-            build_pyqt5=1
-            ;;
-            pyqt6)
-            reinstall_pyqt6=1
-            build_pyqt6=1
-            ;;
-            PyQt6)
-            reinstall_pyqt6=1
-            build_pyqt6=1
-            ;;
-            vigra)
-            reinstall_vigra=1
-            ;;
-            VIGRA)
-            reinstall_vigra=1
-            ;;
-            Vigra)
-            reinstall_vigra=1
-            ;;
-            neuron)
-            reinstall_neuron=1
-            ;;    
-            Neuron)
-            reinstall_neuron=1
-            ;;    
-            NEURON)
-            reinstall_neuron=1
-            ;;    
-            fenicsx)
-            reinstall_fenicsx=1
-            ;;
-            pips)
-            reinstall_pips=1
-            ;;
-            desktopentry)
-            reinstall_desktop=1
-            ;;
-            *)
-            ;;
-        esac
-        ;;
+#         --install=*)
+#         reinstall="${i#*=}"
+#         shift
+#         case $reinstall in
+#             pyqt5)
+#             reinstall_pyqt5=1
+#             build_pyqt5=1
+#             ;;
+#             PyQt5)
+#             reinstall_pyqt5=1
+#             build_pyqt5=1
+#             ;;
+#             pyqt6)
+#             reinstall_pyqt6=1
+#             build_pyqt6=1
+#             ;;
+#             PyQt6)
+#             reinstall_pyqt6=1
+#             build_pyqt6=1
+#             ;;
+#             vigra)
+#             reinstall_vigra=1
+#             ;;
+#             VIGRA)
+#             reinstall_vigra=1
+#             ;;
+#             Vigra)
+#             reinstall_vigra=1
+#             ;;
+#             neuron)
+#             reinstall_neuron=1
+#             ;;    
+#             Neuron)
+#             reinstall_neuron=1
+#             ;;    
+#             NEURON)
+#             reinstall_neuron=1
+#             ;;    
+#             fenicsx)
+#             reinstall_fenicsx=1
+#             ;;
+#             pips)
+#             reinstall_pips=1
+#             ;;
+#             desktopentry)
+#             reinstall_desktop=1
+#             ;;
+#             *)
+#             ;;
+#         esac
+#         ;;
         --about)
         showinstalldoc
         exit 0
@@ -1225,12 +1319,16 @@ else
     python_exec=$VIRTUAL_ENV/bin/"python${major}"
 fi
 
-if [[ `id -u ` -eq 0 ]] ; then
-#     echo "running as root"
-    python_executable=`which ${python_exec}`;
-else
-    python_executable=${python_exec}
-fi
+python_executable=${python_exec}
+# NOTE 2025-03-13 09:37:16
+# no more root install!
+# build the app locally as a pyinstaller bundle then distribute
+# if [[ `id -u ` -eq 0 ]] ; then
+# #     echo "running as root"
+#     python_executable=`which ${python_exec}`;
+# else
+#     python_executable=${python_exec}
+# fi
 
 echo -e "virtual_env is ${virtual_env}"
 echo -e "python executable: ${python_executable}"
@@ -1265,10 +1363,10 @@ if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
     mkdir -p "$VIRTUAL_ENV/src" && cd "$VIRTUAL_ENV/src"
     
     # install pip requirements NOTE: 2023-06-25 10:55:09 FIXME how to pass the virtualenv python to builder when run as root?
-    installpipreqs
+    installpipreqs_part1
     
     if [[ $? -ne 0 ]] ; then
-        echo -e "Could not install pip requirements; check the console for messages. Goodbye!\n"
+        echo -e "Could not install pip requirements (part 1); check the console for messages. Goodbye!\n"
         exit 1
     fi
     
@@ -1283,7 +1381,7 @@ if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
     dopyqt5 
     
 #     dopyqt6 
-    
+    installpipreqs_part2
     # build vigra NOTE: 2023-06-25 10:55:09 FIXME how to pass the virtualenv python to builder when run as root?
     dovigra
     
