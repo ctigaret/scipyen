@@ -31,17 +31,26 @@ function show_help ()
     echo -e "\tthis will include installing an activation script for the environmment \n"
 }
 
-if [ -z ${CONDA_PREFIX} ]; then
-echo -e "This script must be run from an activated mamba environment"
-exit 1
+if [ ( -z ${VIRTUAL_ENV} ) | ( -z ${CONDA_PREFX} ) ]; then
+    if [ -a $HOME/.scipyenrc ] ; then
+        source $HOME/.scipyenrc && scipyact
+    else
+        echo "Cannot activate an environment for Scipyen"
+        exit 1
+    fi
 fi
-# if [ -z ${VIRTUAL_ENV} ]; then
-# 
-#     if [ -a $HOME/.scipyenrc ] ; then
-#         source $HOME/.scipyenrc && scipyact
+
+# if [ -z ${CONDA_PREFIX} ]; then
+#     if [ -z ${VIRTUAL_ENV} ]; then
+#         if [ -a $HOME/.scipyenrc ] ; then
+#             source $HOME/.scipyenrc && scipyact
+#         else
+#             echo "Cannot activate a python virtual environment for Scipyen"
+#             exit 1
+#         fi
 #     else
-#     echo "Cannot activate a python virtual environment for Scipyen"
-#     exit 1
+#         echo -e "This script must be run from an activated mamba or vitualenv environment"
+#         exit 1
 #     fi
 # fi
 
