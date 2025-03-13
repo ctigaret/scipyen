@@ -9,6 +9,29 @@
 #
 # Distributed under GNU GPL License v.2
 #
+#
+# Changelog:
+# 2025-03-13 10:45:35:
+# • No more installation as root
+# • uses Python 3.13
+# • pip requirements for linux split in two batches
+#   ∘ first one installs the mimimum packages necessary to build PyQt5 locally
+#   ∘ second one installs the rest
+# • builds PyQt5 locally (support for PyQt6 and/or Pyside6 is still being developed )
+#   this requires some packages supplied by the distribution (including their
+#   development counterparts where shown by ∗):
+#   ∘ Qt5 (∗) and tools (e.g. designer, qmake)
+#   ∘ tiff (∗)
+#   ∘ png (∗)
+#   ∘ zlib (∗)
+#   ∘ gnu toolchain and cmake
+# • vigra is built locally -- requires sphinx, and the following packages
+#   supplied by your distribution (including their development counterparts, ∗):
+#   ∘ python (>=3.13, ∗)
+#   ∘ gnu toolchain and cmake
+#   ∘ boost-python bindings (∗)
+#   ∘ for a complete list please see 
+#       https://ukoethe.github.io/vigra/doc-release/vigra/Installation.html
 
 function showinstalldoc () 
 {
@@ -925,59 +948,6 @@ chmod +x ${target_dir}/scipyen
 echo -e "Scipyen startup script created in ${target_dir} \n"
 }
 
-# function make_launch_script_old () 
-# {
-#     # force the use of XCB platform abstraction plugin in Qt
-# if [[ `id -u` -eq 0 ]] ; then
-#     target_dir=/usr/local/bin
-# else
-#     target_dir=${HOME}/bin
-# fi
-#     
-# mkdir -p ${target_dir}
-# if [ -r ${target_dir}/scipyen ] ; then
-#     dt=`date '+%Y-%m-%d_%H-%M-%s'`
-#     mv ${target_dir}/scipyen ${target_dir}/scipyen.$dt
-# fi
-# shopt -s lastpipe
-# 
-# # if [[ `id -u` -eq 0 ]] ; then
-# cat <<END > ${target_dir}/scipyen 
-# #! /bin/sh
-# if [ -z \${VIRTUAL_ENV} ]; then
-# source ${virtual_env}/bin/activate
-# fi
-# git -C $scipyendir rev-parse 2>/dev/null;
-# if [[ \$? -eq 0 ]]; then
-# branch=\`git -C ${scipyendir} branch --show-current\`
-# RED='\033[0;31m'
-# GREEN='\033[0;32m'
-# BLUE='\033[0;34m'
-# NC='\033[0m'
-# echo -e "${RED}WARNING:${NC} Running ${GREEN}\${branch}${NC} branch of local scipyen git repository in ${BLUE}$scipyendir${NC} with status:"
-# git -C $scipyendir status --short --branch
-# fi
-# echo -e "\nUsing Python environment in ${VIRTUAL_ENV}\n"
-# if [ -z \$BROWSER ]; then
-# if [ -a \$VIRTUAL_ENV/bin/browser ]; then
-# source \$VIRTUAL_ENV/bin/browser
-# fi
-# fi
-# export LD_LIBRARY_PATH=${VIRTUAL_ENV}/lib:${VIRTUAL_ENV}/lib64:\${LD_LIBRARY_PATH}
-# export OUTDATED_IGNORE=1
-# a=\`which xrdb\` # do we have xrdb to read the X11 resources? (on Unix almost surely yes)
-# if [ \$0 == 0 ] ; then
-# if [ -r $scipyensrcdir/neuron_python/app-defaults/nrniv ] ; then
-# xrdb -merge $scipyensrcdir/neuron_python/app-defaults/nrniv
-# fi
-# fi
-# ${python_executable} -Xfrozen_modules=off ${scipyensrcdir}/scipyen.py "\$*"
-# END
-# shopt -u lastpipe
-# chmod +x ${target_dir}/scipyen 
-# echo -e "Scipyen startup script created in ${target_dir} \n"
-# }
-
 #### Execution starts here ###
 if [[ `id -u` -eq 0 ]] ; then
 echo -e "This script MUST be run as regular user, NOT as root!"
@@ -987,26 +957,8 @@ fi
 SECONDS=0
 get_pyver
 
-# virtual_env="testenv"
 virtual_env_pfx="scipyenv"
-# virtual_env_pfx="scipyenv.$pyver"
-# virtual_env_pfx="scipyenv_test" #.$pyver"
-# install_dir=$HOME
-# pyqt5_version=5.15.9
-# pyqt5_repo=https://files.pythonhosted.org/packages/source/P/PyQt5/
-# pyqt5_src=PyQt5-$pyqt5_version.tar.gz
-# NOTE: figure out is /where is dbus-python.h
-# pcgconf (pkg-config) must be installed
-# pkgconf --list-all  | grep dbus => list of dbus-* packages including dbus-python
-# qdbus_python_dir=
-
-
 install_dir=${HOME}
-# if [[ `id -u ` -eq 0 ]] ; then
-# install_dir="/usr/local"
-# else
-# install_dir=${HOME}
-# fi
 realscript=`realpath $0`
 scipyendir=`dirname "$realscript"`
 docdir=${scipyendir}/doc
@@ -1208,57 +1160,6 @@ for i in "$@" ; do
             ;;
         esac
         ;;
-#         --install=*)
-#         reinstall="${i#*=}"
-#         shift
-#         case $reinstall in
-#             pyqt5)
-#             reinstall_pyqt5=1
-#             build_pyqt5=1
-#             ;;
-#             PyQt5)
-#             reinstall_pyqt5=1
-#             build_pyqt5=1
-#             ;;
-#             pyqt6)
-#             reinstall_pyqt6=1
-#             build_pyqt6=1
-#             ;;
-#             PyQt6)
-#             reinstall_pyqt6=1
-#             build_pyqt6=1
-#             ;;
-#             vigra)
-#             reinstall_vigra=1
-#             ;;
-#             VIGRA)
-#             reinstall_vigra=1
-#             ;;
-#             Vigra)
-#             reinstall_vigra=1
-#             ;;
-#             neuron)
-#             reinstall_neuron=1
-#             ;;    
-#             Neuron)
-#             reinstall_neuron=1
-#             ;;    
-#             NEURON)
-#             reinstall_neuron=1
-#             ;;    
-#             fenicsx)
-#             reinstall_fenicsx=1
-#             ;;
-#             pips)
-#             reinstall_pips=1
-#             ;;
-#             desktopentry)
-#             reinstall_desktop=1
-#             ;;
-#             *)
-#             ;;
-#         esac
-#         ;;
         --about)
         showinstalldoc
         exit 0
@@ -1307,10 +1208,6 @@ fi
 
 echo -e "Will install in ${install_dir}" 
 
-# echo "python major": $major
-# echo "python minor": $minor
-# echo "python micro": $micro
-
 if ! [ -v VIRTUAL_ENV ] ; then
     virtual_env=${install_dir}/${virtual_env_pfx}
     python_exec="python${major}.${minor}"
@@ -1320,16 +1217,6 @@ else
 fi
 
 python_executable=${python_exec}
-# NOTE 2025-03-13 09:37:16
-# no more root install!
-# build the app locally as a pyinstaller bundle then distribute
-# if [[ `id -u ` -eq 0 ]] ; then
-# #     echo "running as root"
-#     python_executable=`which ${python_exec}`;
-# else
-#     python_executable=${python_exec}
-# fi
-
 echo -e "virtual_env is ${virtual_env}"
 echo -e "python executable: ${python_executable}"
 
@@ -1370,22 +1257,28 @@ if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
         exit 1
     fi
     
-    # build Pyqt5/6 NOTE: 2023-06-25 10:55:09 FIXME how to pass the virtualenv python to builder when run as root?
-    
     # NOTE: we need at least pyqt5; on Linux we build the wheel from scratch unless
     # specifically requested
     
     # NOTE/BUG 2025-03-12 00:37:03 FIXME
     # after upgrading platform OS (with full migration to python3.13)
     # the PyQt5 build has issues with xcb and wayland plugins (i.e., they're not found)
+    #
+    # NOTE: 2025-03-13 11:01:58 FIXED
+    # • using python3.13 (took a while until PyPI packages migrated to this version)
+    # may take a while until conda packages are also uptodate :)
+    # • splitting pip package installation in two batches (installpipreqs_part1 & installpipreqs_part2
+    # see changelog above)
     dopyqt5 
     
+    # NOTE: 2025-03-13 11:01:07 TODO/FIXME
 #     dopyqt6 
+#     dopyside6 # TODO
+
     installpipreqs_part2
-    # build vigra NOTE: 2023-06-25 10:55:09 FIXME how to pass the virtualenv python to builder when run as root?
+
     dovigra
     
-    # build neuron NOTE: 2023-06-25 10:55:09 FIXME how to pass the virtualenv python to builder when run as root?
     if [ $install_neuron -ne 0 ] ; then
         doneuron
     fi
@@ -1396,11 +1289,6 @@ if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
     
     # make scripts
     make_scipyenrc
-#     
-#     if [[ `id -u` -ne 0 ]] ; then
-#         # only update bashrc for regular users
-#         update_bashrc
-#     fi
     
     make_launch_script
     
