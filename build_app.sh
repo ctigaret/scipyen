@@ -31,7 +31,7 @@ function show_help ()
     echo -e "\tthis will include installing an activation script for the environmment \n"
 }
 
-if [  -z ${VIRTUAL_ENV}  |  -z ${CONDA_PREFX}  ]; then
+if [  -z ${VIRTUAL_ENV} ] | [ -z ${CONDA_PREFX}  ]; then
     if [ -a $HOME/.scipyenrc ] ; then
         source $HOME/.scipyenrc && scipyact
     else
@@ -39,20 +39,6 @@ if [  -z ${VIRTUAL_ENV}  |  -z ${CONDA_PREFX}  ]; then
         exit 1
     fi
 fi
-
-# if [ -z ${CONDA_PREFIX} ]; then
-#     if [ -z ${VIRTUAL_ENV} ]; then
-#         if [ -a $HOME/.scipyenrc ] ; then
-#             source $HOME/.scipyenrc && scipyact
-#         else
-#             echo "Cannot activate a python virtual environment for Scipyen"
-#             exit 1
-#         fi
-#     else
-#         echo -e "This script must be run from an activated mamba or vitualenv environment"
-#         exit 1
-#     fi
-# fi
 
 destination=${HOME}/scipyen_app 
 
