@@ -711,7 +711,7 @@ class ScipyenNetworkManager(QtCore.QObject):
 
 def example_get_download_size(s:str) -> int:
     import re
-    search_result = re.search("([0-9]+\.[0-9] [MGK]B)|([0-9]+ [MGK]B)", s)
+    search_result = re.search(r"([0-9]+\.[0-9] [MGK]B)|([0-9]+ [MGK]B)", s)
     assert search_result is not None
     sz_str = search_result.group()
     assert sz_str is not None
@@ -814,7 +814,7 @@ def example_sequential_download_handler(info:QtCore.QByteArray,
     """
     def _parse_size(s:str) -> int:
         import re
-        search_result = re.search("([0-9]+\.[0-9] [MGK]B)|([0-9]+ [MGK]B)", s)
+        search_result = re.search(r"([0-9]+\.[0-9] [MGK]B)|([0-9]+ [MGK]B)", s)
         assert search_result is not None
         sz_str = search_result.group()
         assert sz_str is not None
