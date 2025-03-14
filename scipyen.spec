@@ -631,45 +631,6 @@ if compile_options.debug:
 
 bundlepath = os.path.join(distpath, product)
 
-# print(f"bundlepath = {bundlepath}")
-# NOTE: 2024-05-31 09:31:43 FIXME/TODO
-# ------------------------------------
-# this needs more work + adapt for the install script (i.e. when the user wants
-# to install the bundled app directory system-wide, e.g. in /usr/local)
-# ------------------------------------
-#
-
-# if sys.platform.startswith("linux"):
-#     # add a system-wide installation script
-#     desktoptempdir = tempfile.mkdtemp()
-#     desktop_file_name = os.path.join(desktoptempdir, f"Scipyen_app{gitsfx}.desktop")
-#     # desktop_icon_file = os.path.join(bundlepath,"gui/resources/images/pythonbackend.svg")
-#     desktop_icon_file = "pythonbackend.svg"
-#     exec_file = os.path.join(bundlepath, "scipyen")
-#     desktop_file_contents = ["[Desktop Entry]",
-#     "Type=Application",
-#     "Name[en_GB]=Scipyen",
-#     "Name=Scipyen",
-#     "Comment[en_GB]=Scientific Python Environment for Neurophysiology",
-#     "Comment=Scientific Python Environment for Neurophysiology",
-#     "GenericName[en_GB]=Scientific Python Environment for Neurophysiology",
-#     "GenericName=Scientific Python Environment for Neurophysiology",
-#     f"Icon={desktop_icon_file}",
-#     "Categories=Science;Utilities;",
-#     "Exec=%k/scipyen",
-#     "MimeType=",
-#     "Path=",
-#     "StartupNotify=true",
-#     "Terminal=true",
-#     "TerminalOptions=\s--noclose",
-#     "X-DBUS-ServiceName=",
-#     "X-DBUS-StartupType=",
-#     "X-KDE-SubstituteUID=false",
-#     "X-KDE-Username=",
-#     ]
-#     with open(desktop_file_name, "wt") as desktop_file:
-#         for line in desktop_file_contents:
-#             desktop_file.write(f"{line}\n")
 # 
 #     dist_install_script = ["#!/bin/bash",
 #                         "mydir=`dirname $0`",
@@ -871,6 +832,46 @@ coll = COLLECT(
     name=product, # name of distribution directory (e.g, 'scipyen_dev' etc)
 )
 
+# print(f"bundlepath = {bundlepath}")
+# NOTE: 2024-05-31 09:31:43 FIXME/TODO
+# ------------------------------------
+# this needs more work + adapt for the install script (i.e. when the user wants
+# to install the bundled app directory system-wide, e.g. in /usr/local)
+# ------------------------------------
+#
+
+# if sys.platform.startswith("linux"):
+#     # add a system-wide installation script
+#     desktoptempdir = tempfile.mkdtemp()
+#     desktop_file_name = os.path.join(desktoptempdir, f"org.scipyen.{gitsfx}.desktop")
+#     desktop_icon_file = "pythonbackend.svg"
+#     exec_file = os.path.join(bundlepath, "scipyen")
+#     desktop_file_contents = ["[Desktop Entry]",
+#     "Type=Application",
+#     "Name[en_GB]=Scipyen",
+#     "Name=Scipyen",
+#     "Comment[en_GB]=Scientific Python Environment for Neurophysiology",
+#     "Comment=Scientific Python Environment for Neurophysiology",
+#     "GenericName[en_GB]=Scientific Python Environment for Neurophysiology",
+#     "GenericName=Scientific Python Environment for Neurophysiology",
+#     f"Icon={desktop_icon_file}",
+#     "Categories=Science;Utilities;",
+#     "Exec=%k/scipyen",
+#     "MimeType=",
+#     "Path=",
+#     "StartupNotify=true",
+#     "Terminal=true",
+#     "TerminalOptions=\s --noclose",
+#     "X-DBUS-ServiceName=",
+#     "X-DBUS-StartupType=",
+#     "X-KDE-SubstituteUID=false",
+#     "X-KDE-Username=",
+#     ]
+#     with open(desktop_file_name, "wt") as desktop_file:
+#         for line in desktop_file_contents:
+#             desktop_file.write(f"{line}\n")
+
+
 stop_time = time.perf_counter()
 dt = stop_time - start_time
 dd = int(dt//86400)
@@ -879,6 +880,8 @@ hh = int(dt//3600)
 dt = dt % 3600
 mm = int(dt//60)
 dt = dt % 60
+
+
 
 print(f"\n\nDuration: {dd} days, {hh} hours, {mm} minutes and {dt} seconds")
 
