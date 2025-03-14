@@ -95,7 +95,7 @@ exit 1
 fi
 
 echo -e "Creating a desktop file for Scipyen_app\n"
-desktopfile=${destdir}/Scipyen_app.desktop
+desktopfile=${distdir}/org.Scipyen.desktop
 cat<<END > ${desktopfile}
 [Desktop Entry]
 Type=Application
