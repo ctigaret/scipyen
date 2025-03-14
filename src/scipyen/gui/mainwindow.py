@@ -564,7 +564,7 @@ def infoSoftwareComponents() -> str:
         else:
             bundle_name = pathlib.Path(sys._MEIPASS).parent.name
             
-        txt.append(f'<ul> Running in a PyInstaller bundle: </ul>')
+        txt.append(f'<ul> Running in a <a href="https://pyinstaller.org/en/stable/">PyInstaller</a> bundle: </ul>')
         txt.append(f'<ul> &emsp; {bundle_name} </ul>')
     
     txt.append('<h3>Data Analysis</h3>')
