@@ -621,9 +621,11 @@ mn = f"{now.minute}"
 sc = f"{now.second}"
 build_sfx = f"{year}{month}{day}_{hr}_{mn}_{sc}"
 pyver_sfx = "_".join(["python", f"{sys.version_info.major}", f"{sys.version_info.minor}", f"{sys.version_info.micro}"])
-debug_sfx = "debug" if compile_options.debug else ""
+# debug_sfx = "debug" if compile_options.debug else ""
 
-product = "_".join(["scipyen", gitsfx, platform, host_name, pyver_sfx, debug_sfx, build_sfx])
+product = "_".join(["scipyen", gitsfx, platform, host_name, pyver_sfx, build_sfx])
+if compile_options.debug:
+    product += "_debug"
 # product = f"scipyen{gitsfx}_{platform}_{host_name}{debug_sfx}"
 # product = f"scipyen{gitsfx}_{platform}_{hr}_{mn}_{sc}_{year}{month}{day}"
 
