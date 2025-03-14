@@ -111,7 +111,7 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
 
     @property
     def selectedItemsText(self):
-        """A a list of str - text of selected items, which may be empty
+        r"""A a list of str - text of selected items, which may be empty
         """
         return [str(i.text()) for i in self.listWidget.selectedItems()]
         
@@ -141,7 +141,7 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
         self.listWidget.setSelectionMode(selectmode)
                 
     def setItems(self, itemsList, preSelected=None):
-        """Populates the list dialog with a list of strings :-)
+        r"""Populates the list dialog with a list of strings :-)
         
         itemsList: a python list of python strings :-)
         """

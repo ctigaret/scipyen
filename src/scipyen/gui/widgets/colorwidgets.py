@@ -1,4 +1,4 @@
-"""KColorButton and KColorCombo from KWidgetsAddons framework 'translated' here.
+r"""KColorButton and KColorCombo from KWidgetsAddons framework 'translated' here.
 
 Translation and additional code (C) 2021 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 
@@ -64,7 +64,7 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
 
 class ColorPushButton(QtWidgets.QPushButton):
-    """Blunt port (read "almost verbatim code translation") of KColorButton
+    r"""Blunt port (read "almost verbatim code translation") of KColorButton
     
     What is new:
         option to keep alpha value when a color is dropped or pasted onto the widget
@@ -99,7 +99,7 @@ class ColorPushButton(QtWidgets.QPushButton):
         
     @safeWrapper
     def initStyleOption(self, opt:QtWidgets.QStyleOptionButton):
-        """Required in all concrete subclasses of QWidget
+        r"""Required in all concrete subclasses of QWidget
         """
         opt.initFrom(self)
         opt.state = QtWidgets.QStyle.State_Sunken if self.isDown() else QtWidgets.QStyle.State_Raised
@@ -202,14 +202,14 @@ class ColorPushButton(QtWidgets.QPushButton):
         
     @safeWrapper
     def sizeHint(self):
-        """Returns a QSize"""
+        r"""Returns a QSize"""
         opt = QtWidgets.QStyleOptionButton()
         self.initStyleOption(opt)
         return self.style().sizeFromContents(QtWidgets.QStyle.CT_PushButton, opt, QtCore.QSize(16,16), self)
 
     @safeWrapper
     def minimumSizeHint(self):
-        """Returns a QSize"""
+        r"""Returns a QSize"""
         opt = QtWidgets.QStyleOptionButton()
         self.initStyleOption(opt)
         return self.style().sizeFromContents(QtWidgets.QStyle.CT_PushButton, opt, QtCore.QSize(8,8), self)
@@ -660,7 +660,7 @@ class ColorComboBox(QtWidgets.QComboBox):
     
     @property
     def colors(self) -> typing.List[QtGui.QColor]:
-        """The list of currently displayed colors (beginning with the custom one)
+        r"""The list of currently displayed colors (beginning with the custom one)
         """
         ret = list()
         if self.color.isValid():
@@ -672,7 +672,7 @@ class ColorComboBox(QtWidgets.QComboBox):
     
     @colors.setter
     def colors(self, palette:typing.Union[dict,tuple, list, str, ColorPalette]):
-        """WARNING: Does NOT check the contents of value!
+        r"""WARNING: Does NOT check the contents of value!
         """
         if isinstance(palette, ColorPalette):
             self._color_palette = palette
@@ -702,7 +702,7 @@ class ColorComboBox(QtWidgets.QComboBox):
         
     @property
     def colorNames(self) -> typing.List[str]:
-        """The list of color names in "#rrggbb" format
+        r"""The list of color names in "#rrggbb" format
         """
         ret = [name for name in self._color_palette.keys()]
         if self.color.isValid():
@@ -712,7 +712,7 @@ class ColorComboBox(QtWidgets.QComboBox):
             
     @property
     def qualifiedColorNames(self) -> typing.List[str]:
-        """the list of qualified color names (if they exist), else #rgb names
+        r"""the list of qualified color names (if they exist), else #rgb names
         """
         if len(self._color_palette):
             if self.color().isValid():
@@ -754,7 +754,7 @@ class ColorComboBox(QtWidgets.QComboBox):
         painter.end()
 
 class ColorSelectionWidget(QtWidgets.QWidget):
-    """Combines a ColorComboBox and a ColorPushButton in the same widget
+    r"""Combines a ColorComboBox and a ColorPushButton in the same widget
     """
     colorChanged = Signal(QtGui.QColor, name="colorChanged")
     

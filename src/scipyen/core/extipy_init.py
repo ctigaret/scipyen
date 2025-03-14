@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""Used for importing modules from site-package.
+r"""Used for importing modules from site-package.
 Unless Scipyen is among those, import statements for Scipyen's modules won't
 work here.
 """

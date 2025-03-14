@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""
+r"""
 """
 import sys, os, typing
 from qtpy import QtCore, QtGui, QtWidgets, QtSvg
@@ -85,7 +85,7 @@ class GraphicsImageViewerScene(QtWidgets.QGraphicsScene):
             item.setVisible(True)
             
     def mouseMoveEvent(self, evt):
-        """Emits signalMouseAt(x,y) if event position is inside the scene.
+        r"""Emits signalMouseAt(x,y) if event position is inside the scene.
         """
         
         if self.__gpixitem__ is None:
@@ -122,7 +122,7 @@ class GraphicsImageViewerScene(QtWidgets.QGraphicsScene):
         evt.ignore()
         
 class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
-    """
+    r"""
     A simple image view widget based on Qt5 graphics view framework
     
     The widget does not own the data but a pixmap copy of it; therefore data values 
@@ -259,7 +259,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         self.signalZoomChanged[float].emit(self.__zoomVal__)
         
     def _removeGraphicsObject(self, o):
-        """Removes a GraphicsObject from the scene.
+        r"""Removes a GraphicsObject from the scene.
         A GraphicsObject is a frontend to a PlanarGraphics object.
         CAUTION: This function only removes the frontent (a Qt graphics item);
         the widget stil retains a reference to the PlanarGraphics backend of 
@@ -304,7 +304,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
 
     def _removePlanarGraphics(self, name:typing.Optional[str]=None,
                               cursors:typing.Optional[bool]=None):
-        """Removes a PlanarGraphics object by its name.
+        r"""Removes a PlanarGraphics object by its name.
         Optionally, the operation can be restricted to cursors or non-cursors
         (i.e., ROIs).
         """
@@ -624,7 +624,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         
     @Slot()
     def buildROI(self):
-        """Interactively builds a new ROI (i.e. using the GUI).
+        r"""Interactively builds a new ROI (i.e. using the GUI).
         """
         # NOTE: triggered by ImageViewer.newROIAction
         # once the ROI is build, the ROI is set to emit signalROIConstructed
@@ -664,7 +664,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
                      editable=True, frameVisibility=[], 
                      showLabel=True, labelShowsPosition=True,
                      autoSelect=False, parentWidget=None):
-        """Creates a ROI programmatically, or interactively
+        r"""Creates a ROI programmatically, or interactively
         """
         if self.__scene__.rootImage is None:
             return
@@ -819,7 +819,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     def newGraphicsObject(self, item:typing.Optional[typing.Union[pgui.PlanarGraphics, type]], 
                           movable=True, editable=True, showLabel=True, 
                           labelShowsPosition=True, autoSelect=False) -> typing.Optional[pgui.GraphicsObject]:
-        """Creates a GraphicsObject that represents a PlanarGraphics for display.
+        r"""Creates a GraphicsObject that represents a PlanarGraphics for display.
         
         The object is created by either:
         1) passing a PlanarGraphics (e.g. constructed in separate code then 
@@ -1032,7 +1032,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         return qobj
         
     def clear(self):
-        """Clears the contents of the viewer.
+        r"""Clears the contents of the viewer.
         
         Removes all cursors, rois and image data and clears the 
         underlying scene.
@@ -1245,7 +1245,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     @Slot(str, bool)
     @safeWrapper
     def slot_setSelectedCursor(self, cId:str, sel:bool):
-        """To keep track of what cursor is selected, 
+        r"""To keep track of what cursor is selected, 
         independently of the underlying graphics view fw.
         """
         if cId in iter_attribute(self.graphicsCursors, "name"):
@@ -1443,7 +1443,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     
     @property
     def graphicsObjects(self) -> typing.Iterator:
-        """Iterator for existing pictgui.GraphicsObjects.
+        r"""Iterator for existing pictgui.GraphicsObjects.
         """
 
         #NOTE ATTENTION: 2021-05-08 21:27:31 New API:
@@ -1463,20 +1463,20 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         
     @property
     def planarGraphics(self) -> typing.Generator:
-        """Iterator for the backends of all the GraphicsObjects in the scene.
+        r"""Iterator for the backends of all the GraphicsObjects in the scene.
         These include cursors and rois.
         """
         return iter_attribute(self.graphicsObjects, "backend")
     
     @property
     def rois(self) -> typing.Iterator:
-        """All ROIs (PlanarGraphics) with frontends in the scene.
+        r"""All ROIs (PlanarGraphics) with frontends in the scene.
         """
         return filterfalse_type(self.planarGraphics, pgui.Cursor)
     
     @property
     def graphicsCursors(self) -> typing.Iterator:
-        """All PlanarGraphics Cursors with frontends in the scene.
+        r"""All PlanarGraphics Cursors with frontends in the scene.
         """
         return filter_type(self.planarGraphics, pgui.Cursor)
         
@@ -1488,7 +1488,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     def roi(self, value:typing.Optional[typing.Any]=None, attribute:str="name", 
             predicate:typing.Optional[typing.Callable[...,bool]]=lambda x,y: x == y, 
             **kwargs):
-        """Iterates through ROIs with specific attributes.
+        r"""Iterates through ROIs with specific attributes.
         
         ROIs are selected by comparing the value of a specific ROI attribute
         (named in 'attribute') against the value specified in 'value'.
@@ -1560,7 +1560,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
                      attribute:str="name",
                      predicate:typing.Optional[typing.Callable[...,bool]]=lambda x,y: x == y, 
                      **kwargs):
-        """Iterates through Cursors with specific attributes.
+        r"""Iterates through Cursors with specific attributes.
         
         Data cursors are selected by comparing the value of a specific cursor 
         attribute (named in 'attribute') against the value specified in 'value'.
@@ -1641,7 +1641,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         
     @safeWrapper
     def hasCursor(self, crsid):
-        """Tests for existence of a GraphicsObject cursor with given id or label.
+        r"""Tests for existence of a GraphicsObject cursor with given id or label.
         
         Parameters:
         ===========

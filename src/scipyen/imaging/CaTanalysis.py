@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 
-"""
+r"""
 Module for analysis of Ca2+ transients (CaTs)
 
 NOTE: 2019-03-18 09:17:24
@@ -301,7 +301,7 @@ else:
     __UI_LSCaTWindow__, __QMainWindow__ = __loadUiType__(__ui_path__)#, import_from="gui")
 
 def vCursor2ScanlineProjection(v, path, span=None):
-    """Maps the x coordinate for a vertical cursor in linescans space (x,y) coordinates on scanline path, in scene space.
+    r"""Maps the x coordinate for a vertical cursor in linescans space (x,y) coordinates on scanline path, in scene space.
     
     Returns the pair (x,y) of coordinates along the scanline "path" in the scene image,
     that correspond to the x coordinate of the vertical cursor "v" in the linescan image.
@@ -464,7 +464,7 @@ def vCursor2ScanlineProjection(v, path, span=None):
     return (ret_x, ret_y)
 
 def vCursorPos2ScanlineCoords(v, path, span=None):
-    """Maps the x coordinate for a vertical cursor in linescans space (x,y) coordinates on scanline path, in scene space.
+    r"""Maps the x coordinate for a vertical cursor in linescans space (x,y) coordinates on scanline path, in scene space.
     
     Returns the pair (x,y) of coordinates along the scanline "path" in the scene image,
     that correspond to the x coordinate of the vertical cursor "v" in the linescan image.
@@ -723,7 +723,7 @@ def vCursorPos2ScanlineCoords(v, path, span=None):
     return (ret_x, ret_y)
 
 def mapScansVCToScenePCOnPath(v, p, path, span=None):
-    """Maps the X coordinate of vertical cursor to a point cursor position on a path.
+    r"""Maps the X coordinate of vertical cursor to a point cursor position on a path.
     
     ATTENTION: This is implemented only for the cases when the scanline is 
     1) a line defined by two points ("simple" or "classical" line scan trajectory)
@@ -817,7 +817,7 @@ def mapScansVCToScenePCOnPath(v, p, path, span=None):
     
 #@safeWrapper
 def epscatDiscriminator(base, peak, func, pred, predValue, predFunc):#, accFcnBase, accFcnPeak, predFcn, predicate):
-    """
+    r"""
     base, peak: single-channel 2D vigra.VigraArray, neo.AnalogSignals, datatypes.DataSignals or 1D numpy.ndarrays
     
     func:       tuple (str, dict): str = name of unary array function; dict = kwargs of function
@@ -841,7 +841,7 @@ def epscatDiscriminator(base, peak, func, pred, predValue, predFunc):#, accFcnBa
     return eval(pred)(peak_base_value, predValue), peak_value, base_value, peak_base_value
 
 def getTimeSlice(scandata, t0, t1):
-    """Returns a time slice of the linescans
+    r"""Returns a time slice of the linescans
     """
     cal = calibration(scandata.scans[0].axistags["t"])
     
@@ -880,7 +880,7 @@ def getTimeSlice(scandata, t0, t1):
     return ret
     
 def getProfile(scandata, roi, scene=True):
-    """Generates scanline profiles from roi's contour in scene or scans.
+    r"""Generates scanline profiles from roi's contour in scene or scans.
     
     Does this for all available channels.
     
@@ -934,7 +934,7 @@ def averageEPSCaTs(scandata, epscatname, frame_index = None):
     return ret
 
 def analyseLSData(*args, **kwargs):
-    """Batch analysis, useful for bulk (re-) analysis of ScanData objects.
+    r"""Batch analysis, useful for bulk (re-) analysis of ScanData objects.
     
     all analysisOptions are stored in the ScanData objects.
     
@@ -959,7 +959,7 @@ def analyseLSData(*args, **kwargs):
 def analyseEPSCaT(lsdata, frame, indicator_channel_ndx, 
                   unit = None, reference_channel_ndx=None, do_fit = True,
                   detrend=False):
-    """Calculates EPSCaT trace and optionally fits an EPSCaT model.
+    r"""Calculates EPSCaT trace and optionally fits an EPSCaT model.
     
     The EPSCaT waveform is computed on an AnalysisUnit!
     
@@ -1618,7 +1618,7 @@ def analyseEPSCaT(lsdata, frame, indicator_channel_ndx,
         return fitted_epscat #, src_base, src_peak
     
 def analyseFrame(lsdata:ScanData, frame:int, unit=None, indicator_channel_ndx=None, reference_channel_ndx=None, detrend=False, gen_long_fits=False):
-    """Analyses a specific frame in a ScanData object.
+    r"""Analyses a specific frame in a ScanData object.
     See also the module-level function CaTanalysis.analyseFrame(...)
     Modifies ScanData in place !
     Uses analysisOptions stored in lsdata.
@@ -1873,7 +1873,7 @@ def analyseFrame(lsdata:ScanData, frame:int, unit=None, indicator_channel_ndx=No
         
 #@safeWrapper
 def computeLSCaT(roiRange, f0Range, ca_data, ref_data=None, detrend=False, name=None, description=None, units=pq.dimensionless, **annotations):
-    """
+    r"""
     Generates an EPSCaT trace by calculating df/a or df/f on a linescan time series.
     
     Positional parameters:
@@ -2056,7 +2056,7 @@ def computeLSCaT(roiRange, f0Range, ca_data, ref_data=None, detrend=False, name=
 
 #@safeWrapper
 def fitEPSCaT(data, p0, bounds, fitWindow = None, integration=None):
-    """Fit EPSCaT model defined by p0 parameters through data.
+    r"""Fit EPSCaT model defined by p0 parameters through data.
     
     Parameters:
     ============
@@ -2454,7 +2454,7 @@ def fitEPSCaT(data, p0, bounds, fitWindow = None, integration=None):
     return result
 
 def collateReports(data):
-    """
+    r"""
     Concatenates several pandas DataFrame objects into one
     
     Wraps ps.concat for dataframes in *args. dataframes are concatenated along
@@ -2511,7 +2511,7 @@ def collateReports(data):
         traceback.print_exc()
         
 def reportUnitAnalysis(scandata, analysis_unit=None, protocols=None, frame_index = None, filename=None, return_type="dataframe"):
-    """Returns data containins LSCaT analysis result for the specified analysis unit(s).
+    r"""Returns data containins LSCaT analysis result for the specified analysis unit(s).
     
     Parameters:
     ===========
@@ -3067,7 +3067,7 @@ def reportUnitAnalysis(scandata, analysis_unit=None, protocols=None, frame_index
     return result
 
 def writeEPSCaTReport(result, filename):
-    """Write analysis report to a csv file
+    r"""Write analysis report to a csv file
     """
     import io, csv
     
@@ -3198,7 +3198,7 @@ def detectRoisInProfile(profile, order, *args, **kwargs):
 
 
 def addMirrorCursor(data, vc):
-    """Generates a poin cursor on the scanline trajectory on the scene.
+    r"""Generates a poin cursor on the scanline trajectory on the scene.
     The cursor's position on the scanline trajectory mirrors the corresponding
     vertical cursor X coordinate in the linescan image.
     
@@ -3306,7 +3306,7 @@ def addMirrorCursor(data, vc):
     data.sceneCursors[c.name] = pc
     
 def generateMirrorCursors(data):
-    """Generates point_cursors on the scanline trajectory in the scene, to mirror the X coordinate of the vertical linescan cursors
+    r"""Generates point_cursors on the scanline trajectory in the scene, to mirror the X coordinate of the vertical linescan cursors
     
     Unlike addMirrorCursor(), this function will REPLACE all objects in sceneCursors
     that have names identical to those of the vertical cursors in linescans.
@@ -3387,7 +3387,7 @@ def generateMirrorCursors(data):
         data.sceneCursors[c.name] = pc
         
 def removeMirrorCursors(data):
-    """Removes ALL mirror point cursors created with generateMirrorCursors()
+    r"""Removes ALL mirror point cursors created with generateMirrorCursors()
     
     Uses the names of the linescan vertical cursors to remove the omonymous 
     point cursors from the scene. 
@@ -3418,7 +3418,7 @@ def removeMirrorCursors(data):
                 data.sceneCursors.pop(obj.name, None)
             
 def removeMirrorCursor(data, vc):
-    """
+    r"""
     Parameters:
     ===========
     
@@ -3761,7 +3761,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             item[0].disconnect(item[1])
             
     #def saveSettings(self):
-        #"""Overrides ScipyenViewer.saveSettings
+        #r"""Overrides ScipyenViewer.saveSettings
         #"""
         ##print("%s.saveSettings %s" % (self.__class__.__name__, self.winTitle))
         ## NOTE: 2021-07-08 10:18:11
@@ -3789,7 +3789,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         #self.loadViewerSettings()
         
     def saveViewerSettings(self):
-        """Overrides ScipyenViewer.saveViewerSettings()
+        r"""Overrides ScipyenViewer.saveViewerSettings()
         """
         # TODO/FIXME: 2021-07-08 10:55:21
         # settings for LnF of cursors & rois
@@ -3839,7 +3839,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 
             
     def saveWindowSettings(self):
-        """Overrides ScipyenViewer.saveWindowSettings()
+        r"""Overrides ScipyenViewer.saveWindowSettings()
         Also saves window settings for child windows.
         
         NOTE: The window settings for each of these child windows are loaded
@@ -3892,7 +3892,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         super().saveWindowSettings() # to save LSCaT window pos, geometry & state
             
     def loadViewerSettings(self):
-        """Loads settings unrelated to QMainWindowe instance.
+        r"""Loads settings unrelated to QMainWindowe instance.
         Concerns only the LSCaTWindow and not its client image/signal viewers
         """
         pass
@@ -4513,7 +4513,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
     @safeWrapper
     def filterData(self, scene=True, scans=True):#, frames = None):
-        """ Filters data with functions selected in the "Filters" tab.
+        r""" Filters data with functions selected in the "Filters" tab.
         
         Wraps processData() function in separate pictgui.ProgressWorkerRunnable threads,
         one for the scans and one for the scene ⟹ there will be two progressbars
@@ -4798,7 +4798,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     
     @currentFrame.setter
     def currentFrame(self, value:int):
-        """Sets the current frame number without emitting signals.
+        r"""Sets the current frame number without emitting signals.
         Updates the currentFrame attribute of various graphics objects.
         Call this when changing frame from outside this window
         """
@@ -5071,7 +5071,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         pvimp.open()
         
     def _analyzeFrames_(self, frames, progressSignal=None, setMaxSignal=None, **kwargs):
-        """Calls to the module-level analyseFrame() for each frame in frames.
+        r"""Calls to the module-level analyseFrame() for each frame in frames.
         This is meant to be executed in a separate GUI thread, (i.e. it is called 
         by a ProgressWorkerRunnable) emits progressSignal(int) Signal
         
@@ -6684,7 +6684,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     @Slot(QtWidgets.QTableWidgetItem)
     @safeWrapper
     def slot_protocolTableEdited(self, item):
-        """Modifies lsdata's TriggerProtocols directly.
+        r"""Modifies lsdata's TriggerProtocols directly.
         
         Then calls lsdata.embedTriggerEvents
         """
@@ -7013,7 +7013,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 
     #@safeWrapper
     def collectAnalysisUnits(self, name_list, progressSignal=None):
-        """
+        r"""
         name_list: a list of ScanData objects (variables) names in the workspace
         
         progressSignal: None (default) or Signal when this function is
@@ -7195,7 +7195,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         return result
     
     def extractAnalysisUnit(self):
-        """ Extract the selected analysis unit as a ScanData object.
+        r""" Extract the selected analysis unit as a ScanData object.
         
         Returns a ScanData constructed from the data region and segments/frames 
         defined in the selected analysis unit and its attached protocols.
@@ -7264,7 +7264,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             return -1
                 
     def slot_batch_extract_reports(self):
-        """Exports analysis results for selected workspace ScanData
+        r"""Exports analysis results for selected workspace ScanData
         
         Analyis results are saved as pandas.DataFrame objects in the workspace
         
@@ -7323,7 +7323,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 
     @Slot()
     def slot_collate_reports(self):
-        """Concatenates all analysis reports (pandas.DataFrames) from workspace.
+        r"""Concatenates all analysis reports (pandas.DataFrames) from workspace.
         These not be all from the same cell/field/unit.
         """
         from core.workspacefunctions import getvarsbytype
@@ -7474,7 +7474,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     @safeWrapper
     @Slot()
     def slot_reportLSCaTResults(self):
-        """Exports analysis result (pandas.DataFrame) to workspace.
+        r"""Exports analysis result (pandas.DataFrame) to workspace.
         
         The resulting variable can then be saved as CSV form workspace browser
         
@@ -7763,7 +7763,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     @Slot(int)
     @safeWrapper
     def slot_gui_spinbox_select_cursor_by_index(self, index):
-        """ TODO FIXME Adapt to select/deselect AnalysisUnits
+        r""" TODO FIXME Adapt to select/deselect AnalysisUnits
         or maybe create separate slots?
         """
         if self._data_ is None:
@@ -7892,7 +7892,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     @Slot()
     @safeWrapper
     def slot_gui_edit_analysis_unit_descriptors(self):
-        """
+        r"""
         """
         # we need:
         # distance from soma
@@ -8514,7 +8514,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     @Slot()
     @safeWrapper
     def slot_gui_changed_analysis_unit_name(self):
-        """Rename an analysis unit
+        r"""Rename an analysis unit
         For landmark (PlanarGraphics) - based analysis units, this also changes
         the name of the landmark.
         
@@ -8655,7 +8655,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     @Slot(object)
     @safeWrapper
     def slot_graphics_object_added_in_window(self, obj):
-        """Slot to be connected to image viewer window signals emitted when a 
+        r"""Slot to be connected to image viewer window signals emitted when a 
         GraphicsObject has been created in window
         
         obj: a pictgui.GraphicsObject backend i.e., a pictgui.PlanarGraphics
@@ -8766,7 +8766,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     @Slot(object)
     @safeWrapper
     def slot_graphics_object_changed_in_window(self, obj):
-        """Triggered by direct interaction with a GraphicsObject cursor.
+        r"""Triggered by direct interaction with a GraphicsObject cursor.
         Direct interaction means either that cursor was modified by mouse action,
         or cursor properties have been edited through a dialog.
         
@@ -9460,7 +9460,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     @Slot(int)
     @safeWrapper
     def _slot_frameChangedInChildViewer(self, value):
-        """Captures frame index change in the child viewer
+        r"""Captures frame index change in the child viewer
         Parameters:
         ===========
         value:int, index of the newly displayed frame in the viewer.
@@ -9533,7 +9533,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     @Slot(int)
     @safeWrapper
     def slot_setFrameNumber(self, value):
-        """Connected to frameQSlider or framesQSpinBox signals.
+        r"""Connected to frameQSlider or framesQSpinBox signals.
         """
 
         # NOTE: 2022-01-16 13:14:04
@@ -9685,7 +9685,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     @Slot(int)
     @safeWrapper
     def slot_sceneDisplayChannelChanged(self, value):
-        """When scene is a sequence of single-band data, send this to the display.
+        r"""When scene is a sequence of single-band data, send this to the display.
         
         NOTE: index 0 means display ALL channels!
         """
@@ -9846,7 +9846,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
     @safeWrapper
     def _init_data_viewers_(self, section:str):
-        """Sets up the viewer(s) for a specific ScanData section
+        r"""Sets up the viewer(s) for a specific ScanData section
         Parameters:
         ==========
         section: str, one of: 
@@ -9927,7 +9927,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
     @safeWrapper
     def _get_viewers_for_data_section(self, section:str) -> typing.Tuple[typing.Any]:
-        """
+        r"""
         Parameters:
         ==========
         section: str, one of: 
@@ -10027,7 +10027,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             
     @safeWrapper
     def _init_viewers_(self):
-        """Sets up the data viewers.
+        r"""Sets up the data viewers.
         Calls self._init_data_viewers_ for each data component attribute in ScanData instance
         """
         if self._data_ is None:
@@ -10630,7 +10630,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     @Slot()
     @safeWrapper
     def slot_refreshDataDisplay(self, showFiltered = True):
-        """ TODO/FIXME clean up this mess, 
+        r""" TODO/FIXME clean up this mess, 
         """
         if self._data_ is None:
             return
@@ -10718,7 +10718,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                         
     @safeWrapper
     def _display_graphics_objects_(self, rois=True, scene=True):
-        """Displays a specified overlay type in a specific data subset.
+        r"""Displays a specified overlay type in a specific data subset.
         
         Keyword parameters:
         ====================
@@ -10864,7 +10864,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
 
     @safeWrapper
     def _update_analysis_unit_ui_fields_(self):
-        """Updates GUI fields in Analysis unit groupbox _AND_ the results in the text viewer window
+        r"""Updates GUI fields in Analysis unit groupbox _AND_ the results in the text viewer window
         """
         
         
@@ -11420,7 +11420,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
     @safeWrapper
     def _parsedata_(self, newdata=None):#, varname=None):
-        """Parses metainformation and then actually assigns the data to the _data_ attribute
+        r"""Parses metainformation and then actually assigns the data to the _data_ attribute
         """
         if isinstance(newdata, ScanData):
             name = getattr(newdata, "name", None)
@@ -11561,7 +11561,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
     @safeWrapper
     def setScansFilterFunction(self, channel, value, *args, **kwargs):
-        """Sets the filtering function for the specified scans channel
+        r"""Sets the filtering function for the specified scans channel
         
         channel: channel name (str)
         
@@ -11609,7 +11609,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             
     @safeWrapper
     def getSceneFilterFunction(self, channel):
-        """Returns the function object for filtering the specified scene channel
+        r"""Returns the function object for filtering the specified scene channel
         """
         if not isinstance(self._data_, ScanData):
             return
@@ -11634,7 +11634,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             
     @safeWrapper
     def setSceneFilterFunction(self, channel, value, *args, **kwargs):
-        """Sets the filtering function for the specified scene channel
+        r"""Sets the filtering function for the specified scene channel
         
         channel: channel name (str)
         
@@ -11680,7 +11680,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             
     @safeWrapper
     def getScansFilterFunction(self, channel):
-        """Returns the function object for filtering the specified scans channel
+        r"""Returns the function object for filtering the specified scans channel
         """
         if not isinstance(self._data_, ScanData):
             return
@@ -11705,7 +11705,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             
     @safeWrapper
     def generateFilters(self):
-        """Generates filter specifications in ScanData
+        r"""Generates filter specifications in ScanData
         
         Uses the specifications in data.analysisOptions to generate filter
         functions used for filtering (denoising) data.scene and data.scans.
@@ -11812,7 +11812,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 
     @safeWrapper
     def generateScanRegionProfiles(self):
-        """
+        r"""
         FIXME/TODO adapt to a new scenario where all scene image data is a single
         multi-channel VigraArray
         
@@ -11834,7 +11834,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
 
     @safeWrapper
     def generateScanRegionProfilesFromScene(self):
-        """Generates scanline profiles from the scene rois
+        r"""Generates scanline profiles from the scene rois
         
         FIXME/TODO adapt to a new scenario where all scene image data is a single
         multi-channel VigraArray
@@ -11928,7 +11928,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 
     @safeWrapper
     def generateScanRegionProfilesFromScans(self):
-        """Generates scanline profiles from the linescans X axis average.
+        r"""Generates scanline profiles from the linescans X axis average.
         
         FIXME/TODO adapt to a new scenario where all scene image data is a single
         multi-channel VigraArray
@@ -12015,7 +12015,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 
     @safeWrapper
     def processData(self, progressSignal = None, setMaxSignal=None, **kwargs):#scene=True, channel = None, ):
-        """Applies 2D filters frame-wise to raw scene or scans image data subsets.
+        r"""Applies 2D filters frame-wise to raw scene or scans image data subsets.
         
         The function is meant to be called by a ProgressWorkerRunnable instance.
         
@@ -12317,7 +12317,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
     @safeWrapper
     def setData(self, newdata = None, doc_title=None, **kwargs):
-        """When newdata is None this resets everything to their defaults"""
+        r"""When newdata is None this resets everything to their defaults"""
         
 #         uiParamsPrompt = kwargs.pop("uiParamsPrompt", False)
 #         
@@ -12350,7 +12350,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         #self.closeEvent(evt)
 
     def closeEvent(self, evt):
-        """Overrides ScipyenFrameViewer.closeEvent() for clean up.
+        r"""Overrides ScipyenFrameViewer.closeEvent() for clean up.
         """
         #print("%s.closeEvent %s:" % (self.__class__.__name__, self.winTitle))
         #print("LSCaTWindow.closeEvent: isTopLevel", self.isTopLevel)
@@ -12586,7 +12586,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
 
     @safeWrapper
     def _displayChannels_(self, scene=True, channels=None):
-        """Display selected channels in scene or frame data.
+        r"""Display selected channels in scene or frame data.
         
         scene: bool; when True (default), displays selected scene channels, 
             otherwise displays selected channels in the frame scans;
@@ -12647,7 +12647,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             raise TypeError("channels is expected to be a list of str or int, or None")
                 
 def addSex(data, value):
-    """Creates a 'Sex' column in the data.
+    r"""Creates a 'Sex' column in the data.
     Parameters:
     ==========
     data: pandas.DataFrame with LSCaT results
@@ -12685,7 +12685,7 @@ def addSex(data, value):
         data.insert(index, gdr)
         
 def clean_NA(data):
-    """
+    r"""
     CAUTION 2018-12-14 16:54:46
     Replaces the string "NA" with np.nan to represent missing values in numerical columns 
     (bad idea to use "NA", but initially used to export result to csv
@@ -12707,7 +12707,7 @@ def clean_NA(data):
         data[col].astype(np.float64, copy=False)
         
 def fixAnalysisDateTime(data):
-    """Changes the type of Analysis_Date_Time from string to datetime.
+    r"""Changes the type of Analysis_Date_Time from string to datetime.
     
     More precisely, to the datetime64[ns] (numpy.dtype("<M8[ns]") i.e. "timestamp")
     """
@@ -12731,7 +12731,7 @@ def categorize_somatic_distance(data, bin_edges = (0,150,250,300)):
     categoriseNumericalData(data, "Distance_From_Soma", bin_edges, "somatic_dist_2")
     
 def convert_Branch_Order_to_category(data):
-    """Does what its name says.
+    r"""Does what its name says.
     Modifies data in place!
     """
     
@@ -12838,7 +12838,7 @@ def addAge(data, value):
         data.insert(index, age_series)
             
 def addSource(data):
-    """Creates a 'Source' column in the data 
+    r"""Creates a 'Source' column in the data 
     Animal ID is extracted from the string values in the "Cell" column by
     concatenating all but the last "."-separated tokens in the string 
     NOTE: This requires that the "Cell" field must contain "."-separated tokens, e.g.
@@ -12886,7 +12886,7 @@ def addSource(data):
     data.insert(1, "Source", sources.astype("category"))
     
 def renameCategory(data, level, old_name, new_name):
-    """Renames a the category given by "old_name" to that in "new_name".
+    r"""Renames a the category given by "old_name" to that in "new_name".
     
     Parameters:
     ===========
@@ -12937,7 +12937,7 @@ def renameCategory(data, level, old_name, new_name):
     
     
 def categoriseLSCaTResult(data, inplace=True):
-    """Converts a pre-defined set of columns to categorical data type in a LSCaT result DataFrame
+    r"""Converts a pre-defined set of columns to categorical data type in a LSCaT result DataFrame
     
     Positional parameters:
     ======================
@@ -13183,7 +13183,7 @@ def normaliseLSCaTResultVariables(data,
         return ret
     
 def categoriseNumericalData(data, parameter, values, name, inplace=True):
-    """Generates a categorical column for a specified numerical data columns in DataFrame data.
+    r"""Generates a categorical column for a specified numerical data columns in DataFrame data.
     
     Useful to generate categorical "bins" from a numerical column, e.g. from
     morphometric parameters
@@ -13280,7 +13280,7 @@ def categoriseNumericalData(data, parameter, values, name, inplace=True):
         return cat_series
     
 def addGenotype(data, value):
-    """Adds genotype to LSCaT result data as categorical column.
+    r"""Adds genotype to LSCaT result data as categorical column.
     
     Modifies data in-place
     
@@ -13331,7 +13331,7 @@ def group(data,
                     "Fit_EPSCaT_0_taudecay_0_norm_to_1bAP", 
                     "Integration_EPSCaT_Simpson_norm_to_1bAP"),
         grouping=("Unit_Type", "somatic_dist_2", "Protocol")):
-    """Wrapper around pandas.DataFrame.groupby()
+    r"""Wrapper around pandas.DataFrame.groupby()
     Discards data according to boolean condition.
     
     Positional parameters:
@@ -13465,7 +13465,7 @@ def group_cond(data,
         grouping=("Unit_Type", "somatic_dist_2", "Protocol"),
         conditions="FailSuccess_EPSCaT_0_success",
         restrict=False):
-    """Wraps around pandas.DataFrame.groupby()
+    r"""Wraps around pandas.DataFrame.groupby()
     Discards data according to boolean condition.
     
     Positional parameters:
@@ -13627,7 +13627,7 @@ def aggregateParameters(data,
                                     "Integration_EPSCaT_Simpson_norm_to_1bAP"), 
                         grouping=("Unit_Type", "somatic_dist_2", "Protocol"),
                         functions=(np.nanmean, np.nanstd, sgp.nansem, sgp.nansize)):
-    """Aggregates values in the LSCaT result DataFrame
+    r"""Aggregates values in the LSCaT result DataFrame
     
     NOTE: the LSCaT result DataFrame would have already been pre-processed
         with categoriseLSCaTResult and categoriseNumericalData, especially if
@@ -13723,7 +13723,7 @@ def aggregateParameters_cond(data,
                         conditions = "FailSuccess_EPSCaT_0_success",
                         functions=(np.nanmean, np.nanstd, sgp.nansem, sgp.nansize),
                         restrict=False):
-    """Aggregates values in the LSCaT result DataFrame
+    r"""Aggregates values in the LSCaT result DataFrame
     
     NOTE: the LSCaT result DataFrame would have already been pre-processed
         with categoriseLSCaTResult and categoriseNumericalData, especially if
@@ -13825,7 +13825,7 @@ def aggregateParameters_cond(data,
     return pd.DataFrame(series_dict), data_grouping
         
 #def getStatistic(data, parameter, func, **conditions):
-    #"""Applies statistic function to a subset of data in the DataFrame data.
+    #r"""Applies statistic function to a subset of data in the DataFrame data.
     #See aggregateParameters for a better solution to apply several statisical 
     #functions
     #Parameters
@@ -13842,7 +13842,7 @@ def aggregateParameters_cond(data,
     
     
 def collectParameterStatAcrossCells(data, parameter, protocol):
-    """Brings together per-cell statistic
+    r"""Brings together per-cell statistic
     
     Parameters:
     ===========
@@ -13913,7 +13913,7 @@ def collectParameterStatAcrossCells(data, parameter, protocol):
 
     
 def collectMeansAcrossCells(data, protocol):
-    """Shorthand for collectParameterStatAcrossCells for "nanmean" values.
+    r"""Shorthand for collectParameterStatAcrossCells for "nanmean" values.
     """
     
     parameters = [c for c in data[0].columns if "nanmean" in c]
@@ -13931,7 +13931,7 @@ def correctUnitType(data):
         
         
 def blankUncageArtifactInLineScans(data, time, width, bgstart, bgend, frame=0):
-    """
+    r"""
     Blanks uncaging artifact
     
     data: ScanData with line scan images.

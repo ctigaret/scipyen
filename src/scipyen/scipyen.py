@@ -334,7 +334,7 @@ if hasattr(QtCore, "QLoggingCategory"):
 
 
 class MyProxyStyle(QtWidgets.QProxyStyle):
-    """To prevent repeats of valueChanged in QSpinBox controls for frame navigation.
+    r"""To prevent repeats of valueChanged in QSpinBox controls for frame navigation.
     
     This raises the spin box SH_SpinBox_ClickAutoRepeatThreshold so that
     valueChanged is not repetedly called when frame navigation takes too long time.

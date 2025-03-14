@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""Capture & redirect output from 3rd party C/C++ libraries
+r"""Capture & redirect output from 3rd party C/C++ libraries
 
 Inspired from code by Eli Bendersky
 
@@ -61,7 +61,7 @@ c_stderr = ctypes.c_void_p.in_dll(libc, 'stderr')
     ##original_stdout_fd = sys.stdout.fileno()
 
     #def _redirect_(ostr, to_fd):
-        #"""Redirect stdout to the given file descriptor."""
+        #r"""Redirect stdout to the given file descriptor."""
         ## Flush the C-level buffer stdout
         #libc.fflush(c_stream)
         ## Flush and close sys.stdout - also closes the file descriptor (fd)
@@ -92,7 +92,7 @@ c_stderr = ctypes.c_void_p.in_dll(libc, 'stderr')
         
 @contextmanager
 def stdout_redirector(stream):
-    """FIXME: 2021-11-30 15:04:24
+    r"""FIXME: 2021-11-30 15:04:24
     Subsequent error messages from Python code(via sys.stderr) do not show up 
     anymore until after Scipyen has been closed. 
     """
@@ -104,7 +104,7 @@ def stdout_redirector(stream):
     original_stdout_fd = sys.stdout.fileno()
 
     def _redirect_(to_fd):
-        """Redirect stdout to the given file descriptor."""
+        r"""Redirect stdout to the given file descriptor."""
         # Flush the C-level buffer stdout
         libc.fflush(c_stdout)
         # Flush and close sys.stdout - also closes the file descriptor (fd)
@@ -144,7 +144,7 @@ def stderr_redirector(stream):
     #system_stderr_fd = sys.stderr.fileno() # also save this
 
     def _redirect_(to_fd):
-        """Redirect stderr to the given file descriptor."""
+        r"""Redirect stderr to the given file descriptor."""
         # Flush the C-level buffer stderr
         libc.fflush(c_stderr)
         

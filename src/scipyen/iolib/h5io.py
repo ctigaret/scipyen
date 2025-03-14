@@ -23,7 +23,7 @@
 # the strategy is to create a structured numpy array
 # for multi-level DataFrame objects we use the examples at
 # https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.reset_index.html?highlight=reset_index#pandas.DataFrame.reset_index
-"""
+r"""
 df0 = pd.DataFrame([('bird', 389.0),
                     ('bird', 24.0),
                     ('mammal', 80.5),
@@ -220,7 +220,7 @@ def dataset2string(d:h5py.Dataset):
     return np.atleast_1d(d)[0].decode("utf-8")
 
 def pandasDtype2HF5Dtype(dtype, col, categorical_info:dict=None):
-    """Helper function for pandas2Structarray.
+    r"""Helper function for pandas2Structarray.
     
     Parameters:
     -----------
@@ -287,7 +287,7 @@ def pandasDtype2HF5Dtype(dtype, col, categorical_info:dict=None):
         raise
         
 def pandas2Structarray(obj):
-    """
+    r"""
     Convert a pandas DataFrame object to a numpy structured array.
     
     Parameters:
@@ -396,7 +396,7 @@ def __check_make_entity_args__(obj, oname, entity_cache):
 #     s[id(obj)] = (obj, entity)
 
 def storeEntityInCache(s:dict, obj:typing.Any, entity:typing.Union[h5py.Group, h5py.Dataset]):
-    """Keeps of cache of HDF5-endoced objects and their HDF5 entities.
+    r"""Keeps of cache of HDF5-endoced objects and their HDF5 entities.
     
     The cache maps the id of the object stored as HDF5 entity to the entity itself
     
@@ -432,7 +432,7 @@ def printHdf(v):
 
 def h5pyIterator(g:h5py.Group, prefix:str='',
                  entity_cache:typing.Optional[dict]=None):
-    """HDF5 Group traverser.
+    r"""HDF5 Group traverser.
     
     See Answer 1 in 
     https://stackoverflow.com/questions/50117513/can-you-view-hdf5-files-in-pycharm
@@ -463,7 +463,7 @@ def h5pyIterator(g:h5py.Group, prefix:str='',
             yield from h5pyDatasetIterator(item, path)
             
 def h5pyDatasetIterator(g:h5py.Group, prefix:str=''):
-    """HDF5 Group traverser.
+    r"""HDF5 Group traverser.
     
     See Answer 1 in 
     https://stackoverflow.com/questions/50117513/can-you-view-hdf5-files-in-pycharm
@@ -493,7 +493,7 @@ def h5pyDatasetIterator(g:h5py.Group, prefix:str=''):
             yield from h5pyDatasetIterator(item, path)
             
 def exploreHDF(hdf_file:typing.Union[str, h5py.Group]):
-    """Traverse all datasets across all groups in HDF5 file.
+    r"""Traverse all datasets across all groups in HDF5 file.
 
     See Answer 1 in 
     https://stackoverflow.com/questions/50117513/can-you-view-hdf5-files-in-pycharm
@@ -539,7 +539,7 @@ def string2hdf(s):
 
 @singledispatch
 def makeAttr(x):
-    """Returns a representation of 'x' suitable as a HDF5 entity attribute.
+    r"""Returns a representation of 'x' suitable as a HDF5 entity attribute.
     
     `x` is typically a basic Python type, and the representation is a JSON string.
     
@@ -633,7 +633,7 @@ def _(x:np.ndarray):
     
 
 def makeAttrDict(**kwargs):
-    """Generates a dict suitable for storage as 'attrs' property of a HDF5 entity.
+    r"""Generates a dict suitable for storage as 'attrs' property of a HDF5 entity.
     
     The returned dict object maps keys (str) to values that can be stored as
     attrs values into a h5py Group or Dataset.
@@ -707,7 +707,7 @@ def group2neoContainer(g:h5py.Group, target_class:type, cache:dict = {}):
     return obj
 
 def group2neoSignal(g:h5py.Group, target_class:type, cache:dict = {}):
-    """Reconstructs neo.core.basesignal.BaseSignal objects from their HDF5 Group.
+    r"""Reconstructs neo.core.basesignal.BaseSignal objects from their HDF5 Group.
 
     These object types are:
     • neo.AnalogSignal
@@ -941,7 +941,7 @@ def group2neoSignal(g:h5py.Group, target_class:type, cache:dict = {}):
     return obj
 
 def group2neoDataObject(g:h5py.Group, target_class:type, cache:dict = {}):
-    """Reconstructs neo.core.dataobject.DataObject objects from their HDF5 Group.
+    r"""Reconstructs neo.core.dataobject.DataObject objects from their HDF5 Group.
     
     These object types are:
     • Signal objects → delegated to group2neoSignal():
@@ -1213,7 +1213,7 @@ def group2VigraArray(g:h5py.Group, cache:dict = {}):
         raise RuntimeError(f"Cannot parse a VigraArray from the HDF5 Group {g}")
                 
 def group2neo(g:h5py.Group, target_class:type, cache:dict = {}):
-    """Reconstructs neo objects
+    r"""Reconstructs neo objects
     
     • neo.core.container.Container (neo.Block, neo.Segment, neo.Group)
     • neo.core.dataobject.DataObject:
@@ -1273,7 +1273,7 @@ def group2neo(g:h5py.Group, target_class:type, cache:dict = {}):
         raise TypeError(f"Don't know how to manage {target_class}")
             
 def fromHDF5(entity:typing.Union[h5py.Group, h5py.Dataset], cache:dict=dict()):
-    """Back from toHDF5 (complete the round trip)
+    r"""Back from toHDF5 (complete the round trip)
     """
     # print("in fromHDF5: ")
     # NOTE: 2022-10-08 13:16:14
@@ -1361,7 +1361,7 @@ def fromHDF5(entity:typing.Union[h5py.Group, h5py.Dataset], cache:dict=dict()):
 
 
 def attrs2dict(attrs:h5py.AttributeManager):
-    """Generates a dict object from a h5py Group or Dataset 'attrs' property.
+    r"""Generates a dict object from a h5py Group or Dataset 'attrs' property.
     
     Althogh one can simply call `dict(attrs)` or `dict(attrs.items())`, 
     this function also decodes the items of `attrs` to reverse the actions of 
@@ -1494,7 +1494,7 @@ def attrs2dict(attrs:h5py.AttributeManager):
     return ret
 
 def extract_array_annotations(obj):
-    """Extracts array annotations from neo data objects
+    r"""Extracts array annotations from neo data objects
     """
     # NOTE: 2022-10-07 11:27:36
     # we don't store array_annotations directly (as an ArrayDict); instead,
@@ -1535,7 +1535,7 @@ def makeDataTypeAttrs(data):
 def getFileGroupChild(fileNameOrGroup:typing.Union[str, h5py.Group],
                        pathInFile:typing.Optional[str] = None, 
                        mode:typing.Optional[str]=None) -> typing.Tuple[typing.Optional[h5py.File], h5py.Group, typing.Optional[str]]:
-    """Common tool for coherent syntax of h5io read/write functions.
+    r"""Common tool for coherent syntax of h5io read/write functions.
     Inspired from vigra.impex.readHDF5/writeHDF5, (c) U.Koethe
     TODO/FIXME: Not used ?!?
     """
@@ -1619,7 +1619,7 @@ def makeEntryName(obj):
     return type(obj).__name__
     
 def makeObjAttrs(obj:typing.Any, oname:typing.Optional[str]=None):
-    """Generates name and attrs dict for a HDF5 entity
+    r"""Generates name and attrs dict for a HDF5 entity
     
     Parameters:
     ----------
@@ -1681,7 +1681,7 @@ def makeObjAttrs(obj:typing.Any, oname:typing.Optional[str]=None):
 
 @singledispatch
 def makeDatasetAttrs(obj):
-    """Generates an attribute dict for HDF5 datasets.
+    r"""Generates an attribute dict for HDF5 datasets.
     Only to be used for hdf5 Datasets that actually store data (that is, 
     numeric arrays)
     """
@@ -1741,7 +1741,7 @@ def _(obj):
         
 @singledispatch
 def makeAxisDict(obj, axisindex:int):
-    """Returns a dict with axis information for storage in HDF5 hierarchy.
+    r"""Returns a dict with axis information for storage in HDF5 hierarchy.
     
     Attached to the 'attrs' attribute of the axis Dataset in 'makeAxisSale'.
     
@@ -1885,7 +1885,7 @@ def _(obj, axisindex):
         
 @singledispatch        
 def makeNeoSignalAxisDict(obj, axisindex:int):
-    """Encode object type-specific information into an Axis entity.
+    r"""Encode object type-specific information into an Axis entity.
     
     Supplements 'makeAxisDict'
     
@@ -2026,7 +2026,7 @@ def _(obj, axisindex):
 
 @singledispatch
 def makeNeoDataAxisDict(obj, axisindex):
-    """Encode object type-specific information into an Axis entity.
+    r"""Encode object type-specific information into an Axis entity.
     
     Supplements 'makeAxisDict'
     
@@ -2122,7 +2122,7 @@ def _(obj, axisindex):
 # def makeAxisScale(obj, dset:h5py.Dataset, axesgroup:h5py.Group, dimindex:int,axisdict:dict,compression:str="gzip",chunks:bool=None,track_order=True):
 def makeAxisScale(obj, dset:h5py.Dataset, axesgroup:h5py.Group, dimindex:int,
                   compression:str="gzip",chunks:bool=None,track_order=True):
-    """
+    r"""
     Attaches a dimension scale for a specific dimension in a HDF5 Dataset.
     
     The dimension scale is constructed from an axis data set in the 
@@ -2592,7 +2592,7 @@ def toHDF5(obj, group:h5py.Group, name:typing.Optional[str]=None,
             track_order:typing.Optional[bool] = True, 
             entity_cache:typing.Optional[dict]=None,
             **kwargs):# -> typing.Union[h5py.Group, h5py.Dataset]:
-    """
+    r"""
     Encodes Python objects into a HDF5 entity (Group or Dataset).
     Parameters:
     -----------
@@ -2865,7 +2865,7 @@ def toHDF5(obj, group:h5py.Group, name:typing.Optional[str]=None,
 def makeHDF5Dataset(obj, group: h5py.Group, name:typing.Optional[str]=None, 
                     compression:typing.Optional[str]="gzip", 
                     chunks:typing.Optional[bool] = None, track_order:typing.Optional[bool]=True, entity_cache:typing.Optional[dict] = None):
-    """Creates a HDF5 Dataset in group based on obj.
+    r"""Creates a HDF5 Dataset in group based on obj.
     Delegates to makeDataset to create a data set then adorns its attrs 
     with obj-specific information via the singledispatch function 'makeDataset'.
     
@@ -3087,7 +3087,7 @@ def _(obj:datetime.timedelta, group, attrs, name, compression, chunks, track_ord
 @makeDataset.register(vigra.VigraArray)
 def _(obj:vigra.VigraArray, group:h5py.Group, attrs:dict, name:str, compression=None, 
       chunks=None, track_order=True, entity_cache=None):
-    """Variant of vigra.impex.writeHDF5 returning the created h5py.Dataset object
+    r"""Variant of vigra.impex.writeHDF5 returning the created h5py.Dataset object
     Also populates the dataset's dimension scales.
     
     Modified from vigra.impex.writeHDF5 (python version, (C) U.Koethe)
@@ -3311,7 +3311,7 @@ def makeHDF5Group(obj:typing.Any, group:h5py.Group, name:typing.Optional[str]=No
                   chunks:typing.Optional[bool]=None, 
                   track_order:typing.Optional[bool] = True, 
                   entity_cache:typing.Optional[dict] = None):# -> h5py.Group:
-    """Writes python iterable collection and neo containers to a HDF5 Group.
+    r"""Writes python iterable collection and neo containers to a HDF5 Group.
         • iterable collections: tuple, list, dict (and subclasses)
         • neo containers: Block, Segment, Group
         • neo ChannelView

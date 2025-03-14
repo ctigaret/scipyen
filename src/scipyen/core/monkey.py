@@ -42,7 +42,7 @@ def identify_neo_patch(obj_name):
     
     
 def import_module(name, package=None):
-    """An approximate implementation of import."""
+    r"""An approximate implementation of import."""
     absolute_name = importlib.util.resolve_name(name, package)
     try:
         return sys.modules[absolute_name]

@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""
+r"""
 Module for managing trigger protocols by way of special Event types embedded
 in neo.Segment data structure
 
@@ -100,7 +100,7 @@ DEFAULTS["ImagingFrameTrigger"]["Name"] = "imaging"
   
 @dataclass
 class TriggerProtocol:
-    """Encapsulates an experimental stimulation protocol (a.k.a, "triggers").
+    r"""Encapsulates an experimental stimulation protocol (a.k.a, "triggers").
     
     TriggerProtocol objects contain a combination of TriggerEvent types and the 
     indices of segments (sweep or data frame)¹ from a collection, where this 
@@ -265,7 +265,7 @@ class TriggerProtocol:
 #     _decsriptor_attributes_ = _data_attributes_ + neo.core.baseneo.BaseNeo._recommended_attrs
     
     def __len__(self):
-        """The number of TriggerEvents, of any type, in this protocol
+        r"""The number of TriggerEvents, of any type, in this protocol
         """
         if self.presynaptic is None:
             pre = 0
@@ -329,7 +329,7 @@ class TriggerProtocol:
         return self.__str__()
     
     def getEvent(self, event_type):
-        """Returns the event specified by type
+        r"""Returns the event specified by type
         """
         if isinstance(event_type, str):
             if event_type in TriggerEventType.__members__:
@@ -360,7 +360,7 @@ class TriggerProtocol:
     
     @property
     def ntriggers(self):
-        """Number of trigger events (of any type)
+        r"""Number of trigger events (of any type)
         """
         return len(self)
     
@@ -387,13 +387,13 @@ class TriggerProtocol:
     
     @property
     def nsegments(self):
-        """Number of neo.Segment objects to which this protocol applies
+        r"""Number of neo.Segment objects to which this protocol applies
         """
         return len(self.segmentIndices())
     
     @safeWrapper
     def hasSameEvents(self, other, rtol = RELATIVE_TOLERANCE, atol = ABSOLUTE_TOLERANCE, equal_nan = EQUAL_NAN):
-        """Compares pre-, post- and photo- events with those from other TriggerProtocol.
+        r"""Compares pre-, post- and photo- events with those from other TriggerProtocol.
         
         NOTE: 2018-06-07 22:42:04
         This way to compare protocols, also used by overloaded __eq__, is recommended
@@ -505,7 +505,7 @@ class TriggerProtocol:
         return pre and post and photo and img_del and acq and usr
     
     def __eq__(self, other):
-        """Compares pre-, post- and photo- events and frame index with those from other TriggerProtocol.
+        r"""Compares pre-, post- and photo- events and frame index with those from other TriggerProtocol.
         The compared protocols may have different frame indices!
         """
         # Will raise exception if other is not a TriggerProtocol
@@ -515,7 +515,7 @@ class TriggerProtocol:
             self.imagingDelay == other.imagingDelay
     
     def shift(self, value, copy=False):
-        """Shifts all events by given value 
+        r"""Shifts all events by given value 
         See TriggerEvent shift
         """
         
@@ -547,7 +547,7 @@ class TriggerProtocol:
         return ret
             
     def setEvent(self, event_type, value, event_label=None, replace=True):
-        """Set or updates the time stamps of an event type.
+        r"""Set or updates the time stamps of an event type.
         
         Parameters:
         ==========
@@ -648,26 +648,26 @@ class TriggerProtocol:
             
     @property
     def imagingFrameTrigger(self):
-        """Returns an imaging_frame trigger event, if any
+        r"""Returns an imaging_frame trigger event, if any
         """
         return self.acquisition
         #return self.__get_acquisition_event__(TriggerEventType.imaging_frame)
         
     @imagingFrameTrigger.setter
     def imagingFrameTrigger(self, value):
-        """Pass None to clear acquisition events
+        r"""Pass None to clear acquisition events
         """
         self.acquisition = value
         
     @property
     def imagingLineTrigger(self):
-        """Returns an imaging_line trigger event, if any
+        r"""Returns an imaging_line trigger event, if any
         """
         return self.acquisition
     
     @imagingLineTrigger.setter
     def imagingLineTrigger(self, value):
-        """Pass None to clear acquisition events
+        r"""Pass None to clear acquisition events
         """
         self.acquisition = value
 
@@ -681,7 +681,7 @@ class TriggerProtocol:
         
     @safeWrapper
     def updateSegmentIndex(self, value):
-        """Update current segment index with the one specified in value.
+        r"""Update current segment index with the one specified in value.
         
         When value is a list or an int, the current segment index will be coerced to a list.
         """
@@ -833,7 +833,7 @@ class TriggerProtocol:
                 raise TypeError("Cannot update frame indexing %s with %s" % (self.segments, value))
     
     def segmentIndices(self, value=None):
-        """Returns a list of segment indices.
+        r"""Returns a list of segment indices.
         'value' is used only when segmentIndex is a python slice object, and it must be an int
         """
         
@@ -954,7 +954,7 @@ def auto_define_trigger_events(src:typing.Union[neo.Block, neo.Segment, typing.S
                                clearSimilarEvents:bool = True, 
                                clearTriggerEvents:bool = True, 
                                clearAllEvents:bool = False, reltimes:bool = True):
-    """Constructs TriggerEvent objects from events detected in analog signals.
+    r"""Constructs TriggerEvent objects from events detected in analog signals.
     
     TriggerEvent objects are constructed using either time stamps given as
     function parameters, or using events detected based on trigger-like waveforms
@@ -1185,7 +1185,7 @@ def get_trigger_events(*src:typing.Union[neo.Block, neo.Segment, typing.Sequence
                        as_dict:bool=False, flat:bool=False, 
                        triggers:typing.Optional[typing.Union[str, int, type, typing.Sequence]]=None, 
                        match:str="==") -> list:
-    """
+    r"""
     Returns a list of TriggerEvent objects embedded in the data.
     
     Delegates to neoutils.get_events
@@ -1223,7 +1223,7 @@ def detect_trigger_events(x, event_type,
                           use_lo_hi=True, 
                           label=None, 
                           name=None):
-    """Creates a datatypes.TriggerEvent object (array) of specified type.
+    r"""Creates a datatypes.TriggerEvent object (array) of specified type.
     
     Parameters:
     ===========
@@ -1334,7 +1334,7 @@ def detect_trigger_events(x, event_type,
     
 
 def remove_trigger_protocol(protocol, block):
-    """Removes embedded trigger events associated with a specified trigger protocol
+    r"""Removes embedded trigger events associated with a specified trigger protocol
     """
     if not isinstance(protocol, TriggerProtocol):
         raise TypeError("'protocol' expected to be a TriggerProtocol; got %s instead" % type(protocol).__name__)
@@ -1364,7 +1364,7 @@ def remove_trigger_protocol(protocol, block):
         block.segments[k].annotations.pop("trigger_protocol", None)
                 
 def modify_trigger_protocol(protocol, block):
-    """
+    r"""
     Uses the events in the protocol to add TriggerEvents or modify exiting ones,
     in the segment indices specified by this protocol's segment indices.
     """
@@ -1438,7 +1438,7 @@ def modify_trigger_protocol(protocol, block):
 
 
 def embed_trigger_event(event, segment, clear=False): 
-    """
+    r"""
     Embeds the neo.Event object event in the neo.Segment object segment.
     
     In the segment's events list, the event is stored by reference.
@@ -1525,7 +1525,7 @@ def embed_trigger_protocol(protocol:TriggerProtocol,
                            useProtocolSegments:bool=True, 
                            clearTriggers:bool=True, 
                            clearEvents:bool=False):
-    """ Embeds TriggerEvent objects found in the TriggerProtocol 'protocol', 
+    r""" Embeds TriggerEvent objects found in the TriggerProtocol 'protocol', 
     in the segments of the neo.Block object 'target'.
     
     Inside the target, trigger event objects are stored by reference!
@@ -1650,7 +1650,7 @@ def embed_trigger_protocol(protocol:TriggerProtocol,
 
 @safeWrapper
 def parse_trigger_protocols(src, return_source:typing.Optional[bool]=False):
-    """Constructs a list of TriggerProtocol objects from embeded TriggerEvent objects.
+    r"""Constructs a list of TriggerProtocol objects from embeded TriggerEvent objects.
     
     "src" may be a neo.Segment, neo.Block, a sequence of neo.Segment, or a
     sequence of neo.Block.
@@ -1726,7 +1726,7 @@ def parse_trigger_protocols(src, return_source:typing.Optional[bool]=False):
         
     """
     def __compose_protocol__(events, protocol_list, index = None):
-        """
+        r"""
         events: a list of TriggerEvent objects
         
         protocol: TriggerProtocol or None (default); 
@@ -1900,7 +1900,7 @@ def auto_detect_trigger_protocols(data: typing.Union[neo.Block, neo.Segment, typ
                                   up=True, protocols=True,
                                   reltimes:bool=True) -> typing.Optional[typing.List[TriggerProtocol]]:
     
-    """Determines the set of trigger protocols in a neo.Block by searching for 
+    r"""Determines the set of trigger protocols in a neo.Block by searching for 
     trigger waveforms in the analogsignals contained in 'data'.
     
     Time stamps of the detected trigger protocols will then be used to construct

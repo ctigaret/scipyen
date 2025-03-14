@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 
-"""
+r"""
 Qt5-based viewer window for two dimensional ndarrays
 
 """
@@ -32,7 +32,7 @@ __scipyen_plugin__ = None
 
 # TODO / FIXME: 2019-11-10 16:33:13 Merge with TableEditor
 class MatrixViewer(ScipyenViewer):
-    """Simple table viewer for numpy arrays and vigra.filters.Kernel* objects.
+    r"""Simple table viewer for numpy arrays and vigra.filters.Kernel* objects.
     
     No context menu or editing capabilities are implemented.
     

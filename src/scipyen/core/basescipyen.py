@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""Base ancestor of Scipyen's data objects: AnalysisUnit, ScanData
+r"""Base ancestor of Scipyen's data objects: AnalysisUnit, ScanData
 """
 import functools, typing, dataclasses, pathlib
 import collections

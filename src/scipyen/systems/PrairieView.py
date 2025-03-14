@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 
-"""Import routines for PrairieView data
+r"""Import routines for PrairieView data
 """
 #### BEGIN core python modules
 import os, sys, traceback, warnings, mimetypes, io, typing
@@ -86,7 +86,7 @@ else:
     __UI_PrairieImporter, __QDialog__ = __loadUiType__(__ui_path__)
 
 
-""" NOTE: 2017-09-22 09:28:23
+r""" NOTE: 2017-09-22 09:28:23
 Image file organization with respect to (hyper-)volume data (hereafter I describe 
 the data structures resulted form parsing an XML file):
 
@@ -250,7 +250,7 @@ class PVLinescanDefinition(object):
         
     @property
     def parent(self):
-        """The parent PVSequence object, or None
+        r"""The parent PVSequence object, or None
         """
         return self.__parent__
     
@@ -264,7 +264,7 @@ class PVLinescanDefinition(object):
     
     @property
     def sequence(self):
-        """Alias for parent
+        r"""Alias for parent
         """
         return self.parent
     
@@ -345,7 +345,7 @@ class PVLaser(object):
             
     @property
     def parent(self):
-        """The parent PVSystemConfiguration object, or None
+        r"""The parent PVSystemConfiguration object, or None
         """
         return self.__parent__
     
@@ -401,7 +401,7 @@ class PVSystemConfiguration(object):
         
     @property
     def parent(self):
-        """The parent PVScan object, or None
+        r"""The parent PVScan object, or None
         """
         return self.__parent__
     
@@ -415,7 +415,7 @@ class PVSystemConfiguration(object):
     
     @property
     def scan(self):
-        """Alias for parent
+        r"""Alias for parent
         """
         return self.parent
     
@@ -473,7 +473,7 @@ class PVStateShard(object):
                 
     @property
     def parent(self):
-        """The parent PVFrame object, or None
+        r"""The parent PVFrame object, or None
         """
         return self.__parent__
     
@@ -487,7 +487,7 @@ class PVStateShard(object):
         
     @property
     def frame(self):
-        """Alias for parent
+        r"""Alias for parent
         """
         return self.parent
     
@@ -501,14 +501,14 @@ class PVStateShard(object):
     
     @property # dictionary view
     def keys(self):
-        """dict_view of the keys
+        r"""dict_view of the keys
         """
         #return self.__attributes__.keys()
         return self.__dict__.keys()
     
     @property # dictionary view
     def items(self):
-        """dict_view of the items
+        r"""dict_view of the items
         """
         #return self.__attributes__.items()
         return self.__dict__.items()
@@ -617,7 +617,7 @@ class PVFrame(object):
         
     @property
     def parent(self):
-        """The parent PVSequence object, or None
+        r"""The parent PVSequence object, or None
         """
         return self.__parent__
     
@@ -631,7 +631,7 @@ class PVFrame(object):
         
     @property
     def sequence(self):
-        """Alias for parent
+        r"""Alias for parent
         """
         return self.parent
     
@@ -645,7 +645,7 @@ class PVFrame(object):
         
     @property
     def channels(self):
-        """Returns the number of channels
+        r"""Returns the number of channels
         
         To obtain the channel data use "files" property.
         """
@@ -661,7 +661,7 @@ class PVFrame(object):
     
     @property
     def multiBandOutput(self):
-        """If True, the () operator reads this frame's files as a multiband image.
+        r"""If True, the () operator reads this frame's files as a multiband image.
         This requires that each file corresponds to one channel and that all files 
         have a channel axis. Only applies when there are between 2 and 4 files per frame.
         """
@@ -669,7 +669,7 @@ class PVFrame(object):
     
     @multiBandOutput.setter
     def multiBandOutput(self, val):
-        """Permanently sets the state of the multiBandOutput property to val.
+        r"""Permanently sets the state of the multiBandOutput property to val.
         
         Parameters:
         "val: boolean
@@ -677,7 +677,7 @@ class PVFrame(object):
         self.__mergeChannelsOnOutput__ = val
     
     def mergeChannels(self, val=True, filepath=None):
-        """Coerce reading the files as a multiband image.
+        r"""Coerce reading the files as a multiband image.
         
         The self.multiBandOutput property is temporarily set to True, then 
         reverted to its previous value after the image files were read.
@@ -705,7 +705,7 @@ class PVFrame(object):
         return data
     
     def __call__(self, filepath=None):
-        """Reads the specified files and returns a vigra array corresponding to
+        r"""Reads the specified files and returns a vigra array corresponding to
         the image files that compose the frame.
         
         Keyword parameter:
@@ -1033,7 +1033,7 @@ class PVFrame(object):
         return frameData, sourceData
     
     def metadata(self):
-        """Returns metadata associated with this frame.
+        r"""Returns metadata associated with this frame.
         """
         
         channelIndex = [f["channel"] for f in self.files]
@@ -1077,7 +1077,7 @@ class PVFrame(object):
 # NOTE: 2017-08-03 09:24:20
 # TODO: make the instances sortable by cycle number (found in attributes
 class PVSequence (object):
-    """Sequence data structures are common enough to guarantee the 
+    r"""Sequence data structures are common enough to guarantee the 
     need for a new data type here
     """
     def __init__(self, node, parent=None):
@@ -1126,7 +1126,7 @@ class PVSequence (object):
         return len(self.frames)
     
     def __call__(self, filepath=None):
-        """Load the images from the file(s) define in its frames attribute
+        r"""Load the images from the file(s) define in its frames attribute
         
         If there is only one frame, then it will load that data and return it
         as a (possibly, multi-channel or "multi-band" ) vigra array
@@ -1473,7 +1473,7 @@ class PVSequence (object):
             
         
     def mergeChannels(self, filepath=None):
-        """Coerce reading the files as a multiband image.
+        r"""Coerce reading the files as a multiband image.
         
         The self.multiBandOutput property is temporarily set to True, then 
         reverted to its previous value after the image files were read.
@@ -1490,7 +1490,7 @@ class PVSequence (object):
         return data
     
     def metadata(self):
-        """Returns metadata for this sequence.
+        r"""Returns metadata for this sequence.
         
         This is an ordered dictionary with the following fields:
         attributes    = dictionary with the sequence attributes
@@ -1574,7 +1574,7 @@ class PVSequence (object):
         
     @property
     def parent(self):
-        """The parent PVScan object, or None
+        r"""The parent PVScan object, or None
         """
         return self.__parent__
     
@@ -1588,7 +1588,7 @@ class PVSequence (object):
         
     @property
     def scan(self):
-        """Alias for parent
+        r"""Alias for parent
         """
         return self.parent
     
@@ -1598,7 +1598,7 @@ class PVSequence (object):
     
     @property
     def multiBandOutput(self):
-        """If True, the () operator reads this frame's files as a multiband image.
+        r"""If True, the () operator reads this frame's files as a multiband image.
         This requires that each file corresponds to one channel and that all files 
         have a channel axis. Only applies when there are between 2 and 4 files per frame.
         """
@@ -1606,7 +1606,7 @@ class PVSequence (object):
     
     @multiBandOutput.setter
     def multiBandOutput(self, val):
-        """Permanently sets the state of the multiBandOutput property to val.
+        r"""Permanently sets the state of the multiBandOutput property to val.
         
         Parameters:
         "val: boolean
@@ -1641,13 +1641,13 @@ class PVSequence (object):
     
     @property # read only
     def type(self):
-        """ Alias to sequencetype property
+        r""" Alias to sequencetype property
         """
         return self.sequencetype
     
     @property # read only
     def typename(self):
-        """Alias to sequencetypename property
+        r"""Alias to sequencetypename property
         """
         return self.sequencetypename
     
@@ -1658,7 +1658,7 @@ class PVSequence (object):
     
     @property
     def filepath(self):
-        """Returns the absolute path to the data referred to in this object.
+        r"""Returns the absolute path to the data referred to in this object.
         
         Value of path is the attribute of the parent PVScan, or None if the 
         latter is None.
@@ -1702,7 +1702,7 @@ class PVSequence (object):
                 
 
 class PVScan(object):
-    """Encapsulates a PrairieView scan data.
+    r"""Encapsulates a PrairieView scan data.
     Stores a scan configuration object as parsed from an XML file, 
     optionally with data from a *Config file (also an XMl file but saved as ascii).
     The two files must have been read and parsed into valid xml documents and 
@@ -1823,7 +1823,7 @@ class PVScan(object):
         return len(self.sequences)
     
     def __call__(self, filepath=None):
-        """Returns a tuple (scans, scene) where each element is a sequence of VigraArray"""
+        r"""Returns a tuple (scans, scene) where each element is a sequence of VigraArray"""
         # NOTE: 2017-10-24 22:47:12
         # get the type of the first sequence; this should be the same for ALL
         # sequences in this scan (otherwise, behaviour is undefined)
@@ -2047,7 +2047,7 @@ class PVScan(object):
             
 
     def scanData(self, mergeChannels=False, analysisOptions=None, electrophysiology=None, name=None):
-        """Returns a datatypes.ScanData object
+        r"""Returns a datatypes.ScanData object
         """
         
         if mergeChannels:
@@ -2081,7 +2081,7 @@ class PVScan(object):
         
             
     def metadata(self):
-        """Returns metadata associated with this PVSCan
+        r"""Returns metadata associated with this PVSCan
         """
         metadata = DataBag(mutable_types=True, allow_none=True)
         metadata["configuration"] = self.configuration.as_dict()
@@ -2114,7 +2114,7 @@ class PVScan(object):
         return metadata
     
     def mergeChannels(self, filepath=None):
-        """Coerce reading the files as a multiband image.
+        r"""Coerce reading the files as a multiband image.
         
         The self.multiBandOutput property is temporarily set to True, then 
         reverted to its previous value after the image files were read.
@@ -2160,7 +2160,7 @@ class PVScan(object):
         
     @property
     def datapath(self):
-        """Alias for the filepath property
+        r"""Alias for the filepath property
         """
         return self.filepath
     
@@ -2171,7 +2171,7 @@ class PVScan(object):
         
     @property
     def multiBandOutput(self):
-        """If True, the () operator reads this frame's files as a multiband image.
+        r"""If True, the () operator reads this frame's files as a multiband image.
         This requires that each file corresponds to one channel and that all files 
         have a channel axis. Only applies when there are between 2 and 4 files per frame.
         """
@@ -2179,7 +2179,7 @@ class PVScan(object):
     
     @multiBandOutput.setter
     def multiBandOutput(self, val):
-        """Permanently sets the state of the multiBandOutput property to val.
+        r"""Permanently sets the state of the multiBandOutput property to val.
         
         Parameters:
         "val: boolean
@@ -2243,7 +2243,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
                  clearTriggerEvents: typing.Optional[bool]=False,
                  auto_export:bool = False,
                  **kwargs): # parent, flags - see documentation for QDialog constructor in Qt Assistant
-        """
+        r"""
         Parameters:
         -----------
         name:str (optional, default is None) - name of generated ScanData
@@ -2444,7 +2444,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
         
     @Slot(int)
     def _slot_removeProtocol(self, index):
-        """Removes a trigger protocol.
+        r"""Removes a trigger protocol.
         """
         # TODO: contemplate the use of the traitlets' observer paradigm with
         # TriggerProtocol objects.
@@ -2476,7 +2476,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
     @Slot()
     @safeWrapper
     def _slot_startTriggerEventDetectionGui(self):
-        """Opens the trigger event detection dialog.
+        r"""Opens the trigger event detection dialog.
         The following signals are connected to this slot:
             detectTriggersToolButton.clicked()
             protocolEditorDialog.sig_detectTrigger()
@@ -2502,7 +2502,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
             
     @Slot()
     def _slot_stopTriggerEventDetectionGui(self):
-        """Closes trigger event detection dialog and interprets the result.
+        r"""Closes trigger event detection dialog and interprets the result.
         If dialog.result() is "accepted" (or yes/ok) then a new set collection
         of trigger protocols is generated.
     
@@ -2981,7 +2981,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
         
     @Slot()
     def done(self, value):
-        """Generates ScanData object (if accepted) and closes the dialog.
+        r"""Generates ScanData object (if accepted) and closes the dialog.
         value: a QtWidgets.QDialog.DialogCode (Accepted = 1, Rejected = 2)
         NOTE: Clients need to connect custom slots to this dialog's accepted(),
         rejected(), or finished(int) signals
@@ -3005,7 +3005,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
     @Slot()
     @safeWrapper
     def slot_generateScanData(self):
-        """Creates a ScanData object based on the loaded data files.
+        r"""Creates a ScanData object based on the loaded data files.
         The created ScanData object is available as the property `scandata` or 
         `scanData`. If self.auto_export is True, the ScanData object is also 
         exported to the Scipyen workspace.
@@ -3054,6 +3054,6 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
     
     @property
     def scandata(self):
-        """Alias to self.scanData
+        r"""Alias to self.scanData
         """
         return self.scanData

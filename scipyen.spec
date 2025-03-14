@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""
+r"""
 NOTE: 2023-06-26 17:25:32
 Spec file for bundling Scipyen as a Python executable, using PyInstaller.
 
@@ -304,7 +304,7 @@ def file2TOCEntry(src_path:str, topdirparts:list, file_category:str="DATA"):
     return target_path, os.fspath(src_path), file_category
 
 def file2entry(src_path:str, topdirparts:list, strip_path:bool=True) -> tuple:
-    """Returns a 2-tuple (source_full_path, target_dir)
+    r"""Returns a 2-tuple (source_full_path, target_dir)
     To be used in the Analysis constructor, below
     
     Parameters:

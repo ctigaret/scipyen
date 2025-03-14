@@ -147,7 +147,7 @@ Ui_AxesCalibrationDialog, QDialog = __loadUiType__(adapt_ui_path(__module_path__
 Ui_TransformImageValueDialog, QDialog = __loadUiType__(adapt_ui_path(__module_path__,"transformimagevaluedialog.ui"))
 
 class ComplexDisplay(Enum):
-    """TODO
+    r"""TODO
     """
     real  = 1
     imag  = 2
@@ -698,7 +698,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     
     @property
     def colorMapObj(self):
-        """The colormap used as default for displaying gray-scale images
+        r"""The colormap used as default for displaying gray-scale images
         This is not a configurable property; however, changing it will result in
         a new value of the colorMap property
         """
@@ -717,7 +717,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
     @property
     def colorMap(self):
-        """Name of the colormap used as default for displaying gray-scale images.
+        r"""Name of the colormap used as default for displaying gray-scale images.
         This is the 'name' attribute (str) of a matplotlib.colors.Colormap object.
         This is so that the name can be safely stored in QSettings.
         
@@ -737,7 +737,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     @markConfigurable("ColorMap")
     @colorMap.setter
     def colorMap(self, val:typing.Union[str, colormaps.mpl.colors.Colormap]):
-        """Setter for colorMap
+        r"""Setter for colorMap
         """
         if isinstance(val, colormaps.mpl.colors.Colormap):
             cmap_name = val.name
@@ -783,7 +783,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
     @property
     def temporaryColorMap(self):
-        """Name of a temporary colormap or None.
+        r"""Name of a temporary colormap or None.
         A temporary colormap is to be used for displaying 'channel' images (e.g.,
         2D Vigra arrays representing an image 'channel').
         In order to be used, the temporary colormap needs to be passed as the
@@ -831,7 +831,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     
     @currentFrame.setter
     def currentFrame(self, val):
-        """
+        r"""
         Emits self.frameChanged signal
         """
         missing = (isinstance(self._missing_frame_value_, (int, float)) and val == self._missing_frame_value_) or \
@@ -893,14 +893,14 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     
     @property
     def graphicsCursors(self):
-        """List of Cursor planar graphics.
+        r"""List of Cursor planar graphics.
         This is the list of unique planar graphics cursor backends for the 
         displayed cursors
         """
         return list(self.viewerWidget.graphicsCursors)
     
     def getGraphicsCursors(self, **kwargs):
-        """List with a specific subset of Cursor planar graphics objects.
+        r"""List with a specific subset of Cursor planar graphics objects.
         
         Var-keyword parameters
         ======================
@@ -919,7 +919,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     
     @safeWrapper
     def imageCursor(self, value:typing.Optional[typing.Any]=None, *args, **kwargs):
-        """Returns a list of pictgui.Cursor selected by one or more attributes.
+        r"""Returns a list of pictgui.Cursor selected by one or more attributes.
         
         By default, compares the value of the 'name' attribute of the 
         PlanarGraphics Cursor object to the 'value' parameter.
@@ -954,7 +954,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
 
     @safeWrapper
     def hasCursor(self, *args, **kwargs):
-        """Tests for existence of a GraphicsObject cursor with specified ID or name (label).
+        r"""Tests for existence of a GraphicsObject cursor with specified ID or name (label).
         
         Delegates to self.imageCursor(...)
         """
@@ -962,7 +962,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     
     @property
     def rois(self):
-        """List of non-Cursor planargraphics
+        r"""List of non-Cursor planargraphics
         This is the list of unique planar graphics cursor backends for the 
         displayed cursors
         """
@@ -970,7 +970,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     
     @safeWrapper
     def roi(self, value:typing.Optional[typing.Any]=None, *args, **kwargs):
-        """Returns a list of PlanarGraphics ROI roi with a specific attribute value.
+        r"""Returns a list of PlanarGraphics ROI roi with a specific attribute value.
         
         Delegates to GraphicsImageViewerWidget.roi(...); by default, compares
         the value of the 'name' attribute of the PlanarGraphics to the 'value'
@@ -1005,7 +1005,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
     @safeWrapper
     def hasRoi(self, *args, **kwargs):
-        """Tests for existence of a PlanarGraphics ROI roi with a given attribute.
+        r"""Tests for existence of a PlanarGraphics ROI roi with a given attribute.
         
         Delegates to self.roi(...)
         
@@ -1036,32 +1036,32 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     
     @property
     def scene(self):
-        """A reference to viewerWidget's QGraphicsScene.
+        r"""A reference to viewerWidget's QGraphicsScene.
         """
         return self.viewer.scene
     
     
     @property
     def selectedRoi(self):
-        """A reference to the selected ROI
+        r"""A reference to the selected ROI
         """
         return self.viewer.selectedRoi
     
     @property
     def selectedCursor(self):
-        """A reference to the selected cursor
+        r"""A reference to the selected cursor
         """
         return self.viewer.selectedCursor
     
     @property
     def imageWidth(self):
-        """Width of the displayed image (in pixels); read-only; 0 if no image
+        r"""Width of the displayed image (in pixels); read-only; 0 if no image
         """
         return self._image_width_
     
     @property
     def imageHeight(self):
-        """Height of the displayed image (in pixels); read-only; 0 if no image
+        r"""Height of the displayed image (in pixels); read-only; 0 if no image
         """
         return self._image_height_
     
@@ -1259,7 +1259,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
     @Slot(object)
     def slot_varModified(self, obj):
-        """Connected to _scipyenWindow_.workspaceModel.varModified signal
+        r"""Connected to _scipyenWindow_.workspaceModel.varModified signal
         """
         self.displayFrame()
         
@@ -1490,7 +1490,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     @Slot(bool)
     @safeWrapper
     def slot_displayScaleBar(self, value):
-        """
+        r"""
         """
         if value:
             if self._data_ is None:
@@ -1748,7 +1748,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     ####
     
     def _parseVigraArrayData_(self, img:vigra.VigraArray):
-        """ Extract information about image axes to figure out how to display it.
+        r""" Extract information about image axes to figure out how to display it.
         
         For now ImageViewer only accepts images with up to three dimensions.
         
@@ -1829,7 +1829,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             return False
         
     def _applyColorTable_(self, image: vigra.VigraArray, colorMap:typing.Optional[colormaps.colors.Colormap]=None):
-        """Applies the internal color table to the 2D array.
+        r"""Applies the internal color table to the 2D array.
         
         Parameters:
         -----------
@@ -1898,7 +1898,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                 #q
     
     def _frameView_(self, channel):
-        """Returns a slice (frame) of self._data_ along the self.frameAxis
+        r"""Returns a slice (frame) of self._data_ along the self.frameAxis
         
         If the slice contains np.nan returns a copy of the image slice.
         
@@ -2413,7 +2413,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     
 
     def _displayValueAtCoordinates(self, coords, crsId=None):
-        """
+        r"""
         coords: a list or tuple with 2 -- 4 elements:
                 (x,y), (x,y,wx), (x,y,wx,wy) where any can be None
                 x,y = coordinates in the displayed frame
@@ -2792,7 +2792,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
     @safeWrapper
     def removeGraphicsObject(self, item:typing.Union[str, pgui.GraphicsObject]):
-        """Removes a GraphicsObject from the viewer's scene.
+        r"""Removes a GraphicsObject from the viewer's scene.
         A GraphicsObject is a Qt graphics object used as frontend for a PlanarGraphics.
         WARNING: This only removes the object from the viewer scene; the viewer and
         the PlanarGraphics backend still retain a reference to the GraphicsObject!
@@ -2821,7 +2821,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             
     @safeWrapper
     def removePlanarGraphics(self, item:typing.Union[str, pgui.PlanarGraphics]):
-        """Removes a planar graphics from the viewer's scene.
+        r"""Removes a planar graphics from the viewer's scene.
         Parameters:
         ===========
         item: a str (PlanarGraphics 'name' attribute) or a PlanarGraphics. If the
@@ -3135,7 +3135,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             raise TypeError("First argument must be a VigraArray, a numpy.ndarray, a QtGui.QImage or a QtGui.QPixmap")
         
     def clear(self):
-        """Clears all image data cursors and rois from this window
+        r"""Clears all image data cursors and rois from this window
         """
         self._number_of_frames_ = 0
         self._current_frame_index_ = 0
@@ -3171,7 +3171,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.viewerWidget.clear()
         
     def showScaleBars(self, origin=None, length=None, calibrated_length=None, pen=None, units=None):
-        """Shows a scale bar for both axes in the display
+        r"""Shows a scale bar for both axes in the display
         origin: tuple or list with (x,y) coordinates of scale bars origin
         length: tuple or list with the length of the respective scale bars (x and y)
         
@@ -3301,7 +3301,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self._scaleBarOrigin_ = origin
         
     def addCursors(self, **kwargs):
-        """Programmatically creates a set of cursors from cursor parameters.
+        r"""Programmatically creates a set of cursors from cursor parameters.
         
         Creates gui.planargraphics.Cursor objects and their 
         gui.planargraphics.GraphicsObject frontends.
@@ -3393,7 +3393,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         return objects
         
     def addPlanarGraphics(self, item:pgui.PlanarGraphics, movable:bool = True, editable:bool = True, showLabel:bool = True, labelShowsPosition:bool = True, autoSelect:bool = True, transparentLabel:bool = False, returnGraphics:bool=False):
-        """Add a roi or a cursor to the underlying scene.
+        r"""Add a roi or a cursor to the underlying scene.
         
         The function generates a gui.planargraphics.GraphicsObject as a frontend
         to a gui.plarangraphics.PlanarGraphics object.

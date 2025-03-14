@@ -3,11 +3,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""
+r"""
 Wrapper around BrainGlobe API, with shims
 """
 class Taxon:
-    """Shim class that will be overwritten below if taxoniq package is installed.
+    r"""Shim class that will be overwritten below if taxoniq package is installed.
     For HDF5 storage, all we need is a scientific_name
     """
     # def __new__(obj, *args, **kwargs):
@@ -41,7 +41,7 @@ from core.prog import (scipywarn, safeWrapper)
 
 @safeWrapper
 def get_nearest_parent_common_name(t:Taxon):
-    """Returns the common name of the taxon.
+    r"""Returns the common name of the taxon.
     If the taxon does not have a common name, then returns the common name of
     its nearest parent.
     """
@@ -80,7 +80,7 @@ def get_taxon(s:str) -> Taxon | str:
 #     pass
 
 class TaxonDescriptor:
-    """Python descriptors for taxoniq.Taxon or a placeholder if taxoniq is not available
+    r"""Python descriptors for taxoniq.Taxon or a placeholder if taxoniq is not available
     default can be a string (scientific name of the species, e.g. Rattus, Mus, Homo, Dabio, Gallus)
     """
     def __init__(self, *, default:typing.Optional[typing.Union[Taxon, str, type(pd.NA), type(MISSING)]] = None):

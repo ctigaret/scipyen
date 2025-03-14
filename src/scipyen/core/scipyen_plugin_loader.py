@@ -252,7 +252,7 @@ def check_plugin_module(file_name) -> bool:
     return False
 
 # def find_frozen():
-#     """Locates plugin modules packaged with pyinstaller (i.e., 'frozen')
+#     r"""Locates plugin modules packaged with pyinstaller (i.e., 'frozen')
 #     """
 #     # this should be run AFTER all relevant modules have been loaded
 #     # and BEFORE find_plugins(…) is called
@@ -263,7 +263,7 @@ def check_plugin_module(file_name) -> bool:
 #             loaded_plugins[module.__name__] = module
 
 def find_bytecode_plugins(path:typing.Union[str, pathlib.Path], scipyendir:typing.Union[str,pathlib.Path]):
-    """Intended to collect bytecode plugins by pyinstaller
+    r"""Intended to collect bytecode plugins by pyinstaller
     """
     import dis, marshal
     if isinstance(path, pathlib.Path) and path.is_dir() and path.exists():
@@ -325,7 +325,7 @@ def find_bytecode_plugins(path:typing.Union[str, pathlib.Path], scipyendir:typin
     check_load_module(module_spec, verb)
 
 def find_plugins(path:typing.Union[str, pathlib.Path], scipyendir:typing.Union[str,pathlib.Path]):
-    """Loads and located plugins in a directory tree rooted at `path`
+    r"""Loads and located plugins in a directory tree rooted at `path`
     """
     if isinstance(path, pathlib.Path) and path.is_dir() and path.exists():
         path = str(path.absolute())

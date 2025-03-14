@@ -228,7 +228,7 @@ EVENT_OBJECT_TYPES = (neo.Event, DataMark, TriggerEvent)
 
 EPOCH_OBJECT_TYPES = (neo.Epoch, DataZone) # NOTE: pyabf Epoch must be converted
 
-"""
+r"""
 canvas events in matplotlib:
 DEPRECATED here, but keep for reference
 ['resize_event',
@@ -256,7 +256,7 @@ __ui_path__ = adapt_ui_path(__module_path__,'signalviewer.ui')
 Ui_SignalViewerWindow, QMainWindow = __loadUiType__(__ui_path__)
 
 class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
-    """ A plotter for multi-sweep signals ("frames" or "segments"), with cursors.
+    r""" A plotter for multi-sweep signals ("frames" or "segments"), with cursors.
     
         Python data types handled by SignalViewer as of 2019-11-23 11:30:23:
         --------------------------------------------------------------------
@@ -514,7 +514,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     defaultLeftAxisLabelWrapMode = "WrapAtWordBoundary"
 
     def __init__(self, x: (neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None, y: (neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None, parent: (QtWidgets.QMainWindow, type(None)) = None, ID:(int, type(None)) = None, win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None, frameIndex:(int, tuple, list, range, slice, type(None)) = None, frameAxis:(int, type(None)) = None, signalIndex:(str, int, tuple, list, range, slice, type(None)) = None, signalChannelAxis:(int, type(None)) = None, signalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, irregularSignalIndex:(str, int, tuple, list, range, slice, type(None)) = None, irregularSignalChannelAxis:(int, type(None)) = None, irregularSignalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, separateSignalChannels:bool = False, singleFrame:bool=False, interval:(tuple, list) = None, channelIndex:object = None, currentFrame:(int, type(None)) = None, plotStyle: str = "plot", nAxes:typing.Optional[int] = None,*args, **kwargs):
-        """SignalViewer constructor.
+        r"""SignalViewer constructor.
         TODO: Write docstring!
         """
         super(QMainWindow, self).__init__(parent)
@@ -873,7 +873,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                             *args, **kwargs)
         
     def _configureUI_(self):
-        """
+        r"""
         
         NOTE: 2022-11-21 10:55:41
         Brief description of the organisation of plot axes in the UI (to be completed):
@@ -1133,7 +1133,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
     @property
     def signalAxes(self):
-        """Read-only list of PlotItem objects dedicated to plotting signals
+        r"""Read-only list of PlotItem objects dedicated to plotting signals
         """
         return self._signal_axes_
     
@@ -1350,7 +1350,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
     @property
     def xAxesLinked(self): 
-        """This is True when all PlotItems but one have X axes linked"""
+        r"""This is True when all PlotItems but one have X axes linked"""
         return self._xAxesLinked_
     
     @markConfigurable("XAxesLinked")
@@ -1963,7 +1963,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         return ret
     
     def _make_targetItem(self, data:typing.Union[tuple, list, QtCore.QPointF, QtCore.QPoint, pg.Point], **kwargs):
-        """Generates a pg.TargetItem
+        r"""Generates a pg.TargetItem
         Parameters:
         ==========
         data: pair of coordinates (in the axis coordinate system), 
@@ -2003,7 +2003,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                  minX:typing.Optional[float]=None, 
                                  maxX:typing.Optional[float]=None, 
                                  **kwargs):
-        """For plotting events and spike trains on their own (separate) axis
+        r"""For plotting events and spike trains on their own (separate) axis
         Epochs & DataZones are represented as regions between vertical lines 
         across all axes, and therefore they are not dealt with, here.
         adapt_X_range determines the x range (you may want to pass a custom one if needed)
@@ -2164,7 +2164,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             traceback.print_exc()
             
     def _clear_targets_overlay_(self, axis):
-        """Removes the targets overlay from this axis
+        r"""Removes the targets overlay from this axis
             Cached targets are left in place
         """
         #### BEGIN debug
@@ -2239,7 +2239,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self.annotationsViewer.topLevelItem(0).setText(0, "Data")
             
     def _gen_signal_ndx_name_map_(self, signals:typing.Union[tuple, list]):
-        """Generates a mapping of entry_name ↦ (index , signal_name)
+        r"""Generates a mapping of entry_name ↦ (index , signal_name)
         """
         sig_ndx_names = list(map(lambda x: (x[0],x[1]) if isinstance(x[1], str) and len(x[1].strip()) else (x[0],f"Analog signal {x[0]}") , ((k,getattr(s, "name", f"Analog signal {k}")) for k,s in enumerate(signals))))
         
@@ -2276,7 +2276,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         return mapping
                 
     def _populate_signal_chooser_(self, mapping, combo):
-        """ Helper for the self._setup_signal_choosers_ method
+        r""" Helper for the self._setup_signal_choosers_ method
         """
         sigBlock = QtCore.QSignalBlocker(combo)
         if len(mapping):
@@ -2332,7 +2332,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
     def _setup_signal_choosers_(self, analog:typing.Optional[list] = None, 
                                 irregular:typing.Optional[list] = None):
-        """ Populates the GUI signal combo boxes based on the signals
+        r""" Populates the GUI signal combo boxes based on the signals
         """
         # print(f"{self.__class__.__name__}._setup_signal_choosers_: {len(analog) if isinstance(analog, (tuple, list, NeoObjectList)) else analog} analogs")
         
@@ -2369,7 +2369,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         evt.accept()
             
     def overlayTargets(self, *args, axis:typing.Optional[typing.Union[int, pg.PlotItem]]=None, clear:bool=False, **kwargs):
-        """Overlays "target" glyphs on the given axis, for the current frame.
+        r"""Overlays "target" glyphs on the given axis, for the current frame.
         Targets are also added to an internal cache.
         
         Var-positional parameters (*args):
@@ -2432,7 +2432,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self._plot_discrete_entities_(self._target_overlays_[cFrame][axNdx], axis, clear=clear)
         
     def removeTargetsOverlay(self, axis:typing.Optional[typing.Union[int, pg.PlotItem]]=None):
-        """Remove targets overlaid in this axis.
+        r"""Remove targets overlaid in this axis.
         Target objects are also removed from the internal cache
         """
         
@@ -2469,7 +2469,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
     def addLabel(self, text:str, axis:typing.Optional[typing.Union[int, pg.PlotItem]]=None, 
                  pos = None, **kwargs):
-        """Add a pg.TextItem to the specified axis (pg.PlotItem)
+        r"""Add a pg.TextItem to the specified axis (pg.PlotItem)
         Parameters:
         ===========
         text: the label contents
@@ -2532,7 +2532,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
     @singledispatchmethod
     def addDataFrame(self, obj):
-        """Adds a new data frame to the displayed data.
+        r"""Adds a new data frame to the displayed data.
         Do not confuse with pandas.DataFrame objects!
 Automatically displays the last data frame.
 The following table shows what this method supports:
@@ -2781,7 +2781,7 @@ anything else       anything else       ❌
         self._remove_legend(axis)
         
     def removeLabels(self, axis:typing.Optional[typing.Union[int, pg.PlotItem]]=None):
-        """ Removes ALL labels (TextItems) from the given axis
+        r""" Removes ALL labels (TextItems) from the given axis
         """
         # if axis not in range(-len(self.plotItems), len(self.plotItems)):
         #     return
@@ -2805,7 +2805,7 @@ anything else       anything else       ❌
                 
         
     def closeEvent(self, evt):
-        """Override ScipyenViewer.closeEvent.
+        r"""Override ScipyenViewer.closeEvent.
         Attempt to deal with situations where C/C++ objects are deleted before 
         their wrappers in pyqtgraph
         """
@@ -2816,7 +2816,7 @@ anything else       anything else       ❌
         evt.accept()
 
     def addCursors(self, /, *args, **kwargs):
-        """Manually adds a set of cursors to the selected axes in the SignalViewer window.
+        r"""Manually adds a set of cursors to the selected axes in the SignalViewer window.
         
         Requires at least one Axis object, therefore some data must be plotted first.
         
@@ -2990,7 +2990,7 @@ anything else       anything else       ❌
                   axis: typing.Optional[int] = None, 
                   editFirst: bool=False,
                   **kwargs):
-        """ Add a cursor to the selected axes in the signal viewer window.
+        r""" Add a cursor to the selected axes in the signal viewer window.
 
         When no data has been plotted, the cursor is created in the scene.
         
@@ -3108,7 +3108,7 @@ anything else       anything else       ❌
                 
     @safeWrapper
     def setupCursors(self, cursorType="c", *where, **kwargs):
-        """Removes whatever cursors are already there then add new ones from the arguments.
+        r"""Removes whatever cursors are already there then add new ones from the arguments.
         cursorType "c" (default), "h" or "v"
         *where = a sequence of X coordinates
         Requires at least one Axis object, therefore some data must be plotted first.
@@ -3288,7 +3288,7 @@ anything else       anything else       ❌
     @Slot(int)
     @safeWrapper
     def slot_analogSignalsComboBoxIndexChanged(self, index):
-        """Triggered by a change in Analog signal selection combo box.
+        r"""Triggered by a change in Analog signal selection combo box.
     This combo box is self.analogSignalComboBox"""
         # FIXME: 2023-07-09 12:12:42
         # this signal is only triggered when the combo box selection has changed
@@ -3423,7 +3423,7 @@ anything else       anything else       ❌
     @Slot(int)
     @safeWrapper
     def slot_irregularSignalsComboBoxIndexChanged(self, index):
-        """Triggered by a change in Irregular signal selection combo box.
+        r"""Triggered by a change in Irregular signal selection combo box.
     This combo box is self.irregularSignalComboBox"""
                 
         if len(self._frame_irregs_map_) == 0 :
@@ -3490,7 +3490,7 @@ anything else       anything else       ❌
         self._var_notified_ = True
 
     def linkCursors(self, id1, *ids):
-        """ Bidirectionally links cursors of the same type.
+        r""" Bidirectionally links cursors of the same type.
         Linked cursors move together when either of them is moved by the user.
         Supports single-axis static cursors (which can only be "dragged" around).
         The axes need not be the same, HOWEVER:
@@ -3522,7 +3522,7 @@ anything else       anything else       ❌
         self.signalCursor(id1).linkTo(*other)
             
     def unlinkCursors(self, id1=None, *ids):
-        """Unlinks several linked cursors.
+        r"""Unlinks several linked cursors.
         
         Either cursor may still be individually linked to other cursors of the same type.
         """
@@ -3586,7 +3586,7 @@ anything else       anything else       ❌
         
     @Slot(object)
     def slot_varModified(self, obj):
-        """Connected to _scipyenWindow_.workspaceModel.varModified signal
+        r"""Connected to _scipyenWindow_.workspaceModel.varModified signal
         """
         self.displayFrame()
         
@@ -3634,7 +3634,7 @@ anything else       anything else       ❌
             raise ValueError("Unknown cursor type %s" % cursortype)
     
     def _set_cursors_color(self, val:typing.Any, cursortype:str, linked:bool=False):
-        """ Common color setter code for cursors, called by propery setters
+        r""" Common color setter code for cursors, called by propery setters
         
         Allowed cursortype values are: 'crosshair', 'horizontal', 'vertical' and 
         'hover', in which case this changes the hover color for all cursors.
@@ -3699,7 +3699,7 @@ anything else       anything else       ❌
                     precision:typing.Optional[int] = None, 
                     editFirst: bool = False,
                     **kwargs) -> str:
-        """Common landing zone for signal cursor creation methods.
+        r"""Common landing zone for signal cursor creation methods.
         kwargs: var-keyword parameters for SignalCursor constructor (pen, etc)
         """
         # print(f"{self.__class__.__name__}_addCursor_ cursor_type = {cursor_type}, x = {x} ,y = {y}, xwindow = {xwindow}, ywindow = {ywindow},xBounds = {xBounds},yBounds = {yBounds}, axis={axis}, label= {label}, follows_mouse = {follows_mouse}")
@@ -4585,7 +4585,7 @@ anything else       anything else       ❌
         
     @safeWrapper
     def removeCursors(self):
-        """Remove all signal cursors
+        r"""Remove all signal cursors
         """
         self.slot_removeCursors()
         
@@ -4991,7 +4991,7 @@ anything else       anything else       ❌
             self.slot_editCursor(crsId=self.selectedDataCursor.ID, choose=False)
 #     
 #     def testGlobalsFcn(self, workspace):
-#         """workspace is a dict as returned by globals() 
+#         r"""workspace is a dict as returned by globals() 
 #         """
 #         exec("a=np.eye(3)", workspace)
         
@@ -4999,7 +4999,7 @@ anything else       anything else       ❌
     @Slot()
     @safeWrapper
     def slot_cursorsToEpoch(self):
-        """Creates a neo.Epoch from existing cursors and exports it to the workspace.
+        r"""Creates a neo.Epoch from existing cursors and exports it to the workspace.
         The epoch is NOT embedded in the plotted data.
         """
         scipyenWindow = self.scipyenWindow
@@ -5076,7 +5076,7 @@ anything else       anything else       ❌
     @Slot()
     @safeWrapper
     def slot_cursorsToEpochInData(self):
-        """Creates a neo.Epoch from current vertical/crosshair cursors.
+        r"""Creates a neo.Epoch from current vertical/crosshair cursors.
         The Epoch is embedded in the plotted data.
         """
         vertAndCrossCursors = collections.ChainMap(self._crosshairSignalCursors_, self._verticalSignalCursors_)
@@ -5444,7 +5444,7 @@ anything else       anything else       ❌
                        all_segments:bool = True, 
                        relative_to_segment_start:bool=False, 
                        overwrite:bool = False):
-        """Creates a neo.Epoch from a list of vertical cursors.
+        r"""Creates a neo.Epoch from a list of vertical cursors.
         
         Each cursor contributes to one epoch interval with duration equal to the 
         cursor's xwindow, and time equal to cursor's x - xindow/2
@@ -5704,7 +5704,7 @@ anything else       anything else       ❌
         return epoch
     
 #     def cursorToEpoch(self, crs=None, name=None):
-#         """Creates a neo.Epoch from a single cursor
+#         r"""Creates a neo.Epoch from a single cursor
 #         DEPRECATED superceded by the new cursorsToEpoch
 #         """
 #         if crs is None:
@@ -5731,7 +5731,7 @@ anything else       anything else       ❌
 #         return cursors2epoch(crs, name=name)
         
     def epochBetweenCursors(self, c0:typing.Union[SignalCursor, str], c1:typing.Union[SignalCursor, str], name:typing.Optional[str]=None, label:typing.Optional[str]=None, embed:bool = False, all_segments:bool = True, relative_to_segment_start:bool=False, overwrite:bool = False):
-        """ Creates a neo.Epoch between two vertical cursors.
+        r""" Creates a neo.Epoch between two vertical cursors.
         The Epoch contains a single interval starting at the location of the
         first cursor, and with duration determined by the location of the second 
         cursors (the cursors are sorted in ascending order of their X axis location)
@@ -5931,7 +5931,7 @@ anything else       anything else       ❌
                      signalChannelAxis, signalIndex, signalChannelIndex, 
                      irregularSignalIndex, irregularSignalChannelAxis, irregularSignalChannelIndex, 
                      separateSignalChannels, separateChannelsIn, singleFrame) -> typing.Tuple[bool, typing.Any, typing.Any, int]:
-        """Sets up the data model.
+        r"""Sets up the data model.
         Interprets the data passed in 'x' and 'y' structure and sets up internal
         (state) variables to enable plotting of different types of objects.
         
@@ -6896,7 +6896,7 @@ anything else       anything else       ❌
                    interval:(tuple, list, neo.Epoch, type(None)) = None, 
                    plotStyle:str = "plot", showFrame:int = None, 
                    *args, **kwargs):
-        """Sets up internal variables and triggers plotting.
+        r"""Sets up internal variables and triggers plotting.
 Does the behind the scene work of self.setData(...)
 """
         self.plot_start = None
@@ -7027,7 +7027,7 @@ Does the behind the scene work of self.setData(...)
                 singleFrame:bool=False, interval:(tuple, list, neo.Epoch, type(None)) = None,
                 plotStyle:str = "plot", get_focus:bool = False,
                 showFrame = None, *args, **kwargs):
-        """Plot data in SignalViewer.
+        r"""Plot data in SignalViewer.
         
 Positional parameters:
 ----------------------
@@ -7295,7 +7295,7 @@ signals in the signal collection.
                           irregularSignalIndex, irregularSignalChannelAxis, 
                           irregularSignalChannelIndex,
                           separateSignalChannels, separatechannelsIn,singleFrame):
-        """ Parameters to prompt for (via quickdialog.StringInput unless specified):
+        r""" Parameters to prompt for (via quickdialog.StringInput unless specified):
         NOTE 1: below, a value of None can be specified as the string "None"
         NOTE 2: a bool value can be specified as "frue" or "false" (case-insensitive)
             or as an int (0, or 1)
@@ -7342,7 +7342,7 @@ signals in the signal collection.
     
     @currentFrame.setter
     def currentFrame(self, val:typing.Union[int, type(MISSING), type(NA), type(None), float]):
-        """ Programmatically sets up the index of the displayed frame.
+        r""" Programmatically sets up the index of the displayed frame.
         CAUTION: emits self.frameChanged signal
         """
         missing = (isinstance(self._missing_frame_value_, (int, float)) and val == self._missing_frame_value_) or \
@@ -7382,7 +7382,7 @@ signals in the signal collection.
 
     @property
     def plotItemsWithLayoutPositions(self):
-        """ A zipped list of tuples (PlotItem, grid coordinates).
+        r""" A zipped list of tuples (PlotItem, grid coordinates).
         Aliased to the axesWithLayoutPositions property
         
         This includes the signal axes, and the events and spiketrains axes.
@@ -7405,7 +7405,7 @@ signals in the signal collection.
     
     @property
     def plotItems(self):
-        """A tuple of PlotItems.
+        r"""A tuple of PlotItems.
         This includes the signal axes, and the events and spiketrains axes
         """
         px = self.plotItemsWithLayoutPositions
@@ -7420,13 +7420,13 @@ signals in the signal collection.
     
     @property
     def axesWithLayoutPositions(self):
-        """Alias to self.plotItemsWithLayoutPositions property (syntactic sugar)
+        r"""Alias to self.plotItemsWithLayoutPositions property (syntactic sugar)
         """
         return self.plotItemsWithLayoutPositions
     
     @property
     def axes(self):
-        """The tuple of axes (PlotItem objects) for current frame
+        r"""The tuple of axes (PlotItem objects) for current frame
         
         Alias to self.plotItems property
         """
@@ -7434,7 +7434,7 @@ signals in the signal collection.
     
     @safeWrapper
     def plotItem(self, index: int):
-        """Returns the axis (PlotItem) at the specified index.
+        r"""Returns the axis (PlotItem) at the specified index.
         
         Does the same thing as self.axis(index) but with the overhead of 
         iterating over the items in self.signalsLayout (a pg.GraphicsLayout).
@@ -7444,7 +7444,7 @@ signals in the signal collection.
         return self.axes[index]
     
     def axis(self, index:typing.Union[int, str]):
-        """Calls self.plotItem(index) -- syntactic sugar
+        r"""Calls self.plotItem(index) -- syntactic sugar
         """
         if isinstance(index, str):
             axnames = [ax.vb.name for ax in self.axes]
@@ -7476,14 +7476,14 @@ signals in the signal collection.
         
     @property
     def data(self):
-        """Tuple X data, Y data.
+        r"""Tuple X data, Y data.
         X data may be None, depending on the type of Y data
         """
         return self.xData, self.yData
     
     @data.setter
     def data(self, value:tuple):
-        """Calls self.setData (x,y) and default values for the other parameters.
+        r"""Calls self.setData (x,y) and default values for the other parameters.
         See self.setData (aliased to self.plot and to self.view) for details.
         """
         if isinstance(value, tuple):
@@ -7502,7 +7502,7 @@ signals in the signal collection.
     
     @property
     def selectedPlotItem(self):
-        """Alias to currentPlotItem"""
+        r"""Alias to currentPlotItem"""
         return self.currentPlotItem
     
     @selectedPlotItem.setter
@@ -7511,7 +7511,7 @@ signals in the signal collection.
         
     @property
     def currentPlotItem(self):
-        """Reference to the selected (current) axis (PlotItem).
+        r"""Reference to the selected (current) axis (PlotItem).
         
         The setter counterpart sets the current plot item to be a reference to
         the PlotItem with the specified index.
@@ -7520,7 +7520,7 @@ signals in the signal collection.
     
     @currentPlotItem.setter
     def currentPlotItem(self, index: typing.Union[int, pg.PlotItem, str]):
-        """Sets the current plot item to the one at the specified index.
+        r"""Sets the current plot item to the one at the specified index.
         
         Index: int index or a plotitem
         """
@@ -7590,12 +7590,12 @@ signals in the signal collection.
         
     @property
     def selectedAxis(self):
-        """Alias to currentAxis"""
+        r"""Alias to currentAxis"""
         return self.currentAxis
     
     @property
     def plotNames(self):
-        """A dict of int keys mapped to axes names (str).
+        r"""A dict of int keys mapped to axes names (str).
         The keys are the indices of the axes (with 0 being the first axis from 
         the top).
         The values (names) are the 'name' attribute (if it exists) of the plotted 
@@ -7641,7 +7641,7 @@ signals in the signal collection.
         axis.setLabel("left", lbl, **lblStyle)
         
     def signalCursor(self, ID:str) -> SignalCursor:
-        """Not to be confused with the Qt method self.cursor() !!!
+        r"""Not to be confused with the Qt method self.cursor() !!!
         """
         if len(self._data_cursors_) and ID in self._data_cursors_:
             return self._data_cursors_[ID]
@@ -7671,7 +7671,7 @@ signals in the signal collection.
             return (self._data_cursors_[self.selectedDataCursor.ID].xwindow, self._data_cursors_[self.selectedDataCursor.ID].ywindow)
         
     def cursorsInAxis(self, index=None):
-        """Returns a list of SignalCursor objects in a PlotItem or spanning all plot items.
+        r"""Returns a list of SignalCursor objects in a PlotItem or spanning all plot items.
         
         List is empty if no cursor exists.
         
@@ -7719,7 +7719,7 @@ signals in the signal collection.
         return ret
     
     def getSignalCursors(self, cursorType:typing.Optional[typing.Union[str, SignalCursorTypes]]=None):
-        """Returns the dictionary of SignalCursor objects with the specified type.
+        r"""Returns the dictionary of SignalCursor objects with the specified type.
         All cursors with the same cursor type are stored in the same dictionary
         regardless whether they are atatched to a specific axis or not.
         Hence, no two cursors of the same type can have the same ID.
@@ -7738,7 +7738,7 @@ signals in the signal collection.
         return getattr(self, attr, dict())
     
     def getDataCursors(self, cursorType:typing.Optional[typing.Union[str, SignalCursorTypes]]):
-        """ Calls self.getSignalCursors: 
+        r""" Calls self.getSignalCursors: 
         Returns a dictionary of SignalCursor objects with the specified type."""
         return self.getSignalCursors(cursorType)
     
@@ -7746,7 +7746,7 @@ signals in the signal collection.
         return self.getSignalCursors(cursorType)
     
     def registerCursor(self, cursor, cursorDict:typing.Optional[dict]=None, **kwargs):
-        """Register externally-created cursors.
+        r"""Register externally-created cursors.
         """
         # TODO: 2023-06-12 23:11:50
         # Use for internally created cursors as well (to call from _addCursor_)
@@ -7802,19 +7802,19 @@ signals in the signal collection.
     
     @property
     def verticalCursors(self):
-        """List of vertical signal cursors
+        r"""List of vertical signal cursors
         """
         return [c for c in self._verticalSignalCursors_.values()]
     
     @property
     def horizontalCursors(self):
-        """List of horizontal signal cursors
+        r"""List of horizontal signal cursors
         """
         return [c for c in self._horizontalSignalCursors_.values()]
     
     @property
     def crosshairCursors(self):
-        """List of croshair signal cursors
+        r"""List of croshair signal cursors
         """
         return [c for c in self._crosshairSignalCursors_.values()]
     
@@ -7870,7 +7870,7 @@ signals in the signal collection.
     @Slot(object, object)
     @safeWrapper
     def _slot_plot_axis_x_range_changed(self, vb, x0x1):
-        """Captures changes in the view range on the X axis.
+        r"""Captures changes in the view range on the X axis.
         Triggered by PlotItem signal sigXRangeChanged.
         These changes are typically generated using a mouse button pressed in 
         a Plotitem (signal viewer "axis").
@@ -7903,7 +7903,7 @@ signals in the signal collection.
                 
     @Slot(object)
     def _slot_plot_axis_range_changed_manually(self, value:object):
-        """Triggered by PlotItem's ViewBox sigRangeChangedManually signal"""
+        r"""Triggered by PlotItem's ViewBox sigRangeChangedManually signal"""
         vb = self.sender()
         
         
@@ -7926,7 +7926,7 @@ signals in the signal collection.
         
     @safeWrapper
     def refresh(self):
-        """
+        r"""
         Refresh the display
         """
         for axis in self.axes:
@@ -7935,7 +7935,7 @@ signals in the signal collection.
         
     @safeWrapper
     def displayFrame(self):
-        """ Plots individual frame (data "sweep" or "segment")
+        r""" Plots individual frame (data "sweep" or "segment")
         
         Implements gui.scipyenviewer.ScipyenFrameViewer.displayFrame
         
@@ -8084,7 +8084,7 @@ signals in the signal collection.
         
     def _calculate_new_X_offset_scale_(self, databounds:tuple, viewbounds:tuple,
                                        padding:typing.Optional[float] = 0.) -> tuple:
-        """Calculates the X offset and X view scale given X data bounds and view range.
+        r"""Calculates the X offset and X view scale given X data bounds and view range.
     Helper function returning a tuple (offset, scale) used in the _align_X_range
     """
         # print(f"{self.__class__.__name__}._calculate_new_X_offset_scale_ databounds = {databounds}, viewbounds = {viewbounds}")
@@ -8097,7 +8097,7 @@ signals in the signal collection.
         return offset,scale
         
     def _get_axis_X_view_state(self, ax:typing.Union[int, pg.PlotItem]) -> tuple:
-        """Returns a tuple (offset, scale).
+        r"""Returns a tuple (offset, scale).
     When there is no data plottd in the item returns (None, None)"""
         if isinstance(ax, pg.PlotItem):
             if ax not in self.axes:
@@ -8273,7 +8273,7 @@ signals in the signal collection.
         
         
     def _align_X_range(self, padding:typing.Optional[float] = None):
-        """ Maintains an X view range for frames with different X data bounds.
+        r""" Maintains an X view range for frames with different X data bounds.
     Necessary to recreate a view range to an axis relative to the axis' X data.
         
     This is intended for the particular case where the X domain in each 'frame' 
@@ -8484,7 +8484,7 @@ signals in the signal collection.
         
     @safeWrapper
     def _plotSpikeTrains_(self, trains:typing.Optional[typing.Union[neo.SpikeTrain, neo.core.spiketrainlist.SpikeTrainList, tuple, list]] = None, clear:bool = False, plotLabelText = None, **kwargs):
-        """Common landing zone for SpikeTrainList or collection of SpikeTrain.
+        r"""Common landing zone for SpikeTrainList or collection of SpikeTrain.
         Actual plotting delegated to _plot_discrete_entities_.
         """
         # plot all spike trains stacked in a single axis
@@ -8520,7 +8520,7 @@ signals in the signal collection.
     @safeWrapper
     def _plotEvents_(self, events: typing.Optional[typing.Union[typing.Sequence[neo.Event], typing.Sequence[DataMark]]] = None, 
                      plotLabelText=None, **kwargs):
-        """ Common landing zone for Event/DataMark plotting 
+        r""" Common landing zone for Event/DataMark plotting 
         Delegates further to _plot_discrete_entities_
         """
         if self._plot_events_:
@@ -8545,7 +8545,7 @@ signals in the signal collection.
         
 
     def _plot_epoch_data_(self, epoch:typing.Union[neo.Epoch, DataZone], **kwargs):
-        """ Plots the time intervals defined in a single neo.Epoch or DataZone """
+        r""" Plots the time intervals defined in a single neo.Epoch or DataZone """
         brush = kwargs.pop("brush", self.epoch_plot_options["epoch_brush"])
         
         # relative = getattr(epoch, "relative", False)
@@ -8586,7 +8586,7 @@ signals in the signal collection.
     
 
     def _plot_epochs_sequence_(self, *args, **kwargs):
-        """Plots data from a sequence of neo.Epochs.
+        r"""Plots data from a sequence of neo.Epochs.
         Epochs is always a non-empty sequence (tuple or list) of neo.Epochs
         We keep this as a nested function to avoid calling it directly. Thus
         there is no need to check if the epochs argument is the same as 
@@ -8661,7 +8661,7 @@ signals in the signal collection.
         
 #     @safeWrapper
 #     def _plotEpochs_(self, epochs: typing.Optional[typing.Union[neo.Epoch, DataZone, typing.Sequence]] = None, clear: bool = True, from_cache: bool = False, plotLabelText=None, **kwargs):
-#         """Plots stand-alone epochs.
+#         r"""Plots stand-alone epochs.
 #         A neo.Epoch contains time intervals each defined by time and duration.
 #         Epoch intervals are drawn using pyqtgraph.LinearRegionItem objects.
 #         
@@ -8818,7 +8818,7 @@ signals in the signal collection.
     
     @_plot_data_.register(neo.Segment)
     def _(self, obj:neo.Segment, *args, **kwargs):
-        """Plots a neo.Segment.
+        r"""Plots a neo.Segment.
         Plots the signals (optionally the selected ones) present in a segment, 
         and the associated epochs, events, and spike trains.
         """
@@ -8913,7 +8913,7 @@ signals in the signal collection.
     @_plot_data_.register(DataZone)
     def _(self, obj:typing.Union[neo.Epoch, DataZone], 
           *args, **kwargs):
-        """ Plots a single neo.Epoch 
+        r""" Plots a single neo.Epoch 
         NOTE: a single Epoch MAY contain several time intervals.
         """
         clear_epochs = kwargs.get("clear", True)
@@ -8936,7 +8936,7 @@ signals in the signal collection.
     @_plot_data_.register(TriggerEvent)
     def _(self, obj:typing.Union[neo.Event, DataMark],
           *args, **kwargs):
-        """Plot stand-alone events"""
+        r"""Plot stand-alone events"""
         if len(obj) == 0:
             self._events_axis_.clear()
             self._events_axis_.setVisible(False)
@@ -9222,7 +9222,7 @@ signals in the signal collection.
         vb.name = None
     
     def _signals_select_(self, signals, signalCBox):
-        """Helper method for setting up the collection of selected signals to plot.
+        r"""Helper method for setting up the collection of selected signals to plot.
         Selection is based on the GUI combo box passed as 2nd parameter to the call.
         signals: collection of signals in a frame
         signalCBox: the combo box for selecting which signal to plot, in GUI
@@ -9268,7 +9268,7 @@ signals in the signal collection.
     
     @safeWrapper
     def _plot_signals_(self, analog, irregs, *args, **kwargs):
-        """Common landing zone for plotting collections (sequences) of signals.
+        r"""Common landing zone for plotting collections (sequences) of signals.
         
         Signals are neo.AnalogSignal, DataSignal, neo.IrregularlySampledSignal
         and IrregularlySampledDataSignal objects.
@@ -9395,7 +9395,7 @@ signals in the signal collection.
         
     @safeWrapper
     def _plotNumpyArrays_(self, x, y, plotLabelText = None, *args, **kwargs):
-        """Plots several signals in one frame"""
+        r"""Plots several signals in one frame"""
         self._setup_signal_choosers_(analogs = [y]) # FIXME for a list of signals
         
         if not isinstance(y, (tuple, list)) or not all(isinstance(v, np.ndarray) for v in y):
@@ -9425,7 +9425,7 @@ signals in the signal collection.
         
     @safeWrapper
     def _plotNumpyArray_(self, x, y, axis, plotLabelText = None, *args, **kwargs):
-        """Plots a numpy array of up to two dimensions.
+        r"""Plots a numpy array of up to two dimensions.
         Applies to quantity array and numeric numpy arrays.
         """
         if not isinstance(axis, pg.PlotItem):
@@ -9472,7 +9472,7 @@ signals in the signal collection.
         
     @safeWrapper
     def _plot_signal_(self, signal, *args, **kwargs):
-        """Plots individual signal objects.
+        r"""Plots individual signal objects.
         
         Signal objects are those defined in the Neuralensemble's neo package 
         (neo.AnalogSignal, neo.IrregularlySampledSignal), as well as datasignal
@@ -9688,7 +9688,7 @@ signals in the signal collection.
     @safeWrapper
     @Slot(dict)
     def _slot_plot_numeric_data_(self, data:dict):
-        """For dict's keys and values see parameters of self._plot_numeric_data_
+        r"""For dict's keys and values see parameters of self._plot_numeric_data_
         For threading...
         """
         #print("_slot_plot_numeric_data_")
@@ -9713,7 +9713,7 @@ signals in the signal collection.
         self.statusBar().clearMessage()
         
     def _plot_events_or_marks_(self, entities_list, entities_axis, xLabel, yLabel, minX, maxX, adapt_X_range, height_interval, symbolStyle, **labelStyle):
-        """ Helper method for self._plot_discrete_entities_(events or data marks)"""
+        r""" Helper method for self._plot_discrete_entities_(events or data marks)"""
         symbolColor = symbolStyle["color"]
         symbolPen = symbolStyle["pen"]
         symbolBrush = symbolStyle.get("brush", None)
@@ -9783,7 +9783,7 @@ signals in the signal collection.
             
     def _plot_signal_data_(self, signal:typing.Union[neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal, IrregularlySampledDataSignal], 
                            plot_name:str, plotItem:pg.PlotItem, plotItemName:str, *args, **kwargs):
-        """ Helper method for self._plot_signals_(…).
+        r""" Helper method for self._plot_signals_(…).
      (do not confuse with self._plot_signal_(…))"""
         # print(f"{self.__class__.__name__}._plot_signal_data_(signal<{type(signal).__name__}>) kwargs = {kwargs}")
         sig_channel_index = kwargs.pop("SignalChannelIndex", None)
@@ -9953,7 +9953,7 @@ signals in the signal collection.
                             title:(str, type(None))=None, # name:(str, type(None))=None, 
                             reusePlotItems:bool = True, *args, **kwargs):
                             # symbolColor:(cycle, type(None))=None, 
-        """ The workhorse that does the actual plotting of signals
+        r""" The workhorse that does the actual plotting of signals
         Common landing zone for many of the self._plot_* methods
         
         Parameters:
@@ -10249,7 +10249,7 @@ signals in the signal collection.
             ax.showGrid(y=value)
         
     def linkAllXAxes(self):
-        """Link all PlotItem objects (a.k.a signal viewer 'axes') to the top one.
+        r"""Link all PlotItem objects (a.k.a signal viewer 'axes') to the top one.
         The consequence is that all X axes are linked: a horizontal zoom on any 
     of them (e.g. using the mouse interaction) triggers an equivalent zoom 
     in the others.
@@ -10295,7 +10295,7 @@ signals in the signal collection.
             ax.vb.setXLink(None)
         
     def _setup_axes_(self, _n_signal_axes_:int) -> None:
-        """Call this ONCE after parsing the data.
+        r"""Call this ONCE after parsing the data.
         In SignalViewer there are n + 2 pg.PlotItem¹ objects:
         n PlotItem to display signals
         1 PlotItem to display events (e.g. triggers, etc)
@@ -10521,7 +10521,7 @@ signals in the signal collection.
     @Slot(object)
     @safeWrapper
     def _slot_mouseHoverInPlotItem(self, obj): 
-        """ Connected to a PlotItem's scene sigMouseHover signal.
+        r""" Connected to a PlotItem's scene sigMouseHover signal.
         
         The signal does NOT report mouse position!
         
@@ -10627,7 +10627,7 @@ signals in the signal collection.
         return x,y
             
     def _use_coords_sequence_(self, seq, xw, yw, lbls, ax, cursorType):
-        """Adds cursors based on a sequence of cursor coordinates
+        r"""Adds cursors based on a sequence of cursor coordinates
         """
         # print(f"_use_coords_sequence_ seq = {seq}, xw = {xw}, yw = {yw}, lbls = {lbls}, ax = {ax}")
         for (k, coords) in enumerate(seq):
@@ -10750,7 +10750,7 @@ signals in the signal collection.
     @safeWrapper
     # def clear(self, keepCursors=False):
     def clear(self):
-        """Clears the display
+        r"""Clears the display
         """
         # TODO: cache cursors when keepCursors is True
         # at the moment do NOT pass keepCcursor other than False!
@@ -10853,7 +10853,7 @@ signals in the signal collection.
             
 
     def setTitlePrefix(self, value):
-        """Sets the window-specific prefix of the window title
+        r"""Sets the window-specific prefix of the window title
         """
         if isinstance(value, str) and len(value.strip()) > 0:
             self._winTitle_ = value
@@ -10868,14 +10868,14 @@ signals in the signal collection.
             
     @property
     def cursors(self):
-        """A list with all defined SignalCursors.
+        r"""A list with all defined SignalCursors.
         ATTENTION: the list is NOT ordered.
         """
         return list(self._data_cursors_.values())
     
     @property
     def signalCursors(self):
-        """Alias to cursors property
+        r"""Alias to cursors property
         """
         return self.cursors
     

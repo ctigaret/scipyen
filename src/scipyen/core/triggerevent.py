@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""TriggerEvent class
+r"""TriggerEvent class
 
 Changelog:
 2021-01-06 14:34:02 tolerances and equal_nan moved to datatypes module, 
@@ -50,7 +50,7 @@ def _new_DataMark(cls, places = None, labels=None, units=None, name=None,
 def _new_TriggerEvent(cls, times = None, labels=None, units=None, name=None, 
                description=None, file_origin=None, event_type=None,
                segment=None, relative=None, array_annotations=None, annotations={}):
-    """Keep for old pickles
+    r"""Keep for old pickles
     """
     if not isinstance(annotations, dict):
         if annotations is None:
@@ -72,7 +72,7 @@ def _new_TriggerEvent(cls, times = None, labels=None, units=None, name=None,
     return e
     
 class MarkType(TypeEnum):
-    """Some useful data mark types
+    r"""Some useful data mark types
     """
     # TODO 2024-11-12 18:58:21
     # refine this !
@@ -105,7 +105,7 @@ class MarkType(TypeEnum):
     
 
 class TriggerEventType(TypeEnum):
-    """Convenience enum type for trigger event types.
+    r"""Convenience enum type for trigger event types.
     
     Inherits introspection methods from dataypes.TypeEnum.
     
@@ -151,7 +151,7 @@ class TriggerEventType(TypeEnum):
     
 # class DataMark(DataObject):
 class DataMark(neo.Event):
-    """Similar to neo.Event but suitable to all domains, not just time
+    r"""Similar to neo.Event but suitable to all domains, not just time
     """
     _single_parent_objects = ('Segment',)
     _single_parent_attrs = ('segment',)
@@ -166,7 +166,7 @@ class DataMark(neo.Event):
     #@staticmethod
     @classmethod
     def parseValues(cls, value, units:typing.Optional[pq.Quantity]=None) -> pq.Quantity:
-        """ Parses values to an array of quantities suitable for a TriggerEvent
+        r""" Parses values to an array of quantities suitable for a TriggerEvent
         
         Parameters:
         ==========
@@ -424,7 +424,7 @@ class DataMark(neo.Event):
     def __init__(self, places=None, times=None, labels=None, units=None, name=None, 
                  description=None, file_origin=None, mark_type=None, 
                  relative = None, array_annotations=None, **annotations):
-        """Constructs a DataMark.
+        r"""Constructs a DataMark.
         
         For DataMark objects, event_type is by default MarkType.place
         
@@ -577,7 +577,7 @@ class DataMark(neo.Event):
         self._labels = np.array(labels)
 
     def merge(self, other):
-        """Merge this event with the time stamps from other event
+        r"""Merge this event with the time stamps from other event
         Both events must have the same type.
         
         Returns:
@@ -681,7 +681,7 @@ class DataMark(neo.Event):
         self.setLabel(value)
         
     def shift(self, value, copy=False):
-        """Adds value to the places attribute (shifting).
+        r"""Adds value to the places attribute (shifting).
         
         Value must be a pq.Quantity with the same units as the times attribute,
         or a scalar
@@ -718,7 +718,7 @@ class DataMark(neo.Event):
         return ret # for convenience so that we can chain this e.g. "return obj.copy().shift()"
         
     def place_shift(self, t_shift):
-        """
+        r"""
         Shifts places by given amount.
 
         Parameters:
@@ -741,7 +741,7 @@ class DataMark(neo.Event):
         return new_evt
     
     def time_shift(self, t_shift):
-        """Delegates to place_shift.
+        r"""Delegates to place_shift.
         for API compatibility with neo.Event
         """
         return self.place_shift(t_shift)
@@ -810,7 +810,7 @@ class DataMark(neo.Event):
         return new
 
     def append_marks(self, value):
-        """Appends more marks
+        r"""Appends more marks
         
         Parameters:
         ==========
@@ -884,13 +884,13 @@ class DataMark(neo.Event):
         return new_obj
     
     def time_slice(self, t_start, t_stop):
-        """Delegates to region_slice.
+        r"""Delegates to region_slice.
         For API compatibility with neo.Event
         """
         return self.region_slice(t_start, t-stop)
     
     def as_array(self, units=None):
-        """
+        r"""
         Return the event times as a plain NumPy array.
 
         If `units` is specified, first rescale to those units.
@@ -901,14 +901,14 @@ class DataMark(neo.Event):
             return self.magnitude
 
     def as_quantity(self):
-        """
+        r"""
         Return the event times as a quantities array.
         """
         return self.view(pq.Quantity)
     
     def is_same_as(self, other, rtol = RELATIVE_TOLERANCE, atol =  ABSOLUTE_TOLERANCE, 
                    equal_nan = EQUAL_NAN):
-        """Work around standard equality test
+        r"""Work around standard equality test
         Compares event type, time stamps, labels and name.
         
         Time stamps are compared within a relative and absolute tolerances by
@@ -977,7 +977,7 @@ class DataMark(neo.Event):
         return result
             
     def to_zone(self, pairwise=False, durations=None, to_epoch:bool=False):
-        """
+        r"""
         Returns a new Epoch object based on the times and labels in the TriggerEvent object.
 
         This method has three modes of action.
@@ -1055,7 +1055,7 @@ class DataMark(neo.Event):
     
     @property
     def relative(self) -> bool:
-        """Indicates if the domain value is relative to the start of the signal.
+        r"""Indicates if the domain value is relative to the start of the signal.
         """
         return getattr(self, "_relative", False)
     
@@ -1096,7 +1096,7 @@ class DataMark(neo.Event):
         
 
 class TriggerEvent(DataMark):
-    """Trigger event.
+    r"""Trigger event.
     
     Encapsulates a neo.Event-like object that can be stored in a neo.Segment's
     "events" attribute.
@@ -1312,7 +1312,7 @@ class TriggerEvent(DataMark):
     def __init__(self, times=None, labels=None, units=None, name=None, description=None,
                 file_origin=None, event_type=None, relative=None,
                 array_annotations=None, **annotations):
-        """Constructs a TriggerEvent.
+        r"""Constructs a TriggerEvent.
         
         By default its __mark_type__ is TriggerEventType.presynaptic
         """
@@ -1356,7 +1356,7 @@ class TriggerEvent(DataMark):
                                self.segment, self.array_annotations, annots)
     
     def append_times(self, value):
-        """Appends time values to this event.
+        r"""Appends time values to this event.
         
         Parameters:
         ==========
@@ -1376,7 +1376,7 @@ class TriggerEvent(DataMark):
         return self.append_marks(value) # inherited from DataMark
 
     def to_zone(self, pairwise=False, durations=None, to_epoch:bool=False):
-        """
+        r"""
         Returns a new Epoch object based on the times and labels in the TriggerEvent object.
 
         This method has three modes of action.

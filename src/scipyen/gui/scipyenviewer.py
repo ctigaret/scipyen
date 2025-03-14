@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 
-"""Superclass for Scipyen viewer windows
+r"""Superclass for Scipyen viewer windows
 """
 import typing, warnings, inspect, sys, platform, os
 from dataclasses import MISSING
@@ -36,7 +36,7 @@ from pandas import NA
 
 
 class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
-    """Base type for all Scipyen viewers.
+    r"""Base type for all Scipyen viewers.
     
     Includes common functionality for all viewer classes defined in Scypien.
     
@@ -151,7 +151,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
                  ID:(int, type(None)) = None, win_title: (str, type(None)) = None, 
                  doc_title: (str, type(None)) = None, 
                  deleteOnClose:bool=False, **kwargs):
-        """Constructor.
+        r"""Constructor.
         
         Sets up attributes common to all Scipyen's viewers.
         
@@ -329,7 +329,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         #super().mousePressEvent(evt)
 
     def requestActivate(self):
-        """workaround wayland"""
+        r"""workaround wayland"""
         if os.getenv("XDG_SESSION_TYPE").lower() == "wayland":
             return
         super().requestActivate()
@@ -383,7 +383,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     def update_title(self, doc_title: typing.Optional[str] = None, 
                      win_title: typing.Optional[str] = None, 
                      enforce: bool = False):
-        """Sets up the window title according to the pattern document - viewer.
+        r"""Sets up the window title according to the pattern document - viewer.
         
         Parameters:
         -----------
@@ -444,7 +444,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             
     @abstractmethod
     def setDataDisplayEnabled(self, value):
-        """Enable/disable the central data display widget.
+        r"""Enable/disable the central data display widget.
         Abstract method; it must be implemented in subclasses, which have full
         control if and how a central data display widget is implemented.
         """
@@ -455,7 +455,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             
     @abstractmethod
     def _configureUI_(self):
-        """Custom GUI initialization.
+        r"""Custom GUI initialization.
         Abstract method, it must be implemented in the derived :class:.
         
         Required when specifc GUI elements are introduced to the viewer's
@@ -468,7 +468,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         pass
     
     def view(self, data: (object, type(None)), doc_title: (str, type(None)) = None, *args, **kwargs):
-        """Set the data to be displayed by this viewer.
+        r"""Set the data to be displayed by this viewer.
         NOTE: Should be reimplemented in the derived :class:.
         In the derived class, the function binds the data to the actual data
         model used by the concrete viewer :class:.
@@ -493,7 +493,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             return __check_val_type_is_supported__(value)
         
     def setData(self, *args, **kwargs):
-        """Generic function to set the data to be displayed by this viewer.
+        r"""Generic function to set the data to be displayed by this viewer.
         
         Checks that data is one of the supported types, or inherits from one of
         the supported types.
@@ -586,13 +586,13 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         
     @abstractmethod
     def _set_data_(self, data: object, *args, **kwargs):
-        """Must implement in the subclass
+        r"""Must implement in the subclass
         """
         pass
     
     @property
     def ID(self):
-        """An unique ID for this viewer.
+        r"""An unique ID for this viewer.
         Do NOT confuse with the following available "id"s:
         • python's id (objetc identofier, typically the memory address in CPython)
         • self.winId() which is a sip voidptr to the QMainWindow
@@ -602,7 +602,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     
     @ID.setter
     def ID(self, val: int):
-        """Sets the window ID.
+        r"""Sets the window ID.
         
         If the viewer does not have a custom display name this will also update
         the window title.
@@ -618,7 +618,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             
     @property
     def winTitle(self):
-        """The prefix of the window title.
+        r"""The prefix of the window title.
         
         This is the initial string in the window title, used in common regardless
         of the document's own name (typically, this is the name of the viewer's 
@@ -630,7 +630,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     
     @winTitle.setter
     def winTitle(self, value: (str, type(None)) = None):
-        """Sets up a custom display name for the viewer.
+        r"""Sets up a custom display name for the viewer.
         
         Calls self.update_title()
         
@@ -647,7 +647,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             
     @property
     def docTitle(self):
-        """The document-specific part of the window title (display name of data).
+        r"""The document-specific part of the window title (display name of data).
         
         This is typically, but not necessarily, the variable name of the data 
         displayed in the viewer i.e., the symbolic name that the data is bound
@@ -659,7 +659,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     
     @docTitle.setter
     def docTitle(self, value: (str, type(None)) = None):
-        """Sets the display name of the data.
+        r"""Sets the display name of the data.
         
         This is the "document" part of the pattern "document - window" used in the window title.
         
@@ -678,7 +678,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         self.update_title(doc_title=value)
         
     def resetTitle(self):
-        """Resets the window title.
+        r"""Resets the window title.
         
         Removes the data display name from the window title and reverts the 
         viewer display name to its canonical value.
@@ -697,7 +697,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             e.accept()
         
     def closeEvent(self, evt:QtCore.QEvent):
-        """All viewers in Scipyen should behave consistently.
+        r"""All viewers in Scipyen should behave consistently.
         However, this may by reimplemented in derived classes.
         """
         # print(f"ScipyenViewer<{self.__class__.__name__}>.closeEvent {self.winTitle}: isTopLevel {self.isTopLevel}")
@@ -722,7 +722,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             evt.accept()
         
     def event(self, evt:QtCore.QEvent):
-        """Generic event handler
+        r"""Generic event handler
         NOTE: This can be reimplemented in the derived :class:
         """
         evt.accept()
@@ -754,7 +754,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
                 reply = dbusinterface.call("UnregisterWindow", old_v)
                 
     def _restore_menuBar_(self):
-        """Hack to restore the window's menubar in the desktop's global menu.
+        r"""Hack to restore the window's menubar in the desktop's global menu.
         
         Only necessary when running Scipyen in a windowing system / desktop
         environment that provides such service, such as GNOME AND KDE on UN*X.
@@ -787,7 +787,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     @Slot()
     @safeWrapper
     def slot_refreshDataDisplay(self):
-        """Triggeres a refresh of the displayed information.
+        r"""Triggeres a refresh of the displayed information.
         Typical usage is to connect it to a signal emitted after data has been
         modified, and implies two things:
         
@@ -817,7 +817,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         pass
             
 class ScipyenFrameViewer(ScipyenViewer):
-    """Base type for Scipyen viewers that handle data "frames".
+    r"""Base type for Scipyen viewers that handle data "frames".
     
     This should be inherited by viewers for data that is organized, or can be 
     sliced, in "frames","sweeps" or "segments", and display one frame (sweep or 
@@ -980,7 +980,7 @@ class ScipyenFrameViewer(ScipyenViewer):
                  frameIndex: typing.Optional[typing.Union[int, tuple, list, range, slice]] = None, 
                  currentFrame: typing.Optional[int] = None, 
                  missingFrameValue:typing.Optional[object]=None, *args, **kwargs):
-        """Constructor for ScipyenFrameViewer.
+        r"""Constructor for ScipyenFrameViewer.
         
         Parameters:
         -----------
@@ -1055,7 +1055,7 @@ class ScipyenFrameViewer(ScipyenViewer):
         
     @abstractmethod
     def displayFrame(self, *args, **kwargs):
-        """Display the data frame with _current_frame_index_.
+        r"""Display the data frame with _current_frame_index_.
         Must be implemented in the derived class.
         The implementation may rely on an internal "curent_frame":int, or
         expect the index of the frame to be passed as function parameter.
@@ -1064,7 +1064,7 @@ class ScipyenFrameViewer(ScipyenViewer):
     
     @property
     def nDataFrames(self):
-        """The number of "frames" (segments, sweeps) in which data is organized.
+        r"""The number of "frames" (segments, sweeps) in which data is organized.
         This may be larger than nFrames which is the number of frames the viewer
         can actually display - e.g. see LSCaT.
         
@@ -1074,7 +1074,7 @@ class ScipyenFrameViewer(ScipyenViewer):
     
     @property
     def nFrames(self):
-        """The number of data "frames" this viewer knows of; read-only.
+        r"""The number of data "frames" this viewer knows of; read-only.
         
         A "frame" is either a 2D slice through a nD array (e.g. a 2D slice of a 
         VigraArray), a neo.Segment (which corresponds to an electrophysiology
@@ -1104,7 +1104,7 @@ class ScipyenFrameViewer(ScipyenViewer):
     
     @property
     def frameIndex(self):
-        """Indices of frames.
+        r"""Indices of frames.
         By default, this is range(self.nFrames). In turn, by default:
         self.nFrames == self.nDataFrames.
         
@@ -1143,7 +1143,7 @@ class ScipyenFrameViewer(ScipyenViewer):
         
     @property
     def currentFrame(self):
-        """The index of the current data "frame".
+        r"""The index of the current data "frame".
         Actually, the index into the current data frame index.
         
         For example, when only a subset of data frames are selected for display, 
@@ -1158,7 +1158,7 @@ class ScipyenFrameViewer(ScipyenViewer):
     
     @currentFrame.setter
     def currentFrame(self, value:int):
-        """Sets value of the current frame (to be displayed).
+        r"""Sets value of the current frame (to be displayed).
         
         The function actually sets the index into the current frame index; when
         the viewer displays only a subset of the available data frames, 
@@ -1211,7 +1211,7 @@ class ScipyenFrameViewer(ScipyenViewer):
             
     @property
     def linkedViewers(self):
-        """A list with linked viewers.
+        r"""A list with linked viewers.
         All viewers must be ScipyenFrameViewer objects, and the "link" refers to
         the synchronization of frame navigation across several viewers.
         
@@ -1226,7 +1226,7 @@ class ScipyenFrameViewer(ScipyenViewer):
     
     @property
     def framesSlider(self):
-        """Read-only access to the frames QSlider.
+        r"""Read-only access to the frames QSlider.
         
         This is either None, or the actual QSlider used by the derived class
         for frame navigation (if defined). 
@@ -1235,13 +1235,13 @@ class ScipyenFrameViewer(ScipyenViewer):
     
     @property
     def framesSpinner(self):
-        """Read-only access to the frames QSpinBox.
+        r"""Read-only access to the frames QSpinBox.
         """
         return self._frames_spinner_
     
     @safeWrapper
     def linkToViewers(self, *viewers, broadcast: bool = True):
-        """Synchronizes frame navigation with the specified viewer(s).
+        r"""Synchronizes frame navigation with the specified viewer(s).
         
         CAUTION: Assumes each viewer in viewers manages data with the same 
         number of data frames.
@@ -1274,7 +1274,7 @@ class ScipyenFrameViewer(ScipyenViewer):
     
     @safeWrapper
     def unlinkViewer(self, other):
-        """Removes the bidirectional link with the other viewer.
+        r"""Removes the bidirectional link with the other viewer.
         """
         if isinstance(other, ScipyenFrameViewer) and other in self._linkedViewers_:
             if self in other.linkedViewers:
@@ -1285,7 +1285,7 @@ class ScipyenFrameViewer(ScipyenViewer):
             
     @safeWrapper
     def unlinkFromViewers(self, *others):
-        """Removes frame navigation synchronization with other viewers.
+        r"""Removes frame navigation synchronization with other viewers.
         
         Var-positional parmeters:
         =========================
@@ -1317,7 +1317,7 @@ class ScipyenFrameViewer(ScipyenViewer):
     @Slot(int)
     @safeWrapper
     def slot_setFrameNumber(self, value:typing.Union[int, type(MISSING), type(NA), type(None), float]):
-        """Drives frame navigation from the GUI.
+        r"""Drives frame navigation from the GUI.
         
         The valueChanged signal of the widget used to select the index of the 
         displayed data frame should be connected to this slot in _configureUI_()

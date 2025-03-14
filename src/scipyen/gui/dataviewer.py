@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 
-"""
+r"""
 Qt5-based viewer window for dict and subclasses
 """
 
@@ -80,7 +80,7 @@ from gui import quickdialog
 __scipyen_plugin__ = None
 
 class DataViewer(ScipyenViewer):
-    """Viewer for hierarchical (nesting) collection types.
+    r"""Viewer for hierarchical (nesting) collection types.
     These can be: (nested) dictionaries, lists, tuples.
     Numpy arrays and pandas data types, although collection data types, are
     considered "leaf" objects.
@@ -139,7 +139,7 @@ class DataViewer(ScipyenViewer):
     # view_action_name = "Object"
     
     def __init__(self, data: (object, type(None)) = None, parent: (QtWidgets.QMainWindow, type(None)) = None, ID:(int, type(None)) = None,  win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None, useTableEditor:bool = True, predicate = None, hideRoot:bool=False, *args, **kwargs):
-        """
+        r"""
         Parameters:
         ===========
         data: a Python object
@@ -234,7 +234,7 @@ class DataViewer(ScipyenViewer):
         self.addToolBar(QtCore.Qt.TopToolBarArea, self.toolBar)
         
     def _set_data_(self, data:object, predicate=None, hideRoot=False, *args, **kwargs):
-        """
+        r"""
         Display new data
         # TODO 2019-09-14 10:16:03: NOTE: 2021-10-03 13:10:00 SCRAP THAT
         # expand this to other hierarchical containers including those in
@@ -530,7 +530,7 @@ class DataViewer(ScipyenViewer):
     @Slot()
     @safeWrapper
     def slot_exportItemDataToWorkspace(self):
-        """Exports data from currently selected items to the workspace.
+        r"""Exports data from currently selected items to the workspace.
         
         When a single item is selected, the user is presented with a Dialog to
         verify/modify the symbol (name) to which the data will be bound in the
@@ -664,7 +664,7 @@ class DataViewer(ScipyenViewer):
     
     @safeWrapper
     def _get_path_for_item_(self, item:QtWidgets.QTreeWidgetItem):#, as_expression:bool=True):
-        """Returns a tree (indexing) path to item, as a list of 'nodes'.
+        r"""Returns a tree (indexing) path to item, as a list of 'nodes'.
         
         This EXCLUDES the top level parent.
         
@@ -715,7 +715,7 @@ class DataViewer(ScipyenViewer):
     
     @safeWrapper
     def _export_data_items_(self, items, fullPathAsName=False):
-        """Export data displayed by their corresponding items, to workspace.
+        r"""Export data displayed by their corresponding items, to workspace.
         
         Parameters:
         ----------

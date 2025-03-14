@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 
-"""quickdialog module adapted from vigranumpy.pyqt.quickdialog
+r"""quickdialog module adapted from vigranumpy.pyqt.quickdialog
 Useful to have even when vigranumpy is not installed.
 
 """
@@ -395,7 +395,7 @@ class VDialogGroup(DialogGroup):
 
        
 class QuickDialogComboBox(QtWidgets.QFrame):
-    """A combobox to use with a QuickDialog.
+    r"""A combobox to use with a QuickDialog.
     
     The combobox is nothing fancy -- only accepts a list of text items
     """
@@ -449,7 +449,7 @@ class QuickDialogComboBox(QtWidgets.QFrame):
         self.currentTextChanged[str].connect(slot)
         
     def connectIndexChanged(self, slot):
-        """Connects the combobox currentIndexChanged signal.
+        r"""Connects the combobox currentIndexChanged signal.
         NOTE: this is an overlaoded signal, with to versions 
         (respectively, with a str and int argument).
         
@@ -487,7 +487,7 @@ class QuickDialogComboBox(QtWidgets.QFrame):
 # TODO FIXME: when using my custom QValidator python (or pyqt5) crashes with
 # TypeError: invalid result from VarNameValidator.validate()
 class VariableNameStringInput(StringInput):
-    """
+    r"""
     Cezar M. Tigaret
     """
     class VarNameValidator(QtGui.QValidator):
@@ -528,7 +528,7 @@ class VariableNameStringInput(StringInput):
         return True
     
 class QuickWidget(QtWidgets.QWidget):
-    """Quick creation of a custom widget
+    r"""Quick creation of a custom widget
     TODO: 2022-10-28 11:27:24
     """
     def __init__(self, parent:typing.Optional[QtWidgets.QWidget]=None, layoutType:type=QtWidgets.QVBoxLayout):
@@ -570,7 +570,7 @@ class QuickWidget(QtWidgets.QWidget):
         self.addWidget(label, 0, QtCore.Qt.AlignLeft)
     
 class QuickDialog(QtWidgets.QDialog):
-    """From vigranumpy.pyqt.quickdialog"""
+    r"""From vigranumpy.pyqt.quickdialog"""
     def __init__(self, parent:typing.Optional[QtWidgets.QWidget]=None, 
                  title:typing.Optional[str]=None, 
                  addStretch=True, 

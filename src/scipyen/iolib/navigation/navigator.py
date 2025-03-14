@@ -16,7 +16,7 @@
 #
 
 
-"""
+r"""
 About special protocols (KIO slaves) in KDE:
 NOTE: A list of available protocols can be seen in KDE gui via the Dolphin file
 manager open a Dolphin window, click in the navigator bar to show is as an 
@@ -237,7 +237,7 @@ class ApplyUrlMethod(IntEnum):
 class UrlNavigator: pass # fwd decl
 
 class LocationData:
-    """
+    r"""
     Encapsulates location data
     """
     # KCoreUrlNavigator API
@@ -260,7 +260,7 @@ class LocationData:
         return self.url.adjusted(QtCore.QUrl.StripTrailingSlash) == other.url.adjusted(QtCore.QUrl.StripTrailingSlash)
     
 class UrlNavigatorData(typing.NamedTuple):
-    """
+    r"""
     Encapsulates KCoreUrlNavigator data
     """
     # KUrlNavigator API
@@ -434,7 +434,7 @@ class UrlComboOverLoadResolving(IntEnum):
     RemoveBottom = 1
     
 class UrlComboBox(QtWidgets.QComboBox):
-    """Implementation of KIO KUrlComboBox"""
+    r"""Implementation of KIO KUrlComboBox"""
     # TODO/FIXME: 2025-01-20 22:48:00
     # finalize completer - currently not working
     # TODO/FIXME: 2025-01-21 23:27:58
@@ -786,7 +786,7 @@ class UrlNavigatorMenu(QtWidgets.QMenu):
         self._mouseMoved_ = True
         
 class UrlNavigatorButtonBase(QtWidgets.QPushButton):
-    """Common ancestor for breadcrumbs buttons
+    r"""Common ancestor for breadcrumbs buttons
     """
     BorderWidth = 2
     
@@ -1123,7 +1123,7 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
             self.setMinimumWidth(minWidth)
             
     def initMenu(self, menu: QtWidgets.QMenu, startIndex:int, maxItems:int):
-        """Populates the subdirectories menu
+        r"""Populates the subdirectories menu
         """
         # print(f"{self.__class__.__name__}<{self.plainText()}>.initMenu({menu}, {startIndex})")
         
@@ -1507,7 +1507,7 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
     
     @Slot(QtWidgets.QAction, QtCore.Qt.MouseButton)
     def slot_menuActionClicked(self, action:QtWidgets.QAction, button:QtCore.Qt.MouseButton):
-        """Invoked by mouse clicking on a subdirectories menu entry.
+        r"""Invoked by mouse clicking on a subdirectories menu entry.
         """
         # NOTE: 2025-01-21 09:06:45 see NOTE: 2025-01-21 08:59:29
         # result = action.data().toInt()
@@ -1581,7 +1581,7 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         
     @Slot()
     def slot_openSubDirsMenu(self):
-        """Creates a menu with subdirectories of this button's directory.
+        r"""Creates a menu with subdirectories of this button's directory.
         """
         # NOTE: 2025-01-21 08:49:34
         # Connected to (and called by) ListDirsJob.finished Signal. The connection
@@ -1630,7 +1630,7 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
     
     @Slot(list)
     def slot_addEntriesToSubdirs(self, entries:list[pathlib.Path]):
-        """Populates the list of subdirectories for this button.
+        r"""Populates the list of subdirectories for this button.
         The subdirectories are entries generated asynchronously by a ListDirsJob.
         """
         # NOTE: 2025-01-21 08:53:03
@@ -1652,7 +1652,7 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
 # # NOTE: 2025-01-02 16:02:17 but this may change
 # #
 # class UrlNavigatorSchemeCombo(UrlNavigatorButtonBase):
-#     """Implementation of KIO KUrlNavigatorSchemeCombo
+#     r"""Implementation of KIO KUrlNavigatorSchemeCombo
 #     """
 #     # NOTE: 2025-01-21 16:34:28
 #     # was UrlNavigatorProtocolCombo
@@ -1927,7 +1927,7 @@ class UrlNavigatorDropDownButton(UrlNavigatorButtonBase):
                 self.style().drawPrimitive(QtWidgets.QStyle.PE_IndicatorArrowLeft, option, painter, self)
             
 class CoreUrlNavigator(QtCore.QObject):
-    """Implementation of KIO KCoreUrlNavigator"""
+    r"""Implementation of KIO KCoreUrlNavigator"""
     currentUrlAboutToChange     = Signal(QtCore.QUrl, name = "currentUrlAboutToChange")
     currentLocationUrlChanged   = Signal(name = "currentLocationUrlChanged")
     urlSelectionRequested       = Signal(QtCore.QUrl, name = "urlSelectionRequested")
@@ -2539,7 +2539,7 @@ class _UrlNavigator_(QtCore.QObject):
     
     @Slot(QtCore.QPoint)
     def openContextMenu(self, p:QtCore.QPoint):
-        """UrlNavigator's context menu
+        r"""UrlNavigator's context menu
         Allows 
         • copy/paste of path, 
         • switching between edit mode and breadcrumb navigation mode, 
@@ -2631,7 +2631,7 @@ class _UrlNavigator_(QtCore.QObject):
             
     @Slot(str)
     def slotPathBoxChanged(self, text:str): # WARNING 2025-01-19 09:30:32 possible BUG
-        """
+        r"""
         This slot only deals with the situation where a scheme needs changing
         """
         # KUrlNavigatorPrivate
@@ -3025,7 +3025,7 @@ class _UrlNavigator_(QtCore.QObject):
 
 
 class UrlNavigator(QtWidgets.QWidget):
-    """Implementation of KIO KUrlNavigator
+    r"""Implementation of KIO KUrlNavigator
     """
         
     # ### BEGIN signals

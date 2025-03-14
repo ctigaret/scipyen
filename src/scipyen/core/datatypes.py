@@ -200,7 +200,7 @@ def is_enum_value(x):
     return isinstance(type(x), EnumMeta)
 
 def is_routine(x):
-    """ Similar to is_callable but excludes classes with __call__ method.
+    r""" Similar to is_callable but excludes classes with __call__ method.
     """
     
     function_types = (types.FunctionType, types.LambdaType, types.MethodType,
@@ -213,7 +213,7 @@ def is_routine(x):
     
 
 def is_callable(x):
-    """Brief reminder:
+    r"""Brief reminder:
     An object is callable if it is:
 
     • a Python function (including created by a lambda expression) ↔ inspect.isfunction
@@ -259,7 +259,7 @@ def is_callable(x):
     return ret
 
 def is_vector(x):
-    """Returns True if x is a numpy array encapsulating a vector.
+    r"""Returns True if x is a numpy array encapsulating a vector.
     
     A vector is taken to be a numpy array with one dimension, or a numpy
     array with two dimensions (ndim == 2) with one singleton dimension
@@ -279,7 +279,7 @@ def is_vector(x):
         return False
         
 def is_column_vector(x):
-    """Returns True if x is a numpy arrtay encapsulating a column vector.
+    r"""Returns True if x is a numpy arrtay encapsulating a column vector.
     
     A column vector is taken to be a numpy array with one dimension or a numpy
     array with two dimensions where axis 1 is singleton
@@ -299,7 +299,7 @@ def is_column_vector(x):
         return False
         
 def isRowVector(x):
-    """Returns True if x is a numpy array encapsulating a column vector.
+    r"""Returns True if x is a numpy array encapsulating a column vector.
     
     A column vector is taken to be a numpy array with one dimension or a numpy
     array with two dimensions where axis 0 is singleton
@@ -319,7 +319,7 @@ def isRowVector(x):
         return False
     
 def is_uniform_sequence(s):
-    """Returns True when all elements in the sequence have the same type
+    r"""Returns True when all elements in the sequence have the same type
     Can also be used with sets after conversion to list.
     """
     ret = isinstance(s, collections.abc.Sequence) 
@@ -341,7 +341,7 @@ def is_convertible_to_numpy_array(s):
     return ret
 
 def is_uniform_collection(obj):
-    """Shorthand to apply is_uniform_sequence() to what can be converted to list.
+    r"""Shorthand to apply is_uniform_sequence() to what can be converted to list.
     For dict collections, it applied to obj.values()
     """
     try:
@@ -366,7 +366,7 @@ def check_type(t:typing.Union[type, typing.Sequence[type], typing.Set[type]],
                      use_ref_mro:bool=False,
                      check_elements:bool=False,
                      check_keys:bool=False) -> bool:
-    """Checks a type in 't' against a reference type in 'ref'.
+    r"""Checks a type in 't' against a reference type in 'ref'.
     
     't': a type, or a collection of types (i.e., tuple, list or set)
     
@@ -395,7 +395,7 @@ def check_type(t:typing.Union[type, typing.Sequence[type], typing.Set[type]],
     check_keys:bool - Not used
     
     
-"""
+    """
     # NOTE: 2024-01-07 00:12:32
     # the following five variables are not currently used; 
     # defined here for future code to check types nested in collections
@@ -479,7 +479,7 @@ def check_type(t:typing.Union[type, typing.Sequence[type], typing.Set[type]],
     return len(t_set & ref_set) > 0 or any(issubclass(v, tuple(ref_set)) for v in t_set)
 
 def enum2str(etype:Enum) -> str:
-    """Returns the symbol (NOT the value) of the enum type"""
+    r"""Returns the symbol (NOT the value) of the enum type"""
     enumItems = list(filter(lambda x: x[1] == etype, 
                             inspect.getmembers_static(etype, predicate = lambda x: isinstance(x, IntEnum))))
     
@@ -491,7 +491,7 @@ def enum2str(etype:Enum) -> str:
     return str()
 
 def enums2str(etypes: typing.Sequence[Enum]) -> list[str]:
-    """Like enum2str but does a single pass throughn the sequence"""
+    r"""Like enum2str but does a single pass throughn the sequence"""
     if len(etypes) == 0:
         return list()
     
@@ -543,7 +543,7 @@ def type2str(t:type) -> str:
     return t.__name__
     
 def array_slice(data:np.ndarray, slicing:(dict, type(None))):
-    """Dynamic slicing of nD arrays and introducing new axis in the array.
+    r"""Dynamic slicing of nD arrays and introducing new axis in the array.
     
     Parameters:
     ===========
@@ -713,7 +713,7 @@ def is_namedtuple(x):
     return ret
     
 def is_string(array):
-    """Determine whether the argument has a string or character datatype, when
+    r"""Determine whether the argument has a string or character datatype, when
     converted to a NumPy array.
     
     String or character (including unicode) have dtype.kind of "S" or "U"
@@ -722,7 +722,7 @@ def is_string(array):
     return np.asarray(array).dtype.kind in NUMPY_STRING_KINDS
 
 def is_numeric_string(array):
-    """Determines if the argument is a string array that can be parsed as numeric.
+    r"""Determines if the argument is a string array that can be parsed as numeric.
     """
     if isinstance(array, str):
         array = [array]
@@ -730,7 +730,7 @@ def is_numeric_string(array):
     return is_string(array) and not np.isnan(np.genfromtxt(array)).any()
 
 def is_numeric(array):
-    """Determine whether the argument has a numeric datatype, when
+    r"""Determine whether the argument has a numeric datatype, when
     converted to a NumPy array.
 
     Booleans, unsigned integers, signed integers, floats and complex
@@ -762,7 +762,7 @@ def __default_undimensioned__():
     return pq.dimensionless
 
 def categorize_data_frame_columns(data, *column_names, inplace=True):
-    """"""
+    r""""""
     if not isinstance(data, pd.DataFrame):
         raise TypeError("Expecting a pandas.DataFrame; got %s instead" % type(data).__name__)
     
@@ -822,7 +822,7 @@ class DoseDescriptor:
             
 @dataclass
 class ScipyenDataclass:
-    """An 'enhanced' dataclass, ancestor of Scipyen data classes.
+    r"""An 'enhanced' dataclass, ancestor of Scipyen data classes.
 
     WARNING: to derive (i.e. create a subclass) from ScipyenDataclass follow the 
     steps below:
@@ -1007,33 +1007,33 @@ class ScipyenDataclass:
     
 TE = typing.TypeVar("TE", bound="TypeEnum")
 class TypeEnum(IntEnum):
-    """Common ancestor for enum types used in Scipyen
+    r"""Common ancestor for enum types used in Scipyen
     """
     
     @classmethod
     def default(cls) -> type[TE]:
-        """Aways returns the first member of the enum class
+        r"""Aways returns the first member of the enum class
         """
         names = list(cls.names())
         return cls[names[0]]
     
     @classmethod
     def names(cls) -> typing.Generator[str, None, None]:
-        """Iterate through the names in TypeEnum enumeration.
+        r"""Iterate through the names in TypeEnum enumeration.
         """
         for t in cls:
             yield t.name
     
     @classmethod
     def values(cls) -> typing.Generator[int, None, None]:
-        """Iterate through the int values of TypeEnum enumeration.
+        r"""Iterate through the int values of TypeEnum enumeration.
         """
         for t in cls:
             yield t.value
         
     @classmethod
     def types(cls) -> typing.Generator[type[TE], None, None]:
-        """Iterate through the elements of TypeEnum enumeration.
+        r"""Iterate through the elements of TypeEnum enumeration.
         Useful to quickly remember what the members of this enum are (with their
         names and values).
         
@@ -1046,7 +1046,7 @@ class TypeEnum(IntEnum):
             
     @classmethod
     def namevalue(cls, name:str) -> int:
-        """Return the value (int) corresponding to a given name;
+        r"""Return the value (int) corresponding to a given name;
         WARNING If name is not a valid TypeEnum name returns -1
         """
         if name in cls.names():
@@ -1056,7 +1056,7 @@ class TypeEnum(IntEnum):
     
     @classmethod
     def stringToType(cls, name:str) -> int:
-        """Return the value (int) corresponding to a given name;
+        r"""Return the value (int) corresponding to a given name;
         WARNING If name is not a valid TypeEnum name returns -1
         """
         return cls.namevalue(name)
@@ -1077,7 +1077,7 @@ class TypeEnum(IntEnum):
 
     @classmethod
     def type(cls, t:typing.Union[str, int]) -> type[TE]:
-        """Returns the enum type corresponding to `t`, where
+        r"""Returns the enum type corresponding to `t`, where
         `t` can be:
         • str: the name / symbol associated with the type in the enum
         • int: the value associated with the type in the enum
@@ -1118,7 +1118,7 @@ class TypeEnum(IntEnum):
             
     @classmethod
     def strand(cls, name1:str, name2:str) -> int:
-        """ Emulates '&' operator for type names 'name1' and 'name2'.
+        r""" Emulates '&' operator for type names 'name1' and 'name2'.
         If neither arguments are valid names returns 0
         """
         if any([n not in cls.names() for n in [name1, name2]]):
@@ -1131,7 +1131,7 @@ class TypeEnum(IntEnum):
     
     @classmethod
     def is_primitive_type(cls, t) -> bool:
-        """Checks if 't' is a primitive type in this types enumeration.
+        r"""Checks if 't' is a primitive type in this types enumeration.
         
         Parameters:
         -----------
@@ -1145,7 +1145,7 @@ class TypeEnum(IntEnum):
     
     @classmethod
     def is_derived_type(cls, t) -> bool:
-        """Checks if 't' is a compound type (i.e. derived from other type enums)
+        r"""Checks if 't' is a compound type (i.e. derived from other type enums)
         
         Parameters:
         -----------
@@ -1160,7 +1160,7 @@ class TypeEnum(IntEnum):
         
     @classmethod
     def is_composite_type(cls, t) -> bool:
-        """Alias of TypeEnum.is_derived_type()
+        r"""Alias of TypeEnum.is_derived_type()
         
         Parameters:
         -----------
@@ -1174,7 +1174,7 @@ class TypeEnum(IntEnum):
     
     @classmethod
     def primitive_component_types(cls, t) -> typing.List[TE]:
-        """ Returns a list of primitive TypeEnum objects that compose 't'.
+        r""" Returns a list of primitive TypeEnum objects that compose 't'.
         If 't' is already a primitive type, returns an empty list.
         
         Parameters:
@@ -1200,7 +1200,7 @@ class TypeEnum(IntEnum):
         
     @classmethod
     def component_types(cls, t) -> typing.List[TE]:
-        """ Returns a list of TypeEnum objects that compose 't'.
+        r""" Returns a list of TypeEnum objects that compose 't'.
         If 't' is already a primitive type, returns an empty list.
     
         The TypeEnum objects can also be composite types.
@@ -1230,7 +1230,7 @@ class TypeEnum(IntEnum):
     
     @classmethod
     def derived_types(cls, t) -> typing.List[TE]:
-        """ Returns the composite TypeEnum objects where 't' participates.
+        r""" Returns the composite TypeEnum objects where 't' participates.
         Parameters:
         -----------
         t: int, str, TypeEnum (or subclass)
@@ -1252,12 +1252,12 @@ class TypeEnum(IntEnum):
         return [_t for _t in filter(lambda x: x & t, cls) if not _t.is_primitive() and _t is not t and _t.value > t.value]# _t.value > t.value]
         
     def is_derived(self):
-        """Return True if this TypeEnum object is a composite (i.e., derived) type.
+        r"""Return True if this TypeEnum object is a composite (i.e., derived) type.
         """
         return self.is_derived_type(self)
     
     def is_composite(self) -> bool:
-        """Return True if this TypeEnum object is a composite (i.e., derived) type.
+        r"""Return True if this TypeEnum object is a composite (i.e., derived) type.
         """
         return self.is_derived()
     
@@ -1265,7 +1265,7 @@ class TypeEnum(IntEnum):
         return self.is_primitive_type(self)
     
     def primitives(self) -> typing.List[TE]:
-        """Returns a list of primitive types used to generate this type.
+        r"""Returns a list of primitive types used to generate this type.
         
         Compound types are generated from primitive types through the logical
         OR operator (bitwise OR).
@@ -1275,7 +1275,7 @@ class TypeEnum(IntEnum):
         return self.primitive_component_types(self)
     
     def components(self) -> typing.List[TE]:
-        """Returns a list of components for this TypeEnum object.
+        r"""Returns a list of components for this TypeEnum object.
         
         Compound types are generated from primitive types through the logical
         OR operator (bitwise OR).
@@ -1285,7 +1285,7 @@ class TypeEnum(IntEnum):
         return self.component_types(self)
     
     def includes(self, t) -> bool:
-        """Returns True if 't' is a component of this TypeEnum object.
+        r"""Returns True if 't' is a component of this TypeEnum object.
         
         't' may be a primitive or a composite type.
         
@@ -1296,7 +1296,7 @@ class TypeEnum(IntEnum):
         return t in self.components()
     
     def is_primitive_of(self, t) -> bool:
-        """Returns True if this TypeEnum object is a primitive of 't'.
+        r"""Returns True if this TypeEnum object is a primitive of 't'.
         
         Always returns False when this TypeEnum object is a composite (i.e., 
         even if it is a component of 't').
@@ -1306,19 +1306,19 @@ class TypeEnum(IntEnum):
         return self in t.primitives()
     
     def is_component_of(self, t) -> bool:
-        """Returns True if this TypeEnum object is a component of 't'.
+        r"""Returns True if this TypeEnum object is a component of 't'.
         """
         t = self.type(t)
         
         return self in t.components()
     
     def nameand(self, name:str) -> TE:
-        """ Applies strand() to the name of this object and the argument.
+        r""" Applies strand() to the name of this object and the argument.
         """
         return self.strand(self.name, name)
     
 class CellCompartmentType(TypeEnum):
-    """Follows SWC/CNIC specification augmented with 'spine', 'nucleus', 'nucleolus'. 
+    r"""Follows SWC/CNIC specification augmented with 'spine', 'nucleus', 'nucleolus'. 
     See http://www.neuronland.org/NLMorphologyConverter/MorphologyFormats/SWC/Spec.html
     """
     undefined = 0
@@ -1539,7 +1539,7 @@ class Organism(ScipyenDataclass):
     
 @dataclass
 class BiologicalSource(ScipyenDataclass):
-    """
+    r"""
         TODO: 2024-11-17 21:11:13 : locate and use neuronal taxonomy API
     """
     organism:Organism = dataclasses.field(default_factory=Organism)
@@ -1624,7 +1624,7 @@ class BiologicalSource(ScipyenDataclass):
     
 @dataclass
 class Procedure(ScipyenDataclass):
-    """An experimental procedure: what is being done during an Episode.
+    r"""An experimental procedure: what is being done during an Episode.
     
     A succession of procedures (attached to the episodes of a Schedule) 
         represents an experimental protocol.
@@ -1651,7 +1651,7 @@ class Procedure(ScipyenDataclass):
     
 @dataclass
 class SubstanceDosage(ScipyenDataclass):
-    """Logical mapping between a compund (or substance) and a dose, in a Treatment.
+    r"""Logical mapping between a compund (or substance) and a dose, in a Treatment.
     Fields:
     name:str. Name of the compound (free-form within Python's rules)
     dose: pq.Quantity. This can be:
@@ -1679,7 +1679,7 @@ class SubstanceDosage(ScipyenDataclass):
     
 @dataclass
 class Treatment(Procedure):
-    """
+    r"""
     Encapsulates the administration of a dose of substance(s) via a specified route.
     
     name: treatment name (typically, the compound's name)
@@ -1704,7 +1704,7 @@ class Treatment(Procedure):
     
 @dataclass
 class Episode(ScipyenDataclass):
-    """Generic episode for frame-based data.
+    r"""Generic episode for frame-based data.
         NOTE: The `beginFrame` and `endFrame` fields are inclusive indices.
         To use them in indexing a sequence (or frames), add 1 (one) to the 
         `endFrame` field, e.g.:
@@ -1751,61 +1751,9 @@ class Episode(ScipyenDataclass):
         ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
         return "\n".join(ret)
     
-#     def toHDF5(self,group:h5py.Group, name:str, oname:str, 
-#                        compression:str, chunks:bool, track_order:bool,
-#                        entity_cache:dict) -> h5py.Dataset:
-#         """Encodes an episode as an empty hdf5 dataset"""
-#         from iolib import h5io
-#         target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
-#         cached_entity = h5io.getCachedEntity(entity_cache, self)
-#         if isinstance(cached_entity, h5py.Dataset):
-#             group[target_name] = cached_entity
-#             return cached_entity
-#         
-#         attrs = dict((x, getattr(self, x)) for x in ("name", "begin", "end", "beginFrame", "endFrame", "description"))
-#         
-#         objattrs = h5io.makeAttrDict(**attrs)
-#         obj_attrs.update(objattrs)
-#         
-#         if isinstance(name, str) and len(name.strip()):
-#             target_name = name
-#         
-#         entity = group.create_dataset(name, data = h5py.Empty("f"), track_order=track_order)
-#         entity.attrs.update(obj_attrs)
-#         
-#         h5io.toHDF5(self.procedure, entity, name="procedure", oname="procedure",
-#                             compression=compression,chunks=chunks,
-#                             track_order=track_order,
-#                             entity_cache=entity_cache)
-#         
-#         h5io.storeEntityInCache(entity_cache, self, entity)
-#         
-#         return entity
-#     
-#     @classmethod
-#     def fromHDF5(cls, entity:h5py.Dataset,
-#                              attrs:typing.Optional[dict]=None, cache:dict={}):
-#         from iolib import h5io
-#         if entity in cache:
-#             return cache[entity]
-#         
-#         attrs = h5io.attrs2dict(entity.attrs)
-#         
-#         name = attrs["name"]
-#         begin = attrs["begin"]
-#         end = attrs["end"]
-#         beginFrame = attrs["beginFrame"]
-#         endFrame = attrs["endFrame"]
-# 
-#         procedure = h5io.fromHDF5(entity["procedure"], cache=cache)
-#         
-#         return cls(name, begin=begin, end=end, 
-#                    beginFrame=beginFrame, endFrame=endFrame,
-#                    procedure=procedure)
-        
 @dataclass
 class Schedule(ScipyenDataclass):
-    """Logical grouping of a sequence of episodes.
+    r"""Logical grouping of a sequence of episodes.
         A Schedule can be logically considered a "protocol", where any of its
         constituent episodes may associate a Procedure. 
     """

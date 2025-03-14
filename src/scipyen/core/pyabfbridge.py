@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""Module to access ABF meta-information.
+r"""Module to access ABF meta-information.
 
 This modules provides functionality to access "metadata" (e.g. command waveforms, 
 protocol details) associated with electrophysiology data recorded using Axon 
@@ -521,7 +521,7 @@ class ABFInputConfiguration:   # placeholder to allow the definition of ABFProto
     pass                         # will be (properly) redefined further below
 
 class ABFAcquisitionMode(datatypes.TypeEnum):
-    """Corresponds to nOperationMode in ABF._protocolSection and annotations"""
+    r"""Corresponds to nOperationMode in ABF._protocolSection and annotations"""
     variable_length_event = 1
     fixed_length_event = 2
     gap_free = 3
@@ -529,7 +529,7 @@ class ABFAcquisitionMode(datatypes.TypeEnum):
     episodic_stimulation = 5
     
 class ABFAveragingMode(datatypes.TypeEnum):
-    """Corresponds to nAverageAlgorithm in ABF._protocolSection"""
+    r"""Corresponds to nAverageAlgorithm in ABF._protocolSection"""
     cumulative = 0
     most_recent = 1
     
@@ -549,7 +549,7 @@ class ABFEpochType(datatypes.TypeEnum):
     Biphasic = 7
     
 class ABFEpoch:
-    """Encapsulates an ABF Epoch - a building part of the DAC (command) waveform.
+    r"""Encapsulates an ABF Epoch - a building part of the DAC (command) waveform.
     Similar to pyabf.waveform.Epoch.
     
     Takes into account digital train pulses.
@@ -704,18 +704,18 @@ class ABFEpoch:
         
     @property
     def letter(self) -> str:
-        """Epoch's letter in the epochs index.
+        r"""Epoch's letter in the epochs index.
         E.g., 'A', 'B', etc"""
         return getEpochLetter(self.number)
     
     @property
     def number(self) -> int:
-        """Alias to self.index"""
+        r"""Alias to self.index"""
         return self._epochNumber_
     
     @property
     def index(self) -> int:
-        """Index of thsi epochs in the Epochs table"""
+        r"""Index of thsi epochs in the Epochs table"""
         return self._epochNumber_
     
     @number.setter
@@ -724,7 +724,7 @@ class ABFEpoch:
         
     @property
     def epochNumber(self) -> int:
-        """Alias to self.number for backward compatibility"""
+        r"""Alias to self.number for backward compatibility"""
         return self.number
     
     @epochNumber.setter
@@ -733,12 +733,12 @@ class ABFEpoch:
         
     @property
     def epochType(self) -> ABFEpochType:
-        """Alias to self.type"""
+        r"""Alias to self.type"""
         return self._epochType_
     
 #     @property
 #     def emulatesTTL(self) -> bool:
-#         """True when epoch type is ABFEpochType.Pulse and meets the conditions below:
+#         r"""True when epoch type is ABFEpochType.Pulse and meets the conditions below:
 #         • First level       != 0
 #         • Delta level       == 0
 #         • Delta duration    == 0
@@ -829,7 +829,7 @@ class ABFEpoch:
         
     @property
     def trainPeriod(self):
-        """Alias to pulsePeriod"""
+        r"""Alias to pulsePeriod"""
         return self.pulsePeriod
     
     @trainPeriod.setter
@@ -844,7 +844,7 @@ class ABFEpoch:
         
     @property
     def trainRate(self) -> pq.Quantity:
-        """Alias to pulseFrequency"""
+        r"""Alias to pulseFrequency"""
         return self.pulseFrequency
         
     @property
@@ -858,7 +858,7 @@ class ABFEpoch:
         
     @property
     def dacIndex(self) -> int:
-        """Physical index of the DAC where this epoch was defined"""
+        r"""Physical index of the DAC where this epoch was defined"""
         return self._dacNum_
     
     @dacIndex.setter
@@ -866,7 +866,7 @@ class ABFEpoch:
         self._dacNum_ = val
         
 class ABFProtocol(ElectrophysiologyProtocol):
-    """Instance of an ABF protocol (for Clampex v ≥ 10).
+    r"""Instance of an ABF protocol (for Clampex v ≥ 10).
     Particularities:
         • When "Alternative Waveforms" is enabled, only TWO DACs will emit analog
         waveforms, on alternative sweeps ()
@@ -1144,7 +1144,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         return "\n".join(ret)
     
     def __eq__(self, other):
-        """Tests for equality of scalar properties and epochs tables.
+        r"""Tests for equality of scalar properties and epochs tables.
         Epochs tables are checked for equality sweep by sweep, in all channels.
         
         WARNING: This includes any digital output patterns definded.
@@ -1211,7 +1211,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
     
     def toHDF5(self, group:h5py.Group, name:str, oname:str, compression, chunks, track_order,
                        entity_cache) -> h5py.Group:
-        """Encodes this ABFProtocol as a HDF5 Group"""
+        r"""Encodes this ABFProtocol as a HDF5 Group"""
         target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
         
         
@@ -1362,7 +1362,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         return ret
     
     def logicalADCIndex(self, index:int) -> int:
-        """Returns the logical index of the ADC with specified physical index.
+        r"""Returns the logical index of the ADC with specified physical index.
     
         See also self.physicalADCIndex
         """
@@ -1375,7 +1375,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         raise ValueError(f"Invalid physical ADC index: {index}")
     
     def physicalADCIndex(self, index:int) -> int:
-        """Returns the physical index of the ADC with specified logical index.
+        r"""Returns the physical index of the ADC with specified logical index.
         
         See also self.logicalADCIndex."""
         if not isinstance(index, int):
@@ -1447,14 +1447,14 @@ class ABFProtocol(ElectrophysiologyProtocol):
     
     @property
     def acquisitionMode(self) -> ABFAcquisitionMode:
-        """Alias to operationMode"""
+        r"""Alias to operationMode"""
         return self._acquisitionMode_
     
     # NOTE: 2024-11-08 12:25:51
     # this property is removed, being made obsolete by self.getDACsWithDigitalOutput
 #     @property
 #     def digitalOutputDACs(self) -> tuple:
-#         """DAC channels where digital output is configured"""
+#         r"""DAC channels where digital output is configured"""
 #         if not self.digitalOutputEnabled:
 #             return tuple()
 #         
@@ -1478,7 +1478,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
     
     @property
     def operationMode(self) -> ABFAcquisitionMode:
-        """    
+        r"""    
         variable_length_event = 1
         fixed_length_event = 2
         gap_free = 3
@@ -1493,12 +1493,12 @@ class ABFProtocol(ElectrophysiologyProtocol):
     
     @property
     def activeDACChannelIndex(self) -> int:
-        """Alias to self.activeDACChannel, for backward compatibility"""
+        r"""Alias to self.activeDACChannel, for backward compatibility"""
         return self.activeDACChannel
     
     @property
     def activeDACChannel(self) -> int:
-        """Index of the "active" DAC channel as reported in the ABF file protocol.
+        r"""Index of the "active" DAC channel as reported in the ABF file protocol.
         """
         
         return self._activeDACChannel_
@@ -1517,7 +1517,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
     
     @property
     def nDIGChannels(self)->int:
-        """Total number of physical DIG channels available.
+        r"""Total number of physical DIG channels available.
         
         In ABF v2, during an Epoch, each physical DIG out channel can output:
         • a single TTL "step-like", determined by the logical level set to the 
@@ -1540,7 +1540,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
     
     @property
     def nTotalDigitalOutputs(self):
-        """Total number of logical digital output channels.
+        r"""Total number of logical digital output channels.
         
         Describes the capability of sending alternate DIG outputs through the 
         physical DIG channels.
@@ -1558,7 +1558,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
     
     @property
     def nAlternateDigitalOutputs(self) -> int:
-        """Number of logical "alternate" digital outputs.
+        r"""Number of logical "alternate" digital outputs.
         This is typically identical to nDIGChannels, and half of nTotalDigitalOutputs
         """
         return self._nAlternateDigitalOutputs_
@@ -1576,7 +1576,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
     
     @property
     def digitalUseLastEpochHolding(self) -> bool:
-        """This is :
+        r"""This is :
         • False, if the states of the DIG channels active during an ABFEpoch 
             return to the holding value at the end of the ABFEpoch, or
         • True, f at the end of thre ABFEpoch the DIG channels retain their 
@@ -1586,12 +1586,12 @@ class ABFProtocol(ElectrophysiologyProtocol):
             
     @property
     def nSweeps(self) -> int:
-        """Number of sweeps per run or per trial average"""
+        r"""Number of sweeps per run or per trial average"""
         return self._nSweeps_
     
     @property
     def nRuns(self) -> int:
-        """Number of runs per trial.
+        r"""Number of runs per trial.
         All runs have the same number of sweeps (self.nSweeps)
         A trial with more than one run will save sweep-by-sweep average in the ABF
         file. This average is equivalent of a single run with self.nSweeps sweeps.
@@ -1600,17 +1600,17 @@ class ABFProtocol(ElectrophysiologyProtocol):
     
     @property
     def nTrials(self) -> int:
-        """This is always 1?"""
+        r"""This is always 1?"""
         return self._nTrials_
     
     @property
     def averaging(self) -> ABFAveragingMode:
-        """Averaging mode - irrelevant when self.nRuns == 1"""
+        r"""Averaging mode - irrelevant when self.nRuns == 1"""
         return self._averaging_
     
     @property
     def averageWeighting(self) -> float:
-        """Sweep eighting when averaging - irrelevant when self.nRuns == 1"""
+        r"""Sweep eighting when averaging - irrelevant when self.nRuns == 1"""
         return self._averageWeighting_
     
     @property
@@ -1627,7 +1627,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
     
     @property
     def holdingTime(self) -> pq.Quantity:
-        """Read-only (determined by Clampex).
+        r"""Read-only (determined by Clampex).
         This corresponds 1/64 samples of total samples in a sweep"""
         samplingPeriod = (1/self.samplingRate).rescale(pq.s)
         return self.holdingSampleCount * samplingPeriod
@@ -1662,7 +1662,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
     
     @property
     def sweepInterval(self) -> pq.Quantity:
-        """Time interval between the starts of successive sweeps"""
+        r"""Time interval between the starts of successive sweeps"""
         return self._sweepInterval_
     
     @property
@@ -1671,12 +1671,12 @@ class ABFProtocol(ElectrophysiologyProtocol):
     
     @property
     def alternateDigitalOutputsEnabled(self) -> bool:
-        """Alias to self.alternateDigitalOutputStateEnabled"""
+        r"""Alias to self.alternateDigitalOutputStateEnabled"""
         return self._hasAltDigOutState_
         
     @property
     def alternateDACOutputStateEnabled(self) -> bool:
-        """This property is True if protocol emits alternate command waveforms.
+        r"""This property is True if protocol emits alternate command waveforms.
     
         The command waveforms are analog signals sent to the recorded source via
         the amplifier. They are "synthesized" by the acquisition software as 
@@ -1694,7 +1694,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
     
     @property
     def alternateWaveformsEnabled(self) -> bool:
-        """Alias to self.alternateDACOutputStateEnabled"""
+        r"""Alias to self.alternateDACOutputStateEnabled"""
         return self._hasAltDacOutState_
         
     @property
@@ -1723,7 +1723,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
     
     def digitalOutputs(self, alternate:typing.Optional[bool] = None, 
                        trains:typing.Optional[bool] = None) -> set:
-        """Indices of the digital output channels used in this protocol.
+        r"""Indices of the digital output channels used in this protocol.
     
         By default, returns all DIG channels used in both main and alternate 
         patterns, for TTL pulses and TTL trains.
@@ -1746,7 +1746,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
                      dac:typing.Optional[typing.Union[int, str, ABFOutputConfiguration]] = None,
                      physicalADC:bool=True,
                      physicalDAC:bool=True) -> object:
-        """Infers the clamping mode used in the experiment run with this protocol.
+        r"""Infers the clamping mode used in the experiment run with this protocol.
         
         The inferrence is based on the physical units of the input - output signal
         pair, as follows:
@@ -1818,7 +1818,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
                                         dac:typing.Optional[typing.Union[ABFOutputConfiguration, int, str]]=None,
                                         byFirstStimulus:bool=True,
                                         indices:bool=True):
-        """Returns sweep-specific digital stimulation of pathways.
+        r"""Returns sweep-specific digital stimulation of pathways.
         
         Often, a protocol is used to digitally stimulate more than one synaptic
         pathway (typically, to test cross-talk, or overlap, between two synaptic
@@ -2051,17 +2051,17 @@ class ABFProtocol(ElectrophysiologyProtocol):
     
     @property
     def inputs(self):
-        """List of input configurations (ADC channels); alias to self.ADCs"""
+        r"""List of input configurations (ADC channels); alias to self.ADCs"""
         return self.ADCs
     
     @property
     def ADCs(self):
-        """List of input configurations (ADC channels)"""
+        r"""List of input configurations (ADC channels)"""
         return self._inputs_
     
     def getADC(self, adcChannel:typing.Union[int, str] = 0, 
                physical:bool=True) -> ABFInputConfiguration:
-        """Access the input configuration of an ADC channel with a given index or name.
+        r"""Access the input configuration of an ADC channel with a given index or name.
         
         Parameters:
         -----------
@@ -2105,27 +2105,27 @@ class ABFProtocol(ElectrophysiologyProtocol):
             raise ValueError(f"Invalid {chtype} ADC channel index specified ({adcChannel})")
 
     def getInput(self, adcChannel:int = 0, physical:bool=True) -> ABFInputConfiguration:
-        """Calls self.getADC(…)"""
+        r"""Calls self.getADC(…)"""
         return self.getADC(adcChannel, physical=physical)
     
     def inputConfiguration(self, adcChannel:typing.Union[int, str] = 0, 
                            physical:bool=True) -> ABFInputConfiguration:
-        """Calls self.getADC(…)"""
+        r"""Calls self.getADC(…)"""
         return self.getADC(adcChannel, physical=physical)
         
     @property
     def DACs(self):
-        """List of output configurations (DAC channels)"""
+        r"""List of output configurations (DAC channels)"""
         return self._outputs_
     
     @property
     def outputs(self):
-        """List of output configurations (DAC channels); alias to self.DACs"""
+        r"""List of output configurations (DAC channels); alias to self.DACs"""
         return self.DACs
     
     def getDAC(self, dacChannel:typing.Optional[typing.Union[int, str]] = None, 
                             physical:bool=True) -> ABFOutputConfiguration:
-        """Access the output configuration of a DAC channel with a given index or name.
+        r"""Access the output configuration of a DAC channel with a given index or name.
         
         Parameters:
         -----------
@@ -2166,7 +2166,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
             raise ValueError(f"Invalid {chtype} DAC channel specified {dacChannel}")
         
     def getDigitalTrainLogicLevels(self) -> typing.Tuple[pq.Quantity]:
-        """TTL levels for digital trains, V.
+        r"""TTL levels for digital trains, V.
         HIGH level is 5 V, LOW level is 0 V.
         If protocol.digitalTrainActiveLogic is True then all digital pulses in 
         the train are steps from OFF = LOW to ON = HIGH then back to OFF = LOW;
@@ -2181,7 +2181,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
             return (5 * pq.V, 0 * pq.V)
         
     def getDigitalPulseLogicLevels(self, digChannel:int = 0) -> typing.Tuple[pq.Quantity]:
-        """TTL levels for digital pulses.
+        r"""TTL levels for digital pulses.
         HIGH level is 5 V, LOW level is 0 V.
         
         If protocol.getDigitalHoldingValue(digChannel) is True, then a TTL pulse
@@ -2198,7 +2198,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
          
     @property
     def digitalLogicLevels(self) -> typing.Tuple[pq.Quantity]:
-        """Returns:
+        r"""Returns:
         (OFF, ON) when 'trains' is False, or
         (trainOFF, trainON) when 'trains' is True, or
         (digOFF, digON, trainOFF, trainON) in any other case
@@ -2223,7 +2223,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
                                dac:typing.Union[ABFOutputConfiguration, int, str],
                                sweep:int=0, 
                                samples:bool=False) -> typing.Union[pq.Quantity, int]:
-        """Actual epoch duration (in time units or or samples) for the given sweep.
+        r"""Actual epoch duration (in time units or or samples) for the given sweep.
         Takes into account first duration and delta duration, both defined in the 
         protocol, for the given DAC. 
         
@@ -2245,7 +2245,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
     def getEpochDeltaDuration(self, epoch:typing.Union[ABFEpoch, int, str],
                                     dac:typing.Union[ABFOutputConfiguration, int, str],
                                     samples:bool=False) -> typing.Union[pq.Quantity, int]:
-        """Change in epoch duration (time units or samples) with each sweep"""
+        r"""Change in epoch duration (time units or samples) with each sweep"""
         dac, epoch = self._check_DAC_Epoch_(dac, epoch)
         
         ret = epoch.deltaDuration
@@ -2267,7 +2267,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
                             holding:bool=True,
                             fromRunStart:bool=False,
                             samples:bool=False) -> pq.Quantity:
-        """Starting time of the epoch (in time units or samples) relative to run or sweep.
+        r"""Starting time of the epoch (in time units or samples) relative to run or sweep.
         Parameters:
         -----------
         epoch: ABFEpoch, str (epoch letter) or int (epoch index, 0-based)
@@ -2347,7 +2347,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         
     def getPreviousSweepLastEpochLevel(self, dac:typing.Union[ABFOutputConfiguration, int, str],
                                        sweep:int) -> pq.Quantity:
-        """Final analog value in the previous epoch"""
+        r"""Final analog value in the previous epoch"""
         # FIXME: 2023-09-18 23:34:27
         # this can become very expensive for many sweeps!
         dac, _ = self._check_DAC_Epoch_(dac, None)
@@ -2391,7 +2391,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
                                alternate:typing.Optional[bool]=None,
                                trains:typing.Optional[bool]=None,
                                ) -> tuple[int]:
-        """Reports DIG chanel usage in a specified sweep.
+        r"""Reports DIG chanel usage in a specified sweep.
         
         By default this reports the DIG channels used for emitting either a "step"
         (i.e. single pulse) or a "train", in the digital pattern that would be active
@@ -2508,7 +2508,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
     
     @property
     def epochsWithDigitalOutput(self) -> tuple:
-        """A tuple of all ABFEpoch numbers where a digital output is defined"""
+        r"""A tuple of all ABFEpoch numbers where a digital output is defined"""
         return tuple(map(lambda x: x[0], 
                          filter(lambda x: not all (x_ ==0 for x_ in x[1]),
                                 map(lambda i: (i[0], tuple(itertools.chain.from_iterable(i[1].main + i[1].alternate))), 
@@ -2524,7 +2524,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         return sorted(list(ret))
         
     def getDACsForEpoch(self, epoch:typing.Union[ABFEpoch, str, int]) -> tuple:
-        """A tuple of DAC physical indexes where the epoch is defined.
+        r"""A tuple of DAC physical indexes where the epoch is defined.
         
         Parameters:
         -----------
@@ -2557,7 +2557,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
                           natural:bool=True, 
                           separateBanks:bool=False,
                           letters:bool=False) -> tuple:
-        """
+        r"""
         Queries the digital pattern defined in an ABFEpoch.
         
         A digital pattern is a sequence of 0, 1, or '*' where the position of 
@@ -2759,7 +2759,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
                              label:typing.Optional[typing.Union[str, typing.Sequence[str]]] = None,
                              name:typing.Optional[str] = None,
                              enableEmptyEvent:bool=True):
-        """ TriggerEvent emitted by digital output channels (TTLs) during an ABF Epoch.
+        r""" TriggerEvent emitted by digital output channels (TTLs) during an ABF Epoch.
         
         For an Epoch of type Step or Pulse AND where digital output is enabled (i.e.
         the digital pattern is non-zero in any DIG output) the method will generate
@@ -2997,7 +2997,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
                             label:typing.Optional[typing.Union[str, typing.Sequence[str]]] = None,
                             name:typing.Optional[str] = None,
                             enableEmptyEvent:bool=True):
-        """Returns TriggerEvent encoded as analog step or pulse waveforms
+        r"""Returns TriggerEvent encoded as analog step or pulse waveforms
         WARNING: Do not use yet
         """
         # TODO: 2024-11-10 21:08:23
@@ -3022,7 +3022,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
                     byDIGIndex:bool=False,
                     relativeToRunStart:typing.Optional[bool]=True,
                     useHoldingTime:bool=True) -> typing.Sequence:
-        """Trigger events emitted by the epochs in this DAC.
+        r"""Trigger events emitted by the epochs in this DAC.
         The method considers that there is one TriggerEvent for each DIG 
         channel that emits a TTL while this DAC is "live"¹, across all the 
         DAC's Epochs. This is because each DIG channel normally controls 
@@ -3212,7 +3212,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
     def getEpochsTable(self, sweep:int = 0, /,
                        dac:typing.Optional[typing.Union[ABFOutputConfiguration, int, str]]=None,
                        includeDigitalPattern:bool=True) -> pd.DataFrame:
-        """Returns the Epochs Description table for a specific DAC.
+        r"""Returns the Epochs Description table for a specific DAC.
         
         Parameters:
         ----------
@@ -3471,7 +3471,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
                            separateWaves:bool=True,
                            normalized:bool=False,
                            asSignals:bool=False) -> neo.AnalogSignal:
-        """TTL (digital) waveforms for the given sweep.
+        r"""TTL (digital) waveforms for the given sweep.
         See NOTE in the docstring for self.getEpochsTable(…)
         """
         if sweep not in range(self.nSweeps):
@@ -3674,7 +3674,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
                                 normalized:bool=False,
                                 asSignals:bool=False,
                                 returnLevels:bool = False) -> tuple[pq.Quantity]:
-        """Waveform with the TTL signals emitted by the epoch.
+        r"""Waveform with the TTL signals emitted by the epoch.
         
         Mandatory positional parameters:
         --------------------------------
@@ -3924,7 +3924,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         return waves
     
     def waveformPreview(self, continuous:typing.Optional[bool]=None):
-        """Generates a waveform preview, Clampex-style.
+        r"""Generates a waveform preview, Clampex-style.
         Returns a neo.Block with output waveforms per sweep, for all DAC and DIG
         channels in the protocol, taking into account which waveform is generated
         in what sweep (when alternative analog or digital outputs are enabled).
@@ -4175,13 +4175,13 @@ class ABFProtocol(ElectrophysiologyProtocol):
     def getAnalogWaveform(self, sweep:int=0, 
                           dac:typing.Optional[typing.Union[ABFOutputConfiguration, int, str]]=None,
                           ignoreIsWaveformEnabled:bool=False) -> neo.AnalogSignal:
-        """Alias to self.getCommandWaveform"""
+        r"""Alias to self.getCommandWaveform"""
         return self.getCommandWaveform(sweep, dac, ignoreIsWaveformEnabled=ignoreIsWaveformEnabled)
     
     def getCommandWaveform(self, sweep:int = 0,
                            dac:typing.Optional[typing.Union[ABFOutputConfiguration, int, str]]=None,
                            ignoreIsWaveformEnabled:bool=False) -> neo.AnalogSignal:
-        """Generates an AnalogSignal representation of a DAC command waveform.
+        r"""Generates an AnalogSignal representation of a DAC command waveform.
         
         DAC command waveforms (and digital outputs) are enabled only in 
         Episodic Stimulation type of experiments.
@@ -4370,7 +4370,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
                                             name = dac.name)
                 
     def getDACCommandWaveform(self, dac, sweep):
-        """Returns the analog waveform emitted by the DAC on a given sweep.
+        r"""Returns the analog waveform emitted by the DAC on a given sweep.
         This returns the output as defined in the Epochs table, i.e., regardless
         of whether the DAC would output a waveform or not, given the specified
         sweep index.
@@ -4552,17 +4552,17 @@ class ABFProtocol(ElectrophysiologyProtocol):
 
     def outputConfiguration(self, index:typing.Optional[typing.Union[int, str]] = None, 
                             physical:bool=False) -> ABFOutputConfiguration:
-        """Calls self.getDAC(…)
+        r"""Calls self.getDAC(…)
         """
         return self.getDAC(index, physical)
     
     def getOutput(self, index:typing.Optional[typing.Union[int, str]] = None, 
                             physical:bool=False) -> ABFOutputConfiguration:
-        """Calls self.getDAC(…)"""
+        r"""Calls self.getDAC(…)"""
         return self.getDAC(index, physical)
     
     def getDigitalChannelUsage(self, digChannel:int) -> tuple:
-        """Looks up the sweeps and epochs where a digital channel emits a TTL pulse or train
+        r"""Looks up the sweeps and epochs where a digital channel emits a TTL pulse or train
         See ABFOutputConfiguration.getEpochsForDigitalChannel documentation for 
         details.
         
@@ -4583,7 +4583,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         
     
 class ABFInputConfiguration:
-    """Deliberately thin class with basic info about an ADC input in Clampex.
+    r"""Deliberately thin class with basic info about an ADC input in Clampex.
         More information may be added for convenience later; until then, just
         explore the neo.Block annotations (assuming the Block was created from an
         Axon ABF file) or the relevanmt sections in an ABF object created using
@@ -4593,7 +4593,7 @@ class ABFInputConfiguration:
         classes when the AnalogSignals are constructed using the input data in
         the ABF.
 
-    """
+    r"""
     def __init__(self, obj: typing.Optional[typing.Union[pyabf.ABF, neo.Block]]=None,
                  adcChannel:int = 0, physical:bool=False, physicalIndex:typing.Optional[int]=None,
                  name:str = None,
@@ -4734,7 +4734,7 @@ class ABFInputConfiguration:
                 
     def toHDF5(self, group, name, oname, compression, chunks, track_order,
                        entity_cache) -> h5py.Group:
-        """Encodes this ABFInputConfiguration as a HDF5 Group.
+        r"""Encodes this ABFInputConfiguration as a HDF5 Group.
         """
         
         # print(f"{self.__class__.__name__}.toHDF5: group = {group}, name = {name}, oname = {oname}")
@@ -4864,7 +4864,7 @@ class ABFInputConfiguration:
     
     @property
     def number(self) -> int:
-        """Alias to self.logicalIndex"""
+        r"""Alias to self.logicalIndex"""
         return self.logicalIndex
 
     @property
@@ -4877,7 +4877,7 @@ class ABFInputConfiguration:
     
     @property
     def physical(self) -> int:
-        """Alias to self.physicalIndex"""
+        r"""Alias to self.physicalIndex"""
         return self.physicalIndex
     
     @property
@@ -4890,7 +4890,7 @@ class ABFInputConfiguration:
     
     @property
     def adcName(self)->str:
-        """Alias to self.name for backward compatibility"""
+        r"""Alias to self.name for backward compatibility"""
         return self.name
     
     @property
@@ -4906,7 +4906,7 @@ class ABFInputConfiguration:
         return self._adcUnits_
 
 class ABFOutputConfiguration:
-    """Configuration of a DAC channel and digital outputs in pClamp/Clampex ABF files.
+    r"""Configuration of a DAC channel and digital outputs in pClamp/Clampex ABF files.
         
     An ABFOutputConfiguration contains the information related to the use of a 
     particular DAC channel (between 0 and the maximum number of DAC outputs of 
@@ -5292,7 +5292,7 @@ class ABFOutputConfiguration:
             raise NotImplementedError(f"ABf version {abfVer} is not supported")
         
     def __eq__(self, other):
-        """Tests for equality of scalar properties and epochs tables.
+        r"""Tests for equality of scalar properties and epochs tables.
         Epochs tables are checked for equality sweep by sweep, in all channels.
         
         WARNING: This includes any digital output patterns definded.
@@ -5338,7 +5338,7 @@ class ABFOutputConfiguration:
     
     def toHDF5(self, group, name, oname, compression, chunks, track_order,
                        entity_cache) -> h5py.Group:
-        """Encodes this ABFOutputConfiguration as a HDF5 Group"""
+        r"""Encodes this ABFOutputConfiguration as a HDF5 Group"""
         
         # NOTE: 2024-07-18 16:01:14
         # I chose Group because we need to store a link to the parent protocol
@@ -5449,7 +5449,7 @@ class ABFOutputConfiguration:
         
     @property
     def returnToHold(self) -> bool: 
-        """True if the command waveform return to last epoch's level.
+        r"""True if the command waveform return to last epoch's level.
         This is specific to the DAC output.
         """
         return self._interEpisodeLevel_
@@ -5460,7 +5460,7 @@ class ABFOutputConfiguration:
     
     @property
     def epochs(self) -> list:
-        """List of ABFEpoch objects defined for this DAC channel"""
+        r"""List of ABFEpoch objects defined for this DAC channel"""
         return self._epochs_
     
     @epochs.setter
@@ -5469,13 +5469,13 @@ class ABFOutputConfiguration:
             self._epochs_[:] = val[:]
     
     # def getEpochsWithDigitalOutput(self) -> typing.List[ABFEpoch]:
-    #     """List of ABF Epochs emitting digital signals (TTLs)"""
+    #     r"""List of ABF Epochs emitting digital signals (TTLs)"""
     #     return [e for e in self.epochs if len(e.getUsedDigitalOutputChannels())]
     
     def getEpochsWithTTLWaveforms(self, sweep:int = 0,
                                   indexes: bool=False,
                                   train: typing.Optional[bool] = None) -> typing.List[ABFEpoch]:
-        """Returns the epochs (or their indices) where the DAC emits TTL-emulating waveforms.
+        r"""Returns the epochs (or their indices) where the DAC emits TTL-emulating waveforms.
         A an epoch with TTL-emulating waveform(s) has:
         • type ABFEpochType.Pulse
         • First level       != 0 (NOTE: this should be ± 5 V but this is not
@@ -5500,7 +5500,7 @@ class ABFOutputConfiguration:
 #                          label:typing.Optional[typing.Union[str, typing.Sequence[str]]] = None,
 #                          name:typing.Optional[str] = None,
 #                          enableEmptyEvent:bool=True) -> TriggerEvent|None:
-#         """Generates TriggerEvent objects from all epochs in the protocol.
+#         r"""Generates TriggerEvent objects from all epochs in the protocol.
 #         These may be empty if the protocol epochs do not define digital patterns.
 #         (NOTE: 'enableEmptyEvent' parameter is not yet used)
 #         
@@ -5666,7 +5666,7 @@ class ABFOutputConfiguration:
 #                              label:typing.Optional[typing.Union[str, typing.Sequence[str]]] = None,
 #                              name:typing.Optional[str] = None,
 #                              enableEmptyEvent:bool=True) -> typing.Union[TriggerEvent, typing.List[TriggerEvent]]:
-#         """
+#         r"""
 #         TODO: Move this code to ABFProtocol, thus breaking the need to store
 #         a reference to the protocol in this ABFOutputConfiguration instance.
 #         
@@ -5855,7 +5855,7 @@ class ABFOutputConfiguration:
 #             raise TypeError(f"digChannel expected an int or a sequence of int; instead, got {digChannel}")
     
 #     def getEpochsTable(self, sweep:int = 0, includeDigitalPattern:bool=True):
-#         """Generate a Pandas DataFrame with the epochs definition for this DAC channel.
+#         r"""Generate a Pandas DataFrame with the epochs definition for this DAC channel.
 #         
 #         Regarding the command and digital outputs, this reflects the actual 
 #         DAC and DIG outputs for the specified sweep.
@@ -5930,7 +5930,7 @@ class ABFOutputConfiguration:
 #     def getEpochAnalogWaveform(self, epoch:typing.Union[ABFEpoch, str, int], previousLevel:pq.Quantity, 
 #                       sweep:int = 0, lastLevelOnly:bool=False,
 #                       returnLevels:bool=False) -> pq.Quantity:
-#         """
+#         r"""
 #         TODO: Move this code to ABFProtocol, thus breaking the need to store
 #         a reference to the protocol in this ABFOutputConfiguration instance.
 #         
@@ -6042,7 +6042,7 @@ class ABFOutputConfiguration:
 #                                 trainOFF:typing.Optional[pq.Quantity]=None,
 #                                 trainON:typing.Optional[pq.Quantity]=None,
 #                                 returnLevels:bool=False) -> typing.Union[pq.Quantity, typing.Sequence[pq.Quantity]]:
-#         """Waveform with the TTL signals emitted by the epoch.
+#         r"""Waveform with the TTL signals emitted by the epoch.
 #         
 #         Mandatory positional parameters:
 #         --------------------------------
@@ -6200,7 +6200,7 @@ class ABFOutputConfiguration:
             
                         
 #     def getPreviousSweepLastEpochLevel(self, sweep:int) -> pq.Quantity:
-#         """Final analog value in the previous epoch"""
+#         r"""Final analog value in the previous epoch"""
 #         # FIXME: 2023-09-18 23:34:27
 #         # this can become very expensive for many sweeps!
 #         if len(self.epochs) == 0 or sweep == 0:
@@ -6235,7 +6235,7 @@ class ABFOutputConfiguration:
 #     def getEpochsForDigitalChannel(self, digChannel: int, sweep: int = 0, 
 #                                    indexes: bool=False, 
 #                                    train: typing.Optional[bool] = None) -> list:
-#         """Returns the index of the epoch where the digChannel is used (set to 1 or '*')
+#         r"""Returns the index of the epoch where the digChannel is used (set to 1 or '*')
 #         Parameters:
 #         -----------
 #         digChannel: int in the semi-open interval [0 ⋯ 8)
@@ -6325,7 +6325,7 @@ class ABFOutputConfiguration:
     
 #     def getEpochDigitalPattern(self, epoch:typing.Union[ABFEpoch, str, int], 
 #                                sweep:int=0) ->tuple:
-#         """
+#         r"""
 #         TODO: Move this code to ABFProtocol, thus breaking the need to store
 #         a reference to the protocol in this ABFOutputConfiguration instance.
 #         
@@ -6482,7 +6482,7 @@ class ABFOutputConfiguration:
     
     @property
     def emulatesTTL(self)->bool:
-        """True when this ADC emulates TTLs for3rd party devices.
+        r"""True when this ADC emulates TTLs for3rd party devices.
         This can happen when:
         • the DAC has analog waveform enabled
         • the DAC has epochs that emulate TTLs via analog waveforms (see ABFEpoch.emulatesTTL)
@@ -6524,7 +6524,7 @@ class ABFOutputConfiguration:
     
 #     @property
 #     def digitalOutputsEnabled(self) -> bool:
-#         """True if any epoch defined in this DAC emits digital pulses or trains"""
+#         r"""True if any epoch defined in this DAC emits digital pulses or trains"""
 #         # NOTE: 2023-10-18 09:57:46
 #         # This is NOT an intrinsic variable in Clampex, but is used here to
 #         # help identify if this DAC associates the main digital output pattern
@@ -6547,7 +6547,7 @@ class ABFOutputConfiguration:
     
     @property
     def logicalIndex(self) -> int:
-        """The index of the DAC channel configured in this object.
+        r"""The index of the DAC channel configured in this object.
         Read-only. 
         An instance of ABFOutputConfiguration is 'linked' to the same
         DAC channel throughtout its lifetime; therefore this property can only 
@@ -6566,7 +6566,7 @@ class ABFOutputConfiguration:
     
     @property
     def number(self) -> int:
-        """Alias to self.logicalIndex"""
+        r"""Alias to self.logicalIndex"""
         return self.logicalIndex
     
     @property
@@ -6584,7 +6584,7 @@ class ABFOutputConfiguration:
     
     @property
     def dacName(self)->str:
-        """Alias to self.name for backward compatibility"""
+        r"""Alias to self.name for backward compatibility"""
         return self.name
     
     @property
@@ -6601,13 +6601,13 @@ class ABFOutputConfiguration:
     
     # @property
     # def sweepSampleCount(self) -> int:
-    #     """Read-only; can only be set up at initialization (construction)
+    #     r"""Read-only; can only be set up at initialization (construction)
     #     and stays the same throughout the lifetime of the object"""
     #     return self.protocol.sweepSampleCount
     
     # @property
     # def digitalOutputsCount(self) -> int:
-    #     """Read-only; can only be set up at initialization (construction)
+    #     r"""Read-only; can only be set up at initialization (construction)
     #     and stays the same throughout the lifetime of the object"""
     #     return self.protocol.nDigitalOutputs
     
@@ -6623,7 +6623,7 @@ class ABFOutputConfiguration:
     
     @property
     def dacHoldingLevel(self) -> pq.Quantity:
-        """DAC-specific"""
+        r"""DAC-specific"""
         return self._dacHoldingLevel_
     
     @dacHoldingLevel.setter
@@ -6649,7 +6649,7 @@ class ABFOutputConfiguration:
 #         return self.getCommandWaveform(sweep)
 #     
 #     def getCommandWaveform(self, sweep:int=0) -> neo.AnalogSignal: 
-#         """Generates an AnalogSignal representation of the command waveform.
+#         r"""Generates an AnalogSignal representation of the command waveform.
 #         
 #         CAUTION: The 'sweep' parameter is only used to get the epoch parameter 
 #         values where these values vary from one sweep to another ("Delta level" 
@@ -6752,7 +6752,7 @@ class ABFOutputConfiguration:
 #     def getDigitalWaveform(self, sweep:int=0, 
 #                            digChannel:typing.Optional[typing.Union[int, typing.Sequence[int]]] = None,
 #                            separateWaves:bool=True) -> neo.AnalogSignal:
-#         """Realizes the digital output waveform (pulses, trains) emitted when
+#         r"""Realizes the digital output waveform (pulses, trains) emitted when
 #         this DAC channel is active.
 #         
 #         """
@@ -6860,7 +6860,7 @@ class ABFOutputConfiguration:
 #         return waveforms
     
     def getEpochEmulatesTTL(dac, epoch, /, sweep:int=0) -> bool:
-        """True when epoch type is ABFEpochType.Pulse and meets the conditions below:
+        r"""True when epoch type is ABFEpochType.Pulse and meets the conditions below:
         • First level       != 0
         • Delta level       == 0
         • Delta duration    == 0
@@ -6875,7 +6875,7 @@ class ABFOutputConfiguration:
 # ### BEGIN module-level functions
         
 def getEpochNumberFromLetter(x:str) -> int:
-    """The inverse function of getEpochLetter()"""
+    r"""The inverse function of getEpochLetter()"""
     from core import strutils
     return strutils.lettersToOrdinal(x)
 
@@ -6893,7 +6893,7 @@ def sourcedFromABF(x:neo.Block) -> bool:
     return x.annotations.get("software", None) == "Axon"
 
 def getABF(obj:typing.Union[str, pathlib.Path, neo.Block]):
-    """
+    r"""
     Returns a pyabf.ABF object from an ABF file.
     
     Parameters:
@@ -6944,7 +6944,7 @@ def getABF(obj:typing.Union[str, pathlib.Path, neo.Block]):
         warning.warn(f"{filename} is not an Axon file")
         
 def getABFsection(abf:pyabf.ABF, sectionType:typing.Optional[str] = None) -> dict:
-    """Return a specific section from a pyabf.ABF object, as a dict.
+    r"""Return a specific section from a pyabf.ABF object, as a dict.
     The section's type is specified as a string (case-insensitive) which can be
     one of:
     'adc'
@@ -7027,7 +7027,7 @@ def getABFsection(abf:pyabf.ABF, sectionType:typing.Optional[str] = None) -> dic
     return datatypes.inspect_members(s, lambda x: not any(f(x) for f in reject_funcs) and not isinstance(x, property) and not isinstance(x, io.BufferedReader))
     
 def readInt16(fb):
-    """"""
+    r""""""
     # NOTE: 2024-10-24 15:40:12
     # this should be Little-endian as it is generated on a IBM PC
     bytes = fb.read(2)
@@ -7084,7 +7084,7 @@ def bitListToString(bits:list, star:bool=False):
 @singledispatch
 def getDIGPatterns(o:typing.Union[neo.Block, pyabf.ABF], reverse_banks:bool=False, wrap:bool=False, 
                    pack_str:bool=False, epoch_num:typing.Optional[int]=None) -> dict:
-    """Access the digital patterns of bit flags associated with the Epochs.
+    r"""Access the digital patterns of bit flags associated with the Epochs.
 
     Returns a mapping epoch_number:int ↦ nested mapping of key:str ↦ pair of 4-tuples of int or '*' elements
 
@@ -7218,7 +7218,7 @@ def _(obj:neo.Block, reverse_banks:bool=False, wrap:bool=False,
 @getDIGPatterns.register(pyabf.ABF)
 def _(abf:pyabf.ABF, reverse_banks:bool=False, wrap:bool=False, 
       pack_str:bool=False, epoch_num:typing.Optional[int]=None) -> dict:
-    """Creates a representation of the digital pattern associated with a DAC channel.
+    r"""Creates a representation of the digital pattern associated with a DAC channel.
 
     Requires access to the original ABF file, because we are using our own
     algorithm to decode digital output trains.
@@ -7390,7 +7390,7 @@ def _(abf:pyabf.ABF, reverse_banks:bool=False, wrap:bool=False,
     
 # @singledispatch
 # def epochTable2DF(obj, src) -> pd.DataFrame:
-#     """Returns a pandas.DataFrame with the data from the epoch table 'x'
+#     r"""Returns a pandas.DataFrame with the data from the epoch table 'x'
 #     """
 #     raise NotImplementedError(f"{type(obj).__name__} objects are not supported")
 # 
@@ -7462,7 +7462,7 @@ def _(abf:pyabf.ABF, reverse_banks:bool=False, wrap:bool=False,
     
 @singledispatch
 def getABFHoldDelay(obj):
-    """Returns the duration of holding time before actual sweep start.
+    r"""Returns the duration of holding time before actual sweep start.
     DEPRECATED: 2024-11-15 10:34:29 use protocol.holdingTime property, instead
     
     WARNING: Only works with a neo.Block generated from an Axon ABF file.
@@ -7518,7 +7518,7 @@ def _(data:neo.Block):
 
 @singledispatch
 def getActiveDACChannel(obj) -> int:
-    """Returns the index of the active DAC channel.
+    r"""Returns the index of the active DAC channel.
 
     WARNING: Only works with a neo.Block generated from an Axon ABF file.
     
@@ -7559,7 +7559,7 @@ def getActiveDACChannel(obj) -> int:
 #                         adcChannel:typing.Optional[typing.Union[int, str]] = None,
 #                         dacChannel:typing.Optional[typing.Union[int, str]]=None,
 #                         absoluteTime:bool=False) -> dict:
-#     """Retrieves the waveforms of the command (DAC) signal.
+#     r"""Retrieves the waveforms of the command (DAC) signal.
 #     
 #     Returns one waveform per sweep (i.e., per neo.Segment) unless segmentIndex
 #     if specified, and has a valid int value.
@@ -7589,7 +7589,7 @@ def getActiveDACChannel(obj) -> int:
 #       adcChannel:typing.Optional[typing.Union[int, str]] = None,
 #       dacChannel:typing.Optional[typing.Union[int, str]] = None,
 #       absoluteTime:bool=False) -> dict:
-#     """Retrieves the waveforms of the command (DAC) signal."""
+#     r"""Retrieves the waveforms of the command (DAC) signal."""
 #     
 #     # NOTE: 2023-08-28 15:31:13
 #     # each ADC input channels in Clampex is associated with one DAC output
@@ -7901,7 +7901,7 @@ def _(obj:neo.Block) -> int:
 
 @singledispatch
 def usedADCs(obj, useQuantities:bool=True) -> dict:
-    """Returns a mapping of used ADC channel index (int) to pair (name, units).
+    r"""Returns a mapping of used ADC channel index (int) to pair (name, units).
 
     Units are returned as a python Quantity if useQuantities is True, else as
     a string (units symbol)
@@ -7926,7 +7926,7 @@ def _(obj:neo.Block, useQuantities:bool=True) -> dict:
 
 @singledispatch
 def usedDACs(obj, useQuantities:bool=True) -> dict:
-    """Returns a mapping of used DAC channel index (int) to pair (name, units)
+    r"""Returns a mapping of used DAC channel index (int) to pair (name, units)
 
     Units are returned as a python Quantity if useQuantities is True, else as
     a string (units symbol)

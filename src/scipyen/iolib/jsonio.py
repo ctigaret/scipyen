@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-""" JSON codecs
+r""" JSON codecs
 
     General schema:
     
@@ -207,7 +207,7 @@ FROM_JSON_FACTORY_METHODS = ("fromjson", "fromJSON", "from_json", "from_JSON",
                              "read_json", "read_JSON", "readJSON", "readjson")
 
 def makeFuncStub(function:typing.Optional[typing.Union[CALLABLE_TYPES + (str, )]]=None):
-    """Generate a stub dictionary.
+    r"""Generate a stub dictionary.
     
     The result contains the following key/value pairs (see also general schema
     described in the module docstring):
@@ -289,22 +289,22 @@ def makeJSONStub(o) -> tuple: # (str, dict)
 
 
 def makeH5PyOpaqueDtype(name):
-    """Required because inspect.signature fails with h5py dtype factories
+    r"""Required because inspect.signature fails with h5py dtype factories
     """
     return h5py.opaque_dtype(np.dtype(name))
 
 def makeH5PyEnumDtype(name):
-    """Required because inspect.signature fails with h5py dtype factories
+    r"""Required because inspect.signature fails with h5py dtype factories
     """
     return h5py.enum_dtype(name)
     
 def makeH5PyStringDtype(encoding, length):
-    """Required because inspect.signature fails with h5py dtype factories
+    r"""Required because inspect.signature fails with h5py dtype factories
     """
     return h5py.string_dtype(encoding, length)
 
 def makeH5PyVlenDtype(name):
-    """Required because inspect.signature fails with h5py dtype factories
+    r"""Required because inspect.signature fails with h5py dtype factories
     """
     return h5py.vlen_dtype(name)
 
@@ -710,14 +710,14 @@ def _(o:pq.Quantity):
     return {hdr:ret}
     
 def dtype2JSON(d) -> dict:
-    """Delegates to json converter for h5py, pandas or numpy (in this order)
+    r"""Delegates to json converter for h5py, pandas or numpy (in this order)
     Also required as intermediate for recurdive call in numpyDtype2JSON.
     """
     jsonrep = h5pyDtype2JSON(d) or pandasDtype2JSON(d) or numpyDtype2JSON(d)
     return jsonrep
 
 def numpyDtype2JSON(d:np.dtype) -> dict:
-    """Roundtrip numpy dtype - json string format - write side
+    r"""Roundtrip numpy dtype - json string format - write side
     An alternative to the np.lib.format.dtype_to_descr
     Returns a dict for recarray dtypes; a str in any other case.
     """
@@ -753,7 +753,7 @@ def numpyDtype2JSON(d:np.dtype) -> dict:
     return {hdr:ret}
 
 def h5pyDtype2JSON(d) -> dict:
-    """Checks if d is a special h5py dtype.
+    r"""Checks if d is a special h5py dtype.
     Returns a json representation (dict) if d is a h5py special dtype, or None.
     """
     hdr, ret = makeJSONStub(d)
@@ -794,7 +794,7 @@ def h5pyDtype2JSON(d) -> dict:
     return {hdr:ret}
             
 def pandasDtype2JSON(d) -> dict:
-    """Checks if d is a pandas extension dtype (for standard pandas extensions)
+    r"""Checks if d is a pandas extension dtype (for standard pandas extensions)
     Returns a json representation (either str or dict) if d is a pandas extension
     dtype; returns None otherwise.
     """
@@ -969,7 +969,7 @@ def pandasDtype2JSON(d) -> dict:
                              #"__ns__":"pd"}}
         
 #def json2dtype(s):
-    #"""Roundtrip numpy dtype - json string format - read side
+    #r"""Roundtrip numpy dtype - json string format - read side
     #An alternative to np.lib.format.descr_to_dtype
     #"""
     #if isinstance(s, str):
@@ -985,7 +985,7 @@ def pandasDtype2JSON(d) -> dict:
         #return np.dtype(s) 
 
 def decode_hook(dct) -> typing.Any:
-    """ Almost complete round trip for a subset of Python types - read side.
+    r""" Almost complete round trip for a subset of Python types - read side.
     
     Implemented types:
     type
@@ -1125,7 +1125,7 @@ def load(filename):
     return ret
 
 def json2python(jsonobj:typing.Union[list, tuple, dict]) -> typing.Any:
-    """Restores a Python object from it JSON representation.
+    r"""Restores a Python object from it JSON representation.
     
     WARNING: Functions, and, with a few exceptions, types and method objects 
     cannot be restored unless they are already defined in a module that can be 

@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""
+r"""
 This modules complements the Quantities package with additional unit quantities
 and exposes some much needed constants (as shorthand¹, but NOTE that values are
 slightly different - TODO/FIXME):
@@ -83,7 +83,7 @@ def makeScaledUnitQuantity(quantity:pq.Quantity,
                            base:int=10, scale:typing.Union[int, float] = 1., 
                            symbol:typing.Optional[str]=None, 
                            name:typing.Optional[str] = None):
-    """Create custom quantity as a scaled version of an existing quantity
+    r"""Create custom quantity as a scaled version of an existing quantity
     
     The function generates a new quantity, scaled by base^power * scale.
     
@@ -351,7 +351,7 @@ def getConstants():
     return ret
 
 def getUnits():
-    """Collects all units definitions.
+    r"""Collects all units definitions.
     Units are defined in the Python Quantities package and augmented in this module.
     Must be called AFTER importing this module, so that it contains the custom 
     uniqt quantities defined in this module.
@@ -545,7 +545,7 @@ def getBaseUnitQuantities(x:pq.Quantity | pq.UnitQuantity):
     return ret
             
 def getUnitFamily(unit:typing.Union[pq.Quantity, pq.UnitQuantity]):
-    """
+    r"""
     Retrieves the family of units for this quantity
     """
     if isinstance(unit, pq.UnitQuantity):
@@ -627,7 +627,7 @@ def familyUnits(family:str, kind:typing.Optional[str]=None):
     
     
 def quantity2scalar(x:typing.Union[int, float, complex, np.ndarray, pq.Quantity]):
-    """
+    r"""
     """
     if isinstance(x, (complex, float, int)) or x == np.nan:
         return x
@@ -656,7 +656,7 @@ def quantity2scalar(x:typing.Union[int, float, complex, np.ndarray, pq.Quantity]
     raise TypeError(f"Expecting a scalar int float, complex, numpy array or Pyhon quantities.Quantity; got {type(x).__name__} instead")
 
 def str2quantity(x:str):
-    """Reconstruct a scalar quantity or dimensionality from a str.
+    r"""Reconstruct a scalar quantity or dimensionality from a str.
     Performs the reverse of quantity2str.
     
     Parameters:
@@ -700,7 +700,7 @@ def str2quantity(x:str):
         raise ValueError(f"Expecting a str of the form '<number><space><UnitQuantity symbol>'; indtead, got {x}")
 
 def shortSymbol(x:typing.Union[pq.Quantity, pq.dimensionality.Dimensionality]) -> str:
-    """Returns the (short) symbol of this quantity's units)
+    r"""Returns the (short) symbol of this quantity's units)
     E.g., 'V', 'mV', '1/Hz'
     """
     if isinstance(x, pq.UnitQuantity):
@@ -750,7 +750,7 @@ def prettySymbol(x:typing.Union[pq.Quantity, pq.dimensionality.Dimensionality]) 
 def quantity2str(x:typing.Union[pq.Quantity, pq.UnitQuantity, pq.dimensionality.Dimensionality], 
                  precision:int = 2, 
                  format:str="f"):
-    """Returns a str representation of a scalar Quantity or Dimensionality.
+    r"""Returns a str representation of a scalar Quantity or Dimensionality.
     Useful to store quantities via json/yaml etc.
     WARNING: There will be loss of precision!
     
@@ -803,7 +803,7 @@ def quantity2str(x:typing.Union[pq.Quantity, pq.UnitQuantity, pq.dimensionality.
 
 #@cache
 def nameFromUnit(u, as_key:bool=False):
-    """
+    r"""
     FIXME make it more intelligent!
     """
     from core.utilities import unique, index_of
@@ -1003,7 +1003,7 @@ def checkElectricalPotentialUnits(value):
     return value._reference.dimensionality == ref._reference.dimensionality
     
 def conversion_factor(x:pq.Quantity, y:pq.Quantity):
-    """Calculates the conversion factor from y units to x units.
+    r"""Calculates the conversion factor from y units to x units.
     Alternative to pq.quantity.get_conversion_factor()
     
     """
@@ -1032,7 +1032,7 @@ def conversion_factor(x:pq.Quantity, y:pq.Quantity):
         return 1.0
     
 def unitsConvertible(x: pq.Quantity, y: pq.Quantity) -> bool:
-    """Checks that the units of python Quantities x and y are identical or convertible to each other.
+    r"""Checks that the units of python Quantities x and y are identical or convertible to each other.
     NOTE: To check that x and y have IDENTICAL units simply call 'x.units == y.units'
     """
     if not isinstance(x, (pq.Quantity, pq.UnitQuantity)):
@@ -1044,7 +1044,7 @@ def unitsConvertible(x: pq.Quantity, y: pq.Quantity) -> bool:
     return x._reference.dimensionality == y._reference.dimensionality
 
 def checkRescale(x: pq.Quantity, y: pq.Quantity) -> pq.Quantity:
-    """Checks that units of `x` are convertible to units of `y`.
+    r"""Checks that units of `x` are convertible to units of `y`.
     
     Returns `x` rescaled to units of `y`, or raises AssertionError if `x` units 
     and `y` units are not convertible to each other (or not identical)
@@ -1083,13 +1083,13 @@ def unitQuantityFromNameOrSymbol(s):
         return ret
         
 def nSamples(t:pq.Quantity, s:pq.Quantity) -> int:
-    """Returns the number of samples in a time interval `t` for sampling rate `s`"""
+    r"""Returns the number of samples in a time interval `t` for sampling rate `s`"""
     assert isinstance(t, pq.Quantity) and checkTimeUnits(t), f"{t} should be a time quantity (i.e. a 'duration')"
     assert isinstance(s, pq.Quantity) and checkTimeUnits(1./s), f"sampling rate {s} is not a frequency quantity"
     return int(t.rescale(pq.s) * s.rescale(pq.Hz))
     
 class QuantityDescriptorValidator(BaseDescriptorValidator):
-    """Descriptor validator for Python quantities, to be used in dataclass types"""
+    r"""Descriptor validator for Python quantities, to be used in dataclass types"""
     def __init__(self, name:str, default = dataclasses.MISSING,
                  default_factory = dataclasses.MISSING, 
                  validator:typing.Optional[types.FunctionType]=None):
@@ -1171,7 +1171,7 @@ class QuantityDescriptorValidator(BaseDescriptorValidator):
             self.validator = dataclasses.MISSING
             
     def __get__(self, obj, objtype=None) -> object:
-        """Implements access to a data descriptor value (attribute access).
+        r"""Implements access to a data descriptor value (attribute access).
         Customized to resolve to a default factory function for the Python's
         dataclass mechanism.
         
@@ -1196,7 +1196,7 @@ class QuantityDescriptorValidator(BaseDescriptorValidator):
         return ret
         
     def validate(self, value):
-        """"""
+        r""""""
         # NOTE: 2024-08-20 11:51:01
         # see ATTENTION 2024-08-20 11:47:59 for why this also accepts a factory
         # function

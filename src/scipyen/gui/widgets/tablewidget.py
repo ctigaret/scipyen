@@ -50,7 +50,7 @@ from core.traitcontainers import (DataBag, DataBagTraitsObserver,)
 # from gui.tableeditor import (TableEditorWidget, TabularDataModel,)
 
 class SimpleTableWidget(TableWidget): # TableWidget imported from pyqtgraph
-    """Another simple table widget, which allows zero-based row/column indices.
+    r"""Another simple table widget, which allows zero-based row/column indices.
     
     gui.widgets.tableeditorwidget.TableEditorWidget does that too, and more, but is too slow. 
     
@@ -86,7 +86,7 @@ class SimpleTableWidget(TableWidget): # TableWidget imported from pyqtgraph
             
         
     def iterFirstAxis(self, data):
-        """Overrides TableWidget.iterFirstAxis.
+        r"""Overrides TableWidget.iterFirstAxis.
         
         Avoid exceptions when data is a dimesionless array.
         

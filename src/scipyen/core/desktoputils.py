@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""Utilities for Linux desktop integration
+r"""Utilities for Linux desktop integration
 """
 # ### BEGIN internal comments
 # NOTE: 2025-01-03 17:37:47
@@ -183,7 +183,7 @@ def isUnixSystemLocation(p:typing.Union[pathlib.Path, QtCore.QUrl, str]) -> bool
 
 @dataclass
 class DEPlace():
-    """Stand-in for PlacesItem - use in UrlNavigator in the absence of PlacesModel
+    r"""Stand-in for PlacesItem - use in UrlNavigator in the absence of PlacesModel
         Or as backend to PlacesItem
     """
     name:str
@@ -293,7 +293,7 @@ except:
     #     pass
     
 def get_wm():
-    """Retrieves the name of the window manager, on Linux platforms.
+    r"""Retrieves the name of the window manager, on Linux platforms.
     On any other platforms returns None.
     Somewhat redundant to get_desktop()
     """
@@ -347,7 +347,7 @@ def get_wm():
             return wm
 
 def get_desktop(what:str="desktop"):
-    """Somewhat redundant to get_wm()
+    r"""Somewhat redundant to get_wm()
     """
     if sys.platform.startswith("linux"):
         if what == "wm":
@@ -363,7 +363,7 @@ def get_desktop(what:str="desktop"):
         return sys.platform
 
 def get_cloud_storage_path(service_name):
-    """Retrieves the local path for a specified cloud storage service.
+    r"""Retrieves the local path for a specified cloud storage service.
     WARNING: Work in progress, DO NOT USE
     Original code at https://tech-champion.com/programming/python-programming/finding-your-onedrive-path-in-python-a-practical-guide/"""
     config_paths = {
@@ -399,7 +399,7 @@ def get_cloud_storage_path(service_name):
 # print(get_cloud_storage_path("dropbox"))
 
 def get_dbus_service_names(what:str="session"):
-    """
+    r"""
     what: one of "session", "system"
     """
     if platform.system() != "Linux":
@@ -438,7 +438,7 @@ def is_kde():
     return get_desktop("session").lower() in ("x11", "wayland") and get_desktop() == "KDE"
 
 def get_local_filesystem_places(placesDict:typing.Optional[dict]=None) -> dict:
-    """
+    r"""
     Get special directories (KDE Plasma5/6 specific)
     """
     if not isinstance(placesDict, dict):
@@ -504,7 +504,7 @@ def get_system_terminal_executable():
         warnings.warn(f"{sys.platform} platform is not yet supported")
         
 def get_standard_desktop_places(all_folder_icons:bool=False) -> PlacesMap:
-    """Platform-independent Desktop places.
+    r"""Platform-independent Desktop places.
     These are defined in the Qt toolkit
     """
     locations = tuple(map(lambda x: StandardLocationInfo(getattr(QtCore.QStandardPaths, x[0]), standardIconName(x[0], all_folder_icons)), StandardDesktopLocationsQt))
@@ -539,7 +539,7 @@ def get_desktop_places(schema:typing.Optional[str]=None,
                        include_hidden:bool=False, 
                        include_system:bool=True,
                        intKeys:bool=False) -> PlacesMap:
-    """Collect user places as defined in the freedesktop.org XDG framework.
+    r"""Collect user places as defined in the freedesktop.org XDG framework.
     Useful for xdg-compliant Linux desktops.
     
     Returns:
@@ -890,7 +890,7 @@ def get_desktop_places(schema:typing.Optional[str]=None,
 # def get_recent_places(asQUrl:bool=False,
 #                        intKeys:bool=True) -> BookmarksMap:
 def get_recent_places(intKeys:bool=True) -> BookmarksMap:
-    """Collect recent places as defined in the freedesktop.org XDG framework.
+    r"""Collect recent places as defined in the freedesktop.org XDG framework.
     Useful for Linux desktops that comply with XDG (e.g. KDE, GNOME, XFCE, LXDE, etc).
     
     Returns:
@@ -1062,75 +1062,6 @@ def iconNameForUrl(url:QtCore.QUrl):
         iconName = mimeType.iconName()
         
     return iconName
-
-#     """
-#     Get recently viewed places in the underlying desktop environment.
-#     
-#     NOTE: These are NOT necessarily the recently opened files and directories in 
-#     Scipyen!
-#     
-#     Meaningful only when Scipyen is run inside on a Linux platform with a 
-#     desktop environment that complied with the freedesktop.org XDG specification.
-#     
-#     In all other circumstances, returns an empty dict.
-#     
-#     WARNING: This should be filtered to remove entries pointing to hidden files,
-#     special IO protocols (e.g. "desktop:/", etc) or entries not relevant to 
-#     Scipyen.
-#     
-#     In addition, Scipyen manages its own recently used files, directories and
-#     scripts indepenedently, so there should be no much use for this function
-#     in the day-to-day use.
-#     
-#     """
-#     
-#     # ret = dict()
-#     ret = PlacesMap()
-#     
-#     if sys.platform.startswith("linux") and HAS_PYXDG:
-#         places = pio.loadXMLFile(os.path.join(xdg.BaseDirectory.xdg_data_home, "recently-used.xbel"))
-#             
-#         if "xbel" not in places.documentElement.tagName.lower():
-#             return ret
-#         
-#         bookmarks = places.getElementsByTagName("bookmark")
-#         
-#         for b in places.getElementsByTagName("bookmark"):
-#             place_url   = b.getAttribute("href")
-#             modified    = b.getAttribute("modified")
-#             visited     = b.getAttribute("visited")
-#             added       = b.getAttribute("added")
-#             
-#             info_node = b.getElementsByTagName("info")[0]
-#             info_metadata_nodes = info_node.getElementsByTagName("metadata")
-#             
-#             if len(info_metadata_nodes) == 0:
-#                 continue
-#             
-#             info_metadata_node = info_metadata_nodes[0]
-#             
-#             place_mime_type = info_metadata_node.getElementsByTagName("mime:mime-type")[0].getAttribute("type")
-#             applications_node = info_metadata_node.getElementsByTagName("bookmark:applications")[0]
-#             
-#             application_nodes = applications_node.getElementsByTagName("bookmark:application")
-#             
-#             application_data = list()
-#             
-#             for application_node in application_nodes:
-#                 application_data.append({
-#                                          "count": application_node.getAttribute("count"),
-#                                          "modified": application_node.getAttribute("modified"),
-#                                          "name": application_node.getAttribute("name"),
-#                                          "exec": application_node.getAttribute("exec"),
-#                                          })
-# 
-#             ret[place_url] = {"mimetype": place_mime_type,
-#                               "applications": application_data,
-#                               "added": added, 
-#                               "modified": modified,
-#                               "visited": visited,
-#                               }
-#     return ret
 
 def local_recent_places():
     ret = get_recent_places()

@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""Coroutines and tasks
+r"""Coroutines and tasks
 """
 
 import asyncio, subprocess, signal, sys, os
@@ -40,7 +40,7 @@ def nblaunch(argv=None, **kwargs):
     ##await asyncstart_jupyter_notebook()
     
 def launch_jupyter_notebook(browser:str="firefox", redirect=False):
-    """Launch jupter notebook server as a separate process as if from a shell.
+    r"""Launch jupter notebook server as a separate process as if from a shell.
     """
     # ATTENTION: 2021-01-19 21:56:34
     # all code versions below are syntactically correct; all up to and excluding
@@ -82,7 +82,7 @@ def launch_jupyter_notebook(browser:str="firefox", redirect=False):
         return subprocess.run(("jupyter", "notebook", "--browser", browser))
     
 def launch_jupyter_notebook_popen(browser:str="firefox", redirect=False):
-    """Launch jupter notebook server as a separate process as if from a shell.
+    r"""Launch jupter notebook server as a separate process as if from a shell.
     """
     # NOTE: 2021-01-19 22:08:23
     # Does NOT block; the Popen object is returned immediately.
@@ -103,7 +103,7 @@ def launch_jupyter_notebook_popen(browser:str="firefox", redirect=False):
         return Popen(("jupyter", "notebook", "--browser", browser))
     
 def shutdown_jupyter_notebook_popen(p):
-    """NOTE: REDUNDANT: Can also use p.terminate() to send SIGTERM on all platforms
+    r"""NOTE: REDUNDANT: Can also use p.terminate() to send SIGTERM on all platforms
     """
     if os.name == "nt":
         os.kill(p.pid, signal.CTRL_C_EVENT)
@@ -112,7 +112,7 @@ def shutdown_jupyter_notebook_popen(p):
         #os.kill(p.pid, signal.SIGINT) # interrupt from keyboard
 
 def kill_process_gracefully(p, sig=None):
-    """ Run man 7 signal for what signals are there in Unix
+    r""" Run man 7 signal for what signals are there in Unix
     """
     if not sig:
         if os.name == "nt":

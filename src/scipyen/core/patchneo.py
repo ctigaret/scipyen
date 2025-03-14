@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""Small patches to neo.Epoch and neo.Events
+r"""Small patches to neo.Epoch and neo.Events
 """
 
 #__all__ = ["neo"]
@@ -50,7 +50,7 @@ original ={"neo.core.analogsignal._new_AnalogSignalArray": neo.core.analogsignal
            } 
 
 def _patch_new_neo(original_f, *args, **kwargs):
-    """Workarounds to load pickled neo data created a long time ago..."""
+    r"""Workarounds to load pickled neo data created a long time ago..."""
     # All params in neo's _new_* factory functions are NAMED !!!
     # since this 'patches' _new_* functions, the first element in args is
     # the actual class of the array type being created:

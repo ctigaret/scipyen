@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Widgets for parameter inputs
+r"""Widgets for parameter inputs
 """
 import math, numbers, typing, os
 import numpy as np
@@ -24,7 +24,7 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 #         self.setupUi(self)
 
 class ModelParametersWidget(QtWidgets.QWidget):
-    """A widget composed of labels and spin boxes for input of numeric values
+    r"""A widget composed of labels and spin boxes for input of numeric values
     The child widgets (input field and labels) are arranged in a grid.
     There is support for numerical scalar parameters only, used for model fitting.
 
@@ -64,7 +64,7 @@ class ModelParametersWidget(QtWidgets.QWidget):
     _mandatory_columns_ = ("Initial Value:", "Lower Bound:", "Upper Bound:")
     
     def __init__(self, parent:QtWidgets.QWidget=None, **kwargs):
-        """ Constructor of ModelParametersWidget.
+        r""" Constructor of ModelParametersWidget.
     
             Positional parameters:
             ======================
@@ -239,7 +239,7 @@ class ModelParametersWidget(QtWidgets.QWidget):
         
             
     def getSpinBox(self, paramName:str, value_type:str):
-        """Access the spin box of a numeric parameter initial value, or boundary.
+        r"""Access the spin box of a numeric parameter initial value, or boundary.
         
         Useful to restrict the of values for a particular spin box to a range
         that is both physically and numerically reasonable, AFER the widget has
@@ -291,7 +291,7 @@ class ModelParametersWidget(QtWidgets.QWidget):
     
     @property
     def parameters(self):
-        """A pandas DataFrame with model parameters, lower and upper bounds.
+        r"""A pandas DataFrame with model parameters, lower and upper bounds.
             Follows the widget's orientation
         
         Orientation must be changed BEFORE setting new parameters via the setter
@@ -312,7 +312,7 @@ class ModelParametersWidget(QtWidgets.QWidget):
                                refresh=True)
             
     def setParameters(self, parameters:typing.Sequence, lower=None, upper=None, names=None, refresh = True):
-        """Generates new parameters data frame.
+        r"""Generates new parameters data frame.
         
         The display is refreshed UNLESS refresh is False. The display update
         either changes individual values in the spin boxes (if the new parameters
@@ -573,7 +573,7 @@ class ModelParametersWidget(QtWidgets.QWidget):
                                            self._parameters_.columns[layout_col-1])
             
     def validate(self):
-        """ Always returns True.
+        r""" Always returns True.
         This method is present so that ModelParametersWidget instances can be
         embedded in QuickDialog (which expects widgets with a `validate` method)
         """

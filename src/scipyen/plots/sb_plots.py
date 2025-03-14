@@ -11,7 +11,7 @@ from six import string_types
 
 class SB_CategoricalPlotter(sb.categorical._CategoricalPlotter):
     def categorical_order(self, values, order=None, skip=None):
-        """Return a list of unique data values.
+        r"""Return a list of unique data values.
 
         Determine an ordered list of levels in ``values``.
 
@@ -74,7 +74,7 @@ class SB_CategoricalPlotter(sb.categorical._CategoricalPlotter):
         return list(order)
 
     def annotate_axes(self, ax, show_legend=True):
-        """Add descriptive labels to an Axes object."""
+        r"""Add descriptive labels to an Axes object."""
         #print("SB_CategoricalPlotter.annotate_axes show_legend", show_legend)
         if self.orient == "v":
             xlabel, ylabel = self.group_label, self.value_label
@@ -118,7 +118,7 @@ class SB_CategoricalPlotter(sb.categorical._CategoricalPlotter):
                     leg._legend_title_box._text.set_font_properties(prop)
     
     def add_legend_data(self, ax, color, label):
-        """Add a dummy patch object so we can get legend data."""
+        r"""Add a dummy patch object so we can get legend data."""
         rect = plt.Rectangle([0, 0], 0, 0,
                              linewidth=self.linewidth / 2,
                              edgecolor=self.gray,
@@ -129,7 +129,7 @@ class SB_CategoricalPlotter(sb.categorical._CategoricalPlotter):
     def establish_variables(self, x=None, y=None, hue=None, data=None,
                             orient=None, order=None, hue_order=None,
                             skip = None, units=None):
-        """Convert input specification into a common representation."""
+        r"""Convert input specification into a common representation."""
         from seaborn._core import infer_orient
         # Option 1:
         # We are plotting a wide-form dataset
@@ -335,14 +335,14 @@ class SB_CategoricalPlotter(sb.categorical._CategoricalPlotter):
         self.plot_units = plot_units
 
 class SB_CategoricalStatPlotter(SB_CategoricalPlotter):
-    """Seaborn's CategoricalPlotter variant allowing custom statistics.
+    r"""Seaborn's CategoricalPlotter variant allowing custom statistics.
     For now, accepts ci as "se" in adddition to Seaborn's options, which are:
     float, "sd" and None; float indicates the confidence interval, 95% by default
     """
     
     @property
     def nested_width(self):
-        """A float with the width of plot elements when hue nesting is used."""
+        r"""A float with the width of plot elements when hue nesting is used."""
         if self.dodge:
             width = self.width / len(self.hue_names)
         else:
@@ -378,7 +378,7 @@ class SB_CategoricalStatPlotter(SB_CategoricalPlotter):
                             color=color, **kws)
 
     def estimate_statistic(self, estimator, ci, n_boot):
-        """Also accepts ci given as "se"
+        r"""Also accepts ci given as "se"
         """
         from seaborn import utils
         from seaborn.utils import remove_na
@@ -505,7 +505,7 @@ class SB_BarPlotter(SB_CategoricalStatPlotter):
                  estimator, ci, n_boot, units,
                  orient, color, palette, saturation, errcolor,
                  errwidth, capsize, dodge, bar_width):
-        """Initialize the plotter."""
+        r"""Initialize the plotter."""
         self.dodge              = dodge
 
         self.errcolor           = errcolor
@@ -522,7 +522,7 @@ class SB_BarPlotter(SB_CategoricalStatPlotter):
 
 
     def draw_bars(self, ax, kws):
-        """Draw the bars onto `ax`."""
+        r"""Draw the bars onto `ax`."""
         # Get the right matplotlib function depending on the orientation
         barfunc = ax.bar if self.orient == "v" else ax.barh
         barpos = np.arange(len(self.statistic))
@@ -564,7 +564,7 @@ class SB_BarPlotter(SB_CategoricalStatPlotter):
                                        self.capsize)
 
     def plot(self, ax, bar_kws):
-        """Make the plot."""
+        r"""Make the plot."""
         show_legend = bar_kws.pop("show_legend", True)
         #print("SB_BarPlotter.plot show_legend", show_legend)
         self.draw_bars(ax, bar_kws)
@@ -575,12 +575,12 @@ class SB_BarPlotter(SB_CategoricalStatPlotter):
 class SB_PointPlotter(SB_CategoricalStatPlotter):
     default_palette = "dark"
 
-    """Show point estimates and confidence intervals with (joined) points."""
+    r"""Show point estimates and confidence intervals with (joined) points."""
     def __init__(self, x, y, hue, data, order, hue_order,
                  estimator, ci, n_boot, units,
                  markers, linestyles, dodge, join, scale,
                  orient, color, palette, errwidth=None, capsize=None):
-        """Initialize the plotter."""
+        r"""Initialize the plotter."""
         self.establish_variables(x, y, hue, data, orient,
                                  order, hue_order, units)
         self.establish_colors(color, palette, 1)
@@ -617,7 +617,7 @@ class SB_PointPlotter(SB_CategoricalStatPlotter):
 
     @property
     def hue_offsets(self):
-        """Offsets relative to the center position for each hue level."""
+        r"""Offsets relative to the center position for each hue level."""
         if self.dodge:
             offset = np.linspace(0, self.dodge, len(self.hue_names))
             offset -= offset.mean()
@@ -626,7 +626,7 @@ class SB_PointPlotter(SB_CategoricalStatPlotter):
         return offset
 
     def draw_points(self, ax):
-        """Draw the main data components of the plot."""
+        r"""Draw the main data components of the plot."""
         from seaborn.utils import remove_na
         # Get the center positions on the categorical axis
         pointpos = np.arange(len(self.statistic))
@@ -715,7 +715,7 @@ class SB_PointPlotter(SB_CategoricalStatPlotter):
                            zorder=z)
 
     def plot(self, ax):
-        """Make the plot."""
+        r"""Make the plot."""
         self.draw_points(ax)
         self.annotate_axes(ax)
         if self.orient == "h":
@@ -726,7 +726,7 @@ class SB_PointPlotter(SB_CategoricalStatPlotter):
 #               jitter=True, dodge=False, orient=None, color=None, palette=None,
 #               size=5, edgecolor="gray", linewidth=0, ax=None, 
 #               alpha=1, **kwargs):
-#     """Adapted from seaborn.stripplot
+#     r"""Adapted from seaborn.stripplot
 #     
 #     Additional keyword arguments:
 #     ----------------------------
@@ -820,7 +820,7 @@ def barplot_sb(*args, x=None, y=None, hue=None, data=None, order=None,
                errcolor="0", errwidth=None, capsize=None, dodge=True,
                ax=None, overlay_stripplot=True, axes_offset=0, despine=True,
                tick_direction="in", **kwargs):
-    """
+    r"""
     Show point estimates and confidence intervals as rectangular bars.
     
     Modified verison of Seaborn barplot, that allows to:
@@ -1013,7 +1013,7 @@ def catplot_sb(x=None, y=None, hue=None, data=None, row=None, col=None,
             despine=True, tick_direction="in",
             legend=True, legend_out=True, sharex=True, sharey=True,
             margin_titles=False, facet_kws=None, dropna=False, **kwargs):
-    """Seaborn catlpot adapted to accept se as ci and other arguments.
+    r"""Seaborn catlpot adapted to accept se as ci and other arguments.
     
     Keyword arguments :
     ------------------
@@ -1183,7 +1183,7 @@ def pointplot_sb(x=None, y=None, hue=None, data=None, order=None, hue_order=None
               orient=None, color=None, palette=None, saturation=.75,
               errcolor="0", errwidth=None, overlay_stripplot=True, despine=True,
               axes_offset=0, capsize=None, ax=None, **kwargs):
-    """
+    r"""
     Keyword arguments :
     ------------------
     ci: in addition to the accepted values for seaborn.barplot, it can also be 

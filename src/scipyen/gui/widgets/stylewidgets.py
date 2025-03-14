@@ -1,4 +1,4 @@
-"""Style widgets
+r"""Style widgets
 """
 
 import array, os, typing, numbers
@@ -198,7 +198,7 @@ class PenComboDelegate(QtWidgets.QAbstractItemDelegate):
             return QtCore.QSize(50, option.fontMetrics.height() + 2 * self.LayoutMetrics.FrameMargin)
     
 class PenComboBox(QtWidgets.QComboBox):
-    """Use to select a QPen stroke, cap or join style
+    r"""Use to select a QPen stroke, cap or join style
     See:
       qt examples/widgets/painting/pathstroke
       qt examples/widgets/painting/pinterpaths
@@ -427,7 +427,7 @@ class PenComboBox(QtWidgets.QComboBox):
             
     @property
     def value(self):
-        """Returns a QPen stroke style, cap style or join style, depending on 
+        r"""Returns a QPen stroke style, cap style or join style, depending on 
         which styling has been used to initialize this instance of PenComboBox
         """
         return self._internalStyle
@@ -529,7 +529,7 @@ class BrushComboDelegate(QtWidgets.QAbstractItemDelegate):
         return QtCore.QSize(50, option.fontMetrics.height() + 2 * self.LayoutMetrics.FrameMargin)
     
 class BrushComboBox(QtWidgets.QComboBox):
-    """Selection of brush styles, texture and gradients, including custom ones.
+    r"""Selection of brush styles, texture and gradients, including custom ones.
 
     For brush gradients see 
       qt examples/widgets/painting/gradients
@@ -599,7 +599,7 @@ class BrushComboBox(QtWidgets.QComboBox):
         
     @property
     def value(self):
-        """Returns a QBrush
+        r"""Returns a QBrush
         """
         return self._brush
         

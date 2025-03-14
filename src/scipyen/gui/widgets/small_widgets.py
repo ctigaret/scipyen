@@ -19,7 +19,7 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 Ui_QuantityChooserWidget, QWidget = loadUiType(os.path.join(__module_path__, "quantitychooserwidget.ui"))
 
 class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
-    """Compound widget allowing the user to choose a physical dimensionality.
+    r"""Compound widget allowing the user to choose a physical dimensionality.
     Convenience UI elements to attach quantities to various numeric variables.
     
     By default, the user is prompted to select a unit quantity from one of several
@@ -30,7 +30,7 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
     unitChanged = Signal(object, name="unitChanged")
     
     def __init__(self, parent:typing.Optional[QtWidgets.QWidget]=None, unit:typing.Optional[pq.Quantity]=None, unitFamily:typing.Optional[str]=None):
-        """
+        r"""
         Named parameters:
         =================
         parent:     the parent QWidget; optional, default is None
@@ -130,7 +130,7 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
         self._currentFamilyUnits = list(combo_units)
         
     def _setupFamilyCombo(self):
-        """Called by _configureUI_ but also when manually setting the units family
+        r"""Called by _configureUI_ but also when manually setting the units family
         """
         signalBlocker = QtCore.QSignalBlocker(self.unitFamilyComboBox)
         self.unitFamilyComboBox.clear()
@@ -142,7 +142,7 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
             self._currentUnitsFamily = self._unitFamilies[self.unitFamilyComboBox.currentIndex()]
         
     def _setupUnitCombo(self):
-        """Called by _configureUI_ but also when manually setting up a unit
+        r"""Called by _configureUI_ but also when manually setting up a unit
         """
         self._generateCurrentFamilyUnits()
         signalBlocker = QtCore.QSignalBlocker(self.unitComboBox)
@@ -219,17 +219,17 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
                     self._currentUnit = self._currentUnitsFamily[unit_index_in_family]
                 
     def value(self):
-        """For compatibilty with qd.QuickDialog"""
+        r"""For compatibilty with qd.QuickDialog"""
         return self.currentUnit
     
     def setValue(self, value:typing.Optional[pq.Quantity]=None):
-        """For compatibilty with qd.QuickDialog"""
+        r"""For compatibilty with qd.QuickDialog"""
         if value is None:
             value = pq.dimensionless
         self.currentUnit = value
         
     def validate(self):
-        """For compatibilty with qd.QuickDialog"""
+        r"""For compatibilty with qd.QuickDialog"""
         return True
     
     def restrictToUnitFamily(self, value:typing.Optional[str]=None):
@@ -239,7 +239,7 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
         
 
 class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
-    """Subclass of QDoubleSpinBox aware of Python quantities.
+    r"""Subclass of QDoubleSpinBox aware of Python quantities.
     Single step, number of decimals and units suffix are all configurable.
         
     Most methods are inherited directly from QDoubleSpinBox, with the following
@@ -265,7 +265,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         
     
     def __init__(self, parent:typing.Optional[QtWidgets.QWidget]=None, units:typing.Optional[pq.Quantity]=None, unitsFamily:typing.Optional[str]=None, singleStep:typing.Optional[float]=None, decimals:typing.Optional[int]=None):#, minimum:typing.Optional[typing.Union[pq.Quantity, float]]=None, maximum:typing.Optional[typing.Union[pq.Quantity, float]]=None):
-        """
+        r"""
         Named parameters:
         =================
         parent: parent widget; optional, default is None
@@ -356,7 +356,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         cm.popup(self.mapToGlobal(evt.pos()))
         
     def setMinimum(self, value:typing.Optional[typing.Union[float, pq.Quantity]]=None):
-        """Overloads QDoubleSpinBox.setMinimum, to accept:
+        r"""Overloads QDoubleSpinBox.setMinimum, to accept:
         • a None
         • a float
         • a scalar Quantity
@@ -378,7 +378,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             self.units = units
         
     def setMaximum(self, value:typing.Optional[typing.Union[float, pq.Quantity]]=None):
-        """Overloads QDoubleSpinBox.setMaximum, to accept:
+        r"""Overloads QDoubleSpinBox.setMaximum, to accept:
         • a None
         • a float
         • a scalar Quantity
@@ -400,7 +400,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             self.units = units
             
     def setRange(self, minimum:typing.Optional[typing.Union[float, pq.Quantity]]=None, maximum:typing.Optional[typing.Union[float, pq.Quantity]]=None):
-        """Overloads QDoubleSpinBox.setRange to accept:
+        r"""Overloads QDoubleSpinBox.setRange to accept:
         • floats
         • scalar Quantity
         • None
@@ -475,7 +475,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
     # def decimals(self)d
     
     def value(self):
-        """ Reimplements QDoubleSpinBox.value() to return a quantity
+        r""" Reimplements QDoubleSpinBox.value() to return a quantity
         """
         # NOTE: use NA as a volatile; once we've moved away from it we're done
         # by the way, one can only move away from NA by entering a numeric value 
@@ -537,7 +537,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         return ret
         
     def setValue(self, value:typing.Union[pq.Quantity, float, type(pd.NA)]):
-        """Also allows changing the units if not convertible to current ones.
+        r"""Also allows changing the units if not convertible to current ones.
         Otherwise the value will be rescales to current units.
         """
         # print(f"{self.__class__.__name__}.setValue({value})")

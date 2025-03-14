@@ -69,7 +69,7 @@ def _new_IrregularlySampledDataSignal(cls, domain, signal, units=None, domain_un
 
 
 class DataSignal(BaseSignal):
-    """A "generic" neo.AnalogSignal with domain not restricted to time.
+    r"""A "generic" neo.AnalogSignal with domain not restricted to time.
     
     Very much modeled after neo.AnalogSignal
     """
@@ -196,7 +196,7 @@ class DataSignal(BaseSignal):
     
     def __init__(self, signal, units=None, domain_units = None, time_units = None, dtype=None, copy=True, t_start=0*pq.dimensionless, sampling_rate=None, sampling_period=None, name=None, domain_name = None, file_origin=None, description=None, array_annotations=None, **annotations):
         
-        """DataSignal constructor.
+        r"""DataSignal constructor.
         """
         # ATTENTION: __init__ is called AFTER __new__ so `self` is already 
         # partly initialized here !!!
@@ -562,7 +562,7 @@ class DataSignal(BaseSignal):
     
     @property
     def origin(self):
-        """The domain coordinate of the first data sample in the signal.
+        r"""The domain coordinate of the first data sample in the signal.
         
         A convenience equivalent of neo.AnalogSignal.t_start
         """
@@ -584,19 +584,19 @@ class DataSignal(BaseSignal):
     
     @property
     def domain_begin(self):
-        """Alias to self.origin
+        r"""Alias to self.origin
         """
         return self.origin
     
     @property
     def domain_end(self):
-        """Alias to self.t_stop, which is an alias to self.domain[-1]
+        r"""Alias to self.t_stop, which is an alias to self.domain[-1]
         """
         return self.origin + self.extent
     
     @property
     def t_start(self):
-        """The domain coordinate of the first data sample in the signal.
+        r"""The domain coordinate of the first data sample in the signal.
         Alias to self.origin; convenience equivalent of neo.AnalogSignal.t_start
         
         """
@@ -604,7 +604,7 @@ class DataSignal(BaseSignal):
     
     @property
     def t_stop(self):
-        """The domain coordinate of the last data sample in the signal.
+        r"""The domain coordinate of the last data sample in the signal.
         Read-only; alias to self.domain_end
         A convenience equivalent of neo.AnalogSignal.t_stop
         """
@@ -659,7 +659,7 @@ class DataSignal(BaseSignal):
             
     @property
     def extent(self):
-        """The extent of the data domain of the signal, as a quantity.
+        r"""The extent of the data domain of the signal, as a quantity.
         
         Also the equivalent of neo.AnalogSignal.duration property. Read-only.
         
@@ -671,7 +671,7 @@ class DataSignal(BaseSignal):
     
     @property
     def end(self):
-        """The equivalent of neo.AnalogSignal.t_stop
+        r"""The equivalent of neo.AnalogSignal.t_stop
         """
         return self.origin + self.extent
     
@@ -686,7 +686,7 @@ class DataSignal(BaseSignal):
     
     @property
     def domain_name(self):
-        """A brief description of the domain name
+        r"""A brief description of the domain name
         """
         if self._domain_name_ is None:
             self._domain_name_ = nameFromUnit(self.domain)
@@ -701,19 +701,19 @@ class DataSignal(BaseSignal):
             
     @property
     def extent(self):
-        """The extent of this signal in its domain
+        r"""The extent of this signal in its domain
         """
         return self.shape[0] / self.sampling_rate
     
     @property
     def duration(self):
-        """Alias to self extent
+        r"""Alias to self extent
         """
         return self.extent
     
     @property
     def domain(self):
-        """The domain for the data samples in the signal.
+        r"""The domain for the data samples in the signal.
         
         Equivalent to neo.AnalogSignal.times. Read-only.
         
@@ -729,7 +729,7 @@ class DataSignal(BaseSignal):
     
     @property
     def times(self):
-        """The domain for the data samples in the signal.
+        r"""The domain for the data samples in the signal.
         Alias to self.domain
         
         Provided for api compatibility with neo.AnalogSignal
@@ -749,7 +749,7 @@ class DataSignal(BaseSignal):
         return new_signal
     
     def time_index(self, t):
-        """Copied from neo.AnalogSignal"""
+        r"""Copied from neo.AnalogSignal"""
         i = (t - self.t_start) * self.sampling_rate
         i  = np/rint(i.simplified.magitude).astype(np.int64)
         
@@ -759,7 +759,7 @@ class DataSignal(BaseSignal):
         return self.time_index(x)
 
     def as_array(self, units=None):
-        """
+        r"""
         Return the signal as a plain NumPy array.
 
         If `units` is specified, first rescale to those units.
@@ -770,13 +770,13 @@ class DataSignal(BaseSignal):
             return self.magnitude
 
     def as_quantity(self):
-        """
+        r"""
         Return the signal as a quantities array.
         """
         return self.view(pq.Quantity)
     
     def rescale(self, units):
-        """Return a copy of the DataSignal object converted to specified units.
+        r"""Return a copy of the DataSignal object converted to specified units.
         
         """
         to_dims = pq.quantity.validate_dimensionality(units)
@@ -910,7 +910,7 @@ class DataSignal(BaseSignal):
         return obj
     
     def time_slice(self, start, stop):
-        """Calls self.interval(start, stop).
+        r"""Calls self.interval(start, stop).
         
         Provided for api compatibility with neo.AnalogSignal
         """
@@ -980,7 +980,7 @@ class DataSignal(BaseSignal):
         return signal
 
     def downsample(self, downsampling_factor, **kwargs):
-        """
+        r"""
         Downsample the data of a signal.
         This method reduces the number of samples of the AnalogSignal to a fraction of the
         original number of samples, defined by `downsampling_factor`.
@@ -1023,7 +1023,7 @@ class DataSignal(BaseSignal):
         return downsampled_signal
 
     def resample(self, sample_count, **kwargs):
-        """
+        r"""
         Resample the data points of the signal.
         This method interpolates the signal and returns a new signal with a fixed number of
         samples defined by `sample_count`.
@@ -1069,7 +1069,7 @@ class DataSignal(BaseSignal):
         return resampled_signal
 
     def rectify(self, **kwargs):
-        """
+        r"""
         Rectify the signal.
         This method rectifies the signal by taking the absolute value.
         This method is a wrapper of numpy.absolute() and accepts the same set of keyword
@@ -1097,7 +1097,7 @@ class DataSignal(BaseSignal):
         return rectified_signal
 
     def concatenate(self, *signals, overwrite:bool=False, padding:bool=False):
-        """
+        r"""
         Concatenate multiple DataSignal objects across the domain axis.
 
         Units, sampling_rate and number of signal traces must be the same
@@ -1230,7 +1230,7 @@ class DataSignal(BaseSignal):
         return new_ranges
 
 class IrregularlySampledDataSignal(BaseSignal):
-    """Almost literal copy of the neo.IrregularlySampledSignal, accepting a domain other than time
+    r"""Almost literal copy of the neo.IrregularlySampledSignal, accepting a domain other than time
     """
     _parent_objects = ('Segment',)
     _parent_attrs = ('segment',)
@@ -1388,7 +1388,7 @@ class IrregularlySampledDataSignal(BaseSignal):
         return obj
                 
     def __init__(self, domain, signal, units=None, domain_units=None, time_units=None, dtype=None, domain_dtype=None, domain_name=None, copy=True, name=None, file_origin=None, description=None,array_annotations=None, **annotations):
-        """IrregularlySampledDataSignal constructor
+        r"""IrregularlySampledDataSignal constructor
         Similar to the neo.IrregularlySampledSignal but not restricted to the 
         time domain.
     
@@ -1736,7 +1736,7 @@ class IrregularlySampledDataSignal(BaseSignal):
     
     # def mean(self, axis:typing.Optional[int] = None, interpolation:bool=None):
     def mean(self, interpolation:bool=None):
-        """
+        r"""
         TODO interpolation
         """
         if interpolation is None:
@@ -1745,7 +1745,7 @@ class IrregularlySampledDataSignal(BaseSignal):
             raise NotImplementedError
         
     def nanmean(self, interpolation=None):
-        """
+        r"""
         TODO: Interpolation
         """
         if interpolation is None:
@@ -1755,7 +1755,7 @@ class IrregularlySampledDataSignal(BaseSignal):
             raise NotImplementedError
 
     def resample(self, sample_count, **kwargs):
-        """
+        r"""
         Resample the data points of the signal.
         This method interpolates the signal and returns a new signal with a fixed number of
         samples defined by `sample_count`.
@@ -1818,7 +1818,7 @@ class IrregularlySampledDataSignal(BaseSignal):
         raise NotImplementedError
     
     def time_shift(self, t_shift):
-        """
+        r"""
         Shifts a :class:`IrregularlySampledSignal` to start at a new time.
 
         Parameters:
@@ -1858,7 +1858,7 @@ class IrregularlySampledDataSignal(BaseSignal):
     
     @property
     def t_start(self):
-        """The domain coordinate of the first data sample in the signal.
+        r"""The domain coordinate of the first data sample in the signal.
         A convenience equivalent of neo.AnalogSignal.t_start
         
         Read-only
@@ -1868,7 +1868,7 @@ class IrregularlySampledDataSignal(BaseSignal):
     
     @property
     def t_stop(self):
-        """The domain coordinate of the last data sample in the signal.
+        r"""The domain coordinate of the last data sample in the signal.
         
         A convenience equivalent of neo.AnalogSignal.t_stop
         
@@ -1886,7 +1886,7 @@ class IrregularlySampledDataSignal(BaseSignal):
     
     @property
     def extent(self):
-        """The extent of the data domain of the signal, as a quantity.
+        r"""The extent of the data domain of the signal, as a quantity.
         
         Also the equivalent of neo.AnalogSignal.duration property. Read-only.
         
@@ -1902,7 +1902,7 @@ class IrregularlySampledDataSignal(BaseSignal):
     
     @property
     def end(self):
-        """The equivalent of neo.AnalogSignal.t_stop
+        r"""The equivalent of neo.AnalogSignal.t_stop
         """
         return self.domain[0] + self.extent
     
@@ -1917,7 +1917,7 @@ class IrregularlySampledDataSignal(BaseSignal):
     
     @property
     def domain_name(self):
-        """A brief description of the domain name
+        r"""A brief description of the domain name
         """
         if self._domain_name_ is None:
             self._domain_name_ = nameFromUnit(self.domain) if isinstance(self.domain, pq.Quantity) else "Dimensionless"
@@ -1931,7 +1931,7 @@ class IrregularlySampledDataSignal(BaseSignal):
     
     @property
     def domain(self):
-        """The domain coordinate for the data samples in the signal.
+        r"""The domain coordinate for the data samples in the signal.
         
         Equivalent to neo.AnalogSignal.times. 
         
@@ -1968,7 +1968,7 @@ class IrregularlySampledDataSignal(BaseSignal):
     
     @property
     def times(self):
-        """The domain coordinate for the data samples in the signal.
+        r"""The domain coordinate for the data samples in the signal.
         
         Provided for api compatibility with neo.AnalogSignal
         
@@ -1994,7 +1994,7 @@ class IrregularlySampledDataSignal(BaseSignal):
         return new_signal
 
     def as_array(self, units=None):
-        """
+        r"""
         Return the signal as a plain NumPy array.
 
         If `units` is specified, first rescale to those units.
@@ -2005,13 +2005,13 @@ class IrregularlySampledDataSignal(BaseSignal):
             return self.magnitude
 
     def as_quantity(self):
-        """
+        r"""
         Return the signal as a quantities array.
         """
         return self.view(pq.Quantity)
     
     def rescale(self, units):
-        """Return a copy of the DataSignal object converted to specified units.
+        r"""Return a copy of the DataSignal object converted to specified units.
         
         """
         to_dims = pq.quantity.validate_dimensionality(units)
@@ -2140,7 +2140,7 @@ class IrregularlySampledDataSignal(BaseSignal):
         return obj
     
     def time_slice(self, start, stop):
-        """Calls self.interval(start, stop).
+        r"""Calls self.interval(start, stop).
         
         Provided for api compatibility with neo.AnalogSignal
         """

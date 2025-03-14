@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 
-"""Initialization code to use NEURON environment with external IPython kernels.
+r"""Initialization code to use NEURON environment with external IPython kernels.
 To be used on the "host" side (i.e. executed by the external kernel)
 
 Should NOT be imported in Scipyen or its internal IPython console; instead, its

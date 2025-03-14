@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""Defines magics for the Scipyen's internal IPython
+r"""Defines magics for the Scipyen's internal IPython
 """
 import os, warnings, keyword
 import confuse
@@ -18,7 +18,7 @@ class ScipyenMagics(Magics):
     @line_magic
     @needs_local_scope
     def exit(self, line, local_ns):
-        """%exit line magic
+        r"""%exit line magic
         """
         #if "mainWindow" in local_ns and isinstance(local_ns["mainWindow"], ScipyenWindow):
         if "mainWindow" in local_ns and local_ns["mainWindow"].__class__.__name__ == "ScipyenWindow":
@@ -29,7 +29,7 @@ class ScipyenMagics(Magics):
     @line_magic
     @needs_local_scope
     def quit(self, line, local_ns):
-        """%exit line magic
+        r"""%exit line magic
         """
         #if "mainWindow" in local_ns and isinstance(local_ns["mainWindow"], ScipyenWindow):
         if "mainWindow" in local_ns and local_ns["mainWindow"].__class__.__name__ == "ScipyenWindow":
@@ -40,7 +40,7 @@ class ScipyenMagics(Magics):
     @line_magic
     @needs_local_scope
     def external_ipython(self, line, local_ns):
-        """%external_ipython magic launches a separate Jupyter Qt Console process
+        r"""%external_ipython magic launches a separate Jupyter Qt Console process
         """
         
         #if "mainWindow" in local_ns and isinstance(local_ns["mainWindow"], ScipyenWindow):
@@ -52,7 +52,7 @@ class ScipyenMagics(Magics):
     @line_magic
     @needs_local_scope
     def neuron_ipython(self, line, local_ns):
-        """%neuron_ipython magic launches a separate NEURON Python process
+        r"""%neuron_ipython magic launches a separate NEURON Python process
         """
         
         #if "mainWindow" in local_ns and isinstance(local_ns["mainWindow"], ScipyenWindow):
@@ -96,7 +96,7 @@ class ScipyenMagics(Magics):
     @line_magic
     @needs_local_scope
     def workspace(self, line, local_ns):
-        """%workspace magic returns a reference to the user namespace
+        r"""%workspace magic returns a reference to the user namespace
         
         Alternative function to use in your own codes: 
             core.workspacefunctions.user_workspace()
@@ -107,7 +107,7 @@ class ScipyenMagics(Magics):
     @line_magic
     @needs_local_scope
     def scipyen_debug(self, line, local_ns):
-        """Turn on/off debugging messages in Scipyen code
+        r"""Turn on/off debugging messages in Scipyen code
         
         Calls:
         scipyen_debug => toggles scipyen debugging
@@ -142,7 +142,7 @@ class ScipyenMagics(Magics):
     @line_magic
     @needs_local_scope
     def clear(self, line, local_ns):
-        """Overrides zmq interactive shell 'clear' line magic
+        r"""Overrides zmq interactive shell 'clear' line magic
         This is because in Scipyen with Python 3.10 'clear' clears the system 
         console, NOT Scipyen's console.
         """
@@ -153,7 +153,7 @@ class ScipyenMagics(Magics):
     @line_magic
     @needs_local_scope
     def view(self, line, local_ns):
-        """View the variable named in `line` using appropriate Scipyen viewers.
+        r"""View the variable named in `line` using appropriate Scipyen viewers.
         
         Parameters:
         ==========

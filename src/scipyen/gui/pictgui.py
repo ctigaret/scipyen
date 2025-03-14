@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""
+r"""
     This module contains various generic GUI utilities: mostly dialogues
 """
 # NOTE: 2018-04-15 10:34:03
@@ -150,7 +150,7 @@ class GuiWorker(QtCore.QRunnable):
             self.signals.signal_Finished.emit()  # Done
             
 class ProgressWorkerSignals(QtCore.QObject):
-    """See Martin Fitzpatrick's tutorial on Multithreading PyQt applications with QThreadPool 
+    r"""See Martin Fitzpatrick's tutorial on Multithreading PyQt applications with QThreadPool 
     https://martinfitzpatrick.name/article/multithreading-pyqt-applications-with-qthreadpool/
     
     Defines the signals available from a running worker thread.
@@ -188,7 +188,7 @@ class ProgressWorkerSignals(QtCore.QObject):
                 self.signal_Canceled)
     
 class ProgressWorkerRunnable(QtCore.QRunnable):
-    """
+    r"""
     ProgressWorkerRunnable thread
 
     Inherits from QRunnable to handle worker thread setup, signals and wrap-up.
@@ -215,7 +215,7 @@ class ProgressWorkerRunnable(QtCore.QRunnable):
     # canceled = Signal(name="canceled")
     
     def __init__(self, fn, progressDialog, *args, **kwargs):
-        """
+        r"""
         fn: callable
         progressDialog: QtWidgets.QProgressDialog
         *args, **kwargs are passed to fn
@@ -314,7 +314,7 @@ class MouseEventSink(QtCore.QObject):
         self.close()
         
 class ProgressWorkerThreaded(QtCore.QObject):
-    """Wraps a worker function in a separate QThread.
+    r"""Wraps a worker function in a separate QThread.
         The worker function is typically executing a time-consuming loop (such
         as an iteration through some data, where each cycle involves a time-
         consuming operation).
@@ -328,7 +328,7 @@ class ProgressWorkerThreaded(QtCore.QObject):
     """
     def __init__(self, fn, /, progressDialog:typing.Optional[QtWidgets.QProgressDialog]=None, 
                  loopControl:typing.Optional[dict]=None, *args, **kwargs):
-        """
+        r"""
         fn: callable
         progressDialog: QtWidgets.QProgressDialog
         loopControl:dict with a single mapping: "break" ↦ bool
@@ -397,7 +397,7 @@ class ProgressWorkerThreaded(QtCore.QObject):
             self.signals.signal_Finished.emit()  # Done
         
 class ProgressThreadController(QtCore.QObject):
-    """The problem(s) with this approach:
+    r"""The problem(s) with this approach:
 • the progres dialog's timers would be stopped from another thread, thus generating
         'QObject::killTimer: Timers cannot be stopped from another thread' which 
         may crash Scipyen.
@@ -461,7 +461,7 @@ class ProgressThreadController(QtCore.QObject):
         self.sig_ready.emit(None)
         
 class WorkerThread(QtCore.QThread):
-    """Thread for a generic returning function
+    r"""Thread for a generic returning function
     """
     def __init__(self, parent, fn:typing.Callable, /, *args, **kwargs):
         QtCore.QThread.__init__(self, parent)
@@ -486,7 +486,7 @@ class WorkerThread(QtCore.QThread):
         
         
 class LoopWorkerThread(QtCore.QThread):
-    """Thread for an atomic function call in a loop.
+    r"""Thread for an atomic function call in a loop.
     See https://stackoverflow.com/questions/9957195/updating-gui-elements-in-multithreaded-pyqt/9964621#9964621
     """
     # sig_ready = Signal(object, name="sig_ready")

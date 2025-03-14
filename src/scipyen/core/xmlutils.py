@@ -187,7 +187,7 @@ def getChildren(element, eltype:int=1) -> typing.Generator:
 
 @getChildren.register(xml.dom.minidom.Element)
 def _(element:xml.dom.minidom.Element, eltype:int=1) -> typing.Generator:
-    """"""
+    r""""""
     if eltype not in range(1,13):
         raise ValueError(f"'eltype' expected to be an int in the range 1⋯13; instead, got {eltype}")
     children = element.childNodes
@@ -196,7 +196,7 @@ def _(element:xml.dom.minidom.Element, eltype:int=1) -> typing.Generator:
     
 @getChildren.register(ET.Element)
 def _(element:ET.Element, eltype:int=None) -> typing.Generator:
-    """"""
+    r""""""
     yield from (c for c in element.iter())
         
         # return (c for c in children if c.nodeType == eltype)
@@ -212,7 +212,7 @@ def elementToDict(node, eltype:int = 1):
     return ret
 
 def attributesToDict(node):
-    """Returns a dictionary with the attributes names/values
+    r"""Returns a dictionary with the attributes names/values
     """
     if node.attributes is None:
         return None
@@ -654,7 +654,7 @@ def dictToXMLDocument(data, name=None, maxElements = 10):
     return doc
 
 def composeStringListForXMLElement(tagname, value):
-    """Generates a list with the components of a string representation for an XML element
+    r"""Generates a list with the components of a string representation for an XML element
     
     Parameters:
     ===========

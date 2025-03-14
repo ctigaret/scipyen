@@ -182,7 +182,7 @@ def __ndArray2csv__(data, writer):
         writer.writerow(l)
         
 def is_hidden(filepath:typing.Union[str, pathlib.Path]):
-    """See https://stackoverflow.com/questions/284115/cross-platform-hidden-file-detection
+    r"""See https://stackoverflow.com/questions/284115/cross-platform-hidden-file-detection
     """
     if isinstance(filepath, str):
         name = os.path.basename(os.path.abspath(filepath))
@@ -221,7 +221,7 @@ def concatPaths(path1:typing.Union[str, pathlib.Path], path2:typing.Union[str, p
     return path1 / path2
         
 def loadHDF5File(fName:typing.Union[str, pathlib.Path]):
-    """
+    r"""
     """
     with h5py.File(fName) as h5file:
         try:
@@ -326,7 +326,7 @@ def loadImageFile(fileName:str, asVolume:bool=False, suppress_cpp_warnings=False
 # TODO: diverge onto HDF5, and bioformats handling
 def saveImageFile(data, fileName:typing.Union[str, pathlib.Path], 
                   separateChannels:bool=True):
-    """
+    r"""
     Writes a vigra array to one of the image file formats supported by Vigra
     library
     
@@ -507,7 +507,7 @@ def loadOctave(fileName) -> object:
     raise RuntimeError("Loading of Octave binary files is not yet supported; please convert them to matlab files first")
     
 def loadMatlab(fileName:typing.Union[str, pathlib.Path], **kwargs) -> dict:
-    """Simple wrapper around scipy.io.loadmat.
+    r"""Simple wrapper around scipy.io.loadmat.
     
     Parameters:
     ----------
@@ -535,7 +535,7 @@ def loadMatlab(fileName:typing.Union[str, pathlib.Path], **kwargs) -> dict:
         
     
 def loadCFSmatlab(fileName:typing.Union[str, pathlib.Path]) -> object:
-    """Load CFS data exported from Signal5 as matlab
+    r"""Load CFS data exported from Signal5 as matlab
     CAUTION: under development
     Returns an analog signal (?)
     """
@@ -717,7 +717,7 @@ def loadAxonText(fileName:typing.Union[str, pathlib.Path]) -> object:
     return loadAxonTextFile(fileName)
 
 def loadAxonTextFile(fileName:typing.Union[str, pathlib.Path]) -> object:
-    """Reads the contents of an axon text file.
+    r"""Reads the contents of an axon text file.
     
     Returns:
     -------
@@ -950,7 +950,7 @@ def loadAxon(fileName:typing.Union[str, pathlib.Path],
 def loadAxonFile(fileName:typing.Union[str, pathlib.Path], 
                  create_group_across_segment:typing.Union[bool, dict]=False, 
                  signal_group_mode:typing.Optional[str]="split-all") -> object:
-    """Loads a binary Axon file (*.abf).
+    r"""Loads a binary Axon file (*.abf).
     
     Parameters:
     -----------
@@ -1111,7 +1111,7 @@ def importDataFrame(fileName:typing.Union[str, pathlib.Path]):
         
 @safeWrapper
 def loadPickleFile(fileName:typing.Union[str, pathlib.Path]) -> object:
-    """Loads pickled data.
+    r"""Loads pickled data.
     ATTENTION: 
     Work in progress to enable loading data from pickle files saved with old 
     (pre-git) Scipyen versions where module hierarchies (and paths) have changed.
@@ -1263,7 +1263,7 @@ def segment_to_atf(segment, fileName:typing.Optional[typing.Union[str, pathlib.P
                    skipHeader=True, skipTimes=True, 
                    acquisition_mode="Episodic Stimulation", comment="", 
                    SyncTimeUnits=3.33333):
-    """
+    r"""
     """
     # NOTE: one segment => one sweep!
     
@@ -1374,7 +1374,7 @@ def saveText(s, fileName:typing.Union[str, pathlib.Path]):
 @safeWrapper
 def writeCsv(data, fileName:typing.Optional[typing.Union[str, pathlib.Path]]=None, 
              header=None):
-    """Exports data to a csv (TAB-separated) file
+    r"""Exports data to a csv (TAB-separated) file
     
     data: a column vector or a matrix (np.ndarray)
     
@@ -1565,7 +1565,7 @@ def loadXMLFile(fileName:typing.Union[str, pathlib.Path]) -> object:
     
     
 #"def" loadBinaryFile(fileName, buffered=True):
-    #""" TODO """
+    #r""" TODO """
     #if os.path.isfile(fileName):
         #pass
     #else:
@@ -1575,7 +1575,7 @@ def loadText(fileName:typing.Union[str, pathlib.Path], forceText=False) -> objec
     return loadTextFile(fileName, forceText)
 
 def loadTextFile(fileName:typing.Union[str, pathlib.Path], forceText=False) -> object:
-    """Reads a file as text, returns a string.
+    r"""Reads a file as text, returns a string.
     If the string contains <?xml version and forceText is False the result
     is an xml Document.
     """
@@ -1704,7 +1704,7 @@ def getLoaderForFile(fName:typing.Union[str, pathlib.Path]):
     return ret
 
 def getMimeAndFileType(fileName:typing.Union[str, pathlib.Path]):
-    """Returns the mime type and the file type for the file specified by fileName.
+    r"""Returns the mime type and the file type for the file specified by fileName.
     
     Parameters:
     -----------
@@ -1843,7 +1843,7 @@ def saveHDF5(data, fileName:typing.Union[str, pathlib.Path]):
     
 @safeWrapper
 def save(*args:typing.Optional[typing.Any], name:typing.Optional[str]=None, ws:typing.Optional[dict]=None, mode:str="pkl", **kwargs):
-    """Saves variable(s) in the current working directory.
+    r"""Saves variable(s) in the current working directory.
     WARNING Do not confuse with IPython %save line magic
     TODO adapt to other modes
     """

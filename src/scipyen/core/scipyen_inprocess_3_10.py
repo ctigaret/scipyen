@@ -7,7 +7,7 @@ import asyncio, inspect, sys, time
 from ipykernel.jsonutil import json_clean
 from ipykernel.inprocess.ipkernel import InProcessKernel
 class ScipyenInProcessKernel(InProcessKernel):
-    """Workaround the following exception when using InProcessKernel (see below).
+    r"""Workaround the following exception when using InProcessKernel (see below).
     
     Traceback (most recent call last):
     File "/home/.../scipyenv39/lib64/python3.9/site-packages/tornado/ioloop.py", line 741, in _run_callback
@@ -48,7 +48,7 @@ class ScipyenInProcessKernel(InProcessKernel):
         yield
     
     async def execute_request(self, stream, ident, parent):
-        """handle an execute_request
+        r"""handle an execute_request
         
         Overrides ipykernel.inprocess.ipkernel.InProcessKernel which in turn
         calls ipykernel.kernelbase.Kernel.execute_request, to fix the issue below

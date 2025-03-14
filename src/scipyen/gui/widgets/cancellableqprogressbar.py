@@ -16,7 +16,7 @@ __ui_path__ = adapt_ui_path(__module_path__, "cancellableqprogressbar.ui")
 Ui_CancellableQProgressBar, QWidget = __loadUiType__(__ui_path__)
 
 class CancellableQProgressBar(QWidget, Ui_CancellableQProgressBar):
-    """No frills; just adds a cancel button.
+    r"""No frills; just adds a cancel button.
     Minimal funcitonality; additional code to be implemented (currently, the
     following properties are as per QProgressBar default, and those markes with
     ✓ are accessible here as read-only):

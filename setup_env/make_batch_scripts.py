@@ -64,7 +64,7 @@ def install_precompiled_vigra(vigra_archive:Path, p:Path):
 
 
 def create_virtual_environment(p:Path):
-    """Creates a virtual Python environment at path p.
+    r"""Creates a virtual Python environment at path p.
     Also installs pip requirements
     """
     try:
@@ -127,7 +127,7 @@ def create_virtual_environment(p:Path):
 def check_pyenv(scipyendir:Path, scipyen_sdk_dir:Path,
                 activation_script="scipyact.bat",
                 scripts_dir = "Scripts"):
-    """Check if operating under a python environment.
+    r"""Check if operating under a python environment.
     If not the ask for one and activate it. If one does not exist, create it and
     then activate it.
 
@@ -195,7 +195,7 @@ def check_pyenv(scipyendir:Path, scipyen_sdk_dir:Path,
         return True
 
 def make_user_scripts_dir(name="Scripts"):
-    """Checks if a user scripts directory exists and is in the PATH.
+    r"""Checks if a user scripts directory exists and is in the PATH.
     """
     try:
         scripts_dir = Path(os.getenv("USERPROFILE")) / name
@@ -234,7 +234,7 @@ def make_user_scripts_dir(name="Scripts"):
 def make_sdk_activation_script(scipyendir:Path, scipyenv_dir:Path, scipyen_sdk_dir:Path,
                       script_name="scipyact_vs64.bat",
                       scripts_dir = "Scripts"):
-    """Use this when compiling the SDK yourself
+    r"""Use this when compiling the SDK yourself
     """
     d = Path(os.getenv("USERPROFILE")) / scripts_dir
     if not d.is_dir() or not d.exists():
@@ -261,7 +261,7 @@ def make_sdk_activation_script(scipyendir:Path, scipyenv_dir:Path, scipyen_sdk_d
 def make_activation_script(scipyendir:Path, scipyenv_dir:Path, scipyen_sdk_dir:Path,
                       script_name:str="scipyact.bat",
                       scripts_dir:str = "Scripts"):
-    """Creates convenience activation script for the virtual Python environment
+    r"""Creates convenience activation script for the virtual Python environment
     This is named in script_name and located in scripts_dir which if needed is
     created and added to the user's PATH.
     """
@@ -296,7 +296,7 @@ def make_scipyen_launchers(scipyendir:Path, scipyen_sdk_dir:Path, scipyenv_dir:P
                            scripts_dir:str = "Scripts",
                            link_name:str = "Scipyen.lnk",
                            script_name:str = "scipyen.bat"):
-    """Creates scipyen launcher batch file and a shortcut.
+    r"""Creates scipyen launcher batch file and a shortcut.
     The batch file is located in the %USERPROFILE%/scripts_dir, whereas the
     shortut is created on the Desktop.
     """

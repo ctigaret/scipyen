@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""Module with housekeeping utilities for an external IPython kernel.
+r"""Module with housekeeping utilities for an external IPython kernel.
 
 To be run/imported inside a REMOTE ipython kernel (see extipyutils_client).
 
@@ -74,14 +74,14 @@ class NeuronMagics(Magics):
     @line_magic
     @needs_local_scope
     def nrngui(self, line, local_ns):
-        """Starts NEURON modelling with gui, in this kernel
+        r"""Starts NEURON modelling with gui, in this kernel
         """
         get_ipython().run_line_magic("run", self.nrngui_magic_cmd)
         
     @line_magic
     @needs_local_scope
     def nrnpy(self, line, local_ns):
-        """Starts NEURON modelling (without gui), in this kernel
+        r"""Starts NEURON modelling (without gui), in this kernel
         """
         get_ipython().run_line_magic("run", self.nrnpy_magic_cmd)
         

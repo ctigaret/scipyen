@@ -85,7 +85,7 @@ standard_obj_summary_headers = ["Name","Workspace",
                                 "Address", "Icon"]
 
 GeneralIndexType = typing.Union[str, int, typing.Union[typing.Sequence[str], typing.Sequence[int]], np.ndarray, range, slice, type(MISSING)]
-"""Generic index type, used with normalized_indexed and similar functions"""
+r"""Generic index type, used with normalized_indexed and similar functions"""
 
 class SafeComparator(object):
     # NOTE: 2021-07-28 13:42:07
@@ -201,7 +201,7 @@ def is_NA(x:object)-> bool:
 @singledispatch
 def is_same_as(x, y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, 
                use_math:bool=True, equal_nan:bool=False, comparator = operator.eq) -> bool:
-    """Compares two objects.
+    r"""Compares two objects.
     
     Parameters:
     ----------
@@ -338,7 +338,7 @@ def ideq(x,y) -> bool:
 
 @singledispatch
 def isclose(x:typing.Union[Number, np.ndarray], y:typing.Union[Number, np.ndarray, pq.Quantity], rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, use_math:bool=True, equal_nan:bool=False):
-    """Generalized isclose.
+    r"""Generalized isclose.
     
     Parameters:
     ==========
@@ -490,12 +490,12 @@ def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None,
     return reduce(operator.and_, (f_isclose(x_, y_) for x_, y_ in ((getattr(x, name), getattr(y, name)) for name in ("real", "imag"))))
 
 def all_or_all_not(*args) -> bool:
-    """Returns True when elements in args are either all True or all False.
+    r"""Returns True when elements in args are either all True or all False.
     """
     return all(args) or all(not(arg) for arg in args)
 
 def hashiterable(x:typing.Iterable[typing.Any]) -> int:
-    """Takes into account the order of the elements.
+    r"""Takes into account the order of the elements.
     
     NOTE: This works when the type of the elements contained in the iterable are
     basic Python type elements. 
@@ -595,7 +595,7 @@ def hashiterable(x:typing.Iterable[typing.Any]) -> int:
 
 @safeWrapper
 def gethash(x:typing.Any) -> int:
-    """Calculates a hash-like figure for objects (including non-hashable types)
+    r"""Calculates a hash-like figure for objects (including non-hashable types)
     To be used for object comparisons.
     
     Not suitable for secure code.
@@ -679,7 +679,7 @@ def gethash(x:typing.Any) -> int:
 def get_index_for_seq(index:int, test:typing.Sequence[typing.Any], 
                       target:typing.Sequence[typing.Any], 
                       mapping:typing.Optional[dict]=None) -> typing.Any:
-    """Heuristic for computing an index into the target sequence.
+    r"""Heuristic for computing an index into the target sequence.
     
     Returns the index of an element in a `target` sequence given the `index`:int
     of the element into the `test` sequence and an optional index mapping.
@@ -861,7 +861,7 @@ def get_index_for_seq(index:int, test:typing.Sequence[typing.Any],
                 return min(index, len(test)-1)
             
 def total_size(o, handlers={}, verbose=False) -> int:
-    """ Returns the approximate memory footprint an object and all of its contents.
+    r""" Returns the approximate memory footprint an object and all of its contents.
 
     Automatically finds the contents of the following builtin containers and
     their subclasses:  tuple, list, deque, dict, set and frozenset.
@@ -925,14 +925,14 @@ def similar_strings(a:str, b:str) -> bool:
 
 @safeWrapper
 def safe_identity_test2(x, y) -> bool:
-    """Uses SafeComparator object
+    r"""Uses SafeComparator object
     Work in progress, expect bugs!
     """
     return SafeComparator(comp=eq)(x, y)
 
 
 def diff(x:object, y:object, showValues:bool=False, idcheck:bool=True) -> dict:
-    """Reveal differences between x and y attributes.
+    r"""Reveal differences between x and y attributes.
     x and y MUST be instances of the SAME class (type)
     # TODO 2024-12-14 15:04:29
     """
@@ -1059,7 +1059,7 @@ def diff(x:object, y:object, showValues:bool=False, idcheck:bool=True) -> dict:
 # @safeWrapper
 def safe_identity_test(x:object, y:object, idcheck:bool=True,
                        equal_na:bool=True, equal_nan:bool=True) -> bool:
-    """Test that symbols in x and y refer to identical Python objects.
+    r"""Test that symbols in x and y refer to identical Python objects.
     
     # TODO: 2024-12-19 17:15:27 FIXME:
     # check for NA and NaNs, use equal_na and equal_nan
@@ -1522,7 +1522,7 @@ def safe_identity_test(x:object, y:object, idcheck:bool=True,
 eq = safe_identity_test
 
 class NestedFinder(object):
-    """Provides searching in nesting (hierarchical) data structures.
+    r"""Provides searching in nesting (hierarchical) data structures.
     
     A nesting, or hierarchical, data structure is a mapping (dict) or sequence 
     (tuple, list, deque) where at least one elements (or value) is another 
@@ -1544,7 +1544,7 @@ class NestedFinder(object):
     
     def __init__(self, src:typing.Optional[typing.Union[dict, list, tuple, deque]]=None, 
                  comparator:typing.Optional[typing.Union[str, typing.Callable[..., typing.Any]]]=safe_identity_test):
-        """NestedFinder initializer.
+        r"""NestedFinder initializer.
         
         Parameters:
         -----------
@@ -1600,14 +1600,14 @@ class NestedFinder(object):
             self._comparator_ = comparator
         
     def reset(self):
-        """Clears book-keeping queues, results and removes data reference
+        r"""Clears book-keeping queues, results and removes data reference
         The comparator function is left the same.
         """
         self.initialize()
         self._data_ = None
         
     def initialize(self):
-        """Clears the result and book-keeping queues.
+        r"""Clears the result and book-keeping queues.
         The comparator function is left unchanged.
         """
         self._visited_.clear()
@@ -1620,13 +1620,13 @@ class NestedFinder(object):
         
     @property
     def comparator(self):
-        """Returns the comparator function used in searching of the str '=='
+        r"""Returns the comparator function used in searching of the str '=='
         """
         return self._comparator_
     
     @comparator.setter
     def comparator(self, fn:typing.Callable[..., typing.Any]):
-        """Sets the comparator function to a custom binary comparator.
+        r"""Sets the comparator function to a custom binary comparator.
         A binary comparator compares two arguments e.g., func(x, y) -> bool
         
         A comparator that also accept further optional parameters (i.e.
@@ -1655,19 +1655,19 @@ class NestedFinder(object):
         
     @property
     def lastSearchIndex(self):
-        """Read-only acces to the last search item
+        r"""Read-only acces to the last search item
         """
         return self._item_as_index_
     
     @property
     def lastSearchValue(self):
-        """Read-only acces to the last search item
+        r"""Read-only acces to the last search item
         """
         return self._item_as_value_
     
     @property
     def paths(self):
-        """Rad-only access to the collection of indexing paths.
+        r"""Rad-only access to the collection of indexing paths.
         Since this may be consumed in other code (e.g. self.get or 
         NestedFinder.getvalue) this property returns a deep copy of the results.
         """
@@ -1676,7 +1676,7 @@ class NestedFinder(object):
         
     @property
     def result(self):
-        """Read-only, deep copy of the search result.
+        r"""Read-only, deep copy of the search result.
         Since this may be consumed in other code (e.g. self.get or 
         NestedFinder.getvalue) this property returns a deep copy of the results.
         """
@@ -1684,7 +1684,7 @@ class NestedFinder(object):
     
     @property
     def values(self):
-        """Read-only, of the collection of values found with search by index.
+        r"""Read-only, of the collection of values found with search by index.
         
         This is a deep copy so that modifications by other code does not alter
         the collection stored in the NestedFinder.
@@ -1693,7 +1693,7 @@ class NestedFinder(object):
     
     @property
     def data(self):
-        """Read/write access to the nesting data structure"""
+        r"""Read/write access to the nesting data structure"""
         return self._data_
     
     @data.setter
@@ -1703,7 +1703,7 @@ class NestedFinder(object):
         
     @staticmethod
     def is_namedtuple(x):
-        """ core.datatype.is_namedtuple imported here.
+        r""" core.datatype.is_namedtuple imported here.
         """
         from core.datatypes import is_namedtuple
         return is_namedtuple(x)
@@ -1790,7 +1790,7 @@ class NestedFinder(object):
         return ""
             
     def _gen_elem(self, src:typing.Any, ndx:typing.Any, report:bool=False):
-        """Element retrieval from collection given key or index
+        r"""Element retrieval from collection given key or index
         Parameters:
         -----------
         src: python object
@@ -1919,7 +1919,7 @@ class NestedFinder(object):
             return self._ndx_expr(src, path)
             
     def _gen_search(self, var, item, parent=None, as_index=False, by_type=False):#, ntabs=0): # ntabs - for debugging only!
-        """Generator to search item in a nesting data structure.
+        r"""Generator to search item in a nesting data structure.
         
         Item can be an indexing object, or a value.
         
@@ -2445,7 +2445,7 @@ class NestedFinder(object):
             
     def find(self, item:typing.Optional[typing.Any]=None, find_value:typing.Optional[bool]=None,
              find_by_type:typing.Optional[bool] = False):
-        """Search for 'item' in a nesting data structure.
+        r"""Search for 'item' in a nesting data structure.
         
         A nesting data structure if a collection (sequence or mapping - a dict)
         that contains other sequnences or dicts nested inside (with arbitrary
@@ -2919,7 +2919,7 @@ class NestedFinder(object):
         return deepcopy(self._result_)
     
     def findkey(self, obj):
-        """Search for value given an atomic key or indexing object
+        r"""Search for value given an atomic key or indexing object
         Returns a sequence of (path, value) tuples, where path is a list of
         indexing objects (or keys) from the top to the item's nesting level,
         and value is the nested value.
@@ -2929,19 +2929,19 @@ class NestedFinder(object):
         return self.find(obj, find_value=False)
     
     def findindex(self, obj):
-        """Calls self.findkey(key_or_indexing_obj).
+        r"""Calls self.findkey(key_or_indexing_obj).
         """
         return self.findkey(key_or_indexing_obj)
     
     def findvalue(self, value):
-        """Search for the key or indexing object nested in self.data.
+        r"""Search for the key or indexing object nested in self.data.
         
         Calls self.find(value, find_value=True)
         """
         return self.find(value, find_value=True)
     
     def path_expression(self, paths:typing.Optional[typing.Union[tuple, list,deque]]=None, single:bool=True):
-        """Generates a str expression to be valuated on the hierarchical data
+        r"""Generates a str expression to be valuated on the hierarchical data
         """
         if not isinstance(paths, (deque, list, tuple)):
             if not self._paths_:
@@ -2970,7 +2970,7 @@ class NestedFinder(object):
         return NestedFinder()._get_path_expression(data, paths)
             
     def get(self, paths:typing.Optional[typing.Union[tuple, list,deque]]=None, single:bool=True):
-        """Retrieves nested value(s) from the internal data using indexing paths.
+        r"""Retrieves nested value(s) from the internal data using indexing paths.
         
         The internal data is the nesting (hierarchical) data type established at
         initialization or later by setting the 'data' property.
@@ -3056,7 +3056,7 @@ class NestedFinder(object):
             
     @staticmethod
     def getvalue(data, paths:typing.Optional[typing.Union[tuple, list, deque]]=None, single:bool = True):
-        """Static version of NestedFinder.get.
+        r"""Static version of NestedFinder.get.
         
         Parameters:
         -----------
@@ -3094,7 +3094,7 @@ class NestedFinder(object):
         
     
 def reverse_dict(x:dict) -> dict:
-    """Returns a reverse mapping (values->keys) from x
+    r"""Returns a reverse mapping (values->keys) from x
     
     Parameters:
     ==========
@@ -3122,7 +3122,7 @@ def reverse_dict(x:dict) -> dict:
     return ret
 
 def reverse_mapping_lookup(x:dict, y:typing.Any) -> typing.Optional[typing.Union[typing.Any, typing.Sequence[typing.Any]]]:
-    """Looks up the key mapped to value y in the x mapping (dict)
+    r"""Looks up the key mapped to value y in the x mapping (dict)
     Parameters:
     ===========
     x:dict
@@ -3157,7 +3157,7 @@ def reverse_mapping_lookup(x:dict, y:typing.Any) -> typing.Optional[typing.Union
         return tuple()
     
 def summarize_object_properties(objname:str, obj:typing.Any, namespace="Internal") -> dict:
-    """Summary of object properties to be displayed in Scipyen workspace view.
+    r"""Summary of object properties to be displayed in Scipyen workspace view.
     
     Parameters:
     
@@ -3527,7 +3527,7 @@ def summarize_object_properties(objname:str, obj:typing.Any, namespace="Internal
     return result
     
 def augment_obj_prop_dict(prop_dict):
-    """Adds/modifies 'Icon' entry in the properties dictionary for variable listing.
+    r"""Adds/modifies 'Icon' entry in the properties dictionary for variable listing.
     Only useful for objects in the namespace of an external kernel.
     See summarize_object_properties for what a properties dict looks like
     """
@@ -3564,7 +3564,7 @@ def augment_obj_prop_dict(prop_dict):
     return prop_dict
         
 def silentindex(a: typing.Sequence, b: typing.Any, multiple:bool = True):
-    """Alternative to list.index(), such that a missing value returns None
+    r"""Alternative to list.index(), such that a missing value returns None
     instead of raising an Exception.
     DEPRECATED
     Use prog.filter_attr
@@ -3579,7 +3579,7 @@ def silentindex(a: typing.Sequence, b: typing.Any, multiple:bool = True):
         return None
     
 def index_of(seq, obj, key=None, multiple=False, comparator=None):
-    """Find the index of obj in the object sequence seq.
+    r"""Find the index of obj in the object sequence seq.
     
     Object finding can be based on the object's identity (by default) or by the 
     value of a specific object attribute. 
@@ -3685,7 +3685,7 @@ def yyMdd(now=None):
     return "%s%s%s" % (time.strftime("%y", tuple(now)), string.ascii_lowercase[now.tm_mon-1], time.strftime("%d", tuple(now)))
 
 def unpack(x:typing.Union[list, tuple, deque], varnames:typing.Sequence[str]):
-    """Unpacks a sequence x of len(x) <= len(varnames) into len(varnames) variables"""
+    r"""Unpacks a sequence x of len(x) <= len(varnames) into len(varnames) variables"""
     import keyword
     from core.datatypes import NoData
     
@@ -3713,13 +3713,13 @@ def make_file_filter_string(extList, genericName):
     return (fileFilterString, individualFilterStrings)
 
 def elements_types(s) -> typing.Sequence[type]:
-    """Returns the unique types in a sequence
+    r"""Returns the unique types in a sequence
     """
     return gen_unique(map(lambda x: type(x).__name__, s))
 
 
 def counter_suffix(x:str, strings:typing.List[str], sep:str="_", start:int=0, ret:bool=False):
-    """Appends a counter suffix to x:str if x is found in the list of strings
+    r"""Appends a counter suffix to x:str if x is found in the list of strings
     
     Parameters:
     ==========
@@ -3773,10 +3773,10 @@ def counter_suffix(x:str, strings:typing.List[str], sep:str="_", start:int=0, re
         
         #p = re.compile(base)
         # if bracketed:
-        #     p = re.compile("^%s%s{0,1}\(\d*\)$" % (base, sep))
+        #     p = re.compile(r"^%s%s{0,1}\(\d*\)$" % (base, sep))
         # else:
-        #     p = re.compile("^%s%s{0,1}\d*$" % (base, sep))
-        p = re.compile("^%s%s{0,1}\d*$" % (base, sep))
+        #     p = re.compile(r"^%s%s{0,1}\d*$" % (base, sep))
+        p = re.compile(r"^%s%s{0,1}\d*$" % (base, sep))
         
         items = sorted(list(filter(lambda x: p.match(x), strings)))
         
@@ -3833,7 +3833,7 @@ def counter_suffix(x:str, strings:typing.List[str], sep:str="_", start:int=0, re
     return x
                 
 def get_nested_value(src, path):
-    """Returns a value contained in a hierarchical data structure.
+    r"""Returns a value contained in a hierarchical data structure.
     
     Returns None if path is not found in dict.
     
@@ -3904,7 +3904,7 @@ def get_nested_value(src, path):
         raise TypeError("Expecting a hashable object or a sequence of hashable objects, for path %s; got %s instead" % (path, type(path).__name__))
         
 def set_nested_value(src, path, value):
-    """Adds (or sets) a nested value in a mapping (dict) src.
+    r"""Adds (or sets) a nested value in a mapping (dict) src.
     """
     #print(src)
     if not isinstance(src, dict):
@@ -3930,7 +3930,7 @@ def set_nested_value(src, path, value):
         raise TypeError("Expecting a hashable object or a sequence of hashable objects, for path %s; got %s instead" % (path, type(path).__name__))
         
 def nth(iterable, n, default=None):
-    """Returns the nth item or a default value
+    r"""Returns the nth item or a default value
     
     iterable: an iterable
     
@@ -3943,7 +3943,7 @@ def nth(iterable, n, default=None):
     return next(itertools.islice(iterable, n, None), default)
 
 def pairwise(iterable)-> zip:
-    """s -> (s0,s1), (s1,s2), (s2, s3), ...
+    r"""s -> (s0,s1), (s1,s2), (s2, s3), ...
     
     NOTE: Recipe from the documentation for python itertools module.
     """
@@ -3960,7 +3960,7 @@ def sort_with_none(iterable, none_last = True) -> typing.Sequence:
 
 # def unique(seq, key=None, indices:bool=False) -> typing.Sequence:
 def unique(seq, key=None, indices:bool=False, idcheck:bool=True) -> typing.Sequence:
-    """Returns a sequence of unique elements in the iterable 'seq'.
+    r"""Returns a sequence of unique elements in the iterable 'seq'.
     Functional version of gen_unique.
     Parameters:
     -----------
@@ -4006,7 +4006,7 @@ def unique(seq, key=None, indices:bool=False, idcheck:bool=True) -> typing.Seque
     # return seq.__class__(gen_unique(seq, key=key, indices=indices))
 
 def duplicates(seq, key=None, indices:bool=False, idcheck:bool=True) -> typing.Sequence:
-    """Returns a sequence of duplicate elements in 'seq'.
+    r"""Returns a sequence of duplicate elements in 'seq'.
     
     Implements:
         if indices:
@@ -4057,7 +4057,7 @@ def duplicates(seq, key=None, indices:bool=False, idcheck:bool=True) -> typing.S
     
 
 def gen_unique(seq, key=None, indices:bool=False, idcheck:bool=True):
-    """Iterates through unique elements in the sequence 'seq'.
+    r"""Iterates through unique elements in the sequence 'seq'.
     
     Parameters:
     -----------
@@ -4190,7 +4190,7 @@ def gen_unique(seq, key=None, indices:bool=False, idcheck:bool=True):
                 yield from (x for x in seq if __check_val__(key))
             
 def gen_duplicates(seq, key=None, indices:bool=False, idcheck:bool=True):
-    """Iterates through the duplicate elements in the sequence 'seq'.
+    r"""Iterates through the duplicate elements in the sequence 'seq'.
     Parameters:
     -----------
     seq: an iterable sequence (tuple, list, range)
@@ -4310,7 +4310,7 @@ def gen_duplicates(seq, key=None, indices:bool=False, idcheck:bool=True):
     
             
 def name_lookup(container: typing.Sequence, name:str, multiple: bool = True) -> typing.Optional[typing.Union[int, typing.Sequence[int]]]:
-    """Get indices of container elements with attribute 'name' of given value(s).
+    r"""Get indices of container elements with attribute 'name' of given value(s).
     """
     
     names = [getattr(x, "name") for x in container if (hasattr(x, "name") and isinstance(x.name, str) and len(x.name.strip())>0)]
@@ -4330,7 +4330,7 @@ def name_lookup(container: typing.Sequence, name:str, multiple: bool = True) -> 
     return names.index(name)
 
 def merge_indexes(*args) -> typing.Optional[GeneralIndexType]:
-    """Merge several GeneralIndexType objects into one.
+    r"""Merge several GeneralIndexType objects into one.
     Prerequisites:
     • each element in args must be of the same type or MISSING
 
@@ -4387,7 +4387,7 @@ def merge_indexes(*args) -> typing.Optional[GeneralIndexType]:
 def normalized_index(data: typing.Optional[typing.Union[collections.abc.Sequence, int, pd.core.indexes.base.Index, pd.DataFrame, pd.Series, np.ndarray]], 
                      index: typing.Optional[GeneralIndexType] = None, 
                      silent:bool=False, axis:typing.Optional[int] = None) -> typing.Union[range, typing.Iterable[int]]:
-    """Transform various indexing objects to a range or an iterable of int indices.
+    r"""Transform various indexing objects to a range or an iterable of int indices.
     
 Also checks the validity of the index for an iterable, given its size.
 
@@ -4666,7 +4666,7 @@ ret - an iterable object (range, or tuple of integer indices) that can be
 # def _(data, )
     
 def normalized_sample_index(data:np.ndarray, axis: typing.Union[int, str, vigra.AxisInfo], index: typing.Optional[typing.Union[int, tuple, list, np.ndarray, range, slice]]=None):
-    """Calls normalized_index on a specific array axis.
+    r"""Calls normalized_index on a specific array axis.
     Also checks index validity along a numpy array axis.
     
     Parameters:
@@ -4703,7 +4703,7 @@ def normalized_sample_index(data:np.ndarray, axis: typing.Union[int, str, vigra.
         raise RuntimeError("For data axis %d with size %d:" % (axis, data_len)) from exc
 
 def normalized_axis_index(data:np.ndarray, axis:(int, str, vigra.AxisInfo)):
-    """Returns an integer index for a specific array axis
+    r"""Returns an integer index for a specific array axis
     """
     if not isinstance(data, np.ndarray):
         raise TypeError("Expecting a numpy array or a derivative; got %s instead" % type(data).__name__)
@@ -4731,7 +4731,7 @@ def normalized_axis_index(data:np.ndarray, axis:(int, str, vigra.AxisInfo)):
     return axis
 
 def sp_set_loc(x, index, columns, val):
-    """Assign values to pandas.SparseArray
+    r"""Assign values to pandas.SparseArray
     Work around .loc idiom when fill value is pd.NA
     
     Parameters:
@@ -4830,7 +4830,7 @@ def get_least_pwr10(x:typing.Sequence)-> int:
     return min(int(math.log10(v)) if v > 0 else 0 for v in fr)
 
 def sp_get_loc(x, index, columns):
-    """Retrieve values to pandas.SparseArray
+    r"""Retrieve values to pandas.SparseArray
     Work around .loc idiom when fill value is pd.NA
     
     See also sp_set_loc

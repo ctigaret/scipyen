@@ -7,7 +7,7 @@
 # TODO Code linking to ScanImage ?!?
 
 # -*- coding: utf-8 -*-
-"""Import routines for PrairieView data
+r"""Import routines for PrairieView data
 """
 #### BEGIN core python modules
 import os, sys, traceback, warnings, datetime, time, mimetypes, io, typing

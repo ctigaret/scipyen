@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""Processing of electrophysiology signal data.
+r"""Processing of electrophysiology signal data.
 TODO: 2024-05-30 14:42:46
 extricate AP analysis code from here
 """
@@ -417,7 +417,7 @@ class MembranePropertiesAnalysisParameters(datatypes.ScipyenDataclass):
 #         return cls(**kwargs)
         
 def parse_current_injection_timings(data:neo.Block):
-    """
+    r"""
     Extract current injection timings from the data.
     Data is a neo.Block containing a series of sweeps (a.k.a, segments) with 
     rectangular current injection waveforms. The injected current may be 
@@ -488,7 +488,7 @@ def measure_membrane_test(signal:typing.Union[neo.AnalogSignal, DataSignal],
                   clampMode:typing.Optional[ephys.ClampMode] = None,
                   channel:typing.Optional[int] = None,
                   **kwargs):
-    """Membrane test measurements.
+    r"""Membrane test measurements.
 
 """
     # check for signals consistency; command MAY BE a scalar (i.e. the amount
@@ -731,7 +731,7 @@ def measure_Rs_Rin(im_signal:neo.AnalogSignal,
                            channel:typing.Optional[int] = None,
                            returnIdc:bool=False
                            ) -> tuple:
-    """Calculates Rs and Rin from a membrane test in voltage-clamp
+    r"""Calculates Rs and Rin from a membrane test in voltage-clamp
     
     Parameters:
     ===========
@@ -1001,7 +1001,7 @@ def segment_Rs_Rin(segment: neo.Segment, Im: typing.Union[str, int],
                    regions: typing.Optional[typing.Union[neo.Epoch, typing.Tuple[SignalCursor, SignalCursor, SignalCursor]]] = None, 
                    channel: typing.Optional[int] = None,
                    returnIdc:bool = False):
-    """Calculates the series (Rs) and input (Rin) resistances in voltage-clamp.
+    r"""Calculates the series (Rs) and input (Rin) resistances in voltage-clamp.
     
     Parameters:
     ----------
@@ -1157,7 +1157,7 @@ def block_Rs_Rin(data:typing.Union[neo.Block,typing.Sequence[neo.Segment]],
                  channel:typing.Optional[int] = None, 
                  name:typing.Optional[str] = None,
                  returnIdc:bool=False):
-    """Calls segment_Rs_Rin for all segments in data.
+    r"""Calls segment_Rs_Rin for all segments in data.
     
     Parameters:
     ===========
@@ -1235,7 +1235,7 @@ def cursors_Rs_Rin(signal: typing.Union[neo.AnalogSignal, DataSignal],
                    rin: typing.Union[SignalCursor, tuple], 
                    channel: typing.Optional[int] = None,
                    returnIdc:bool=False):
-    """Calculates series and input resistance from voltage-clamp recording.
+    r"""Calculates series and input resistance from voltage-clamp recording.
     
     Applies to voltage-clamp recordings (membrane current signal).
     
@@ -1373,7 +1373,7 @@ def epoch_Rs_Rin(signal: typing.Union[neo.AnalogSignal, DataSignal],
                  epoch: typing.Union[neo.Epoch, tuple], 
                  channel: typing.Optional[int] = None,
                  returnIdc:bool=False):
-    """Calculates series and input resistance based on epochs.
+    r"""Calculates series and input resistance based on epochs.
     
     The baseline, Rs and Rin are calculated across the time intervals defined in
     the Epoch, which is expected to contain three intervals each with its own
@@ -1437,7 +1437,7 @@ def epoch_Rs_Rin(signal: typing.Union[neo.AnalogSignal, DataSignal],
         
 @safeWrapper
 def v_Nernst(x_out, x_in, z, temp):
-    """Calculates Nernst potential for an ionic species X.
+    r"""Calculates Nernst potential for an ionic species X.
     
     Calculates Nernst potential for an ionic species X, given its concentrations
     x_out and x_in (in M / L), valence, and temperature (in degress centigrade).
@@ -1451,7 +1451,7 @@ def v_Nernst(x_out, x_in, z, temp):
     
 
 # def __wave_interp_root_near_val__(w, value):
-#     """Factored-out code in the for loop under NOTE:2017-09-04 22:09:38
+#     r"""Factored-out code in the for loop under NOTE:2017-09-04 22:09:38
 #     """
 #     # 1) get the waveform region where waveform >= value
 #     index_ge_value = w >= value
@@ -1571,7 +1571,7 @@ def v_Nernst(x_out, x_in, z, temp):
 # 
     
 def fit_Frank_Fuortes(lat, I, fitrheo=False, xstart = 0, xend = 0.1, npts = 100):
-    """Fits the Frank & Fuortes 1956 model through stimulus vs latency curve.
+    r"""Fits the Frank & Fuortes 1956 model through stimulus vs latency curve.
     
     Used for the determination of rheobase from series of depolarising current
     injections of increasing magnitude.
@@ -1754,7 +1754,7 @@ def fit_Frank_Fuortes(lat, I, fitrheo=False, xstart = 0, xend = 0.1, npts = 100)
 
    
 def rheobase_latency(*args, **kwargs):
-    """ Frank & Fuortes (1956) Strength-latency analysis.
+    r""" Frank & Fuortes (1956) Strength-latency analysis.
     
         Calculates rheobase and membrane time constant by fitting on
         1st AP latency vs injected current data.
@@ -2068,7 +2068,7 @@ def rheobase_latency(*args, **kwargs):
     return latencies
 
 def extract_Vm_Im(data, VmSignal="Vm_prim_1", ImSignal="Im_sec_1", t0=None, t1=None):
-    """Convenient function to extract Vm and Im signals as a block.
+    r"""Convenient function to extract Vm and Im signals as a block.
     
     Extract Vm and Im signals from a neo.Block containing current injection
     step experiments (current clamp) recorded in Clampex.
@@ -2245,7 +2245,7 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
                    ssEpoch:typing.Optional[typing.Union[neo.Epoch, tuple, list]]=None, 
                    steadyStateDuration = 0.05 * pq.s, 
                    box_size = 0):
-    """Measurement of passive membrane properties.
+    r"""Measurement of passive membrane properties.
     
     Uses membrane potential recorded during sweeps containins a step of somatic 
     hyperpolarizing current injection. 
@@ -2648,7 +2648,7 @@ def PassiveMembranePropertiesAnalysis(block:neo.Block,
                                       box_size:int = 63, 
                                       name:(str, type(None)) = None,
                                       plot:bool = True,**kwargs):
-    """User-friendly wrap around the passive_Iclamp function.
+    r"""User-friendly wrap around the passive_Iclamp function.
     
     Arguments:
     =========
@@ -2757,7 +2757,7 @@ def PassiveMembranePropertiesAnalysis(block:neo.Block,
     return ret
 
 def ap_waveform_roots(w, value, interpolate=False):
-    """Times where `value` occurs on the rising and decaying phases of the waveform w
+    r"""Times where `value` occurs on the rising and decaying phases of the waveform w
     
     Parameters:
     -----------
@@ -2931,7 +2931,7 @@ def ap_waveform_roots(w, value, interpolate=False):
     return float(rise_x), float(rise_y), float(rise_cslope), float(decay_x), float(decay_y), float(decay_cslope)
 
 def analyse_AP_pulse_trains(data, segment_index=None, signal_index=0,triggers=None, tail=None,thr=20, atol=1e-8, smooth_window = 5,resample_with_period = 1e-5, t0=None, t1=None, dataname=None, cell="NA", genotype="NA", source="NA", sex="NA",age=np.nan, record=None, protocol_name=None,ref_vm = None, ref_vm_relative_onset=False,output_prefix=None):
-    """Batch analysis for pulse-triggered APs in current-clamp.
+    r"""Batch analysis for pulse-triggered APs in current-clamp.
     
     Loops through neo.Segments in data, calling analyse_AP_pulse_train for each
     segment. Suitable for use with ScanData objects (see below).
@@ -3179,7 +3179,7 @@ def analyse_AP_pulse_trains(data, segment_index=None, signal_index=0,triggers=No
         
 def analyse_AP_pulse_train(segment, signal_index=0, triggers=None,tail=None, thr=20, atol=1e-8, smooth_window = 5,resample_with_period = 1e-5, t0=None, t1=None, record=None, dataname=None,cell="NA", genotype="NA", source="NA", sex="NA",age=np.nan, protocol_name="NA", ref_vm = None, ref_vm_relative_onset=False):
     
-    """
+    r"""
     Analyses AP waveforms triggered by a train of current injection pulses.
     
     The function operates on a neo.Segment containing a Vm signal specified by
@@ -3372,7 +3372,7 @@ def analyse_AP_pulse_train(segment, signal_index=0, triggers=None,tail=None, thr
     
 
 def analyse_AP_pulse_signal(signal, times,  tail=None, thr=20, atol=1e-8, smooth_window = 5,resample_with_period = 1e-5, t0=None, t1=None, record=None, cell="NA", genotype="NA", source="NA", sex="NA",age=np.nan, dataname=None, protocol_name="NA", ref_vm = None, ref_vm_relative_onset=False):
-    """Waveform analysis for action potentials elicited individually by brief 
+    r"""Waveform analysis for action potentials elicited individually by brief 
     pulses of current injection.
     
     Potisional parameters:
@@ -3576,7 +3576,7 @@ def analyse_AP_pulse_signal(signal, times,  tail=None, thr=20, atol=1e-8, smooth
     return ap_results, report, ap_waves, ap_dvdt, ap_d2vdt2
 
 def get_AP_analysis_parameter(data:typing.Union[dict, tuple, list], parameter=str, min_APs:typing.Optional[int] = None):
-    """
+    r"""
     Get AP parameter from an AP analysis data for each depolarising step.
     
     Returns:
@@ -3655,7 +3655,7 @@ def get_AP_analysis_parameter(data:typing.Union[dict, tuple, list], parameter=st
 
 
 def extract_AP_waveforms(sig, iinj, times, before = None, after = None, use_min_isi=False):
-    """Extracts the AP waveforms from a Vm signal.
+    r"""Extracts the AP waveforms from a Vm signal.
     
     Parameters:
     ===========
@@ -3845,7 +3845,7 @@ def extract_AP_waveforms(sig, iinj, times, before = None, after = None, use_min_
     
     
 def extract_pulse_triggered_APs(sig, times, tail = None):
-    """
+    r"""
     Extracts AP waveforms from a Vm signal.
     
     The AP are supposed to be triggered by brief pulses of
@@ -4132,7 +4132,7 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
                      resample_with_rate:(pq.Quantity, type(None)) = None,
                      Itimes_relative:bool = True,
                      Itimes_samples:bool = False):
-    """
+    r"""
     Extract the time slice of the VM corresponding to a current injection step.
     
     If a signal containing a rectangular current injection waveform is given, it
@@ -4398,7 +4398,7 @@ def detect_AP_waveform_times(sig, thr=10, smooth_window=5,
                              rtol = 1e-5, 
                              atol = 1e-8, 
                              vm_thr=0):
-    """Detects timings of AP waveforms in an AP train during depolarizing current injection.
+    r"""Detects timings of AP waveforms in an AP train during depolarizing current injection.
 
     Detection is done primarily via thresholding on the 1st derivative of the Vm signal.
     
@@ -4715,7 +4715,7 @@ def detect_AP_waveforms_in_train(sig, iinj,
                                  return_all = False, 
                                  vm_thr=0, 
                                  **kwargs):
-    """Detects action potentials in a Vm signal.
+    r"""Detects action potentials in a Vm signal.
     For use with experiments using "steps" of depolarizing current injections.
     
     Parameters:
@@ -5676,7 +5676,7 @@ def detect_AP_waveforms_in_train_old(sig, iinj,
                                  return_all = False, 
                                  vm_thr=0, 
                                  **kwargs):
-    """Detects action potentials in a Vm signal.
+    r"""Detects action potentials in a Vm signal.
     For use with experiments using "steps" of depolarizing current injections.
     
     Parameters:
@@ -6570,7 +6570,7 @@ def detect_AP_waveforms_in_train_old(sig, iinj,
     return ap_train, ap_waveform_signals
         
 def ap_duration_at_Vm(ap, value, **kwargs): #decay_ref, decay_intercept_approx="linear", interpolate=False):
-    """Returns the duration of the AP waveform at given Vm value
+    r"""Returns the duration of the AP waveform at given Vm value
     
     Parameters:
     -----------
@@ -6662,7 +6662,7 @@ def ap_duration_at_Vm(ap, value, **kwargs): #decay_ref, decay_intercept_approx="
     return ret
 
 def ap_phase_plot_data(vm, dvdt=None, smooth_window=None):
-    """Creates a DataSignal for a phase plot.
+    r"""Creates a DataSignal for a phase plot.
     """
     from scipy.signal import boxcar
     
@@ -6702,7 +6702,7 @@ def ap_phase_plot_data(vm, dvdt=None, smooth_window=None):
 
 
 def analyse_AP_waveform(vm, dvdt=None, d2vdt2=None, ref_vm = None, ref_vm_relative_onset=False, atol=1e-8, smooth_window = None,detect_times=True, dvdt_thr=10):
-    """ AP waveform analysis for APs triggered by individual current pulses.
+    r""" AP waveform analysis for APs triggered by individual current pulses.
     
     WARNING: only to be used on isolated AP waveforms, obtained by calling
     extract_pulse_triggered_APs()
@@ -6889,7 +6889,7 @@ def analyse_AP_waveform(vm, dvdt=None, d2vdt2=None, ref_vm = None, ref_vm_relati
     return result
     
 def collect_Iclamp_steps(block, VmSignal = "Vm_prim_1", ImSignal = "Im_sec_1", head = 0.05 * pq.s, tail = 0.05 * pq.s, name=None, segments=None):
-    """Generates an segment from step current step injections in I-clamp experiments.
+    r"""Generates an segment from step current step injections in I-clamp experiments.
     Useful or stack-plotting.
     
     Arguments:
@@ -7057,7 +7057,7 @@ def collect_Iclamp_steps(block, VmSignal = "Vm_prim_1", ImSignal = "Im_sec_1", h
 
 def getCurrentInjectionParameters(data:neo.Block, 
                                   epoch:typing.Optional[typing.Union[pab.ABFEpoch, int, str]] = None) -> typing.Optional[tuple]:
-    """Parses the current injection steps in a neo.Block.
+    r"""Parses the current injection steps in a neo.Block.
     
     Parameters:
     -----------
@@ -7153,7 +7153,7 @@ def getCurrentInjectionParameters(data:neo.Block,
 def analyse_AP_step_injection_trial(trial:neo.Block,
                                     parameters:MembranePropertiesAnalysisParameters,
                                     biometrics:BaseScipyenData):
-    """Variant of analyse_AP_step_injection_series that uses only neo.Block as data.
+    r"""Variant of analyse_AP_step_injection_series that uses only neo.Block as data.
     
     This relies ENTIRELY on the recording protocol parsed from the trial metadata
     (i.e. Block's annotations).
@@ -7585,7 +7585,7 @@ def analyse_AP_step_injection_trial(trial:neo.Block,
     
 def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, tuple, list], 
                                      **kwargs):
-    """ Action potential (AP) detection and analysis in I-clamp experiment.
+    r""" Action potential (AP) detection and analysis in I-clamp experiment.
     
     Detects and analyses action potentials (AP) fired during depolarizing current
     injections in current clamp.
@@ -8397,7 +8397,7 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
         traceback.print_exc()
  
 def frequency_isi(results_dict: dict, isi_start: int = 0, isi_span: int = 1):
-    """Calculates ISI frequencies vs injected current in a series of depolarizing current injections.
+    r"""Calculates ISI frequencies vs injected current in a series of depolarizing current injections.
     NOTE: Current injections are truncated to powers of 10
 
     Parameters:
@@ -8423,7 +8423,7 @@ def frequency_isi(results_dict: dict, isi_start: int = 0, isi_span: int = 1):
 
 
 def frequency_isi0(results_dict: dict):
-    """Particular case of frequency_isi for first two APs.
+    r"""Particular case of frequency_isi for first two APs.
     """
     return frequency_isi(results_dict, isi_start=0, isi_span=1)
 
@@ -8433,7 +8433,7 @@ def plot_rheobase_latency(data,
                           xend:typing.Optional[typing.Union[float, str]]="auto",
                           fig:typing.Optional[mpl.figure.Figure] = None,
                           title_prefix:typing.Optional[str] = None):
-    """Plots rheobase-latency curve determined from rheobase-latency analysis.
+    r"""Plots rheobase-latency curve determined from rheobase-latency analysis.
     
     Parameters:
     ===========
@@ -8696,7 +8696,7 @@ def plot_rheobase_latency(data,
         raise
         
 def test_for_rheobase_latency(data, minsteps=3):
-    """Tests if data can be used for rheobase-latency analysis.
+    r"""Tests if data can be used for rheobase-latency analysis.
     
     The following conditions are tested:
     
@@ -8742,7 +8742,7 @@ def test_for_rheobase_latency(data, minsteps=3):
     return ok
 
 def report_AP_analysis(data, name=None):
-    """Reports data from analyse_AP_step_series_replicate in pandas format.
+    r"""Reports data from analyse_AP_step_series_replicate in pandas format.
     
     Parameters:
     ----------
@@ -8943,7 +8943,7 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
                                     Itimes_samples:bool = False,
                                     passive_analysis:bool=False,
                                     **kwargs):
-    """AP Train analysis in a sweep (segment) of I-clamp experiments.
+    r"""AP Train analysis in a sweep (segment) of I-clamp experiments.
     APs are triggered by a depolarizing current injection step during the sweep.
     
     The sweep is often part of a sequence of sweeps with current injection of 
@@ -9481,7 +9481,7 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
 def extract_afterSpikePotentials(data:dict, Iinj:pq.Quantity, 
                                  atol:float = 1e0, rtol:float = 1e-1, 
                                  relTime:bool=True) -> typing.Optional[list]:
-    """Retuns the after spike potential waveforms at given Iinj.
+    r"""Retuns the after spike potential waveforms at given Iinj.
     
     Does NOT analyse these waveforms.
     
@@ -9521,7 +9521,7 @@ def extract_afterSpikePotentials(data:dict, Iinj:pq.Quantity,
     return waves
 
 def extract_AHPs(*data_blocks, step_index, Vm_index, Iinj_index, name_prefix):
-    """Extracts AHPs from averaged trials at a given Iinj.
+    r"""Extracts AHPs from averaged trials at a given Iinj.
     
     *data_blocks = trial blocks (can have more that one segment)
     
@@ -9577,7 +9577,7 @@ def extract_AHPs(*data_blocks, step_index, Vm_index, Iinj_index, name_prefix):
     return (AHP, averaged_block, params)
     
 def auto_extract_AHPs(Iinj, Vm_index, Iinj_index, name_prefix, *data_blocks):
-    """Extract an averaged AHP from data_blocks given Iinj value
+    r"""Extract an averaged AHP from data_blocks given Iinj value
     """
     segments = list() # place selected segments here
     
@@ -9648,7 +9648,7 @@ def measure_membrane_RsRin(im_signal:neo.AnalogSignal,
                            testVm:typing.Union[neo.AnalogSignal, DataSignal, pq.Quantity],
                            intervals:tuple
                            ):
-    """Calculates Rs and Rin from a membrane test in voltage-clamp
+    r"""Calculates Rs and Rin from a membrane test in voltage-clamp
     
     Parameters:
     ===========
@@ -9797,7 +9797,7 @@ def measure_membrane_RsRin(im_signal:neo.AnalogSignal,
     
     
 def measure_AHP(signal):
-    """Returns the peak and its integral (Simpson)
+    r"""Returns the peak and its integral (Simpson)
     Signal = neo.AnalogSignal with t_start at 0 s and units of mV with one data channel
     Typically this is an AHP waveform already extracted using other functions in this module.
     
@@ -9839,7 +9839,7 @@ def is_AP_spiketrain(x):
     return ret
 
 def PSCwaveform(model_parameters, units=pq.pA, t_start=0*pq.s, duration=0.02*pq.s, sampling_rate=1e4*pq.Hz):
-    """Helper function to generate a synthetic post-synaptic current waveform.
+    r"""Helper function to generate a synthetic post-synaptic current waveform.
 
     The waveform realizes the Clements & Bekkers 1997 model as a neo.AnalogSignal.
     
@@ -9908,7 +9908,7 @@ def PSCwaveform(model_parameters, units=pq.pA, t_start=0*pq.s, duration=0.02*pq.
     return ret
 
 def detect_Events_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Union[neo.AnalogSignal, DataSignal], threshold:float=4., channels:typing.Optional[typing.Union[int, typing.Sequence[int]]]=None, outputDetection:bool=False, raw_signal=None):
-    """Detect miniature or spontaneous PSCs with optimally scaled template.
+    r"""Detect miniature or spontaneous PSCs with optimally scaled template.
     Implements the "sliding template" algorithm in Clements & Bekkers 1997, Biophys.J.
     
     Parameters:
@@ -10180,7 +10180,7 @@ def test_sliding(x, y, h, viewer, step_size=100):
             break
     
 def slide_detect(x:np.ndarray, h:np.ndarray, padding:bool=True, data_cache = None, **kwargs):
-    """
+    r"""
     WARNING: Expects plain numpy arrays, NOT quantity arrays!
     x: signal
     h: template
@@ -10284,7 +10284,7 @@ def slide_detect(x:np.ndarray, h:np.ndarray, padding:bool=True, data_cache = Non
     # return θ , α, β, ε, σ, xx
     
 def extract_event_waveforms(x:typing.Union[neo.AnalogSignal, DataSignal], duration, θ, threshold, peakfunc):
-    """
+    r"""
     Extracts detected mPSC waveforms.
     
     Waveforms are detected by comparing the θ signal (containing a detection
@@ -10489,7 +10489,7 @@ def extract_event_waveforms(x:typing.Union[neo.AnalogSignal, DataSignal], durati
     return ret
 
 def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Union[np.ndarray, tuple, list]=(0., -1., 0.01, 0.001, 0.01, 0.02), useCBsliding:bool=False, threshold:typing.Optional[float]=None, outputDetection:bool=False, raw_signal=None):
-    """Detect spontaneous events in a signal.
+    r"""Detect spontaneous events in a signal.
 
     Uses cross-correlation with a waveform, or the sliding detection algorithm
     by Clements & Bekkers, 1997, (Biophys J.).
@@ -10712,7 +10712,7 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.
     
 
 def prep_for_nsfa(data):
-    """Helper for the nsfa function
+    r"""Helper for the nsfa function
     Prepares an average event waveform and the variance of fluctuations.
     Parameters:
     ==========
@@ -10795,7 +10795,7 @@ def prep_for_nsfa(data):
     
 # def nsfa(data, /, start:int=0, stop:typing.Optional[int]=None, i=0, N=1, b=0, **kwargs):
 def nsfa(xdata:np.ndarray, ydata:np.ndarray, /, i=0, N=1, b=0, **kwargs):
-    """Non-stationary fluctuation analysis.
+    r"""Non-stationary fluctuation analysis.
     
     The function estimates the number of channels and their unitary currents 
     likely to have contributed to the events. When Vm and Erev are given (see 
@@ -10969,7 +10969,7 @@ def nsfa(xdata:np.ndarray, ydata:np.ndarray, /, i=0, N=1, b=0, **kwargs):
 
 
 def get_nsfa_var(x, params):
-    """
+    r"""
     Calculate nsfa variance from membrane currents in `x` using nsfa parabola.
     
     Useful to plot a fitted nsfa curve (current variance function of current

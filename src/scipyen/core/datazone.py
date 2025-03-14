@@ -42,7 +42,7 @@ def _newDataZone(cls, places=None, extents=None, labels=None, units=None,
 
 # class DataZone(DataObject):
 class DataZone(neo.Epoch):
-    """neo.Epoch-like for DataSignals
+    r"""neo.Epoch-like for DataSignals
     
     The name 'DataZone' was chosen to avoid possible confusions arising from
     using 'region' in the name (which may imply higher dimensions of the data
@@ -66,7 +66,7 @@ class DataZone(neo.Epoch):
                 labels=None, units=None, name=None, description=None, 
                 file_origin=None, segment=None, relative=None,
                 array_annotations=None, **annotations):
-        """
+        r"""
         """
         if places is None:
             if times is None:
@@ -325,7 +325,7 @@ class DataZone(neo.Epoch):
         return self.zone_slice(t_start, t_stop)
         
     def shift(self, shift):
-        """
+        r"""
         Shifts by a given amount.
 
         Parameters:
@@ -349,7 +349,7 @@ class DataZone(neo.Epoch):
         return new_epc
     
     def time_shift(self, t_shift):
-        """
+        r"""
         Shifts by a given amount.
 
         Parameters:
@@ -366,7 +366,7 @@ class DataZone(neo.Epoch):
         return self.shift(t_shift)
     
     def set_durations(self, durations):
-        """For API compatibility with neo.Epoch
+        r"""For API compatibility with neo.Epoch
         """
         self.extents = durations
         
@@ -375,7 +375,7 @@ class DataZone(neo.Epoch):
     
     @property
     def relative(self) -> bool:
-        """Indicates if the coordinates are relative to signal's domain origin.
+        r"""Indicates if the coordinates are relative to signal's domain origin.
         This is independent of the extents of the data zone.
         """
         return getattr(self, "_relative", False)
@@ -386,7 +386,7 @@ class DataZone(neo.Epoch):
 
     @property
     def domain_name(self):
-        """A brief description of the domain name
+        r"""A brief description of the domain name
         """
         if self.__domain_name__ is None:
             self.__domain_name__ = nameFromUnit(self.domain)
@@ -404,13 +404,13 @@ class DataZone(neo.Epoch):
 
     @property
     def domain(self):
-        """Alias to self.places for API compatibility with DataSignal
+        r"""Alias to self.places for API compatibility with DataSignal
         """
         return self.places
 
     @property
     def times(self):
-        """Alias to self.places for API compatibility with neo.Epoch
+        r"""Alias to self.places for API compatibility with neo.Epoch
         """
         return self.places
     
@@ -446,7 +446,7 @@ class DataZone(neo.Epoch):
 
 @dataclass
 class Interval:
-    """Encapsulates an interval of a signal in a Cartesian axis system.
+    r"""Encapsulates an interval of a signal in a Cartesian axis system.
 This can be specified by two landmarks, or by a landmark and an extent
 (or duration) - in this case is similar to a neo.Epoch or DataZone, except that
 if specifies an unique interval.
@@ -549,7 +549,7 @@ Changelog:
     
 def epoch2intervals(epoch: typing.Union[neo.Epoch, DataZone], keep_units:bool = True,
                     duration:bool=True) -> typing.List[Interval]:
-    """Generates a sequence of datatypes.Interval objects
+    r"""Generates a sequence of datatypes.Interval objects
     
     Each interval coresponds to the epoch's interval.
     
@@ -575,7 +575,7 @@ def epoch2intervals(epoch: typing.Union[neo.Epoch, DataZone], keep_units:bool = 
     
 @safeWrapper
 def intervals2epoch(*args, **kwargs):
-    """Construct a neo.Epoch or DataZone from a sequence of Interval objects.
+    r"""Construct a neo.Epoch or DataZone from a sequence of Interval objects.
     All numeric values in the intervals must be python Quantities.
     
     TODO: 2023-06-13 23:48:09
@@ -665,7 +665,7 @@ def epoch2cursors(epoch: typing.Union[neo.Epoch, DataZone],
                   signal_viewer: typing.Optional[QtWidgets.QMainWindow] = None, 
                   axis: typing.Optional[typing.Union[int, str, pg.PlotItem, pg.GraphicsScene]] = None, 
                   **kwargs):
-    """Creates vertical signal cursors from a neo.Epoch.
+    r"""Creates vertical signal cursors from a neo.Epoch.
     
     Parameters:
     ----------

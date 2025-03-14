@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""
+r"""
 Class for reading data from pCLAMP and AxoScope
 files (.abf version 1 and 2), developed by Molecular device/Axon technologies.
 
@@ -305,7 +305,7 @@ class AxonRawIO_v1(BaseRawIO):
         return event_times
 
     def read_raw_protocol(self):
-        """
+        r"""
         Read the protocol waveform of the file, if present;
         function works with ABF2 only. Protocols can be reconstructed
         from the ABF1 header.
@@ -370,7 +370,7 @@ class AxonRawIO_v1(BaseRawIO):
 
 
 def parse_axon_soup(filename):
-    """
+    r"""
     read the header of the file
 
     The strategy here differs from the original script under Matlab.
