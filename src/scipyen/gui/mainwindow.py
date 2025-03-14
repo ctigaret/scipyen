@@ -557,6 +557,16 @@ def infoSoftwareComponents() -> str:
     txt.append(f'<ul> <a href="https://ipython.org/">IPython</a> Interactive Computing {getModuleVersion(IPython)} </ul>')
     txt.append(f'<ul> <a href="https://pypi.org/project/qtconsole/">qtconsole</a> Jupyter QtConsole {getModuleVersion("qtconsole")} </ul>')
     
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+        pyinstaller_bundle = pathlib.Path(sys._MEIPASS)
+        if pyinstaller_bundle.name == "_internal":
+            bundle_name = pathlib.Path(sys._MEIPASS).parent.name
+        else:
+            bundle_name = pathlib.Path(sys._MEIPASS).parent.name
+            
+        txt.append(f'<ul> Running in a PyInstaller bundle: </ul>')
+        txt.append(f'<ul> &emsp; {bundle_name} </ul>')
+    
     txt.append('<h3>Data Analysis</h3>')
     txt.append(f'<ul> <a href="https://neuralensemble.org/neo/">neo</a> {getModuleVersion(neo)} </ul>')
     txt.append(f'<ul> <a href="https://github.com/swharden/pyABF">pyABF</a> {getModuleVersion(pab.pyabf)} </ul>')
