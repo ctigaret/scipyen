@@ -7816,7 +7816,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
     @Slot()
     def slot_useDataViewer(self):
-        if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier):
+        # if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier):
+        if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.AltModifier):
             newWindow = True
 
         else:
@@ -7856,11 +7857,11 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
     @Slot()
     def slot_showInConsole(self):
-        if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier):
-            newWindow = True
-
-        else:
-            newWindow = False
+        # if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier):
+        #     newWindow = True
+        # 
+        # else:
+        #     newWindow = False
 
         # varname = self.workspaceModel.currentItemName
         varname = self.currentVarItemName
@@ -7946,7 +7947,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @Slot()
     @safeWrapper
     def slot_viewSelectedVar(self):
-        if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier):
+        # if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier):
+        if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.AltModifier):
             self.slot_viewSelectedVarInNewWindow()
             return
 
@@ -8005,7 +8007,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     def slot_viewNDarray(self):
         r"""Displays ndarray in a TableEditor
         """
-        if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier):
+        # if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier):
+        if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.AltModifier):
             self.slot_viewNDarrayNewWindow()
             return
 

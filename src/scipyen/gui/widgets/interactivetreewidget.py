@@ -515,6 +515,6 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
             return typeStr, desc, children, widget, typeTip 
         
         except:
-            print(f"{self.__class__.__name__}.parse data type : {type(data).__name__}, data: {data}")
+            # print(f"{self.__class__.__name__}.parse data type : {type(data).__name__}, data: {data}")
             raise
         
