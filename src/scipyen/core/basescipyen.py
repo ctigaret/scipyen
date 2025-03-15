@@ -60,10 +60,10 @@ class BaseScipyenData(ScipyenDataclass):
     # includes treatment, with dosage route, and schedule; does NOT include triggers
     # as these are specific to ephys/imaging protocols.
     
-    __match_args__ = tuple(set(ScipyenDataclass.__match_args__ + ("file_origin",
-                                                                  "file_datetime",
-                                                                  "rec_datetime",
-                                                                  "analysis_datetime")))
+    # __match_args__ = tuple(set(ScipyenDataclass.__match_args__ + ("file_origin",
+    #                                                               "file_datetime",
+    #                                                               "rec_datetime",
+    #                                                               "analysis_datetime")))
     
     def __repr__(self):
         indent = lambda x: x.replace("\n", "\n\t")

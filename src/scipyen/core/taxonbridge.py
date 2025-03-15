@@ -76,24 +76,10 @@ def get_taxon(s:str) -> Taxon | str:
         scipywarn(f"taxoniq package is not installed")
         return s
     
-# def toHDF5(obj:tpying.Union[Taxon, str]): # -> see iolib.h5io
-#     pass
-
 class TaxonDescriptor:
     r"""Python descriptors for taxoniq.Taxon or a placeholder if taxoniq is not available
     default can be a string (scientific name of the species, e.g. Rattus, Mus, Homo, Dabio, Gallus)
     """
-    def __init__(self, *, default:typing.Optional[typing.Union[Taxon, str, type(pd.NA), type(MISSING)]] = None):
-        if hasTaxoniq and isinstance(default, taxoniq.Taxon):
-            self._default = default
-        elif isinstance(default, str) or default in (None, MISSING, pd.NA):
-            if hasTaxoniq and isinstance(default, str) and default in supported_species:
-                self._default = Taxon(scientific_name=default)
-                # self._default = default
-            self._default=default
-        else:
-            raise TypeError(f"Expecting a str, a Taxon, None, or MISSING; instead, got {type(value).__name__}")
-            
     def __set_name__(self, obj:object, name:str):
         if len(name.strip()) == 0:
             raise ValueError("Cannot accept an empty name")
@@ -101,15 +87,19 @@ class TaxonDescriptor:
         
     def __get__(self, obj:object, objtype:type) -> object:
         if obj is None:
-            return self._default
-        return getattr(obj, self._name, self._default)
+            return
+        return getattr(obj, self._name, None)
     
     def __set__(self, obj:object, value:typing.Optional[typing.Union[str, Taxon, type(MISSING)]] = None):
         if isinstance(value, Taxon):
             setattr(obj, self._name, value)
         elif isinstance(value, str) or value in (None, MISSING, pd.NA):
-            if hasTaxoniq and isinstance(value, str) and value in supported_species:
-                value = Taxon(scientific_name=value)
+            if hasTaxoniq and isinstance(value, str):
+                if value in supported_species:
+                    value = Taxon(scientific_name=value)
+                else:
+                    value = get_taxon(value)
+                    
             setattr(obj, self._name, value)
         else:
             raise TypeError(f"Expecting a str, a Taxon, None, or MISSING; instead, got {type(value).__name__}")

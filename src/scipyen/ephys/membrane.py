@@ -326,19 +326,6 @@ class MembranePropertiesAnalysisParameters(datatypes.ScipyenDataclass):
     
     resample:typing.Optional[pq.Quantity] = None
     
-    # __changed__ = False
-    
-    __match_args__ = tuple(set(datatypes.ScipyenDataclass.__match_args__ + 
-                               ("metadata", "VmSignal", "ImSignal",
-                                "useEmbeddedProtocol", "CurrentInjectionEpochIndex",
-                                "dV_dt_thr", "min_Vm_AP", "freq_bounds",
-                                "width_code", "ssDuration", "box_size",
-                                "average_passive_results", "fitrheo",
-                                "rheobase_factor", "test_Iinj",
-                                "minAPs_for_active_properties", "nAPs",
-                                "isi_span", "isi_span", "isi_start", 
-                                "fAHP_window", "ADP_window", "resample")))
-    
     def __eq__(self, other):
         return super().__eq__(other)
 
@@ -348,67 +335,6 @@ class MembranePropertiesAnalysisParameters(datatypes.ScipyenDataclass):
         ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
         return "\n".join(ret)
     
-#     def toHDF5(self, group:h5py.Group, name:str, oname:str, 
-#                        compression:str, chunks:bool, track_order:bool,
-#                        entity_cache:dict) -> h5py.Group:
-#         
-#         from iolib import h5io
-#         target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
-#         cached_entity = h5io.getCachedEntity(entity_cache, self)
-#         if isinstance(cached_entity, h5py.Dataset):
-#             group[target_name] = cached_entity
-#             return cached_entity
-#         
-#         # full_attrs = dict((x, getattr(self, x)) for x in self.__match_args__)
-#         full_attrs = asdict(self)
-#         
-#         attrs_to_entities = dict((k,v) for k,v in full_attrs.items() if (isinstance(v, np.ndarray) and v.size > 1))
-#         
-#         attrs = dict((k,v) for k,v in full_attrs.items() if k not in attrs_to_entities)
-#         
-#         objattrs = h5io.makeAttrDict(**attrs)
-#         obj_attrs.update(objattrs)
-#         
-#         if isinstance(name, str) and len(name.strip()):
-#             target_name = name
-#         
-#         entity = group.create_group(target_name, track_order=track_order)
-#         entity.attrs.update(obj_attrs)
-#         
-#         if len(attrs_to_entities):
-#             for k,v in attrs_to_entities.items():
-#                 h5io.toHDF5(v, entity, name=k, oname=k,
-#                             compression=compression,chunks=chunks,
-#                             track_order=track_order,
-#                             entity_cache=entity_cache)
-#                 
-#         h5io.storeEntityInCache(entity_cache, self, entity)
-#         
-#         return entity
-#     
-#     @classmethod
-#     def fromHDF5(cls, entity:h5py.Group, 
-#                              attrs:typing.Optional[dict]=None, cache:dict = {}):
-#         
-#         from iolib import h5io
-#         if entity in cache:
-#             return cache[entity]
-#         
-#         attrs = h5io.attrs2dict(entity.attrs)
-#         
-#         attrs_as_entities = [a for a in cls.__match_args__ if a not in attrs]
-#         
-#         kwargs = dict()
-#         
-#         for a in cls.__match_args__:
-#             if a in attrs:
-#                 kwargs[a] = attrs[a]
-#             else:
-#                 if a in entity.keys():
-#                     kwargs[a] = h5io.fromHDF5(entity[a], cache=cache)
-#                     
-#         return cls(**kwargs)
-        
 def parse_current_injection_timings(data:neo.Block):
     r"""
     Extract current injection timings from the data.

@@ -1295,53 +1295,6 @@ def fromHDF5(entity:typing.Union[h5py.Group, h5py.Dataset], cache:dict=dict()):
 
     target_class = attrs["python_class"]
     
-    # try:
-        # type_name = attrs.get("type_name", None)
-        # # print(f"\ttype_name: {type_name}")
-        # if type_name is None:
-        #     return None
-        # python_class = attrs["python_class"]
-        # python_class_comps = python_class.split(".")
-        # module_name = attrs["module_name"]
-        # module_name_comps = module_name.split(".")
-        
-#         if module_name_comps[0] == "builtins":
-#             target_class = eval(type_name)
-#         else:
-#             try:
-#                 if module_name in sys.modules:
-#                     pymodule = sys.modules[module_name]
-#                     target_class = eval(type_name, pymodule.__dict__)
-#                     
-#                 else:
-#                     if module_name_comps[0] not in sys.modules:
-#                         pymodule = importlib.import_module(module_name_comps[0])
-#                         
-#                     else:
-#                         pymodule = sys.modules[module_name_comps[0]]
-#                     
-#                     target_class = eval(".".join(python_class_comps[1:]), pymodule.__dict__)
-#                     
-#                 # print(f"target_class: {target_class} from pymodule: {pymodule}")
-# 
-#                 # NOTE: 2022-10-05 18:40:53 FIXME possible BUG
-#                 # this doesn't work if the module is imported under an alias
-#                     
-#             except:
-#                 traceback.print_exc()
-#                 print(f"😢 python_class: {python_class}")
-#                 print(f"😢 fromHDF5 -> python_class_comps: {python_class_comps}")
-#                 print(f"😢 fromHDF5 -> module_name: {module_name}")
-#                 print(f"😢 fromHDF5 -> module_name_comps: {module_name_comps}")
-#                 print(f"😢 fromHDF5 -> wanted target_class: {'.'.join(python_class_comps[1:])}")
-#                 raise
-#             
-#     except:
-#         print(f"😢 fromHDF5 -> entity: {entity.name}")
-#         traceback.print_exc()
-#         raise
-    
-    
     # print(f"h5io.fromHDF5: entity '{entity.name}' has target_class {target_class}")
     
     object_decoder = inspect.getattr_static(target_class,"fromHDF5", None)
@@ -3486,7 +3439,10 @@ def _(entity:h5py.Dataset, target_class:type, attrs:dict, cache:dict=dict()):
     # specialized objects such a neo signal etc
     # hence these will be dealt with in the "group" branch below; don't
     # call fromHDF5 on the children datsets there!
-    # print(f"h5io.objectFromEntity({type(entity).__name__}): target_class = {target_class}")
+    # print(f"objectFromEntity: {entity.name}")
+    # if any(a in entity.name for a in ("dose", "route")):
+    #     print(f"h5io.objectFromEntity({type(entity).__name__}): target_class = {target_class}")
+    
     if entity.shape is None or len(entity.shape) == 0: 
         # no axes imply no Dataset dimscales either
         # most likely a scalar and therefore we attempt to instantiate

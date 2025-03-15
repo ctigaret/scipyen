@@ -115,7 +115,7 @@ except:
     def show_atlases(show_local_path:bool=False, table_width:int=88): None
 
 class BGStructureDescriptor:
-    r"""Generic, str-based brain structure descriptor.
+    r"""Generic, string-based brain structure descriptor.
     Currently, a shim, to evolve into a descriptor for instances of 
     brainglobe_atlasapi.structure_class.Structure once I've figured out a way to
     "normalize" the structure IDs for corresponding structures across various 
