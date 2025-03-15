@@ -21,7 +21,7 @@ import math
 from qtpy import QtCore, QtGui, QtWidgets
 from qtpy.QtCore import Signal, Slot, Property
 
-from pyqtgraph import (DataTreeWidget, TableWidget, )
+# from pyqtgraph import (DataTreeWidget, TableWidget, )
 
 import neo
 import quantities as pq
@@ -64,7 +64,8 @@ from gui.widgets.tableeditorwidget import (TableEditorWidget, TabularDataModel,)
 
 SINGLETONS = (tuple(), None, math.inf, math.nan, np.inf, np.nan, MISSING, pd.NA)
 
-class InteractiveTreeWidget(DataTreeWidget):
+# class InteractiveTreeWidget(DataTreeWidget):
+class InteractiveTreeWidget(QtWidgets.QTreeWidget):
     r"""Extends pyqtgraph.widgets.DataTreeWidget.
     
     Enables the following:
@@ -88,19 +89,21 @@ class InteractiveTreeWidget(DataTreeWidget):
         useTableEditor:bool, default is False; 
             When True, use TableEditorWidget, else use SimpleTableWidget
         """
-        self._visited_ = dict()
+        parent =  kwargs.pop("parent", None)
+        super().__init__(parent=parent)
         self._use_TableEditor_ = kwargs.pop("useTableEditor", False)
+        self._supported_data_types_ = kwargs.pop("supported_data_types", tuple())
+        if not isinstance(self._supported_data_types_, tuple) or not all(isinstance(v, type) for v in self._supported_data_types_):
+            self._supported_data_types_ = tuple()
+        self._visited_ = dict()
         self.top_title = "/"
         self._last_active_item_ = None
         self._last_active_item_column_ = 0
         self.has_dynamic_private = False
         self._private_data_ = None
-        self._supported_data_types_ = kwargs.pop("supported_data_types", tuple())
-        if not isinstance(self._supported_data_types_, tuple) or not all(isinstance(v, type) for v in self._supported_data_types_):
-            self._supported_data_types_ = tuple()
-        # super(InteractiveTreeWidget, self).__init__(*args, **kwargs)
-        DataTreeWidget.__init__(self, *args, **kwargs)
+        # DataTreeWidget.__init__(self, *args, **kwargs)
         self.setVerticalScrollMode(QtWidgets.QAbstractItemView.ScrollPerItem)
+        self.setAlternatingRowColors(True)
         self.setColumnCount(3)
         self.setHeaderLabels(['key / index', 'type', 'value / info'])
         self.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)

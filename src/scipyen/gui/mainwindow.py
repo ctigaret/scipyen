@@ -5070,19 +5070,21 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.consolesAction.setMenu(self.menuConsoles)
         self.scriptsAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("dialog-scripts"), "Scripts")
         self.scriptsAction.setMenu(self.menuScripts)
+        self.settingsAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("settings-configure"), "Settings")
+        self.settingsAction.setMenu(self.menuSettings)
         self.applicationsAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("homerun"), "Applications")
         self.applicationsAction.setMenu(self.menuApplications)
         self.refreshViewAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("view-refresh"), "Refresh Active View")
         self.refreshViewAction.triggered.connect(self.slot_refreshView)
-        self.settingsAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("settings-configure"), "Settings")
-        self.settingsAction.setMenu(self.menuSettings)
         # NOTE: 2024-06-01 18:08:54
         # whats this action should be the last action added to the toolbar
-        
-        self.toolBar.addAction(self.whatsThisAction)
+        self.helpTbAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("help-contents"), "Help")
+        self.helpTbAction.setMenu(self.menuHelp)
+        # self.toolBar.addAction(self.whatsThisAction)
 
         tbactions = (self.newViewersAction, self.consolesAction,
-                     self.scriptsAction, self.applicationsAction)
+                     self.scriptsAction, self.applicationsAction, 
+                     self.helpTbAction, self.settingsAction)
         if os.environ["QT_API"] in ("pyqt5", "pyside2"):
             tw = (w for w in itertools.chain(*(a.associatedWidgets()
                 for a in tbactions)) if w is not self.toolBar)
@@ -5102,7 +5104,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.tbChDir.setPopupMode(QtWidgets.QToolButton.MenuButtonPopup)
         self.tbChDir.setMenu(self.recentDirectoriesMenu)
         
-        
+        # self.toolBar.removeAction(self.actionChange_Working_Directory)
+        # self.toolBar.insertAction(self.actionChange_Working_Directory, self.actionSave)
 
         # BEGIN do not delete: action for presenting a list of viewer types to choose from
         # self.menuViewer.addSeparator()

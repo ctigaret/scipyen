@@ -336,18 +336,11 @@ class MembranePropertiesAnalysisParameters(datatypes.ScipyenDataclass):
                                 "average_passive_results", "fitrheo",
                                 "rheobase_factor", "test_Iinj",
                                 "minAPs_for_active_properties", "nAPs",
-                                "isi_span", "isi_span", "fAHP_window",
-                                "ADP_window", "resample")))
+                                "isi_span", "isi_span", "isi_start", 
+                                "fAHP_window", "ADP_window", "resample")))
     
     def __eq__(self, other):
         return super().__eq__(other)
-#         if not isinstance(other, self.__class__):
-#             return False
-#         
-#         ret = self.name == other.name
-#         
-#         if ret:
-#             ret &= all(getattr(self, f.name) == getattr(other, f.name) for f in dataclasses.fields(self.__class__))
 
     def __repr__(self):
         indent = lambda x: x.replace("\n", "\n\t")

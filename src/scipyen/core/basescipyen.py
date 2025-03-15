@@ -37,8 +37,8 @@ class BaseScipyenData(ScipyenDataclass):
     # In addition, I introduce an "analysis_datetime" field to ease up tracking
     # analysis times, and a "triggers" field (which may not be generally useful,
     # see NOTE below)
-    name:str = ""
-    description:str = ""
+    # name:str = ""
+    # description:str = ""
     file_origin:typing.Union[str, pathlib.Path] = dataclasses.field(default="")
     # which file it originates from
     file_datetime:datetime = dataclasses.field(default_factory = datetime.now)
@@ -59,6 +59,11 @@ class BaseScipyenData(ScipyenDataclass):
     procedure:Procedure = dataclasses.field(default_factory=Procedure)
     # includes treatment, with dosage route, and schedule; does NOT include triggers
     # as these are specific to ephys/imaging protocols.
+    
+    __match_args__ = tuple(set(ScipyenDataclass.__match_args__ + ("file_origin",
+                                                                  "file_datetime",
+                                                                  "rec_datetime",
+                                                                  "analysis_datetime")))
     
     def __repr__(self):
         indent = lambda x: x.replace("\n", "\n\t")

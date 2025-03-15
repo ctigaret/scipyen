@@ -827,14 +827,15 @@ class ScipyenDataclass:
     WARNING: to derive (i.e. create a subclass) from ScipyenDataclass follow the 
     steps below:
 
-    1) use the '@dataclass' decorator
+    1) use the '@dataclass' decorator with the new class
     2) define the class attribute '__match_args__' of the subclass, to include 
         the elements of the parent class attribute '__match_args__'
     
     This is because inheriting from a dataclass is not as straightforward as it 
     is for general python classes; specifically, the '__match_args__' is set up
     by the decorator code unless defined in the subclass, yet we use it for 
-    reconstituting the instance of the subclass from HDF5 data structure.
+    reconstituting the instance of the subclass (e.g. when reading data stored 
+    in HDF5).
 
     NOTE: passing this through a set constructor ensures the fields are uniquely
     contained in __match_args__
