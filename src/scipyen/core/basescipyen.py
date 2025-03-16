@@ -54,11 +54,11 @@ class BaseScipyenData(ScipyenDataclass):
     # (with the caveat that it would be too deeply nested in the final object)
     # triggers:typing.Union[TriggerProtocol, list] = dataclasses.field(default_factory=TriggerProtocol)
     
-    source:BiologicalSource = dataclasses.field(default_factory=BiologicalSource)
     # biological source including organism, organ, tissue, cell, ID, 
-    procedure:Procedure = dataclasses.field(default_factory=Procedure)
+    source:BiologicalSource = dataclasses.field(default_factory=BiologicalSource)
     # includes treatment, with dosage route, and schedule; does NOT include triggers
     # as these are specific to ephys/imaging protocols.
+    procedure:Procedure = dataclasses.field(default_factory=Procedure)
     
     # __match_args__ = tuple(set(ScipyenDataclass.__match_args__ + ("file_origin",
     #                                                               "file_datetime",
