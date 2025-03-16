@@ -893,14 +893,16 @@ class ScipyenDataclass:
                                              chunks=chunks,
                                              track_order=track_order,
                                              entity_cache=entity_cache)
-                if name in ("dose", "route"):
-                    msg = f"{self.__class__.__name__}.toHDF5 created entity {element_entity} for field '{name}' ({type(value).__name__})"
-                    if isinstance(value, np.ndarray):
-                        msg += f" with size: {value.size} and shape: {value.shape}\n"
-                    else:
-                        msg += "\n"
-                        
-                    print(msg)
+                # ### BEGIN for debugging
+#                 if name in ("dose", "route"):
+#                     msg = f"{self.__class__.__name__}.toHDF5 created entity {element_entity} for field '{name}' ({type(value).__name__})"
+#                     if isinstance(value, np.ndarray):
+#                         msg += f" with size: {value.size} and shape: {value.shape}\n"
+#                     else:
+#                         msg += "\n"
+#                         
+#                     print(msg)
+                # ### END   for debugging
                 
         # print(f"### END {self.__class__.__name__}.toHDF5 \n\n")
         return entity
@@ -1600,6 +1602,7 @@ class SubstanceDosage(ScipyenDataclass):
     dose: DoseDescriptor = DoseDescriptor()
     # dose: DoseDescriptor = DoseDescriptor(default=None)
     
+    # Required for interconversion with HDF5
     __match_args__ = tuple(set(ScipyenDataclass.__match_args__ + ("dose", )))
     
     def __repr__(self):
@@ -1622,7 +1625,8 @@ class Treatment(Procedure):
     
     """
     name:str = "Treatment"
-    # __match_args__ = tuple(set(Procedure.__match_args__ + ("substance", "route", "type")))
+    # Required for interconversion with HDF5
+    __match_args__ = tuple(set(Procedure.__match_args__ + ("substance", "route", "type")))
     _:KW_ONLY
     substance:typing.Union[SubstanceDosage, typing.Sequence[SubstanceDosage]] = field(default_factory=SubstanceDosage)
     # allow combination of compounds
