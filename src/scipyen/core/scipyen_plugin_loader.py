@@ -479,13 +479,13 @@ def check_load_module(spec, verb:bool=False, alias:typing.Optional[str] = None, 
             module = importlib.util.module_from_spec(spec)
             # print(f"check_load_module module from spec {spec} ⇒ {module}")
             sys.modules[spec.name] = module
-            if isinstance(alias, str) and len(alias.strip()):
+            if isinstance(alias, str) and len(alias.strip()) and alias.isidentifier():
                 sys.modules[alias] = module
             # else:
             #     sys.modules[spec.name] = module
             spec.loader.exec_module(module)
             if register:
-                if isinstance(alias, str) and len(alias.strip()):
+                if isinstance(alias, str) and len(alias.strip() and alias.isidentifier()):
                     loaded_plugins[alias] = module
                 else:
                     loaded_plugins[spec.name] = module
