@@ -1339,6 +1339,7 @@ def attrs2dict(attrs:h5py.AttributeManager):
             except:
                 module_name = attrs["module_name"]
                 type_name = attrs["type_name"]
+                # print(f"h5io.attrs2dict: module_name = {module_name}, type_name = {type_name}")
                 if type_name == "NoneType":
                     v = type(None)
                 elif type_name == "NAType":
