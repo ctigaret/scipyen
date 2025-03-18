@@ -6188,7 +6188,7 @@ def infer_schedule(*args, name:typing.Optional[str] = None) -> RecordingSchedule
     
 def getProtocol(x:typing.Union[neo.Block, pab.pyabf.ABF]):
     if not isinstance(x, (neo.Block, pab.pyabf.ABF)):
-        raise TypeError(f"Expecting a neo.Block or a pyabf.ABF object; mstead, got {type(x).__name__}")
+        raise TypeError(f"Expecting a neo.Block or a pyabf.ABF object; instead, got {type(x).__name__}")
     
     if isinstance(x, neo.Block) and not pab.sourcedFromABF(x):
         raise NotImplementedError("Only ABF protocols are supported for the moment")
