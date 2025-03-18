@@ -489,12 +489,28 @@ def check_load_module(spec, verb:bool=False, alias:typing.Optional[str] = None, 
                     loaded_plugins[alias] = module
                 else:
                     loaded_plugins[spec.name] = module
+            setattr(module, "__spec__", spec)
+            # NOTE: 2025-03-18 23:00:46 see NOTE: 2025-03-18 22:59:47
+            setattr(module, "__pluginspec__", spec)
         except:
             traceback.print_exc()
             
 
 def reload_plugin(obj:types.ModuleType) -> types.ModuleType:
-    spec = importlib.util.find_spec(obj.__name__)
+    try:
+        spec = importlib.util.find_spec(obj.__name__)
+    except:
+        # NOTE: 2025-03-18 22:59:47
+        # I dont't quite understand why __spec__ is re-set to None; compensating
+        # by using the cached __pluginspec__ attribute
+        spec = getattr(obj, "__spec__", None)
+        if spec is None:
+            spec = getattr(obj, "__pluginspec__", None)
+            if spec is None:
+                raise
+            else:
+                setattr(obj, "__spec__", spec)
+                
     spec.loader.exec_module(obj)
     sys.modules[spec.name] = obj
     loaded_plugins[spec.name] = obj

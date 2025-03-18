@@ -1492,6 +1492,11 @@ class ABFProtocol(ElectrophysiologyProtocol):
         return self.outputs[self.activeDACChannelIndex]
     
     @property
+    def activeDAC(self) -> ABFOutputConfiguration:
+        r"""Alias to self.activeDACOutput"""
+        return self.outputs[self.activeDACChannelIndex]
+    
+    @property
     def activeDACChannelIndex(self) -> int:
         r"""Alias to self.activeDACChannel, for backward compatibility"""
         return self.activeDACChannel
