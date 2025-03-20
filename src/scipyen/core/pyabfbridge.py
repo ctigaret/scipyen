@@ -2265,7 +2265,47 @@ class ABFProtocol(ElectrophysiologyProtocol):
         dac, epoch = self._check_DAC_Epoch_(dac, epoch)
         return epoch.firstLevel + sweep * epoch.deltaLevel
        
+    def neoEpochForDAC(self, dac:typing.Union[ABFOutputConfiguration, int, str],
+                 sweep:int=0,
+                 epoch:typing.Optional[typing.Union[ABFEpoch, int, str]] = None,
+                 holding:bool=True,
+                 fromRunStart:bool=False,
+                 name:typing.Optional[str] = None,
+                 description:typing.Optional[str] = None) -> neo.Epoch:
+        """Creates a neo.Epoch based on ABFEpoch(s) defined for a DAC at a specific sweep."""
+        if dac is None:
+            dac = self.activeDAC
+        elif isinstance(dac, (int, str)):
+            dac = self.getDAC(dac)
+        if not isinstance(dac, ABFOutputConfiguration) or dac not in self._outputs_:
+            raise TypeError(f"Invalid DAC {dac}")
 
+        if isinstance(epoch, (ABFEpoch, str, int)):
+            if isinstance(epoch, (int,str)):
+                epoch = dac.getEpoch(epoch)
+            if not isinstance(epoch, ABFEpoch) or epoch.number not in tuple(e.number for e in dac.epochs):
+                raise ValueError(f"Invalid epoch specified {epoch} for DAC ({dac.physicalIndex} ('{dac.name}')) with {len(dac.epochs)} epochs")
+            units = epoch.firstDuration.units
+            times = [self.getEpochStart(epoch, dac, sweep, holding, fromRunStart, samples=False)]
+            durations = [epoch.firstDuration + sweep * epoch.deltaDuration]
+            labels = [epoch.letter]
+            
+            if not isinstance(name, str) or len(name.strip()) == 0:
+                name = epoch.letter
+            
+        else:
+            epochs = dac.epochs
+            units = epochs[0].firstDuration.units
+            times, durations, labels = zip(*list(map(lambda e: (self.getEpochStart(e, dac, sweep, holding, fromRunStart, samples=False),
+                                                                e.firstDuration + sweep * e.deltaDuration,
+                                                                e.letter), 
+                                                     epochs)))
+            if not isinstance(name, str) or len(name.strip()) == 0:
+                name = f"Epochs for dac {dac.name} in protocol {self.name}"
+                
+        return neo.Epoch(times = times, durations = durations, units=units, 
+                         labels = labels, name=name, description=description)
+    
     def getEpochStart(self, epoch:typing.Union[ABFEpoch, str, int], 
                             dac:typing.Union[ABFOutputConfiguration, int, str],
                             sweep:int = 0,

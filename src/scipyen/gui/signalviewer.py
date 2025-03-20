@@ -5116,9 +5116,9 @@ anything else       anything else       ❌
             
             cursors.sort(key=attrgetter('x'))
             
-            # else:
-            #     cursors = [c for c in vertAndCrossCursors.values()]
-                    
+        else:
+            cursors = [c for c in vertAndCrossCursors.values()]
+            
         if hasattr(self._yData_, "name") and isinstance(self._yData_.name, str) and len(self._yData_.name.strip()):
             name = "%s_Epoch" % self._yData_.name
             
@@ -8550,6 +8550,8 @@ signals in the signal collection.
         
         # relative = getattr(epoch, "relative", False)
         
+        epoch_units = epoch.units
+        
         x0 = epoch.times.flatten().magnitude
         x1 = x0 + epoch.durations.flatten().magnitude
         
@@ -8637,152 +8639,6 @@ signals in the signal collection.
         for epoch in args:
             brush = next(brushes)
             self._plot_epoch_data_(epoch, brush)
-#             # print(f"SignalViewer._plot_epochs_sequence_ epoch times {epoch.times} durations {epoch.durations}")
-#             x0 = epoch.times.flatten().magnitude
-#             x1 = x0 + epoch.durations.flatten().magnitude
-#             
-#             brush = next(brushes)
-#             
-#             for k in range(len(self.axes)):
-#                 self.axes[k].update() # to update its viewRange()
-#                 
-#                 regions = [v for v in zip(x0,x1)]
-#                 
-#                 lris = [pg.LinearRegionItem(values=value, 
-#                                             brush=brush, 
-#                                             orientation=pg.LinearRegionItem.Vertical, 
-#                                             movable=False) for value in regions]
-#                 
-#                 for kl, lri in enumerate(lris):
-#                     self.axes[k].addItem(lri)
-#                     lri.setZValue(10)
-#                     lri.setVisible(True)
-#                     lri.setRegion(regions[kl])
-        
-#     @safeWrapper
-#     def _plotEpochs_(self, epochs: typing.Optional[typing.Union[neo.Epoch, DataZone, typing.Sequence]] = None, clear: bool = True, from_cache: bool = False, plotLabelText=None, **kwargs):
-#         r"""Plots stand-alone epochs.
-#         A neo.Epoch contains time intervals each defined by time and duration.
-#         Epoch intervals are drawn using pyqtgraph.LinearRegionItem objects.
-#         
-#         Parameters:
-#         ------------
-#         
-#         epochs: neo.Epoch or a sequence (tuple, or list) of neo.Epoch objects,
-#             or None (default).
-#             
-#             The behaviour of this function depends on whether the signal viewer 
-#             was set to plot standalone epoch data (i.e. epoch data NOT associated
-#             with a neo Segment, or with anything else).
-#             
-#             FIXME: Standalone epoch data is an Epoch or sequence of Epoch objects
-#             passed as the 'y' parameter to self.setData(...) function
-#             (NOTE that self.setData is aliased to 'self.plot' and 'self.view').
-#             
-#             When the 'epochs' parameter is None or an empty sequence, the 
-#             function plots the standalone epoch data, if it exists, or clears
-#             any representations of previous epoch data from all axes.
-#             
-#         clear: bool, default is True.
-#             When True, all representations of epochs data are cleared from the
-#             axes, regardless if there exists standalone epoch data.
-#             
-#             Otherwise new epochs are added to the plot.
-#             
-#         from_cache: bool, default is False:
-#             When True, plots internally cached epochs
-#         
-#         """
-#         
-#         # print(f"SignalViewer _plotEpochs_ epochs: {epochs}; cached: {self._cached_epochs_}")
-#         
-#         # BEGIN plot epochs from cache (containing standalone epoch data), if any and if requested
-#         
-#         if from_cache:
-#             epoch_seq = self._cached_epochs_.get(self.currentFrame, None)
-#             
-#             # BEGIN plot epochs from cache: clear current displayed epoch if requested
-#             # if epoch_seq is not None and clear:
-#             if clear:
-#                 for k, ax in enumerate(self.axes):
-#                     lris = [i for i in ax.items if isinstance(i, pg.LinearRegionItem)]
-#                     for l in lris:
-#                         ax.removeItem(l)
-#             
-#             # END plot epochs from cache: clear current displayed epoch if requested
-#             
-#             self._plot_epochs_sequence_(*epoch_seq, **kwargs)
-#                 
-#             if not isinstance(self.docTitle, str) or len(self.docTitle.strip()) == 0:
-#                 self.docTitle = "Epochs"
-#                 
-#             return
-#                 
-#         # END plot epochs from cache (containing standalone epoch data), if any and if requested
-#             
-#         # BEGIN plot supplied epoch
-#         # BEGIN clear current epoch display if requested
-#         if clear:
-#             for k, ax in enumerate(self.axes):
-#                 lris = [i for i in ax.items if isinstance(i, pg.LinearRegionItem)]
-#                 for l in lris:
-#                     ax.removeItem(l)
-#         # END clear current epoch display if requested
-#         
-#         epoch_seq = list()
-#         # END plot supplied epoch
-#         
-#         if epochs is None or len(epochs) == 0:
-#             # None, an empty sequence of epochs or an empty epoch
-#             if isinstance(self._yData_, neo.Epoch):
-#                 # self._prepareAxes_(1) # use a brand new single axis
-#                 epoch_seq = [self._yData_]
-#                 
-#             elif isinstance(self._yData_, typing.Sequence) and all([isinstance(y_, (neo.Epoch, DataZone)) for y_ in self._yData_]):
-#                 # self._prepareAxes_(1) # use a brand new single axis
-#                 epoch_seq = self._yData_
-#                 
-#         elif isinstance(epochs, (neo.Epoch, DataZone)):
-#             epoch_seq = [epochs]
-#             
-#         elif isinstance(epochs, typing.Sequence):
-#             if all([isinstance(e, (neo.Epoch, DataZone)) for e in epochs]):
-#                 epoch_seq = epochs
-#                 
-#             else:
-#                 # NOTE: 2020-10-27 09:19:26
-#                 # some of these may be relics from old API (i.e., neoepoch.Epoch)
-#                 # therefore we try to salvage them
-#                 epoch_seq = list()
-#                 
-#                 for e in epochs:
-#                     if isinstance(e, (neo.Epoch, DataZone)):
-#                         epoch_seq.append(e)
-#                         
-#         else:
-#             raise TypeError("Expecting a neo.Epoch or a Sequence of neo.Epoch objects; got %s instead" % type(epochs).__name__)
-#         
-#         if len(epoch_seq):
-#             self._plot_epochs_sequence_(*epoch_seq, **kwargs)
-#             
-#             if self.currentFrame in self._cached_epochs_:
-#                 if len(self._cached_epochs_[self.currentFrame]):
-#                     if clear:
-#                         self._cached_epochs_[self.currentFrame] = epoch_seq
-#                         
-#                     else:
-#                         self._cached_epochs_[self.currentFrame] += epoch_seq
-#                         
-#             if not isinstance(self.docTitle, str) or len(self.docTitle.strip()) == 0:
-#                 self.docTitle = "Epochs"
-#                 
-#         else:
-#             # clear cache when no epochs were passed
-#             self._cached_epochs_.pop(self.currentFrame, None)
-#                     
-#         if isinstance(plotLabelText, str) and len(plotLabelText.strip()):
-#             self.plotTitleLabel.setText(plotLabelText, color = "#000000")
-#             
 
     @singledispatchmethod
     def _plot_data_(self, obj, *args, **kwargs):

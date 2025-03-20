@@ -205,9 +205,8 @@ from .prog import (
     scipywarn,
 )
 
-from .datatypes import (
-    is_string,
-    is_vector,
+
+from .constants import (
     RELATIVE_TOLERANCE,
     ABSOLUTE_TOLERANCE,
     EQUAL_NAN,
@@ -1149,6 +1148,8 @@ def assign_to_signal(
     channel int or None; when int it must point to a valid channel index into both signals
 
     """
+    from . import datatypes
+    
     if not isinstance(dest, neo.AnalogSignal):
         raise TypeError(
             "dest expected to be an AnalogSignal; got %s instead"
@@ -1189,7 +1190,7 @@ def assign_to_signal(
         else:
             dest[:, channel] = src
 
-    elif isinstance(src, np.ndarray) and is_vector(src):
+    elif isinstance(src, np.ndarray) and datatypes.is_vector(src):
         # TODO
         if channel is None:
             pass

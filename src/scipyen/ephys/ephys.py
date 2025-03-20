@@ -201,8 +201,10 @@ from core.datazone import (DataZone, Interval)
 from core.triggerevent import (DataMark, MarkType, TriggerEvent, TriggerEventType, )
 from core.triggerprotocols import TriggerProtocol
 
+from core.typeenum import TypeEnum
+from core.scipyendataclasses import (Episode, Schedule,)
 from core import datatypes
-from core.datatypes import (Episode, Schedule, TypeEnum, check_type, type2str)
+from core.datatypes import (check_type, type2str)
 from core import workspacefunctions
 from core import signalprocessing as sigp
 from core import utilities

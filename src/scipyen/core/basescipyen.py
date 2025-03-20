@@ -22,9 +22,9 @@ from core.triggerprotocols import TriggerProtocol
 from core.quantities import unitsConvertible
 
 # from core.datatypes import * # clashes with datetime class imported from datetime module !!!
-
-from core.datatypes import (Episode, Schedule, ProcedureType, AdministrationRoute, 
-                            Procedure, TypeEnum, BioSourceType, TaxonDescriptor, Taxon,
+from core.typeenum import TypeEnum
+from core.scipyendataclasses import (Episode, Schedule, ProcedureType, AdministrationRoute, 
+                            Procedure, BioSourceType, TaxonDescriptor, Taxon,
                             BiologicalSource, CellCompartment, CellCompartmentType,
                             Organism, Biometrics, ScipyenDataclass, 
                             )

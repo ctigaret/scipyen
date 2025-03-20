@@ -157,7 +157,9 @@ from core.quantities import(arbitrary_unit,
                             nameFromUnit, unitsConvertible,
                             str2quantity, quantity2str)
 
-from core.datatypes import (TypeEnum,UnitTypes, GENOTYPES, 
+from core.typeenum import TypeEnum
+from core.constants import GENOTYPES
+from core.datatypes import (UnitTypes,
                             is_uniform_sequence, is_uniform_collection, 
                             is_namedtuple, is_string,
                             is_numeric_string, is_numeric, 
