@@ -1252,7 +1252,7 @@ def detect_trigger_events(x, event_type,
     
     """
     if not isinstance(x, (neo.AnalogSignal, DataSignal, np.ndarray)):
-        raise TypeError("Expecting a neo.AnalogSignal, or a datatypes.DataSignal, or a np.ndarray as first parameter; got %s instead" % type(x).__name__)
+        raise TypeError("Expecting a neo.AnalogSignal, or a datasignal.DataSignal, or a np.ndarray as first parameter; got %s instead" % type(x).__name__)
     
     if isinstance(event_type, str):
         if event_type in list(TriggerEventType.__members__.keys()):

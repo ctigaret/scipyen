@@ -490,6 +490,7 @@ from collections import namedtuple
 
 from core import quantities as scq
 from core import datatypes, strutils, utilities
+from core.typeenum import TypeEnum
 from core.triggerevent import (DataMark, TriggerEvent, TriggerEventType, MarkType)
 from core.triggerprotocols import TriggerProtocol
 from core.prog import scipywarn
@@ -520,7 +521,7 @@ class ABFOutputConfiguration:   # placeholder to allow the definition of ABFProt
 class ABFInputConfiguration:   # placeholder to allow the definition of ABFProtocol, below
     pass                         # will be (properly) redefined further below
 
-class ABFAcquisitionMode(datatypes.TypeEnum):
+class ABFAcquisitionMode(TypeEnum):
     r"""Corresponds to nOperationMode in ABF._protocolSection and annotations"""
     variable_length_event = 1
     fixed_length_event = 2
@@ -528,17 +529,17 @@ class ABFAcquisitionMode(datatypes.TypeEnum):
     high_speed_oscilloscope = 4 # Not supported by neo, but supported by pyabf!
     episodic_stimulation = 5
     
-class ABFAveragingMode(datatypes.TypeEnum):
+class ABFAveragingMode(TypeEnum):
     r"""Corresponds to nAverageAlgorithm in ABF._protocolSection"""
     cumulative = 0
     most_recent = 1
     
-class ABFDACWaveformSource(datatypes.TypeEnum):
+class ABFDACWaveformSource(TypeEnum):
     none     = 0
     epochs   = 1
     wavefile = 2
     
-class ABFEpochType(datatypes.TypeEnum):
+class ABFEpochType(TypeEnum):
     Unknown = -1
     Off = 0
     Step = 1

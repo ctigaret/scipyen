@@ -818,7 +818,7 @@ def mapScansVCToScenePCOnPath(v, p, path, span=None):
 #@safeWrapper
 def epscatDiscriminator(base, peak, func, pred, predValue, predFunc):#, accFcnBase, accFcnPeak, predFcn, predicate):
     r"""
-    base, peak: single-channel 2D vigra.VigraArray, neo.AnalogSignals, datatypes.DataSignals or 1D numpy.ndarrays
+    base, peak: single-channel 2D vigra.VigraArray, neo.AnalogSignals, datasignal.DataSignals or 1D numpy.ndarrays
     
     func:       tuple (str, dict): str = name of unary array function; dict = kwargs of function
     predFunc:   str: name of predicate function: binary function
@@ -1183,7 +1183,7 @@ def analyseEPSCaT(lsdata, frame, indicator_channel_ndx,
         # 
         # NOTE there may be more than one fitted waveform
         #
-        # NOTE all waveforms are packed as "channels" in the datatypes.DataSignal
+        # NOTE all waveforms are packed as "channels" in the datasignal.DataSignal
         # i.e. as column vectors with a common time base
         #
         # NOTE: EPSCaT waveform is column 0, fitted EPSCaT is on column 1
@@ -2219,7 +2219,7 @@ def fitEPSCaT(data, p0, bounds, fitWindow = None, integration=None):
         return int_dict
         
     if not isinstance(data, (neo.AnalogSignal, DataSignal)):
-        raise TypeError("Expecting a neo.AnalogSignal or datatypes.DataSignal; got %s instead" % type(data).__name__)
+        raise TypeError("Expecting a neo.AnalogSignal or datasignal.DataSignal; got %s instead" % type(data).__name__)
     
     
     # CAUTION this may have been fitted before!

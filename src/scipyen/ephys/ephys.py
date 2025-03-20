@@ -17,7 +17,7 @@ The module provides a set of utility functions to operate primarily on objects
 in NeuralEnsemble's neo package (http://neuralensemble.org/), 
 documented here: https://neo.readthedocs.io/en/stable/
 
-Some of these function also apply to datatypes.DataSignal in Scipyen package.
+Some of these function also apply to datasignal.DataSignal in Scipyen package.
 
 NOTE 2020-10-07 09:42:28
 # Code split and redistributed across ephys.ephys, core.neoutils and core.triggerprotocols
@@ -4136,7 +4136,7 @@ def cursor_average(signal: typing.Union[neo.AnalogSignal, DataSignal],
     Parameters:
     -----------
     
-    signal: neo.AnalogSignal or datatypes.DataSignal
+    signal: neo.AnalogSignal or datasignal.DataSignal
     
     cursor: tuple, or signalviewer.SignalCursor (vertical).
         When a tuple (t,w), it represents a notional vertical cursor with window
@@ -4175,7 +4175,7 @@ def cursor_value(signal:typing.Union[neo.AnalogSignal, DataSignal],
     
     Parameters:
     -----------
-    signal: neo.AnalogSignal or datatypes.DataSignal
+    signal: neo.AnalogSignal or datasignal.DataSignal
     
     cursor: float, python Quantity or vertical SignalCursor
     
@@ -4220,7 +4220,7 @@ def cursor_index(signal:typing.Union[neo.AnalogSignal, DataSignal],
     
     Parameters:
     -----------
-    signal: neo.AnalogSignal or datatypes.DataSignal
+    signal: neo.AnalogSignal or datasignal.DataSignal
     
     cursor: float, python Quantity, vertical SignalCursor or cursor parameters
             tuple
@@ -4313,7 +4313,7 @@ def cursors_difference(signal: typing.Union[neo.AnalogSignal, DataSignal],
     
     Parameters:
     -----------
-    signal:neo.AnalogSignal, datatypes.DataSignal
+    signal:neo.AnalogSignal, datasignal.DataSignal
     
     cursor0, cursor1: SignalCursor of vertical type, or (x, window) tuples 
         representing, respectively, the cursor's x coordinate (time) and window 
@@ -4690,7 +4690,7 @@ def epoch_average(signal: typing.Union[neo.AnalogSignal, DataSignal],
     
     Parameters:
     -----------
-    signal: neo.AnalogSignal or datatypes.DataSignal
+    signal: neo.AnalogSignal or datasignal.DataSignal
     
     epoch: neo.Epoch
     
@@ -5176,19 +5176,19 @@ def waveform_signal(extent, sampling_frequency, model_function, *args, **kwargs)
                         documentation of the particular model_function for details) 
     
     **kwargs            : keyword parameters for the model function and those for
-                        the constructor of neo.AnalogSignal or datatypes.DataSignal, 
+                        the constructor of neo.AnalogSignal or datasignal.DataSignal, 
                         used when asSignal is True (see below, for details)
                         
     Keyword parameters of special interest:
     
         asSignal        : boolean default False; when True, returns a neo.AnalogSignal
-                        of datatypes.DataSignal according to the keyword parameter
+                        of datasignal.DataSignal according to the keyword parameter
                         "domain_units" (see below).
                         When False, returns a np.array (column vector).
                         
         domain_units    : Python UnitQuantity or Quantity; default is s.
                         When different from pq.s and asSignal is True, then the
-                        function returns a datatypes.DataSignal; othwerise the 
+                        function returns a datasignal.DataSignal; othwerise the 
                         function returns a neo.AnalogSignal unless asSignal is False
                         in which case it returns a numpy array
                         
@@ -5208,7 +5208,7 @@ def waveform_signal(extent, sampling_frequency, model_function, *args, **kwargs)
     When asSignal is True:
         
         when "domain_units" is present in kwargs and is NOT a time unit:
-            returns a datatypes.DataSignal
+            returns a datasignal.DataSignal
                 
         otherwise:
             returns a neo.AnalogSignal (domain units are s by default)
@@ -5297,7 +5297,7 @@ def waveform_signal(extent, sampling_frequency, model_function, *args, **kwargs)
 
         if returnDataSignal:
             origin = 0*domain_units
-            return  datatypes.DataSignal(y, origin=origin, **signalkwargs)
+            return  datasignal.DataSignal(y, origin=origin, **signalkwargs)
             
         else:
             return neo.AnalogSignal(y, **signalkwargs)

@@ -58,7 +58,7 @@ def fitGauss1DSum(x, y, locations, **kwargs):
         xx = x.squeeze()
         
     else:
-        raise TypeError("x expected to be a np.ndarray, a neo.AnalogSignal or a datatypes.DataSignal; got %s instead" % type(x).__name__)
+        raise TypeError("x expected to be a np.ndarray, a neo.AnalogSignal or a datasignal.DataSignal; got %s instead" % type(x).__name__)
         
     if xx.ndim > 1:
         raise TypeError("x must be a vector")
@@ -72,7 +72,7 @@ def fitGauss1DSum(x, y, locations, **kwargs):
         yy = y.squeeze()
         
     else:
-        raise TypeError("y expected to be a np.ndarray, a neo.AnalogSignal or a datatypes.DataSignal; got %s instead" % type(y).__name__)
+        raise TypeError("y expected to be a np.ndarray, a neo.AnalogSignal or a datasignal.DataSignal; got %s instead" % type(y).__name__)
         
     if yy.ndim > 1:
         raise TypeError("y must be a vector")
@@ -221,7 +221,7 @@ def fit_compound_exp_rise_multi_decay(data, p0, bounds=(-np.inf, np.inf), method
     from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
     
     if not isinstance(data, (neo.AnalogSignal, DataSignal)):
-        raise TypeError("Data to be fitted must be a neo.AnalogSignal, or a datatypes.DataSignal; got %s instead" % type(data).__name__)
+        raise TypeError("Data to be fitted must be a neo.AnalogSignal, or a datasignal.DataSignal; got %s instead" % type(data).__name__)
     
     if data.ndim == 2 and data.shape[1] > 1:
         raise ValueError("Data must contain a single channel")
@@ -586,7 +586,7 @@ def fit_Event_model(data, p0, **kwargs):
     verbose     = kwargs.pop("verbose",     0)
     
     if not isinstance(data, (neo.AnalogSignal, DataSignal)):
-        raise TypeError("Data to be fitted must be a neo.AnalogSignal, or a datatypes.DataSignal; got %s instead" % type(data).__name__)
+        raise TypeError("Data to be fitted must be a neo.AnalogSignal, or a datasignal.DataSignal; got %s instead" % type(data).__name__)
     
     if data.ndim == 2 and data.shape[1] > 1:
         raise ValueError("Data must contain a single channel")
@@ -765,14 +765,14 @@ def fit_Event_wave(data, wave):
     """
     
     if not isinstance(data, (neo.AnalogSignal, DataSignal)):
-        raise TypeError("Data to be fitted must be a neo.AnalogSignal, or a datatypes.DataSignal; got %s instead" % type(data).__name__)
+        raise TypeError("Data to be fitted must be a neo.AnalogSignal, or a datasignal.DataSignal; got %s instead" % type(data).__name__)
     
     if data.ndim == 2 and data.shape[1] > 1:
         raise ValueError("Data must contain a single channel")
     
     
     if not isinstance(wave, (neo.AnalogSignal, DataSignal)):
-        raise TypeError("Data to be fitted must be a neo.AnalogSignal, or a datatypes.DataSignal; got %s instead" % type(data).__name__)
+        raise TypeError("Data to be fitted must be a neo.AnalogSignal, or a datasignal.DataSignal; got %s instead" % type(data).__name__)
     
     if wave.ndim == 2 and wave.shape[1] > 1:
         raise ValueError("Data must contain a single channel")
