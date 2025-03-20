@@ -198,6 +198,7 @@ requests-toolbelt
 researchpy
 scikit-image
 scikit-learn
+opencv-contrib-python
 scipy
 seaborn
 shapely
