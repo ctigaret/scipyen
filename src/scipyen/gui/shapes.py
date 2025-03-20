@@ -22,7 +22,7 @@ import scipy
 from traitlets import Bunch
 from qtpy import QtCore, QtGui, QtWidgets, QtXml
 from qtpy.QtCore import Signal, Slot, Property
-from core.datatypes import (TypeEnum, )
+from core.typeenum import (TypeEnum, )
 from core.utilities import (reverse_mapping_lookup, reverse_dict, )
 from core.traitcontainers import DataBag
 from core.prog import (safeWrapper, deprecated,

@@ -7,6 +7,8 @@ r"""TriggerEvent class
 Changelog:
 2021-01-06 14:34:02 tolerances and equal_nan moved to datatypes module, 
     as module contants
+    
+    
 
 """
 import warnings
@@ -19,8 +21,8 @@ import numpy as np
 import quantities as pq
 import neo
 from neo.core.dataobject import (DataObject, ArrayDict,)
-from core.datatypes import (is_string, TypeEnum,
-                            RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE, EQUAL_NAN,)
+from core.typeenum import TypeEnum
+from core.constants import (RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE, EQUAL_NAN,)
 from core.prog import scipywarn
 from core.quantities import checkTimeUnits
 #from core.utilities import unique
@@ -191,6 +193,7 @@ class DataMark(neo.Event):
             otherwise assigns the default (pq.s)
         
         """
+        from core.datatypes import is_string
         if units is None:
             if isinstance(value, DataMark):
                 if cls is TriggerEvent:

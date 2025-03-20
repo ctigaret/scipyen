@@ -247,122 +247,6 @@ def change_error_display_for_style(style:typing.Union[str, Style]):
 
 #current_syntax_styles = get_available_syntax_styles()
 
-#class ScipyenDummySocket(DummySocket):
-    #r""" A dummy socket implementing (part of) the zmq.Socket interface. """
-
-    #def getsockopt(self, *args, **kwargs):
-        #pass
-        ##return subprocess.DEVNULL
-    
-# class ScipyenInProcessKernel(InProcessKernel):
-#     r"""Workaround the following exception when using InProcessKernel (see below).
-#     
-#     Traceback (most recent call last):
-#     File "/home/.../scipyenv39/lib64/python3.9/site-packages/tornado/ioloop.py", line 741, in _run_callback
-#         ret = callback()
-#     File "/home/.../scipyenv39/lib/python3.9/site-packages/ipykernel/kernelbase.py", line 419, in enter_eventloop
-#         schedule_next()
-#     File "/home/.../scipyenv39/lib/python3.9/site-packages/ipykernel/kernelbase.py", line 416, in schedule_next
-#         self.io_loop.call_later(0.001, advance_eventloop)
-#     AttributeError: 'InProcessKernel' object has no attribute 'io_loop'
-#     
-#     See also https://github.com/ipython/ipykernel/issues/319
-#     
-#     (NOTE: This DOES NOT crash the kernel):
-#     ERROR:tornado.application:Exception in callback 
-#     functools.partial(<bound method Kernel.enter_eventloop of <ipykernel.inprocess.ipkernel.InProcessKernel object at 0x7f0b6abe5730>>)
-#     
-#     It turns out that all we need is to set eventloop to None so that tornado
-#     "stays put".
-#     
-#     NOTE: 2022-03-05 16:36:35
-#     In addition, ScipyenInProcessKernel also overrides execute_request to await 
-#     for the _abort_queues instead of calling them directly, see below, at
-#     NOTE: 2022-03-05 16:04:03
-#     
-#     (It is funny that this happens in Scipyen, because this warning does not
-#     appear in jupyter qtconsole launched in the same virtual Python environment
-#     as Scipyen (Python 3.10.2), and I don't think this has anything to do with 
-#     setting eventloop to None)
-# 
-#     """
-#     eventloop = None
-#     
-#     def __init__(self, **traits):
-#         super().__init__(**traits)
-#         
-#     @asyncio.coroutine
-#     def _abort_queues(self):
-#         yield
-#     
-#     async def execute_request(self, stream, ident, parent):
-#         r"""handle an execute_request
-#         
-#         Overrides ipykernel.inprocess.ipkernel.InProcessKernel which in turn
-#         calls ipykernel.kernelbase.Kernel.execute_request, to fix the issue below
-#         
-#         NOTE: 2022-03-05 16:04:03
-#         
-#         In the InProcessKernel _abort_queues is a coroutine and not a method 
-#         (function); this raises the RuntimeWarning: 
-#         coroutine 'InProcessKernel._abort_queues' was never awaited.
-#         
-#         """
-# 
-#         with self._redirected_io(): # NOTE: 2022-03-14 22:12:02 this is ESSENTIAL!!!
-#             try:
-#                 content = parent['content']
-#                 code = content['code']
-#                 silent = content['silent']
-#                 store_history = content.get('store_history', not silent)
-#                 user_expressions = content.get('user_expressions', {})
-#                 allow_stdin = content.get('allow_stdin', False)
-#             except Exception:
-#                 self.log.error("Got bad msg: ")
-#                 self.log.error("%s", parent)
-#                 return
-# 
-#             stop_on_error = content.get('stop_on_error', True)
-# 
-#             metadata = self.init_metadata(parent)
-# 
-#             # Re-broadcast our input for the benefit of listening clients, and
-#             # start computing output
-#             if not silent:
-#                 self.execution_count += 1
-#                 self._publish_execute_input(code, parent, self.execution_count)
-# 
-#             reply_content = self.do_execute(
-#                 code, silent, store_history,
-#                 user_expressions, allow_stdin,
-#             )
-#             if inspect.isawaitable(reply_content):
-#                 reply_content = await reply_content
-# 
-#             # Flush output before sending the reply.
-#             sys.stdout.flush()
-#             sys.stderr.flush()
-#             # FIXME: on rare occasions, the flush doesn't seem to make it to the
-#             # clients... This seems to mitigate the problem, but we definitely need
-#             # to better understand what's going on.
-#             if self._execute_sleep:
-#                 time.sleep(self._execute_sleep)
-# 
-#             # Send the reply.
-#             reply_content = json_clean(reply_content)
-#             metadata = self.finish_metadata(parent, metadata, reply_content)
-# 
-#             reply_msg = self.session.send(stream, 'execute_reply',
-#                                         reply_content, parent, metadata=metadata,
-#                                         ident=ident)
-# 
-#             self.log.debug("%s", reply_msg)
-# 
-#             if not silent and reply_msg['content']['status'] == 'error' and stop_on_error:
-#                 # NOTE: 2022-03-05 16:04:10 
-#                 # this apparently fixes the issue at NOTE: 2022-03-05 16:04:03
-#                 await self._abort_queues() 
-
 class ScipyenInProcessKernelManager(QtInProcessKernelManager):
     r"""Starts our own custom ScipyenInProcessKernel
     
@@ -652,10 +536,6 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
     def _save_settings_(self):
         gname, pfx = saveWindowSettings(self.qsettings, self)#, group_name=self.__class__.__name__)
 
-    #def _load_settings_(self):
-        ## located in $HOME/.config/Scipyen/Scipyen.conf
-        #gname, pfx = loadWindowSettings(self.qsettings, self)#, group_name=self.__class__.__name__)
-
     def set_pygment_new(self, scheme:typing.Optional[str]="", colors:typing.Optional[str]=None):
         r"""Sets up style sheet for console colors and syntax highlighting style.
         
@@ -789,6 +669,22 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
                 
                 if self.kernel_client:
                     self._execute(f"colors {colors}", True)
+                    self._execute(
+f"""
+get_ipython().InteractiveTB.tb_highlight = 'bg:ansired'
+""",
+            True)
+#                     self._execute(
+# f"""
+# from IPython.core.ultratb import VerboseTB
+# if getattr(VerboseTB, 'tb_highlight', None) is not None:
+#     VerboseTB.tb_highlight = 'bg:ansired'
+# elif getattr(VerboseTB, '_tb_highlight', None) is not None:
+#     VerboseTB._tb_highlight = 'bg:ansired'
+# else:
+#     get_ipython().run_line_magic('colors', '{colors}')
+# """,
+#             True)
                             #self.reset(clear=True)
                             #self.kernel_client.execute("colors %s"% colors, True)
                         
@@ -969,6 +865,17 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
                 #JupyterWidget.style_sheet = sheet
                 #JupyterWidget.syntax_style = scheme
                 
+                # NOTE: 2025-03-20 00:08:35
+                # the combination of yellow backgrodun with white foregreound 
+                # that IPython.core.ultratb.VerboseTB creates is downright ugly
+                # 
+                if self.kernel_client:
+                    # self._execute(f"colors {colors}", True)
+                    self._execute(
+f"""
+get_ipython().InteractiveTB.tb_highlight = 'bg:ansired'
+""",
+            True)
             except:
                 traceback.print_exc()
                 #pass
@@ -3383,88 +3290,6 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         r"""Dictionary of connections (as view from client - side)"""
         return self.window.connections
         
-    #def frontend_execute(self, frontend, **kwargs) -> bool:
-        #r"""Delegates to frontend.execute() method.
-        
-        #ATTENTION 
-        #DO NOT confuse frontend.execute() with frontend.kernel_client.execute().
-        #fronted.execute() is actually qtconsole.ConsoleWidget.execute()
-        #although they both end up doing the same thing?
-        
-        #Here we use the former, see RichJupyterWidget.execute(); to execute code
-        #by calling kernel_client.execute() and allow
-        
-        
-        #Parameters:
-        
-        #-----------
-        #frontend: RichJupyterWidget, int or str, or None.
-            #int = the index of the frontend's tab in the tab bar of the console
-                    #window
-                    
-            #str = the title of the frontend's tab, in the console window
-            
-            #RichJupyterWidget: the frontend itself (it may belong to another
-            #console)
-            
-            
-            #When None, this is set to the active frontend. Otherwise, code is 
-            #executed in the specified frontend, or in the frontend at the 
-            #specified index in the console's tab bar, or at the tab with the 
-            #specified title
-            
-        #**kwargs: additional keyword arguments passed directly to 
-            #frontend.execute, as follows:
-            
-            #source : str, optional
-
-                #The source to execute. If not specified, the input buffer will be
-                #used. If specified and 'hidden' is False, the input buffer will be
-                #replaced with the source before execution.
-
-            #hidden : bool, optional (default False)
-
-                #If set, no output will be shown and the prompt will not be modified.
-                #In other words, it will be completely invisible to the user that
-                #an execution has occurred.
-
-            #interactive : bool, optional (default False)
-
-                #Whether the console is to treat the source as having been manually
-                #entered by the user. The effect of this parameter depends on the
-                #subclass implementation.
-
-        #Raises
-        #------
-        #RuntimeError
-            #If incomplete input is given and 'hidden' is True. In this case,
-            #it is not possible to prompt for more input.
-            
-        #ValueError
-            #If the specified frontend index or name was not found
-            
-        #TypeError
-            #If the specified frontend is neither an int, str or RichJupyterWidget
-
-        #Returns
-        #-------
-        #A boolean indicating whether the source was executed.        
-        #"""
-        ## TODO factorize this with self.execute()
-        #if frontend is None:
-            #frontend = self.window.active_frontend
-            
-        #elif isinstance(frontend, (int, str)):
-            #frontend = self.window.get_frontend(frontend)
-            
-        #elif not isinstance(frontend, RichJupyterWidget):
-            #raise TypeError("frontend expected to be a RichJupyterWidget, int or str; got %s instead" % type(frontend).__name__)
-        
-        #if frontend is None:
-            #raise ValueError("Frontend %s not found" % frontend)
-        
-        #return frontend.execute(**kwargs)
-
 # NOTE: use Jupyter (IPython >= 4.x and qtconsole / qt5 by default)
 class ScipyenConsoleWidget(ConsoleWidget):
     r"""Console widget with an in-process kernel manager.
@@ -3741,282 +3566,6 @@ class ScipyenConsoleWidget(ConsoleWidget):
                 
         return text
 
-#     def set_pygment_new(self, scheme:typing.Optional[str]="", colors:typing.Optional[str]=None):
-#         r"""Sets up style sheet for console colors and syntax highlighting style.
-#         
-#         The console widget (a RichJupyterWidget) takes:
-#         a) a style specified in a style sheet - used for the general appearance of the console 
-#         (background and Prmopt colors, etc)
-#         b) a color syntax highlight scheme - used for syntax highlighting
-#         
-#         
-#         This allows bypassing any style/colors specified in 
-#         $HOME/.jupyter/jupyter_qtconsole_config.py
-#         
-#         and usually retrieved by the app's method config()
-#         
-#         Parameter:
-#         -------------
-#         
-#         scheme: str (optional, default is the empty string) - name of available 
-#                 syntax style (pygment).
-#                 
-#                 For a list of available pygment names, see
-#                 
-#                 available_pygments() in this module
-#                 
-#                 When empty or None, reverts to the defaults as set by the jupyter 
-#                 configuration file.
-#                 
-#         colors: str (optional, default is None) console color set. 
-#             There are, by defult, three color sets:
-#             'light' or 'lightbg', 
-#             'dark' or 'linux',
-#             'nocolor'
-#             
-#         """
-#         # TODO/FIXME: 2023-06-04 10:23:24
-#         # figure out how the ?/?? system works, and apply better terminal colors
-#         #   for dark backgrounds, to it; in fact, apply the curren terminal colors
-#         #   to the displayed help text as well 
-#         #   also, figure out how to alter the placement
-#         #   of the scrollbar when the console is showing the message from ?/??
-#         #   system -> check out _create_page_control in qtconsole/console_widget.py
-#         # might have to look at the page and console submodules in IPython/jupyter
-#         # but requires deep digging into their code
-#         # import pkg_resources
-#         #print("ConsoleWidget.set_pygment scheme:", scheme, "colors:", colors)
-#         if scheme is None or (isinstance(scheme, str) and len(scheme.strip()) == 0):
-#             self.set_default_style()
-#             #self._control.style = self._initial_style
-#             #self.style_sheet = self._initial_style_sheet
-#             return
-#         
-#         # NOTE: 2020-12-23 11:15:50
-#         # code below is modified from qtconsoleapp module, plus my comments;
-#         # find the value for colors: there are three color sets for prompts:
-#         # 1. light or lightbg (i.e. colors suitable for schemes with light background)
-#         # 2. dark or linux (i.e colors suitable for schemes with dark background)
-#         # 3. nocolor - for black and white scheme
-#         #else:
-#             #colors=None
-#             
-#         sheet = None
-#         
-#         # NOTE: 2024-09-19 16:21:02 temporary FIX
-#         if scheme == "KeplerDark":
-#             scheme = "native"
-#             
-#         # if scheme in available_pygments():
-#         if scheme in PYGMENT_STYLES:
-#             #print("found %s scheme" % scheme)
-#             # rules of thumb:
-#             #
-#             # 1. the syntax highlighting scheme is set by setting the console 
-#             # (RichJupyterWidget) 'syntax_style' attribute to scheme. 
-#             #
-#             # 2. the style sheet gives the widget colors ("style") - so we always 
-#             #   need a style sheet, and we "pygment" the console by setting its
-#             #   'style_sheet' attribute. NOTE that schemes do not always provide
-#             #   prompt styling colors, therefore we need to set up a style sheet 
-#             #   dynamically based on the colors guessed according to whether the
-#             #   scheme is a "dark" one or not.
-#             #
-#             # NOTE: the approach described above is the one used in qtconsole
-#             #
-#             if scheme == "KeplerDark":
-#                 # use my own - TODO: 2024-09-19 15:24:37 give possibility of 
-#                 # future additional custom schemes to be packaged with Scipyen
-#                 stylecolors = get_style_colors(scheme)
-#                 sheet = styles.default_dark_style_template%stylecolors
-#                 colors = "linux"
-#                 
-#             else:
-#                 if isinstance(colors, str) and len(colors.strip()): # force colors irrespective of scheme
-#                     colors=colors.lower()
-#                     if colors in ('lightbg', 'light'):
-#                         colors='lightbg'
-#                     elif colors in ('dark', 'linux'):
-#                         colors='linux'
-#                     else:
-#                         colors='nocolor'
-#                 
-#                 else: # (colors is "" or anything else)
-#                     # make an informed choice of colors, according to whether the scheme
-#                     # is bright (light) or dark
-#                     if scheme=='bw':
-#                         colors='nocolor'
-#                     elif styles.dark_style(scheme):
-#                         colors='linux'
-#                     else:
-#                         colors='lightbg'
-#                 try:
-#                     sheetfile = pkg_resources.resource_filename("jupyter_qtconsole_colorschemes", "%s.css" % scheme)
-#                     if os.path.isfile(sheetfile):
-#                         with open(sheetfile) as f:
-#                             sheet = f.read()
-#                 except:
-#                     # revert to built-in schemes
-#                     sheet = styles.sheet_from_template(scheme, colors)
-#                       
-#             if sheet:
-#                 # also need to call notifiers - this is the order in which they
-#                 # are called in qtconsoleapp module ('JupyterConsoleApp.init_colors')
-#                 # not sure whether it makes a difference but stick to it for now
-#                 self.syntax_style = scheme
-#                 self.style_sheet = sheet
-#                 self._syntax_style_changed()
-#                 self._style_sheet_changed()
-#                 
-#                 # remember these changes - to save them in _save_settings_()
-#                 self._console_pygment = scheme
-#                 self._console_colors = colors
-#                 
-#                 if self.kernel_client:
-#                     self._execute(f"colors {colors}", True)
-#                             #self.reset(clear=True)
-#                             #self.kernel_client.execute("colors %s"% colors, True)
-#                         
-#                         # NOTE: 2021-01-08 14:23:14
-#                         # These two will affect all Jupyter console apps in Scipyen that
-#                         # will be launched AFTER the internal console has been initiated. 
-#                         # These include the ExternalIPython.
-#                         #JupyterWidget.style_sheet = sheet
-#                         #JupyterWidget.syntax_style = scheme
-                        
-#     def set_pygment(self, scheme:typing.Optional[str]="", colors:typing.Optional[str]=None):
-#         r"""Sets up style sheet for console colors and syntax highlighting style.
-#         
-#         The console widget (a RichJupyterWidget) takes:
-#         a) a style specified in a style sheet - used for the general appearance of the console 
-#         (background and ormopt colors, etc)
-#         b) a color syntax highlight scheme - used for syntax highlighting
-#         
-#         
-#         This allows bypassing any style/colors specified in 
-#         ~./jupyter/jupyter_qtconsole_config.py
-#         
-#         Parameter:
-#         -------------
-#         
-#         scheme: str (optional, default is the empty string) - name of available 
-#                 syntax style (pygment).
-#                 
-#                 For a list of available pygment names, see
-#                 
-#                 available_pygments() in this module
-#                 
-#                 When empty or None, reverts to the defaults as set by the jupyter 
-#                 configuration file.
-#                 
-#         colors: str (optional, default is None) console color set. 
-#             There are, by defult, three color sets:
-#             'light' or 'lightbg', 
-#             'dark' or 'linux',
-#             'nocolor'
-#             
-#         """
-#         import pkg_resources
-#         #print("console.set_pygment scheme:", scheme, "colors:", colors)
-#         if scheme is None or (isinstance(scheme, str) and len(scheme.strip()) == 0):
-#             self.set_default_style()
-#             #self._control.style = self._initial_style
-#             #self.style_sheet = self._initial_style_sheet
-#             return
-#         
-#         # NOTE: 2020-12-23 11:15:50
-#         # code below is modified from qtconsoleapp module, plus my comments;
-#         # find the value for colors: there are three color sets for prompts:
-#         # 1. light or lightbg (i.e. colors suitable for schemes with light background)
-#         # 2. dark or linux (i.e colors suitable for schemes with dark background)
-#         # 3. nocolor - for black and white scheme
-#         if isinstance(colors, str) and len(colors.strip()): # force colors irrespective of scheme
-#             colors=colors.lower()
-#             if colors in ('lightbg', 'light'):
-#                 colors='lightbg'
-#             elif colors in ('dark', 'linux'):
-#                 colors='linux'
-#             else:
-#                 colors='nocolor'
-#         
-#         else: # (colors is "" or anything else)
-#             # make an informed choice of colors, according to whether the scheme
-#             # is bright (light) or dark
-#             if scheme=='bw':
-#                 colors='nocolor'
-#             elif styles.dark_style(scheme):
-#                 colors='linux'
-#             else:
-#                 colors='lightbg'
-#         #else:
-#             #colors=None
-#             
-#         if scheme in available_pygments():
-#             #print("found %s scheme" % scheme)
-#             # rules of thumb:
-#             #
-#             # 1. the syntax highlighting scheme is set by setting the console 
-#             # (RichJupyterWidget) 'syntax_style' attribute to scheme. 
-#             #
-#             # 2. the style sheet gives the widget colors ("style") - so we always 
-#             #   need a style sheet, and we "pygment" the console by setting its
-#             #   'style_sheet' attribute. NOTE that schemes do not always provide
-#             #   prompt styling colors, therefore we need to set up a style sheet 
-#             #   dynamically based on the colors guessed according to whether the
-#             #   scheme is a "dark" one or not.
-#             #
-#             try:
-#                 sheetfile = pkg_resources.resource_filename("jupyter_qtconsole_colorschemes", "%s.css" % scheme)
-#                 
-#                 if os.path.isfile(sheetfile):
-#                     with open(sheetfile) as f:
-#                         sheet = f.read()
-#                         
-#                 else:
-#                     #print("no style sheet found for %s" % scheme)
-#                     sheet = styles.sheet_from_template(scheme, colors)
-#                     #if colors:
-#                         #sheet = styles.sheet_from_template(scheme, colors)
-#                     #else:
-#                         #sheet = styles.sheet_from_template(scheme)
-#                     
-#                 self.style_sheet = sheet
-#                 self.syntax_style = scheme
-#                 # also need to call notifiers - this is the order in which they
-#                 # are called in qtconsoleapp module ('JupyterConsoleApp.init_colors')
-#                 # not sure whether it makes a difference but stick to it for now
-#                 self._syntax_style_changed()
-#                 self._style_sheet_changed()
-#                 
-#                 # remember these changes - to save them in _save_settings_()
-#                 self._console_pygment = scheme
-#                 self._console_colors = colors
-#                 #self._custom_style_sheet = sheet
-#                 #self._custom_syntax_scheme = scheme
-#                 
-#                 # NOTE: 2021-01-08 14:23:14
-#                 # These two will affect all Jupyter console apps in Scipyen that
-#                 # will be launched AFTER the internal console has been initiated. 
-#                 # These include the ExternalIPython.
-#                 #JupyterWidget.style_sheet = sheet
-#                 #JupyterWidget.syntax_style = scheme
-#                 
-#             except:
-#                 traceback.print_exc()
-#                 #pass
-#             
-#             # not needed (for now)
-#             #style = pstyles.get_style_by_name(scheme)
-#             #try:
-#                 ##self.syntax_style=scheme
-#                 #self._control.style = style
-#                 #self._highlighter.set_style (scheme)
-#                 #self._custom_syntax_style = style
-#                 #self._syntax_style_changed()
-#             #except:
-#                 #traceback.print_exc()
-#                 #pass
-            
 class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     # NOTE: 2023-09-27 12:55:24 TODO
     # to implements julia-style propgress indicators;

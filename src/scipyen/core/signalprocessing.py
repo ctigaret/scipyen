@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 r"""Functions for processing generic 1D signals (numpy array).
-For signal processing on elecctorphysiology signal types (e.g. neo.AnalogSignals or datatypes.DataSignal)
+For signal processing on elecctorphysiology signal types (e.g. neo.AnalogSignals or datasignal.DataSignal)
 please use the "ephys" module.
 """
 
@@ -2260,7 +2260,7 @@ def root_mean_square(x, axis=None):
 
     Positional parameters
     =====================
-    x = neo.AnalogSignal, neo.IrregularlySampledSignal, or datatypes.DataSignal
+    x = neo.AnalogSignal, neo.IrregularlySampledSignal, or datasignal.DataSignal
 
     Named parameters
     ================
@@ -2283,7 +2283,7 @@ def root_mean_square(x, axis=None):
 
     if not isinstance(x, (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal)):
         raise TypeError(
-            "Expecting a neo.AnalogSignal, neo.IrregularlySampledSignal, or a datatypes.DataSignal; got %s instead"
+            "Expecting a neo.AnalogSignal, neo.IrregularlySampledSignal, or a datasignal.DataSignal; got %s instead"
             % type(x).__name__
         )
 
@@ -2314,7 +2314,7 @@ def signal_to_noise(x, axis=None, ddof=None, db=True):
 
     Positional parameters:
     =====================
-    x = neo.AnalogSignal, neo.IrregularlySampledSignal, or datatypes.DataSignal
+    x = neo.AnalogSignal, neo.IrregularlySampledSignal, or datasignal.DataSignal
 
     Named parameters
     ================
@@ -2343,7 +2343,7 @@ def signal_to_noise(x, axis=None, ddof=None, db=True):
 
     if not isinstance(x, (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal)):
         raise TypeError(
-            "Expecting a neo.AnalogSignal, neo.IrregularlySampledSignal, or a datatypes.DataSignal; got %s instead"
+            "Expecting a neo.AnalogSignal, neo.IrregularlySampledSignal, or a datasignal.DataSignal; got %s instead"
             % type(x).__name__
         )
 
@@ -2407,7 +2407,7 @@ def resample_poly(sig, new_rate, p=1000, window=("kaiser", 5.0)):
     Parameters:
     ===========
 
-    sig: neo.AnalogSignal or datatypes.DataSignal
+    sig: neo.AnalogSignal or datasignal.DataSignal
 
     new_rate: either a float scalar, or a Python Quantity
             When a Python Quantity, it must have the same units as signal's
@@ -2651,7 +2651,7 @@ def correlate(in1, in2, **kwargs):
 
     ----------
 
-    in1 : neo.AnalogSignal, neo.IrregularlySampledSignal, datatypes.DataSignal, or np.ndarray.
+    in1 : neo.AnalogSignal, neo.IrregularlySampledSignal, datasignal.DataSignal, or np.ndarray.
 
         Must be a 1D signal i.e. with shape (N,) or (N,1) where N is the number
         of samples in "in1"
@@ -2660,7 +2660,7 @@ def correlate(in1, in2, **kwargs):
 
         Typically this is the longer of the signals to correlate.
 
-    in2 : neo.AnalogSignal, neo.IrregularlySampledSignal, datatypes.DataSignal, or np.ndarray
+    in2 : neo.AnalogSignal, neo.IrregularlySampledSignal, datasignal.DataSignal, or np.ndarray
 
         Must be a 1D signal, i.e. with shape (M,) or (M,1) where M is the number
         of samples in "in2"
@@ -2692,7 +2692,7 @@ def correlate(in1, in2, **kwargs):
     ret : object of the same type as "in1"
         Contains the result of correlating "in1" with "in2".
 
-        When "in1" is a neo.AnalogSignal, neo.IrregularlySampledSignal, or datatypes.DataSignal,
+        When "in1" is a neo.AnalogSignal, neo.IrregularlySampledSignal, or datasignal.DataSignal,
         ret will have "times" attribute copied from "in1" and with "units" attribute
         set to dimensionless, unless specified explicitly by "units" var-keyword parameter.
 

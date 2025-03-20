@@ -16,7 +16,6 @@ import numpy as np
 import quantities as pq
 import numbers
 from core import quantities as scq
-from core.datatypes import is_vector
 
 def check_rise_decay_params(x):
     r"""Returns the number of decay components for a exp-rise-multi-decay transient.
@@ -827,6 +826,7 @@ def Heaviside(x:typing.Union[pq.Quantity, np.ndarray],
         False ⇒ transition 1 → 0
         
     """
+    from core.datatypes import is_vector
     if not is_vector(x):
         raise TypeError(f"Domain (x) is not a vector")
     
@@ -880,7 +880,9 @@ def Heaviside2(x:typing.Union[pq.Quantity, np.ndarray],
     level0, level1:float; optional, defaults are 0 anbd 1, respectively
         The initial and the final level of the step function.
         
-"""
+    """
+    from core.datatypes import is_vector
+    
     if not is_vector(x):
         raise TypeError(f"Domain (x) is not a vector")
     

@@ -97,65 +97,6 @@ import ephys.ephys as ephys
 #### END Scipyen ephys modules
 
 
-def parse_current_injection_timings(data:neo.Block):
-    r"""
-    Extract current injection timings from the data.
-    Data is a neo.Block containing a series of sweeps (a.k.a, segments) with 
-    rectangular current injection waveforms. The injected current may be 
-    hyperpolarizing (for passive membrane properties) and/or depolarizing 
-    (for AP firing properties).
-
-    In the ABF protocol used for recording, these current injections are specified 
-    as Epochs of type "Step".
-
-    The rectangular current injections waveforms may change step-wise by a constant
-    value ('delta duration') from one sweep to the next, although the most common
-    case is to use the same duration for current injections in all sweeps.
-
-    The amplitude of the current injection is expected to change step-wise by a 
-    constant value ('delta level') from one sweep to the next. The amplitude for 
-    the first sweep must  be != 0.
-
-    NOTE: When the protocol defines more than one such epoch, the first epoch
-    will be used
-
-Returns a tuple (Istart, Istop, Iinj_0, delta_I)
-
-"""
-    protocol = pab.ABFProtocol(data)#, generateOutputConfigs=False)
-    dac = protocol.outputConfiguration(protocol.activeDACChannelIndex)
-
-    if not scq.unitsConvertible(dac.units, pq.A):
-        scipywarn(
-            f"Data block {data.name} does not appear to be a current clamp experiment. Expecting a DAC command in current units; instead, got {dac.dacUnits}")
-        useProtocol = False
-    
-    currentInjectionEpochs = [e for e in dac.epochs if e.epochType == pab.ABFEpochType.Step and e.firstLevel != 0 * dac.units ]
-
-    if len(currentInjectionEpochs) == 0:
-        scipywarn(
-            f"Data block {data.name} does not have a suitable current injection epoch")
-        useProtocol = False
-
-    elif len(currentInjectionEpochs) > 1:
-        scipywarn(
-            f"Data block {data.name} appears to have more than one ABF epoch defining a current injection step.\n Will use the first suitable epoch")
-
-    currentInjectionEpoch = currentInjectionEpochs[0]
-    
-    Iinj_0  = currentInjectionEpoch.firstLevel
-    delta_I = currentInjectionEpoch.deltaLevel
-    delta_t = currentInjectionEpoch.deltaDuration
-    
-    if delta_t != 0 * pq.s:
-        Istart  = [dac.getEpochActualRelativeStartTime(currentInjectionEpoch, k) for k in range(protocol.nSweeps)]
-        Istop   = [Istart[k] + dac.getEpochActualDuration(currentInjectionEpoch, k) for k in range(protocol.nSweeps)]
-        
-    else:
-        Istart  = dac.getEpochActualRelativeStartTime(currentInjectionEpoch, 0)
-        Istop   = Istart + dac.getEpochActualDuration(currentInjectionEpoch, 0)
-        
-    return Istart, Istop, Iinj_0, delta_I
     
 
 # NOTE: 2023-06-12 16:09:45
@@ -2890,7 +2831,7 @@ def analyse_AP_pulse_train(segment, signal_index=0, triggers=None,tail=None, thr
                 the times of the current injection pulses for eliciting APs are
                 taken as sthe postsynaptic trigger times
                 
-              neo.IrregularlySampledSignal or datatypes.IrregularlySampledDataSignal
+              neo.IrregularlySampledSignal or datasignal.IrregularlySampledDataSignal
                 the times of the current injection pulses are taken as the 
                 'times' attribute
                 

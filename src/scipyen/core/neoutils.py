@@ -205,9 +205,8 @@ from .prog import (
     scipywarn,
 )
 
-from .datatypes import (
-    is_string,
-    is_vector,
+
+from .constants import (
     RELATIVE_TOLERANCE,
     ABSOLUTE_TOLERANCE,
     EQUAL_NAN,
@@ -1149,6 +1148,8 @@ def assign_to_signal(
     channel int or None; when int it must point to a valid channel index into both signals
 
     """
+    from . import datatypes
+    
     if not isinstance(dest, neo.AnalogSignal):
         raise TypeError(
             "dest expected to be an AnalogSignal; got %s instead"
@@ -1189,7 +1190,7 @@ def assign_to_signal(
         else:
             dest[:, channel] = src
 
-    elif isinstance(src, np.ndarray) and is_vector(src):
+    elif isinstance(src, np.ndarray) and datatypes.is_vector(src):
         # TODO
         if channel is None:
             pass
@@ -1336,7 +1337,7 @@ def get_signal_names_indices(
     Parameters:
     ==========
 
-    data: a neo.Segment, or a sequence of neo.AnalogSignal, datatypes.DataSignal,
+    data: a neo.Segment, or a sequence of neo.AnalogSignal, datasignal.DataSignal,
             and/or neo.IrregularlySampledSignal objects
 
     analog: boolean, default True: returns the names/indices of analosignals and
@@ -1378,12 +1379,12 @@ def get_signal_names_indices(
 
         else:
             raise TypeError(
-                "The sequence should contain only neo.AnalogSignal, datatypes.DataSignal and neo.IrregularlySampledSignal objects"
+                "The sequence should contain only neo.AnalogSignal, datasignal.DataSignal and neo.IrregularlySampledSignal objects"
             )
 
     else:
         raise TypeError(
-            "Expecting a neo.Segment or a sequence of neo.AnalogSignal, datatypes.DataSignal and neo.IrregularlySampledSignal objects; got %s instead"
+            "Expecting a neo.Segment or a sequence of neo.AnalogSignal, datasignal.DataSignal and neo.IrregularlySampledSignal objects; got %s instead"
             % type(data).__name__
         )
 
@@ -2238,7 +2239,7 @@ def normalized_signal_index(
     ctype: type object; the type of signal to index; valid signal types are
         neo.AnalogSignal, neo.IrregularlySampledSignal,
         neo.Event, neo.Epoch, neo.SpikeTrain, neo.ImageSequence, neo.Unit,
-        datatypes.DataSignal and datatypes.IrregularlySampledDataSignal
+        datasignal.DataSignal and datasignal.IrregularlySampledDataSignal
 
         Defaults is neo.AnalogSignal.
 
@@ -2416,7 +2417,7 @@ def get_index_of_named_signal(
     -------------------
 
     stype:  the type (Python class ) of signal-like object to be looked up, or;
-            or a tuple of types, e.g. (neo.AnalogSignal, datatypes.DataSignal)
+            or a tuple of types, e.g. (neo.AnalogSignal, datasignal.DataSignal)
 
             Acceptable types are:
                 neo.AnalogSignal
@@ -3938,7 +3939,7 @@ def concatenate_signals(
 
     else:
         raise TypeError(
-            "Expecting a sequence of neo.AnalogSignal or datatypes.DataSignal objects"
+            "Expecting a sequence of neo.AnalogSignal or datasignal.DataSignal objects"
         )
 
 
@@ -4014,7 +4015,7 @@ def copy_with_data_subset(obj, **kwargs):
     analogsignals:
         Indexing of analog signal(s) into each of the segments, that
         will be retained in the concatenated data. These include
-        neo.AnalogSignal and datatypes.DataSignal
+        neo.AnalogSignal and datasignal.DataSignal
 
         This index can be (see normalized_index):
         int, str (signal name), sequence of int or str, a range,
@@ -4023,7 +4024,7 @@ def copy_with_data_subset(obj, **kwargs):
     irregularlysampledsignals:
         as analogsignals, for irregularly sampled signals. These
         include neo.IrregularlySampledSignal and
-        datatypes.IrregularlySampledDataSignal
+        datasignal.IrregularlySampledDataSignal
 
     imagesequences:
         as analogsignals, for neo.ImageSequence objects (for neo version
@@ -5489,7 +5490,7 @@ def check_ephys_data(x: typing.Any, mix: bool = False):
     Electrophysiology data types are:
     neo.Block, neo.Segment, neo.AnalogSignal, neo.IrregularlySampledSignal,
     neo.SpikeTrain,
-    core.datatypes.DataSignal, and core.datatypes.IrregularlySampledDataSignal
+    core.datasignal.DataSignal, and core.datasignal.IrregularlySampledDataSignal
 
     They MAY contain attributes that are ancillary data types such as neo.Event,
     neo.Epoch, and other (non-signal-like) data types, as well as
@@ -6294,7 +6295,7 @@ def lookup(
     Parameters:
     ----------
     signal: one of neo.AnalogSignal, neo.IrregularlySampledSignal,
-            datatypes.DataSignal, or datatypes.IrregularlySampledDataSignal.
+            datasignal.DataSignal, or datasignal.IrregularlySampledDataSignal.
 
     value: float scalar, the nominal value of the domain, or a monotonic
             sequence (tuple, list) of scalars.
@@ -6357,7 +6358,7 @@ def lookup(
     domain_vals: Subarray of the signal, indexed using the "index" array.
 
     CAUTION:
-    For regularly sampled signals (e.g. neo.AnalogSignal or datatypes.DataSignal)
+    For regularly sampled signals (e.g. neo.AnalogSignal or datasignal.DataSignal)
     this function will almost surely fail to return all signal values where the
     domain is close to the specified nominal value. The success depends on the
     sampling rate and signal quantization error.
@@ -6470,7 +6471,7 @@ def inverse_lookup(
     Parameters:
     ----------
     signal: one of neo.AnalogSignal, neo.IrregularlySampledSignal,
-            datatypes.DataSignal, or datatypes.IrregularlySampledDataSignal.
+            datasignal.DataSignal, or datasignal.IrregularlySampledDataSignal.
 
     value: float scalar, the nominal value of the signal, or a monotonic
             sequence (tuple, list) of scalars.
@@ -6533,7 +6534,7 @@ def inverse_lookup(
     sigvals: Subarray of the signal, indexed using the "index" array.
 
     CAUTION:
-    For regularly sampled signals (e.g. neo.AnalogSignal or datatypes.DataSignal)
+    For regularly sampled signals (e.g. neo.AnalogSignal or datasignal.DataSignal)
     this function will almost surely fail to return all domain values where the
     signal is close to the specified nominal value. The success depends on the
     sampling rate and signal quantization error.
@@ -8675,7 +8676,7 @@ def average_blocks_new(*args, **kwargs):
     analogsignals: int, str, range, slice, typing.Sequence
                 Indexing of analog signal(s) into each of the segments, that
                 will be retained in the result. These include neo.AnalogSignal
-                and datatypes.DataSignal.
+                and datasignal.DataSignal.
 
                 This index can be (see neo_use_lookup_index):
                 int, str (signal name), sequence of int or str, a range, a

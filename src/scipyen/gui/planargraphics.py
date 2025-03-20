@@ -177,7 +177,7 @@ from qtpy.QtCore import Signal, Slot, Property
 #### END 3rd party modules
 
 #### BEGIN core modules
-from core.datatypes import (TypeEnum, )
+from core.typeenum import (TypeEnum, )
 from core.utilities import (reverse_mapping_lookup, reverse_dict, )
 from core.traitcontainers import DataBag
 from core.prog import (safeWrapper, deprecated,

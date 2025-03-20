@@ -55,7 +55,7 @@ from core.utilities import (summarize_object_properties,
 from core.strutils import (is_cached_output_varname, is_cached_input_varname)
 
 from core.prog import (safeWrapper, timefunc, processtimefunc, timeblock)
-from core.datatypes import TypeEnum
+from core.typeenum import TypeEnum
 # from jupyter_core.paths import jupyter_runtime_dir
 
 from qtpy import QtCore, QtGui, QtWidgets
