@@ -75,14 +75,6 @@ from core.typeenum import TypeEnum
 from core.constants import (RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE,
                             EQUAL_NAN, GENOTYPES)
 
-# from core.scipyendataclasses import (AdministrationRoute,DoseDescriptor,
-#                                      ScipyenDataclass, CellCompartmentType,
-#                                      BioSourceType, ProcedureType, 
-#                                      OrganismStage, CellCompartment, Biometrics,
-#                                      Organism, Tissue, Organ, BiologicalSource,
-#                                      Procedure, Treatment, SubstanceDosage, 
-#                                      Episode, Schedule, )
-
 #### END pict.core.modules
 
 # CHANGELOG (most recent first)

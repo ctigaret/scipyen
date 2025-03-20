@@ -2239,7 +2239,7 @@ def normalized_signal_index(
     ctype: type object; the type of signal to index; valid signal types are
         neo.AnalogSignal, neo.IrregularlySampledSignal,
         neo.Event, neo.Epoch, neo.SpikeTrain, neo.ImageSequence, neo.Unit,
-        datasignal.DataSignal and datatypes.IrregularlySampledDataSignal
+        datasignal.DataSignal and datasignal.IrregularlySampledDataSignal
 
         Defaults is neo.AnalogSignal.
 
@@ -4024,7 +4024,7 @@ def copy_with_data_subset(obj, **kwargs):
     irregularlysampledsignals:
         as analogsignals, for irregularly sampled signals. These
         include neo.IrregularlySampledSignal and
-        datatypes.IrregularlySampledDataSignal
+        datasignal.IrregularlySampledDataSignal
 
     imagesequences:
         as analogsignals, for neo.ImageSequence objects (for neo version
@@ -5490,7 +5490,7 @@ def check_ephys_data(x: typing.Any, mix: bool = False):
     Electrophysiology data types are:
     neo.Block, neo.Segment, neo.AnalogSignal, neo.IrregularlySampledSignal,
     neo.SpikeTrain,
-    core.datasignal.DataSignal, and core.datatypes.IrregularlySampledDataSignal
+    core.datasignal.DataSignal, and core.datasignal.IrregularlySampledDataSignal
 
     They MAY contain attributes that are ancillary data types such as neo.Event,
     neo.Epoch, and other (non-signal-like) data types, as well as
@@ -6295,7 +6295,7 @@ def lookup(
     Parameters:
     ----------
     signal: one of neo.AnalogSignal, neo.IrregularlySampledSignal,
-            datasignal.DataSignal, or datatypes.IrregularlySampledDataSignal.
+            datasignal.DataSignal, or datasignal.IrregularlySampledDataSignal.
 
     value: float scalar, the nominal value of the domain, or a monotonic
             sequence (tuple, list) of scalars.
@@ -6471,7 +6471,7 @@ def inverse_lookup(
     Parameters:
     ----------
     signal: one of neo.AnalogSignal, neo.IrregularlySampledSignal,
-            datasignal.DataSignal, or datatypes.IrregularlySampledDataSignal.
+            datasignal.DataSignal, or datasignal.IrregularlySampledDataSignal.
 
     value: float scalar, the nominal value of the signal, or a monotonic
             sequence (tuple, list) of scalars.

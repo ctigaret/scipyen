@@ -2831,7 +2831,7 @@ def analyse_AP_pulse_train(segment, signal_index=0, triggers=None,tail=None, thr
                 the times of the current injection pulses for eliciting APs are
                 taken as sthe postsynaptic trigger times
                 
-              neo.IrregularlySampledSignal or datatypes.IrregularlySampledDataSignal
+              neo.IrregularlySampledSignal or datasignal.IrregularlySampledDataSignal
                 the times of the current injection pulses are taken as the 
                 'times' attribute
                 
