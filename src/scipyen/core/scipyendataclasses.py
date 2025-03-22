@@ -51,7 +51,7 @@ from core import xmlutils
 from core import strutils
 from core.prog import (safeWrapper, is_hashable, is_type_or_subclass, 
                        ImmutableDescriptor, scipywarn, NoData, printStyled)
-from core.datazone import DataZone
+# from core.datazone import DataZone
 from core.datasignal import (_new_DataSignal, _new_IrregularlySampledDataSignal, DataSignal, IrregularlySampledDataSignal)
 # from core import bgbridge
 # from core.bgbridge import (BGStructureDescriptor, BrainGlobeAtlas)

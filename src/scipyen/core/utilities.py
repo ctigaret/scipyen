@@ -51,7 +51,7 @@ from .prog import safeWrapper, deprecation, with_doc, is_hashable
 
 from .strutils import get_int_sfx
 from .quantities import unitsConvertible
-from .datazone import DataZone
+# from .datazone import DataZone
 
 # NOTE: 2021-07-24 15:03:53
 # moved TO core.datatypes
@@ -4467,6 +4467,7 @@ ret - an iterable object (range, or tuple of integer indices) that can be
         
     """
     from core.datatypes import is_vector
+    from core.datazone import DataZone
     
     if data is None:
         return tuple()
