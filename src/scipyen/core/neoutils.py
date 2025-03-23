@@ -45,7 +45,7 @@ neo_lookup
 neo_child_container_name
 is_same_as
 lookup
-normalized_signal_index
+normalized_index
 normalized_segment_index
 
 
@@ -2217,26 +2217,30 @@ def neo_use_lookup_index(
     return tuple(ret)
 
 
-def normalized_signal_index(
+def normalized_index(
     src: neo.core.container.Container,
     index: typing.Union[int, str, range, slice, typing.Sequence],
-    sigtype: type = neo.AnalogSignal,
+    childtype: type = neo.AnalogSignal,
     silent: bool = False,
 ):
-    r"""Returns the integral index of a signal in its container.
+    r"""Returns the integral index of a child object in its container.
+    
+    
+    The child object is identified by the value of its 'name' attribute.
+    CAUTION It is assumed that, in a given container, no two objects of the same
+    type have identical values for the 'name' attribute.
 
     Useful to get the index of data by its name.
-    CAUTION Indexing by name assumes that all data in the container have unique names.
 
     Parameters:
     ----------
 
-    src: neo container
+    src: neo container (Block, Segment, Group)
 
     index: int, str, tuple, list, range, or slice; any valid form of indexing
         including by the value of the signal's "name " attribute.
 
-    sigtype: type object; the type of signal to index; valid signal types are
+    childtype: type object; the type of signal to index; valid signal types are
         neo.AnalogSignal, neo.IrregularlySampledSignal,
         neo.Event, neo.Epoch, neo.SpikeTrain, neo.ImageSequence, neo.Unit,
         datasignal.DataSignal and datasignal.IrregularlySampledDataSignal
@@ -2262,56 +2266,56 @@ def normalized_signal_index(
     data_len = None
     
     if isinstance(src, neo.Block):
-        return list(map(lambda seg: normalized_signal_index(seg, index, sigtype, silent), src.segments))
+        return list(map(lambda seg: normalized_index(seg, index, childtype, silent), src.segments))
 
     if not isinstance(src, neo.Segment):
         raise TypeError("Expecting a neo.Segment; got %s instead" % type(src).__name__)
 
     #### BEGIN figure out what signal collection we're after
-    if sigtype in (neo.AnalogSignal, DataSignal):
+    if childtype in (neo.AnalogSignal, DataSignal):
         if not isinstance(src, neo.Segment):
             raise TypeError(
-                "%s does not contain %s" % (type(src).__name__, sigtype.__name__)
+                "%s does not contain %s" % (type(src).__name__, childtype.__name__)
             )
 
         signal_collection = src.analogsignals
 
-    elif sigtype in (neo.IrregularlySampledSignal, IrregularlySampledDataSignal):
+    elif childtype in (neo.IrregularlySampledSignal, IrregularlySampledDataSignal):
         if not isinstance(src, neo.Segment):
             raise TypeError(
-                "%s does not contain %s" % (type(src).__name__, sigtype.__name__)
+                "%s does not contain %s" % (type(src).__name__, childtype.__name__)
             )
 
         signal_collection = src.irregularlysampledsignals
 
-    elif sigtype is neo.SpikeTrain:
+    elif childtype is neo.SpikeTrain:
         if not isinstance(src, neo.Segment):
             raise TypeError(
-                "%s does not contain %s" % (type(src).__name__, sigtype.__name__)
+                "%s does not contain %s" % (type(src).__name__, childtype.__name__)
             )
 
         signal_collection = src.spiketrains
 
-    elif sigtype is neo.Event:
+    elif childtype is neo.Event:
         if not isinstance(src, neo.Segment):
             raise TypeError(
-                "%s does not contain %s" % (type(src).__name__, sigtype.__name__)
+                "%s does not contain %s" % (type(src).__name__, childtype.__name__)
             )
 
         signal_collection = src.events
 
-    elif sigtype is neo.Epoch:
+    elif childtype is neo.Epoch:
         if not isinstance(src, neo.Segment):
             raise TypeError(
-                "%s does not contain %s" % (type(src).__name__, sigtype.__name__)
+                "%s does not contain %s" % (type(src).__name__, childtype.__name__)
             )
 
         signal_collection = src.epochs
 
-    elif any([major >= 0, minor >= 8]) and sigtype is neo.core.ImageSequence:
+    elif any([major >= 0, minor >= 8]) and childtype is neo.core.ImageSequence:
         if not isinstance(src, neo.Segment):
             raise TypeError(
-                "%s does not contain %s" % (type(src).__name__, sigtype.__name__)
+                "%s does not contain %s" % (type(src).__name__, childtype.__name__)
             )
 
         # ImageSequence: either a 3D numpy array [frame][row][column] OR
@@ -2342,7 +2346,7 @@ def normalized_signal_index(
             data_len = len(signal_collection)
 
     else:
-        raise TypeError("Cannot handle %s" % sigtype.__name__)
+        raise TypeError("Cannot handle %s" % childtype.__name__)
 
     #### END figure out what signal collection we're after'
 
@@ -2394,11 +2398,11 @@ def get_index_of_named_signal(
     r"""Returns a list of indices of signals named as specified by 'names',
     and contained in src.
 
-    NOTE: This function is DEPRECATED in favor of normalized_signal_index
+    NOTE: This function is DEPRECATED in favor of normalized_index
     (which calls utlities.normalized_index).
 
     However, it is kept to avoid breaking older code. In new code, please use
-    normalized_signal_index
+    normalized_index
 
     Positional parameters:
     ----------------------
@@ -7790,7 +7794,7 @@ def average_segments(*args, **kwargs) -> typing.List[neo.Segment]:
             seg.analogsignals[:] = args[0].analogsignals
 
         else:
-            sig_ndx = normalized_signal_index(args[0], analog_index)
+            sig_ndx = normalized_index(args[0], analog_index)
             seg.analogsignals[:] = [args[0].analogsignals[i] for i in sig_ndx]
 
         return seg
@@ -7863,7 +7867,7 @@ def average_segments(*args, **kwargs) -> typing.List[neo.Segment]:
                     selected_signals = [s for s in args[k].analogsignals]
 
                 else:
-                    sig_ndx = normalized_signal_index(args[k], analog_index)
+                    sig_ndx = normalized_index(args[k], analog_index)
                     # print(f"r: {r}, k: {k}, sig_ndx: {sig_ndx}")
                     selected_signals = [args[k].analogsignals[i] for i in sig_ndx]
 
@@ -7884,7 +7888,7 @@ def average_segments(*args, **kwargs) -> typing.List[neo.Segment]:
 
                 else:
                     try:
-                        sig_ndx = normalized_signal_index(args[k], analog_index)
+                        sig_ndx = normalized_index(args[k], analog_index)
                         # print(f"r: {r}, k: {k}, sig_ndx: {sig_ndx}")
                     except:
                         print(

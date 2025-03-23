@@ -659,11 +659,19 @@ def makeAttrDict(**kwargs):
     return ret
 
 def group2neoContainer(g:h5py.Group, target_class:type, cache:dict = {}):
-    # treats Segment, Block, Group -- TODO
+    # treats Segment, Block, Group -- 
     # neo.core.container.Containers are (as of neo 0.11.0):
     # • Block
     # • Segment
     # • Group
+    
+    # BUG 2025-03-23 22:29:38 TODO/FIXME
+    # neo.Group obejcts are not populated with their children NeoObjectList
+    
+    # print(f"group2neoContainer: target_class {target_class.__name__}")
+    if g in cache:
+        # print(f"\tfound cached object {cache[g]}")
+        return cache[g]
     
     attrs = attrs2dict(g.attrs)
     rec_attrs = dict((a[0], attrs[a[0]]) for a in target_class._recommended_attrs)
@@ -680,23 +688,27 @@ def group2neoContainer(g:h5py.Group, target_class:type, cache:dict = {}):
                         "epochs", "events",
                         "spiketrains", "imagesequences", "annotations")
         
-    elif target_class == neo.Group:
-        for child_container in child_containers:
-            entity = g.get(child_container, None)
-            if isinstance(entity, (h5py.Group, h5py.Dataset)):
-                child = fromHDF5(entity, cache)
-                setattr(obj, child_container, child)
+    # elif target_class == neo.Group:
+    #     for child_container in child_containers:
+    #         print(f"\tneo.Group child container {child_container}")
+    #         entity = g.get(child_container, None)
+    #         if isinstance(entity, (h5py.Group, h5py.Dataset)):
+    #             child = fromHDF5(entity, cache)
+    #             setattr(obj, child_container, child)
             
-    obj = target_class() # this automatically creates container children e.g. analosginals, etc
+    obj = target_class() # this automatically creates container children e.g. analogsignals, etc
     
     cache[g] = obj
 
     for child_container in child_containers:
+        # print(f"\tchild_container {child_container} of {target_class.__name__}")
         entity = g.get(child_container, None)
         if isinstance(entity, (h5py.Group, h5py.Dataset)):
             child = fromHDF5(entity, cache)
             # print(f"group2neoContainer child_container {child_container}, entity: {entity}, child: {type(child).__name__}")
             setattr(obj, child_container, child)
+            
+    # print("")
         
     for k,v in rec_attrs.items():
         setattr(obj, k, v)
@@ -719,6 +731,9 @@ def group2neoSignal(g:h5py.Group, target_class:type, cache:dict = {}):
     • neo.ImageSequence
     
     """
+    if g in cache:
+        return cache[g]
+    
     # first prepare some defaults
     signal = []
     times = []
@@ -961,6 +976,9 @@ def group2neoDataObject(g:h5py.Group, target_class:type, cache:dict = {}):
     • neo.SpikeTrain
     
     """
+    if g in cache:
+        return cache[g]
+    
     # delegate for signals 
     if neo.core.basesignal.BaseSignal in inspect.getmro(target_class):
         return group2neoSignal(g, target_class)
@@ -1235,6 +1253,9 @@ def group2neo(g:h5py.Group, target_class:type, cache:dict = {}):
     
     # print(f"group2neo: target_class {target_class}")
     
+    if g in cache:
+        return cache[g]
+    
     mro = inspect.getmro(target_class)
     
     # print(f"group2neo: {g}, ({target_class})")
@@ -1306,6 +1327,8 @@ def fromHDF5(entity:typing.Union[h5py.Group, h5py.Dataset], cache:dict=dict()):
     if isinstance(object_decoder, prog.CALLABLE_TYPES + (classmethod,)):
         return target_class.fromHDF5(entity, attrs, cache)
     
+    # if issubclass(target_class, (neo.core.baseneo.BaseNeo, NeoObjectList)):
+    #     print(f"h5io.fromHDF5 to call objectFromEntity for {target_class.__name__}")
     obj = objectFromEntity(entity, target_class, attrs, cache)
     
     cache[entity] = obj
@@ -2181,7 +2204,7 @@ def objectToEntity(obj,
     # print(f"h5io.objectToEntity: {type(obj).__name__}")
     
     if (isinstance(obj, (collections.abc.Iterable, neo.core.container.Container)) or hasattr(type(obj),"__iter__")) and \
-        not isinstance(obj, (str, bytes, bytearray, np.ndarray, neo.core.spiketrainlist.SpikeTrainList)):
+        not isinstance(obj, (str, bytes, bytearray, np.ndarray, neo.core.spiketrainlist.SpikeTrainList, NeoObjectList)):
         # neo Container, tuple, list, dict → h5py.Group child of group
         # CAUTION: 2022-10-10 22:05:17
         # neo.core.spiketrainlist.SpikeTrainList is a collections.abc.Iterable
@@ -2337,6 +2360,39 @@ def _(obj:typing.Union[vigra.VigraArray, neo.core.dataobject.DataObject],
         
         storeEntityInCache(entity_cache, obj, entity)
         
+        return entity
+    
+@objectToEntity.register(NeoObjectList)
+def _(obj:NeoObjectList, 
+      obj_attrs:dict, group:h5py.Group, name:typing.Optional[str]=None,
+      target_name:typing.Optional[str]=None,
+      compression:typing.Optional[str]="gzip",
+      chunks:typing.Optional[bool]=None,
+      track_order:typing.Optional[bool] = True, 
+      entity_cache:typing.Optional[dict]=None,
+      **kwargs):
+        cached_entity = getCachedEntity(entity_cache, obj)
+        if isinstance(cached_entity, h5py.Group):
+            group[target_name] = cached_entity
+            return cached_entity
+        
+        obj_attrs["allowed_contents"] = [f"{c.__module__}.{c.__name__}" for c in obj.allowed_contents]
+        items = [s for s in obj] # list of SpikeTrain objects
+        
+        entity = toHDF5(items, group, name, 
+                        compression = compression, chunks = chunks,
+                        track_order = track_order,
+                        entity_cache = entity_cache)
+        
+        # entity = makeHDF5Group(items, group, name = name, 
+        #                        compression = compression, chunks = chunks,
+        #                        track_order = track_order,
+        #                        entity_cache = entity_cache)
+        
+        entity.attrs.update(obj_attrs) # will include name, description, file_origin
+        
+        storeEntityInCache(entity_cache, obj, entity)
+
         return entity
 
 @objectToEntity.register(neo.core.spiketrainlist.SpikeTrainList)
@@ -3288,18 +3344,19 @@ def makeGroup(obj, group:h5py.Group, attrs:dict, name:str,
               compression:typing.Optional[str]="gzip", 
               chunks:typing.Optional[bool]=None, track_order:typing.Optional[bool] = True, 
               entity_cache:typing.Optional[dict] = None):# -> h5py.Group:
-    cached_entity = getCachedEntity(entity_cache, obj)
-    
-    if isinstance(cached_entity, h5py.Group):
-        group[name] = cached_entity
-        return cached_entity
-        
+    raise NotImplementedError(f"Objects of type {type(obj)._name__} are not supported")
     # NOTE: 2021-11-18 14:46:12
-    # reserved for generic mapping objects
-    grp = group.create_group(name, track_order = track_order)
-    grp.attrs.update(attrs)
-    storeEntityInCache(entity_cache, obj, grp)
-    return grp
+    # reserved for generic container objects (such as ?!?)
+#     cached_entity = getCachedEntity(entity_cache, obj)
+#     
+#     if isinstance(cached_entity, h5py.Group):
+#         group[name] = cached_entity
+#         return cached_entity
+#         
+#     grp = group.create_group(name, track_order = track_order)
+#     grp.attrs.update(attrs)
+#     storeEntityInCache(entity_cache, obj, grp)
+#     return grp
     
 @makeGroup.register(dict)
 def _(obj:dict, group, attrs, name, compression, chunks, track_order, 
@@ -3378,6 +3435,35 @@ def _(obj:ephys.SynapticPathway, group, attrs, name, compression, chunks,
         return cached_entity
     
     measurements = [m for m in obj.measurements]
+    
+# @makeGroup.register(NeoObjectList)
+# def _(obj:NeoObjectList, group, attrs, name, compression, chunks, 
+#       track_order, entity_cache):
+#     print(f"h5io.makeGroup NeoObjectList")
+#     cached_entity = getCachedEntity(entity_cache, obj)
+#     if isinstance(cached_entity, h5py.Group):
+#         group[target_name] = cached_entity
+#         return cached_entity
+#     
+#     attrs["allowed_contents"] = [f"{c.__module__}.{c.__name__}" for c in obj.allowed_contents]
+#     grp = group.create_group(name, track_order = track_order)
+#     grp.attrs.update(attrs)
+#     storeEntityInCache(entity_cache, obj, grp)
+#     
+#     # NOTE: 2025-03-23 22:59:39
+#     # treat this as a list
+#     for k, element in enumerate(obj):
+#         cached_entity = getCachedEntity(entity_cache, element)
+#         element_name = getattr(element, "name", type(element).__name__)
+#         element_entry_name = f"{k}_{element_name}"
+#         if isinstance(cached_entity, (h5py.Group, h5py.Dataset)):
+#             grp[element_entry_name] = cached_entity
+#         else:
+#             element_entity = toHDF5(element, grp, element_entry_name, compression = compression, chunks = chunks,
+#                             track_order = track_order, entity_cache = entity_cache)
+#             
+#     return grp
+        
         
 @makeGroup.register(neo.core.container.Container)
 def _(obj:neo.core.container.Container, group, attrs, name, compression, chunks, 
@@ -3617,6 +3703,7 @@ def _(entity:h5py.Group, target_class:type, attrs:dict, cache:dict=dict()):
             items = list()
             item_types = list()
             for k in entity.keys():
+                # print(f"\tkey {k} in {target_class.__name__}")
                 o = fromHDF5(entity[k], cache)
                 items.append(o)
                 item_types.append(type(o))
@@ -3624,6 +3711,9 @@ def _(entity:h5py.Group, target_class:type, attrs:dict, cache:dict=dict()):
             # print(f"\tcontained types -> {item_types}")
                 
             obj = target_class(item_types)
+            allowed_contents = tuple(map(lambda x: eval(x), attrs.get("allowed_contents", tuple())))
+            if len(allowed_contents):
+                setattr(obj, "allowed_contents", allowed_contents)
             obj.extend(items)
             
         elif target_class in (pd.DataFrame, pd.Series):
@@ -3638,8 +3728,6 @@ def _(entity:h5py.Group, target_class:type, attrs:dict, cache:dict=dict()):
             obj = target_class(data[names], index = data["index"])
                 
         else:
-            # TODO:
-            # vigra.VigraArray (follow the model for neo DataObject)
             obj = target_class # for now
     
     return obj
