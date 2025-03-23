@@ -2220,7 +2220,7 @@ def neo_use_lookup_index(
 def normalized_signal_index(
     src: neo.core.container.Container,
     index: typing.Union[int, str, range, slice, typing.Sequence],
-    ctype: type = neo.AnalogSignal,
+    sigtype: type = neo.AnalogSignal,
     silent: bool = False,
 ):
     r"""Returns the integral index of a signal in its container.
@@ -2236,7 +2236,7 @@ def normalized_signal_index(
     index: int, str, tuple, list, range, or slice; any valid form of indexing
         including by the value of the signal's "name " attribute.
 
-    ctype: type object; the type of signal to index; valid signal types are
+    sigtype: type object; the type of signal to index; valid signal types are
         neo.AnalogSignal, neo.IrregularlySampledSignal,
         neo.Event, neo.Epoch, neo.SpikeTrain, neo.ImageSequence, neo.Unit,
         datasignal.DataSignal and datasignal.IrregularlySampledDataSignal
@@ -2260,55 +2260,58 @@ def normalized_signal_index(
     major, minor, dot = get_neo_version()
 
     data_len = None
+    
+    if isinstance(src, neo.Block):
+        return list(map(lambda seg: normalized_signal_index(seg, index, sigtype, silent), src.segments))
 
     if not isinstance(src, neo.Segment):
         raise TypeError("Expecting a neo.Segment; got %s instead" % type(src).__name__)
 
     #### BEGIN figure out what signal collection we're after
-    if ctype in (neo.AnalogSignal, DataSignal):
+    if sigtype in (neo.AnalogSignal, DataSignal):
         if not isinstance(src, neo.Segment):
             raise TypeError(
-                "%s does not contain %s" % (type(src).__name__, ctype.__name__)
+                "%s does not contain %s" % (type(src).__name__, sigtype.__name__)
             )
 
         signal_collection = src.analogsignals
 
-    elif ctype in (neo.IrregularlySampledSignal, IrregularlySampledDataSignal):
+    elif sigtype in (neo.IrregularlySampledSignal, IrregularlySampledDataSignal):
         if not isinstance(src, neo.Segment):
             raise TypeError(
-                "%s does not contain %s" % (type(src).__name__, ctype.__name__)
+                "%s does not contain %s" % (type(src).__name__, sigtype.__name__)
             )
 
         signal_collection = src.irregularlysampledsignals
 
-    elif ctype is neo.SpikeTrain:
+    elif sigtype is neo.SpikeTrain:
         if not isinstance(src, neo.Segment):
             raise TypeError(
-                "%s does not contain %s" % (type(src).__name__, ctype.__name__)
+                "%s does not contain %s" % (type(src).__name__, sigtype.__name__)
             )
 
         signal_collection = src.spiketrains
 
-    elif ctype is neo.Event:
+    elif sigtype is neo.Event:
         if not isinstance(src, neo.Segment):
             raise TypeError(
-                "%s does not contain %s" % (type(src).__name__, ctype.__name__)
+                "%s does not contain %s" % (type(src).__name__, sigtype.__name__)
             )
 
         signal_collection = src.events
 
-    elif ctype is neo.Epoch:
+    elif sigtype is neo.Epoch:
         if not isinstance(src, neo.Segment):
             raise TypeError(
-                "%s does not contain %s" % (type(src).__name__, ctype.__name__)
+                "%s does not contain %s" % (type(src).__name__, sigtype.__name__)
             )
 
         signal_collection = src.epochs
 
-    elif any([major >= 0, minor >= 8]) and ctype is neo.core.ImageSequence:
+    elif any([major >= 0, minor >= 8]) and sigtype is neo.core.ImageSequence:
         if not isinstance(src, neo.Segment):
             raise TypeError(
-                "%s does not contain %s" % (type(src).__name__, ctype.__name__)
+                "%s does not contain %s" % (type(src).__name__, sigtype.__name__)
             )
 
         # ImageSequence: either a 3D numpy array [frame][row][column] OR
@@ -2339,7 +2342,7 @@ def normalized_signal_index(
             data_len = len(signal_collection)
 
     else:
-        raise TypeError("Cannot handle %s" % ctype.__name__)
+        raise TypeError("Cannot handle %s" % sigtype.__name__)
 
     #### END figure out what signal collection we're after'
 
