@@ -1519,6 +1519,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self._default_scipyen_user_plugins_dir = os.path.join(self._user_home_, "scipyen_plugins")
         
         self._user_plugins_dir = self._default_scipyen_user_plugins_dir
+        # self._external_HDF5_viewer: str = str()         # NOTE: 2025-03-24 21:35:03 NOT USED
 
         # BEGIN configurables; for each of these we define a read-write property
         # decorated with markConfigurable
@@ -1899,6 +1900,20 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         • getMenusForUIPlugin
         """
         return dict((k.__name__, dict((self._crawl_plugin_UI_menu(act), l.__name__) for l,act in v.items())) for k,v in  self._ui_plugins_.items())
+        
+#     @property
+#     def externalHDF5Viewer(self) -> str:
+#         # NOTE: 2025-03-24 21:35:03 NOT USED
+#         return self._external_HDF5_viewer
+#         
+#     @markConfigurable("ExternalHDF5Viewer", trait_notifier=True)
+#     @externalHDF5Viewer.setter
+#     def externalHDF5Viewer(self, value:typing.Optional[str] = None):
+#         # NOTE: 2025-03-24 21:35:03 NOT USED
+#         if isinstance(val, str) and len(val.strip()):
+#             self._external_HDF5_viewer = val
+#         else:
+#             self._external_HDF5_viewer = str()
         
     @property
     def userPluginsDirectory(self) -> str:
@@ -2809,6 +2824,9 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         r"""Sets obj to be the current window and raises it.
         Steals focus.
         """
+        # WARNING: 2025-03-24 21:40:05 FIXME
+        # Doesn't work in wayland
+        
         # print(f"{self.__class__.__name__}.raiseWindow ({obj})")
         if not isinstance(obj, (scipyenviewer.ScipyenViewer, mpl.figure.Figure)):
             return
@@ -3933,7 +3951,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @safeWrapper
     def slot_variableItemPressed(self, ndx):
         r"""Triggered by single-click of lmb in workspace viewer.
-    """
+        """
         self.currentVarItem, self.currentVarItemName = self._getWorkspaceVarItemAndName_(
             ndx)
         try:
@@ -4878,7 +4896,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         self.actionGUI_Style.triggered.connect(self._slot_set_Application_style)
         self.actionSet_user_plugins_directory.triggered.connect(self._slot_set_Users_Plugins_directory)
-        # self.actionConfigure_External_HDF5_Viewer.triggered.connect(self._slot_set_ExternalHDF5Viewer)
+        # self.actionConfigure_external_HDF_viewer.triggered.connect(self._slot_set_ExternalHDF5Viewer)
         self.actionAuto_launch_Script_Manager.toggled.connect(self._slot_set_scriptManagerAutoLaunch)
         self.actionAuto_delete_viewer.triggered.connect(self._slot_setAutoRemoveViewers)
         
@@ -5347,8 +5365,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.slot_systemOpenFileOrFolder(targetDir)
         
     @Slot()
-    @safeWrapper
-    def slot_openCurrentDirInSystemTerminal(self):
+    def _slot_startSystemTerminal(self):
         dest = str(pathlib.Path(self.currentDir))
         terminal = desktoputils.get_system_terminal_executable()
         if sys.platform.startswith("win32"):
@@ -5356,7 +5373,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         elif sys.platform.startswith("linux"):
             # subprocess.run(["xterm", "-e", "'cd", dest, "&&", "/bin/bash'"], shell=True)
             if terminal == "konsole":
-                subprocess.run([terminal, "--subprocess", "--workdir", dest], shell=True)
+                # subprocess.run([terminal, "--subprocess", "--workdir", dest], shell=True)
+                subprocess.run([terminal, "--separate", "--workdir", dest], shell=True)
             elif terminal == "xterm":
                 subprocess.run([terminal, "-e", "'cd", dest, "&&", "/bin/bash'"], shell=True)
             else:
@@ -5364,6 +5382,16 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 
         else:
             warnings.warn(f"Launching a terminal on {sys.platform} is not yet supported")
+        
+        
+    @Slot()
+    @safeWrapper
+    def slot_openCurrentDirInSystemTerminal(self):
+        terminalLauncher = QtCore.QTimer(self)
+        terminalLauncher.singleShot(0, self._slot_startSystemTerminal)
+        # terminalLauncher.setSingleShot(True)
+        # terminalLauncher.timeout.connect(self._slot_startSystemTerminal)
+        terminalLauncher.deleteLater()
         
     @Slot()
     @safeWrapper
@@ -5613,9 +5641,9 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             openFileObjects = cm.addAction("Open")
             openFileObjects.triggered.connect(self.slot_openSelectedFileItems)
 
-            for f in fileNames:
-                if pio.checkFileReadAccess(f):
-                    mime_file_type = pio.getMimeAndFileType(f)
+            # for f in fileNames:
+            #     if pio.checkFileReadAccess(f):
+            #         mime_file_type = pio.getMimeAndFileType(f)
 
             if not all(pio.checkFileReadAccess(f) for f in fileNames):
                 return
@@ -5643,6 +5671,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
             action_0 = openFileObjects
 
+        cm.addSeparator()
         openParentFolderInSystemApp = cm.addAction(
             "Open Parent Folder In File Manager")
         openParentFolderInSystemApp.triggered.connect(
@@ -7645,9 +7674,17 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @Slot()
     @safeWrapper
     def _slot_set_ExternalHDF5Viewer(self):
+        # NOTE: 2025-03-24 21:35:03 NOT USED
+        caption = "Path to external HDF5 Viewer executable"
+        kw = dict()
+        if sys.platform.startswith("win32"):
+            kw = {"options":QtWidgets.QFileDialog.Option.DontUseNativeDialog}
+            
+        hdf5Viewer = str(QtWidgets.QFileDialog.getExistingDirectory(
+            self, caption=caption, directory = pathlib.Path.home().as_posix(), **kw))
         
-        pass
-    
+        if len(fileName) > 0:
+            self.externalHDF5Viewer = fileName
     
     @Slot()
     @safeWrapper
