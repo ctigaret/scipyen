@@ -31,19 +31,14 @@ function show_help ()
     echo -e "\tthis will include installing an activation script for the environmment \n"
 }
 
-if [ -z ${CONDA_PREFIX} ]; then
-echo -e "This script must be run from an activated mamba environment"
-exit 1
+if [  -z ${VIRTUAL_ENV} ] | [ -z ${CONDA_PREFX}  ]; then
+    if [ -a $HOME/.scipyenrc ] ; then
+        source $HOME/.scipyenrc && scipyact
+    else
+        echo "Cannot activate an environment for Scipyen"
+        exit 1
+    fi
 fi
-# if [ -z ${VIRTUAL_ENV} ]; then
-# 
-#     if [ -a $HOME/.scipyenrc ] ; then
-#         source $HOME/.scipyenrc && scipyact
-#     else
-#     echo "Cannot activate a python virtual environment for Scipyen"
-#     exit 1
-#     fi
-# fi
 
 destination=${HOME}/scipyen_app 
 
@@ -99,34 +94,28 @@ echo -e "Compilation of frozen Scipyen application failed"
 exit 1
 fi
 
-# echo -e "Creating a desktop file for Scipyen_app\n"
-# 
-# # tmpfiledir=$(mktemp -d)
-# # tmpfile=${tmpfiledir}/cezartigaret-Scipyen.desktop
-# # tmpfile=${tmpfiledir}/Scipyen_app.desktop
-# desktopfile=${workdir}/Scipyen_app.desktop
-# 
-# # cat<<END > ${tmpfile}
-# cat<<END > ${desktopfile}
-# [Desktop Entry]
-# Type=Application
-# Name[en_GB]=Scipyen app
-# Name=Scipyen app
-# Comment[en_GB]=Scientific Python Environment for Neurophysiology - PyInstaller frozen application
-# Comment=Scientific Python Environment for Neurophysiology - PyInstaller frozen application
-# GenericName[en_GB]=Scipyen application 
-# GenericName=Scipyen application 
-# Icon=pythonbackend
-# Categories=Science;Utilities;
-# Exec=${distdir}/Scipyen_app
-# MimeType=
-# Path=
-# StartupNotify=true
-# Terminal=true
-# TerminalOptions=\s
-# X-DBUS-ServiceName=
-# X-DBUS-StartupType=
-# X-KDE-SubstituteUID=false
-# X-KDE-Username=
-# END
-# 
+echo -e "Creating a desktop file for Scipyen_app\n"
+desktopfile=${distdir}/org.Scipyen.desktop
+cat<<END > ${desktopfile}
+[Desktop Entry]
+Type=Application
+Name[en_GB]=Scipyen
+Name=Scipyen
+Comment[en_GB]=Scientific Python Environment for Neurophysiology - PyInstaller frozen application
+Comment=Scientific Python Environment for Neurophysiology - PyInstaller frozen application
+GenericName[en_GB]=Scipyen
+GenericName=Scipyen
+Icon=pythonbackend
+Categories=Science;Utilities;
+Exec=scipyen.app
+MimeType=
+Path=
+StartupNotify=true
+Terminal=true
+TerminalOptions=\s
+X-DBUS-ServiceName=
+X-DBUS-StartupType=
+X-KDE-SubstituteUID=false
+X-KDE-Username=
+END
+

@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 
-"""Plot utitilies
+r"""Plot utitilies
 Functions for plotting with matplotlib and seaborn
 """
 #### BEGIN core python modules
@@ -127,7 +127,7 @@ mpl_plot_functions["streamplot"]            = Axes.streamplot
 
 
 class IV2TimeScale(mpl.scale.ScaleBase):
-    """For IV curves (IV ramps) this defines the linear function V(t)of the Vm 
+    r"""For IV curves (IV ramps) this defines the linear function V(t)of the Vm 
     ramp, used to show a time axis in IV ramp plots.
     
     When plotting an IV ramp, Im is plotted as function of Vm (I(V)) whereas the
@@ -161,7 +161,7 @@ class IV2TimeScale(mpl.scale.ScaleBase):
     name = "iv2time"
     
     def __init__(self, axis, **kwargs):
-        """Receives keyword arguments via a call to "set_xscale".
+        r"""Receives keyword arguments via a call to "set_xscale".
         
         Additional keywords:
         
@@ -220,7 +220,7 @@ class IV2TimeScale(mpl.scale.ScaleBase):
         # contyemplate the use of masked arrays to keep the time values 
         # strictly within the RAMP region
         def transform_non_affine(self, a):
-            """Returns the time when Vm equals a
+            r"""Returns the time when Vm equals a
             """
             
             return self.t0 + (a-self.V0)/self.slope
@@ -250,7 +250,7 @@ mpl.scale.register_scale(IV2TimeScale)
     
 
 def zeroCrossedAxes(fig, axisStyle, *args, **kwargs):
-    """ Creates zero-crossing axes in a matplotlib figure
+    r""" Creates zero-crossing axes in a matplotlib figure
     
     Arguments:
     fig = a matplotlib.figure.Figure instance
@@ -305,7 +305,7 @@ def zeroCrossedAxes(fig, axisStyle, *args, **kwargs):
     
 
 def plotZeroCrossedAxes(x, y, fig=None, xlabel="Vm", ylabel="Im", axisStyle="-|>", t_axis=True, newPlot = False, legend=[], **kwargs):
-    """Plot y vs x as an IV plot (on zero-crossed axes).
+    r"""Plot y vs x as an IV plot (on zero-crossed axes).
     Arguments:
         x, y    = data to plot: must be numpy.ndarray vectors of similar lengths & shape
         
@@ -397,7 +397,7 @@ def plotNeoSignal(data, fig=None, label=None, newPlot=False, title = None,
                   xlabel=None, ylabel=None,
                   tick_direction="in", tick_length = 4.5, axes_offset=0,
                   despine=True, panel_size=None, **kwargs):
-    """
+    r"""
     TODO: plot multiple signals overlaid, with legend
     """
     import neo
@@ -503,7 +503,7 @@ def plotVigraKernel1D(val, fig=None, label=None, xlabel=None, ylabel=None,
 def plotVigraKernel(val, fig=None, label=None, xlabel=None, ylabel=None,
                       newPlot=False, plotStyle=None, tick_direction="in",
                       **kwargs):
-    """
+    r"""
     Important kwargs:
     ----------------
     plotStyle: str: 
@@ -611,7 +611,7 @@ def plotVigraKernel(val, fig=None, label=None, xlabel=None, ylabel=None,
 # NOTE: 2022-04-16 20:11:11 
 # from here on this is code from the matplotlib tutorial "origin and extend in imshow"
 def index_to_coordinate(index, extent, origin):
-    """Return the pixel center of an index."""
+    r"""Return the pixel center of an index."""
     left, right, bottom, top = extent
 
     hshift = 0.5 * np.sign(right - left)
@@ -631,7 +631,7 @@ def index_to_coordinate(index, extent, origin):
 
 
 def get_index_label_pos(index, extent, origin, inverted_xindex):
-    """
+    r"""
     Return the desired position and horizontal alignment of an index label.
     """
     if extent is None:
@@ -647,7 +647,7 @@ def get_index_label_pos(index, extent, origin, inverted_xindex):
 
 
 def get_color(index, data, cmap):
-    """Return the data color of an index."""
+    r"""Return the data color of an index."""
     val = {
         "[0, 0]": data[0, 0],
         "[0, N']": data[0, -1],
@@ -658,7 +658,7 @@ def get_color(index, data, cmap):
 
 
 def lookup_extent(origin):
-    """Return extent for label positioning when not given explicitly."""
+    r"""Return extent for label positioning when not given explicitly."""
     if origin == 'lower':
         return (-0.5, 6.5, -0.5, 5.5)
     else:
@@ -671,7 +671,7 @@ def set_extent_None_text(ax):
 
 
 def plot_imshow_with_labels(ax, data, extent, origin, xlim, ylim):
-    """Actually run ``imshow()`` and add extent and index labels."""
+    r"""Actually run ``imshow()`` and add extent and index labels."""
     im = ax.imshow(data, origin=origin, extent=extent)
 
     # extent labels (left, right, bottom, top)
@@ -744,7 +744,7 @@ def generate_imshow_demo_grid(extents, xlim=None, ylim=None):
     return columns
 
 def plot_Gantt(data, **kwargs):
-    """
+    r"""
     Renders a Gantt chart plot.
     The data is organized in intervals (start, finish) with each interval being
     represented by a horizontal bar along a time axis, and is encapsulated in 
@@ -820,7 +820,7 @@ def plot_Gantt(data, **kwargs):
     return func(data, **kwargs)
 
 def plot_Gantt_Epochs(data:typing.Union[tuple, list, neo.Epoch], **kwargs):
-    """
+    r"""
     Renders a Gantt chart plot.
     The data is organized in intervals (start, finish) with each interval being
     represented by a horizontal bar along a time axis, encapsulated in a neo
@@ -899,7 +899,7 @@ def plot_Gantt_Epochs(data:typing.Union[tuple, list, neo.Epoch], **kwargs):
 
 
 def plot_Gantt_DF(data:typing.Union[tuple, list, pd.DataFrame], **kwargs):
-    """
+    r"""
     Renders a Gantt chart plot.
     The data is organized in intervals (start, finish) with each interval being
     represented by a horizontal bar along a time axis, encapsulated in a pandas

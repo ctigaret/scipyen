@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""Various helpers for GUI
+r"""Various helpers for GUI
 """
 import os, typing, warnings, math
 import numpy as np
@@ -91,7 +91,7 @@ class ComplexValidator(InftyDoubleValidator):
                 return (QtGui.QValidator.Invalid, s, pos)
                         
 def validatorString(val:typing.Union[QtGui.QValidator.State, int]):
-    """String representation of a QValidator.State value
+    r"""String representation of a QValidator.State value
     """
     if not isinstance(val, (QtGui.QValidator.State, int)):
         return "Invalid"
@@ -99,7 +99,7 @@ def validatorString(val:typing.Union[QtGui.QValidator.State, int]):
     return "Acceptable" if val == QtGui.QValidator.Acceptable else "Intermediate" if val == QtGui.QValidator.Intermediate else "Invalid"
 
 def getPlotItemDataBoundaries(item:pg.PlotItem):
-    """Calculates actual data bounds (data domain, `X`, and data range, `Y`)
+    r"""Calculates actual data bounds (data domain, `X`, and data range, `Y`)
     NOTE: 2022-11-21 16:11:36
     Unless there is data plotted, this does not rely on PlotItem.viewRange()  
     because this extends outside of the data domain and data range.
@@ -138,7 +138,7 @@ def getPlotItemDataBoundaries(item:pg.PlotItem):
     
         
 def get_QDoubleSpinBox_params(x:typing.Sequence):
-    """Return stepSize and decimals for a QDoubleSpinBox given x.
+    r"""Return stepSize and decimals for a QDoubleSpinBox given x.
 
     x is a sequence of numbers
     """
@@ -148,7 +148,7 @@ def get_QDoubleSpinBox_params(x:typing.Sequence):
     return (0, 1)
     
 def csqueeze(s:str, w:int):
-    """Returns text elided to the right
+    r"""Returns text elided to the right
     """
     if len(s) > w and w > 3:
         part = (w-3)//2
@@ -156,7 +156,7 @@ def csqueeze(s:str, w:int):
     return s
 
 def rsqueeze(s:str, w:int):
-    """Returns text elided to the right
+    r"""Returns text elided to the right
     """
     if len(s) > w:
         part = w - 3
@@ -164,7 +164,7 @@ def rsqueeze(s:str, w:int):
     return s
 
 def lsqueeze(s:str, w:int):
-    """Returns text elided to the left
+    r"""Returns text elided to the left
     """
     if len(s) > w:
         part = w - 3
@@ -203,7 +203,7 @@ def get_text_width_and_height(s:str, flags=QtCore.Qt.TextSingleLine, tabStops = 
     return sz.width(), sz.height()
 
 def get_font_style(val:typing.Union[str, FontStyleType]) -> typing.Union[int, QtGui.QFont.Style]:
-    """Returns an int or a QtGui.QFont.Style enum value
+    r"""Returns an int or a QtGui.QFont.Style enum value
     
     Always returns QtGui.QFont.StyleNormal if val has wrong type or value.
     
@@ -247,7 +247,7 @@ def get_font_style(val:typing.Union[str, FontStyleType]) -> typing.Union[int, Qt
     
             
 def get_font_weight(val:typing.Union[str, FontWeightType]) -> typing.Union[int, QtGui.QFont.Weight]:
-    """Returns an int or a QtGui.QFont.Weight eunm value
+    r"""Returns an int or a QtGui.QFont.Weight eunm value
     
     Always returns QtGui.QFont.Normal if val has wrong type or value
     """

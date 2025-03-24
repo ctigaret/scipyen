@@ -10,7 +10,7 @@ from core.vigra_patches import vigra
 
 def g_blob(meanX:float = 64., meanY:float = 64., meanZ:typing.Optional[float]=None,
            varX:float = 1.0, varY:float = 1.0, varZ:float = 0., n:int = 128):
-    """Generates random normally distributed x and y coordinates for a set of points on a 2D grid.
+    r"""Generates random normally distributed x and y coordinates for a set of points on a 2D grid.
     
     Parameters:
     -----------
@@ -52,7 +52,7 @@ def g_blob(meanX:float = 64., meanY:float = 64., meanZ:typing.Optional[float]=No
     return ret
 
 def g_blob_image(blob, img:typing.Optional[typing.Union[np.ndarray, vigra.VigraArray]]=None, size:int=128) -> vigra.VigraArray:
-    """Embeds a `g_blob` result in an image.
+    r"""Embeds a `g_blob` result in an image.
     The image may be passed as the `img` argument, or a `size` by `size` synthetic
     image will be generated.
     

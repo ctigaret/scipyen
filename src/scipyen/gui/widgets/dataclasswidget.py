@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-""" Editing dataclasses fields - options to explore:
+r""" Editing dataclasses fields - options to explore:
 1) use a Tree widget (as in dataViewer), make it editable;
     • The data model would be a (temporary) dict — a copy of the dataclass
     instance fields created by calling dataclasses.asdict(…)

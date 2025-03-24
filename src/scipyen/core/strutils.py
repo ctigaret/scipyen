@@ -3,8 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""Various string utilties
-"""
+r"""Various string utilties"""
 
 from __future__ import print_function
 import errno, os
@@ -16,75 +15,104 @@ import string
 import itertools
 import ast
 import re as _re
-from numbers import (Number, Real,)
+from numbers import (
+    Number,
+    Real,
+)
 import numpy as np
 import quantities as pq
 
 import inflect
+
 InflectEngine = inflect.engine()
 
 from qtpy import QtCore, QtGui
 
-REGEXP_METACHARACTERS = (".", "^", "$", "*", "+", "?", "{", "}", "[", "]", "\\", "|", "(", ")")
+REGEXP_METACHARACTERS = (
+    ".",
+    "^",
+    "$",
+    "*",
+    "+",
+    "?",
+    "{",
+    "}",
+    "[",
+    "]",
+    "\\",
+    "|",
+    "(",
+    ")",
+)
 
-__translation_table_to_identifier = str.maketrans(dict([(c_, "_") for c_ in string.punctuation + string.whitespace]))
+__translation_table_to_identifier = str.maketrans(
+    dict([(c_, "_") for c_ in string.punctuation + string.whitespace])
+)
 
-__translation_table_to_R_identifier = str.maketrans(dict([(c_, ".") for c_ in string.punctuation + string.whitespace]))
+__translation_table_to_R_identifier = str.maketrans(
+    dict([(c_, ".") for c_ in string.punctuation + string.whitespace])
+)
 
-__output_cache_regexp__ = _re.compile("^(_o)|(_+)(h|\d*)$")
+__output_cache_regexp__ = _re.compile(r"^(_o)|(_+)(h|\d*)$")
 
-__input_cache_regexp__ = _re.compile("^_i+(h|\d*)$")
+__input_cache_regexp__ = _re.compile(r"^_i+(h|\d*)$")
 
 import errno, os
 
-def is_sequence(s:str) -> bool:
-    """Return True if the s is a string representation of a tuple or list"""
+
+def is_sequence(s: str) -> bool:
+    r"""Return True if the s is a string representation of a tuple or list"""
     if not isinstance(s, str):
         return False
-    
+
     possibleSequence = False
-    if s.startswith('(') and s.endswith(')'):
+    if s.startswith("(") and s.endswith(")"):
         possibleSequence = True
-        seqStart = '('
-        seqEnd = ')'
-        
-    elif s.startswith('[') and s.endswith(']'):
+        seqStart = "("
+        seqEnd = ")"
+
+    elif s.startswith("[") and s.endswith("]"):
         possibleSequence = True
-        seqStart = '['
-        seqEnd = ']'
-        
+        seqStart = "["
+        seqEnd = "]"
+
     if possibleSequence:
         ss = s[1:-1].replace(" ", "")
-        if ',' in ss:
-            if len(ss.split('.')):
+        if "," in ss:
+            if len(ss.split(".")):
                 return True
-            
+
     return False
 
-def is_cached_output_varname(s:str) -> bool:
-    """Returns True if s is an IPython cached output variable"""
+
+def is_cached_output_varname(s: str) -> bool:
+    r"""Returns True if s is an IPython cached output variable"""
     return __output_cache_regexp__.match(s) is not None
 
-def is_cached_input_varname(s:str) -> bool:
-    """Returns True if s is an IPython cached input variable"""
+
+def is_cached_input_varname(s: str) -> bool:
+    r"""Returns True if s is an IPython cached input variable"""
     return __input_cache_regexp__.match(s) is not None
-            
-def is_glob(s:str) -> bool:
-    """Returns True if s is a string containing the '*' character"""
-    return isinstance(s, str) and any(c in s for c in ('*', '?') )
 
-def is_regexp(s:str) -> bool:
-    """Returns True if s is a string containing regexp metacharacters.
 
-The regexp metacharacters are:
+def is_glob(s: str) -> bool:
+    r"""Returns True if s is a string containing the '*' character"""
+    return isinstance(s, str) and any(c in s for c in ("*", "?"))
 
-".", "^", "$", "*", "+", "?", "{", "}", "[", "]", "\\", "|", "(", ")"
-    
-"""
+
+def is_regexp(s: str) -> bool:
+    r"""Returns True if s is a string containing regexp metacharacters.
+
+    The regexp metacharacters are:
+
+    ".", "^", "$", "*", "+", "?", "{", "}", "[", "]", "\\", "|", "(", ")"
+
+    """
     return isinstance(s, str) and any(c in s for c in REGEXP_METACHARACTERS)
 
-def ordinalToLetters(x:int, upperCase:bool=True):
-    """Returns a string given an integer ordinal `x`.
+
+def ordinalToLetters(x: int, upperCase: bool = True):
+    r"""Returns a string given an integer ordinal `x`.
 
     The string is the element with index `x` from the complete ascii sequence¹
     extended with its own cartesian product i.e.:
@@ -95,28 +123,30 @@ def ordinalToLetters(x:int, upperCase:bool=True):
 
     Returns '?' if x < 0 or x >= 702
 
-    ¹⁾ Either upper (default) or lower case, depending on the value of the 
+    ¹⁾ Either upper (default) or lower case, depending on the value of the
     `upperCase` parameter.
 
     """
     if x < 0:
-        return '?'
-    
+        return "?"
+
     l = list(string.ascii_uppercase if upperCase else string.ascii_lowercase)
-    
-    ll = list(itertools.product(l,l))
-    
+
+    ll = list(itertools.product(l, l))
+
     l.extend(ll)
-    
+
     if x >= len(l):
         return "?"
-    
+
     return "".join(list(l[x]))
+
 
 ordinal2letters = ordinalToLetters
 
-def lettersToOrdinal(x:str):
-    """The inverse of ordinalToLetters.
+
+def lettersToOrdinal(x: str):
+    r"""The inverse of ordinalToLetters.
     Case-insensitive.
 
     Returns -1 if `x` is nto of the form '𝒙' or '𝒙𝒚' where 𝒙 and 𝒚 are characters
@@ -124,86 +154,91 @@ def lettersToOrdinal(x:str):
     """
 
     x = "".join(tuple(x.lower()))
-    
+
     l = list(string.ascii_lowercase)
-    
-    ll = list(map(lambda k: "".join(k), itertools.product(l,l)))
-    
+
+    ll = list(map(lambda k: "".join(k), itertools.product(l, l)))
+
     l.extend(ll)
-    
+
     if x not in l:
         return -1
-    
+
     return l.index(x)
 
+
 letters2ordinal = lettersToOrdinal
-    
-def str2sequence(s:str) -> typing.List[str]:
-    """Parses the string representation of a sequence into a sequence of strings"""
+
+
+def str2sequence(s: str) -> typing.List[str]:
+    r"""Parses the string representation of a sequence into a sequence of strings"""
     possibleSequence = False
-    
-    if s.startswith('(') and s.endswith(')'):
+
+    if s.startswith("(") and s.endswith(")"):
         possibleSequence = True
-        seqStart = '('
-        seqEnd = ')'
-        
-    elif s.startswith('[') and s.endswith(']'):
+        seqStart = "("
+        seqEnd = ")"
+
+    elif s.startswith("[") and s.endswith("]"):
         possibleSequence = True
-        seqStart = '['
-        seqEnd = ']'
-        
+        seqStart = "["
+        seqEnd = "]"
+
     if possibleSequence:
         ss = s[1:-1].replace(" ", "")
         delim = None
-        if ',' in ss:
-            delim = ','
-        elif ';' in ss:
-            delim = ';'
+        if "," in ss:
+            delim = ","
+        elif ";" in ss:
+            delim = ";"
         else:
             return s
-        
+
         if delim is not None:
-            if seqStart == '(' and seqEnd == ')':
+            if seqStart == "(" and seqEnd == ")":
                 return tuple(ss.split(delim))
             else:
-                return ss.split # a list
+                return ss.split  # a list
         else:
             return s
-        
+
     return s
-            
-def is_path(s:str) -> bool:
-    """Returns True if s is a string representation of a file system path."""
+
+
+def is_path(s: str) -> bool:
+    r"""Returns True if s is a string representation of a file system path."""
     return isinstance(s, str) and any(c in s for c in (os.sep, os.pathsep, ";", "\\"))
-    
-def str2range(s:str) -> range:
-    """Parses the string representation of a range into a range object"""
+
+
+def str2range(s: str) -> range:
+    r"""Parses the string representation of a range into a range object"""
     parts = list(int(s_) for s_ in s.split(":"))
     if len(parts) <= 3:
         return range(*parts)
     else:
         return range(*parts[0:3])
-    
+
+
 def is_pathname_valid(pathname: str) -> bool:
-    '''
+    """
     `True` if 'pathname' is a valid pathname regardless of the current OS;
     `False` otherwise.
-    
+
     See:
     https://stackoverflow.com/questions/9532499/check-whether-a-path-is-valid-in-python-without-creating-a-file-at-the-paths-ta/34102855#34102855
-    '''
+    """
     # Sadly, Python fails to provide the following magic number for us.
-    #Windows-specific error code indicating an invalid pathname.
+    # Windows-specific error code indicating an invalid pathname.
 
-    #See Also
-    #----------
-    #https://docs.microsoft.com/en-us/windows/win32/debug/system-error-codes--0-499-
-        #Official listing of all such codes.
+    # See Also
+    # ----------
+    # https://docs.microsoft.com/en-us/windows/win32/debug/system-error-codes--0-499-
+    # Official listing of all such codes.
     ERROR_INVALID_NAME = 123
     # If this pathname is either not a string or is but is empty, this pathname
     # is invalid.
     try:
-        if not (isinstance(pathname, str) and len(pathname.strip)>0) or not pathname:
+        if not (isinstance(pathname, str) and len(pathname.strip) > 0) or not pathname:
             return False
 
         # Strip this pathname's Windows-specific drive specifier (e.g., `C:\`)
@@ -215,9 +250,12 @@ def is_pathname_valid(pathname: str) -> bool:
         # Directory guaranteed to exist. If the current OS is Windows, this is
         # the drive to which Windows was installed (e.g., the "%HOMEDRIVE%"
         # environment variable); else, the typical root directory.
-        root_dirname = os.environ.get('HOMEDRIVE', 'C:') \
-            if sys.platform.startswith('win32') else os.path.sep
-        assert os.path.isdir(root_dirname)   # ...Murphy and her ironclad Law
+        root_dirname = (
+            os.environ.get("HOMEDRIVE", "C:")
+            if sys.platform.startswith("win32")
+            else os.path.sep
+        )
+        assert os.path.isdir(root_dirname)  # ...Murphy and her ironclad Law
 
         # Append a path separator to this directory if needed.
         root_dirname = root_dirname.rstrip(os.path.sep) + os.path.sep
@@ -246,7 +284,7 @@ def is_pathname_valid(pathname: str) -> bool:
             #   * Under most POSIX-compatible OSes, "ENAMETOOLONG".
             #   * Under some edge-case OSes (e.g., SunOS, *BSD), "ERANGE".
             except OSError as exc:
-                if hasattr(exc, 'winerror'):
+                if hasattr(exc, "winerror"):
                     if exc.winerror == ERROR_INVALID_NAME:
                         return False
                 elif exc.errno in {errno.ENAMETOOLONG, errno.ERANGE}:
@@ -263,186 +301,192 @@ def is_pathname_valid(pathname: str) -> bool:
     # (e.g., a bug). Permit this exception to unwind the call stack.
     #
     # Did we mention this should be shipped with Python already?
-    
-def get_int_sfx(s:str, sep:str = "_", use_re:bool=False) -> typing.Tuple[str, int]:
-    """Parses an integral suffix from the string.
-    
+
+
+def get_int_sfx(s: str, sep: str = "_", use_re: bool = False) -> typing.Tuple[str, int]:
+    r"""Parses an integral suffix from the string.
+
     The suffix needs to be delimited by the sep string.
-    
+
     Returns the string base and the integer value as given by the literal suffix.
-    
+
     If a literal suffix is absent, the value is None
-    
+
     e.g.:
-    
+
     get_int_sfx("some_name") -> ("some_name", None)
-    
+
     but:
-    
+
     get_int_sfx("some_name_0") -> ("some_name", 0)
-    
+
     whereas:
-    
+
     get_int_sfx("some_name_1") -> ("some_name", 1)
-    
-    
+
+
     """
     if not isinstance(sep, str) or len(sep) == 0 or use_re:
-        # regexp = _re.compile("^(\D+)*(\d*)$")
-        regexp = _re.compile("(.*?)??(\d*)$")
+        # regexp = _re.compile(r"^(\D+)*(\d*)$")
+        regexp = _re.compile(r"(.*?)??(\d*)$")
         re_match = regexp.match(s)
         if re_match is not None and len(re_match.groups()) > 1:
             try:
-                base, sfx = re_match.group(1,2)
+                base, sfx = re_match.group(1, 2)
             except:
                 base, sfx = s, 0
                 # base, sfx = s, None
-                
+
         else:
             base, sfx = s, 0
             # base, sfx = s, None
-                
+
     else:
         parts = s.split(sep)
-        
+
         # if len(parts) <= 1:
         if len(parts) < 2:
             return s, 0
             # return s, None
-        
+
         sfx = parts[-1]
         base = sep.join(parts[:-1])
-    
+
     try:
         sfx = int(sfx)
     except:
         # sfx = None
         sfx = 0
-        
+
     return base, sfx
 
-def pluralize(s:str, n:int) -> str:
+
+def pluralize(s: str, n: int) -> str:
     return InflectEngine.plural(s, n)
 
-def simplify(s:str) -> str:
-    """Strips spaces at ends and converts inner double spaces to single spaces"""
+
+def simplify(s: str) -> str:
+    r"""Strips spaces at ends and converts inner double spaces to single spaces"""
     s = s.strip()
     while "  " in s:
         s = s.replace("  ", " ")
-        
+
     return s
-    
-def str2symbol(s:str) -> str:
-    """Returns a string that can be used as valid Python symbol (a.k.a variable name).
-    
-    If argument can already be used as a symbol ('s.isidentifier() is True') 
+
+
+def str2symbol(s: str) -> str:
+    r"""Returns a string that can be used as valid Python symbol (a.k.a variable name).
+
+    If argument can already be used as a symbol ('s.isidentifier() is True')
     returns the argument unchanged.
-    
+
     Otherwise:
     * replace any punctuation & white spaces with "_"
-    
-    * if s is a Python keyword or does not beign with a letter or underscore, 
+
+    * if s is a Python keyword or does not beign with a letter or underscore,
         prepends "data_" and returns it
-    
+
     """
     if not isinstance(s, str):
         raise TypeError("Expecting a str; got %s instead" % type(s).__name__)
-    
+
     if s.isidentifier():
         return s
-    
+
     if keyword.iskeyword(s):
-        s = "data_"+s
-    
+        s = "data_" + s
+
     # replace any punctuation & white spaces with "_"
-    #print("str2symbol: ", s)
-    s = _re.sub("^(?=\d)","data_", _re.sub("\W", "_", _re.sub("\s", "_", s)))
+    # print("str2symbol: ", s)
+    s = _re.sub(r"^(?=\d)", "data_", _re.sub(r"\W", "_", _re.sub(r"\s", "_", s)))
     # s = s.translate(__translation_table_to_identifier)
-    
+
     # do some grooming
-    while ("__" in s):
+    while "__" in s:
         s = s.replace("__", "_")
-        
+
     if s.endswith("_"):
         s = s[0:-1]
-    
+
     # then check if all is digits
-    
+
     # if len(s) and not s[0].isalpha():
     #     s = "data_"+s
-        
+
     return s
 
-def strcat(a:str, b:str) -> str:
-    """Just a convenience function for ''.join((a,b))
-    """
-    return ''.join((a,b))
 
-def str2R(s:str) -> str:
-    """Converts the string s into a form usable in R.
+def strcat(a: str, b: str) -> str:
+    r"""Just a convenience function for ''.join((a,b))"""
+    return "".join((a, b))
+
+
+def str2R(s: str) -> str:
+    r"""Converts the string s into a form usable in R.
     The non-alpha-numeric characters are replaced with dots ('.')
-"""
+    """
     if not isinstance(s, str):
         raise TypeError("Expecting a str; got %s instead" % type(s).__name__)
-    
+
     if keyword.iskeyword(s):
-        s = "data."+s
-    
-    s = _re.sub("^(?=\d)","data.", _re.sub("\W", ".", _re.sub("\s", ".", arg)))
+        s = "data." + s
+
+    s = _re.sub(r"^(?=\d)", "data.", _re.sub(r"\W", ".", _re.sub(r"\s", ".", arg)))
     # s = s.translate(__translation_table_to_R_identifier)
-    while (".." in s):
+    while ".." in s:
         s = s.replace("..", ".")
-        
+
     if s.endswith("."):
         s = s[0:-1]
 
     return s
-    
+
+
 class QNameValidator(QtGui.QValidator):
     def __init__(self, parent=None):
         super().__init__(parent=parent)
-        
-    def validate(self, value:str, pos:int) -> QtGui.QValidator.State:
+
+    def validate(self, value: str, pos: int) -> QtGui.QValidator.State:
         if len(value.strip()) == 0:
             return QtGui.QValidator.Intermediate
-            
+
         if keyword.iskeyword(value[0:pos]):
             return QtGui.QValidator.Intermediate
-        
+
         elif value[0:pos].isidentifier():
             return QtGui.QValidator.Acceptable
-        
+
         else:
             return QtGui.QValidator.Intermediate
-        
-    def fixup(self, value:str) -> str:
+
+    def fixup(self, value: str) -> str:
         return str2symbol(value)
-            
+
 
 class QRNameValidator(QtGui.QValidator):
     def __init__(self, parent=None):
         super().__init__(parent=parent)
-        
-    def validate(self, value:str, pos:int) -> QtGui.QValidator.State:
+
+    def validate(self, value: str, pos: int) -> QtGui.QValidator.State:
         if len(value.strip()) == 0:
             return QtGui.QValidator.Intermediate
-            
+
         if not value[0].isalpha():
             return QtGui.QValidator.Intermediate
-        
+
         else:
             if any([c in string.punctuation + string.whitespace for c in value[0:pos]]):
                 return QtGui.QValidator.Intermediate
-            
+
             else:
                 return QtGui.QValidator.Acceptable
-        
-    def fixup(self, value:str) -> str:
+
+    def fixup(self, value: str) -> str:
         return str2R(value)
-        
+
 
 def make_ordinal(n):
-    '''
+    """
     Convert an integer into its ordinal representation::
 
         make_ordinal(0)   => '0th'
@@ -454,19 +498,24 @@ def make_ordinal(n):
     https://stackoverflow.com/questions/9647202/ordinal-numbers-replacement,
 
     modifed by me to use superscript unicode characters)
-    '''
+    """
     n = int(n)
     if 11 <= (n % 100) <= 13:
-        suffix = 'ᵗʰ'
+        suffix = "ᵗʰ"
         # suffix = 'th'
     else:
-        suffix = ['ᵗʰ', 'ˢᵗ', 'ⁿᵈ', 'ʳᵈ', 'ᵗʰ'][min(n % 10, 4)]
+        suffix = ["ᵗʰ", "ˢᵗ", "ⁿᵈ", "ʳᵈ", "ᵗʰ"][min(n % 10, 4)]
         # suffix = ['th', 'st', 'nd', 'rd', 'th'][min(n % 10, 4)]
     return str(n) + suffix
 
-def numbers2str(value:typing.Optional[typing.Union[Number, np.ndarray, tuple, list]], 
-                precision:int=5, format:str="g", show_units=False) -> str:
-    """Generates a string representation of numeric data in base 10.
+
+def numbers2str(
+    value: typing.Optional[typing.Union[Number, np.ndarray, tuple, list]],
+    precision: int = 5,
+    format: str = "g",
+    show_units=False,
+) -> str:
+    r"""Generates a string representation of numeric data in base 10.
     Parameters:
     ----------
     value: numpy array, scalar, or sequence of scalars = base 10 numeric data
@@ -474,109 +523,119 @@ def numbers2str(value:typing.Optional[typing.Union[Number, np.ndarray, tuple, li
     format:str (optional default is '%f') printf-style format string, for example:
         %d = integer data (ignores precision)
         %f = floating point (takes precision into account)
-        
+
         For details see https://docs.python.org/3/library/stdtypes.html#old-string-formatting
-        
+
     show_units:bool (optional default is False)
         If True, include units in the text representation of python quantity
         values.
-    
+
     """
-    
+
     from core.quantities import quantity2str
-    
+
     if value is None:
         return ""
     # TODO 2020-12-28 11:41:33
     # convert for new formatting specs (using str.format() and format string syntax)
     if isinstance(value, np.ndarray):
         val = value.flatten()
-        
+
     elif isinstance(value, Number):
         val = np.array([value]).flatten()
-        
-    elif isinstance(value, (tuple, list)) and all([isinstance(v, Number) for v in value]):
+
+    elif isinstance(value, (tuple, list)) and all(
+        [isinstance(v, Number) for v in value]
+    ):
         val = value
-        
+
     else:
-        raise TypeError("Expecting a scalar, a sequence (tuple, list) of scalars or a numpy array")
-        
+        raise TypeError(
+            "Expecting a scalar, a sequence (tuple, list) of scalars or a numpy array"
+        )
+
     mag_format = "%d" % precision
-    
+
     fmt = "%." + mag_format + format
-    
+
     if show_units and all([isinstance(v, pq.Quantity) for v in val]):
-        txt = ", ".join([quantity2str(i, precision=precision, format=format) for i in val])
+        txt = ", ".join(
+            [quantity2str(i, precision=precision, format=format) for i in val]
+        )
     else:
         txt = ", ".join([fmt % i for i in val])
-        
+
     return txt
 
-def str2float(s:str) -> float:
-    """Parse the stirng s into a float value"""
+
+def str2float(s: str) -> float:
+    r"""Parse the stirng s into a float value"""
     if not isinstance(s, str):
         return np.nan
-    
+
     try:
         ret = eval(s)
-        
+
     except:
         ret = np.nan
-    
+
     return ret
 
-def isnumber(s:str) -> bool:
-    """Returns True if string s can be evalated to a numbers.Number
-    
+
+def isnumber(s: str) -> bool:
+    r"""Returns True if string s can be evalated to a numbers.Number
+
     Strings of the form [-/+]x.y[e][-/+]z return True.
-    
+
     """
     if not isinstance(s, str) or len(s.strip()) == 0:
         return False
-    
+
     try:
         v = eval(s)
         if isinstance(v, Number):
             return True
-        
+
     except:
         return False
-    
-def parse_version_string(s:str):
-    parts = s.split('.')
-    
+
+
+def parse_version_string(s: str):
+    parts = s.split(".")
+
     # ### BEGIN fool around, do NOT delete
+
+
 #     # split the string in parts separated by the current locale decimal point,
 #     # or by "e" (scientific notation)
-#     
+#
 #     # in scientific notation a mantissa can have a decimal point
-#     
+#
 #     ss = s.split("e")
-#     
+#
 #     if len(ss) > 2:
 #         return False
-#     
+#
 #     ss_ = ss[0].split(locale.localeconv()["decimal_point"])
 #     if len(ss_) > 2:
 #         return False
-#     
+#
 #     print(f"ss_: {ss_}")
 #     ss_.extend(ss[1:])
 #     print(f"extended ss_: {ss_}")
-#     
+#
 #     if ss_[0].startswith('-') or ss_[0].startswith('+'):
 #         ss_[0] = ss_[0][1:]
-#     
+#
 #     if ss_[-1].startswith('-') or ss_[-1].startswith('+'):
 #         ss_[-1] = ss_[-1][1:]
-#         
+#
 #     if ss_[-1].endswith('j'):
 #         ss_[-1] - ss_[-1][0:-1]
-#      
+#
 #     print(f"ss_: {ss_} w/o signs")
 #     test = "".join(ss_)
 #     print(f"test: {test}")
-#     
+#
 #     return test.isnumeric()
-    # ### END fool around, do NOT delete
-
+# ### END fool around, do NOT delete

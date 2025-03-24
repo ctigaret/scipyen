@@ -3,12 +3,15 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-''' Utilities for generic and numpy array-based data types such as quantities
+r''' Utilities for generic and numpy array-based data types such as quantities
 Changelog:
 2021-01-06 14:35:30 gained module-level constants:
 RELATIVE_TOLERANCE
 ABSOLUTE_TOLERANCE
 EQUALS_NAN
+
+2025-03-20 00:21:23 
+the above constants moved to core.constants to avoid circular imports
 
     
 '''
@@ -64,10 +67,13 @@ from core.prog import (safeWrapper, is_hashable, is_type_or_subclass,
                        ImmutableDescriptor, scipywarn, NoData, printStyled)
 from core.datazone import DataZone
 from core.datasignal import (_new_DataSignal, _new_IrregularlySampledDataSignal, DataSignal, IrregularlySampledDataSignal)
-from core import bgbridge
-from core.bgbridge import (BGStructureDescriptor, BrainGlobeAtlas)
+# from core import bgbridge
+# from core.bgbridge import (BGStructureDescriptor, BrainGlobeAtlas)
 from core import taxonbridge
 from core.taxonbridge import(Taxon, TaxonDescriptor)
+from core.typeenum import TypeEnum
+from core.constants import (RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE,
+                            EQUAL_NAN, GENOTYPES)
 
 #### END pict.core.modules
 
@@ -160,12 +166,11 @@ UnitTypes = collections.defaultdict(lambda: "NA",
 # NOTE: 2024-07-28 15:46:49 
 # these are utterly generic; almost surely you'd want to write your own
 # e.g. Cacna1c+/-, etc...
-GENOTYPES = ["NA", "wt", "het", "hom", "+/+", "+/-", "-/-"]
 
 
-RELATIVE_TOLERANCE = 1e-4
-ABSOLUTE_TOLERANCE = 1e-4
-EQUAL_NAN = True
+# RELATIVE_TOLERANCE = 1e-4
+# ABSOLUTE_TOLERANCE = 1e-4
+# EQUAL_NAN = True
 
 def default_value(x:type):
     if not isinstance(x, type):
@@ -200,7 +205,7 @@ def is_enum_value(x):
     return isinstance(type(x), EnumMeta)
 
 def is_routine(x):
-    """ Similar to is_callable but excludes classes with __call__ method.
+    r""" Similar to is_callable but excludes classes with __call__ method.
     """
     
     function_types = (types.FunctionType, types.LambdaType, types.MethodType,
@@ -213,7 +218,7 @@ def is_routine(x):
     
 
 def is_callable(x):
-    """Brief reminder:
+    r"""Brief reminder:
     An object is callable if it is:
 
     • a Python function (including created by a lambda expression) ↔ inspect.isfunction
@@ -259,7 +264,7 @@ def is_callable(x):
     return ret
 
 def is_vector(x):
-    """Returns True if x is a numpy array encapsulating a vector.
+    r"""Returns True if x is a numpy array encapsulating a vector.
     
     A vector is taken to be a numpy array with one dimension, or a numpy
     array with two dimensions (ndim == 2) with one singleton dimension
@@ -279,7 +284,7 @@ def is_vector(x):
         return False
         
 def is_column_vector(x):
-    """Returns True if x is a numpy arrtay encapsulating a column vector.
+    r"""Returns True if x is a numpy arrtay encapsulating a column vector.
     
     A column vector is taken to be a numpy array with one dimension or a numpy
     array with two dimensions where axis 1 is singleton
@@ -299,7 +304,7 @@ def is_column_vector(x):
         return False
         
 def isRowVector(x):
-    """Returns True if x is a numpy array encapsulating a column vector.
+    r"""Returns True if x is a numpy array encapsulating a column vector.
     
     A column vector is taken to be a numpy array with one dimension or a numpy
     array with two dimensions where axis 0 is singleton
@@ -319,7 +324,7 @@ def isRowVector(x):
         return False
     
 def is_uniform_sequence(s):
-    """Returns True when all elements in the sequence have the same type
+    r"""Returns True when all elements in the sequence have the same type
     Can also be used with sets after conversion to list.
     """
     ret = isinstance(s, collections.abc.Sequence) 
@@ -341,7 +346,7 @@ def is_convertible_to_numpy_array(s):
     return ret
 
 def is_uniform_collection(obj):
-    """Shorthand to apply is_uniform_sequence() to what can be converted to list.
+    r"""Shorthand to apply is_uniform_sequence() to what can be converted to list.
     For dict collections, it applied to obj.values()
     """
     try:
@@ -366,7 +371,7 @@ def check_type(t:typing.Union[type, typing.Sequence[type], typing.Set[type]],
                      use_ref_mro:bool=False,
                      check_elements:bool=False,
                      check_keys:bool=False) -> bool:
-    """Checks a type in 't' against a reference type in 'ref'.
+    r"""Checks a type in 't' against a reference type in 'ref'.
     
     't': a type, or a collection of types (i.e., tuple, list or set)
     
@@ -395,7 +400,7 @@ def check_type(t:typing.Union[type, typing.Sequence[type], typing.Set[type]],
     check_keys:bool - Not used
     
     
-"""
+    """
     # NOTE: 2024-01-07 00:12:32
     # the following five variables are not currently used; 
     # defined here for future code to check types nested in collections
@@ -479,7 +484,7 @@ def check_type(t:typing.Union[type, typing.Sequence[type], typing.Set[type]],
     return len(t_set & ref_set) > 0 or any(issubclass(v, tuple(ref_set)) for v in t_set)
 
 def enum2str(etype:Enum) -> str:
-    """Returns the symbol (NOT the value) of the enum type"""
+    r"""Returns the symbol (NOT the value) of the enum type"""
     enumItems = list(filter(lambda x: x[1] == etype, 
                             inspect.getmembers_static(etype, predicate = lambda x: isinstance(x, IntEnum))))
     
@@ -491,7 +496,7 @@ def enum2str(etype:Enum) -> str:
     return str()
 
 def enums2str(etypes: typing.Sequence[Enum]) -> list[str]:
-    """Like enum2str but does a single pass throughn the sequence"""
+    r"""Like enum2str but does a single pass throughn the sequence"""
     if len(etypes) == 0:
         return list()
     
@@ -543,7 +548,7 @@ def type2str(t:type) -> str:
     return t.__name__
     
 def array_slice(data:np.ndarray, slicing:(dict, type(None))):
-    """Dynamic slicing of nD arrays and introducing new axis in the array.
+    r"""Dynamic slicing of nD arrays and introducing new axis in the array.
     
     Parameters:
     ===========
@@ -713,7 +718,7 @@ def is_namedtuple(x):
     return ret
     
 def is_string(array):
-    """Determine whether the argument has a string or character datatype, when
+    r"""Determine whether the argument has a string or character datatype, when
     converted to a NumPy array.
     
     String or character (including unicode) have dtype.kind of "S" or "U"
@@ -722,7 +727,7 @@ def is_string(array):
     return np.asarray(array).dtype.kind in NUMPY_STRING_KINDS
 
 def is_numeric_string(array):
-    """Determines if the argument is a string array that can be parsed as numeric.
+    r"""Determines if the argument is a string array that can be parsed as numeric.
     """
     if isinstance(array, str):
         array = [array]
@@ -730,7 +735,7 @@ def is_numeric_string(array):
     return is_string(array) and not np.isnan(np.genfromtxt(array)).any()
 
 def is_numeric(array):
-    """Determine whether the argument has a numeric datatype, when
+    r"""Determine whether the argument has a numeric datatype, when
     converted to a NumPy array.
 
     Booleans, unsigned integers, signed integers, floats and complex
@@ -762,7 +767,7 @@ def __default_undimensioned__():
     return pq.dimensionless
 
 def categorize_data_frame_columns(data, *column_names, inplace=True):
-    """"""
+    r""""""
     if not isinstance(data, pd.DataFrame):
         raise TypeError("Expecting a pandas.DataFrame; got %s instead" % type(data).__name__)
     
@@ -788,639 +793,8 @@ def categorize_data_frame_columns(data, *column_names, inplace=True):
             
         return ret
     
-class DoseDescriptor:
-    def __init__(self, *, default:typing.Optional[pq.Quantity]=None):
-        if isinstance(default, pq.Quantity):
-            if not scq.checkDosageUnits(default):
-                raise ValueError(f"Expecting dosage units; instead, got {default.units}")
             
-        elif default is not None:
-            raise TypeError(f"Expecting a scalar dosage Quantity or None; instead, got {type(default).__name__}")
-        
-        self._default = default
-        
-    def __set_name__(self, obj:object, name:str):
-        if len(name.strip()) == 0:
-            raise ValueError("Cannot accept an empty name")
-        self._name = "_"+name
-        
-    def __get__(self, obj:object, objtype:type) -> object:
-        if obj is None:
-            return self._default
-        return getattr(obj, self._name, self._default)
-    
-    def __set__(self, obj:object, value:typing.Optional[pq.Quantity] = None):
-        if isinstance(value, pq.Quantity):
-            if not scq.checkDosageUnits(value):
-                raise ValueError(f"Expecting dosage units; instead got {value.units}")
-            
-        elif value is not None:
-            raise TypeError(f"Expecting a scalar dosage Quantity, or None; instead got {type(value).__name__}")
-
-        setattr(obj, self._name, value)
-        
-            
-@dataclass
-class ScipyenDataclass:
-    """An 'enhanced' dataclass, ancestor of Scipyen data classes.
-
-    WARNING: to derive (i.e. create a subclass) from ScipyenDataclass follow the 
-    steps below:
-
-    1) use the '@dataclass' decorator
-    2) define the class attribute '__match_args__' of the subclass, to include 
-        the elements of the parent class attribute '__match_args__'
-    
-    This is because inheriting from a dataclass is not as straightforward as it 
-    is for general python classes; specifically, the '__match_args__' is set up
-    by the decorator code unless defined in the subclass, yet we use it for 
-    reconstituting the instance of the subclass from HDF5 data structure.
-
-    NOTE: passing this through a set constructor ensures the fields are uniquely
-    contained in __match_args__
-    
-    For example (pseudo-code, not supposed to run):
-    
-    @dataclass
-    class MyClass(ScipyenDataclass):
-        field1 …
-        field2 …
-        __match_args__ = tuple(set(ScipyenDataclass.__match_args__ + ("field1", "field2")))
-    
-        ⋮
-    
-        <other code in your subclass definition>
-    
-    And, one step further in the inheritance chain (again pseudo-code, it won't run):
-    
-    @dataclass
-    class MySubclass(MyClass):
-        field_A …
-        field_B …
-        _:KW_ONLY
-        field_C
-        
-        __match_args__ = tuple(set(MyClass.__match_args__ + ("field_A", "field_B", "field_C")))
-    
-        ⋮
-        
-        <other code in your subclass definition>
-    
-    So, the two new classes will show:
-        
-    MyClass.__match_args__
-        -> ("name", "description", "field1", "field2")
-    
-    MySubClass.__match_args__
-        -> ("name", "description", "field1", "field2", "field_A", "field_B", "field_C")
-    
-    
-    Replicate this mechanism for sub-subclasses.
-    
-    """
-    # BUG: 2024-12-15 12:33:55 FIXME
-    # __match_args__ in subclasses must reflect superclass and keyword args
-    name:str = dataclasses.field(default_factory=str)
-    description: str = dataclasses.field(default_factory=str)
-    
-    def diff(self, other, showValues:bool=False) -> dict | tuple:
-        # print(f"{self.__class__.__name__}.diff: ")
-        from core.utilities import safe_identity_test
-            
-        if other.__class__ != self.__class__:
-            raise TypeError(f"Expecting an object of type {self.__class__.__name__}; instead, got {type(other).__name__}")
-        
-        
-        fields = tuple(map(lambda f: (f.name, getattr(self, f.name), getattr(other, f.name)), dataclasses.fields(self.__class__)))
-        
-        # test_eq = lambda x: ( pd.isna(x[0]) and pd.isna(x[1])) or \
-        #     (math.isnan(x[0]) and math.isnan(x[1])) or (math.isinf(x[0]) and math.isinf(x[1])) or\
-        #         ( np.all(x[0]==x[1]) if any(map(lambda x_: isinstance(x_, np.ndarray), x)) else (x[0] == x[1]) )
-        
-        diff_fields = tuple(filter(lambda f: type(f[1]) != type(f[2]) or not safe_identity_test(f[1], f[2]), fields))
-        
-        # diff_fields = tuple(filter(lambda f: np.all(getattr(self, f.name) != getattr(other, f.name)), dataclasses.fields(self.__class__)))
-        
-        if showValues:
-            # return dict(map(lambda f: (f.name, (getattr(self, f.name), getattr(other, f.name))), diff_fields))
-            return dict(map(lambda f: (f[0], (f[1], f[2])), diff_fields))
-        
-        return tuple(map(lambda f: f[0], diff_fields))
-    
-    def __eq__(self, other) -> bool:
-        if not isinstance(other, self.__class__):
-            return False
-        
-        return len(self.diff(other)) == 0
-        
-    def toHDF5(self, group:h5py.Group, name:str, oname:str, 
-                       compression:str, chunks:bool, track_order:bool,
-                       entity_cache:dict) -> h5py.Group:
-        # BUG: 2024-12-12 00:43:33  FIXME
-        # cannot store all fields as entity attributes, because subclasses of 
-        # ScipyenDataclass MAY have composite types which cannot be encoded in json.
-        #
-        # Therefore: TODO: convert to dict using asdict then store it as if is was a dict!
-        # TODO: adapt fromHDF5 to reflect this!
-        
-        # see examples in h5io.objectToEntity
-        
-        from iolib import h5io
-        
-        # print(f"\n\n### BEGIN {self.__class__.__name__}.toHDF5")
-        
-        target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
-        cached_entity = h5io.getCachedEntity(entity_cache, self)
-        if isinstance(cached_entity, h5py.Dataset):
-            group[target_name] = cached_entity
-            # print(f"{self.__class__.__name__}.toHDF5 found entity {cached_entity}")
-            # print(f"### END {self.__class__.__name__}.toHDF5 \n\n")
-            return cached_entity
-        
-        if isinstance(name, str) and len(name.strip()):
-            target_name = name
-            
-        # calling asDict recursively converts all nested dataclass instances to
-        # a dict -- effectively "peeling out" the dataclass
-        data = dataclasses.asdict(self)
-        
-        # therefore, I need to inspect which of the fields ARE in fact, instances
-        # of dataclass
-        dataclass_fields = list(filter(lambda f: dataclasses.is_dataclass(getattr(self, f.name)), dataclasses.fields(self)))
-        
-        # then assign these back into the dictionary from above:
-        data.update(dict(map(lambda f: (f.name, getattr(self, f.name)), dataclass_fields)))
-
-        # NOTE: 2024-12-12 15:41:25
-        # instead of creating a nested hf5 group, just populate this one with
-        # the items from the updated data dict above
-        entity = group.create_group(target_name, track_order = track_order)
-        entity.attrs.update(obj_attrs)
-        
-        for name, value in data.items():
-            cached_entity = h5io.getCachedEntity(entity_cache, value)
-            if isinstance(cached_entity, (h5py.Group, h5py.Dataset)):
-                entity[name] = cached_entity
-            else:
-                element_entity = h5io.toHDF5(value, entity, name=name,
-                                             compression=compression,
-                                             chunks=chunks,
-                                             track_order=track_order,
-                                             entity_cache=entity_cache)
-                # if name == "dose":
-                #     print(f"{self.__class__.__name__}.toHDF5 created entity {element_entity} for field '{name}' ({type(value).__name__})\n")
-                
-        # print(f"### END {self.__class__.__name__}.toHDF5 \n\n")
-        return entity
-        
-    @classmethod
-    def fromHDF5(cls, entity:h5py.Group, 
-                attrs:typing.Optional[dict] = None, cache:dict = {}):
-        from iolib import h5io
-        
-        # print(f"\n\n### BEGIN {cls.__name__}.fromHDF5 ")
-        
-        if entity in cache:
-            val = cache[entity]
-            # print(f"{cls.__name__}.fromHDF5 got cached entity {type(val).__name__}")
-            return val
-        
-        attrs = h5io.attrs2dict(entity.attrs)
-        
-        # print(f"{cls.__name__}.fromHDF5: attrs = {attrs}")
-        
-        # assert attrs["python_class"] == str(cls).strip("<").strip(">").strip("class").strip()[1:-1], \
-        assert attrs["python_class"] == cls, f"Object has unexpected class: {attrs['python_class']}"
-        
-        attrs_as_entities = [a for a in cls.__match_args__ if a not in attrs]
-        
-        kwargs = dict()
-        
-        for a in attrs_as_entities:
-            if a in entity.keys():
-                kwargs[a] = h5io.fromHDF5(entity[a], cache=cache)
-                # print(f"{cls.__name__}.fromHDF5: got field '{a}' with type: {type(kwargs[a]).__name__}\n")
-                    
-        # print(f"### END {cls.__name__}.fromHDF5 \n\n")
-        return cls(**kwargs)
-    
-    
-TE = typing.TypeVar("TE", bound="TypeEnum")
-class TypeEnum(IntEnum):
-    """Common ancestor for enum types used in Scipyen
-    """
-    
-    @classmethod
-    def default(cls) -> type[TE]:
-        """Aways returns the first member of the enum class
-        """
-        names = list(cls.names())
-        return cls[names[0]]
-    
-    @classmethod
-    def names(cls) -> typing.Generator[str, None, None]:
-        """Iterate through the names in TypeEnum enumeration.
-        """
-        for t in cls:
-            yield t.name
-    
-    @classmethod
-    def values(cls) -> typing.Generator[int, None, None]:
-        """Iterate through the int values of TypeEnum enumeration.
-        """
-        for t in cls:
-            yield t.value
-        
-    @classmethod
-    def types(cls) -> typing.Generator[type[TE], None, None]:
-        """Iterate through the elements of TypeEnum enumeration.
-        Useful to quickly remember what the members of this enum are (with their
-        names and values).
-        
-        A TypeEnum enum member is by definition a member 
-        of TypeEnum enum and an instance of TypeEnum.
-        
-        """
-        for t in cls:
-            yield t
-            
-    @classmethod
-    def namevalue(cls, name:str) -> int:
-        """Return the value (int) corresponding to a given name;
-        WARNING If name is not a valid TypeEnum name returns -1
-        """
-        if name in cls.names():
-            return getattr(cls, name).value
-        
-        return -1
-    
-    @classmethod
-    def stringToType(cls, name:str) -> int:
-        """Return the value (int) corresponding to a given name;
-        WARNING If name is not a valid TypeEnum name returns -1
-        """
-        return cls.namevalue(name)
-    
-    @classmethod
-    def __contains__(cls, value) -> bool:
-        if isinstance(value, cls):
-            return value in cls.types()
-        
-        elif isinstance(value, int):
-            return value in cls.values()
-        
-        elif isinstance(value, str):
-            return value in cls.names()
-        
-        else:
-            return False
-
-    @classmethod
-    def type(cls, t:typing.Union[str, int]) -> type[TE]:
-        """Returns the enum type corresponding to `t`, where
-        `t` can be:
-        • str: the name / symbol associated with the type in the enum
-        • int: the value associated with the type in the enum
-        
-        
-        """
-        if isinstance(t, str):
-            if t in cls.names():
-                return [_t for _t in cls if _t.name == t][0]
-            else:
-                # check for user-defined composite type - break it down to a list
-                # of existing types, if possible
-                if "|" in t:
-                    t_hat = [cls.type(_t.strip()) for _t in t.split("|")]
-                    if len(t_hat):
-                        return t_hat
-                    else:
-                        raise ValueError("Unknown %s type name %s" % (cls.__name__, t))
-                else:
-                    raise ValueError("Unknown %s type name %s" % (cls.__name__, t))
-            
-        elif isinstance(t, int):
-            if t in cls.values():
-                return [_t for _t in cls if _t.value == t][0]
-            else:
-                # check for implicit composite type (i.e. NOT listed in the definition)
-                ret = [_t for _t in cls if _t.value & t]
-                if len(ret):
-                    return ret
-                else:
-                    raise ValueError("Unknown %s type value %d" % (cls.__name__, t))
-            
-        elif isinstance(t, cls):
-            return t
-        
-        else:
-            raise TypeError("Expecting a %s, int or str; got %s instead" % (cls.__name__, type(t).__name__))
-            
-    @classmethod
-    def strand(cls, name1:str, name2:str) -> int:
-        """ Emulates '&' operator for type names 'name1' and 'name2'.
-        If neither arguments are valid names returns 0
-        """
-        if any([n not in cls.names() for n in [name1, name2]]):
-            return 0
-        
-        val1 = cls.namevalue(name1)
-        val2 = cls.namevalue(name2)
-        
-        return val1 & val2
-    
-    @classmethod
-    def is_primitive_type(cls, t) -> bool:
-        """Checks if 't' is a primitive type in this types enumeration.
-        
-        Parameters:
-        -----------
-        t: int, str, TypeEnum (or subclass)
-        
-            When an int or a str, the value must be a valid one (i.e., found in
-            TypeEnum.values() or TypeEnum.names(), respectively)
-        
-        """
-        return len(cls.primitive_component_types(t)) == 0
-    
-    @classmethod
-    def is_derived_type(cls, t) -> bool:
-        """Checks if 't' is a compound type (i.e. derived from other type enums)
-        
-        Parameters:
-        -----------
-        t: int, str, TypeEnum (or subclass)
-        
-            When an int or a str, the value must be a valid one (i.e., found in
-            TypeEnum.values() or TypeEnum.names(), respectively)
-        
-        """
-        return len(cls.component_types(t)) > 0
-        #return len(cls.primitive_component_types(t)) > 0
-        
-    @classmethod
-    def is_composite_type(cls, t) -> bool:
-        """Alias of TypeEnum.is_derived_type()
-        
-        Parameters:
-        -----------
-        t: int, str, TypeEnum (or subclass)
-        
-            When an int or a str, the value must be a valid one (i.e., found in
-            TypeEnum.values() or TypeEnum.names(), respectively)
-        
-        """
-        return cls.is_derived_type(t)
-    
-    @classmethod
-    def primitive_component_types(cls, t) -> typing.List[TE]:
-        """ Returns a list of primitive TypeEnum objects that compose 't'.
-        If 't' is already a primitive type, returns an empty list.
-        
-        Parameters:
-        -----------
-        t: int, str, TypeEnum (or subclass)
-        
-            When an int or a str, the value must be a valid one (i.e., found in
-            TypeEnum.values() or TypeEnum.names(), respectively)
-        
-        """
-        from .utilities import unique
-        if isinstance(t, (int, str)):
-            t_hat = cls.type(t)
-            if isinstance(t_hat, list):
-                return unique([__t for __t in chain.from_iterable([[_t for _t in cls if _t.is_primitive() and _t.value <= t_.value] for t_ in t_hat])])
-            else:
-                t = t_hat
-                
-        elif not isinstance(t, cls):
-            raise TypeError("Expecting a TypeEnum, int or str; got %s instead" % type(t).__name__)
-        
-        return [_t for _t in filter(lambda x: x & t, cls) if _t.value < t.value and _t.is_primitive()]
-        
-    @classmethod
-    def component_types(cls, t) -> typing.List[TE]:
-        """ Returns a list of TypeEnum objects that compose 't'.
-        If 't' is already a primitive type, returns an empty list.
-    
-        The TypeEnum objects can also be composite types.
-        
-        Parameters:
-        -----------
-        t: int, str, TypeEnum (or subclass)
-        
-            When an int or a str, the value must be a valid one (i.e., found in
-            TypeEnum.values() or TypeEnum.names(), respectively)
-        
-        """
-        from .utilities import unique
-        if isinstance(t, (int, str)):
-            t_hat = cls.type(t)
-            if isinstance(t_hat, list):
-                # NOTE: 2021-04-14 23:33:22
-                # by definition this only occurs with a composite type
-                return unique([__t for __t in chain.from_iterable([[_t for _t in cls if _t.value <= t_.value] for t_ in t_hat])])
-            else:
-                t = t_hat
-                
-        elif not isinstance(t, cls):
-            raise TypeError("Expecting a %s, int or str; got %s instead" % (cls.__name__, type(t).__name__))
-        
-        return [_t for _t in filter(lambda x: x & t, cls) if _t.value < t.value]
-    
-    @classmethod
-    def derived_types(cls, t) -> typing.List[TE]:
-        """ Returns the composite TypeEnum objects where 't' participates.
-        Parameters:
-        -----------
-        t: int, str, TypeEnum (or subclass)
-        
-            When an int or a str, the value must be a valid one (i.e., found in
-            TypeEnum.values() or TypeEnum.names(), respectively)
-        
-        """
-        if isinstance(t, (int, str)):
-            t_hat = cls.type(t)
-            if isinstance(t_hat, list):
-                return unique([__t for __t in chain.from_iterable([[_t for _t in cls if _t is not t_ and _t.value > t_.value] for t_ in t_hat])])
-            else:
-                t = t_hat
-                
-        elif not isinstance(t, cls):
-            raise TypeError("Expecting a %s, int or str; got %s instead" % (cls.__name__, type(t).__name__))
-        
-        return [_t for _t in filter(lambda x: x & t, cls) if not _t.is_primitive() and _t is not t and _t.value > t.value]# _t.value > t.value]
-        
-    def is_derived(self):
-        """Return True if this TypeEnum object is a composite (i.e., derived) type.
-        """
-        return self.is_derived_type(self)
-    
-    def is_composite(self) -> bool:
-        """Return True if this TypeEnum object is a composite (i.e., derived) type.
-        """
-        return self.is_derived()
-    
-    def is_primitive(self) -> bool:
-        return self.is_primitive_type(self)
-    
-    def primitives(self) -> typing.List[TE]:
-        """Returns a list of primitive types used to generate this type.
-        
-        Compound types are generated from primitive types through the logical
-        OR operator (bitwise OR).
-        
-        Returns an empty list of this is a primitive type.
-        """
-        return self.primitive_component_types(self)
-    
-    def components(self) -> typing.List[TE]:
-        """Returns a list of components for this TypeEnum object.
-        
-        Compound types are generated from primitive types through the logical
-        OR operator (bitwise OR).
-        
-        If this TypeEnum object is a primitive returns an empty list
-        """
-        return self.component_types(self)
-    
-    def includes(self, t) -> bool:
-        """Returns True if 't' is a component of this TypeEnum object.
-        
-        't' may be a primitive or a composite type.
-        
-        Always returns False when this is a primitive.
-        """
-        t = self.type(t)
-            
-        return t in self.components()
-    
-    def is_primitive_of(self, t) -> bool:
-        """Returns True if this TypeEnum object is a primitive of 't'.
-        
-        Always returns False when this TypeEnum object is a composite (i.e., 
-        even if it is a component of 't').
-        """
-        t = self.type(t)
-            
-        return self in t.primitives()
-    
-    def is_component_of(self, t) -> bool:
-        """Returns True if this TypeEnum object is a component of 't'.
-        """
-        t = self.type(t)
-        
-        return self in t.components()
-    
-    def nameand(self, name:str) -> TE:
-        """ Applies strand() to the name of this object and the argument.
-        """
-        return self.strand(self.name, name)
-    
-class CellCompartmentType(TypeEnum):
-    """Follows SWC/CNIC specification augmented with 'spine', 'nucleus', 'nucleolus'. 
-    See http://www.neuronland.org/NLMorphologyConverter/MorphologyFormats/SWC/Spec.html
-    """
-    undefined = 0
-    cell = undefined
-    soma = 1
-    axon = 2
-    dendrite = 3 # basal dendrite
-    apical_dendrite = 4
-    fork_point = 5
-    end_point = 6
-    spine = 7
-    basal_dendrite_spine = dendrite | spine # = 10
-    apical_dendrite_spine = apical_dendrite | spine # = 11
-    nucleus = 12
-    nucleolus = 13
-    
-class BioSourceType(TypeEnum):
-    exvivo      = 1
-    invitro     = 2
-    insilico    = 4
-    monolayer   = 8     # e.g. "primary" culture = invitro | monolayer = 10
-    tissue      = 16    # e.g. acute brain slice = exvivo | tissue = 17 
-                        # e.g. "organotypic" slice culture = invitro | tissue  = 18
-    assembloid  = 32    # e.g. "organoid" = invitro | assembloid = 34
-    
-    invivo      = 64
-    
-    organism    = 128   
-    
-class ProcedureType(TypeEnum):
-    null = 0
-    mating = 1
-    treatment = 2
-    behaviour = 4 # includes navigation in real or virtual environment, rotarod, inclined plane, licking etc # TODO to refine
-    surgery = 8
-    biopsy = 16
-    postop = 32
-    tagging = 64
-    weaning = 128
-    cull = 256
-    other = 512
-    
-class OrganismStage(TypeEnum):
-    undefined   = 0
-    zygote      = 1
-    morula      = 2
-    blastula    = 4
-    gastrula    = 8
-    embryo      = zygote | morula | blastula | gastrula # = 15
-    foetal      = 16
-    prenatal = embryo | foetal # = 31
-    larva       = 32
-    pup         = larva
-    prepubertal = larva
-    preweaning  = prepubertal
-    adolescent  = 33
-    adult       = 34
-    juvenile    = larva | adolescent # = 65
-    postnatal   = larva | adolescent | adult # = 99
-    
-class AdministrationRoute(TypeEnum):
-    null = 0
-    bath = 1 # relates to ex vivo tissue slices
-    puff = 2 # relates to ex vivo tissue slices — e.g. picospritzer, pressurized micropipette, etc
-    intraperitoneal = 4
-    intramuscular = 8
-    intravenous = 16
-    intraarterial = 32
-    intracerebral = 64
-    intraventricular = 128 # can be in the heart!
-    intracerebroventricular = intracerebral | intraventricular # 192
-    intracardiac = 256
-    intracardioventricular = intracardiac | intraventricular # 384
-    subcutaneous = 512
-    transcutaneous = 1024
-    peros = 2048 # e.g. gavage
-    inhalation = 4096
-    intranasal = 8192
-    intraorbital = 16384
-    food_water = 32768
-    other = 65536
-    
-    # aliases
-    ip = intraperitoneal
-    iv = intravenous
-    ia = intraarterial
-    im = intramuscular
-    ic = intracerebral
-    icv = intracerebroventricular
-    icd = intracardiac
-    icdv = intracardioventricular
-    ins = intranasal # 'in' is a reserved Python keyword
-    inh = inhalation
-    io = intraorbital
-    sc = subcutaneous
-    tc = transcutaneous
-    gavage = peros
-    oral = peros
-    custom = other
-    bulk = bath
-    
-    
+   
 def inspect_members(obj, predicate=None):
     skips = ("__class__", "__module__", "__name__", "__qualname__", "__func__",
              "__self__", "__code__", "__defaults__", "__kwdefaults__", 
@@ -1453,732 +827,3 @@ def inspect_members(obj, predicate=None):
         
     return dict(mb)
 
-@dataclass
-class CellCompartment(ScipyenDataclass):
-    # name:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
-    type:CellCompartmentType = CellCompartmentType.undefined
-    id:int = 0
-    
-    __match_args__ = tuple(set(ScipyenDataclass.__match_args__ + ("type", "id")))
-
-    def __repr__(self):
-        indent = lambda x: x.replace("\n", "\n\t")
-        repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}"
-        ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
-        return "\n".join(ret)
-    
-    def __eq__(self, other) -> bool:
-        return super().__eq__(other)
-    
-@dataclass
-class Biometrics(ScipyenDataclass):
-    genotype:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
-    # genotype of the source - keep it simple
-    #
-    # NOTE: avoid strings like (+/-, TSNeo/-, etc) as they don't play well when
-    # importing data in, say, R
-    # These are entirely conventional, and, within the same line of genetic 
-    # animal model they would have a well-defined meaning
-    #
-
-    sex:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
-    # ID of source sex (where appropriate); one of "f", "m", "na" (case-insensitive)
-    #
-    
-    age:typing.Union[pq.Quantity, type(pd.NA)] = dataclasses.field(default=pd.NA)
-    # animal's age (more generaly the age of the biological source)- almost 
-    # free-form string, see NOTE for animal ID - keep it
-    #   simple, yet meaningful, and indicate units (e.g. 3_mo, or 20_d, or 1_yr)
-    #
-    # NOTE: these are simply for a quick information; in the future Scipyen will
-    # provide a more standardized way to store this information, hopefully more
-    # suitable to some sort of database management
-    
-    postnatal:bool=True
-    
-    weight:typing.Union[pq.Quantity, type(pd.NA)] = dataclasses.field(default=pd.NA) 
-    height:typing.Union[pq.Quantity, type(pd.NA)] = dataclasses.field(default=pd.NA)
-    
-    __match_args__ = tuple(set(ScipyenDataclass.__match_args__ + ("genotype", "sex",
-                                                                  "age", "postnatal",
-                                                                  "weight", "height")))
-    
-    def __repr__(self):
-        indent = lambda x: x.replace("\n", "\n\t")
-        repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}"
-        ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
-        return "\n".join(ret)
-    
-    def __eq__(self, other) -> bool:
-        return super().__eq__(other)
-    
-@dataclass
-class Organism(ScipyenDataclass):
-    taxon:TaxonDescriptor = TaxonDescriptor(default="Rattus")
-    subspecies:str = "Sprague Dawley"
-    strain:str = ""
-    stage:OrganismStage = dataclasses.field(default=OrganismStage.postnatal)
-    biometrics:Biometrics = dataclasses.field(default_factory=Biometrics)
-    
-    __match_args__ = tuple(set(ScipyenDataclass.__match_args__ + ("taxon", "subspecies",
-                                                                  "strain","stage",
-                                                                  "biometrics")))
-    
-    def __post_init__(self):
-        if isinstance(self.biometrics, Biometrics):
-            self.biometrics.postnatal = self.stage > OrganismStage.prenatal
-                
-    def __repr__(self):
-        indent = lambda x: x.replace("\n", "\n\t")
-        repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}"
-        ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
-        return "\n".join(ret)
-    
-    def __eq__(self, other) -> bool:
-        return super().__eq__(other)
-    
-@dataclass
-class BiologicalSource(ScipyenDataclass):
-    """
-        TODO: 2024-11-17 21:11:13 : locate and use neuronal taxonomy API
-    """
-    organism:Organism = dataclasses.field(default_factory=Organism)
-    # organ:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
-    
-    # BUG: 2024-12-13 15:31:40 FIXME
-    # accessing this will trigger the lazy initialization of the "mesh" object,
-    # and invalidate future comparisons (e.g. see ScipyenDataclass.__eq__ and
-    # ScipyenDataclass.diff)
-    #
-    #   NOTE: 2024-12-13 15:40:14
-    #   understand how meshio obejcts are being compared - see meshio package!
-    #   
-    #   TODO: 2024-12-14 10:17:30 possible fix - no need for the above; becuase
-    #   the meshio obejcts will ALWAYS be different (their comparison does NOT
-    # compare actual data but rather object python id) we must use the strategy
-    #   below:
-    # a "source" is uniquely determined by its "id" (source id, not python id)
-    # and by the atlas is belongs to; therefore they can be uniquely compared
-    # for equality using only these two attributes (or rather elements of the
-    # source underlying dictionary)(and, therefore, stored in HDF5)
-    structure:BGStructureDescriptor = BGStructureDescriptor()
-    # for now, only brain atlas api is supported
-    
-    
-    cellType:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA) # e.g. "neuron"
-    cellMorphologicalType:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA) # e.g."pyramidal"
-    cellDescriptors:typing.Union[str, type(pd.NA), typing.Sequence[str]] = dataclasses.field(default=pd.NA)
-    sourceType:BioSourceType = dataclasses.field(default=BioSourceType.exvivo)
-    sourceID:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
-    # identifier for the cell source: this may a (meaningful) combination of:
-    #   animal ID,
-    #   experimental date
-    #   cortex region
-    #
-    #   e.g. TS2_1234567_01_02_22_VisCx_
-    #
-    # NOTE: the rules for naming the source are up to you, BUT:
-    #   1) be consistent
-    #   2) should contain ONLY alphanumeric characters and underscore ('_')
-    #   3) should NOT begin with a digit or underscore ('_')
-
-    cellID:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
-    # identifier for this cell; there may be more than one cell from the same animal
-    #
-    # NOTE: the rules for constructing a cell ID are up to you, BUT:
-    #   1) be consistent
-    #   2) should contain ONLY alphanumeric characters and underscore ('_')
-    #   3) should NOT begin with a digit or underscore ('_')
-    # 
-    
-    # TODO: 2024-11-18 16:51:36
-    # move this to ScanData metadata
-    # fieldID:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
-    # # ID for a microscopy field — useful only for experiments involving imaging
-    # # unique identifier for the microscopy field (e.g. one can record from more 
-    # # than one field containing (sub)-regions of the same cell — spines, 
-    # # dendritic segments, etc)
-    
-    cellCompartment:CellCompartment = dataclasses.field(default_factory=CellCompartment)
-    # cellular compartment (there may be more than one in the same
-    # field) — e,g, "spine", "dendrite", "axon", "soma"
-    
-    __match_args__ = tuple(set(ScipyenDataclass.__match_args__ + ("organism",
-                                                                  "structure",
-                                                                  "cellType",
-                                                                  "cellMorphologicalType",
-                                                                  "cellDescriptors",
-                                                                  "sourceType",
-                                                                  "sourceID",
-                                                                  "cellID",
-                                                                  "cellCompartment",)))
-    
-    def __repr__(self):
-        indent = lambda x: x.replace("\n", "\n\t")
-        repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}"
-        ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
-        return "\n".join(ret)
-    
-    def __eq__(self, other) -> bool:
-        return super().__eq__(other)
-    
-@dataclass
-class Procedure(ScipyenDataclass):
-    """An experimental procedure: what is being done during an Episode.
-    
-    A succession of procedures (attached to the episodes of a Schedule) 
-        represents an experimental protocol.
-        
-    NOTE: The Treatment class is recommended for use in lieu of generic Procedure
-    where procedureType is 'treatment'
-    
-    """
-    # name:str = ""
-    _:KW_ONLY
-    type: ProcedureType = ProcedureType.null
-    # description: str = ""
-    
-    __match_args__ = tuple(set(ScipyenDataclass.__match_args__ + ("type", ) )) # "name" and "description" inherited from ScipyenDataclass
-    
-    def __repr__(self):
-        indent = lambda x: x.replace("\n", "\n\t")
-        repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}"
-        ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
-        return "\n".join(ret)
-    
-    def __eq__(self, other) -> bool:
-        return super().__eq__(other)
-    
-@dataclass
-class SubstanceDosage(ScipyenDataclass):
-    """Logical mapping between a compund (or substance) and a dose, in a Treatment.
-    Fields:
-    name:str. Name of the compound (free-form within Python's rules)
-    dose: pq.Quantity. This can be:
-        • a scalar quantity - unique dose administered during a Treatment
-        • a signal-like object:
-            ∘ neo.AnalogSignal - a "continuously" time-varying dose, sampled at
-                regular time intervals
-            ∘ neo.IrregularlySampledSignal - different doses administered at 
-                discrete, possibly irregular, times
-    """
-    name:str = "Vehicle"
-    dose: DoseDescriptor = DoseDescriptor(default=None)
-    
-    __match_args__ = tuple(set(ScipyenDataclass.__match_args__ + ("dose", )))
-    
-    def __repr__(self):
-        indent = lambda x: x.replace("\n", "\n\t")
-        repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}"
-        ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
-        return "\n".join(ret)
-    
-    def __eq__(self, other) -> bool:
-        return super().__eq__(other)
-    
-    
-@dataclass
-class Treatment(Procedure):
-    """
-    Encapsulates the administration of a dose of substance(s) via a specified route.
-    
-    name: treatment name (typically, the compound's name)
-    substance: SubstanceDosage or sequence (tuple, list) of SubstanceDosage
-    
-    """
-    name:str = "Treatment"
-    __match_args__ = tuple(set(Procedure.__match_args__ + ("substance", "route", "type")))
-    _:KW_ONLY
-    substance:typing.Union[SubstanceDosage, typing.Sequence[SubstanceDosage]] = field(default_factory=SubstanceDosage)
-    # allow combination of compounds
-    route:AdministrationRoute = AdministrationRoute.null
-    
-    type:ImmutableDescriptor = ImmutableDescriptor(default=ProcedureType.treatment)
-    
-    def __post_init__(self):
-        super().__init__(name=self.name, description=self.description, 
-                         type = ProcedureType.treatment)
-        
-    def __eq__(self, other) -> bool:
-        return super().__eq__(other)
-    
-@dataclass
-class Episode(ScipyenDataclass):
-    """Generic episode for frame-based data.
-        NOTE: The `beginFrame` and `endFrame` fields are inclusive indices.
-        To use them in indexing a sequence (or frames), add 1 (one) to the 
-        `endFrame` field, e.g.:
-        range(data.beginFrame, data.endFrame +1)
-        An Episode is an elementary part of a Schedule, and is logically associated
-        with a Procedure.
-        
-        The defining attributes are: `name`, `begin`, `end`, `beginFrame`, `endFrame`
-        and `procedure`.
-        
-        In addition, the `description` attribute (a str) has an informative role
-        without affecting the identity of an Episode
-    """
-    # name:str = ""
-    _:KW_ONLY
-    begin:datetime.datetime = datetime.datetime.now()
-    end:datetime.datetime = datetime.datetime.now()
-    beginFrame:int = 0
-    endFrame:int = 0
-    # description:str = ""
-    procedure:typing.Optional[Procedure] = field(default = None)
-    
-    __match_args__ = tuple(set(ScipyenDataclass.__match_args__ + ("begin", "end", 
-                                                                  "beginFrame", "endFrame",
-                                                                  "procedure")))
-    
-    def __eq__(self, other) -> bool:
-        return super().__eq__(other)
-    
-# #         if not isinstance(other, self.__class__):
-# #             return False
-# #         
-# #         ret = True
-# #         ret &= self.name == other.name
-# #         if ret:
-# #             # don't compare description as this is not definitory
-# #             ret &= all(getattr(self, f.name) == getattr(other, f.name) for f in list(filter(lambda x: x.name != "description", dataclasses.fields(self.__class__))))
-# #             
-#         return ret
-    
-    def __repr__(self):
-        indent = lambda x: x.replace("\n", "\n\t")
-        repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}"
-        ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
-        return "\n".join(ret)
-    
-#     def toHDF5(self,group:h5py.Group, name:str, oname:str, 
-#                        compression:str, chunks:bool, track_order:bool,
-#                        entity_cache:dict) -> h5py.Dataset:
-#         """Encodes an episode as an empty hdf5 dataset"""
-#         from iolib import h5io
-#         target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
-#         cached_entity = h5io.getCachedEntity(entity_cache, self)
-#         if isinstance(cached_entity, h5py.Dataset):
-#             group[target_name] = cached_entity
-#             return cached_entity
-#         
-#         attrs = dict((x, getattr(self, x)) for x in ("name", "begin", "end", "beginFrame", "endFrame", "description"))
-#         
-#         objattrs = h5io.makeAttrDict(**attrs)
-#         obj_attrs.update(objattrs)
-#         
-#         if isinstance(name, str) and len(name.strip()):
-#             target_name = name
-#         
-#         entity = group.create_dataset(name, data = h5py.Empty("f"), track_order=track_order)
-#         entity.attrs.update(obj_attrs)
-#         
-#         h5io.toHDF5(self.procedure, entity, name="procedure", oname="procedure",
-#                             compression=compression,chunks=chunks,
-#                             track_order=track_order,
-#                             entity_cache=entity_cache)
-#         
-#         h5io.storeEntityInCache(entity_cache, self, entity)
-#         
-#         return entity
-#     
-#     @classmethod
-#     def fromHDF5(cls, entity:h5py.Dataset,
-#                              attrs:typing.Optional[dict]=None, cache:dict={}):
-#         from iolib import h5io
-#         if entity in cache:
-#             return cache[entity]
-#         
-#         attrs = h5io.attrs2dict(entity.attrs)
-#         
-#         name = attrs["name"]
-#         begin = attrs["begin"]
-#         end = attrs["end"]
-#         beginFrame = attrs["beginFrame"]
-#         endFrame = attrs["endFrame"]
-# 
-#         procedure = h5io.fromHDF5(entity["procedure"], cache=cache)
-#         
-#         return cls(name, begin=begin, end=end, 
-#                    beginFrame=beginFrame, endFrame=endFrame,
-#                    procedure=procedure)
-        
-@dataclass
-class Schedule(ScipyenDataclass):
-    """Logical grouping of a sequence of episodes.
-        A Schedule can be logically considered a "protocol", where any of its
-        constituent episodes may associate a Procedure. 
-    """
-    # name:str = ""
-    _:KW_ONLY
-    episodes:typing.Sequence[Episode] = field(default_factory = lambda : list())
-    
-    __match_args__ = tuple(set(ScipyenDataclass.__match_args__ + ("episodes",)))
-    
-    def __repr__(self):
-        indent = lambda x: x.replace("\n", "\n\t")
-        repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}"
-        ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
-        return "\n".join(ret)
-    
-    def __eq__(self, other) -> bool:
-        return super().__eq__(other)
-    
-#         if not isinstance(other, self.__class__):
-#             return False
-#         
-#         ret = len(self.episodes) == len(other.episodes)
-#         
-#         if ret:
-#             return all(e==e1 for (e,e1) in zip(self.episodes, other.episodes))
-#         
-#         return ret
-    
-    def __len__(self)->int:
-        return len(self.episodes)
-    
-    def __getitem__(self, key:typing.Union[int, slice, range, tuple, list, collections.deque, str]):
-        if isinstance(key, int):
-            if key >= len(self.episodes) or key < -1 * len(self.episodes):
-                raise IndexError(f"Index {key} out of range for {len(self.episodes)} episodes")
-            return self.episodes[key]
-        
-        elif isinstance(key, str):
-            if len(self.episodes) == 0:
-                raise KeyError(f"Episode named {key} not found")
-            
-            ret = list(filter(lambda x:x.name == key, self.episodes))
-            
-            if len(ret) == 0:
-                raise KeyError(f"Episode named {key} not found")
-            elif len(ret) > 1:
-                scipywarn(f"Duplicate episode name ({key}) found")
-                
-            return ret
-        
-        elif isinstance(key, slice):
-            return self.episodes[key]
-        
-        elif isinstance(key, range):
-            if any(k >= len(self.episodes) or k < -1 * len(self.episodes) for k in key):
-                raise IndexError(f"Index out of range for {len(self.episodes)} episodes")
-            
-            return [self.episodes[k] for k in key]
-        
-        elif isinstance(key, (tuple, list, collections.deque)):
-            if len(key) == 0:
-                return list()
-            elif all(isinstance(k, int) for k in key):
-                if any(k >= len(self.episodes) or k < -1 * len(self.episodes) for k in key):
-                    raise IndexError(f"Index out of range for {len(self.episodes)} episodes")
-                return [self.episodes[k] for k in key]
-            
-            else:
-                raise KeyError("All indices must be int")
-            
-        else:
-            raise TypeError(f"Invalid indexing key type {type(key).__name__}")
-        
-    def __setitem__(self, key:typing.Union[int, slice, range, tuple, list, collections.deque], 
-                    value:typing.Union[Episode, typing.Iterable[Episode]]):
-        if isinstance(key, int):
-            if key >= len(self.episodes) or key < -1 * len(self.episodes):
-                raise IndexError(f"Index {key} out of range for {len(self.episodes)} episodes")
-            if not isinstance(value, Episode):
-                raise TypeError(f"Expecting an Episode; instead, got {type(value).__name__}")
-            
-            self.episodes[key] = value
-        
-        elif isinstance(key, slice):
-            if not isinstance(value, typing.Iterable):
-                raise TypeError(f"The RHS of the assignment must be an iterable; instead, got {type(value).__name__}")
-            if not all(isinstance(v, Episode) for v in value):
-                raise TypeError(f"The RHS iterable must contain only Episode objects; instead got {unique((type(v).__name__ for v in value))}")
-            l_indices = len(range(*key.indices(len(self.episodes))))
-            if l_indices < len(value):
-                raise ValueError(f"Too many RHS elements ({l_indices}); expecting {len(key)}")
-            if l_indices > len(value):
-                raise ValueError(f"Too few RHS elements ({l_indices}); expecting {len(key)}")
-            
-            self.episodes[key] = value
-        
-        elif isinstance(key, range):
-            if not isinstance(value, typing.Iterable):
-                raise TypeError(f"The RHS of the assignment must be an iterable; instead, got {type(value).__name__}")
-            if not all(isinstance(v, Episode) for v in value):
-                raise TypeError(f"The RHS iterable must contain only Episode objects; instead got {unique((type(v).__name__ for v in value))}")
-            if any(k >= len(self.episodes) or k < -1 * len(self.episodes) for k in key):
-                raise IndexError(f"Index out of range for {len(self.episodes)} episodes")
-            if len(key) < len(value):
-                raise ValueError(f"Too many RHS elements ({l_indices}); expecting {len(key)}")
-            if len(key) > len(value):
-                raise ValueError(f"Too few RHS elements ({l_indices}); expecting {len(key)}")
-            
-            for k in key:
-                self.episodes[k] = value[k]
-            
-        elif isinstance(key, (tuple, list, collections.deque)):
-            if len(key) == 0:
-                return
-            elif all(isinstance(k, int) for k in key):
-                if not isinstance(value, typing.Iterable):
-                    raise TypeError(f"The RHS of the assignment must be an iterable; instead, got {type(value).__name__}")
-                if not all(isinstance(v, Episode) for v in value):
-                    raise TypeError(f"The RHS iterable must contain only Episode objects; instead got {unique((type(v).__name__ for v in value))}")
-                if any(k >= len(self.episodes) or k < -1 * len(self.episodes) for k in key):
-                    raise IndexError(f"Index out of range for {len(self.episodes)} episodes")
-                if len(values) > len(key):
-                    raise ValueError(f"Too many RHS elements ({l_indices}); expecting {len(key)}")
-                if len(values) < len(key):
-                    raise ValueError(f"Too few RHS elements ({l_indices}); expecting {len(key)}")
-                
-                for k in key:
-                    self.episodes[k] = value[k]
-            else:
-                raise KeyError("All indices must be int")
-            
-        else:
-            raise TypeError(f"Invalid indexing key type {type(key).__name__}")
-        
-    def __delitem__(self, key:typing.Union[int, slice, range, tuple, list, collections.deque, str]):
-        if isinstance(key, int):
-            if key >= len(self.episodes) or key < -1 * len(self.episodes):
-                raise IndexError(f"Index {key} out of range for {len(self.episodes)} episodes")
-            
-            del self.episodes[key]
-            
-        elif isinstance(key, str):
-            if len(self.episodes) == 0:
-                raise KeyError(f"Episode named {key} not found")
-            
-            ret = list(filter(lambda x:x.name == key, self.episodes))
-            
-            if len(ret) == 0:
-                raise KeyError(f"Episode named {key} not found")
-            
-            elif len(ret) > 1:
-                scipywarn(f"Duplicate episode name ({key}) found")
-                
-            keep  = [e for e in self.episodes if e.name != key]
-
-            self.episodes[:] = keep
-        
-        elif isinstance(key, slice):
-             del self.episodes[key]
-        
-        elif isinstance(key, range):
-            if any(k >= len(self.episodes) or k < -1 * len(self.episodes) for k in key):
-                raise IndexError(f"Index out of range for {len(self.episodes)} episodes")
-            
-            keep  = [self.episodes[k] for k in range(len(self.episodes)) if k not in key]
-            self.episodes[:] = keep
-            
-        elif isinstance(key, (tuple, list, collections.deque)):
-            if len(key) == 0:
-                return
-            
-            elif all(isinstance(k, int) for k in key):
-                if any(k >= len(self.episodes) or k < -1 * len(self.episodes) for k in key):
-                    raise IndexError(f"Index out of range for {len(self.episodes)} episodes")
-                
-                keep  = [self.episodes[k] for k in range(len(self.episodes)) if k not in key]
-                self.episodes[:] = keep
-            
-            # elif all(isinstance(k, str) for k in key):
-            #     keep  = [self.episodes[k] for k in range(len(self.episodes)) if k not in key]
-            #     self.episodes[:] = keep
-            
-            else:
-                raise KeyError("All indices must be int or str")
-            
-        else:
-            raise TypeError(f"Invalid indexing key type {type(key).__name__}")
-        
-    def __iter__(self):
-        return self.episodes.__iter__()
-    
-    def __reversed__(self):
-        return self.episodes.__reversed__()
-    
-    def __add__(self, other):
-        if isinstance(other, self.__class__):
-            newepisodes = self.episodes.__add__(other.episodes)
-            return self.__class__(name=self.name, episodes = newepisodes)
-            
-        elif isinstance(other, typing.Sequence):
-            if len(other) and not all(isinstance(e, Episode)):
-                raise TypeError("Can only add a sequence of Episodes")
-            newepisodes = self.episodes.__add__(other)
-            return self.__class__(name=self.name, episodes = newepisodes)
-        
-        else:
-            raise TypeError(f"Invalid argument type ({type(other).__name__})")
-            
-    def __iadd__(self, other):
-        if isinstance(other, self.__class__):
-            self.episodes.__iadd__(other.episodes)
-            return self
-            
-        elif isinstance(other, typing.Sequence):
-            if len(other) and not all(isinstance(e, Episode)):
-                raise TypeError("Can only add a sequence of Episodes")
-            self.episodes.__iadd__(other)
-            return self
-        
-        else:
-            raise TypeError(f"Invalid argument type ({type(other).__name__})")
-        
-    def __mul__(self, value:int):
-        return self.__class__(name=self.name, episodes = self.episodes.__mul__(value))
-            
-    def __imul__(self, value:int):
-        self.episodes.__imul__(value)
-        return self
-    
-    def __contains__(self, value:Episode):
-        return value in self.episodes
-    
-    def append(self, value:Episode):
-        if not isinstance(value, Episode):
-            raise TypeError("A Schedule can only contain Episodes")
-        
-        self.episodes.append(value)
-        
-    def insert(self, index:int, value:Episode):
-        if not isinstance(value, Episode):
-            raise TypeError("A Schedule can only contain Episodes")
-
-        self.episodes.insert(index, value)
-        
-    def pop(self, index:int=-1) -> Episode:
-        return self.episodes.pop(index)
-    
-    def remove(self, value:Episode):
-        if not isinstance(value, Episode):
-            raise TypeError("A Schedule can only contain Episodes")
-        
-        self.episodes.remove(value)
-        
-    def reverse(self):
-        self.episodes.reverse()
-        
-    def sort(self, *args, **kwargs):
-        self.episodes.sort(*argsm **kwargs)
-    
-    def extend(self, value):
-        if isinstance(value, self.__class__):
-            self.episodes.append(value.episodes)
-            
-        elif isinstance(value, typing.Sequence):
-            if len(value):
-                if all(isinstance(v, Episode) for v in value):
-                    self.episodes.append(value)
-                else:
-                    raise TypeError("A Schedule can only contain Episodes")
-                    
-        else:
-            raise TypeError(f"Can only append a Schedule or a sequence of Episodes")
-        
-    def index(self, episode:Episode):
-        if not isinstance(episode, Episode):
-            raise TypeError("A Schedule can only contain Episodes")
-        if episode not in self.episodes:
-            raise ValueError("Episode is not contained in this Schedule")
-        
-        ndx = [k for k in range(len(self.episodes)) if self.episodes[k] == episode]
-        
-        return ndx[0]
-
-    def count(self, episode:Episode):
-        if not isinstance(episode, Episode):
-            raise TypeError("A Schedule can only contain Episodes")
-        
-        if episode not in self.episodes:
-            return 0
-        
-        return len(e for e in self.episodes if e == episode)
-    
-        
-    def toHDF5(self, group, name, oname, compression, chunks, track_order,
-                       entity_cache) -> h5py.Group:
-        
-        from iolib import h5io
-        target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
-        cached_entity = h5io.getCachedEntity(entity_cache, self)
-        if isinstance(cached_entity, h5py.Dataset):
-            group[target_name] = cached_entity
-            return cached_entity
-        
-        attrs = {"name": getattr(self, "name")}
-        
-        objattrs = h5io.makeAttrDict(**attrs)
-        obj_attrs.update(objattrs)
-        
-        if isinstance(name, str) and len(name.strip()):
-            target_name = name
-        
-        entity = group.create_group(target_name, track_order=track_order)
-        entity.attrs.update(obj_attrs)
-        h5io.toHDF5(self.episodes, entity, name="episodes", 
-                            oname="episodes", compression=compression,
-                            chunks=chunks, track_order=track_order,
-                            entity_cache=entity_cache)
-        h5io.storeEntityInCache(entity_cache, self, entity)
-        return entity
-    
-    @classmethod
-    def fromHDF5(cls, entity:h5py.Group,
-                             attrs:typing.Optional[dict] = None, cache:dict={}):
-        
-        from iolib import h5io
-        if entity in cache:
-            return cache[entity]
-        
-        attrs = h5io.attrs2dict(entity.attrs)
-        
-        name = attrs["name"]
-        
-        episodes = h5io.fromHDF5(entity["episodes"], cache)
-        
-        return cls(name, episodes=episodes)
-    
-    @singledispatchmethod
-    def episode(self, ndx) -> Episode:
-        raise NotImplementedError(f"Wrong index type: {type(ndx).__name__}")
-    
-    @episode.register(int)
-    def _(self, ndx:int) -> Episode:
-        if ndx >= len(self.episodes) or ndx < -1 * len(self.episodes):
-            raise IndexError(f"Invalid episode index {ndx} for {len(self.episodes)}")
-        
-        return self.episodes[ndx]
-    
-    @episode.register(str)
-    def _(self, name:str) -> Episode:
-        episodes = [e for e in self.episodes if e.name == name]
-        if len(episodes):
-            return episodes[0]
-        else:
-            raise IndexError(f"Episode name {name} does not exist")
-        
-    def episodeNames(self) -> list[str]:
-        return [e.name for e in self.episodes]
-    
-    def epsodeIndex(self, name:str) -> int:
-        return self.episodeNames.index(name)
-    
-    def addEpisode(self, episode:Episode):
-        if episode not in self.episodes:
-            self.episodes.append(episode)
-            
-    def addEpisodes(self, episodes:typing.Sequence[Episode]):
-        self.episodes.extend([e for e in episodes if e not in self.episodes])
-        
-    def removeEpisode(self, episode):
-        if episode in self.episodes:
-            self.episodes.remove(episode)
-            
-    @property
-    def procedures(self):
-        return [e.procedure for e in self.episodes]
-    

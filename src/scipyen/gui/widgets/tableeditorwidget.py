@@ -154,7 +154,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         
     @property
     def selectedColumnIndex(self) -> typing.Optional[int]:
-        """DEPRECATED"""
+        r"""DEPRECATED"""
         # warnings.warn("This property is deprecated; please use self.selectedColumnIndexes")
         return self._selectedColumnIndex_
     
@@ -173,7 +173,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
     
     @property
     def selectedRowIndex(self) -> typing.Optional[int]:
-        """DEPRECATED"""
+        r"""DEPRECATED"""
         return self._selectedRowIndex_
     
     @selectedRowIndex.setter
@@ -226,7 +226,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
             self.tableView.setEditTriggers(self._defaultEditTriggers_)
             
     def setEditTriggers(self, val):
-        """See documentation for QtWidgets.QAbstractItemView.setEditTriggers()
+        r"""See documentation for QtWidgets.QAbstractItemView.setEditTriggers()
         """
         self.tableView.setEditTriggers(val)
             
@@ -650,7 +650,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         cm.popup(self.tableView.mapToGlobal(pos), copySelectedAction)
 
 class TabularDataModel(QtCore.QAbstractTableModel):
-    """
+    r"""
     Change log:
     NOTE  2018-11-25 01:24:39
     1. Read-only row/column headers

@@ -35,7 +35,7 @@ import gui.pictgui as pgui
 SESSION_TYPE = os.getenv("XDG_SESSION_TYPE")
 
 class DirectoryFileWatcher(QtCore.QObject):
-    """Signal dispatcher between a file system directory monitor and an observer.
+    r"""Signal dispatcher between a file system directory monitor and an observer.
     Binds signals emitted by the monitor to bound methods (callbacks) in the 
     observer.
     
@@ -233,7 +233,7 @@ class DirectoryFileWatcher(QtCore.QObject):
 
     @Slot(tuple)
     def slot_newFiles(self, value):
-        """"""
+        r""""""
         # Check all items in value are files and are in the same parent directory
         if not all(isinstance(v, pathlib.Path) for v in value):
             warnings.warn(f"Should have received a tuple of pathlib.Path objects only!")
@@ -379,7 +379,7 @@ class GuiMessages(object):
 
     @staticmethod
     def questionMessage_static(obj:typing.Optional[QtWidgets.QWidget]=None, title:str="Question", text:str="", default=QtWidgets.QMessageBox.No):
-        """Check the return value for equality to QtWidgets.QMessageBox.Yes"""
+        r"""Check the return value for equality to QtWidgets.QMessageBox.Yes"""
         return QtWidgets.QMessageBox.question(obj, title, text, defaultButton=default)
         
     @safeWrapper
@@ -392,7 +392,7 @@ class GuiMessages(object):
         
     @safeWrapper
     def detailedMessage(self, title:str, text:str, info:typing.Optional[str]="", detail:typing.Optional[str]="", msgType:typing.Optional[typing.Union[str, QtGui.QPixmap]]="Critical"):
-        """Detailed generic message dialog box
+        r"""Detailed generic message dialog box
         title: str  = dialog title
         text:str =  main message
         info:str (optional, default is None) informative text
@@ -445,7 +445,7 @@ class GuiMessages(object):
                                info:typing.Optional[str]="", 
                                detail:typing.Optional[str]="", 
                                msgType:typing.Optional[typing.Union[str, QtGui.QPixmap]]="Critical"):
-        """Detailed generic message dialog box
+        r"""Detailed generic message dialog box
         title: str  = dialog title
         text:str =  main message
         info:str (optional, default is None) informative text
@@ -508,7 +508,7 @@ class DirectoryObserver(QtCore.QObject):
 class FileIOGui(object):
     @safeWrapper
     def chooseFile(self, caption:typing.Optional[str]=None, fileFilter:typing.Optional[str]=None, single:typing.Optional[bool]=True, save:bool=False, targetDir:typing.Optional[str]=None):
-        """Launcher of file open dialog
+        r"""Launcher of file open dialog
         
         Parameters:
         ----------
@@ -574,7 +574,7 @@ class FileIOGui(object):
     
     @staticmethod
     def chooseFile_static(obj:typing.Optional[QtWidgets.QWidget]=None, caption:typing.Optional[str]=None, fileFilter:typing.Optional[str]=None, single:typing.Optional[bool]=True, save:bool=False, targetDir:typing.Optional[str]=None):
-        """Launcher of file open dialog (static version)
+        r"""Launcher of file open dialog (static version)
         
         Parameters:
         ----------
@@ -669,7 +669,7 @@ class FileIOGui(object):
         return dirName
     
 class FileStatChecker(QtCore.QObject):
-    """Monitors changes ot a file system file object.
+    r"""Monitors changes ot a file system file object.
         WARNING: The user needs to have read access 
     """
     okToProcess = Signal(pathlib.Path, name="okToProcess")
@@ -799,7 +799,7 @@ class FileStatChecker(QtCore.QObject):
                     self._callback_(self._filePath_)
             
 class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
-    """Mixin type for windows that need to be aware of Scipyen's main workspace.
+    r"""Mixin type for windows that need to be aware of Scipyen's main workspace.
     
     Provides:
     1) Common functionality needed in Scipyen's windows:
@@ -959,7 +959,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
     
     def __init__(self, parent: (QtWidgets.QMainWindow, type(None)) = None, 
                  title="", *args, **kwargs):
-        """WorkspaceGuiMixin initializer
+        r"""WorkspaceGuiMixin initializer
     NOTE: 2023-08-26 22:23:33 - new supported keyword: 'scipyenWindow'
     to specify the Scipyen's main window
     when this parameter is missing, the 'classical behaviour' applies, i.e.
@@ -1032,7 +1032,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         
     @property
     def scipyenWindow(self):
-        """Returns a reference to the main Scipyen window.
+        r"""Returns a reference to the main Scipyen window.
     
         For windows that are "top level", this is the same as the `appWindow`
         property.
@@ -1142,7 +1142,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
 
     @property
     def appWindow(self):
-        """The parent application window of this window.
+        r"""The parent application window of this window.
         
         This property has one of following possible values:
         
@@ -1201,7 +1201,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
     
     @safeWrapper
     def importWorkspaceData(self, dataTypes:typing.Union[typing.Type[typing.Any], typing.Sequence[typing.Type[typing.Any]]], title:str="Import from workspace", single:bool=True, preSelected:typing.Optional[str]=None, with_varName:bool=False):
-        """Launches ItemsListDialog to import on or several workspace variables.
+        r"""Launches ItemsListDialog to import on or several workspace variables.
         
         Parameters:
         -----------
@@ -1292,7 +1292,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
             self.statusBar().showMessage("Done!")
         
     def getDataSymbolInWorkspace_(self, data=None):
-        """Calls workspacefunctions.get_symbol_in_namespace for the data.
+        r"""Calls workspacefunctions.get_symbol_in_namespace for the data.
         """
         if self.isTopLevel and self.appWindow:
             scipyenWindow = self.appWindow
@@ -1310,7 +1310,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
             return get_symbol_in_namespace(data, scipyenWindow.workspace)
     
     def saveOptionsToUserFile(self):
-        """
+        r"""
         Save non-Qt configurables to a user-defined file.
         Not to be confused with self.saveSettings method
         """
@@ -1363,7 +1363,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
                         self.set_configurable_attribute(k,v,cfg)
     @Slot()
     def _slot_breakLoop(self):
-        """To be connected to the `canceled` signal of a progress dialog.
+        r"""To be connected to the `canceled` signal of a progress dialog.
         Modifies the loopControl variable to interrupt a worker loop gracefully.
         """
         # print(f"{self.__class__.__name__}._slot_breakLoop")

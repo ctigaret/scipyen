@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 
-""" Various utilities for Scipyen workspace functions
+r""" Various utilities for Scipyen workspace functions
 All functions defined here are to be imported in the top namespace
 (e.g., 'from workspacefunctions import *')
 
@@ -30,7 +30,7 @@ except ImportError:
     pass
 
 def debug_scipyen(arg:typing.Optional[typing.Union[str, bool]] = None):
-    """Sets or gets the state of scipyen debugging.
+    r"""Sets or gets the state of scipyen debugging.
     
     The state is a boolean variable SCIPYEN_DEBUG in the user namespace.
     
@@ -81,7 +81,7 @@ def lsvars(*args,
            sort:bool=False, 
            sortkey:object=None, 
            reverse:bool=False) -> typing.Union[typing.List[str], typing.Generator, typing.KeysView]:
-    """List names of variables in a namespace, according to selection criteria.
+    r"""List names of variables in a namespace, according to selection criteria.
     
 The selection occurs in stages:
 
@@ -232,7 +232,7 @@ A (possibly sorted) list of variable names if found, or an empty list.
     return ret
     
 def getvarsbytype(vartype, ws=None):
-    """Get variables by type, from a namespace or a dict
+    r"""Get variables by type, from a namespace or a dict
     """
     if not isinstance(vartype, (type, tuple, list)):
         raise TypeError("Expecting  type or a sequence of types as first argument; got %s instead" % (type(vartype).__name__))
@@ -266,7 +266,7 @@ def getvars(*args,
             sort:bool= False, 
             sortkey:object=None, 
             reverse:bool = False) -> typing.Sequence:
-    """Collects a subset of variabes from a workspace or a dictionary.
+    r"""Collects a subset of variabes from a workspace or a dictionary.
 
 Returns a (possibly sorted) list of the variables if found, or an empty list.
 
@@ -417,7 +417,7 @@ NOTE: The function was designed to complement the %who, %who_ls and %whos
     return ret
 
 def assignin(variable, varname, ws=None):
-    """Assign variable as varname in workspace ws"""
+    r"""Assign variable as varname in workspace ws"""
     user_ws = user_workspace()
     if ws is None:
         ws = user_ws
@@ -432,7 +432,7 @@ def assignin(variable, varname, ws=None):
 assign = assignin # syntactic sugar
 
 def get_symbol_in_namespace(x:typing.Any, ws:typing.Optional[dict] = None):
-    """Returns a list of symbols to which 'x' is bound in the namespace 'ws'
+    r"""Returns a list of symbols to which 'x' is bound in the namespace 'ws'
     
     The  list is empty when the variable 'x' does not exist in ws (e.g when it is
     dynamically created by an expression).
@@ -454,7 +454,7 @@ def get_symbol_in_namespace(x:typing.Any, ws:typing.Optional[dict] = None):
     return [k for k in ws if ws[k] is x and not k.startswith("_")]
 
 def getMainScipyenWindow() -> object:
-    """Try and retrieve Scipyen's main window instance.
+    r"""Try and retrieve Scipyen's main window instance.
     This is searched in 
         1) the user's workspace;
         2) the call stack
@@ -510,7 +510,7 @@ def getCallSource() -> object:
     return ret
 
 def user_workspace():
-    """Returns a reference to the user workspace (a.k.a user namespace)
+    r"""Returns a reference to the user workspace (a.k.a user namespace)
     """
     frame_records = inspect.getouterframes(inspect.currentframe())
     for (n,f) in enumerate(frame_records):
@@ -545,7 +545,7 @@ def scipyentopdir():
     return user_ns["mainWindow"]._scipyendir_
 
 def delvars(*args, glob=True, ws=None):
-    """Delete variable named in *args from workspace ws
+    r"""Delete variable named in *args from workspace ws
     CAUTION 
     """
     if ws is None:
@@ -672,7 +672,7 @@ def delvars(*args, glob=True, ws=None):
                     ws.pop(t[0], None)
                         
 def validate_varname(arg, ws=None, start_counter=0, sep = "_", return_counter:bool=False):
-    """Returns a valid symbol based on an intended variable name.
+    r"""Returns a valid symbol based on an intended variable name.
     
     arg: a string (symbol to be bound to a variable in the namespace `ws`)
     

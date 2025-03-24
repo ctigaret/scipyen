@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""
+r"""
 Traitlets-aware containers
 An attempt to supplement traitlets package with container traits that can trigger
 notifications if their contents change.
@@ -45,7 +45,7 @@ class DataBagTraitsObserver(HasTraits):
         self._verbose_ = (val == True)
         
     def add_trait(self, traitname:str, traitobject:TraitType) -> None:
-        """Binds a TraitType instance to a new attribute of self.
+        r"""Binds a TraitType instance to a new attribute of self.
         This must be followed by a call to setattr in the caller.
         """
         # print(f"\n{self.__class__.__name__}.add_trait({traitname}, {traitobject})")
@@ -78,7 +78,7 @@ class DataBagTraitsObserver(HasTraits):
             trait.instance_init(self)
         
     def set_trait_coercive(self, name:str, traitobj:TraitType, val:typing.Any) -> None:
-        """Forcibly sets trait attribute, bypassing validation.
+        r"""Forcibly sets trait attribute, bypassing validation.
         The trait name must already exist
         """
         # copied from tratilets' HasTraits
@@ -93,7 +93,7 @@ class DataBagTraitsObserver(HasTraits):
             object.__setattr__(self, name, val)
             
     def _notify_trait(self, name, old_value, new_value, change_type:str="modified"):
-        """Augmented version of HasTraits._notify_trait.
+        r"""Augmented version of HasTraits._notify_trait.
             Expects a change_type (str) as one of: "modified", "new", "removed".
             By default, this is "modified". 
         """
@@ -109,7 +109,7 @@ class DataBagTraitsObserver(HasTraits):
             )
 
     def remove_trait(self, traitname:str, traitobject:TraitType):
-        """Unbinds a TraitType instance from an attribute of self.
+        r"""Unbinds a TraitType instance from an attribute of self.
         
         Does NOT notify.
         
@@ -157,7 +157,7 @@ class DataBagTraitsObserver(HasTraits):
             self.remove_trait(traitname, traitobject)
 
     def notify_change(self, change):
-        """Notify observers of a change event"""
+        r"""Notify observers of a change event"""
         if self._verbose_:
             print(f"notify_change: event = {event}")
 
@@ -165,7 +165,7 @@ class DataBagTraitsObserver(HasTraits):
 
 
 class DataBag(Bunch):
-    """Dictionary with semantics for direct attribute reference and attribute change observer.
+    r"""Dictionary with semantics for direct attribute reference and attribute change observer.
 
     NOTE 2020-07-04 17:48:10
     The implementation is based on traitlets.utils.bunch.Bunch
@@ -270,7 +270,7 @@ class DataBag(Bunch):
     # @staticmethod
     @classmethod
     def _make_hidden(cls, **kwargs):
-        """ Returns a Bunch where each key in kwargs is mapped to a bool.
+        r""" Returns a Bunch where each key in kwargs is mapped to a bool.
         The mapping flags whether a key in kwargs is to be considered "hidden attribute".
 
         Contrary to this label, a "hidden attribute" is one that it is NOT a
@@ -304,7 +304,7 @@ class DataBag(Bunch):
     # hold_trait_notifications = self._observer__.hold_trait_notifications
     # @contextlib.contextmanager
     # def hold_trait_notifications(self):
-    #     """Context manager to hold trait change notifications in self.__observer__
+    #     r"""Context manager to hold trait change notifications in self.__observer__
     #     """
     #     with self.__observer__.hold_trait_notifications() as holder:
     #         yield holder
@@ -316,7 +316,7 @@ class DataBag(Bunch):
     #     #     return self.__observer__.hold_trait_notifications
 
     def __init__(self, *args, **kwargs):
-        """Constructor for a DataBag.
+        r"""Constructor for a DataBag.
 
         *args    : a DataBag, or None;
             When a DataBag (or a type that inherits it) this behaves like a 
@@ -422,7 +422,7 @@ class DataBag(Bunch):
         return dtrait(obj)  # , force_trait=traitlets.Any)
 
     def __setitem__(self, key, val):
-        """Implements indexed (subscript) assignment: obj[key] = val
+        r"""Implements indexed (subscript) assignment: obj[key] = val
         """
         # from .scipyen_traitlets import MetaNotifier
         # NOTE 2020-07-04 17:32:16 :
@@ -618,7 +618,7 @@ class DataBag(Bunch):
         return pformat(d)
 
     def __getitem__(self, key):
-        """Implements obj[key] (subscript access, or "bracket syntax"")
+        r"""Implements obj[key] (subscript access, or "bracket syntax"")
         """
         try:
             obs = object.__getattribute__(self, "__observer__")
@@ -693,7 +693,7 @@ class DataBag(Bunch):
             
 
     def __getattr__(self, key):
-        """Implements obj.key (attribute access, or "dot syntax")
+        r"""Implements obj.key (attribute access, or "dot syntax")
         """
         try:
             obs = object.__getattribute__(self, "__observer__")
@@ -715,7 +715,7 @@ class DataBag(Bunch):
             raise  # KeyError("%s" % key)
 
     def __iter__(self):
-        """Restricted membership test ('in' keyword).
+        r"""Restricted membership test ('in' keyword).
         Overloads super().__iter__(self) to restrict membership test for trait
         values.
         """
@@ -734,7 +734,7 @@ class DataBag(Bunch):
         return sum((hash(v) for v in self.items()))
 
     def __delitem__(self, key):
-        """Implements del obj[key] where a is a DataBag and key is a str
+        r"""Implements del obj[key] where a is a DataBag and key is a str
         """
         try:
             obs = object.__getattribute__(self, "__observer__")
@@ -764,7 +764,7 @@ class DataBag(Bunch):
             raise  # KeyError("%s" % key)
         
     def __getstate__(self):
-        """Returns the state of this object's observer wrapped in a dict
+        r"""Returns the state of this object's observer wrapped in a dict
         """
         # NOTE: Python 3.9 way
         if hasattr(self, "__observer__"):
@@ -778,7 +778,7 @@ class DataBag(Bunch):
         return d
 
     def __setstate__(self, state: dict):
-        """Restores the state dictionary
+        r"""Restores the state dictionary
         state: dict
         """
 
@@ -798,7 +798,7 @@ class DataBag(Bunch):
         obs.__setstate__(observer_state)
 
     def __coerce_trait__(self, obs, key, val):
-        """Removes old trait, replaces with new trait"""
+        r"""Removes old trait, replaces with new trait"""
         # print(f"{self.__class__.__name__}.__coerce_trait__ obs = {obs}, key = {key}, val = {val} (type = {type(val).__name__})")
         old_trait = obs.traits().get(key, None)
         old_value = getattr(obs, key, None)
@@ -817,12 +817,12 @@ class DataBag(Bunch):
 
     @property
     def observer(self):
-        """The HasTraits observer. Read-only
+        r"""The HasTraits observer. Read-only
         """
         return self.__observer__
 
     def as_dict(self):
-        """Dictionary of trait values
+        r"""Dictionary of trait values
         """
         try:
             obs = object.__getattribute__(self, "__observer__")
@@ -832,7 +832,7 @@ class DataBag(Bunch):
         return obs._trait_values
     
     def delete(self, *args):
-        """Removes traits by name
+        r"""Removes traits by name
         
         Fails silently when a trait name in args does not exist.
         
@@ -877,7 +877,7 @@ class DataBag(Bunch):
             raise
 
     def pop(self, key, *args):
-        """Implements a.pop(key, default).
+        r"""Implements a.pop(key, default).
         'a' is a DataBag, 'key' is a str and 'default' is the default value if 
         'key' not in 'a'.
         """
@@ -959,20 +959,20 @@ class DataBag(Bunch):
         self.__hidden__.allow_none = val
 
     def keys(self):
-        """Generates a keys 'view'
+        r"""Generates a keys 'view'
         """
         obs = object.__getattribute__(self, "__observer__")
         return obs._trait_values.keys()
         # return obs._traits.keys()
 
     def values(self):
-        """Generates a values 'view'
+        r"""Generates a values 'view'
         """
         obs = object.__getattribute__(self, "__observer__")
         return obs._trait_values.values()
 
     def items(self):
-        """Generates an items 'view'
+        r"""Generates an items 'view'
         """
         obs = object.__getattribute__(self, "__observer__")
         return obs._trait_values.items()
@@ -982,12 +982,12 @@ class DataBag(Bunch):
         return self.__observer__._trait_notifiers
 
     def sortedkeys(self):
-        """Returns a sorted list of member names
+        r"""Returns a sorted list of member names
         """
         return sorted([key for key in self.keys()])
 
     def sortedvalues(self, byname=True):
-        """Returns a sorted list of member values.
+        r"""Returns a sorted list of member values.
 
         if byname, the values will be sorted by member names
 
@@ -1006,7 +1006,7 @@ class DataBag(Bunch):
             return sorted([i for i in self.items()], key=lambda t: t[1])
 
     def copy(self):
-        """Creates a deep copy of this DataBag object.
+        r"""Creates a deep copy of this DataBag object.
 
         In: bag1=databag.DataBag({"a":1, "b":2})                                                             
 
@@ -1043,7 +1043,7 @@ class DataBag(Bunch):
 
     # @timefunc
     def update(self, other):
-        """Updates this DataBag with key/value pairs from 'other'.
+        r"""Updates this DataBag with key/value pairs from 'other'.
 
         'other' is a subclass of dict.
 
@@ -1067,7 +1067,7 @@ class DataBag(Bunch):
         self.__observer__.unobserve(handler, names=names, type=type)
 
     def link(self, name, other, other_name):
-        """Links trait named 'name' to the trait 'other_name' in 'other'.
+        r"""Links trait named 'name' to the trait 'other_name' in 'other'.
 
         The link is bi-directional:  changes of 'self.name' (trait 'name' in this
         object) result in changes to 'other.other_name' (traut 'other_name' in
@@ -1118,7 +1118,7 @@ class DataBag(Bunch):
                 "'other' expected to be a DataBag or HasTraits; got %s instead" % type(other).__name__)
 
     def link_to(self, name, target, target_name, transform=None):
-        """Links trait named 'name' to the trait 'target_name' in 'target'.
+        r"""Links trait named 'name' to the trait 'target_name' in 'target'.
 
         The link is uni-directional, from this object's trait to the target's 
         trait only.
@@ -1157,7 +1157,7 @@ class DataBag(Bunch):
                 "'target' expected to be a DataBag or HasTraits; got %s instead" % type(target).__name__)
 
     def link_from(self, name, source, source_name, transform=None):
-        """Links trait named 'name' to the trait 'source_name' in 'source'.
+        r"""Links trait named 'name' to the trait 'source_name' in 'source'.
 
         The link is uni-directional, from the source's trait to this object's
         trait only.

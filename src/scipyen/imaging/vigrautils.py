@@ -18,7 +18,7 @@ from imaging.axisutils import STANDARD_AXIS_TAGS_KEYS
 from traitlets import Bunch
 
 def imageIndexTuple(img, slicing=None, newAxis=None, newAxisDim=None):
-    """Idiom for introducing a new axis in an image.
+    r"""Idiom for introducing a new axis in an image.
     
     Returns a tuple useful for indexing a VigraArray taking into account a new
     axis when given.
@@ -197,7 +197,7 @@ def imageIndexTuple(img, slicing=None, newAxis=None, newAxisDim=None):
     return tuple(indexobj)
             
 def insertAxis(img, axinfo, axdim):
-    """Inserts an axis specified by axinfo, at dimension axdim, in image img.
+    r"""Inserts an axis specified by axinfo, at dimension axdim, in image img.
     
     Returns a reference to img with a new axis inserted.
     
@@ -230,7 +230,7 @@ def insertAxis(img, axinfo, axdim):
     return img[indexobj]
     
 def padAxis(img, axis, pad_before, pad_after, value=None):
-    """Pads an image along the specified axis by adding pixels at the beginning and at the end.
+    r"""Pads an image along the specified axis by adding pixels at the beginning and at the end.
     
     Parameters:
     ===========
@@ -330,7 +330,7 @@ def padAxis(img, axis, pad_before, pad_after, value=None):
     return result
         
 def padToLargest(array0, array1, pad=0.0):
-    """Brings the two arrays to a common shape, by padding with pad value.
+    r"""Brings the two arrays to a common shape, by padding with pad value.
     The shape is set to the larger of the array sizes in each dimension.
     
     Pads either array along its non-channel axes to bring them to the same shape.
@@ -460,7 +460,7 @@ def padToLargest(array0, array1, pad=0.0):
     return ret0, ret1
                 
 def slicingSequence(array, slicing):
-    """Utility function that returns a sequence of slice objects for indexing into
+    r"""Utility function that returns a sequence of slice objects for indexing into
     a VigraArray object.
     DEPRECATED: code now included in imageIndexTuple()
     
@@ -551,7 +551,7 @@ def slicingSequence(array, slicing):
     return slices
         
 def croppedView(array, axes_slices):
-    """
+    r"""
     Returns a view of the array cropped according to axes_slices.
     
     Positional parameters:
@@ -593,7 +593,7 @@ def croppedView(array, axes_slices):
     return array[slices]
 
 def padToShape(array, shape, pad = np.nan, keep_axis=None):
-    """Pads array axes such that its shape is the largest
+    r"""Pads array axes such that its shape is the largest
     of array.shape and shape.
     
     FIXME: allow padding with replication
@@ -671,7 +671,7 @@ def padToShape(array, shape, pad = np.nan, keep_axis=None):
         return array
     
 def resampleImage(target, src, axis=None, window=None):
-    """Resamples target such that the axes' resolutions match those of the src.
+    r"""Resamples target such that the axes' resolutions match those of the src.
     # TODO give user to force up-sampling from image with lower resolution to
     # image with higher resolution and vice-versa
     
@@ -853,7 +853,7 @@ def resampleImage(target, src, axis=None, window=None):
     return ret
     
 def resampleImageAxis(image, new_res, axis=0, p=1000, window=None):
-    """Resamples image along the specified axis, using scipy.signal.resample_poly
+    r"""Resamples image along the specified axis, using scipy.signal.resample_poly
     
     Parameters:
     ==========
@@ -1011,7 +1011,7 @@ def resampleImageAxis(image, new_res, axis=0, p=1000, window=None):
     return ret
 
 def concatenateImages(*images, **kwargs):
-    """Concatenates a sequence of images along a specified axis.
+    r"""Concatenates a sequence of images along a specified axis.
     Wraps np.concatenate and assigns axistags to the result, if given.
     
     If specified, a new axis can also be added to the arrays.
@@ -1300,7 +1300,7 @@ Arrays are concatenated in two ways, explained here by examples:
     
     
 def removeSlice(img, axis, ndx):
-    """Removes a slice with index ndx, on the specified axis of image img
+    r"""Removes a slice with index ndx, on the specified axis of image img
     """
     
     if not isinstance(img, vigra.VigraArray):
@@ -1353,7 +1353,7 @@ def proposeLayout(img:vigra.VigraArray,
                    timeVertical:bool = True,
                    indices:bool=False,
                    ) -> typing.Tuple[int, typing.Optional[typing.Union[vigra.AxisInfo, typing.List[vigra.AxisInfo]]], vigra.AxisInfo, vigra.AxisInfo, vigra.AxisInfo]:
-    """Proposes a layout for frame-by-frame display and analysis of a VigraArray.
+    r"""Proposes a layout for frame-by-frame display and analysis of a VigraArray.
     
     Based on user-specified hints, suggests which array axes may be used:
         * to slice the array into meaningful 2D array views (data 'frames')
@@ -1827,7 +1827,7 @@ def proposeLayout(img:vigra.VigraArray,
 
 @singledispatch
 def kernel2array(value:typing.Union[vigra.filters.Kernel1D, vigra.filters.Kernel2D], compact:bool=False):
-    """
+    r"""
     Generates a numpy array with coordinates and values for the kernel's samples
     Parameters
     ----------
@@ -1896,7 +1896,7 @@ def kernel2array(value:typing.Union[vigra.filters.Kernel1D, vigra.filters.Kernel
     
 @kernel2array.register(vigra.filters.Kernel1D)
 def _(value, compact=False):
-    """Returns a numpy.ndarray representation of a vigra.Kernel1D object
+    r"""Returns a numpy.ndarray representation of a vigra.Kernel1D object
     Arguments: 
     "value" = vigra.Kernel1D object
     """
@@ -1975,7 +1975,7 @@ def kernelfromarray(x):
         
 
 # def getCalibratedAxisSize(image, axis):
-#     """Returns a calibrated length for "axis" in "image" VigraArray, as a python Quantity
+#     r"""Returns a calibrated length for "axis" in "image" VigraArray, as a python Quantity
 #     
 #     If axisinfo is not calibrated (i.e. does not have a calibration string in its
 #     description attribute) then returns the size of the axis in pixel_unit.
@@ -2050,7 +2050,7 @@ def nFrames(x:vigra.VigraArray,
     
 
 def specifyAxisTags(image, newtags, newshape=None, in_place=False):
-    """Assigns a new AxisTags object to a VigraArray.
+    r"""Assigns a new AxisTags object to a VigraArray.
     Optionally, reshapes the data array and removes or inserts new axes
     if necessary.
     

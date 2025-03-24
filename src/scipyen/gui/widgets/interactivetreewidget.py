@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""
+r"""
 """
 # TODO: 2025-03-10 23:21:21
 # implement editing function, where applicable
@@ -21,7 +21,7 @@ import math
 from qtpy import QtCore, QtGui, QtWidgets
 from qtpy.QtCore import Signal, Slot, Property
 
-from pyqtgraph import (DataTreeWidget, TableWidget, )
+# from pyqtgraph import (DataTreeWidget, TableWidget, )
 
 import neo
 import quantities as pq
@@ -64,8 +64,9 @@ from gui.widgets.tableeditorwidget import (TableEditorWidget, TabularDataModel,)
 
 SINGLETONS = (tuple(), None, math.inf, math.nan, np.inf, np.nan, MISSING, pd.NA)
 
-class InteractiveTreeWidget(DataTreeWidget):
-    """Extends pyqtgraph.widgets.DataTreeWidget.
+# class InteractiveTreeWidget(DataTreeWidget):
+class InteractiveTreeWidget(QtWidgets.QTreeWidget):
+    r"""Extends pyqtgraph.widgets.DataTreeWidget.
     
     Enables the following:
     
@@ -82,25 +83,27 @@ class InteractiveTreeWidget(DataTreeWidget):
     
     """
     def __init__(self, *args, **kwargs):
-        """
+        r"""
         Keyword parameters (selective list):
         ------------------------------------
         useTableEditor:bool, default is False; 
             When True, use TableEditorWidget, else use SimpleTableWidget
         """
-        self._visited_ = dict()
+        parent =  kwargs.pop("parent", None)
+        super().__init__(parent=parent)
         self._use_TableEditor_ = kwargs.pop("useTableEditor", False)
+        self._supported_data_types_ = kwargs.pop("supported_data_types", tuple())
+        if not isinstance(self._supported_data_types_, tuple) or not all(isinstance(v, type) for v in self._supported_data_types_):
+            self._supported_data_types_ = tuple()
+        self._visited_ = dict()
         self.top_title = "/"
         self._last_active_item_ = None
         self._last_active_item_column_ = 0
         self.has_dynamic_private = False
         self._private_data_ = None
-        self._supported_data_types_ = kwargs.pop("supported_data_types", tuple())
-        if not isinstance(self._supported_data_types_, tuple) or not all(isinstance(v, type) for v in self._supported_data_types_):
-            self._supported_data_types_ = tuple()
-        # super(InteractiveTreeWidget, self).__init__(*args, **kwargs)
-        DataTreeWidget.__init__(self, *args, **kwargs)
+        # DataTreeWidget.__init__(self, *args, **kwargs)
         self.setVerticalScrollMode(QtWidgets.QAbstractItemView.ScrollPerItem)
+        self.setAlternatingRowColors(True)
         self.setColumnCount(3)
         self.setHeaderLabels(['key / index', 'type', 'value / info'])
         self.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
@@ -136,7 +139,7 @@ class InteractiveTreeWidget(DataTreeWidget):
             self._supported_data_types_ = types
     
     def setData(self, data, predicate=None, top_title:str = "", dataTypeStr = None, hideRoot=False):
-        """data should be a dictionary."""
+        r"""data should be a dictionary."""
         # print(f"{self.__class__.__name__}<{self.parent().windowTitle()}, {self.parent().parent().windowTitle()}> set data")
         self._visited_.clear()
         self.predicate = predicate
@@ -189,7 +192,7 @@ class InteractiveTreeWidget(DataTreeWidget):
             return data, False
         
     def buildTree(self, data:object, parent:QtWidgets.QTreeWidgetItem, name:str="", nameTip:str="", typeStr = None, predicate=None, hideRoot:bool=False, path:tuple=()):
-        """
+        r"""
         Overrides pyqtgraph.DataTreeWidget.buildTree()
         
         Positional parameters:
@@ -329,7 +332,7 @@ class InteractiveTreeWidget(DataTreeWidget):
             self.buildTree(child_data, node, keyrepr, keyTypeTip, predicate=predicate, path=path+(keyrepr,))
 
     def parse(self, data, predicate=None, typeStr=None):
-        """
+        r"""
         Overrides pyqtgraph.DataTreeWidget.parse()
         
         Returns:
@@ -512,6 +515,6 @@ class InteractiveTreeWidget(DataTreeWidget):
             return typeStr, desc, children, widget, typeTip 
         
         except:
-            print(f"{self.__class__.__name__}.parse data type : {type(data).__name__}, data: {data}")
+            # print(f"{self.__class__.__name__}.parse data type : {type(data).__name__}, data: {data}")
             raise
         

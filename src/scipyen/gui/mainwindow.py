@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""Main window for the Scipyen application
+r"""Main window for the Scipyen application
 
 
 """
@@ -557,6 +557,16 @@ def infoSoftwareComponents() -> str:
     txt.append(f'<ul> <a href="https://ipython.org/">IPython</a> Interactive Computing {getModuleVersion(IPython)} </ul>')
     txt.append(f'<ul> <a href="https://pypi.org/project/qtconsole/">qtconsole</a> Jupyter QtConsole {getModuleVersion("qtconsole")} </ul>')
     
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+        pyinstaller_bundle = pathlib.Path(sys._MEIPASS)
+        if pyinstaller_bundle.name == "_internal":
+            bundle_name = pathlib.Path(sys._MEIPASS).parent.name
+        else:
+            bundle_name = pathlib.Path(sys._MEIPASS).parent.name
+            
+        txt.append(f'<ul> Running in a <a href="https://pyinstaller.org/en/stable/">PyInstaller</a> bundle: </ul>')
+        txt.append(f'<ul> &emsp; {bundle_name} </ul>')
+    
     txt.append('<h3>Data Analysis</h3>')
     txt.append(f'<ul> <a href="https://neuralensemble.org/neo/">neo</a> {getModuleVersion(neo)} </ul>')
     txt.append(f'<ul> <a href="https://github.com/swharden/pyABF">pyABF</a> {getModuleVersion(pab.pyabf)} </ul>')
@@ -618,7 +628,7 @@ else:
 
 
 class WorkspaceViewer(QtWidgets.QTableView):
-    """Inherits QTableView with customized drag & drop
+    r"""Inherits QTableView with customized drag & drop
     """
 
     def __init__(self, mainWindow=None, parent=None):
@@ -988,7 +998,7 @@ class ScriptManager(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__, Workspace
 # TODO: make this configurable (a mime type-like mechanism?)
 # class VTH(QtCore.QObject):
 class VTH(object):
-    """Variable Type Handler.
+    r"""Variable Type Handler.
     Centralized the handling of Python object types with Scipyen viewers.
     """
     # NOTE:
@@ -1009,7 +1019,7 @@ class VTH(object):
     gui_handlers = deepcopy(default_handlers)
 
     def get_handler_spec(variable):
-        """Returns a list of specifications for handling `variable`.
+        r"""Returns a list of specifications for handling `variable`.
 
         If `variable` is a type registered with VTH, or `variable` is an
         instance of a type registered with VTH, returns a 3-tuple:
@@ -1056,13 +1066,13 @@ class VTH(object):
         return list()
 
     def reset_all():
-        """Resets all gui handlers to the default.
+        r"""Resets all gui handlers to the default.
         This will remove any registered custom viewer!
         """
         VTH.gui_handlers = deepcopy(VTH.default_handlers)
 
     def reset_handler(viewerClass):
-        """Resets the configuration for the built-in viewer types.
+        r"""Resets the configuration for the built-in viewer types.
         Does nothing for user-designed viewer that have been registered manually.
         """
         if viewerClass in VTH.default_handlers:
@@ -1118,7 +1128,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     
     @classmethod
     def _walk_mro(cls) -> typing.Generator[typing.Self, None, None]:
-        """Walk the cls.mro() for parent classes that are also singletons
+        r"""Walk the cls.mro() for parent classes that are also singletons
 
         For use in instance()
         """
@@ -1450,7 +1460,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     # @processtimefunc
     def __init__(self, app: QtWidgets.QApplication, 
                  parent: typing.Optional[QtWidgets.QWidget] = None, *args, **kwargs):
-        """Scipyen's main window initializer (constructor).
+        r"""Scipyen's main window initializer (constructor).
 
         Parameters:
         ===========
@@ -1799,7 +1809,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     
     @property
     def pluginNames(self) -> tuple:
-        """Tuple of names of currently loaded plugins.
+        r"""Tuple of names of currently loaded plugins.
         These include all Scipyen plugins (either in the Scipyen code tree or
         in the user-defined plugins directory) regardless if whether they define 
         a UI menu or not.
@@ -1815,7 +1825,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     
     @property
     def pluginModules(self) -> tuple:
-        """Tuple of currently loaded plugin modules.
+        r"""Tuple of currently loaded plugin modules.
         These include all Scipyen plugins (either in the Scipyen code tree or
         in the user-defined plugins directory) regardless if whether they define 
         a UI menu or not.
@@ -1831,7 +1841,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     
     @property
     def plugins(self) -> dict:
-        """Mapping of module name ↦ plugin module for currently loaded plugins.
+        r"""Mapping of module name ↦ plugin module for currently loaded plugins.
         These include all Scipyen plugins (either in the Scipyen code tree or
         in the user-defined plugins directory) regardless if whether they define 
         a UI menu or not.
@@ -1847,7 +1857,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     
     @property
     def UIPlugins(self) -> dict:
-        """Loaded Scipyen "UI" plugins.
+        r"""Loaded Scipyen "UI" plugins.
         These are the Scipyen plugins that define a UI menu (i.e. define the 
         function `init_scipyen_plugin` to generate a UI menu hieracrhy), regardless 
         of where their files are located (either in the Scipyen code tree or in
@@ -1865,7 +1875,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     
     @property
     def UIPluginNames(self) -> tuple:
-        """Names of loaded Scipyen "UI" plugins
+        r"""Names of loaded Scipyen "UI" plugins
         See also the following attributes, properties or methods:
         • plugins
         • pluginModules
@@ -1879,7 +1889,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     
     @property
     def UIPluginMenus(self) -> dict:
-        """Mapping of UI plugins name ↦ mapping of [menu path ↦ plugin function]
+        r"""Mapping of UI plugins name ↦ mapping of [menu path ↦ plugin function]
         See also the following attributes, properties or methods:
         • plugins
         • pluginModules
@@ -2218,7 +2228,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         
     @property
     def currentLocation(self) -> QtCore.QUrl:
-        """URL of the current location (as shown in the navigator)
+        r"""URL of the current location (as shown in the navigator)
         CAUTION: currently this is the same as the url of the current directory
         but in the future it may point to a non-local file system location
         (as support is being implemented — WORK IN PROGRESS) 
@@ -2230,7 +2240,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         
     @property
     def currentUrl(self) -> QtCore.QUrl:
-        """
+        r"""
         URL of the current (working) file system directory.
         CAUTION: In the (unlikely) situaiton the self._curentDir_ attribute is
         NOT properly set, it will return the URL opf the location of the 
@@ -2425,7 +2435,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @Slot(object)
     @safeWrapper
     def slot_windowActivated(self, obj):
-        """Not used, but keep it
+        r"""Not used, but keep it
         """
         if isinstance(obj, (QtWidgets.QMainWindow, mpl.figure.Figure)):
             self.setCurrentWindow(obj)
@@ -2441,7 +2451,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         assert viewer.ID == wid
         
     def requestActivate(self):
-        """workaround wayland"""
+        r"""workaround wayland"""
         if os.getenv("XDG_SESSION_TYPE").lower() == "wayland":
             return
         super().requestActivate()
@@ -2463,13 +2473,13 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
     @safeWrapper
     def handle_mpl_figure_enter(self, evt):
-        """ DEPRECATED """
+        r""" DEPRECATED """
         pass
         # self.setCurrentWindow(evt.canvas.figure)
 
     @safeWrapper
     def handle_mpl_figure_close(self, evt):
-        """Removes the figure from the workspace and updates the workspace table.
+        r"""Removes the figure from the workspace and updates the workspace table.
         Triggered by closing the figure window by clicking its close button
         """
         # NOTE: FIXME/BUG 2023-06-07 09:00:40
@@ -2488,7 +2498,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 
     @safeWrapper
     def newViewer(self, winClass, *args, **kwargs):
-        """Factory method for a GUI Viewer or matplotlib figure.
+        r"""Factory method for a GUI Viewer or matplotlib figure.
 
         Parameters:
         -----------
@@ -2600,7 +2610,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         return win
 
     def _adopt_mpl_figure(self, fig: mpl.figure.Figure):
-        """Gives a FigureCanvasQTAgg to fig.
+        r"""Gives a FigureCanvasQTAgg to fig.
         To be used only with mpl Figure created directly from their c'tor, i.e.,
         lacking the "manager" or a "number" atributes.
         
@@ -2754,7 +2764,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
     @safeWrapper
     def deRegisterWindow(self, win):
-        """Removes references to the viewer window 'win' from the manager.
+        r"""Removes references to the viewer window 'win' from the manager.
 
         Parameters:
         -----------
@@ -2796,7 +2806,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 self.currentViewers[viewer_type] = self.viewers[viewer_type][-1]
             
     def raiseWindow(self, obj):
-        """Sets obj to be the current window and raises it.
+        r"""Sets obj to be the current window and raises it.
         Steals focus.
         """
         # print(f"{self.__class__.__name__}.raiseWindow ({obj})")
@@ -2822,7 +2832,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             obj.setVisible(True)
 
     def setCurrentWindow(self, obj):
-        """Sets obj to be the current window without raising or focus stealing.
+        r"""Sets obj to be the current window without raising or focus stealing.
         Handles both QMainWindow and matplotlib Figure objects
         """
         if not isinstance(obj, (scipyenviewer.ScipyenViewer, mpl.figure.Figure)):
@@ -2842,20 +2852,20 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
     @property
     def matplotlib_figures(self):
-        """A list of figures managed by matplotlib.
+        r"""A list of figures managed by matplotlib.
         """
         return [plt.figure(i) for i in plt.get_fignums()]
 
     @property
     def managed_matplotlib_figures(self):
-        """A list of figures managed by both matplotlib and self.
+        r"""A list of figures managed by both matplotlib and self.
         """
         return [fig for fig in self.matplotlib_figures if fig in self.viewers[mpl.figure.Figure]]
 
     @Slot(int)
     @safeWrapper
     def slot_setCurrentViewer(self, wId):
-        """ Delegates to self.setCurrentWindow 
+        r""" Delegates to self.setCurrentWindow 
             Only meant for QMainWindow instances
         """
         viewer = self.sender()
@@ -2921,7 +2931,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
     @safeWrapper
     def _init_ExternalIPython_(self, new: str = ""):
-        """External IPython launcher.
+        r"""External IPython launcher.
 
         If no External IPython console instance exists, launches an instance
         of External IPython console (running external kernels as separate processes).
@@ -3121,7 +3131,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
     @safeWrapper
     def _init_QtConsole_(self):
-        """Starts an interactive IPython shell with a QtConsole frontend.
+        r"""Starts an interactive IPython shell with a QtConsole frontend.
 
         The shell runs an embedded ("InProcess") IPython kernel with an event 
         loop run by the Scipyen QApplication instance.
@@ -3464,7 +3474,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @Slot()
     @safeWrapper
     def slot_updateWorkspaceView(self):
-        """
+        r"""
         Cosmetic update of the workspace viewer
         • sorts according to 1st column contents
         • resizes 1st column to its contents
@@ -3474,7 +3484,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
     @Slot()
     def slot_updateWorkspaceModel(self):
-        """ pyplot commands may produce or close a figure; we need to reflect this!
+        r""" pyplot commands may produce or close a figure; we need to reflect this!
         """
         # NOTE: 2019-11-20 12:22:17
         # self.workspaceModel.update() triggers the signal
@@ -3492,7 +3502,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
     @Slot()
     def slot_updateCwd(self):
-        """Connected to console.executed signal
+        r"""Connected to console.executed signal
         Makes sure that a cd (change directory) command run at the console
         is reflected in throughout Scipyen.
         """
@@ -3520,7 +3530,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             # self._refreshRecentDirsComboBox_()
 
     def slot_updateHistory(self):
-        """ Slot to update the history tree widget once a command has been entered at the console
+        r""" Slot to update the history tree widget once a command has been entered at the console
         This occurs only for the current session
         """
         # NOTE: 2017-03-19 21:26:37 self.console.history_tail stores only the
@@ -3553,7 +3563,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             self.currentSessionID = self.historyAccessor.get_last_session_id()
 
     def removeWorkspaceSymbol(self, name: str):
-        """Remove a binding from the workspace.
+        r"""Remove a binding from the workspace.
 
         Given 'name' a symbol bound to a variable in the workspace, this method
         removes that binding (and its representation in the "User Variables"
@@ -3569,7 +3579,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.workspaceModel.unbindObjectInNamespace(name) # single-shot
 
     def removeFromWorkspace(self, value: typing.Any, by_name: bool = True):#, update: bool = True):
-        """Removes an object from the workspace via Context menu Delete action.
+        r"""Removes an object from the workspace via Context menu Delete action.
 
         By default, the object to be removed is specified by the symbol (name)
         to which the object is bound in the workspace. 
@@ -3644,7 +3654,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         return varname
 
     def assignToWorkspace(self, name: str, val: object, check_name:bool = True) -> bool:
-        """Binds a Python object to a symbol in the user workspace.
+        r"""Binds a Python object to a symbol in the user workspace.
         
         Parameters:
         ----------
@@ -3730,7 +3740,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @Slot()
     @safeWrapper
     def slot_newViewer(self):
-        """Slot for opening a list of viewer types (currently not used)
+        r"""Slot for opening a list of viewer types (currently not used)
         """
         # viewer_type_names = [v.__name__ for v in gui_viewers]
         viewer_type_names = list(v.__name__ for v in self.viewers)
@@ -3749,7 +3759,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @Slot()
     @safeWrapper
     def slot_newViewerMenuAction(self):
-        """Slot for creating new viewer directly from Windows/Create New menu
+        r"""Slot for creating new viewer directly from Windows/Create New menu
         """
         win = self.newViewer(self.sender().text()
                              )  # inherited: WindowManager.newViewer
@@ -3922,7 +3932,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @Slot(QtCore.QModelIndex)
     @safeWrapper
     def slot_variableItemPressed(self, ndx):
-        """Triggered by single-click of lmb in workspace viewer.
+        r"""Triggered by single-click of lmb in workspace viewer.
     """
         self.currentVarItem, self.currentVarItemName = self._getWorkspaceVarItemAndName_(
             ndx)
@@ -3936,7 +3946,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @Slot(QtCore.QModelIndex)
     @safeWrapper
     def slot_variableItemActivated(self, ndx):
-        """Called by double-click of left mouse button on item in workspace
+        r"""Called by double-click of left mouse button on item in workspace
         """
         # headers = [k for k in standard_obj_summary_headers if k != "Icon"]
         source_ns = self.workspaceModel.item(
@@ -3984,7 +3994,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         return item, varname
 
     def showVariable(self, name: str, newWindow: bool = True, viewerType=None):
-        """Shows obj in a suitable new window
+        r"""Shows obj in a suitable new window
         """
         obj = self.workspace.get(name, None)
         if obj is None:
@@ -4213,7 +4223,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @Slot("QPoint")
     @safeWrapper
     def slot_workspaceViewContextMenuRequest(self, point):
-        """
+        r"""
         Contex menu requested by workspace viewer
         """
         indexList = self.workspaceView.selectedIndexes()
@@ -4258,7 +4268,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @Slot(QtCore.QItemSelection, QtCore.QItemSelection)
     @safeWrapper
     def slot_selectionChanged(self, selected, deselected):
-        """Selection change in the workspace viewer
+        r"""Selection change in the workspace viewer
         """
         if not selected.isEmpty():
             modelIndex = selected.indexes()[0]
@@ -4296,7 +4306,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @Slot("QStandardItem*")
     @safeWrapper
     def slot_variableItemNameChanged(self, item):
-        """Called when itemChanged was emitted by workspaceModel.
+        r"""Called when itemChanged was emitted by workspaceModel.
         Conected to workspace model `itemChanged` signal.
 
         Typically this is called after a variable has been renamed following an
@@ -4370,7 +4380,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @Slot()
     @safeWrapper
     def slot_renameWorkspaceVar(self):
-        """ Renames workspace variables through GUI Menu action.
+        r""" Renames workspace variables through GUI Menu action.
 
         Called when "Rename" menu item is called from the context menu of an 
         workspace item.
@@ -4494,7 +4504,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @Slot()
     @safeWrapper
     def slot_deleteSelectedWorkspaceObjects(self):
-        """Removes objects from the workspace.
+        r"""Removes objects from the workspace.
         Triggered by:
         • workspace viewer context menu Delete action.
         • keyvboard Delete shortcut (key sequence 'Delete')
@@ -4644,7 +4654,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @Slot()
     @safeWrapper
     def slot_copyWorkspaceSelectionQuoted(self):
-        """
+        r"""
         DEPRECATED
         """
         warnings.warn("DEPRECATED", DeprecationWarning)
@@ -4682,7 +4692,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @Slot()
     @safeWrapper
     def slot_pasteQuotedWorkspaceSelection(self):
-        """
+        r"""
         DEPRECATED
         """
         warnings.warn("DEPRECATED", DeprecationWarning)
@@ -4693,7 +4703,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @Slot("QTreeWidgetItem*", int)
     @safeWrapper
     def slot_historyItemSelected(self, item, col):
-        """Triggered by a selcting an item in the Command History list.
+        r"""Triggered by a selcting an item in the Command History list.
         Typically, this occurs after a single click on the item.
         """
         # only accept session items here (for now)
@@ -4724,7 +4734,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @Slot("QTreeWidgetItem*", int)
     @safeWrapper
     def slot_historyItemActivated(self, item, col):
-        """Triggered by activating an item in the Command History list.
+        r"""Triggered by activating an item in the Command History list.
         Typically, this occurs as a resuld of a double-click on the item.
         """
         # NOTE: 2017-03-19 22:54:55#
@@ -4825,7 +4835,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
     # @processtimefunc
     def loadSettings(self):
-        """Overrides ScipyenConfigurable.loadSettings()"""
+        r"""Overrides ScipyenConfigurable.loadSettings()"""
         super(WorkspaceGuiMixin, self).loadSettings()  # inherited from ScipyenConfigurable
 
     def loadWindowSettings(self):
@@ -4868,6 +4878,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         self.actionGUI_Style.triggered.connect(self._slot_set_Application_style)
         self.actionSet_user_plugins_directory.triggered.connect(self._slot_set_Users_Plugins_directory)
+        # self.actionConfigure_External_HDF5_Viewer.triggered.connect(self._slot_set_ExternalHDF5Viewer)
         self.actionAuto_launch_Script_Manager.toggled.connect(self._slot_set_scriptManagerAutoLaunch)
         self.actionAuto_delete_viewer.triggered.connect(self._slot_setAutoRemoveViewers)
         
@@ -5060,19 +5071,21 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.consolesAction.setMenu(self.menuConsoles)
         self.scriptsAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("dialog-scripts"), "Scripts")
         self.scriptsAction.setMenu(self.menuScripts)
+        self.settingsAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("settings-configure"), "Settings")
+        self.settingsAction.setMenu(self.menuSettings)
         self.applicationsAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("homerun"), "Applications")
         self.applicationsAction.setMenu(self.menuApplications)
         self.refreshViewAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("view-refresh"), "Refresh Active View")
         self.refreshViewAction.triggered.connect(self.slot_refreshView)
-        self.settingsAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("settings-configure"), "Settings")
-        self.settingsAction.setMenu(self.menuSettings)
         # NOTE: 2024-06-01 18:08:54
         # whats this action should be the last action added to the toolbar
-        
-        self.toolBar.addAction(self.whatsThisAction)
+        self.helpTbAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("help-contents"), "Help")
+        self.helpTbAction.setMenu(self.menuHelp)
+        # self.toolBar.addAction(self.whatsThisAction)
 
         tbactions = (self.newViewersAction, self.consolesAction,
-                     self.scriptsAction, self.applicationsAction)
+                     self.scriptsAction, self.applicationsAction, 
+                     self.helpTbAction, self.settingsAction)
         if os.environ["QT_API"] in ("pyqt5", "pyside2"):
             tw = (w for w in itertools.chain(*(a.associatedWidgets()
                 for a in tbactions)) if w is not self.toolBar)
@@ -5092,7 +5105,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.tbChDir.setPopupMode(QtWidgets.QToolButton.MenuButtonPopup)
         self.tbChDir.setMenu(self.recentDirectoriesMenu)
         
-        
+        # self.toolBar.removeAction(self.actionChange_Working_Directory)
+        # self.toolBar.insertAction(self.actionChange_Working_Directory, self.actionSave)
 
         # BEGIN do not delete: action for presenting a list of viewer types to choose from
         # self.menuViewer.addSeparator()
@@ -5354,7 +5368,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @Slot()
     @safeWrapper
     def slot_systemOpenSelectedFiles(self):
-        """Opens selected file(s) or directory/ies in the system application"""
+        r"""Opens selected file(s) or directory/ies in the system application"""
         selectedItems = [item for item in self.fileSystemTreeView.selectedIndexes()
                          if item.column() == 0]  # list of QModelIndex
 
@@ -5576,7 +5590,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @Slot(QtCore.QPoint)
     @safeWrapper
     def slot_fileSystemContextMenuRequest(self, point):
-        """Pops up a context menu for the File System viewer.
+        r"""Pops up a context menu for the File System viewer.
         NOTE: The context menu only appears if the collection of selected items
         contains only items pointing to regular files.
     """
@@ -5660,7 +5674,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @Slot(str)
     @safeWrapper
     def slot_filterSelectVarNames(self, val):
-        """Select variables in workspace viewer, according to name filter.
+        r"""Select variables in workspace viewer, according to name filter.
         """
         match = QtCore.Qt.MatchContains | \
             QtCore.Qt.MatchCaseSensitive | \
@@ -5712,7 +5726,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @Slot(str)
     @safeWrapper
     def slot_findCommand(self, val):
-        """Finds command in the history tree based on glob search.
+        r"""Finds command in the history tree based on glob search.
 
         TODO option to search in a selected session only
 
@@ -5908,7 +5922,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @Slot(QtCore.QModelIndex)
     @safeWrapper
     def slot_fileSystemItemActivated(self, ndx):
-        """ 
+        r""" 
         Triggered by double-click on an item in the file system tree view.
         Double-clicking an item in self.fileSystemTreeView emits the 'activated' 
         signal which is connected to this slot
@@ -5977,7 +5991,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @Slot()
     @safeWrapper
     def slot_changeDirectory(self, targetDir:str=None):
-        """Convergence for all directory navigation in ScipyenWindow"""
+        r"""Convergence for all directory navigation in ScipyenWindow"""
         # print(f"MainWindow.slot_changeDirectory(targetDir = {targetDir})")
         if targetDir is None:
             if isinstance(self.sender(), QtWidgets.QAction):
@@ -6143,7 +6157,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @Slot()
     @safeWrapper
     def slot_openSelectedFileItems(self):
-        """Opens files via (triggered from) context menu in File system browser"""
+        r"""Opens files via (triggered from) context menu in File system browser"""
         selectedItems = [self.fileSystemModel.filePath(item) for item in self.fileSystemTreeView.selectedIndexes()
                          if item.column() == 0 and not self.fileSystemModel.isDir(item)]  # list of QModelIndex
 
@@ -6202,7 +6216,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
     @safeWrapper
     def _openSelectedFileItemsThreaded(self, **kwargs):
-        """
+        r"""
         Pass this as fileLoaderFn argument to self.loadFiles inherited from WorkspaceGuiMixin.
         """
         # print(f"{self.__class__.__name__}._openSelectedFileItemsThreaded called")
@@ -6299,7 +6313,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @Slot(str)
     @safeWrapper
     def slot_systemOpenFileOrFolder(self, fileName):
-        """Opens fileName with the associated system application."""
+        r"""Opens fileName with the associated system application."""
         if isinstance(fileName, str) and len(fileName.strip()):
             if os.path.exists(fileName):
                 url = QtCore.QUrl.fromLocalFile(fileName)
@@ -6339,7 +6353,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @Slot()
     @safeWrapper
     def slot_systemOpenParentFolder2(self):
-        """Opens the parent directory of the current directory, in system app"""
+        r"""Opens the parent directory of the current directory, in system app"""
         dest = str(pathlib.Path(self.currentDir).parent)
         # print(f"{self.__class__.__name__}.slot_systemOpenParentFolder2: dest = {dest}")
         if os.path.exists(dest):
@@ -6528,7 +6542,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
     @safeWrapper
     def loadFile(self, fName):
-        """ Entrypoint into the file reading system, for calls from file system tree view
+        r""" Entrypoint into the file reading system, for calls from file system tree view
         Called by: 
             self.slot_fileSystemItemActivated
     
@@ -6586,7 +6600,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @safeWrapper
     def loadDiskFile(self, fName:str, fileReader:typing.Optional[typing.Callable]=None, 
                      addToRecent:bool=True, updateUi:bool=True):
-        """Reads data from a file.
+        r"""Reads data from a file.
         Common landing point for local data input from the file system.
         Called by various slots connected to File menu actions. 
         
@@ -6713,7 +6727,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @Slot()
     @safeWrapper
     def slot_saveFile(self):
-        """Saves data to HDF5 or pickle file(s).
+        r"""Saves data to HDF5 or pickle file(s).
 
         If one variable is selected in the workspace, opens a dialog to save it
         to a specific file type e.g., VigraArrays are saved as images or volumes
@@ -6946,7 +6960,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @Slot()
     @safeWrapper
     def slot_openFiles(self):
-        """Opening of several files via (triggered from) the 'File/Open' menu action.
+        r"""Opening of several files via (triggered from) the 'File/Open' menu action.
         """
         from core.utilities import make_file_filter_string
 
@@ -6990,7 +7004,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @Slot()
     @safeWrapper
     def _slot_openNamedFile_(self):
-        """Called by slot_handlePythonTextFile"""
+        r"""Called by slot_handlePythonTextFile"""
         # TODO: 2023-05-27 14:43:34
         # unformization of I/O, inclusion with future breadcrumbs navigation
         # framework (in progress)
@@ -7135,7 +7149,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @Slot(object)
     @safeWrapper
     def _slot_ext_krn_shell_chnl_msg_recvd(self, msg:dict):
-        """Parses the message received from the external kernel.
+        r"""Parses the message received from the external kernel.
         The function processes <action>_reply messages emitted from the external
         kernel, via the kernel's shell 'channel' or 'socket', in reply to an
         <action>_request message sent by the client (e.g. console.execute(…))
@@ -7628,7 +7642,13 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 # self.app.setPalette(qtPalette)
                 # self.app.setStyle(styleProxy)
 
-            
+    @Slot()
+    @safeWrapper
+    def _slot_set_ExternalHDF5Viewer(self):
+        
+        pass
+    
+    
     @Slot()
     @safeWrapper
     def _slot_set_Users_Plugins_directory(self):
@@ -7803,7 +7823,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
     @Slot()
     def slot_useDataViewer(self):
-        if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier):
+        # if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier):
+        if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.AltModifier):
             newWindow = True
 
         else:
@@ -7843,11 +7864,11 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
     @Slot()
     def slot_showInConsole(self):
-        if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier):
-            newWindow = True
-
-        else:
-            newWindow = False
+        # if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier):
+        #     newWindow = True
+        # 
+        # else:
+        #     newWindow = False
 
         # varname = self.workspaceModel.currentItemName
         varname = self.currentVarItemName
@@ -7933,7 +7954,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @Slot()
     @safeWrapper
     def slot_viewSelectedVar(self):
-        if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier):
+        # if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier):
+        if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.AltModifier):
             self.slot_viewSelectedVarInNewWindow()
             return
 
@@ -7990,9 +8012,10 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @Slot()
     @safeWrapper
     def slot_viewNDarray(self):
-        """Displays ndarray in a TableEditor
+        r"""Displays ndarray in a TableEditor
         """
-        if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier):
+        # if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier):
+        if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.AltModifier):
             self.slot_viewNDarrayNewWindow()
             return
 
@@ -8030,7 +8053,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @Slot()
     @safeWrapper
     def slot_viewNDarrayNewWindow(self):
-        """Displays ndarray in a new  TableEditor
+        r"""Displays ndarray in a new  TableEditor
         """
         varname = self.getCurrentVarName()
         if varname is None:
@@ -8061,7 +8084,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     # , useSignalViewerForNdArrays=True):
     def viewVar(self, varname, newWindow=False, winType=None, 
                 askForParams=False):
-        """Displays a variable in the workspace.
+        r"""Displays a variable in the workspace.
         The variable is selected by its name
         """
         # print("ScipyenWindow.viewVar, newWindow:", newWindow)
@@ -8189,7 +8212,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @safeWrapper
     @Slot()
     def _slot_monitoredDirectoryContentsChanged(self, *args, **kwargs):
-        """Called when the contents of the monitored directories have changed:
+        r"""Called when the contents of the monitored directories have changed:
         
         • when a new file was created in the directory 
             to see this, call 'touch somefile' in a shell, to see this
@@ -8247,7 +8270,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
     def viewObject(self, obj, objname, winType=None, 
                    newWindow=False, askForParams=False):
-        """Actually displays a python object in user's workspace.
+        r"""Actually displays a python object in user's workspace.
         Delegates to appropriate viewer according to object type, creates a new
         viewer if necessary.
         Call this function when the intention is to display variables that are 
@@ -8978,7 +9001,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             return found[0]
     
     def getMenusForUIPlugin(self, plugin_name:str) -> tuple:
-        """Returns the menu path ↦ plugin function mappigns for the specified module.
+        r"""Returns the menu path ↦ plugin function mappigns for the specified module.
         For information about installed plugins see the following attributes,
         properties or methods:
         • plugins

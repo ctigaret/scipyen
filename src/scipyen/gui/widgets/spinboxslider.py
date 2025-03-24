@@ -16,7 +16,7 @@ __ui_path__ = adapt_ui_path(__module_path__, "spinboxslider.ui")
 Ui_SpinBoxSlider, QWidget = __loadUiType__(__ui_path__)
 
 class SpinBoxSlider(QWidget, Ui_SpinBoxSlider):
-    """Compound widget with a QSpinBox and QSlider.
+    r"""Compound widget with a QSpinBox and QSlider.
     The widge is backed by a Python `range` object, meaning that its attributes
     are as follows:
     • minimum       ↦ min(self.range) = self.range.start
@@ -87,7 +87,7 @@ class SpinBoxSlider(QWidget, Ui_SpinBoxSlider):
         
     @property
     def label(self):
-        """A description of what the widget shows.
+        r"""A description of what the widget shows.
         This is the text in the self.descriptionLabel QLabel on the far left.
         Ideally this is one word, followed by a colon (e.g. "Frame:", "Segment:")
         """
@@ -122,7 +122,7 @@ class SpinBoxSlider(QWidget, Ui_SpinBoxSlider):
         
     @property
     def maximum(self):
-        """The maximum value in the spinbox and slider.
+        r"""The maximum value in the spinbox and slider.
         Also sets up the value in the "of..." label.
         """
         return max(self._range_) if len(self._range_) else 0
@@ -162,7 +162,7 @@ class SpinBoxSlider(QWidget, Ui_SpinBoxSlider):
         
     @property
     def range(self):
-        """The Python range for this widget
+        r"""The Python range for this widget
         """
         return self._range_
     
@@ -216,28 +216,28 @@ class SpinBoxSlider(QWidget, Ui_SpinBoxSlider):
         self.slot_setValue(value)
         
     def setValue(self, value:int):
-        """Convenience setter method - sets the 'value' property to value"""
+        r"""Convenience setter method - sets the 'value' property to value"""
         self.value = value
 
     def setMinimum(self, value:int):
         self.minimum = value
         
     def setMaximum(self, value:int):
-        """Qt compatible:
+        r"""Qt compatible:
         Set the maximum value displayed by this widget.
         This is ≠ self.range.stop.
         """
         self.maximum = value
         
     def setRange(self, minimum:int, maximum:int):
-        """Sets the minimum and maximum values.
+        r"""Sets the minimum and maximum values.
         Compatible with the Qt equivalent methods of QSlider and QSpinBox, 
         meaning that `maximum` is the maximum value the widget can take
         """
         self._range_= range(minimum, maximum + 1, 1)
         
     def getRange(self):
-        """Returns a (self.minimum, self.maximum) tuple.
+        r"""Returns a (self.minimum, self.maximum) tuple.
         """
         return (self.minimum, self.maximum)
         

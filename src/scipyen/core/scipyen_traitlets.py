@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""Very much work in progress.
+r"""Very much work in progress.
 FIXME/TODO:2022-01-29 13:29:19
 The issue with collection "traits", I think, is that changes to the contents of
 the collection by using builtin API (e.g. list.append, deque.appendLeft) or 
@@ -100,7 +100,7 @@ TRAITSMAP = {           # use casting versions
 
 class ScipyenTraitTypeMixin:
     def __delete__(self, obj):
-        """Fails silently when owner is of wrong type"""
+        r"""Fails silently when owner is of wrong type"""
         if hasattr(obj, "remove_trait") and hasattr(obj, "_trait_values") and hasattr(obj, "traits"):
             if self.name in obj.traits():
                 trait_to_remove = obj.traits()[self.name]
@@ -192,7 +192,7 @@ class DictTrait(Dict, ScipyenTraitTypeMixin):
         return super().validate_elements(obj, value)
 
     def set(self, obj, value):
-        """
+        r"""
         Additional notifications:
         • change in dict length (i.e. number of keys)
         • change in key types
@@ -244,7 +244,7 @@ class DictTrait(Dict, ScipyenTraitTypeMixin):
   
             
 class ListTrait(List, ScipyenTraitTypeMixin):
-    """TraitType that ideally should notify:
+    r"""TraitType that ideally should notify:
     a) when a list contents has changed (i.e., gained/lost members)
     b) when an element in the list has changed (either a new value, or a new type)
     c) when the order of the elements has changed
@@ -257,7 +257,7 @@ class ListTrait(List, ScipyenTraitTypeMixin):
     
     
     def __init__(self, trait=None, traits=None, default_value=Undefined, **kwargs):
-        """
+        r"""
         trait: in the super() List traitype, `traits` restricts the type of elements
                 in the container to that TraitType -- i.e. all must be of the same type
     
@@ -339,7 +339,7 @@ class ListTrait(List, ScipyenTraitTypeMixin):
         return self.klass(validated)
 
     def set(self, obj, value):
-        """Overrides List.set to check for special hash.
+        r"""Overrides List.set to check for special hash.
         This is supposed to also detect changes in the order of elements.
         """
         new_value = self._validate(obj, value)
@@ -390,7 +390,7 @@ class ListTrait(List, ScipyenTraitTypeMixin):
                               change_type=change_type)
             
 class DataFrameTrait(Instance, ScipyenTraitTypeMixin):
-    """Traitlet for pandas.DataFrame
+    r"""Traitlet for pandas.DataFrame
     """
     info_text = "Traitlet for pandas.DataFrame"
     default_value = pd.DataFrame()
@@ -528,7 +528,7 @@ class DataFrameTrait(Instance, ScipyenTraitTypeMixin):
         
     
     def set(self, obj, value):
-        """See traitlets.traitlets.TraitType.set for details
+        r"""See traitlets.traitlets.TraitType.set for details
         """
         # with timeblock(f"{type(value).__name__}"):
         # this one simply checks if value is the appropriate class, or None (if allow_none is True)
@@ -720,7 +720,7 @@ class SeriesTrait(Instance, ScipyenTraitTypeMixin):
         return ret
         
     def set(self, obj, value):
-        """See traitlets.traitlets.TraitType.set for details
+        r"""See traitlets.traitlets.TraitType.set for details
         """
         # with timeblock(f"{type(value).__name__}"):
         # this one simply checks if value is the appropriate class, or None (if allow_none is True)
@@ -889,7 +889,7 @@ class NdarrayTrait(Instance, ScipyenTraitTypeMixin):
                             change_type=change_type)
                 
 class NeoBaseNeoTrait(Instance, ScipyenTraitTypeMixin):
-    """Traitlet for BaseNeo objects
+    r"""Traitlet for BaseNeo objects
     """
     info_text = "Trais for neo.baseneo.BaseNeo"
     default_value = neo.baseneo.BaseNeo()
@@ -976,7 +976,7 @@ class NeoBaseNeoTrait(Instance, ScipyenTraitTypeMixin):
         return result
     
     def compare_elements(self, old_value, new_value):
-        """Returns True if old_value and new_value are identical.
+        r"""Returns True if old_value and new_value are identical.
         Identity can mean anything from them being the same class, or their
         children (up to a certain nesting level) are identical.
         
@@ -1042,7 +1042,7 @@ class NeoBaseNeoTrait(Instance, ScipyenTraitTypeMixin):
         raise TraitError(e)
     
     def set(self, obj, value):
-        """See traitlets.traitlets.TraitType.set for details
+        r"""See traitlets.traitlets.TraitType.set for details
         """
         # with timeblock(f"{type(value).__name__}"):
         # this one simply checks if value is the appropriate class, or None (if allow_none is True)
@@ -1709,7 +1709,7 @@ class IrregularlySampledDataSignalTrait(NeoDataObjectTrait):
     
     
 class DataBagTrait(Instance, ScipyenTraitTypeMixin):
-    """Avoid slicing the DataBag type to dict.
+    r"""Avoid slicing the DataBag type to dict.
     
     When a DataBag is contained in another DataBag, its corresponding trait type
     should be DataBagTrait, such that the trait value type (DataBag) will be
@@ -1734,7 +1734,7 @@ class DataBagTrait(Instance, ScipyenTraitTypeMixin):
     
     def __init__(self, value_trait=None, per_key_traits=None, default_value=Undefined,
                  mutable_key_value_traits=True, **kwargs):
-        """Avoid back-casting DataBag to dict
+        r"""Avoid back-casting DataBag to dict
         """
         super(ScipyenTraitTypeMixin, self).__init__()
         
@@ -1888,7 +1888,7 @@ class DataBagTrait(Instance, ScipyenTraitTypeMixin):
         super(DataBagTrait, self).instance_init(obj)
 
     def from_string(self, s):
-        """Load value from a single string"""
+        r"""Load value from a single string"""
         if not isinstance(s, str):
             raise TypeError(f"from_string expects a string, got {repr(s)} of type {type(s)}")
         try:
@@ -1900,7 +1900,7 @@ class DataBagTrait(Instance, ScipyenTraitTypeMixin):
             raise
 
     def from_string_list(self, s_list):
-        """Return a dict from a list of config strings.
+        r"""Return a dict from a list of config strings.
 
         This is where we parse CLI configuration.
 
@@ -1932,7 +1932,7 @@ class DataBagTrait(Instance, ScipyenTraitTypeMixin):
         return combined
 
     def item_from_string(self, s):
-        """Cast a single-key dict from a string.
+        r"""Cast a single-key dict from a string.
 
         Evaluated when parsing CLI configuration from a string.
 

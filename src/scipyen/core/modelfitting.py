@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-""" Steps towards a unified frameworks for model fitting.
+r""" Steps towards a unified frameworks for model fitting.
 
 TODO/FIXME: This module is intended to supersede the models.py module (hopefully
 not before too long). For now, it is only EXPERIMENTAL and UNDER DEVELOPMENT
@@ -47,7 +47,7 @@ from core import models # we're still developing this one
 #@contextmanager
 
 class ModelExpression(object):
-    """Class decorator to pass an expression to the model.
+    r"""Class decorator to pass an expression to the model.
     
     Can use this instead of directly hardcoding the expression in the definition
     if the fit model ::class::.
@@ -64,7 +64,7 @@ class ModelExpression(object):
         self._modules_ = modules
         
     def __call__(self, klass):
-        """Decorates the ::class::
+        r"""Decorates the ::class::
         """
         if not isinstance(self._expression_, str) or len(self._expression_.strip()) == 0:
             klass._model_expression_ = ""
@@ -142,7 +142,7 @@ class ModelExpression(object):
         return name
 
 class FitModelMeta(type):
-    """:Metaclass: that generates properties for the model parameters.
+    r""":Metaclass: that generates properties for the model parameters.
     Each model parameter gets three read/write properties named after the 
     parameter's name or suffixed with '_lb' or '_ub', respectively, for the
     initial value, lower and upper bound values.
@@ -191,7 +191,7 @@ class FitModelMeta(type):
         return (initial, lower, upper)
 
 class FitModel(metaclass=FitModelMeta):
-    """Top parent :class: for all fit models
+    r"""Top parent :class: for all fit models
     
     To drive from it:
     1) define a new :class: with the body where AT LEAST the :class: attribute
@@ -260,7 +260,7 @@ class FitModel(metaclass=FitModelMeta):
     
     @property
     def parameter_names(self):
-        """Model parameter names wrapped in a tuple
+        r"""Model parameter names wrapped in a tuple
         """
         return self._parameter_names_
     
@@ -270,7 +270,7 @@ class FitModel(metaclass=FitModelMeta):
     
     @property
     def parameters(self) -> Bunch:
-        """Maps parameter names to initial, lower and upper bounds
+        r"""Maps parameter names to initial, lower and upper bounds
         """
         return Bunch(((name, Bunch(initial=self.initial[name], lower=self.lower[name], upper=self.upper[name])) for k, name in enumerate(self._parameter_names_)))
     
@@ -310,7 +310,7 @@ class FitModel(metaclass=FitModelMeta):
                             
 @ModelExpression('a * exp(-(x-x0)/tau) + offset')
 class ExponentialDecay(FitModel):
-    """Fit model :class: decorated with ModelExpression.
+    r"""Fit model :class: decorated with ModelExpression.
     
     """
     _parameter_names_   = ("offset", "a", "x0", "tau")
@@ -322,7 +322,7 @@ class ExponentialDecay(FitModel):
         super().__init__(**kwargs)
             
 class ExponentialDecay2(FitModel):
-    """Demonstrates defining a new fit model without a decorator.
+    r"""Demonstrates defining a new fit model without a decorator.
     The attribute _model_expression_ needs to be harcoded in the definition
     """
     _parameter_names_   = ("offset", "a", "x0", "tau")
@@ -347,7 +347,7 @@ class ExponentialDecay2(FitModel):
 # compatibility
 
 # def check_rise_decay_params(x):
-#     """Returns the number of decay components for a exp-rise-multi-decay transient.
+#     r"""Returns the number of decay components for a exp-rise-multi-decay transient.
 #     x = iterable with model parameters (see exp_rise_multi_decay())
 #     """
 #     if np.remainder(len(x)-3, 2) != 0:
@@ -356,13 +356,13 @@ class ExponentialDecay2(FitModel):
 #     return (len(x)-3) // 2
 # 
 # def generic_exp_decay(x, offset, scale, delay, decay):
-#     """Realizes f(x) = scale * exp(-(x-delay)/decay) + offset
+#     r"""Realizes f(x) = scale * exp(-(x-delay)/decay) + offset
 #     """
 #     
 #     return scale * np.exp(-(x-delay)/decay) + offset
 # 
 # def alphaFunction(x, parameters):
-#     """
+#     r"""
 #     The Alpha function: a single exponential rise and decay, both with the same 
 #     time-constant (τ):
 #     
@@ -416,7 +416,7 @@ class ExponentialDecay2(FitModel):
 #     return y
 #     
 # def exp_rise_multi_decay(x, parameters, returnDecays = False):
-#     """ Realization of a transient signal with a single exponential rise (r) and
+#     r""" Realization of a transient signal with a single exponential rise (r) and
 #         n exponential decays (d1..dn), at an onset (delay) x0 and a given 
 #         "DC" component (offset) o: 
 # 
@@ -533,7 +533,7 @@ class ExponentialDecay2(FitModel):
 #             return y
 # 
 # def compound_exp_rise_multi_decay(x, parameters, returnDecays = False):
-#     """Compound transient signal -- linear sum of delayed single transient signals
+#     r"""Compound transient signal -- linear sum of delayed single transient signals
 #     Arguments:
 #         x = 1D predictor vector
 #         
@@ -590,7 +590,7 @@ class ExponentialDecay2(FitModel):
 #             return y, yc
 #     
 # def Markwardt_Nilius(x, g, e, h, s):
-#     """Markwardt & Nilius model for voltage-gated Ca2+ channels I-V relationship
+#     r"""Markwardt & Nilius model for voltage-gated Ca2+ channels I-V relationship
 #     See Markwardt & Nilius (1988), J Physiol (London)
 #     
 #     Parameters:
@@ -636,7 +636,7 @@ class ExponentialDecay2(FitModel):
 #     pass
 # 
 # def Talbot_Sayer(x, a, b, c, x0, **kwargs):# t = 33 * pq.degC, o = 2.5 * pq.mM):
-#     """
+#     r"""
 #     Talbot & Sayer model for voltage-gated Ca2+ channels I-V relationship.
 #     
 #     Boltzman squared, multiplied by Goldman-Hogdkin-Katz, 
@@ -732,7 +732,7 @@ class ExponentialDecay2(FitModel):
 #     return boltzman * ghk
 # 
 # def gaussianSum1D(x, *args, **kwargs):
-#     """ Sum of shifted Gaussians in 1D.
+#     r""" Sum of shifted Gaussians in 1D.
 #     
 #     Implements:
 #     
@@ -806,7 +806,7 @@ class ExponentialDecay2(FitModel):
 #     
 #     
 # def Frank_Fuortes(x, tau, x0):
-#     """ Frank & Fuortes 1956 expression Irh/I = 1 - exp(-(t-t0)/tau)
+#     r""" Frank & Fuortes 1956 expression Irh/I = 1 - exp(-(t-t0)/tau)
 #     
 #     In the Frank & Fuortes 1956 paper, Irheo is a constant experimentally measured.
 #     Use this to get the membrane time constant only.
@@ -837,7 +837,7 @@ class ExponentialDecay2(FitModel):
 #     #return 1-np.exp(-x/tau)
 # 
 # def Frank_Fuortes2(x, irh, tau, x0):
-#     """ Implements 1/I = (1-exp(-t/tau)) / Irh 
+#     r""" Implements 1/I = (1-exp(-t/tau)) / Irh 
 #     
 #     By rearranging the Frank & Fuortes 1956 equation
 #     one can also get a fitted value for Irheobase 

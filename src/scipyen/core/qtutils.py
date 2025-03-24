@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""
+r"""
 See https://pyqt.riverbankcomputing.narkive.com/4Atl8IgU/how-to-detect-if-an-object-has-been-deleted
 solution by Giovanni Bajo
 """

@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""System and platform utilities
+r"""System and platform utilities
 """
 import os, sys, subprocess, shutil, platform, pathlib
 from shutil import which

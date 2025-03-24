@@ -17,7 +17,7 @@ from pygments import styles as pstyles
 class KeplerDark(Style):
     name = "KeplerDark"
     
-    background_color = '#232627'
+    background_color = '#232629'
     # highlight_color = '#404040'
     highlight_color = '#384f29'
     line_number_color = '#aaaaaa'
@@ -27,7 +27,7 @@ class KeplerDark(Style):
         Token:              '#eeeeee',
         # Token:              '#ffff00',
         # Whitespace:         '#666666',
-        Whitespace:         '#232627',
+        Whitespace:         '#232629',
 
         Comment:            'italic #ababab',
         Comment.Preproc:    'noitalic bold #ff3a3a',

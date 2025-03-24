@@ -6,7 +6,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""
+r"""
 """
 import sys, os, typing
 from qtpy import QtCore, QtGui, QtWidgets, QtSvg, QtNetwork, sip
@@ -31,7 +31,7 @@ from gui.textviewer import TextViewer
 Ui_MetaDataWidget, QWidget = __loadUiType__(os.path.join(__module_path__, "metadatawidget.ui"))
 
 class MetaDataWidget(Ui_MetaDataWidget, QWidget):
-    """Widget for displaying the most commonly used data attributes in Scipyen.
+    r"""Widget for displaying the most commonly used data attributes in Scipyen.
     Where implemented, it also supports editing.
     NOTE/WARNING: Under development
     """
@@ -182,7 +182,7 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
         self._descriptionEditor.sig_textChanged.connect(self._slot_descriptionChanged)
         
     def value(self):
-        """Returns a dict with field values takes from individual children
+        r"""Returns a dict with field values takes from individual children
         """
         ret = dict()
         ret["VarName"] = strutils.str2symbol(self._dataVarName)
@@ -307,7 +307,7 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
     
     @Slot()
     def _slot_editDateTime(self):
-        """Edits the date & time of analysis.
+        r"""Edits the date & time of analysis.
         Recording date & time should be immutable
         """
         # TODO 2022-11-08 08:32:23
@@ -458,7 +458,7 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
     
     @property
     def dataName(self):
-        """Getter & setter for the data name"""
+        r"""Getter & setter for the data name"""
         return self._dataName
     
     @dataName.setter

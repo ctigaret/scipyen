@@ -4,5 +4,5 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 
-"""shim module for the default (package) configuration
+r"""shim module for the default (package) configuration
 """

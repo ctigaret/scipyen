@@ -1,6 +1,6 @@
 # Clampex DIGDACs
 
-"""
+r"""
 Alternative Outputs logic:
 
 Alternate Waveforms ✔ 

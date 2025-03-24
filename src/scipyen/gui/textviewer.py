@@ -36,7 +36,7 @@ __scipyen_plugin__ = None
 # TODO: 2019-11-10 13:12:40
 # configure text syntax highlighting
 class TextViewer(ScipyenViewer):
-    """No-frills text viewer/editor with the simplest text editing functionality.
+    r"""No-frills text viewer/editor with the simplest text editing functionality.
     • syntax highlighting (XML, HTML, Markdown)
     • support for ODF format (save only)
     • no formatting of characters or font

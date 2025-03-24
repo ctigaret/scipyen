@@ -20,7 +20,7 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
 class IndexProxy(object):
-    """Proxy for accessing a data field in the FrameIndexLookup.
+    r"""Proxy for accessing a data field in the FrameIndexLookup.
     
     The data field itself is a Pandas Series with SparseDtype, contained
     in the 'map' attribute (a DataFrame) of the owner of this proxy, with 
@@ -31,7 +31,7 @@ class IndexProxy(object):
     """
     
     def __init__(self, field:str):
-        """Creates the descriptor corresponding to a data field in the owner.
+        r"""Creates the descriptor corresponding to a data field in the owner.
         Also sets up the field's name as a descriptor of FrameIndexLookup
         """
         if not isinstance(field, str) or len(field.strip()) == 0:
@@ -40,7 +40,7 @@ class IndexProxy(object):
         self._field_ = field
         
     def __get__(self, obj, objtype=None):
-        """Returns the descriptor itself (i.e., this IndexProxy instance).
+        r"""Returns the descriptor itself (i.e., this IndexProxy instance).
         
         The descriptor forwards access & assignment to the corresponding
         Pandas Series object in the owner's 'map' attribute so that the
@@ -55,7 +55,7 @@ class IndexProxy(object):
         return self
     
     def __len__(self):
-        """Returns the number of registered component frame indices.
+        r"""Returns the number of registered component frame indices.
         
         A registered frame index is an int. 
         
@@ -84,7 +84,7 @@ class IndexProxy(object):
         self.private_name = "_" + name + "_"
         
     def __call__(self):
-        """Returns the pandas series corresponding to self._field_
+        r"""Returns the pandas series corresponding to self._field_
         
         The caller is responsible for appropriate indexing into the result.
         """
@@ -109,7 +109,7 @@ class IndexProxy(object):
         
 class FrameIndexLookup(object):
     
-    """Wrapper around multi-frame indexing using sparse pandas DataFrames.
+    r"""Wrapper around multi-frame indexing using sparse pandas DataFrames.
     
     The correspondence between data master ("virtual") frame index and the 
     index of the frames in the child data objects of the owner are stored in a
@@ -207,7 +207,7 @@ class FrameIndexLookup(object):
     
     def __init__(self, field_frames:dict, frame_missing = pd.NA, 
                  index_name="Frame", **kwargs):
-        """
+        r"""
         Parameters:
         ------------
         field_frames: dict 
@@ -416,7 +416,7 @@ class FrameIndexLookup(object):
         return False
         
     def __getitem__(self, key:typing.Union[int, slice, range, collections.abc.Sequence, str]):
-        """Returns the frame mapping for the master frame index given in 'key'.
+        r"""Returns the frame mapping for the master frame index given in 'key'.
         Parameters:
         ----------
         key: either:
@@ -474,7 +474,7 @@ class FrameIndexLookup(object):
         # NOTE: return the key when nothing is mapped to it
         
     def __setitem__(self, key, value):
-        """Item setter
+        r"""Item setter
         
         Parameters:
         -----------
@@ -540,7 +540,7 @@ class FrameIndexLookup(object):
         yield from self._map_.columns
         
     def where(self, field:str, value:int):
-        """Returns the master frame index for the 'field' index 'value'
+        r"""Returns the master frame index for the 'field' index 'value'
         
         Raises KeyError if field is not found.
         """
@@ -562,7 +562,7 @@ class FrameIndexLookup(object):
         
         
     def remap(self, field:str, newMap:dict={}):
-        """Remaps master frame indices to new frame indices of 'field'.
+        r"""Remaps master frame indices to new frame indices of 'field'.
         
         Parameters:
         ===========
@@ -602,7 +602,7 @@ class FrameIndexLookup(object):
                 getattr(self, field)[k] = v
             
     def __check_missing__(self, x):
-        """Quick check for valid missing field frame index value
+        r"""Quick check for valid missing field frame index value
         """
         return x is self.missingFrameIndex if not isinstance(self.missingFrameIndex, int) else x == self.missingFrameIndex
     

@@ -23,7 +23,7 @@ def output_to_system_console():
     print(f"{printStyled('Hello world', 'cyan', True)}")
 
 def helloWorld():
-    """
+    r"""
     The following attributes are "injected" in this module
     namespace:
     

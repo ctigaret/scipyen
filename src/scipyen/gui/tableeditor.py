@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 
-"""
+r"""
 @author Cezar M. Tigaret
     Code solutions inspired from qtpandas (Matthias Ludwig - Datalyze Solutions) and 
     code solutions by eyllanesc on stackoverflow
@@ -76,7 +76,7 @@ import iolib.pictio as pio
 __scipyen_plugin__ = None
 
 class TableEditor(ScipyenViewer):
-    """Viewer/Editor for tabular data
+    r"""Viewer/Editor for tabular data
     """
     # TODO: 2022-11-25 15:11:59
     # inherit from WorkspaceGuiMixin for messages and data I/O
@@ -159,7 +159,7 @@ class TableEditor(ScipyenViewer):
         self._use_matplotlib_ = value
             
     def _configureUI_(self):
-        """Initializes and configures the GUI elements.
+        r"""Initializes and configures the GUI elements.
         """
         # NOTE: 2019-01-12 12:21:34
         # CAUTION: setting section resize mode policies to ResizeToContents has

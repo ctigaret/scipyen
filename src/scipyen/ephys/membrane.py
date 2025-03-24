@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""Processing of electrophysiology signal data.
+r"""Processing of electrophysiology signal data.
 TODO: 2024-05-30 14:42:46
 extricate AP analysis code from here
 """
@@ -54,7 +54,7 @@ import neo
 
 #### END 3rd party modules
 
-#### BEGIN pict.core modules
+#### BEGIN Scipyen core modules
 
 import core.workspacefunctions as wf
 import core.pyabfbridge as pab
@@ -78,403 +78,25 @@ from core.triggerprotocols import (TriggerProtocol, auto_define_trigger_events, 
 from core.prog import (safeWrapper, with_doc, scipywarn, printStyled)
 #from core.patchneo import *
 
-#### END pict.core modules
+#### END Scipyen core modules
 
-#### BEGIN pict.gui modules
+#### BEGIN Scipyen gui modules
 import gui.signalviewer as sv
 import gui.cursors as cursors
 from gui.cursors import SignalCursor
 import gui.pictgui as pgui
 
-#### END pict.gui modules
+#### END Scipyen gui modules
 
-#### BEGIN pict.iolib modules
+#### BEGIN Scipyen iolib modules
 import iolib.pictio as pio
-#### END pict.iolib modules
+#### END Scipyen iolib modules
 
-#### BEGIN pict.ephys modules
+#### BEGIN Scipyen ephys modules
 import ephys.ephys as ephys
-#### END pict.ephys modules
-
-AP_WIDTH_CODES =   {0: "AP_durations_V_0",
-                    1: "AP_durations_V_onset",
-                    2: "AP_durations_V_half_max",
-                    3: "AP_durations_V_third_max",
-                    4: "AP_durations_V_quart_max"}
+#### END Scipyen ephys modules
 
 
-@dataclass
-class MembranePropertiesAnalysisParameters(datatypes.ScipyenDataclass):
-    name:str = "Membrane properties analysis parameters"
-    metadata:BaseScipyenData = dataclasses.field(default_factory = BaseScipyenData)
-    # Contains biological sample parameters, procedure details and origin (file,
-    # file datetime, recording datetime, analysis datetime)
-
-    # Electrophysiology recording parameters: <- These are important and need to
-    # reflect the Clampex protocol used.
-    
-    
-    VmSignal:typing.Union[str, int] = "Vm_prim_0"  
-    # The name or logical index of the recorded membrane voltage signal.
-    # The name depends on how the ADC signals were named in Clampex's Lab bench.
-    # In any case this should resolve to the ADC used to record the Vm.
-    #
-    # When not sure, just use the int index (e.g. 0 for the first signal, etc.)
-    # found by inspecting the trial data (neo.Block) in SignalViewer to see which 
-    # of the recorded signals carry the recorded Vm.
-    # 
-
-    ImSignal:typing.Union[str, int] = "Im_sec_0"   
-    # The name or physical index of the signal representing the membrane current
-    # (command waveform) this depends on how the DAC signals were named in 
-    # Clampex's Lab bench.
-    #
-    # CAUTION: By default, this signal is not recorded during the trial, unless
-    # one of the following configurations are implemented:
-    #
-    # 1) The amplifier supplies a "secondary" output signal representing a copy
-    # of the command waveform (in current clamp this would be the scaled "membrane 
-    # current") and this signal is fed into an ADC input port of the DAQ device.
-    # NOTE: MultiClamp 700 series amplifiers supply such "secondary" signals with
-    # each of their channels.
-    #
-    # 2) The DAC output signal from the DAQ device, which is normally fed into 
-    # the amplifier to supply the command waveform is "teed" into an ADC input 
-    # port of the same DAQ device, thus allowing a direct record of the DAC output
-    # NOTE: This is better avoided, because it may distort the actual command waveform
-    # sent to the amplifier.
-    # 
-    # In any case, 'ImSignal' should resolve to the DAC used to send command
-    # waveforms during the trial.
-    #
-    # When this signal is NOT recorded, the analysis uses the DAC corresponding 
-    # to this signal (see above) in order to determine the command waveform 
-    # parameters (here, injected current amplitude, onset and duration of current
-    # injection) based on the information contained in the trial's protocol, see
-    # 'useEmbeddedProtocol' parameter below.
-    #
-    # "Legacy" code in Scipyen's ephys.membrane module relies heavily on this
-    # signal being recorded in order to "guesstimate" these parameters from a
-    # heuristic analysis of this signal. In the absence of this signal, one 
-    # MUST manually supply the amplitude of the injected current (in each sweep)
-    # and the current injection timings.
-    #
-    # Since now Scipyen is able to extract ABF protocol information from the trials,
-    # such code is fast becoming obsolete and deprecated.
-    
-    useEmbeddedProtocol:bool = True 
-    # Flag indicating whether to use the ABF protocol information embedded in the 
-    # data (stored in ABF files) to infer the timings and amplitude of the current 
-    # injection steps. This data is also propagated in the neo.Block annotations
-    # attribute upon reading an ABF file, and Scipyen can now handle this 
-    # automatically.
-    #
-    # WARNING when this is True, this requires the latest build of Scipyen
-    #
-
-    CurrentInjectionEpochIndex:typing.Optional[int] = 1
-    # index of the ABF epoch in the protocol that defines the current injection
-    # step (typically this is epoch 1 i.e., the second epoch, because the first epoch
-    # is typically a "blank" step to provide some baseline)
-    #
-    # NOTE: One can pass None here, and let the code infer which epoch is used 
-    # for current injection steps. However, this can fail if there are, say, 
-    # "conditioning" epochs tha also provide current injection steps.
-    #
-
-    dV_dt_thr:pq.Quantity = dataclasses.field(default_factory = lambda: 10 * pq.V/pq.s)  # this is the default; change values here
-    # This is the dV/dt threshold for AP detection: a Vm change that is faster
-    # than this value is considered to indicate the start of an AP upstroke.
-    #
-    # By default, this is now 10 * pq.V/pq.s but you may want/need to change it
-    # to suit your cells. Just change the numeric value, leave units as they are.
-    #
-    # The value in Tamagnini et al, of 20 V/s, overestimates the start time of 
-    # the AP (and hence its onset)!!!
-
-    min_Vm_AP:pq.Quantity = dataclasses.field(default_factory = lambda: 0 * pq.mV)  # this is the default; change values here
-    # Threshold of membrane voltage that needs to be crossed by the upstroke
-    # in order to be considered an AP (anything below that is a "false positive"
-    # for a detection based on dV/dt threshold).
-    # 
-    # This is necessary because depending on the quality of the record and the 
-    # current injection intensity, some fluctuations in the Vm may happen at a 
-    # rate faster than 'dV_dt_thr' given above and therefore be "false positives"
-    # when detection is based on dV/dt threshold.
-    #
-    # Notably, this may happen:
-    #   • AT THE START of a large injection step, when the Vm raises passively 
-    #   but still quite fast, before it settles to a slower-rising phase which 
-    #   will trigger a true AP once is gets above the biological Vm threshold.
-    #
-    #   • when the recording is poor/leaky, and (some) APs are severely blunted
-    #   CAUTION: if you find this value needs to be too low, you should question
-    #   the quality of the data)
-    #
-    # The default here (0 mV) is large enough to drop the "false positives" at
-    # the start of the current injection step, yet small enough to capture APs
-    # that don't fully reach their expected peak values (~ +20 mV or more).
-    #
-    # Perhaps not relevant for your study, but some dendritic spikes CAN propagate
-    # at the soma and "look" like APs that don't cross this threshold.
-    #
-
-    freq_bounds:np.ndarray = dataclasses.field(default_factory = lambda: np.array([10, 40, 80, 120, ]) * pq.Hz)  # this is the default; change values here
-    # this is needed to set up the 1ˢᵗ ISI frequency bands;
-    # you may want to change these if you find that too many cells are not firing at
-    # the frequencies you are after
-    #
-    # just edit the values between brackets ([])
-    #
-
-    width_code:int = 3  
-    # where to measure the AP width - see WIDTH_CODES above; my default is ⅓ of max
-    # to measure AP width at half-max (½ of max) set this to 2
-
-    ssDuration:pq.Quantity = dataclasses.field(default_factory = lambda: 50 * pq.ms)   # this is the default; change values here
-    # duration of a window to calculate the mean baseline and
-    #   the mean steady-state Vm for passive properties
-    #
-    # for baseline, this window ends with the start time of 
-    #   the hyperpolarizing current injection step
-    #
-    # for steady-state, this window ends with the stop time
-    #   of the hyperpolarizing current injection
-    #
-    # in both cases, the window starts at the stop time from
-    #   above MINUS the ssDuration
-    #   (in case you wonder, it avoids the rebound because
-    #    the rebound occurs, if at all, AFTER the hyperpolarizing 
-    #    current injection was stopped)
-    #
-                            
-    box_size:int = 0            
-    # int: duration (size) of a boxcar filter applied to the Vm before
-    # passive properties analysis
-    #
-                            
-    average_passive_results:bool = True  
-    # flag indicating how to measure passive properties
-    # when there are replicates of current injection steps:
-    #
-    # When True: the script reports the mean of 
-    # the values of Tau, Rin,capacitance Vsag, Vrebound, etc
-    # across the replicates
-    #
-    # When False: the script will determine these
-    # parameters on the averaged Vm signal (obtained
-    # by averaging the Vm signal across the replicates)
-    #
-                       
-    fitrheo:bool = False
-    # bool
-    # indicate if rheobase analysis should also estimate a fitted rheobase value
-    #
-
-    rheobase_factor:int  = 1
-    # int: the injected current expressed as Irheobase × Irh_factor
-    # to collate AP instantaneous frequencies, amplitudes, fastAHPs, etc.
-    #
-    # e.g. to get these at TWICE the rheobase current, 
-    # set Irh_factor = 2
-    #
-    # there is nothing wrong (in principle) to use 
-    # an Irh_factor = 1 or larger (assuming larger currents
-    # have been used)
-    #
-    
-    test_Iinj:pq.Quantity = dataclasses.field(default_factory = lambda: 300 * pq.pA)
-    # current injection where to collect AP instantaneous frequencies, amplitudes,
-    # aterspikepotentials, etc   
-    #
-    # Typically this would be something like rheobase_factor × Irheobase, BUT:
-    # a) you may not always know the Irh when doing this analysis
-    # b) the protocol may not include an injection step at rheobase_factor × Irheobase
-    # therefore you may decide to use a higher value that rheobase_factor × Irheobase
-    #
-
-    minAPs_for_active_properties:int = 10
-    # int
-    # minimum number of APs in the train for general active properties (i.e.
-    # AP instantaneous frequencies, amplitudes, aterspikepotentials, etc) for 
-    # things like adaptation and attenuation, measured at test_Iinj
-    #
-    # If the number of APs at test_Iinj is less than this number, missing
-    # values are NaNs.
-    #
-    # If the number of APs at test_Iinj is larger than this number, the excess
-    # APs will be discarded.
-    
-    nAPs:int = 5
-    # number of first APs in the train, for AP widths
-    #
-    
-    isi_start:int = 0
-    isi_span:int = 1
-    # these two define the boundary for the ISI used in frequency banding
-    # the defaults (0 and 1) represent the first ISI (i.e., between AP0 and AP1)
-    # if you want the ISI between, say first and the third APs, then set 
-    # isi_start = 0
-    # isi_span = 3
-    #
-    
-    fAHP_window:pq.Quantity = dataclasses.field(default_factory = lambda: 3 * pq.ms)
-    # window duration for afterspike fAHP analysis
-    
-    ADP_window:pq.Quantity = dataclasses.field(default_factory = lambda: 6 * pq.ms)
-    # window duration for afterspike ADP analysis
-    
-    resample:typing.Optional[pq.Quantity] = None
-    
-    # __changed__ = False
-    
-    __match_args__ = tuple(set(datatypes.ScipyenDataclass.__match_args__ + 
-                               ("metadata", "VmSignal", "ImSignal",
-                                "useEmbeddedProtocol", "CurrentInjectionEpochIndex",
-                                "dV_dt_thr", "min_Vm_AP", "freq_bounds",
-                                "width_code", "ssDuration", "box_size",
-                                "average_passive_results", "fitrheo",
-                                "rheobase_factor", "test_Iinj",
-                                "minAPs_for_active_properties", "nAPs",
-                                "isi_span", "isi_span", "fAHP_window",
-                                "ADP_window", "resample")))
-    
-    def __eq__(self, other):
-        return super().__eq__(other)
-#         if not isinstance(other, self.__class__):
-#             return False
-#         
-#         ret = self.name == other.name
-#         
-#         if ret:
-#             ret &= all(getattr(self, f.name) == getattr(other, f.name) for f in dataclasses.fields(self.__class__))
-
-    def __repr__(self):
-        indent = lambda x: x.replace("\n", "\n\t")
-        repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}"
-        ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
-        return "\n".join(ret)
-    
-#     def toHDF5(self, group:h5py.Group, name:str, oname:str, 
-#                        compression:str, chunks:bool, track_order:bool,
-#                        entity_cache:dict) -> h5py.Group:
-#         
-#         from iolib import h5io
-#         target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
-#         cached_entity = h5io.getCachedEntity(entity_cache, self)
-#         if isinstance(cached_entity, h5py.Dataset):
-#             group[target_name] = cached_entity
-#             return cached_entity
-#         
-#         # full_attrs = dict((x, getattr(self, x)) for x in self.__match_args__)
-#         full_attrs = asdict(self)
-#         
-#         attrs_to_entities = dict((k,v) for k,v in full_attrs.items() if (isinstance(v, np.ndarray) and v.size > 1))
-#         
-#         attrs = dict((k,v) for k,v in full_attrs.items() if k not in attrs_to_entities)
-#         
-#         objattrs = h5io.makeAttrDict(**attrs)
-#         obj_attrs.update(objattrs)
-#         
-#         if isinstance(name, str) and len(name.strip()):
-#             target_name = name
-#         
-#         entity = group.create_group(target_name, track_order=track_order)
-#         entity.attrs.update(obj_attrs)
-#         
-#         if len(attrs_to_entities):
-#             for k,v in attrs_to_entities.items():
-#                 h5io.toHDF5(v, entity, name=k, oname=k,
-#                             compression=compression,chunks=chunks,
-#                             track_order=track_order,
-#                             entity_cache=entity_cache)
-#                 
-#         h5io.storeEntityInCache(entity_cache, self, entity)
-#         
-#         return entity
-#     
-#     @classmethod
-#     def fromHDF5(cls, entity:h5py.Group, 
-#                              attrs:typing.Optional[dict]=None, cache:dict = {}):
-#         
-#         from iolib import h5io
-#         if entity in cache:
-#             return cache[entity]
-#         
-#         attrs = h5io.attrs2dict(entity.attrs)
-#         
-#         attrs_as_entities = [a for a in cls.__match_args__ if a not in attrs]
-#         
-#         kwargs = dict()
-#         
-#         for a in cls.__match_args__:
-#             if a in attrs:
-#                 kwargs[a] = attrs[a]
-#             else:
-#                 if a in entity.keys():
-#                     kwargs[a] = h5io.fromHDF5(entity[a], cache=cache)
-#                     
-#         return cls(**kwargs)
-        
-def parse_current_injection_timings(data:neo.Block):
-    """
-    Extract current injection timings from the data.
-    Data is a neo.Block containing a series of sweeps (a.k.a, segments) with 
-    rectangular current injection waveforms. The injected current may be 
-    hyperpolarizing (for passive membrane properties) and/or depolarizing 
-    (for AP firing properties).
-
-    In the ABF protocol used for recording, these current injections are specified 
-    as Epochs of type "Step".
-
-    The rectangular current injections waveforms may change step-wise by a constant
-    value ('delta duration') from one sweep to the next, although the most common
-    case is to use the same duration for current injections in all sweeps.
-
-    The amplitude of the current injection is expected to change step-wise by a 
-    constant value ('delta level') from one sweep to the next. The amplitude for 
-    the first sweep must  be != 0.
-
-    NOTE: When the protocol defines more than one such epoch, the first epoch
-    will be used
-
-Returns a tuple (Istart, Istop, Iinj_0, delta_I)
-
-"""
-    protocol = pab.ABFProtocol(data)#, generateOutputConfigs=False)
-    dac = protocol.outputConfiguration(protocol.activeDACChannelIndex)
-
-    if not scq.unitsConvertible(dac.units, pq.A):
-        scipywarn(
-            f"Data block {data.name} does not appear to be a current clamp experiment. Expecting a DAC command in current units; instead, got {dac.dacUnits}")
-        useProtocol = False
-    
-    currentInjectionEpochs = [e for e in dac.epochs if e.epochType == pab.ABFEpochType.Step and e.firstLevel != 0 * dac.units ]
-
-    if len(currentInjectionEpochs) == 0:
-        scipywarn(
-            f"Data block {data.name} does not have a suitable current injection epoch")
-        useProtocol = False
-
-    elif len(currentInjectionEpochs) > 1:
-        scipywarn(
-            f"Data block {data.name} appears to have more than one ABF epoch defining a current injection step.\n Will use the first suitable epoch")
-
-    currentInjectionEpoch = currentInjectionEpochs[0]
-    
-    Iinj_0  = currentInjectionEpoch.firstLevel
-    delta_I = currentInjectionEpoch.deltaLevel
-    delta_t = currentInjectionEpoch.deltaDuration
-    
-    if delta_t != 0 * pq.s:
-        Istart  = [dac.getEpochActualRelativeStartTime(currentInjectionEpoch, k) for k in range(protocol.nSweeps)]
-        Istop   = [Istart[k] + dac.getEpochActualDuration(currentInjectionEpoch, k) for k in range(protocol.nSweeps)]
-        
-    else:
-        Istart  = dac.getEpochActualRelativeStartTime(currentInjectionEpoch, 0)
-        Istop   = Istart + dac.getEpochActualDuration(currentInjectionEpoch, 0)
-        
-    return Istart, Istop, Iinj_0, delta_I
     
 
 # NOTE: 2023-06-12 16:09:45
@@ -488,7 +110,7 @@ def measure_membrane_test(signal:typing.Union[neo.AnalogSignal, DataSignal],
                   clampMode:typing.Optional[ephys.ClampMode] = None,
                   channel:typing.Optional[int] = None,
                   **kwargs):
-    """Membrane test measurements.
+    r"""Membrane test measurements.
 
 """
     # check for signals consistency; command MAY BE a scalar (i.e. the amount
@@ -731,7 +353,7 @@ def measure_Rs_Rin(im_signal:neo.AnalogSignal,
                            channel:typing.Optional[int] = None,
                            returnIdc:bool=False
                            ) -> tuple:
-    """Calculates Rs and Rin from a membrane test in voltage-clamp
+    r"""Calculates Rs and Rin from a membrane test in voltage-clamp
     
     Parameters:
     ===========
@@ -1001,7 +623,7 @@ def segment_Rs_Rin(segment: neo.Segment, Im: typing.Union[str, int],
                    regions: typing.Optional[typing.Union[neo.Epoch, typing.Tuple[SignalCursor, SignalCursor, SignalCursor]]] = None, 
                    channel: typing.Optional[int] = None,
                    returnIdc:bool = False):
-    """Calculates the series (Rs) and input (Rin) resistances in voltage-clamp.
+    r"""Calculates the series (Rs) and input (Rin) resistances in voltage-clamp.
     
     Parameters:
     ----------
@@ -1157,7 +779,7 @@ def block_Rs_Rin(data:typing.Union[neo.Block,typing.Sequence[neo.Segment]],
                  channel:typing.Optional[int] = None, 
                  name:typing.Optional[str] = None,
                  returnIdc:bool=False):
-    """Calls segment_Rs_Rin for all segments in data.
+    r"""Calls segment_Rs_Rin for all segments in data.
     
     Parameters:
     ===========
@@ -1235,7 +857,7 @@ def cursors_Rs_Rin(signal: typing.Union[neo.AnalogSignal, DataSignal],
                    rin: typing.Union[SignalCursor, tuple], 
                    channel: typing.Optional[int] = None,
                    returnIdc:bool=False):
-    """Calculates series and input resistance from voltage-clamp recording.
+    r"""Calculates series and input resistance from voltage-clamp recording.
     
     Applies to voltage-clamp recordings (membrane current signal).
     
@@ -1373,7 +995,7 @@ def epoch_Rs_Rin(signal: typing.Union[neo.AnalogSignal, DataSignal],
                  epoch: typing.Union[neo.Epoch, tuple], 
                  channel: typing.Optional[int] = None,
                  returnIdc:bool=False):
-    """Calculates series and input resistance based on epochs.
+    r"""Calculates series and input resistance based on epochs.
     
     The baseline, Rs and Rin are calculated across the time intervals defined in
     the Epoch, which is expected to contain three intervals each with its own
@@ -1437,7 +1059,7 @@ def epoch_Rs_Rin(signal: typing.Union[neo.AnalogSignal, DataSignal],
         
 @safeWrapper
 def v_Nernst(x_out, x_in, z, temp):
-    """Calculates Nernst potential for an ionic species X.
+    r"""Calculates Nernst potential for an ionic species X.
     
     Calculates Nernst potential for an ionic species X, given its concentrations
     x_out and x_in (in M / L), valence, and temperature (in degress centigrade).
@@ -1451,7 +1073,7 @@ def v_Nernst(x_out, x_in, z, temp):
     
 
 # def __wave_interp_root_near_val__(w, value):
-#     """Factored-out code in the for loop under NOTE:2017-09-04 22:09:38
+#     r"""Factored-out code in the for loop under NOTE:2017-09-04 22:09:38
 #     """
 #     # 1) get the waveform region where waveform >= value
 #     index_ge_value = w >= value
@@ -1571,7 +1193,7 @@ def v_Nernst(x_out, x_in, z, temp):
 # 
     
 def fit_Frank_Fuortes(lat, I, fitrheo=False, xstart = 0, xend = 0.1, npts = 100):
-    """Fits the Frank & Fuortes 1956 model through stimulus vs latency curve.
+    r"""Fits the Frank & Fuortes 1956 model through stimulus vs latency curve.
     
     Used for the determination of rheobase from series of depolarising current
     injections of increasing magnitude.
@@ -1754,7 +1376,7 @@ def fit_Frank_Fuortes(lat, I, fitrheo=False, xstart = 0, xend = 0.1, npts = 100)
 
    
 def rheobase_latency(*args, **kwargs):
-    """ Frank & Fuortes (1956) Strength-latency analysis.
+    r""" Frank & Fuortes (1956) Strength-latency analysis.
     
         Calculates rheobase and membrane time constant by fitting on
         1st AP latency vs injected current data.
@@ -2068,7 +1690,7 @@ def rheobase_latency(*args, **kwargs):
     return latencies
 
 def extract_Vm_Im(data, VmSignal="Vm_prim_1", ImSignal="Im_sec_1", t0=None, t1=None):
-    """Convenient function to extract Vm and Im signals as a block.
+    r"""Convenient function to extract Vm and Im signals as a block.
     
     Extract Vm and Im signals from a neo.Block containing current injection
     step experiments (current clamp) recorded in Clampex.
@@ -2245,7 +1867,7 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
                    ssEpoch:typing.Optional[typing.Union[neo.Epoch, tuple, list]]=None, 
                    steadyStateDuration = 0.05 * pq.s, 
                    box_size = 0):
-    """Measurement of passive membrane properties.
+    r"""Measurement of passive membrane properties.
     
     Uses membrane potential recorded during sweeps containins a step of somatic 
     hyperpolarizing current injection. 
@@ -2648,7 +2270,7 @@ def PassiveMembranePropertiesAnalysis(block:neo.Block,
                                       box_size:int = 63, 
                                       name:(str, type(None)) = None,
                                       plot:bool = True,**kwargs):
-    """User-friendly wrap around the passive_Iclamp function.
+    r"""User-friendly wrap around the passive_Iclamp function.
     
     Arguments:
     =========
@@ -2757,7 +2379,7 @@ def PassiveMembranePropertiesAnalysis(block:neo.Block,
     return ret
 
 def ap_waveform_roots(w, value, interpolate=False):
-    """Times where `value` occurs on the rising and decaying phases of the waveform w
+    r"""Times where `value` occurs on the rising and decaying phases of the waveform w
     
     Parameters:
     -----------
@@ -2931,7 +2553,7 @@ def ap_waveform_roots(w, value, interpolate=False):
     return float(rise_x), float(rise_y), float(rise_cslope), float(decay_x), float(decay_y), float(decay_cslope)
 
 def analyse_AP_pulse_trains(data, segment_index=None, signal_index=0,triggers=None, tail=None,thr=20, atol=1e-8, smooth_window = 5,resample_with_period = 1e-5, t0=None, t1=None, dataname=None, cell="NA", genotype="NA", source="NA", sex="NA",age=np.nan, record=None, protocol_name=None,ref_vm = None, ref_vm_relative_onset=False,output_prefix=None):
-    """Batch analysis for pulse-triggered APs in current-clamp.
+    r"""Batch analysis for pulse-triggered APs in current-clamp.
     
     Loops through neo.Segments in data, calling analyse_AP_pulse_train for each
     segment. Suitable for use with ScanData objects (see below).
@@ -3179,7 +2801,7 @@ def analyse_AP_pulse_trains(data, segment_index=None, signal_index=0,triggers=No
         
 def analyse_AP_pulse_train(segment, signal_index=0, triggers=None,tail=None, thr=20, atol=1e-8, smooth_window = 5,resample_with_period = 1e-5, t0=None, t1=None, record=None, dataname=None,cell="NA", genotype="NA", source="NA", sex="NA",age=np.nan, protocol_name="NA", ref_vm = None, ref_vm_relative_onset=False):
     
-    """
+    r"""
     Analyses AP waveforms triggered by a train of current injection pulses.
     
     The function operates on a neo.Segment containing a Vm signal specified by
@@ -3209,7 +2831,7 @@ def analyse_AP_pulse_train(segment, signal_index=0, triggers=None,tail=None, thr
                 the times of the current injection pulses for eliciting APs are
                 taken as sthe postsynaptic trigger times
                 
-              neo.IrregularlySampledSignal or datatypes.IrregularlySampledDataSignal
+              neo.IrregularlySampledSignal or datasignal.IrregularlySampledDataSignal
                 the times of the current injection pulses are taken as the 
                 'times' attribute
                 
@@ -3372,7 +2994,7 @@ def analyse_AP_pulse_train(segment, signal_index=0, triggers=None,tail=None, thr
     
 
 def analyse_AP_pulse_signal(signal, times,  tail=None, thr=20, atol=1e-8, smooth_window = 5,resample_with_period = 1e-5, t0=None, t1=None, record=None, cell="NA", genotype="NA", source="NA", sex="NA",age=np.nan, dataname=None, protocol_name="NA", ref_vm = None, ref_vm_relative_onset=False):
-    """Waveform analysis for action potentials elicited individually by brief 
+    r"""Waveform analysis for action potentials elicited individually by brief 
     pulses of current injection.
     
     Potisional parameters:
@@ -3576,7 +3198,7 @@ def analyse_AP_pulse_signal(signal, times,  tail=None, thr=20, atol=1e-8, smooth
     return ap_results, report, ap_waves, ap_dvdt, ap_d2vdt2
 
 def get_AP_analysis_parameter(data:typing.Union[dict, tuple, list], parameter=str, min_APs:typing.Optional[int] = None):
-    """
+    r"""
     Get AP parameter from an AP analysis data for each depolarising step.
     
     Returns:
@@ -3655,7 +3277,7 @@ def get_AP_analysis_parameter(data:typing.Union[dict, tuple, list], parameter=st
 
 
 def extract_AP_waveforms(sig, iinj, times, before = None, after = None, use_min_isi=False):
-    """Extracts the AP waveforms from a Vm signal.
+    r"""Extracts the AP waveforms from a Vm signal.
     
     Parameters:
     ===========
@@ -3845,7 +3467,7 @@ def extract_AP_waveforms(sig, iinj, times, before = None, after = None, use_min_
     
     
 def extract_pulse_triggered_APs(sig, times, tail = None):
-    """
+    r"""
     Extracts AP waveforms from a Vm signal.
     
     The AP are supposed to be triggered by brief pulses of
@@ -4132,7 +3754,7 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
                      resample_with_rate:(pq.Quantity, type(None)) = None,
                      Itimes_relative:bool = True,
                      Itimes_samples:bool = False):
-    """
+    r"""
     Extract the time slice of the VM corresponding to a current injection step.
     
     If a signal containing a rectangular current injection waveform is given, it
@@ -4398,7 +4020,7 @@ def detect_AP_waveform_times(sig, thr=10, smooth_window=5,
                              rtol = 1e-5, 
                              atol = 1e-8, 
                              vm_thr=0):
-    """Detects timings of AP waveforms in an AP train during depolarizing current injection.
+    r"""Detects timings of AP waveforms in an AP train during depolarizing current injection.
 
     Detection is done primarily via thresholding on the 1st derivative of the Vm signal.
     
@@ -4715,7 +4337,7 @@ def detect_AP_waveforms_in_train(sig, iinj,
                                  return_all = False, 
                                  vm_thr=0, 
                                  **kwargs):
-    """Detects action potentials in a Vm signal.
+    r"""Detects action potentials in a Vm signal.
     For use with experiments using "steps" of depolarizing current injections.
     
     Parameters:
@@ -5676,7 +5298,7 @@ def detect_AP_waveforms_in_train_old(sig, iinj,
                                  return_all = False, 
                                  vm_thr=0, 
                                  **kwargs):
-    """Detects action potentials in a Vm signal.
+    r"""Detects action potentials in a Vm signal.
     For use with experiments using "steps" of depolarizing current injections.
     
     Parameters:
@@ -6570,7 +6192,7 @@ def detect_AP_waveforms_in_train_old(sig, iinj,
     return ap_train, ap_waveform_signals
         
 def ap_duration_at_Vm(ap, value, **kwargs): #decay_ref, decay_intercept_approx="linear", interpolate=False):
-    """Returns the duration of the AP waveform at given Vm value
+    r"""Returns the duration of the AP waveform at given Vm value
     
     Parameters:
     -----------
@@ -6662,7 +6284,7 @@ def ap_duration_at_Vm(ap, value, **kwargs): #decay_ref, decay_intercept_approx="
     return ret
 
 def ap_phase_plot_data(vm, dvdt=None, smooth_window=None):
-    """Creates a DataSignal for a phase plot.
+    r"""Creates a DataSignal for a phase plot.
     """
     from scipy.signal import boxcar
     
@@ -6702,7 +6324,7 @@ def ap_phase_plot_data(vm, dvdt=None, smooth_window=None):
 
 
 def analyse_AP_waveform(vm, dvdt=None, d2vdt2=None, ref_vm = None, ref_vm_relative_onset=False, atol=1e-8, smooth_window = None,detect_times=True, dvdt_thr=10):
-    """ AP waveform analysis for APs triggered by individual current pulses.
+    r""" AP waveform analysis for APs triggered by individual current pulses.
     
     WARNING: only to be used on isolated AP waveforms, obtained by calling
     extract_pulse_triggered_APs()
@@ -6889,7 +6511,7 @@ def analyse_AP_waveform(vm, dvdt=None, d2vdt2=None, ref_vm = None, ref_vm_relati
     return result
     
 def collect_Iclamp_steps(block, VmSignal = "Vm_prim_1", ImSignal = "Im_sec_1", head = 0.05 * pq.s, tail = 0.05 * pq.s, name=None, segments=None):
-    """Generates an segment from step current step injections in I-clamp experiments.
+    r"""Generates an segment from step current step injections in I-clamp experiments.
     Useful or stack-plotting.
     
     Arguments:
@@ -7057,7 +6679,7 @@ def collect_Iclamp_steps(block, VmSignal = "Vm_prim_1", ImSignal = "Im_sec_1", h
 
 def getCurrentInjectionParameters(data:neo.Block, 
                                   epoch:typing.Optional[typing.Union[pab.ABFEpoch, int, str]] = None) -> typing.Optional[tuple]:
-    """Parses the current injection steps in a neo.Block.
+    r"""Parses the current injection steps in a neo.Block.
     
     Parameters:
     -----------
@@ -7150,442 +6772,9 @@ def getCurrentInjectionParameters(data:neo.Block,
         
     return Iinj, Istart, Istop
     
-def analyse_AP_step_injection_trial(trial:neo.Block,
-                                    parameters:MembranePropertiesAnalysisParameters,
-                                    biometrics:BaseScipyenData):
-    """Variant of analyse_AP_step_injection_series that uses only neo.Block as data.
-    
-    This relies ENTIRELY on the recording protocol parsed from the trial metadata
-    (i.e. Block's annotations).
-    
-    Currently, only Clampex trials are supported.
-
-    Parameters:
-    ----------
-    trial : neo.Block containing current-clamp (CC) recordings from one run of a
-            series of current injections 'steps', with one 'step' per sweep.
-            Each sweep delivers a rectangular current injection pulse (the 'step')
-            with the SAME duration, and with amplitude incremented by the same
-            amount, in each sweep.
-    
-            Each sweep is stored as a neo.Segment in the Block's 'segments'
-            attribute (a sequence of segments).
-    
-    parameters: analysis parameters
-    
-    biometrics: contains information about the biological sample (cell, source, etc)
-    
-    adc: int or str: logical index or name of the ABFInputConfiguration 
-        (i.e., ADC channel) used to record the membrane voltage:
-
-        • When a name, this is the same as the name of the Vm signal in the 
-            neo.Block (trial data)
-    
-        • When an index this MUST be the same as the index of the Vm signal in 
-            the 'analogsignals' of every Segment in the Block.
-    
-    Named parameters:
-    -----------------
-    epoch: int, str, or None (default); index or letter(s) of the Clampex 
-        ABFEpoch where the parameters of the current injection are defined.
-    
-        Optional, default is None. When None, the function will "parse" the protocol
-        to search for a suitable current injection epoch.
-
-        See getCurrentInjectionParameters(…) for details.
-        
-    Var-keyword parameters (kwargs):
-    --------------------------------
-    VmSignal: int or str; index or name of the Vm analog signal
-        integer index, or name (string) of the Vm analog signal
-        NOTE: the index is the signal's index in the segments' 'analogsignals'
-        attribute (a list of AnalogSignal objects)
-    
-        
-    rheo: boolean, default True
-    
-        When True, the function attempts to calculate the rheobase & membrane
-        time constant using rheobase_latency() function.
-        
-        This assumes that data is a neo.Block or a sequence of neo.Segment
-        containing records of different current injection step amplitudes
-        (one segment for each value of depolarizing current intensity).
-        
-        This parameter is ignored when data has lees than minsteps segments
-
-    fitrheo:boolean, default False
-        When True, and rheo is True, the function will estimate rheobase current
-        from latency vs Iinj curve.
-        
-    minsteps: int (default is 3)
-        minimum number of curent injection steps where APs were triggered, for
-        performing rheobase-latency analysis
-        
-    thr : float or python Quantity
-        value of the dV/dt (in V/s) above which the waveform belongs to an AP.
-        optional; default is 20 V/s
-    
-    plot_rheo: boolean, default is True 
-        (plots the fitted curve) -- useful when a block or a list of segments is
-        analyzed 
-        
-    Var-keyword parameters passed on to analyse_AP_step_injection_sweep():
-    ----------------------------------------------------------------
-    tail: scalar Quantity (units: "s"); default is 0 s
-        duration of the analyzed Vm trace after current injection has ceased
-    
-    
-    resample_with_period: None (default), scalar float or Quantity
-        When not None, the Vm signal will be resampled before processing.
-        
-        When Quantity, it must be in units convertible (scalable) to the signal's
-        sampling period units.
-        
-        Resampling occurs on the region corresponding to the depolarizing current
-        injection, before detection of AP waveforms.
-        
-        Upsampling might be useful (see Naundorf et al, 2006) but slows down
-        the execution. To upsample the Vm signal, pass here a value smaller than
-        the sampling period of the Vm signal.
-        
-    resample_with_rate: None (default), scalar float or Quantity
-        When not None, the Vm signal will be resampled before processing.
-        
-        When Quantity, it must be in units convertible (scalable) to the signal's
-        sampling rate units.
-        
-        Resampling occurs on the region corresponding to the depolarizing current
-        injection, before performing detection of AP waveforms.
-        
-        Upsampling might be useful (see Naundorf et al, 2006) but slows down
-        the execution. To upsample the Vm signal, pass here a value larger than 
-        the sampling period of the Vm signal.
-        
-    box_size: int >= 0; default is 0.
-    
-        size of the boxcar (scipy.signal.boxcar) used for filtering the Im signal
-        (containing the step current injection) before detecting the step 
-        boundaries (start & stop)
-        
-        default is 0 (no boxcar filtering)
-        
-    method: str, one of "state_levels" (default) or "kmeans": method for detection
-        "up" vs "down" states of the step current injection waveform
-    
-    adcres, adcrange, adcscale: float scalars, see signalprocessing.state_levels()
-        called from signalprocessing.detect_boxcar() 
-        
-        Used only when method is "state_levels"
-        
-    before, after: floating point scalars, or Python Quantity objects in time 
-        units convertible to the time units used by VmSignal.
-        interval of the VmSignal data, respectively, before and after the actual
-        AP in the returned AP waveforms -- parameters are passed to detect_AP_waveforms_in_train()
-        
-        defaults are:
-        before: 1e-3
-        after: None
-        
-    min_fast_rise_duration : None, scalar or Quantity (units "s");
-    
-        The minimum duration of the initial (fast) segment of the rising 
-        phase of a putative AP waveform.
-        
-        When None, is will be set to the next higher power of 10 above the sampling period
-        of the signal.
-    
-    min_ap_isi : None, scalar or Quantity;
-    
-                Minimum interval between two consecutive AP fast rising times 
-                ("kinks"). Used to discriminate against suprious fast rising time
-                points that occur DURING the rising phase of AP waveforms.
-                
-                This can happen when the AP waveforms has prominent IS and the SD 
-                "spikes", 
-                
-                see Bean, B. P. (2007) The action potential in mammalian central neurons.
-                Nat.Rev.Neurosci (8), 451-465
-
-    rtol, atol: float scalars;
-        the relative and absolute tolerance, respectively, used in value 
-        comparisons (see numpy.isclose())
-        
-        defaults are:
-        rtol: 1e-5
-        atol: 1e-8
-                
-    reTime:bool, default is True.
-        When True, the afterspike potential waveforms are all set to start at 0 s
-    
-    fAHP_window:pq.Quantity window duration for fAHP analysis; default is 3 * pq.ms
-    
-    ADP_window:pq.Quantity window duration for ADP analysis; default is 6 * pq.ms
-
-    use_min_detected_isi: boolean, default True
-    
-        When True, individual AP waveforms cropped from the Vm signal "sig" will
-            have the duration equal to the minimum detected inter-AP interval.
-        
-        When False, the durations of the AP waveforms will be taken to the onset
-            of the next AP waveform, or the end of the Vm signal
-            
-    smooth_window: int >= 0; default is 5
-        The length (in samples) of a smoothing window (boxcar) used for the 
-        signal's derivatives.
-        
-        The length of the window will be adjusted if the signal is upsampled.
-        
-    interpolate_roots: boolean, default False
-        When true, use linear inerpolation to find the time coordinates of the
-        AP waveform rise and decay phases crossing over the onset, half-maximum
-        and 0 mV. 
-        
-        When False, use the time coordinate of the first & last sample >= Vm value
-        (onset, half-max, or 0 mV) respectively, on the rise and decay phases of
-        the AP waveform.
-        
-        see ap_waveform_roots()
-        
-    decay_intercept_approx: str, one of "linear" (default) or "levels"
-        Used when the end of the decay phase cannot be estimated from the onset
-        Vm.
-        
-        The end of the decay is considerd to be the time point when the decaying
-        Vm crosses over (i.e. goes below) the onset value of the action potential.
-        
-        Whe the AP waveform is riing on a rising baseline, this time point cannot
-        be determined.
-        
-        Instead, it is estimated as specified by "decay_intercept_approx" parameter:
-        
-        When decay_intercept_approx is "linear", the function uses linear extrapolation
-        from a (higher than Vm onset) value specified by decay_ref (see below)
-        to the onset value.
-        
-        When decay_intercept_approx is "levels", the function estimates a "pseudo-baseline"
-        as the lowest of two state levels determined from the AP waveform histogram.
-        
-        The pseudo-baseline is then used to estimate the time intercept on the decay
-        phase.
-        
-    decay_ref: str, one of "hm" or "zero", or floating point scalar
-        Which Vm value should be used to approximate the end of the decay phase
-        when using the "linear" approximation method (see above)
-        
-    get_duration_at_Vm: also get AP waveform duration at specified Vm,
-        (in addition to Vhal-max and V0)
-            default: -15 mV
-            
-    vm_thr: scalar, optional (default is 0) - discard Vm events that do not cross
-        this value, see detect_AP_rises
-        
-        This parameter prevents the fast passive rising phase of the Vm at the
-        start of current injection from being flagged as an AP (and similarly, 
-        for other fast-rising events)
-
-    passive_analysis: bool, default is False
-        When True, then the function will analyze the passive membrane properties
-        for those sweeps with hypoperpolarizing current injection steps, where 
-        Iinj < 0
-        
-
-    NOTE: See analyse_AP_step_injection_sweep() documentation for details
-    
-    Var-keyword parameters related to the experiment "metadata"
-    -----------------------------------------------------------
-    cell: str (default, "NA")
-        Cell ID
-        NOTE: Case-sensitive
-        
-    source: str (default, "NA")
-        Source ID (e.g. animal)
-        NOTE: Case-sensitive
-        
-    genotype: str (default "NA")
-        genotype (e.g., WT, HET, HOM or any other appropriate string)
-        NOTE: Case-sensitive
-        
-    sex: str (default "M")
-        sex: either "F" or "M"
-        NOTE: Case-insensitive
-        
-    treatment: str (default "veh") ATTENTION: case-sensitive!
-        
-    age: python Quantity (one of days, months, years), "NA" or None 
-        Default is None; either None or "NA" result in the string "NA" for age
-        
-    post_natal: bool (default True)
-    
-    name: str
-        name of the results (string), or None; 
-        optional; default is None
-        
-    
-    Returns (see also 'Side effects', below):
-    -----------------------------------------
-    ret: ordered dict with the following key/value pairs:
-    
-        "Name": str or None; 
-            the name parameter
-            
-        "Segment_k" where k is a running counter (int): a dictionary with the
-            following key/value pairs:
-            
-            "Name": the name of the kth segment
-            
-            "AP_analysis": the result returned by calling analyse_AP_step_injection_sweep on
-                the kth segment
-            
-            "Vm_signal": the region of the Vm signal in the kth segment, that 
-                has been analyzed (possibly, upsampled); this corresponds to the
-                current injection step or longer as specified by the "tail" 
-                parameter to the analyse_AP_step_injection_sweep function, so it is usually only
-                a time slice of the original Vm signal.
-        
-        ret["Injected_current"] : neo.IrregularlySampledSignal
-            The intensity of the injected current step, one per segment.
-                                            
-        ret["Reference_AP_threshold"] : neo.IrregularlySampledSignal
-            values of Vm at AP threshold, one per segment.
-            
-        ret["Reference_AP_latency"] : neo.IrregularlySampledSignal
-            the latency of the first AP detected (time from start of step 
-            current injection), one per segment.
-            
-        ret["Mean_AP_Frequency"] : neo.IrregularlySampledSignal
-            mean AP frequency (ie. number of APs / duration of the current injection
-            step, expressed in Hz), one for each segment,
-            
-        ret["Inter_AP_intervals"] : list of arrays with inter-AP intervals
-            (one array per segment) or None for segments without APs
-        
-        ret["AP_peak_values"] : list of arrays with AP_peak_values
-            (one for each segment, or None for segments without APs)
-            
-        ret["AP_peak_amplitudes"] : list of arrays with AP amplitudes
-            (one for each segment or None for segments without APs)
-        
-        ret["AP_durations_at_half-max"] : list of arrays with AP width at 1/2 max
-            (one for eaxch segment or None for segments without APs)
-            
-        ret["AP_durations_V_0"] : list of arrays with AP width at Vm = 0
-            (one for each segment, or None for segments without APs)
-            
-        ret["AP_durations_V_onset"] : list of arrays with AP width at 
-            Vm = threshold potential (one for each segment or None for segments
-            without APs)
-            
-        ret["AP_maximum_dV_dt"] : list of arrays with the maximum dV/dt per AP
-            (one for each segment, or None for segments without APs)
-    
-        NOTE: the lengths of the arrays returned as list elements equals the 
-            number of APs detected in the corresponding segment; if no APs are
-            detected, None is inserted instead of an empty array.
-        
-    Side effects
-    ------------
-        The detected APs are embedded as SpikeTrain objects in the segments
-        where they have been detected.
-
-    """
-    protocol = ephys.getProtocol(trial)
-    
-    adcIndex = adc
-    adc = protocol.getADC(adcIndex, physical=False)
-        
-    Iinj_params = getCurrentInjectionParameters(trial)
-    
-    cellid = kwargs.pop("cell", "NA")
-    sourceid = kwargs.pop("source", "NA")
-    genotype = kwargs.pop("genotype", "NA")
-    sex = kwargs.pop("sex", "M")
-    age = kwargs.pop("age", "NA")
-    passive_analysis = kwargs.pop("passive_analysis", False)
-    if isinstance(age, pq.Quantity):
-        if not any([age.dimensionality == ref.dimensionality for ref in [pq.day, pq.month, pq.year] ]):
-            raise TypeError("age expected to be a python Quanity in day, month or year, or None; got %s instead" % age)
-        
-    elif age is None:
-        age = "NA"
-        
-    treatment = kwargs.pop("treatment", "veh")
-    
-    post_natal = kwargs.pop("post_natal", True)
-    
-    if sex.lower() not in ("m", "f", "na"):
-        raise ValueError("Allowed values for sex are 'm' or 'f'; got %s instead" % sex)
-    
-    plot_rheo = kwargs.pop("plot_rheo", False)
-    
-    thr = kwargs.pop("thr", 10)
-  
-    rheo = kwargs.pop("rheo", True)
-    
-    minsteps = kwargs.pop("minsteps", 3)
-    
-    if not isinstance(minsteps, int):
-        raise TypeError("minsteps expected to be an int; got %s instead" % type(minsteps).__name__)
-
-    if minsteps < 1:
-        raise ValueError("minsteps must be > 0: got %s instead" % minsteps)
-    
-    rheoargs = dict()
-    
-    rheoargs["fitrheo"] = kwargs.pop("fitrheo", False)
-    
-    rheoargs["xstart"] = kwargs.pop("xstart", 0)
-    
-    rheoargs["xend"] = kwargs.pop("xend", 0.1)
-    
-    rheoargs["npts"] = kwargs.pop("npts", 100)
-    
-    rheoargs["minsteps"] = minsteps
-    
-    prefix = "AP_Train_Analysis"
-    
-    name = kwargs.pop("name", None)
-    
-    if name is None or (isinstance(name, str) and len(name.strip()) == 0):
-        name = trial.name
-
-    # kwargs["thr"] = thr
-    ret = collections.OrderedDict()
-    
-    ret["Data"] = name
-    ret["Cell"] = cellid
-    ret["Source"] = sourceid
-    ret["Age"] = age
-    ret["Post-natal"] = post_natal
-    ret["Genotype"] = genotype
-    ret["Sex"] = sex
-    ret["Treatment"] = treatment
-    ret["Current_injection_steps"] = list()
-    
-    kwargs["VmSignal"] = VmSignal
-    
-    try:
-        # NOTE: 2024-11-15 14:49:30 TODO URGENT
-        # call here a revamped / refined version of the analyse_AP_step_injection_sweep
-        # based on Iinj, Istart, Istop being Quantity arrays, to also include
-        # passive properties analysis (if trial contains sweeps with hyperpolarizing
-        # current injection steps)
-        for k, segment in enumerate(trial.segments):
-            vm = segment.analogsignals[adc.logicalIndex].time_slice(Istart[k], Istop[k])
-            if Iinj[k] < 0:
-                # NOTE: 2024-11-15 21:09:42
-                # run passive properties analysis
-                pass
-            else:
-                # NOTE: 2024-11-15 21:28:07
-                # run AP analysis
-                pass
-    except:
-        traceback.print_exc()
-    
-    
 def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, tuple, list], 
                                      **kwargs):
-    """ Action potential (AP) detection and analysis in I-clamp experiment.
+    r""" Action potential (AP) detection and analysis in I-clamp experiment.
     
     Detects and analyses action potentials (AP) fired during depolarizing current
     injections in current clamp.
@@ -8277,10 +7466,6 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
                 
             else:
                 ret["Delta_I_step"]         = 0 * i_units 
-                
-                
-        # apThr = list()
-        # apLatency = list()
         
         apThr = np.full((len(ret["Current_injection_steps"]), 1), fill_value = np.nan)
         apLatency = np.full((len(ret["Current_injection_steps"]), 1), fill_value = np.nan)
@@ -8293,42 +7478,20 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
                 val = seg_res["AP_analysis"]["AP_train"].annotations["AP_onset_Vm"]
                 if val is not None:
                     apThr[kseg] = float(val.magnitude[0])
-                # if val is None:
-                #     apThr.append(np.nan)
-                # else:
-                #     apThr.append(float(val[0]))
                     
                 latval = seg_res["AP_analysis"]["AP_train"][0] - seg_res["AP_analysis"]["AP_train"].t_start
                 apLatency[kseg] = latval.magnitude
-                # apLatency.append(seg_res["AP_analysis"]["AP_train"][0] - seg_res["AP_analysis"]["AP_train"].t_start)
                 
-#             else:
-#                 apThr.append(np.nan)
-#                 apLatency.append(np.nan * vstep.times.units)
-#                 
             ap_freq = seg_res["AP_analysis"]["Mean_AP_Frequency"]
             if apFreqUnits is None:
                 apFreqUnits = ap_freq.units
             apFrequency[kseg] = ap_freq.magnitude
             nAPs[kseg] = int(seg_res["AP_analysis"]["Number_of_APs"])
-#         apThr = (np.array(apThr))[:,np.newaxis] * vstep.units
         
         apThr *= vstep.units
         apLatency *= vstep.times.units
         apFrequency *= apFreqUnits
         
-        #apThr = [seg_res["AP_analysis"]["AP_train"].annotations["AP_onset_Vm"][0] for seg_res in ret["Current_injection_steps"]]
-        
-        #apLatency = [seg_res["AP_analysis"]["AP_train"][0] - seg_res["AP_analysis"]["AP_train"][0].t_start for seg_res in ret["Current_injection_steps"]]
-        
-        # apFrequency = [seg_res["AP_analysis"]["Mean_AP_Frequency"] for seg_res in ret["Current_injection_steps"]]
-        
-        #f_units = apFrequency[0].units
-        
-        # nAPs = [seg_res["AP_analysis"]["Number_of_APs"] for seg_res in ret["Current_injection_steps"]]
-        
-        # print(f"Iinj = {Iinj}")
-        # print(f"apThr = {apThr}")
         ret["First_AP_threshold"]   = IrregularlySampledDataSignal(domain = Iinj,
                                                                    signal = apThr,
                                                                    units = vstep.units,
@@ -8357,16 +7520,6 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
                                                                    domain_units = i_units,
                                                                    name="AP count")
         
-        # NOTE: 2024-01-19 13:29:54
-        # DEPRECATED / OBSOLETE - the rheobase-latency analysis is now included
-        # in the 'annotations' attribute of ret["First_AP_latency"]
-        #
-        # augument result with rheobase-latency analysis
-        # ret["rheobase_analysis"] = None
-        
-        #print("latency", ret["First_AP_latency"])
-        #print("iinj", ret["Injected_current"])
-
         if not test_for_rheobase_latency(ret, minsteps):
             if rheo:
                 print("%s: Rheobase-latency analysis requires a minimum of %d suprathreshold injection steps" % (ret["Name"], minsteps))
@@ -8379,9 +7532,6 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
                 
                 if plot_rheo:
                     plot_rheobase_latency(ret["First_AP_latency"])
-                # ret["rheobase_analysis"] = rheobase_latency(ret, **rheoargs)
-                # if plot_rheo and ret["rheobase_analysis"] is not None:
-                #     plot_rheobase_latency(ret["rheobase_analysis"])
             except:
                 traceback.print_exc()
                 print(f"\n\n *** rheobase_latency using 'fitrheo# {fitrheo} encountered and Error (see above); check data or toggle 'fitrheo'")
@@ -8397,7 +7547,7 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
         traceback.print_exc()
  
 def frequency_isi(results_dict: dict, isi_start: int = 0, isi_span: int = 1):
-    """Calculates ISI frequencies vs injected current in a series of depolarizing current injections.
+    r"""Calculates ISI frequencies vs injected current in a series of depolarizing current injections.
     NOTE: Current injections are truncated to powers of 10
 
     Parameters:
@@ -8423,7 +7573,7 @@ def frequency_isi(results_dict: dict, isi_start: int = 0, isi_span: int = 1):
 
 
 def frequency_isi0(results_dict: dict):
-    """Particular case of frequency_isi for first two APs.
+    r"""Particular case of frequency_isi for first two APs.
     """
     return frequency_isi(results_dict, isi_start=0, isi_span=1)
 
@@ -8433,7 +7583,7 @@ def plot_rheobase_latency(data,
                           xend:typing.Optional[typing.Union[float, str]]="auto",
                           fig:typing.Optional[mpl.figure.Figure] = None,
                           title_prefix:typing.Optional[str] = None):
-    """Plots rheobase-latency curve determined from rheobase-latency analysis.
+    r"""Plots rheobase-latency curve determined from rheobase-latency analysis.
     
     Parameters:
     ===========
@@ -8696,7 +7846,7 @@ def plot_rheobase_latency(data,
         raise
         
 def test_for_rheobase_latency(data, minsteps=3):
-    """Tests if data can be used for rheobase-latency analysis.
+    r"""Tests if data can be used for rheobase-latency analysis.
     
     The following conditions are tested:
     
@@ -8742,7 +7892,7 @@ def test_for_rheobase_latency(data, minsteps=3):
     return ok
 
 def report_AP_analysis(data, name=None):
-    """Reports data from analyse_AP_step_series_replicate in pandas format.
+    r"""Reports data from analyse_AP_step_series_replicate in pandas format.
     
     Parameters:
     ----------
@@ -8913,37 +8063,538 @@ def report_AP_analysis(data, name=None):
     
     return summary, params, waveforms
 
-# def analyse_AP_step_injection_segment():
-#     tail                    = kwargs.pop("tail", 0*pq.s)
-#     resample_with_period    = kwargs.pop("resample_with_period", None)
-#     resample_with_rate      = kwargs.pop("resample_with_rate", None)
-#     method                  = kwargs.pop("method", "state_levels")
-#     box_size                = kwargs.pop("box_size", 0)
-#     adcres                  = kwargs.pop("adcres", 15)
-#     adcrange                = kwargs.pop("adcrange", 10)
-#     adcscale                = kwargs.pop("adcscale", 1e3) # (mV -> V)
-#     smooth_window           = kwargs.pop("smooth_window", 5)
-#     steadyStateDuration     = kwargs.pop("steadyStateDuration", 0.05*pq.s)
-#     box_size                = kwargs.pop("box_size", 0)
-#     relTime                 = kwargs.pop("relTime", True)
-#     fAHP_window             = kwargs.pop("fAHP_window", 3 * pq.ms)
-#     ADP_window              = kwargs.pop("ADP_window", 6 * pq.ms)
-# 
-#     kwargs.pop("return_all", None) # remove the debugging parameter
-#     
-#     if isinstance(VmSignal, str):
-#         VmSignal = neoutils.get_index_of_named_signal(segment, VmSignal)
-#     
-#     vm = segment.analogsignals[VmSignal].copy()
-        
-
 def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "Vm_prim_1", 
                                     ImSignal:typing.Union[int, str, tuple] = "Im_sec_1", 
                                     Itimes_relative:bool = True,
                                     Itimes_samples:bool = False,
                                     passive_analysis:bool=False,
                                     **kwargs):
-    """AP Train analysis in a sweep (segment) of I-clamp experiments.
+    r"""AP Train analysis in a sweep (segment) of I-clamp experiments.
+    APs are triggered by a depolarizing current injection step during the sweep.
+    
+    The sweep is often part of a sequence of sweeps with current injection of 
+    increasing magnitude, where the first sweep(s) may actually be hyperpolarizing.
+    In this case, a hyperpolarizing injection MAY be used to determine the 
+    passive membrane properties.
+    
+    
+    Positional parameters:
+    ---------------------
+    
+    segment: a neo.Segment with at least two analog signals (see below)
+    
+    Named parameters:
+    ----------------
+    
+    VmSignal: int, str.
+        Indicates the analog signal containing the Vm response.
+        
+        When an int, this is the scalar index of the signal, in 'segment'
+        
+        When a str, this is the name of the Vm signal
+        
+        Default is "Vm_prim_1"
+        
+     ImSignal: int, str, tuple
+        Indicates the current injection parameters.
+        
+        When an int, this is the scalar index, in 'segment', of the analog signal
+        containing the current injeciton step.
+        
+        When a str, this is the name of the current injection signal.
+        
+        When a tuple, it MUST contain three elements (Inj, Istart, Istop), where:
+        
+            Iinj: scalar quantity (in pA): the magnitude of the current injection
+                step
+                
+            Istart: scalar (int, float, or quantity in s): the start of the 
+                injection step
+                
+            Istop: scalar (int, float, or quantity in s): the stop of the 
+                injection step
+                
+            NOTE that Istart and Istop can also be given as numbers of samples.
+            In this case, Itimes_samples must be set to True (see below).
+        
+        Default is "Im_sec_1".
+        
+    Itimes_relative:bool, default is True.
+        When ImSignal is a tuple, ImSignal[1] and ImSignal[2] are current 
+        injjection start and stp times, relative to the VmSignal start time.
+        
+    Itimes_samples:bool, default is False
+        Set to True when the current injection start and stop times in the 
+        'ImSignal' tuple are given as samples (BEFORE any resampling, see below).
+        
+        When True, this implies the resolved times are relative to VmSingal
+        start time.
+    
+    passive_analysis: bool default False
+        When True, enables analysis of passive membrane properties for those
+        sweeps where the current injection is hyperpolarizing
+    
+    Var-keyword parameters (kwargs):
+    --------------------------------
+    
+    NOTE: passed to extract_AP_train:
+
+    tail: scalar Quantity (units: "s"); default is 0 s
+        duration of trailing Vm signal after current injection has ceased
+    
+    resample_with_period: None (default), scalar float or Quantity
+        When not None, the Vm signal will be resampled before processing.
+        
+        When Quantity, it must be in units convertible (scalable) to the signal's
+        sampling period units.
+        
+        Resampling occurs on the region corresponding to the depolarizing current
+        injection, before detection of AP waveforms.
+        
+        Upsampling might be useful (see Naundorf et al, 2006) but slows down
+        the execution. To upsample the Vm signal, pass here a value smaller than
+        the sampling period of the Vm signal.
+        
+    resample_with_rate: None (default), scalar float or Quantity
+        When not None, the Vm signal will be resampled before processing.
+        
+        When Quantity, it must be in units convertible (scalable) to the signal's
+        sampling rate units.
+        
+        Resampling occurs on the region corresponding to the depolarizing current
+        injection, before performing detection of AP waveforms.
+        
+        Upsampling might be useful (see Naundorf et al, 2006) but slows down
+        the execution. To upsample the Vm signal, pass here a value larger than 
+        the sampling period of the Vm signal.
+        
+    box_size: int >= 0; default is 0.
+    
+        size of the boxcar (scipy.signal.boxcar) used for filtering the Im signal
+        (containing the step current injection) before detecting the step 
+        boundaries (start & stop)
+        
+        default is 0 (no boxcar filtering)
+        
+    method: str, one of "state_levels" (default) or "kmeans"
+    
+    adcres, adcrange, adcscale: float scalars, see signalprocessing.state_levels()
+        called from signalprocessing.detect_boxcar() 
+        
+        Used only when method is "state_levels"
+        
+    NOTE: The following are passed directly to detect_AP_waveforms_in_train():
+    
+    smooth_window: int >= 0; default is 5
+        The length (in samples) of a smoothing window (boxcar) used for the 
+        signal's derivatives.
+        
+        The length of the window will be adjusted if the signal is upsampled.
+        
+    thr: floating point scalar: the minimum value of dV/dt of the Vm waveform to
+        be considered an action potential (default is 10) -- parameter is passed
+        to detect_AP_waveforms_in_train()
+        
+    before, after: floating point scalars, or Python Quantity objects in time 
+        units convertible to the time units used by VmSignal.
+        interval of the VmSignal data, respectively, before and after the actual
+        AP in the returned AP waveforms -- parameters are passed to 
+        detect_AP_waveforms_in_train()
+        
+        defaults are:
+        before: 1e-3
+        after: None
+        
+    min_fast_rise_duration : None, scalar or Quantity (units "s");
+    
+        The minimum duration of the initial (fast) segment of the rising 
+        phase of a putative AP waveform.
+        
+        When None, is will be set to the next higher power of 10 above the sampling period
+        of the signal.
+    
+    min_ap_isi : None, scalar or Quantity;
+    
+                Minimum interval between two consecutive AP fast rising times 
+                ("kinks"). Used to discriminate against suprious fast rising time
+                points that occur DURING the rising phase of AP waveforms.
+                
+                This can happen when the AP waveforms has prominent IS and the SD 
+                "spikes", 
+                
+                see Bean, B. P. (2007) The action potential in mammalian central neurons.
+                Nat.Rev.Neurosci (8), 451-465
+
+    rtol, atol: float scalars;
+        the relative and absolute tolerance, respectively, used in value 
+        comparisons (see numpy.isclose())
+        
+        defaults are:
+        rtol: 1e-5
+        atol: 1e-8
+    
+    reTime:bool, default is True.
+        When True, the afterspike potential waveforms are all set to start at 0 s
+    
+    fAHP_window:pq.Quantity window duration for fAHP analysis; default is 3 * pq.ms
+    
+    ADP_window:pq.Quantity window duration for ADP analysis; default is 6 * pq.ms
+                
+    use_min_detected_isi: boolean, default True
+    
+        When True, individual AP waveforms cropped from the Vm signal "sig" will
+            have the duration equal to the minimum detected inter-AP interval.
+        
+        When False, the durations of the AP waveforms will be taken to the onset
+            of the next AP waveform, or the end of the Vm signal
+            
+    interpolate_roots: boolean, default False
+        When true, use linear inerpolation to find the time coordinates of the
+        AP waveform rise and decay phases crossing over the onset, half-maximum
+        and 0 mV. 
+        
+        When False, uss the time coordinate of the first & last sample >= Vm value
+        (onset, half-max, or 0 mV) respectively, on the rise and decay phases of
+        the AP waveform.
+        
+        see ap_waveform_roots()
+        
+    decay_intercept_approx: str, one of "linear" (default) or "levels"
+        Used when the end of the decay phase cannot be estimated from the onset
+        Vm.
+        
+        The end of the decay is considerd to be the time point when the decaying
+        Vm crosses over (i.e. goes below) the onset value of the action potential.
+        
+        Whe the AP waveform is riing on a rising baseline, this time point cannot
+        be determined.
+        
+        Instead, it is estimated as specified by "decay_intercept_approx" parameter:
+        
+        When decay_intercept_approx is "linear", the function uses linear extrapolation
+        from a (higher than Vm onset) value specified by decay_ref (see below)
+        to the onset value.
+        
+        When decay_intercept_approx is "levels", the function estimates a "pseudo-baseline"
+        as the lowest of two state levels determined from the AP waveform histogram.
+        
+        The pseudo-baseline is then used to estimate the time intercept on the decay
+        phase.
+        
+    decay_ref: str, one of "hm" or "zero", or floating point scalar
+        Which Vm value should be used to approximate the end of the decay phase
+        when using the "linear" approximation method (see above)
+        
+    Passed to detect_AP_rises
+    -------------------------
+    vm_thr: scalar: putative events (APs) that do not cross this threshold will be 
+            discarded (optional, default is 0)
+            
+            This parameter prevents flagging the passive rising phase of the Vm
+            at the start of the current injection as being an AP.
+        
+            It will also result in no AP waveforms being detected in poor 
+            recordings (e.g., where the APs do not seem to cross the 0 mV 
+            likely due to bad & leaky current clamp).
+            
+    
+    rtol, atol, return_all → see detect_AP_rises
+    
+    Passed to passive_Iclamp (when passive_analysis is True)
+    -------------------------
+    steadyStateDuration: scalar time Quantity, default is 50 * pq.ms
+    box_size: int, default is 0; size of a boxcar filter, see passive_iclamp for details
+    NOTE: the epochs are determined from the im (analogsignal or triplet of Iinj, start, stop)
+            
+    
+        
+    Returns:
+    -------
+    result : ordered dict; 
+        key names should be self-explanatory
+        
+        contains the result of the AP train analysis, including the AP train
+        itself, and AP waveforms and derivatves (1st and 2nd order) as 
+        neo.AnalogSignals -- see detect_AP_waveforms_in_train()
+    
+    vstep : neo.AnalogSignal; 
+        contains the time slice of the Vm signal, encompassing  the AP train
+    
+    passive: a dict with the result from  passive_Iclamp (if 'passive_analysis' parameter is True)
+    
+    References:
+    -----------
+    For AP detection algorithm, please see: Naundorf et al (2006). 
+        Unique features of action potential initiation in  cortical neurons. 
+        Nature 440, 1060–1063.
+    
+    """
+    tail                    = kwargs.pop("tail", 0*pq.s)
+    resample_with_period    = kwargs.pop("resample_with_period", None)
+    resample_with_rate      = kwargs.pop("resample_with_rate", None)
+    method                  = kwargs.pop("method", "state_levels")
+    box_size                = kwargs.pop("box_size", 0)
+    adcres                  = kwargs.pop("adcres", 15)
+    adcrange                = kwargs.pop("adcrange", 10)
+    adcscale                = kwargs.pop("adcscale", 1e3) # (mV -> V)
+    smooth_window           = kwargs.pop("smooth_window", 5)
+    steadyStateDuration     = kwargs.pop("steadyStateDuration", 0.05*pq.s)
+    box_size                = kwargs.pop("box_size", 0)
+    relTime                 = kwargs.pop("relTime", True)
+    fAHP_window             = kwargs.pop("fAHP_window", 3 * pq.ms)
+    ADP_window              = kwargs.pop("ADP_window", 6 * pq.ms)
+    
+    
+    # print(f"analyse_AP_step_injection_sweep: passive_analysis = {passive_analysis}")
+    kwargs.pop("return_all", None) # remove the debugging parameter
+    
+    # NOTE: 2019-05-03 13:08:48
+    # removed: result now has individual AP analysis for all detected APs
+    # 
+    
+    if isinstance(VmSignal, str):
+        VmSignal = neoutils.get_index_of_named_signal(segment, VmSignal)
+    
+    vm = segment.analogsignals[VmSignal].copy()
+        
+    if isinstance(ImSignal, str):
+        im = segment.analogsignals[neoutils.get_index_of_named_signal(segment, ImSignal)].copy()
+        
+    elif isinstance(ImSignal, int):
+        im = segment.analogsignals[ImSignal].copy()
+        
+    elif isinstance(ImSignal, tuple) and len(ImSignal) == 3: # (Iinj, Istart, Istop)
+        im = ImSignal
+        
+    else:
+        raise TypeError(f"ImSignal expected a str (signal name) int signal index) or a triplet (amplitude, start & stop times); got {ImSignal} instad")
+                
+    
+    passive_measure_names = ["BaselineVm", "SteadyStateVm", "VSag", "VRebound", "Rin", "Capacitance", "Tau", "VmFit", "VmFiltered"]
+    
+    # print(f"\nanalyse_AP_step_injection_sweep box_size = {box_size}")
+    vstep, Ihold, Iinj, istep, i_timings = extract_AP_train(vm,im,
+                                    tail=tail,
+                                    method=method,
+                                    box_size=box_size, 
+                                    adcres=adcres,
+                                    adcrange=adcrange,
+                                    adcscale=adcscale,
+                                    resample_with_period=resample_with_period,
+                                    resample_with_rate=resample_with_rate,
+                                    Itimes_relative = Itimes_relative,
+                                    Itimes_samples = Itimes_samples)
+    if passive_analysis:
+        if Iinj < 0 * pq.pA:
+            vbase, vss, vsag, vrebound, Rin, capacitance, time_constant, vfit, v_flt = passive_Iclamp(vm, im, steadyStateDuration = steadyStateDuration,
+                                            box_size = box_size)
+            
+            # # represent vsag and vrebound relative to their bases (vss abd vbase, respectively)
+            # vsag -= vss
+            # vrebound -= vbase
+            
+            # represent vsag and vrebound relative to their bases (vss abd vbase, respectively)
+            vsag = abs(((vsag-vss)/vss).magnitude) * 100
+            vrebound = abs(((vrebound-vbase)/vss).magnitude) * 100
+            
+            passive_measures = (vbase, vss, vsag, vrebound, Rin, capacitance, time_constant, vfit, v_flt)
+            
+            passive = dict(zip(passive_measure_names, passive_measures))
+            
+        else:
+            passive = dict(zip(passive_measure_names, [np.nan] * len(passive_measure_names)))
+            passive["VmFit"] = None
+            passive["VmFiltered"] = None
+        
+    if smooth_window > 0:
+        # should be 1.0 if both resample_with_period or resample_with_rate are None
+        upsampling = (vm.sampling_period.rescale(pq.s) / vstep.sampling_period.rescale(pq.s)).magnitude.flatten()[0]
+        
+        # print(f"\t-> upsampling = {upsampling}")
+        smooth_window = int(smooth_window * upsampling)
+        
+        if smooth_window % 2 == 0:
+            smooth_window += 1
+            
+        kwargs["smooth_window"] = smooth_window
+        # print(f"\t-> new smooth_window = {smooth_window}")
+            
+        
+    #Ihold = im.time_slice(d, im.t_stop).mean()
+    
+    # NOTE: 2019-04-29 13:32:46
+    # upsample the Vm signal if required
+    
+    # returns the array of time "stamps" (neo.SpikeTrain) and a list of AP
+    # waveforms (neo.AnalogSignal objects)
+    
+    # NOTE: 2019-08-16 13:30:43
+    # ap_train is always a SpikeTrain, even if empty
+    kwargs["t_start"] = vm.t_start
+    kwargs["t_stop"] = vm.t_stop
+    kwargs["step_index"] = segment.index
+    
+    # print(f"analyse_AP_step_injection_sweep kwargs thr {kwargs['thr']}")
+    # print(f"analyse_AP_step_injection_sweep kwargs t_start {kwargs['t_start']}, t_stop {kwargs['t_stop']}")
+    
+    # NOTE: 2024-01-23 15:16:43
+    # next line returns (neo.SpikeTrain, typing.List[neo.AnalogSignal])
+    ap_train, ap_waveform_signals = detect_AP_waveforms_in_train(vstep, i_timings, **kwargs)
+    # print(f"analyse_AP_step_injection_sweep ap_train t_start = {ap_train.t_start}, t_stop = {ap_train.t_stop}")
+    
+    result = collections.OrderedDict() #dict()
+    
+    if len(segment.spiketrains) > 0: 
+        # check to see if there already is a spike train of APs; don't just append
+        ndx = list(filter(lambda x: is_AP_spiketrain(x[1]), ((k,s) for k,s in enumerate(segment.spiketrains))))
+        
+        if len(ndx):
+            segment = neoutils.remove_spiketrain(segment, ndx)
+                   
+    segment.spiketrains.append(ap_train)
+        
+    result["Injected_current"] = Iinj
+    result["Injection_timings"] = i_timings
+    result["Ihold"] = Ihold
+    result["AP_train"] = ap_train
+    
+    for key, value in ap_train.annotations.items():
+        result[key] = value
+    
+    # NOTE: mean AP frequency:
+    if len(ap_train) > 1:
+        # Mean AP freq = number of APs / full duration of the AP train;
+        # full AP train duration (NOT the duration of the depolarized Vm region)
+        # is the time difference between the end of the last AP and start of the
+        # first AP;
+        # time of the end of last AP is time of start of last AP + last AP duration at Vonset
+        
+        #print("analyse_AP_step_injection_sweep for Iinj %g: ap_train[-1]: %g, AP_durations_V_onset[-1]: %g, ap_train[0]: %g" % (Iinj, ap_train[-1], ap_train.annotations["AP_durations_V_onset"][-1], ap_train[0]))
+        mean_ap_freq  = ( len(ap_train) / ( ap_train[-1] - ap_train[0] ) ).rescale(pq.Hz)
+        # why do I sometimes get np.nan here ?
+        # because you need to also provide a tail in case the last AP is right on the end of the Vm signal!
+        ap_intvl = np.diff(ap_train.magnitude, axis=0) * vm.times.units
+        
+    elif len(ap_train) == 1: # just 1 AP:
+        # here, there is NO AP train (just one AP) so we're forced to use the
+        # full duration of the depolarized Vm trace
+        mean_ap_freq = (1. / vstep.duration).rescale(pq.Hz)
+        ap_intvl = np.array([np.nan]) * vm.times.units
+        
+    else:
+        mean_ap_freq = 0. * pq.Hz
+        ap_intvl = np.array([np.nan]) * vm.times.units
+        
+    #print("mean_ap_freq", mean_ap_freq)
+        
+    result["Inter_AP_intervals"] = ap_intvl
+    
+    result["Mean_AP_Frequency"]  = mean_ap_freq
+    
+    result["Number_of_APs"] = len(ap_train)
+    
+    result["Waveform_signals"] = ap_waveform_signals
+    
+    result["Afterspike_potentials"] = dict()
+    
+    fAHP_amplitudes = None
+    ADP_amplitudes = None
+    
+    # print(f"fAHP_window = {fAHP_window}\nADP_window = {ADP_window}")
+    
+    # NOTE: 2024-01-29 15:14:47
+    # extracting afterspikepotentials (ASPs)
+    asp_waves = list()
+    
+    try:
+        if ap_train.size > 0:
+            # NOTE: 2024-01-29 15:19:10
+            # AP_durations_V_onset may contain NaNs ⇒ startTimes MAY contain NaNs
+            
+            startTimes = (ap_train.times.magnitude.flatten() + ap_train.annotations["AP_durations_V_onset"].magnitude.flatten()) * ap_train.times.units
+            
+            # therefore take this into account and assign np.nan to startNdx where required
+            startNdx = [w.time_index(t) if np.isfinite(t) else np.nan for w, t in zip(ap_waveform_signals, startTimes)]
+                
+            # and skip those waves where duration at onset could not be determined
+            # 
+            asp_waves = [w[int(n):] if np.isfinite(n) else None for w, n in zip(ap_waveform_signals, startNdx)]
+            
+            if relTime:
+                for w in asp_waves:
+                    if w is None:
+                        continue
+                    w.t_start = 0 * ap_train.times.units
+                    
+            
+            ahpWstop = [(w.t_start + fAHP_window if w.t_start + fAHP_window < w.t_stop else w.t_stop) if (isinstance(w, neo.core.basesignal.BaseSignal) and w.shape[0] > 0) else np.nan for w in asp_waves]
+            adpWstop = [(w.t_start + ADP_window  if w.t_start + ADP_window  < w.t_stop else w.t_stop) if (isinstance(w, neo.core.basesignal.BaseSignal) and w.shape[0] > 0) else np.nan for w in asp_waves]
+            
+            ahpTimes = startTimes
+            
+            asp_waves_endpoints = np.array([float(w[-1]) if (isinstance(w, neo.core.basesignal.BaseSignal) and w.shape[0] > 0) else np.nan for w in asp_waves]).flatten()
+            
+            ahpPeakValues = np.array([w.time_slice(w.t_start, t).min() if (isinstance(w, neo.core.basesignal.BaseSignal) and w.shape[0] > 0) else np.nan for w, t in zip(asp_waves, ahpWstop)])
+            
+            # print(f"asp_waves_endpoints shape {asp_waves_endpoints.shape}")
+            # print(f"ahpPeakValues shape {ahpPeakValues.shape}")
+            
+            onsetVms = ap_train.annotations["AP_onset_Vm"].magnitude.flatten()
+            
+            # First condition for a fAHP:
+            # the minimum value ("trough") needs to be smaller than last value of the waveform
+            # (else, set this to the corresponding onset Vm -> ahpAmpli becomes 0)
+            #
+            # NOTE BUG 2023-09-25 13:11:12 FIXME
+            # this is problematic when the AP is unique and end of waveform ends well below the trough...
+            # badAHPndx = ahpPeakValues >= asp_waves_endpoints
+            # # print(f"badAHPndx = {badAHPndx}")
+            # ahpPeakValues[badAHPndx] = onsetVms[badAHPndx]
+            
+            ahpAmplis = ahpPeakValues - onsetVms
+            
+            # Second condition for a fAHP:
+            # amplitude (calculated by subtracting the AP onset Vm from the trough value) must be <=0
+            # everything else set to 0
+            ahpAmplis[ahpAmplis > 0] = 0.
+            
+            adpPeakValues = np.array([(w.time_slice(w.t_start + ahpS, t).max() if t > ahpS else w.time_slice(w.t_start, ahpS).max()) if (isinstance(w, neo.core.basesignal.BaseSignal) and w.shape[0] > 0 )else np.nan for w, ahpS, t in zip(asp_waves, ahpWstop, adpWstop)])
+            
+            # First condition for an ADP:
+            # the maximum value ("peak") is larger than last value of the waveform
+            # (else, set to the corresponding onset Vm -> adpAmpli becomes 0)
+            badADPndx = adpPeakValues <= asp_waves_endpoints
+            adpPeakValues[badADPndx] = onsetVms[badADPndx]
+            
+            adpAmplis = adpPeakValues - onsetVms
+            
+            # Second condition for an ADP:
+            # amplitude (calcuated by subtracting the AP onset Vm from the peak value) must be >= 0
+            # everything else set to 0
+            adpAmplis[(adpAmplis < 0)] = 0.
+            
+            fAHP_amplitudes = neo.IrregularlySampledSignal(startTimes, ahpAmplis, units = ap_waveform_signals[0].units,
+                                                        name="fAHP Amplitude")
+            
+            ADP_amplitudes = neo.IrregularlySampledSignal(startTimes, adpAmplis, units = ap_waveform_signals[0].units,
+                                                        name = "ADP Amplitude")
+    except:
+        traceback.print_exc()
+        
+        
+    result["Afterspike_potentials"]["fAHP_amplitudes"] = fAHP_amplitudes
+    result["Afterspike_potentials"]["ADP_amplitudes"] = ADP_amplitudes
+    result["Afterspike_potentials"]["Waveforms"] = asp_waves
+    
+    return (result, vstep, passive) if passive_analysis else (result, vstep)
+
+def analyse_AP_step_injection_sweep_old(segment, VmSignal:typing.Union[int, str] = "Vm_prim_1", 
+                                    ImSignal:typing.Union[int, str, tuple] = "Im_sec_1", 
+                                    Itimes_relative:bool = True,
+                                    Itimes_samples:bool = False,
+                                    passive_analysis:bool=False,
+                                    **kwargs):
+    r"""AP Train analysis in a sweep (segment) of I-clamp experiments.
     APs are triggered by a depolarizing current injection step during the sweep.
     
     The sweep is often part of a sequence of sweeps with current injection of 
@@ -9481,7 +9132,7 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
 def extract_afterSpikePotentials(data:dict, Iinj:pq.Quantity, 
                                  atol:float = 1e0, rtol:float = 1e-1, 
                                  relTime:bool=True) -> typing.Optional[list]:
-    """Retuns the after spike potential waveforms at given Iinj.
+    r"""Retuns the after spike potential waveforms at given Iinj.
     
     Does NOT analyse these waveforms.
     
@@ -9521,7 +9172,7 @@ def extract_afterSpikePotentials(data:dict, Iinj:pq.Quantity,
     return waves
 
 def extract_AHPs(*data_blocks, step_index, Vm_index, Iinj_index, name_prefix):
-    """Extracts AHPs from averaged trials at a given Iinj.
+    r"""Extracts AHPs from averaged trials at a given Iinj.
     
     *data_blocks = trial blocks (can have more that one segment)
     
@@ -9577,7 +9228,7 @@ def extract_AHPs(*data_blocks, step_index, Vm_index, Iinj_index, name_prefix):
     return (AHP, averaged_block, params)
     
 def auto_extract_AHPs(Iinj, Vm_index, Iinj_index, name_prefix, *data_blocks):
-    """Extract an averaged AHP from data_blocks given Iinj value
+    r"""Extract an averaged AHP from data_blocks given Iinj value
     """
     segments = list() # place selected segments here
     
@@ -9648,7 +9299,7 @@ def measure_membrane_RsRin(im_signal:neo.AnalogSignal,
                            testVm:typing.Union[neo.AnalogSignal, DataSignal, pq.Quantity],
                            intervals:tuple
                            ):
-    """Calculates Rs and Rin from a membrane test in voltage-clamp
+    r"""Calculates Rs and Rin from a membrane test in voltage-clamp
     
     Parameters:
     ===========
@@ -9797,7 +9448,7 @@ def measure_membrane_RsRin(im_signal:neo.AnalogSignal,
     
     
 def measure_AHP(signal):
-    """Returns the peak and its integral (Simpson)
+    r"""Returns the peak and its integral (Simpson)
     Signal = neo.AnalogSignal with t_start at 0 s and units of mV with one data channel
     Typically this is an AHP waveform already extracted using other functions in this module.
     
@@ -9839,7 +9490,7 @@ def is_AP_spiketrain(x):
     return ret
 
 def PSCwaveform(model_parameters, units=pq.pA, t_start=0*pq.s, duration=0.02*pq.s, sampling_rate=1e4*pq.Hz):
-    """Helper function to generate a synthetic post-synaptic current waveform.
+    r"""Helper function to generate a synthetic post-synaptic current waveform.
 
     The waveform realizes the Clements & Bekkers 1997 model as a neo.AnalogSignal.
     
@@ -9908,7 +9559,7 @@ def PSCwaveform(model_parameters, units=pq.pA, t_start=0*pq.s, duration=0.02*pq.
     return ret
 
 def detect_Events_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Union[neo.AnalogSignal, DataSignal], threshold:float=4., channels:typing.Optional[typing.Union[int, typing.Sequence[int]]]=None, outputDetection:bool=False, raw_signal=None):
-    """Detect miniature or spontaneous PSCs with optimally scaled template.
+    r"""Detect miniature or spontaneous PSCs with optimally scaled template.
     Implements the "sliding template" algorithm in Clements & Bekkers 1997, Biophys.J.
     
     Parameters:
@@ -10180,7 +9831,7 @@ def test_sliding(x, y, h, viewer, step_size=100):
             break
     
 def slide_detect(x:np.ndarray, h:np.ndarray, padding:bool=True, data_cache = None, **kwargs):
-    """
+    r"""
     WARNING: Expects plain numpy arrays, NOT quantity arrays!
     x: signal
     h: template
@@ -10284,7 +9935,7 @@ def slide_detect(x:np.ndarray, h:np.ndarray, padding:bool=True, data_cache = Non
     # return θ , α, β, ε, σ, xx
     
 def extract_event_waveforms(x:typing.Union[neo.AnalogSignal, DataSignal], duration, θ, threshold, peakfunc):
-    """
+    r"""
     Extracts detected mPSC waveforms.
     
     Waveforms are detected by comparing the θ signal (containing a detection
@@ -10489,7 +10140,7 @@ def extract_event_waveforms(x:typing.Union[neo.AnalogSignal, DataSignal], durati
     return ret
 
 def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Union[np.ndarray, tuple, list]=(0., -1., 0.01, 0.001, 0.01, 0.02), useCBsliding:bool=False, threshold:typing.Optional[float]=None, outputDetection:bool=False, raw_signal=None):
-    """Detect spontaneous events in a signal.
+    r"""Detect spontaneous events in a signal.
 
     Uses cross-correlation with a waveform, or the sliding detection algorithm
     by Clements & Bekkers, 1997, (Biophys J.).
@@ -10712,7 +10363,7 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.
     
 
 def prep_for_nsfa(data):
-    """Helper for the nsfa function
+    r"""Helper for the nsfa function
     Prepares an average event waveform and the variance of fluctuations.
     Parameters:
     ==========
@@ -10795,7 +10446,7 @@ def prep_for_nsfa(data):
     
 # def nsfa(data, /, start:int=0, stop:typing.Optional[int]=None, i=0, N=1, b=0, **kwargs):
 def nsfa(xdata:np.ndarray, ydata:np.ndarray, /, i=0, N=1, b=0, **kwargs):
-    """Non-stationary fluctuation analysis.
+    r"""Non-stationary fluctuation analysis.
     
     The function estimates the number of channels and their unitary currents 
     likely to have contributed to the events. When Vm and Erev are given (see 
@@ -10969,7 +10620,7 @@ def nsfa(xdata:np.ndarray, ydata:np.ndarray, /, i=0, N=1, b=0, **kwargs):
 
 
 def get_nsfa_var(x, params):
-    """
+    r"""
     Calculate nsfa variance from membrane currents in `x` using nsfa parabola.
     
     Useful to plot a fitted nsfa curve (current variance function of current

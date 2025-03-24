@@ -301,7 +301,7 @@ def make_transparent_bg(strong:bool=False, size:int=16) -> QtGui.QPixmap:
 def make_checkers(color0:typing.Union[QtGui.QColor, QtCore.Qt.GlobalColor], 
                   color1:typing.Union[QtGui.QColor, QtCore.Qt.GlobalColor],
                   size:int=16) -> QtGui.QPixmap:
-    """Makes square checkers pattern as background for transparent graphics.
+    r"""Makes square checkers pattern as background for transparent graphics.
     
     The checkers pattern is: ▄▀  with color0 at the top left. The color roles
     can be inverted by swapping color0 and color1: ▀▄
@@ -653,7 +653,7 @@ def rescaleGradient(gradient:QtGui.QGradient, src_rect:typing.Union[QtCore.QRect
     return scaleGradient(g, dest_rect)
         
 def scaleGradient(gradient:QtGui.QGradient, rect:typing.Union[QtCore.QRect, QtCore.QRectF]) -> QtGui.QGradient:
-    """ATTENTION/WARNING gradient must have normalized coordinates!
+    r"""ATTENTION/WARNING gradient must have normalized coordinates!
     
     """
     x = rect.x()
@@ -713,7 +713,7 @@ def scaleGradient(gradient:QtGui.QGradient, rect:typing.Union[QtCore.QRect, QtCo
         #raise TypeError("Expecting a concrete QGradient subtype; got %s instead" % type(g).__name__)
 
 def normalizeGradient(gradient:QtGui.QGradient, rect:typing.Union[QtCore.QRect, QtCore.QRectF]) -> QtGui.QGradient:
-    """
+    r"""
     """
     x = rect.x()
     y = rect.y()
@@ -805,7 +805,7 @@ class HoverPoints(QtCore.QObject):
     def __init__(self, widget:QtWidgets.QWidget, shape:PointShape=PointShape.CircleShape,
                  size:typing.Union[int, typing.Tuple[int]]=11,
                  compositionMode:typing.Optional[typing.Union[QtGui.QPainter.CompositionMode, str, int]] = None):
-        """HoverPoints constructor
+        r"""HoverPoints constructor
         
         Parameters:
         -----------
@@ -1353,7 +1353,7 @@ def printGradientStops(g:typing.Union[QtGui.QGradient, typing.Sequence[typing.Tu
                        caller:typing.Optional[typing.Union[str, typing.Callable[..., typing.Any]]]=None,
                        prefix:str = "",
                        suffix:str = "") -> typing.Optional[str]:
-    """Prints out gradient stops in an uniform fashion.
+    r"""Prints out gradient stops in an uniform fashion.
     Particularly helpful for debugging
     
     Parameters:
@@ -1441,7 +1441,7 @@ def printPoints(points:typing.Union[QtGui.QPolygonF, QtGui.QPolygon, typing.Sequ
                 caller:typing.Optional[typing.Union[str, typing.Callable[..., typing.Any]]]=None,
                 prefix:str="",
                 suffix:str="") -> typing.Optional[str]:
-    """Prints out the x,y coordinates of a sequence of QPoint or QPointF objects
+    r"""Prints out the x,y coordinates of a sequence of QPoint or QPointF objects
     Particularly helpful for debugging.
     
     Parameters:
@@ -1511,7 +1511,7 @@ def qPathElementCoordinates(x:QtGui.QPainterPath):
     return ((x.elementAt(k).x, x.elementAt(k).y) for k in range(x.elementCount()))
         
 class ColorGradient():
-    """Encapsulates the appearance of a conical, linear or radial Qt gradient.
+    r"""Encapsulates the appearance of a conical, linear or radial Qt gradient.
     
     It is a callable, therefore it can be used as a factory for one of the Qt 
     gradient :classes:: QtGui.QConicalGradient, QtGui.QLinearGradient, and
@@ -1570,7 +1570,7 @@ class ColorGradient():
             self._ID_ = type(self).__name__
             
     def __init__(self, *args, **kwargs):
-        """ColorGradient constructor:
+        r"""ColorGradient constructor:
         
         Variadic parameters:
         --------------------
@@ -1966,7 +1966,7 @@ class ColorGradient():
         return self.stops[k][1]
     
     def setColorAt(self, x:typing.Union[int, float], color:QtGui.QColor):
-        """Set the color at a gradient stop.
+        r"""Set the color at a gradient stop.
         
         Parameters:
         -----------
@@ -2127,7 +2127,7 @@ class ColorGradient():
         self.scale(dest_rect)
             
     def __call__(self) -> typing.Union[QtGui.QGradient, QtGui.QLinearGradient, QtGui.QRadialGradient, QtGui.QConicalGradient]:
-        """Factory for a concrete QGradient object based on this object's attributes
+        r"""Factory for a concrete QGradient object based on this object's attributes
         
         A 'concrete' QGradient is a QLinearGradient, QRadialGradient, or a 
         QConicalGradient object.
@@ -2141,7 +2141,7 @@ class ColorGradient():
     
     @property
     def valid(self):
-        """Read-only.
+        r"""Read-only.
         This is always False for ColorGradient objects and True for ColorGradient
         subclass instances (LinearColorGradient, RadialColorGradient, ConicalColorGradient)
         """
@@ -2176,7 +2176,7 @@ class ConicalColorGradient(ColorGradient):
         self._valid = True
 
 def colorGradient(*args, **kwargs) -> ColorGradient:
-    """Factory for Linear, Radial and Conical color gradient objects
+    r"""Factory for Linear, Radial and Conical color gradient objects
     
     Originally indended to be used in order to avoid generating instances of the 
     more generic ColorGradient :class:.
@@ -2260,7 +2260,7 @@ def colorGradient(*args, **kwargs) -> ColorGradient:
     return ColorGradient(**kwargs)
 
 class Brush(Bunch):
-    """Encapsulates the appearance atribute of a QtGui.QBrush.
+    r"""Encapsulates the appearance atribute of a QtGui.QBrush.
     
     It is a callable, therefore it can be used as a QBrush factory.
     
@@ -2325,7 +2325,7 @@ class Brush(Bunch):
         return QtGui.QBrush(qcolor(self.color), self.style)
         
 class Pen(Bunch):
-    """Encapsulatesthe appearance attribute of a QtGui.QPen.
+    r"""Encapsulatesthe appearance attribute of a QtGui.QPen.
     
     It is a callable, therefore it can be used as a QPen factory.
     
@@ -2336,7 +2336,7 @@ class Pen(Bunch):
                  cap:str="SquareCap", join:str="BevelJoin", cosmetic:bool=True,
                  brush:typing.Optional[typing.Optional[Brush]]=None,
                  name:typing.Optional[str]=None) -> None:
-        """Default constructor mimics the default behaviour of the QtGui.QPen
+        r"""Default constructor mimics the default behaviour of the QtGui.QPen
         constructor
         """
         if not isinstance(name, str) or len(name.strip()) == 0:

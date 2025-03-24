@@ -18,7 +18,7 @@ from core.triggerprotocols import TriggerProtocol
 from core.quantities import unitsConvertible
 
 class ScipyenResults(BaseScipyenData):
-    """TODO: 2022-11-18 14:46:04"""
+    r"""TODO: 2022-11-18 14:46:04"""
     _data_attributes_ = ("result", dict)
     
     _analysis_attributes_ = ("options", dict,

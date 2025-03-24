@@ -50,7 +50,7 @@ else:
     Ui_TriggerDetectWidget, QWidget = loadUiType(os.path.join(__module_path__, "triggerdetect.ui"))
 
 class TriggerDetectWidget(QWidget, Ui_TriggerDetectWidget):
-    """
+    r"""
     """
     
     sig_dataChanged = Signal()
@@ -63,7 +63,7 @@ class TriggerDetectWidget(QWidget, Ui_TriggerDetectWidget):
                  imaging:typing.Optional[typing.Union[dict, tuple, list]]=None,  
                  clear:bool=False, reltimes:bool=True,
                  parent:typing.Optional[QtWidgets.QWidget]=None):
-        """
+        r"""
         Named parameters:
         -----------------
         parent: None (default) or a QWidgets.QMainWindow object
@@ -123,7 +123,7 @@ class TriggerDetectWidget(QWidget, Ui_TriggerDetectWidget):
         self._update_time_ranges_()
         
     def setValues(self, target, src=None):
-        """Populates the fields for the trigger event type corresponding to target
+        r"""Populates the fields for the trigger event type corresponding to target
         """
         if target in ("pre", "presyn", "presynaptic"):
             groupBox        = self.presynGroupBox
@@ -308,7 +308,7 @@ class TriggerDetectWidget(QWidget, Ui_TriggerDetectWidget):
     
     @property
     def presyn(self):
-        """Tuple: ( signal index, label, (t_start, t_stop) )
+        r"""Tuple: ( signal index, label, (t_start, t_stop) )
         """
         if self.presynGroupBox.isChecked():
             return (self.presynChannelSpinBox.value(),
@@ -578,7 +578,7 @@ class TriggerDetectDialog(qd.QuickDialog):
         return super().exec()
         
     def closeEvent(self, evt):
-        """for when the dialog is closed from the window's close button
+        r"""for when the dialog is closed from the window's close button
         """
         # print("closeEvent owns viewer", self._owns_viewer_)
         if self._ephysViewer_.isVisible():
@@ -621,7 +621,7 @@ class TriggerDetectDialog(qd.QuickDialog):
         
     @Slot(int)
     def done(self, value):
-        """PyQt slot called by self.accept() and self.reject() (see QDialog).
+        r"""PyQt slot called by self.accept() and self.reject() (see QDialog).
         In turn it closes the dialog (equivalent of QWidget.close()).
         """
         if value == QtWidgets.QDialog.Accepted and not self.detected:
@@ -666,7 +666,7 @@ class TriggerDetectDialog(qd.QuickDialog):
                 
     @Slot()
     def slot_undo(self):
-        """Quickly restore the events - no fancy stuff
+        r"""Quickly restore the events - no fancy stuff
         """
         self._restore_events_()
         if self.isVisible():

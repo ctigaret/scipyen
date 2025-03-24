@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""Synthetic imaging data (image simulations)
+r"""Synthetic imaging data (image simulations)
 """
 #### BEGIN core python modules
 import collections 
@@ -51,7 +51,7 @@ from imaging.vigrautils import concatenateImages
 
 
 def synthetic_transients(duration, sampling_frequency, *args, **kwargs):
-    """Generates an idealized time-varying signal described by exponential rise & decay functions.
+    r"""Generates an idealized time-varying signal described by exponential rise & decay functions.
     
     
     Parameters:
@@ -239,7 +239,7 @@ def synthetic_EPSCaT_linescan(field_width, duration,
                               twoChannels=False,
                               addChannelAxis=True,
                               returnCalibration=False):
-    """Generates a synthetic 2D EPSCaT as a vigra.VigraArray
+    r"""Generates a synthetic 2D EPSCaT as a vigra.VigraArray
     
     Parameters:
     ===========

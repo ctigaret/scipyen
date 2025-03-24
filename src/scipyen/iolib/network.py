@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""
+r"""
 """
 import sys, os, typing, collections, pathlib, tarfile, dataclasses
 import inspect, functools, traceback
@@ -38,7 +38,7 @@ class ScipyenNetworkManager(QtCore.QObject):
                  parent:typing.Optional[QtCore.QObject] = None):
                  # verbose:bool=False,
                  # parent:typing.Optional[QtCore.QObject] = None):
-        """Constructor for ScipyenNetworkManager
+        r"""Constructor for ScipyenNetworkManager
         Parameters:
         ----------
         timeout_ms:int = the underlying QNetworkAccessManager timeout (in ms)
@@ -87,7 +87,7 @@ class ScipyenNetworkManager(QtCore.QObject):
         # self._replyTextBuffer_ = QtCore.QTextStream()
         
         # self._outputFileName_ = dataclasses.MISSING
-        """This can be MISSING, None or a string:
+        r"""This can be MISSING, None or a string:
         MISSING: let ScipyenNetworkManager decide (by calling self._setSaveFileName)
         None: does NOT download the reply to a file; useful to process it in memory
             (WARNING this can be very expensive)
@@ -180,7 +180,7 @@ class ScipyenNetworkManager(QtCore.QObject):
                    destination:typing.Optional[typing.Union[typing.Sequence[str], str, type(MISSING)]]=MISSING,
                    replyHandler:typing.Optional[typing.Union[typing.Callable, type(MISSING)]] = MISSING,
                    removeOnFailure:bool=True) -> None:
-        """Request a remote file
+        r"""Request a remote file
         Parameters:
         source: url string QUrl, or a sequence (tuple, list) of these
         
@@ -569,7 +569,7 @@ class ScipyenNetworkManager(QtCore.QObject):
         
     @Slot(QtNetwork.QNetworkReply)
     def slot_handleNetworkData(self, reply:QtNetwork.QNetworkReply):
-        """Generic handler"""
+        r"""Generic handler"""
         url = reply.url()
         netError = reply.error()
         if netError:
@@ -653,7 +653,7 @@ class ScipyenNetworkManager(QtCore.QObject):
         
     @Slot()
     def slot_downloadHeaderChanged(self):
-        """Use to retrieve the advertised expected download size using the reply's headers.
+        r"""Use to retrieve the advertised expected download size using the reply's headers.
         This may not be available; in this case, the expected download size MAY be
         retrieved by other means...
         """
@@ -711,7 +711,7 @@ class ScipyenNetworkManager(QtCore.QObject):
 
 def example_get_download_size(s:str) -> int:
     import re
-    search_result = re.search("([0-9]+\.[0-9] [MGK]B)|([0-9]+ [MGK]B)", s)
+    search_result = re.search(r"([0-9]+\.[0-9] [MGK]B)|([0-9]+ [MGK]B)", s)
     assert search_result is not None
     sz_str = search_result.group()
     assert sz_str is not None
@@ -731,7 +731,7 @@ def example_sequential_download_handler(info:QtCore.QByteArray,
                                           manager:ScipyenNetworkManager,
                                           url:typing.Union[str, QtCore.QUrl], 
                                           ) -> None:
-    """Example of reply handler for sequential download of URLs using ScipyenNetworkManager.
+    r"""Example of reply handler for sequential download of URLs using ScipyenNetworkManager.
         
         The handler accomplishes the task of calculating the expected download size
         of the specified URL, using information retrieved from a previous URL.
@@ -814,7 +814,7 @@ def example_sequential_download_handler(info:QtCore.QByteArray,
     """
     def _parse_size(s:str) -> int:
         import re
-        search_result = re.search("([0-9]+\.[0-9] [MGK]B)|([0-9]+ [MGK]B)", s)
+        search_result = re.search(r"([0-9]+\.[0-9] [MGK]B)|([0-9]+ [MGK]B)", s)
         assert search_result is not None
         sz_str = search_result.group()
         assert sz_str is not None

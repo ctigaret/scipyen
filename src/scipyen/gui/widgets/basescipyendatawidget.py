@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Common widget for meta-information in results
+r"""Common widget for meta-information in results
 """
 import os, math, typing, datetime, dataclasses
 from dataclasses import MISSING
@@ -23,7 +23,7 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 Ui_BaseScipyenDataWidget, QWidget = loadUiType(os.path.join(__module_path__, "basescipyendatawidget.ui"))
 
 class BaseScipyenDataWidget(Ui_BaseScipyenDataWidget, QWidget):
-    """Widget for displaying the most commonly used data attributes in Scipyen.
+    r"""Widget for displaying the most commonly used data attributes in Scipyen.
     Where implemented, it also supports editing.
     NOTE/WARNING: Under development
     """
@@ -173,7 +173,7 @@ class BaseScipyenDataWidget(Ui_BaseScipyenDataWidget, QWidget):
         self._descriptionEditor.sig_textChanged.connect(self._slot_descriptionChanged)
         
     def value(self):
-        """Returns a dict with field values takes from individual children
+        r"""Returns a dict with field values takes from individual children
         """
         ret = dict()
         ret["VarName"] = strutils.str2symbol(self._dataVarName)
@@ -303,7 +303,7 @@ class BaseScipyenDataWidget(Ui_BaseScipyenDataWidget, QWidget):
     
     @Slot()
     def _slot_editDateTime(self):
-        """Edits the date & time of analysis.
+        r"""Edits the date & time of analysis.
         Recording date & time should be immutable
         """
         # TODO 2022-11-08 08:32:23
@@ -454,7 +454,7 @@ class BaseScipyenDataWidget(Ui_BaseScipyenDataWidget, QWidget):
     
     @property
     def dataName(self):
-        """Getter & setter for the data name"""
+        r"""Getter & setter for the data name"""
         return self._dataName
     
     @dataName.setter

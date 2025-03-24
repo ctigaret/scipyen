@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""Base ancestor of Scipyen's data objects: AnalysisUnit, ScanData
+r"""Base ancestor of Scipyen's data objects: AnalysisUnit, ScanData
 """
 import functools, typing, dataclasses, pathlib
 import collections
@@ -22,9 +22,9 @@ from core.triggerprotocols import TriggerProtocol
 from core.quantities import unitsConvertible
 
 # from core.datatypes import * # clashes with datetime class imported from datetime module !!!
-
-from core.datatypes import (Episode, Schedule, ProcedureType, AdministrationRoute, 
-                            Procedure, TypeEnum, BioSourceType, TaxonDescriptor, Taxon,
+from core.typeenum import TypeEnum
+from core.scipyendataclasses import (Episode, Schedule, ProcedureType, AdministrationRoute, 
+                            Procedure, BioSourceType, TaxonDescriptor, Taxon,
                             BiologicalSource, CellCompartment, CellCompartmentType,
                             Organism, Biometrics, ScipyenDataclass, 
                             )
@@ -37,8 +37,8 @@ class BaseScipyenData(ScipyenDataclass):
     # In addition, I introduce an "analysis_datetime" field to ease up tracking
     # analysis times, and a "triggers" field (which may not be generally useful,
     # see NOTE below)
-    name:str = ""
-    description:str = ""
+    # name:str = ""
+    # description:str = ""
     file_origin:typing.Union[str, pathlib.Path] = dataclasses.field(default="")
     # which file it originates from
     file_datetime:datetime = dataclasses.field(default_factory = datetime.now)
@@ -54,11 +54,16 @@ class BaseScipyenData(ScipyenDataclass):
     # (with the caveat that it would be too deeply nested in the final object)
     # triggers:typing.Union[TriggerProtocol, list] = dataclasses.field(default_factory=TriggerProtocol)
     
-    source:BiologicalSource = dataclasses.field(default_factory=BiologicalSource)
     # biological source including organism, organ, tissue, cell, ID, 
-    procedure:Procedure = dataclasses.field(default_factory=Procedure)
+    source:BiologicalSource = dataclasses.field(default_factory=BiologicalSource)
     # includes treatment, with dosage route, and schedule; does NOT include triggers
     # as these are specific to ephys/imaging protocols.
+    procedure:Procedure = dataclasses.field(default_factory=Procedure)
+    
+    # __match_args__ = tuple(set(ScipyenDataclass.__match_args__ + ("file_origin",
+    #                                                               "file_datetime",
+    #                                                               "rec_datetime",
+    #                                                               "analysis_datetime")))
     
     def __repr__(self):
         indent = lambda x: x.replace("\n", "\n\t")

@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""
+r"""
 
 See https://stackoverflow.com/questions/65707027/how-to-display-icon-and-text-together-in-pyqt5-menubar
 

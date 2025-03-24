@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""
+r"""
 Wrappers around scipy.optimize
 
 FIXME/TODO: 2022-10-25 23:57:08
@@ -36,7 +36,7 @@ from core import prog
 #### END pict.core modules
 
 def fitGauss1DSum(x, y, locations, **kwargs):
-    """Fits a sum of shifted 1D Gaussians.
+    r"""Fits a sum of shifted 1D Gaussians.
     
     CAUTION  (TODO/FIXME): Unstable when parameters are given in floating point 
     calibrated axis units. Use with parameters given in data samples.
@@ -58,7 +58,7 @@ def fitGauss1DSum(x, y, locations, **kwargs):
         xx = x.squeeze()
         
     else:
-        raise TypeError("x expected to be a np.ndarray, a neo.AnalogSignal or a datatypes.DataSignal; got %s instead" % type(x).__name__)
+        raise TypeError("x expected to be a np.ndarray, a neo.AnalogSignal or a datasignal.DataSignal; got %s instead" % type(x).__name__)
         
     if xx.ndim > 1:
         raise TypeError("x must be a vector")
@@ -72,7 +72,7 @@ def fitGauss1DSum(x, y, locations, **kwargs):
         yy = y.squeeze()
         
     else:
-        raise TypeError("y expected to be a np.ndarray, a neo.AnalogSignal or a datatypes.DataSignal; got %s instead" % type(y).__name__)
+        raise TypeError("y expected to be a np.ndarray, a neo.AnalogSignal or a datasignal.DataSignal; got %s instead" % type(y).__name__)
         
     if yy.ndim > 1:
         raise TypeError("y must be a vector")
@@ -150,7 +150,7 @@ def fitGauss1DSum(x, y, locations, **kwargs):
     return popt, pcov, yfit
     
 def fit_compound_exp_rise_multi_decay(data, p0, bounds=(-np.inf, np.inf), method="trf", loss="linear"):
-    """Fits CaT model to CaT data.
+    r"""Fits CaT model to CaT data.
     
     Parameters:
     ==========
@@ -221,7 +221,7 @@ def fit_compound_exp_rise_multi_decay(data, p0, bounds=(-np.inf, np.inf), method
     from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
     
     if not isinstance(data, (neo.AnalogSignal, DataSignal)):
-        raise TypeError("Data to be fitted must be a neo.AnalogSignal, or a datatypes.DataSignal; got %s instead" % type(data).__name__)
+        raise TypeError("Data to be fitted must be a neo.AnalogSignal, or a datasignal.DataSignal; got %s instead" % type(data).__name__)
     
     if data.ndim == 2 and data.shape[1] > 1:
         raise ValueError("Data must contain a single channel")
@@ -514,7 +514,7 @@ def fit_compound_exp_rise_multi_decay(data, p0, bounds=(-np.inf, np.inf), method
     return fittedCurve, fittedComponentCurves, result
 
 def fit_Event_model(data, p0, **kwargs):
-    """Fits a Clements & Bekkers '97 waveform through the data.
+    r"""Fits a Clements & Bekkers '97 waveform through the data.
     
     Parameters:
     ==========
@@ -586,7 +586,7 @@ def fit_Event_model(data, p0, **kwargs):
     verbose     = kwargs.pop("verbose",     0)
     
     if not isinstance(data, (neo.AnalogSignal, DataSignal)):
-        raise TypeError("Data to be fitted must be a neo.AnalogSignal, or a datatypes.DataSignal; got %s instead" % type(data).__name__)
+        raise TypeError("Data to be fitted must be a neo.AnalogSignal, or a datasignal.DataSignal; got %s instead" % type(data).__name__)
     
     if data.ndim == 2 and data.shape[1] > 1:
         raise ValueError("Data must contain a single channel")
@@ -598,7 +598,7 @@ def fit_Event_model(data, p0, **kwargs):
         raise TypeError("bounds expected a 2-tuple or a 2-element list")
     
     def __cost_fun__(x, t, y, *args, **kwargs):  # returns residuals
-        """ x: sequence of model params
+        r""" x: sequence of model params
             t: independent variable
             y: the data (dependent variable)
         """
@@ -756,7 +756,7 @@ def fit_Event_model(data, p0, **kwargs):
     return fittedCurve, result
 
 def fit_Event_wave(data, wave):
-    """R² between data and a template waveform
+    r"""R² between data and a template waveform
     
     Not a curve fit but a measure of how well the data is matched by the waveform
     template - used when detecting mEPSCs using a template waveform (rather than
@@ -765,14 +765,14 @@ def fit_Event_wave(data, wave):
     """
     
     if not isinstance(data, (neo.AnalogSignal, DataSignal)):
-        raise TypeError("Data to be fitted must be a neo.AnalogSignal, or a datatypes.DataSignal; got %s instead" % type(data).__name__)
+        raise TypeError("Data to be fitted must be a neo.AnalogSignal, or a datasignal.DataSignal; got %s instead" % type(data).__name__)
     
     if data.ndim == 2 and data.shape[1] > 1:
         raise ValueError("Data must contain a single channel")
     
     
     if not isinstance(wave, (neo.AnalogSignal, DataSignal)):
-        raise TypeError("Data to be fitted must be a neo.AnalogSignal, or a datatypes.DataSignal; got %s instead" % type(data).__name__)
+        raise TypeError("Data to be fitted must be a neo.AnalogSignal, or a datasignal.DataSignal; got %s instead" % type(data).__name__)
     
     if wave.ndim == 2 and wave.shape[1] > 1:
         raise ValueError("Data must contain a single channel")
@@ -788,7 +788,7 @@ def fit_Event_wave(data, wave):
     
     
 def scale_fit_wave(x, y, p0 = 1, method="nelder-mead"):
-    """ Finds a scale factor of y such that it matches x.
+    r""" Finds a scale factor of y such that it matches x.
     
     The objective function being minimized is the scalar product x - p0 * y
     
@@ -826,7 +826,7 @@ def scale_fit_wave(x, y, p0 = 1, method="nelder-mead"):
         raise ValueError(f"x and y must have the same dimensionality and shape; gpt x with {x.ndim} dimensions and {x.shape} shape, and y with {y.ndim} dimensions and {y.shape} shape")
 
     def __wave_fun__(x_, a, b):
-        """x_: scale; 
+        r"""x_: scale; 
            a : original wave
            b: wave to be scaled"""
         y = a - x_ * b
@@ -838,7 +838,7 @@ def scale_fit_wave(x, y, p0 = 1, method="nelder-mead"):
     return res
 
 def scale_fit_wave2(x, y, p0 = (1,0)):
-    """Two-params version """
+    r"""Two-params version """
     def __wave_fun__(x_, y_, a, b):
         y = a - x_*b+y_
         return np.dot(y.T, y)
@@ -858,7 +858,7 @@ def scale_fit_wave2(x, y, p0 = (1,0)):
     return res
     
 def fit_nsfa(data, p0, **kwargs):
-    """Fit the parabola y = x * i - x²/N + b through the observed variable data.
+    r"""Fit the parabola y = x * i - x²/N + b through the observed variable data.
     Parameters:
     ===========
     data: the observed variable
@@ -1059,7 +1059,7 @@ def fit_nsfa(data, p0, **kwargs):
 
                      
 def fit_model(data, func, p0, *args, **kwargs):
-    """Generic fitting function.
+    r"""Generic fitting function.
     Applies scipy.optimize.least_squares to minimize the residuals between the 
     model function `func` and measurements in `data`.
     

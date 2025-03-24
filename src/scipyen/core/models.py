@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-""" Collection of 1D and nD functions and helper functions, for use in model fitting.
+r""" Collection of 1D and nD functions and helper functions, for use in model fitting.
 
 WARNING: This module is on its way to deprecation, and it wil be superseded by
 modelfitting.py in the (hopefully not too distant) future.
@@ -16,10 +16,9 @@ import numpy as np
 import quantities as pq
 import numbers
 from core import quantities as scq
-from core.datatypes import is_vector
 
 def check_rise_decay_params(x):
-    """Returns the number of decay components for a exp-rise-multi-decay transient.
+    r"""Returns the number of decay components for a exp-rise-multi-decay transient.
     x = iterable with model parameters (see exp_rise_multi_decay())
     """
     if np.remainder(len(x)-3, 2) != 0:
@@ -28,7 +27,7 @@ def check_rise_decay_params(x):
     return (len(x)-3) // 2
 
 def generic_exp_decay(x, y0, α, x0, τ):
-    """Realizes y = α × exp(-(x-x₀)/τ) + y₀
+    r"""Realizes y = α × exp(-(x-x₀)/τ) + y₀
     
     x: independent variable (e.g., time)
     
@@ -52,7 +51,7 @@ def generic_exp_decay(x, y0, α, x0, τ):
     return α * np.exp(-(x-x0)/τ) + y0
 
 def generic_exp_rise(x, y0, α, x0, τ):
-    """Realizes α × [1 - exp(-(x-x₀)/τ)] + y₀"""
+    r"""Realizes α × [1 - exp(-(x-x₀)/τ)] + y₀"""
     return α * (1 - np.exp(-(x-x0)/τ)) + y0
 
 def generic_exp_decay_model(x, parameters, **kwargs):
@@ -62,7 +61,7 @@ def generic_exp_rise_model(x, parameters, **kwargs):
     return generic_exp_rise(x, *parameters, **kwargs)
 
 def alphaFunction(x, parameters):
-    """
+    r"""
     The Alpha function: a single exponential rise and decay, both with the same 
     time-constant (τ):
     
@@ -121,7 +120,7 @@ def alphaFunction(x, parameters):
 
 
 def nsfa(x, parameters):
-    """
+    r"""
         y = x * i - x²/N + b
     
     Parameters: i, N, b: unitary current (pA), number of channels, background current variance (pA²))
@@ -139,7 +138,7 @@ def nsfa(x, parameters):
    
 
 def Clements_Bekkers_97(x, parameters, unit_amplitude:bool=False):
-    """
+    r"""
     Clements & Bekkers 1997 mEPSC waveform.
 
     This approximates a single exponential rise and decay each with their own 
@@ -231,7 +230,7 @@ def get_CB_scale_for_unit_amplitude(β, τ_rise, τ_decay, x0=0.):
     return peak/yₘ
     
 def CBsum(x, parameters):
-    """Realizes a sum of two Clements_Bekkers_97 functions, on x.
+    r"""Realizes a sum of two Clements_Bekkers_97 functions, on x.
     
     Let 𝒙 a 1D domain vector:
     
@@ -265,7 +264,7 @@ def CBsum(x, parameters):
     
     
 def exp_rise_multi_decay(x, parameters, returnDecays = False):
-    """ Realization of a transient signal with a single exponential rise (r) and
+    r""" Realization of a transient signal with a single exponential rise (r) and
         n exponential decays (d1..dn), at an onset (delay) x0 and a given 
         "DC" component (offset) o: 
 
@@ -395,7 +394,7 @@ def exp_rise_multi_decay(x, parameters, returnDecays = False):
             return y
 
 def compound_exp_rise_multi_decay(x, parameters, returnDecays = False):
-    """Compound transient signal -- linear sum of delayed single transient signals
+    r"""Compound transient signal -- linear sum of delayed single transient signals
     Arguments:
         x = 1D predictor vector
         
@@ -452,7 +451,7 @@ def compound_exp_rise_multi_decay(x, parameters, returnDecays = False):
             return y, yc
     
 def Markwardt_Nilius(x, g, e, h, s):
-    """Markwardt & Nilius model for voltage-gated Ca2+ channels I-V relationship
+    r"""Markwardt & Nilius model for voltage-gated Ca2+ channels I-V relationship
     See Markwardt & Nilius (1988), J Physiol (London)
     
     Parameters:
@@ -498,7 +497,7 @@ def Markwardt_Nilius(x, g, e, h, s):
 #     pass
 
 def Talbot_Sayer(x, a, b, c, x0, **kwargs):# t = 33 * pq.degC, o = 2.5 * pq.mM):
-    """
+    r"""
     Talbot & Sayer model for voltage-gated Ca2+ channels I-V relationship.
     
     Boltzman squared, multiplied by Goldman-Hogdkin-Katz, 
@@ -594,7 +593,7 @@ def Talbot_Sayer(x, a, b, c, x0, **kwargs):# t = 33 * pq.degC, o = 2.5 * pq.mM):
     return boltzmann * ghk
 
 def gaussianSum1D(x, *args, **kwargs):
-    """ Sum of shifted Gaussians in 1D.
+    r""" Sum of shifted Gaussians in 1D.
     
     Implements:
     
@@ -668,7 +667,7 @@ def gaussianSum1D(x, *args, **kwargs):
     
     
 def Frank_Fuortes(x, tau, x0):
-    """ Frank & Fuortes 1956 expression Irh/I = 1 - exp(-(t-t0)/tau)
+    r""" Frank & Fuortes 1956 expression Irh/I = 1 - exp(-(t-t0)/tau)
     
     In the Frank & Fuortes 1956 paper, Irheo is a constant experimentally measured.
     Use this to get the membrane time constant only.
@@ -699,7 +698,7 @@ def Frank_Fuortes(x, tau, x0):
     #return 1-np.exp(-x/tau)
 
 def Frank_Fuortes2(x, irh, tau, x0):
-    """ Implements 1/I = (1-exp(-t/tau)) / Irh 
+    r""" Implements 1/I = (1-exp(-t/tau)) / Irh 
     
     By rearranging the Frank & Fuortes 1956 equation
     one can also get a fitted value for Irheobase 
@@ -715,7 +714,7 @@ def Frank_Fuortes2(x, irh, tau, x0):
 
     
 def Boltzmann(x, p, pos:bool=True):
-    """ Realises y = 1/(1+exp(±(x₀ - x)/κ))
+    r""" Realises y = 1/(1+exp(±(x₀ - x)/κ))
 
     Function parameters:
     ====================
@@ -815,7 +814,7 @@ def Boltzmann(x, p, pos:bool=True):
 def Heaviside(x:typing.Union[pq.Quantity, np.ndarray], 
               x0:typing.Union[float, pq.Quantity], 
               α:bool=True) -> np.ndarray:
-    """Heaviside (step) function
+    r"""Heaviside (step) function
     
     Parameters:
     ===========
@@ -826,7 +825,8 @@ def Heaviside(x:typing.Union[pq.Quantity, np.ndarray],
         True (default) → 0 → 1 transition
         False ⇒ transition 1 → 0
         
-"""
+    """
+    from core.datatypes import is_vector
     if not is_vector(x):
         raise TypeError(f"Domain (x) is not a vector")
     
@@ -880,7 +880,9 @@ def Heaviside2(x:typing.Union[pq.Quantity, np.ndarray],
     level0, level1:float; optional, defaults are 0 anbd 1, respectively
         The initial and the final level of the step function.
         
-"""
+    """
+    from core.datatypes import is_vector
+    
     if not is_vector(x):
         raise TypeError(f"Domain (x) is not a vector")
     
@@ -940,7 +942,7 @@ def boxcar(x, p, up_first:bool=True):
         
 
 def boxcar2(x, p, level0=0., level1=1.):
-    """"""
+    r""""""
     x0, x1 = p
     
     return Heaviside2(x, x0, level0, level1) + Heaviside2(x, x1, level1, level0)

@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 # -*- coding: utf-8 -*-
-"""Pyqtgraph-based cursors for signal viewers
+r"""Pyqtgraph-based cursors for signal viewers
 """
 import collections, enum, numbers, typing
 import dataclasses
@@ -24,13 +24,13 @@ from core.quantities import checkTimeUnits
 
 @dataclass
 class DataCursor:
-    """Convenience structure for notional 1D cursor represented by a coordinate and a span"""
+    r"""Convenience structure for notional 1D cursor represented by a coordinate and a span"""
     coord:typing.Union[float, pq.Quantity]
     span:typing.Union[float, pq.Quantity]
     name:str = ""
     
 class SignalCursorTypes(enum.Enum):
-    """Enumeration of signal cursor types.
+    r"""Enumeration of signal cursor types.
     """
     vertical    = (False, True)
     horizontal  = (True, False)
@@ -39,31 +39,31 @@ class SignalCursorTypes(enum.Enum):
     
     @classmethod
     def names(cls):
-        """List of the signal cursor type names
+        r"""List of the signal cursor type names
         """
         return [c.name for c in cls]
     
     @classmethod
     def values(cls):
-        """List with the values to which the signal cursor types are mapped.
+        r"""List with the values to which the signal cursor types are mapped.
         """
         return [c.value for c in cls]
     
     @classmethod
     def default(cls):
-        """The default signal cursor type
+        r"""The default signal cursor type
         """
         return cls.crosshair
     
     @classmethod
     def types(cls):
-        """List of the defined signal cursor types.
+        r"""List of the defined signal cursor types.
         """
         return list(cls)
     
     @classmethod
     def getType(cls, value:typing.Union[tuple, str]):
-        """Inverse-lookup: returns signal cursor type mapped to value.
+        r"""Inverse-lookup: returns signal cursor type mapped to value.
         
         Returns None if no signal cursor type is mapped to this value.
         """
@@ -81,7 +81,7 @@ class SignalCursorTypes(enum.Enum):
             
     @classmethod
     def getName(cls, value: tuple):
-        """Inverse-lookup for name of a signal cursor type given its value.
+        r"""Inverse-lookup for name of a signal cursor type given its value.
         
         Returns None if no signal cursor type is mapped to this value.
         """
@@ -141,7 +141,7 @@ class CursorLine(pg.InfiniteLine):
         self.update()
 
 class SignalCursor(QtCore.QObject):
-    """SignalCursor object.
+    r"""SignalCursor object.
     Covers either a SINGLE pyqtgraph.PlotItem (see crosshair.py in pyqtgraph/examples)
     or a pyqtgraph.GraphicsScene (with possibly multiple plot items)
         
@@ -197,7 +197,7 @@ class SignalCursor(QtCore.QObject):
                  label_position:float = 0.5,
                  show_value:bool=False, 
                  precision:int=3, **kwargs):
-        """ SignalCursor constructor.
+        r""" SignalCursor constructor.
             
             By default, this creates a crosshair cursor.
             
@@ -524,7 +524,7 @@ class SignalCursor(QtCore.QObject):
         self.update()
             
     def _get_host_boundaries_(self, host):
-        """Get the useful boundaries for cursor lines, from the host.
+        r"""Get the useful boundaries for cursor lines, from the host.
         Boundaries are returned in the same format as from PlotItem.viewRange()
         
         NOTE: 2022-11-21 22:04:49
@@ -590,7 +590,7 @@ class SignalCursor(QtCore.QObject):
             raise TypeError("expecting a pyqtgraph.PlotItem or a pyqtgraph.GraphicsScene; got %s instead" % type(host).__name__)
         
     def _update_hline_position_(self, val, plotitem=None):
-        """Called by programmatically setting the "y" coordinate 
+        r"""Called by programmatically setting the "y" coordinate 
         """
         if isinstance(self._host_graphics_item_, pg.PlotItem):
             self._hl_.setPos(val)
@@ -612,7 +612,7 @@ class SignalCursor(QtCore.QObject):
                 # self._y_ = self._hl_.getYPos()
                 
     def _update_vline_position_(self, val, plotitem=None):
-        """Called by programmatically setting "x" coordinate 
+        r"""Called by programmatically setting "x" coordinate 
         """
         if isinstance(self._host_graphics_item_, pg.PlotItem):
             self._vl_.setPos(val)
@@ -724,7 +724,7 @@ class SignalCursor(QtCore.QObject):
                     # l.label.setmovable(value==True)
                     
     def setLabelPosition(self, value:float):
-        """Set label's position along its corresponding line.
+        r"""Set label's position along its corresponding line.
         The position is a float (0 ⋯ 1) representin the fraction from the 
         start of the line to its end
         """
@@ -818,7 +818,7 @@ class SignalCursor(QtCore.QObject):
     def setBounds(self, host:typing.Optional[pg.GraphicsItem]=None,
                   xBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None, 
                   yBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None):
-        """ Sets the X and Y allowed range for the cursor lines
+        r""" Sets the X and Y allowed range for the cursor lines
         """
         # NOTE: 2023-01-14 14:04:31
         # this is also called from __init__-> _setup_ so the xBounds and yBounds
@@ -884,7 +884,7 @@ class SignalCursor(QtCore.QObject):
             return self._vl_.maxRange
             
     def linkTo(self, *other):
-        """ Bidirectionally link this cursor to at least another one of the same type.
+        r""" Bidirectionally link this cursor to at least another one of the same type.
         All other cursors will be linked to this one and to each other.
         For linked cursors, when one is moved by dx, dy, the linked cursor(s) is (are) 
         moved by the same distance.
@@ -967,7 +967,7 @@ class SignalCursor(QtCore.QObject):
     
     @property
     def dataCursors(self) -> typing.Tuple[DataCursor]:
-        """A tuple of DataCursor objects.
+        r"""A tuple of DataCursor objects.
         For crosshair cursors, the tuple has DataCursor objects, respectively,
         for the horizontal and vertical components. For all other types of 
         SignalCursors the tuple, has only one DataCursor object.
@@ -1003,7 +1003,7 @@ class SignalCursor(QtCore.QObject):
             self._signal_proxy_ = None
             
     def attach(self, host, xBounds=None, yBounds=None, pos=None):
-        """Attaches this cursor to a PlotItem or a GraphicsScene 
+        r"""Attaches this cursor to a PlotItem or a GraphicsScene 
         (of the pyqtgraph framework)
         TODO allow the attaching to a scene a cursor formerly attached to a 
         plot item, aned vice-versa
@@ -1053,7 +1053,7 @@ class SignalCursor(QtCore.QObject):
                 cursorID:typing.Optional[str]=None, 
                 xBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None, 
                 yBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None, **kwargs):
-        """See docstring for __init__
+        r"""See docstring for __init__
         """
         #print("SignalCursor._setup_ cursor_type %s" % cursor_type)
         
@@ -1218,7 +1218,7 @@ class SignalCursor(QtCore.QObject):
         # print(f"{self.__class__.__name__} in _setup_ after _add_lines_to_host_ _x_ = {self._x_} _y_ = {self._y_}")
         
     def _interpret_scene_mouse_events_(self, scene=None):
-        """for crosshair only
+        r"""for crosshair only
         """
         if scene is None or not isinstance(scene, pg.GraphicsScene):
             scene = self.hostScene
@@ -1260,7 +1260,7 @@ class SignalCursor(QtCore.QObject):
     @Slot(object)
     @safeWrapper
     def _slot_mouse_event_(self, evt):
-        """Workaround to synchronize movement of BOTH lines when mouse is dragged in the scene.
+        r"""Workaround to synchronize movement of BOTH lines when mouse is dragged in the scene.
         Calls _interpret_scene_mouse_events_ in order to find out if any of the lines
         has been clicked on and if it's being dragged.
         """
@@ -1305,7 +1305,7 @@ class SignalCursor(QtCore.QObject):
                         
                 
     def _slot_mouse_moved_(self, evt):
-        """Use only for dynamic cursors
+        r"""Use only for dynamic cursors
         """
         # CAUTION
         # when activated by the scene sigMouseMoved signal, this carries the
@@ -1391,7 +1391,7 @@ class SignalCursor(QtCore.QObject):
         
     @property
     def scenePlotItems(self):
-        """An ordered mapping (collections.OrderedDict) of PlotItems 
+        r"""An ordered mapping (collections.OrderedDict) of PlotItems 
         The plot items are those available to this cursor in the parent widget.
         Returns a map of plot item (key) to its tuple of (x,y) coordinates in the scene (value).
         These would include the plot item host of the cursor (for single axis cursors).
@@ -1413,7 +1413,7 @@ class SignalCursor(QtCore.QObject):
         
     @property
     def hostItem(self):
-        """Read-only:
+        r"""Read-only:
         The GraphicsItem that hosts this cursor.
         Currently, this is either a PlotItem, or a GraphicsScene
         """
@@ -1429,13 +1429,13 @@ class SignalCursor(QtCore.QObject):
     
     @property
     def vline(self):
-        """Read-only
+        r"""Read-only
         """
         return self._vl_
     
     @property
     def hline(self):
-        """Read-only
+        r"""Read-only
         """
         return self._hl_
     
@@ -1455,7 +1455,7 @@ class SignalCursor(QtCore.QObject):
             
     @property
     def parameters(self):
-        """A tuple with cursor parameters.
+        r"""A tuple with cursor parameters.
         
         Vertical cursors: (x, xwindow, ID)
         
@@ -1475,7 +1475,7 @@ class SignalCursor(QtCore.QObject):
         
     @property
     def x(self):
-        """The X coordinate of the cursor in axes (PlotItem) data coordinates.
+        r"""The X coordinate of the cursor in axes (PlotItem) data coordinates.
         For multi-axes cursors this will return the value in the "current" PlotItem
         (i.e., the plot where the cursor coordinates are mapped to a point in the
         plot item's view range)
@@ -1517,7 +1517,7 @@ class SignalCursor(QtCore.QObject):
     
     @x.setter
     def x(self, val):
-        """Expects a value in a plotitem valid range
+        r"""Expects a value in a plotitem valid range
         """
         if isinstance(val, pq.Quantity):
             val = val.magnitude.flatten()[0]
@@ -1553,7 +1553,7 @@ class SignalCursor(QtCore.QObject):
             return plotitem.vb.mapSceneToView(QtCore.QPointF(x, 0.0)).x()
             
     def setX(self, val, plotItem=None):
-        """Sets the X coordinate of a line.
+        r"""Sets the X coordinate of a line.
         
         The X coordinate is specified in axis coordinates
         
@@ -1583,7 +1583,7 @@ class SignalCursor(QtCore.QObject):
             
     @property
     def y(self):
-        """The Y coordinate of the cursor in axes (PlotItem) data coordinates.
+        r"""The Y coordinate of the cursor in axes (PlotItem) data coordinates.
         For multi-axes cursors this will return the value in the "current" PlotItem
         (i.e., the plot where the cursor coordinates are mapped to a point in the
         plot item's view range)
@@ -1711,7 +1711,7 @@ class SignalCursor(QtCore.QObject):
         
     @property
     def name(self):
-        """Alias ot self.ID"""
+        r"""Alias ot self.ID"""
         return self._cursorId_
     
     @name.setter
@@ -1743,7 +1743,7 @@ class SignalCursor(QtCore.QObject):
         
     @property
     def pen(self):
-        """A QtGui.QPen
+        r"""A QtGui.QPen
         """
         return self._pen_
     
@@ -1918,7 +1918,7 @@ class SignalCursor(QtCore.QObject):
     
 @safeWrapper
 def cursors2epoch(*args, **kwargs):
-    """Constructs a neo.Epoch from a sequence of SignalCursor objects.
+    r"""Constructs a neo.Epoch from a sequence of SignalCursor objects.
     
     Each cursor contributes an interval in the Epoch, corresponding to the 
     cursor's horizontal (x) window. In other words, the interval's start time
@@ -2140,7 +2140,7 @@ def cursors2epoch(*args, **kwargs):
     
     #### BEGIN __parse_cursors_params__
     def __parse_cursors_params__(*values):
-        """For each SignalCursor in values returns (x0, x1, label, extent)
+        r"""For each SignalCursor in values returns (x0, x1, label, extent)
         where :
         x0 = cursor.x - cursor.xwindow/2
         x1 = cursor.xwindow if duration, else x0 + cursor.xwindow
@@ -2260,7 +2260,7 @@ def cursors2epoch(*args, **kwargs):
 
 @with_doc(cursors2epoch, use_header=True)
 def cursors2intervals(*args, **kwargs):
-    """Creates a sequence of Interval objects from a sequence of cursors.
+    r"""Creates a sequence of Interval objects from a sequence of cursors.
     
     NOTE: In this context, an interval must not be confused with the arithmetic 
     concept of interval (see PyInterval, https://pyinterval.readthedocs.io/en/latest/)

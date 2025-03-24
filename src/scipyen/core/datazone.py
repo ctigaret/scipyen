@@ -3,9 +3,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-import collections, numbers, typing, itertools
-from copy import deepcopy, copy
+import collections, numbers, typing, itertools, dataclasses
 from dataclasses import dataclass
+from copy import deepcopy, copy
 
 import numpy as np
 import quantities as pq
@@ -16,6 +16,7 @@ import pyqtgraph as pg
 
 from core import quantities as cq
 from core.quantities import checkTimeUnits
+from core.scipyendataclasses import ScipyenDataclass
 # from core.utilities import counter_suffix
 from .prog import (safeWrapper, with_doc)
 from qtpy import QtWidgets
@@ -42,7 +43,7 @@ def _newDataZone(cls, places=None, extents=None, labels=None, units=None,
 
 # class DataZone(DataObject):
 class DataZone(neo.Epoch):
-    """neo.Epoch-like for DataSignals
+    r"""neo.Epoch-like for DataSignals
     
     The name 'DataZone' was chosen to avoid possible confusions arising from
     using 'region' in the name (which may imply higher dimensions of the data
@@ -66,7 +67,7 @@ class DataZone(neo.Epoch):
                 labels=None, units=None, name=None, description=None, 
                 file_origin=None, segment=None, relative=None,
                 array_annotations=None, **annotations):
-        """
+        r"""
         """
         if places is None:
             if times is None:
@@ -325,7 +326,7 @@ class DataZone(neo.Epoch):
         return self.zone_slice(t_start, t_stop)
         
     def shift(self, shift):
-        """
+        r"""
         Shifts by a given amount.
 
         Parameters:
@@ -349,7 +350,7 @@ class DataZone(neo.Epoch):
         return new_epc
     
     def time_shift(self, t_shift):
-        """
+        r"""
         Shifts by a given amount.
 
         Parameters:
@@ -366,7 +367,7 @@ class DataZone(neo.Epoch):
         return self.shift(t_shift)
     
     def set_durations(self, durations):
-        """For API compatibility with neo.Epoch
+        r"""For API compatibility with neo.Epoch
         """
         self.extents = durations
         
@@ -375,7 +376,7 @@ class DataZone(neo.Epoch):
     
     @property
     def relative(self) -> bool:
-        """Indicates if the coordinates are relative to signal's domain origin.
+        r"""Indicates if the coordinates are relative to signal's domain origin.
         This is independent of the extents of the data zone.
         """
         return getattr(self, "_relative", False)
@@ -386,7 +387,7 @@ class DataZone(neo.Epoch):
 
     @property
     def domain_name(self):
-        """A brief description of the domain name
+        r"""A brief description of the domain name
         """
         if self.__domain_name__ is None:
             self.__domain_name__ = nameFromUnit(self.domain)
@@ -404,13 +405,13 @@ class DataZone(neo.Epoch):
 
     @property
     def domain(self):
-        """Alias to self.places for API compatibility with DataSignal
+        r"""Alias to self.places for API compatibility with DataSignal
         """
         return self.places
 
     @property
     def times(self):
-        """Alias to self.places for API compatibility with neo.Epoch
+        r"""Alias to self.places for API compatibility with neo.Epoch
         """
         return self.places
     
@@ -445,57 +446,66 @@ class DataZone(neo.Epoch):
         self._labels = np.array(labels)
 
 @dataclass
-class Interval:
-    """Encapsulates an interval of a signal in a Cartesian axis system.
-This can be specified by two landmarks, or by a landmark and an extent
-(or duration) - in this case is similar to a neo.Epoch or DataZone, except that
-if specifies an unique interval.
+class Interval(ScipyenDataclass):
+    r"""Encapsulates an interval of a signal in a Cartesian axis system.
+    This can be specified by two landmarks, or by a landmark and an extent
+    (or duration) - in this case is similar to a neo.Epoch or DataZone, except that
+    if specifies an unique interval.
 
-This class is intended to be a light-weight, convergent common data type useful
-for accessing a signal region (a.k.a "slice") encapsulated in a neo.Epoch, 
-DataZone or SignalCursor.
-        
-Suppose you write a function to calculate a measure in a signal based on a cursor
-or an epoch interval. Since a SignalCursor and a neo.Epoch are very different 
-types, you may have to write two separate pieces of code for doing the same thing
-i.e., to calculate something based on the signal values in the region defined by
-        
-    • the SignalCursor xwindow around its x coordinate
-    • the Epoch's interval defined by its time and duration.
-        
-The separate pieces of code will differ in the way that the two parameters
-('x' and 'xwindow', for a SignalCursor, or times[k] and durations[k], for 
-the kᵗʰ interval in an Epoch) are used to determine the start and stop times
-of the signal regions where the calculation is to be made.
-        
-An Interval object brings this to a common denominator, so that it can be used
-directly instead of either a cursor or a Epoch's interval, although functions
-using either types are available as well in the 'ephys.ephys' module in Scipyen.
-        
-An Interval it that it allows storing Epoch intervals SEPARATELY, instead of 
-storing the entire Epoch when that is not desired (one could extract one
-interval from an Epoch and use it to construct another Epoch to be stored; 
-however, the first part of this exercise is already done bny constructing an #
-Interval).
-        
-Another use of Interval is to store SignalCursor coordinates to files; since a
-SignalCursor is a Qt object that handles graphic items, IT IS NOT SERIALIZABLE
-HENCE IT CANNOT BE "PICKLED" or otherwise "saved" to a file.
-        
-The only thing an Interval does not know about is the type of the cursor where 
-the coordinates come from (i.e., vertical or horizontal) but that can be deduced 
-from the context.
+    This class is intended to be a light-weight, convergent common data type useful
+    for accessing a signal region (a.k.a "slice") encapsulated in a neo.Epoch, 
+    DataZone or SignalCursor.
+            
+    Suppose you write a function to calculate a measure in a signal based on a cursor
+    or an epoch interval. Since a SignalCursor and a neo.Epoch are very different 
+    types, you may have to write two separate pieces of code for doing the same thing
+    i.e., to calculate something based on the signal values in the region defined by
+            
+        • the SignalCursor xwindow around its x coordinate
+        • the Epoch's interval defined by its time and duration.
+            
+    The separate pieces of code will differ in the way that the two parameters
+    ('x' and 'xwindow', for a SignalCursor, or times[k] and durations[k], for 
+    the kᵗʰ interval in an Epoch) are used to determine the start and stop times
+    of the signal regions where the calculation is to be made.
+            
+    An Interval object brings this to a common denominator, so that it can be used
+    directly instead of either a cursor or a Epoch's interval, although functions
+    using either types are available as well in the 'ephys.ephys' module in Scipyen.
+            
+    An Interval it that it allows storing Epoch intervals SEPARATELY, instead of 
+    storing the entire Epoch when that is not desired (one could extract one
+    interval from an Epoch and use it to construct another Epoch to be stored; 
+    however, the first part of this exercise is already done bny constructing an #
+    Interval).
+            
+    Another use of Interval is to store SignalCursor coordinates to files; since a
+    SignalCursor is a Qt object that handles graphic items, IT IS NOT SERIALIZABLE
+    HENCE IT CANNOT BE "PICKLED" or otherwise "saved" to a file.
+            
+    The only thing an Interval does not know about is the type of the cursor where 
+    the coordinates come from (i.e., vertical or horizontal) but that can be deduced 
+    from the context.
 
-A croshair cursor, for example might be stored as a pair of
-Interval objects according to an ad-hoc convention (e.g. the horizontal coordinates
-first, then the vertical coordinates).
-        
-Changelog:
-    2024-02-09 09:53:36 this is now mutable
-        
-"""
-    t0: typing.Union[numbers.Number, pq.Quantity]
-    t1: typing.Union[numbers.Number, pq.Quantity]
+    A croshair cursor, for example might be stored as a pair of
+    Interval objects according to an ad-hoc convention (e.g. the horizontal coordinates
+    first, then the vertical coordinates).
+            
+    Changelog:
+        2024-02-09 09:53:36 this is now mutable
+            
+    """
+    
+    # NOTE: 2025-03-22 14:40:17
+    # because this inherits from ScipyenDataclass, none of the field below can be 
+    # non-default arguments (because they are added to the class definition AFTER
+    # those defined in ScipyenDataclass)
+    # 
+    # Therefore I make these as "default", but check for them in the custom __init__
+    # below.
+    
+    t0: typing.Union[numbers.Number, pq.Quantity] = dataclasses.field(default=None)
+    t1: typing.Union[numbers.Number, pq.Quantity] = dataclasses.field(default=None)
     name: str = "Interval"
     extent: bool = False
     
@@ -549,7 +559,7 @@ Changelog:
     
 def epoch2intervals(epoch: typing.Union[neo.Epoch, DataZone], keep_units:bool = True,
                     duration:bool=True) -> typing.List[Interval]:
-    """Generates a sequence of datatypes.Interval objects
+    r"""Generates a sequence of datatypes.Interval objects
     
     Each interval coresponds to the epoch's interval.
     
@@ -575,7 +585,7 @@ def epoch2intervals(epoch: typing.Union[neo.Epoch, DataZone], keep_units:bool = 
     
 @safeWrapper
 def intervals2epoch(*args, **kwargs):
-    """Construct a neo.Epoch or DataZone from a sequence of Interval objects.
+    r"""Construct a neo.Epoch or DataZone from a sequence of Interval objects.
     All numeric values in the intervals must be python Quantities.
     
     TODO: 2023-06-13 23:48:09
@@ -665,7 +675,7 @@ def epoch2cursors(epoch: typing.Union[neo.Epoch, DataZone],
                   signal_viewer: typing.Optional[QtWidgets.QMainWindow] = None, 
                   axis: typing.Optional[typing.Union[int, str, pg.PlotItem, pg.GraphicsScene]] = None, 
                   **kwargs):
-    """Creates vertical signal cursors from a neo.Epoch.
+    r"""Creates vertical signal cursors from a neo.Epoch.
     
     Parameters:
     ----------

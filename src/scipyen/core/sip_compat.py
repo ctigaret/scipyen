@@ -14,7 +14,7 @@ except:
     has_sip = False
     
 def no_sip_autoconversion(klass):
-    """Decorator for classes to suppresses sip autoconversion of Qt to Python
+    r"""Decorator for classes to suppresses sip autoconversion of Qt to Python
     types.
     
     Mostly useful to prevent sip to convert QVariant to a python type when
@@ -42,7 +42,7 @@ def no_sip_autoconversion(klass):
 
 @no_sip_autoconversion(QtCore.QVariant)
 def fromMimeData(mimeData:QtCore.QMimeData) -> QtGui.QColor:
-    """Only works with PyQt5/6; PySide2/6 does not implement sip"""
+    r"""Only works with PyQt5/6; PySide2/6 does not implement sip"""
     if mimeData.hasColor():
         # NOTE: 2021-05-14 21:26:16 ATTENTION
         # sip "autoconverts" QVariant<QColor> to an int, therefore constructing

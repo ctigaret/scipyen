@@ -55,9 +55,11 @@ shopt -s lastpipe
 # if [[ `id -u` -eq 0 ]] ; then
 cat <<END > ${target_dir}/scipyen 
 #! /bin/sh
-if [ -z \${CONDA_PREFIX} ]; then
+source \${HOME}/.bashrc
+#if [ -z \${CONDA_PREFIX} ]; then
+scipyact
+#fi
 mamba activate ${scipyenvdir}
-fi
 export OUTDATED_IGNORE=1
 a=\`which xrdb\` # do we have xrdb to read the X11 resources? (on Unix almost surely yes)
 if [ \$0 == 0 ] ; then
@@ -65,7 +67,7 @@ if [ -r $scipyensrcdir/neuron_python/app-defaults/nrniv ] ; then
 xrdb -merge $scipyensrcdir/neuron_python/app-defaults/nrniv
 fi
 fi
-python --Xfrozen_modules=off ${scipyensrcdir}/scipyen.py "\$*"
+python3 --Xfrozen_modules=off ${scipyensrcdir}/scipyen.py "\$*"
 END
 shopt -u lastpipe
 chmod +x ${target_dir}/scipyen 

@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 
-"""Viewer for XML documents
+r"""Viewer for XML documents
 """
 #### BEGIN core python modules
 from __future__ import print_function

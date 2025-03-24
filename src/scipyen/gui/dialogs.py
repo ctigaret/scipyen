@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 
-"""Some common-use dialogs for metadata in Scipyen
+r"""Some common-use dialogs for metadata in Scipyen
 """
 
 import os, math, typing
@@ -26,7 +26,7 @@ class GenericMappingDialog(qd.QuickDialog, WorkspaceGuiMixin):
     _supported_value_types_ = (str, int, float, complex)
     
     def __init__(self, mapping:typing.Optional[dict] = None, title:typing.Optional[str]="Mapping Editor", parent:typing.Optional[QtWidgets.QWidget]=None):
-        """The key parameter is 'mapping', which is a Python dict object
+        r"""The key parameter is 'mapping', which is a Python dict object
         with str keys and basic python data types (number.Numbers, str).
 
             Each key/value pair will results in a QuickDialog custom widget (see gui.quickdialog)

@@ -46,6 +46,7 @@ dependencies:
   - conda-forge::scikit-learn
   - conda-forge::scikit-image
   - conda-forge::pandas-flavor
+  - conda-forge::opencv
   - sympy
   - pyqtgraph
   - qimage2ndarray

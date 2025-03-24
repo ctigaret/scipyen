@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""Small patches to neo.Epoch and neo.Events
+r"""Small patches to neo.Epoch and neo.Events
 """
 
 #__all__ = ["neo"]
@@ -20,11 +20,7 @@ from colorama import Fore, Back, Style
 
 import neo
 from neo.core.baseneo import BaseNeo, _check_annotations
-#from neo.rawio.baserawio import (BaseRawIO, _signal_channel_dtype, _unit_channel_dtype,
-                        #_event_channel_dtype)
 
-#from core.axonrawio_patch import AxonRawIO_v1
-# # from core.neoevent import (_new_Event_v1, _new_Event_v2,)
 import core
 from core.workspacefunctions import scipyentopdir
 from core.neoevent import Event
@@ -37,7 +33,6 @@ from core.prog import (safeWrapper, signature2Dict, SpecFinder)
 
 neo_major, neo_minor, neo_micro = map(lambda x: int(x), neo.__version__.split("."))
 
-# #neo.io.axonio.AxonRawIO = _axonrawio.AxonRawIO_v1
 
 original ={"neo.core.analogsignal._new_AnalogSignalArray": neo.core.analogsignal._new_AnalogSignalArray,
            "neo.core.irregularlysampledsignal._new_IrregularlySampledSignal":neo.core.irregularlysampledsignal._new_IrregularlySampledSignal,
@@ -50,7 +45,7 @@ original ={"neo.core.analogsignal._new_AnalogSignalArray": neo.core.analogsignal
            } 
 
 def _patch_new_neo(original_f, *args, **kwargs):
-    """Workarounds to load pickled neo data created a long time ago..."""
+    r"""Workarounds to load pickled neo data created a long time ago..."""
     # All params in neo's _new_* factory functions are NAMED !!!
     # since this 'patches' _new_* functions, the first element in args is
     # the actual class of the array type being created:

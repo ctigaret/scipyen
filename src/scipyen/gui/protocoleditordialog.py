@@ -255,7 +255,7 @@ class TriggerProtocolsTableModel(QtCore.QAbstractTableModel):
     
     @property
     def modelData(self):
-        """The reference to a protocol list.
+        r"""The reference to a protocol list.
         """
         return self._data_
     
@@ -268,7 +268,7 @@ class TriggerProtocolsTableModel(QtCore.QAbstractTableModel):
             self.endResetModel()
             
 class ProtocolEditorDialog(GuiMessages, QDialog, Ui_ProtocolEditorDialog):
-    """Gateway of GUI actions to triggers protocols management.
+    r"""Gateway of GUI actions to triggers protocols management.
     The dialog uses Qt signal/slot communication to redirect GUI requests for
     trigger protocol changes, to caller code which actually implements these 
     changes.
@@ -386,7 +386,7 @@ class ProtocolEditorDialog(GuiMessages, QDialog, Ui_ProtocolEditorDialog):
     
     @Slot()
     def _slot_detectTriggers(self):
-        """Emits sig_detectTriggers signal.
+        r"""Emits sig_detectTriggers signal.
         
         This should be connected to a slot in the caller widget, which would
         execute (or call the appropriate functions to execute) the trigger event 

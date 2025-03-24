@@ -2,17 +2,82 @@
 # SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""
+r"""
 NOTE: 2023-06-26 17:25:32
-This is for the developer, NOT the final user:
+Spec file for bundling Scipyen as a Python executable, using PyInstaller.
+
+This file is for the developer/maintainer of Scipyen, NOT the final user.
+
+If you are interested in maintaining/ditributing Scipyen then please read on
+(and expect that some information below may be slightly outdated or incomplete).
+
+Otherwise, feel free to skip this file.
+
 To create a distributable scipyen application, you need to:
 
-1) clone the scipyen git repo locally (e.g. to $HOME/scipyen)- NOTE: this is assumed to be the case from here onwards
+1) clone the scipyen git repo locally (e.g. to $HOME/scipyen) - 
+NOTE: this is assumed to be the case from here onwards, on GNU/linux and MacOS
 
-2) use the install.sh script to create a local virtual environment with all the 
-  binaries needed for Scipyen (this includes building PyQt5, VIGRA and - -optionally - NEURON)
+ATTENTION: python binary compatiility(ies) ATTENTION
 
-3) activate the new environment, then buld the distributable app:
+For the bundled app to be portable across machines with the same OS
+make sure that the host platform (where the bundle is to be run) has the SAME
+python libraries as the machine where the bundle was built - especially the 
+python interpreter shared libraries.
+
+For example, in openSUSE tubmleweed one can install two different 
+libpython3.13.so.1.0 files from the same repository (main):
+
+Package                                         ↦   library file (size)
+---------------------------------------------------------------------------
+libpython3_13-1_0 version 3.13.2-2.5            ↦   libpython3.13.so.1.0 (4.9 Mb)
+libpython3_13-1_0-x86-64-v3 version 3.13.2-2.5  ↦   libpython3.13.so.1.0 (5.0 Mb)
+
+If the PyInstaller bundle is built on a machine using libpython3_13-1_0-x86-64-v3
+if will simply NOT work on machine that is using libpython3_13-1_0 !!!
+
+The reverse is OK: the executable built on a machine using libpython3_13-1_0
+WILL work on a machine that uses libpython3_13-1_0-x86-64-v3.
+
+2) use on of the installation scripts in the top directory of the cloned
+    repository to create the local virtual environment required to run Scipyen:
+    
+    • linux — choose between:
+        ∘ virtualenv_build_linux.sh → builds a virtualenv environment; pass --help for options
+            ⋆ can be used to build PyQt5 locally (for better look & feel integration with KDE desktops)
+                (NOTE: currently this 'integration' refers to the GUI widget styles;
+                no KDE/Plasma libraries are used in Scipyen.
+                The only reason to build Pyqt5 locally is the lack of Qt styles
+                otherwise present in your desktop e.g. breeze, etc — more often
+                the Qt plugins on your platform are NOT binary compatible with
+                the stock Pyqt5 from PyPI or conda channels)
+                
+            ⋆ builds vigra locally — can be customized (to some extent) e.g. to
+                use OpenEXR and other optional libraries including versions of 
+                boost for MPI; if you are a tinkerer, then this is the way to go;
+                otherwise I suggest running Scipyen in a conda environment, see below
+                for how to build it.
+            
+        ∘ mamba_env_install_linux.sh → builds a conda environment
+            (see scipyen.yml file for what dependencies are installed)
+            
+            ⋆ installs a 'stock' PyQt5 package from conda-forge — see above for
+                limitations arising from using this
+                
+            ⋆ installs a 'stock' vigra — useful to day-to-day work and likely 
+                what mst users need; 
+                
+    • Windows platforms (>= 10): install mambaforge, then execute mamba_env_install_windows.bat
+        ∘ installs PyQt5 and vigra from conda-forge (and others); some packages come from pip
+        (see scipyen.yml file for what dependencies are installed)
+        
+    • MacOS: install mambaforge then execute mamba_env_install_macos.sh
+        WARNING - as of 2025-03-14 09:43:03 this has NOT been tested yet
+        ∘ installs PyQt5 and vigra from conda-forge (and others); some packages come from pip
+        (see scipyen.yml file for what dependencies are installed)
+    
+
+3) activate the new environment, make sure Scipyen runs, then buld the distributable app:
   in a bash shell do something like (NOTE: 'user@host:>'is your terminal prompt
   and it may look different on your machine, make sure you understand this):
 
@@ -239,7 +304,7 @@ def file2TOCEntry(src_path:str, topdirparts:list, file_category:str="DATA"):
     return target_path, os.fspath(src_path), file_category
 
 def file2entry(src_path:str, topdirparts:list, strip_path:bool=True) -> tuple:
-    """Returns a 2-tuple (source_full_path, target_dir)
+    r"""Returns a 2-tuple (source_full_path, target_dir)
     To be used in the Analysis constructor, below
     
     Parameters:
@@ -556,53 +621,16 @@ mn = f"{now.minute}"
 sc = f"{now.second}"
 build_sfx = f"{year}{month}{day}_{hr}_{mn}_{sc}"
 pyver_sfx = "_".join(["python", f"{sys.version_info.major}", f"{sys.version_info.minor}", f"{sys.version_info.micro}"])
-debug_sfx = "debug" if compile_options.debug else ""
+# debug_sfx = "debug" if compile_options.debug else ""
 
-product = "_".join(["scipyen", gitsfx, platform, host_name, pyver_sfx, debug_sfx, build_sfx])
+product = "_".join(["scipyen", gitsfx, platform, host_name, pyver_sfx, build_sfx])
+if compile_options.debug:
+    product += "_debug"
 # product = f"scipyen{gitsfx}_{platform}_{host_name}{debug_sfx}"
 # product = f"scipyen{gitsfx}_{platform}_{hr}_{mn}_{sc}_{year}{month}{day}"
 
 bundlepath = os.path.join(distpath, product)
 
-# print(f"bundlepath = {bundlepath}")
-# NOTE: 2024-05-31 09:31:43 FIXME/TODO
-# ------------------------------------
-# this needs more work + adapt for the install script (i.e. when the user wants
-# to install the bundled app directory system-wide, e.g. in /usr/local)
-# ------------------------------------
-#
-
-# if sys.platform.startswith("linux"):
-#     # add a system-wide installation script
-#     desktoptempdir = tempfile.mkdtemp()
-#     desktop_file_name = os.path.join(desktoptempdir, f"Scipyen_app{gitsfx}.desktop")
-#     # desktop_icon_file = os.path.join(bundlepath,"gui/resources/images/pythonbackend.svg")
-#     desktop_icon_file = "pythonbackend.svg"
-#     exec_file = os.path.join(bundlepath, "scipyen")
-#     desktop_file_contents = ["[Desktop Entry]",
-#     "Type=Application",
-#     "Name[en_GB]=Scipyen",
-#     "Name=Scipyen",
-#     "Comment[en_GB]=Scientific Python Environment for Neurophysiology",
-#     "Comment=Scientific Python Environment for Neurophysiology",
-#     "GenericName[en_GB]=Scientific Python Environment for Neurophysiology",
-#     "GenericName=Scientific Python Environment for Neurophysiology",
-#     f"Icon={desktop_icon_file}",
-#     "Categories=Science;Utilities;",
-#     "Exec=%k/scipyen",
-#     "MimeType=",
-#     "Path=",
-#     "StartupNotify=true",
-#     "Terminal=true",
-#     "TerminalOptions=\s--noclose",
-#     "X-DBUS-ServiceName=",
-#     "X-DBUS-StartupType=",
-#     "X-KDE-SubstituteUID=false",
-#     "X-KDE-Username=",
-#     ]
-#     with open(desktop_file_name, "wt") as desktop_file:
-#         for line in desktop_file_contents:
-#             desktop_file.write(f"{line}\n")
 # 
 #     dist_install_script = ["#!/bin/bash",
 #                         "mydir=`dirname $0`",
@@ -804,6 +832,46 @@ coll = COLLECT(
     name=product, # name of distribution directory (e.g, 'scipyen_dev' etc)
 )
 
+# print(f"bundlepath = {bundlepath}")
+# NOTE: 2024-05-31 09:31:43 FIXME/TODO
+# ------------------------------------
+# this needs more work + adapt for the install script (i.e. when the user wants
+# to install the bundled app directory system-wide, e.g. in /usr/local)
+# ------------------------------------
+#
+
+# if sys.platform.startswith("linux"):
+#     # add a system-wide installation script
+#     desktoptempdir = tempfile.mkdtemp()
+#     desktop_file_name = os.path.join(desktoptempdir, f"org.scipyen.{gitsfx}.desktop")
+#     desktop_icon_file = "pythonbackend.svg"
+#     exec_file = os.path.join(bundlepath, "scipyen")
+#     desktop_file_contents = ["[Desktop Entry]",
+#     "Type=Application",
+#     "Name[en_GB]=Scipyen",
+#     "Name=Scipyen",
+#     "Comment[en_GB]=Scientific Python Environment for Neurophysiology",
+#     "Comment=Scientific Python Environment for Neurophysiology",
+#     "GenericName[en_GB]=Scientific Python Environment for Neurophysiology",
+#     "GenericName=Scientific Python Environment for Neurophysiology",
+#     f"Icon={desktop_icon_file}",
+#     "Categories=Science;Utilities;",
+#     "Exec=%k/scipyen",
+#     "MimeType=",
+#     "Path=",
+#     "StartupNotify=true",
+#     "Terminal=true",
+#     "TerminalOptions=\s --noclose",
+#     "X-DBUS-ServiceName=",
+#     "X-DBUS-StartupType=",
+#     "X-KDE-SubstituteUID=false",
+#     "X-KDE-Username=",
+#     ]
+#     with open(desktop_file_name, "wt") as desktop_file:
+#         for line in desktop_file_contents:
+#             desktop_file.write(f"{line}\n")
+
+
 stop_time = time.perf_counter()
 dt = stop_time - start_time
 dd = int(dt//86400)
@@ -812,6 +880,8 @@ hh = int(dt//3600)
 dt = dt % 3600
 mm = int(dt//60)
 dt = dt % 60
+
+
 
 print(f"\n\nDuration: {dd} days, {hh} hours, {mm} minutes and {dt} seconds")
 

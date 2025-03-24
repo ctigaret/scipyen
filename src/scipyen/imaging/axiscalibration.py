@@ -53,7 +53,7 @@ from .axisutils import (axisTypeName,
 AxisCalibrationDataType = typing.TypeVar("AxisCalibrationData")
 
 class CalibrationData(object):
-    """:Superclass: for Axis and Channel calibrations.
+    r""":Superclass: for Axis and Channel calibrations.
     
     The sole purpose of these :classes: is to offer a way to store calibration
     data ('fields') in vigra.AxisInfo objects and optionally to notify code using
@@ -94,7 +94,7 @@ class CalibrationData(object):
         return isinstance(x, cls) or (isinstance(x, dict) and all(k in x for k in cls.parameters))
         
     def __init__(self, *args, **kwargs):
-        """Calibration data constructor.
+        r"""Calibration data constructor.
         
         Initializes an object of :class: CalibrationData or one of its 
         :subclasses: : AxisCalibrationData, ChannelCalibrationData.
@@ -715,7 +715,7 @@ class CalibrationData(object):
         p.text("\n")
         
     def __contains__(self, item:str):
-        """Membership test for channel calibration data
+        r"""Membership test for channel calibration data
         Parameters:
         ==========
         item: str, int, or ChannelCalibrationData
@@ -848,7 +848,7 @@ class CalibrationData(object):
         
     @property
     def units(self) -> pq.Quantity:
-        """Get/set the pysical units of measurement.
+        r"""Get/set the pysical units of measurement.
         WARNING: Setting this property will NOT adjust (rescale) the 'origin' 
         and 'resolution' - use self.rescale() for that.
         Issues a warning if the new units are NOT typical for the axis type.
@@ -875,7 +875,7 @@ class CalibrationData(object):
         self._data_.units = u.units
         
     def rescale(self, u:typing.Union[pq.Quantity, pq.dimensionality.Dimensionality, str]) -> None:
-        """Rescale units, origin and resolution for new units.
+        r"""Rescale units, origin and resolution for new units.
         
         New units must be convertible to the current units.
         """
@@ -889,7 +889,7 @@ class CalibrationData(object):
     
     @property
     def origin(self):
-        """Get/set the origin value
+        r"""Get/set the origin value
         """
         return self._data_.origin
     
@@ -915,13 +915,13 @@ class CalibrationData(object):
             
     @property
     def calibratedOrigin(self):
-        """Origin as Python Quantity
+        r"""Origin as Python Quantity
         """
         return self.origin * self.units.units
         
     @property
     def resolution(self):
-        """Get/set the origin value
+        r"""Get/set the origin value
         """
         return self._data_.resolution
     
@@ -947,13 +947,13 @@ class CalibrationData(object):
             
     @property
     def calibratedResolution(self):
-        """Resolution as Python Quantity
+        r"""Resolution as Python Quantity
         """
         return self.resolution * self.units.units
         
     @property
     def calibrationTuple(self):
-        """Returns a tuple of quantities (unit, origin, resolution)
+        r"""Returns a tuple of quantities (unit, origin, resolution)
         """
         if self.__class__ == ChannelCalibrationData:
             return (self.units.units, self.calibratedOrigin, self.calibratedResolution, self.calibratedMaximum)
@@ -962,7 +962,7 @@ class CalibrationData(object):
     
     @property
     def data(self):
-        """Returns the calibration data as a dict
+        r"""Returns the calibration data as a dict
         """
         ret = dict(self._data_)
         
@@ -982,7 +982,7 @@ class CalibrationData(object):
         #return (value * self.getDimensionlessResolution(key, channel) + self.getDimensionlessOrigin(key, channel)) * self.getUnits(key, channel)
     
     def calibratedDistance(self, value:numbers.Number):
-        """Distance from origin in axis units
+        r"""Distance from origin in axis units
         value: distance from origin in samples
         """
         
@@ -998,7 +998,7 @@ class CalibrationData(object):
         return (self.origin + value * self.resolution) * self.units
     
     def sampleDistance(self, value:pq.Quantity):
-        """Returns the number of samples for the calibrated distance from origin.
+        r"""Returns the number of samples for the calibrated distance from origin.
         """
         if not isinstance(value, pq.Quantity):
             raise TypeError(f"Expecting a Quantity; got {type(value).__name__} instead")
@@ -1020,7 +1020,7 @@ class CalibrationData(object):
         #return int(np.rint(value / self.resolution))
     
 class ChannelCalibrationData(CalibrationData):
-    """Encapsulates calibration data for pixel INTENSITIES in a given channel.
+    r"""Encapsulates calibration data for pixel INTENSITIES in a given channel.
     
     Do not confuse with the calibration of a Channels axis itself.
     
@@ -1032,7 +1032,7 @@ class ChannelCalibrationData(CalibrationData):
         
     @property
     def minimum(self):
-        """Get/set minimum calibration value.
+        r"""Get/set minimum calibration value.
         This is the same as origin.
         """
         return self.origin
@@ -1043,7 +1043,7 @@ class ChannelCalibrationData(CalibrationData):
         
     @property
     def maximum(self):
-        """Get/set the maximum calibration value
+        r"""Get/set the maximum calibration value
         """
         return self._data_.maximum
     
@@ -1090,7 +1090,7 @@ class ChannelCalibrationData(CalibrationData):
             self._data_.index = val
 
 class AxisCalibrationData(CalibrationData):
-    """Atomic calibration data for an axis of a vigra.VigraArray.
+    r"""Atomic calibration data for an axis of a vigra.VigraArray.
     
     To be mapped to a vigra.AxisInfo key str in AxesCalibration, or to
     a key str with format "channel_X", in a parent AxisCalibrationData object
@@ -1131,7 +1131,7 @@ class AxisCalibrationData(CalibrationData):
 
     @property
     def name(self):
-        """Get/set the axis name
+        r"""Get/set the axis name
         """
         return self._data_.name
     
@@ -1143,7 +1143,7 @@ class AxisCalibrationData(CalibrationData):
             
     @property
     def key(self):
-        """Get/set the axis type key
+        r"""Get/set the axis type key
         """
         return self._data_.key
     
@@ -1155,7 +1155,7 @@ class AxisCalibrationData(CalibrationData):
             
     @property
     def type(self):
-        """Get/set the axis type flags
+        r"""Get/set the axis type flags
         WARNING: Setting this property will modify the other properties:
         'units', 'name', 'key', 'origin', and 'resolution'
         
@@ -1189,7 +1189,7 @@ class AxisCalibrationData(CalibrationData):
             
     @property
     def channels(self):
-        """Returns a tuple of tuples with (name, ChannelCalibrationData) 
+        r"""Returns a tuple of tuples with (name, ChannelCalibrationData) 
         
         WARNING: Excludes calibration data for virtual channel.
         
@@ -1246,7 +1246,7 @@ class AxisCalibrationData(CalibrationData):
                 
     @property
     def channelCalibrations(self):
-        """A list of tuples (symbol, channel calibration).
+        r"""A list of tuples (symbol, channel calibration).
         
         These INCLUDE the virtual channel when calibrations for real channels do
         not exist; hence,, for a channels-type axis, this property is always a 
@@ -1278,7 +1278,7 @@ class AxisCalibrationData(CalibrationData):
         
     @property
     def channelNames(self):
-        """A tuple of channel names, from their calibration data.
+        r"""A tuple of channel names, from their calibration data.
         These include the virtual channel (if it exists).
         
         This list is empty if the AxisCalibrationData corresponds to a 
@@ -1288,7 +1288,7 @@ class AxisCalibrationData(CalibrationData):
         
     @property
     def channelIndices(self):
-        """A tuple of channel indices, from their calibration data.
+        r"""A tuple of channel indices, from their calibration data.
         These include the virtual channel (if it exists).
         
         This list is empty if the AxisCalibrationData corresponds to a 
@@ -1298,7 +1298,7 @@ class AxisCalibrationData(CalibrationData):
         
     @property
     def nChannels(self) -> int:
-        """Number of data channel along the axis.
+        r"""Number of data channel along the axis.
         This is:
         0 for a non-Channels axis
         1 for a virtual Channels axis (VIGRA Arrays always have at least one
@@ -1314,7 +1314,7 @@ class AxisCalibrationData(CalibrationData):
         
     @property
     def calibrationString(self):
-        """
+        r"""
         An XML-formatted string with one of the following formats, depending on
         whether the axis is a Channels axis or not:
         
@@ -1408,7 +1408,7 @@ class AxisCalibrationData(CalibrationData):
     
     @property
     def axisInfo(self):
-        """Dynamically generated vigra.AxisInfo object
+        r"""Dynamically generated vigra.AxisInfo object
         """
         
         return vigra.AxisInfo(key = standardAxisTypeKeys[self.key], typeFlags = self.type, resolution=self.resolution, description=self.calibrationString)
@@ -1418,7 +1418,7 @@ class AxisCalibrationData(CalibrationData):
     def addChannelCalibration(self, val:ChannelCalibrationData, 
                               name:typing.Optional[str]=None,
                               index:typing.Optional[int]=None):
-        """Add/set ChannelCalibrationData
+        r"""Add/set ChannelCalibrationData
         
         NOTE: name is the name under which this channel calibration is stored
         in self.channelCalibrations (i.e. the 'key'). WARNING This is not
@@ -1474,7 +1474,7 @@ class AxisCalibrationData(CalibrationData):
         self._data_[name] = val
         
     def removeChannelCalibration(self, index:typing.Union[int, str]) -> typing.Union[ChannelCalibrationData]:
-        """Removes ChannelCalibrationData for channel with specified index or name.
+        r"""Removes ChannelCalibrationData for channel with specified index or name.
         
         Returns the ChannelCalibrationData, if found, else None.
         
@@ -1486,7 +1486,7 @@ class AxisCalibrationData(CalibrationData):
         return self._data_.pop(chcal[0], None)
     
     def reindexChannels(self, index:typing.Optional[dict]=None) -> None:
-        """Reindexes the channels
+        r"""Reindexes the channels
         Does nothing for a NonChannel axis or without ChannelCalibrationData.
         
         Parameters:
@@ -1528,7 +1528,7 @@ class AxisCalibrationData(CalibrationData):
                 chcal.index = k
                 
     def sortedChannels(self, by_index:typing.Union[bool,str]=True):
-        """Yields ChannelCalibrationData sorted by chanel index, name or field.
+        r"""Yields ChannelCalibrationData sorted by chanel index, name or field.
         
         by_index: bool or str
             When bool: if True, sort by index; else sort by name
@@ -1542,7 +1542,7 @@ class AxisCalibrationData(CalibrationData):
         yield from sorted(self.channels, key = lambda x: x.by_index if instance(by_index, str) else x.index if by_index is True else x.name)
         
     def clearChannels(self):
-        """Removes all ChannelCalibrationData associated with this object.
+        r"""Removes all ChannelCalibrationData associated with this object.
         """
         if not self.type & vigra.AxisType.Channels:
             return
@@ -1553,7 +1553,7 @@ class AxisCalibrationData(CalibrationData):
     def getChannelCalibration(self, index:typing.Optional[typing.Union[int, str]]=None, 
                               full:typing.Optional[bool]=False,
                               physical:bool=True) -> typing.Optional[typing.Union[list, ChannelCalibrationData]]:
-        """ChannelCalibrationData for a single channel.
+        r"""ChannelCalibrationData for a single channel.
         
         Parameters:
         ==========
@@ -1660,7 +1660,7 @@ class AxisCalibrationData(CalibrationData):
                 return chcal[1]
             
     def getChannelIndex(self, name:str) -> typing.Optional[int]:
-        """Returns the index of the channel with given name.
+        r"""Returns the index of the channel with given name.
         
         Parameters:
         ==========
@@ -1688,7 +1688,7 @@ class AxisCalibrationData(CalibrationData):
         return chcal.index
         
     def setChannelIndex(self, name:str, val:int) -> None:
-        """Sets the index of the channel with given name.
+        r"""Sets the index of the channel with given name.
         
         Parameters:
         ==========
@@ -1718,7 +1718,7 @@ class AxisCalibrationData(CalibrationData):
             self.addChannelCalibration(chcal, chcal.name)
             
     def getChannelName(self, index:int) -> typing.Optional[str]:
-        """Returns the name of the channel with given index.
+        r"""Returns the name of the channel with given index.
         
         Parameters:
         ==========
@@ -1737,7 +1737,7 @@ class AxisCalibrationData(CalibrationData):
             return chcal.name
         
     def setChannelName(self, index:int, val:str) -> None: # ensure_unique:bool = True) -> None:
-        """Sets the name of the channel with given index.
+        r"""Sets the name of the channel with given index.
         
         Parameters:
         ==========
@@ -1825,7 +1825,7 @@ class AxisCalibrationData(CalibrationData):
         
         
     def getChannelUnits(self, index:typing.Union[int, str]) -> typing.Optional[pq.Quantity]:
-        """Returns the units of the specified channel, or None if not found
+        r"""Returns the units of the specified channel, or None if not found
         """
         chcal = self.getChannelCalibration(index)
         if chcal is None:
@@ -1848,7 +1848,7 @@ class AxisCalibrationData(CalibrationData):
             self.addChannelCalibration(chcal, chcal.name)
         
     def calibrateAxis(self, axinfo:typing.Optional[vigra.AxisInfo]=None) -> None:
-        """Associates calibration values with a vigra.AxisInfo object.
+        r"""Associates calibration values with a vigra.AxisInfo object.
         
         This method does the following:
         
@@ -1931,7 +1931,7 @@ class AxisCalibrationData(CalibrationData):
     
     @staticmethod
     def findCalibrationString(s:str):
-        """Returns the coordinates (start & stop) of an XML-formatted calibration
+        r"""Returns the coordinates (start & stop) of an XML-formatted calibration
         sub-string of 's' or None if 's' does not contain an XML-formatted 
         calibration sub-string.
         
@@ -1970,7 +1970,7 @@ class AxisCalibrationData(CalibrationData):
     
     @staticmethod
     def _embedCalibrationString_(s:str, axinfo:vigra.AxisInfo):
-        """Embeds calibration sub-string in 's' into a vigra.AxisInfo object.
+        r"""Embeds calibration sub-string in 's' into a vigra.AxisInfo object.
         
         Does nothing if 's' does not contain an XML-format calibration string.
         
@@ -2016,7 +2016,7 @@ class AxisCalibrationData(CalibrationData):
     
     @staticmethod
     def fromCalibrationString(s:str) -> AxisCalibrationDataType:
-        """AxisCalibrationData factory using a calibration string.
+        r"""AxisCalibrationData factory using a calibration string.
         
         For the structure of an XML-formatted calibration string see the
         documentaiton for the AxisCalibrationData.calibrationString property.
@@ -2107,7 +2107,7 @@ class AxisCalibrationData(CalibrationData):
             
 
 class AxesCalibration(object):
-    """Encapsulates calibration of a set of axes.
+    r"""Encapsulates calibration of a set of axes.
     
     Associates physical units (and names) to a vigra array axis.
     
@@ -2163,7 +2163,7 @@ class AxesCalibration(object):
     """
 
     def __init__(self, *args):
-        """
+        r"""
         Var-positional parameters:
         ==========================
         *args = a vigra.VigraArray, a vigra.AxisTags, up to to five 
@@ -2303,13 +2303,13 @@ class AxesCalibration(object):
         return ret
         
     def __iter__(self):
-        """Iterates through the AxisCalibrationData objects contained within self
+        r"""Iterates through the AxisCalibrationData objects contained within self
         """
         yield from (cal for cal in self._calibration_ if cal.key in self._axistags_)
         #yield from (cal.key for cal in self._calibration_ if cal.key in self._axistags_)
         
     def __contains__(self, item):
-        """Membership test.
+        r"""Membership test.
         item: CalibrationData, str (calibration key or name), or type flag 
             (int or vigra.AxisType)
         """
@@ -2325,7 +2325,7 @@ class AxesCalibration(object):
         return False
      
     def __getitem__(self, index:typing.Union[int, slice, range, str, vigra.AxisInfo]) -> typing.Union[AxisCalibrationData, typing.List[AxisCalibrationData]]:
-        """Indexed access to the AxisCalibrationData for an axis.
+        r"""Indexed access to the AxisCalibrationData for an axis.
         
         Parameters:
         ===========
@@ -2376,7 +2376,7 @@ class AxesCalibration(object):
                 raise IndexError(f"Calibration for axis {index} not found")
             
     def __setitem__(self, index, obj):
-        """Indexed setter.
+        r"""Indexed setter.
         index: int
         obj: AxisCalibrationData object 
         """
@@ -2395,7 +2395,7 @@ class AxesCalibration(object):
         return len(self._calibration_)
     
     def index(self, item:typing.Union[int, str]):
-        """
+        r"""
         item: AxisCalibrationData, or str (key or name)
             When a str, returns the first AxisCalibrationData with key == index
             
@@ -2417,7 +2417,7 @@ class AxesCalibration(object):
                    rtol = RELATIVE_TOLERANCE, 
                    atol =  ABSOLUTE_TOLERANCE, 
                    equal_nan = EQUAL_NAN):
-        """Compares calibration items between two axes, each calibrated by two AxesCalibration objects.
+        r"""Compares calibration items between two axes, each calibrated by two AxesCalibration objects.
         
         AxesCalibration objects are considered similar if:
         1) the underlying axes are of the same type
@@ -2581,7 +2581,7 @@ class AxesCalibration(object):
             p.pretty(cal)
         
     def hasAxis(self, key):
-        """Queries if the axis key is calibrated by this object
+        r"""Queries if the axis key is calibrated by this object
         """
         if isinstance(key, vigra.AxisInfo):
             key = key.key
@@ -2590,19 +2590,19 @@ class AxesCalibration(object):
     
     @property
     def axiskeys(self):
-        """A list of axiskeys
+        r"""A list of axiskeys
         """
         yield from (cal.key for cal in self._calibration_)
     
     #@property
     def keys(self):
-        """Alias to self.axiskeys
+        r"""Alias to self.axiskeys
         """
         yield from self.axiskeys
     
     @property
     def axistags(self):
-        """Read-only
+        r"""Read-only
         """
         return self._axistags_
     
@@ -2623,7 +2623,7 @@ class AxesCalibration(object):
     
     #@property
     def typeFlags(self, key):
-        """Read-only
+        r"""Read-only
         """
         if isinstance(key, vigra.AxisInfo):
             key = key.key
@@ -2634,7 +2634,7 @@ class AxesCalibration(object):
         return self[key]["type"]
     
     def addAxis(self, axisInfo, index = None):
-        """Register a new axis with this AxesCalibration object.
+        r"""Register a new axis with this AxesCalibration object.
         
         The calibration values for the new axis can be atomically set using
         the setXXX methods
@@ -2699,7 +2699,7 @@ class AxesCalibration(object):
             axcal_dataset.attrs["axis_type"] = axisTypeStrings(caldict["axistype"])
             
     def removeAxis(self, axis):
-        """Removes the axis and its associated calibration data
+        r"""Removes the axis and its associated calibration data
         
         Raises KeyError is axis is not found
         
@@ -2730,7 +2730,7 @@ class AxesCalibration(object):
         del(self._axistags_[key])
         
     def synchronize(self):
-        """Synchronizes the axis calibration data.
+        r"""Synchronizes the axis calibration data.
         
         Updates the AxesCalibration values using the axistags instance contained
         within this AxesCalibration object.
@@ -2766,7 +2766,7 @@ class AxesCalibration(object):
                 
         
     def calibrateAxes(self):
-        """Attaches a calibration string to all axes registered with this object.
+        r"""Attaches a calibration string to all axes registered with this object.
         """
         for k, ax in enumerate(self._axistags_):
             self._calibration_[k].calibrateAxis(ax)
@@ -2775,7 +2775,7 @@ def hasNameString(s):
     return AxesCalibration.hasNameString(s)
     
 def axisChannelName(axisinfo, channel):
-    """
+    r"""
     Parameters:
     ===========
     axisinfo: vigra.AxisInfo object
@@ -2785,7 +2785,7 @@ def axisChannelName(axisinfo, channel):
     return AxisCalibrationData(axisinfo).getChannelName(channel)
 
 def axisName(axisinfo):
-    """Returns the axis name stored in the axis description.
+    r"""Returns the axis name stored in the axis description.
     
     Parameters:
     ===========
@@ -2817,7 +2817,7 @@ def axisName(axisinfo):
     return AxesCalibration(axisinfo).axisName
     
 def isCalibrated(axisinfo):
-    """Syntactic shorthand for hasCalibrationString(axisinfo.description).
+    r"""Syntactic shorthand for hasCalibrationString(axisinfo.description).
     
     NOTE: Parameter checking is implicit
     
@@ -2825,7 +2825,7 @@ def isCalibrated(axisinfo):
     return AxesCalibration.isAxisCalibrated(axisinfo)
 
 def calibration(axisinfo, asTuple=True):
-    """Returns the calibration triplet (units, origin, resolution) of an axis.
+    r"""Returns the calibration triplet (units, origin, resolution) of an axis.
     
     The tuple is obtained by parsing the calibration string contained in the
     description attribute of axisinfo, where axisinfo is a vigra.AxisInfo object.
@@ -2850,7 +2850,7 @@ def resolution(axisinfo):
     return AxesCalibration(axisinfo).resolution
 
 def hasCalibrationString(s):
-    """Simple test for what MAY look like a calibration string.
+    r"""Simple test for what MAY look like a calibration string.
     Does nothing more than saving some typing; in particular it DOES NOT verify
     that the calibration string is conformant.
     
@@ -2863,7 +2863,7 @@ def removeCalibrationData(axInfo):
     return AxesCalibration.removeCalibrationData(axInfo)
 
 def removeCalibrationFromString(s):
-    """Returns a copy of the string with any calibration substrings removed.
+    r"""Returns a copy of the string with any calibration substrings removed.
     Convenience function to clean up AxisInfo description strings.
     
     NOTE: Parameter checking is implicit
@@ -2873,7 +2873,7 @@ def removeCalibrationFromString(s):
     return AxesCalibration.removeCalibrationFromString(s)
     
 def calibrationString(units=pq.dimensionless, origin=0.0, resolution=1.0, channel = None):
-    """Generates an axis calibration string from an units, origin and resolution
+    r"""Generates an axis calibration string from an units, origin and resolution
     
     Positional kewyord parameters:
     
@@ -2941,7 +2941,7 @@ def calibrationString(units=pq.dimensionless, origin=0.0, resolution=1.0, channe
     
 
 def parseDescriptionString(s):
-    """Performs the reverse operation to calibrationString.
+    r"""Performs the reverse operation to calibrationString.
     
     Positional parameters:
     ======================
@@ -2971,7 +2971,7 @@ def parseDescriptionString(s):
     return AxesCalibration.parseDescriptionString(s)
 
 def calibrateAxis(axInfo, cal, channel=None, channelname=None):
-    """Attaches a dimensional calibration to an AxisInfo object.
+    r"""Attaches a dimensional calibration to an AxisInfo object.
     Calibration is inserted as an xml-formatted string.
     (see calibrationString)
     
@@ -3074,7 +3074,7 @@ def calibrateAxis(axInfo, cal, channel=None, channelname=None):
 
 def getAxisResolution(axisinfo:vigra.AxisInfo, 
                       channel:typing.Optional[typing.Union[int, str]] = None):
-    """Returns the resolution of the axisinfo object as a Python Quantity.
+    r"""Returns the resolution of the axisinfo object as a Python Quantity.
     """
     if not isinstance(axisinfo, vigra.AxisInfo):
         raise TypeError("Expecting a vigra.AxisInfo object; got %s instead" % type(axisinfo).__name__)
@@ -3109,7 +3109,7 @@ def getAxisUnits(axisinfo:vigra.AxisInfo,
     
     
 def getCalibratedAxisSize(image, axis):
-    """Returns a calibrated length for "axis" in "image" VigraArray, as a python Quantity
+    r"""Returns a calibrated length for "axis" in "image" VigraArray, as a python Quantity
     
     If axisinfo is not calibrated (i.e. does not have a calibration string in its
     description attribute) then returns the size of the axis in pixel_unit.
@@ -3146,7 +3146,7 @@ def getCalibratedAxisSize(image, axis):
     return axcal.calibratedDistance(axsize)
 
 def getAxisOrigin(axisinfo):
-    """Returns the axis origin as a Python Quantity
+    r"""Returns the axis origin as a Python Quantity
     """
     if not isinstance(axisinfo. vigra.AxisInfo):
         raise TypeError("Expecting a vigra.AxisInfo object; got %s instead" % type(axisinfo).__name__)

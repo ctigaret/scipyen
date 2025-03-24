@@ -6,7 +6,7 @@ pictio:
 
 neoutils:
     new function cursors_measure: applies a cursor-based function to a signal, segment or block
-    function normalized_data_index renamed to normalized_signal_index
+    function normalized_data_index renamed to normalized_index
     new function normalized_segment_index
 
 2020-03-11 13:42:34
@@ -23,7 +23,7 @@ cursor functions for signal analysis (all based on vertical cursors, although
     
     NOTE 1 the "time" is used in the loose sense of signal's domain. For 
     neo.AnalogSignal, "time" refers to the time domain of the signal, whereas
-    the domain of datatypes.DataSignal may be some other physical measure (e.g.
+    the domain of datasignal.DataSignal may be some other physical measure (e.g.
     space, or frequency, etc)
     
     NOTE 2: all signals are column vectors; a multi-channel signal is a matrix
@@ -34,7 +34,7 @@ cursor functions for signal analysis (all based on vertical cursors, although
     
     Functions based on a single cursor:
     ====================================
-        * all take a neo.AnalogSignal or datatypes.DataSignal as first parameter
+        * all take a neo.AnalogSignal or datasignal.DataSignal as first parameter
         
         * second parameter conveys the cursor's coordinate in the signal's 
             domain, and can be one of:
@@ -85,7 +85,7 @@ cursor functions for signal analysis (all based on vertical cursors, although
             
     Functions based on two cursors
     ==============================
-        * first parameter is a neo.AnalogSignal or datatypes.DataSignal
+        * first parameter is a neo.AnalogSignal or datasignal.DataSignal
         
         * second and third parameters are SignalCursor objects, or SignalCursor
             parameter tuples

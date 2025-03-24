@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-""" Scipyen configuration module to manage and store GUI- and non-GUI-related 
+r""" Scipyen configuration module to manage and store GUI- and non-GUI-related 
 configuration data (a.k.a "settings") specific to Scipyen, beyond the lifetime
 of a running Scipyen session.
 
@@ -184,7 +184,7 @@ if not scipyen_config._materialized:# make sure this is done only once
 scipyen_user_config_source = [s for s in scipyen_config.sources if not s.default][0]
 
 def configsrc2bunch(src:typing.Union[confuse.ConfigSource, Bunch]):
-    """Creates a nested Bunch from this confuse.ConfigSource
+    r"""Creates a nested Bunch from this confuse.ConfigSource
     
     Useful for loading configurable values from a source.
     
@@ -199,7 +199,7 @@ def configsrc2bunch(src:typing.Union[confuse.ConfigSource, Bunch]):
     return Bunch(((k, configsrc2bunch(v)) if isinstance(v, (confuse.ConfigSource, Bunch)) else (k,v) for k,v in src.items()))
 
 def markConfigurable(confname:str, conftype:str="", setter:bool=True, default:typing.Optional[typing.Any]=None, trait_notifier:typing.Optional[typing.Union[bool, DataBag]] = None, value_type=None):
-    """Decorator for instance methods & properties.
+    r"""Decorator for instance methods & properties.
     
     Decorates instance properties and methods that access instance attributes 
     considered to be persistent configuration options.
@@ -422,7 +422,7 @@ def markConfigurable(confname:str, conftype:str="", setter:bool=True, default:ty
                     conf_setter = f.fset.configurable_setter
                     
                     def newfset(instance, *args, **kwargs):
-                        """Calls the owner's property fset function & updates the trait notifier.
+                        r"""Calls the owner's property fset function & updates the trait notifier.
                         This only has effect when trait notifier is a DataBag
                         that is observing.
                         """
@@ -456,7 +456,7 @@ def markConfigurable(confname:str, conftype:str="", setter:bool=True, default:ty
                     conf_setter = f.configurable_setter #["trait_notifier"] = trait_notifier
                         
                     def newf(instance, trn, *args, **kwargs):
-                        """Calls the owner's setter method & updates the trait notifier.
+                        r"""Calls the owner's setter method & updates the trait notifier.
                         This only has effect when trait notifier is a DataBag
                         that is observing.
                         """
@@ -490,7 +490,7 @@ def markConfigurable(confname:str, conftype:str="", setter:bool=True, default:ty
                 conf_setter = Bunch({"type": conftype, "name": confname, "setter":f.__name__, "default": default, "value_type": value_type})
 
                 def newf(instance,  trn, *args, **kwargs):
-                    """Calls the owner's setter method & updates the trait notifier.
+                    r"""Calls the owner's setter method & updates the trait notifier.
                     This only has effect when trait notifier is a DataBag
                     that is observing.
                     """
@@ -528,7 +528,7 @@ def markConfigurable(confname:str, conftype:str="", setter:bool=True, default:ty
     
 @safeWrapper
 def qSettingsGroupPfx(win:typing.Union[QMainWindow, QWidget, Figure]):
-    """Generates a QSettings group name and, optionally, a prefix for a window.
+    r"""Generates a QSettings group name and, optionally, a prefix for a window.
     
     Parameters:
     ===========
@@ -636,7 +636,7 @@ def syncQtSettings(qsettings:QSettings, win:typing.Union[QMainWindow, QWidget, F
                    group_name:typing.Optional[str]=None,
                    prefix:typing.Optional[str]=None, 
                    save:bool=True):
-    """Synchronize user-specifc settings with the Scipyen's Qt configuration file.
+    r"""Synchronize user-specifc settings with the Scipyen's Qt configuration file.
     
     The Scipyen's configuration file is in native format, and on Linux it usually
     is $HOME/.config/Scipyen/Scipyen.conf. For details, please see QSettings 
@@ -974,7 +974,7 @@ def syncQtSettings(qsettings:QSettings, win:typing.Union[QMainWindow, QWidget, F
     return gname, pfx
 
 def collect_configurables(cls):
-    """Collects all configurables for this instance in a mapping.
+    r"""Collects all configurables for this instance in a mapping.
     
     The mapping has two fields: 'qt' and 'conf' that describe what settings
     are to be saved to / loaded from the Scipyen.conf ('qt') or config.yaml 
@@ -1042,7 +1042,7 @@ def collect_configurables(cls):
     return ret
 
 class ScipyenConfigurable(object):
-    """Base :class: for Scipyen's configurable types.
+    r"""Base :class: for Scipyen's configurable types.
     
     Implements functionality to deal with non-Qt settings made persistent across
     Scipyen sessions.
@@ -1200,7 +1200,7 @@ class ScipyenConfigurable(object):
             
         
     def _make_confuse_config_data_(self, change, isTop=True, parent=None, tag=None):
-        """Wraps change.new data to a structure storable with confuse library
+        r"""Wraps change.new data to a structure storable with confuse library
         `change` is a dict sent via the traits notification mechanism
     
         Prepares data for the `write` side of the confuse framework
@@ -1236,7 +1236,7 @@ class ScipyenConfigurable(object):
         return Bunch({self.__class__.__name__:Bunch({change.name:v})})
         
     def _get_config_view_(self, isTop=True, parent=None, tag=None):
-        """
+        r"""
         If isTop, returns the confuse config section for the class of this instance:
                 scipyen_config → this class name
         Else:
@@ -1278,7 +1278,7 @@ class ScipyenConfigurable(object):
         
     @property
     def configurables(self):
-        """All configurables
+        r"""All configurables
         
         Collects all configurables for this ::class:: in a mapping.
         
@@ -1295,18 +1295,18 @@ class ScipyenConfigurable(object):
     
     @property
     def qtconfigurables(self):
-        """QSettings configurables
+        r"""QSettings configurables
         """
         return  self.configurables.get("qt", Bunch())
     
     @property
     def clsconfigurables(self):
-        """Class configurables
+        r"""Class configurables
         """
         return self.configurables.get("conf", Bunch())
     
     def loadWindowSettings(self):
-        """Reads window and Qt GUI settings from the QSettings file
+        r"""Reads window and Qt GUI settings from the QSettings file
         """
         # print(f"ScipyenConfigurable<{self.__class__.__name__}>.loadWindowSettings")
         if isinstance(self, Figure): # this presupposes self is an instance that also inherits from matplotlib Figure
@@ -1319,7 +1319,7 @@ class ScipyenConfigurable(object):
         loadWindowSettings(self.qsettings, self, group_name = group_name, prefix=prefix)
     
     def saveWindowSettings(self):
-        """Writes windows and Qt GUI settins to the QSettings file
+        r"""Writes windows and Qt GUI settins to the QSettings file
         """
         # print(f"ScipyenConfigurable<{self.__class__.__name__}>.saveWindowSettings")
         if isinstance(self, Figure):# this presupposes self is an instance that also inherits from matplotlib Figure
@@ -1409,7 +1409,7 @@ class ScipyenConfigurable(object):
             self.loadWindowSettings() 
             
     def saveSettings(self):
-        """ Must be called with super() if reimplemented in subclasses
+        r""" Must be called with super() if reimplemented in subclasses
         
         NOTE: 2022-11-01 22:13:57 Does not support mapping collections as
         configuration settings. In other words, an individual setting cannot be
@@ -1490,7 +1490,7 @@ class ScipyenConfigurable(object):
             self.saveWindowSettings()
             
     def get_configurable_attribute(self, name, config_dict):
-        """Helper to get the actual attribute value correspondong to a config entry.
+        r"""Helper to get the actual attribute value correspondong to a config entry.
         Called in order to WRITE a the value of a configurable attribute to the 
         config file.
         """
@@ -1512,7 +1512,7 @@ class ScipyenConfigurable(object):
             raise RuntimeError(f"{gettername} is not a `get` property")
         
     def set_configurable_attribute(self, name, val, config_dict):
-        """Helper function to assign the value of an attribute to a configurable attribute
+        r"""Helper function to assign the value of an attribute to a configurable attribute
         Called in order to READ a config value from the config file and assign it to
         the coprrespondng attribute via its 'setter' method
         """
@@ -1527,7 +1527,7 @@ class ScipyenConfigurable(object):
         
         
 class ScipyenConfiguration(DataBag):
-    """Superclass of all non-gui configurations
+    r"""Superclass of all non-gui configurations
     """
     leaf_parameters = tuple()
     
@@ -1547,7 +1547,7 @@ class ScipyenConfiguration(DataBag):
                         allow_none = allow_none)
 
 class FunctionConfiguration(ScipyenConfiguration):
-    """ScipyenConfiguration specialized for functional options.
+    r"""ScipyenConfiguration specialized for functional options.
     
     A functional option stores the name of a function, and the names and
     values of its parameters, if present, as one of the many functions available to
@@ -1624,7 +1624,7 @@ class FunctionConfiguration(ScipyenConfiguration):
     leaf_parameters = ("name", "args", "kwargs")
     
     def __init__(self, *args, **kwargs):
-        """Constructs a FunctionConfiguration object.
+        r"""Constructs a FunctionConfiguration object.
         Examples:
         1. To create a function configuration for the linear algebra function 
         "norm" (numpy package) either one of the next three calls creates the
@@ -1677,7 +1677,7 @@ class FunctionConfiguration(ScipyenConfiguration):
         super().__init__(name=fname, args=fargs, kwargs=fkwargs)
         
 def get_config_file(configuration:confuse.Configuration=scipyen_config, default:bool=False):
-    """Returns the fully qualified path to the file holding non-Qt configuration.
+    r"""Returns the fully qualified path to the file holding non-Qt configuration.
         
     Named Parameters
     ================
@@ -1719,7 +1719,7 @@ def get_QtSettings_file():
 
 @safeWrapper
 def write_config(config:typing.Optional[confuse.Configuration]=scipyen_config, filename:typing.Optional[str]=None, full:bool=True, redact:bool=False, as_default:bool=False, default_only:bool=False):
-    """Saves Scipyen non-gui configuration options to an yaml file.
+    r"""Saves Scipyen non-gui configuration options to an yaml file.
     Settings are saved implicitly to the config.yaml file located in the 
     application configuration directory and stored in the 'filename' attribute
     of the first configuration source.
@@ -1825,7 +1825,7 @@ def write_config(config:typing.Optional[confuse.Configuration]=scipyen_config, f
     return True
     
 def saveWindowSettings(qsettings:QtCore.QSettings, win:typing.Union[QtWidgets.QMainWindow, Figure], group_name:typing.Optional[str]=None, prefix:typing.Optional[str]=None):
-    """Saves window settings to the Scipyen's Qt configuration file.
+    r"""Saves window settings to the Scipyen's Qt configuration file.
     
     On recent Linux distributions this is $HOME/.config/Scipyen/Scipyen.conf 
     
@@ -1918,7 +1918,7 @@ def loadWindowSettings(qsettings:QtCore.QSettings,
                        win:typing.Union[QtWidgets.QMainWindow, Figure],
                        group_name:typing.Optional[str]=None,
                        prefix:typing.Optional[str]=None):
-    """Loads window settings from the Scipyen's Qt configuration file.
+    r"""Loads window settings from the Scipyen's Qt configuration file.
     
     On recent Linux distributions this is $HOME/.config/Scipyen/Scipyen.conf 
     
@@ -2014,7 +2014,7 @@ def loadWindowSettings(qsettings:QtCore.QSettings,
 
 
 def data2confuse(x):
-    """Filter to convert some special data to str for yaml representation.
+    r"""Filter to convert some special data to str for yaml representation.
     Uses iolib.jonsio to enable storage of more specialized /complex data types
     with the confuse framework.
     A bit expensive, though... Therefore not sure I will use it...

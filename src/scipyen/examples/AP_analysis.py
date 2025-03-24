@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 
-"""
+r"""
 WARNING code in this script to be executed block by block by copy/paste into 
 PICT console as it requires modules imported into PICT console workspace
 

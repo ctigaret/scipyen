@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""A collection of functions to prompt user input using GUI
+r"""A collection of functions to prompt user input using GUI
 """
 import typing, collections, dataclasses
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg,)
@@ -14,7 +14,7 @@ from .itemslistdialog import ItemsListDialog
 
 
 class _InputSpec():
-    """Encapsulates arguments to interact.getInput(...)
+    r"""Encapsulates arguments to interact.getInput(...)
     """
     __slots__ = ("_default", "_mytype")
     
@@ -47,7 +47,7 @@ class _InputSpec():
                 
 
 def selectWSData(*args, title="", single=True, asDict=False, **kwargs):
-    """Selection of workspace variables from a list
+    r"""Selection of workspace variables from a list
     """
     from core.workspacefunctions import (lsvars, getvarsbytype, user_workspace)
     
@@ -87,7 +87,7 @@ def selectWSData(*args, title="", single=True, asDict=False, **kwargs):
 
 
 def getInputs(**kwargs):
-    """Calls 'getInput' with a prompt mapping created from key/value pairs
+    r"""Calls 'getInput' with a prompt mapping created from key/value pairs
     Returns a list.
     
     Typical use:
@@ -98,7 +98,7 @@ def getInputs(**kwargs):
     return getInput(kwargs, mapping=False)
 
 def packInputs(**kwargs):
-    """Verison of getInputs that returns a dict
+    r"""Verison of getInputs that returns a dict
     Typical use:
     
     result = getInputs(a=1, b=2, c=3)
@@ -111,7 +111,7 @@ def packInputs(**kwargs):
     return getInput(kwargs, mapping=True)
 
 def getInput(prompts:dict, mapping:bool=False):
-    """Opens a quick dialog to prompt user input for integer, float and string values
+    r"""Opens a quick dialog to prompt user input for integer, float and string values
     
     Parameters:
     -----------

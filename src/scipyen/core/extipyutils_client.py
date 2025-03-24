@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""Module with utilities for an external IPython kernel.
+r"""Module with utilities for an external IPython kernel.
 To be used on the client side (i.e. Scipyen app side, NOT in the REMOTE kernel).
 Contains functions and types used to communicate with the remote kernel via its
 messaging API.
@@ -188,7 +188,7 @@ init_scipyen_qt_gui = [
     ]
 
 class ForeignCall(DataBag):
-    """Usage:
+    r"""Usage:
     call = ForeignCall(user_expressions={"test":"etc"})
     
     kernel_client.execute(*call())
@@ -257,7 +257,7 @@ class ForeignCall(DataBag):
 #### BEGIN expression generators    
 
 def make_user_expression(**kwargs):
-    """TODO Generates a single user_expressions string for execution in a remote kernel.
+    r"""TODO Generates a single user_expressions string for execution in a remote kernel.
 
     The user_expressions parameter to the kernel local client's execute() is a 
     dict mapping some name (local to the calling namespace) to a command string
@@ -384,7 +384,7 @@ def pickle_wrap_expr(expr):
     return "".join(["pickle.dumps(",expr,")"])
     
 def define_foreign_data_props_getter_fun_str(dataname:str, namespace:str="Internal") -> str:
-    """Defines a function to retieve object properties in the foreign namespace.
+    r"""Defines a function to retieve object properties in the foreign namespace.
     
     The function is wrapped by a context manager so that any module imports are
     are not reflected in the foreign namespace. - is this true !?
@@ -409,7 +409,7 @@ def define_foreign_data_props_getter_fun_str(dataname:str, namespace:str="Intern
     # ])
 
 def define_foreign_data_props_getter_gen_str(dataname:str, namespace:str="Internal") -> str:
-    """Defines a generator to retrieve object properties in the foreign namespace.
+    r"""Defines a generator to retrieve object properties in the foreign namespace.
     
     The function is decorated with @contextmanager hence behaves like such, and
     any module imports are not reflected in the foreign namespace.
@@ -432,7 +432,7 @@ def define_foreign_data_props_getter_gen_str(dataname:str, namespace:str="Intern
 #### BEGIN call generators
 
 def cmds_get_foreign_data_props(dataname:str, namespace:str="Internal") -> list:
-    """Creates a list of execute calls retrieving data properties in foregn ns
+    r"""Creates a list of execute calls retrieving data properties in foregn ns
     
     """
     # see NOTE 2020-07-11 10:26:3`8
@@ -482,7 +482,7 @@ def cmds_get_foreign_data_props(dataname:str, namespace:str="Internal") -> list:
     return exec_calls
     
 def cmds_get_foreign_data_props2(dataname:str, namespace:str="Internal") -> list:
-    """Creates a list of execute calls retrieving data properties in foregn ns
+    r"""Creates a list of execute calls retrieving data properties in foregn ns
     
     """
     exec_calls = list()
@@ -524,7 +524,7 @@ def cmds_get_foreign_data_props2(dataname:str, namespace:str="Internal") -> list
     return exec_calls
     
 def cmd_copy_from_foreign(varname:str, as_call=True) -> typing.Union[ForeignCall, dict]:
-    """Create user expression to fetch varname from a foreign kernel's namespace.
+    r"""Create user expression to fetch varname from a foreign kernel's namespace.
     
     The foreign kernel is the with which the kernel client executing this command
     is communicating.
@@ -589,7 +589,7 @@ def cmd_copy_from_foreign(varname:str, as_call=True) -> typing.Union[ForeignCall
         return expr
 
 def cmd_copies_from_foreign(*args, as_call=True) -> typing.Union[ForeignCall, dict]:
-    """Create user expressions to fetch several variables from a foreign kernel.
+    r"""Create user expressions to fetch several variables from a foreign kernel.
     
     The foreign kernel is the with which the kernel client executing this command
     is communicating.
@@ -650,7 +650,7 @@ def cmd_copies_from_foreign(*args, as_call=True) -> typing.Union[ForeignCall, di
     return expr
 
 def cmd_copy_to_foreign(dataname, data:typing.Any) -> str:
-    """Creates a user expression to place a copy of data to a remote kernel space.
+    r"""Creates a user expression to place a copy of data to a remote kernel space.
     
     The data will be bound, in the remote namespace, to the identifier specified
     by "dataname".
@@ -689,7 +689,7 @@ def cmd_copy_to_foreign(dataname, data:typing.Any) -> str:
     return exec_calls
     
 def cmd_foreign_namespace_listing(namespace:str="Internal", as_call=True) -> dict:
-    """Creates a user_expression containing the variable names in a foreign namespace.
+    r"""Creates a user_expression containing the variable names in a foreign namespace.
     """
     
     expr = {"ns_listing_of_%s" % namespace : "dir()"}
@@ -701,7 +701,7 @@ def cmd_foreign_namespace_listing(namespace:str="Internal", as_call=True) -> dic
     return expr
     
 def cmd_foreign_shell_ns_listing(namespace:str="Internal", as_call=True) -> dict:
-    """Creates a user_expression containing the variable names in a foreign namespace.
+    r"""Creates a user_expression containing the variable names in a foreign namespace.
     
     This one returns get_ipython().user_ns and get_ipython().user_ns_hidden
     """
@@ -722,7 +722,7 @@ def cmd_foreign_shell_ns_listing(namespace:str="Internal", as_call=True) -> dict
     return expr
     
 def cmd_foreign_shell_ns_hidden_listing(namespace:str="Internal", as_call=True) -> dict:
-    """Creates a user_expression containing the variable names in a foreign namespace.
+    r"""Creates a user_expression containing the variable names in a foreign namespace.
     
     This one returns get_ipython().user_ns and get_ipython().user_ns_hidden
     """
@@ -745,7 +745,7 @@ def cmd_foreign_shell_ns_hidden_listing(namespace:str="Internal", as_call=True) 
 
 @safeWrapper
 def unpack_shell_channel_data(msg:dict) -> dict:
-    """Extracts data shuttled from the remote kernel via " execute_reply" message.
+    r"""Extracts data shuttled from the remote kernel via " execute_reply" message.
     
     The data are present as text/plain mime type data in the received execute_reply
     message, inside its "content"/"user_expressions" nested dictionary.
@@ -815,7 +815,7 @@ def unpack_shell_channel_data(msg:dict) -> dict:
     return ret
 
 def execute(client, *args, **kwargs):
-    """Execute code in the kernel, sent via the specified kernel client.
+    r"""Execute code in the kernel, sent via the specified kernel client.
         
     Parameters
     ----------

@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""Utilities for programming with traitlets.
+r"""Utilities for programming with traitlets.
 NOTE: 2022-01-29 13:32:21
 There are issues when trying to implement traitlets for collection's CONTENTS,
 see docstring in scipyen_traitlets module (FIXME/TODO 2022-01-29 13:29:19)
@@ -71,7 +71,7 @@ from core.prog import safeWrapper
 # in particular this is the case for traitcontainer.DataBag, TriggerEvent, etc
 
 def traitlet_delete(self_instance, owner_instance):
-    """Wraps descriptor __delete__
+    r"""Wraps descriptor __delete__
     Fails silently when owner is of wrong type
     """
     if hasattr(owner_instance, "remove_trait") and hasattr(owner_instance, "_trait_values") and hasattr(owner_instance, "traits"):
@@ -85,7 +85,7 @@ def traitlet_delete(self_instance, owner_instance):
 
 #@timefunc
 def traitlet_set(instance, obj, value):
-    """Overrides traitlets.TraitType.set to check for special hash.
+    r"""Overrides traitlets.TraitType.set to check for special hash.
     This is supposed to also detect changes in the order of elements in sequences.
     WARNING: Slows down execution
     """
@@ -285,7 +285,7 @@ def adapt_args_kw(x, args, kw, allow_none): # where is this used ?!?
     return args, kw
     
 def dynamic_trait(x, *args, **kwargs):
-    """Generates a trait type for object x.
+    r"""Generates a trait type for object x.
     
     Parameters:
     ===========
@@ -453,7 +453,7 @@ def dynamic_trait(x, *args, **kwargs):
         return traitlet_class(default_value = x, allow_none = allow_none)
     
 class transform_link(traitlets.link):
-    """Bi-directional link traits from different objects via optional transforms.
+    r"""Bi-directional link traits from different objects via optional transforms.
     
     Parameters
     ----------
@@ -510,7 +510,7 @@ class transform_link(traitlets.link):
         self.source, self.target = None, None
         
 # def trait_from_type(x, *args, **kwargs):
-#     """Generates a TraitType for object x.
+#     r"""Generates a TraitType for object x.
 #     
 #     Prerequisites: Except for enum types (enum.Enum and enumIntEnum)
 #     x.__class__ should define a "copy constructor", e.g.:
