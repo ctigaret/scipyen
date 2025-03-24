@@ -4878,7 +4878,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         self.actionGUI_Style.triggered.connect(self._slot_set_Application_style)
         self.actionSet_user_plugins_directory.triggered.connect(self._slot_set_Users_Plugins_directory)
-        self.actionConfigure_External_HDF5_Viewer.triggered.connect(self._slot_set_ExternalHDF5Viewer)
+        # self.actionConfigure_External_HDF5_Viewer.triggered.connect(self._slot_set_ExternalHDF5Viewer)
         self.actionAuto_launch_Script_Manager.toggled.connect(self._slot_set_scriptManagerAutoLaunch)
         self.actionAuto_delete_viewer.triggered.connect(self._slot_setAutoRemoveViewers)
         
@@ -7642,7 +7642,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 # self.app.setPalette(qtPalette)
                 # self.app.setStyle(styleProxy)
 
-    @SLot()
+    @Slot()
     @safeWrapper
     def _slot_set_ExternalHDF5Viewer(self):
         

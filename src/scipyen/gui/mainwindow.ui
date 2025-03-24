@@ -140,7 +140,6 @@
     <addaction name="menuCode_editor"/>
     <addaction name="actionAuto_delete_viewer"/>
     <addaction name="actionSet_user_plugins_directory"/>
-    <addaction name="actionConfigure_External_HDF5_Viewer"/>
     <addaction name="separator"/>
     <addaction name="actionGUI_Style"/>
     <addaction name="actionSet_Icon_Size"/>
@@ -200,7 +199,7 @@
     <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;A table view with user's variables in Scipyen's workspace.&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;CAUTION:&lt;/span&gt;&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:400;&quot;&gt;Not all variables are visible. Notable hidden variables are: `_`, `__`, and objects created at start up (imported modules, functions and variables which are NOT necessarily global). &lt;/span&gt;&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:400;&quot;&gt;To see all the contents of the workspace at any time, execute `dir()` in Scipyen's console.&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
    </property>
    <property name="features">
-    <set>QDockWidget::DockWidgetFeature::DockWidgetFloatable|QDockWidget::DockWidgetFeature::DockWidgetMovable</set>
+    <set>QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable</set>
    </property>
    <property name="windowTitle">
     <string>&amp;User Variables</string>
@@ -219,7 +218,7 @@
         </sizepolicy>
        </property>
        <property name="contextMenuPolicy">
-        <enum>Qt::ContextMenuPolicy::CustomContextMenu</enum>
+        <enum>Qt::CustomContextMenu</enum>
        </property>
        <property name="acceptDrops">
         <bool>true</bool>
@@ -262,10 +261,10 @@ NOTE: you can click anywhere in the row to select</string>
         <bool>false</bool>
        </property>
        <property name="dragDropMode">
-        <enum>QAbstractItemView::DragDropMode::DragOnly</enum>
+        <enum>QAbstractItemView::DragOnly</enum>
        </property>
        <property name="defaultDropAction">
-        <enum>Qt::DropAction::IgnoreAction</enum>
+        <enum>Qt::IgnoreAction</enum>
        </property>
        <property name="alternatingRowColors">
         <bool>true</bool>
@@ -274,7 +273,7 @@ NOTE: you can click anywhere in the row to select</string>
         <bool>false</bool>
        </property>
        <property name="gridStyle">
-        <enum>Qt::PenStyle::DotLine</enum>
+        <enum>Qt::DotLine</enum>
        </property>
        <property name="sortingEnabled">
         <bool>true</bool>
@@ -341,7 +340,7 @@ NOTE: you can click anywhere in the row to select</string>
     <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The history of commands and statements executed at Scipyen's console, and grouped by session, (start and end times shown).&lt;/p&gt;&lt;p&gt;Sessions without an end time are those where Scipyen was suddenly aborted.&lt;/p&gt;&lt;p&gt;You can copy these lines to a file, to the Scipyen's console, or execute them again (directly) by double-clicking.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
    </property>
    <property name="features">
-    <set>QDockWidget::DockWidgetFeature::DockWidgetFloatable|QDockWidget::DockWidgetFeature::DockWidgetMovable</set>
+    <set>QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable</set>
    </property>
    <property name="windowTitle">
     <string>&amp;Command History</string>
@@ -360,13 +359,13 @@ NOTE: you can click anywhere in the row to select</string>
         </sizepolicy>
        </property>
        <property name="contextMenuPolicy">
-        <enum>Qt::ContextMenuPolicy::CustomContextMenu</enum>
+        <enum>Qt::CustomContextMenu</enum>
        </property>
        <property name="verticalScrollBarPolicy">
-        <enum>Qt::ScrollBarPolicy::ScrollBarAlwaysOn</enum>
+        <enum>Qt::ScrollBarAlwaysOn</enum>
        </property>
        <property name="horizontalScrollBarPolicy">
-        <enum>Qt::ScrollBarPolicy::ScrollBarAlwaysOn</enum>
+        <enum>Qt::ScrollBarAlwaysOn</enum>
        </property>
        <property name="showDropIndicator" stdset="0">
         <bool>false</bool>
@@ -375,16 +374,16 @@ NOTE: you can click anywhere in the row to select</string>
         <bool>true</bool>
        </property>
        <property name="dragDropMode">
-        <enum>QAbstractItemView::DragDropMode::DragOnly</enum>
+        <enum>QAbstractItemView::DragOnly</enum>
        </property>
        <property name="alternatingRowColors">
         <bool>true</bool>
        </property>
        <property name="selectionMode">
-        <enum>QAbstractItemView::SelectionMode::ExtendedSelection</enum>
+        <enum>QAbstractItemView::ExtendedSelection</enum>
        </property>
        <property name="selectionBehavior">
-        <enum>QAbstractItemView::SelectionBehavior::SelectItems</enum>
+        <enum>QAbstractItemView::SelectItems</enum>
        </property>
        <property name="columnCount">
         <number>2</number>
@@ -467,7 +466,7 @@ NOTE: you can click anywhere in the row to select</string>
     <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Scipyen's (read-only) view of the current (working) directory in the file system.&lt;/p&gt;&lt;p&gt;By design Scipyen does not allow generic file system operations (file or directory creation, removal, duplication or relocation). These operations should be enacted through the host tools (file manager, terminal etc).&lt;/p&gt;&lt;p&gt;Data can be written to files in the current directory using Save or Export actions from the context menu of the symbols (variables) in Scipyen's workspace table.&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
    </property>
    <property name="features">
-    <set>QDockWidget::DockWidgetFeature::DockWidgetFloatable|QDockWidget::DockWidgetFeature::DockWidgetMovable</set>
+    <set>QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable</set>
    </property>
    <property name="windowTitle">
     <string>File S&amp;ystem</string>
@@ -483,7 +482,7 @@ NOTE: you can click anywhere in the row to select</string>
         <number>0</number>
        </property>
        <property name="sizeConstraint">
-        <enum>QLayout::SizeConstraint::SetNoConstraint</enum>
+        <enum>QLayout::SetNoConstraint</enum>
        </property>
        <item>
         <widget class="QToolButton" name="dirHomeBtn">
@@ -528,7 +527,7 @@ NOTE: you can click anywhere in the row to select</string>
           <bool>true</bool>
          </property>
          <property name="arrowType">
-          <enum>Qt::ArrowType::LeftArrow</enum>
+          <enum>Qt::LeftArrow</enum>
          </property>
         </widget>
        </item>
@@ -553,7 +552,7 @@ NOTE: you can click anywhere in the row to select</string>
           <bool>true</bool>
          </property>
          <property name="arrowType">
-          <enum>Qt::ArrowType::RightArrow</enum>
+          <enum>Qt::RightArrow</enum>
          </property>
         </widget>
        </item>
@@ -578,7 +577,7 @@ NOTE: you can click anywhere in the row to select</string>
           <bool>true</bool>
          </property>
          <property name="arrowType">
-          <enum>Qt::ArrowType::UpArrow</enum>
+          <enum>Qt::UpArrow</enum>
          </property>
         </widget>
        </item>
@@ -603,7 +602,7 @@ NOTE: you can click anywhere in the row to select</string>
           <bool>true</bool>
          </property>
          <property name="arrowType">
-          <enum>Qt::ArrowType::NoArrow</enum>
+          <enum>Qt::NoArrow</enum>
          </property>
         </widget>
        </item>
@@ -722,10 +721,10 @@ NOTE: you can click anywhere in the row to select</string>
        <item>
         <spacer name="horizontalSpacer_2">
          <property name="orientation">
-          <enum>Qt::Orientation::Horizontal</enum>
+          <enum>Qt::Horizontal</enum>
          </property>
          <property name="sizeType">
-          <enum>QSizePolicy::Policy::MinimumExpanding</enum>
+          <enum>QSizePolicy::MinimumExpanding</enum>
          </property>
          <property name="sizeHint" stdset="0">
           <size>
@@ -751,16 +750,16 @@ NOTE: you can click anywhere in the row to select</string>
           </sizepolicy>
          </property>
          <property name="contextMenuPolicy">
-          <enum>Qt::ContextMenuPolicy::CustomContextMenu</enum>
+          <enum>Qt::CustomContextMenu</enum>
          </property>
          <property name="acceptDrops">
           <bool>false</bool>
          </property>
          <property name="sizeAdjustPolicy">
-          <enum>QAbstractScrollArea::SizeAdjustPolicy::AdjustToContentsOnFirstShow</enum>
+          <enum>QAbstractScrollArea::AdjustToContentsOnFirstShow</enum>
          </property>
          <property name="editTriggers">
-          <set>QAbstractItemView::EditTrigger::DoubleClicked</set>
+          <set>QAbstractItemView::DoubleClicked</set>
          </property>
          <property name="tabKeyNavigation">
           <bool>true</bool>
@@ -772,16 +771,16 @@ NOTE: you can click anywhere in the row to select</string>
           <bool>true</bool>
          </property>
          <property name="dragDropMode">
-          <enum>QAbstractItemView::DragDropMode::DragOnly</enum>
+          <enum>QAbstractItemView::DragOnly</enum>
          </property>
          <property name="alternatingRowColors">
           <bool>true</bool>
          </property>
          <property name="selectionMode">
-          <enum>QAbstractItemView::SelectionMode::ExtendedSelection</enum>
+          <enum>QAbstractItemView::ExtendedSelection</enum>
          </property>
          <property name="selectionBehavior">
-          <enum>QAbstractItemView::SelectionBehavior::SelectItems</enum>
+          <enum>QAbstractItemView::SelectItems</enum>
          </property>
          <property name="iconSize">
           <size>
@@ -812,10 +811,10 @@ NOTE: you can click anywhere in the row to select</string>
        <item>
         <widget class="QFrame" name="filesFilterFrame">
          <property name="frameShape">
-          <enum>QFrame::Shape::StyledPanel</enum>
+          <enum>QFrame::StyledPanel</enum>
          </property>
          <property name="frameShadow">
-          <enum>QFrame::Shadow::Plain</enum>
+          <enum>QFrame::Plain</enum>
          </property>
          <property name="lineWidth">
           <number>0</number>
@@ -862,10 +861,10 @@ NOTE: you can click anywhere in the row to select</string>
           <item>
            <spacer name="horizontalSpacer">
             <property name="orientation">
-             <enum>Qt::Orientation::Horizontal</enum>
+             <enum>Qt::Horizontal</enum>
             </property>
             <property name="sizeType">
-             <enum>QSizePolicy::Policy::Preferred</enum>
+             <enum>QSizePolicy::Preferred</enum>
             </property>
             <property name="sizeHint" stdset="0">
              <size>
@@ -896,7 +895,7 @@ NOTE: you can click anywhere in the row to select</string>
              <bool>true</bool>
             </property>
             <property name="insertPolicy">
-             <enum>QComboBox::InsertPolicy::InsertAtTop</enum>
+             <enum>QComboBox::InsertAtTop</enum>
             </property>
            </widget>
           </item>
@@ -934,7 +933,7 @@ NOTE: you can click anywhere in the row to select</string>
     </size>
    </property>
    <property name="toolButtonStyle">
-    <enum>Qt::ToolButtonStyle::ToolButtonFollowStyle</enum>
+    <enum>Qt::ToolButtonFollowStyle</enum>
    </property>
    <attribute name="toolBarArea">
     <enum>TopToolBarArea</enum>
@@ -1178,7 +1177,7 @@ NOTE: you can click anywhere in the row to select</string>
     <string>GUI Style...</string>
    </property>
    <property name="menuRole">
-    <enum>QAction::MenuRole::PreferencesRole</enum>
+    <enum>QAction::PreferencesRole</enum>
    </property>
   </action>
   <action name="actionAuto_launch_Script_Manager">
@@ -1310,14 +1309,6 @@ NOTE: you can click anywhere in the row to select</string>
    </property>
    <property name="text">
     <string>Set Icon Size</string>
-   </property>
-  </action>
-  <action name="actionConfigure_External_HDF5_Viewer">
-   <property name="icon">
-    <iconset theme="graphics-viewer-document-symbolic"/>
-   </property>
-   <property name="text">
-    <string>Configure External HDF5 Viewer...</string>
    </property>
   </action>
  </widget>
