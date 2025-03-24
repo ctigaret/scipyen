@@ -2203,8 +2203,8 @@ def objectToEntity(obj,
     
     # print(f"h5io.objectToEntity: {type(obj).__name__}")
     
-    if (isinstance(obj, (collections.abc.Iterable, neo.core.container.Container)) or hasattr(type(obj),"__iter__")) and \
-        not isinstance(obj, (str, bytes, bytearray, np.ndarray, neo.core.spiketrainlist.SpikeTrainList, NeoObjectList)):
+    if isinstance(obj, (collections.abc.Iterable, neo.core.container.Container)) or (hasattr(type(obj),"__iter__") and \
+        not isinstance(obj, (str, bytes, bytearray, np.ndarray, neo.core.spiketrainlist.SpikeTrainList))):
         # neo Container, tuple, list, dict → h5py.Group child of group
         # CAUTION: 2022-10-10 22:05:17
         # neo.core.spiketrainlist.SpikeTrainList is a collections.abc.Iterable
@@ -2212,6 +2212,14 @@ def objectToEntity(obj,
         # hence it deserved special treatment, above
         #
         # NOTE: 2024-06-18 19:09:09 added/included NeoObjectList
+        #
+        # WARNING: dispatching NeoObjectList objects to makeHDF5Group -> makeGroup
+        # DOES work when saving neo..Group objects in a NeoObjectList "groups"
+        # Unfortunately, dispatching NeoObjectList to the specialized 
+        # objectToEntity does not save the contents of the NeoObjectList; not sure
+        # why, as it works with other objectlist instances...
+        # )
+        # see WARNING: 2025-03-24 18:32:11 BUG
         factory = makeHDF5Group
         
     else:
@@ -2309,7 +2317,7 @@ def _(obj:typing.Union[vigra.VigraArray, neo.core.dataobject.DataObject],
       entity_cache:typing.Optional[dict]=None,
       **kwargs):
         # NOTE: 2021-11-19 11:34:38
-        # VigraArray and neo DataObjet are stored as a Group child of group.
+        # VigraArray and neo DataObject are stored as a Group child of group.
         #
         # In turn the created group has  the following children:
         # • a Dataset with the array data
@@ -2362,38 +2370,45 @@ def _(obj:typing.Union[vigra.VigraArray, neo.core.dataobject.DataObject],
         
         return entity
     
-@objectToEntity.register(NeoObjectList)
-def _(obj:NeoObjectList, 
-      obj_attrs:dict, group:h5py.Group, name:typing.Optional[str]=None,
-      target_name:typing.Optional[str]=None,
-      compression:typing.Optional[str]="gzip",
-      chunks:typing.Optional[bool]=None,
-      track_order:typing.Optional[bool] = True, 
-      entity_cache:typing.Optional[dict]=None,
-      **kwargs):
-        cached_entity = getCachedEntity(entity_cache, obj)
-        if isinstance(cached_entity, h5py.Group):
-            group[target_name] = cached_entity
-            return cached_entity
-        
-        obj_attrs["allowed_contents"] = [f"{c.__module__}.{c.__name__}" for c in obj.allowed_contents]
-        items = [s for s in obj] # list of SpikeTrain objects
-        
-        entity = toHDF5(items, group, name, 
-                        compression = compression, chunks = chunks,
-                        track_order = track_order,
-                        entity_cache = entity_cache)
-        
-        # entity = makeHDF5Group(items, group, name = name, 
-        #                        compression = compression, chunks = chunks,
-        #                        track_order = track_order,
-        #                        entity_cache = entity_cache)
-        
-        entity.attrs.update(obj_attrs) # will include name, description, file_origin
-        
-        storeEntityInCache(entity_cache, obj, entity)
-
-        return entity
+# WARNING: 2025-03-24 18:32:11 BUG
+# this function specialization doesn't work property and I am still to figure 
+# out why 😦
+# until I find a fix, use makeGroup(NeoObjectList) called from within
+# makeHDF5Group (delegated to it in the generic objectToEntity, above)
+# @objectToEntity.register(NeoObjectList)
+# def _(obj:NeoObjectList, 
+#       obj_attrs:dict, group:h5py.Group, name:typing.Optional[str]=None,
+#       target_name:typing.Optional[str]=None,
+#       compression:typing.Optional[str]="gzip",
+#       chunks:typing.Optional[bool]=None,
+#       track_order:typing.Optional[bool] = True, 
+#       entity_cache:typing.Optional[dict]=None,
+#       **kwargs):
+#         print(f"h5io.objectToEntity NeoObjectList name = {name}")
+#         cached_entity = getCachedEntity(entity_cache, obj)
+#         if isinstance(cached_entity, h5py.Group):
+#             group[target_name] = cached_entity
+#             return cached_entity
+#         
+#         obj_attrs["allowed_contents"] = [f"{c.__module__}.{c.__name__}" for c in obj.allowed_contents]
+#         items = list(obj)
+#         # items = [s for s in obj] # list of SpikeTrain objects
+#         
+#         entity = toHDF5(items, group, name, 
+#                         compression = compression, chunks = chunks,
+#                         track_order = track_order,
+#                         entity_cache = entity_cache)
+#         
+#         # entity = makeHDF5Group(items, group, name = name, 
+#         #                        compression = compression, chunks = chunks,
+#         #                        track_order = track_order,
+#         #                        entity_cache = entity_cache)
+#         
+#         entity.attrs.update(obj_attrs) # will include name, description, file_origin
+#         
+#         storeEntityInCache(entity_cache, obj, entity)
+# 
+#         return entity
 
 @objectToEntity.register(neo.core.spiketrainlist.SpikeTrainList)
 def _(obj:neo.core.spiketrainlist.SpikeTrainList, 
@@ -2715,7 +2730,7 @@ def toHDF5(obj, group:h5py.Group, name:typing.Optional[str]=None,
     
     This function works in tandem with fromHDF5() function in this
     module. Both have been designed to work essentially on immutable Python types
-    (i.e., thiose defined in the standard Python library, and in 3rd party libraries
+    (i.e., those defined in the standard Python library, and in 3rd party libraries
     such as `neo` and `pandas`). Although the code was written with a view towards
     generality, these functions by no means cover a large range of possibilities.
     
@@ -3436,38 +3451,41 @@ def _(obj:ephys.SynapticPathway, group, attrs, name, compression, chunks,
     
     measurements = [m for m in obj.measurements]
     
-# @makeGroup.register(NeoObjectList)
-# def _(obj:NeoObjectList, group, attrs, name, compression, chunks, 
-#       track_order, entity_cache):
-#     print(f"h5io.makeGroup NeoObjectList")
-#     cached_entity = getCachedEntity(entity_cache, obj)
-#     if isinstance(cached_entity, h5py.Group):
-#         group[target_name] = cached_entity
-#         return cached_entity
-#     
-#     attrs["allowed_contents"] = [f"{c.__module__}.{c.__name__}" for c in obj.allowed_contents]
-#     grp = group.create_group(name, track_order = track_order)
-#     grp.attrs.update(attrs)
-#     storeEntityInCache(entity_cache, obj, grp)
-#     
-#     # NOTE: 2025-03-23 22:59:39
-#     # treat this as a list
-#     for k, element in enumerate(obj):
-#         cached_entity = getCachedEntity(entity_cache, element)
-#         element_name = getattr(element, "name", type(element).__name__)
-#         element_entry_name = f"{k}_{element_name}"
-#         if isinstance(cached_entity, (h5py.Group, h5py.Dataset)):
-#             grp[element_entry_name] = cached_entity
-#         else:
-#             element_entity = toHDF5(element, grp, element_entry_name, compression = compression, chunks = chunks,
-#                             track_order = track_order, entity_cache = entity_cache)
-#             
-#     return grp
+@makeGroup.register(NeoObjectList)
+def _(obj:NeoObjectList, group, attrs, name, compression, chunks, 
+      track_order, entity_cache):
+    print(f"h5io.makeGroup NeoObjectList: {name}")
+    cached_entity = getCachedEntity(entity_cache, obj)
+    if isinstance(cached_entity, h5py.Group):
+        group[target_name] = cached_entity
+        return cached_entity
+    
+    attrs["allowed_contents"] = [f"{c.__module__}.{c.__name__}" for c in obj.allowed_contents]
+    grp = group.create_group(name, track_order = track_order)
+    grp.attrs.update(attrs)
+    storeEntityInCache(entity_cache, obj, grp)
+    
+    # NOTE: 2025-03-23 22:59:39
+    # treat this as a list
+    for k, element in enumerate(obj):
+        cached_entity = getCachedEntity(entity_cache, element)
+        element_name = getattr(element, "name", type(element).__name__)
+        element_entry_name = f"{k}_{element_name}"
+        if isinstance(cached_entity, (h5py.Group, h5py.Dataset)):
+            grp[element_entry_name] = cached_entity
+        else:
+            element_entity = toHDF5(element, grp, element_entry_name, compression = compression, chunks = chunks,
+                            track_order = track_order, entity_cache = entity_cache)
+            
+    return grp
         
         
 @makeGroup.register(neo.core.container.Container)
 def _(obj:neo.core.container.Container, group, attrs, name, compression, chunks, 
       track_order, entity_cache):
+    
+    objname = getattr(obj, "name", None)
+    print(f"h5io.makeGroup {type(obj).__name__} named {objname}")
     cached_entity = getCachedEntity(entity_cache, obj)
     
     if isinstance(cached_entity, h5py.Group):
@@ -3482,13 +3500,16 @@ def _(obj:neo.core.container.Container, group, attrs, name, compression, chunks,
     
     children_dict = dict()
     
-    for container_name in obj._child_containers:
-        collection = getattr(obj, container_name, None)
-        collection_group_name = container_name
+    # for child_container in obj._child_containers:
+    for child_container in child_containers:
+        collection = getattr(obj, child_container, None)
+        print(f"child container of {type(obj).__name__} (named '{objname}') = {child_container}: {type(collection).__name__}")
+        collection_group_name = child_container
         cached_entity = getCachedEntity(entity_cache, collection)
         if isinstance(cached_entity, (h5py.Group, h5py.Dataset)):
             grp[collection_group_name] = cached_entity
         else:
+            print(f"call toHDF5({child_container}: {type(collection).__name__})")
             collection_entity = toHDF5(collection, grp, collection_group_name, 
                                                  compression = compression, 
                                                  chunks = chunks,
