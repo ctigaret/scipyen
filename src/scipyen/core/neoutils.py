@@ -228,7 +228,7 @@ from . import workspacefunctions
 from . import signalprocessing as sigp
 from . import utilities
 from core.utilities import (
-    normalized_index,
+    # normalized_index, # don't; it will be overridden by normalized_index in this module
     name_lookup,
     GeneralIndexType,
     elements_types,
@@ -1425,7 +1425,7 @@ def normalized_segment_index(
     data_len = len(src)
 
     if isinstance(index, (int, range, slice, np.ndarray, type(None))):
-        return normalized_index(data_len, index)
+        return utilities.normalized_index(data_len, index)
 
     elif isinstance(index, str):
         if slient:
@@ -1438,7 +1438,7 @@ def normalized_segment_index(
 
         for ndx in index:
             if isinstance(ndx, int):
-                indices.append(normalized_index(data_len, ndx))
+                indices.append(utilities.normalized_index(data_len, ndx))
 
             elif isinstance(ndx, str):
                 if silent:
@@ -1493,7 +1493,7 @@ def __get_container_collection_attribute__(
     else:
         return [
             (k, ret[k])
-            for k in normalized_index(len(ret), container_index, multiple=multiple)
+            for k in utilities.normalized_index(len(ret), container_index, multiple=multiple)
         ]
 
 
@@ -1527,7 +1527,7 @@ def __container_lookup__(
     # 1) check if the container's type is among the contained_type._parent_objects
 
     if isinstance(container, neo.container.Container):
-        pfun0 = partial(normalized_index, index=index_obj, multiple=multiple)
+        pfun0 = partial(utilities.normalized_index, index=index_obj, multiple=multiple)
 
         signal_collection_name = neo_child_container_name(contained_type)
 
@@ -2217,8 +2217,10 @@ def neo_use_lookup_index(
     return tuple(ret)
 
 
+# NOTE: 2025-03-25 14:50:13
+# careful now, to NOT override utilities.normalized_index !
 def normalized_index(
-    src: neo.core.container.Container,
+    src: neo.core.container.Container, # neo.Block, neo.Segment, neo.Group
     index: typing.Union[int, str, range, slice, typing.Sequence],
     childtype: type = neo.AnalogSignal,
     silent: bool = False,
@@ -2266,58 +2268,34 @@ def normalized_index(
     data_len = None
     
     if isinstance(src, neo.Block):
-        return list(map(lambda seg: normalized_index(seg, index, childtype, silent), src.segments))
+        getsingle = lambda x: x[0] if isinstance(x, tuple) and len(x) == 1 else x
+        return list(map(lambda seg: getsingle(normalized_index(seg, index, childtype, silent)), src.segments))
+        # return list(chain(map(lambda seg: normalized_index(seg, index, childtype, silent), src.segments)))
 
-    if not isinstance(src, neo.Segment):
+    if not isinstance(src, (neo.Segment, neo.Group)):
         raise TypeError("Expecting a neo.Segment; got %s instead" % type(src).__name__)
+    
+    if childtype.__name__ not in src._child_objects:
+        raise TypeError(f"{childtype.__name__} is not a child object of {type(src).__name__}")
 
     #### BEGIN figure out what signal collection we're after
     if childtype in (neo.AnalogSignal, DataSignal):
-        if not isinstance(src, neo.Segment):
-            raise TypeError(
-                "%s does not contain %s" % (type(src).__name__, childtype.__name__)
-            )
-
         signal_collection = src.analogsignals
 
     elif childtype in (neo.IrregularlySampledSignal, IrregularlySampledDataSignal):
-        if not isinstance(src, neo.Segment):
-            raise TypeError(
-                "%s does not contain %s" % (type(src).__name__, childtype.__name__)
-            )
-
         signal_collection = src.irregularlysampledsignals
 
     elif childtype is neo.SpikeTrain:
-        if not isinstance(src, neo.Segment):
-            raise TypeError(
-                "%s does not contain %s" % (type(src).__name__, childtype.__name__)
-            )
-
         signal_collection = src.spiketrains
 
     elif childtype is neo.Event:
-        if not isinstance(src, neo.Segment):
-            raise TypeError(
-                "%s does not contain %s" % (type(src).__name__, childtype.__name__)
-            )
-
         signal_collection = src.events
 
     elif childtype is neo.Epoch:
-        if not isinstance(src, neo.Segment):
-            raise TypeError(
-                "%s does not contain %s" % (type(src).__name__, childtype.__name__)
-            )
-
         signal_collection = src.epochs
 
     elif any([major >= 0, minor >= 8]) and childtype is neo.core.ImageSequence:
-        if not isinstance(src, neo.Segment):
-            raise TypeError(
-                "%s does not contain %s" % (type(src).__name__, childtype.__name__)
-            )
-
+        # NOTE: 2025-03-25 14:43:38
         # ImageSequence: either a 3D numpy array [frame][row][column] OR
         # a sequence (list) of 2D numpy arrays [row][column]
         signal_collection = src.imagesequences
@@ -2359,7 +2337,7 @@ def normalized_index(
     # print("data_len", data_len)
 
     if isinstance(index, (int, range, slice, np.ndarray, type(None))):
-        return normalized_index(data_len, index)
+        return utilities.normalized_index(data_len, index)
 
     elif isinstance(index, str):
         if silent:
@@ -2368,24 +2346,7 @@ def normalized_index(
         return [i.name for i in signal_collection].index(index)
 
     elif isinstance(index, (tuple, list)):
-        return normalized_index(signal_collection, index)
-    #         indices = list()
-    #
-    #         for ndx in index:
-    #             if isinstance(ndx, int):
-    #                 indices.append(normalized_index(data_len, ndx))
-    #
-    #             elif isinstance(ndx, str):
-    #                 if silent:
-    #                     indices.append(utilities.silentindex([i.name for i in signal_collection], ndx))
-    #
-    #                 else:
-    #                     indices.append([i.name for i in signal_collection].index(ndx) )
-    #
-    #             else:
-    #                 raise IndexError("Invalid index element type %s" % type(ndx).__name__)
-    #
-    #         return indices
+        return utilities.normalized_index(signal_collection, index)
 
     else:
         raise IndexError("Invalid indexing: %s" % index)
@@ -9213,3 +9174,6 @@ def plot_neo(
         plt.title(name)
 
     plt.legend()
+    
+def isABFTrial(data:neo.Block):
+    return isinstance(data.annotations.get("generator", None), dict) and (data.annotations["generator"].get("abf_version", None) is not None)

@@ -2087,7 +2087,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         """
         if isinstance(adcChannel, str):
             if adcChannel not in self.adcNames:
-                raise ValueError(f"Invalid ADC channel name {adcChannel}")
+                raise ValueError(f"Invalid ADC channel name '{adcChannel}'")
             
             adcChannel = self.adcNames.index(adcChannel)
             
@@ -2155,7 +2155,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
             
         elif isinstance(dacChannel, str):
             if dacChannel not in self.dacNames:
-                raise ValueError(f"Invalid DAC channel name {dacChannel}")
+                raise ValueError(f"Invalid DAC channel name '{dacChannel}'")
             
             dacChannel = self.dacNames.index(dacChannel)
             physical=True
@@ -2169,7 +2169,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
             return outputConfs[0]
         else:
             chtype = "physical" if physical else "logical"
-            raise ValueError(f"Invalid {chtype} DAC channel specified {dacChannel}")
+            raise ValueError(f"Invalid {chtype} DAC channel index specified ({dacChannel})")
         
     def getDigitalTrainLogicLevels(self) -> typing.Tuple[pq.Quantity]:
         r"""TTL levels for digital trains, V.
