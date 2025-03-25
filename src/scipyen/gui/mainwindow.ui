@@ -1233,7 +1233,7 @@ NOTE: you can click anywhere in the row to select</string>
   </action>
   <action name="actionOpen_System_Terminal">
    <property name="enabled">
-    <bool>false</bool>
+    <bool>true</bool>
    </property>
    <property name="icon">
     <iconset theme="scriptnew"/>
@@ -1254,7 +1254,7 @@ NOTE: you can click anywhere in the row to select</string>
     <string>Ctrl+T</string>
    </property>
    <property name="visible">
-    <bool>false</bool>
+    <bool>true</bool>
    </property>
   </action>
   <action name="actionSet_user_plugins_directory">

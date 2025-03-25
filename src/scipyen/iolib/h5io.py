@@ -212,6 +212,11 @@ from gui.pictgui import (Arc, ArcMove, CrosshairCursor, Cubic, Ellipse,
 # 'if __DEBUG__:' clause
 __DEBUG__=False
 
+try:
+    numpystr = np.str_
+except:
+    numpystr = str
+
 class HDFDataError(Exception):
     pass
 
@@ -2178,8 +2183,7 @@ def objectToEntity(obj,
     
     # print(f"h5io.objectToEntity: {type(obj).__name__}")
     
-    if isinstance(obj, (collections.abc.Iterable, neo.core.container.Container)) or (hasattr(type(obj),"__iter__") and \
-        not isinstance(obj, (str, bytes, bytearray, np.ndarray, neo.core.spiketrainlist.SpikeTrainList))):
+    if isinstance(obj, (collections.abc.Iterable, neo.core.container.Container)) or hasattr(type(obj),"__iter__"):
         # neo Container, tuple, list, dict → h5py.Group child of group
         # CAUTION: 2022-10-10 22:05:17
         # neo.core.spiketrainlist.SpikeTrainList is a collections.abc.Iterable
@@ -2200,7 +2204,7 @@ def objectToEntity(obj,
     else:
         # everything else → h5py.Dataset child of group
         factory = makeHDF5Dataset
-        
+    
     # this call here WILL check for cached entities and WILL store entity if
     # not already in cache
     entity = factory(obj, group, name = name, compression = compression, 
@@ -2208,7 +2212,28 @@ def objectToEntity(obj,
                     entity_cache = entity_cache)
     entity.attrs.update(obj_attrs)
     return entity
-    # raise NotImplementedError(f"Exporting to HDF5 entity is not implemented for {type(obj).__name__}")
+    
+@objectToEntity.register(str)
+@objectToEntity.register(bytes)
+@objectToEntity.register(bytearray)
+@objectToEntity.register(np.ndarray)
+@objectToEntity.register(neo.core.spiketrainlist.SpikeTrainList)
+def _(obj:typing.Union[str, bytes, bytearray, np.ndarray, neo.core.spiketrainlist.SpikeTrainList],
+      obj_attrs:dict, group:h5py.Group, name:typing.Optional[str]=None,
+      target_name:typing.Optional[str]=None,
+      compression:typing.Optional[str]="gzip",
+      chunks:typing.Optional[bool]=None,
+      track_order:typing.Optional[bool] = True, 
+      entity_cache:typing.Optional[dict]=None,
+      **kwargs):
+    factory = makeHDF5Dataset
+    # this call here WILL check for cached entities and WILL store entity if
+    # not already in cache
+    entity = factory(obj, group, name = name, compression = compression, 
+                    chunks = chunks, track_order = track_order, 
+                    entity_cache = entity_cache)
+    entity.attrs.update(obj_attrs)
+    return entity
 
 @objectToEntity.register(vigra.filters.Kernel1D)
 @objectToEntity.register(vigra.filters.Kernel2D)
@@ -2955,6 +2980,7 @@ def _(obj:type(pd.NA), group, attrs:dict, name:str, compression, chunks,
 
 @makeDataset.register(str)
 def _(obj:str, group, attrs, name, compression, chunks, track_order, entity_cache):
+    # print(f"h5io.makeDataset({type(obj)}): {obj}")
     cached_entity = getCachedEntity(entity_cache, obj)
     if isinstance(cached_entity, h5py.Dataset):
         group[name] = cached_entity # make a hard link
@@ -2966,8 +2992,10 @@ def _(obj:str, group, attrs, name, compression, chunks, track_order, entity_cach
         if len(obj.strip().strip(b"\x00".decode())) == 0: # empty string
             dset = group.create_dataset(name, data = h5py.Empty("f"), track_order=track_order)
         else:
-            dset = group.create_dataset(name, data = np.array(obj, dtype = h5py.string_dtype()),
+            dset = group.create_dataset(name, data = obj, dtype = h5py.string_dtype(),
                                         track_order=track_order)
+            # dset = group.create_dataset(name, data = np.array(obj, dtype = h5py.string_dtype()),
+            #                             track_order=track_order)
             
     except:
         msg = printStyled(f"makeDataset<str> offending object: {obj} (len: {len(obj)})",
@@ -3334,7 +3362,7 @@ def makeGroup(obj, group:h5py.Group, attrs:dict, name:str,
               compression:typing.Optional[str]="gzip", 
               chunks:typing.Optional[bool]=None, track_order:typing.Optional[bool] = True, 
               entity_cache:typing.Optional[dict] = None):# -> h5py.Group:
-    raise NotImplementedError(f"Objects of type {type(obj)._name__} are not supported")
+    raise NotImplementedError(f"Objects of type {type(obj).__name__} are not supported")
     
 @makeGroup.register(dict)
 def _(obj:dict, group, attrs, name, compression, chunks, track_order, 
@@ -3349,31 +3377,57 @@ def _(obj:dict, group, attrs, name, compression, chunks, track_order,
     grp.attrs.update(attrs)
     storeEntityInCache(entity_cache, obj, grp)
     
-    if all(isinstance(k, str) for k in obj.keys()):
-        for k, element in obj.items():
-            cached_entity = getCachedEntity(entity_cache, element)
-            if isinstance(cached_entity, (h5py.Group, h5py.Dataset)):
-                grp[k] = cached_entity
+    # print(f"h5io.makeGroup({type(obj).__name__}) for name {name}:")
+    
+    # NOTE: 2025-03-25 18:57:12
+    # use the code for generic maps by default
+    for k, (key, element) in enumerate(obj.items()):
+        # print(f"key {k} ({type(k).__name__}): element is a {type(element)}")
+        key_type = type(key)
+        key_value_grp_name = f"{k}_{key_type.__name__}_key"
+        key_value_grp = grp.create_group(key_value_grp_name, track_order=track_order)
+        
+        key_entity = toHDF5(key, key_value_grp ,"key", compression = compression, chunks = chunks,
+                            track_order = track_order, entity_cache = entity_cache)
+        
+        cached_entity = getCachedEntity(entity_cache, element)
+        if isinstance(cached_entity, (h5py.Group, h5py.Dataset)):
+            key_value_grp["value"] = cached_entity
+        else:
+            element_entity = toHDF5(element, key_value_grp, "value", compression = compression, chunks = chunks,
+                            track_order = track_order, entity_cache = entity_cache)
             
-            else:
-                element_entity = toHDF5(element, grp, k, compression = compression, chunks = chunks,
-                                track_order = track_order, entity_cache = entity_cache)
-    else:
-        for k, (key, element) in enumerate(obj.items()):
-            key_type = type(key)
-            key_value_grp_name = f"{k}_{key_type.__name__}_key"
-            key_value_grp = grp.create_group(key_value_grp_name, track_order=track_order)
-            
-            key_entity = toHDF5(key, key_value_grp ,"key", compression = compression, chunks = chunks,
-                                track_order = track_order, entity_cache = entity_cache)
-            
-            cached_entity = getCachedEntity(entity_cache, element)
-            if isinstance(cached_entity, (h5py.Group, h5py.Dataset)):
-                key_value_grp["value"] = cached_entity
-            else:
-                element_entity = toHDF5(element, key_value_grp, "value", compression = compression, chunks = chunks,
-                                track_order = track_order, entity_cache = entity_cache)
     return grp
+    
+#     if all(isinstance(k, str) for k in obj.keys()):
+#         for k, element in obj.items():
+#         print(f"key {k} ({type(k).__name__}): element is a {type(element).__name__}")
+#             cached_entity = getCachedEntity(entity_cache, element)
+#             if isinstance(cached_entity, (h5py.Group, h5py.Dataset)):
+#                 grp[k] = cached_entity
+#             
+#             else:
+#                 element_entity = toHDF5(element, grp, k, compression = compression, chunks = chunks,
+#                                 track_order = track_order, entity_cache = entity_cache)
+#         print("")
+#     else:
+#         for k, (key, element) in enumerate(obj.items()):
+#         print(f"key {k} ({type(k).__name__}): element is a {type(element).__name__}")
+#         print(f"key {k}: element is a {type(element).__name__}")
+#             key_type = type(key)
+#             key_value_grp_name = f"{k}_{key_type.__name__}_key"
+#             key_value_grp = grp.create_group(key_value_grp_name, track_order=track_order)
+#             
+#             key_entity = toHDF5(key, key_value_grp ,"key", compression = compression, chunks = chunks,
+#                                 track_order = track_order, entity_cache = entity_cache)
+#             
+#             cached_entity = getCachedEntity(entity_cache, element)
+#             if isinstance(cached_entity, (h5py.Group, h5py.Dataset)):
+#                 key_value_grp["value"] = cached_entity
+#             else:
+#                 element_entity = toHDF5(element, key_value_grp, "value", compression = compression, chunks = chunks,
+#                                 track_order = track_order, entity_cache = entity_cache)
+#     return grp
 
 @makeGroup.register(collections.abc.Iterable)
 def _(obj:collections.abc.Iterable, group, attrs, name, compression, chunks, 

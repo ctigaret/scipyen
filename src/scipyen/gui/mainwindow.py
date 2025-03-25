@@ -5365,7 +5365,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.slot_systemOpenFileOrFolder(targetDir)
         
     @Slot()
-    def _slot_startSystemTerminal(self):
+    def _slot_launchSystemTerminal(self):
         dest = str(pathlib.Path(self.currentDir))
         terminal = desktoputils.get_system_terminal_executable()
         if sys.platform.startswith("win32"):
@@ -5374,7 +5374,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             # subprocess.run(["xterm", "-e", "'cd", dest, "&&", "/bin/bash'"], shell=True)
             if terminal == "konsole":
                 # subprocess.run([terminal, "--subprocess", "--workdir", dest], shell=True)
-                subprocess.run([terminal, "--separate", "--workdir", dest], shell=True)
+                subprocess.run([terminal, "--separate", "--workdir", dest, "&"], shell=True)
             elif terminal == "xterm":
                 subprocess.run([terminal, "-e", "'cd", dest, "&&", "/bin/bash'"], shell=True)
             else:
@@ -5388,9 +5388,9 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @safeWrapper
     def slot_openCurrentDirInSystemTerminal(self):
         terminalLauncher = QtCore.QTimer(self)
-        terminalLauncher.singleShot(0, self._slot_startSystemTerminal)
+        terminalLauncher.singleShot(0, self._slot_launchSystemTerminal)
         # terminalLauncher.setSingleShot(True)
-        # terminalLauncher.timeout.connect(self._slot_startSystemTerminal)
+        # terminalLauncher.timeout.connect(self._slot_launchSystemTerminal)
         terminalLauncher.deleteLater()
         
     @Slot()
