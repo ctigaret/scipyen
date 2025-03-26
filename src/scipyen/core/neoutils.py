@@ -2350,11 +2350,52 @@ def _(src: neo.core.container.Container,
 ):
     major, minor, dot = get_neo_version()
 
-    # data_len = None
-    
     if isinstance(src, neo.Block):
         getsingle = lambda x: x[0] if isinstance(x, (tuple, list)) and len(x) == 1 else x
-        collection = src.groups if ingroups else src.segments
+        if issubclass(childtype, neo.core.container.Container):
+            # NOTE: 2025-03-26 20:41:29
+            # incorporate code for normalized_segment/group_index here and get rid of those functions
+            if childtype is neo.Block:
+                raise ValueError("'childtype' cannot be a neo.Block which is at the top of container hierarchy")
+            
+            if childtype is neo.Segment:
+                collection = src.segments
+            else:
+                collection = src.groups
+                
+            if isinstance(index, (int, range, slice, np.ndarray, type(None))):
+                ret = utilities.normalized_index(len(collection), index)
+                return ret[0] if len(ret) == 1 else ret
+
+            elif isinstance(index, str):
+                if silent:
+                    ret = tuple(filter_attr(collection, indices_only=True, name=index))
+                    return ret[0] if len(ret) == 1 else ret
+                return tuple(map(lambda x: x.name, collection)).index(index)
+
+            elif isinstance(index, (tuple, list)):
+                indices = list()
+
+                for ndx in index:
+                    if isinstance(ndx, int):
+                        indices.append(utilities.normalized_index(len(collection), ndx))
+
+                    elif isinstance(ndx, str):
+                        if silent:
+                            indices.append(tuple(filter_attr(collection, indices_only=True, name=ndx)))
+
+                        else:
+                            indics.append([i.name for i in collection].index(ndx))
+
+                    else:
+                        raise TypeError("Invalid index element type %s" % type(ndx).__name__)
+                    
+                return indices[0] if len(indices) == 1 else indices
+
+            else:
+                raise TypeError("Invalid indexing: %s" % index)
+        else:
+            collection = src.groups if ingroups else src.segments
         # NOTE: groups collect data objects of similar type with the same index 
         # in their corresponding objectlists, across segments; in a trial, such 
         # dataobjects will also have the same name (ADC name), even if they are
@@ -2411,17 +2452,9 @@ def _(src: neo.core.container.Container,
             if img.ndim != 3:
                 raise TypeError("Ambiguous image sequence data type")
 
-            # if img.ndim == 3:
-            #     data_len = img.shape[0]
-            # 
-            # else:
-            #     raise TypeError("Ambiguous image sequence data type")
-
         elif len(signal_collection) > 1:
             if any([i.image_data.ndim != 2 for i in signal_collection]):
                 raise TypeError("Ambiguous image sequence data type")
-
-            # data_len = len(signal_collection)
 
     else:
         raise TypeError("Cannot handle %s" % childtype.__name__)
@@ -2432,26 +2465,6 @@ def _(src: neo.core.container.Container,
         return range(0)
     
     return normalized_index(signal_collection, index, silent=silent, ingroups=ingroups, childtype=childtype)
-
-    # if data_len is None:
-    #     data_len = len(signal_collection)
-
-    # print("data_len", data_len)
-
-    # if isinstance(index, (int, range, slice, np.ndarray, type(None))):
-    #     return utilities.normalized_index(data_len, index)
-    # 
-    # elif isinstance(index, str):
-    #     if silent:
-    #         return utilities.silentindex([i.name for i in signal_collection], index)
-    # 
-    #     return [i.name for i in signal_collection].index(index)
-    # 
-    # elif isinstance(index, (tuple, list)):
-    #     return utilities.normalized_index(signal_collection, index)
-    # 
-    # else:
-    #     raise IndexError("Invalid indexing: %s" % index)
 
 @normalized_index.register(NeoObjectList) # neo.core.objectlist.Objectlist for neo >= 0.13.0 or, simply, list
 @normalized_index.register(list) # neo.core.objectlist.Objectlist for neo >= 0.13.0 or, simply, list
@@ -2474,12 +2487,13 @@ def _(src: typing.Union[NeoObjectList, list, tuple, deque],
 
     elif isinstance(index, str):
         if silent:
-            return tuple(filter_attr(src, indices_only=True, name=index))
-            # return utilities.silentindex(names, index)
+            ret = tuple(filter_attr(src, indices_only=True, name=index))
+            return ret[0] if len(ret) == 1 else ret
         return tuple(map(lambda x: x.name, src)).index(index)
 
     elif isinstance(index, (tuple, list)):
-        return utilities.normalized_index(src, index)
+        ret = utilities.normalized_index(src, index)
+        return ret[0] if len(ret) == 1 else ret
 
     else:
         raise IndexError("Invalid indexing: %s" % index)
