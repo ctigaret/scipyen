@@ -46,7 +46,6 @@ neo_child_container_name
 is_same_as
 lookup
 normalized_index
-normalized_segment_index
 
 
 IV. neo objects hierarchy
@@ -1403,115 +1402,117 @@ def get_signal_names_indices(
     return [item[1] for item in sig_indices_names]
 
 
-def normalized_group_index(
-    src: neo.Block, index: typing.Union[int, str, range, slice, typing.Sequence],
-    silent:bool=False
-):
-    r"""Returns integral indices of a Segment in a neo.Block or list of Segments."""
+# def normalized_group_index(
+#     src: neo.Block, index: typing.Union[int, str, range, slice, typing.Sequence],
+#     silent:bool=False
+# ):
+#     r"""Returns integral indices of a Segment in a neo.Block or list of Segments."""
+# 
+#     if isinstance(src, neo.Block):
+#         src = src.groups
+# 
+#     elif isinstance(src, neo.Group):
+#         # a bit useless, innit ?!?
+#         src = [src]
+# 
+#     elif not isinstance(src, (tuple, list)) or not all(
+#         [isinstance(s, neo.Group) for s in src]
+#     ):
+#         raise TypeError(
+#             "src expected to be a neo.Block, a sequence of neo.Group, or a neo.Group; got %s instead"
+#             % type(src).__name__
+#         )
+# 
+#     data_len = len(src)
+# 
+#     if isinstance(index, (int, range, slice, np.ndarray, type(None))):
+#         return utilities.normalized_index(data_len, index)
+# 
+#     elif isinstance(index, str):
+#         if silent:
+#             return tuple(filter_attr(src, indices_only=True, name=index))
+#             # return utilities.silentindex([i.name for i in src], index)
+#         return tuple(map(lambda x: x.name, src)).index(index)
+# 
+#     elif isinstance(index, (tuple, list)):
+#         indices = list()
+# 
+#         for ndx in index:
+#             if isinstance(ndx, int):
+#                 indices.append(utilities.normalized_index(data_len, ndx))
+# 
+#             elif isinstance(ndx, str):
+#                 if silent:
+#                     indices.append(tuple(utilities.silentindex([i.name for i in src]), ndx))
+#                     # indices.append(utilities.silentindex([i.name for i in src], ndx))
+# 
+#                 else:
+#                     indics.append([i.name for i in src].index(ndx))
+# 
+#             else:
+#                 raise TypeError("Invalid index element type %s" % type(ndx).__name__)
+#         return indices
+# 
+#     else:
+#         raise TypeError("Invalid indexing: %s" % index)
 
-    if isinstance(src, neo.Block):
-        src = src.groups
-
-    elif isinstance(src, neo.Group):
-        # a bit useless, innit ?!?
-        src = [src]
-
-    elif not isinstance(src, (tuple, list)) or not all(
-        [isinstance(s, neo.Group) for s in src]
-    ):
-        raise TypeError(
-            "src expected to be a neo.Block, a sequence of neo.Group, or a neo.Group; got %s instead"
-            % type(src).__name__
-        )
-
-    data_len = len(src)
-
-    if isinstance(index, (int, range, slice, np.ndarray, type(None))):
-        return utilities.normalized_index(data_len, index)
-
-    elif isinstance(index, str):
-        if silent:
-            return tuple(filter_attr(src, indices_only=True, name=index))
-            # return utilities.silentindex([i.name for i in src], index)
-        return tuple(map(lambda x: x.name, src)).index(index)
-
-    elif isinstance(index, (tuple, list)):
-        indices = list()
-
-        for ndx in index:
-            if isinstance(ndx, int):
-                indices.append(utilities.normalized_index(data_len, ndx))
-
-            elif isinstance(ndx, str):
-                if silent:
-                    indices.append(tuple(utilities.silentindex([i.name for i in src]), ndx))
-                    # indices.append(utilities.silentindex([i.name for i in src], ndx))
-
-                else:
-                    indics.append([i.name for i in src].index(ndx))
-
-            else:
-                raise TypeError("Invalid index element type %s" % type(ndx).__name__)
-        return indices
-
-    else:
-        raise TypeError("Invalid indexing: %s" % index)
-
-def normalized_segment_index(
-    src: neo.Block, index: typing.Union[int, str, range, slice, typing.Sequence],
-    silent:bool=False
-):
-    r"""Returns integral indices of a Segment in a neo.Block or list of Segments."""
-
-    if isinstance(src, neo.Block):
-        src = src.segments
-
-    elif isinstance(src, neo.Segment):
-        # a bit useless, innit ?!?
-        src = [src]
-
-    elif not isinstance(src, (tuple, list)) or not all(
-        [isinstance(s, neo.Segment) for s in src]
-    ):
-        raise TypeError(
-            "src expected to be a neo.Block, a sequence of neo.Segments, or a neo.Segment; got %s instead"
-            % type(src).__name__
-        )
-
-    data_len = len(src)
-
-    if isinstance(index, (int, range, slice, np.ndarray, type(None))):
-        return utilities.normalized_index(data_len, index)
-
-    elif isinstance(index, str):
-        if silent:
-            return tuple(filter_attr(src, indices_only=True, name=index))
-            # return utilities.silentindex([i.name for i in src], index)
-        names = tuple(map(lambda x: x.name, src))
-        return names.index(index)
-
-    elif isinstance(index, (tuple, list)):
-        indices = list()
-
-        for ndx in index:
-            if isinstance(ndx, int):
-                indices.append(utilities.normalized_index(data_len, ndx))
-
-            elif isinstance(ndx, str):
-                if silent:
-                    indices.append(tuple(utilities.silentindex([i.name for i in src]), ndx))
-                    # indices.append(utilities.silentindex([i.name for i in src], ndx))
-
-                else:
-                    indics.append([i.name for i in src].index(ndx))
-
-            else:
-                raise TypeError("Invalid index element type %s" % type(ndx).__name__)
-        return indices
-
-    else:
-        raise TypeError("Invalid indexing: %s" % index)
-
+# def normalized_segment_index(
+#     src: neo.Block, index: typing.Union[int, str, range, slice, typing.Sequence],
+#     silent:bool=False
+# ):
+#     r"""Returns integral indices of a Segment in a neo.Block or list of Segments.
+#     DEPRECATED Use neoutils.normalized_index instead
+#     """
+# 
+#     if isinstance(src, neo.Block):
+#         src = src.segments
+# 
+#     elif isinstance(src, neo.Segment):
+#         # a bit useless, innit ?!?
+#         src = [src]
+# 
+#     elif not isinstance(src, (tuple, list)) or not all(
+#         [isinstance(s, neo.Segment) for s in src]
+#     ):
+#         raise TypeError(
+#             "src expected to be a neo.Block, a sequence of neo.Segments, or a neo.Segment; got %s instead"
+#             % type(src).__name__
+#         )
+# 
+#     data_len = len(src)
+# 
+#     if isinstance(index, (int, range, slice, np.ndarray, type(None))):
+#         return utilities.normalized_index(data_len, index)
+# 
+#     elif isinstance(index, str):
+#         if silent:
+#             return tuple(filter_attr(src, indices_only=True, name=index))
+#             # return utilities.silentindex([i.name for i in src], index)
+#         names = tuple(map(lambda x: x.name, src))
+#         return names.index(index)
+# 
+#     elif isinstance(index, (tuple, list)):
+#         indices = list()
+# 
+#         for ndx in index:
+#             if isinstance(ndx, int):
+#                 indices.append(utilities.normalized_index(data_len, ndx))
+# 
+#             elif isinstance(ndx, str):
+#                 if silent:
+#                     indices.append(tuple(utilities.silentindex([i.name for i in src]), ndx))
+#                     # indices.append(utilities.silentindex([i.name for i in src], ndx))
+# 
+#                 else:
+#                     indics.append([i.name for i in src].index(ndx))
+# 
+#             else:
+#                 raise TypeError("Invalid index element type %s" % type(ndx).__name__)
+#         return indices
+# 
+#     else:
+#         raise TypeError("Invalid indexing: %s" % index)
+# 
 
 def neo_child_container_name(type_or_obj):
     r"""Provisional: name of member collection.
