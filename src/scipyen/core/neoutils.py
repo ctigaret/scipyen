@@ -1403,6 +1403,59 @@ def get_signal_names_indices(
     return [item[1] for item in sig_indices_names]
 
 
+def normalized_group_index(
+    src: neo.Block, index: typing.Union[int, str, range, slice, typing.Sequence]
+):
+    r"""Returns integral indices of a Segment in a neo.Block or list of Segments."""
+
+    if isinstance(src, neo.Block):
+        src = src.groups
+
+    elif isinstance(src, neo.Group):
+        # a bit useless, innit ?!?
+        src = [src]
+
+    elif not isinstance(src, (tuple, list)) or not all(
+        [isinstance(s, neo.Group) for s in src]
+    ):
+        raise TypeError(
+            "src expected to be a neo.Block, a sequence of neo.Group, or a neo.Group; got %s instead"
+            % type(src).__name__
+        )
+
+    data_len = len(src)
+
+    if isinstance(index, (int, range, slice, np.ndarray, type(None))):
+        return utilities.normalized_index(data_len, index)
+
+    elif isinstance(index, str):
+        if slient:
+            return tuple(filter_attr(src, indices_only=True, name=index))
+            # return utilities.silentindex([i.name for i in src], index)
+        return tuple(map(lambda x: x.name, src)).index(index)
+
+    elif isinstance(index, (tuple, list)):
+        indices = list()
+
+        for ndx in index:
+            if isinstance(ndx, int):
+                indices.append(utilities.normalized_index(data_len, ndx))
+
+            elif isinstance(ndx, str):
+                if silent:
+                    indices.append(tuple(utilities.silentindex([i.name for i in src]), ndx))
+                    # indices.append(utilities.silentindex([i.name for i in src], ndx))
+
+                else:
+                    indics.append([i.name for i in src].index(ndx))
+
+            else:
+                raise TypeError("Invalid index element type %s" % type(ndx).__name__)
+        return indices
+
+    else:
+        raise TypeError("Invalid indexing: %s" % index)
+
 def normalized_segment_index(
     src: neo.Block, index: typing.Union[int, str, range, slice, typing.Sequence]
 ):
@@ -1412,6 +1465,7 @@ def normalized_segment_index(
         src = src.segments
 
     elif isinstance(src, neo.Segment):
+        # a bit useless, innit ?!?
         src = [src]
 
     elif not isinstance(src, (tuple, list)) or not all(
@@ -1429,9 +1483,10 @@ def normalized_segment_index(
 
     elif isinstance(index, str):
         if slient:
-            return utilities.silentindex([i.name for i in src], index)
-
-        return [i.name for i in src].index(index)
+            return tuple(filter_attr(src, indices_only=True, name=index))
+            # return utilities.silentindex([i.name for i in src], index)
+        names = tuple(map(lambda x: x.name, src))
+        return names.index(index)
 
     elif isinstance(index, (tuple, list)):
         indices = list()
@@ -1442,7 +1497,8 @@ def normalized_segment_index(
 
             elif isinstance(ndx, str):
                 if silent:
-                    indices.append(utilities.silentindex([i.name for i in src], ndx))
+                    indices.append(tuple(utilities.silentindex([i.name for i in src]), ndx))
+                    # indices.append(utilities.silentindex([i.name for i in src], ndx))
 
                 else:
                     indics.append([i.name for i in src].index(ndx))
@@ -2219,15 +2275,15 @@ def neo_use_lookup_index(
 
 # NOTE: 2025-03-25 14:50:13
 # careful now, to NOT override utilities.normalized_index !
+@singledispatch
 def normalized_index(
-    src: neo.core.container.Container, # neo.Block, neo.Segment, neo.Group
-    index: typing.Union[int, str, range, slice, typing.Sequence],
-    childtype: type = neo.AnalogSignal,
+    src: object,
+    index: typing.Union[int, str, range, slice, typing.Sequence], /,
     silent: bool = False,
+    ingroups: bool = False,
+    childtype: type = neo.AnalogSignal,
 ):
     r"""Returns the integral index of a child object in its container.
-    
-    
     The child object is identified by the value of its 'name' attribute.
     CAUTION It is assumed that, in a given container, no two objects of the same
     type have identical values for the 'name' attribute.
@@ -2238,10 +2294,22 @@ def normalized_index(
     ----------
 
     src: neo container (Block, Segment, Group)
+        NOTE: When neo.Block, the function descends recursively into the Block's
+        segments, unless 'ingroups' is set to True
 
-    index: int, str, tuple, list, range, or slice; any valid form of indexing
-        including by the value of the signal's "name " attribute.
+    index: int, str, tuple, list, range, or slice; 
+        any valid form of indexing;
+        WARNING: when a str, this requires that the objects of 'childtype' have
+        an attribute 'name' of type str
 
+    silent: bool, default is False 
+        Determines what happens when 'index' parameter is a str, and the elements
+        in the collection do not have a 'name' attribute of type 'str':
+    
+        'silent' is Fale -> the function will raise an exception
+        'silent' is True -> the function will ignore elements without a 'name':str
+            attribute
+    
     childtype: type object; the type of signal to index; valid signal types are
         neo.AnalogSignal, neo.IrregularlySampledSignal,
         neo.Event, neo.Epoch, neo.SpikeTrain, neo.ImageSequence, neo.Unit,
@@ -2249,29 +2317,56 @@ def normalized_index(
 
         Defaults is neo.AnalogSignal.
 
-
-
-        WARNING: AS OF 2021-10-03 13:08:37 ChannelIndex and Unit are OUT
+        NOTE: AS OF 2021-10-03 13:08:37 ChannelIndex and Unit have been removed
+        from neo v >= 0.13.0
 
         Segment objects contain analog & irregularly sampled signals, events,
             epochs, spike trains, channel indexes, and image sequences.
 
         Unit objects contain only spike trains.
+    
+    ingroups:bool, default is False
+        NOTE: Since 2025-03-26 09:24:15
+    
+        When True, and src is a neo.Block, the function descends into the 
+        'groups' attribute (which may be empty!)
+    
 
     Returns:
     --------
     a range or list of integer indices
 
     """
+    raise NotImplementedError(f"Function is not implemented for objects of type {type(src)}")
+
+@normalized_index.register(neo.core.container.Container) # neo.Block, neo.Segment, neo.Group
+def _(src: neo.core.container.Container,
+    index: typing.Union[int, str, range, slice, typing.Sequence], /, 
+    silent: bool = False,
+    ingroups: bool = False,
+    childtype: type = neo.AnalogSignal,
+):
     major, minor, dot = get_neo_version()
 
-    data_len = None
+    # data_len = None
     
     if isinstance(src, neo.Block):
-        getsingle = lambda x: x[0] if isinstance(x, tuple) and len(x) == 1 else x
-        return list(map(lambda seg: getsingle(normalized_index(seg, index, childtype, silent)), src.segments))
+        getsingle = lambda x: x[0] if isinstance(x, (tuple, list)) and len(x) == 1 else x
+        collection = src.groups if ingroups else src.segments
+        # NOTE: groups collect data objects of similar type with the same index 
+        # in their corresponding objectlists, across segments; in a trial, such 
+        # dataobjects will also have the same name (ADC name), even if they are
+        # likely to differ numerically; therefore getting the index of a named 
+        # data object (say and AnalogSignal) in a neo.Group's objectlist member
+        # (in this examplel ,'analogsignals') does NOT make sense at all (all 
+        # signals have the same name)! This applies to all other types of data 
+        # objects in any objectlisyt member of a neo.Group:
+        #     collection = src.groups
+        # else:
+        return list(map(lambda x: getsingle(normalized_index(x, index, silent=silent, ingroups=ingroups, childtype=childtype)), collection))
         # return list(chain(map(lambda seg: normalized_index(seg, index, childtype, silent), src.segments)))
 
+    # print(f"neoutils.normalized_index: src is a {type(src)}")
     if not isinstance(src, (neo.Segment, neo.Group)):
         raise TypeError("Expecting a neo.Segment; got %s instead" % type(src).__name__)
     
@@ -2279,6 +2374,7 @@ def normalized_index(
         raise TypeError(f"{childtype.__name__} is not a child object of {type(src).__name__}")
 
     #### BEGIN figure out what signal collection we're after
+    # print(f"childtype: {childtype}")
     if childtype in (neo.AnalogSignal, DataSignal):
         signal_collection = src.analogsignals
 
@@ -2310,18 +2406,20 @@ def normalized_index(
 
         if len(signal_collection) == 1:
             img = signal_collection[0].image_data
-
-            if img.ndim == 3:
-                data_len = img.shape[0]
-
-            else:
+            if img.ndim != 3:
                 raise TypeError("Ambiguous image sequence data type")
+
+            # if img.ndim == 3:
+            #     data_len = img.shape[0]
+            # 
+            # else:
+            #     raise TypeError("Ambiguous image sequence data type")
 
         elif len(signal_collection) > 1:
             if any([i.image_data.ndim != 2 for i in signal_collection]):
                 raise TypeError("Ambiguous image sequence data type")
 
-            data_len = len(signal_collection)
+            # data_len = len(signal_collection)
 
     else:
         raise TypeError("Cannot handle %s" % childtype.__name__)
@@ -2330,27 +2428,59 @@ def normalized_index(
 
     if signal_collection is None or len(signal_collection) == 0:
         return range(0)
+    
+    return normalized_index(signal_collection, index, silent=silent, ingroups=ingroups, childtype=childtype)
 
-    if data_len is None:
-        data_len = len(signal_collection)
+    # if data_len is None:
+    #     data_len = len(signal_collection)
 
     # print("data_len", data_len)
 
+    # if isinstance(index, (int, range, slice, np.ndarray, type(None))):
+    #     return utilities.normalized_index(data_len, index)
+    # 
+    # elif isinstance(index, str):
+    #     if silent:
+    #         return utilities.silentindex([i.name for i in signal_collection], index)
+    # 
+    #     return [i.name for i in signal_collection].index(index)
+    # 
+    # elif isinstance(index, (tuple, list)):
+    #     return utilities.normalized_index(signal_collection, index)
+    # 
+    # else:
+    #     raise IndexError("Invalid indexing: %s" % index)
+
+@normalized_index.register(NeoObjectList) # neo.core.objectlist.Objectlist for neo >= 0.13.0 or, simply, list
+@normalized_index.register(list) # neo.core.objectlist.Objectlist for neo >= 0.13.0 or, simply, list
+@normalized_index.register(tuple) # neo.core.objectlist.Objectlist for neo >= 0.13.0 or, simply, list
+@normalized_index.register(deque) # neo.core.objectlist.Objectlist for neo >= 0.13.0 or, simply, list
+def _(src: typing.Union[NeoObjectList, list, tuple, deque], 
+    index: typing.Union[int, str, range, slice, typing.Sequence], /, 
+    silent: bool = False,
+    ingroups: bool = False, # not used
+    childtype: type = neo.AnalogSignal # not used
+):
+    # print(f"neoutils.normalized_index in {type(src).__name__}:")
+    # print(f" index = {index} ({type(index).__name__}):")
+    # print(f" silent = {silent} ({type(silent).__name__}):")
+    # print(f" ingroups = {ingroups} ({type(ingroups).__name__}):")
+    # print(f" ingroups = {childtype} ({type(childtype).__name__}):")
+    
     if isinstance(index, (int, range, slice, np.ndarray, type(None))):
-        return utilities.normalized_index(data_len, index)
+        return utilities.normalized_index(len(src), index)
 
     elif isinstance(index, str):
         if silent:
-            return utilities.silentindex([i.name for i in signal_collection], index)
-
-        return [i.name for i in signal_collection].index(index)
+            return tuple(filter_attr(src, indices_only=True, name=index))
+            # return utilities.silentindex(names, index)
+        return tuple(map(lambda x: x.name, src)).index(index)
 
     elif isinstance(index, (tuple, list)):
-        return utilities.normalized_index(signal_collection, index)
+        return utilities.normalized_index(src, index)
 
     else:
         raise IndexError("Invalid indexing: %s" % index)
-
 
 # @safeWrapper
 def get_index_of_named_signal(

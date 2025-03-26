@@ -1656,7 +1656,7 @@ def filter_attr(
         NOTE: Setting the 'indices_only' flag to True, automatically sets 'indices'
         to True as well (this will save some typing).
 
-    exclude:bool, ooptioinal (default is False)
+    exclude:bool, optional (default is False)
         When True, the function NEGATES the evaluation of the predicates.
 
     Var-keyword parameters (kwargs):
@@ -1744,6 +1744,13 @@ def filter_attr(
 
     if indices_only is True:
         indices = True
+        
+    # print("prog.filter_attr:")
+    # print(f"  iterable: {type(iterable).__name__}")
+    # print(f"  op: {op}")
+    # print(f"  indices: {indices}")
+    # print(f"  indices_only: {indices_only}")
+    # print(f"  exclude: {exclude}")
 
     if not isinstance(
         op,
