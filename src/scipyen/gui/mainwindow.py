@@ -8566,7 +8566,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # else:
         #     scipyen_plugin_loader.find_plugins(self._scipyendir_, self._scipyendir_)  # calls os.walk
         scipyen_plugin_loader.find_plugins(self._scipyendir_, self._scipyendir_)  # calls os.walk
-        scipyen_plugin_loader.find_plugins(self.userPluginsDirectory, self._scipyendir_)  # calls os.walk
+        scipyen_plugin_loader.find_plugins(self.userPluginsDirectory, self._scipyendir_, True)  # calls os.walk
         
 
         # NOTE: 2016-04-15 11:53:08

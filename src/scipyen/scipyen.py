@@ -19,6 +19,7 @@ import xdg
 from xdg import IconTheme
 
 from core.prog import scipywarn, printStyled
+from core import sysutils
 
 my_conda_env = os.environ.get("CONDA_DEFAULT_ENV", None)
 conda_env_prefix = os.environ.get("CONDA_PREFIX", None)
@@ -47,32 +48,37 @@ else:
 
 try:
     # print(f"scipyen module: {__file__}")
+    # NOTE: 2025-03-26 09:02:01
+    # This figures out is scipyen is being run off a local git repository; if it
+    # does, then outputs a brief message about the git branch begn used and its 
+    # status (modified, or not, etc)
     moduleFilePath = pathlib.Path(__file__)
     moduleDir = moduleFilePath.parent
     if moduleDir.name == "scipyen":
         srcDir = moduleDir.parent
         if srcDir.name == "src":
             repoDir = srcDir.parent
-            gitTest = subprocess.run(["git", "-C", repoDir.as_posix(), "status", "--short", "--branch"], capture_output=True)
-
-            if gitTest.returncode == 0:
-                result = gitTest.stdout.decode().split("\n")
-                brComp = result[0]
-                head, branches = brComp.split("## ")
-                local, remote = branches.split("...")
-                local = printStyled(local, color="green")
-                remote = printStyled(remote, color="red")
-                msg = f"{printStyled('WARNING:', color='yellow')} Running {local} branch of the local Scipyen git repository in {printStyled(repoDir.as_posix(), color='blue')}, with status:"
-                result[0] = "## "+local+"..."+remote
-                if len(result) > 1:
-                    for k in range(1,len(result)):
-                        s = result[k]
-                        head = printStyled(s[:2], color="red")
-                        fileName = s[2:]
-                        result[k] = head+fileName
-
-                result.insert(0, msg)
-                print("\n".join(result))
+            sysutils.checkGitRepo(repoDir, "Scipyen") # will print out git branch status is available
+            # gitTest = subprocess.run(["git", "-C", repoDir.as_posix(), "status", "--short", "--branch"], capture_output=True)
+            # 
+            # if gitTest.returncode == 0:
+            #     result = gitTest.stdout.decode().split("\n")
+            #     brComp = result[0]
+            #     head, branches = brComp.split("## ")
+            #     local, remote = branches.split("...")
+            #     local = printStyled(local, color="green")
+            #     remote = printStyled(remote, color="red")
+            #     msg = f"{printStyled('WARNING:', color='yellow')} Running {local} branch of the local Scipyen git repository in {printStyled(repoDir.as_posix(), color='blue')}, with status:"
+            #     result[0] = "## "+local+"..."+remote
+            #     if len(result) > 1:
+            #         for k in range(1,len(result)):
+            #             s = result[k]
+            #             head = printStyled(s[:2], color="red")
+            #             fileName = s[2:]
+            #             result[k] = head+fileName
+            # 
+            #     result.insert(0, msg)
+            #     print("\n".join(result))
 except:
     traceback.print_exc()
     pass
