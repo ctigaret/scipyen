@@ -1404,7 +1404,8 @@ def get_signal_names_indices(
 
 
 def normalized_group_index(
-    src: neo.Block, index: typing.Union[int, str, range, slice, typing.Sequence]
+    src: neo.Block, index: typing.Union[int, str, range, slice, typing.Sequence],
+    silent:bool=False
 ):
     r"""Returns integral indices of a Segment in a neo.Block or list of Segments."""
 
@@ -1429,7 +1430,7 @@ def normalized_group_index(
         return utilities.normalized_index(data_len, index)
 
     elif isinstance(index, str):
-        if slient:
+        if silent:
             return tuple(filter_attr(src, indices_only=True, name=index))
             # return utilities.silentindex([i.name for i in src], index)
         return tuple(map(lambda x: x.name, src)).index(index)
@@ -1457,7 +1458,8 @@ def normalized_group_index(
         raise TypeError("Invalid indexing: %s" % index)
 
 def normalized_segment_index(
-    src: neo.Block, index: typing.Union[int, str, range, slice, typing.Sequence]
+    src: neo.Block, index: typing.Union[int, str, range, slice, typing.Sequence],
+    silent:bool=False
 ):
     r"""Returns integral indices of a Segment in a neo.Block or list of Segments."""
 
@@ -1482,7 +1484,7 @@ def normalized_segment_index(
         return utilities.normalized_index(data_len, index)
 
     elif isinstance(index, str):
-        if slient:
+        if silent:
             return tuple(filter_attr(src, indices_only=True, name=index))
             # return utilities.silentindex([i.name for i in src], index)
         names = tuple(map(lambda x: x.name, src))
