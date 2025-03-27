@@ -675,7 +675,10 @@ def split_histogram(counts, f):
 
     """
     # from numbers import Real, Integral
-    from scipy import where
+    try:
+        from scipy import where
+    except:
+        from numpy import where
 
     def __splitter__(c, f0, f1):
         lo = where(c > 0)[0][0]
@@ -834,7 +837,10 @@ def state_levels(x: np.ndarray, **kwargs):
 
 
     """
-    from scipy import where
+    try:
+        from scipy import where
+    except:
+        from numpy import where
 
     if not isinstance(x, np.ndarray):
         raise TypeError(f"Numpy array expected; instead, got a {type(x).__name__}")
@@ -3115,7 +3121,7 @@ def detect_boxcar(
         # print(f"threshold = {minampli*sig.units}")
 
         if np.all(np.abs(amplitude) < minampli):
-            return (None, None, None, None, None, None)
+            return (np.array([np.nan])* x.times.units, np.array([np.nan])* x.times.units, np.nan, np.nan, np.nan, False)
 
         code, cdist = cluster.vq.vq(sig, sorted(cbook))  # use un-filtered signal here
 
@@ -3137,16 +3143,16 @@ def detect_boxcar(
                 np.array([x.times[k] for k in ndx_lo_hi]) * x.times.units
             )  # up transitions
         else:
-            times_lo_hi = None
+            times_lo_hi = np.array([np.nan]) * x.times.units
 
         if ndx_hi_lo.size:
             times_hi_lo = (
                 np.array([x.times[k] for k in ndx_hi_lo]) * x.times.units
             )  # down transitions
         else:
-            times_hi_lo = None
+            times_hi_lo = np.array([np.nan]) * x.times.units
 
-        if all(v is not None for v in (times_lo_hi, times_hi_lo)):
+        if all(v is not np.nan for v in (times_lo_hi, times_hi_lo)):
             if times_lo_hi.size == times_hi_lo.size:  # signal has boxcars only
                 if times_lo_hi.size == 1:
                     upward = (
@@ -3175,18 +3181,18 @@ def detect_boxcar(
                     upward = np.append(upward, lastup)
 
         else:
-            upward = True if times_lo_hi is not None else False
+            upward = True if times_lo_hi is not np.nan else False
 
     except Exception as e:
         traceback.print_exc()
-        times_lo_hi = None
-        times_hi_lo = None
+        times_lo_hi = np.nan
+        times_hi_lo = np.nan
 
-        amplitude = None
-        cbook = None
-        code = None
+        amplitude = np.nan
+        cbook = np.nan
+        code = np.nan
 
-        upward = None
+        upward = False
 
     # when there are all boxcars, times_lo_hi and times_hi_lo have the same length
     # where there is just one steap (Heaviside) then one of times_lo_hi and times_hi_lo

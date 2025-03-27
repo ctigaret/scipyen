@@ -705,9 +705,14 @@ class ABFEpoch:
         
     @property
     def letter(self) -> str:
-        r"""Epoch's letter in the epochs index.
+        r"""Epoch's letter in the epochs index; read-only.
         E.g., 'A', 'B', etc"""
         return getEpochLetter(self.number)
+    
+    @property
+    def name(self) -> str:
+        r"""Alias to self.letterm(for convenience); read-only"""
+        return self.letter
     
     @property
     def number(self) -> int:
@@ -2306,6 +2311,29 @@ class ABFProtocol(ElectrophysiologyProtocol):
                 
         return neo.Epoch(times = times, durations = durations, units=units, 
                          labels = labels, name=name, description=description)
+    
+    def dacEpochsToNeoEpoch(self, dac:typing.Union[ABFOutputConfiguration, int, str],
+                      sweep:int = 0):
+        if isinstance(dac, (int, str)):
+            dac = self.getDAC(dac)
+            
+        elif isinstance(dac, ABFOutputConfiguration):
+            if dac not in self.DACs:
+                raise ValueError("The specified DAC is not configured in this protocol")
+            
+        else:
+            raise TypeError(f"'dac' expected tp be an ABFOutputConfiguration, int or str; got {type(dac).__name__} instead")
+        
+        times = list(map(lambda epoch: self.getEpochStart(epoch, dac, sweep), dac.epochs))
+        durations = list(map(lambda epoch: self.getEpochDuration(epoch, dac, sweep), dac.epochs))
+        
+        labels = list(map(lambda epoch: epoch.letter, dac.epochs))
+        
+        ret = neo.Epoch(times = times, durations = durations, labels = labels,
+                        units = times[0].units, name = f"{dac.name}_sweep_{sweep}_ABFEpochs",
+                        description = f"ABFEpochs for DAC {dac.name} in sweep {sweep}")
+        
+        return ret
     
     def getEpochStart(self, epoch:typing.Union[ABFEpoch, str, int], 
                             dac:typing.Union[ABFOutputConfiguration, int, str],
