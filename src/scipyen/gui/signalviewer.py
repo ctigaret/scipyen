@@ -559,6 +559,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # when True, ALL signals in the data "frame" are (re)plotted - subject to the signal selectors
         self._new_frame_ = True
         
+        self._new_data_ = True # needed to refresh the plotitems when new data has been set with the viewer
+        
         self._plot_names_ = dict() # maps item row position to name
         
         self._cursorWindowSizeX_ = self.defaultCursorWindowSizeX
@@ -1209,6 +1211,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.ignoreEmptySpikeTrains = value==True
         if self.yData is not None:
             self.displayFrame()
+            self._new_data_ = False
         
     @property
     def ignoreEmptySpikeTrains(self):
@@ -2278,7 +2281,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     def _populate_signal_chooser_(self, mapping, combo):
         r""" Helper for the self._setup_signal_choosers_ method
         """
+        # print(f"{self.__class__.__name__}._populate_signal_chooser: mapping = {mapping}")
         sigBlock = QtCore.QSignalBlocker(combo)
+        analog = combo == self.analogSignalComboBox
         if len(mapping):
             entries = ["All"] + list(mapping.keys()) + ["Choose"]
             current_ndx = combo.currentIndex()
@@ -2287,7 +2292,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
             current_txt = combo.currentText() # for empty combo this is ""
             
-            if combo == self.analogSignalComboBox:
+            if analog:
                 signal_selection = self.guiSelectedAnalogSignalEntries
             else:
                 signal_selection = self.guiSelectedIrregularSignalEntries
@@ -2299,8 +2304,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             else:
                 selected_signals_for_frame = list()
                 
-            cname = "Analog" if combo == self.analogSignalComboBox else "Irregular"
-            # print(f"{self.__class__.__name__}._populate_signal_chooser_ {cname} selected_signals_for_frame = {selected_signals_for_frame}")
+            # print(f"{self.__class__.__name__}._populate_signal_chooser_ {'Analog' if analog else 'Irregular'}: selected_signals_for_frame = {selected_signals_for_frame}")
                 
             if len(selected_signals_for_frame)>1:
                 new_ndx = len(entries)-1
@@ -2327,6 +2331,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 combo.clear()
                 combo.addItems(entries)
                 combo.setCurrentIndex(new_ndx)
+                # NOTE: 2025-03-30 21:40:12
+                # update the gui selection variable as well!
+                # print(f"{self.__class__.__name__}._populate_signal_chooser_ {combo.currentText()} vs {current_txt}")
+                if len(current_txt.strip()) and current_txt != combo.currentText():
+                    signal_selection[:] = [combo.currentText()]
         else:
             combo.clear()
         
@@ -2334,7 +2343,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                 irregular:typing.Optional[list] = None):
         r""" Populates the GUI signal combo boxes based on the signals
         """
-        # print(f"{self.__class__.__name__}._setup_signal_choosers_: {len(analog) if isinstance(analog, (tuple, list, NeoObjectList)) else analog} analogs")
+        # print(f"{self.__class__.__name__}._setup_signal_choosers_:")
         
         if not isinstance(analog, (tuple, list, NeoObjectList)) or len(analog) == 0:
             self._frame_analog_map_.clear()
@@ -3289,7 +3298,7 @@ anything else       anything else       ❌
     @safeWrapper
     def slot_analogSignalsComboBoxIndexChanged(self, index):
         r"""Triggered by a change in Analog signal selection combo box.
-    This combo box is self.analogSignalComboBox"""
+        This combo box is self.analogSignalComboBox"""
         # FIXME: 2023-07-09 12:12:42
         # this signal is only triggered when the combo box selection has changed
         # if you wanted to choose signals again it won't be called, because the 
@@ -3469,7 +3478,7 @@ anything else       anything else       ❌
         # print(f"\n{self.__class__.__name__}[{self.windowTitle()}].var_observer change = {change}")
 #         if isinstance(newObj, neo.Block):
 #             print(f"new: {newObj} name = {newObj.name}\n\t with segments = {newObj.segments}")
-        
+        # self._var_notified_ = True
         if self.currentFrame not in self.frameIndex:
             self.currentFrame = self.frameIndex[-1] # ⇒ also calls self.displayFrame()
         else:
@@ -6897,8 +6906,8 @@ anything else       anything else       ❌
                    plotStyle:str = "plot", showFrame:int = None, 
                    *args, **kwargs):
         r"""Sets up internal variables and triggers plotting.
-Does the behind the scene work of self.setData(...)
-"""
+        Does the behind the scene work of self.setData(...)
+        """
         self.plot_start = None
         self.plot_stop = None
         
@@ -6980,6 +6989,8 @@ Does the behind the scene work of self.setData(...)
 
                 self.actionDetect_Triggers.setEnabled(check_ephys_data_collection(self._yData_))
                             
+                self._new_data_ = True
+                
                 self.observed_vars["xData"] = self._xData_
                 self.observed_vars["yData"] = self._yData_
                 
@@ -6992,11 +7003,14 @@ Does the behind the scene work of self.setData(...)
                 # contemplate placing _var_notified_ and _new_frame_ in the 
                 # observed_var
                 
+                
                 if not self._var_notified_:
                     # NOTE: 2023-07-09 11:56:22
                     # see also NOTE: 2023-07-09 11:54:06
                     # force replotting the data
                     self._new_frame_ = True
+                    # NOTE: 2025-03-30 22:07:23
+                    # this initiates the entire plotting call chain
                     self.displayFrame()
                     self._new_frame_ = False
                 else:
@@ -7007,7 +7021,6 @@ Does the behind the scene work of self.setData(...)
             else:
                 warnings.warn(f"{self.__class__.__name__} <{self.windowTitle()}>: Could not parse the data x: {x}, y: {y}")
                 return
-            
 
         except Exception as e:
             traceback.print_exc()
@@ -7029,207 +7042,207 @@ Does the behind the scene work of self.setData(...)
                 showFrame = None, *args, **kwargs):
         r"""Plot data in SignalViewer.
         
-Positional parameters:
-----------------------
-x: data to plot.
+        Positional parameters:
+        ----------------------
+        x: data to plot.
 
-    This can be either:
-    • neo.core.baseneo.BaseNeo (i.e. all neo object types, AND 
-        Scipyen types: DataSignal, IrregularlySampledDataSignal, 
-        DataZone, DataMark, TriggerEvent, TriggerProtocol), 
+            This can be either:
+            • neo.core.baseneo.BaseNeo (i.e. all neo object types, AND 
+                Scipyen types: DataSignal, IrregularlySampledDataSignal, 
+                DataZone, DataMark, TriggerEvent, TriggerProtocol), 
 
-    • vigra.filters.Kernel1D,
+            • vigra.filters.Kernel1D,
 
-    • numpy ndarray
+            • numpy ndarray
 
-    • a sequence (tuple, list) of the types listed above, or
+            • a sequence (tuple, list) of the types listed above, or
 
-    • None
+            • None
 
-    With the exception of unspecialized ndarray (from the numpy package)
-    and unspecialized Quantity arrays (from the quantities package) the 
-    data objects of the types shown above typically supply their own data
-    domain (e.g. the `times` attribute of neo objects) or the data domain
-    is implicit (e.g. int he case of vigra Kernel1D objects).
+            With the exception of unspecialized ndarray (from the numpy package)
+            and unspecialized Quantity arrays (from the quantities package) the 
+            data objects of the types shown above typically supply their own data
+            domain (e.g. the `times` attribute of neo objects) or the data domain
+            is implicit (e.g. int he case of vigra Kernel1D objects).
 
-    For unsepcialized numpy arrays and Quantity arrays the implicit data
-    domain is the sample index, although it can be specifies in the `x`
-    parameter.
+            For unsepcialized numpy arrays and Quantity arrays the implicit data
+            domain is the sample index, although it can be specifies in the `x`
+            parameter.
 
-    When the data to plot is passed separately as the `y` parameter (see
-    below), then `x` represents the (custom) domain of the data,
+            When the data to plot is passed separately as the `y` parameter (see
+            below), then `x` represents the (custom) domain of the data,
 
-    Explicit examples:
+            Explicit examples:
 
-    sigview = SignalViewer() # create a SignalViewer object
+            sigview = SignalViewer() # create a SignalViewer object
 
-    # Plot some data that specifies its own data domain (see above):
+            # Plot some data that specifies its own data domain (see above):
 
-    sigview.plot(data)
+            sigview.plot(data)
 
-    # Plot some numeric data that does NOT specify its own domain (e.g.,
-    # an unspecialized numpy ndarray):
+            # Plot some numeric data that does NOT specify its own domain (e.g.,
+            # an unspecialized numpy ndarray):
 
-    sigview.plot(data) # uses the implicit domain i.e., the sample number
+            sigview.plot(data) # uses the implicit domain i.e., the sample number
 
-    # Alternatively, supply a domain created manually, e.g.:
+            # Alternatively, supply a domain created manually, e.g.:
 
-    x_data = [k for k in range(len(data))]
+            x_data = [k for k in range(len(data))]
 
-    sigview.plot(x_data, data) # in this case, supply the custom-made
-        domain, followed by the data to plot
+            sigview.plot(x_data, data) # in this case, supply the custom-made
+                domain, followed by the data to plot
 
-Named parameters:
-------------------
-y: object (type as above) or None (default);
-    When `y` is None, then `x` is used as the data to be plotted (possibly
-    supplying its own domain, see above)
+        Named parameters:
+        ------------------
+        y: object (type as above) or None (default);
+            When `y` is None, then `x` is used as the data to be plotted (possibly
+            supplying its own domain, see above)
 
-    Otherwise, `y` is considered to contain the data to be plotted, and
-    `x` (which cannot be None) is the domain of the data.
-    
-    See above for examples.
-    
-doc_title: str or None = name of the data (will also appear in the 
-    window title).
+            Otherwise, `y` is considered to contain the data to be plotted, and
+            `x` (which cannot be None) is the domain of the data.
+            
+            See above for examples.
+            
+        doc_title: str or None = name of the data (will also appear in the 
+            window title).
 
-    NOTE: neo data types usually supply their own data_name in their
-    `name` attribute. In this case, data_name is taken from there, unless
-    it is given here explicitly (thus overrulling the object `name`)
-    
-frameAxis: int, str, vigra.AxisInfo or None (default)
-    When plot data is a numpy array, it indicates the axis along which
-    the data "frames" are defined
+            NOTE: neo data types usually supply their own data_name in their
+            `name` attribute. In this case, data_name is taken from there, unless
+            it is given here explicitly (thus overrulling the object `name`)
+            
+        frameAxis: int, str, vigra.AxisInfo or None (default)
+            When plot data is a numpy array, it indicates the axis along which
+            the data "frames" are defined
 
-    NOTE: VigraArray objects are python wrappers to C++ arrays, with
-    numpy array methods; they are "seen" by the Python interpreter as 
-    specialized numpy arrays. For these objects, frameAxis may also be
-    may also be specified as a string (axis "key") or AxisInfo object.
+            NOTE: VigraArray objects are python wrappers to C++ arrays, with
+            numpy array methods; they are "seen" by the Python interpreter as 
+            specialized numpy arrays. For these objects, frameAxis may also be
+            may also be specified as a string (axis "key") or AxisInfo object.
 
-    See vigranumpy documentation for details.
-        
-    When plot data is a structured signal object (e.g. neo.AnalogSignal,
-    datasignal.DataSignal) frameAxis may be used to plot the signal's
-    channels in separate frames.
-    
-    The default (None) indicates that plot data should not be considered
-    as organized in frames (unless it is a collection of signals, 
-    see below).
-        
-    frameAxis is disregarded in the case of structured signal collections
-    such as neo.Block (which already contains several data frames or 
-    "segments") and neo.Segment (which encapsulates one frame).
-    
-signalChannelAxis: int, str, vigra.AxisInfo or None (default) - indicates
-    the axis along which the signal channels are defined.
-    
-    When None, it indicates that data is NOT organized in channels. This
-    is useful for numpy arrays where a 2D array can represent a collection
-    of several single-channel signals, instead of a single multi-channel
-    signal.
-    
-    The typical type of this parameter is an int (for numpy arrays and 
-    also for structured signal types).
-    
-    Vigra arrays can also accept str (axis "key") or AxisInfo objects.
-    
-    For neo.Block and neo.Segments, this parameter affects only the
-    regularly sampled signals.
-    
-irregularSignalChannelAxis: int, None (default) - the index of the axis
-    along which the signal channels are defined. Only used for irregularly
-    sampled signals.
+            See vigranumpy documentation for details.
+                
+            When plot data is a structured signal object (e.g. neo.AnalogSignal,
+            datasignal.DataSignal) frameAxis may be used to plot the signal's
+            channels in separate frames.
+            
+            The default (None) indicates that plot data should not be considered
+            as organized in frames (unless it is a collection of signals, 
+            see below).
+                
+            frameAxis is disregarded in the case of structured signal collections
+            such as neo.Block (which already contains several data frames or 
+            "segments") and neo.Segment (which encapsulates one frame).
+            
+        signalChannelAxis: int, str, vigra.AxisInfo or None (default) - indicates
+            the axis along which the signal channels are defined.
+            
+            When None, it indicates that data is NOT organized in channels. This
+            is useful for numpy arrays where a 2D array can represent a collection
+            of several single-channel signals, instead of a single multi-channel
+            signal.
+            
+            The typical type of this parameter is an int (for numpy arrays and 
+            also for structured signal types).
+            
+            Vigra arrays can also accept str (axis "key") or AxisInfo objects.
+            
+            For neo.Block and neo.Segments, this parameter affects only the
+            regularly sampled signals.
+            
+        irregularSignalChannelAxis: int, None (default) - the index of the axis
+            along which the signal channels are defined. Only used for irregularly
+            sampled signals.
 
-frameIndex: int, tuple, list, range, slice, or None (default) = selection
-    of frame indices for plot data organized in frames.
-    
-    When None (default) all data frames will be plotted; the user can 
-    navigate across the frames using the spinner and slider at the 
-    bottom of the window.
-    
-signalIndex: str, int, tuple, list, range, slice, None (default) = 
-    selection of regularly signals to plot, from a structured signal collections 
-    (neo.Block, neo.Segment), or iterables of structured signals.
-    
-    When None, all available signals in the collection will be plotted.
-    
-    Otherwise, signals to be plotted will be selected according to the
-    type of signalIndex:
-    a) int -- the integral index of the signals in the collection
-    b) str -- the name of the signal -- applies to collections of neo 
-        signals, datatypes signals, pandas Series and pandas DataFrame,
-        or any array-like object with a "name" attribute.
-    c) tuple/list  -- all elements must be int or str (if the signal
-        has a "name" attribute)
-        
-    d) range, slice -- the range or slice object must resolve to a 
-        sequence of integral indices, valid for the signal collection
-        
-    For neo.Segment and neo.Block, this parameters affects only the
-    (sub)set of regularly sampled signals (neo.AnalogSignal, 
-    datasignal.DataSignal).
-    
-irregularSignalIndex: str, int, tuple, list, range, slice, None (default)
-    used for neo.Block and neo.Segment - selects irregular signals for 
-    plotting. Irregular signals are neo.IrregularlySampledSignal and
-    datatpes.IrregularlySampledDataSignal
-    
-signalChannelIndex: int, tuple, list, range, slice, None (default)
-    selects a subset of signal channels. When None (default) all the
-    available channels are plotted.
-    
-irregularSignalChannelIndex: int, tuple, list, range, slice, None (default)
-    selects a subset of signal channels, in irregularly sampled signals.
-    When None (default) all the available channels are plotted.
-    
-separateSignalChannels: bool, default False; When True, signal channels
-    are plotted in separate axes and/or frames, depending on the data 
-    layout.
-    
-interval: tuple, list, neo.Epoch, None (default) -- pair of scalars or Python Quantity
-    that specify the interval in the signal domain (start, stop) over 
-    which the signal(s)  are to be plotted. 
-    
-    When None (default), the entire signals are plotted.
-    
-    CAUTION: When interval is not None, the functions assumes:
-    a) that the two values in the pair are in increasing order
-    b) that the interval falls within the domain of all signals in the 
-        data
+        frameIndex: int, tuple, list, range, slice, or None (default) = selection
+            of frame indices for plot data organized in frames.
+            
+            When None (default) all data frames will be plotted; the user can 
+            navigate across the frames using the spinner and slider at the 
+            bottom of the window.
+            
+        signalIndex: str, int, tuple, list, range, slice, None (default) = 
+            selection of regularly signals to plot, from a structured signal collections 
+            (neo.Block, neo.Segment), or iterables of structured signals.
+            
+            When None, all available signals in the collection will be plotted.
+            
+            Otherwise, signals to be plotted will be selected according to the
+            type of signalIndex:
+            a) int -- the integral index of the signals in the collection
+            b) str -- the name of the signal -- applies to collections of neo 
+                signals, datatypes signals, pandas Series and pandas DataFrame,
+                or any array-like object with a "name" attribute.
+            c) tuple/list  -- all elements must be int or str (if the signal
+                has a "name" attribute)
+                
+            d) range, slice -- the range or slice object must resolve to a 
+                sequence of integral indices, valid for the signal collection
+                
+            For neo.Segment and neo.Block, this parameters affects only the
+            (sub)set of regularly sampled signals (neo.AnalogSignal, 
+            datasignal.DataSignal).
+            
+        irregularSignalIndex: str, int, tuple, list, range, slice, None (default)
+            used for neo.Block and neo.Segment - selects irregular signals for 
+            plotting. Irregular signals are neo.IrregularlySampledSignal and
+            datatpes.IrregularlySampledDataSignal
+            
+        signalChannelIndex: int, tuple, list, range, slice, None (default)
+            selects a subset of signal channels. When None (default) all the
+            available channels are plotted.
+            
+        irregularSignalChannelIndex: int, tuple, list, range, slice, None (default)
+            selects a subset of signal channels, in irregularly sampled signals.
+            When None (default) all the available channels are plotted.
+            
+        separateSignalChannels: bool, default False; When True, signal channels
+            are plotted in separate axes and/or frames, depending on the data 
+            layout.
+            
+        interval: tuple, list, neo.Epoch, None (default) -- pair of scalars or Python Quantity
+            that specify the interval in the signal domain (start, stop) over 
+            which the signal(s)  are to be plotted. 
+            
+            When None (default), the entire signals are plotted.
+            
+            CAUTION: When interval is not None, the functions assumes:
+            a) that the two values in the pair are in increasing order
+            b) that the interval falls within the domain of all signals in the 
+                data
 
-channelIndex: DEPRECATED neo.ChannelIndex object, or None (default) - used to select
-    which data channel to plot (NOT to be confused with signal channels)
+        channelIndex: DEPRECATED neo.ChannelIndex object, or None (default) - used to select
+            which data channel to plot (NOT to be confused with signal channels)
 
-plotStyle: str, default is "plot" -- keyword reserved for development
+        plotStyle: str, default is "plot" -- keyword reserved for development
 
-get_focus: bool - Flag to indicate if viewer is to be shown (i.e. made the 
-    active window).
-    
-    Default is True. May be set to False to keep an already visible 
-    viewer window in the background (useful when the windowing system of 
-    the operating system does not implement a focus stealing mechanism)
-    
-showFrame: int (optional default is None)
-    When given, this is the index of the frame (among the frames available
-    for display, see NOTE below) to be displayed upon plotting the new
-    data.
-    
-    When None, the viewer automatically displays the first frame available
-    
-    NOTE: Data frames vs displayed frames.
-    Commonly, the number of frames available for display equals the number
-    of data frames; however, plotting can be restricted to a subset of
-    the data frames by passing a frame selection in the 'frameIndex'
-    parameter, described above.
-        
+        get_focus: bool - Flag to indicate if viewer is to be shown (i.e. made the 
+            active window).
+            
+            Default is True. May be set to False to keep an already visible 
+            viewer window in the background (useful when the windowing system of 
+            the operating system does not implement a focus stealing mechanism)
+            
+        showFrame: int (optional default is None)
+            When given, this is the index of the frame (among the frames available
+            for display, see NOTE below) to be displayed upon plotting the new
+            data.
+            
+            When None, the viewer automatically displays the first frame available
+            
+            NOTE: Data frames vs displayed frames.
+            Commonly, the number of frames available for display equals the number
+            of data frames; however, plotting can be restricted to a subset of
+            the data frames by passing a frame selection in the 'frameIndex'
+            parameter, described above.
+                
 
-*args, **kwargs -- further parameters and keyword parameters passed on 
-    to PyQtGraph plot function.
+        *args, **kwargs -- further parameters and keyword parameters passed on 
+            to PyQtGraph plot function.
 
-When the data to plot is a structured signal collection, the parameter 
-supplied in *args and **kwargs apply to ALL individual plots for the 
-signals in the signal collection.
-        
+        When the data to plot is a structured signal collection, the parameter 
+        supplied in *args and **kwargs apply to ALL individual plots for the 
+        signals in the signal collection.
+                
         """ 
         
         # print(f"{self.__class__.__name__}.setData(x={type(x).__name__}, y={type(y).__name__})")
@@ -7375,7 +7388,7 @@ signals in the signal collection.
         signalBlocker = QtCore.QSignalBlocker(self._frames_spinBoxSlider_)
         self._frames_spinBoxSlider_.setValue(self._current_frame_index_)
 
-        self.displayFrame()
+        self.displayFrame() # trigger the plotting call chain
         
         if self._new_frame_:
             self.frameChanged.emit(self._current_frame_index_)
@@ -7981,6 +7994,7 @@ signals in the signal collection.
         if self._yData_ is None:
             # print(f"{self.__class__.__name__} self._yData_ is None")
             self.clear()
+            self._new_data_ = True
             return
         
         self.currentFrameAnnotations = None
@@ -8081,6 +8095,7 @@ signals in the signal collection.
         # hold off this for now
         # self._adjust_left_label_space_()    
         self.sig_frameDisplayReady.emit()
+        self._new_data_ = False
         
     def _calculate_new_X_offset_scale_(self, databounds:tuple, viewbounds:tuple,
                                        padding:typing.Optional[float] = 0.) -> tuple:
@@ -9082,60 +9097,88 @@ signals in the signal collection.
         Selection is based on the GUI combo box passed as 2nd parameter to the call.
         signals: collection of signals in a frame
         signalCBox: the combo box for selecting which signal to plot, in GUI
+        
+        Called by self._plot_signals_selection_
         """
-        if signalCBox == self.analogSignalComboBox:
+        analog = signalCBox == self.analogSignalComboBox
+        if analog:
             guiSelection = self.guiSelectedAnalogSignalEntries
             mapping = self._frame_analog_map_
         else:
             guiSelection = self.guiSelectedIrregularSignalEntries
             mapping = self._frame_irregs_map_
             
-        cname = "Analog" if signalCBox == self.analogSignalComboBox else "Irregular"
-        print(f"{self.__class__.__name__}._signals_select_ {cname} guiSelection = {guiSelection}")
-        
-        selected_signals = list()
-        selected_signal_names = list()
-        selected_signal_ndx = list()
-        selected_signal_axis_names = list()
-        
-        # print(f"{self.__class__.__name__}._signals_select_: guiSelection = {guiSelection}")
+        # print(f"{self.__class__.__name__}._signals_select_: {'Analog' if analog else 'Irregular'} guiSelection = {guiSelection},\nmapping = {mapping}")
         
         if len(guiSelection):
             selected_signal_axis_names = guiSelection
-            signal_selection = tuple(filter(lambda x: x[1] in guiSelection, mapping.items()))
-            print(f"{self.__class__.__name__}._signals_select_: signal_selection = {signal_selection}")
+            signal_selection = tuple(filter(lambda x: x[1] in guiSelection, mapping.values()))
+            # print(f"{self.__class__.__name__}._signals_select_: selected_signal_axis_names = {selected_signal_axis_names}")
+            # print(f"{self.__class__.__name__}._signals_select_: signal_selection = {signal_selection}")
             if len(signal_selection):
                 selected_signal_ndx, selected_signal_names = zip(*signal_selection)
                 selected_signals = [signals[ndx] for ndx in selected_signal_ndx]
             else:
-                selected_signal_ndx = range(len(signals))
-                selected_signal_names = tuple(map(lambda x: x.name, signals))
                 selected_signals = signals[:]
-                sigBlock = QtCore.QSignalBlocker(signalCBox)
-                if signalCBox == self.analogSignalComboBox:
-                    self._setup_signal_choosers_(analog = signals)
-                else:
-                    self._setup_signal_choosers_(irregular = signals)
-                    
-            # selected_signal_ndx, selected_signal_names = zip(*list(mapping[k] for k in selected_signal_axis_names if k in mapping ))
-            # selected_signal_ndx = [mapping[k][0] for k in guiSelection]
-            # if len(selected_signal_ndx):
-            #     selected_signals = [signals[ndx] for ndx in selected_signal_ndx]
-            # else:
-            #     selected_signals = signals[:]
+                selected_signal_ndx = range(len(signals))
+                selected_signal_names = list(x[1] for x in mapping.values())
+                selected_signal_axis_names = list(mapping.keys())
                 
-            
         else:
-            selected_signals[:] = signals[:]
+            selected_signals = signals[:]
             selected_signal_ndx = range(len(signals))
             selected_signal_names = list(x[1] for x in mapping.values())
             selected_signal_axis_names = list(mapping.keys())
         
-        current_ndx = signalCBox.currentIndex() 
-        current_txt = signalCBox.currentText()
-        # print(f"{self.__class__.__name__}._signals_select_ {cname} current_ndx = {current_ndx}, current_txt = {current_txt}")
-        
         return selected_signals, selected_signal_names, selected_signal_ndx, selected_signal_axis_names
+    
+    @safeWrapper
+    def _plot_signals_selection_(self, signals, cBox, axis_indices, *args, **kwargs):
+        r"""Called by _plot_signals_"""
+        # print(f"{self.__class__.__name__}._plot_signals_selection_: {'analog' if cBox == self.analogSignalComboBox else 'irreglarly sampled'}" )
+        used_axes_ndx = list()
+        analog = cBox == self.analogSignalComboBox
+        
+        # NOTE: 2025-03-30 21:07:33
+        # Gert the signal selection (if any) from the combo box 
+        selected_signals, selected_signal_names, selected_signal_ndx, selected_signal_axis_names = self._signals_select_(signals, cBox)
+        # print(f"\n{self.__class__.__name__}._plot_signals_selection_: selected_signal_names = {selected_signal_names},\n{self.__class__.__name__}._plot_signals_selection_: selected_signal_ndx = {selected_signal_ndx},\n{self.__class__.__name__}._plot_signals_selection_: selected_signal_axis_names = {selected_signal_axis_names}")
+        
+        # NOTE: 2025-03-30 22:30:33
+        # needed for below, see NOTE: 2025-03-30 22:17:05
+        mapping = self._frame_analog_map_ if analog else self._frame_irregs_map_
+        hiddenSignals = dict(filter(lambda x: x[0] not in selected_signal_ndx, mapping.values())) # hiddenSignals is a dict{index: int ↦ signame: str}, possibly empty
+        for k, signal in enumerate(signals):
+            ax_ndx = axis_indices[k]
+            plotItem = self.signalAxes[ax_ndx]
+            used_axes_ndx.append(ax_ndx)
+            if k in selected_signal_ndx:
+                plot_name_ndx = selected_signal_ndx.index(k)
+                # print(f"{self.__class__.__name__}._plot_signals_selection_: plot_name_ndx = {plot_name_ndx}")
+                plotItemName = selected_signal_axis_names[plot_name_ndx]
+                # plotItemName = plotItemNames[plot_name_ndx]
+                # NOTE: 2023-01-04 22:14:55
+                # avoid plotting if frame hasn't changed - just change plotItem's visibility
+                # HOWEVER: this will NOT refresh the content of other plotitems when
+                # a new data is set up (and the selection has not been reverted to "All")
+                if self._new_frame_ or self._new_data_: # NOTE: 2023-05-16 23:05:22
+                    sig_name = selected_signal_names[selected_signal_ndx.index(k)]
+                    self._plot_signal_data_(signal, sig_name, plotItem, plotItemName, *args, **kwargs)
+                    
+                plotItem.setVisible(True)
+                
+            else:
+                if self._new_data_ and k in hiddenSignals: 
+                    # NOTE: 2025-03-30 22:17:05
+                    # if new data has been setup then update the contents of all
+                    # plotitems even if hidden
+                    plotItemName = tuple(map(lambda x: x[0], filter(lambda x: x[1][0] == k, mapping.items())))
+                    if len(plotItemName):
+                        self._plot_signal_data_(signal, hiddenSignals[k], plotItem, plotItemName[0], *args, **kwargs)
+
+                plotItem.setVisible(False)
+                    
+        return used_axes_ndx
     
     @safeWrapper
     def _plot_signals_(self, analog, irregs, *args, **kwargs):
@@ -9169,6 +9212,8 @@ signals in the signal collection.
         # 
         # so a mapping of signal index to axis index is used here for bookkeeping
         
+        # print(f"\n\n{self.__class__.__name__}._plot_signals_:")
+        
         analog_ndx = range(len(analog))
         
         irregs_ndx = range(len(irregs))
@@ -9185,44 +9230,13 @@ signals in the signal collection.
         
         self._setup_signal_choosers_(analog = analog, irregular = irregs) 
         
-        selected_analogs = list()
-        selected_analog_names = list()
-        selected_analog_ndx = list()
-        
-        selected_irregs = list()
-        selected_irreg_names = list()
-        selected_irreg_ndx = list()
-        
         used_axes_ndx = list()
+        
         #### BEGIN plot regular (analog) signals
         # NOTE: update only those plotItems where a selected signal should be
         # all other plotItems are hidden
         if self._plot_analogsignals_: # flag set up by `Analog` checkbox
-            # selected_analogs, selected_analog_names, selected_analog_ndx, plotItemNames = self._signals_select_(analog, self.analogSignalComboBox)
-            selected_signals, selected_signal_names, selected_signal_ndx, selected_signal_axis_names = self._signals_select_(analog, self.analogSignalComboBox)
-            print(f"\n\n{self.__class__.__name__}._plot_signals_:")
-            print(f"selected_signal_names = {selected_signal_names},\nselected_signal_ndx = {selected_signal_ndx},\nselected_signal_axis_names = {selected_signal_axis_names}")
-            # print(f"selected_signals = {selected_signals},\nselected_signal_names = {selected_signal_names},\nselected_signal_ndx = {selected_signal_ndx},\nselected_signal_axis_names = {selected_signal_axis_names}")
-            for k, signal in enumerate(analog):
-                ax_ndx = analog_axes[k]
-                used_axes_ndx.append(ax_ndx)
-                plotItem = self.signalAxes[ax_ndx]
-                if k in selected_analog_ndx:
-                    plot_name_ndx = selected_signal_ndx.index(k)
-                    # plot_name_ndx = selected_analog_ndx.index(k)
-                    print(f"{self.__class__.__name__}._plot_signals_:  plot_name_ndx = {plot_name_ndx}")
-                    plotItemName = selected_signal_axis_names[plot_name_ndx]
-                    # plotItemName = plotItemNames[plot_name_ndx]
-                    # NOTE: 2023-01-04 22:14:55
-                    # avoid plotting if frame hasn't changed - just change plotItem's visibility
-                    if self._new_frame_: 
-                        sig_name = selected_signal_names[selected_signal_ndx.index(k)]
-                        self._plot_signal_data_(signal, sig_name, plotItem, plotItemName, *args, **kwargs)
-                        
-                    plotItem.setVisible(True)
-                    
-                else:
-                    plotItem.setVisible(False)
+            used_axes_ndx.extend(self._plot_signals_selection_(analog, self.analogSignalComboBox, analog_axes, *args, **kwargs))
                     
         else: # hide all analog signal plotItems
             for ax_ndx in analog_axes.values():
@@ -9232,29 +9246,9 @@ signals in the signal collection.
         
         #### BEGIN plot irregular signals
         if self._plot_irregularsignals_: # flag set up by `Irregular` checkbox
-            selected_irregs, selected_irreg_names, selected_irreg_ndx, plotItemNames = self._signals_select_(irregs, self.irregularSignalComboBox)
-
-            # kwargs["symbol"] = self.defaultIrregularSignalSymbols[0]
             kwargs["pen"] = None
-            # kwargs["symbolPen"] = self.defaultIrregularSignalSymbolPen
-            # kwargs["symbolBrush"] = self.defaultIrregularSignalSymbolBrush
-            # kwargs["symbolSize"] = self.defaultIrregularSignalSymbolSize
             kwargs["pxMode"] = True
-            
-            for k, signal in enumerate(irregs):
-                ax_ndx = irregs_axes[k]
-                used_axes_ndx.append(ax_ndx)
-                plotItem = self.signalAxes[ax_ndx]
-                if k in selected_irreg_ndx:
-                    plot_name_ndx = selected_irreg_ndx.index(k)
-                    plotItemName = plotItemNames[plot_name_ndx]
-                    if self._new_frame_: # NOTE: 2023-05-16 23:05:22
-                        sig_name = selected_irreg_names[selected_irreg_ndx.index(k)]
-                        self._plot_signal_data_(signal, sig_name, plotItem, plotItemName, *args, **kwargs)
-            
-                    plotItem.setVisible(True)
-                else:
-                    plotItem.setVisible(False)
+            used_axes_ndx.extend(self._plot_signals_selection_(irregs, self.irregularSignalComboBox, irregs_axes, *args, **kwargs))
                     
         else:
             for ax_ndx in irregs_axes.values():
