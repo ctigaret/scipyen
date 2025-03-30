@@ -9090,8 +9090,8 @@ signals in the signal collection.
             guiSelection = self.guiSelectedIrregularSignalEntries
             mapping = self._frame_irregs_map_
             
-        # cname = "Analog" if signalCBox == self.analogSignalComboBox else "Irregular"
-        # print(f"{self.__class__.__name__}._signals_select_ {cname} guiSelection = {guiSelection}")
+        cname = "Analog" if signalCBox == self.analogSignalComboBox else "Irregular"
+        print(f"{self.__class__.__name__}._signals_select_ {cname} guiSelection = {guiSelection}")
         
         selected_signals = list()
         selected_signal_names = list()
@@ -9102,12 +9102,27 @@ signals in the signal collection.
         
         if len(guiSelection):
             selected_signal_axis_names = guiSelection
-            selected_signal_ndx, selected_signal_names = zip(*list(mapping[k] for k in selected_signal_axis_names if k in mapping ))
-            # selected_signal_ndx = [mapping[k][0] for k in guiSelection]
-            if len(selected_signal_ndx):
+            signal_selection = tuple(filter(lambda x: x[1] in guiSelection, mapping.items()))
+            print(f"{self.__class__.__name__}._signals_select_: signal_selection = {signal_selection}")
+            if len(signal_selection):
+                selected_signal_ndx, selected_signal_names = zip(*signal_selection)
                 selected_signals = [signals[ndx] for ndx in selected_signal_ndx]
             else:
+                selected_signal_ndx = range(len(signals))
+                selected_signal_names = tuple(map(lambda x: x.name, signals))
                 selected_signals = signals[:]
+                sigBlock = QtCore.QSignalBlocker(signalCBox)
+                if signalCBox == self.analogSignalComboBox:
+                    self._setup_signal_choosers_(analog = signals)
+                else:
+                    self._setup_signal_choosers_(irregular = signals)
+                    
+            # selected_signal_ndx, selected_signal_names = zip(*list(mapping[k] for k in selected_signal_axis_names if k in mapping ))
+            # selected_signal_ndx = [mapping[k][0] for k in guiSelection]
+            # if len(selected_signal_ndx):
+            #     selected_signals = [signals[ndx] for ndx in selected_signal_ndx]
+            # else:
+            #     selected_signals = signals[:]
                 
             
         else:
@@ -9183,20 +9198,25 @@ signals in the signal collection.
         # NOTE: update only those plotItems where a selected signal should be
         # all other plotItems are hidden
         if self._plot_analogsignals_: # flag set up by `Analog` checkbox
-            selected_analogs, selected_analog_names, selected_analog_ndx, plotItemNames = self._signals_select_(analog, self.analogSignalComboBox)
-            
+            # selected_analogs, selected_analog_names, selected_analog_ndx, plotItemNames = self._signals_select_(analog, self.analogSignalComboBox)
+            selected_signals, selected_signal_names, selected_signal_ndx, selected_signal_axis_names = self._signals_select_(analog, self.analogSignalComboBox)
+            print(f"\n\n{self.__class__.__name__}._plot_signals_:")
+            print(f"selected_signal_names = {selected_signal_names},\nselected_signal_ndx = {selected_signal_ndx},\nselected_signal_axis_names = {selected_signal_axis_names}")
+            # print(f"selected_signals = {selected_signals},\nselected_signal_names = {selected_signal_names},\nselected_signal_ndx = {selected_signal_ndx},\nselected_signal_axis_names = {selected_signal_axis_names}")
             for k, signal in enumerate(analog):
                 ax_ndx = analog_axes[k]
                 used_axes_ndx.append(ax_ndx)
                 plotItem = self.signalAxes[ax_ndx]
                 if k in selected_analog_ndx:
-                    plot_name_ndx = selected_analog_ndx.index(k)
-                    # print(f"{self.__class__.__name__}._plot_signals_: plotItemNames = {plotItemNames}")
-                    plotItemName = plotItemNames[plot_name_ndx]
+                    plot_name_ndx = selected_signal_ndx.index(k)
+                    # plot_name_ndx = selected_analog_ndx.index(k)
+                    print(f"{self.__class__.__name__}._plot_signals_:  plot_name_ndx = {plot_name_ndx}")
+                    plotItemName = selected_signal_axis_names[plot_name_ndx]
+                    # plotItemName = plotItemNames[plot_name_ndx]
                     # NOTE: 2023-01-04 22:14:55
                     # avoid plotting if frame hasn't changed - just change plotItem's visibility
                     if self._new_frame_: 
-                        sig_name = selected_analog_names[selected_analog_ndx.index(k)]
+                        sig_name = selected_signal_names[selected_signal_ndx.index(k)]
                         self._plot_signal_data_(signal, sig_name, plotItem, plotItemName, *args, **kwargs)
                         
                     plotItem.setVisible(True)
