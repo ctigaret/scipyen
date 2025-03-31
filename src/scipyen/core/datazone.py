@@ -450,7 +450,8 @@ class Interval(ScipyenDataclass):
     r"""Encapsulates an interval of a signal in a Cartesian axis system.
     This can be specified by two landmarks, or by a landmark and an extent
     (or duration) - in this case is similar to a neo.Epoch or DataZone, except that
-    if specifies an unique interval.
+    if specifies an unique interval (by comparison, neo.Epoch and DataZone objects
+    store TWO arrays, one for times and the other for the associated durations).
 
     This class is intended to be a light-weight, convergent common data type useful
     for accessing a signal region (a.k.a "slice") encapsulated in a neo.Epoch, 
@@ -504,9 +505,19 @@ class Interval(ScipyenDataclass):
     # Therefore I make these as "default", but check for them in the custom __init__
     # below.
     
+    # first "time" point (left boundary, or 'start' time of the interval)
     t0: typing.Union[numbers.Number, pq.Quantity] = dataclasses.field(default=None)
+    
+    # this is either:
+    # • the second time point (right boundary, or 'stop' time of the interval) 
+    #       if 'extent' field (see below) is False, else
+    # • the 'extent' (or 'duration') of the interval
     t1: typing.Union[numbers.Number, pq.Quantity] = dataclasses.field(default=None)
+    
+    # name of this interval
     name: str = "Interval"
+    
+    # flag indicating what fields 't1' means
     extent: bool = False
     
     def __init__(self, t0: typing.Union[numbers.Number, pq.Quantity],

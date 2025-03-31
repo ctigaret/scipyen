@@ -4514,7 +4514,7 @@ ret - an iterable object (range, or tuple of integer indices) that can be
         if index not in range(-data_len, data_len):
             if silent:
                 return None
-            raise ValueError(f"Index {index} is invalid for {len(data)} elements")
+            raise IndexError(f"Index {index} is out of range for {data_len} elements")
         
         if isinstance(data, pd.core.indexes.base.Index):
             return (data[index], )

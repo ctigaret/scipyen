@@ -140,6 +140,7 @@
     <addaction name="menuCode_editor"/>
     <addaction name="actionAuto_delete_viewer"/>
     <addaction name="actionSet_user_plugins_directory"/>
+    <addaction name="actionConfigure_external_HDF_viewer"/>
     <addaction name="separator"/>
     <addaction name="actionGUI_Style"/>
     <addaction name="actionSet_Icon_Size"/>
@@ -1231,6 +1232,9 @@ NOTE: you can click anywhere in the row to select</string>
    </property>
   </action>
   <action name="actionOpen_System_Terminal">
+   <property name="enabled">
+    <bool>true</bool>
+   </property>
    <property name="icon">
     <iconset theme="scriptnew"/>
    </property>
@@ -1238,16 +1242,19 @@ NOTE: you can click anywhere in the row to select</string>
     <string>Open System Terminal</string>
    </property>
    <property name="toolTip">
-    <string>Open system terminal in current folder</string>
+    <string>Open system terminal</string>
    </property>
    <property name="statusTip">
-    <string>Open system terminal in current folder</string>
+    <string>Open system terminal</string>
    </property>
    <property name="whatsThis">
-    <string>Open system terminal in current folder</string>
+    <string>Open system terminal</string>
    </property>
    <property name="shortcut">
     <string>Ctrl+T</string>
+   </property>
+   <property name="visible">
+    <bool>true</bool>
    </property>
   </action>
   <action name="actionSet_user_plugins_directory">
@@ -1309,6 +1316,23 @@ NOTE: you can click anywhere in the row to select</string>
    </property>
    <property name="text">
     <string>Set Icon Size</string>
+   </property>
+  </action>
+  <action name="actionConfigure_external_HDF_viewer">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Configure external HDF viewer...</string>
+   </property>
+   <property name="visible">
+    <bool>false</bool>
+   </property>
+   <property name="iconVisibleInMenu">
+    <bool>false</bool>
+   </property>
+   <property name="shortcutVisibleInContextMenu">
+    <bool>false</bool>
    </property>
   </action>
  </widget>

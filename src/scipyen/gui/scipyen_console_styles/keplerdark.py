@@ -58,7 +58,8 @@ class KeplerDark(Style):
         Generic.Subheading: 'underline #ffffff',
         Generic.Deleted:    '#ff3a3a',
         Generic.Inserted:   '#589819',
-        Generic.Error:      '#ff3a3a',
+        # Generic.Error:      '#ff3a3a',
+        Generic.Error:      '#ff6200',
         Generic.Emph:       'italic',
         Generic.Strong:     'bold',
         Generic.EmphStrong: 'bold italic',
@@ -66,9 +67,11 @@ class KeplerDark(Style):
         Generic.Prompt:     '#cccccc',
         # Generic.Output:     '#cccccc',
         Generic.Output:     '#eeeeee',
-        Generic.Traceback:  '#ff3a3a',
+        # Generic.Traceback:  '#ff3a3a',
+        Generic.Traceback:  '#ff6200',
 
-        Error:              'bg:#2d1e1e #a61717'
+        # Error:              'bg:#2d1e1e #a61717'
+        Error:              'bg:#2d1e1e #a65e17'
         # Error:              'bg:#e3d2d2 #a61717'
         # Error:              '#a61717'
     }

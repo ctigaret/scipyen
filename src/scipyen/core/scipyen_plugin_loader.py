@@ -231,7 +231,7 @@ import types, typing, pathlib
 import collections, functools, itertools 
 from pprint import pprint
 # import os, inspect, imp, sys, collections
-from core import prog
+from core import prog, sysutils
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_name__ = os.path.splitext(os.path.basename(__file__))[0]
@@ -324,7 +324,9 @@ def find_bytecode_plugins(path:typing.Union[str, pathlib.Path], scipyendir:typin
             
     check_load_module(module_spec, verb)
 
-def find_plugins(path:typing.Union[str, pathlib.Path], scipyendir:typing.Union[str,pathlib.Path]):
+def find_plugins(path:typing.Union[str, pathlib.Path], 
+                 scipyendir:typing.Union[str,pathlib.Path], 
+                 checkgit:bool=False):
     r"""Loads and located plugins in a directory tree rooted at `path`
     """
     if isinstance(path, pathlib.Path) and path.is_dir() and path.exists():
@@ -335,7 +337,7 @@ def find_plugins(path:typing.Union[str, pathlib.Path], scipyendir:typing.Union[s
         return
     
     if isinstance(scipyendir, pathlib.Path) and scipyendir.is_dir() and scipyendir.exists():
-        scipyendir = scipyendir.absolue()
+        scipyendir = scipyendir.absolute()
         
     elif isinstance(scipyendir, str) and len(scipyendir.strip()) and os.path.isdir(scipyendir) and os.path.exists(scipyendir):
         scipyendir = pathlib.Path(scipyendir)
@@ -349,9 +351,12 @@ def find_plugins(path:typing.Union[str, pathlib.Path], scipyendir:typing.Union[s
     
     topdir = pathlib.Path(path)
     
+    if checkgit:
+        sysutils.checkGitRepo(topdir, "Scipyen plugins")
     # print(f"scipyen_plugin_loader.find_plugins: topdir = {topdir}")
     
-    plugin_source_files = list(map(lambda x: pathlib.Path(x), list(filter(lambda x: os.path.splitext(x)[-1] in importlib.machinery.SOURCE_SUFFIXES and check_plugin_module(x), list(itertools.chain.from_iterable( (os.path.join(e[0], i) for i in e[2]) for e in os.walk(path)))))))
+    # plugin_source_files = list(map(lambda x: pathlib.Path(x), list(filter(lambda x: os.path.splitext(x)[-1] in importlib.machinery.SOURCE_SUFFIXES and check_plugin_module(x), list(itertools.chain.from_iterable( (os.path.join(e[0], i) for i in e[2]) for e in os.walk(path)))))))
+    plugin_source_files = list(map(lambda x: pathlib.Path(x), list(filter(lambda x: os.path.splitext(x)[-1] in importlib.machinery.SOURCE_SUFFIXES and check_plugin_module(x), list(itertools.chain.from_iterable( (os.path.join(e[0], i) for i in e[2]) for e in os.walk(topdir)))))))
     
     # print(f"find_plugins: plugin_source_files = {plugin_source_files}")
     

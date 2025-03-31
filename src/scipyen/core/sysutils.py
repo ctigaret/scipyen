@@ -5,8 +5,9 @@
 
 r"""System and platform utilities
 """
-import os, sys, subprocess, shutil, platform, pathlib
+import os, sys, subprocess, shutil, platform, pathlib, typing
 from shutil import which
+from core.prog import printStyled
 # from core.desktoputils import (get_wm, get_desktop, get_dbus_service_names, 
 #                                is_kde_x11, is_kde_wayland, is_kde)
 
@@ -14,3 +15,26 @@ from shutil import which
 
 def adapt_ui_path(module_path, uifile):
     return os.path.join(module_path, uifile)
+
+def checkGitRepo(path:pathlib.Path, label:str = "Scipyen"):
+    gitTest = subprocess.run(["git", "-C", path.as_posix(), "status", "--short", "--branch"], capture_output=True)
+
+    if gitTest.returncode == 0:
+        result = gitTest.stdout.decode().split("\n")
+        brComp = result[0]
+        head, branches = brComp.split("## ")
+        local, remote = branches.split("...")
+        local = printStyled(local, color="green")
+        remote = printStyled(remote, color="red")
+        msg = f"{printStyled('WARNING:', color='yellow')} Running {local} branch of the local {label} git repository in {printStyled(path.as_posix(), color='blue')}, with status:"
+        result[0] = "## "+local+"..."+remote
+        if len(result) > 1:
+            for k in range(1,len(result)):
+                s = result[k]
+                head = printStyled(s[:2], color="red")
+                fileName = s[2:]
+                result[k] = head+fileName
+
+        result.insert(0, msg)
+        print("\n".join(result))
+    
