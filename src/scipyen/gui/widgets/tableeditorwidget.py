@@ -78,7 +78,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
                  #parent:typing.Optional[QtWidgets.QMainWindow]=None) -> None:
     def __init__(self, parent:typing.Optional[QtWidgets.QMainWindow]=None) -> None:
         super().__init__(parent=parent)
-        
+        self._is_vigra_filter_kernel_ = False # needed in future implementations of editing functionality
         self._dataModel_ = TabularDataModel(parent=self)
         
         # NOTE: 2021-10-18 09:32:45
@@ -116,6 +116,14 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
                        DataSignal, IrregularlySampledDataSignal,
                        TriggerEvent, TriggerProtocol,
                        np.ndarray, vigra.VigraArray, vigra.filters.Kernel1D, vigra.filters.Kernel2D), *args, **kwargs):
+        
+        from imaging import vigrautils
+        
+        if isinstance(data, (vigra.filters.Kernel1D, vigra.filters.Kernel2D)):
+            data = vigrautils.kernel2array(data)
+            self._is_vigra_filter_kernel_ = True
+        else:
+            self._is_vigra_filter_kernel_ = False
         
         self._data_ = data
         
@@ -836,12 +844,13 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 self._modelRows_ = data.shape[0]
                 self._modelColumns_ = 1
                 
-            elif isinstance(data, (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal, IrregularlySampledDataSignal)):
+            # elif isinstance(data, (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal, IrregularlySampledDataSignal)):
+            elif isinstance(data, neo.core.dataobject.DataObject):
                 if data.ndim:
                     self._modelRows_ = data.shape[0]
                     
                     if data.ndim > 1:
-                        self._modelColumns_ = data.shape[1] + 1 # include domain as the first column
+                        self._modelColumns_ = data.shape[1] + 1 # include domain as the first column - FIXME: use row headers for time domain?
                     
                 else:
                     self._modelRows_ = 1
@@ -1108,6 +1117,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             elif isinstance(self._modelData_, neo.core.basesignal.BaseSignal):
                 if orientation == QtCore.Qt.Horizontal: # horizontal (columns) header
                     if role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.AccessibleTextRole):
+                        # return QtCore.QVariant("%s (channel %d, %s)" % (self._modelData_.name, section, self._modelData_.dimensionality))
                         if section == 0:
                             if isinstance(self._modelData_, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)):
                                 domain_name = getattr(self._modelData_,"domain_name", None)
@@ -1199,6 +1209,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                     ret = ret.isoformat(" ")
                     
             elif isinstance(self._modelData_, (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal, IrregularlySampledDataSignal)):
+                # NOTE: 2025-03-31 23:47:43 WRONG:
+                # use the times as the row index!
                 if col == 0:
                     ret = self._modelData_.times[row]
                     ret_type = type(ret).__name__
@@ -1371,6 +1383,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             
         return False
     
+    @property
     def sourceData(self):
         r"""Access to the source data behind this model"""
         return self._modelData_

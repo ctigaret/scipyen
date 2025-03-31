@@ -3960,11 +3960,15 @@ def sort_with_none(iterable, none_last = True) -> typing.Sequence:
 
 # def unique(seq, key=None, indices:bool=False) -> typing.Sequence:
 def unique(seq, key=None, indices:bool=False, idcheck:bool=True) -> typing.Sequence:
-    r"""Returns a sequence of unique elements in the iterable 'seq'.
+    r"""Returns a sequence of unique elements in the 1D iterable 'seq'.
+    
     Functional version of gen_unique.
+    
     Parameters:
     -----------
-    seq: an iterable (tuple, list, range, map, generator)
+    seq: an iterable (tuple, list, range, map, generator, numpy array)
+        NOTE: when `seq` is a numpy array this function will flatten it first.
+        Therefore when possible please use the `numpy.unique` function directly.
     
     key: predicate for uniqueness (optional, default is None)
         Typically, this is an object returned by a lambda function
@@ -4001,6 +4005,12 @@ def unique(seq, key=None, indices:bool=False, idcheck:bool=True) -> typing.Seque
     """
     if not hasattr(seq, "__iter__"):
         raise TypeError(f"Expecting an iterable; got {type(seq).__name__} instead")
+    
+    if isinstance(seq, np.ndarray):
+        if indices:
+            u, i = np.unique(seq, return_index=True)
+            return i
+        return np.unique(seq)
     
     return seq.__class__(gen_unique(seq, key=key, indices=indices, idcheck=idcheck))
     # return seq.__class__(gen_unique(seq, key=key, indices=indices))

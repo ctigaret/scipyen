@@ -334,100 +334,140 @@ class TableEditor(ScipyenViewer):
         
     @safeWrapper
     def _plot_model_data_(self, modelIndexes, custom=False):
-        from core.utilities import unique
+        # NOTE: 2025-03-31 23:21:51
+        # model data can only be a pandas DatafRame, Series, or numpy 2D array
+        # vigra filter kernels are converted to numpy arrays in the editor widget
+        # from core.utilities import unique
         if len(modelIndexes)==0: # bail out if there is no selection
             return
         
-        (ndx_k, ndx_rows, ndx_columns) = [k for k in zip(*[(k, ndx.row(), ndx.column()) for k, ndx in enumerate(modelIndexes)])]
+        sourceData = self._dataModel_.sourceData
         
-        # ### BEGIN 2025-03-31 18:30:13 stub for a better way to retrieve data ?!?
-        # is this a single column selection?
-        #
-        unique_cols = unique(ndx_columns)
-        
-        singleColumn = len(unique_cols) == 1
-        
-        unique_rows = unique(ndx_rows)
-        
-        singleRow = len(unique_rows) == 1
-        
-        modelData = self._dataModel_.sourceData
-        
-        if modelData is None:
+        if sourceData is None:
             return
-        #
-        # ### END   2025-03-31 18:30:13 stub for a better way to retrieve data ?!?
-        
-        # NOTE: 2019-09-06 10:16:28
-        # find out how many columns the selection spans
-        selected_column_indices = unique(ndx_columns)
-        
-        n_columns = len(selected_column_indices)
-        
-        # NOTE: 2019-09-06 10:23:17
-        # arrange selected model indexes by column
-        
-        model_index_list = list()
-        
-        # select model indexes by their columns => list of models with same column
-        for column in selected_column_indices:
-            column_index = [kc for kc, c in enumerate(ndx_columns) if c == column]
-            column_model_list = [modelIndexes[ndx_k[k]] for k in column_index]
-            
-            sorted_column_model_list = sorted(column_model_list, key=lambda x: x.row())
-            
-            model_index_list.append(sorted_column_model_list)
-            
-        if len(model_index_list) == 0:
-            return
-            
-        # bail out if there are different numbers of selected model indexes in different columns
-        if not all([len(l) == len(model_index_list[0]) for l in model_index_list]):
-            return
-    
-        # NOTE: 2019-09-06 10:47:17
-        # generate data to plot
-        column_headers = ["%s" % self._dataModel_.__getHeaderData__(k, QtCore.Qt.Horizontal).value() for k in selected_column_indices]
-        
+
         data = list()
         
-        nan = np.nan
+        # except for np.ndarray, the data is organized in columns, by definition,
+        # for DataFrames an Series.
+        # we implicitly extend this rule to np.ndarrays, to KISS
+        #
+        # iterate by column, the by row in each column
+        ndx_rows_cols = tuple(map(lambda ndx: (ndx.row(), ndx.column()), modelIndexes))
+        selected_columns_ordered = np.array(list(map(lambda x: x[1], sorted(ndx_rows_cols, key = lambda x: x[1]))))
+        u_sel_cols = np.unique(selected_columns_ordered)
         
-        if isinstance(modelData, (pd.DataFrame, pd.Series, np.ndarray)):
-            self._plot_pandas_or_array_data_(modelData, model_index_list)
-            
+        if isinstance(sourceData, (pd.DataFrame, pd.Series)):
+            column_headers = list(sourceData.columns[u_sel_cols])
         else:
-        
-            for l in model_index_list: # NOTE: this has column indexes! 
-                column_data = np.array(list(map(lambda ndx: str2float("%s" % self._dataModel_.__getModelData__(ndx.row(), ndx.column()).value()), l)), dtype="float64")
-                
-                data.append(column_data)
-                
-            # TODO: 2019-11-10 12:53:50
-            # implement plotting with pyqtgraph
-            if self._use_matplotlib_:
-                fig = self._scipyenWindow_.newViewer(mpl.figure.Figure)
-                
-                plt.figure(fig.number) # make this the current figure
-                
-                if len(data) == 1:
-                    #plot_data = data[0]
-                    plt.plot(data[0])
-                    plt.gca().set_ylabel(column_headers[0])
-                    
+            if isinstance(sourceData, neo.core.dataobject.DataObject):
+                obj_name = getattr(sourceData, "name", "signal")
+                array_annotations = getattr(sourceData, "array_annotations", dict())
+                # careful here! signals are plotted with time (domain) values in column 0 and "channels" in columns 1 -> ...
+                if 0 in u_sel_cols:
+                    if u_sel_cols.size > 1:
+                        data_cols = list(filter(lambda x: x!=0, u_sel_cols))
+                        if len(array_annotations):
+                            column_headers = list(map(lambda x: f"{obj_name} channel {sourceData.array_annotations_at_index(x-1)['channel_names']}", data_cols))
+                        else:
+                            column_headers = list(map(lambda x: f"{obj_name} channel {x-1}", data_cols))
+                    else: # times column selected
+                        column_headers = [self._dataModel_.__getHeaderData__(0, QtCore.Qt.Horizontal).value()]
                 else:
-                    if custom:
-                        pass # TODO
+                    if len(array_annotations):
+                        column_headers = list(map(lambda x: f"{obj_name} channel {sourceData.array_annotations_at_index(x-1)['channel_names']}", u_sel_cols))
                     else:
-                        plot_data = np.concatenate([np.atleast_2d(d).T for d in data], axis=1)
-                    
-                        lines = plt.plot(plot_data)
-                        
-    @singledispatchmethod
-    def _plot_pandas_or_array_data_(self):
-        print(f"{self.__class__.__name__}._plot_pandas_or_array_data_: IMPLEMENT ME NOW!")
-        pass
+                        column_headers = list(map(lambda x: f"{obj_name} channel {x-1}", u_sel_cols))
+            else:
+                column_headers = list(map(lambda x: f"column {x}", u_sel_cols))
+        
+        for column in u_sel_cols:
+            # collect all model indexes for a given column
+            # NOTE: only DataFrame and 2D numpy arrays can have more than one column!
+            indexes_for_column = tuple(filter(lambda ndx: ndx.column() == column, modelIndexes))
+            if len(indexes_for_column) == 0:
+                continue # should never happem
             
+            # order them by row
+            selected_rows_for_column = np.array(list(map(lambda x: x.row(), sorted(indexes_for_column, key = lambda x: x.row()))))
+            
+            # are there any duplicates? how is this relevant?
+            # by definition one cannot have duplicate rows in the same columns
+            # u_sel_rows = np.unique(selected_rows_for_column)
+            # has_duplicate_rows = u_sel_rows.size < selected_rows_for_column.size
+            
+            if np.all(np.ediff1d(selected_rows_for_column) == 1):
+                # contiguous selection with respect to rows, within this particular column
+                start, stop = np.min(selected_rows_for_column), np.max(selected_rows_for_column)
+                
+                if isinstance(sourceData, (pd.DataFrame, pd.Series)):
+                    dd = sourceData.iloc[start:stop+1, column]
+                    data.append((dd.index, dd)) # NOTE include the row index
+                    
+                else:#elif isinstance(sourceData,  np.ndarray):
+                    # x = np.atleast_2d(np.arange(0, sourceData.shape[0])[start:stop+1]).T
+                    # data.append((x, np.atleast_2d(sourceData[start:stop+1, column]).T))# NOTE include the row index
+                    if isinstance(sourceData, neo.core.dataobject.DataObject):
+                        if column == 0:
+                            if len(u_sel_cols) > 1:
+                                continue
+                            x = np.atleast_2d(np.arange(0, sourceData.shape[0])[start:stop+1]).T
+                            y = np.atleast_2d(sourceData.times[start:stop+1]).T
+                            # print(f"x.shape: {x.shape}, y.shape: {y.shape}")
+                            
+                            data.append((x, y))
+                        else:
+                            x = np.atleast_2d(sourceData.times[start:stop+1]).T
+                            y = np.atleast_2d(sourceData[start:stop+1, column-1])
+                            # print(f"x.shape: {x.shape}, y.shape: {y.shape}")
+                            data.append((x, y))
+                    else:
+                        x = np.atleast_2d(np.arange(0, sourceData.shape[0])[start:stop+1]).T
+                        y = np.atleast_2d(sourceData[start:stop+1, column])
+                        # print(f"x.shape: {x.shape}, y.shape: {y.shape}")
+                        data.append((x, y))
+                
+            else:
+                if isinstance(sourceData, (pd.DataFrame, pd.Series)):
+                    data.append(sourceData.iloc[selected_rows_for_column, column]) # NOTE this will include the row index
+                else:#elif isinstance(sourceData,  np.ndarray):
+                    if isinstance(sourceData, neo.core.dataobject.DataObject):
+                        if column == 0:
+                            x = np.atleast_2d(selected_rows_for_column).T
+                            y = np.atleast_2d(sourceData.times[selected_rows_for_column]).T
+                            # print(f"x.shape: {x.shape}, y.shape: {y.shape}")
+                            
+                            data.append((x, y))
+                        else:
+                            x = np.atleast_2d(sourceData.times[selected_rows_for_column]).T
+                            y = np.atleast_2d(sourceData[selected_rows_for_column, column-1])
+                            # print(f"x.shape: {x.shape}, y.shape: {y.shape}")
+                            data.append((x, y))
+                    else:
+                        x = np.atleast_2d(selected_rows_for_column).T
+                        y = np.atleast_2d(sourceData[selected_rows_for_column, column])
+                        # print(f"x.shape: {x.shape}, y.shape: {y.shape}")
+                        data.append((x, y))
+                    
+        # TODO: 2019-11-10 12:53:50
+        # implement plotting with pyqtgraph
+        if self._use_matplotlib_:
+            fig = self._scipyenWindow_.newViewer(mpl.figure.Figure)
+            
+            plt.figure(fig.number) # make this the current figure
+            
+            if len(data) == 1:
+                plt.plot(data[0][0], data[0][1], label=column_headers[0])
+                plt.gca().set_ylabel(column_headers[0])
+                
+            else:
+                if custom:
+                    pass # TODO - what's the intention here?
+                else:
+                    for k,d in enumerate(data):
+                        plt.plot(d[0], d[1], label=column_headers[k])
+                    plt.legend()
+                        
     @property
     def useMatplotlib(self):
         return self._use_matplotlib_
