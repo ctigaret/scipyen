@@ -1370,3 +1370,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         #sip.enableautoconversion(QtCore.QVariant, old_qvariant_autoconv)
             
         return False
+    
+    def sourceData(self):
+        r"""Access to the source data behind this model"""
+        return self._modelData_

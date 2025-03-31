@@ -16,6 +16,8 @@ copy/paste entire selection, not just row/column names ⇐ in TableEditorWidget
 from __future__ import print_function
 
 import os, inspect, warnings, traceback, datetime, typing, sys
+from functools import (singledispatch, singledispatchmethod)
+
 #### END core python modules
 
 #### BEGIN 3rd party modules
@@ -338,6 +340,24 @@ class TableEditor(ScipyenViewer):
         
         (ndx_k, ndx_rows, ndx_columns) = [k for k in zip(*[(k, ndx.row(), ndx.column()) for k, ndx in enumerate(modelIndexes)])]
         
+        # ### BEGIN 2025-03-31 18:30:13 stub for a better way to retrieve data ?!?
+        # is this a single column selection?
+        #
+        unique_cols = unique(ndx_columns)
+        
+        singleColumn = len(unique_cols) == 1
+        
+        unique_rows = unique(ndx_rows)
+        
+        singleRow = len(unique_rows) == 1
+        
+        modelData = self._dataModel_.sourceData
+        
+        if modelData is None:
+            return
+        #
+        # ### END   2025-03-31 18:30:13 stub for a better way to retrieve data ?!?
+        
         # NOTE: 2019-09-06 10:16:28
         # find out how many columns the selection spans
         selected_column_indices = unique(ndx_columns)
@@ -373,30 +393,40 @@ class TableEditor(ScipyenViewer):
         
         nan = np.nan
         
-        for l in model_index_list:
-            column_data = np.array([str2float("%s" % self._dataModel_.__getModelData__(ndx.row(), ndx.column()).value()) for ndx in l], dtype="float64")
+        if isinstance(modelData, (pd.DataFrame, pd.Series, np.ndarray)):
+            self._plot_pandas_or_array_data_(modelData, model_index_list)
             
-            data.append(column_data)
-            
-        # TODO: 2019-11-10 12:53:50
-        # implement plotting with pyqtgraph
-        if self._use_matplotlib_:
-            fig = self._scipyenWindow_._newViewer(mpl.figure.Figure)
-            
-            plt.figure(fig.number) # make this the current figure
-            
-            if len(data) == 1:
-                #plot_data = data[0]
-                plt.plot(data[0])
-                plt.gca().set_ylabel(column_headers[0])
+        else:
+        
+            for l in model_index_list: # NOTE: this has column indexes! 
+                column_data = np.array(list(map(lambda ndx: str2float("%s" % self._dataModel_.__getModelData__(ndx.row(), ndx.column()).value()), l)), dtype="float64")
                 
-            else:
-                if custom:
-                    pass # TODO
+                data.append(column_data)
+                
+            # TODO: 2019-11-10 12:53:50
+            # implement plotting with pyqtgraph
+            if self._use_matplotlib_:
+                fig = self._scipyenWindow_.newViewer(mpl.figure.Figure)
+                
+                plt.figure(fig.number) # make this the current figure
+                
+                if len(data) == 1:
+                    #plot_data = data[0]
+                    plt.plot(data[0])
+                    plt.gca().set_ylabel(column_headers[0])
+                    
                 else:
-                    plot_data = np.concatenate([np.atleast_2d(d).T for d in data], axis=1)
-                
-                    lines = plt.plot(plot_data)
+                    if custom:
+                        pass # TODO
+                    else:
+                        plot_data = np.concatenate([np.atleast_2d(d).T for d in data], axis=1)
+                    
+                        lines = plt.plot(plot_data)
+                        
+    @singledispatchmethod
+    def _plot_pandas_or_array_data_(self):
+        print(f"{self.__class__.__name__}._plot_pandas_or_array_data_: IMPLEMENT ME NOW!")
+        pass
             
     @property
     def useMatplotlib(self):

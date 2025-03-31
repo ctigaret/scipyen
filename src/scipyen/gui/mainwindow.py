@@ -2157,18 +2157,21 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         if len(self._recentDirectories) == 0:
             self._recentDirectories.appendleft(os.getcwd())
 
-        if isinstance(self.navigator, navigator.UrlNavigator):
-            path = pathlib.Path(self._recentDirectories[0])
-            if not path.is_dir():
-                path = pathlib.Path(self._user_home_)
-            # if not path.is_absolute():
-            #     path = path.absolute()
-                
-            url = QtCore.QUrl(path.as_uri())
-            self.navigator.setLocationUrl(url)
-            self.navigator.urlChanged.emit(url)
-        else:
-            self.slot_changeDirectory(self._recentDirectories[0])  # alse refreshes gui
+        path = pathlib.Path(self._recentDirectories[0])
+        if not path.is_dir():
+            path = pathlib.Path(self._user_home_)
+        url = QtCore.QUrl(path.as_uri())
+        self.navigator.setLocationUrl(url)
+        self.navigator.urlChanged.emit(url)
+        # if isinstance(self.navigator, navigator.UrlNavigator):
+        #     path = pathlib.Path(self._recentDirectories[0])
+        #     if not path.is_dir():
+        #         path = pathlib.Path(self._user_home_)
+        #     url = QtCore.QUrl(path.as_uri())
+        #     self.navigator.setLocationUrl(url)
+        #     self.navigator.urlChanged.emit(url)
+        # else: # NOTE: 2025-03-31 15:15:12 DEPRECATED branch TODO REMOVE
+        #     self.slot_changeDirectory(self._recentDirectories[0])  # alse refreshes gui
             
 
     @property
@@ -3538,14 +3541,11 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             except:
                 pass
             
-            # url = QtCore.QUrl(pathlib.Path(newCwd).resolve().as_uri())
             url = QtCore.QUrl(pathlib.Path(newCwd).absolute().as_uri())
             self.navigator.setLocationUrl(url)
             
             self._setRecentDirectory_(self.cwd)
             self._updateFileSystemView_(self.cwd, False)
-            # self._resizeFileColumn_()
-            # self._refreshRecentDirsComboBox_()
 
     def slot_updateHistory(self):
         r""" Slot to update the history tree widget once a command has been entered at the console
@@ -5288,75 +5288,21 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @safeWrapper
     def slot_goToHomeDir(self):
         self.navigator.goHome()
-#         if sys.platform.startswith("win32"):
-#             target = os.environ['USERPROFILE']
-#         else:
-#             target = os.environ['HOME']
-#             
-#         if isinstance(self.navigator, navigator.UrlNavigator):
-#             url = QtCore.QUrl(pathlib.Path(target).resolve().as_uri())
-#             self.navigator.setLocationUrl(url)
-#             self.navigator.urlChanged.emit(url)
-#         else:
-#             self.slot_changeDirectory(target)
-            
-            
-        # if sys.platform.startswith("win32"):
-        #     self.slot_changeDirectory(os.environ['USERPROFILE'])
-        # else:
-            # self.slot_changeDirectory(os.environ['HOME'])
-
+        
     @Slot()
     @safeWrapper
     def slot_goToParentDir(self):
         self.navigator.goUp()
-#         # print(self.currentDir)
-#         if self.currentDir is None:
-#             target = pathlib.Path.cwd().parent
-#             
-#         else:
-#             target = pathlib.Path(self.currentDir).resolve().parent
-#             target = pathlib.Path(self.currentDir).absolute().parent
-#             
-#         if isinstance(self.navigator, navigator.UrlNavigator):
-#             url = QtCore.QUrl(target.as_uri())
-#             self.navigator.setLocationUrl(url)
-#             self.navigator.urlChanged.emit(url)
-#         else:
-#             self.slot_changeDirectory(target.as_posix)
-            
-        # if self.currentDir is None:
-        #     self.slot_changeDirectory()
-        # else:
-        #     self.slot_changeDirectory(os.path.dirname(os.path.abspath(self.currentDir)))
 
     @Slot()
     @safeWrapper
     def slot_goToPrevDir(self):
         self.navigator.goBack()
-        # if len(self.navPrevDir) > 0:
-        #     self.navNextDir.appendleft(self.navPrevDir[0])
-        #     prevDir = self.navPrevDir.popleft()
-        #     if isinstance(self.navigator, navigator.UrlNavigator):
-        #         url = QtCore.QUrl(pathlib.Path(prevDir).resolve().as_uri())
-        #         self.navigator.setLocationUrl(url)
-        #         self.navigator.urlChanged.emit(url)
-        #     else:
-        #         self.slot_changeDirectory(prevDir)
 
     @Slot()
     @safeWrapper
     def slot_goToNextDir(self):
         self.navigator.goForward()
-        # if len(self.navNextDir) > 0:
-        #     self.navPrevDir.appendleft(self.navNextDir[0])
-        #     nextDir = self.navNextDir.popleft()
-        #     if isinstance(self.navigator, navigator.UrlNavigator):
-        #         url = QtCore.QUrl(pathlib.Path(nextDir).resolve().as_uri())
-        #         self.navigator.setLocationUrl(url)
-        #         self.navigator.urlChanged.emit(url)
-        #     else:
-        #         self.slot_changeDirectory(nextDir)
 
     @Slot()
     @safeWrapper
@@ -5613,7 +5559,9 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             self.loadFiles(file_paths, self._openSelectedFileItemsThreaded, updateUi=False)
             
             if target_dir and os.path.isdir(target_dir):
-                self.slot_changeDirectory(target_dir)
+                url = QtCore.QUrl(pathlib.Path(target_dir).as_uri())
+                self.navigator.setLocationUrl(url)
+                self.navigator.urlChanged.emit(url)
 
     @Slot(QtCore.QPoint)
     @safeWrapper
@@ -5958,18 +5906,27 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         """
         if self.fileSystemModel.isDir(ndx):
             # if this is a directory then chdir to it
-            if isinstance(self.navigator, navigator.UrlNavigator):
-                path = pathlib.Path(self.fileSystemModel.filePath(ndx))
-                if not path.is_dir():
-                    scipywarn(f"The path {printStyled(path, 'yellow')} does not exist. is it a mount point or a remote place?")
-                    return
+            path = pathlib.Path(self.fileSystemModel.filePath(ndx))
+            if not path.is_dir():
+                scipywarn(f"The path {printStyled(path, 'yellow')} does not exist. is it a mount point or a remote place?")
+                return
 
-                # print(f"{self.__class__.__name__}.slot_fileSystemItemActivated: path = {path}")
-                url = QtCore.QUrl(path.as_uri())
-                self.navigator.setLocationUrl(url)
-                self.navigator.urlChanged.emit(url)
-            else:
-                self.slot_changeDirectory(self.fileSystemModel.filePath(ndx))
+            # print(f"{self.__class__.__name__}.slot_fileSystemItemActivated: path = {path}")
+            url = QtCore.QUrl(path.as_uri())
+            self.navigator.setLocationUrl(url)
+            self.navigator.urlChanged.emit(url)
+            # if isinstance(self.navigator, navigator.UrlNavigator):
+            #     path = pathlib.Path(self.fileSystemModel.filePath(ndx))
+            #     if not path.is_dir():
+            #         scipywarn(f"The path {printStyled(path, 'yellow')} does not exist. is it a mount point or a remote place?")
+            #         return
+            # 
+            #     # print(f"{self.__class__.__name__}.slot_fileSystemItemActivated: path = {path}")
+            #     url = QtCore.QUrl(path.as_uri())
+            #     self.navigator.setLocationUrl(url)
+            #     self.navigator.urlChanged.emit(url)
+            # else: #  NOTE: 2025-03-31 15:13:43 this branch is DEPRECATED - TODO REMOVE
+            #     self.slot_changeDirectory(self.fileSystemModel.filePath(ndx))
 
         else:
             self.loadFiles([self.fileSystemModel.filePath(ndx)], 
@@ -6001,21 +5958,6 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         url = QtCore.QUrl(path.as_uri())
         self.navigator.setLocationUrl(url)
         self.navigator.urlChanged.emit(url)
-        # self.navigatorButtonActivated.emit(url, button, QtCore.Qt.NoModifier)
-        
-        
-#     @Slot(str)
-#     def slot_changeLocation(self, targetDir):
-#         # print(f"{self.__class__.__name__}.slot_changeLocation: targetDir = {targetDir}")
-#         if targetDir is None:
-#             return
-#         
-#         if isinstance(self.navigator, navigator.UrlNavigator):
-#             url = QtCore.QUrl(pathlib.Path(targetDir).resolve().as_uri())
-#             self.navigator.setLocationUrl(url)
-#             self.navigator.urlChanged.emit(url)
-#         else:
-#             self.slot_changeDirectory(targetDir)
 
     @Slot()
     @safeWrapper
@@ -6045,13 +5987,9 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             except:
                 pass
             
-            # print(f"{self.__class__.__name__}.slot_changeDirectory targetDir = {targetDir}")
-
             if sys.platform.startswith("win32"):
                 targetDir = targetDir.replace("\\", "/")
                 targetDir = rf"{targetDir}"
-
-            # print(f"MainWindow.slot_changeDirectory targetDir = {targetDir}")
 
             if self.ipkernel is not None and self.shell is not None and self.console is not None:
                 # print(''.join(["cd '", targetDir, "'"]))
@@ -6063,8 +6001,6 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 self.console.execute(
                     ''.join(["os.chdir('", targetDir, "')"]), hidden=True)
 
-                # self.console.execute(''.join(["cd '", targetDir, "'"]), hidden=True if sys.platform=="linux" else False)
-
             if self.external_console:
                 self.external_console.execute("".join(["os.chdir('", targetDir, "')"]))
 
@@ -6072,14 +6008,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
             self._updateFileSystemView_(targetDir, True)
 
-            # self.fileSystemModel.setRootPath(targetDir)
-            # self.fileSystemTreeView.scrollTo(self.fileSystemModel.index(targetDir))
-            # self.fileSystemTreeView.setRootIndex(self.fileSystemModel.index(targetDir))
-            # self.fileSystemTreeView.sortByColumn(0, QtCore.Qt.AscendingOrder)
-
-            # self.currentDir = targetDir
             self.currentDirectory = targetDir
-            # self.currentDirLabel.setText(targetDir)
             mpl.rcParams["savefig.directory"] = targetDir
             self.setWindowTitle("Scipyen %s" % targetDir)
             
