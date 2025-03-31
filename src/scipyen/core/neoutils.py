@@ -726,7 +726,8 @@ def _(obj, /, **kwargs):
 
     # NOTE: 2024-06-18 08:52:02
     # more recent verison of neo library enforce against the use of int as annotations keys
-
+    
+    # print(f"neoutils.make_neo_object({type(obj).__name__}): factory_pos_params = {factory_pos_params}")
     factory = partial(type(obj), *factory_pos_params)
 
     ret = factory()
@@ -831,6 +832,12 @@ def _(obj, /, **kwargs):
     factory_params.update(factory_named_params)
     factory_params.update(factory_kwarg_params)
 
+    # print(f"neoutils.make_neo_object({type(obj).__name__}):")
+    # print(f"\nfactory_pos_params = {factory_pos_params}")
+    # print(f"\nfactory_params = {factory_params}")
+    if neo.__version__ >= "0.13.0":
+        # NOTE: 2025-03-31 09:14:58 avoid "copy" in recent neo
+        factory_params["copy"] = None
     factory = partial(type(obj), *factory_pos_params, **factory_params)
 
     return factory()
@@ -4203,7 +4210,6 @@ def _(obj, **kwargs):
             sourceMetaData["annotations"] = dict()
     # ### END
 
-    # toCopy = kwargs.pop("copy", True)
 
     # NOTE: 2023-04-13 09:45:19
     # some kwargs are not suitable for a Block, but they may be suitable for
@@ -4258,7 +4264,7 @@ def _(obj, **kwargs):
             copy_with_data_subset(obj.segments[k], **kwargs) for k in keep_segs_ndx
         )
     except:
-        print(f"*****\nCannot copy segment {k} from object {obj.name}\n*****\n")
+        print(f"*****\nCannot copy segments from object {obj.name}\n*****\n")
         raise
 
     for k, seg in enumerate(new_segments):
