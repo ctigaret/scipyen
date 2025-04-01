@@ -133,8 +133,10 @@ class TableEditor(ScipyenViewer):
         if self._data_ is not None:
             self._viewData_()
             
-            self.show()
-        
+        self.show()
+        self.toolBar.setMovable(False)
+        self.toolBar.setVisible(True)
+            
     def _save_viewer_settings_(self):
         if type(self._scipyenWindow_).__name__ == "ScipyenWindow":
             self.qsettings.setValue("/".join([self.__class__.__name__, "UseMatplotlib"]), "%s" % self._use_matplotlib_)
@@ -166,7 +168,7 @@ class TableEditor(ScipyenViewer):
         # NOTE: 2019-01-12 12:21:34
         # CAUTION: setting section resize mode policies to ResizeToContents has
         # a HUGE speed penalty for large data sets (~ 1k rows and tens of columns) 
-        # A better alternative I guess is to resize ot contents AFTER the table model
+        # A better alternative I guess is to resize to contents AFTER the table model
         # data has been (re)loaded, or just resize manually e.g. via a menu action.
         # CAUTION
         
@@ -180,11 +182,11 @@ class TableEditor(ScipyenViewer):
         
         self.plotMenu = self.menuBar().addMenu("&Plot")
         self.plotMenu.setToolTipsVisible(True)
-        self.plotMenu.setToolTip("Plot selected columns")
+        self.plotMenu.setToolTip("Plot selected data")
         
         plot_Action = self.plotMenu.addAction("&Plot")
         
-        plot_Action.triggered.connect(self.slot_plotSelectedColumns)
+        plot_Action.triggered.connect(self.slot_plotSelectedData)
         
         # TODO see plots module
         #plot_Action_Custom = self.plotMenu.addAction("PlotCustom...")
@@ -225,6 +227,8 @@ class TableEditor(ScipyenViewer):
         refreshAction.triggered.connect(self.slot_refreshDataDisplay)
         
         self.addToolBar(self.toolBar)
+        self.toolBar.setVisible(True)
+        self.toolBar.setMovable(False)
         
     def clear(self):
         pass # what's this for? do I really need it?
@@ -243,10 +247,12 @@ class TableEditor(ScipyenViewer):
         
         self._viewData_()
         
-        if kwargs.get("show", True):
+        if kwargs.get("show", True): # ??? won't work in wayland anyway
             self.activateWindow()
         
     def _viewData_(self):
+        r"""Populates the tableWidget (a tableeditorwidget.TableEditorWidget).
+        In turn, the tableWidget uses tableeditorwidget.TabularDataModel"""
         # TODO code for xarray.DataArray
         # TODO code to display categories for categorical data (like frame viewer in rkward)
         # FIXME what is the difference between pandas.Categorical and a series with dtype CategoricalDType?
@@ -304,7 +310,7 @@ class TableEditor(ScipyenViewer):
         
     @Slot()
     @safeWrapper
-    def slot_plotSelectedColumns(self):
+    def slot_plotSelectedData(self):
         '''Plot table selection
         NOTE: 2019-09-06 10:30:36
         We default to matplotlib plotting.
@@ -313,38 +319,188 @@ class TableEditor(ScipyenViewer):
         
         # NOTE: 2019-09-06 10:44:22
         # we need _scipyenWindow_ to expose the matplotlib figure
-        #print("slot_plotSelectedColumns", type(self._scipyenWindow_).__name__)
+        #print("slot_plotSelectedData", type(self._scipyenWindow_).__name__)
         if type(self._scipyenWindow_).__name__ != "ScipyenWindow":
             return
         
         modelIndexes = self.tableView.selectedIndexes()
         
-        self._plot_model_data_(modelIndexes, custom=False)
+        self.plotData()
+        # self.plotData(modelIndexes, custom=False)
         
-    @Slot()
+    # ### BEGIN don't delete yet
+#     @Slot()
+#     @safeWrapper
+#     def slot_customPlotSelectedColumns(self):
+#         if type(self._scipyenWindow_).__name__ != "ScipyenWindow":
+#             return
+#         
+#         modelIndexes = self.tableView.selectedIndexes()
+#         
+#         self.plotData(modelIndexes, custom=True)
+    # ### END   don't delete yet
+        
+        
     @safeWrapper
-    def slot_customPlotSelectedColumns(self):
-        if type(self._scipyenWindow_).__name__ != "ScipyenWindow":
+    def plotData(self, *args, **kwargs):
+        r"""Plots selected data.
+        
+        For sparse selections, the selected cells are grouped by their column 
+        index, creating as many 1D data vectors as the number of selected column
+        indexes. These vectors are then plotted individually in the same plot window.
+        
+        This method uses matplotlib.pyplot interface.
+        
+        When called from the TableEditor menu, the function will generate plots
+        using the pyplot default (line, no markers, default color palette, etc).
+        
+        For custom plot appearances you may either:
+        1) call this method directly, passing options as *args and **kwargs
+        2) call this method via the GUI ("Plot" menuitem), then use the tools of
+        the newly shown matplotlib Figure tools to customize the plot.
+        3) retrieve the selected data by calling getSelectedData() then use your
+        own code to plot it.
+        
+        For full-column selection(s) each selected column supplies one data vector.
+        These vectors are then plotted individually in the same plot window.
+        
+        The functions behaves in a way specific to the type of data shown in the
+        table:
+        
+        • pandas DataFrame or Series:
+            the domain of the plotted curves is taken from the index of the
+            DataFrame or Series. NOTE: the index is shown as the vertical (row)
+            header of the table.
+        
+        • neo DataObject, including BaseSignal
+            the (usually, time) domain of the object is always shown in the first
+            column of the table (column 0, the left-most), with higher index
+            columns showing the signal's 'channels'.
+        
+            Selecting anything in column 0 will plot a data vector containing the 
+            selected values, against their index in the column 0. 
+    
+            Selecting anything in columns with higher index will plot the selected
+            values against the data in column 0 at the selected rows.
+        
+        • numpy array
+            Generic array data is considered to contain column vectors, with the 
+            domain being represented by the index of the data element in the column
+            vector.
+        
+            Any selected data will be grouped per column index as above and plotted
+            against the index of the data.
+        
+        NOTE: vigra filter kernels (1D, 2D) are first converted to numpy array
+        before being used as model data for the table editor.
+        
+        NOTE: VigraArray are numpy arrays; for simplicity, the table editor does
+        not currently take into account any AxisInfo objects associated with the 
+        array. I might revisit this in the near future.
+        
+        """
+        from core.prog import scipywarn
+        from core import quantities as scq
+        
+        data, column_headers = self.getSelectedData()
+        
+        if not isinstance(data, list) or len(data) == 0:
+            scipywarn("Nothing to plot")
             return
         
-        modelIndexes = self.tableView.selectedIndexes()
+        if len(data) != len(column_headers):
+            scipywarn("Mistmatch between number of data vectors to plot and column headers")
+            return
         
-        self._plot_model_data_(modelIndexes, custom=True)
+        # TODO: 2019-11-10 12:53:50
+        # implement plotting with pyqtgraph
+        if self._use_matplotlib_:
+            fig = self._scipyenWindow_.newViewer(mpl.figure.Figure)
+            
+            plt.figure(fig.number) # make this the current figure
+            
+            if len(data) == 1:
+                plt.plot(data[0][0], data[0][1], label=column_headers[0], *args, **kwargs)
+                ylabel = column_headers[0]
+                if isinstance(data[0][1], pq.Quantity):
+                    ylabel += f" ({data[0][1].units.dimensionality})"
+                    
+                if isinstance(data[0][0], pq.Quantity):
+                    xlabel = f"{scq.getUnitFamily(data[0][0].units)} ({data[0][0].units.dimensionality})"
+                else:
+                    xlabel = ""
+                plt.gca().set_ylabel(ylabel)
+                if len(xlabel.strip()):
+                    plt.gca().set_xlabel(xlabel)
+                
+            else:
+                data_units = list()
+                multiple_data_units = False
+                domain_units = list()
+                multiple_domain_units = False
+                
+                for k,d in enumerate(data):
+                    if isinstance(d[0], pq.Quantity):
+                        domain_units.append(d[0].units)
+                    else:
+                        multiple_domain_units = True
+                        domain_units.append(None)
+                        
+                    if isinstance(d[1], pq.Quantity):
+                        data_units.append(d[1].units)
+                    else:
+                        data_units.append(None)
+                        
+                    if any(u is None for u in domain_units) or not all(scq.unitsConvertible(u, domain_units[0]) for u in domain_units):
+                        xlabel = ""
+                        domain_data = d[0]
+                    else:
+                        if isinstance(d[0], pq.Quantity):
+                            domain_data = d[0].rescale(domain_units[0])
+                        else:
+                            domain_data = d[0]
+                        xlabel = f"{scq.getUnitFamily(domain_units[0])} ({domain_units[0].dimensionality})"
+                            
+                    if any(u is None for u in data_units) or not all(scq.unitsConvertible(u, data_units[0]) for u in data_units):
+                        ylabel = ""
+                        column_data = d[1]
+                    else:
+                        if isinstance(d[1], pq.Quantity):
+                            column_data = d[1].rescale(data_units[0])
+                        else:
+                            column_data = d[1]
+                        ylabel = f"{scq.getUnitFamily(data_units[0])} ({data_units[0].dimensionality})"
+                            
+                    
+                    plt.plot(domain_data, column_data, label=column_headers[k], *args, *kwargs)
+                        
+                plt.legend()
+                
+        else:
+            scipywarn("Only matplotlib backend is supported, currently. Please set useMatplotlib to True.")
+                        
+    def getSelectedData(self) -> tuple:
+        r"""Retrieves the selected data in the table.
+        Returns a two lists:
+        • 'data': a list of tuples of the form (x, y) where x and y are column vectors
+        • 'column_headers': a list of str objects, one for each tuple in 'data'
         
+        See documentation of plotData for what is returned, based on the selection.
         
-    @safeWrapper
-    def _plot_model_data_(self, modelIndexes, custom=False):
+        """
+        
         # NOTE: 2025-03-31 23:21:51
-        # model data can only be a pandas DatafRame, Series, or numpy 2D array
+        # model data can only be a pandas DataFrame, Series, or numpy 2D array
         # vigra filter kernels are converted to numpy arrays in the editor widget
         # from core.utilities import unique
+        modelIndexes = self.tableView.selectedIndexes()
         if len(modelIndexes)==0: # bail out if there is no selection
-            return
+            return list(), list()
         
         sourceData = self._dataModel_.sourceData
         
         if sourceData is None:
-            return
+            return list(), list()
 
         data = list()
         
@@ -427,7 +583,7 @@ class TableEditor(ScipyenViewer):
                         # print(f"x.shape: {x.shape}, y.shape: {y.shape}")
                         data.append((x, y))
                 
-            else:
+            else: # sparse selection
                 if isinstance(sourceData, (pd.DataFrame, pd.Series)):
                     data.append(sourceData.iloc[selected_rows_for_column, column]) # NOTE this will include the row index
                 else:#elif isinstance(sourceData,  np.ndarray):
@@ -439,8 +595,8 @@ class TableEditor(ScipyenViewer):
                             
                             data.append((x, y))
                         else:
-                            x = np.atleast_2d(sourceData.times[selected_rows_for_column]).T
-                            y = np.atleast_2d(sourceData[selected_rows_for_column, column-1])
+                            x = np.atleast_2d(sourceData.times[selected_rows_for_column]).T # this is a quantity array
+                            y = np.atleast_2d(np.array(list(map(lambda k: sourceData[k, column-1], selected_rows_for_column)))).T * sourceData[:,column-1].units
                             # print(f"x.shape: {x.shape}, y.shape: {y.shape}")
                             data.append((x, y))
                     else:
@@ -449,24 +605,7 @@ class TableEditor(ScipyenViewer):
                         # print(f"x.shape: {x.shape}, y.shape: {y.shape}")
                         data.append((x, y))
                     
-        # TODO: 2019-11-10 12:53:50
-        # implement plotting with pyqtgraph
-        if self._use_matplotlib_:
-            fig = self._scipyenWindow_.newViewer(mpl.figure.Figure)
-            
-            plt.figure(fig.number) # make this the current figure
-            
-            if len(data) == 1:
-                plt.plot(data[0][0], data[0][1], label=column_headers[0])
-                plt.gca().set_ylabel(column_headers[0])
-                
-            else:
-                if custom:
-                    pass # TODO - what's the intention here?
-                else:
-                    for k,d in enumerate(data):
-                        plt.plot(d[0], d[1], label=column_headers[k])
-                    plt.legend()
+        return data, column_headers
                         
     @property
     def useMatplotlib(self):

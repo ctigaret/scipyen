@@ -127,6 +127,11 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         
         self._data_ = data
         
+        if getattr(data, "shape", (0,0))[0] > 10:
+            # avoid autio-resizing rows for data with more than 10 rows — it is
+            # resource consuming
+            self.resizeRowsToolButton.setEnabled(False)
+        
         if isinstance(data, np.ndarray):
             if data.ndim > 2:
                 self._slicingAxis_ = kwargs.get("sliceaxis", None)
@@ -242,8 +247,6 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         self.setupUi(self)
         self.tableView.setSortingEnabled(False)
         self.tableView.setModel(self._dataModel_)
-        #self._dataModel_.signal_rowsPopulated[int].connect(self.slot_rowsReceived)
-        #self._dataModel_.signal_columnsPopulated[int].connect(self.slot_columnsReceived)
         
         self.tableView.horizontalHeader().setSectionsMovable(False)
         # NOTE: 2018-11-28 21:46:18
@@ -262,8 +265,6 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         self.tableView.verticalHeader().setSectionsMovable(False)
         
         # see NOTE: 2018-11-28 21:46:18 and NOTE: 2018-11-29 23:15:13
-        #self.tableView.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
-        #self.tableView.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
         self.tableView.verticalHeader().setResizeContentsPrecision(0) 
         
         self.tableView.verticalHeader().setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
