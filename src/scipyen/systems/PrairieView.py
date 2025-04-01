@@ -4,10 +4,51 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 
-r"""Import routines for PrairieView data
+r"""Import routines for PrairieView data, and classes for various PrairiewView
+data types.
+
+Classes defined in this module: 
+ 'PVScan',
+ 'PVSystemConfiguration',
+ 'PVSequence',
+ 'PVSequenceType',
+ 'PVStateShard',
+ 'PVFrame',
+ 'PVLaser',
+ 'PVLinescanDefinition',
+ 'PVLinescanMode',
+ 'PrairieViewImporter'
+ 
+Classes defined in other Scipyen modules and imported in this module:
+ 'AxesCalibration',
+ 'AxisCalibrationData',
+ 'CalibrationData',
+ 'ChannelCalibrationData',
+ 'DataBag',
+ 'ProtocolEditorDialog',
+ 'ScanData',
+ 'ScanDataOptions',
+ 'TriggerDetectDialog',
+ 'TriggerDetectWidget',
+ 'TriggerEvent',
+ 'TriggerEventType',
+ 'TriggerProtocol',
+ 'WorkspaceGuiMixin',
+ 
+Qt packages & classes imported in this module:
+ 'QtCore',
+ 'QtGui',
+ 'QtWidgets',
+ 'Signal',
+ 'Slot',
+
+Classes imported from Python standard library:
+ 'Enum',
+ 'IntEnum',
+ 'OrderedDict',
 """
 #### BEGIN core python modules
-import os, sys, traceback, warnings, mimetypes, io, typing
+import os, sys, traceback, warnings, mimetypes, io, typing, pathlib
 import  datetime, time, dateutil
 from enum import Enum, IntEnum #, unique
 from collections import OrderedDict
@@ -27,6 +68,7 @@ from qtpy.uic import loadUiType as __loadUiType__
 #### END 3rd party modules
 
 #### BEGIN scipyen modules
+from core.prog import (scipywarn, printStyled)
 from core.utilities import safeWrapper
 from core.traitcontainers import DataBag
 from core.triggerevent import (TriggerEvent, TriggerEventType, )
@@ -316,11 +358,13 @@ class PVLinescanDefinition(object):
         
         return DataBag(metadata)
         
-
 class PVLaser(object):
     def __init__(self, node, parent=None):
-        if node.nodeType != xmlutils.xml.dom.Node.ELEMENT_NODE or node.nodeName != "Laser":
-            raise ValueError("Expecting an element node named 'Laser'")
+        # if node.nodeType != xmlutils.xml.dom.Node.ELEMENT_NODE or node.nodeName != "Laser":
+        # NOTE: 2025-04-01 22:59:10
+        # adapt to newer PV version >= 5.5; keep backwards compatibility as much as possible
+        if node.nodeType != xmlutils.xml.dom.Node.ELEMENT_NODE or node.nodeName not in ("Laser", "PVLaser"): 
+            raise ValueError("Expecting an element node named 'Laser' or 'PVLaser'")
         
         self.__parent__ = None
         
@@ -331,17 +375,10 @@ class PVLaser(object):
             else:
                 raise TypeError("Parent can only be None on a PVSystemConfiguration object")
 
-        #if node.attributes is not None:
-            #self.__dict__.update(xmlutils.attributesToDict(node))
-        ##else:
-            ##self.__attributes__ = dict()
-            ##self.__dict__.update(dict([(k.name, k.value) for k in node.attributes.values()]))
-            
         if node.attributes is not None:
             self.__attributes__ = DataBag(xmlutils.attributesToDict(node))
         else:
             self.__attributes__ = DataBag(dict())
-            #self.__dict__.update(dict([(k.name, k.value) for k in node.attributes.values()]))
             
     @property
     def parent(self):
@@ -371,6 +408,18 @@ class PVLaser(object):
         return "".join(ret)
 
 class PVSystemConfiguration(object):
+    r"""Encapsulates the configuration of the PrairieView system used for acquisition.
+        Sometime around PrairieView v5.5 this has changed from being a node named
+        'SystemConfiguration' in the main XML file, to being an auxiliary *env file
+        (also in XML format) where the top node is named 'Environment'.
+        
+        I think in PrairiewView >= 5.5 there is the option to save files in the 
+        'old' ('legacy') format, but I haven't checked if this is compatible with
+        the (old) code here dealing with PrairieView 5.0.
+        
+        Instead of renaming this class to PVEnvironment, I will just create an 
+        alias to it, in this module.
+    """
     def __init__(self, node, parent=None):
         if node.nodeType != xmlutils.xml.dom.Node.ELEMENT_NODE or node.nodeName not in ("SystemConfiguration", "Environment"):
             raise ValueError("Expecting an element node named 'SystemConfiguration' or 'Environment")
@@ -380,25 +429,59 @@ class PVSystemConfiguration(object):
         if parent is not None:
             if isinstance(parent, PVScan):
                 self.__parent__ = parent
-                
             else:
                 raise TypeError("Parent of a PVSystemConfiguration can only be one or a PVScan object")
 
         if node.attributes is not None:
             self.__attributes__ = DataBag(xmlutils.attributesToDict(node))
+            v = self.__attributes__.get("version", None)
+            if isinstance(v, str) and len(v.strip()):
+                try:
+                    self.__version__ = tuple(map(lambda x: eval(x), v.split('.')))
+                except:
+                    scipywarn(f"Could not parse the Prairie Environment (SystemConfiguration) version data {v})")
+                                        
+            else: # get the parent's version
+                self.__version__ = parent.version
             
+            d = self.__attributes__.get("date", None)
+            # print(f"{self.__class__.__name__}.__init__: d for date = {d}")
+            if isinstance(d, str) and len(d.strip()):
+                try:
+                    self.__rec_datetime__ = dateutil.parser.parse(d)
+                    # self.__rec_datetime__ = datetime.datetime.fromisoformat(d)
+                except:
+                    traceback.print_exc()
+                    scipywarn(f"Due to the above caught exception, rec_datetime will be set to `datetime.now()`")
+            else: # get the parent's version
+                self.__rec_datetime__ = parent.__rec_datetime__
+            # else:
+            #     scipywarn(f"No suitable date string found; rec_datetime will be set to `datetime.now()")
+                
         else:
-            self.__attributes__ = DataBag()
-        
-        lasers = node.getElementsByTagName("Laser")
-        if len(lasers) == 0 or hasattr(self, "__version__") and self.__version__[1] > 0:
-            lasers = node.getElementsByTagName("PVLasers")
-        if len(lasers):
-            self.lasers = [PVLaser(l) for l in lasers]
+            self.__attributes__ = DataBag(dict())
+           
+        laserNodes = node.getElementsByTagName("Laser")
+        if len(laserNodes) == 0 or self.versionString >= '5.5':
+            laserNodes = node.getElementsByTagName("PVLasers")
+            
+        if len(laserNodes):
+            self.lasers = [PVLaser(l) for l in laserNodes[0].getElementsByTagName("PVLaser")]
             
         self.data = xmlutils.elementToDict(node)
         self.name = node.nodeName
         
+    @property
+    def version(self) -> tuple[int]:
+        r"""PrairieView software version as a 4-tuple of ints: (major, minor, micro dot)"""
+        return self.__version__
+    
+    @property
+    def versionString(self) -> str:
+        r"""PrairieView software version as a string <major>.<minor>.<micro>.<dot>)
+        See also self.version property"""
+        return ".".join(map(lambda x: f"{x}", self.version))
+    
     @property
     def parent(self):
         r"""The parent PVScan object, or None
@@ -447,6 +530,8 @@ class PVSystemConfiguration(object):
 
         return "\n".join(ret)
         
+PVEnvironment = PVSystemConfiguration
+
 class PVStateShard(object):
     def __init__(self, node, parent=None):
         if node.nodeType != xmlutils.xml.dom.Node.ELEMENT_NODE or node.nodeName != "PVStateShard":
@@ -1302,7 +1387,7 @@ class PVSequence (object):
                     newAxisInfo = vigra.AxisInfo(key="t", 
                                                  typeFlags=vigra.AxisType.Time, 
                                                  resolution=framePeriod, 
-                                                 description=axisTypeName(axisTypeFromString["t"]))
+                                                 description=axisTypeName(axisTypeFromString("t")))
                     
                     newAxisCal = AxisCalibrationData(newAxisInfo)
                     newAxisCal.units = pq.s,
@@ -1325,7 +1410,7 @@ class PVSequence (object):
                     newAxisInfo = vigra.AxisInfo(key="z", 
                                                  typeFlags=vigra.AxisType.Space,
                                                  resolution=zres,
-                                                 description=axisTypeName(axisTypeFromString["z"]))
+                                                 description=axisTypeName(axisTypeFromString("z")))
                     
                     newAxisCal = AxisCalibrationData(newAxisInfo)
                     newAxisCal.units = pq.um
@@ -1401,7 +1486,7 @@ class PVSequence (object):
                     newAxisInfo = vigra.AxisInfo(key="t", 
                                                  typeFlags = vigra.AxisType.Time,
                                                  resolution=framePeriod,
-                                                 description=axisTypeName(axisTypeFromString["t"]))
+                                                 description=axisTypeName(axisTypeFromString("t")))
                     
                     newAxisCal = AxisCalibrationData(units = pq.s, 
                                                      origin = float(self.frames[0].attributes["absoluteTime"]), 
@@ -1420,7 +1505,7 @@ class PVSequence (object):
                     newAxisInfo = vigra.AxisInfo(key="z", 
                                                  typeFlags=vigra.AxisType.Space,
                                                  resolution=zres,
-                                                 description=axisTypeName(axisTypeFromString["z"]))
+                                                 description=axisTypeName(axisTypeFromString("z")))
                     
                     newAxisCal = AxisCalibrationData(newAxisInfo)
                     newAxisCal.units=pq.um
@@ -1716,14 +1801,23 @@ class PVScan(object):
     
     """
     
-    def __init__(self, doc, configElement=None, name=None):
+    def __init__(self, doc:typing.Union[xmlutils.xml.dom.minidom.Document, pathlib.Path], 
+                 configElement=None, name=None):
+        self.__path__ = None
+        self.__filename__ = None
+        
         if not isinstance(doc, xmlutils.xml.dom.minidom.Document):
-            raise TypeError("Expecting a xmlutils.xml.dom.minidom.Document as argument; got %s instead" % (type(doc).__name__))
+            if isinstance(doc, pathlib.Path):
+                filePath = doc.absolute()
+                doc = pio.loadXMLFile(filePath)
+                
+            else:
+                raise TypeError("Expecting a xmlutils.xml.dom.minidom.Document or a pathlib.Path for an XMl file as argument; got %s instead" % (type(doc).__name__))
         
         if doc.documentElement is None or doc.documentElement.nodeName != "PVScan":
             raise ValueError("Expecting a valid PVScan XML data")
         
-        # FIXME DO NOT store the documentElement attributes, directly in __dict__
+        # ATTENTION NEVER store the documentElement attributes, directly in __dict__
         # NOTE:2017-10-31 08:37:19
         # storing attributed in __dict__ will result in infinite recursions in __str__()
         # at various places in the code, unless you write code to manage it.
@@ -1749,7 +1843,6 @@ class PVScan(object):
                     scipywarn(f"Due to the above caught exception, rec_datetime will be set to `datetime.now()`")
             else:
                 scipywarn(f"No suitable date string found; rec_datetime will be set to `datetime.now()")
-                    
                 
         else:
             self.__attributes__ = DataBag(dict())
@@ -1772,49 +1865,56 @@ class PVScan(object):
         # READ THE "about PVScan" file; go and fetch element nodes by their name
         
         try:
-            self.__path__ = doc.documentElement.getElementsByTagName("DocPath")[0].childNodes[0].nodeValue
-            # self.__dirname__ = os.path.dirname(self.__path__)
+            if self.__path__ is None:
+                pathNodes = doc.documentElement.getElementsByTagName("DocPath")
+                if len(pathNodes):
+                    self.__path__ = pathNodes[0].getAttribute("value")
         except Exception as e:
-            traceback.print_exc()
-            scipywarn("Invalid DocPath element. PVScan object path will be set to None")
-            self.__path__ = None
-            # self.__dirname__ = None
+            scipywarn("Invalid DocPath element")
+            raise
             
         try:
-            self.__filename__ = doc.documentElement.getElementsByTagName("DocFileName")[0].childNodes[0].nodeValue
+            if self.__filename__ is None:
+                fileNameNodes = doc.documentElement.getElementsByTagName("DocFileName")
+                if len(fileNameNodes):
+                    self.__filename__ = fileNameNodes[0].getAttribute("value")
         
         except Exception as e:
-            traceback.print_exc()
-            warnings.warn("PVScan object filename will be set to None")
-            # if isinstance(self.__path__, str) and len(self.__path__.strip()):
-            #     self.__dirname__ = os.path.dirname(self.__path___)
-            #     self.__filename__ = os.path.basename(self.__path__)
-            self.__filename__ = None
+            scipywarn("Invalid DocFileName element")
+            raise
             
+        # print(f"{self.__class__.__name__}.__init__: dirname: {self.__path__}, filename: {self.__filename__}")
+        
         if isinstance(name, str):
             self.__name__ = name
             
         else:
             if self.__filename__ is not None:
-                self.__name__ = os.path.splitext(self.__filename__)[0]
+                self.__name__ = pathlib.Path(self.__filename__).stem
                 
         # NOTE: 2017-08-03 09:22:43
         # there should be only ONE SystemConfiguration element node
         # NOTE: 2024-08-28 09:07:55
         # this was removed around PV version 5.5; instead there is a *.env file
-        # with a single node "Envronment" node
+        # with a single node "Environment" node
+        
         sysconfig = doc.documentElement.getElementsByTagName("SystemConfiguration")
         if len(sysconfig):
             self.__systemConfiguration__ = PVSystemConfiguration(sysconfig[0], parent=self)
         else:
             if os.path.isdir(self.__path__) and os.path.isfile(self.__filename__):
-                print(f"dirname: {self.__path__}, filename: {self.__filename__}")
                 base = os.path.splitext(self.__filename__)[0]
                 env_filename = os.path.join(self.__path__, base+".env")
                 envDoc = pio.loadXMLFile(env_filename)
                 pvEnviron = envDoc.documentElement.getElementsByTagName("Environment")
                 if len(pvEnviron):
                     self.__systemConfiguration__ = PVSystemConfiguration(pvEnviron[0], parent=self)
+                elif envDoc.documentElement.nodeName == "Environment":
+                    self.__systemConfiguration__ = PVSystemConfiguration(envDoc.documentElement, parent=self)
+                else:
+                    raise RuntimeError("Cannot obtain a PVSystemConfiguration for this PVScan")
+            else:
+                raise RuntimeError("Cannot obtain a PVSystemConfiguration for this PVScan")
 
         self.sequences = [PVSequence(n, parent=self) for n in doc.documentElement.getElementsByTagName("Sequence")]
         
@@ -2185,7 +2285,20 @@ class PVScan(object):
         "val: boolean
         """
         self.__mergeChannelsOnOutput__ = val
+        
+    @property
+    def version(self) -> tuple[int]:
+        r"""Version of the PrairieView software used to acquire this PVScan object.
+        Returns a tuple of int: (major, minor, micro, dot)"""
+        return self.__version__
     
+    @property
+    def versionString(self) -> str:
+        r"""Version of the PrairieView software used to acquire this PVScan object.
+        Returns a stringof the form major.minor.micro.dot where each component is
+        a string representation of an integer"""
+        return ".".join(map(lambda x: f"{x}", self.version))
+        
     @property
     def attributes(self):
         return self.__attributes__

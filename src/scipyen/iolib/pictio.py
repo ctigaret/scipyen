@@ -1538,10 +1538,11 @@ def writeCsv(data, fileName:typing.Optional[typing.Union[str, pathlib.Path]]=Non
         raise NotImplementedError(f"{type(data).__name__} is not yet supported")
             
 def loadXML(fileName:typing.Union[str, pathlib.Path]) -> object:
+    r"""Alias to loadXMLFile function in this module"""
     return loadXMLFile(fileName)
 
 def loadXMLFile(fileName:typing.Union[str, pathlib.Path]) -> object:
-    filePath = pathlib.Path(fileName)
+    filePath = pathlib.Path(fileName).absolute()
     # if os.path.isfile(fileName):
     if filePath.is_file():
         ret = xmlutils.xml.dom.minidom.parse(fileName)
@@ -1550,14 +1551,18 @@ def loadXMLFile(fileName:typing.Union[str, pathlib.Path]) -> object:
         #print("loadXMLFile: doc file name",  os.path.basename(fileName))
         
         doc_filepath = ret.createElement("DocPath")
-        doc_path = ret.createTextNode(os.path.dirname(fileName)) # this is OK, os.path.dirname supports pathlib.Path
-        doc_filepath.appendChild(doc_path)
+        doc_filepath.setAttribute("value", filePath.parent.as_posix())
         ret.documentElement.appendChild(doc_filepath)
+        # doc_path = ret.createTextNode(filePath.parent.as_posix()) 
+        # doc_path = ret.createTextNode(os.path.dirname(fileName)) # this is OK, os.path.dirname supports pathlib.Path
+        # doc_filepath.appendChild(doc_path)
         
         doc_name = ret.createElement("DocFileName")
-        doc_fn = ret.createTextNode(os.path.basename(fileName))
-        doc_name.appendChild(doc_fn)
+        doc_name.setAttribute("value", filePath.name)
         ret.documentElement.appendChild(doc_name)
+        # doc_fn = ret.createTextNode(filePath.name)
+        # doc_fn = ret.createTextNode(os.path.basename(fileName))
+        # doc_name.appendChild(doc_fn)
         
         return ret
     else:
