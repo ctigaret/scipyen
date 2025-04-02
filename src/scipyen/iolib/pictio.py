@@ -1541,32 +1541,12 @@ def loadXML(fileName:typing.Union[str, pathlib.Path]) -> object:
     r"""Alias to loadXMLFile function in this module"""
     return loadXMLFile(fileName)
 
-def loadXMLFile(fileName:typing.Union[str, pathlib.Path]) -> object:
-    filePath = pathlib.Path(fileName).absolute()
-    # if os.path.isfile(fileName):
+def loadXMLFile(filePath:typing.Union[str, pathlib.Path]) -> object:
+    filePath = pathlib.Path(filePath).absolute()
     if filePath.is_file():
-        ret = xmlutils.xml.dom.minidom.parse(fileName)
-        # augument with a text node called "document_filesource"
-        #print("loadXMLFile: doc path",  os.path.dirname(fileName))
-        #print("loadXMLFile: doc file name",  os.path.basename(fileName))
-        
-        doc_filepath = ret.createElement("DocPath")
-        doc_filepath.setAttribute("value", filePath.parent.as_posix())
-        ret.documentElement.appendChild(doc_filepath)
-        # doc_path = ret.createTextNode(filePath.parent.as_posix()) 
-        # doc_path = ret.createTextNode(os.path.dirname(fileName)) # this is OK, os.path.dirname supports pathlib.Path
-        # doc_filepath.appendChild(doc_path)
-        
-        doc_name = ret.createElement("DocFileName")
-        doc_name.setAttribute("value", filePath.name)
-        ret.documentElement.appendChild(doc_name)
-        # doc_fn = ret.createTextNode(filePath.name)
-        # doc_fn = ret.createTextNode(os.path.basename(fileName))
-        # doc_name.appendChild(doc_fn)
-        
-        return ret
+        return xmlutils.xml.dom.minidom.parse(filePath.as_posix())
     else:
-        raise OSError("File %s not found" % fileName)
+        raise OSError("File %s not found" % filePath)
     
     
 #"def" loadBinaryFile(fileName, buffered=True):

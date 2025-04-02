@@ -422,7 +422,7 @@ class PVSystemConfiguration(object):
     """
     def __init__(self, node, parent=None):
         if node.nodeType != xmlutils.xml.dom.Node.ELEMENT_NODE or node.nodeName not in ("SystemConfiguration", "Environment"):
-            raise ValueError("Expecting an element node named 'SystemConfiguration' or 'Environment")
+            raise ValueError("Expecting an element node named 'SystemConfiguration' or 'Environment'")
 
         self.__parent__ = None
         
@@ -461,12 +461,14 @@ class PVSystemConfiguration(object):
         else:
             self.__attributes__ = DataBag(dict())
            
-        laserNodes = node.getElementsByTagName("Laser")
+        laserNodes = node.getElementsByTagName("Lasers")
         if len(laserNodes) == 0 or self.versionString >= '5.5':
             laserNodes = node.getElementsByTagName("PVLasers")
+            if len(laserNodes):
+                self.lasers = [PVLaser(l) for l in laserNodes[0].getElementsByTagName("PVLaser")]
+        else:
+            self.lasers = [PVLaser(l) for l in laserNodes[0].getElementsByTagName("Laser")]
             
-        if len(laserNodes):
-            self.lasers = [PVLaser(l) for l in laserNodes[0].getElementsByTagName("PVLaser")]
             
         self.data = xmlutils.elementToDict(node)
         self.name = node.nodeName
@@ -1801,122 +1803,142 @@ class PVScan(object):
     
     """
     
-    def __init__(self, doc:typing.Union[xmlutils.xml.dom.minidom.Document, pathlib.Path], 
-                 configElement=None, name=None):
+    def __init__(self, doc:typing.Union[str, xmlutils.xml.dom.minidom.Document, pathlib.Path], 
+                 config:typing.Optional[typing.Union[str, xmlutils.xml.dom.minidom.Document, pathlib.Path]] = None,
+                 name=None):
         self.__path__ = None
-        self.__filename__ = None
+        self.__mergeChannelsOnOutput__ = False
+        self.__systemConfiguration__ = None
+        self.__version__ = tuple() # major, minor, micro, dot
+        self.__rec_datetime__ = datetime.datetime.now() # fallback value
         
-        if not isinstance(doc, xmlutils.xml.dom.minidom.Document):
-            if isinstance(doc, pathlib.Path):
-                filePath = doc.absolute()
-                doc = pio.loadXMLFile(filePath)
-                
-            else:
-                raise TypeError("Expecting a xmlutils.xml.dom.minidom.Document or a pathlib.Path for an XMl file as argument; got %s instead" % (type(doc).__name__))
+        if isinstance(doc, str):
+            doc = pathlib.Path(doc)
+        
+        if isinstance(doc, pathlib.Path):
+            if not doc.is_file():
+                raise OSError(f"Cannot find the file {doc}")
+            mime_type, file_type, encoding = pio.getMimeAndFileType(doc)
+            if "xml" not in mime_type.lower() and "xml" not in file_type("lower"): # don't rely on the 'xml' extension
+                raise ValueError(f"{doc} does not appear to be an XML file")
+            self.__path__ = doc.absolute()
+            doc = loadPrairieViewXML(self.__path__) # loadPrairieViewXML will augment the XML document with DocPath node; not needed at this point, but surely later
+            
+        elif not isinstance(doc, xmlutils.xml.dom.minidom.Document):
+            raise TypeError("Expecting a xmlutils.xml.dom.minidom.Document or a pathlib.Path for an XMl file as argument; got %s instead" % (type(doc).__name__))
         
         if doc.documentElement is None or doc.documentElement.nodeName != "PVScan":
-            raise ValueError("Expecting a valid PVScan XML data")
+            raise ValueError("XML data is not a valid PVScan Document")
         
+        if doc.documentElement.attributes is None or any(s not in doc.documentElement.attributes for s in ("version", "date", "notes")):
+            raise ValueError("XML data is not a valid PVScan Document")
+            
+        if not doc.documentElement.hasChildNodes():
+            raise ValueError("PVScan XML data is empty!")
+
         # ATTENTION NEVER store the documentElement attributes, directly in __dict__
         # NOTE:2017-10-31 08:37:19
         # storing attributed in __dict__ will result in infinite recursions in __str__()
         # at various places in the code, unless you write code to manage it.
         # -- too work for little benefit
-        self.__version__ = tuple() # major, minor, micro, dot
-        self.__rec_datetime__ = datetime.datetime.now()
         
-        if doc.documentElement.attributes is not None:
-            self.__attributes__ = DataBag(xmlutils.attributesToDict(doc.documentElement))
-            v = self.__attributes__.get("version", None)
-            if isinstance(v, str) and len(v.strip()):
-                try:
-                    self.__version__ = tuple(map(lambda x: eval(x), v.split('.')))
-                except:
-                    scipywarn(f"Could not parse the Prairie version data {v})")
-            
-            d = self.__attributes__.get("date", None)
-            if isinstance(d, str) and len(d.strip()):
-                try:
-                    self.__rec_datetime__ = dateutil.parser.parse(d)
-                except:
-                    traceback.print_exc()
-                    scipywarn(f"Due to the above caught exception, rec_datetime will be set to `datetime.now()`")
-            else:
-                scipywarn(f"No suitable date string found; rec_datetime will be set to `datetime.now()")
-                
+        self.__attributes__ = DataBag(xmlutils.attributesToDict(doc.documentElement))
+        v = self.__attributes__.get("version", None)
+        if isinstance(v, str) and len(v.strip()):
+            self.__version__ = tuple(map(lambda x: eval(x), v.split('.')))
         else:
-            self.__attributes__ = DataBag(dict())
+            raise ValueError(f"Invalid 'version' attribute: {v}")
+        
+        d = self.__attributes__.get("date", None)
+        if isinstance(d, str) and len(d.strip()):
+            self.__rec_datetime__ = dateutil.parser.parse(d)
+        else:
+            raise ValueError(f"Invalid 'date' attribute: {d}")
+        
+        # NOTE: 2025-04-02 22:06:15
+        # Get the configuration of the system where the data was acquired.
+        #
+        # In older PV versions (before around 5.5) the configuration was stored
+        # in a "SystemConfiguration" child node of the main PSVScan XML file.
+        #
+        # Since around verison 5.5 the configuration is stored in a separate file ("*.env")
+        # containing a single document element named "Environment"; in PV 5.5.64
+        # (the latest I have access to) there is the option of saving in the "old"
+        # format - not sure if that means the configuration being stored as 
+        # before, in a "SystemConfiguration" node inside the main PVSCan file
+        #
+        # So I'm goint out on a limb, here, expect trouble
+        if self.versionString < "5.5":
+            sysconfig = doc.documentElement.getElementsByTagName("SystemConfiguration")
+            if len(sysconfig):
+                # all hunkydory
+                self.__systemConfiguration__ = PVSystemConfiguration(sysconfig[0], parent=self)
+                
+        if self.versionString >= "5.5" or self.__systemConfiguration__ is None: 
+            # attempt to cover up intermediate verions I don't have access to.
+            # keeping fingers crossed here, as even more recent versions may have
+            # broken things
             
-        # print(f"{self.__class__.__name__} attributes: {self.__attributes__}")
+            # This first looks for the information necessary to locate and *.env 
+            # embedded in the PVScan document - not sure if there is an option 
+            # in PV software to specify where this file is to be saved. On the
+            # system I work with, this file is by default saved in the same
+            # directory as the main PVScan xml file, so I assume that this is a
+            # workable default.
+            #
+            # If the main PVscan XML document was loaded with the custom loadPrairieViewXML
+            # function defined in this module then it WILL have a "DocPath" child 
+            # node "injected" by the loadPrairieViewXML function, with the attribute
+            # 'value' set to the str of the full path of the XML document file;
+            # otherwise, the configuration  MUST be supplied as a parameter to the
+            # constructor
+            if isinstance(self.__path__, pathlib.Path): 
+                # self.__path__ WAS set up above IF doc argument is a XML file.
+                # On the system I work with, the environment (or configuration) file 
+                # is saved in the same directory as the main PVSCan XML file
+                # So, going out on a limb here.
+                configFile = self.__path__.with_suffix(".env")
+                config = pio.loadXML(configFile)
+                self.__systemConfiguration__ = PVSystemConfiguration(config.documentElement, parent=self)
+            else: 
+                # self.__path__ has NOT been set; this is usually because the 
+                # 'doc' argument is a document previously loaded (either using
+                # the pio.loadXMLFile function, or the custom loadPrairieViewXML
+                # function in this module. In the latter case it WILL HAVE BEEN
+                # 'augmented' with a child node 'DocPath' with the 'value'
+                # attribute set to the absolute path of the PVScan XML file.
+                docPathNodes = doc.documentElement.getElementsByTagName("DocPath")
+                if len(docPathNodes):
+                    # was loaded using loadPrairieViewXML; 
+                    self.__path__ = pathlib.Path(docPathNodes[0]).getAttributes("value")
+                    # so I assume the env file saved in the same directory by default
+                    configFile = self.__path__.with_suffix(".env")
+                    if not configFile.is_file():
+                        # my assumption failed here
+                        raise OSError(f"Cannot find the configuration file {configFile}")
+                    config = pio.loadXML(configFile)
+                    self.__systemConfiguration__ = PVSystemConfiguration(config.documentElement, parent=self)
+                
+                else:
+                    if isinstance(config, str):
+                        config = pathlib.Path(config)
+                        
+                    if isinstance(config, pathlib.Path) and config.is_file() and config.suffix.lower() == ".env":
+                        config = pio.loadXMLFile(config) # OK to use the generic XML loader in pio module
+                    elif isinstance(config, xmlutils.xml.dom.minidom.Document):
+                        self.__systemConfiguration__ = PVSystemConfiguration(config.documentElement, parent=self)
+                    else:                    
+                        raise TypeError(f"For separately loaded XML documents created with PrairieView version {self.versionString}, a 'config' parameter must be given,\n either a absolute path to an existing configuration file, or as a loaded XML document")
+                
             
-        # query its children
-        if not doc.documentElement.hasChildNodes():
-            raise ValueError("PVScan XML data is empty!")
-        
-        self.__mergeChannelsOnOutput__ = False
-        
-        # the document element has both text nodes (simply rubbish of the form "\n  ") 
-        # and element nodes which contain relevant information
-        
-        # We could just go and iterate blindly through all of these, or query
-        # specific fields/data structures, provided the PVScan XML files we have
-        # are enough to cover the entire PV data structures API
-        
-        # READ THE "about PVScan" file; go and fetch element nodes by their name
-        
-        try:
-            if self.__path__ is None:
-                pathNodes = doc.documentElement.getElementsByTagName("DocPath")
-                if len(pathNodes):
-                    self.__path__ = pathNodes[0].getAttribute("value")
-        except Exception as e:
-            scipywarn("Invalid DocPath element")
-            raise
-            
-        try:
-            if self.__filename__ is None:
-                fileNameNodes = doc.documentElement.getElementsByTagName("DocFileName")
-                if len(fileNameNodes):
-                    self.__filename__ = fileNameNodes[0].getAttribute("value")
-        
-        except Exception as e:
-            scipywarn("Invalid DocFileName element")
-            raise
-            
-        # print(f"{self.__class__.__name__}.__init__: dirname: {self.__path__}, filename: {self.__filename__}")
-        
         if isinstance(name, str):
             self.__name__ = name
             
         else:
-            if self.__filename__ is not None:
-                self.__name__ = pathlib.Path(self.__filename__).stem
+            self.__name__ =self.__path__.stem
                 
-        # NOTE: 2017-08-03 09:22:43
-        # there should be only ONE SystemConfiguration element node
-        # NOTE: 2024-08-28 09:07:55
-        # this was removed around PV version 5.5; instead there is a *.env file
-        # with a single node "Environment" node
-        
-        sysconfig = doc.documentElement.getElementsByTagName("SystemConfiguration")
-        if len(sysconfig):
-            self.__systemConfiguration__ = PVSystemConfiguration(sysconfig[0], parent=self)
-        else:
-            if os.path.isdir(self.__path__) and os.path.isfile(self.__filename__):
-                base = os.path.splitext(self.__filename__)[0]
-                env_filename = os.path.join(self.__path__, base+".env")
-                envDoc = pio.loadXMLFile(env_filename)
-                pvEnviron = envDoc.documentElement.getElementsByTagName("Environment")
-                if len(pvEnviron):
-                    self.__systemConfiguration__ = PVSystemConfiguration(pvEnviron[0], parent=self)
-                elif envDoc.documentElement.nodeName == "Environment":
-                    self.__systemConfiguration__ = PVSystemConfiguration(envDoc.documentElement, parent=self)
-                else:
-                    raise RuntimeError("Cannot obtain a PVSystemConfiguration for this PVScan")
-            else:
-                raise RuntimeError("Cannot obtain a PVSystemConfiguration for this PVScan")
-
         self.sequences = [PVSequence(n, parent=self) for n in doc.documentElement.getElementsByTagName("Sequence")]
+        
         
             
     def __len__(self):
@@ -2245,7 +2267,11 @@ class PVScan(object):
         
     @property
     def filename(self):
-        return self.__filename__
+        return self.__path__.name
+    
+    @property
+    def rec_datetime(self):
+        return self.__rec_datetime__
     
     @property
     def name(self):
@@ -2264,11 +2290,6 @@ class PVScan(object):
         """
         return self.filepath
     
-    
-    @datapath.setter
-    def datapath(self, val):
-        self.filepath = val
-        
     @property
     def multiBandOutput(self):
         r"""If True, the () operator reads this frame's files as a multiband image.
@@ -3170,3 +3191,14 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
         r"""Alias to self.scanData
         """
         return self.scanData
+
+def loadPrairieViewXML(filePath:typing.Union[str, pathlib.Path]) -> object:
+    filePath = pathlib.Path(filePath).absolute()
+    ret = pio.loadXML(filePath)
+    if ret.documentElement.tagName != "PVScan":
+        raise ValueError("Not a PVScan experiment file")
+    # augument with the full path to this file
+    doc_filepath = ret.createElement("DocPath")
+    doc_filepath.setAttribute("value", filePath.as_posix())
+    ret.documentElement.appendChild(doc_filepath)
+    return ret
