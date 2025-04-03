@@ -308,24 +308,6 @@ class PVLinescanDefinition(PVObject):
         """
         return self._parent_
     
-    @parent.setter
-    def parent(self, val):
-        if (isinstance(val, PVSequence) and parent.typename == "Linescan") or val is None:
-            self._parent_ = val
-            
-        else:
-            raise TypeError("Parent  of a PVLinescanDefinition can only be None or a PVSequence object of Linescan type")
-    
-    @property
-    def sequence(self):
-        r"""Alias for parent
-        """
-        return self.parent
-    
-    @sequence.setter
-    def sequence(self, val):
-        self.parent=val
-    
     @property
     def attributes(self):
         return self._attributes_
@@ -523,24 +505,6 @@ class PVSystemConfiguration(PVObject):
         """
         return self._parent_
     
-    @parent.setter
-    def parent(self, val):
-        if isinstance(val, (type(None), PVScan)):
-            self._parent_ = val
-            
-        else:
-            raise TypeError("Parent of a PVSystemConfiguration can only be None or a PVScan object")
-    
-    @property
-    def scan(self):
-        r"""Alias for parent
-        """
-        return self.parent
-    
-    @scan.setter
-    def scan(self, val):
-        self.parent=val
-    
     @property
     def attributes(self):
         return self._attributes_
@@ -616,7 +580,7 @@ class PVStateValue(PVObject):
         
         self._indexedValues_ = list(map(lambda n: PVIndexedValue(n, self), ivalueNodes))
         
-        subIvaluesNodes = xmlutils.getChildren(node, tagName ="SubIndexedValues")
+        subIvaluesNodes = xmlutils.getChildren(node, tagName ="SubindexedValues")
         
         self._subIndexedValuesLists_ = list(map(lambda n: PVSubIndexedValueList(n, self), subIvaluesNodes))
         
@@ -631,11 +595,15 @@ class PVStateValue(PVObject):
             ret += list(map(lambda v: f"{   v}", self.indexedValues))
             
         if len(self.subIndexedValuesLists):
-            ret += ["   SubIndexedValues:"]
+            ret += ["   SubindexedValues:"]
             ret += list(map(lambda v: f"{   v}", self.subIndexedValuesLists))
             
         ret += ["\n"]
         return "".join(ret)
+    
+    @property
+    def parent(self):
+        return self._parent_
     
     @property
     def key(self):
@@ -667,10 +635,14 @@ class PVStateValue(PVObject):
             return svalues[0]
         else:
             raise IndexError(f"This {self.__class__.__name__} object does not contain a SubIndexedValueList with index {index}")
+        
+    @property
+    def parent(self):
+        return self._parent_
     
     @property
     def keys(self):
-        yield from map(lambda s: s.index, self.indexedValues + self.subIndexedValuesLists)
+        yield from map(lambda s: s.index, self.values)
     
     @property
     def values(self):
@@ -680,17 +652,18 @@ class PVStateValue(PVObject):
     def items(self):
         yield from map(lambda v: (v.index, v), self.values)
     
-    def __getitem__(self, item, default=MISSING):
-        if item not in self.keys:
+    def get(self, item, default=MISSING):
+        try:
+            return self[item]
+        except KeyError as e:
             if default is MISSING:
-                raise KeyError(f"Index {item} not found")
+                raise
             return default
-        values = tuple(filter(lambda v: v.index == item, self.indexedValues + self.subIndexedValuesLists))
-        if len(values):
-            return values[0]
-        if default is MISSING:
-            raise KeyError(f"Index {item} not found")
-        return default
+        
+    def __getitem__(self, item):
+        if item not in self.keys:
+            raise KeyError(f"Index {item} not found in {type(self.parent).__name__} object {self.key}")
+        return tuple(filter(lambda v: v.index == item, self.indexedValues + self.subIndexedValuesLists))[0]
         
     def __len__(self):
         return len(tuple(self.keys))
@@ -733,6 +706,10 @@ class PVIndexedValue(PVObject):
         ret += ["  %s = %s\n" % (i[0], i[1]) for i in self._attributes_.items()]
         ret += ["\n"]
         return "".join(ret)
+    
+    @property
+    def parent(self):
+        return self._parent_
 
     @property
     def attributes(self) -> DataBag:
@@ -780,6 +757,10 @@ class PVSubIndexedValue(PVObject):
         ret += ["  %s = %s\n" % (i[0], i[1]) for i in self._attributes_.items()]
         ret += ["\n"]
         return "".join(ret)
+    
+    @property
+    def parent(self):
+        return self._parent_
 
     @property
     def subindex(self):
@@ -815,7 +796,7 @@ class PVSubIndexedValueList(PVObject):
         
             self._attributes_[k] = v
         
-        sIvalues = xmlutils.getChildren(node, tagName="SubIndexedValue")
+        sIvalues = xmlutils.getChildren(node, tagName="SubindexedValue")
         
         self._subIndexedValues_ = list(map(lambda n: PVSubIndexedValue(n, self), sIvalues))
         
@@ -856,20 +837,18 @@ class PVSubIndexedValueList(PVObject):
     def items(self):
         yield from map(lambda v: (v.subindex, v), self._subIndexedValues_)
         
-    def __getitem__(self, item, default=MISSING):
-        if item not in self.keys:
+    def get(self, item, default=MISSING):
+        try:
+            return self[item]
+        except KeyError as e:
             if default is MISSING:
-                raise KeyError(f"Subindex {item} not found")
+                raise
             return default
         
-        else:
-            vals = tuple(filter(lambda x: x.subindex == item, self._subIndexedValues_))
-            if len(vals):
-                return vals[0]
-            else:
-                if default is MISSING:
-                    raise KeyError(f"Subindex {item} not found")
-                return default
+    def __getitem__(self, item):
+        if item not in self.keys:
+            raise KeyError(f"Subindex {item} not found")
+        return tuple(filter(lambda x: x.subindex == item, self._subIndexedValues_))[0]
     
     def __len__(self):
         return len(tuple(self.keys))
@@ -949,13 +928,18 @@ class PVStateShard(PVObject):
     def items(self):
         yield from map(lambda s: (s.key, s), self.values) 
         
-    def __getitem__(self, item, default=MISSING):
-        if item not in self.keys:
+    def get(self, item, default=MISSING):
+        try:
+            return self[item]
+        except KeyError as e:
             if default is MISSING:
-                raise KeyError(f"Index {item} not found")
+                raise
             return default
         
-        return self.getState(item, default)
+    def __getitem__(self, item):
+        if item not in self.keys:
+            raise KeyError(f"Index {item} not found")
+        return tuple(filter(lambda s: s.key == item, self.values))[0]
     
     def __len__(self):
         return len(tuple(self.keys))
@@ -964,16 +948,6 @@ class PVStateShard(PVObject):
     def attributes(self):
         return self._attributes_
     
-    def getState(self, key:str, default=MISSING):
-        states = tuple(filter(lambda s: s.key == key, self.values))
-        # states = tuple(filter(lambda s: s.attributes.get("key", None) == key, self.stateValues))
-        if len(states):
-            return states[0]
-        else:
-            if default is MISSING:
-                raise KeyError(f"Index {item} not found")
-            return default
-        
     def getStateValue(self, key:str):
         states = tuple(filter(lambda s: s.attributes.get("key", None) == key and s.attributes.get("value", None) is not None, self.states))
         if len(states):
@@ -1048,12 +1022,12 @@ class PVStateShard(PVObject):
 # with ZSeries also, as it can be used to load the entire ZSeries data for one channel
 # into a single VigraArray
 class PVFrame(PVObject):
-    def __init__(self, node, parent:PVObject):
+    def __init__(self, node, parent:PVSequence):
         if node.nodeType != xmlutils.xml.dom.Node.ELEMENT_NODE or node.nodeName != "Frame":
             raise ValueError("Expecting an element node named 'Frame'")
         
         self._parent_ = None
-        if isinstance(parent, PVObject):
+        if isinstance(parent, PVSequence):
             self._parent_ = parent
             
         else:
@@ -1100,16 +1074,6 @@ class PVFrame(PVObject):
         else:
             raise TypeError("Parent of a PVFrame can only be None or a PVSequence object")
         
-    @property
-    def sequence(self):
-        r"""Alias for parent
-        """
-        return self.parent
-    
-    @sequence.setter
-    def sequence(self, val):
-        self.parent=val
-    
     @property
     def attributes(self):
         return self._attributes_
@@ -1353,9 +1317,12 @@ class PVFrame(PVObject):
             
             fdata_axis_0_cal  = AxisCalibrationData(fdata_axis_0_info)
             if self.versionString < "5.5":
-                fdata_axis_0_cal.resolution = self.state.attributes["micronsPerPixel_XAxis"]
+                fdata_axis_0_cal.resolution = float(self.state["micronsPerPixel_XAxis"].value)
             else:
-                fdata_axis_0_cal.resolution = self.parent.parent.state["micronsPerPixel"]["XAxis"].attributes.value
+                state = self.state
+                if len(self.state) == 0:
+                    state = self.parent.parent.state
+                fdata_axis_0_cal.resolution = float(state["micronsPerPixel"]["XAxis"].value)
             fdata_axis_0_cal.units = pq.um
             
             # embed calibration string into axis_0_info's description
@@ -1383,9 +1350,10 @@ class PVFrame(PVObject):
                 
                 fdata_axis_1_cal = AxisCalibrationData(fdata_axis_1_info)
                 if self.versionString < "5.5":
-                    fdata_axis_1_cal.resolution = self.state.attributes["micronsPerPixel_YAxis"]
+                    fdata_axis_1_cal.resolution = float(self.state["micronsPerPixel_YAxis"].value)
                 else:
-                    fdata_axis_1_cal.resolution = self.parent.parent.state["micronsPerPixel"]["YAxis"].attributes.value
+                    state = self.state if len(self.state) else self.parent.parent.state
+                    fdata_axis_1_cal.resolution = float(state["micronsPerPixel"]["YAxis"].value)
                 fdata_axis_1_cal.units = pq.um
                 
             # embed calibration string into axis_1_info's description
@@ -1446,9 +1414,12 @@ class PVFrame(PVObject):
                 sdata_axis_0_info = sdata.axistags[0]
                 sdata_axis_0_cal = AxisCalibrationData(sdata_axis_0_info)
                 if self.versionString < "5.5":
-                    sdata_axis_0_cal.resolution = self.state.attributes["micronsPerPixel_XAxis"]
+                    sdata_axis_0_cal.resolution = float(self.state["micronsPerPixel_XAxis"].value)
                 else:
-                    sdata_axis_0_cal.resolution = self.parent.parent["micronsPerPixel"]["XAxis"].attributes.value
+                    state = self.state
+                    if len(state) == 0:
+                        state = self.parent.parent.state
+                    sdata_axis_0_cal.resolution = float(state["micronsPerPixel"]["XAxis"].value)
                 sdata_axis_0_cal.units = pq.um
                 
                 sdata_axis_0_info = sdata_axis_0_cal.calibrateAxis(sdata_axis_0_info)
@@ -1456,9 +1427,10 @@ class PVFrame(PVObject):
                 sdata_axis_1_info = sdata.axistags[1]
                 sdata_axis_1_cal = AxisCalibrationData(sdata_axis_1_info)
                 if self.versionString < "5.5":
-                    sdata_axis_1_cal.resolution=self.state.attributes["micronsPerPixel_YAxis"]
+                    sdata_axis_1_cal.resolution=float(self.state["micronsPerPixel_YAxis"].value)
                 else:
-                    sdata_axis_1_cal.resolution=self.parent.parent["micronsPerPixel"]["YAxis"].attributes.value
+                    state = self.state if len(self.state) else self.parent.parent.state
+                    sdata_axis_1_cal.resolution=float(state["micronsPerPixel"]["YAxis"].value)
                 sdata_axis_1_cal.units = pq.um
                 
                 sdata_axis_1_info = sdata_axis_1_cal.calibrateAxis(sdata_axis_1_info)
@@ -1797,7 +1769,12 @@ class PVSequence (PVObject):
                 #newAxisDim = data[0].ndim
                 
                 if self.type == PVSequenceType.TSeries:
-                    frameTimes = [float(f.attributes["absoluteTime"]) for f in self.frames]
+                    if self.parent.versionString < "5.5":
+                        frameTimes = [float(f.state["absoluteTime"].value) for f in self.frames]
+                    else:
+                        states = list(map(lambda f: f.state if len(f.state) else self.parent.state))
+                        frameTimes = list(map(float(s["absoluteTime"].value), states))
+                        
 
                     diffTimes = np.diff(frameTimes) # there will be some jitter
 
@@ -1810,19 +1787,18 @@ class PVSequence (PVObject):
                     
                     newAxisCal = AxisCalibrationData(newAxisInfo)
                     newAxisCal.units = pq.s,
-                    newAxisCal.origin = float(self.frames[0].attributes["absoluteTime"])
+                    newAxisCal.origin = frameTimes[0]
                     newAxisCal.resolution = framePeriod
-                    
                     newAxisInfo = newAxisCal.calibrateAxis(newAxisInfo)
                     
                 else: # Z series
                     # get the Z axis resolution from the frames state
-                    if self.parent.versinString < "5.5":
-                        z_pos = [float(f.state.attributes["positionCurrent_ZAxis"]) for f in self.frames]
+                    if self.parent.versionString < "5.5":
+                        z_pos = list(map(lambda f: float(f.state["positionCurrent_ZAxis"].value), self.frames))
                     else:
-                        getState = lambda f: f.state if len(f.state) else self.parent.state
-                        frameStates = map(lambda f: getState(f), self.frames)
-                        z_pos = list(map(lambda s: float(s["positionCurrent"]["ZAxis"], frameStates)))
+                        frameStates = map(lambda f: f.state if len(f.state) else self.parent.state, self.frames)
+                        z_pos = list(map(lambda s: float(s["positionCurrent"]["ZAxis"].value), frameStates))
+                        
                     z_steps = np.diff(z_pos)
                     
                     if len(z_steps) > 1:
@@ -1838,17 +1814,8 @@ class PVSequence (PVObject):
                     
                     newAxisCal = AxisCalibrationData(newAxisInfo)
                     newAxisCal.units = pq.um
-                        
-                    if self.parent.versionString < "5.5":
-                        newAxisCal.origin = float(self.frames[0].state.attributes["positionCurrent"]["ZAxis"].attributes.value)
-                    else:
-                        state = self.frames[0].state 
-                        if len(state) == 0:
-                            state = self.parent.state
-                            
-                        newAxisCal.origin = float(state.attributes["positionCurrent"]["ZAxis"].attributes.value)
+                    newAxisCal.origin = z_pos[0]
                     newAxisCal.resolution = zres
-                    
                     newAxisInfo = newAxisCal.calibrateAxis(newAxisInfo)
                 
                 # NOTE: 2018-08-01 17:03:52
@@ -1911,7 +1878,11 @@ class PVSequence (PVObject):
                     newAxisDim = data[0][0].ndim # use highest dimension for concatenation axis
                     
                 if self.sequencetype == PVSequenceType.TSeries:
-                    framePeriods = [float(f.attributes["absoluteTime"]) for f in self.frames]
+                    if self.parent.versionString < "5.5":
+                        frameTimes = list(map(float(f.state["absoluteTime"].value), self.frames))
+                    else:
+                        states = map(lambda f: f.state if len(f.state) else self.parent.state)
+                        frameTimes = list(map(lambda s: float(s["absoluteTime"].value), states))
                     
                     diffTimes = np.diff(frameTimes) # there will be some jitter
 
@@ -1923,7 +1894,7 @@ class PVSequence (PVObject):
                                                  description=axisTypeName(axisTypeFromString("t")))
                     
                     newAxisCal = AxisCalibrationData(units = pq.s, 
-                                                     origin = float(self.frames[0].attributes["absoluteTime"]), 
+                                                     origin = frameTimes[0], 
                                                      resolution = framePeriod,
                                                      name = axisTypeName(newAxisInfo))
                     
@@ -1932,12 +1903,11 @@ class PVSequence (PVObject):
                 else: # ZSeries
                     # get the Z axis resolution from the frames state
                     if self.parent.versionString < "5.5":
-                        z_pos = [float(f.state.attributes["positionCurrent_ZAxis"]) for f in self.frames]
+                        z_pos = list(map(lambda f: float(f.state["positionCurrent_ZAxis"].value), self.frames))
                     else:
-                        getState = lambda f: f.state if len(f.state) else self.parent.state
-                        frameStates = map(lambda f: getState(f), self.frames)
-                        z_pos = list(map(lambda s: float(s["positionCurrent"]["ZAxis"].attributes.value), frameStates))
-                        # z_pos = [float((lambda f: f.state if len(f.state) else self.parent.state)["positionCurrent"]["ZAxis"].attributes.value) for f in self.frames]
+                        frameStates = map(lambda f: f.state if len(f.state) else self.parent.state, self.frames)
+                        z_pos = list(map(lambda s: float(s["positionCurrent"]["ZAxis"][0].value), frameStates))
+
                     z_steps = np.diff(z_pos)
 
                     zres = abs(z_steps[0])
@@ -1949,15 +1919,8 @@ class PVSequence (PVObject):
                     
                     newAxisCal = AxisCalibrationData(newAxisInfo)
                     newAxisCal.units=pq.um
-                    if self.parent.versionString < "5.5":
-                        newAxisCal.origin=float(self.frames[0].state.attributes["positionCurrent_ZAxis"])
-                    else:
-                        state = self.frames[0].state 
-                        if len(state) == 0:
-                            state = self.parent.state
-                        newAxisCal.origin=float(state.attributes["positionCurrent"]["ZAxis"].attributes.value)
+                    newAxisCal.origin=z_pos[0]
                     newAxisCal.resolution=zres
-                    
                     newAxisInfo = newAxisCal.calibrateAxis(newAxisInfo)
                     
                 # NOTE: 2018-08-01 17:03:52
@@ -2123,23 +2086,11 @@ class PVSequence (PVObject):
         """
         return self._parent_
     
-    @parent.setter
-    def parent(self, val):
-        if isinstance(val, (type(None), PVScan)):
-            self._parent_ = val
-            
-        else:
-            raise TypeError("Parent of a PVSequence can only be None or a PVScan object")
-        
     @property
     def scan(self):
         r"""Alias for parent
         """
         return self.parent
-    
-    @scan.setter
-    def scan(self, val):
-        self.parent=val
     
     @property
     def multiBandOutput(self):
