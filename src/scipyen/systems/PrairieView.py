@@ -54,6 +54,7 @@ from enum import Enum, IntEnum #, unique
 from collections import OrderedDict
 import concurrent.futures
 import threading
+from dataclasses import MISSING
 #import xml
 #### END core python modules
 
@@ -231,24 +232,27 @@ PVSequenceType = IntEnum("PVSequenceType", "Single Linescan TSeries ZSeries Poin
 # circle spiral and lissajous all get internally convereted to freehand coordinates!
 PVLinescanMode = IntEnum("PVLinescanMode", "straightLine, freeHand, circle, spiral, lissajous", qualname="PrairieView.PVLinescanMode")
 
+class PVObject(object): pass
+
 # TODO: work out other linescan modes
 ## FIXME: for linescans other than Freehand coordinates is empty!
 # NOTE: circle is converted into freehand!
-class PVLinescanDefinition(object):
+class PVLinescanDefinition(PVObject):
     def __init__(self, node, parent=None):
         if node.nodeType != xmlutils.xml.dom.Node.ELEMENT_NODE or node.nodeName != "PVLinescanDefinition":
             raise ValueError("Expecting an element node named 'PVLinescanDefinition")
         
-        self.__parent__ = None
+        self._parent_ = None
+        self.line_length = 0
         
         if parent is not None:
             if isinstance(parent, PVSequence) and parent.typename == "Linescan":
-                self.__parent__ = parent
+                self._parent_ = parent
                 
             else:
                 raise TypeError("Parent of a PVLinescanDefinition can only be None or a PVSequence of Linescan type")
         
-        self.__attributes__ = dict()
+        self._attributes_ = dict()
         
         if node.attributes is not None:
             for k in node.attributes.values():
@@ -258,48 +262,56 @@ class PVLinescanDefinition(object):
                     val = k.value
                     
                 if k.name == "mode":
-                    self.__attributes__[k.name] = PVLinescanMode[val].value
+                    self._attributes_[k.name] = PVLinescanMode[val].value
                 else:
-                    self.__attributes__[k.name] = val
+                    self._attributes_[k.name] = val
                 
-        if self.__attributes__["mode"] == PVLinescanMode.freeHand:
-            freehandnodes = node.getElementsByTagName("Freehand")
+        if self._attributes_["mode"] == PVLinescanMode.freeHand:
+            freehandnodes = xmlutils.getChildren(node, tagName = "Freehand")
             
             if len(freehandnodes) > 0:
-                self.__coordinates__ = [(eval(n.attributes.getNamedItem("x").value), eval(n.attributes.getNamedItem("y").value)) for n in freehandnodes]
+                self._coordinates_ = [(eval(n.attributes.getNamedItem("x").value), eval(n.attributes.getNamedItem("y").value)) for n in freehandnodes]
             else:
-                self.__coordinates__ = [] # TODO/FIXME what is a good default here?
+                self._coordinates_ = [] # TODO/FIXME what is a good default here?
                     
         #elif self.__dict__["mode"] == PVLinescanMode.straightLine.value:
-        elif self.__attributes__["mode"] == PVLinescanMode.straightLine:
-            linenodes = node.getElementsByTagName("Line")
+        elif self._attributes_["mode"] == PVLinescanMode.straightLine:
+            linenodes = tuple(xmlutils.getChildren(node, tagName = "Line"))
             if len(linenodes) > 0:
                 if len(linenodes) == 1:
-                    self.__coordinates__ = [(eval(linenodes[0].attributes.getNamedItem("startPixelX").value), \
+                    self._coordinates_ = [(eval(linenodes[0].attributes.getNamedItem("startPixelX").value), \
                                              eval(linenodes[0].attributes.getNamedItem("startPixelY").value)),\
                                             (eval(linenodes[0].attributes.getNamedItem("stopPixelX").value), \
                                              eval(linenodes[0].attributes.getNamedItem("startPixelY").value))]
                 else:
-                    self.__coordinates__ = [((eval(n.attributes.getNamedItem("startPixelX").value), \
+                    self._coordinates_ = [((eval(n.attributes.getNamedItem("startPixelX").value), \
                                             eval(n.attributes.getNamedItem("startPixelY").value)), \
                                             (eval(n.attributes.getNamedItem("stopPixelX").value), \
                                             eval(n.attributes.getNamedItem("startPixelY").value))) for n in linenodes]
                     
+            self.line_length = linenodes[0].attributes.getNamedItem("lineLength").value
         else: # TODO code for other linescan modes
-            self.__coordinates__ = [] # for now!
+            self._coordinates_ = [] # for now!
             
-        self.line_length = eval(node.getElementsByTagName("Line")[0].attributes.getNamedItem("lineLength").value)
         
+    @property
+    def version(self):
+        return self.parent.version
+    
+    @property
+    def versionString(self):
+        return self.parent.versionString
+
     @property
     def parent(self):
         r"""The parent PVSequence object, or None
         """
-        return self.__parent__
+        return self._parent_
     
     @parent.setter
     def parent(self, val):
         if (isinstance(val, PVSequence) and parent.typename == "Linescan") or val is None:
-            self.__parent__ = val
+            self._parent_ = val
             
         else:
             raise TypeError("Parent  of a PVLinescanDefinition can only be None or a PVSequence object of Linescan type")
@@ -316,15 +328,15 @@ class PVLinescanDefinition(object):
     
     @property
     def attributes(self):
-        return self.__attributes__
+        return self._attributes_
     
     @property
     def mode(self): # read only
-        return self.__attributes__["mode"]
+        return self._attributes_["mode"]
     
     @property
     def coordinates(self):
-        return self.__coordinates__
+        return self._coordinates_
     
     def __as_string__(self, indent_level=0):
         # TODO: return a list of str
@@ -340,11 +352,11 @@ class PVLinescanDefinition(object):
         ret = [" Linescan mode: %s\n" % (PVLinescanMode(self.mode).name)]
         #for k,v in self.__dict__.items():
             #ret.append(" %s = %s\n" % (k, v))
-        if len(self.__attributes__) > 0:
-            for k,v in self.__attributes__.items():
+        if len(self._attributes_) > 0:
+            for k,v in self._attributes_.items():
                 ret.append(" %s = %s\n" % (k, v))
         ret.append(" coordinates (x, y):\n ")
-        for c in self.__coordinates__:
+        for c in self._coordinates_:
             ret.append("  %s\n" % (c.__str__()))
         ret.append(" length = %g\n" % (self.line_length))
         
@@ -352,13 +364,13 @@ class PVLinescanDefinition(object):
     
     def metadata(self):
         metadata = dict()
-        metadata["attributes"] = self.__attributes__
-        metadata["coordinates"] = self.__coordinates__
+        metadata["attributes"] = self._attributes_
+        metadata["coordinates"] = self._coordinates_
         metadata["line_length"] = self.line_length
         
         return DataBag(metadata)
         
-class PVLaser(object):
+class PVLaser(PVObject):
     def __init__(self, node, parent=None):
         # if node.nodeType != xmlutils.xml.dom.Node.ELEMENT_NODE or node.nodeName != "Laser":
         # NOTE: 2025-04-01 22:59:10
@@ -366,48 +378,56 @@ class PVLaser(object):
         if node.nodeType != xmlutils.xml.dom.Node.ELEMENT_NODE or node.nodeName not in ("Laser", "PVLaser"): 
             raise ValueError("Expecting an element node named 'Laser' or 'PVLaser'")
         
-        self.__parent__ = None
+        self._parent_ = None
         
         if parent is not None:
             if isinstance(parent, PVSystemConfiguration):
-                self.__parent__ = parent
+                self._parent_ = parent
                 
             else:
                 raise TypeError("Parent can only be None on a PVSystemConfiguration object")
 
         if node.attributes is not None:
-            self.__attributes__ = DataBag(xmlutils.attributesToDict(node))
+            self._attributes_ = DataBag(xmlutils.attributesToDict(node))
         else:
-            self.__attributes__ = DataBag(dict())
+            self._attributes_ = DataBag(dict())
             
+    @property
+    def version(self):
+        return self.parent.version
+    
+    @property
+    def versionString(self):
+        return self.parent.versionString
+
     @property
     def parent(self):
         r"""The parent PVSystemConfiguration object, or None
         """
-        return self.__parent__
+        return self._parent_
     
     @parent.setter
     def parent(self, val):
         if isinstance(val, (None, PVSystemConfiguration)):
-            self.__parent__ = val
+            self._parent_ = val
             
         else:
             raise TypeError("Parent can only be None or a PVSystemConfiguration object")
     
     @property
     def attributes(self):
-        return self.__attributes__
+        return self._attributes_
     
     def __repr__(self):
         return self.__str__()
     
     def __str__(self):
         ret = ["Laser:\n"]
-        ret += [" %s = %s\n" % (i[0], i[1]) for i in self.__attributes__.items()]
+        ret += [" %s = %s\n" % (i[0], i[1]) for i in self._attributes_.items()]
         
         return "".join(ret)
 
-class PVSystemConfiguration(object):
+class PVSystemConfiguration(PVObject):
     r"""Encapsulates the configuration of the PrairieView system used for acquisition.
         Sometime around PrairieView v5.5 this has changed from being a node named
         'SystemConfiguration' in the main XML file, to being an auxiliary *env file
@@ -424,17 +444,18 @@ class PVSystemConfiguration(object):
         if node.nodeType != xmlutils.xml.dom.Node.ELEMENT_NODE or node.nodeName not in ("SystemConfiguration", "Environment"):
             raise ValueError("Expecting an element node named 'SystemConfiguration' or 'Environment'")
 
-        self.__parent__ = None
+        self._parent_ = None
+        self.lasers = list()
         
         if parent is not None:
             if isinstance(parent, PVScan):
-                self.__parent__ = parent
+                self._parent_ = parent
             else:
                 raise TypeError("Parent of a PVSystemConfiguration can only be one or a PVScan object")
 
         if node.attributes is not None:
-            self.__attributes__ = DataBag(xmlutils.attributesToDict(node))
-            v = self.__attributes__.get("version", None)
+            self._attributes_ = DataBag(xmlutils.attributesToDict(node))
+            v = self._attributes_.get("version", None)
             if isinstance(v, str) and len(v.strip()):
                 try:
                     self.__version__ = tuple(map(lambda x: eval(x), v.split('.')))
@@ -444,35 +465,47 @@ class PVSystemConfiguration(object):
             else: # get the parent's version
                 self.__version__ = parent.version
             
-            d = self.__attributes__.get("date", None)
+            d = self._attributes_.get("date", None)
             # print(f"{self.__class__.__name__}.__init__: d for date = {d}")
             if isinstance(d, str) and len(d.strip()):
                 try:
-                    self.__rec_datetime__ = dateutil.parser.parse(d)
-                    # self.__rec_datetime__ = datetime.datetime.fromisoformat(d)
+                    self._rec_datetime_ = dateutil.parser.parse(d)
+                    # self._rec_datetime_ = datetime.datetime.fromisoformat(d)
                 except:
                     traceback.print_exc()
                     scipywarn(f"Due to the above caught exception, rec_datetime will be set to `datetime.now()`")
             else: # get the parent's version
-                self.__rec_datetime__ = parent.__rec_datetime__
+                self._rec_datetime_ = parent._rec_datetime_
             # else:
             #     scipywarn(f"No suitable date string found; rec_datetime will be set to `datetime.now()")
                 
         else:
-            self.__attributes__ = DataBag(dict())
-           
-        laserNodes = node.getElementsByTagName("Lasers")
-        if len(laserNodes) == 0 or self.versionString >= '5.5':
-            laserNodes = node.getElementsByTagName("PVLasers")
-            if len(laserNodes):
-                self.lasers = [PVLaser(l) for l in laserNodes[0].getElementsByTagName("PVLaser")]
-        else:
-            self.lasers = [PVLaser(l) for l in laserNodes[0].getElementsByTagName("Laser")]
-            
-            
-        self.data = xmlutils.elementToDict(node)
-        self.name = node.nodeName
+            self._attributes_ = DataBag(dict())
         
+        if self.versionString >= '5.5':
+            tag1 = "PVLasers"
+            tag2 = "PVLaser"
+        else:
+            tag1 = "Lasers"
+            tag2 = "Laser"
+            
+        lasersNodes = tuple(xmlutils.getChildren(node, tagName = tag1))
+        if len(lasersNodes):
+            laserNodes = xmlutils.getChildren(lasersNodes[0], tagName=tag2)
+            self.lasers[:] = list(map(lambda l: PVLaser(l, self), laserNodes))
+            
+            
+        self._data_ = xmlutils.elementToDict(node)
+        self._name_ = node.nodeName
+        
+    @property
+    def name(self) -> str:
+        return self._name_
+    
+    @property
+    def data(self)->dict:
+        return self._data_
+    
     @property
     def version(self) -> tuple[int]:
         r"""PrairieView software version as a 4-tuple of ints: (major, minor, micro dot)"""
@@ -488,12 +521,12 @@ class PVSystemConfiguration(object):
     def parent(self):
         r"""The parent PVScan object, or None
         """
-        return self.__parent__
+        return self._parent_
     
     @parent.setter
     def parent(self, val):
         if isinstance(val, (type(None), PVScan)):
-            self.__parent__ = val
+            self._parent_ = val
             
         else:
             raise TypeError("Parent of a PVSystemConfiguration can only be None or a PVScan object")
@@ -510,7 +543,7 @@ class PVSystemConfiguration(object):
     
     @property
     def attributes(self):
-        return self.__attributes__
+        return self._attributes_
     
     def as_dict(self):
         ret = dict()
@@ -524,8 +557,8 @@ class PVSystemConfiguration(object):
     
     def __str__(self):
         ret = ["System Configuration:"]
-        if self.__attributes__.items() is not None:
-            ret += ["%s = %s" % (i[0], i[1]) for i in self.__attributes__.items() if i is not None]
+        if self._attributes_.items() is not None:
+            ret += ["%s = %s" % (i[0], i[1]) for i in self._attributes_.items() if i is not None]
         #ret += ["%s = %s" % (i[0], i[1]) for i in self.__dict__.items()]
         for l in self.lasers:
             ret.append(l.__str__())
@@ -534,80 +567,417 @@ class PVSystemConfiguration(object):
         
 PVEnvironment = PVSystemConfiguration
 
-class PVStateShard(object):
-    def __init__(self, node, parent=None):
-        if node.nodeType != xmlutils.xml.dom.Node.ELEMENT_NODE or node.nodeName != "PVStateShard":
-            raise ValueError("Expecting an element node 'PVStateShard")
+class PVStateShard(PVObject): pass # overwritten further below; here needed for PVStateValue
 
-        keyNodes = node.getElementsByTagName("Key")
+class PVIndexedValue(PVObject): pass
+class PVSubIndexedValue(PVObject): pass
+class PVSubIndexedValueList(PVObject): pass
+
+class PVStateValue(PVObject):
+    r"""Introduced in PrarieView v5.5 or later.
+        A PVStateValue has:
+        'key': str -> mandatory
+        'value' str, number, OR list of PVIndexedValues, OR list of PVSubIndexedValueList
         
-        self.__parent__ = None
+        A PVIndexedValue has:
+        'value': str, int -> mandatory
+        'index': str, int -> mandatory
+        'description': str -> optional
         
-        if parent is not None:
-            if isinstance(parent, PVFrame):
-                self.__parent__ = parent
+        A PVSubIndexedValueList has:
+        'index': str, int -> mandatory
+        'value': a list of PVSubIndexedValue objects -> mandatory
+        
+        A PVSubIndexedValue has:
+        'subindex': str, int -> mandatory
+        'value': str, int -> mandatory
+        'description': str -> optional
+        
+    """
+    def __init__(self, node, parent):
+        if not isinstance(parent, PVStateShard):
+            raise TypeError("Parent of a PVStateValue can only be None or a PVStateShard object")
+        
+        self._parent_ = parent
                 
-            else:
-                raise TypeError("Parent of a PVStateShard can only be None or a PVFrame object")
+        attributes = xmlutils.attributesToDict(node)
+        # print(f"{self.__class__.__name__}.__init__: attributes = {attributes}")
         
-        self.__attributes__ = DataBag(dict())
-
-        for n in keyNodes:
+        self._attributes_ = DataBag()
+        for k,v in attributes.items():
             try:
-                self.__attributes__[n.getAttribute("key")] = eval(n.getAttribute("value"))
+                v = eval(v)
             except:
-                self.__attributes__[n.getAttribute("key")] = n.getAttribute("value")
-                
-    @property
-    def parent(self):
-        r"""The parent PVFrame object, or None
-        """
-        return self.__parent__
-    
-    @parent.setter
-    def parent(self, val):
-        if isinstance(val, (type(None), PVFrame)):
-            self.__parent__ = val
-            
-        else:
-            raise TypeError("Parent of a PVStateShard can only be None or a PVFrame object")
+                pass
         
-    @property
-    def frame(self):
-        r"""Alias for parent
-        """
-        return self.parent
-    
-    @frame.setter
-    def frame(self, val):
-        self.parent=val
-    
-    @property
-    def attributes(self):
-        return self.__attributes__
-    
-    @property # dictionary view
-    def keys(self):
-        r"""dict_view of the keys
-        """
-        #return self.__attributes__.keys()
-        return self.__dict__.keys()
-    
-    @property # dictionary view
-    def items(self):
-        r"""dict_view of the items
-        """
-        #return self.__attributes__.items()
-        return self.__dict__.items()
-    
+            self._attributes_[k] = v
+        
+        ivalueNodes = xmlutils.getChildren(node, tagName="IndexedValue")
+        
+        self._indexedValues_ = list(map(lambda n: PVIndexedValue(n, self), ivalueNodes))
+        
+        subIvaluesNodes = xmlutils.getChildren(node, tagName ="SubIndexedValues")
+        
+        self._subIndexedValuesLists_ = list(map(lambda n: PVSubIndexedValueList(n, self), subIvaluesNodes))
+        
     def __repr__(self):
         return self.__str__()
     
     def __str__(self):
-        ret = [" State:\n"]
-        ret += ["  %s = %s\n" % (i[0], i[1]) for i in self.__attributes__.items()]
-        #ret += ["  %s = %s\n" % (i[0], i[1]) for i in self.__dict__.items()]
-        #ret.append("\n")
+        ret = [f"{self.__class__.__name__}:\n"]
+        ret += ["  %s = %s\n" % (i[0], i[1]) for i in self._attributes_.items()]
+        if len(self.indexedValues):
+            ret += ["   IndexedValues:"]
+            ret += list(map(lambda v: f"{   v}", self.indexedValues))
+            
+        if len(self.subIndexedValuesLists):
+            ret += ["   SubIndexedValues:"]
+            ret += list(map(lambda v: f"{   v}", self.subIndexedValuesLists))
+            
+        ret += ["\n"]
+        return "".join(ret)
+    
+    @property
+    def key(self):
+        return self.attributes.key
+
+    @property
+    def value(self):
+        if "value" in self.attributes:
+            return self.attributes.value
+        
+        elif len(self.indexedValues):
+            return self.indexedValues
+        
+        elif len(self.subIndexedValuesLists):
+            return self.subIndexedValuesLists
+        
+    def getIndexedValue(self, index):
+        """Look up Indexed Values by index"""
+        ivalues = tuple(filter(lambda v: v.index == index, self.indexedValues))
+        if len(ivalues):
+            return ivalues[0]
+        else:
+            raise IndexError(f"This {self.__class__.__name__} object does not contain an IndexedValue with index {index}")
+        
+    def getSubIndexedValueList(self, index):
+        svalues = tuple(filter(lambda s: s.index == index, self.subIndexedValuesLists))
+        
+        if len(svalues):
+            return svalues[0]
+        else:
+            raise IndexError(f"This {self.__class__.__name__} object does not contain a SubIndexedValueList with index {index}")
+    
+    @property
+    def keys(self):
+        yield from map(lambda s: s.index, self.indexedValues + self.subIndexedValuesLists)
+    
+    @property
+    def values(self):
+        yield from self.indexedValues + self.subIndexedValuesLists
+        
+    @property
+    def items(self):
+        yield from map(lambda v: (v.index, v), self.values)
+    
+    def __getitem__(self, item, default=MISSING):
+        if item not in self.keys:
+            if default is MISSING:
+                raise KeyError(f"Index {item} not found")
+            return default
+        values = tuple(filter(lambda v: v.index == item, self.indexedValues + self.subIndexedValuesLists))
+        if len(values):
+            return values[0]
+        if default is MISSING:
+            raise KeyError(f"Index {item} not found")
+        return default
+        
+    @property
+    def attributes(self) -> DataBag:
+        return self._attributes_
+    
+    @property
+    def indexedValues(self) -> list:
+        return self._indexedValues_
+    
+    @property
+    def subIndexedValuesLists(self) -> list:
+        return self._subIndexedValuesLists_
+        
+class PVIndexedValue(PVObject):
+    def __init__(self, node, parent:PVStateValue):
+        if not isinstance(parent, PVStateValue):
+            raise TypeError("parent must be a PVStateValue")
+        
+        self._parent_ = parent
+        
+        attributes = xmlutils.attributesToDict(node)
+        
+        self._attributes_ = DataBag()
+        for k,v in attributes.items():
+            try:
+                v = eval(v)
+            except:
+                pass
+        
+            self._attributes_[k] = v
+        
+    def __repr__(self):
+        return self.__str__()
+    
+    def __str__(self):
+        ret = [f" {self.__class__.__name__}:\n"]
+        ret += ["  %s = %s\n" % (i[0], i[1]) for i in self._attributes_.items()]
+        ret += ["\n"]
+        return "".join(ret)
+
+    @property
+    def attributes(self) -> DataBag:
+        return self._attributes_
+    
+    @property
+    def key(self):
+        return self.attributes.key
+    
+    @property
+    def index(self):
+        return self.attributes.index
+    
+    @property
+    def value(self):
+        return self.attributes.value
+    
+    @property
+    def description(self):
+        return self.attributes.get("description", None)
+    
+class PVSubIndexedValue(PVObject):
+    def __init__(self, node, parent:PVSubIndexedValueList):
+        if not isinstance(parent, PVSubIndexedValueList):
+            raise TypeError("parent must be a PVSubIndexedValueList")
+        
+        self._parent_ = parent
+        
+        attributes = xmlutils.attributesToDict(node)
+        
+        self._attributes_ = DataBag()
+        for k,v in attributes.items():
+            try:
+                v = eval(v)
+            except:
+                pass
+        
+            self._attributes_[k] = v
+
+    def __repr__(self):
+        return self.__str__()
+    
+    def __str__(self):
+        ret = [f" {self.__class__.__name__}:\n"]
+        ret += ["  %s = %s\n" % (i[0], i[1]) for i in self._attributes_.items()]
+        ret += ["\n"]
+        return "".join(ret)
+
+    @property
+    def subindex(self):
+        return self.attributes.subindex
+    
+    @property
+    def value(self):
+        return self.attributes.value
+    
+    @property
+    def description(self):
+        return self.attributes.get("description", None)
+    
+    @property
+    def attributes(self) -> DataBag:
+        return self._attributes_
+    
+class PVSubIndexedValueList(PVObject):
+    def __init__(self, node, parent:PVStateValue):
+        if not isinstance(parent, PVStateValue):
+            raise TypeError("parent must be a PVStateValue")
+        
+        self._parent_ = parent
+        
+        attributes = xmlutils.attributesToDict(node)
+        
+        self._attributes_ = DataBag()
+        for k,v in attributes.items():
+            try:
+                v = eval(v)
+            except:
+                pass
+        
+            self._attributes_[k] = v
+        
+        sIvalues = xmlutils.getChildren(node, tagName="SubIndexedValue")
+        
+        self._subIndexedValues_ = list(map(lambda n: PVSubIndexedValue(n, self), sIvalues))
+        
+    def __repr__(self):
+        return self.__str__()
+    
+    def __str__(self):
+        ret = [f" {self.__class__.__name__}:\n"]
+        ret += ["  %s = %s\n" % (i[0], i[1]) for i in self._attributes_.items()]
+        if len(self.value):
+            ret += ["   SubIndexedValues:"]
+            ret += list(map(lambda v: f"   {v}", self.value))
+            
+        ret += ["\n"]
+        return "".join(ret)
+
+    @property
+    def attributes(self) -> DataBag:
+        return self._attributes_
+    
+    @property
+    def index(self):
+        return self.attributes.index
+    
+    @property
+    def value(self) -> list:
+        return self._subIndexedValues_
+    
+    @property
+    def values(self):
+        yield from self._subIndexedValues_
+        
+    @property
+    def keys(self):
+        yield from map(lambda v: v.subindex, self._subIndexedValues_)
+        
+    @property
+    def items(self):
+        yield from map(lambda v: (v.subindex, v), self._subIndexedValues_)
+        
+    def __getitem__(self, item, default=MISSING):
+        if item not in self.keys:
+            if default is MISSING:
+                raise KeyError(f"Subindex {item} not found")
+            return default
+        
+        else:
+            vals = tuple(filter(lambda x: x.subindex == item, self._subIndexedValues_))
+            if len(vals):
+                return vals[0]
+            else:
+                if default is MISSING:
+                    raise KeyError(f"Subindex {item} not found")
+                return default
+    
+    def getSubIndexedValue(self, subindex):
+        values = tuple(filter(lambda v: v.subindex == subindex, self.value))
+        if len(values):
+            return values[0]
+        else:
+            raise IndexError(f"This {self.__class__.__name__} object does not contain a SubIndexedValue with subimndex {subindex}")
+    
+    
+class PVFrame(PVObject): pass # needed for below; overwritten later
+
+class PVStateShard(PVObject):
+    # NOTE: 2025-04-03 10:34:49
+    # as of v5.5 at least, each Frame has a PVStateShard!, 
+    def __init__(self, node, parent:PVObject):
+        if node.nodeType != xmlutils.xml.dom.Node.ELEMENT_NODE or node.nodeName != "PVStateShard":
+            raise ValueError("Expecting an element node 'PVStateShard")
+        
+        if not isinstance(parent, PVObject):
+            raise TypeError("Parent of a PVStateShard can only be None or a PVObject object")
+        
+        self._parent_ = parent
+
+        self._state_values_ = list() # NOTE: 2025-04-03 09:53:22 new, in v >= 5.5
+        
+        self._attributes_ = DataBag(dict())
+        
+        # print(f"{self.__class__.__name__}.__init__ attributes: {dict(node.attributes)}")
+            
+        if node.attributes is not None:
+            for k, v in node.attributes.items():
+                try:
+                    val=eval(v)
+                except:
+                    val = v
+                    
+                self._attributes_[k] = val
+                    
+                    
+        if self.versionString >= "5.5":
+            stateValueNodes = xmlutils.getChildren(node, tagName="PVStateValue")
+        else:
+            stateValueNodes = xmlutils.getChildren(node, tagName="Key")
+
+        self._state_values_[:] = list(map(lambda node: PVStateValue(node, parent=self), stateValueNodes))
+                
+    @property
+    def version(self):
+        return self.parent.version
+    
+    @property
+    def versionString(self):
+        return self.parent.versionString
+
+    @property
+    def parent(self):
+        r"""The parent PVObject
+        """
+        return self._parent_
+    
+    @property
+    def states(self)->list:
+        return self._state_values_
+    
+    @property
+    def keys(self):
+        yield from map(lambda s: s.key, self.states)
+        
+    @property
+    def values(self):
+        yield from self.states
+    
+    @property
+    def items(self):
+        yield from map(lambda s: (s.key, s), self.values) 
+        
+    def __getitem__(self, item, default=MISSING):
+        if item not in self.keys:
+            if default is MISSING:
+                raise KeyError(f"Index {item} not found")
+            return default
+        
+        return self.getState(item, default)
+    
+    @property
+    def attributes(self):
+        return self._attributes_
+    
+    def getState(self, key:str, default=MISSING):
+        states = tuple(filter(lambda s: s.key == key, self.values))
+        # states = tuple(filter(lambda s: s.attributes.get("key", None) == key, self.stateValues))
+        if len(states):
+            return states[0]
+        else:
+            if default is MISSING:
+                raise KeyError(f"Index {item} not found")
+            return default
+        
+    def getStateValue(self, key:str):
+        states = tuple(filter(lambda s: s.attributes.get("key", None) == key and s.attributes.get("value", None) is not None, self.states))
+        if len(states):
+            return states[0].attributes.value
+        
+    def __repr__(self):
+        return self.__str__()
+    
+    def __str__(self):
+        ret = [f"{self.__class__.__name__}:\n"]
+        ret += ["  %s = %s\n" % (i[0], i[1]) for i in self._attributes_.items()]
+        ret += ["  State values:\n"]
+        ret += list(map(lambda s: f"   {s}", self.values))
         
         return "".join(ret)
 
@@ -668,50 +1038,55 @@ class PVStateShard(object):
 # the behavior of vigraimpex towards file names that are paret of a sequence is quite handy
 # with ZSeries also, as it can be used to load the entire ZSeries data for one channel
 # into a single VigraArray
-class PVFrame(object):
-    def __init__(self, node, parent=None):
+class PVFrame(PVObject):
+    def __init__(self, node, parent:PVObject):
         if node.nodeType != xmlutils.xml.dom.Node.ELEMENT_NODE or node.nodeName != "Frame":
             raise ValueError("Expecting an element node named 'Frame'")
         
-        self.__parent__ = None
-        
-        if parent is not None:
-            if isinstance(parent, PVSequence):
-                self.__parent__ = parent
-                
-            else:
-                raise TypeError("Parent of a PVFrame can only be None or a PVSequence")
+        self._parent_ = None
+        if isinstance(parent, PVObject):
+            self._parent_ = parent
+            
+        else:
+            raise TypeError("Parent of a PVFrame can only be None or a PVSequence")
         
         if node.attributes is not None:
-            self.__attributes__ = DataBag(xmlutils.attributesToDict(node))
+            self._attributes_ = DataBag(xmlutils.attributesToDict(node))
         else:
-            self.__attributes__ = DataBag(dict())
+            self._attributes_ = DataBag(dict())
             
-        self.__files__ = [DataBag(xmlutils.attributesToDict(n)) for n in node.getElementsByTagName("File")]
+        fileNodes = xmlutils.getChildren(node, tagName = "File")
+            
+        self._files_ = list(map(lambda n: DataBag(xmlutils.attributesToDict(n)), fileNodes))
         
-        ep = node.getElementsByTagName("ExtraParameters")
+        extraParamNodes = xmlutils.getChildren(node, tagName="ExtraParameters")
         
-        if len(ep) > 0:
-            self.ExtraParameters = [DataBag(xmlutils.attributesToDict(n)) for n in ep]
-        else:
-            self.ExtraParameters = None
+        self.ExtraParameters = list(map(lambda n: DataBag(xmlutils.attributesToDict(n)), extraParamNodes))
+
+        stateShardNodes = tuple(xmlutils.getChildren(node, tagName="PVStateShard"))
+        if len(stateShardNodes):
+            self._stateshard_ = PVStateShard(stateShardNodes[0], self)
         
-        self.__stateshard__ = PVStateShard(node.getElementsByTagName("PVStateShard")[0], \
-                                            parent=self)
+        self._mergeChannelsOnOutput_ = False
         
-        self.__mergeChannelsOnOutput__ = False
-        
+    @property
+    def version(self):
+        return self.parent.version
+    
+    @property
+    def versionString(self):
+        return self.parent.versionString
         
     @property
     def parent(self):
         r"""The parent PVSequence object, or None
         """
-        return self.__parent__
+        return self._parent_
     
     @parent.setter
     def parent(self, val):
         if isinstance(val, (type(None), PVSequence)):
-            self.__parent__ = val
+            self._parent_ = val
             
         else:
             raise TypeError("Parent of a PVFrame can only be None or a PVSequence object")
@@ -728,7 +1103,7 @@ class PVFrame(object):
     
     @property
     def attributes(self):
-        return self.__attributes__
+        return self._attributes_
         
     @property
     def channels(self):
@@ -736,15 +1111,15 @@ class PVFrame(object):
         
         To obtain the channel data use "files" property.
         """
-        return len(self.__files__)
+        return len(self._files_)
     
     @property
     def files(self):
-        return self.__files__
+        return self._files_
     
     @property
     def state(self):
-        return self.__stateshard__
+        return self._stateshard_
     
     @property
     def multiBandOutput(self):
@@ -752,7 +1127,7 @@ class PVFrame(object):
         This requires that each file corresponds to one channel and that all files 
         have a channel axis. Only applies when there are between 2 and 4 files per frame.
         """
-        return self.__mergeChannelsOnOutput__
+        return self._mergeChannelsOnOutput_
     
     @multiBandOutput.setter
     def multiBandOutput(self, val):
@@ -761,7 +1136,7 @@ class PVFrame(object):
         Parameters:
         "val: boolean
         """
-        self.__mergeChannelsOnOutput__ = val
+        self._mergeChannelsOnOutput_ = val
     
     def mergeChannels(self, val=True, filepath=None):
         r"""Coerce reading the files as a multiband image.
@@ -779,19 +1154,19 @@ class PVFrame(object):
             files (and thus overrides any path prefix taken from the parent PVSequence)
         
         """
-        v = self.__mergeChannelsOnOutput__
-        self.__mergeChannelsOnOutput__= True
+        v = self._mergeChannelsOnOutput_
+        self._mergeChannelsOnOutput_= True
         try:
             data = self.__call__(filepath=filepath)
         except Exception as e:
-            self.__mergeChannelsOnOutput__ = v
+            self._mergeChannelsOnOutput_ = v
             raise e
         
-        self.__mergeChannelsOnOutput__ = v
+        self._mergeChannelsOnOutput_ = v
         
         return data
     
-    def __call__(self, filepath=None):
+    def __call__(self, filepath:typing.Optional[typing.Union[str, pathlib.Path]]=None) -> tuple:
         r"""Reads the specified files and returns a vigra array corresponding to
         the image files that compose the frame.
         
@@ -803,6 +1178,21 @@ class PVFrame(object):
         
         This value overrides any value from the parent PVSequence (when the latter
         is not None).
+        
+        Returns:
+        ========
+        A tuple (frame data, scene data), where:
+        
+        • frame data: contains the image data associated with the frame; the data
+            is either a sequence of VigraArray (one per channel) or a single
+            multi-channel VigraArray (if __mergeChannelsOnOutput__ is true)
+        
+        • scene data: for line scans only, this contains the image data associated
+            with the "Scene" or context where the frame line scan image data was
+            acquired.
+        
+            In all other PVScan types this is None (the "scene" or context data
+            is the frame-associated image itself)
         
         """
         
@@ -910,8 +1300,12 @@ class PVFrame(object):
             # NOTE: 2022-01-06 00:10:42
             # fdata: frame data
             # sdata: source data
-            if filepath is not None:
-                fdata = pio.loadImageFile(os.path.join(filepath, fileName))
+            if isinstance(filepath, str):
+                filepath = pathlib.Path(filepath)
+                
+            if isinstance(filepath, pathlib.Path):
+                fdata = pio.loadImageFile(filepath.parent / fileName)
+                # fdata = pio.loadImageFile(os.path.join(filepath, fileName))
                 # fdata = pio.loadImageFile(os.path.join(filepath, self.files[k]["filename"]))
             
             else:
@@ -949,7 +1343,10 @@ class PVFrame(object):
             # NOTE: 2021-10-26 15:48:42
             
             fdata_axis_0_cal  = AxisCalibrationData(fdata_axis_0_info)
-            fdata_axis_0_cal.resolution = self.state.attributes["micronsPerPixel_XAxis"]
+            if self.versionString < "5.5":
+                fdata_axis_0_cal.resolution = self.state.attributes["micronsPerPixel_XAxis"]
+            else:
+                fdata_axis_0_cal.resolution = self.state.attributes["micronsPerPixel_XAxis"]
             fdata_axis_0_cal.units = pq.um
             
             # embed calibration string into axis_0_info's description
@@ -1079,7 +1476,7 @@ class PVFrame(object):
             # NOTE: 2017-11-06 19:40:44
             # concatenation will lose the image metadata
             # therefore we need to collect it then pass it back onto the result
-            if self.__mergeChannelsOnOutput__:
+            if self._mergeChannelsOnOutput_:
                 channels = [int(self.files[k]["channel"]) for k in range(len(self.files))]
                 channel_names = [self.files[k]["channelName"] for k in range(len(self.files))]
                 
@@ -1142,15 +1539,15 @@ class PVFrame(object):
     def __str__(self):
         ret = [" Frame:\n"]
             
-        for k in self.__attributes__.keys():
-            ret.append("  %s = %s\n" % (k, self.__attributes__[k]))
+        for k in self._attributes_.keys():
+            ret.append("  %s = %s\n" % (k, self._attributes_[k]))
             
         ret.append(" Files:\n")
-        for f in self.__files__:
+        for f in self._files_:
             for t in f.keys():
                 ret.append("  %s = %s\n" % (t, f[t]))
                 
-        ret.append(self.__stateshard__.__str__())
+        ret.append(self._stateshard_.__str__())
         
         if self.ExtraParameters is not None:
             ret.append(" Extra Parameters:\n")
@@ -1160,28 +1557,27 @@ class PVFrame(object):
             
         return "".join(ret)
         
-        
+class PVSCan(PVObject): pass # needed for PVSequence below; overwritten further down
 # NOTE: 2017-08-03 09:24:20
 # TODO: make the instances sortable by cycle number (found in attributes
-class PVSequence (object):
-    r"""Sequence data structures are common enough to guarantee the 
-    need for a new data type here
+class PVSequence (PVObject):
+    r"""a PVSequence in PVSCan experiment file
     """
-    def __init__(self, node, parent=None):
+    def __init__(self, node, parent=PVSCan):
         if node.nodeType != xmlutils.xml.dom.Node.ELEMENT_NODE or node.nodeName != "Sequence":
             raise ValueError("Expecting an element node named 'Sequence'")
         
-        self.__mergeChannelsOnOutput__ = False
+        self._mergeChannelsOnOutput_ = False
         
-        self.__parent__ = None
+        self._parent_ = None
+        if not isinstance(parent, PVScan):
+            raise TypeError("Parent of a PVSequence can only be None or a PVScan object")
+        self._parent_ = parent
         
-        if parent is not None:
-            if isinstance(parent, PVScan):
-                self.__parent__ = parent
-            else:
-                raise TypeError("Parent of a PVSequence can only be None or a PVScan object")
+        self._definition_ = None
+        self._syncZAxis_ = None
         
-        self.__attributes__ = DataBag(dict())
+        self._attributes_ = DataBag(dict())
         
         if node.attributes is not None:
             for k in node.attributes.values():
@@ -1191,23 +1587,26 @@ class PVSequence (object):
                     val = k.value
                     
                 if k.name == "type": 
-                    self.__attributes__["sequencetype"] = PVSequenceType[val.split()[0]].value
+                    self._attributes_["sequencetype"] = PVSequenceType[val.split()[0]].value
                 else:
-                    self.__attributes__[k.name] = val
+                    self._attributes_[k.name] = val
                     
-            self.__attributes__["sequencetypename"] = PVSequenceType(self.__attributes__["sequencetype"]).name
+            self._attributes_["sequencetypename"] = PVSequenceType(self._attributes_["sequencetype"]).name
         
-        if self.__attributes__["sequencetype"] == PVSequenceType.Linescan:
-            self.__definition__ = PVLinescanDefinition(node.getElementsByTagName("PVLinescanDefinition")[0], \
-                                                        parent=self)
-            
-            self.__syncZAxis__ = DataBag(xmlutils.attributesToDict(node.getElementsByTagName("PVLinescanSynchZ")[0]))
+        if self._attributes_["sequencetype"] == PVSequenceType.Linescan:
+            definitionNodes = tuple(xmlutils.getChildren(node, tagName="PVLinescanDefinition"))
+            if len(definitionNodes):
+                self._definition_ = PVLinescanDefinition(definitionNodes[0], self)
+            syncZAxisNodes = tuple(xmlutils.getChildren(node, tagName = "PVLinescanSynchZ"))
+            if len(syncZAxisNodes):
+                self._syncZAxis_ = DataBag(xmlutils.attributesToDict(syncZAxisNodes[0]))
             
         else: # TODO / FIXME code for other sequence tyes
-            self.__definition__ = None
-            self.__syncZAxis__ = None
+            self._definition_ = None
+            self._syncZAxis_ = None
                 
-        self.frames = [PVFrame(n, parent=self) for n in node.getElementsByTagName("Frame")]
+        frameNodes = xmlutils.getChildren(node, tagName="Frame")
+        self.frames = list(map(lambda n: PVFrame(n, self), frameNodes))
         
     def __len__(self):
         return len(self.frames)
@@ -1268,7 +1667,7 @@ class PVSequence (object):
         # either n single-channel (single-band) images, 
         #   where n = number of frames in the sequence
         #
-        # or one multi-band image if self.__mergeChannelsOnOutput__ is True 
+        # or one multi-band image if self._mergeChannelsOnOutput_ is True 
         # (this is propagated to the underlying frame(s)), in which case
         # frame data for each frame is a 3D vigra array!
         
@@ -1338,7 +1737,7 @@ class PVSequence (object):
             
                 # NOTE: 2017-10-27 21:47:29
                 # for linescans, the Y axis should be Time !!!
-                if self.__mergeChannelsOnOutput__:
+                if self._mergeChannelsOnOutput_:
                     data = self.frames[0].mergeChannels(filepath=filepath) # a tuple of frameData, sourceData, both multiband vigra arrays
                     
                 else:
@@ -1358,7 +1757,7 @@ class PVSequence (object):
         elif self.sequencetype in (PVSequenceType.TSeries, PVSequenceType.ZSeries): 
             # there are at least one frame per sequence (but at least one)
             # parent PVScan should only have one such sequence
-            if self.__mergeChannelsOnOutput__:
+            if self._mergeChannelsOnOutput_:
                 data = [f.mergeChannels(filepath=filepath) for f in self.frames]# a tuple of frameData, sourceData
                 
                 # NOTE: 2017-10-25 00:34:44
@@ -1405,7 +1804,7 @@ class PVSequence (object):
                     
                     if len(z_steps) > 1:
                         if not all(z == z_steps[0] for z in z_steps):
-                            raise ValueError("Irregular Z axis sampling not supported")
+                            raise ValueError("Irregular Z axis sampling is not supported")
                         
                     zres = z_steps[0]
                     
@@ -1438,7 +1837,9 @@ class PVSequence (object):
                 return concatenateImages(images, axis=newAxisInfo), None
             
             else: # separate channels
-                data = [f(filepath=filepath) for f in self.frames] # for each frame: a tuple of frame data & src data if linescan
+                # for frame κ, data[κ] is the tuple (frame data, src data) if this is a linescan;
+                # else, just the tuple (frame data, None)
+                data = [f(filepath=filepath) for f in self.frames] 
                 
                 # NOTE: 2017-10-25 00:34:44
                 # be mindful that frames __call__() return a TUPLE of
@@ -1526,6 +1927,12 @@ class PVSequence (object):
                 else:
                     newAxisDim = data[0][0].ndim
                     
+                # NOTE: 2025-04-03 08:57:14
+                # return the tuple (frame data, None), where
+                # frame data is a sequence of frame image data for each channel,
+                # as a 3D VigraArray containing the concatenation of frame images 
+                # along the time (for TSeries) or z (for ZSeries) axis; there are
+                # as many 3D image arrays as there are channels having been acquired
                 return [concatenateImages([insertAxis(data[frame][channel], newAxisInfo, newAxisDim) 
                                                         for frame in range(len(self.frames))], 
                                                         axis=newAxisInfo) 
@@ -1539,7 +1946,7 @@ class PVSequence (object):
             # frame data and source data; except for Linescan frames, source data
             # is None,so we eliminate it here
                 
-            if self.__mergeChannelsOnOutput__:
+            if self._mergeChannelsOnOutput_:
                 return self.frames[0].mergeChannels() #tuple of frame data & None
                 
             else:
@@ -1566,14 +1973,14 @@ class PVSequence (object):
         reverted to its previous value after the image files were read.
         
         """
-        v = self.__mergeChannelsOnOutput__
-        self.__mergeChannelsOnOutput__= True
+        v = self._mergeChannelsOnOutput_
+        self._mergeChannelsOnOutput_= True
         try:
             data = self.__call__(filepath=filepath)
         except Exception as e:
-            self.__mergeChannelsOnOutput__ = v
+            self._mergeChannelsOnOutput_ = v
             raise e
-        self.__mergeChannelsOnOutput__ = v
+        self._mergeChannelsOnOutput_ = v
         return data
     
     def metadata(self):
@@ -1658,17 +2065,25 @@ class PVSequence (object):
         metadata["type"] = self.__class__.__name__
         
         return DataBag(metadata)
+    
+    @property
+    def version(self):
+        return self.parent.version
+    
+    @property
+    def versionString(self):
+        return self.parent.versionString
         
     @property
     def parent(self):
         r"""The parent PVScan object, or None
         """
-        return self.__parent__
+        return self._parent_
     
     @parent.setter
     def parent(self, val):
         if isinstance(val, (type(None), PVScan)):
-            self.__parent__ = val
+            self._parent_ = val
             
         else:
             raise TypeError("Parent of a PVSequence can only be None or a PVScan object")
@@ -1689,7 +2104,7 @@ class PVSequence (object):
         This requires that each file corresponds to one channel and that all files 
         have a channel axis. Only applies when there are between 2 and 4 files per frame.
         """
-        return self.__mergeChannelsOnOutput__
+        return self._mergeChannelsOnOutput_
     
     @multiBandOutput.setter
     def multiBandOutput(self, val):
@@ -1698,11 +2113,11 @@ class PVSequence (object):
         Parameters:
         "val: boolean
         """
-        self.__mergeChannelsOnOutput__ = val
+        self._mergeChannelsOnOutput_ = val
     
     @property
     def attributes(self):
-        return self.__attributes__
+        return self._attributes_
         
     @property
     def length(self):
@@ -1710,20 +2125,20 @@ class PVSequence (object):
     
     @property
     def definition(self):
-        return self.__definition__
+        return self._definition_
     
     @property
     def zAxisSynchronization(self):
-        return self.__syncZAxis__
+        return self._syncZAxis_
     
     @property
     def cycle(self):
-        return self.__attributes__["cycle"]
+        return self._attributes_["cycle"]
         #return self.__dict__["cycle"]
         
     @property # read only
     def sequencetype(self):
-        return self.__attributes__["sequencetype"]
+        return self._attributes_["sequencetype"]
         #return self.__dict__["sequencetype"]
     
     @property # read only
@@ -1740,7 +2155,7 @@ class PVSequence (object):
     
     @property
     def sequencetypename(self):
-        return PVSequenceType(self.__attributes__["sequencetype"]).name
+        return PVSequenceType(self._attributes_["sequencetype"]).name
         #return PVSequenceType(self.__dict__["sequencetype"]).name
     
     @property
@@ -1763,19 +2178,19 @@ class PVSequence (object):
         
         ret.append(" Sequence attributes:\n")
         #for k in self.__dict__.keys():
-        for k in self.__attributes__.keys():
+        for k in self._attributes_.keys():
             if k != "sequencetype":
-                ret.append("  %s = %s\n" % (k, self.__attributes__[k]))
+                ret.append("  %s = %s\n" % (k, self._attributes_[k]))
                 #ret.append("  %s = %s\n" % (k, self.__dict__[k]))
                 
-        if self.__definition__ is not None:
+        if self._definition_ is not None:
             ret.append("\n Sequence definition:\n")
-            ret.append(self.__definition__.__str__())
+            ret.append(self._definition_.__str__())
 
-        if self.__syncZAxis__ is not None:
+        if self._syncZAxis_ is not None:
             ret.append("\n Z Axis Synchronization:\n")
-            for k in self.__syncZAxis__.keys():
-                ret.append("  %s = %s\n" % (k, self.__syncZAxis__[k]))
+            for k in self._syncZAxis_.keys():
+                ret.append("  %s = %s\n" % (k, self._syncZAxis_[k]))
 
         ret.append("\n")
             
@@ -1788,7 +2203,7 @@ class PVSequence (object):
         
                 
 
-class PVScan(object):
+class PVScan(PVObject):
     r"""Encapsulates a PrairieView scan data.
     Stores a scan configuration object as parsed from an XML file, 
     optionally with data from a *Config file (also an XMl file but saved as ascii).
@@ -1806,11 +2221,13 @@ class PVScan(object):
     def __init__(self, doc:typing.Union[str, xmlutils.xml.dom.minidom.Document, pathlib.Path], 
                  config:typing.Optional[typing.Union[str, xmlutils.xml.dom.minidom.Document, pathlib.Path]] = None,
                  name=None):
-        self.__path__ = None
-        self.__mergeChannelsOnOutput__ = False
-        self.__systemConfiguration__ = None
+        self._path_ = None
+        self._mergeChannelsOnOutput_ = False
+        self._systemConfiguration_ = None
+        self._stateshard_ = None # NOTE: 2025-04-03 09:43:50 this is a PVStateShard in versions >= 5.5
+        self._sequences_ = list()
         self.__version__ = tuple() # major, minor, micro, dot
-        self.__rec_datetime__ = datetime.datetime.now() # fallback value
+        self._rec_datetime_ = datetime.datetime.now() # fallback value
         
         if isinstance(doc, str):
             doc = pathlib.Path(doc)
@@ -1821,8 +2238,8 @@ class PVScan(object):
             mime_type, file_type, encoding = pio.getMimeAndFileType(doc)
             if "xml" not in mime_type.lower() and "xml" not in file_type("lower"): # don't rely on the 'xml' extension
                 raise ValueError(f"{doc} does not appear to be an XML file")
-            self.__path__ = doc.absolute()
-            doc = loadPrairieViewXML(self.__path__) # loadPrairieViewXML will augment the XML document with DocPath node; not needed at this point, but surely later
+            self._path_ = doc.absolute()
+            doc = loadPrairieViewXML(self._path_) # loadPrairieViewXML will augment the XML document with DocPath node; not needed at this point, but surely later
             
         elif not isinstance(doc, xmlutils.xml.dom.minidom.Document):
             raise TypeError("Expecting a xmlutils.xml.dom.minidom.Document or a pathlib.Path for an XMl file as argument; got %s instead" % (type(doc).__name__))
@@ -1842,16 +2259,16 @@ class PVScan(object):
         # at various places in the code, unless you write code to manage it.
         # -- too work for little benefit
         
-        self.__attributes__ = DataBag(xmlutils.attributesToDict(doc.documentElement))
-        v = self.__attributes__.get("version", None)
+        self._attributes_ = DataBag(xmlutils.attributesToDict(doc.documentElement))
+        v = self._attributes_.get("version", None)
         if isinstance(v, str) and len(v.strip()):
             self.__version__ = tuple(map(lambda x: eval(x), v.split('.')))
         else:
             raise ValueError(f"Invalid 'version' attribute: {v}")
         
-        d = self.__attributes__.get("date", None)
+        d = self._attributes_.get("date", None)
         if isinstance(d, str) and len(d.strip()):
-            self.__rec_datetime__ = dateutil.parser.parse(d)
+            self._rec_datetime_ = dateutil.parser.parse(d)
         else:
             raise ValueError(f"Invalid 'date' attribute: {d}")
         
@@ -1869,12 +2286,11 @@ class PVScan(object):
         #
         # So I'm goint out on a limb, here, expect trouble
         if self.versionString < "5.5":
-            sysconfig = doc.documentElement.getElementsByTagName("SystemConfiguration")
-            if len(sysconfig):
-                # all hunkydory
-                self.__systemConfiguration__ = PVSystemConfiguration(sysconfig[0], parent=self)
+            sysconfigNodes = tuple(xmlutils.getChildren(doc.documentElement, tagName="SystemConfiguration"))
+            if len(sysconfigNodes):
+                self._systemConfiguration_ = PVSystemConfiguration(sysconfigNodes[0], self)
                 
-        if self.versionString >= "5.5" or self.__systemConfiguration__ is None: 
+        if self.versionString >= "5.5" or self._systemConfiguration_ is None: 
             # attempt to cover up intermediate verions I don't have access to.
             # keeping fingers crossed here, as even more recent versions may have
             # broken things
@@ -1892,32 +2308,32 @@ class PVScan(object):
             # 'value' set to the str of the full path of the XML document file;
             # otherwise, the configuration  MUST be supplied as a parameter to the
             # constructor
-            if isinstance(self.__path__, pathlib.Path): 
-                # self.__path__ WAS set up above IF doc argument is a XML file.
+            if isinstance(self._path_, pathlib.Path): 
+                # self._path_ WAS set up above IF doc argument is a XML file.
                 # On the system I work with, the environment (or configuration) file 
                 # is saved in the same directory as the main PVSCan XML file
                 # So, going out on a limb here.
-                configFile = self.__path__.with_suffix(".env")
+                configFile = self._path_.with_suffix(".env")
                 config = pio.loadXML(configFile)
-                self.__systemConfiguration__ = PVSystemConfiguration(config.documentElement, parent=self)
+                self._systemConfiguration_ = PVSystemConfiguration(config.documentElement, self)
             else: 
-                # self.__path__ has NOT been set; this is usually because the 
+                # self._path_ has NOT been set; this is usually because the 
                 # 'doc' argument is a document previously loaded (either using
                 # the pio.loadXMLFile function, or the custom loadPrairieViewXML
                 # function in this module. In the latter case it WILL HAVE BEEN
                 # 'augmented' with a child node 'DocPath' with the 'value'
                 # attribute set to the absolute path of the PVScan XML file.
-                docPathNodes = doc.documentElement.getElementsByTagName("DocPath")
+                docPathNodes = tuple(xmlutils.getChildren(doc.documentElement, tagName="DocPath"))
                 if len(docPathNodes):
                     # was loaded using loadPrairieViewXML; 
-                    self.__path__ = pathlib.Path(docPathNodes[0]).getAttributes("value")
+                    self._path_ = pathlib.Path(docPathNodes[0]).getAttributes("value")
                     # so I assume the env file saved in the same directory by default
-                    configFile = self.__path__.with_suffix(".env")
+                    configFile = self._path_.with_suffix(".env")
                     if not configFile.is_file():
                         # my assumption failed here
                         raise OSError(f"Cannot find the configuration file {configFile}")
                     config = pio.loadXML(configFile)
-                    self.__systemConfiguration__ = PVSystemConfiguration(config.documentElement, parent=self)
+                    self._systemConfiguration_ = PVSystemConfiguration(config.documentElement, parent=self)
                 
                 else:
                     if isinstance(config, str):
@@ -1926,20 +2342,26 @@ class PVScan(object):
                     if isinstance(config, pathlib.Path) and config.is_file() and config.suffix.lower() == ".env":
                         config = pio.loadXMLFile(config) # OK to use the generic XML loader in pio module
                     elif isinstance(config, xmlutils.xml.dom.minidom.Document):
-                        self.__systemConfiguration__ = PVSystemConfiguration(config.documentElement, parent=self)
+                        self._systemConfiguration_ = PVSystemConfiguration(config.documentElement, parent=self)
                     else:                    
                         raise TypeError(f"For separately loaded XML documents created with PrairieView version {self.versionString}, a 'config' parameter must be given,\n either a absolute path to an existing configuration file, or as a loaded XML document")
                 
             
         if isinstance(name, str):
-            self.__name__ = name
+            self._name_ = name
             
         else:
-            self.__name__ =self.__path__.stem
+            self._name_ =self._path_.stem
                 
-        self.sequences = [PVSequence(n, parent=self) for n in doc.documentElement.getElementsByTagName("Sequence")]
+        sequenceNodes = xmlutils.getChildren(doc.documentElement, tagName="Sequence")
+        self._sequences_[:] = list(map(lambda n: PVSequence(n, self), sequenceNodes))
         
-        
+        # NOTE: 2025-04-03 09:41:47 
+        # in v5.5. and later there is now common state shard
+        if self.versionString >= "5.5":
+            stateNodes= tuple(xmlutils.getChildren(doc.documentElement, tagName = "PVStateShard"))
+            if len(stateNodes):
+                self._stateshard_ = PVStateShard(stateNodes[0], self)
             
     def __len__(self):
         return len(self.sequences)
@@ -2030,7 +2452,7 @@ class PVScan(object):
                 
                 newAxisInfo = newAxisCal.calibrateAxis(newAxisInfo)
                 
-                if self.__mergeChannelsOnOutput__:
+                if self._mergeChannelsOnOutput_:
                     data = [s.mergeChannels(filepath=filepath) for s in self.sequences]
                     
                     srcdata = [d[1] for d in data]
@@ -2108,11 +2530,16 @@ class PVScan(object):
                         
                     # NOTE: 2017-10-25 00:46:39
                     # returns a tuple of single-band frame data channels & single-band source data channels 
+                    
+                    # NOTE: 2025-04-03 08:46:21
+                    # fdata is a sequence of single-band frame data channels
                     fdata = [concatenateImages(*[insertAxis(frmdata[sequence][channel], 
                                                                       newAxisInfo, 
                                                                       newAxisDim) for sequence in range(len(self.sequences))],
                                                         axis=newAxisInfo) for channel in range(len(frmdata[0]))]
                     
+                    # NOTE: 2025-04-03 08:49:27
+                    # sdata is a sequence of single-band scene data channels
                     sdata = [concatenateImages(*[insertAxis(srcdata[sequence][channel],
                                                                       newAxisInfo, 
                                                                       newAxisDim) for sequence in range(len(self.sequences))],
@@ -2141,11 +2568,13 @@ class PVScan(object):
             # is None; ths tuple is unravelled by the PVSequence, to return only
             # frame data (because TSeries and ZSeries frames have no "source"
             # attribute)
-            if self.__mergeChannelsOnOutput__:
-                return (self.sequences[0].mergeChannels(), None) # (frameData, None)
+            if self._mergeChannelsOnOutput_:
+                return self.sequences[0].mergeChannels() # (frameData, None)
+                # return (self.sequences[0].mergeChannels(), None) # (frameData, None)
                 
             else:
-                return (self.sequences[0](), None )# (frameData, None)
+                return self.sequences[0]() #, None )# (frameData, None)
+                # return (self.sequences[0](), None )# (frameData, None)
             
         elif self.sequences[0].sequencetype == PVSequenceType.Single.value:
             # again, nothing to do here -- this pertains to SingleImage 
@@ -2153,11 +2582,13 @@ class PVScan(object):
             # TODO - FIXME can these ever have mmore thann one sequence? can each
             # of these sequences ever have more than one frame?
             
-            if self.__mergeChannelsOnOutput__:
-                return (self.sequences[0].mergeChannels(), None )# (frameData, None)
+            if self._mergeChannelsOnOutput_:
+                return self.sequences[0].mergeChannels()# (frameData, None)
+                # return (self.sequences[0].mergeChannels(), None )# (frameData, None)
                 
             else:
-                return (self.sequences[0](), None )# (frameData, None)
+                return self.sequences[0]() #, None )# (frameData, None)
+                # return (self.sequences[0](), None )# (frameData, None)
             
         
         elif self.sequences[0].sequencetype == PVSequenceType.Point.value:
@@ -2189,7 +2620,7 @@ class PVScan(object):
         meta = self.metadata()
         
         file_origin = self.filepath
-        rec_datetime = self.__rec_datetime__
+        rec_datetime = self._rec_datetime_
             
         return ScanData(scene=scene, scans=scans, name=self.name,
                         electrophysiology=electrophysiology,
@@ -2201,7 +2632,25 @@ class PVScan(object):
     def scandata(self, *args, **kwargs):
         return self.scanData(*args, **kwargs)
         
-            
+    def mergeChannels(self, filepath=None):
+        r"""Coerce reading the files as a multiband image.
+        
+        The self.multiBandOutput property is temporarily set to True, then 
+        reverted to its previous value after the image files were read.
+        
+        """
+        v = self._mergeChannelsOnOutput_
+        self._mergeChannelsOnOutput_= True
+        try:
+            data = self.__call__(filepath=filepath)
+        except Exception as e:
+            self._mergeChannelsOnOutput_ = v
+            raise e
+        
+        self._mergeChannelsOnOutput_ = v
+        return data
+    
+    @property
     def metadata(self):
         r"""Returns metadata associated with this PVSCan
         """
@@ -2235,54 +2684,44 @@ class PVScan(object):
         
         return metadata
     
-    def mergeChannels(self, filepath=None):
-        r"""Coerce reading the files as a multiband image.
-        
-        The self.multiBandOutput property is temporarily set to True, then 
-        reverted to its previous value after the image files were read.
-        
-        """
-        v = self.__mergeChannelsOnOutput__
-        self.__mergeChannelsOnOutput__= True
-        try:
-            data = self.__call__(filepath=filepath)
-        except Exception as e:
-            self.__mergeChannelsOnOutput__ = v
-            raise e
-        
-        self.__mergeChannelsOnOutput__ = v
-        return data
+    @property
+    def state(self):
+        return self._stateshard_
+    
+    @property
+    def sequences(self):
+        return self._sequences_
     
     @property
     def filepath(self):
-        return self.__path__
+        return self._path_
     
     @filepath.setter
     def filepath(self, val):
         from os import path
         if os.path.isdir(val):
-            self.__path__ = val
+            self._path_ = val
         else:
             raise ValueError("A valid directory path was expected")
         
     @property
     def filename(self):
-        return self.__path__.name
+        return self._path_.name
     
     @property
     def rec_datetime(self):
-        return self.__rec_datetime__
+        return self._rec_datetime_
     
     @property
     def name(self):
-        return self.__name__
+        return self._name_
     
     @name.setter
     def name(self, value):
         if not isinstance(value, str):
             raise TypeError("expecting a str; got %s instead" % type(value).__name__)
         
-        self.__name__ = value
+        self._name_ = value
         
     @property
     def datapath(self):
@@ -2296,7 +2735,7 @@ class PVScan(object):
         This requires that each file corresponds to one channel and that all files 
         have a channel axis. Only applies when there are between 2 and 4 files per frame.
         """
-        return self.__mergeChannelsOnOutput__
+        return self._mergeChannelsOnOutput_
     
     @multiBandOutput.setter
     def multiBandOutput(self, val):
@@ -2305,7 +2744,7 @@ class PVScan(object):
         Parameters:
         "val: boolean
         """
-        self.__mergeChannelsOnOutput__ = val
+        self._mergeChannelsOnOutput_ = val
         
     @property
     def version(self) -> tuple[int]:
@@ -2322,7 +2761,7 @@ class PVScan(object):
         
     @property
     def attributes(self):
-        return self.__attributes__
+        return self._attributes_
         
     @property
     def cycles(self):
@@ -2330,7 +2769,7 @@ class PVScan(object):
     
     @property
     def configuration(self):
-        return self.__systemConfiguration__
+        return self._systemConfiguration_
     
     def __repr__(self):
         return self.__str__()
@@ -2342,13 +2781,13 @@ class PVScan(object):
         #for k in self.__dict__.keys():
             #ret.append(" %s = %s" % (k, self.__dict__[k]))
             
-        for k in self.__attributes__.keys():
-            ret.append(" %s = %s" % (k, self.__attributes__[k]))
+        for k in self._attributes_.keys():
+            ret.append(" %s = %s" % (k, self._attributes_[k]))
             
         ret.append("\n")
 
         #ret.append("Configuration:")
-        ret.append(self.__systemConfiguration__.__str__())
+        ret.append(self._systemConfiguration_.__str__())
         
         ret.append("\n")
 
@@ -3202,3 +3641,4 @@ def loadPrairieViewXML(filePath:typing.Union[str, pathlib.Path]) -> object:
     doc_filepath.setAttribute("value", filePath.as_posix())
     ret.documentElement.appendChild(doc_filepath)
     return ret
+

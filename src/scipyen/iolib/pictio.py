@@ -235,16 +235,17 @@ def loadHDF5(fName:typing.Union[str, pathlib.Path]) -> object:
     return loadHDF5File(fName)
         
     
-def loadImage(fileName:str, asVolume:bool=False, suppress_cpp_warnings=False) -> object:
+def loadImage(fileName:typing.Union[str, pathlib.Path], asVolume:bool=False, 
+              suppress_cpp_warnings:bool=False) -> object:
     return loadImageFile(fileName, asVolume, suppress_cpp_warnings)
 
 # NOTE: 2017-09-21 16:34:21
 # BioFormats dumped mid 2017 because there are no good python ports to it
 # (it uses javabridge which is suboptimal)
-def loadImageFile(fileName:str, asVolume:bool=False, suppress_cpp_warnings=False) -> object:
-    ''' Reads pixel data from a raster image file
+def loadImageFile(fileName:typing.Union[str, pathlib.Path], asVolume:bool=False, 
+                  suppress_cpp_warnings:bool=False) -> object:
+    r''' Reads pixel data from a raster image file
     Uses the vigra impex library.
-    
     
     asVolume: boolean, optional (default is False):
         
@@ -261,12 +262,13 @@ def loadImageFile(fileName:str, asVolume:bool=False, suppress_cpp_warnings=False
         When True, it will suppress warnings issued by the vigra impex library
         (C++ side)
         
-        WARNING: this is a hack: while it successfully suppresses warning #
+        WARNING: this is a hack: while it successfully suppresses warning 
         messages issued by vigra impex library, it will also "mute" the 
-        error messages subsewuenly raised in Python code
+        error messages subsequenly raised in Python code
+    
         I guess this is because of code in the io.redirections module.
         
-        Until that is fixed, keep this parameter to False/
+        Until that is fixed, keep this parameter to False.
         
     NOTE: Things to be aware of:
     
@@ -277,6 +279,14 @@ def loadImageFile(fileName:str, asVolume:bool=False, suppress_cpp_warnings=False
     form within a scan object (e.g. a PVScan object) and stop after the first cycle.
     
     '''    
+    from . import redirections
+    
+    if isinstance(fileName, pathlib.Path):
+        if not fileName.is_file():
+            raise OSError(f"Cannot find {fileName}")
+        
+        fileName = fileName.as_posix()
+        
     # NOTE: 2021-11-30 11:46:12
     # suppress warnings from vigra impex
     if sys.platform.startswith("win32"):
@@ -294,7 +304,6 @@ def loadImageFile(fileName:str, asVolume:bool=False, suppress_cpp_warnings=False
         return ret
         
 
-    from . import redirections
     #f = io.StringIO()
     #with warnings.catch_warnings():
     #with contextlib.redirect_stderr(f):
