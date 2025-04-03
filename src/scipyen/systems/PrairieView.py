@@ -692,6 +692,9 @@ class PVStateValue(PVObject):
             raise KeyError(f"Index {item} not found")
         return default
         
+    def __len__(self):
+        return len(tuple(self.keys))
+    
     @property
     def attributes(self) -> DataBag:
         return self._attributes_
@@ -868,6 +871,9 @@ class PVSubIndexedValueList(PVObject):
                     raise KeyError(f"Subindex {item} not found")
                 return default
     
+    def __len__(self):
+        return len(tuple(self.keys))
+    
     def getSubIndexedValue(self, subindex):
         values = tuple(filter(lambda v: v.subindex == subindex, self.value))
         if len(values):
@@ -950,6 +956,9 @@ class PVStateShard(PVObject):
             return default
         
         return self.getState(item, default)
+    
+    def __len__(self):
+        return len(tuple(self.keys))
     
     @property
     def attributes(self):
@@ -1346,7 +1355,7 @@ class PVFrame(PVObject):
             if self.versionString < "5.5":
                 fdata_axis_0_cal.resolution = self.state.attributes["micronsPerPixel_XAxis"]
             else:
-                fdata_axis_0_cal.resolution = self.state.attributes["micronsPerPixel_XAxis"]
+                fdata_axis_0_cal.resolution = self.parent.parent.state["micronsPerPixel"]["XAxis"].attributes.value
             fdata_axis_0_cal.units = pq.um
             
             # embed calibration string into axis_0_info's description
@@ -1373,7 +1382,10 @@ class PVFrame(PVObject):
                 fdata_axis_1_info = fdata.axistags[1] # by default vigra behaviour is Space 
                 
                 fdata_axis_1_cal = AxisCalibrationData(fdata_axis_1_info)
-                fdata_axis_1_cal.resolution = self.state.attributes["micronsPerPixel_YAxis"]
+                if self.versionString < "5.5":
+                    fdata_axis_1_cal.resolution = self.state.attributes["micronsPerPixel_YAxis"]
+                else:
+                    fdata_axis_1_cal.resolution = self.parent.parent.state["micronsPerPixel"]["YAxis"].attributes.value
                 fdata_axis_1_cal.units = pq.um
                 
             # embed calibration string into axis_1_info's description
@@ -1433,14 +1445,20 @@ class PVFrame(PVObject):
                     
                 sdata_axis_0_info = sdata.axistags[0]
                 sdata_axis_0_cal = AxisCalibrationData(sdata_axis_0_info)
-                sdata_axis_0_cal.resolution = self.state.attributes["micronsPerPixel_XAxis"]
+                if self.versionString < "5.5":
+                    sdata_axis_0_cal.resolution = self.state.attributes["micronsPerPixel_XAxis"]
+                else:
+                    sdata_axis_0_cal.resolution = self.parent.parent["micronsPerPixel"]["XAxis"].attributes.value
                 sdata_axis_0_cal.units = pq.um
                 
                 sdata_axis_0_info = sdata_axis_0_cal.calibrateAxis(sdata_axis_0_info)
                 
                 sdata_axis_1_info = sdata.axistags[1]
                 sdata_axis_1_cal = AxisCalibrationData(sdata_axis_1_info)
-                sdata_axis_1_cal.resolution=self.state.attributes["micronsPerPixel_YAxis"]
+                if self.versionString < "5.5":
+                    sdata_axis_1_cal.resolution=self.state.attributes["micronsPerPixel_YAxis"]
+                else:
+                    sdata_axis_1_cal.resolution=self.parent.parent["micronsPerPixel"]["YAxis"].attributes.value
                 sdata_axis_1_cal.units = pq.um
                 
                 sdata_axis_1_info = sdata_axis_1_cal.calibrateAxis(sdata_axis_1_info)
@@ -1799,7 +1817,12 @@ class PVSequence (PVObject):
                     
                 else: # Z series
                     # get the Z axis resolution from the frames state
-                    z_pos = [float(f.state.attributes["positionCurrent_ZAxis"]) for f in self.frames]
+                    if self.parent.versinString < "5.5":
+                        z_pos = [float(f.state.attributes["positionCurrent_ZAxis"]) for f in self.frames]
+                    else:
+                        getState = lambda f: f.state if len(f.state) else self.parent.state
+                        frameStates = map(lambda f: getState(f), self.frames)
+                        z_pos = list(map(lambda s: float(s["positionCurrent"]["ZAxis"], frameStates)))
                     z_steps = np.diff(z_pos)
                     
                     if len(z_steps) > 1:
@@ -1815,7 +1838,15 @@ class PVSequence (PVObject):
                     
                     newAxisCal = AxisCalibrationData(newAxisInfo)
                     newAxisCal.units = pq.um
-                    newAxisCal.origin = float(self.frames[0].state.attributes["positionCurrent_ZAxis"])
+                        
+                    if self.parent.versionString < "5.5":
+                        newAxisCal.origin = float(self.frames[0].state.attributes["positionCurrent"]["ZAxis"].attributes.value)
+                    else:
+                        state = self.frames[0].state 
+                        if len(state) == 0:
+                            state = self.parent.state
+                            
+                        newAxisCal.origin = float(state.attributes["positionCurrent"]["ZAxis"].attributes.value)
                     newAxisCal.resolution = zres
                     
                     newAxisInfo = newAxisCal.calibrateAxis(newAxisInfo)
@@ -1900,7 +1931,13 @@ class PVSequence (PVObject):
                     
                 else: # ZSeries
                     # get the Z axis resolution from the frames state
-                    z_pos = [float(f.state.attributes["positionCurrent_ZAxis"]) for f in self.frames]
+                    if self.parent.versionString < "5.5":
+                        z_pos = [float(f.state.attributes["positionCurrent_ZAxis"]) for f in self.frames]
+                    else:
+                        getState = lambda f: f.state if len(f.state) else self.parent.state
+                        frameStates = map(lambda f: getState(f), self.frames)
+                        z_pos = list(map(lambda s: float(s["positionCurrent"]["ZAxis"].attributes.value), frameStates))
+                        # z_pos = [float((lambda f: f.state if len(f.state) else self.parent.state)["positionCurrent"]["ZAxis"].attributes.value) for f in self.frames]
                     z_steps = np.diff(z_pos)
 
                     zres = abs(z_steps[0])
@@ -1912,7 +1949,13 @@ class PVSequence (PVObject):
                     
                     newAxisCal = AxisCalibrationData(newAxisInfo)
                     newAxisCal.units=pq.um
-                    newAxisCal.origin=float(self.frames[0].state.attributes["positionCurrent_ZAxis"])
+                    if self.parent.versionString < "5.5":
+                        newAxisCal.origin=float(self.frames[0].state.attributes["positionCurrent_ZAxis"])
+                    else:
+                        state = self.frames[0].state 
+                        if len(state) == 0:
+                            state = self.parent.state
+                        newAxisCal.origin=float(state.attributes["positionCurrent"]["ZAxis"].attributes.value)
                     newAxisCal.resolution=zres
                     
                     newAxisInfo = newAxisCal.calibrateAxis(newAxisInfo)
