@@ -963,6 +963,8 @@ class PVStateShard(PVObject):
         ret += list(map(lambda s: f"   {s}", self.values))
         
         return "".join(ret)
+    
+class PVSequence(PVObject): pass #needed for PVFrame below
 
 # NOTE: 2017-08-07 12:55:53
 # the "Files" element node point to file names of the linescan data (or whatever
