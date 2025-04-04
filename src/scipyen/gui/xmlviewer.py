@@ -52,8 +52,7 @@ __scipyen_plugin__ = None
 
 # 2016-08-16 23:55:53
 class DomItem(object):
-    '''Wraps a QDomNode 
-    WARNING: This is based on a DEPRECATED Qt module
+    r'''Wraps a QDomNode 
     '''
     def __init__(self, node: (QtXml.QDomNode, QtXml.QDomDocument), row: int, parent: (QtXml.QDomNode, type(None)) = None):
         ''' DomItem constructor

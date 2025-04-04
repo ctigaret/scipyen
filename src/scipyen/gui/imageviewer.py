@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
-# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-FileCopyrightText: 2017 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-'''
+r'''
 Image viewer: designed for viewing vigra arrays (primarily)
 Based on GraphicsView Qt framework
 Supports cursors defined in pictgui module.
@@ -81,7 +81,8 @@ from core.prog import (safeWrapper, deprecation, iter_attribute,
                        filter_attr, filterfalse_attr)
 
 from core import strutils as strutils
-from core import datatypes  
+from core import datatypes 
+from core import quantities as scq
 from core.quantities import quantity2str
 from core.traitcontainers import DataBag
 from core.scipyen_config import markConfigurable
@@ -147,7 +148,7 @@ Ui_AxesCalibrationDialog, QDialog = __loadUiType__(adapt_ui_path(__module_path__
 Ui_TransformImageValueDialog, QDialog = __loadUiType__(adapt_ui_path(__module_path__,"transformimagevaluedialog.ui"))
 
 class ComplexDisplay(Enum):
-    r"""TODO
+    r"""
     """
     real  = 1
     imag  = 2
@@ -249,7 +250,8 @@ class ImageBrightnessDialog(QDialog, Ui_TransformImageValueDialog):
         
 
 class AxesCalibrationDialog(QDialog, Ui_AxesCalibrationDialog):
-    def __init__(self, image, pWin=None, parent=None):
+    def __init__(self, image:typing.Union[vigra.AxisTags, vigra.VigraArray], 
+                 pWin=None, parent=None):
         super(AxesCalibrationDialog, self).__init__(parent)
         
         self.arrayshape=None
@@ -271,19 +273,19 @@ class AxesCalibrationDialog(QDialog, Ui_AxesCalibrationDialog):
         
         self.resolution = 1.0
         self.origin = 0.0
-        self.units =  datatypes.pixel_unit
+        self.units =  scq.pixel_unit
         
         self.selectedAxisIndex = 0
         
-        #self.axesCalibration = AxesCalibration(img)
+        self.calibration = AxesCalibration(self.axistags)
         
         self.axisMetaData = dict()
         
         for axisInfo in self.axistags:
-            self.axisMetaData[axisInfo.key]["calibration"] = axiscalibration.AxesCalibration(axisInfo)
-                
-            self.axisMetaData[axisInfo.key]["description"] = axiscalibration.AxesCalibration.removeCalibrationFromString(axisInfo.description)
-
+            self.axisMetaData[axisInfo.key]=dict()
+            self.axisMetaData[axisInfo.key]["calibration"] = self.calibration[axisInfo.key]
+            self.axisMetaData[axisInfo.key]["description"] = axisInfo.description
+            
         self.units          = self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].units
         self.origin         = self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].origin
         self.resolution     = self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].resolution
@@ -411,7 +413,7 @@ class AxesCalibrationDialog(QDialog, Ui_AxesCalibrationDialog):
     def slot_calibratedDistanceChecked(self, value):
         self.calibratedDistanceSpinBox.setReadOnly(value)
         self.pixelsDistanceSpinBox.setReadOnly(not value)
-        self.resolutionSpinBox.setReadOnly(value)
+        self.resolutionSpinBox.setReadOnly(not value)
     
     @Slot()
     @safeWrapper
@@ -472,7 +474,7 @@ class AxesCalibrationDialog(QDialog, Ui_AxesCalibrationDialog):
             
             self.resolution = self.resolutionSpinBox.value()
             
-        elif self.pixelsDistanceSpinBox.isChecked(): # calculate pixels distance
+        elif self.pixelsDistanceRaioButton.isChecked(): # calculate pixels distance
             self.pixelsDistanceSpinBox.setValue(int(value // self.resolutionSpinBox.value()))
         
         self.slot_generateCalibration()
@@ -1065,7 +1067,9 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         """
         return self._image_height_
     
-    
+    @property
+    def axesCalibration(self):
+        return self._axes_calibration_
     
     ####
     # slots
@@ -2330,6 +2334,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         self.toolBar = QtWidgets.QToolBar("Main", self)
         self.toolBar.setObjectName("%s_Main_Toolbar" % self.__class__.__name__)
+        self.toolBar.setMovable(False)
         
         refreshAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("view-refresh"), "Refresh")
         refreshAction.triggered.connect(self.slot_refreshDataDisplay)
@@ -2338,6 +2343,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         self.zoomToolBar = QtWidgets.QToolBar("Zoom Toolbar", self)
         self.zoomToolBar.setObjectName("ImageViewerZoomToolBar")
+        self.zoomToolBar.setMovable(False)
         
         self.zoomOutAction = self.zoomToolBar.addAction(QtGui.QIcon.fromTheme("zoom-out"), "Zoom Out")
         self.zoomOriginalAction = self.zoomToolBar.addAction(QtGui.QIcon.fromTheme("zoom-original"), "Original Zoom")
@@ -2351,8 +2357,19 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
 
         self.addToolBar(QtCore.Qt.TopToolBarArea, self.zoomToolBar)
         
+        self.imageToolBar = QtWidgets.QToolBar("Image Toolbar", self)
+        self.imageToolBar.setObjectName("ImageViewerImageToolBar")
+        self.imageToolBar.setMovable(False)
+        self.setAxesScalesAction = self.imageToolBar.addAction(QtGui.QIcon.fromTheme("settings-configure-symbolic"), "Axes scales")
+        self.setAxesScalesAction.triggered.connect(self.slot_axesScales)
+        
     def _editColorMap(self):
         pass
+    
+    @Slot()
+    def slot_axesScales(self):
+        dlg = AxesCalibrationDialog(self._axes_calibration_)
+        dlg.exec()
     
     @Slot(str)
     @safeWrapper
@@ -3007,8 +3024,13 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                      frameAxis=frameAxis, frameIndex=None, displayChannel=displayChannel, 
                      asAlphaChannel=asAlphaChannel, get_focus=get_focus)
         
-    def _set_data_(self, data, normalize=True, colormap = None, gamma = None, tempColorMap = None, frameAxis=None, frameIndex=None, arrayAxes:(type(None), vigra.AxisTags) = None, displayChannel = None, doc_title:(str, type(None)) = None, asAlphaChannel:bool=False, *args, **kwargs):
-        '''
+    def _set_data_(self, data, normalize=True, colormap = None, gamma = None, 
+                   tempColorMap = None, frameAxis=None, frameIndex=None, 
+                   arrayAxes:typing.Optional[vigra.AxisTags] = None, 
+                   displayChannel = None, doc_title:(str, type(None)) = None, 
+                   asAlphaChannel:bool=False,
+                   *args, **kwargs):
+        r'''
         SYNTAX: self.view(image, title = None, normalize = True, colormap = None, gamma = None, separateChannels = False, frameAxis = None)
     
         Parameters:
@@ -3099,9 +3121,20 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                 
   
         elif isinstance(data, (QtGui.QImage, QtGui.QPixmap)):
+            # NOTE 2025-04-03 23:30:10
+            # cannot associate axes calibrations to these objects;
+            # HOWEVER (TODO/FIXME) we CAN create axes calibrations for the purpose
+            # of display, which we can then associate with a VigraArray created by
+            # exporting this data to a VigraArray (TODO)
             self._number_of_frames_ = 1
             self.frameIndex = range(self._number_of_frames_)
             self._data_  = data
+            if isinstance(arrayAxes, vigra.AxisTags):
+                if len(arrayAxes) != 2:
+                    raise ValueError(f"For QImage or QPixmap, arrayAxes — if specified — must have exactly two elements, not {len(arrayAxes)}")
+            else:
+                arrayAxes = vigra.VigraArray.defaultAxistags(2, noChannels=True)
+            self._axes_calibration_ = AxesCalibration(arrayAxes)
             self.frameAxis = None
             self.displayFrame()
             
@@ -3122,6 +3155,10 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             # NOTE: 2021-10-25 16:29:38
             # For display purposes only, we construct a VigraArray on the numpy
             # ndarray passed as 'image'
+            
+            # NOTE: 2025-04-03 23:28:39
+            # in this case as in the case of Qt raster image types we CANNOT
+            # associate axes calibration, but see above (NOTE 2025-04-03 23:30:10)
             
             array_data = vigra.VigraArray(data, axistags=arrayAxes)
             if self._parseVigraArrayData_(array_data):

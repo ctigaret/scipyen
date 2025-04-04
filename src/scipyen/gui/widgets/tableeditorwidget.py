@@ -78,7 +78,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
                  #parent:typing.Optional[QtWidgets.QMainWindow]=None) -> None:
     def __init__(self, parent:typing.Optional[QtWidgets.QMainWindow]=None) -> None:
         super().__init__(parent=parent)
-        
+        self._is_vigra_filter_kernel_ = False # needed in future implementations of editing functionality
         self._dataModel_ = TabularDataModel(parent=self)
         
         # NOTE: 2021-10-18 09:32:45
@@ -117,7 +117,20 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
                        TriggerEvent, TriggerProtocol,
                        np.ndarray, vigra.VigraArray, vigra.filters.Kernel1D, vigra.filters.Kernel2D), *args, **kwargs):
         
+        from imaging import vigrautils
+        
+        if isinstance(data, (vigra.filters.Kernel1D, vigra.filters.Kernel2D)):
+            data = vigrautils.kernel2array(data)
+            self._is_vigra_filter_kernel_ = True
+        else:
+            self._is_vigra_filter_kernel_ = False
+        
         self._data_ = data
+        
+        if getattr(data, "shape", (0,0))[0] > 10:
+            # avoid autio-resizing rows for data with more than 10 rows — it is
+            # resource consuming
+            self.resizeRowsToolButton.setEnabled(False)
         
         if isinstance(data, np.ndarray):
             if data.ndim > 2:
@@ -234,8 +247,6 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         self.setupUi(self)
         self.tableView.setSortingEnabled(False)
         self.tableView.setModel(self._dataModel_)
-        #self._dataModel_.signal_rowsPopulated[int].connect(self.slot_rowsReceived)
-        #self._dataModel_.signal_columnsPopulated[int].connect(self.slot_columnsReceived)
         
         self.tableView.horizontalHeader().setSectionsMovable(False)
         # NOTE: 2018-11-28 21:46:18
@@ -254,8 +265,6 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         self.tableView.verticalHeader().setSectionsMovable(False)
         
         # see NOTE: 2018-11-28 21:46:18 and NOTE: 2018-11-29 23:15:13
-        #self.tableView.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
-        #self.tableView.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
         self.tableView.verticalHeader().setResizeContentsPrecision(0) 
         
         self.tableView.verticalHeader().setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
@@ -836,12 +845,13 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 self._modelRows_ = data.shape[0]
                 self._modelColumns_ = 1
                 
-            elif isinstance(data, (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal, IrregularlySampledDataSignal)):
+            # elif isinstance(data, (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal, IrregularlySampledDataSignal)):
+            elif isinstance(data, neo.core.dataobject.DataObject):
                 if data.ndim:
                     self._modelRows_ = data.shape[0]
                     
                     if data.ndim > 1:
-                        self._modelColumns_ = data.shape[1] + 1 # include domain as the first column
+                        self._modelColumns_ = data.shape[1] + 1 # include domain as the first column - FIXME: use row headers for time domain?
                     
                 else:
                     self._modelRows_ = 1
@@ -1108,6 +1118,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             elif isinstance(self._modelData_, neo.core.basesignal.BaseSignal):
                 if orientation == QtCore.Qt.Horizontal: # horizontal (columns) header
                     if role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.AccessibleTextRole):
+                        # return QtCore.QVariant("%s (channel %d, %s)" % (self._modelData_.name, section, self._modelData_.dimensionality))
                         if section == 0:
                             if isinstance(self._modelData_, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)):
                                 domain_name = getattr(self._modelData_,"domain_name", None)
@@ -1199,6 +1210,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                     ret = ret.isoformat(" ")
                     
             elif isinstance(self._modelData_, (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal, IrregularlySampledDataSignal)):
+                # NOTE: 2025-03-31 23:47:43 WRONG:
+                # use the times as the row index!
                 if col == 0:
                     ret = self._modelData_.times[row]
                     ret_type = type(ret).__name__
@@ -1370,3 +1383,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         #sip.enableautoconversion(QtCore.QVariant, old_qvariant_autoconv)
             
         return False
+    
+    @property
+    def sourceData(self):
+        r"""Access to the source data behind this model"""
+        return self._modelData_

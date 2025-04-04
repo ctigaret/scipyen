@@ -112,7 +112,7 @@ from traitlets.utils.bunch import Bunch
 import traitlets.config
 from .traitcontainers import DataBag
 from core import (traitutils, strutils)
-from core.prog import (safeWrapper, printStyled)
+from core.prog import (safeWrapper, printStyled, scipywarn)
 from core.workspacefunctions import user_workspace
 from core.quantities import(quantity2str, str2quantity)
 from iolib.jsonio import (object2JSON, json2python)
@@ -627,7 +627,12 @@ def loadQSettingsKey(qsettings:QSettings, gname:str, pfx:str, key:str, default:t
     
     qsettings.beginGroup(gname)
     # print(f"loadQSettingsKey group: {gname}, key: {key})")
-    ret = qsettings.value(key_name, default)
+    try:
+        ret = qsettings.value(key_name, default)
+    except:
+        scipywarn(f"Cannot load QSettings for key {key_name}")
+        traceback.print_exc()
+        ret = None
     qsettings.endGroup()
     # print(f"loadQSettingsKey group: {gname}, key: {key}, value: {ret} ({type(ret).__name__})")
     return ret

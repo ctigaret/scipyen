@@ -2171,7 +2171,7 @@ class AxesCalibration(object):
                 AxisCalibrationData objects.
                 
         NOTE: 
-        The AxisInfo objects used in the AxesCalibraiton's initialization WILL
+        The AxisInfo objects used in the AxesCalibration's initialization WILL
         NOT gain a calibration string in their `description` attribute (i.e., 
         the AxisInfo will not be automatically 'calibrated').
             

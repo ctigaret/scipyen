@@ -60,7 +60,7 @@
      <item>
       <widget class="QToolButton" name="prevSliceToolbutton">
        <property name="toolTip">
-        <string>Previous slice</string>
+        <string>Previous frame of data</string>
        </property>
        <property name="text">
         <string>Prev.</string>
@@ -73,7 +73,7 @@
      <item>
       <widget class="QToolButton" name="nextSliceToolButton">
        <property name="toolTip">
-        <string>Next slice</string>
+        <string>Next frame of data</string>
        </property>
        <property name="text">
         <string>Next</string>

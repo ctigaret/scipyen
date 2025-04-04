@@ -182,20 +182,25 @@ class XmlSyntaxHighlighter(QtGui.QSyntaxHighlighter):
                 break
             
 @singledispatch
-def getChildren(element, eltype:int=1) -> typing.Generator:
-    raise NotImplementedError(f"Fucntion does not support {type(element)} objects")
+def getChildren(element, eltype:int=1, tagName:typing.Optional[str]=None) -> typing.Generator:
+    raise NotImplementedError(f"Function does not support {type(element)} objects")
 
 @getChildren.register(xml.dom.minidom.Element)
-def _(element:xml.dom.minidom.Element, eltype:int=1) -> typing.Generator:
+def _(element:xml.dom.minidom.Element, eltype:int=1, tagName:typing.Optional[str]=None) -> typing.Generator:
     r""""""
     if eltype not in range(1,13):
         raise ValueError(f"'eltype' expected to be an int in the range 1⋯13; instead, got {eltype}")
     children = element.childNodes
     if len(children):
-        yield from (c for c in children if c.nodeType == eltype)
+        if isinstance(tagName, str) and len(tagName.strip()):
+            yield from filter(lambda c: c.nodeType == eltype and getattr(c, "tagName", "") == tagName, children)
+            # yield from (c for c in children if c.nodeType == eltype and getattr(c, "tagName", "") == tagName)
+        else:
+            yield from filter(lambda c: c.nodeType == eltype, children)
+            # yield from (c for c in children if c.nodeType == eltype)
     
 @getChildren.register(ET.Element)
-def _(element:ET.Element, eltype:int=None) -> typing.Generator:
+def _(element:ET.Element, eltype:int=None, tagName:typing.Optional[str]=None) -> typing.Generator:
     r""""""
     yield from (c for c in element.iter())
         
