@@ -232,7 +232,19 @@ PVSequenceType = IntEnum("PVSequenceType", "Single Linescan TSeries ZSeries Poin
 # circle spiral and lissajous all get internally convereted to freehand coordinates!
 PVLinescanMode = IntEnum("PVLinescanMode", "straightLine, freeHand, circle, spiral, lissajous", qualname="PrairieView.PVLinescanMode")
 
-class PVObject(object): pass
+class PVObject(object): 
+    def __init__(self):
+        self._parent_ = None
+        self._stateshard_ = None
+        
+    @property
+    def parent(self):
+        return self._parent_
+    
+    @property
+    def state(self):
+        return self._stateshard_
+    
 
 # TODO: work out other linescan modes
 ## FIXME: for linescans other than Freehand coordinates is empty!
@@ -242,6 +254,7 @@ class PVLinescanDefinition(PVObject):
         if node.nodeType != xmlutils.xml.dom.Node.ELEMENT_NODE or node.nodeName != "PVLinescanDefinition":
             raise ValueError("Expecting an element node named 'PVLinescanDefinition")
         
+        super().__init__()
         self._parent_ = None
         self.line_length = 0
         
@@ -360,6 +373,8 @@ class PVLaser(PVObject):
         if node.nodeType != xmlutils.xml.dom.Node.ELEMENT_NODE or node.nodeName not in ("Laser", "PVLaser"): 
             raise ValueError("Expecting an element node named 'Laser' or 'PVLaser'")
         
+        super().__init__()
+
         self._parent_ = None
         
         if parent is not None:
@@ -426,6 +441,7 @@ class PVSystemConfiguration(PVObject):
         if node.nodeType != xmlutils.xml.dom.Node.ELEMENT_NODE or node.nodeName not in ("SystemConfiguration", "Environment"):
             raise ValueError("Expecting an element node named 'SystemConfiguration' or 'Environment'")
 
+        super().__init__()
         self._parent_ = None
         self.lasers = list()
         
@@ -562,6 +578,7 @@ class PVStateValue(PVObject):
         if not isinstance(parent, PVStateShard):
             raise TypeError("Parent of a PVStateValue can only be None or a PVStateShard object")
         
+        super().__init__()
         self._parent_ = parent
                 
         attributes = xmlutils.attributesToDict(node)
@@ -660,6 +677,9 @@ class PVStateValue(PVObject):
                 raise
             return default
         
+    def __contains__(self, item):
+        return item in tuple(self.keys)
+
     def __getitem__(self, item):
         if item not in self.keys:
             raise KeyError(f"Index {item} not found in {type(self.parent).__name__} object {self.key}")
@@ -685,6 +705,7 @@ class PVIndexedValue(PVObject):
         if not isinstance(parent, PVStateValue):
             raise TypeError("parent must be a PVStateValue")
         
+        super().__init__()
         self._parent_ = parent
         
         attributes = xmlutils.attributesToDict(node)
@@ -736,6 +757,7 @@ class PVSubIndexedValue(PVObject):
         if not isinstance(parent, PVSubIndexedValueList):
             raise TypeError("parent must be a PVSubIndexedValueList")
         
+        super().__init__()
         self._parent_ = parent
         
         attributes = xmlutils.attributesToDict(node)
@@ -783,6 +805,7 @@ class PVSubIndexedValueList(PVObject):
         if not isinstance(parent, PVStateValue):
             raise TypeError("parent must be a PVStateValue")
         
+        super().__init__()
         self._parent_ = parent
         
         attributes = xmlutils.attributesToDict(node)
@@ -845,6 +868,9 @@ class PVSubIndexedValueList(PVObject):
                 raise
             return default
         
+    def __contains__(self, item):
+        return item in tuple(self.keys)
+
     def __getitem__(self, item):
         if item not in self.keys:
             raise KeyError(f"Subindex {item} not found")
@@ -873,6 +899,7 @@ class PVStateShard(PVObject):
         if not isinstance(parent, PVObject):
             raise TypeError("Parent of a PVStateShard can only be None or a PVObject object")
         
+        super().__init__()
         self._parent_ = parent
 
         self._state_values_ = list() # NOTE: 2025-04-03 09:53:22 new, in v >= 5.5
@@ -936,8 +963,11 @@ class PVStateShard(PVObject):
                 raise
             return default
         
+    def __contains__(self, item):
+        return item in tuple(self.keys)
+        
     def __getitem__(self, item):
-        if item not in self.keys:
+        if item not in tuple(self.keys):
             raise KeyError(f"Index {item} not found")
         return tuple(filter(lambda s: s.key == item, self.values))[0]
     
@@ -1024,16 +1054,30 @@ class PVSequence(PVObject): pass #needed for PVFrame below
 # with ZSeries also, as it can be used to load the entire ZSeries data for one channel
 # into a single VigraArray
 class PVFrame(PVObject):
-    def __init__(self, node, parent:PVSequence):
+    def __init__(self, node, index:int, parent:PVSequence):
+        r"""PVFrame constructor:
+        node: xmlutils.xml.dom.Node with type ELEMENT_NODE
+        index: int index of the frame in the parent sequence; must be >= 0
+            Also this shuldbe uniue among all the frames in a sequence (CAUTION: this is NOT enforced)
+        parent: a PVSequence object
+        
+        """
         if node.nodeType != xmlutils.xml.dom.Node.ELEMENT_NODE or node.nodeName != "Frame":
             raise ValueError("Expecting an element node named 'Frame'")
         
+        super().__init__()
         self._parent_ = None
+        
         if isinstance(parent, PVSequence):
             self._parent_ = parent
             
         else:
-            raise TypeError("Parent of a PVFrame can only be None or a PVSequence")
+            raise TypeError("Parent of a PVFrame can only be a PVSequence")
+        
+        if not isinstance(index, int) or index < 0:
+            raise ValueError(f"Invalid frame index specified: {index}; must be >= 0")
+        
+        self._index_ = index
         
         if node.attributes is not None:
             self._attributes_ = DataBag(xmlutils.attributesToDict(node))
@@ -1061,6 +1105,10 @@ class PVFrame(PVObject):
     @property
     def versionString(self):
         return self.parent.versionString
+    
+    @property
+    def index(self)->int:
+        return self._index_
         
     @property
     def parent(self):
@@ -1321,11 +1369,31 @@ class PVFrame(PVObject):
             if self.versionString < "5.5":
                 fdata_axis_0_cal.resolution = float(self.state["micronsPerPixel_XAxis"].value)
             else:
-                state = self.state
-                if len(self.state) == 0:
-                    state = self.parent.parent.state
-                fdata_axis_0_cal.resolution = float(state["micronsPerPixel"]["XAxis"].value)
-            fdata_axis_0_cal.units = pq.um
+                # ATTENTION: 2025-04-04 15:07:52
+                # axes resolutions are ALL in the state shard at PVScan level,  
+                # NOT in the frame's stateshard, which contain frame-specific information
+                # such as gain & laser power, ONLY WHEN APPROPRIATE (e.g. in a Z series)
+                # 
+                state = self.parent.parent.state
+#                 if self.index == 0:
+#                     state = self.parent.parent.state
+#                 else:
+#                     state = self.state
+#                     
+#                 if not isinstance(state, PVStateShard) or len(state) == 0 or "micronsPerPixel" not in state:
+#                     parent = self.parent
+#                     while len(self.state) == 0  and isinstance(parent, PVObject):
+#                         state = parent.state
+#                         if isinstance(state, PVStateShard) and "micronsPerPixel" in state:
+#                             break
+#                         parent = parent.parent
+                        
+                # print(f"{self.__class__.__name__}.__call__: query scales for {fdata_axis_0_info} - state keys: {tuple(state.keys)}")
+                if isinstance(state, PVStateShard) and "micronsPerPixel" in state:
+                    fdata_axis_0_cal.resolution = float(state["micronsPerPixel"]["XAxis"].value)
+                    fdata_axis_0_cal.units = pq.um
+                else:
+                    scipywarn(f"Cannot get the μm / pixel for axis {printStyled(f'{fdata_axis_0_info}', 'yellow')} in frame {printStyled(f'frame {self.index}', 'yellow')}")
             
             # embed calibration string into axis_0_info's description
             fdata_axis_0_info = fdata_axis_0_cal.calibrateAxis(fdata_axis_0_info)
@@ -1354,9 +1422,26 @@ class PVFrame(PVObject):
                 if self.versionString < "5.5":
                     fdata_axis_1_cal.resolution = float(self.state["micronsPerPixel_YAxis"].value)
                 else:
-                    state = self.state if len(self.state) else self.parent.parent.state
-                    fdata_axis_1_cal.resolution = float(state["micronsPerPixel"]["YAxis"].value)
-                fdata_axis_1_cal.units = pq.um
+                    # NOTE: see ATTENTION: 2025-04-04 15:07:52
+                    state = self.parent.parent.state
+                    # if self.index == 0:
+                    #     state = self.parent.parent.state
+                    # else:
+                    #     state = self.state
+                    # if not isinstance(state, PVStateShard) or len(state) == 0 or "micronsPerPixel" not in state:
+                    #     parent = self.parent
+                    #     while len(self.state) == 0  and isinstance(parent, PVObject):
+                    #         state = parent.state
+                    #         if isinstance(state, PVStateShard) and "micronsPerPixel" in state:
+                    #             break
+                    #         parent = parent.parent
+                    # print(f"{self.__class__.__name__}.__call__: query scales for {fdata_axis_1_info} - state keys: {tuple(state.keys)}")
+                    # state = self.state if len(self.state) else self.parent.parent.state
+                    if isinstance(state, PVStateShard) and "micronsPerPixel" in state:
+                        fdata_axis_1_cal.resolution = float(state["micronsPerPixel"]["YAxis"].value)
+                        fdata_axis_1_cal.units = pq.um
+                    else:
+                        scipywarn(f"Cannot get the μm / pixel for axis {printStyled(f'{fdata_axis_1_info}', 'yellow')} in frame {printStyled(f'frame {self.index}', 'yellow')}")
                 
             # embed calibration string into axis_1_info's description
             fdata_axis_1_info = fdata_axis_1_cal.calibrateAxis(fdata_axis_1_info)
@@ -1418,12 +1503,28 @@ class PVFrame(PVObject):
                 if self.versionString < "5.5":
                     sdata_axis_0_cal.resolution = float(self.state["micronsPerPixel_XAxis"].value)
                 else:
-                    state = self.state
-                    if len(state) == 0:
-                        state = self.parent.parent.state
-                    sdata_axis_0_cal.resolution = float(state["micronsPerPixel"]["XAxis"].value)
-                sdata_axis_0_cal.units = pq.um
-                
+                    # NOTE: see ATTENTION: 2025-04-04 15:07:52
+                    state = self.parent.parent.state
+#                     if self.index == 0:
+#                         state = self.parent.parent.state
+#                     else:
+#                         state = self.state
+#                     
+#                     if not isinstance(state, PVStateShard) or len(state) == 0:
+#                         parent = self.parent
+#                         while len(self.state) == 0  and isinstance(parent, PVObject):
+#                             state = parent.state
+#                             if isinstance(state, PVStateShard) and "micronsPerPixel" in state:
+#                                 break
+#                             parent = parent.parent
+                            
+                    # print(f"{self.__class__.__name__}.__call__: query scales for SOURCE {sdata_axis_0_info} - state keys: {tuple(state.keys)}")
+                    if isinstance(state, PVStateShard) and "micronsPerPixel" in state:
+                        sdata_axis_0_cal.resolution = float(state["micronsPerPixel"]["XAxis"].value)
+                        sdata_axis_0_cal.units = pq.um
+                    else:
+                        scipywarn(f"Cannot get the μm / pixel for axis {printStyled(f'{sdata_axis_0_info}', 'yellow')} in frame {printStyled(f'frame {self.index}', 'yellow')}")
+                        
                 sdata_axis_0_info = sdata_axis_0_cal.calibrateAxis(sdata_axis_0_info)
                 
                 sdata_axis_1_info = sdata.axistags[1]
@@ -1431,10 +1532,27 @@ class PVFrame(PVObject):
                 if self.versionString < "5.5":
                     sdata_axis_1_cal.resolution=float(self.state["micronsPerPixel_YAxis"].value)
                 else:
-                    state = self.state if len(self.state) else self.parent.parent.state
-                    sdata_axis_1_cal.resolution=float(state["micronsPerPixel"]["YAxis"].value)
-                sdata_axis_1_cal.units = pq.um
-                
+                    # NOTE: see ATTENTION: 2025-04-04 15:07:52
+                    state = self.parent.parent.state
+#                     if self.index == 0:
+#                         state = self.parent.parent.state
+#                     else:
+#                         state = self.state
+#                         
+#                     if not isinstance(state, PVStateShard) or len(state) == 0:
+#                         parent = self.parent
+#                         while len(self.state) == 0  and isinstance(parent, PVObject):
+#                             state = parent.state
+#                             if isinstance(state, PVStateShard) and "micronsPerPixel" in state:
+#                                 break
+#                             parent = parent.parent
+                            
+                    # print(f"{self.__class__.__name__}.__call__: query scales for SOURCE {sdata_axis_1_info} - state keys: {tuple(state.keys)}")
+                    if isinstance(state, PVStateShard) and "micronsPerPixel" in state:
+                        sdata_axis_1_cal.resolution=float(state["micronsPerPixel"]["YAxis"].value)
+                        sdata_axis_1_cal.units = pq.um
+                    else:
+                        scipywarn(f"Cannot get the μm / pixel for axis {printStyled(f'{sdata_axis_1_info}', 'yellow')} in frame {printStyled(f'frame {self.index}', 'yellow')}")
                 sdata_axis_1_info = sdata_axis_1_cal.calibrateAxis(sdata_axis_1_info)
                 
                 if sdata.channelIndex == sdata.ndim:
@@ -1549,13 +1667,14 @@ class PVFrame(PVObject):
             
         return "".join(ret)
         
-class PVSCan(PVObject): pass # needed for PVSequence below; overwritten further down
+class PVScan(PVObject): pass # needed for PVSequence below; overwritten further down
 # NOTE: 2017-08-03 09:24:20
 # TODO: make the instances sortable by cycle number (found in attributes
 class PVSequence (PVObject):
-    r"""a PVSequence in PVSCan experiment file
+    r"""a PVSequence in PVScan experiment file
     """
-    def __init__(self, node, parent=PVSCan):
+    def __init__(self, node, parent=PVScan):
+        super().__init__()
         if node.nodeType != xmlutils.xml.dom.Node.ELEMENT_NODE or node.nodeName != "Sequence":
             raise ValueError("Expecting an element node named 'Sequence'")
         
@@ -1598,7 +1717,7 @@ class PVSequence (PVObject):
             self._syncZAxis_ = None
                 
         frameNodes = xmlutils.getChildren(node, tagName="Frame")
-        self.frames = list(map(lambda n: PVFrame(n, self), frameNodes))
+        self.frames = list(map(lambda n: PVFrame(n[1], n[0], self), enumerate(frameNodes)))
         
     def __len__(self):
         return len(self.frames)
@@ -2217,7 +2336,9 @@ class PVScan(PVObject):
     def __init__(self, doc:typing.Union[str, xmlutils.xml.dom.minidom.Document, pathlib.Path], 
                  config:typing.Optional[typing.Union[str, xmlutils.xml.dom.minidom.Document, pathlib.Path]] = None,
                  name=None):
+        super().__init__()
         self._path_ = None
+        self._parent_ = None
         self._mergeChannelsOnOutput_ = False
         self._systemConfiguration_ = None
         self._stateshard_ = None # NOTE: 2025-04-03 09:43:50 this is a PVStateShard in versions >= 5.5
@@ -2278,7 +2399,7 @@ class PVScan(PVObject):
         # containing a single document element named "Environment"; in PV 5.5.64
         # (the latest I have access to) there is the option of saving in the "old"
         # format - not sure if that means the configuration being stored as 
-        # before, in a "SystemConfiguration" node inside the main PVSCan file
+        # before, in a "SystemConfiguration" node inside the main PVScan file
         #
         # So I'm goint out on a limb, here, expect trouble
         if self.versionString < "5.5":
@@ -2307,7 +2428,7 @@ class PVScan(PVObject):
             if isinstance(self._path_, pathlib.Path): 
                 # self._path_ WAS set up above IF doc argument is a XML file.
                 # On the system I work with, the environment (or configuration) file 
-                # is saved in the same directory as the main PVSCan XML file
+                # is saved in the same directory as the main PVScan XML file
                 # So, going out on a limb here.
                 configFile = self._path_.with_suffix(".env")
                 config = pio.loadXML(configFile)
@@ -2648,7 +2769,7 @@ class PVScan(PVObject):
     
     @property
     def metadata(self):
-        r"""Returns metadata associated with this PVSCan
+        r"""Returns metadata associated with this PVScan
         """
         metadata = DataBag(mutable_types=True, allow_none=True)
         metadata["configuration"] = self.configuration.as_dict()
@@ -3290,7 +3411,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
     @safeWrapper
     def _slot_importPVScanFromWorkspace(self):
         vars_ = self.importWorkspaceData([xmlutils.xml.dom.minidom.Document, PVScan],
-                                         title="Import PVSCan",
+                                         title="Import PVScan",
                                          single=True)
         
         if len(vars_):
@@ -3299,7 +3420,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
             elif isinstance(vars_[0], PVScan):
                 self._pvscan_ = vars_[0]
             else:
-                self.errorMessage("Import PrairieView", "Expecting a PVSCan or an XML document; got %s instead." % type(vars_[0]).__name__)
+                self.errorMessage("Import PrairieView", "Expecting a PVScan or an XML document; got %s instead." % type(vars_[0]).__name__)
 
             signalblockers = [QtCore.QSignalBlocker(w) for w in (self.pvScanFileNameLineEdit, self.dataNameLineEdit)]
             self.pvScanFileNameLineEdit.setText("<imported>")

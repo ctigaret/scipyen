@@ -1287,6 +1287,7 @@ Arrays are concatenated in two ways, explained here by examples:
                 
             else:
                 if not axcal[key].isclose(img_axcal[key]):
+                    print("In vigrautils.concatenateImages:")
                     print(f"axcal[{key}] {axcal[key]}")
                     print(f"img_axcal[{key}] {img_axcal[key]}")
                     raise RuntimeError("Cannot concatenate images with non-matching calibration for axis %s" % key)
