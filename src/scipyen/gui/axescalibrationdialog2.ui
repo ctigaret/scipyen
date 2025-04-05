@@ -10,7 +10,7 @@
     <x>0</x>
     <y>0</y>
     <width>356</width>
-    <height>512</height>
+    <height>575</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -42,6 +42,12 @@
       <widget class="QSpinBox" name="axisIndexSpinBox">
        <property name="toolTip">
         <string>Select axis index</string>
+       </property>
+       <property name="statusTip">
+        <string>Select axis index</string>
+       </property>
+       <property name="whatsThis">
+        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Select the axis to calibrate, given the index of the axis. &lt;/p&gt;&lt;p&gt;&lt;a href=&quot;https://numpy.org/doc/stable/index.html&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#72b925;&quot;&gt;Numpy arrays&lt;/span&gt;&lt;/a&gt; associate a Cartesian system of axes, which are indexed starting with 0. &lt;span style=&quot; font-style:italic;&quot;&gt;1D arrays have a single axis&lt;/span&gt;. &lt;/p&gt;&lt;p&gt;For generic numpy arrays with at least two dimensions, the first axis (axis 0) is the vertical axis: iterating along its dimension points to an array &amp;quot;row&amp;quot;. &lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;The &lt;a href=&quot;https://ukoethe.github.io/vigra/&quot;&gt;&lt;span style=&quot; font-weight:600; text-decoration: underline; color:#72b925;&quot;&gt;Vigra&lt;/span&gt;&lt;/a&gt; library introduces the VigraArray, an enhanced form of numpy arrays where each axis has defined semantic (e.g. , space, time, etc) encapsulated in the concept of AxisTags. It is often useful to attach a physical dimension to such axes (units of measure for distance, time, etc). &lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;A VigraArray can have an additional axis representing the &amp;quot;channel&amp;quot; axis. This is useful particularly for multi-band, or multi-channel, images. In single-band images the channel axis, when present, has size 1 (a &amp;quot;singleton&amp;quot; axis). It makes sense to attach units of measure to this axis, too, thus giving a physical meaning to the channel data, when appropriate.&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;Raster image data represented by classes in the &lt;a href=&quot;https://www.qt.io/&quot;&gt;&lt;span style=&quot; font-weight:600; text-decoration: underline; color:#72b925;&quot;&gt;Qt framework&lt;/span&gt;&lt;/a&gt; (QImage, QPixmap) by definition have only two axes corresponding to the Cartesian system of the image. &lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
        </property>
       </widget>
      </item>
@@ -98,32 +104,22 @@
      <layout class="QGridLayout" name="gridLayout_2">
       <item row="0" column="0">
        <widget class="QLabel" name="label_5">
+        <property name="toolTip">
+         <string>Select a physical unit</string>
+        </property>
+        <property name="statusTip">
+         <string>Select a physical unit</string>
+        </property>
+        <property name="whatsThis">
+         <string>Select a physical unit</string>
+        </property>
         <property name="text">
          <string>&amp;Units:</string>
-        </property>
-        <property name="buddy">
-         <cstring>unitsLineEdit</cstring>
         </property>
        </widget>
       </item>
       <item row="0" column="1">
-       <widget class="QLineEdit" name="unitsLineEdit">
-        <property name="sizePolicy">
-         <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
-          <horstretch>0</horstretch>
-          <verstretch>0</verstretch>
-         </sizepolicy>
-        </property>
-        <property name="toolTip">
-         <string>Physical Units of the Selected Axis</string>
-        </property>
-        <property name="statusTip">
-         <string>Physical Units of the Selected Axis</string>
-        </property>
-        <property name="whatsThis">
-         <string>Physical Units of the Selected Axis</string>
-        </property>
-       </widget>
+       <widget class="QuantityChooserWidget" name="unitSelectionWidget" native="true"/>
       </item>
       <item row="1" column="0">
        <widget class="QLabel" name="label_2">
@@ -317,6 +313,14 @@ Select this to calculate it based on Resolution and Distance in pixels</string>
    </item>
   </layout>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>QuantityChooserWidget</class>
+   <extends>QWidget</extends>
+   <header location="global">gui.widgets.small_widgets</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
  <resources/>
  <connections>
   <connection>

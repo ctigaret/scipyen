@@ -54,8 +54,8 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
             self._unitFamilies = [unitFamily]
             
         else:
-            _irreds = [k for k in scq.UNITS_DICT if len(scq.UNITS_DICT[k]["irreducibles"])]
-            _derived = [k for k in scq.UNITS_DICT if len(scq.UNITS_DICT[k]["irreducibles"])==0]
+            _irreds = [k for k in scq.UNITS_DICT if len(scq.UNITS_DICT[k]["irreducible"])]
+            _derived = [k for k in scq.UNITS_DICT if len(scq.UNITS_DICT[k]["irreducible"])==0]
             self._unitFamilies = list(_irreds + _derived)
         
         # set up some defaults
@@ -94,7 +94,7 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
         combo_units = list()
         unscalables = set()
         
-        units = [u for u in scq.UNITS_DICT[self._currentUnitsFamily]["irreducibles"] | scq.UNITS_DICT[self._currentUnitsFamily]["derived"]]
+        units = [u for u in scq.UNITS_DICT[self._currentUnitsFamily]["irreducible"] | scq.UNITS_DICT[self._currentUnitsFamily]["derived"]]
         
         fdt_ = set()
         for u in units:
@@ -204,9 +204,11 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
             unit_index_in_family = None
             unit = value.units
             
+            unitFamily = scq.getUnitFamily(unit)
+            
             # find the units family where value's units might belong
             for k, family in enumerate(self._unitFamilies):
-                units = scq.UNITS_DICT[family]["irreducibles"] | scq.UNITS_DICT[family]["derived"]
+                units = scq.UNITS_DICT[family]["irreducible"] | scq.UNITS_DICT[family]["derived"]
                 u_names = [u.name for u in units]
                 
                 # then find the index of the value's units in the family of units

@@ -544,7 +544,7 @@ def getBaseUnitQuantities(x:pq.Quantity | pq.UnitQuantity):
                 ret.append(bbase)
     return ret
             
-def getUnitFamily(unit:typing.Union[pq.Quantity, pq.UnitQuantity]):
+def getUnitFamily(unit:typing.Union[pq.Quantity, pq.UnitQuantity], as_string:bool=True) -> typing.Union[str, list[str]]:
     r"""
     Retrieves the family of units for this quantity
     """
@@ -575,8 +575,10 @@ def getUnitFamily(unit:typing.Union[pq.Quantity, pq.UnitQuantity]):
                 ufamily.append(fml)
                 
         families.append(ufamily)
-        
-    return "; ".join(list(map(lambda x: " * ".join(x), more_itertools.partial_product(*families))))
+    if as_string:
+        return "; ".join(list(map(lambda x: " * ".join(x), more_itertools.partial_product(*families))))
+    else:
+        return families
         
     # family_exprs = list(msp)
     # ret = list()
