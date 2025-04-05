@@ -4783,23 +4783,33 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         backSession = self.currentSessionID - sessionNo
 
-        # TODO: explore constructing a command like %hist %rerun %recall line magics
-        # TODO: I'd need to store the line number as well, somehow, in the history tree widget
-        # TODO: in which case the history tree would have the items on 3 columns (session, line no, code)
-        # TODO: and these would be executed by self.ipkernel.shell.run_line_magic('recall', ...)
-        # NOTE: until then, we send the item's text to the shell by calling
-        # NOTE: self.ipkernel.shell.run_cell(cmd, store_history=True, silent=False, shell_futures=True)
-        # NOTE: see code comments in self.slot_initQtConsole()
-        self.ipkernel.shell.run_cell(
-            cmd, store_history=True, silent=False, shell_futures=True)
-        # NOTE: 2017-03-19 21:15:48 while this DOES go to the ipython's history
-        # NOTE: it DOES NOT go to the self.console.history_tail therefore calling the slot_updateHistory slot
-        # NOTE: won't work hence -- basically, console.history and shell history go out of sync
-        # NOTE: therefore we need to update OUR history manually
-        self.executionCount = self.ipkernel.shell.execution_count
-        self._updateHistoryView_(
-            self.executionCount-1, self.ipkernel.shell.history_manager.input_hist_raw[-1])
-        
+        currentMouseCursor = self.cursor()
+        self.statusBar().showMessage("Working...")
+        self.setCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
+        try:
+            # TODO: explore constructing a command like %hist %rerun %recall line magics
+            # TODO: I'd need to store the line number as well, somehow, in the history tree widget
+            # TODO: in which case the history tree would have the items on 3 columns (session, line no, code)
+            # TODO: and these would be executed by self.ipkernel.shell.run_line_magic('recall', ...)
+            # NOTE: until then, we send the item's text to the shell by calling
+            # NOTE: self.ipkernel.shell.run_cell(cmd, store_history=True, silent=False, shell_futures=True)
+            # NOTE: see code comments in self.slot_initQtConsole()
+            self.ipkernel.shell.run_cell(
+                cmd, store_history=True, silent=False, shell_futures=True)
+            # NOTE: 2017-03-19 21:15:48 while this DOES go to the ipython's history
+            # NOTE: it DOES NOT go to the self.console.history_tail therefore calling the slot_updateHistory slot
+            # NOTE: won't work hence -- basically, console.history and shell history go out of sync
+            # NOTE: therefore we need to update OUR history manually
+            self.executionCount = self.ipkernel.shell.execution_count
+            self._updateHistoryView_(
+                self.executionCount-1, self.ipkernel.shell.history_manager.input_hist_raw[-1])
+        except:
+            traceback.print_exc()
+            self.setCursor(currentMouseCursor)
+            raise()
+        self.statusBar().showMessage("Done!")
+        # self.statusBar().clearMessage()
+        self.setCursor(currentMouseCursor)
         # NOTE: 2023-05-25 21:47:27
         # don't call this anymore - let the workspaceModel deal with it;
         # otherwise this may generate double entries in the workspace viewer

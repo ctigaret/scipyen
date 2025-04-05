@@ -250,7 +250,12 @@ class ImageBrightnessDialog(QDialog, Ui_TransformImageValueDialog):
         
 
 class AxesCalibrationDialog(QDialog, Ui_AxesCalibrationDialog):
+    DefaultResolution = 1.0
+    DefaultOrigin = 0.0
+    DefaultUnits = scq.pixel_unit
+    
     def __init__(self, image:typing.Union[vigra.AxisTags, vigra.VigraArray], 
+                 calibration:typing.Optional[AxesCalibration] = None,
                  pWin=None, parent=None):
         super(AxesCalibrationDialog, self).__init__(parent)
         
@@ -260,20 +265,46 @@ class AxesCalibrationDialog(QDialog, Ui_AxesCalibrationDialog):
         if isinstance(image, vigra.AxisTags):
             self.axistags = image
             self._data_ = None
+            self.calibration = AxesCalibration(self.axistags)
             
         elif isinstance(image, vigra.VigraArray):
             self.axistags = image.axistags
             self.arrayshape = image.shape
             self._data_ = image
+            self.calibration = AxesCalibration(self.axistags)
+            
+        elif isinstance(image, AxesCalibration):
+            self.calibration = image
+            self._data_ = None
+            self.axistags = self.calibration.axistags
+            
+        elif isinstance(image, ((QtGui.QImage, QtGui.QPixmap))):
+            self._data_ = image
+            self.arrayshape = (image.width(), image.height())
+            if not isinstance(calibration, AxesCalibration):
+                self.calibration = AxesCalibration(vigra.VigraArray.defaultAxistags(2, noChannels=True))
+            else:
+                assert len(calibration.keys()) == 2, f"Unexpected number of axes in the calibration ({len(calibration.keys())}) for 2D data"
+                self.calibration = calibration
+            self.axistags = self.calibration.axistags
+            
+        elif isinstance(image, np.ndarray):
+            self._data_ = image
+            self.arrayshape = image.shape
+            if not isinstance(calibration, AxesCalibration):
+                self.calibration = AxesCalibration(vigra.VigraArray.defaultAxistags(image.ndim, noChannels=True))
+            else:
+                assert len(calibration.keys()) == image.ndim, f"Unexpected number of axes in the calibration ({len(calibration.keys())}) for an array with {image.ndim} axes"
+                self.calibration = calibration
+            self.axistags = self.calibration.axistags
+            
             
         else:
-            raise TypeError("A VigraArray instance was expected; got %d instead" % (type(image).__name__))
+            raise TypeError(f"A {type(image).__name__} object is not an image")
         
-        #self._data_ = image
-        
-        self.resolution = 1.0
-        self.origin = 0.0
-        self.units =  scq.pixel_unit
+        self.resolution = self.DefaultResolution
+        self.origin = self.DefaultOrigin
+        self.units =  self.DefaultUnits
         
         self.selectedAxisIndex = 0
         
@@ -285,11 +316,16 @@ class AxesCalibrationDialog(QDialog, Ui_AxesCalibrationDialog):
             self.axisMetaData[axisInfo.key]=dict()
             self.axisMetaData[axisInfo.key]["calibration"] = self.calibration[axisInfo.key]
             self.axisMetaData[axisInfo.key]["description"] = axisInfo.description
+            if isinstance(self.arrayshape, tuple):
+                self.axisMetaData[axisInfo.key]["length"] = self.arrayshape[self.axistags.index(axisInfo.key)]
+            else:
+                self.axisMetaData[axisInfo.key]["length"] = 0
             
         self.units          = self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].units
         self.origin         = self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].origin
         self.resolution     = self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].resolution
         self.description    = self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["description"]
+        self.axislength     = self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["length"]
         
         self._configureUI_()
         
@@ -341,6 +377,8 @@ class AxesCalibrationDialog(QDialog, Ui_AxesCalibrationDialog):
         
         self.resolutionSpinBox.valueChanged[float].connect(self.slot_resolutionChanged)
         
+        self.pixelsDistanceSpinBox.setValue(self.axislength)
+        
         self.pixelsDistanceSpinBox.valueChanged[int].connect(self.slot_pixelDistanceChanged)
         
         self.calibratedDistanceSpinBox.valueChanged[float].connect(self.slot_calibratedDistanceChanged)
@@ -351,11 +389,17 @@ class AxesCalibrationDialog(QDialog, Ui_AxesCalibrationDialog):
         
         self.axisDescriptionEdit.textChanged.connect(self.slot_descriptionChanged)
         
+        if isinstance(self._data_, (np.ndarray, QtGui.QImage, QtGui.QPixmap)):
+            # disable these, because the axis length in pixels is fixed by the data
+            self.pixelsDistanceSpinBox.setEnabled(False) 
+            self.pixelsDistanceRadioButton.setEnabled(False)
+        
     def updateFieldsFromAxis(self):
         self.units          = self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].units
         self.origin         = self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].origin
         self.resolution     = self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].resolution
         self.description    = self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["description"]
+        self.axislength     = self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["length"]
 
         if self.arrayshape is None:
             self.axisInfoLabel.setText("Axis key: %s, type: %s" % (self.axistags[self.selectedAxisIndex].key, axisTypeName(self.axistags[self.selectedAxisIndex])))
@@ -365,12 +409,14 @@ class AxesCalibrationDialog(QDialog, Ui_AxesCalibrationDialog):
         self.unitsLineEdit.setText(self.units.__str__().split()[1])
         self.originSpinBox.setValue(self.origin)
         self.resolutionSpinBox.setValue(self.resolution)
+        self.pixelsDistanceSpinBox.setValue(self.axislength)
+        self.calibratedDistanceSpinBox.setValue(self.resolution * self.pixelsDistanceSpinBox.value())
         
-        if self.resolutionRadioButton.isChecked():
-            self.calibratedDistanceSpinBox.setValue(self.resolution * self.pixelsDistanceSpinBox.value())
-            
-        else:
+        if not self.resolutionRadioButton.isChecked():
             self.slot_resolutionChanged(self.resolution)
+            # self.calibratedDistanceSpinBox.setValue(self.resolution * self.pixelsDistanceSpinBox.value())
+        # else:
+            # self.slot_resolutionChanged(self.resolution)
     
         self.axisDescriptionEdit.clear()
         self.axisDescriptionEdit.plainText = self.description
@@ -474,7 +520,7 @@ class AxesCalibrationDialog(QDialog, Ui_AxesCalibrationDialog):
             
             self.resolution = self.resolutionSpinBox.value()
             
-        elif self.pixelsDistanceRaioButton.isChecked(): # calculate pixels distance
+        elif self.pixelsDistanceRadioButton.isChecked(): # calculate pixels distance
             self.pixelsDistanceSpinBox.setValue(int(value // self.resolutionSpinBox.value()))
         
         self.slot_generateCalibration()
@@ -2341,6 +2387,14 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         self.addToolBar(QtCore.Qt.TopToolBarArea, self.toolBar)
         
+        self.imageToolBar = QtWidgets.QToolBar("Image Toolbar", self)
+        self.imageToolBar.setObjectName("ImageViewerImageToolBar")
+        self.imageToolBar.setMovable(False)
+        self.setAxesScalesAction = self.imageToolBar.addAction(QtGui.QIcon.fromTheme("settings-configure-symbolic"), "Axes scales")
+        self.setAxesScalesAction.triggered.connect(self.slot_axesScales)
+        
+        self.addToolBar(QtCore.Qt.TopToolBarArea, self.imageToolBar)
+        
         self.zoomToolBar = QtWidgets.QToolBar("Zoom Toolbar", self)
         self.zoomToolBar.setObjectName("ImageViewerZoomToolBar")
         self.zoomToolBar.setMovable(False)
@@ -2357,19 +2411,19 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
 
         self.addToolBar(QtCore.Qt.TopToolBarArea, self.zoomToolBar)
         
-        self.imageToolBar = QtWidgets.QToolBar("Image Toolbar", self)
-        self.imageToolBar.setObjectName("ImageViewerImageToolBar")
-        self.imageToolBar.setMovable(False)
-        self.setAxesScalesAction = self.imageToolBar.addAction(QtGui.QIcon.fromTheme("settings-configure-symbolic"), "Axes scales")
-        self.setAxesScalesAction.triggered.connect(self.slot_axesScales)
-        
     def _editColorMap(self):
         pass
     
     @Slot()
     def slot_axesScales(self):
-        dlg = AxesCalibrationDialog(self._axes_calibration_)
-        dlg.exec()
+        if isinstance(self._data_, vigra.VigraArray):
+            dlg = AxesCalibrationDialog(self._data_)
+        else:
+            dlg = AxesCalibrationDialog(self._axes_calibration_)
+        if dlg.exec() > 0:
+            self._axes_calibration_ = dlg.calibration
+            self._axes_calibration_.calibrateAxes()
+            self.displayFrame()
     
     @Slot(str)
     @safeWrapper

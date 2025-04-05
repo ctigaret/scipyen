@@ -2591,11 +2591,11 @@ class AxesCalibration(object):
     
     @property
     def axiskeys(self):
-        r"""A list of axiskeys
+        r"""A generator of axiskeys
         """
         yield from (cal.key for cal in self._calibration_)
     
-    #@property
+    # @property
     def keys(self):
         r"""Alias to self.axiskeys
         """
