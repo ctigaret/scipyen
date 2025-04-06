@@ -1766,6 +1766,14 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         
         self._winFlagsCache_ = self.windowFlags()
                 
+        if isinstance(self.console, consoles.ScipyenConsole):
+            if isinstance(self.console.active_frontend, consoles.ConsoleWidget):
+                # NOTE: 2025-04-06 17:28:19
+                # enable the %editor magic
+                if self.overrideSystemEditor:
+                    self.console.active_frontend.editor = self.scipyenEditor
+                else:
+                    self.console.active_frontend.editor = desktoputils.DEFAULT_EDITOR
 
     # BEGIN Properties
     

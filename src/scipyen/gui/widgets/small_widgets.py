@@ -37,7 +37,9 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
     """
     unitChanged = Signal(object, name="unitChanged")
     
-    def __init__(self, parent:typing.Optional[QtWidgets.QWidget]=None, unit:typing.Optional[pq.Quantity]=None, unitFamily:typing.Optional[str]=None):
+    def __init__(self, parent:typing.Optional[QtWidgets.QWidget]=None, 
+                 unit:typing.Optional[pq.Quantity]=None):#, 
+                 # unitFamily:typing.Optional[str]=None):
         r"""
         Named parameters:
         =================
@@ -50,24 +52,22 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
         """
         QWidget.__init__(self, parent=parent)
         
-        if unitFamily in scq.UNITS_DICT:
-            self._unitFamilies = [unitFamily]
-            
-        else:
-            _irreds = [k for k in scq.UNITS_DICT if len(scq.UNITS_DICT[k]["irreducible"])]
-            _derived = [k for k in scq.UNITS_DICT if len(scq.UNITS_DICT[k]["irreducible"])==0]
-            self._unitFamilies = list(_irreds + _derived)
+        _irreds = [k for k in scq.UNITS_DICT if len(scq.UNITS_DICT[k]["irreducible"])]
+        _derived = [k for k in scq.UNITS_DICT if len(scq.UNITS_DICT[k]["irreducible"])==0]
+        self._family_names, self._families = zip(*list(scq.UNITS_DICT.items()))
+        # self._unitFamilies = list(_irreds + _derived)
+#         if unitFamily in scq.UNITS_DICT:
+#             self._unitFamilies = [unitFamily]
+#             
+#         else:
+#             _irreds = [k for k in scq.UNITS_DICT if len(scq.UNITS_DICT[k]["irreducible"])]
+#             _derived = [k for k in scq.UNITS_DICT if len(scq.UNITS_DICT[k]["irreducible"])==0]
+#             self._unitFamilies = list(_irreds + _derived)
         
-        # set up some defaults
-        self._currentUnitsFamily = None # when set, this will be a str
-        self._currentFamilyUnits = list() # when set, this will be a list of pq.Quantity objects (UnitQuantity to be exact)
-        self._currentUnit = pq.dimensionless
+        self._currentUnit = unit.units if isinstance(unit, pq.Quantity) else pq.dimensionless
         
-        # NOTE: 2022-11-07 10:22:22
-        # will also set up:
-        # • self._currentUnitsFamily
-        # • self._currentFamilyUnits
-        # • self._currentUnit
+        self._getUnitFamilyAndUnitFamilyUnits(self._currentUnit)
+        
         self._configureUI_() # will also assign the initial value of self._currentUnitsFamily 
         
         if isinstance(unit, pq.Quantity):
@@ -80,99 +80,68 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
         
         self.unitFamilyComboBox.currentIndexChanged.connect(self._slot_refresh_unitComboBox)
         
-        
-        self._setupUnitCombo() # also sets up self._currentFamilyUnits
+        self._setupUnitCombo() 
         
         self.unitComboBox.setCurrentIndex(0)
         
-        self._selectedUnitIndex = self.unitComboBox.currentIndex()
+        self._unitIndexInFamily = self.unitComboBox.currentIndex()
         self.unitComboBox.currentIndexChanged.connect(self._slot_unitComboNewIndex)
         
-        self._currentUnit = self._currentFamilyUnits[self._selectedUnitIndex]
+        self._currentUnit = self._currentUnitFamilyUnits[self._unitIndexInFamily]
         
-    def _generateCurrentFamilyUnits(self):
-        combo_units = list()
-        unscalables = set()
+    def _getUnitFamilyAndUnitFamilyUnits(self, unit:pq.Quantity):
+        # print(f"{self.__class__.__name__}._getUnitFamilyAndUnitFamilyUnits (unit = {unit})")
+        family_name, directly_found = scq.getUnitFamily(unit, show_components=False, 
+                                                   as_string=True, 
+                                                   indicate_if_directly_found=True)
         
-        units = [u for u in scq.UNITS_DICT[self._currentUnitsFamily]["irreducible"] | scq.UNITS_DICT[self._currentUnitsFamily]["derived"]]
+        self._currentUnitsFamily = scq.UNITS_DICT[family_name]
+        self._currentUnitFamilyUnits = list(scq.familyUnits(family_name))
         
-        fdt_ = set()
-        for u in units:
-            try:
-                fdt_.add(u.dimensionality.simplified)
-            except:
-                unscalables.add(u)
-                
-        fdt = list(fdt_)
+        if not directly_found:
+            self._currentUnitFamilyUnits.insert(0, unit.units)
         
-        fdu_ = set()
-        for u in units:
-            try:
-                if u.dimensionality in fdt:
-                    fdu_.add(u)
-                else:
-                    unscalables.add(u)
-            except:
-                unscalables.add(u)
+        self._familyIndex = list(scq.UNITS_DICT).index(family_name)
         
-        fdu = list(fdu_)
-        
-        units_reduced = sorted([u for u in units if u not in fdu or (u in fdu and u.name not in [u_.name for u_ in fdu])], key = lambda x: x.name)
-        
-        for u in fdu:
-            combo_units.append(u)
-            u_s = set()
-            for uu in units_reduced:
-                try:
-                    u_scale = float(uu.rescale(u).magnitude)
-                    u_s.add((uu, u_scale))
-                except:
-                    unscalables.add(uu)
-                    continue
-            if len(u_s):
-                u_ss = sorted(list(u_s), key = lambda x: x[1])
-                combo_units += [v[0] for v in u_ss]
-                
-        combo_units += list(unscalables)
-        
-        self._currentFamilyUnits = list(combo_units)
+        self._unitIndexInFamily = self._currentUnitFamilyUnits.index(unit.units)
         
     def _setupFamilyCombo(self):
         r"""Called by _configureUI_ but also when manually setting the units family
         """
         signalBlocker = QtCore.QSignalBlocker(self.unitFamilyComboBox)
         self.unitFamilyComboBox.clear()
-        self.unitFamilyComboBox.addItems(self._unitFamilies)
-        if self._currentUnitsFamily in self._unitFamilies:
-            self.unitFamilyComboBox.setCurrentIndex(self._unitFamilies.index(self._currentUnitsFamily))
+        self.unitFamilyComboBox.addItems(self._family_names)
+        if self._currentUnitsFamily in self._families:
+            self.unitFamilyComboBox.setCurrentIndex(self._families.index(self._currentUnitsFamily))
         else:
             self.unitFamilyComboBox.setCurrentIndex(0)
-            self._currentUnitsFamily = self._unitFamilies[self.unitFamilyComboBox.currentIndex()]
+            self._currentUnitsFamily = self._families[self.unitFamilyComboBox.currentIndex()]
+            self._currentUnitFamilyUnits = list(scq.familyUnits(self._family_names[self.unitFamilyComboBox.currentIndex()]))
         
     def _setupUnitCombo(self):
         r"""Called by _configureUI_ but also when manually setting up a unit
         """
-        self._generateCurrentFamilyUnits()
+        # self._generateCurrentFamilyUnits()
         signalBlocker = QtCore.QSignalBlocker(self.unitComboBox)
         self.unitComboBox.clear()
-        self.unitComboBox.addItems([u.name for u in self._currentFamilyUnits])
-        u_names = [u.name for u in self._currentFamilyUnits]
+        u_names = [u.name for u in self._currentUnitFamilyUnits]
+        self.unitComboBox.addItems(u_names)
         if self._currentUnit.name in u_names:
             self.unitComboBox.setCurrentIndex(u_names.index(self._currentUnit.name))
         else:
             self.unitComboBox.setCurrentIndex(0)
-            self._currentUnit = self._currentFamilyUnits[self.unitComboBox.currentIndex()]
+            # self._currentUnit = self._currentUnitFamilyUnits[self.unitComboBox.currentIndex()]
         
     @Slot(int)
     def _slot_refresh_unitComboBox(self, value):
         self._currentUnitsFamily = self._unitFamilies[self.unitFamilyComboBox.currentIndex()]
         self._setupUnitCombo()
-        self._currentUnit = self._currentFamilyUnits[self.unitComboBox.currentIndex()]
+        self._currentUnit = self._currentUnitFamilyUnits[self.unitComboBox.currentIndex()]
         self.unitChanged.emit(self._currentUnit)
         
     @Slot(int)
     def _slot_unitComboNewIndex(self, value):
-        self._currentUnit = self._currentFamilyUnits[self.unitComboBox.currentIndex()]
+        self._currentUnit = self._currentUnitFamilyUnits[self.unitComboBox.currentIndex()]
         
         # print(f"self.__class__.__name__._slot_unitComboNewIndex {currentUnit}, type: {type(currentUnit).__name__}, dimensionality: {currentUnit.dimensionality}")
         
@@ -195,39 +164,21 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
         return self._currentUnit
     
     @currentUnit.setter
-    def currentUnit(self, value:typing.Optional[pq.Quantity]=None):
+    def currentUnit(self, value:typing.Optional[typing.Union[pq.UnitQuantity, pq.Quantity]]=None):
         if value is None:
             value = pq.dimensionless
             
-        if isinstance(value, pq.Quantity):
-            family_index = None
-            unit_index_in_family = None
-            unit = value.units
-            
-            unitFamily = scq.getUnitFamily(unit)
-            
-            # find the units family where value's units might belong
-            for k, family in enumerate(self._unitFamilies):
-                units = scq.UNITS_DICT[family]["irreducible"] | scq.UNITS_DICT[family]["derived"]
-                u_names = [u.name for u in units]
-                
-                # then find the index of the value's units in the family of units
-                # to be more accurate, use name, not the units itself
-                if unit in units and unit.name in u_names:
-                    unit_index_in_family = u_names.index(unit.name)
-                    family_index = k
-                    # exit loop after first units found
-                    break
-                
-            if isinstance(family_index, int) and family_index in range(self.unitFamilyComboBox.maxCount()):
-                if isinstance(unit_index_in_family, int) and unit_index_in_family in range(self.unitComboBox.maxCount()):
-                    signalBlockers = [QtCore.QSignalBlocker(w) for w in (self.unitFamilyComboBox, self.unitComboBox)]
-                    self.unitFamilyComboBox.setCurrentIndex(family_index)
-                    self.unitComboBox.setCurrentIndex(unit_index_in_family)
-                    self._currentUnitsFamily = self._unitFamilies[family_index]
-                    self._generateCurrentFamilyUnits()
-                    self._currentUnit = self._currentUnitsFamily[unit_index_in_family]
-                
+        self._getUnitFamilyAndUnitFamilyUnits(value)
+        self._currentUnit = self._currentUnitFamilyUnits[self._unitIndexInFamily]
+        
+        signalBlockers = [QtCore.QSignalBlocker(w) for w in (self.unitFamilyComboBox, self.unitComboBox)]
+        currentUnitComboboxIndex = self.unitFamilyComboBox.currentIndex()
+        if currentUnitComboboxIndex != self._familyIndex:
+            self.unitFamilyComboBox.setCurrentIndex(self._familyIndex)
+            self._setupUnitCombo()
+        else:
+            self.unitComboBox.setCurrentIndex(self._unitIndexInFamily)
+        
     def value(self):
         r"""For compatibilty with qd.QuickDialog"""
         return self.currentUnit

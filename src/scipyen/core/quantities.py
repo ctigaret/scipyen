@@ -15,12 +15,18 @@ N_A : Avogadro constant 6.02214076e23 mol⁻¹
 
 ¹ NOTE: These are aready contained in the "constants" module of the Quantities 
 package, as UnitConstant objects, but some are bound to rather "verbose" symbols
-e.g.:
+e.g., (considering to have executed 'import quantities as pq'):
 
 pq.constants.R
 pq.constants.Faraday_constant
 pq.constants.e
 pq.constants.Avogadro_constant
+
+WARNING for developers: 
+When imported, this module registers new units with Python Quantities module.
+This means that reloading this module after any modifications of the source
+code will BREAK things. If you modify this module, please restart Scipyen.
+
 
 """
 import inspect, typing, traceback, warnings, types, dataclasses
@@ -328,6 +334,23 @@ BinaryUnitsByPower = [pq.byte, pq.kibibyte, pq.mebibyte, pq.gibibyte,
                       pq.tebibyte, pq.pebibyte, pq.exbibyte, pq.zebibyte, 
                       pq.yobibyte]
 
+class FamilyUnitsMapping(dict):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+    def __getitem__(self, item):
+        if item in ("LuminousIntensity", ):
+            return super().__getitem__("Electromagnetism")
+        else:
+            return super().__getitem__(item)
+        
+    def __contains__(self, item):
+        if item in ("LuminousIntensity", ):
+            return super().__contains__("Electromagnetism")
+        else:
+            return super().__contains__(item)
+        
+
 def getInformationQuantity(v:int, asQuantity:bool=True) -> pq.Quantity | tuple:
     from core import quantities as scq
     import math
@@ -350,18 +373,17 @@ def getConstants():
         
     return ret
 
-def getUnits():
-    r"""Collects all units definitions.
+def getUnits() -> dict:
+    r"""Collects all physical unit definitions available to Scipyen.
     Units are defined in the Python Quantities package and augmented in this module.
-    Must be called AFTER importing this module, so that it contains the custom 
-    uniqt quantities defined in this module.
     
     Returns:
     ========
-    
-    unit_dict: mapping family name ↦ mapping irreducible ↦ set, derived ↦ set
-    irreducible: mapping UnitQuantity ↦ family name
-    derived: mapping UnitQuantity ↦ family name
+    A nested dictionary structure containing the mapping {family name ↦ value} 
+        where 'value' is a mapping with two elements:
+            "irreducible" ↦ set of irreducible UnitQuantity objects
+            "derived" ↦ set of derived UnitQuantity objects — are defined by an
+                        algebraic expression using other UnitQuantity objects.
     """
     
     unitsmodules = [(k,v) for (k,v) in pq.units.__dict__.items() if inspect.ismodule(v)] # + [pq.unitquantity]
@@ -373,7 +395,7 @@ def getUnits():
     
     main_families = sorted([u[1].__name__.replace("Unit", "") for u in uq if u[1].__name__.startswith("Unit") and not any(u[1].__name__.endswith(s) for s in ("Constant", "Quantity", "LuminousIntensity"))])
     
-    ret = dict((k, {"irreducible":set(), "derived":set()}) for k in main_families)
+    ret = FamilyUnitsMapping((k, {"irreducible":set(), "derived":set()}) for k in main_families)
     
     for module in unitsmodules:
         # check for all quantities
@@ -544,12 +566,58 @@ def getBaseUnitQuantities(x:pq.Quantity | pq.UnitQuantity):
                 ret.append(bbase)
     return ret
             
-def getUnitFamily(unit:typing.Union[pq.Quantity, pq.UnitQuantity], as_string:bool=True) -> typing.Union[str, list[str]]:
+def getUnitFamily(unit:typing.Union[pq.Quantity, pq.UnitQuantity], /, 
+                  show_components:bool=False,
+                  as_string:bool=True,
+                  indicate_if_directly_found:bool=False) -> typing.Union[str, list[str]]:
     r"""
-    Retrieves the family of units for this quantity
+    Retrieves the family of units for this quantity.
+    Parameters:
+    -----------
+    unit: a Python Quantity or UnitQuantity object
+    
+    Named parameters:
+    ----------------
+    show_components: bool, optional; default is False
+        • when False, returns the units family where 'unit' belongs;
+            this can be:, either 
+            ∘ a string (if 'as_string' parameter is True), 
+            ∘ a nested list [[<family>]] where <family> is the name of the 
+                identified unit family (if 'as_string' parameter is False)
+    
+        • when True, returns the families of the units that compose 'unit', as:
+            ∘ a string containing any algebraic relationship between them, e.g.:
+                Length * Time ** 2, for m/s² (i.e. acceleration) — when 
+                'as_string' parameter is True
+    
+            ∘ or a list e.g. [["Length"], ["Time"]] — when 'as_string' is False
+    
+    as_string: bool, optional; default is True
+        Specifies the format of the result (see above)
+    
+    indicate_if_directly_found: bool, optional; default is False
+        When True, the function returns, in addition to the unit families, a boolean
+        flag indicating that the unit was directly found in the returned family, or
+        not.
+    
+        This is used only when show_components is False.
+    
+        Useful for derived units (e.g. m/s²) which are not directly found among 
+        the unit quantities of a family, yet their dimensionality (or the 
+        dimensionality of their simplified form) maps onto that family.
+    
+        This information is helpful to GUI tools conceived to select a Quantity
+        given a family of units.
+        
+    
     """
+    # print(f"scq.getUnitFamily(unit={unit})")
+    
+    getUQSimp = lambda x: x if x._reference is x else x.simplified
+    
     if isinstance(unit, pq.UnitQuantity):
-        udim_pw = list(unit.simplified.dimensionality.items())
+        # udim_pw = list(unit.simplified.dimensionality.items())
+        udim_pw = list(getUQSimp(unit).dimensionality.items())
         
     elif isinstance(unit, pq.Quantity):
         udim_pw = list(unit.dimensionality.items())
@@ -557,13 +625,84 @@ def getUnitFamily(unit:typing.Union[pq.Quantity, pq.UnitQuantity], as_string:boo
     else:
         raise TypeError(f"Expecting a Quantity or UnitQuantity; got {type(unit).__name__} instead")
     
+    def __try_simp_dim__(x):
+        # needed because some units such as currencies cannot be 'simplified'
+        # (which requires algebraic conversion between unit quantities)
+        try:
+            return x.simplified.dimensionality
+        except:
+            return
+        
     families = list()
     ndims = len(udim_pw)
     
+    # 1) first, lookup the unit directly in the UNITS_DICT mapping;
+    # if found, and show_components is False (the default), then return the family;
+    # otherwise, carry on
+    for family, contents in UNITS_DICT.items():
+        uset = contents["irreducible"] | contents["derived"]
+        # CAUTION: This works only with UnitQuantity objects, which are hashable;
+        # Quantity objects are NOT hashable
+        if isinstance(unit, typing.Hashable):
+            if unit in uset and not show_components:
+                if as_string:
+                    return (family, True) if indicate_if_directly_found else family
+                else:
+                    return ([[family]], True) if indicate_if_directly_found else [[family]]
+            
+        else: # not hashable (i.e. a pq.Quantity) -> lookup via dimensionality
+            udims = list(map(lambda x: x.dimensionality, uset))
+            usimpdims = list(filter(lambda x: x is not None, map(lambda x: __try_simp_dim__(x), uset)))
+            unit_simpDim = __try_simp_dim__(unit)
+            if not show_components:
+                # the logic here is as follows:
+                # 1. if the dimensionality is found among the dimensionalities of
+                #  the derived units in the family, then return the family directly.,
+                #  and indicate (if asked) that the unit parameter was found in that
+                #  family. Otherwise:
+                # 2. check if the dimensionality of 'unit' parameter if among
+                #  the dimensionality of the simplified derived units in the family
+                # 3. if (2) produced no result, then check if the dimensionality
+                #  of the simplified form of the 'unit' parameter is among the
+                #  dimensionalities of the simplified forms of the units in this
+                #  family;
+                # 
+                # If either (2) and (3) produce a result, and if asked, then
+                # indicate that the 'unit' was not found DIRECTLY
+                if unit.dimensionality in udims:
+                    # derived unit are stored directly in the mapping
+                    if as_string:
+                        return (family, True) if indicate_if_directly_found else family
+                    else:
+                        return ([[family]], True) if indicate_if_directly_found else [[family]]
+                elif unit.dimensionality in usimpdims:
+                    if as_string:
+                        return (family, False) if indicate_if_directly_found else family
+                    else:
+                        return ([[family]], False) if indicate_if_directly_found else [[family]]
+                elif unit_simpDim in usimpdims:
+                    if as_string:
+                        return (family, False) if indicate_if_directly_found else family
+                    else:
+                        return ([[family]], False) if indicate_if_directly_found else [[family]]
+    
+    # 2) if (1) did not return, then unit is either:
+    # 2.a) a compound Unit that was not found in the UNITS_DICT mapping,
+    # 2.b) or show_components parameters is False; 
+    #
+    # Therefore, here we look up its components; in this case, return the familes
+    # of the component units and any algebraic relationship between them
+    # e.g. Length * Time ** 2, for m/s² (i.e. acceleration)
+    #
     for u, p in udim_pw:
+        # iterates through the units that compose this unit
+        # an irreducible unit has a single component
         ufamily = list()
         for family, contents in UNITS_DICT.items():
             uset = contents["irreducible"] | contents["derived"]
+            # if unit in uset:
+            #     ufamily.append(family)
+            #     break
             if u in uset:
                 if p > 1:
                     fml = f"{family} ** {p}"
@@ -575,6 +714,7 @@ def getUnitFamily(unit:typing.Union[pq.Quantity, pq.UnitQuantity], as_string:boo
                 ufamily.append(fml)
                 
         families.append(ufamily)
+        
     if as_string:
         return "; ".join(list(map(lambda x: " * ".join(x), more_itertools.partial_product(*families))))
     else:
@@ -608,7 +748,7 @@ def getUnitFamily(unit:typing.Union[pq.Quantity, pq.UnitQuantity], as_string:boo
 #     return families
         
     
-def familyUnits(family:str, kind:typing.Optional[str]=None):
+def familyUnits(family:str, kind:typing.Optional[str]=None) -> set:
     if family not in UNITS_DICT:
         raise ValueError(f"{family} is not a valid UnitQuantity family; valid units families are {list(UNITS_DICT.keys())}\n\n\t(see {__name__}.UNITS_DICT)")
     

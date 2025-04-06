@@ -279,18 +279,12 @@ StandardDesktopLocationQtInfos = tuple(map(lambda x: StandardLocationInfo(getatt
 # install pyxdg instead !!!
 # Currently (2023-04-30 13:45:34) I have no experience with xdgspec
 HAS_PYXDG = False
-# HAS_XDGSPEC = False
 try:
     import xdg # CAUTION this is from pyxdg
     HAS_PYXDG = True
     
 except:
     pass
-    # try:
-    #     import xdgspec
-    #     HAS_XDGSPEC = True
-    # except:
-    #     pass
     
 def get_wm():
     r"""Retrieves the name of the window manager, on Linux platforms.
@@ -1193,6 +1187,42 @@ def desktopPlaceUrl(p:DEPlace) -> QtCore.QUrl:
         raise TypeError(f"Expecting a DEPlace; instead, got {type(p).__name__}")
     url = p.url
     return url if isinstance(url, QtCore.QUrl) else QtCore.QUrl(url)
+
+def get_editor() -> str:
+    os_env_editor = os.getenv("EDITOR")
+    if isinstance(os_env_editor, str):
+        return os_env_editor
+    
+    elif sys.platform.startswith("linux") and  HAS_PYXDG:
+        try:
+            out = subprocess.run(["xdg-mime", "query", "default", "text/plain"],
+                                capture_output=True)
+            
+            if out.returncode == 0:
+                result = out.stdout.decode()
+                if result.endswith(".desktop"):
+                    locate = subprocess.run(["locate", result], capture_output=True)
+                    if locate.returncode == 0:
+                        dfiles = list(filter(lambda x: len(x.strip()) and not x.startswith(os.getenv("HOME")), locate.stdout.decode().split("\n")))
+                        if len(dfiles):
+                            dfile = pathlib.Path(dfiles[0]).absolute()
+                            if dfile.is_file():
+                                entry = dict(filter(lambda x: len(x)==2, map(lambda x: x.split("="), pio.loadText(dfile).split("\n"))))
+                                cmd = entry.get("Exec", None)
+                                if isinstance(cmd, str) and len(cmd.strip()):
+                                    # get rid of argument placeholders:
+                                    cmd = cmd.split()[0]
+                                    return cmd
+                                
+        except:
+            traceback.print_exc()
+            return ""
+        
+    else:
+        # TODO: 2025-04-06 21:36:16 FIXME
+        # how to find out the default text editor on Windows and MacOS?
+        return ""
+    
         
 def closestPlace(url:QtCore.QUrl, places:typing.Optional[PlacesMap]=None) -> DEPlace | None:
     # TODO 2025-02-21 13:48:06
@@ -1293,3 +1323,6 @@ class PlacesMonitor(QtCore.QObject):
     @Slot()
     def slot_bookmarksChanged(self):
         self.sig_bookmarksChanged.emit()
+
+
+DEFAULT_EDITOR = get_editor()

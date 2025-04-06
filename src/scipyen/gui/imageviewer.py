@@ -299,7 +299,6 @@ class AxesCalibrationDialog(QDialog, Ui_AxesCalibrationDialog):
                 self.calibration = calibration
             self.axistags = self.calibration.axistags
             
-            
         else:
             raise TypeError(f"A {type(image).__name__} object is not an image")
         
@@ -311,22 +310,22 @@ class AxesCalibrationDialog(QDialog, Ui_AxesCalibrationDialog):
         
         self.calibration = AxesCalibration(self.axistags)
         
-        self.axisMetaData = dict()
+        self.axesMetaData = dict()
         
         for axisInfo in self.axistags:
-            self.axisMetaData[axisInfo.key]=dict()
-            self.axisMetaData[axisInfo.key]["calibration"] = self.calibration[axisInfo.key]
-            self.axisMetaData[axisInfo.key]["description"] = axisInfo.description
+            self.axesMetaData[axisInfo.key]=dict()
+            self.axesMetaData[axisInfo.key]["calibration"] = self.calibration[axisInfo.key]
+            self.axesMetaData[axisInfo.key]["description"] = axisInfo.description
             if isinstance(self.arrayshape, tuple):
-                self.axisMetaData[axisInfo.key]["length"] = self.arrayshape[self.axistags.index(axisInfo.key)]
+                self.axesMetaData[axisInfo.key]["length"] = self.arrayshape[self.axistags.index(axisInfo.key)]
             else:
-                self.axisMetaData[axisInfo.key]["length"] = 0
+                self.axesMetaData[axisInfo.key]["length"] = 0
             
-        self.units          = self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].units
-        self.origin         = self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].origin
-        self.resolution     = self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].resolution
-        self.description    = self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["description"]
-        self.axislength     = self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["length"]
+        self.units          = self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].units
+        self.origin         = self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].origin
+        self.resolution     = self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].resolution
+        self.description    = self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["description"]
+        self.axislength     = self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["length"]
         
         self._configureUI_()
         
@@ -406,11 +405,11 @@ class AxesCalibrationDialog(QDialog, Ui_AxesCalibrationDialog):
             # self.pixelsDistanceRadioButton.setEnabled(False)
         
     def updateFieldsFromAxis(self):
-        self.units          = self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].units
-        self.origin         = self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].origin
-        self.resolution     = self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].resolution
-        self.description    = self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["description"]
-        self.axislength     = self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["length"]
+        self.units          = self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].units
+        self.origin         = self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].origin
+        self.resolution     = self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].resolution
+        self.description    = self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["description"]
+        self.axislength     = self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["length"]
 
         if self.arrayshape is None:
             self.axisInfoLabel.setText("Axis key: %s, type: %s" % (self.axistags[self.selectedAxisIndex].key, axisTypeName(self.axistags[self.selectedAxisIndex])))
@@ -437,7 +436,7 @@ class AxesCalibrationDialog(QDialog, Ui_AxesCalibrationDialog):
     def slot_axisIndexChanged(self, value):
         self.selectedAxisIndex = value
         self.updateFieldsFromAxis()
-        #self.slot_generateCalibration()
+        #self.slot_updateAxesMetaData()
         
     @Slot()
     @safeWrapper
@@ -449,7 +448,7 @@ class AxesCalibrationDialog(QDialog, Ui_AxesCalibrationDialog):
             pass
             #print("Try again!")
         
-        self.slot_generateCalibration()
+        self.slot_updateAxesMetaData()
 
     @Slot(bool)
     @safeWrapper
@@ -474,28 +473,25 @@ class AxesCalibrationDialog(QDialog, Ui_AxesCalibrationDialog):
     
     @Slot()
     @safeWrapper
-    def slot_generateCalibration(self):
-        self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].units = \
+    def slot_updateAxesMetaData(self):
+        self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].units = \
             eval("1*%s" % (self.unitsLineEdit.text()), pq.__dict__)
         
-        self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].origin = \
+        self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].origin = \
             self.origin
         
-        self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].resolution = \
+        self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].resolution = \
             self.resolution
         
-        self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["description"] = \
+        self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["description"] = \
             self.description
-        
-        
     
     @Slot(float)
     @safeWrapper
     def slot_originChanged(self, value):
         self.origin = value
         
-        self.slot_generateCalibration()
-
+        self.slot_updateAxesMetaData()
 
     @Slot(float)
     @safeWrapper
@@ -508,7 +504,7 @@ class AxesCalibrationDialog(QDialog, Ui_AxesCalibrationDialog):
             
         self.resolution = value
         
-        self.slot_generateCalibration()
+        self.slot_updateAxesMetaData()
 
     @Slot(int)
     @safeWrapper
@@ -521,7 +517,7 @@ class AxesCalibrationDialog(QDialog, Ui_AxesCalibrationDialog):
         elif self.calibratedDistanceRadioButton.isChecked(): # calculate calibrated distance
             self.calibratedDistanceSpinBox.setValue(self.resolutionSpinBox.value() * value)
     
-        self.slot_generateCalibration()
+        self.slot_updateAxesMetaData()
         
     @Slot(float)
     @safeWrapper
@@ -534,13 +530,13 @@ class AxesCalibrationDialog(QDialog, Ui_AxesCalibrationDialog):
         elif self.pixelsDistanceRadioButton.isChecked(): # calculate pixels distance
             self.pixelsDistanceSpinBox.setValue(int(value // self.resolutionSpinBox.value()))
         
-        self.slot_generateCalibration()
+        self.slot_updateAxesMetaData()
         
     @Slot()
     @safeWrapper
     def slot_descriptionChanged(self):
         self.description = self.axisDescriptionEdit.toPlainText()
-        self.slot_generateCalibration()
+        self.slot_updateAxesMetaData()
 
     def calculateResolution(self, pixels=None, distance=None):
         if pixels is None:
@@ -553,7 +549,7 @@ class AxesCalibrationDialog(QDialog, Ui_AxesCalibrationDialog):
         
         self.resolutionSpinBox.setValue(self.resolution)
 
-        self.slot_generateCalibration()
+        self.slot_updateAxesMetaData()
         
 class AxesCalibrationDialog2(QDialog, Ui_AxesCalibrationDialog2):
     DefaultResolution = 1.0
@@ -604,7 +600,6 @@ class AxesCalibrationDialog2(QDialog, Ui_AxesCalibrationDialog2):
                 self.calibration = calibration
             self.axistags = self.calibration.axistags
             
-            
         else:
             raise TypeError(f"A {type(image).__name__} object is not an image")
         
@@ -616,22 +611,22 @@ class AxesCalibrationDialog2(QDialog, Ui_AxesCalibrationDialog2):
         
         self.calibration = AxesCalibration(self.axistags)
         
-        self.axisMetaData = dict()
+        self.axesMetaData = dict()
         
         for axisInfo in self.axistags:
-            self.axisMetaData[axisInfo.key]=dict()
-            self.axisMetaData[axisInfo.key]["calibration"] = self.calibration[axisInfo.key]
-            self.axisMetaData[axisInfo.key]["description"] = axisInfo.description
+            self.axesMetaData[axisInfo.key]=dict()
+            self.axesMetaData[axisInfo.key]["calibration"] = self.calibration[axisInfo.key]
+            self.axesMetaData[axisInfo.key]["description"] = axisInfo.description
             if isinstance(self.arrayshape, tuple):
-                self.axisMetaData[axisInfo.key]["length"] = self.arrayshape[self.axistags.index(axisInfo.key)]
+                self.axesMetaData[axisInfo.key]["length"] = self.arrayshape[self.axistags.index(axisInfo.key)]
             else:
-                self.axisMetaData[axisInfo.key]["length"] = 0
+                self.axesMetaData[axisInfo.key]["length"] = 0
             
-        self.units          = self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].units
-        self.origin         = self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].origin
-        self.resolution     = self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].resolution
-        self.description    = self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["description"]
-        self.axislength     = self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["length"]
+        self.units          = self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].units
+        self.origin         = self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].origin
+        self.resolution     = self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].resolution
+        self.description    = self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["description"]
+        self.axislength     = self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["length"]
         
         self._configureUI_()
         
@@ -664,6 +659,7 @@ class AxesCalibrationDialog2(QDialog, Ui_AxesCalibrationDialog2):
         # #self.unitsLineEdit.returnPressed.connect(self.slot_unitsChanged)
         
         self.unitSelectionWidget.setValue(self.units)
+        self.unitSelectionWidget.unitChanged[object].connect(self.slot_unitsChanged)
         
         self.axisIndexSpinBox.valueChanged[int].connect(self.slot_axisIndexChanged)
         
@@ -713,18 +709,19 @@ class AxesCalibrationDialog2(QDialog, Ui_AxesCalibrationDialog2):
             # self.pixelsDistanceRadioButton.setEnabled(False)
         
     def updateFieldsFromAxis(self):
-        self.units          = self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].units
-        self.origin         = self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].origin
-        self.resolution     = self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].resolution
-        self.description    = self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["description"]
-        self.axislength     = self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["length"]
+        self.units          = self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].units
+        self.origin         = self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].origin
+        self.resolution     = self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].resolution
+        self.description    = self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["description"]
+        self.axislength     = self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["length"]
 
         if self.arrayshape is None:
             self.axisInfoLabel.setText("Axis key: %s, type: %s" % (self.axistags[self.selectedAxisIndex].key, axisTypeName(self.axistags[self.selectedAxisIndex])))
         else:
             self.axisInfoLabel.setText("Axis key: %s, type: %s, length: %d" % (self.axistags[self.selectedAxisIndex].key, axisTypeName(self.axistags[self.selectedAxisIndex]), self.arrayshape[self.selectedAxisIndex]))
             
-        self.unitsLineEdit.setText(self.units.__str__().split()[1])
+        self.unitSelectionWidget.setValue(self.units)
+        # self.unitsLineEdit.setText(self.units.__str__().split()[1])
         self.originSpinBox.setValue(self.origin)
         self.resolutionSpinBox.setValue(self.resolution)
         self.pixelsDistanceSpinBox.setValue(self.axislength)
@@ -742,21 +739,23 @@ class AxesCalibrationDialog2(QDialog, Ui_AxesCalibrationDialog2):
     @Slot(int)
     @safeWrapper
     def slot_axisIndexChanged(self, value):
+        self.slot_updateAxesMetaData()
         self.selectedAxisIndex = value
         self.updateFieldsFromAxis()
-        #self.slot_generateCalibration()
         
-    @Slot()
+    @Slot(object)
     @safeWrapper
-    def slot_unitsChanged(self):
-        try:
-            self.units = eval("1*%s" % (self.unitsLineEdit.text()), pq.__dict__)
-            #print("%s --> %s" % (self.unitsLineEdit.text(),self.units))
-        except:
-            pass
-            #print("Try again!")
+    def slot_unitsChanged(self, value):
+        print(f"{self.__class_.__name__}.slot_unitsChanged: value = {value}")
+        self.units = value
+        # try:
+        #     self.units = eval("1*%s" % (self.unitsLineEdit.text()), pq.__dict__)
+        #     #print("%s --> %s" % (self.unitsLineEdit.text(),self.units))
+        # except:
+        #     pass
+        #     #print("Try again!")
         
-        self.slot_generateCalibration()
+        self.slot_updateAxesMetaData()
 
     @Slot(bool)
     @safeWrapper
@@ -781,17 +780,20 @@ class AxesCalibrationDialog2(QDialog, Ui_AxesCalibrationDialog2):
     
     @Slot()
     @safeWrapper
-    def slot_generateCalibration(self):
-        self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].units = \
-            eval("1*%s" % (self.unitsLineEdit.text()), pq.__dict__)
+    def slot_updateAxesMetaData(self):
+        # units = self.unitSelectionWidget.value()
+        print(f"{self.__class__.__name__}.slot_updateAxesMetaData for {self.axistags[self.selectedAxisIndex].key}")
+        # self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].units = \
+        #     eval("1*%s" % (self.unitsLineEdit.text()), pq.__dict__)
+        self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].units = self.units
         
-        self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].origin = \
+        self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].origin = \
             self.origin
         
-        self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].resolution = \
+        self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].resolution = \
             self.resolution
         
-        self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["description"] = \
+        self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["description"] = \
             self.description
         
         
@@ -801,7 +803,7 @@ class AxesCalibrationDialog2(QDialog, Ui_AxesCalibrationDialog2):
     def slot_originChanged(self, value):
         self.origin = value
         
-        self.slot_generateCalibration()
+        self.slot_updateAxesMetaData()
 
 
     @Slot(float)
@@ -815,7 +817,7 @@ class AxesCalibrationDialog2(QDialog, Ui_AxesCalibrationDialog2):
             
         self.resolution = value
         
-        self.slot_generateCalibration()
+        self.slot_updateAxesMetaData()
 
     @Slot(int)
     @safeWrapper
@@ -828,7 +830,7 @@ class AxesCalibrationDialog2(QDialog, Ui_AxesCalibrationDialog2):
         elif self.calibratedDistanceRadioButton.isChecked(): # calculate calibrated distance
             self.calibratedDistanceSpinBox.setValue(self.resolutionSpinBox.value() * value)
     
-        self.slot_generateCalibration()
+        self.slot_updateAxesMetaData()
         
     @Slot(float)
     @safeWrapper
@@ -841,13 +843,13 @@ class AxesCalibrationDialog2(QDialog, Ui_AxesCalibrationDialog2):
         elif self.pixelsDistanceRadioButton.isChecked(): # calculate pixels distance
             self.pixelsDistanceSpinBox.setValue(int(value // self.resolutionSpinBox.value()))
         
-        self.slot_generateCalibration()
+        self.slot_updateAxesMetaData()
         
     @Slot()
     @safeWrapper
     def slot_descriptionChanged(self):
         self.description = self.axisDescriptionEdit.toPlainText()
-        self.slot_generateCalibration()
+        self.slot_updateAxesMetaData()
 
     def calculateResolution(self, pixels=None, distance=None):
         if pixels is None:
@@ -860,7 +862,7 @@ class AxesCalibrationDialog2(QDialog, Ui_AxesCalibrationDialog2):
         
         self.resolutionSpinBox.setValue(self.resolution)
 
-        self.slot_generateCalibration()
+        self.slot_updateAxesMetaData()
         
 class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     closeMe                 = Signal(int)
@@ -2743,7 +2745,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             
         if dlg.exec() > 0:
             self._axes_calibration_ = dlg.calibration
-            if isinstance(self._data_attributes_, vigra.VigraArray):
+            if isinstance(self._data_, vigra.VigraArray):
                 self._axes_calibration_.calibrateAxes()
             self.displayFrame()
     
@@ -2942,7 +2944,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                                 sval = "(%s)" % "; ".join(["%.2f" % v for v in val])
                         
                         else: 
-                            # NOITE: 2022-10-06 17:15:22
+                            # NOTE: 2022-10-06 17:15:22
                             # single channel => channelCalibration only has ONE channel
                             # but WARNING: if calling with index argument, one MUST specify
                             # the value of the channel's property, which is not always
