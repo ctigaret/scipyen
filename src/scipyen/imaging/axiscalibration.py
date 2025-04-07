@@ -933,7 +933,7 @@ class CalibrationData(object):
             
         elif isinstance(val, pq.Quantity):
             if not unitsConvertible(val.units, self.units.units):
-                raise TypeError(f"Resolution units ({val.units}) incompatible with my units ({self.units.units})")
+                raise TypeError(f"New resolution units ({val.units}) are incompatible with my units ({self.units.units})")
             
             if val.units != self.units.units:
                 val = val.rescale(self.units.units)
@@ -1083,6 +1083,7 @@ class ChannelCalibrationData(CalibrationData):
             
     @property
     def index(self):
+        r"""Index of channel where this calibration applies"""
         return self._data_.index
     
     @index.setter
@@ -1175,14 +1176,7 @@ class AxisCalibrationData(CalibrationData):
             if val != vigra.AxisType.Channels and self._data_.type == vigra.AxisType.Channels:
                 for c in self.channels:
                     self._data_.pop(c[0], None)
-                #if len(list(self.channels)):
-                    ## switch AWAY FROM Channels:
-                    ## remove channels
-                    #chcals = [k for k in self._data_ if k.startswith("channel")]
-                    
-                    #for k in chcals:
-                        #self._data_.pop(k, None)
-                        
+
             self._data_.type = val
             self._data_.units = axisTypeUnits(val)
             self._data_.name = axisTypeName(val)

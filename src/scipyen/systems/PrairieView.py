@@ -1375,18 +1375,6 @@ class PVFrame(PVObject):
                 # such as gain & laser power, ONLY WHEN APPROPRIATE (e.g. in a Z series)
                 # 
                 state = self.parent.parent.state
-#                 if self.index == 0:
-#                     state = self.parent.parent.state
-#                 else:
-#                     state = self.state
-#                     
-#                 if not isinstance(state, PVStateShard) or len(state) == 0 or "micronsPerPixel" not in state:
-#                     parent = self.parent
-#                     while len(self.state) == 0  and isinstance(parent, PVObject):
-#                         state = parent.state
-#                         if isinstance(state, PVStateShard) and "micronsPerPixel" in state:
-#                             break
-#                         parent = parent.parent
                         
                 # print(f"{self.__class__.__name__}.__call__: query scales for {fdata_axis_0_info} - state keys: {tuple(state.keys)}")
                 if isinstance(state, PVStateShard) and "micronsPerPixel" in state:
