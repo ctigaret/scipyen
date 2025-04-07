@@ -2029,7 +2029,7 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
                         # was not found (e.g. in the case of external kernels)
                         
                         master = self.find_master_tab(closing_widget)
-                        print("master", master)
+                        # print(f"{self.__class__.__name__}close_tab: master: {master}")
                         
                         self.find_master_tab(closing_widget).execute('exit') 
                         

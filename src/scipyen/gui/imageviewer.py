@@ -746,7 +746,7 @@ class AxesCalibrationDialog2(QDialog, Ui_AxesCalibrationDialog2):
     @Slot(object)
     @safeWrapper
     def slot_unitsChanged(self, value):
-        print(f"{self.__class_.__name__}.slot_unitsChanged: value = {value}")
+        print(f"{self.__class__.__name__}.slot_unitsChanged: value = {value}")
         self.units = value
         # try:
         #     self.units = eval("1*%s" % (self.unitsLineEdit.text()), pq.__dict__)
@@ -2744,6 +2744,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             dlg = AxesCalibrationDialog2(self._axes_calibration_)
             
         if dlg.exec() > 0:
+            print(f"{self.__class__.__name__}.slot_axesScales: dlg.calibration = {dlg.calibration}")
             self._axes_calibration_ = dlg.calibration
             if isinstance(self._data_, vigra.VigraArray):
                 self._axes_calibration_.calibrateAxes()

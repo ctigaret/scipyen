@@ -1766,14 +1766,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         
         self._winFlagsCache_ = self.windowFlags()
                 
-        if isinstance(self.console, consoles.ScipyenConsole):
-            if isinstance(self.console.active_frontend, consoles.ConsoleWidget):
-                # NOTE: 2025-04-06 17:28:19
-                # enable the %editor magic
-                if self.overrideSystemEditor:
-                    self.console.active_frontend.editor = self.scipyenEditor
-                else:
-                    self.console.active_frontend.editor = desktoputils.DEFAULT_EDITOR
+        self._updateConsolesEditor()
 
     # BEGIN Properties
     
@@ -2401,6 +2394,9 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             self._scipyenEditor = val
         else:
             self._scipyenEditor = ""
+            
+        self._updateConsolesEditor()
+        # self._updateConsolesEditor(False)
 
     @property
     def overrideSystemEditor(self):
@@ -2413,7 +2409,9 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         sigBlock = QtCore.QSignalBlocker(
             self.actionUse_system_s_default_code_editor)
         self.actionUse_system_s_default_code_editor.setChecked(
-            self._overrideSystemEditor)
+            not self._overrideSystemEditor)
+        
+        self._updateConsolesEditor()
 
     @markConfigurable("LastCommandSearch", "Qt")
     @lastCommandSearch.setter
@@ -2634,7 +2632,33 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.workspaceModel.bindObjectInNamespace(workspace_win_varname, win)
 
         return win
-
+    
+    def _updateConsolesEditor(self, target:typing.Optional[str]=None):
+        if isinstance(target, str):
+            if target.lower() == "internal":
+                console_objects = [self.console]
+            elif target.lower() == "external":
+                console_objects = [self.external_console]
+            else:
+                console_objects = [self.console, self.external_console]
+        else:
+            console_objects = [self.console, self.external_console]
+        
+        for console in console_objects:
+            if isinstance(console, (consoles.ScipyenConsole, consoles.ExternalIPython)):
+                if isinstance(console.active_frontend, consoles.ConsoleWidget):
+                    # NOTE: 2025-04-06 17:28:19
+                    # for the %edit magic:
+                    if self.overrideSystemEditor and isinstance(self.scipyenEditor, str): # allow empty string to wipe out the editor
+                        console.active_frontend.editor = self.scipyenEditor
+                    else:
+                        # normally this might set up in jupyer configuration files,
+                        # so do not override it
+                        if len(console.active_frontend.editor.strip()) == 0:
+                            if isinstance(desktoputils.DEFAULT_EDITOR, str) and len(desktoputils.DEFAULT_EDITOR.strip()):
+                                console.active_frontend.editor = desktoputils.DEFAULT_EDITOR
+                            
+                            
     def _adopt_mpl_figure(self, fig: mpl.figure.Figure):
         r"""Gives a FigureCanvasQTAgg to fig.
         To be used only with mpl Figure created directly from their c'tor, i.e.,
@@ -2916,10 +2940,12 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         d.editorNameInput = editorNameInput
         if d.exec() == QtWidgets.QDialog.Accepted:
             self.scipyenEditor = d.editorNameInput.text()
+            
+            
 
     @Slot(bool)
     def _slot_setOverrideSystemEditor(self, val):
-        self.overrideSystemEditor = val == True
+        self.overrideSystemEditor = val == False
 
     @Slot()
     def slot_launchExternalRunningIPython(self):
@@ -3155,6 +3181,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                     self.external_console.execute(cmd_foreign_shell_ns_hidden_listing(namespace=ns))
                     if isinstance(new, str) and str == "neuron_ext":
                         self.external_console.window.start_neuron_in_current_tab()
+                        
+        self._updateConsolesEditor("external")
 
     # END   Methods
 
@@ -3466,6 +3494,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # NOTE: 2021-10-18 11:28:25
         # The following must be called when console has become visible!
         self.console.consoleWidget.set_pygment(self.console.consoleWidget._console_pygment)
+        
+        self._updateConsolesEditor("internal")
         
 #         verstr = f"'Scipyen is using Qt {QtCore._qt_version}, neo {neo.__version__}, VIGRA {vigra.version}'"
 #         
@@ -9078,3 +9108,6 @@ class WindowEventFilter(QtCore.QObject):
                     self.scipyenWindow.raiseWindow(self.fig)
 
         return False  # do not block the event; pass it on to obj
+
+
+

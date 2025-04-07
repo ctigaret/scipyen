@@ -96,7 +96,7 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
                                                    indicate_if_directly_found=True)
         
         self._currentUnitsFamily = scq.UNITS_DICT[family_name]
-        self._currentUnitFamilyUnits = list(scq.familyUnits(family_name))
+        self._currentUnitFamilyUnits = sorted(list(scq.familyUnits(family_name)), key = lambda x: x.name)
         
         if not directly_found:
             self._currentUnitFamilyUnits.insert(0, unit.units)
@@ -116,7 +116,7 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
         else:
             self.unitFamilyComboBox.setCurrentIndex(0)
             self._currentUnitsFamily = self._families[self.unitFamilyComboBox.currentIndex()]
-            self._currentUnitFamilyUnits = list(scq.familyUnits(self._family_names[self.unitFamilyComboBox.currentIndex()]))
+            self._currentUnitFamilyUnits = sorted(list(scq.familyUnits(self._family_names[self.unitFamilyComboBox.currentIndex()])), key = lambda x: x.name)
         
     def _setupUnitCombo(self):
         r"""Called by _configureUI_ but also when manually setting up a unit
@@ -124,7 +124,7 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
         # self._generateCurrentFamilyUnits()
         signalBlocker = QtCore.QSignalBlocker(self.unitComboBox)
         self.unitComboBox.clear()
-        u_names = [u.name for u in self._currentUnitFamilyUnits]
+        u_names = list(map(lambda x: x.name, self._currentUnitFamilyUnits))
         self.unitComboBox.addItems(u_names)
         if self._currentUnit.name in u_names:
             self.unitComboBox.setCurrentIndex(u_names.index(self._currentUnit.name))
