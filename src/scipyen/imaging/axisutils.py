@@ -842,7 +842,50 @@ def isValidAxisType(x:typing.Union[vigra.AxisType, int]):
     
     return False
 
-def isSpecificAxisType(x:typing.Union[vigra.AxisType, int, str]):
+def isElementaryAxisType(x:typing.Union[vigra.AxisType, int, str]) -> bool:
+    r"""Checks if the parameter is or resolves to an elementary AxisType flag.
+    Elementary AxisType flags, and their corresponding integer values, are:
+        'vigra.AxisType.Channels'           ↦   1
+        'vigra.AxisType.Space'              ↦   2
+        'vigra.AxisType.Angle'              ↦   4
+        'vigra.AxisType.Time'               ↦   8
+        'vigra.AxisType.Frequency'          ↦  16
+        'vigra.AxisType.Edge'               ↦  32
+        'vigra.AxisType.UnknownAxisType'    ↦  64
+    
+    A 'compound' AxisType flag¹ is the result of a binary OR operator on any
+        combination of AxisType flags. 
+    
+        Builtin compund AxisType flags:
+    
+        'vigra.AxisType.NonChannel'         ↦  94
+            Counter-intuitively, this is the logical OR between elementary
+            AxisType flags EXCEPT the 'Channels' and 'Edge' flag
+    
+        'vigra.AxisType.AllAxes'            ↦ 127
+            This is the logical OR between all elementary AxisType flags
+    
+        NOTE:¹ With the exceptions of AllAxes and NonChannel, these combinations 
+            do NOT result in another vigra.AxisType value, but in an integer.
+    
+    
+        Examples of combinations:
+    
+            vigra.AxisType.Angle | vigra.AxisType.Frequency
+        
+            vigra.AxisType.Space | vigra.AxisType.Frequency (e.g for the result of 
+                Fourier transform in the space domain)
+        
+            vigra.AxisType.Time | vigra.AxisType.Frequency (e.g for the result of 
+                Fourier transform in the time domain)
+    
+        By contrast, combining a Channel Axis with a NonChannel axis MIGHT make
+        sense, if the set of pixel data values represent some physical measure 
+        related to any of the NonChannel domains listed above (space, time,
+        space-frequency, time-frequency, etc)
+    
+    
+    """
     if isinstance(x, str):
         x = axisTypeFromString(x)
         
