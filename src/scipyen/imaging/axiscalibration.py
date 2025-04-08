@@ -7,6 +7,7 @@
 # re-design based on dataclasses - NOW!
 
 import numbers, operator, math, dataclasses
+from dataclasses import (dataclass, MISSING, field)
 import inspect, functools, itertools, traceback, typing, warnings
 from collections import deque
 from collections.abc import Sequence
@@ -55,6 +56,12 @@ from .axisutils import (axisTypeName,
 
 AxisCalibrationDataType = typing.TypeVar("AxisCalibrationData")
 
+# @dataclass
+# class CalibrationData:
+#     units:pq.Quantity = field(default=pq.arbitrary_unit)
+    
+    
+
 class CalibrationData(object):
     r"""Superclass for AxisCalibrationData and ChannelCalibrationData types.
     
@@ -85,7 +92,7 @@ class CalibrationData(object):
     NOTE 1: calibration fields (as set up in here and derived :classes:)
     are only checked at initialization time.
     
-    NOTE 2: CalibrationData assumes a linear (1st order) model
+    NOTE 2: CalibrationData for NonChannel axes assumes a linear (1st order) model
     
     
     """
@@ -207,11 +214,25 @@ class CalibrationData(object):
                             'description' attribute, if it contains an
                             XML-formatted calibration substring, else determine
                             default values from the parameter's 'key' and 
-                            'typeFlags' attributes.
+                            'typeFlags' attributes. 
+    
+                            For a Channels axis, if the 'channels' keyword is given 
+                            as an int value >= 1 then that many default ChannelCalibrationData
+                            objects will be created for the axis. If the 'channels' 
+                            keyword is a sequence of ChannelCalibrationData objects, 
+                            then thesewill be used to populate the AxisCalibrationData for 
+                            this Channels axis. Otherwise, it is assumed that the 
+                            Channels axis has only one channel.
+    
+                            WARNING: it is the responsibility of the caller to 
+                            ensure that the number of ChannelCalibrationData
+                            objects or the int value of in "channels" matches the 
+                            size of the array along the Channels axis.
                             
                             The object will be fully initialized by the first 
                             parameter of this type and all other var-positional
-                            and var-keyword parameters are ignored.
+                            and var-keyword parameters are ignored, except for
+                            the 'channels' keyword.
                             
         dict                Calibration fields set up from the key/value pairs
                             if appropriate (verified by CalibrationData.isCalibration).
@@ -289,8 +310,8 @@ class CalibrationData(object):
             
         The valid keyword literals and value types are:
         
-        'type': `vigra.AxisType`, `int` (logical OR of `vigra.AxisType` flags), 
-                or `str`
+        'type': vigra.AxisType, int (logical OR of vigra.AxisType flags), 
+                or str
         
             When a `str` this can be a vigra.AxisInfo 'key' or a descriptive 
                 string (see axisutils.axisTypeFromString() for details)
@@ -302,8 +323,8 @@ class CalibrationData(object):
         
         'index': int -> only for ChannelCalibrationData; sets up 'index' field
         
-        'units': `str`, `Python quantities.Quantity`, or 
-                `quantities.dimensionality.Dimensionality`
+        'units': str, Python quantities.Quantity, or 
+                quantities.dimensionality.Dimensionality
                 
         'origin', 'minimum', 'resolution', 'maximum -> scalars:
             Python Quantity or numpy array, int, cmplex, or float (including 
@@ -316,9 +337,8 @@ class CalibrationData(object):
             'minimum' is an alias to 'origin'; 'maxium' is only used for 
             ChannelCalibrationData)
     
-        'virtual':bool - used for ChannelCalibrationData; default is False; set 
-            this to True for virtual channel axes
-        
+        "channels": int or sequence of ChannelCalibrationData, or None.
+    
         """
         # FIXME 2021-10-22 09:48:23
         # a DataBag here gets "sliced" in :subclasses: of CalibrationData
@@ -345,15 +365,19 @@ class CalibrationData(object):
                 self._data_.update(args[0]._data_)# copy c'tor
                 return
             
-        # cache channel calibration data structures there may be in kwargs, in 
-        # order to ensure consistency; these would be given as key=value pairs
-        # where key = channel name; value = a ChannelCalibrationData or a
-        # mapping with valid ChannelCalibrationData structure; the 'keys' must
-        # NOT be a valid parameter name for this class
-        channeldata = [(k, ChannelCalibrationData(v)) for k,v in kwargs.items() if ChannelCalibrationData.isCalibration(v) and k not in self.__class__.parameters]
+        # get the channel specification, if any
+        channels for kwargs.pop("channels", None)
         
-        for c in channeldata:
-            kwargs.pop(c[0], None)
+        if isinstance(channels, int) and channels >= 1:
+            channelData = list(map(lambda x: ChannelCalibrationData(0.0, 1.0, maximum=np.nan, name=f"channel_{x}"), range(channels)))
+        elif isinstance(channels, (tuple, list, deque)) and all(isinstance(c, ChannelCalibrationData) for c in channels):
+            channelData = channels
+        else:
+            channelData = tuple() # leave this empty because it indicates that
+            # we're calibrating a NonChannel axis, when an arg is of type int
+        
+        # for c in channeldata:
+        #     kwargs.pop(c[0], None)
         
         # now, just go ahead and use the remaining var-positional parameters in
         # args
@@ -400,12 +424,12 @@ class CalibrationData(object):
                         # will overwrite it
                         self._data_.type = axisTypeFromString(arg)
                         
-                        # just to be clear: if var-keyword parameters contain
-                        # channel calibration data, then we force this to be
-                        # a calibration for a Channels axis, in case self._data_.type
-                        # was set to an incorrect value by axisTypeFromString
-                        if len(channeldata):
-                            self._data_.type = vigra.AxisType.Channels
+                        # # just to be clear: if var-keyword parameters contain
+                        # # channel calibration data, then we force this to be
+                        # # a calibration for a Channels axis, in case self._data_.type
+                        # # was set to an incorrect value by axisTypeFromString
+                        # if len(channeldata):
+                        #     self._data_.type = vigra.AxisType.Channels
                         
                         if isElementaryAxisType(self._data_.type):
                             if not isinstance(self._data_.name, str) or len(self._data_.name.strip()) == 0:
@@ -431,8 +455,8 @@ class CalibrationData(object):
                     if not isElementaryAxisType(self._data_.type):
                         self._data_.type = arg
                         
-                        if len(channeldata):
-                            self._data_.type = vigra.AxisType.Channels
+                        # if len(channeldata):
+                        #     self._data_.type = vigra.AxisType.Channels
                         
                         if not isinstance(self._data_.name, str) or len(self._data_.name.strip()) == 0:
                             self._data_.name = axisTypeName(self._data_.type)
@@ -458,8 +482,8 @@ class CalibrationData(object):
                                 if len(test):
                                     self._data_.type = functools.reduce(operator.or_, test)
                                     
-                        if len(channeldata):
-                            self._data_.type = vigra.AxisType.Channels
+                        # if len(channelData):
+                        #     self._data_.type = vigra.AxisType.Channels
                                 
                         if isElementaryAxisType(self._data_.type):
                             if not isinstance(self._data_.name, str) or len(self._data_.name.strip()) == 0:
@@ -554,13 +578,16 @@ class CalibrationData(object):
                         self._data_.maximum = arg
                         
             elif isinstance(arg, vigra.AxisInfo):
+                # the MOST common use!
+                # ---------------------
                 # will use calibration string embedded in the AxisInfo.description
                 # if found;
                 # the values of the AsisInfo's typeFlags & key attributes take
                 # precedence over the calibration string if the latter is not
                 # conforming
                 # in either case the AxisInfo's description will NOT be updated;
-                # this MUST be done separately
+                # this MUST be done separately i.e. by calling calibrateAxis or
+                # calibrateAxes
                 
                 if self.__class__ == AxisCalibrationData:
                     axtype = arg.typeFlags
@@ -574,13 +601,38 @@ class CalibrationData(object):
                         self._data_.type = axtype
                         self._data_.key = axkey
                         self._data_.name = axisTypeName(self._data_.type)
-                        self._data_.units = axisTypeUnits(self._data_.type)
-                        self._data_.origin = 0.
-                        self._data_.resolution = 1. if arg.resolution == 0. else arg.resolution
                         # bring back channel calibrations if appropriate
+                        # NOTE: 2025-04-08 21:58:50
+                        # for a Channels axis we do NOT store units, origin and
+                        # resolution for this axis anymore; instead, we store the
+                        # the ChannelCalibrationData for each channnel, as 
+                        # an attribute named after the channel; 
+                        #
+                        # if the channel axis is virtual, the we set the "virtual"
+                        # flag to True in the ChannelCalibrationData
+                        #
+                        # A "virtual" channel axis is one where the index of the
+                        # channel axis equals the number of dimensions of the array
                         if self._data_.type & vigra.AxisType.Channels:
-                            for k, chcal in enumerate(channeldata):
-                                self._data_[chcal[0]] = chcal[1]
+                            # FIXME 2025-04-08 22:12:38
+                            # what if more channels are given, than they actually exist?
+                            # in the axis? that's up to the caller to ensure 
+                            # no mismatch
+                            #
+                            # it is also up to the caller to make sure the units
+                            # are OK.
+                            if len(channelData):
+                                for chcal in channelData:
+                                    self._data_[chcal.name] = chcal
+                                    
+                            else:
+                                chcal = ChannelCalibrationData(0.0, 1.0, maximum=np.nan, name="channel_0"), 
+                                self._data_[chcal.name] = chcal
+                                
+                        else:
+                            self._data_.units = axisTypeUnits(self._data_.type)
+                            self._data_.origin = axorigin
+                            self._data_.resolution = 1. if arg.resolution == 0. else arg.resolution
                         
                     else:
                         cal = AxisCalibrationData.fromCalibrationString(arg.description[cal_str_start_stop[0]:cal_str_start_stop[1]])
@@ -591,7 +643,7 @@ class CalibrationData(object):
                     return # only allow one AxisInfo argument
                 
                 else:
-                    raise TypeError(f"AxisInfo parameters accepted only for the initialization of AxisCalibrationData")
+                    raise TypeError(f"AxisInfo parameters are accepted only for the initialization of AxisCalibrationData")
                 
             elif isinstance(arg, dict) and self.__class__.isCalibration(arg):
                 # form a calibration dict
@@ -1068,7 +1120,7 @@ class ChannelCalibrationData(CalibrationData):
     Do not confuse with the calibration of a Channels axis itself.
     
     """
-    parameters = CalibrationData.parameters + ("name", "index", "maximum", "virtual")
+    parameters = CalibrationData.parameters + ("name", "index", "maximum")
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -1176,7 +1228,7 @@ class AxisCalibrationData(CalibrationData):
     
     NOTE: an AxisCalibrationData can be constructed by passing a vigra.AxisInfo
     object as sole parameter. However, the AxisInfo object will NOT be stored in 
-    the newly create AxisCalibrationData object.
+    the newly created AxisCalibrationData object.
     
     """
     parameters = CalibrationData.parameters + ("type", "name", "key")
@@ -2290,22 +2342,23 @@ class AxesCalibration(object):
             if isinstance(args[0], vigra.VigraArray):
                 self._axistags_ = args[0].axistags
                 
-                self._calibration_ = [AxisCalibrationData(axinfo) for axinfo in args[0].axistags]
+                self._calibration_ = list(map(lambda x: AxisCalibrationData(x), args[0].axistags))
+                # self._calibration_ = [AxisCalibrationData(axinfo) for axinfo in args[0].axistags]
                 
                 #set up channel calibrations with default values:
                 if args[0].channelIndex != args[0].ndim: # real channel axis exists
-                    chax_index = args[0].axistags.index("c")
+                    channel_axis_index = args[0].axistags.index("c")
                     # Make sure we don't overwrite existing channel calibrations
-                    if len(self._calibration_[chax_index].channels) < args[0].channels:
-                        for k in range(len(self._calibration_[chax_index].channels), args[0].channels):
-                            self._calibration_[chax_index].addChannelCalibration(ChannelCalibrationData(name=f"channel_{k}", index=k), name=f"channel_{k}")
-                    elif len(self._calibration_[chax_index].channels) > args[0].channels:
+                    if len(self._calibration_[channel_axis_index].channels) < args[0].channels:
+                        for k in range(len(self._calibration_[channel_axis_index].channels), args[0].channels):
+                            self._calibration_[channel_axis_index].addChannelCalibration(ChannelCalibrationData(name=f"channel_{k}", index=k), name=f"channel_{k}")
+                    elif len(self._calibration_[channel_axis_index].channels) > args[0].channels:
                         extra = list()
-                        for k in range(args[0].channels, len(self._calibration_[chax_index].channels)):
-                            extra.append(self._calibration_[chax_index].channels[k])
+                        for k in range(args[0].channels, len(self._calibration_[channel_axis_index].channels)):
+                            extra.append(self._calibration_[channel_axis_index].channels[k])
                             
                         for k,c in extra:
-                            self._calibration_[chax_index]._data_.pop(k, None)
+                            self._calibration_[channel_axis_index]._data_.pop(k, None)
                 
                 return
 

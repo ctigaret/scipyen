@@ -14,7 +14,7 @@ from .axiscalibration import (AxesCalibration,
                               ChannelCalibrationData,
                               getCalibratedAxisSize)
 from imaging import axisutils
-from imaging.axisutils import STANDARD_AXIS_TAGS_KEYS
+from imaging.axisutils import (STANDARD_AXIS_TAGS_KEYS, axisTypeFromString, axisTypeName)
 from traitlets import Bunch
 
 def imageIndexTuple(img, slicing=None, newAxis=None, newAxisDim=None):
@@ -1039,12 +1039,13 @@ def concatenateImages(*images, **kwargs):
     Named parameters:
     ================
 
-    axis    :   the concatenation axis, specified in one of the following ways:
+    axis    :   the axis along which the concatenation should take place
+                (the "concatenation" axis), specified as one of the following:
                 
         int = index of an existing axis (default is 0)
                 
         str = a valid AxisInfo key for an existing axis, or for a new axis to be 
-            added to all images at the next higher dimension
+            added to all images at the next higher dimension¹.
                 
         AxisInfo object for an existing axis, or for a new axis to be added to 
         the images on their next higher dimension.
@@ -1059,76 +1060,167 @@ def concatenateImages(*images, **kwargs):
     
     A VigraArray produced by concatenating the images
     
-    NOTE: 2018-07-31 23:47:17
-    Inserting a new axis in a lower dimension can be performed by first inserting
-    the axis in the images to be concatenated at the appropriate dimension, before
-    calling this function. 
+    NOTE ¹
+    When specifying a non-existent axis of concatenation this function will 
+    insert a new (singleton) axis at the highest dimension of the arrays.
+    
+    If that is not what is intended, i.e. when seeking to insert a new axis at a
+    lower dimension, then this axis must be first inserted into each of the images
+    to be concatenated, before calling this function. This can be done using the
+    function insertAxis(…) in this module.
     
     This and other (possibly "fanciful") concatenations are really problem-dependent
-    and thus beyond the scope of this function
+    and thus beyond the scope of this function.
+    
+    For example, suppose one wants to read a 3D VigraArrwy (a "volume") from a
+    sequence of 2D image files, where the file names do not necessarily follow the
+    convention used by vigra.readVolume(…). In this case, one can follow the 
+    following steps:
+    
+    # 1) Assume you have collected in a list, the file names for a sequence of 2D
+    grayscale image files:
+    
+                    image_files = [<…>]
+    
+    # 2) By default, vigra loads 2D image files as 3D arrays with axes "x", "y" 
+    and "c" (channel axis). Note that the third dimension (the "c" axis) is a singleton
+    dimension (i.e. it has the size 1) such that the array still represents a 2D
+    image plane (or frame). 
 
-
-What this function does:
-========================
-
-Concatenates VigraArray data; uses numpy.concatenate(...) behind the 
-scenes.
-
-Arrays are concatenated in two ways, explained here by examples:
-
-    (1) SIMPLE CONCATENATIONS - 
+    The intention here is to concatenate the 2D VigraArrays loaded from disk into 
+    a 3D VigraArray, along a third space dimension (the "z" axis) which does not 
+    yet exist. The solution is to use the 'insertAxis' function in this module, 
+    e.g.: 
     
-    concatenates arrays along an existing axis
+                    img_3d = insertAxis(img, "z", 2) 
     
-    Example 1: along the x axis: concatenation axis preexists
+    i.e., insert an axis with key "z" (space) at the 3rd dimension of the array 
+    (remember that the "x" and "y" axes are at the dimension 0 and 1, respectively), 
+    for each of the 2D images loaded from disk.
     
-    prerequisites:
+    We can do this in a one-liner, which generates a list of 3D vigra arrays for
+    each image plane (or frame):
     
-    all([img.ndim == images[0].ndim for img in images[1:]])
+    images = list(map(lambda x: insertAxis(pio.loadImage(x), "z", 2), image_files))
     
-    all([img.axistags == images[0].axistags for img in images[1:]])
+    Then we can concatenate these along the "z" axis by using this function:
     
-         __           __     __       __ __ __
-        |  |         |  |   |  |     |  |  |  |
-        |  |       + |  | + |  |  => |  |  |  | 
-        |__|         |__|   |__|     |__|__|__|
-
+        volume = concatenateImages(images, axis="z")
     
+    ATTENTION: The concatenation axis (here, the "z" axis) must be specified as 
+    a 'key=value' pair.
     
-    Example 2: along the y axis: concatenation axis preexists
+    Collapsing all into a one line of code:
     
-    prerequisites - as above
-                                      __
-                                     |  |
-                                     |  |
-         __           __     __      |__|
-        |  |         |  |   |  |     |  |
-        |  |       + |  | + |  |  => |  |
-        |__|         |__|   |__|     |__|
-                                     |  |
-                                     |  |
-                                     |__|
+    volume = concatenateImages(list(map(lambda x: insertAxis(pio.loadImage(x), "z", 2), image_files)),
+                                axis = "z")
     
-    NOTE for Example 1 & 2: a new axis can always be specified, and it would be
-    added to the result even if it was not used in the concatenation.
+    You will notice that the volume has four axes:
     
-    Example 3: along a new axis: concatenation axis does not exist;
+                    volume.ndim
+                    --> 4
     
-    prerequisites - as above, plus:
+    which are:
     
-    concatenation axis must be specified as an AxisInfo object that does not 
-    already exist in the image arrays being concatenated
+                    volume.axistags
+                    --> x, y, z, c
+    
+    with the "z" axis on the 3rd dimension (where it was intended) and the "c"
+    axis (a singleton) pushed to the highest dimension (where it would normally
+    be):
+                    volume.channelIndex
+                    --> 3
+    
+                    volume.shape
+                    --> (256, 256, 129, 1)
+    
+    This example assumes there were 129 2D grayscale images, each with 
+    256 x 256 pixels.
+    
+    Incidentally, the channel (or Channels) axis may be virtual i.e. its index
+    corresponds to the number of dimensions - 1. e.g., given 'img' a 2D array 
+    with axes x y:
+    
+                    img.ndim
+                    --> 2
+    
+                    imt.axistags
+                    --> x y
+    
+                    img.channelIndex
+                    --> 2
+    
+                    img.channelIndex == img.ndim
+                    --> True
+    
+                    
+    
         
-         __           __     __       __ 
-        |  |         |  |   |  |     |  |_
-        |  |       + |  | + |  |  => |  | |_ 
-        |__|         |__|   |__|     |__| | |
-                                       |__| |
-                                         |__|
     
-    """
-    #from .axiscalibration import AxesCalibration
+    
 
+
+    What this function does:
+    ========================
+
+    Concatenates VigraArray data; uses numpy.concatenate(...) behind the 
+    scenes.
+
+    Arrays are concatenated in two ways, explained here by examples:
+
+        (1) SIMPLE CONCATENATIONS - 
+        
+        concatenates arrays along an existing axis
+        
+        Example 1: along the x axis: concatenation axis preexists
+        
+        prerequisites:
+        
+        all([img.ndim == images[0].ndim for img in images[1:]])
+        
+        all([img.axistags == images[0].axistags for img in images[1:]])
+        
+             __           __     __       __ __ __
+            |  |         |  |   |  |     |  |  |  |
+            |  |       + |  | + |  |  => |  |  |  | 
+            |__|         |__|   |__|     |__|__|__|
+
+        
+        
+        Example 2: along the y axis: concatenation axis preexists
+        
+        prerequisites - as above
+                                          __
+                                         |  |
+                                         |  |
+             __           __     __      |__|
+            |  |         |  |   |  |     |  |
+            |  |       + |  | + |  |  => |  |
+            |__|         |__|   |__|     |__|
+                                         |  |
+                                         |  |
+                                         |__|
+        
+        NOTE for Example 1 & 2: a new axis can always be specified, and it would 
+        be added to the result even if it was not used in the concatenation, with
+        the provisions specified in NOTE ¹ above.
+        
+        Example 3: along a new axis: concatenation axis does not exist;
+        
+        prerequisites - as above, plus:
+        
+        concatenation axis must be specified as an AxisInfo object that does not 
+        already exist in the image arrays being concatenated (please read NOTE ¹
+        above for details)
+            
+             __           __     __       __ 
+            |  |         |  |   |  |     |  |_
+            |  |       + |  | + |  |  => |  | |_ 
+            |__|         |__|   |__|     |__| | |
+                                           |__| |
+                                             |__|
+        
+    """
     catAxis = 0
     
     ignore = None
@@ -1974,44 +2066,12 @@ def kernelfromarray(x):
     else:
         raise TypeError(f"Expecting a tuple or numpy array; got {type(x).__name__} instead")
         
+def nChannels(x:vigra.VigraArray) -> int:
+    return 1 if x.channelIndex == x.ndim else x.shape[x.channelIndex]
 
-# def getCalibratedAxisSize(image, axis):
-#     r"""Returns a calibrated length for "axis" in "image" VigraArray, as a python Quantity
-#     
-#     If axisinfo is not calibrated (i.e. does not have a calibration string in its
-#     description attribute) then returns the size of the axis in pixel_unit.
-#     
-#     Parameters:
-#     ==========
-#     
-#     image: vigra.VigraArray
-#     
-#     axis: vigra.AxisInfo, axis info key string, or an integer; any of these must 
-#         point to an existing axis in the image
-#     
-#     """
-#     
-#     if isinstance(axis, int):
-#         axsize = image.shape[axis]
-#         axisinfo = image.axistags[axis]
-#         
-#     elif isinstance(axis, str):
-#         axsize = image.shape[image.axistags.index(axis)]
-#         axisinfo = image.axistags[axis]
-# 
-#     elif isinstance(axis, vigra.AxisInfo):
-#         axsize = image.shape[image.axistags.index(axis.key)]
-#         axisinfo = axis
-# 
-#     else:
-#         raise TypeError("axis expected to be an int, str or vigra.AxisInfo; got %s instead" % type(axis).__name__)
-#     
-#     axcal = AxisCalibrationData(axisinfo)
-#     
-#     # FIXME what to do when there are several channels?
-#     
-#     return axcal.calibratedDistance(axsize)
-
+def hasVirtualChannels(x:vigra.VigraArray) -> bool:
+    return x.channelIndex == x.ndim
+    
 def nFrames(x:vigra.VigraArray, 
             frameAxis:typing.Optional[typing.Union[vigra.AxisInfo, str, int, collections.abc.Sequence[typing.Union[vigra.AxisInfo, str, int]]]]=None):
     if not isinstance(x, vigra.VigraArray):
