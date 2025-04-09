@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-import typing
+import typing, traceback
 import collections.abc
 from functools import singledispatch
 from core.vigra_patches import vigra
@@ -1353,39 +1353,42 @@ def concatenateImages(*images, **kwargs):
     else:
         raise TypeError("concatenation axis must be specified as an int, a str or a vigra.AxisInfo object; got %s instead" % type(catAxis).__name__)
         
-    axistags    = images[0].axistags
-    axcal       = AxesCalibration(images[0])
         
+    axistags    = images[0].axistags
     # NOTE: 2018-09-05 23:32:14
     # check axistags, axis calibrations and array shapes
     # we allow for mismatches only for the concatenation axis, including ignoring
     # some or all of its calibration parameters (units, origin, resolution)
-    for img in images[1:]:
-        if img.axistags != axistags:
-            raise ValueError("Cannot concatenate images with different AxisInfo objects")
-        
-        img_axcal = AxesCalibration(img)
-        #print("img_axcal", img_axcal)
-        #print("axistags", axistags)
-        for key in img_axcal.keys():
-            #print("key", key)
-            if axistags[key] == catAxis:
-                if not axcal[key].isclose(img_axcal[key], ignore=ignore):
-                    if ignore is None:
-                        raise RuntimeError("Cannot concatenate along the axis %s which has non-matching calibration across images" % key)
+    try:
+        axcal       = AxesCalibration(images[0])
+        for img in images[1:]:
+            if img.axistags != axistags:
+                raise ValueError("Cannot concatenate images with different AxisInfo objects")
+            
+            img_axcal = AxesCalibration(img)
+            #print("img_axcal", img_axcal)
+            #print("axistags", axistags)
+            for key in img_axcal.keys():
+                #print("key", key)
+                if axistags[key] == catAxis:
+                    if not axcal[key].isclose(img_axcal[key], ignore=ignore):
+                        if ignore is None:
+                            raise RuntimeError("Cannot concatenate along the axis %s which has non-matching calibration across images" % key)
+                        
+                        else:
+                            raise RuntimeError("Cannot concatenate along the axis %s which has non-matching calibration across images, ignoring %s" % (key, str(ignore)))
                     
-                    else:
-                        raise RuntimeError("Cannot concatenate along the axis %s which has non-matching calibration across images, ignoring %s" % (key, str(ignore)))
-                
-            else:
-                if not axcal[key].isclose(img_axcal[key]):
-                    print("In vigrautils.concatenateImages:")
-                    print(f"axcal[{key}] {axcal[key]}")
-                    print(f"img_axcal[{key}] {img_axcal[key]}")
-                    raise RuntimeError("Cannot concatenate images with non-matching calibration for axis %s" % key)
-                
-        if not all(first_shape[s] == img.shape[s] for s in range(min_dims) if s != catAxisNdx):
-            raise RuntimeError("Images must have identical shapes except along the concatenation axis")
+                else:
+                    if not axcal[key].isclose(img_axcal[key]):
+                        print("In vigrautils.concatenateImages:")
+                        print(f"axcal[{key}] {axcal[key]}")
+                        print(f"img_axcal[{key}] {img_axcal[key]}")
+                        raise RuntimeError("Cannot concatenate images with non-matching calibration for axis %s" % key)
+                    
+            if not all(first_shape[s] == img.shape[s] for s in range(min_dims) if s != catAxisNdx):
+                raise RuntimeError("Images must have identical shapes except along the concatenation axis")
+    except:
+        traceback.print_exc()
             
     result = vigra.VigraArray(np.concatenate(images, axis=catAxisNdx), axistags = axistags)
     

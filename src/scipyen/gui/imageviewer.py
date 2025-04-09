@@ -2881,16 +2881,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             wy = None
             
         if isinstance(self._data_, vigra.VigraArray):
-            # this can also be a PictArray! 
-            # NOTE: 2020-09-04 08:51:38 PictArray is defunct and removed from the API
-            # NOTE: 2017-07-24 09:03:38
             # w and h are a convention here
-            #w = self._data_.shape[0]
-            #h = self._data_.shape[1]
-            
-            #widthAxisIndex = self._data_.axistags.index(self.widthAxis.key)
-            #heightAxisIndex = self._data_.axistags.index(self.heightAxis.key)
-            
             w = self._data_.shape[self.widthAxis]
             h = self._data_.shape[self.heightAxis]
             
@@ -3518,7 +3509,11 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                 self._data_  = data
                 self.frameIndex = frameIndex or range(self._data_frames_) # set by _parseVigraArrayData_
                 self._number_of_frames_ = len(self.frameIndex)
-                self._axes_calibration_ = AxesCalibration(data)
+                try:
+                    self._axes_calibration_ = AxesCalibration(data)
+                except:
+                    self._axes_calibration_ = None
+                    traceback.print_exc()
                 self._setup_channels_display_actions_()
                 self.displayFrame(asAlphaChannel=asAlphaChannel)
                 

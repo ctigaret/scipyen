@@ -9,6 +9,7 @@
 import numbers, operator, math, dataclasses
 from dataclasses import (dataclass, MISSING, field)
 import inspect, functools, itertools, traceback, typing, warnings
+from functools import (singledispatch, singledispatchmethod)
 from collections import deque
 from collections.abc import Sequence
 from pprint import (pprint, pformat)
@@ -56,9 +57,71 @@ from .axisutils import (axisTypeName,
 
 AxisCalibrationDataType = typing.TypeVar("AxisCalibrationData")
 
-# @dataclass
-# class CalibrationData:
-#     units:pq.Quantity = field(default=pq.arbitrary_unit)
+@dataclass
+class CalibrationData2:
+    units:pq.Quantity = field(default=pq.arbitrary_unit)
+    name:typing.Optional[str] = field(default_factory = str)
+    description:typing.Optional[str] = field(default_factory = str)
+    relative_tolerance:float = 1e-4
+    absolute_tolerance:float = 1e-4
+    equal_nan:bool = True
+
+    @classmethod
+    def isCalibration(cls, x):
+        return isinstance(x, cls) or (isinstance(x, dict) and all(k in x for k in cls.parameters))
+    
+@dataclass
+class AxisCalibrationData2(CalibrationData2):
+    origin:float = 0.0
+    resolution:float = 1.0
+    maximum:typing.Optional[float] = None
+    type:typing.Optional[vigra.AxisType] = field(default=vigra.AxisType.UnknownAxisType)
+    key:typing.Optional[str] = "?"
+    size:typing.Optional[int] = None
+    channels:typing.Optional[typing.Sequence] = field(default_factory=list)
+    
+    @singledispatchmethod
+    @classmethod
+    def create(cls, o:object):
+        raise NotImplementedError(f"Not implemented for obejcts of type {type(o).__name__}")
+    
+    @create.register(vigra.AxisInfo)
+    @classmethod
+    def _(cls, o:vigra.AxisInfo):
+        axtype = arg.typeFlags
+        axkey = arg.key
+        axres = 1. if arg.resolution == 0 else arg.resolution
+        axorigin = 0.0
+        
+        if axtype & vigra.Axistype.Channels:
+            pass # FIXME 2025-04-09 22:44:09 need to supply channels
+        
+        cal_str_start_stop = AxisCalibrationData.findCalibrationString(arg.description)
+        if cal_str_start_stop is None:
+            return cls(type=axtype, key = axkey, name = axisTypeName(axtype))
+        
+    @staticmethod
+    def findCalibrationString(s:str) -> typing.optional[tuple]:
+        start = s.find("<axis_calibration>")
+        if start > -1:
+            stop = s.rfind("</axis_calibration>") 
+            if stop > -1:
+                stop += len("</axis_calibration>")
+            else:
+                stop = start + len("<axis_calibration>")
+            return (start, stop)
+        
+        
+    
+@dataclass
+class ChannelCalibrationData2(CalibrationData2):
+    origin:float = 0.0
+    resolution:float = 1.0
+    maximum:typing.Optional[float] = None
+    formula:typing.Optional[str] = field(default_factory=str)
+    
+    
+    
     
     
 
@@ -366,7 +429,7 @@ class CalibrationData(object):
                 return
             
         # get the channel specification, if any
-        channels for kwargs.pop("channels", None)
+        channels = kwargs.pop("channels", None)
         
         if isinstance(channels, int) and channels >= 1:
             channelData = list(map(lambda x: ChannelCalibrationData(0.0, 1.0, maximum=np.nan, name=f"channel_{x}"), range(channels)))
@@ -482,9 +545,6 @@ class CalibrationData(object):
                                 if len(test):
                                     self._data_.type = functools.reduce(operator.or_, test)
                                     
-                        # if len(channelData):
-                        #     self._data_.type = vigra.AxisType.Channels
-                                
                         if isElementaryAxisType(self._data_.type):
                             if not isinstance(self._data_.name, str) or len(self._data_.name.strip()) == 0:
                                 self._data_.name = axisTypeName(self._data_.type)
