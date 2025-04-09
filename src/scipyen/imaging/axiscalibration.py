@@ -101,7 +101,7 @@ class AxisCalibrationData2(CalibrationData2):
             return cls(type=axtype, key = axkey, name = axisTypeName(axtype))
         
     @staticmethod
-    def findCalibrationString(s:str) -> typing.optional[tuple]:
+    def findCalibrationString(s:str) -> typing.Optional[tuple]:
         start = s.find("<axis_calibration>")
         if start > -1:
             stop = s.rfind("</axis_calibration>") 
