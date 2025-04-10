@@ -70,6 +70,128 @@ class CalibrationData2:
     def isCalibration(cls, x):
         return isinstance(x, cls) or (isinstance(x, dict) and all(k in x for k in cls.parameters))
     
+    @property
+    def calibrationString(self):
+        r"""
+        An XML-formatted string with one of the following formats, depending on
+        whether the axis is a Channels axis or not:
+        
+        1) For a NonChannel axis:
+        ----------------------------
+        
+        <axis_calibration>
+            <type>int</type>
+            <key>str</key>
+            <name>str</name>
+            <size>int</size>
+            <units>str</units>
+            <origin>float</origin>
+            <resolution>float</resolution>
+            <maximum>float</maximum>
+            <relative_tolerance>float</relative_tolerance>
+            <absolute_tolerance>float</absolute_tolerance>
+            <equal_nan>bool</equal_nan>
+            <channels></channels> 
+        </axis_calibration>
+        
+        NOTE: <channels></channels> is empty for NonChannel axes
+        
+        2) for a Channels axis:
+        ----------------------------
+        <axis_calibration>
+            <type>int</type>
+            <key>str</key>
+            <name>str</name>
+            <size>int</size>
+            <units></units>
+            <origin></origin>
+            <resolution></resolution>
+            <channels>
+                <channel_0>
+                    <index>int</index>
+                    <name>str</name>
+                    <units>str</units>
+                    <minimum>float|complex|int</minimum>
+                    <maximum>float|complex|int</maximum>
+                    <resolution>float</resolution>
+                    <relative_tolerance>float</relative_tolerance>
+                    <absolute_tolerance>float</absolute_tolerance>
+                    <equal_nan>bool</equal_nan>
+                    <formula>str</formula>
+                </channel_0>
+                <channel_1>
+                    <index>int</index>
+                    <name>str</name>
+                    <units>str</units>
+                    <minimum>float|complex|int</minimum>
+                    <maximum>float|complex|int</maximum>
+                    <resolution>float</resolution>
+                    <relative_tolerance>float</relative_tolerance>
+                    <absolute_tolerance>float</absolute_tolerance>
+                    <equal_nan>bool</equal_nan>
+                    <formula>str</formula>
+                </channel_1>
+                ... etc ...
+            </channels> 
+        </axis_calibration>
+        """
+        
+        def __gen_xml_element__(obj, param):
+            value = getattr(obj._data_, param, None)
+            
+            ss = [f"<{param}>"]
+            
+            if isinstance(value, str): # ("name", "key")
+                s = value
+                
+            elif param == "type":
+              s = "|".join(axisTypeStrings(value))
+            
+            elif param == "units":
+                # output the dimensionality's string property
+                s = value.units.dimensionality.string
+                
+            elif param == "index":
+                s = "%d" % value
+                
+            #elif param in ("origin", "resolution", "maximum", "minimum"):
+                
+            else: # ("origin", "resolution", "maximum", "minimum")
+                s = "%f"%value
+                
+            ss.append(s)
+            
+            ss.append(f"</{param}>")
+            
+            return "".join(ss)
+
+        strlist = ["<axis_calibration>"]
+        
+        for param in sorted(self.__class__.parameters):
+            strlist.append(__gen_xml_element__(self, param))
+            
+        if self.type & vigra.AxisType.Channels:
+            for ch in self.channels:
+                # NOTE: 2021-11-08 11:35:19
+                # only append channel info if there are channel calibrations
+                # NOTE: 2025-04-08 14:39:48
+                # see NOTE: 2025-04-08 14:39:08
+                # if "virtual" not in ch[0]:
+                if not ch.virtual:
+                    strlist.append(f"<{ch.name}>")
+                    # strlist.append(f"<{ch[0]}>")
+                    for p in sorted(ChannelCalibrationData.parameters):
+                        # strlist.append(__gen_xml_element__(ch[1], p))
+                        # NOTE: 2025-04-08 14:39:48
+                        # see NOTE: 2025-04-08 14:39:08
+                        strlist.append(__gen_xml_element__(ch, p))
+                    strlist.append(f"</{ch.name}>")
+                    # strlist.append(f"</{ch[0]}>")
+                
+        strlist.append("</axis_calibration>")
+        
+        return "".join(strlist)
+    
 @dataclass
 class AxisCalibrationData2(CalibrationData2):
     origin:float = 0.0
@@ -94,11 +216,14 @@ class AxisCalibrationData2(CalibrationData2):
         axorigin = 0.0
         
         if axtype & vigra.Axistype.Channels:
-            pass # FIXME 2025-04-09 22:44:09 need to supply channels
+            
+            pass # FIXME 2025-04-09 22:44:09 need to supply channels separately
         
         cal_str_start_stop = AxisCalibrationData.findCalibrationString(arg.description)
+        
         if cal_str_start_stop is None:
             return cls(type=axtype, key = axkey, name = axisTypeName(axtype))
+        else:
         
     @staticmethod
     def findCalibrationString(s:str) -> typing.Optional[tuple]:
@@ -111,7 +236,96 @@ class AxisCalibrationData2(CalibrationData2):
                 stop = start + len("<axis_calibration>")
             return (start, stop)
         
+    @staticmethod
+    def parseCalibrationString(s:str):
+        r"""Parses a calibration string.
         
+        For the structure of an XML-formatted calibration string see the
+        documentation for the AxisCalibrationData.calibrationString property.
+        
+        Parameters:
+        ==========
+        
+        s: str = XML-formatted calibration string (see documentation for
+        AxisCalibrationData.calibrationString property)
+        
+        Returns:
+        ========
+        An AxisCalibrationData instance. 
+            This either a reference to the AxisCalibrationData object passed as
+            the 'cal' parameter, or a new AxisCalibrationData object, otherwise.
+            
+            When 's' is a string containing an XML-formatted calibration string 
+            (see AxisCalibrationData.calibrationString()), the returned value
+            (and 'cal', if passed) will be updated with the calibration values
+            parsed from the string in 's'. Otherwise, the returned value is the
+            original value of 'cal' (if 'cal' is an AxisCalibrationData object) 
+            or a new, 'default' AxisCalibrationData object (as for an axis with 
+            type flags UnknownAxisType).
+        
+        """
+        import xml.etree.ElementTree as ET
+        
+        def __eval_xml_element_text__(param, txt):
+            if param == "units":
+                value = unitQuantityFromNameOrSymbol(txt)
+            elif param in ("key", "name"):
+                value = txt
+            elif param == "type":
+                value = axisTypeFromString(txt)
+            else: # ("index", "origin", "resolution", "minimum", "maximum")
+                if "nan" in txt:
+                    value = np.nan
+                else:
+                    value = eval(txt)
+                
+            return value
+        
+        if not isinstance(s,str) or len(s.strip()) == 0 or not s.startswith("<axis_calibration>") or not s.endswith("</axis_calibration>"):
+            raise ValueError("This is not an axis calibration string")
+            
+        # cal = AxisCalibrationData()
+        
+        # OK, now extract the relevant xml string
+        try:
+            cal_xml_element = ET.fromstring(s)
+            
+            # make sure we're OK
+            if cal_xml_element.tag != "axis_calibration":
+                raise ValueError("Wrong element tag; was expecting 'axis_calibration', instead got %s" % element.tag)
+            
+            # see NOTE: 2021-10-09 23:58:58
+            # xml.etree.ElementTree.Element.getchildren() is absent in Python 3.9.7
+            for child_node in getXMLChildren(cal_xml_element):
+                # these can be <children_X> tags (X is a 0-based index) or a <name> tag
+                # ignore everything else
+                if child_node.tag.lower() in AxisCalibrationData.parameters:
+                    param = child_node.tag.lower()
+                    txt = child_node.text
+                    setattr(cal, param, __eval_xml_element_text__(param, txt))
+                    
+                else:
+                    chcaldict = dict() # = ChannelCalibrationData()
+                    chcalname = child_node.tag.lower()
+                    ch_children = getXMLChildren(child_node)
+                    ch_tags = dict((c.tag, c.text) for c in ch_children)
+                    for param in ChannelCalibrationData.parameters:
+                        if param in ch_tags:
+                            value = __eval_xml_element_text__(param, ch_tags[param])
+                            chcaldict[param] = value
+                            
+                    if len(chcaldict):
+                        chcal = ChannelCalibrationData(**chcaldict)
+                        cal.addChannelCalibration(chcal, name=chcal.name)
+                            
+        except Exception as e:
+            traceback.print_exc()
+            print("cannot parse calibration string %s" % calibration_string)
+            raise e
+            
+        return cal
+            
+
     
 @dataclass
 class ChannelCalibrationData2(CalibrationData2):
@@ -3145,35 +3359,35 @@ def calibrationString(units=pq.dimensionless, origin=0.0, resolution=1.0, channe
     return axcal.calibrationString(includeChannelCalibration = channel is not None)
     
 
-def parseDescriptionString(s):
-    r"""Performs the reverse operation to calibrationString.
-    
-    Positional parameters:
-    ======================
-
-    s = an XML - formatted string (as returned by calibrationString), or a 
-        free-form string _CONTAINING_ an XML - formatted string as returned 
-        by calibrationString.
-        
-    The function tries to detect whether the argument string 's' contains a
-    "calibration string" with the format as returned by calibrationString 
-    then parses that substring to return a (unit,origin) tuple.
-    
-    If such a (sub)string is not found, the function returns the default 
-    values of (dimensionless, 0.0). If found, the (sub)string must be 
-    correctly formatted (i.e. start/end tags must exist) otherwise the 
-    function raises ValueError.
-    
-    Returns :
-    =========
-    
-    A tuple (python Quantity, real_scalar, real_scalar) containing respectively,
-    the unit, origin and resolution. 
-    
-    Raises ValueError if a calibration string is not found in s
-    
-    """
-    return AxesCalibration.parseDescriptionString(s)
+# def parseDescriptionString(s):
+#     r"""Performs the reverse operation to calibrationString.
+#     DEPRECATED
+#     Positional parameters:
+#     ======================
+# 
+#     s = an XML - formatted string (as returned by calibrationString), or a 
+#         free-form string _CONTAINING_ an XML - formatted string as returned 
+#         by calibrationString.
+#         
+#     The function tries to detect whether the argument string 's' contains a
+#     "calibration string" with the format as returned by calibrationString 
+#     then parses that substring to return a (unit,origin) tuple.
+#     
+#     If such a (sub)string is not found, the function returns the default 
+#     values of (dimensionless, 0.0). If found, the (sub)string must be 
+#     correctly formatted (i.e. start/end tags must exist) otherwise the 
+#     function raises ValueError.
+#     
+#     Returns :
+#     =========
+#     
+#     A tuple (python Quantity, real_scalar, real_scalar) containing respectively,
+#     the unit, origin and resolution. 
+#     
+#     Raises ValueError if a calibration string is not found in s
+#     
+#     """
+#     return AxesCalibration.parseDescriptionString(s)
 
 def calibrateAxis(axInfo, cal, channel=None, channelname=None):
     r"""Attaches a dimensional calibration to an AxisInfo object.
