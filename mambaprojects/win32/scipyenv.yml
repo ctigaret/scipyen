@@ -62,6 +62,8 @@ dependencies:
   - octave_kernel
   # - python-magic
   - pyinstaller
+  - openmath
+  - scscp
   - pip:
       - cattrs==24.1.2
       - gnuplot-kernel==0.4.1

@@ -48,6 +48,8 @@ dependencies:
   - conda-forge::pandas-flavor
   - conda-forge::opencv
   - sympy
+  - openmath
+  - scscp
   - pyqtgraph
   - qimage2ndarray
   - quantities

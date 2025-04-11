@@ -187,6 +187,7 @@ pytest
 python-magic
 pytz
 pywin32 ; sys_platform == 'win32'
+openmath
 pyxdg
 qimage2ndarray
 ravenclaw
@@ -202,6 +203,7 @@ opencv-contrib-python
 scipy
 seaborn
 shapely
+scscp
 # slytherin
 smart-open
 smmap
