@@ -188,6 +188,7 @@ python-magic
 pytz
 pywin32 ; sys_platform == 'win32'
 openmath
+openexpressions
 pyxdg
 qimage2ndarray
 ravenclaw

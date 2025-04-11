@@ -50,6 +50,7 @@ dependencies:
   - sympy
   - openmath
   - scscp
+  - openexpressions
   - pyqtgraph
   - qimage2ndarray
   - quantities

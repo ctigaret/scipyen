@@ -123,7 +123,9 @@ class ChannelCalibrationData(CalibrationData):
     # algebraic expression for the transformation of pixel intensity (a.u.) 
     # into calibrated values; default is 'data.max() / (maximum-origin)'
     # 
-    # NOTE: 2025-04-10 23:23:42 TODO consider using py-openmath
+    # NOTE: 2025-04-10 23:23:42 TODO consider using
+    # • py-openmath
+    # • openexpressions - simpler and more to the point of what I want to achieve?
     expression:typing.Optional[str] = field(default="data.max() / (maximum-origin)")
     
     @property

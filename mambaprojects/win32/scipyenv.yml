@@ -63,6 +63,7 @@ dependencies:
   # - python-magic
   - pyinstaller
   - openmath
+  - openexpressions
   - scscp
   - pip:
       - cattrs==24.1.2
