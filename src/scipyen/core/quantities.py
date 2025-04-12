@@ -318,6 +318,8 @@ del(cq, _pqpfx)
 # better keep __custom_quantities__
 # del(__custom_quantities__, cq, _pqpfx)
 
+# ### BEGIN constants
+
 # universal gas constant
 R = 8.31446261815324 * pq.J/(pq.K * pq.mol)
 
@@ -329,6 +331,11 @@ qe = 1.602176634e-19 * pq.C
 
 # Avogadro constant
 N_A = 6.02214076e23 * pq.mol**(-1)
+
+# Fluo_5F 𝑲d
+Fluo_5F_Kd = 2.3 * pq.micromolar
+
+# ### END   constants
 
 BinaryUnitsByPower = [pq.byte, pq.kibibyte, pq.mebibyte, pq.gibibyte, 
                       pq.tebibyte, pq.pebibyte, pq.exbibyte, pq.zebibyte, 

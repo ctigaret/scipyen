@@ -130,7 +130,42 @@ class ChannelCalibrationData(CalibrationData):
     # NOTE: 2025-04-10 23:23:42 TODO consider using
     # • py-openmath
     # • openexpressions - simpler and more to the point of what I want to achieve?
-    expression:typing.Optional[str] = field(default="data.max() / (maximum-origin)")
+    #   example: estimate change in [Ca²⁺]ᵢ using Kd * ΔF/F / max(ΔF/F)
+    #       WARNING: openexpressions.Parser cannot parse expression strings containing
+    #       unicode characters!!!
+    #
+    #       notation used:
+    #       Kd          -> 𝑲d
+    #       x           -> ΔF/F  = (𝑭-𝑭₀)/𝑭₀
+    #       xMax        -> max(ΔF/F) (i.e., fluorescence intensity at saturation)
+    #
+    #       WARNING: background fluorescence must have been subtracted from both
+    #           𝑭 and 𝑭₀ ‼
+    #        
+    #       from openexpressions.Parser import Parser
+    #       math_parser = Parser()
+    #       expression = math_parser.parse("Kd * x / xMax")
+    #       this can be evaluated at a given pixel, with intensty 'x', e.g.:
+    #       y = expression.eval({'Kd':2.5 * pq.uM, 'x': 128, 'xMax': 2048})
+    #       -> y = array(0.625)*uM
+    #       NOTE: quantities ARE supported by the evaluation code
+    #
+    #       WARNING: for numpy arrays don't use numpy ufuncs for vectorizing; 
+    #       just pass the array to the appripriate symbol in the call to eval, 
+    #       e.g.:
+    #       img1 = expression.eval({'Kd':2.5 * pq.uM, 'x': img, 'xMax': img.max()})
+    #
+    #       img1 is a quantity array
+    #
+    #       CAUTION: when the array in 'img' is a VigraArray, then you should create a 
+    #       VigraArray from the resulting array, but be aware of the following:
+    #       1) this will splice-out the quantity units
+    #       2) you MUST supply and axistags parameter to the VigraArray constructor
+    #       — this is the good time to apply a quantity calibration to the 
+    #       channel axis in the axistags destined for the result!
+    #       
+    #
+    expression:typing.Optional[str] = field(default_factory = str)
     
     @property
     def calibrationString(self) -> str:
