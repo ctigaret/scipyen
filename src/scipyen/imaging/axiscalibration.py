@@ -169,6 +169,7 @@ class ChannelCalibrationData(CalibrationData):
     #
     # • alternatives to openexpressions to consider
     #   ∘ https://github.com/louisfisch/mathematical-expression-parser
+    #   ∘ pymep
     #   ∘ write your own parser using python's ast module
     expression:typing.Optional[str] = field(default_factory = str)
     
