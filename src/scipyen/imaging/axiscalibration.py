@@ -107,7 +107,11 @@ class CalibrationData:
 
 @dataclass
 class ChannelCalibrationData(CalibrationData):
+    r"""See Helmchen (2011) CSH Protocols
+
     
+
+    """
     # channel index
     index:int = 0 
     
