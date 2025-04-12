@@ -164,7 +164,12 @@ class ChannelCalibrationData(CalibrationData):
     #       — this is the good time to apply a quantity calibration to the 
     #       channel axis in the axistags destined for the result!
     #       
+    # • openexpressions in conjunctio with sympy (simpyfy) to perform some algebraic
+    #   simplifications of the expression if needed
     #
+    # • alternatives to openexpressions to consider
+    #   ∘ https://github.com/louisfisch/mathematical-expression-parser
+    #   ∘ write your own parser using python's ast module
     expression:typing.Optional[str] = field(default_factory = str)
     
     @property
