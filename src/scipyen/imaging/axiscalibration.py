@@ -6,11 +6,62 @@
 # TODO: 2025-04-08 12:54:19 FIXME
 # re-design based on dataclasses - NOW!
 
+r"""Classes for attaching physical units to the axes of 𝒏-dimensional arrays.
+
+The module is intended primarily for VigraArrays, where each axis has a defined
+physical meaning (space, time, frequency, etc) including the "channels" axis,
+which can be used to attach a physical dimensionality to the channel data.
+
+For "non-channel" axes, the calibration assigns physical units to the axes
+along the specified dimension of the array. NOTE that these units refer to the 
+physical domain for the specified dimension (space, time, frequency etc), and
+NOT the physical domain of the actual array values. The latter is managed
+using "channel calibration objects" for a Channels axis, see below.
+
+For a Channels axis, the physical domain of the actual values in the array is
+managed individually for each "channel" of the array. VigraArrays can treat 
+elements as represented by more than one channel "value" at the same array
+coordinate. This effectively means that the array has one extra dimension: the 
+Channels axis.
+
+Here, a channels axis calibration is simply attaching a physical unit to the 
+values in the array, without any numerical trasformation.
+
+NOTE: This is NOT the same as calibrating the image channel data, which means 
+attributing a numeric relationship between the value at each element in the 
+(raw) pixel data and a define physical measure. This form of calibration 
+effectively transforms raw pixel values (e.g, "intensities") into some physical 
+measure with different numerical values, AND units.
+
+For numpy arrays where all elements belong to the same physical domain,
+Python Quantity arrays can, and should, be used instead. However, the physical
+domain of their coordinate system can still benefit from this module.
+
+
+Classes in this module:
+
+CalibrationData: superclass for AxisCalibrationData and ChannelCalibrationData
+
+AxisCalibrationData: type encapsulating the physical units (and domain) for an 
+    axis. Contains channel calibration data for a Channel axis.
+    
+ChannelCalibrationData: type encapsulating the physical units of a channel in the
+    array.
+
+AxesCalibration: collects all AxisCalibrationData associated with an array
+
+CalSpec: the named tuple (origin, maximum, units) - used as shorthand
+for factory methods.
+
+
+
+"""
+
 import numbers, operator, math, dataclasses
 from dataclasses import (dataclass, MISSING, field)
 import inspect, functools, itertools, traceback, typing, warnings
 from functools import (singledispatch, singledispatchmethod)
-from collections import deque
+from collections import (deque, namedtuple)
 from collections.abc import Sequence
 from pprint import (pprint, pformat)
 import h5py
@@ -56,11 +107,11 @@ from .axisutils import (axisTypeName,
                         standardAxisTypeKeys,
                         )
 
-AxisCalibrationDataType = typing.TypeVar("AxisCalibrationData")
+CalSpec = namedtuple("CalSpec", ["origin", "maximum", "units"])
 
 @dataclass
 class CalibrationData:
-    r'''Suprclass for AxisCalibrationData and ChannelCalibrationData'''
+    r'''Superclass for AxisCalibrationData and ChannelCalibrationData'''
     
     units:pq.Quantity = field(default=pq.arbitrary_unit)
     r'''The physical units'''
@@ -193,11 +244,11 @@ class ChannelCalibrationData(CalibrationData):
     index:int = 0 
     r'''channel index'''
     
-    # channel's minimum value, in self.units, as float
-    # origin:float = 0.0 # is this EVER needed?
+    origin:float = 0.0 # is this really needed?
+    r"""channel's minimum value, in self.units, as float"""
     
-    # channel's maximum value, in self.units, as float
-    # maximum:typing.Optional[float] = 1.0 # is this EVER needed?
+    maximum:typing.Optional[float] = 1.0 # is this really needed?
+    r"""channel's maximum value, in self.units, as float"""
     
     # is this channel virtual?
     # virtual:bool=False
@@ -217,15 +268,17 @@ class ChannelCalibrationData(CalibrationData):
 @dataclass
 class AxisCalibrationData(CalibrationData):
     index:int = 0
-    r'''index of this axis in the array dimensions: 0-based'''
+    r'''index of this axis in the array dimensions: 0-based.
+    Must be ≥ 0
+    '''
     
-    origin:float = 0.0
+    origin:numbers.Number = 0.0
     r'''The origin of the axis coordinates.
     To what coordinate does the 0th element along the axis correspond?
     By default this is 0.0, but there can be good reasons for why axis might have
     a non-zero origin (i.e., an "offset")'''
     
-    resolution:float = 1.0
+    resolution:numbers.Number = 1.0
     r'''The sampling resolution (in 1/axis units).
     WARNING: Unlike the "resolution" field of a vigra.AxisInfo, where a value
     of 0 signals no defined resolution, here "resolution" represents the number
@@ -240,7 +293,7 @@ class AxisCalibrationData(CalibrationData):
     You almost surely want to change this.
     '''
     
-    maximum:typing.Optional[float] = None
+    maximum:typing.Optional[numbers.Number] = None
     r'''The upper limit of the axis coordinates.
     To what coordinate does the last element along the axis correspond?'''
     
@@ -261,14 +314,35 @@ class AxisCalibrationData(CalibrationData):
     For a NonChannel axis this MUST be None, or an empty list; for a Channels 
     axis, even a virtual one, this MUST have at least one ChannelCalibrationData'''
     
+    # def __post_init__(self):
+    #     r"""Allows constructing an AxisCalibrationData object from a single parameter.
+    #     The following parameter types are allowed:
+    #     vigra.AxisInfo
+    #     str (calibraion string)
+    #     CalSpec
+    #     """
+    #     # NOTE: 2025-04-13 22:27:49
+    #     # by virtue of inheriting from CalibrationData, the first field set in the
+    #     # __init__ generated by the dataclass decorator is 'units', which will
+    #     # therefore 'swallow' the first parameter pased to the constructor
+    #     print(f"{self.__class__.__name__}.__post_init__: self.units: {type(self.units).__name__}")
+    #     if isinstance(self.units, vigra.AxisInfo):
+            
+    
     @singledispatchmethod
     @classmethod
-    def create(cls, o:object):
-        raise NotImplementedError(f"Not implemented for obejcts of type {type(o).__name__}")
+    def new(cls, o:object):
+        r"""Factory for AxisCalibrationData objects"""
+        raise NotImplementedError(f"Not implemented for objects of type {type(o).__name__}")
     
-    @create.register(vigra.AxisInfo)
+    @new.register(vigra.AxisInfo)
     @classmethod
-    def _(cls, arg:vigra.AxisInfo):
+    def _(cls, arg:vigra.AxisInfo, index:typing.Optional[int] = None, 
+        size: typing.Optional[int] = None,
+        origin: typing.Optional[typing.Union[numbers.Number, pq.Quantity, CalSpec]] = None,
+        maximum: typing.Optional[typing.Union[numbers.Number, pq.Quantity]] = None,
+        units: typing.Optional[pq.Quantity] = None,
+        channels: typing.Optional[typing.Sequence[CalSpec]] = None):
         # NOTE: 2025-04-13 13:42:52
         # in vigra.AxisInfo, a 'resolution' field 0.0 means axis resolution (in
         # the sense of sampling resolution, which should be in (axis units)⁻¹ ) 
@@ -276,28 +350,119 @@ class AxisCalibrationData(CalibrationData):
         axtype = arg.typeFlags
         axkey = arg.key
         axres = 1. if arg.resolution == 0 else arg.resolution
-        # axorigin = 0.0
         
         cal_str_start_stop = cls.findCalibrationString(arg.description)
-        # if not axtype & vigra.Axistype.Channels:
-            # pass # FIXME 2025-04-09 22:44:09 need to supply channels separately
-        
         
         if cal_str_start_stop is None:
-            return cls(type=axtype, key = axkey, name = axisTypeName(axtype))
+            ret = cls(type=axtype, key = axkey, name = axisTypeName(axtype), resolution = axres)
+            
+            # overwrite the defaults if needed:
+            #
+            if isinstance(index, int):
+                if index >= 0 :
+                    ret.index = index
+                else:
+                    raise ValueError(f"Invalid axis index: {index}")
+                
+            if isinstance(size, int):
+                if size >= 1:
+                    ret.size = size
+                else:
+                    raise ValueError(f"Invalid axis size: {size}")
+                
+            if arg.typeFlags & vigra.AxisType.Channels:
+                ret.origin  = np.nan
+                ret.maximum = np.nan
+                ret.resolution = np.nan
+                
+                if isinstance(channels, typing.Sequence) and all(isinstance(v, CalSpec) for v in channels):
+                    if len(channels) != ret.size:
+                        if ret.size == 1:
+                            ret.size = len(channels)
+                        else:
+                            raise ValueError(f"{len(channels)} wwre specified for a Channels axis of size {ret.size}")
+                
+                ret.channels = list(map(lambda k: ChannelCalibrationData(index=k, name=f"channel_{k}", **channels[k]), range(ret.size)))
+                
+            else:
+                if isinstance(origin, CalSpec):
+                    origin, maximum, units = origin
+                
+                if isinstance(units, pq.UnitQuantity):
+                    ret.units = units
+                
+                elif isinstance(units, pq.Quantity):
+                    ret.units = units.units
+                    
+                elif units is not None:
+                    raise TypeError(f"Invalid type for units: {type(units)._name__}; a pq.Quantity, pq.UnitQuantity or None was expected")
+                    
+                if isinstance(origin, numbers.Number):
+                    ret.origin = origin
+                    
+                elif isinstance(origin, pq.Quantity):
+                    if origin.ndim > 0:
+                        raise ValueError(f"Origin quantity must be a scalar")
+                    if origin.units != ret.units:
+                        if scq.unitsConvertible(origin.units, ret.units):
+                            origin = origin.rescale(ret.units)
+                        else:
+                            raise ValueError(f"Wrong units ({origin.units}) for axis origin, for a calibration with units of {ret.units}")
+                    
+                    val = origin.magnitude
+                    valdtype = val.dtype
+                    if "int" in valdtype.name:
+                        ret.origin = int(val)
+                    elif "complex" in valdtype.name:
+                        ret.origin = complex(val)
+                    elif "float" in valdtype.name:
+                        ret.origin = float(val)
+                    else:
+                        raise TypeError(f"Unsupported dtype: {valdtype}")
+                    
+                elif origin is not None:
+                    raise TypeError(f"Invalid type for origin: {type(origin).__name__}; a number.Number, pq.Quantity, a CalSpec, or None was expected")
+                    
+                if isinstance(maximum, numbers.Number):
+                    ret.maximum = maximum
+                        
+                elif isinstance(maximum, pq.Quantity):
+                    if maximum.units != ret.units:
+                        if scq.unitsConvertible(maximum.units, ret.units):
+                            maximum = maximum.rescale(ret.units)
+                        else:
+                            raise ValueError(f"Wrong units ({maximum.units}) for axis maximum,  for a calibration with units of {ret.units}")
+                    
+                    val = maximum.magnitude
+                    valdtype = val.dtype
+                    if "int" in valdtype.name:
+                        ret.maximum = int(val)
+                    elif "complex" in valdtype.name:
+                        ret.maximum = complex(val)
+                    elif "float" in valdtype.name:
+                        ret.maximum = float(val)
+                    else:
+                        raise TypeError(f"Unsupported dtype: {valdtype}")
+                        
+                elif maximum is not None:
+                    raise TypeError(f"Invalid type for maximum: {type(maximum).__name__}; a number.Number, a pq.Quantity, or None was expected.")
+                
+                
+            # return cls(type=axtype, key = axkey, name = axisTypeName(axtype), resolution = axres)
+            
         else:
             # TODO 2025-04-13 13:45:58 FIXME parse the calibration string
             # embedded in this AxisInfo 'description'.
             calStr = arg.description[cal_str_start_stop[0]:cal_str_start_stop[1]]
-            return cls.create(calStr)
+            return cls.new(calStr)
         
-    @create.register(dict)
+    @new.register(dict)
     @classmethod
     def _(cls, d:dict):
         if cls.isCalibration(d):
             return cls(**d)
         
-    @create.register(str)
+    @new.register(str)
     @classmethod
     def _(cls, s:str):
         r"""Parses a calibration string.
