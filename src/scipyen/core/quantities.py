@@ -236,6 +236,7 @@ vpv = makeScaledUnitQuantity(pq.L/pq.L, name="volume per volume")#, symbol = "kg
 Pound_Sterling = pq.UnitCurrency("Pound_Sterling", symbol="£")
 US_Dollar = pq.UnitCurrency("US_Dollar", symbol="$")
 Euro = pq.UnitCurrency("Euro", symbol = "€")
+
 # ### END custom units
 
 

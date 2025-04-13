@@ -16,6 +16,7 @@ from pprint import (pprint, pformat)
 import h5py
 from core.vigra_patches import vigra 
 import numpy as np
+import pandas as pd
 import quantities as pq
 from traitlets import Bunch
 
@@ -32,8 +33,8 @@ from core.quantities import (arbitrary_unit,
                             unitsConvertible,
                             )
 
-from core.datatypes import (is_numeric, is_numeric_string,
-                            RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE, EQUAL_NAN)
+from core.datatypes import (is_numeric, is_numeric_string,)
+from core.constants import ( RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE, EQUAL_NAN)
 
 from core.utilities import (reverse_mapping_lookup, unique, counter_suffix,
                             isclose, all_or_all_not)
@@ -59,32 +60,90 @@ AxisCalibrationDataType = typing.TypeVar("AxisCalibrationData")
 
 @dataclass
 class CalibrationData:
+    r'''Suprclass for AxisCalibrationData and ChannelCalibrationData'''
+    
     units:pq.Quantity = field(default=pq.arbitrary_unit)
+    r'''The physical units'''
+    
     name:typing.Optional[str] = field(default_factory = str)
-    description:typing.Optional[str] = field(default_factory = str)
-    relative_tolerance:float = 1e-4
-    absolute_tolerance:float = 1e-4
-    equal_nan:bool = True
+    r'''The name of this calibration.
+    For a Channels axis, this is the Channel name'''
+    
+    # NOTE: 2025-04-13 09:46:01
+    # this may create confusion with the AxisInfo 'description' field; besides, 
+    # I'm not sure about what this brings to the data...
+    # description:typing.Optional[str] = field(default_factory = str)
+    
+    relative_tolerance:float = RELATIVE_TOLERANCE
+    r'''Useful when comparing values'''
+    
+    absolute_tolerance:float = ABSOLUTE_TOLERANCE
+    r'''Useful when comparing values'''
+    
+    equal_nan:bool = EQUAL_NAN
+    r'''When comparing calibration data with NaN values, this determines whether
+    NaN values are considwered equal overriding the default in Python.'''
+    
+    fc_template:bool = "{:.16f}"
+    r'''String format template for loating point and complex scalars.
+    see str.format() for details'''
 
     @classmethod
     def isCalibration(cls, x):
-        return isinstance(x, cls) or (isinstance(x, dict) and all(k in x for k in cls.parameters))
+        fnames = list(map(lambda f: f.name, dataclasses.fields(cls)))
+        return isinstance(x, cls) or (isinstance(x, dict) and all(k in fnames for k in x))
     
-    def _gen_xml_element_(self, param):
-        print(f"{self.__class__.__name__}_gen_xml_element_(param = {param})")
+    def asdict(self) -> dict:
+        r'''Creates a dict from this instance'''
+        return dataclasses.asdict(self)
+    
+    @property
+    def calibrationString(self) -> str:
+        fnames = tuple(map(lambda f: self._to_xml_(f.name), dataclasses.fields(self)))
+        return "".join(fnames)
+        
+    @staticmethod
+    def _from_xml_text_(param, txt) -> object:
+        if param == "units":
+            value = unitQuantityFromNameOrSymbol(txt)
+            
+        elif param in ("key", "name"):
+            value = txt
+            
+        elif param == "type":
+            value = axisTypeFromString(txt)
+            
+        elif param == "fc_template":
+            value = txt
+            
+        else:
+            if txt is None:
+                value = None
+                
+            elif isinstance(txt, str):
+                if "nan" in txt:
+                    value = np.nan
+                elif "None" in txt:
+                    value = None
+                elif "MISSING" in txt:
+                    value = dataclasses.MISSING
+                else:
+                    value = eval(txt)
+                    
+            else:
+                value = None
+            
+        # print(f"param: {param}, txt: {txt}, value: {value}")
+        return value
+    
+    def _to_xml_(self, param):
+        # print(f"{self.__class__.__name__}_to_xml_(param = {param})")
         value = getattr(self, param, None)
         
         ss = [f"<{param}>"]
         
         if value is not None:
-        
-            if isinstance(value, str): # ("name", "key")
-                s = value
-                
-            elif isinstance(value, bool):
-                s = "True" if value else "False"
-                
-            elif param == "type":
+            if param == "type":
                 s = "|".join(axisTypeStrings(value))
             
             elif param == "units":
@@ -94,84 +153,54 @@ class CalibrationData:
             elif param == "index":
                 s = "%d" % value
                 
-            #elif param in ("origin", "resolution", "maximum", "minimum"):
+            elif isinstance(value, (float, complex)) or (isinstance(value, pq.Quantity) and value.ndim == 0): # ("origin", "resolution", "maximum", "minimum")
+                # includes np.nan, math.nan, np.inf, math.inf
+                # and purely scalar Quantities
+                # NOTE: 2025-04-13 09:53:33 WARNING
+                # posible loss of precision here!
+                # hence we need the fc_template field
+                s = self.fc_template.format(value)
                 
-            else: # ("origin", "resolution", "maximum", "minimum")
-                s = "%f"%value
+            elif value is dataclasses.MISSING:
+                s = "MISSING"
+                
+            else:
+                # includes any int, str, pd.NA, None, bool, bytes, bytearray
+                s =f"{value}"
+                # raise TypeError(f"Unsupported value type {type(value).__name__}")
                 
             ss.append(s)
         
         ss.append(f"</{param}>")
         
-        return "".join(ss)
-
+        return "".join(ss) 
+    
+    def __eq__(self, other):
+        ret = self.__class__ == other.__class__
+        if ret:
+            if self.equal_nan and other.equal_nan:
+                nanfields = list(filter(lambda x: np.isnan(x[1]), map(lambda f: (f.name, getattr(self, f.name)), dataclasses.fields(self))))
+                print(f"{self.__class__.__name__}.__eq__: nanfields = {nanfields}")
+                for f in nanfields:
+                    ret &= getattr(other, f[0], np.nan) in (np.nan, math.nan)
+                    
+            else:
+                ret &= super(self).__eq__(other)
+                        
 @dataclass
 class ChannelCalibrationData(CalibrationData):
-    r"""See Helmchen (2011) CSH Protocols
-
-    
-
-    """
-    # channel index
+    r""" Calibration for a channel in a Channels axis """
     index:int = 0 
+    r'''channel index'''
     
     # channel's minimum value, in self.units, as float
-    origin:float = 0.0 
+    # origin:float = 0.0 # is this EVER needed?
     
     # channel's maximum value, in self.units, as float
-    maximum:typing.Optional[float] = 1.0
+    # maximum:typing.Optional[float] = 1.0 # is this EVER needed?
     
     # is this channel virtual?
-    virtual:bool=False
-    
-    # algebraic expression for the transformation of pixel intensity (a.u.) 
-    # into calibrated values; default is 'data.max() / (maximum-origin)'
-    # 
-    # NOTE: 2025-04-10 23:23:42 TODO consider using
-    # • py-openmath
-    # • openexpressions - simpler and more to the point of what I want to achieve?
-    #   example: estimate change in [Ca²⁺]ᵢ using Kd * ΔF/F / max(ΔF/F)
-    #       WARNING: openexpressions.Parser cannot parse expression strings containing
-    #       unicode characters!!!
-    #
-    #       notation used:
-    #       Kd          -> 𝑲d
-    #       x           -> ΔF/F  = (𝑭-𝑭₀)/𝑭₀
-    #       xMax        -> max(ΔF/F) (i.e., fluorescence intensity at saturation)
-    #
-    #       WARNING: background fluorescence must have been subtracted from both
-    #           𝑭 and 𝑭₀ ‼
-    #        
-    #       from openexpressions.Parser import Parser
-    #       math_parser = Parser()
-    #       expression = math_parser.parse("Kd * x / xMax")
-    #       this can be evaluated at a given pixel, with intensty 'x', e.g.:
-    #       y = expression.eval({'Kd':2.5 * pq.uM, 'x': 128, 'xMax': 2048})
-    #       -> y = array(0.625)*uM
-    #       NOTE: quantities ARE supported by the evaluation code
-    #
-    #       WARNING: for numpy arrays don't use numpy ufuncs for vectorizing; 
-    #       just pass the array to the appripriate symbol in the call to eval, 
-    #       e.g.:
-    #       img1 = expression.eval({'Kd':2.5 * pq.uM, 'x': img, 'xMax': img.max()})
-    #
-    #       img1 is a quantity array
-    #
-    #       CAUTION: when the array in 'img' is a VigraArray, then you should create a 
-    #       VigraArray from the resulting array, but be aware of the following:
-    #       1) this will splice-out the quantity units
-    #       2) you MUST supply and axistags parameter to the VigraArray constructor
-    #       — this is the good time to apply a quantity calibration to the 
-    #       channel axis in the axistags destined for the result!
-    #       
-    # • openexpressions in conjunctio with sympy (simpyfy) to perform some algebraic
-    #   simplifications of the expression if needed
-    #
-    # • alternatives to openexpressions to consider
-    #   ∘ https://github.com/louisfisch/mathematical-expression-parser
-    #   ∘ pymep
-    #   ∘ write your own parser using python's ast module
-    expression:typing.Optional[str] = field(default_factory = str)
+    # virtual:bool=False
     
     @property
     def calibrationString(self) -> str:
@@ -179,7 +208,7 @@ class ChannelCalibrationData(CalibrationData):
 
         strlist = [f"<{name}>"]
         for param in sorted(map(lambda x: x.name, dataclasses.fields(self.__class__))):
-            strlist.append(self._gen_xml_element_(param))
+            strlist.append(self._to_xml_(param))
         strlist.append(f"</{name}>")
         
         return "".join(strlist)
@@ -188,13 +217,49 @@ class ChannelCalibrationData(CalibrationData):
 @dataclass
 class AxisCalibrationData(CalibrationData):
     index:int = 0
+    r'''index of this axis in the array dimensions: 0-based'''
+    
     origin:float = 0.0
+    r'''The origin of the axis coordinates.
+    To what coordinate does the 0th element along the axis correspond?
+    By default this is 0.0, but there can be good reasons for why axis might have
+    a non-zero origin (i.e., an "offset")'''
+    
     resolution:float = 1.0
+    r'''The sampling resolution (in 1/axis units).
+    WARNING: Unlike the "resolution" field of a vigra.AxisInfo, where a value
+    of 0 signals no defined resolution, here "resolution" represents the number
+    number of axis elements corresponding to a unit of axis physical coordinates,
+    e.g., number of pixels in a micrometer, etc.
+
+    When the resolution is undetermined, the value of this field should be NaN here.
+    
+    By default, this ios set to 1.0 i.e., one axis element per axis physical unit
+    (e.g., one pixel per micrometer).
+    
+    You almost surely want to change this.
+    '''
+    
     maximum:typing.Optional[float] = None
+    r'''The upper limit of the axis coordinates.
+    To what coordinate does the last element along the axis correspond?'''
+    
     type:typing.Optional[typing.Union[vigra.AxisType, int]] = field(default=vigra.AxisType.UnknownAxisType)
+    r'''The type of the axis'''
+    
     key:typing.Optional[str] = "?"
-    size:typing.Optional[int] = None
-    channels:typing.Optional[typing.Sequence] = field(default_factory=list)
+    r'''String symbol of the axis'''
+    
+    size:typing.Optional[int] = 1
+    r'''Size of te axis (i.e. size of the array along the dimension of this axis).
+    For a Channels axis, this is also the number of channels.
+    Must be ≥ 1.
+    '''
+    
+    channels:typing.Optional[typing.Sequence[CalibrationData]] = None
+    r'''Sequence of ChannelCalibrationData, one per channel.
+    For a NonChannel axis this MUST be None, or an empty list; for a Channels 
+    axis, even a virtual one, this MUST have at least one ChannelCalibrationData'''
     
     @singledispatchmethod
     @classmethod
@@ -203,23 +268,100 @@ class AxisCalibrationData(CalibrationData):
     
     @create.register(vigra.AxisInfo)
     @classmethod
-    def _(cls, o:vigra.AxisInfo):
+    def _(cls, arg:vigra.AxisInfo):
+        # NOTE: 2025-04-13 13:42:52
+        # in vigra.AxisInfo, a 'resolution' field 0.0 means axis resolution (in
+        # the sense of sampling resolution, which should be in (axis units)⁻¹ ) 
+        # is not defined !
         axtype = arg.typeFlags
         axkey = arg.key
         axres = 1. if arg.resolution == 0 else arg.resolution
-        axorigin = 0.0
+        # axorigin = 0.0
         
-        if axtype & vigra.Axistype.Channels:
-            
-            pass # FIXME 2025-04-09 22:44:09 need to supply channels separately
+        cal_str_start_stop = cls.findCalibrationString(arg.description)
+        # if not axtype & vigra.Axistype.Channels:
+            # pass # FIXME 2025-04-09 22:44:09 need to supply channels separately
         
-        cal_str_start_stop = AxisCalibrationData.findCalibrationString(arg.description)
         
         if cal_str_start_stop is None:
             return cls(type=axtype, key = axkey, name = axisTypeName(axtype))
         else:
-            pass
+            # TODO 2025-04-13 13:45:58 FIXME parse the calibration string
+            # embedded in this AxisInfo 'description'.
+            calStr = arg.description[cal_str_start_stop[0]:cal_str_start_stop[1]]
+            return cls.create(calStr)
         
+    @create.register(dict)
+    @classmethod
+    def _(cls, d:dict):
+        if cls.isCalibration(d):
+            return cls(**d)
+        
+    @create.register(str)
+    @classmethod
+    def _(cls, s:str):
+        r"""Parses a calibration string.
+        
+        For the structure of an XML-formatted calibration string see the
+        documentation for the AxisCalibrationData.calibrationString property.
+        
+        Parameters:
+        ==========
+        
+        s: str = XML-formatted calibration string (see documentation for
+        AxisCalibrationData.calibrationString property)
+        
+        Returns:
+        ========
+        An AxisCalibrationData instance. 
+            This either a reference to the AxisCalibrationData object passed as
+            the 'cal' parameter, or a new AxisCalibrationData object, otherwise.
+            
+            When 's' is a string containing an XML-formatted calibration string 
+            (see AxisCalibrationData.calibrationString()), the returned value
+            (and 'cal', if passed) will be updated with the calibration values
+            parsed from the string in 's'. Otherwise, the returned value is the
+            original value of 'cal' (if 'cal' is an AxisCalibrationData object) 
+            or a new, 'default' AxisCalibrationData object (as for an axis with 
+            type flags UnknownAxisType).
+        
+        """
+        import xml.etree.ElementTree as ET
+        
+        if not isinstance(s,str) or len(s.strip()) == 0 or not s.startswith("<axis_calibration>") or not s.endswith("</axis_calibration>"):
+            raise ValueError("This is not an axis calibration string")
+            
+        cal = dict()
+        
+        # OK, now extract the relevant xml string
+        try:
+            cal_xml_element = ET.fromstring(s)
+            
+            # make sure we're OK
+            if cal_xml_element.tag != "axis_calibration":
+                raise ValueError("Wrong element tag; was expecting 'axis_calibration', instead got %s" % element.tag)
+            
+            # see NOTE: 2021-10-09 23:58:58
+            # xml.etree.ElementTree.Element.getchildren() is absent in Python 3.9.7
+            
+            # fnames = tuple(map(lambda f: f.name, dataclasses.fields(cls)))
+            
+            # for param in fnames:
+            for param in map(lambda f: f.name, dataclasses.fields(cls)):
+                child_nodes = tuple(getXMLChildren(cal_xml_element, tagName=param))
+                if len(child_nodes):
+                    child_node = child_nodes[0]
+                    txt = child_node.text
+                    cal[param] = cls._from_xml_text_(param, txt)
+
+        except Exception as e:
+            traceback.print_exc()
+            print(f"cannot parse calibration string {s}")
+            raise e
+            
+        if cls.isCalibration(cal):
+            return cls(**cal)
+
     @property
     def calibrationString(self) -> str:
         r"""
@@ -289,26 +431,29 @@ class AxisCalibrationData(CalibrationData):
         strlist = ["<axis_calibration>"]
         
         # for param in sorted(self.__class__.parameters):
-        for param in sorted(filter(lambda x: x != "channels", map(lambda x: x.name, dataclasses.fields(self.__class__)))):
-            strlist.append(self._gen_xml_element_(param))
+        for param in sorted(filter(lambda x: x != "channels", map(lambda x: x.name, dataclasses.fields(self)))):
+            strlist.append(self._to_xml_(param))
             
-        if self.type & vigra.AxisType.Channels:
+        if self.type & vigra.AxisType.Channels and isinstance(self.channels, (list, tuple)) and len(self.channels):
+            strlist.append("<channels>")
             for ch in self.channels:
-                # NOTE: 2021-11-08 11:35:19
-                # only append channel info if there are channel calibrations
+                # NOTE: 2025-04-13 18:13:32
+                # ch should be a ChannelCalibrationData
                 # NOTE: 2025-04-08 14:39:48
                 # see NOTE: 2025-04-08 14:39:08
+                # NOTE: 2021-11-08 11:35:19
+                # only append channel information if there are channel calibrations
                 # if "virtual" not in ch[0]:
                 if not ch.virtual:
                     strlist.append(f"<{ch.name}>")
                     strlist.append(ch.calibrationString)
                     strlist.append(f"</{ch.name}>")
+                    
+            strlist.append("</channels>")
                 
         strlist.append("</axis_calibration>")
         
         return "".join(strlist)
-    
-
     
     @staticmethod
     def findCalibrationString(s:str) -> typing.Optional[tuple]:
@@ -320,95 +465,7 @@ class AxisCalibrationData(CalibrationData):
             else:
                 stop = start + len("<axis_calibration>")
             return (start, stop)
-        
-    @staticmethod
-    def parseCalibrationString(s:str):
-        r"""Parses a calibration string.
-        
-        For the structure of an XML-formatted calibration string see the
-        documentation for the AxisCalibrationData.calibrationString property.
-        
-        Parameters:
-        ==========
-        
-        s: str = XML-formatted calibration string (see documentation for
-        AxisCalibrationData.calibrationString property)
-        
-        Returns:
-        ========
-        An AxisCalibrationData instance. 
-            This either a reference to the AxisCalibrationData object passed as
-            the 'cal' parameter, or a new AxisCalibrationData object, otherwise.
-            
-            When 's' is a string containing an XML-formatted calibration string 
-            (see AxisCalibrationData.calibrationString()), the returned value
-            (and 'cal', if passed) will be updated with the calibration values
-            parsed from the string in 's'. Otherwise, the returned value is the
-            original value of 'cal' (if 'cal' is an AxisCalibrationData object) 
-            or a new, 'default' AxisCalibrationData object (as for an axis with 
-            type flags UnknownAxisType).
-        
-        """
-        import xml.etree.ElementTree as ET
-        
-        def __eval_xml_element_text__(param, txt):
-            if param == "units":
-                value = unitQuantityFromNameOrSymbol(txt)
-            elif param in ("key", "name"):
-                value = txt
-            elif param == "type":
-                value = axisTypeFromString(txt)
-            else: # ("index", "origin", "resolution", "minimum", "maximum")
-                if "nan" in txt:
-                    value = np.nan
-                else:
-                    value = eval(txt)
-                
-            return value
-        
-        if not isinstance(s,str) or len(s.strip()) == 0 or not s.startswith("<axis_calibration>") or not s.endswith("</axis_calibration>"):
-            raise ValueError("This is not an axis calibration string")
-            
-        # cal = AxisCalibrationData()
-        
-        # OK, now extract the relevant xml string
-        try:
-            cal_xml_element = ET.fromstring(s)
-            
-            # make sure we're OK
-            if cal_xml_element.tag != "axis_calibration":
-                raise ValueError("Wrong element tag; was expecting 'axis_calibration', instead got %s" % element.tag)
-            
-            # see NOTE: 2021-10-09 23:58:58
-            # xml.etree.ElementTree.Element.getchildren() is absent in Python 3.9.7
-            for child_node in getXMLChildren(cal_xml_element):
-                # these can be <children_X> tags (X is a 0-based index) or a <name> tag
-                # ignore everything else
-                if child_node.tag.lower() in AxisCalibrationData.parameters:
-                    param = child_node.tag.lower()
-                    txt = child_node.text
-                    setattr(cal, param, __eval_xml_element_text__(param, txt))
-                    
-                else:
-                    chcaldict = dict() # = ChannelCalibrationData()
-                    chcalname = child_node.tag.lower()
-                    ch_children = getXMLChildren(child_node)
-                    ch_tags = dict((c.tag, c.text) for c in ch_children)
-                    for param in ChannelCalibrationData.parameters:
-                        if param in ch_tags:
-                            value = __eval_xml_element_text__(param, ch_tags[param])
-                            chcaldict[param] = value
-                            
-                    if len(chcaldict):
-                        chcal = ChannelCalibrationData(**chcaldict)
-                        cal.addChannelCalibration(chcal, name=chcal.name)
-                            
-        except Exception as e:
-            traceback.print_exc()
-            print("cannot parse calibration string %s" % calibration_string)
-            raise e
-            
-        return cal
+    
             
     
 
