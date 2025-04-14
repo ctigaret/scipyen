@@ -126,12 +126,14 @@ class FullCalSpec(typing.NamedTuple):
     name:typing.Optional[str] = None
     index:int = 0
 
-@dataclass
+@dataclass(slots=True)
 class CalibrationData:
     r'''Superclass for AxisCalibrationData and ChannelCalibrationData'''
     
-    units:pq.Quantity = field(default=pq.arbitrary_unit)
-    r'''The physical units'''
+    # units:pq.Quantity = field(default=pq.arbitrary_unit)
+    # r'''The physical units
+    # Currently, this must be set to MISSING for a Channels-type axis.
+    # '''
     
     name:typing.Optional[str] = field(default_factory = str)
     r'''The name of this calibration.
@@ -270,7 +272,7 @@ class CalibrationData:
 #         
 #         return "\n".join(ret)
     
-@dataclass
+@dataclass(slots=True)
 class ChannelCalibrationData(CalibrationData):
     r""" Calibration for a channel in a Channels axis 
         
@@ -372,47 +374,48 @@ class ChannelCalibrationData(CalibrationData):
         return cls.new(data)
         
     
-@dataclass
+@dataclass(slots=True)
 class AxisCalibrationData(CalibrationData):
+    r"""Calibration data for an array axis.
+    """
+    
+    # NOTE: 2025-04-14 17:42:15 FIXME/TODO
+    # The issues with the current design is that fields suitable for a NonChannel
+    # axis are NOT fully suitable for a Channels axis, thus leading to unnecessary
+    # data content and complicating the code:
+    #
+    # 1) 'units', 'origin', 'maximum' -> OK for a NonChannel axis, but meanignless
+    # for a Channels axis, at AxisCalibrationData level; instead, they ARE useful
+    # for individual ChannelCalibrationData objects INSIDE the 'channels'
+    # attribute of the AxisCalibrationData for a Channels-type axis
+    #
+    # 2) 'channels' attribute is meaningless for a NonChannel-type axis, but required
+    # for the AxisCalibrationData of a Channels-type axis
+    #
+    # 3) finally, the 'size' attribute is REQUIRED for the  AxisCalibrationData
+    # of a NonChannel-type axis, but redundant for the AxisCalibrationData of a 
+    # Channels-type axis (because 'size' if in effect the length of the list of 
+    # ChannelCalibrationData objects in the 'channels' attributes)
+    # with the risk of duplicating some code: create a new subclass of CalibrationData
+    # for Channels axis, to prohibit the use of unit, origin, maximum and resolution
+    # at axis calibration level (and to delegate instead to ChannelCalibrationData
+    # in the channels attribute)
+    #
+    # It would, however, be nice to be able to use a single language construct to
+    # instantiate an AxisCalibrationData for an axis of either type.
+    #
+    # The problem is that the type of the axis (AxisType object) is a "runtime"
+    # concept, effectively like an Enum value — established at runtime — whereas 
+    # the slightly different 'versions' of AxisCalibrationData are a "static"
+    # concept, defined at compile time.
+    
+    # A possible suggestion is to create to different AxisCalibrationData types
+    # one for NonChannel and the other for Channels axis - but this still needs
+    # the axis type flag to ve interrogated BEFORE calling the appropriate contructor
+    
     index:int = 0
     r'''index of this axis in the array dimensions: 0-based.
     Must be ≥ 0
-    '''
-    
-    # NOTE: 2025-04-14 17:42:15 FIXME/TODO
-    # with the risk of duplcating some code: create a new subclass of CalibrationData
-    # for Channels axis, to prohibit the use of unit, origin, maximum and resolution
-    # at axis calibration level (and to delegate instead to each ChannelCalibrationData)
-    
-    origin:numbers.Number = 0.0
-    r'''The origin of the axis coordinates.
-    To what coordinate does the 0th element along the axis correspond?
-    By default this is 0.0, but there can be good reasons for why axis might have
-    a non-zero origin (i.e., an "offset")'''
-    
-    resolution:numbers.Number = 1.0
-    r'''The sampling resolution (in 1/axis units).
-    WARNING: Unlike the "resolution" field of a vigra.AxisInfo, where a value
-    of 0 signals no defined resolution, here "resolution" represents the number
-    number of axis elements corresponding to a unit of axis physical coordinates,
-    e.g., number of pixels in a micrometer, etc.
-
-    When the resolution is undetermined, the value of this field should be NaN here.
-    
-    By default, this ios set to 1.0 i.e., one axis element per axis physical unit
-    (e.g., one pixel per micrometer).
-    
-    You almost surely want to change this.
-    '''
-    
-    maximum:typing.Optional[numbers.Number] = None
-    r'''The upper limit of the axis coordinates.
-    To what coordinate does the last element along the axis correspond?'''
-    
-    size:typing.Optional[int] = 1
-    r'''Size of the axis (i.e. size of the array along the dimension of this axis).
-    For a Channels axis, this is also the number of channels.
-    Must be ≥ 1.
     '''
     
     key:typing.Optional[str] = "?"
@@ -422,83 +425,92 @@ class AxisCalibrationData(CalibrationData):
     type:typing.Optional[typing.Union[vigra.AxisType, int]] = field(default=vigra.AxisType.UnknownAxisType)
     r'''The type of the axis'''
     
-    def __post_init__(self):
+    _units_:dataclasses.InitVar[pq.Quantity] = field(default=pq.arbitrary_unit)
+    r'''The physical units
+    Currently, this must be set to MISSING for a Channels-type axis.
+    ''' 
+    
+    _origin_:dataclasses.InitVar[numbers.Number] = 0.0
+    r'''The origin of the axis coordinates.
+    To what coordinate does the 0th element along the axis correspond?
+    By default this is 0.0, but there can be good reasons for why axis might have
+    a non-zero origin (i.e., an "offset").
+
+    Currently, this must be set to MISSING for a Channels-type axis
+    '''
+    
+    _resolution_:dataclasses.InitVar[numbers.Number] = 1.0
+    r'''The sampling resolution (in 1/axis units).
+    WARNING: Unlike the "resolution" field of a vigra.AxisInfo, where a value
+    of 0 signals no defined resolution, here "resolution" represents the number
+    number of axis elements corresponding to a unit of axis physical coordinates,
+    e.g., number of pixels in a micrometer, etc.
+
+    When the resolution is undetermined, the value of this field should be NaN here.
+    
+    By default, this is set to 1.0 i.e., one axis element per axis physical unit
+    (e.g., one pixel per micrometer).
+    
+    You almost surely want to change this.
+    
+    Currently, this must be set to MISSING for a Channels-type axis
+    '''
+    
+    _maximum_:dataclasses.InitVar[typing.Optional[numbers.Number]] = None
+    r'''The upper limit of the axis coordinates.
+    To what coordinate does the last element along the axis correspond?
+    Currently, this must be set to MISSING for a Channels-type axis.
+    '''
+    
+    _size_:dataclasses.InitVar[typing.Optional[int]] = 1
+    r'''Size of the axis (i.e. size of the array along the dimension of this axis).
+    Must be ≥ 1.
+    
+    For a Channels axis, this is also the number of channels, hence redundant.
+    '''
+    
+    # channels:typing.Optional[typing.Sequence[typing.Union[CalibrationData, CalSpec]]] = None
+    _channels_:dataclasses.InitVar[typing.Optional[typing.Sequence[typing.Union[CalibrationData, CalSpec]]]] = None
+    r'''Sequence of ChannelCalibrationData, one per channel
+    Currently, this must be set to MISSING for a NonChannel-type axis
+    '''
+
+    def __post_init__(self, units, origin, resolution, maximum, size, channels):
         r"""Further curates the fields after construction.
         NOTE: To create an AxisCalibrationData object from a vigra.AxisInfo object,
         a dict or a calibration string (xml-formatted) please use the "new" factory
         class methods.
         """
-        # NOTE: 2025-04-13 22:27:49
-        # ATTENTION: the fields order in CalibrationData is:
-        # 'units',
-        # 'name',
-        # 'relative_tolerance',
-        # 'absolute_tolerance',
-        # 'equal_nan',
-        # 'fc_template'
-        #
-        # Followed by the fields of AxisCalibrationData in this order:
-        # 'index',
-        # 'origin',
-        # 'resolution',
-        # 'maximum',
-        # 'type',
-        # 'key',
-        # 'size',
-        # 'channels'
-        #
-        # OR by the fields of ChannelCalibrationData, in thbis order:
-        # 'index',
-        # 'origin',
-        # 'maximum'
-        #
-        # ------
-        #
-        # For a Channels axis:
-        # the origin, maximum and resolution will be set to MISSING; instead 
-        # the 'origin' and 'maximum' fields in the ChannelCalibrationData will 
-        # be set according to the the data in the 'channels' parameter, which 
-        # can be a sequence of 
-        # • ChannelCalibrationData,
-        # • CalSpec named tuples
-        
         if self.type & vigra.AxisType.Channels:
-            raise ValueError("Cannot instantiate an AxisCalibrationData for Channels axis; please use ChannelAxisCalibrationData instead")
-#             # NOTE: 2025-04-14 14:02:54 
-#             # use MISSING instead of NaN, to signify that these fields are meaningless
-#             # for a channel axis (they should be present in the channel calibration data
-#             # themselves)
-#             self.origin = dataclasses.MISSING
-#             self.resolution = dataclasses.MISSING
-#             self.maximum = dataclasses.MISSING
-#             self.units = dataclasses.MISSING
-#             if isinstance(self.channels, typing.Sequence):
-#                 channel_data = tuple(filter(lambda x: isinstance(x, (ChannelCalibrationData, CalSpec)), self.channels))
-#                 
-#                 if len(channel_data) == 0:
-#                     # must create a channel by default:
-#                     self.channels = [ChannelCalibrationData(index = 0)]
-#                     
-#                 elif self.size != len(channel_data):
-#                     if self.size == 1: # may not have been specified
-#                         self.size = len(channel_data)
-#                     else:
-#                         raise RuntimeError(f"Mismatch between axis size ({self.size}) and number of specified channels ({len(channel_data)})")
-#                     
-#                     self.channels = channel_data
-#                     
-#             else:
-#                 self.channels = list(map(lambda k: ChannelCalibrationData(index=k, name=f"channel_{k}"), range(self.size)))
-        # else:
-        #     self.channels = dataclasses.MISSING
+            # raise ValueError("Cannot instantiate an AxisCalibrationData for Channels axis; please use ChannelAxisCalibrationData instead")
+            # NOTE: 2025-04-14 14:02:54 
+            # use MISSING instead of NaN, to signify that these fields are meaningless
+            # for a channel axis (they should be present in the channel calibration data
+            # themselves)
+            # self.origin = dataclasses.MISSING
+            # self.resolution = dataclasses.MISSING
+            # self.maximum = dataclasses.MISSING
+            # self.units = dataclasses.MISSING
+            # self.channels = list()
+            if isinstance(channels, typing.Sequence):
+                channel_data = tuple(map(lambda x: x if isinstance(x, ChannelCalibrationData) else ChannelCalibrationData(**x._asdict()), 
+                                         filter(lambda x: isinstance(x, (ChannelCalibrationData, CalSpec)), channels)))
+                
+                if len(channel_data) == 0:
+                    # must create a channel by default:
+                    self.channels = [ChannelCalibrationData(index = 0)]
+                    
+                else:
+                    self.channels = channel_data
+                    
+            else:
+                self.channels = list(map(lambda k: ChannelCalibrationData(index=k, name=f"channel_{k}"), range(size)))
+        else:
+            self.origin = origin
+            self.resolution = resolution
+            self.maximum = maximum
+            self.units = units
             
-#     def __setattr__(self, name, value):
-#         if name in ("units", "origin", "maximum", "resolution"):
-#             if self.type & vigra.AxisType.Channels:
-#                 raise AttributeError(f"Cannot assign to the {name} attribute of a Channels axis")
-#             
-#             super().__setattr__(name, value)
-    
     @singledispatchmethod
     @classmethod
     def new(cls, o:object):
@@ -528,7 +540,7 @@ class AxisCalibrationData(CalibrationData):
             # NOTE: 2025-04-14 14:52:33
             # if this is a Channels axis, then __post_init__ will set
             # origin, maximum and resolution to MISSING
-            ret = cls(type=axtype, key = axkey, name = axisTypeName(axtype), resolution = axres)
+            ret = cls(type=axtype, key = axkey, name = axisTypeName(axtype), _resolution_ = axres)
             
             # overwrite the defaults if needed:
             #
@@ -545,19 +557,17 @@ class AxisCalibrationData(CalibrationData):
                     raise ValueError(f"Invalid axis size: {size}")
                 
             if arg.typeFlags & vigra.AxisType.Channels:
-                raise ValueError("Cannot instantiate an AxisCalibrationData for Channels axis; please use ChannelAxisCalibrationData instead")
-#                 # see NOTE: 2025-04-13 13:42:52
-#                 if isinstance(channels, typing.Sequence) and all(isinstance(v, CalSpec) for v in channels):
-#                     if len(channels) != ret.size:
-#                         if ret.size == 1:
-#                             ret.size = len(channels)
-#                         else:
-#                             raise ValueError(f"{len(channels)} wwre specified for a Channels axis of size {ret.size}")
-#                 
-#                     ret.channels = list(map(lambda k: ChannelCalibrationData(index=k, name=f"channel_{k}", **channels[k]), range(ret.size)))
-#                     
-#                 else:
-#                     ret.channels = [ChannelCalibrationData(index=0, name="channel_0")]
+                if isinstance(channels, typing.Sequence) and all(isinstance(v, CalSpec) for v in channels):
+                    if len(channels) != ret.size:
+                        if ret.size == 1:
+                            ret.size = len(channels)
+                        else:
+                            raise ValueError(f"{len(channels)} wwre specified for a Channels axis of size {ret.size}")
+                
+                    ret.channels = list(map(lambda k: ChannelCalibrationData(index=k, name=f"channel_{k}", **channels[k]), range(ret.size)))
+                    
+                else:
+                    ret.channels = [ChannelCalibrationData(index=0, name="channel_0")]
                 
             else:
                 if isinstance(origin, CalSpec):
@@ -826,22 +836,20 @@ class AxisCalibrationData(CalibrationData):
             return (start, stop)
     
             
-class ChannelAxisCalibrationData(CalibrationData):
-    channels:typing.Optional[typing.Sequence[typing.Union[CalibrationData, CalSpec]]] = None
-    r'''Sequence of ChannelCalibrationData, one per channel'''
-    
-    key:typing.Optional[str] = "c"
-    r'''String symbol of the axis'''
-    
-    
-    type:typing.Optional[typing.Union[vigra.AxisType, int]] = field(default=vigra.AxisType.UnknownAxisType)
-    r'''The type of the axis.
-    Postcondition: self.type & vigra.AxisType.Channels > 0'''
-    
-    def __post_init__(self):
-        if self.type & vigra.AxisType.Channels == 0:
-            raise ValueError("Cannot instantiate a ChahnelsAxisCalibrationData for a NonChannel axis; please use AxisCalibrationData instead")
-            
+# class ChannelAxisCalibrationData(CalibrationData):
+#     
+#     key:typing.Optional[str] = "c"
+#     r'''String symbol of the axis'''
+#     
+#     
+#     type:typing.Optional[typing.Union[vigra.AxisType, int]] = field(default=vigra.AxisType.UnknownAxisType)
+#     r'''The type of the axis.
+#     Postcondition: self.type & vigra.AxisType.Channels > 0'''
+#     
+#     def __post_init__(self):
+#         if self.type & vigra.AxisType.Channels == 0:
+#             raise ValueError("Cannot instantiate a ChahnelsAxisCalibrationData for a NonChannel axis; please use AxisCalibrationData instead")
+#             
 
     
 
