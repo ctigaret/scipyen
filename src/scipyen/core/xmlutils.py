@@ -204,8 +204,8 @@ def _(element:ET.Element, eltype:int=None, tagName:typing.Optional[str]=None) ->
     r""""""
     if isinstance(tagName, str) and len(tagName.strip()):
         yield from filter(lambda c: c.tag == tagName, element.iter())
-        
-    yield from (c for c in element.iter())
+    else:
+        yield from (c for c in element.iter())
         
         # return (c for c in children if c.nodeType == eltype)
     # chiter = element.iter()
