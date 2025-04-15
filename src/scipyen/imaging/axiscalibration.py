@@ -74,7 +74,7 @@ from traitlets import Bunch
 
 from core import datatypes, xmlutils
 from core.xmlutils import getChildren as getXMLChildren
-from core import quantities as cq
+from core import quantities as scq
 from core.quantities import (arbitrary_unit, 
                             space_frequency_unit,
                             angle_frequency_unit,
@@ -131,100 +131,6 @@ class FullCalSpec(typing.NamedTuple):
     name:typing.Optional[str] = None
     index:int = 0
     
-class CalibrationUnitsDescriptor:
-    def __init__(self, *, default:typing.Optional[typing.Union[pq.Quantity, MissingType]] = pq.arbitrary_unit):
-        if isinstance(default, pq.Quantity):
-            default = cq.ensureScalar(default)
-            
-        elif not isinstance(default, (MissingType, type(None))):
-            raise TypeError(f"Expecting a Quantity or {MissingType}; instead, got {type(default).__name__}")
-        
-        self._default_ = default
-        
-    def __set_name__(self, owner, name:str):
-        self._name_ = f"_{name}"
-        
-    def __get__(self, obj, type_):
-        if obj is None:
-            return self._default_
-        
-        return getattr(obj, self._name_, self._default_)
-    
-    def __set__(self, obj, value:typing.Optional[typing.Union[pq.Quantity, MissingType]]=None):
-        if isinstance(value, pq.Quantity):
-            if not cq.isScalar(value):
-                raise ValueError(f"Expecting a scalar quantity; instead got a Quantity with {value.size} elements")
-            
-            value = cq.ensureScalar(value)
-            
-        elif not isinstance(value, (MissingType, type(None))):
-            raise TypeError(f"Expecting a Quantity or {MissingType}; instead, got {type(value).__name__}")
-        
-        
-        setattr(obj, self._name_, value)
-        
-class CalibrationScalarDescriptor:
-    def __init__(self, *, default:typing.Optional[typing.Union[numbers.Number, pq.Quantity, MissingType]]=None):
-        if isinstance(default, pq.Quantity):
-            default = cq.ensureScalar(default).magnitude
-            if "complex" in default.dtype.name:
-                default = complex(default)
-            else:
-                default = float(default)
-            
-        elif not isinstance(default, (numbers.Number, MissingType, type(None))):
-            raise TypeError(f"Expecting a nmbers.Number, a Quantity or {MissingType}; instead, got {type(default).__name__}")
-        
-        self._default_ = default
-        
-    def __set_name__(self, owner, name:str):
-        self._name_ = f"_{name}"
-        
-    def __get__(self, obj, type_):
-        if obj is None:
-            return self._default_
-        
-        return getattr(obj, self._name_, self._default_)
-    
-    def __set__(self, obj, value:typing.Optional[typing.Union[numbers.Number, pq.Quantity, MissingType]]=None):
-        if isinstance(value, pq.Quantity):
-            value  = cq.ensureScalar(value)
-            units = getattr(obj, "units", None)
-            if isinstance(units, pq.Quantity):
-                if not cq.unitsConvertible(value, units):
-                    raise TypeError(f"Value has {value.units} that are incompatible with the units of this object ({units})")
-                
-                if value.units != units:
-                    value = value.rescale(units)
-                    
-            value = value.magnitude
-            
-            if "complex" in value.dtype.name:
-                value = complex(value)
-            else:
-                # should work for float dtype and object dtypes that can be 
-                # cast to float (e.g. arrays of fractions.Fraction)
-                value = float(value) # will raise Error if conversion fails
-                
-        elif not isinstance(value, (numbers.Number, MissingType, type(None))):
-            raise TypeError(f"Expecting a scalar Quantity or a numbers.Number; instead, got {type(value).__name__}")
-        
-        setattr(obj, self._name_, value)
-        
-class CalibrationChannelsDescriptor:
-    def __init__(self, *, default = typing.Optional[typing.Sequence]):
-        if isinstance(default, typing.Sequence):
-            chcals = list(filter(lambda x: isinstance(x, ChannelCalibrationData), map(lambda x: ChannelCalibrationData(**x._asdict()) if isinstance(x, CalSpec) ChannelCalibrationData(**x) if isinstance(x, dict) else x if isinstance(x, ChannelCalibrationData))))
-            if len(chcals):
-                self._default_ = chcals
-            else:
-                self._default_ = None
-                
-        elif not isinstance(default, (MissingType, type(None))):
-            raise TypeError(f"Expecting a sequence, {MissingType}, or None; instead, got {type(default).__name__}")
-        
-        self._default_ = default
-
 @dataclass(slots=True)
 class CalibrationData:
     r'''Superclass for AxisCalibrationData and ChannelCalibrationData'''
@@ -268,7 +174,7 @@ class CalibrationData:
     
     @property
     def calibrationString(self) -> str:
-        fnames = tuple(map(lambda f: self._to_xml_(f.name), dataclasses.fields(self)))
+        fnames = tuple(filter(lambda x: x is not None, map(lambda f: self._to_xml_(f.name), dataclasses.fields(self))))
         return "".join(fnames)
         
     @staticmethod
@@ -308,6 +214,8 @@ class CalibrationData:
     def _to_xml_(self, param):
         # print(f"{self.__class__.__name__}_to_xml_(param = {param})")
         value = getattr(self, param, None)
+        if value is dataclasses.MISSING:
+            return
         
         ss = [f"<{param}>"]
         
@@ -319,8 +227,8 @@ class CalibrationData:
                 # output the dimensionality's string property
                 if isinstance(value, pq.Quantity):
                     s = value.units.dimensionality.string
-                elif value is dataclasses.MISSING:
-                    s = "MISSING"
+                else:
+                    return
                 
             elif param == "index":
                 s = "%d" % value
@@ -332,9 +240,6 @@ class CalibrationData:
                 # posible loss of precision here!
                 # hence we need the fc_template field
                 s = self.fc_template.format(value)
-                
-            elif value is dataclasses.MISSING:
-                s = "MISSING"
                 
             else:
                 # includes any int, str, pd.NA, None, bool, bytes, bytearray
@@ -473,6 +378,186 @@ class ChannelCalibrationData(CalibrationData):
         return cls.new(data)
         
     
+class CalibrationUnitsDescriptor:
+    r"""Use this for the 'units' attribute of an AxisCalibrationData object.
+    This enforces the rule that only NonChannel axes have this attribute with a
+    pq.Quantity value, while setting it to dataclasses.MISSING for a Channels
+    axis."""
+    def __init__(self, *, default:pq.Quantity = pq.arbitrary_unit):
+        if isinstance(default, pq.Quantity):
+            if not scq.isScalar(default):
+                raise ValueError(f"Expecting a scalar Quantity; instead, got a Quantity array with {default.size} elements")
+            default = scq.ensureScalar(default)
+            
+        else:
+            raise TypeError(f"Expecting a Quantity; instead, got a {type(default).__name__}")
+        
+        self._default_ = default
+        
+    def __set_name__(self, owner, name:str):
+        self._name_ = f"_{name}_"
+        
+    def __get__(self, obj, type_):
+        if obj is None:
+            return self._default_
+        obj_axtype = getattr(obj, "type", None)
+        if not obj_axtype & vigra.AxisType.AllAxes:
+            return
+        if obj_axtype & vigra.AxisType.Channels:
+            return dataclasses.MISSING
+        return getattr(obj, self._name_, self._default_)
+    
+    def __set__(self, obj, value:pq.Quantity):
+        obj_axtype = getattr(obj, "type", None)
+        if not obj_axtype & vigra.AxisType.AllAxes:
+            scipywarn(f"The owner (a {type(obj).__name__}) has an invalid type attribute: {obj_axtype}")
+            return
+        if obj_axtype & vigra.AxisType.Channels:
+            setattr(obj, self._name_, dataclasses.MISSING)
+        else:
+            if isinstance(value, pq.Quantity):
+                if not scq.isScalar(value):
+                    raise ValueError(f"Expecting a scalar quantity; instead, got a Quantity array with {value.size} elements")
+                value = scq.ensureScalar(value)
+            else:
+                raise TypeError(f"Expecting a Quantity; instead, got a {type(value).__name__}")
+            setattr(obj, self._name_, value)
+        
+class CalibrationScalarDescriptor:
+    r"""Use this for the following scalar attributes of AxisCalibrationData:
+    'origin', 'maximum', 'resolution'
+    This enforces the rule that these attributes get numeric values only for 
+    NonChannel axes, but are set to dataclasses.MISSING for Channels axes.
+    """
+    def __init__(self, *, default:typing.Union[numbers.Number, pq.Quantity]=0.0):
+        if isinstance(default, pq.Quantity):
+            if not scq.isScalar(default):
+                raise ValueError(f"Expecting a scalar Quantity; instead, got a Quantity array with {default.size} elements")
+            default = scq.ensureScalar(default).magnitude
+            # NOTE: 2025-04-15 23:02:24
+            # strip away the units
+            # ATTENTION: In contrast, in the __set__ we must ensure that if a
+            # quantity is passed it is scaled ot the current units
+            if "complex" in default.dtype.name:
+                default = complex(default)
+            else:
+                default = float(default)
+            
+        elif not isinstance(default, numbers.Number):
+            raise TypeError(f"Expecting a numbers.Number, or a scalar Quantity; instead, got {type(default).__name__}")
+        
+        self._default_ = default
+        
+    def __set_name__(self, owner, name:str):
+        self._name_ = f"_{name}_"
+        
+    def __get__(self, obj, type_):
+        r"""Returns None if the owner is invalid"""
+        if obj is None:
+            return self._default_
+        obj_axtype = getattr(obj, "type", None)
+        if not obj_axtype & vigra.AxisType.AllAxes:
+            return
+        if obj_axtype & vigra.AxisType.Channels:
+            return datatypes.MISSING
+        return getattr(obj, self._name_, self._default_)
+    
+    def __set__(self, obj, value:typing.Optional[typing.Union[numbers.Number, pq.Quantity, MissingType]]=None):
+        r"""Setter. The owner object must have a valid 'type' attribute"""
+        obj_axtype = getattr(obj, "type", None)
+        if not obj_axtype & vigra.AxisType.AllAxes:
+            scipywarn(f"The owner (a {type(obj).__name__}) has an invalid type attribute: {obj_axtype}")
+            return
+        # NOTE: 2025-04-15 23:03:56
+        # set this to MISSING in case obj is an AxisCalibrationData for a Channels axis
+        if obj_axtype & vigra.AxisType.NonChannel:
+            if isinstance(value, pq.Quantity):
+                value  = scq.ensureScalar(value)
+                units = getattr(obj, "units", None)
+                if isinstance(units, pq.Quantity):
+                    if not scq.unitsConvertible(value, units):
+                        raise TypeError(f"Value has {value.units} that are incompatible with the units of this object ({units})")
+                    
+                    if value.units != units:
+                        value = value.rescale(units)
+                        
+                value = value.magnitude
+                
+                if "complex" in value.dtype.name:
+                    value = complex(value)
+                else:
+                    # should work for float dtype and object dtypes that can be 
+                    # cast to float (e.g. arrays of fractions.Fraction)
+                    value = float(value) # will raise Error if conversion fails
+                    
+            elif not isinstance(value, (numbers.Number, MissingType, type(None))):
+                raise TypeError(f"Expecting a scalar Quantity or a numbers.Number; instead, got {type(value).__name__}")
+            
+            setattr(obj, self._name_, value)
+        else:
+            # see NOTE: 2025-04-15 23:03:56
+            setattr(obj, self._name_, dataclasses.MISSING)
+        
+class CalibrationChannelsDescriptor:
+    def __init__(self, *, default:typing.Sequence=list()):
+        self._default_ = list()
+        if isinstance(default, typing.Sequence):
+            chcals = list(filter(lambda x: isinstance(x, ChannelCalibrationData), map(lambda x: ChannelCalibrationData(**x._asdict()) if isinstance(x, CalSpec) else ChannelCalibrationData(**x) if isinstance(x, dict) else x if isinstance(x, ChannelCalibrationData) else None, default)))
+            if len(chcals):
+                self._default_ = chcals
+        
+    def __set_name__(self, owner, name:str):
+        self._name_ = f"_{name}_"
+
+    def __get__(self, obj, type_):
+        if obj is None:
+            return self._default_
+        obj_axtype = getattr(obj, "type", None)
+        if not obj_axtype & vigra.AxisType.AllAxes:
+            return
+        
+        if obj_axtype & vigra.AxisType.NonChannel:
+            return dataclasses.MISSING
+        
+        return getattr(obj, self._name_, self._default_)
+    
+    def __set__(self, obj, value:typing.Sequence = list()):
+        obj_axtype = getattr(obj, "type", None)
+        if not obj_axtype & vigra.AxisType.AllAxes:
+            scipywarn(f"The owner (a {type(obj).__name__}) has an invalid type attribute: {obj_axtype}")
+            return
+        # NOTE: 2025-04-15 23:05:35
+        # set this attribute only for a Channels axis; otherwise set it to MISSING
+        if isinstance(value, typing.Sequence):
+            if obj_axtype & vigra.AxisType.Channels:
+                obj_size = getattr(obj, "size", 0)
+                chcals = list(filter(lambda x: isinstance(x, ChannelCalibrationData), map(lambda x: ChannelCalibrationData(**x._asdict()) if isinstance(x, CalSpec) else ChannelCalibrationData(**x) if isinstance(x, dict) else x if isinstance(x, ChannelCalibrationData) else None, value)))
+                if len(chcals):
+                    if obj_size == 0 and len(chcals) > 1:
+                        scipywarn(f"Mismatch between owner axis size (0), and {len(chcals)} ChannelCalibrationData objects being assigned; owner size will be adjusted")
+                        setattr(obj, "size", len(chcals))
+                    elif obj_size > 1 and obj_size != len(chcals):
+                        scipywarn(f"Mismatch between owner axis size ({obj_size}), and {len(chcals)} ChannelCalibrationData objects being assigned; owner size will be adjusted")
+                        setattr(obj, "size", len(chcals))
+                        
+                else:
+                    if len(chcals) == 0:
+                        if obj_size == 0:
+                            chcals = [ChannelCalibrationData(name="channel_0")] # ensure a single ChannelCalibrationData
+                        else:
+                            # BUG: 2025-04-15 23:34:01 FIXME/TODO
+                            # not sure this is a bug or feature ?!? surely poor design...
+                            scipywarn("No valid channel calibrations were specified; this will ERASE the channels attribute an set the owner axis size to 0")
+                            setattr(obj, "size", len(chcals))
+                        
+                setattr(obj, self._name_, chcals)
+                
+            else:
+                setattr(obj, self._name_, dataclasses.MISSING)
+                
+        else:
+            raise TypeError(f"Expecting a sequence; instead got {type()}")
+
 @dataclass(slots=True)
 class AxisCalibrationData(CalibrationData):
     r"""Calibration data for an array axis.
@@ -555,64 +640,68 @@ class AxisCalibrationData(CalibrationData):
     
     You almost surely want to change this.
     
-    Currently, this must be set to MISSING for a Channels-type axis
+    Currently, this is be set to MISSING for a Channels-type axis, regardless of
+    what is passed to the constructor.
     '''
     
-    maximum:CalibrationScalarDescriptor = CalibrationScalarDescriptor(default=None)
-    # _maximum_:dataclasses.InitVar[typing.Optional[numbers.Number]] = None
+    maximum:CalibrationScalarDescriptor = CalibrationScalarDescriptor()
     r'''The upper limit of the axis coordinates.
     To what coordinate does the last element along the axis correspond?
     Currently, this must be set to MISSING for a Channels-type axis.
     '''
     
-    size:CalibrationScalarDescriptor = CalibrationScalarDescriptor(default = 1)
+    size:int = 0
     r'''Size of the axis (i.e. size of the array along the dimension of this axis).
-    Must be ≥ 1.
+    Must be ≥ 0, although 0 is only useful for virtual axes.
     
-    For a Channels axis, this is also the number of channels, hence redundant.
+    NOTE: For a virtual Channels axis, size is 0 but there should be at lest one 
+    ChannelCalibrationData in the 'channels' attribute (see below). For a non-virtual
+    channel axis the axis size wil be adjusted to match the number of channel
+    calibration data objects in the 'channel' attribute.
     '''
     
-    # channels:typing.Optional[typing.Sequence[typing.Union[CalibrationData, CalSpec]]] = None
-    _channels_:dataclasses.InitVar[typing.Optional[typing.Sequence[typing.Union[CalibrationData, CalSpec]]]] = None
+    channels:CalibrationChannelsDescriptor = dataclasses.field(default_factory = CalibrationChannelsDescriptor)
     r'''Sequence of ChannelCalibrationData, one per channel
-    Currently, this must be set to MISSING for a NonChannel-type axis
+    Currently, this will be set to MISSING for a NonChannel-type axis.
+    For a Channels axis, setting this attribute MAY result in a change of the 
+    AxisCalibrationData size attribute (see above).
     '''
 
-    def __post_init__(self, units, origin, resolution, maximum, size, channels):
-        r"""Further curates the fields after construction.
-        NOTE: To create an AxisCalibrationData object from a vigra.AxisInfo object,
-        a dict or a calibration string (xml-formatted) please use the "new" factory
-        class methods.
-        """
-        if self.type & vigra.AxisType.Channels:
-            # raise ValueError("Cannot instantiate an AxisCalibrationData for Channels axis; please use ChannelAxisCalibrationData instead")
-            # NOTE: 2025-04-14 14:02:54 
-            # use MISSING instead of NaN, to signify that these fields are meaningless
-            # for a channel axis (they should be present in the channel calibration data
-            # themselves)
-            # self.origin = dataclasses.MISSING
-            # self.resolution = dataclasses.MISSING
-            # self.maximum = dataclasses.MISSING
-            # self.units = dataclasses.MISSING
-            # self.channels = list()
-            if isinstance(channels, typing.Sequence):
-                channel_data = tuple(map(lambda x: x if isinstance(x, ChannelCalibrationData) else ChannelCalibrationData(**x._asdict()), 
-                                         filter(lambda x: isinstance(x, (ChannelCalibrationData, CalSpec)), channels)))
-                
-                if len(channel_data) == 0:
-                    # must create a channel by default:
-                    self.channels = [ChannelCalibrationData(index = 0)]
-                    
-                else:
-                    self.channels = channel_data
-                    
-            else:
-                self.channels = list(map(lambda k: ChannelCalibrationData(index=k, name=f"channel_{k}"), range(size)))
-        else:
-            self.origin = origin
-            self.resolution = resolution
-            self.maximum = maximum
-            self.units = units
+#     def __post_init__(self):
+#         r"""Further curates the fields after construction.
+#         NOTE: To create an AxisCalibrationData object from a vigra.AxisInfo object,
+#         a dict or a calibration string (xml-formatted) please use the "new" factory
+#         class methods.
+#         """
+#         if self.type & vigra.AxisType.Channels:
+#             # raise ValueError("Cannot instantiate an AxisCalibrationData for Channels axis; please use ChannelAxisCalibrationData instead")
+#             # NOTE: 2025-04-14 14:02:54 
+#             # use MISSING instead of NaN, to signify that these fields are meaningless
+#             # for a channel axis (they should be present in the channel calibration data
+#             # themselves)
+#             # self.origin = dataclasses.MISSING
+#             # self.resolution = dataclasses.MISSING
+#             # self.maximum = dataclasses.MISSING
+#             # self.units = dataclasses.MISSING
+#             # self.channels = list()
+#             if isinstance(channels, typing.Sequence):
+#                 channel_data = tuple(map(lambda x: x if isinstance(x, ChannelCalibrationData) else ChannelCalibrationData(**x._asdict()), 
+#                                          filter(lambda x: isinstance(x, (ChannelCalibrationData, CalSpec)), channels)))
+#                 
+#                 if len(channel_data) == 0:
+#                     # must create a channel by default:
+#                     self.channels = [ChannelCalibrationData(index = 0)]
+#                     
+#                 else:
+#                     self.channels = channel_data
+#                     
+#             else:
+#                 self.channels = list(map(lambda k: ChannelCalibrationData(index=k, name=f"channel_{k}"), range(size)))
+#         else:
+#             self.origin = origin
+#             self.resolution = resolution
+#             self.maximum = maximum
+#             self.units = units
             
     @singledispatchmethod
     @classmethod
@@ -626,8 +715,8 @@ class AxisCalibrationData(CalibrationData):
         size: typing.Optional[int] = None,
         origin: typing.Optional[typing.Union[numbers.Number, pq.Quantity, CalSpec]] = None,
         maximum: typing.Optional[typing.Union[numbers.Number, pq.Quantity]] = None,
-        units: typing.Optional[pq.Quantity] = None):
-        # channels: typing.Optional[typing.Sequence[CalSpec]] = None):
+        units: typing.Optional[pq.Quantity] = None,
+        channels: typing.Optional[typing.Sequence[CalSpec]] = None):
         r"""Factory for constructing an AxisCalibrationData using vigra.AxisInfo"""
         # NOTE: 2025-04-13 13:42:52
         # in vigra.AxisInfo, a 'resolution' field 0.0 means axis resolution (in
