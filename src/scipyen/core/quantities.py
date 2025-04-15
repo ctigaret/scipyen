@@ -814,12 +814,12 @@ def ensureScalar(x:pq.Quantity):
     if not isinstance(x, pq.Quantity):
         raise TypeError(f"Expecting a Quantity; intead, got a {type(x).__name__}")
     if not isScalar(x):
-        raise ValueError("Cannot accept an array")
+        raise ValueError(f"Cannot accept an Quantity with {x.size} elements")
     
     if x.ndim == 0:
         return x
     
-    return x.flatten().[0]
+    return x.flatten()[0]
 
 def str2quantity(x:str):
     r"""Reconstruct a scalar quantity or dimensionality from a str.

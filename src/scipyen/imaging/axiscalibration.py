@@ -108,33 +108,37 @@ from .axisutils import (axisTypeName,
                         standardAxisTypeKeys,
                         )
 
-MissingType = typing.TypeVar[type(dataclasses.MISSING)]
+MissingType: typing.TypeAlias = type(dataclasses.MISSING)
+
+class ChannelCalibrationData: pass
+
 
 class CalSpec(typing.NamedTuple):
     origin:typing.Optional[typing.Union[numbers.Number, pq.Quantity, MissingType]] = None
     maximum:typing.Optional[typing.Union[numbers.Number, pq.Quantity, MissingType]] = None
-    units:typing.Optional[pq.Quantity, MissingType] = None
+    units:typing.Optional[typing.Union[pq.Quantity, MissingType]] = None
     
 class NamedCalSpec(typing.NamedTuple):
     origin:typing.Optional[typing.Union[numbers.Number, pq.Quantity, MissingType]] = None
     maximum:typing.Optional[typing.Union[numbers.Number, pq.Quantity, MissingType]] = None
-    units:typing.Optional[pq.Quantity, MissingType] = None
+    units:typing.Optional[typing.Union[pq.Quantity, MissingType]] = None
     name:typing.Optional[str] = None
     
 class FullCalSpec(typing.NamedTuple):
     origin:typing.Optional[typing.Union[numbers.Number, pq.Quantity, MissingType]] = None
     maximum:typing.Optional[typing.Union[numbers.Number, pq.Quantity, MissingType]] = None
-    units:typing.Optional[pq.Quantity, MissingType] = None
+    units:typing.Optional[typing.Union[pq.Quantity, MissingType]] = None
     name:typing.Optional[str] = None
     index:int = 0
     
 class CalibrationUnitsDescriptor:
     def __init__(self, *, default:typing.Optional[typing.Union[pq.Quantity, MissingType]] = pq.arbitrary_unit):
         if isinstance(default, pq.Quantity):
-            if default.ndim != 0:
-                if default.size > 1:
-                    default = default[0]
-                raise ValueError(f"Expecting a scalar Quantity; instead, got ")
+            default = cq.ensureScalar(default)
+            
+        elif not isinstance(default, (MissingType, type(None))):
+            raise TypeError(f"Expecting a Quantity or {MissingType}; instead, got {type(default).__name__}")
+        
         self._default_ = default
         
     def __set_name__(self, owner, name:str):
@@ -146,14 +150,31 @@ class CalibrationUnitsDescriptor:
         
         return getattr(obj, self._name_, self._default_)
     
-    def __set__(self, obj, value:typing.Optional[typing.Union[pq.Quantity, , MissingType]]):
-        if not isinstance(value, pq.Quantity):
-            raise TypeError(f"Expecting a Quantity; instead, got {type(value).__name__}")
+    def __set__(self, obj, value:typing.Optional[typing.Union[pq.Quantity, MissingType]]=None):
+        if isinstance(value, pq.Quantity):
+            if not cq.isScalar(value):
+                raise ValueError(f"Expecting a scalar quantity; instead got a Quantity with {value.size} elements")
+            
+            value = cq.ensureScalar(value)
+            
+        elif not isinstance(value, (MissingType, type(None))):
+            raise TypeError(f"Expecting a Quantity or {MissingType}; instead, got {type(value).__name__}")
+        
         
         setattr(obj, self._name_, value)
         
 class CalibrationScalarDescriptor:
     def __init__(self, *, default:typing.Optional[typing.Union[numbers.Number, pq.Quantity, MissingType]]=None):
+        if isinstance(default, pq.Quantity):
+            default = cq.ensureScalar(default).magnitude
+            if "complex" in default.dtype.name:
+                default = complex(default)
+            else:
+                default = float(default)
+            
+        elif not isinstance(default, (numbers.Number, MissingType, type(None))):
+            raise TypeError(f"Expecting a nmbers.Number, a Quantity or {MissingType}; instead, got {type(default).__name__}")
+        
         self._default_ = default
         
     def __set_name__(self, owner, name:str):
@@ -166,10 +187,43 @@ class CalibrationScalarDescriptor:
         return getattr(obj, self._name_, self._default_)
     
     def __set__(self, obj, value:typing.Optional[typing.Union[numbers.Number, pq.Quantity, MissingType]]=None):
-        if not isinstance(value, pq.Quantity):
-            raise TypeError(f"Expecting a Quantity; instead, got {type(value).__name__}")
+        if isinstance(value, pq.Quantity):
+            value  = cq.ensureScalar(value)
+            units = getattr(obj, "units", None)
+            if isinstance(units, pq.Quantity):
+                if not cq.unitsConvertible(value, units):
+                    raise TypeError(f"Value has {value.units} that are incompatible with the units of this object ({units})")
+                
+                if value.units != units:
+                    value = value.rescale(units)
+                    
+            value = value.magnitude
+            
+            if "complex" in value.dtype.name:
+                value = complex(value)
+            else:
+                # should work for float dtype and object dtypes that can be 
+                # cast to float (e.g. arrays of fractions.Fraction)
+                value = float(value) # will raise Error if conversion fails
+                
+        elif not isinstance(value, (numbers.Number, MissingType, type(None))):
+            raise TypeError(f"Expecting a scalar Quantity or a numbers.Number; instead, got {type(value).__name__}")
         
         setattr(obj, self._name_, value)
+        
+class CalibrationChannelsDescriptor:
+    def __init__(self, *, default = typing.Optional[typing.Sequence]):
+        if isinstance(default, typing.Sequence):
+            chcals = list(filter(lambda x: isinstance(x, ChannelCalibrationData), map(lambda x: ChannelCalibrationData(**x._asdict()) if isinstance(x, CalSpec) ChannelCalibrationData(**x) if isinstance(x, dict) else x if isinstance(x, ChannelCalibrationData))))
+            if len(chcals):
+                self._default_ = chcals
+            else:
+                self._default_ = None
+                
+        elif not isinstance(default, (MissingType, type(None))):
+            raise TypeError(f"Expecting a sequence, {MissingType}, or None; instead, got {type(default).__name__}")
+        
+        self._default_ = default
 
 @dataclass(slots=True)
 class CalibrationData:
@@ -476,7 +530,8 @@ class AxisCalibrationData(CalibrationData):
     Currently, this must be set to MISSING for a Channels-type axis.
     ''' 
     
-    _origin_:dataclasses.InitVar[numbers.Number] = 0.0
+    origin:CalibrationScalarDescriptor = CalibrationScalarDescriptor(default = 0.0)
+    # _origin_:dataclasses.InitVar[numbers.Number] = 0.0
     r'''The origin of the axis coordinates.
     To what coordinate does the 0th element along the axis correspond?
     By default this is 0.0, but there can be good reasons for why axis might have
@@ -485,7 +540,8 @@ class AxisCalibrationData(CalibrationData):
     Currently, this must be set to MISSING for a Channels-type axis
     '''
     
-    _resolution_:dataclasses.InitVar[numbers.Number] = 1.0
+    resolution:CalibrationScalarDescriptor = CalibrationScalarDescriptor(default=1.0)
+    # _resolution_:dataclasses.InitVar[numbers.Number] = 1.0
     r'''The sampling resolution (in 1/axis units).
     WARNING: Unlike the "resolution" field of a vigra.AxisInfo, where a value
     of 0 signals no defined resolution, here "resolution" represents the number
@@ -502,13 +558,14 @@ class AxisCalibrationData(CalibrationData):
     Currently, this must be set to MISSING for a Channels-type axis
     '''
     
-    _maximum_:dataclasses.InitVar[typing.Optional[numbers.Number]] = None
+    maximum:CalibrationScalarDescriptor = CalibrationScalarDescriptor(default=None)
+    # _maximum_:dataclasses.InitVar[typing.Optional[numbers.Number]] = None
     r'''The upper limit of the axis coordinates.
     To what coordinate does the last element along the axis correspond?
     Currently, this must be set to MISSING for a Channels-type axis.
     '''
     
-    _size_:dataclasses.InitVar[typing.Optional[int]] = 1
+    size:CalibrationScalarDescriptor = CalibrationScalarDescriptor(default = 1)
     r'''Size of the axis (i.e. size of the array along the dimension of this axis).
     Must be ≥ 1.
     
@@ -586,7 +643,7 @@ class AxisCalibrationData(CalibrationData):
             # NOTE: 2025-04-14 14:52:33
             # if this is a Channels axis, then __post_init__ will set
             # origin, maximum and resolution to MISSING
-            ret = cls(type=axtype, key = axkey, name = axisTypeName(axtype), _resolution_ = axres)
+            ret = cls(type=axtype, key = axkey, name = axisTypeName(axtype), resolution = axres)
             
             # overwrite the defaults if needed:
             #
