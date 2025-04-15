@@ -805,6 +805,22 @@ def quantity2scalar(x:typing.Union[int, float, complex, np.ndarray, pq.Quantity]
     
     raise TypeError(f"Expecting a scalar int float, complex, numpy array or Pyhon quantities.Quantity; got {type(x).__name__} instead")
 
+def isScalar(x:pq.Quantity):
+    if not isinstance(x, pq.Quantity):
+        raise TypeError(f"Expecting a Quantity; intead, got a {type(x).__name__}")
+    return x.ndim == 0 or x.size == 1
+
+def ensureScalar(x:pq.Quantity):
+    if not isinstance(x, pq.Quantity):
+        raise TypeError(f"Expecting a Quantity; intead, got a {type(x).__name__}")
+    if not isScalar(x):
+        raise ValueError("Cannot accept an array")
+    
+    if x.ndim == 0:
+        return x
+    
+    return x.flatten().[0]
+
 def str2quantity(x:str):
     r"""Reconstruct a scalar quantity or dimensionality from a str.
     Performs the reverse of quantity2str.

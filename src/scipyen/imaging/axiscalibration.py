@@ -108,23 +108,68 @@ from .axisutils import (axisTypeName,
                         standardAxisTypeKeys,
                         )
 
+MissingType = typing.TypeVar[type(dataclasses.MISSING)]
+
 class CalSpec(typing.NamedTuple):
-    origin:typing.Optional[typing.Union[numbers.Number, pq.Quantity]] = None
-    maximum:typing.Optional[typing.Union[numbers.Number, pq.Quantity]] = None
-    units:typing.Optional[pq.Quantity] = None
+    origin:typing.Optional[typing.Union[numbers.Number, pq.Quantity, MissingType]] = None
+    maximum:typing.Optional[typing.Union[numbers.Number, pq.Quantity, MissingType]] = None
+    units:typing.Optional[pq.Quantity, MissingType] = None
     
 class NamedCalSpec(typing.NamedTuple):
-    origin:typing.Optional[typing.Union[numbers.Number, pq.Quantity]] = None
-    maximum:typing.Optional[typing.Union[numbers.Number, pq.Quantity]] = None
-    units:typing.Optional[pq.Quantity] = None
+    origin:typing.Optional[typing.Union[numbers.Number, pq.Quantity, MissingType]] = None
+    maximum:typing.Optional[typing.Union[numbers.Number, pq.Quantity, MissingType]] = None
+    units:typing.Optional[pq.Quantity, MissingType] = None
     name:typing.Optional[str] = None
     
 class FullCalSpec(typing.NamedTuple):
-    origin:typing.Optional[typing.Union[numbers.Number, pq.Quantity]] = None
-    maximum:typing.Optional[typing.Union[numbers.Number, pq.Quantity]] = None
-    units:typing.Optional[pq.Quantity] = None
+    origin:typing.Optional[typing.Union[numbers.Number, pq.Quantity, MissingType]] = None
+    maximum:typing.Optional[typing.Union[numbers.Number, pq.Quantity, MissingType]] = None
+    units:typing.Optional[pq.Quantity, MissingType] = None
     name:typing.Optional[str] = None
     index:int = 0
+    
+class CalibrationUnitsDescriptor:
+    def __init__(self, *, default:typing.Optional[typing.Union[pq.Quantity, MissingType]] = pq.arbitrary_unit):
+        if isinstance(default, pq.Quantity):
+            if default.ndim != 0:
+                if default.size > 1:
+                    default = default[0]
+                raise ValueError(f"Expecting a scalar Quantity; instead, got ")
+        self._default_ = default
+        
+    def __set_name__(self, owner, name:str):
+        self._name_ = f"_{name}"
+        
+    def __get__(self, obj, type_):
+        if obj is None:
+            return self._default_
+        
+        return getattr(obj, self._name_, self._default_)
+    
+    def __set__(self, obj, value:typing.Optional[typing.Union[pq.Quantity, , MissingType]]):
+        if not isinstance(value, pq.Quantity):
+            raise TypeError(f"Expecting a Quantity; instead, got {type(value).__name__}")
+        
+        setattr(obj, self._name_, value)
+        
+class CalibrationScalarDescriptor:
+    def __init__(self, *, default:typing.Optional[typing.Union[numbers.Number, pq.Quantity, MissingType]]=None):
+        self._default_ = default
+        
+    def __set_name__(self, owner, name:str):
+        self._name_ = f"_{name}"
+        
+    def __get__(self, obj, type_):
+        if obj is None:
+            return self._default_
+        
+        return getattr(obj, self._name_, self._default_)
+    
+    def __set__(self, obj, value:typing.Optional[typing.Union[numbers.Number, pq.Quantity, MissingType]]=None):
+        if not isinstance(value, pq.Quantity):
+            raise TypeError(f"Expecting a Quantity; instead, got {type(value).__name__}")
+        
+        setattr(obj, self._name_, value)
 
 @dataclass(slots=True)
 class CalibrationData:
@@ -425,7 +470,8 @@ class AxisCalibrationData(CalibrationData):
     type:typing.Optional[typing.Union[vigra.AxisType, int]] = field(default=vigra.AxisType.UnknownAxisType)
     r'''The type of the axis'''
     
-    _units_:dataclasses.InitVar[pq.Quantity] = field(default=pq.arbitrary_unit)
+    units:CalibrationUnitsDescriptor = CalibrationUnitsDescriptor(default=pq.arbitrary_unit)
+    # _units_:dataclasses.InitVar[pq.Quantity] = field(default=pq.arbitrary_unit)
     r'''The physical units
     Currently, this must be set to MISSING for a Channels-type axis.
     ''' 
