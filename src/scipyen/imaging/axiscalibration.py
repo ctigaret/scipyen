@@ -241,6 +241,9 @@ class CalibrationData:
                 # hence we need the fc_template field
                 s = self.fc_template.format(value)
                 
+            # elif isinstance(value, typing.Sequence) and all(isinstance(v, ChannelCalibrationData) for v in value):
+            #     ss.extend(list(map(lambda c: c.calibrationString, value)))
+                
             else:
                 # includes any int, str, pd.NA, None, bool, bytes, bytearray
                 s =f"{value}"
@@ -499,27 +502,33 @@ class CalibrationScalarDescriptor:
             setattr(obj, self._name_, dataclasses.MISSING)
         
 class CalibrationChannelsDescriptor:
-    def __init__(self, *, default:typing.Sequence=list()):
-        self._default_ = list()
+    def __init__(self, *, default:typing.Union[typing.Sequence, MissingType]=dataclasses.MISSING):
+        self._default_ = dataclasses.MISSING
         if isinstance(default, typing.Sequence):
             chcals = list(filter(lambda x: isinstance(x, ChannelCalibrationData), map(lambda x: ChannelCalibrationData(**x._asdict()) if isinstance(x, CalSpec) else ChannelCalibrationData(**x) if isinstance(x, dict) else x if isinstance(x, ChannelCalibrationData) else None, default)))
             if len(chcals):
                 self._default_ = chcals
+            else:
+                self._default_ = dataclasses.MISSING
         
     def __set_name__(self, owner, name:str):
         self._name_ = f"_{name}_"
 
     def __get__(self, obj, type_):
         if obj is None:
-            return self._default_
-        obj_axtype = getattr(obj, "type", None)
-        if not obj_axtype & vigra.AxisType.AllAxes:
-            return
-        
-        if obj_axtype & vigra.AxisType.NonChannel:
-            return dataclasses.MISSING
-        
-        return getattr(obj, self._name_, self._default_)
+            ret = self._default_
+        else:
+            obj_axtype = getattr(obj, "type", None)
+            if not obj_axtype & vigra.AxisType.AllAxes:
+                ret = dataclasses.MISSING
+            
+            elif obj_axtype & vigra.AxisType.NonChannel:
+                ret = dataclasses.MISSING
+                
+            else: ret = getattr(obj, self._name_, self._default_)
+            
+        # print(f"{self.__class__.__name__}.__get__ from {type(obj).__name__} -> {type(ret).__name__}")
+        return ret
     
     def __set__(self, obj, value:typing.Sequence = list()):
         obj_axtype = getattr(obj, "type", None)
@@ -605,9 +614,18 @@ class AxisCalibrationData(CalibrationData):
     key:typing.Optional[str] = "?"
     r'''String symbol of the axis'''
     
-    
     type:typing.Optional[typing.Union[vigra.AxisType, int]] = field(default=vigra.AxisType.UnknownAxisType)
-    r'''The type of the axis'''
+    r'''The type of the axis — see vigra.AxisType enumeration'''
+    
+    size:int = 0
+    r'''Size of the axis (i.e. size of the array along the dimension of this axis).
+    Must be ≥ 0, although 0 is only useful for virtual axes.
+    
+    NOTE: For a virtual Channels axis, size is 0 but there should be at lest one 
+    ChannelCalibrationData in the 'channels' attribute (see below). For a non-virtual
+    channel axis the axis size wil be adjusted to match the number of channel
+    calibration data objects in the 'channel' attribute.
+    '''
     
     units:CalibrationUnitsDescriptor = CalibrationUnitsDescriptor(default=pq.arbitrary_unit)
     # _units_:dataclasses.InitVar[pq.Quantity] = field(default=pq.arbitrary_unit)
@@ -650,17 +668,11 @@ class AxisCalibrationData(CalibrationData):
     Currently, this must be set to MISSING for a Channels-type axis.
     '''
     
-    size:int = 0
-    r'''Size of the axis (i.e. size of the array along the dimension of this axis).
-    Must be ≥ 0, although 0 is only useful for virtual axes.
+    _:dataclasses.KW_ONLY
     
-    NOTE: For a virtual Channels axis, size is 0 but there should be at lest one 
-    ChannelCalibrationData in the 'channels' attribute (see below). For a non-virtual
-    channel axis the axis size wil be adjusted to match the number of channel
-    calibration data objects in the 'channel' attribute.
-    '''
-    
-    channels:CalibrationChannelsDescriptor = dataclasses.field(default_factory = CalibrationChannelsDescriptor)
+    # channels:typing.Union[typing.Sequence, MissingType] = dataclasses.field(default = dataclasses.MISSING)
+    channels:CalibrationChannelsDescriptor = CalibrationChannelsDescriptor(default=dataclasses.MISSING)
+    # channels:CalibrationChannelsDescriptor = dataclasses.field(default = CalibrationChannelsDescriptor())
     r'''Sequence of ChannelCalibrationData, one per channel
     Currently, this will be set to MISSING for a NonChannel-type axis.
     For a Channels axis, setting this attribute MAY result in a change of the 
@@ -713,10 +725,11 @@ class AxisCalibrationData(CalibrationData):
     @classmethod
     def _(cls, arg:vigra.AxisInfo, index:typing.Optional[int] = None, 
         size: typing.Optional[int] = None,
+        units: typing.Optional[pq.Quantity] = None,
         origin: typing.Optional[typing.Union[numbers.Number, pq.Quantity, CalSpec]] = None,
         maximum: typing.Optional[typing.Union[numbers.Number, pq.Quantity]] = None,
-        units: typing.Optional[pq.Quantity] = None,
-        channels: typing.Optional[typing.Sequence[CalSpec]] = None):
+        resolution: typing.Optional[typing.Union[numbers.Number, pq.Quantity]] = None,
+        channels: typing.Optional[typing.Sequence[CalSpec | ChannelCalibrationData]] = None):
         r"""Factory for constructing an AxisCalibrationData using vigra.AxisInfo"""
         # NOTE: 2025-04-13 13:42:52
         # in vigra.AxisInfo, a 'resolution' field 0.0 means axis resolution (in
@@ -726,16 +739,23 @@ class AxisCalibrationData(CalibrationData):
         axkey = arg.key
         axres = 1. if arg.resolution == 0 else arg.resolution
         
+        ischannels = axtype & vigra.AxisType.Channels
+        
         cal_str_start_stop = cls.findCalibrationString(arg.description)
         
         if cal_str_start_stop is None:
-            # NOTE: 2025-04-14 14:52:33
-            # if this is a Channels axis, then __post_init__ will set
-            # origin, maximum and resolution to MISSING
-            ret = cls(type=axtype, key = axkey, name = axisTypeName(axtype), resolution = axres)
+            if ischannels:
+                ret = cls(type=axtype, key = axkey, name = axisTypeName(axtype), 
+                        units = dataclasses.MISSING, origin = dataclasses.MISSING,
+                        maximum = dataclasses.MISSING, resolution = dataclasses.MISSING,
+                        channels = list())
+            else:
+                ret = cls(type=axtype, key = axkey, name = axisTypeName(axtype), 
+                        resolution = axres, channels=dataclasses.MISSING)
+                
             
-            # overwrite the defaults if needed:
-            #
+            # overwrite the defaults if needed, using the descriptor classes for
+            # units, origing, maximum, resolution, and channels
             if isinstance(index, int):
                 if index >= 0 :
                     ret.index = index
@@ -743,90 +763,30 @@ class AxisCalibrationData(CalibrationData):
                     raise ValueError(f"Invalid axis index: {index}")
                 
             if isinstance(size, int):
-                if size >= 1:
+                if size >= 0:
                     ret.size = size
                 else:
                     raise ValueError(f"Invalid axis size: {size}")
                 
-            if arg.typeFlags & vigra.AxisType.Channels:
-                if isinstance(channels, typing.Sequence) and all(isinstance(v, CalSpec) for v in channels):
-                    if len(channels) != ret.size:
-                        if ret.size == 1:
-                            ret.size = len(channels)
-                        else:
-                            raise ValueError(f"{len(channels)} wwre specified for a Channels axis of size {ret.size}")
-                
-                    ret.channels = list(map(lambda k: ChannelCalibrationData(index=k, name=f"channel_{k}", **channels[k]), range(ret.size)))
-                    
+            if ischannels:
+                if isinstance(channels, typing.Sequence):
+                    ret.channels = channels # use the CalibrationChannelsDescriptor
                 else:
-                    ret.channels = [ChannelCalibrationData(index=0, name="channel_0")]
-                
+                    ret.channels.append(ChannelCalibrationData(name = "channel_0", index=0)) # a default, for one channel!
             else:
                 if isinstance(origin, CalSpec):
                     origin, maximum, units = origin
-                
-                if isinstance(units, pq.UnitQuantity):
+                    
+                if isinstance(units, pq.Quantity):
                     ret.units = units
-                
-                elif isinstance(units, pq.Quantity):
-                    ret.units = units.units
-                    
-                elif units is not None:
-                    raise TypeError(f"Invalid type for units: {type(units)._name__}; a pq.Quantity, pq.UnitQuantity or None was expected")
-                    
-                if isinstance(origin, numbers.Number):
+                        
+                if isinstance(origin, (numbers.Number, pq.Quantity)):
                     ret.origin = origin
                     
-                elif isinstance(origin, pq.Quantity):
-                    if origin.ndim > 0:
-                        raise ValueError(f"Origin quantity must be a scalar")
-                    if origin.units != ret.units:
-                        if scq.unitsConvertible(origin.units, ret.units):
-                            origin = origin.rescale(ret.units)
-                        else:
-                            raise ValueError(f"Wrong units ({origin.units}) for axis origin, for a calibration with units of {ret.units}")
-                    
-                    val = origin.magnitude
-                    valdtype = val.dtype
-                    if "int" in valdtype.name:
-                        ret.origin = int(val)
-                    elif "complex" in valdtype.name:
-                        ret.origin = complex(val)
-                    elif "float" in valdtype.name:
-                        ret.origin = float(val)
-                    else:
-                        raise TypeError(f"Unsupported dtype: {valdtype}")
-                    
-                elif origin is not None:
-                    raise TypeError(f"Invalid type for origin: {type(origin).__name__}; a number.Number, pq.Quantity, a CalSpec, or None was expected")
-                    
-                if isinstance(maximum, numbers.Number):
+                if isinstance(maximum, (numbers.Number, pq.Quantity)):
                     ret.maximum = maximum
                         
-                elif isinstance(maximum, pq.Quantity):
-                    if maximum.units != ret.units:
-                        if scq.unitsConvertible(maximum.units, ret.units):
-                            maximum = maximum.rescale(ret.units)
-                        else:
-                            raise ValueError(f"Wrong units ({maximum.units}) for axis maximum,  for a calibration with units of {ret.units}")
-                    
-                    val = maximum.magnitude
-                    valdtype = val.dtype
-                    if "int" in valdtype.name:
-                        ret.maximum = int(val)
-                    elif "complex" in valdtype.name:
-                        ret.maximum = complex(val)
-                    elif "float" in valdtype.name:
-                        ret.maximum = float(val)
-                    else:
-                        raise TypeError(f"Unsupported dtype: {valdtype}")
-                        
-                elif maximum is not None:
-                    raise TypeError(f"Invalid type for maximum: {type(maximum).__name__}; a number.Number, a pq.Quantity, or None was expected.")
-                
-                
             return ret
-            # return cls(type=axtype, key = axkey, name = axisTypeName(axtype), resolution = axres)
             
         else:
             # TODO 2025-04-13 13:45:58 FIXME parse the calibration string
@@ -875,6 +835,12 @@ class AxisCalibrationData(CalibrationData):
             raise ValueError("This is not an axis calibration string")
             
         cal = dict()
+        # these will be treated differently according to the axis type flags
+        cal["units"] = dataclasses.MISSING
+        cal["origin"] = dataclasses.MISSING
+        cal["maximum"] = dataclasses.MISSING
+        cal["resolution"] = dataclasses.MISSING
+        cal["channels"] = dataclasses.MISSING
         
         # OK, now extract the relevant xml string
         try:
@@ -884,44 +850,67 @@ class AxisCalibrationData(CalibrationData):
             if cal_xml_element.tag != "axis_calibration":
                 raise ValueError("Wrong element tag; was expecting 'axis_calibration', instead got %s" % element.tag)
             
-            # see NOTE: 2021-10-09 23:58:58
-            # xml.etree.ElementTree.Element.getchildren() is absent in Python 3.9.7
-            
-            # fnames = tuple(map(lambda f: f.name, dataclasses.fields(cls)))
-            
-            # print(f"{cls.__name__}.new(str)")
-            
-            # first, get the type if the axis:
+            # first, get the type of the axis:
             type_nodes = tuple(getXMLChildren(cal_xml_element, tagName = "type"))
             if len(type_nodes) == 0:
                 raise ValueError(f"Missing 'type' child element")
             
             cal["type"] = cls._from_xml_text_("type", type_nodes[0].text)
             
-            if cal["type"] & vigra.AxisType.Channels:
-                skipfields = ("origin", "units", "maximum", "resolution", "type")
+            ischannels = cal["type"] & vigra.AxisType.Channels
+            
+            # custonmize creation based on axis typeflag
+            # these below are SKIPPED from being translated to the calibration string
+            # so without that there is the risk of them being assigned default values elsewhere.
+            #
+            # in addition, "channels" field is always treated specially accordin to
+            # the axis type flags
+            #
+            if ischannels:
+                # cal["units"] = dataclasses.MISSING
+                # cal["origin"] = dataclasses.MISSING
+                # cal["maximum"] = dataclasses.MISSING
+                # cal["resolution"] = dataclasses.MISSING
+                skipfields = ("units", "origin", "maximum", "resolution", "channels", "type")
             else:
+                # cal["channels"] = dataclasses.MISSING
                 skipfields = ("channels", "type")
-
+                
             for param in filter(lambda x: x not in skipfields, map(lambda f: f.name, dataclasses.fields(cls))):
                 child_nodes = tuple(getXMLChildren(cal_xml_element, tagName=param))
                 if len(child_nodes):
                     child_node = child_nodes[0]
-                    if param == "channels":
-                        channel_elems = tuple(e for e in child_node)
-                        if len(channel_elems):
-                            cal[param] = list(map(lambda e: ChannelCalibrationData.new(e), channel_elems)) 
+                    txt = child_node.text
+                    cal[param] = cls._from_xml_text_(param, txt)
+                    
+                # print(f"{cls.__name__}.new({type(s).__name__}): cal[{param}] = {cal[param]}")
+                        
+            if ischannels:
+                child_nodes = tuple(getXMLChildren(cal_xml_element, tagName="channels"))
+                if len(child_nodes):
+                    child_node = child_nodes[0]
+                    channel_elems = tuple(e for e in child_node)
+                    if len(channel_elems):
+                        cal["channels"] = list(map(lambda e: ChannelCalibrationData.new(e), channel_elems)) 
                     else:
-                        txt = child_node.text
-                        cal[param] = cls._from_xml_text_(param, txt)
+                        cal["channels"] = [ChannelCalibrationData(name="channel_0", index=0)]
+                else:
+                    # enforce the calibration of a virtual channel.
+                    # technically, this case should never occur
+                    cal["channels"] = [ChannelCalibrationData(name="channel_0", index=0)]
+        
 
         except Exception as e:
             traceback.print_exc()
-            print(f"cannot parse calibration string {s}")
+            print(f"Invalid calibration string {s}")
             raise e
             
         if cls.isCalibration(cal):
             return cls(**cal)
+        
+    @property
+    def isChannels(self):
+        return self.type & vigra.AxisType.Channels
 
     @property
     def calibrationString(self) -> str:
@@ -987,29 +976,26 @@ class AxisCalibrationData(CalibrationData):
         if a singleton channel needs calibration then the array MUST have a
         Channel axis defined.
         """
-        
+        ischannels = self.type & vigra.AxisType.Channels
 
+        skipfields = ("channels", ) # always treat channels field specially
+        
+        if ischannels:
+            skipfields += ("units", "origin", "maximum", "resolution")
+        
         strlist = ["<axis_calibration>"]
         
-        # for param in sorted(self.__class__.parameters):
-        for param in sorted(filter(lambda x: x != "channels", map(lambda x: x.name, dataclasses.fields(self)))):
-            strlist.append(self._to_xml_(param))
+        for param in sorted(filter(lambda x: x not in skipfields, map(lambda x: x.name, dataclasses.fields(self)))):
+            # print(f"{self.__class__.__name__}.calibrationString: ischannels: {ischannels} -> param = {param}")
+            s = self._to_xml_(param)
+            if isinstance(s, str):
+                strlist.append(self._to_xml_(param))
             
-        if self.type & vigra.AxisType.Channels and isinstance(self.channels, (list, tuple)) and len(self.channels):
+        if ischannels and isinstance(self.channels, typing.Sequence):
             strlist.append("<channels>")
             for ch in self.channels:
-                # NOTE: 2025-04-13 18:13:32
-                # ch should be a ChannelCalibrationData
-                # NOTE: 2025-04-08 14:39:48
-                # see NOTE: 2025-04-08 14:39:08
-                # NOTE: 2021-11-08 11:35:19
-                # only append channel information if there are channel calibrations
-                # if "virtual" not in ch[0]:
-                # strlist.append(f"<{ch.name}>")
-                strlist.append(ch.calibrationString)
-                # strlist.append(f"</{ch.name}>")
-                # if not ch.virtual:
-                    
+                if isinstance(ch, ChannelCalibrationData):
+                    strlist.append(ch.calibrationString)
             strlist.append("</channels>")
                 
         strlist.append("</axis_calibration>")
