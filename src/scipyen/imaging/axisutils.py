@@ -5,7 +5,7 @@
 
 
 '''
-utilities to enhance axis and axistags handling
+Utilities to enhance axis and axistags handling
 
     NOTE: vigra defines a set of standard axis type keys: ‘x’, ‘y’, ‘z’, ‘t’, 
     and ‘c’ and the combinations'fx','fy', and 'fz'. 
@@ -341,8 +341,6 @@ def axisTypeFromUnits(u:typing.Union[pq.Quantity, pq.dimensionality.Dimensionali
         
     return vigra.AxisType.UnknownAxisType
         
-    
-#def axisTypeFromString(s:str) -> typing.Union[vigra.AxisType, int]:
 def axisTypeFromString(s:str) -> vigra.AxisType:
     r"""Inverse lookup of axis type flags from descriptive string or axis info key.
     Performs the reverse of axisTypeName and the reverse mapping of standardAxisTypeKeys.
@@ -745,8 +743,10 @@ def dimIter(data:vigra.VigraArray, key:typing.Union[str, int, vigra.AxisInfo]):
         
 def dimEnum(data, key):
     r"""Generates a tuple (k, slice) along dimension with axistag "key".
-    Simlar to dimIter, but in addition outputs the int index of the slice.
-    See dimIter for more details.
+    Similar to dimIter in this module, but in addition outputs the int index of 
+    the slice. 
+
+    See dimIter for details.
     """
     if not isinstance(data, vigra.VigraArray):
         raise TypeError(f"First parameter expected to be a VigraArray; instead, got {type(data).__name__}")

@@ -106,6 +106,7 @@ from .axisutils import (axisTypeName,
                         isValidAxisType,
                         isElementaryAxisType,
                         standardAxisTypeKeys,
+                        getAxisTypeFlagsInt
                         )
 
 MissingType: typing.TypeAlias = type(dataclasses.MISSING)
@@ -282,10 +283,41 @@ class CalibrationData:
 class ChannelCalibrationData(CalibrationData):
     r""" Calibration for a channel in a Channels axis 
         
+    Fields inherited from CalibrationData:
+        'name' : str — here, the name of the channel
+        'relative_tolerance' : float — used for numerical comparison e.g.
+            np.isclose or math.isclose
+        'absolute_tolerance' : float — used for numerical comparison e.g.
+            np.isclose or math.isclose
+        'equal_nan' : bool — used in comparing two ChannelCalibrationData objects.
+            Python treats two NaN numbers are distinct, i.e., 
+                math.nan == math.nan
+                -> False
+        
+            This results in two CalibrationData object beign "seen" as different
+            when the same numeric field has math.nan value in both of them, even
+            though the other fields are numerically identical.
+        
+            Setting 'equal_nan' to True (the default) avoids this effect.
+        
+        'fc_template': str — format template for string represntations of
+            numeric data (sets the precision for converting to/from an 
+            AxisInfo description string)
+        
+    Specific fields (all scalars):
+        'index': int  = the channel index
+        
+        'origin':float = 0.0, the channel's minimum value, in self.units
+        
+        'maximum':float = math.nan, the channel's maximum value, in self.units
+    
+        'units':pq.Quantity = pq.arbitrary_unit (scalar), the physical units 
+            associated with the values in this channel. See NOTE 3 below.
+        
         NOTE 1: There is no 'resolution' field in this class.
         
-        The physical measure represented by the data points in one channel of
-        the array ('pixels', 'voxels', etc) is usually a continuous, i.e., analog,
+        NOTE 2: The physical measure represented by the data points in one channel
+        of the array ('pixels', 'voxels', etc) is usually a continuous, i.e., analog,
         quantity; yet, the array data point itself is a discrete one. This 
         discretization process is called "quantization" and depends on the underlying
         numerical precision of the system that recorded the data (and thus on the 
@@ -317,7 +349,7 @@ class ChannelCalibrationData(CalibrationData):
         amplification, etc) before beng wuantized. This which makes the concept of
         "resolution", and its use, far less trivial that it may appear.
         
-        NOTE 2: This channel "calibration" simply attaches a physcial quantity to
+        NOTE 3: This channel "calibration" simply attaches a physcial quantity to
         the (discrete) values in the array. Therefore it should NOT be confused 
         with the physical calibration that sets up a map between the values of the 
         array's data points and the underlying quantity that generated the array's
@@ -329,6 +361,33 @@ class ChannelCalibrationData(CalibrationData):
         to the original ones by a linear or non-linear transformation. For eaxmple,
         see Helmchen, F. "Calibration of Fluorescent Calcium Indicators" (2011),
         Cold Spring Harb Protoc; doi:10.1101/pdb.top120
+        
+        WARNING about the 'units' field and related and scalar fields 
+        'origin', and 'maximum'
+        
+        The units can be changed by assigning this field any python Quantity, but 
+        the scalar values for 'origin', & 'maximum' will NOT be recalculated 
+        or rescaled. Theis values should be recalculated as necessary and set to 
+        corerect values manually.
+        
+        A Quantity can also be assigned directly to the 'origin' and 'maximum',
+        however:
+        • The field will only store its "magnitude" (i.e. numerical value without
+        dimensionality) in the respective field
+        • If the units of the new value are different from the units of the 
+        calibration, but convertible to these, then the numerical value assigned
+        to the field will first be rescaled to the units of the calibration. If
+        the units of the new value are not convertible to the units of the 
+        calibration, an Exception will be raised.
+        
+        Therefore the recommended way to change a calibration is:
+        1) Assign new units
+        2) If the new units are convertible to the original units,
+            rescale each value of the scalar field to the new units, assign back
+            the resulting magnitude to the respective field .
+            Othwerise, ATTENTION:  make sure that the scalar field values make 
+            sense given the new units.
+         
 
     """
         
@@ -410,6 +469,7 @@ class AxisCalibrationUnitsDescriptor:
         if not obj_axtype & vigra.AxisType.AllAxes:
             return
         if obj_axtype & vigra.AxisType.Channels:
+            scipywarn(f"The {self._name_} fields for a Channels axis is meaningless — try one of its Channel calibrations")
             return dataclasses.MISSING
         return getattr(obj, self._name_, self._default_)
     
@@ -465,6 +525,7 @@ class AxisCalibrationScalarDescriptor:
         if not obj_axtype & vigra.AxisType.AllAxes:
             return
         if obj_axtype & vigra.AxisType.Channels:
+            scipywarn(f"The {self._name_} fields for a Channels axis is meaningless — try one of its Channel calibrations")
             return datatypes.MISSING
         return getattr(obj, self._name_, self._default_)
     
@@ -480,12 +541,17 @@ class AxisCalibrationScalarDescriptor:
             if isinstance(value, pq.Quantity):
                 value  = scq.ensureScalar(value)
                 units = getattr(obj, "units", None)
+                
+                # NOTE: 2025-04-16 23:14:39
+                # check and rescale to calibration units
                 if isinstance(units, pq.Quantity):
-                    if not scq.unitsConvertible(value, units):
-                        raise TypeError(f"Value has {value.units} that are incompatible with the units of this object ({units})")
-                    
                     if value.units != units:
-                        value = value.rescale(units)
+                        if scq.unitsConvertible(value, units):
+                            value = value.rescale(units)
+                        elif scq.unitsConvertible(value, 1/units): # for 'resolution'
+                            value = value.rescale(1/units)
+                        else:
+                            raise TypeError(f"Value has {value.units} that are incompatible with the units of this object ({units})")
                         
                 value = value.magnitude
                 
@@ -525,16 +591,16 @@ class AxisCalibrationChannelsDescriptor:
         else:
             obj_axtype = getattr(obj, "type", None)
             if not obj_axtype & vigra.AxisType.AllAxes:
-                # ret = dataclasses.MISSING
+                scipywarn("Not a valid axis type flag")
                 ret = list()
             
             elif obj_axtype & vigra.AxisType.NonChannel:
+                scipywarn("Noft a Channels axis!")
                 ret = list()
                 # ret = dataclasses.MISSING
                 
             else: ret = getattr(obj, self._name_, self._default_)
             
-        # print(f"{self.__class__.__name__}.__get__ from {type(obj).__name__} -> {type(ret).__name__}")
         return ret
     
     def __set__(self, obj, value:typing.Sequence = list()):
@@ -584,32 +650,81 @@ class AxisCalibrationData(CalibrationData):
         
         • Universal fields — valid for all AxisType flags, 
         see vigra.AxisType for details; see also CalibrationData:
-        'name' : str
-        'relative_tolerance' : float
-        'absolute_tolerance' : float
-        'equal_nan' : bool
-        'fc_template' : format template for converting numeric data to string
-            (fixes the precision for converting to/from an AxisInfo description
-             string)
+            ∘ defined in the CalibrationData superclass:
+                'name' : str — the name of the calibration object (reflective of 
+                    the axis type flag)
+                'relative_tolerance' : float — used for numerical comparison e.g.
+                    np.isclose or math.isclose
+                'absolute_tolerance' : float — used for numerical comparison e.g.
+                    np.isclose or math.isclose
+                'equal_nan' : bool — used in comparing two ChannelCalibrationData
+                objects.
+                    Python treats two NaN numbers are distinct, i.e., 
+                        math.nan == math.nan
+                        -> False
+                
+                    This results in two CalibrationData object beign "seen" as different
+                    when the same numeric field has math.nan value in both of them, even
+                    though the other fields are numerically identical.
+                
+                    Setting 'equal_nan' to True (the default) avoids this effect.
+        
+                'fc_template': str — format template for string represntations of
+                    numeric data (sets the precision for converting to/from an 
+                    AxisInfo description string)
+        
+            ∘ defined in this class:
+                'index': int — the index of the axis in the array's dimensions
         
         • Fields specific for a NonChannel axis (see vigra.AxisType for details):
-        'units' : scalar pq.Quantity
-        'origin' : float or complex
-        'maximum': float or complex
+            'units' : scalar pq.Quantity — the physical units associated with 
+                calibrated axis. 
+            'origin' : float or complex — the axis minimum coordinate, in axis units
+            'maximum': float or complex — the axis maximum coordinate, in axis units
+            'reslution': float or complex — the axis maximum coordinate in axis units⁻¹
         
-        'channels' -> always an empty list for a NonChannel axis
+            'channels' -> always an empty list for a NonChannel axis
         
-        Fields specific for a Channels axis (see vigra.AxisType for details):
-        'channels' -> a list of ChannelCalibrationData objects.
-            NOTE: for a 'virtual' channel axis this field will always contain a
-            ChannelCalibrationData object, either using default values, or the 
-            values given in the constructor parameters.
+        • Fields specific for a Channels axis (see vigra.AxisType for details):
+            'channels' -> a list of ChannelCalibrationData objects.
+                NOTE: for a 'virtual' channel axis this field will always contain a
+                ChannelCalibrationData object, either using default values, or the 
+                values given in the constructor parameters.
         
-        In addition, the 'units', 'origin', 'maximum' and 'resolution' are always
-        set to MISSING for the calibration of a Channels axis.
+            The 'units', 'origin', 'maximum' and 'resolution' fields are always 
+            MISSING when the AxisCalibrationData relates to a Channels axis.
         
         See also:
         ChannelCalibrationData
+        
+        WARNING about the 'units' field and related and scalar fields 
+        'origin', 'maximum' and 'resolution':
+        
+        The units associated with an AxisCalibrationData or ChannelCalibrationData
+        can be changed by assigning this field any python Quantity, but the scalar
+        values for 'origin', 'maximum' and 'resolution' will NOT be recalculated 
+        or rescaled. Therefore, 'origin', 'maximum' and 'resolution' values 
+        should be recalculated as necessary and set to corerect values manually.
+        
+        A Quantity can also be assigned directly to the 'origin', 'maximum' and 
+        'resolution', however:
+        • The field will only store its "magnitude" (i.e. numerical value without
+        dimensionality) in the respective field
+        • If the units of the new value are different from the units of the 
+        calibration, but convertible to these, then the numerical value assigned
+        to the field will first be rescaled to the units of the calibration. If
+        the units of the new value are not convertible to the units of the 
+        calibration, an Exception will be raised.
+        
+        Therefore the recommended way to change a calibration is:
+        1) Assign new units
+        2) If the new units are convertible to the original units,
+            rescale each value of the scalar field to the new units, assign back
+            the resulting magnitude to the respective field .
+            ATTENTION: 'resolution' should correspond to the inverse of the 
+            calibration units!
+            Othwerise, makwe sure that the scalar field values make sense given
+            the new units.
         
     """
     
@@ -690,6 +805,10 @@ class AxisCalibrationData(CalibrationData):
         a dict or a calibration string (xml-formatted) please use the "new" factory
         class methods.
         """
+        typeFlagKey = axisTypeSymbol(self.type)
+        if typeFlagKey != self.key:
+            self.key = typeFlagKey
+            
         # print(f"{self.__class__.__name__}.__post_init__: is Channels =  {self.isChannels}")
         if self.isChannels:
             # bounce these to ChannelCalibrationData if needed , and set them to 
@@ -712,12 +831,20 @@ class AxisCalibrationData(CalibrationData):
             self.resolution = dataclasses.MISSING
             
         else:
-             # enforce empty channels list for a NonChannel axis
+            # NOTE: 2025-04-16 22:41:29
+            # To avoid messing up the scalar fields throught rescaling (see
+            # AxisCalibrationScalarDescriptor), I avoid setting up the units here
+            # in accordance to the typeFlag self.type. This is best left to 
+            # setting the units at construction time (in the __init_ generated by
+            # 'dataclass' decorator).
+            #
+            # NOTE: 2025-04-16 22:43:43
+            # enforce empty channels list for a NonChannel axis
             if isinstance(self.channels, typing.Sequence) and len(self.channels):
                 self.channels.clear()
             else:
                 self.channels = list()
-            
+                
     @singledispatchmethod
     @classmethod
     def new(cls, o:object):
@@ -1028,7 +1155,6 @@ class AxisCalibrationData(CalibrationData):
     def calibrateAxis(self, axinfo:vigra.AxisInfo):
         assert self.type == axinfo.typeFlags, f"Cannot apply a {self.type} axis calibration to a {axinfo.typeFlags} axis"
         
-        
         description = axinfo.description.strip()
         calStr = self.calibrationString
         start_stop = self.findCalibrationString(description)
@@ -1042,6 +1168,8 @@ class AxisCalibrationData(CalibrationData):
         axinfo.description = newDescr
         
         return axinfo
+    
+    
     
     @singledispatchmethod
     def channelCalibration(self, o):
@@ -1079,6 +1207,8 @@ class AxisCalibrationData(CalibrationData):
             chCal = list(filter(lambda c: getattr(c, "index", None) == channel, self.channels))
             if len(chCal):
                 return chCal[0]
+        else:
+            scipywarn("Not a Channels axis")
             
     @channelCalibration.register(str)
     def _(self, channel:str):
@@ -1086,6 +1216,8 @@ class AxisCalibrationData(CalibrationData):
             chCal = list(filter(lambda c: getattr(c, "name", None) == channel, self.channels))
             if len(chCal):
                 return chCal[0]
+        else:
+            scipywarn("Not a Channels axis")
             
 class AxesCalibration(object):
     r"""Encapsulates calibration of a set of axes.
