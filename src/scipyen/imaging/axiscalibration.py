@@ -109,11 +109,13 @@ from .axisutils import (axisTypeName,
                         getAxisTypeFlagsInt
                         )
 
+# forward declaration needed for the descriptor classes below.
+class AxisCalibrationData: pass
 class ChannelCalibrationData: pass
 
 class CalSpec(typing.NamedTuple):
-    origin:typing.Optional[typing.Union[numbers.Number, pq.Quantity, MissingType]] = None
-    maximum:typing.Optional[typing.Union[numbers.Number, pq.Quantity, MissingType]] = None
+    origin: typing.Optional[typing.Union[numbers.Number, pq.Quantity, MissingType]] = None
+    maximum: typing.Optional[typing.Union[numbers.Number, pq.Quantity, MissingType]] = None
     units:typing.Optional[typing.Union[pq.Quantity, MissingType]] = None
     
 class NamedCalSpec(typing.NamedTuple):
@@ -127,7 +129,9 @@ class FullCalSpec(typing.NamedTuple):
     maximum:typing.Optional[typing.Union[numbers.Number, pq.Quantity, MissingType]] = None
     units:typing.Optional[typing.Union[pq.Quantity, MissingType]] = None
     name:typing.Optional[str] = None
-    index:int = 0
+    index:int = 0,
+    size:int = 0,
+    type:vigra.AxisType = vigra.AxisType.UnknownAxisType
     
 # NOTE: 2025-04-17 13:28:42 
 # Don't use slots=True because it messes up the Descriptor functionality
@@ -275,6 +279,251 @@ class CalibrationData:
                 
         return ret
                 
+class CalibrationUnitsDescriptor:
+    r"""Use this for the 'units' attribute of an AxisCalibrationData object.
+    This enforces the rule that only NonChannel axes have this attribute with a
+    pq.Quantity value, while setting it to dataclasses.MISSING for a Channels
+    axis."""
+    def __init__(self, *, default:typing.Union[pq.Quantity, MissingType, str] = pq.arbitrary_unit):
+        if isinstance(default, str):
+            default = scq.str2quantity(default)
+        if isinstance(default, pq.Quantity):
+            default = default.units # see NOTE: 2025-04-17 13:49:04 below
+        elif not isinstance(default, MissingType):
+            raise TypeError(f"Expecting a Quantity, a string representation of a Quantity, or dataclasses.MISSING; instead, got a {type(default).__name__}")
+        
+        self._default_ = default
+        
+    def __set_name__(self, owner, name:str):
+        self._name_ = f"_{name}_"
+        
+    def __get__(self, obj, type_):
+        if obj is None:
+            return self._default_
+        
+        if isinstance(obj, ChannelCalibrationData):
+            return getattr(obj, self._name_, self._default_)
+        
+        if not isinstance(obj, AxisCalibrationData):
+            return self._default_
+        
+        obj_axtype = getattr(obj, "type", None)
+        if obj_axtype is None:
+            scipywarn(f"Undetermined axis type flag")
+            return 
+        if not obj_axtype & vigra.AxisType.AllAxes:
+            return
+        if obj_axtype & vigra.AxisType.Channels:
+            # scipywarn(f"The {self._name_} fields for a Channels axis is meaningless — try one of its Channel calibrations")
+            return dataclasses.MISSING
+        
+        ret = getattr(obj, self._name_, self._default_)
+        return ret
+    
+    def __set__(self, obj, value:typing.Union[pq.Quantity, str, MissingType]):
+        # print(f"{self.__class__.__name__}.__set__: value = {value}")
+        if not isinstance(obj, (AxisCalibrationData, ChannelCalibrationData)):
+            return
+        
+        if isinstance(value, str):
+            value = scq.str2quantity(value)
+        if isinstance(value, pq.Quantity):
+            value = value.units
+        elif not isinstance(value, (numbers.Number, MissingType, str)):
+            raise TypeError(f"Expecting a scalar Quantity, a numbers.Number or a string representation of a scalar Quantity; instead, got {type(value).__name__}")
+        
+        if isinstance(obj, ChannelCalibrationData):
+            if isinstance(value, MissingType):
+                # enforce the units on ChannelCalibrationData
+                value = pq.arbitrary_unit
+            setattr(obj, self._name_, value)
+            return
+        
+        obj_axtype = getattr(obj, "type", None)
+        
+        if not obj_axtype & vigra.AxisType.AllAxes:
+            scipywarn(f"The owner (a {type(obj).__name__}) has an invalid type attribute: {obj_axtype}")
+            return
+        
+        elif obj_axtype & vigra.AxisType.Channels:
+            setattr(obj, self._name_, dataclasses.MISSING)
+        else:
+            if isinstance(value, str):
+                value = scq.str2quantity(value)
+                
+            if isinstance(value, pq.Quantity):
+                # NOTE: 2025-04-17 13:49:04
+                # either Quantity.units or UnitQuantity.units returns a 
+                # UnitQuantity so no need to check if it is scalar 
+                value = value.units 
+                
+            elif isinstance(value, MissingType):
+                # silently enforce a unit on NonChannel AxisCalibrationData
+                value = pq.arbitrary_unit
+            else:
+                raise TypeError(f"Expecting a Quantity, or a string representation of a Quantity; instead, got a {type(value).__name__}")
+            setattr(obj, self._name_, value)
+        
+class CalibrationScalarDescriptor:
+    r"""Use this for the following scalar attributes of AxisCalibrationData:
+    'origin', 'maximum', 'resolution'
+    This enforces the rule that these attributes get numeric values only for 
+    NonChannel axes, but are set to dataclasses.MISSING for Channels axes.
+    """
+    def __init__(self, *, default:typing.Union[numbers.Number, pq.Quantity, MissingType, str]=0.0):
+        if isinstance(default, str):
+            default = scq.str2quantity(default)
+            
+        if isinstance(default, pq.Quantity):
+            if not scq.isScalar(default):
+                raise ValueError(f"Expecting a scalar Quantity; instead, got a Quantity array with {default.size} elements")
+            default = scq.ensureScalar(default).magnitude
+            # NOTE: 2025-04-15 23:02:24
+            # strip away the units
+            default = scq.quantity2scalar(default)
+            
+        elif not isinstance(default, (numbers.Number, MissingType, str)):
+            raise TypeError(f"Expecting a numbers.Number, a scalar Quantity, or a string representation of a scalar quantity; instead, got {type(default).__name__}")
+        
+        self._default_ = default
+        
+    def __set_name__(self, owner, name:str):
+        self._name_ = f"_{name}_"
+        
+    def __get__(self, obj, type_):
+        r"""Returns None if the owner is invalid"""
+        if obj is None:
+            return self._default_
+        
+        if isinstance(obj, ChannelCalibrationData):
+            return getattr(obj, self._name_, self._default_)
+        
+        if not isinstance(obj, AxisCalibrationData):
+            return self._default_
+        
+        obj_axtype = getattr(obj, "type", None)
+        if obj_axtype is None:
+            scipywarn(f"Undetermined axis type flag")
+            return 
+        if not obj_axtype & vigra.AxisType.AllAxes:
+            scipywarn(f"The owner (a {type(obj).__name__}) has an invalid type attribute: {obj_axtype}")
+            return
+        if obj_axtype & vigra.AxisType.Channels:
+            # scipywarn(f"The {self._name_} fields for a Channels axis is meaningless — try one of its Channel calibrations")
+            return datatypes.MISSING
+        return getattr(obj, self._name_, self._default_)
+    
+    def __set__(self, obj, value:typing.Union[numbers.Number, pq.Quantity, MissingType, str]):
+        r"""Setter. The owner object must have a valid 'type' attribute"""
+        # print(f"{self.__class__.__name__}.__set__ value = {value}")
+        if not isinstance(obj, (AxisCalibrationData, ChannelCalibrationData)):
+            return
+        
+        if isinstance(value, str):
+            value = scq.str2quantity(value)
+        if isinstance(value, pq.Quantity):
+            value  = scq.ensureScalar(value)
+            units = getattr(obj, "units", None)
+            # NOTE: 2025-04-16 23:14:39
+            # check and rescale to calibration units
+            if isinstance(units, pq.Quantity):
+                if value.units != units:
+                    if scq.unitsConvertible(value, units):
+                        value = value.rescale(units)
+                    else:
+                        raise TypeError(f"Value has {value.units} that are incompatible with the units of this object ({units})")
+            value = scq.quantity2scalar(value)
+            
+        elif not isinstance(value, (numbers.Number, MissingType, str)):
+            raise TypeError(f"Expecting a scalar Quantity, a numbers.Number or a string representation of a scalar Quantity; instead, got {type(value).__name__}")
+        
+        if isinstance(obj, ChannelCalibrationData):
+            setattr(obj, self._name_, value)
+            return 
+        
+        obj_axtype = getattr(obj, "type", None)
+        if not obj_axtype & vigra.AxisType.AllAxes:
+            scipywarn(f"The owner (a {type(obj).__name__}) has an invalid type attribute: {obj_axtype}")
+            return
+        # NOTE: 2025-04-15 23:03:56
+        # set this to MISSING in case obj is an AxisCalibrationData for a Channels axis
+        if obj_axtype & vigra.AxisType.NonChannel:
+            setattr(obj, self._name_, value)
+        else:
+            # see NOTE: 2025-04-15 23:03:56
+            setattr(obj, self._name_, dataclasses.MISSING)
+        
+class CalibrationChannelsDescriptor:
+    def __init__(self, *, default:typing.Sequence=list()):
+        self._default_ = list()
+        # self._default_ = dataclasses.MISSING
+        if isinstance(default, typing.Sequence):
+            chcals = list(filter(lambda x: isinstance(x, ChannelCalibrationData), map(lambda x: ChannelCalibrationData(**x._asdict()) if isinstance(x, CalSpec) else ChannelCalibrationData(**x) if isinstance(x, dict) else x if isinstance(x, ChannelCalibrationData) else None, default)))
+            if len(chcals):
+                self._default_ = chcals
+            else:
+                self._default_ = list()
+        
+    def __set_name__(self, owner, name:str):
+        self._name_ = f"_{name}_"
+
+    def __get__(self, obj, type_):
+        if obj is None:
+            ret = self._default_
+        else:
+            obj_axtype = getattr(obj, "type", None)
+            if not obj_axtype & vigra.AxisType.AllAxes:
+                scipywarn("Not a valid axis type flag")
+                ret = list()
+            
+            elif obj_axtype & vigra.AxisType.NonChannel:
+                scipywarn("Noft a Channels axis!")
+                ret = list()
+                # ret = dataclasses.MISSING
+                
+            else: ret = getattr(obj, self._name_, self._default_)
+            
+        return ret
+    
+    def __set__(self, obj, value:typing.Sequence = list()):
+        obj_axtype = getattr(obj, "type", None)
+        if not obj_axtype & vigra.AxisType.AllAxes:
+            setattr(obj, self._name_, list())
+            # scipywarn(f"The owner (a {type(obj).__name__}) has an invalid type attribute: {obj_axtype}")
+            return
+        # NOTE: 2025-04-15 23:05:35
+        # set this attribute only for a Channels axis; otherwise set it to MISSING
+        if isinstance(value, typing.Sequence):
+            if obj_axtype & vigra.AxisType.Channels:
+                obj_size = getattr(obj, "size", 0)
+                chcals = list(filter(lambda x: isinstance(x, ChannelCalibrationData), map(lambda x: ChannelCalibrationData(**x._asdict()) if isinstance(x, CalSpec) else ChannelCalibrationData(**x) if isinstance(x, dict) else x if isinstance(x, ChannelCalibrationData) else None, value)))
+                if len(chcals):
+                    if obj_size == 0 and len(chcals) > 1:
+                        scipywarn(f"Mismatch between owner axis size (0), and {len(chcals)} ChannelCalibrationData objects being assigned; owner size will be adjusted")
+                        setattr(obj, "size", len(chcals))
+                    elif obj_size > 1 and obj_size != len(chcals):
+                        scipywarn(f"Mismatch between owner axis size ({obj_size}), and {len(chcals)} ChannelCalibrationData objects being assigned; owner size will be adjusted")
+                        setattr(obj, "size", len(chcals))
+                        
+                else:
+                    if len(chcals) == 0:
+                        if obj_size == 0:
+                            chcals = [ChannelCalibrationData(name="channel_0")] # ensure a single ChannelCalibrationData
+                        else:
+                            # BUG: 2025-04-15 23:34:01 FIXME/TODO
+                            # not sure this is a bug or feature ?!? surely poor design...
+                            scipywarn("No valid channel calibrations were specified; this will ERASE the channels attribute an set the owner axis size to 0")
+                            setattr(obj, "size", len(chcals))
+                        
+                setattr(obj, self._name_, chcals)
+                
+            else:
+                # setattr(obj, self._name_, dataclasses.MISSING)
+                setattr(obj, self._name_, list())
+                
+        else:
+            raise TypeError(f"Expecting a sequence; instead got {type()}")
+
 # Don't use slots=True because it messes up the Descriptor functionality
 @dataclass(eq=False)
 class ChannelCalibrationData(CalibrationData):
@@ -391,13 +640,13 @@ class ChannelCalibrationData(CalibrationData):
     index:int = 0 
     r'''channel index'''
     
-    origin:float = 0.0 # is this really needed?
+    origin:CalibrationScalarDescriptor = CalibrationScalarDescriptor(default = 0.0) # is this really needed?
     r"""channel's minimum value, in self.units, as float"""
     
-    maximum:float = math.nan # is this really needed?
+    maximum:CalibrationScalarDescriptor = CalibrationScalarDescriptor(default = np.nan) # is this really needed?
     r"""channel's maximum value, in self.units, as float"""
     
-    units:pq.Quantity = pq.arbitrary_unit
+    units:CalibrationUnitsDescriptor = CalibrationUnitsDescriptor(default=pq.arbitrary_unit)
     
     @property
     def calibrationString(self) -> str:
@@ -412,6 +661,33 @@ class ChannelCalibrationData(CalibrationData):
         
         return "".join(strlist)
     
+    def rescale(self, u:typing.Union[pq.Quantity, pq.dimensionality.Dimensionality, str]) -> None:
+        if isinstance(u, str):
+            u = scq.str2quantity(u)
+        if not scq.unitsConvertible(u, self.units):
+            raise ValueError(f"New units ({u}) are incompatible with current units ({self.units}) and therefore, the calibration cannot be rescaled.")
+            
+        # NOTE: 2025-04-17 10:44:36
+        # the next two calls will throw exceptions if self.units are not convertible
+        # to the new units
+        new_o = self.calibratedOrigin.rescale(u)
+        new_m = self.calibratedMaximum.rescale(u)
+        self.origin = scq.quantity2scalar(new_o)
+        self.maximum = scq.quantity2scalar(new_m)
+        self.units = u
+        
+    def calibratedValue(self, value) -> pq.Quantity:
+        r"""Aimply applied the physical units to the array value"""
+        return value * self.units
+    
+    @property
+    def calibratedOrigin(self) -> pq.Quantity:
+        return self.origin * self.units
+    
+    @property
+    def calibratedMaximum(self) -> pq.Quantity:
+        return self.maximum * self.units
+        
     @singledispatchmethod
     @classmethod
     def new(cls, o:object):
@@ -439,214 +715,76 @@ class ChannelCalibrationData(CalibrationData):
         # print(f"{cls.__name__}.new({data})")
         return cls.new(data)
         
-    
-class AxisCalibrationUnitsDescriptor:
-    r"""Use this for the 'units' attribute of an AxisCalibrationData object.
-    This enforces the rule that only NonChannel axes have this attribute with a
-    pq.Quantity value, while setting it to dataclasses.MISSING for a Channels
-    axis."""
-    def __init__(self, *, default:typing.Union[pq.Quantity, MissingType, str] = pq.arbitrary_unit):
-        if isinstance(default, str):
-            default = scq.str2quantity(default)
-        if isinstance(default, pq.Quantity):
-            default = default.units # see NOTE: 2025-04-17 13:49:04 below
-        elif not isinstance(default, MissingType):
-            raise TypeError(f"Expecting a Quantity, a string representation of a Quantity, or dataclasses.MISSING; instead, got a {type(default).__name__}")
-        
-        self._default_ = default
-        
-    def __set_name__(self, owner, name:str):
-        self._name_ = f"_{name}_"
-        
-    def __get__(self, obj, type_):
-        if obj is None:
-            return self._default_
-        obj_axtype = getattr(obj, "type", None)
-        if not obj_axtype & vigra.AxisType.AllAxes:
-            return
-        if obj_axtype & vigra.AxisType.Channels:
-            # scipywarn(f"The {self._name_} fields for a Channels axis is meaningless — try one of its Channel calibrations")
-            return dataclasses.MISSING
-        
-        ret = getattr(obj, self._name_, self._default_)
-        return ret
-    
-    def __set__(self, obj, value:typing.Union[pq.Quantity, str]):
-        # print(f"{self.__class__.__name__}.__set__: value = {value}")
-        obj_axtype = getattr(obj, "type", None)
-        if not obj_axtype & vigra.AxisType.AllAxes:
-            scipywarn(f"The owner (a {type(obj).__name__}) has an invalid type attribute: {obj_axtype}")
-            return
-        
-        elif obj_axtype & vigra.AxisType.Channels:
-            setattr(obj, self._name_, dataclasses.MISSING)
-        else:
-            if isinstance(value, str):
-                value = scq.str2quantity(value)
-                
-            if isinstance(value, pq.Quantity):
-                # NOTE: 2025-04-17 13:49:04
-                # either Quantity.units or UnitQuantity.units returns a 
-                # UnitQuantity so no need to check if it is scalar 
-                value = value.units 
-            else:
-                raise TypeError(f"Expecting a Quantity, or a string representation of a Quantity; instead, got a {type(value).__name__}")
-            setattr(obj, self._name_, value)
-        
-class AxisCalibrationScalarDescriptor:
-    r"""Use this for the following scalar attributes of AxisCalibrationData:
-    'origin', 'maximum', 'resolution'
-    This enforces the rule that these attributes get numeric values only for 
-    NonChannel axes, but are set to dataclasses.MISSING for Channels axes.
-    """
-    def __init__(self, *, default:typing.Union[numbers.Number, pq.Quantity, MissingType, str]=0.0):
-        if isinstance(default, str):
-            default = scq.str2quantity(default)
-            
-        if isinstance(default, pq.Quantity):
-            if not scq.isScalar(default):
-                raise ValueError(f"Expecting a scalar Quantity; instead, got a Quantity array with {default.size} elements")
-            default = scq.ensureScalar(default).magnitude
-            # NOTE: 2025-04-15 23:02:24
-            # strip away the units
-            default = scq.quantity2scalar(default)
-            
-        elif not isinstance(default, (numbers.Number, MissingType, str)):
-            raise TypeError(f"Expecting a numbers.Number, a scalar Quantity, or a string representation of a scalar quantity; instead, got {type(default).__name__}")
-        
-        self._default_ = default
-        
-    def __set_name__(self, owner, name:str):
-        self._name_ = f"_{name}_"
-        
-    def __get__(self, obj, type_):
-        r"""Returns None if the owner is invalid"""
-        if obj is None:
-            return self._default_
-        obj_axtype = getattr(obj, "type", None)
-        if not obj_axtype & vigra.AxisType.AllAxes:
-            return
-        if obj_axtype & vigra.AxisType.Channels:
-            # scipywarn(f"The {self._name_} fields for a Channels axis is meaningless — try one of its Channel calibrations")
-            return datatypes.MISSING
-        return getattr(obj, self._name_, self._default_)
-    
-    def __set__(self, obj, value:typing.Union[numbers.Number, pq.Quantity, MissingType, str]):
-        r"""Setter. The owner object must have a valid 'type' attribute"""
-        # print(f"{self.__class__.__name__}.__set__ value = {value}")
-        obj_axtype = getattr(obj, "type", None)
-        if not obj_axtype & vigra.AxisType.AllAxes:
-            scipywarn(f"The owner (a {type(obj).__name__}) has an invalid type attribute: {obj_axtype}")
-            return
-        # NOTE: 2025-04-15 23:03:56
-        # set this to MISSING in case obj is an AxisCalibrationData for a Channels axis
-        if obj_axtype & vigra.AxisType.NonChannel:
-            if isinstance(value, str):
-                value = scq.str2quantity(value)
-            if isinstance(value, pq.Quantity):
-                value  = scq.ensureScalar(value)
-                units = getattr(obj, "units", None)
-                
-                # NOTE: 2025-04-16 23:14:39
-                # check and rescale to calibration units
-                if isinstance(units, pq.Quantity):
-                    if value.units != units:
-                        if scq.unitsConvertible(value, units):
-                            value = value.rescale(units)
-                        else:
-                            raise TypeError(f"Value has {value.units} that are incompatible with the units of this object ({units})")
-                        
-                value = scq.quantity2scalar(value)
-                
-            elif not isinstance(value, (numbers.Number, MissingType, str)):
-                raise TypeError(f"Expecting a scalar Quantity, a numbers.Number or a string representation of a scalar Quantity; instead, got {type(value).__name__}")
-            
-            setattr(obj, self._name_, value)
-        else:
-            # see NOTE: 2025-04-15 23:03:56
-            setattr(obj, self._name_, dataclasses.MISSING)
-        
-class AxisCalibrationChannelsDescriptor:
-    def __init__(self, *, default:typing.Sequence=list()):
-        self._default_ = list()
-        # self._default_ = dataclasses.MISSING
-        if isinstance(default, typing.Sequence):
-            chcals = list(filter(lambda x: isinstance(x, ChannelCalibrationData), map(lambda x: ChannelCalibrationData(**x._asdict()) if isinstance(x, CalSpec) else ChannelCalibrationData(**x) if isinstance(x, dict) else x if isinstance(x, ChannelCalibrationData) else None, default)))
-            if len(chcals):
-                self._default_ = chcals
-            else:
-                self._default_ = list()
-        
-    def __set_name__(self, owner, name:str):
-        self._name_ = f"_{name}_"
-
-    def __get__(self, obj, type_):
-        if obj is None:
-            ret = self._default_
-        else:
-            obj_axtype = getattr(obj, "type", None)
-            if not obj_axtype & vigra.AxisType.AllAxes:
-                scipywarn("Not a valid axis type flag")
-                ret = list()
-            
-            elif obj_axtype & vigra.AxisType.NonChannel:
-                scipywarn("Noft a Channels axis!")
-                ret = list()
-                # ret = dataclasses.MISSING
-                
-            else: ret = getattr(obj, self._name_, self._default_)
-            
-        return ret
-    
-    def __set__(self, obj, value:typing.Sequence = list()):
-        obj_axtype = getattr(obj, "type", None)
-        if not obj_axtype & vigra.AxisType.AllAxes:
-            setattr(obj, self._name_, list())
-            # scipywarn(f"The owner (a {type(obj).__name__}) has an invalid type attribute: {obj_axtype}")
-            return
-        # NOTE: 2025-04-15 23:05:35
-        # set this attribute only for a Channels axis; otherwise set it to MISSING
-        if isinstance(value, typing.Sequence):
-            if obj_axtype & vigra.AxisType.Channels:
-                obj_size = getattr(obj, "size", 0)
-                chcals = list(filter(lambda x: isinstance(x, ChannelCalibrationData), map(lambda x: ChannelCalibrationData(**x._asdict()) if isinstance(x, CalSpec) else ChannelCalibrationData(**x) if isinstance(x, dict) else x if isinstance(x, ChannelCalibrationData) else None, value)))
-                if len(chcals):
-                    if obj_size == 0 and len(chcals) > 1:
-                        scipywarn(f"Mismatch between owner axis size (0), and {len(chcals)} ChannelCalibrationData objects being assigned; owner size will be adjusted")
-                        setattr(obj, "size", len(chcals))
-                    elif obj_size > 1 and obj_size != len(chcals):
-                        scipywarn(f"Mismatch between owner axis size ({obj_size}), and {len(chcals)} ChannelCalibrationData objects being assigned; owner size will be adjusted")
-                        setattr(obj, "size", len(chcals))
-                        
-                else:
-                    if len(chcals) == 0:
-                        if obj_size == 0:
-                            chcals = [ChannelCalibrationData(name="channel_0")] # ensure a single ChannelCalibrationData
-                        else:
-                            # BUG: 2025-04-15 23:34:01 FIXME/TODO
-                            # not sure this is a bug or feature ?!? surely poor design...
-                            scipywarn("No valid channel calibrations were specified; this will ERASE the channels attribute an set the owner axis size to 0")
-                            setattr(obj, "size", len(chcals))
-                        
-                setattr(obj, self._name_, chcals)
-                
-            else:
-                # setattr(obj, self._name_, dataclasses.MISSING)
-                setattr(obj, self._name_, list())
-                
-        else:
-            raise TypeError(f"Expecting a sequence; instead got {type()}")
-
 # Don't use slots=True because it messes up the Descriptor functionality
 @dataclass(eq=False)
 class AxisCalibrationData(CalibrationData):
     r"""Calibration data for an array axis.
+        Provides a mechanism to attach a physical dimensionality to vigra.AxisInfo
+        objects which, in turn, are used to attach semantics to the axes of a
+        vigra.VigraArray (see vigra documentation for details).
         
-        Provides the following fields:
+        A vigra.VigraArray object always associates a vigra.AxisInfo to the 
+        array axes.
+        
+        The AxisCalibrationData can be used to attach the physical dimensionality
+        to an AxisInfo in a persistent manner, by seralizing it to an XML-formatted
+        string embedded in the AxisInfo.description attribute.
+        
+        Conversely, the string contained in the AxisInfo.description attribute
+        can be used to recreate the AxisCalibrationData object.
+        
+        Constructing an AxisCalibrationData object:
+        ===========================================
+        
+        An AxisCalibrationData object can be constructed by supplying field values
+        directly (see the description of fields, below), in the order of their 
+        definition in the class, i.e.:
+
+            calibration = AxisCalibrationData(index, key, type, <…, channels = … >)
+        
+            NOTE that the 'channels' field is always supplied as a keyword parameter,
+            i.e.as 'key = value' pair. 
+        
+            In this form, the constructor assigns the parameters to the fields in
+            the order of their definition, until all parameters are 'consumed'; 
+            remanig unassigned fields will receive their default values. It 
+            follows that "skipping" fields in the constructor can have unintended
+            consequences.
+        
+        The recommended way to construct an AxisCalibrationData object is to supply
+            field values as 'key=value' pairs. Fields can be supplied in ANY order, 
+            and skipped fields will get their default values implicitly.
+        
+        An alternative way to instantiate an AxisCalibrationData is to use its
+            "new" class method factory, which has an overloaded syntax:
+        
+        • AxisCalibrationData.new(x:dict), 
+            where 'x' is a dictionary with field names as keys mapped to field value
+        
+        • AxisCalibrationData.new(x:str),
+            where 'x' is an XML-formatted axis calibration string
+            (see AxisCalibrationData.calibrationString for details)
+        
+        • AxisCalibrationData.new(x:vigra.AxisInfo, <index, size, units, origin, 
+                                    maximum, resolution, channels>),
+            where 'x' is an AxisInfo.
+            This form will "parse" the AxisInfo for a calibration string and, if
+            found, will use it to crate an instance of AxisCalibrationData.
+        
+            If a calibration string is not found in the AxisInfo, the factory
+            will initiate some of the fields ('key', 'type', 'origin', 'resolution',
+            'units') based on the AxisInfo data. 
+
+            The optional parameters following 'x' can be used to override the 
+            field values. If given, they must be supplied in the order described
+            here, without skipping; unspecified fields will not be modified.
+        
+        AxisCalibrationData class has the following fields:
         
         • Universal fields — valid for all AxisType flags, 
-        see vigra.AxisType for details; see also CalibrationData:
-            ∘ defined in the CalibrationData superclass:
+            see vigra.AxisType for details; see also CalibrationData:
+        
+            ∘ Fields defined in the CalibrationData superclass:
                 'name' : str — the name of the calibration object (reflective of 
                     the axis type flag)
                 'relative_tolerance' : float — used for numerical comparison e.g.
@@ -669,7 +807,7 @@ class AxisCalibrationData(CalibrationData):
                     numeric data (sets the precision for converting to/from an 
                     AxisInfo description string)
         
-            ∘ defined in this class:
+            ∘ Fields defined in this class:
                 'index': int — the index of the axis in the array's dimensions
         
         • Fields specific for a NonChannel axis (see vigra.AxisType for details):
@@ -770,7 +908,7 @@ class AxisCalibrationData(CalibrationData):
     calibration data objects in the 'channel' attribute.
     '''
     
-    units:AxisCalibrationUnitsDescriptor = AxisCalibrationUnitsDescriptor(default=pq.arbitrary_unit)
+    units:CalibrationUnitsDescriptor = CalibrationUnitsDescriptor(default=pq.arbitrary_unit)
     r'''The physical units
     Currently, this is set (and fixed) to MISSING for a Channels-type axis.
     
@@ -780,7 +918,7 @@ class AxisCalibrationData(CalibrationData):
     
     ''' 
     
-    origin:AxisCalibrationScalarDescriptor = AxisCalibrationScalarDescriptor(default = 0.0)
+    origin:CalibrationScalarDescriptor = CalibrationScalarDescriptor(default = 0.0)
     # _origin_:dataclasses.InitVar[numbers.Number] = 0.0
     r'''The origin of the axis coordinates.
     To what coordinate does the 0th element along the axis correspond?
@@ -790,7 +928,7 @@ class AxisCalibrationData(CalibrationData):
     Currently, this must be set to MISSING for a Channels-type axis
     '''
     
-    resolution:AxisCalibrationScalarDescriptor = AxisCalibrationScalarDescriptor(default=1.0)
+    resolution:CalibrationScalarDescriptor = CalibrationScalarDescriptor(default=1.0)
     # _resolution_:dataclasses.InitVar[numbers.Number] = 1.0
     r'''The sampling resolution (in axis units).
     WARNING: Unlike the "resolution" field of a vigra.AxisInfo, where a value
@@ -807,7 +945,7 @@ class AxisCalibrationData(CalibrationData):
     is passed to the constructor.
     '''
     
-    maximum:AxisCalibrationScalarDescriptor = AxisCalibrationScalarDescriptor(default = np.nan)
+    maximum:CalibrationScalarDescriptor = CalibrationScalarDescriptor(default = np.nan)
     r'''The upper limit of the axis coordinates.
     To what coordinate does the last element along the axis correspond?
     Currently, this must be set to MISSING for a Channels-type axis.
@@ -815,7 +953,7 @@ class AxisCalibrationData(CalibrationData):
     
     _:dataclasses.KW_ONLY
     
-    channels:AxisCalibrationChannelsDescriptor = dataclasses.field(default_factory=list)
+    channels:CalibrationChannelsDescriptor = dataclasses.field(default_factory=list)
     r'''Sequence of ChannelCalibrationData, one per channel
     Currently, this will be set to MISSING for a NonChannel-type axis.
     For a Channels axis, setting this attribute MAY result in a change of the 
@@ -856,7 +994,7 @@ class AxisCalibrationData(CalibrationData):
         else:
             # NOTE: 2025-04-16 22:41:29
             # To avoid messing up the scalar fields throught rescaling (see
-            # AxisCalibrationScalarDescriptor), I avoid setting up the units here
+            # CalibrationScalarDescriptor), I avoid setting up the units here
             # in accordance to the typeFlag self.type. This is best left to 
             # setting the units at construction time (in the __init_ generated by
             # 'dataclass' decorator).
@@ -877,12 +1015,13 @@ class AxisCalibrationData(CalibrationData):
     @new.register(vigra.AxisInfo)
     @classmethod
     def _(cls, arg:vigra.AxisInfo, index:typing.Optional[int] = None, 
-        size: typing.Optional[int] = None,
-        units: typing.Optional[pq.Quantity] = None,
-        origin: typing.Optional[typing.Union[numbers.Number, pq.Quantity, CalSpec]] = None,
-        maximum: typing.Optional[typing.Union[numbers.Number, pq.Quantity]] = None,
-        resolution: typing.Optional[typing.Union[numbers.Number, pq.Quantity]] = None,
-        channels: typing.Optional[typing.Sequence[CalSpec | ChannelCalibrationData]] = None):
+          name: typing.Optional[str] = None, 
+          size: typing.Optional[int] = None,
+          units: typing.Optional[typing.Union[pq.Quantity, str, MissingType]] = None,
+          origin: typing.Optional[typing.Union[numbers.Number, pq.Quantity, CalSpec]] = None,
+          maximum: typing.Optional[typing.Union[numbers.Number, pq.Quantity]] = None,
+          resolution: typing.Optional[typing.Union[numbers.Number, pq.Quantity]] = None,
+          channels: typing.Optional[typing.Sequence[CalSpec | ChannelCalibrationData]] = None):
         r"""Factory for constructing an AxisCalibrationData using vigra.AxisInfo"""
         # NOTE: 2025-04-13 13:42:52
         # in vigra.AxisInfo, a 'resolution' field 0.0 means axis resolution, in
@@ -908,12 +1047,15 @@ class AxisCalibrationData(CalibrationData):
                 
             
             # overwrite the defaults if needed, using the descriptor classes for
-            # units, origing, maximum, resolution, and channels
+            # units, origin, maximum, resolution, and channels
             if isinstance(index, int):
                 if index >= 0 :
                     ret.index = index
                 else:
                     raise ValueError(f"Invalid axis index: {index}")
+                
+            if isinstance(name, str):
+                ret.name = name
                 
             if isinstance(size, int):
                 if size >= 0:
@@ -923,7 +1065,7 @@ class AxisCalibrationData(CalibrationData):
                 
             if ischannels:
                 if isinstance(channels, typing.Sequence):
-                    ret.channels = channels # use the AxisCalibrationChannelsDescriptor
+                    ret.channels = channels # use the CalibrationChannelsDescriptor
                 else:
                     if len(ret.channels) == 0:
                         ret.channels.append(ChannelCalibrationData(name = "channel_0", index=0)) # a default, for one channel!
@@ -931,7 +1073,9 @@ class AxisCalibrationData(CalibrationData):
                 if isinstance(origin, CalSpec):
                     origin, maximum, units = origin
                     
-                if isinstance(units, pq.Quantity):
+                if isinstance(units, (pq.Quantity, str)):
+                    if isinstance(units, str):
+                        units = scq.str2quantity(units)
                     ret.units = units
                         
                 if isinstance(origin, (numbers.Number, pq.Quantity)):
@@ -943,10 +1087,9 @@ class AxisCalibrationData(CalibrationData):
             return ret
             
         else:
-            # TODO 2025-04-13 13:45:58 FIXME parse the calibration string
-            # embedded in this AxisInfo 'description'.
             calStr = arg.description[cal_str_start_stop[0]:cal_str_start_stop[1]]
             return cls.new(calStr)
+            
         
     @new.register(dict)
     @classmethod
@@ -1215,8 +1358,8 @@ class AxisCalibrationData(CalibrationData):
         # the next two calls will throw exceptions if self.units are not convertible
         # to the new units
         new_o = self.calibratedOrigin.rescale(u)
-        self.origin = scq.quantity2scalar(new_o)
         new_m = self.calibratedMaximum.rescale(u)
+        self.origin = scq.quantity2scalar(new_o)
         self.maximum = scq.quantity2scalar(new_m)
         if not self.isChannels:
             new_r = self.calibratedResolution.rescale(u)
@@ -1274,6 +1417,13 @@ class AxisCalibrationData(CalibrationData):
             raise TypeError(f"Expecting a numbers.Number; got {type(value).__name__} instead")
         return value * self.resolution * self.units
     
+    def calibratedDistance(self, value) -> pq.Quantity | None:
+        r"""Calls calibratedMeasure(value).
+        For backward compatibility.
+        """
+        return self.calibratedMeasure(value)
+        
+    
     def coordinateInSamples(self, value:pq.Quantity) -> int | None:
         r"""Converts a calibrated distance from axis origin to number of samples.
             This performs the inverse of self.calibratedCoordinate.
@@ -1296,13 +1446,6 @@ class AxisCalibrationData(CalibrationData):
                 raise TypeError(f"Cannot convert between {value.units} and {self.units}")
             value = value.rescale(self.units)
         
-#         value_dim = pq.quantity.validate_dimensionality(value.units)
-#         my_dim = pq.quantity.validate_dimensionality(self.units)
-#         
-#         if value_dim != my_dim:
-#             cf = pq.quantity.get_conversion_factor(my_dim, value_dim)
-#             value *= cf
-            
         return math.ceil((value - self.calibratedOrigin) / self.resolution)
     
     def measureInSamples(self, value: pq.Quantity) -> int | None:
@@ -1455,7 +1598,7 @@ class AxesCalibration(object):
             if isinstance(args[0], vigra.VigraArray):
                 self._axistags_ = args[0].axistags
                 
-                self._calibration_ = list(map(lambda x: AxisCalibrationData(x), args[0].axistags))
+                self._calibration_ = list(map(lambda x: AxisCalibrationData.new(x), args[0].axistags))
                 # self._calibration_ = [AxisCalibrationData(axinfo) for axinfo in args[0].axistags]
                 
                 #set up channel calibrations with default values:
@@ -1464,27 +1607,22 @@ class AxesCalibration(object):
                     # Make sure we don't overwrite existing channel calibrations
                     if len(self._calibration_[channel_axis_index].channels) < args[0].channels:
                         for k in range(len(self._calibration_[channel_axis_index].channels), args[0].channels):
-                            self._calibration_[channel_axis_index].addChannelCalibration(ChannelCalibrationData(name=f"channel_{k}", index=k), name=f"channel_{k}")
-                    elif len(self._calibration_[channel_axis_index].channels) > args[0].channels:
-                        extra = list()
-                        for k in range(args[0].channels, len(self._calibration_[channel_axis_index].channels)):
-                            extra.append(self._calibration_[channel_axis_index].channels[k])
+                            self._calibration_[channel_axis_index].channels.append(ChannelCalibrationData(name=f"channel_{k}", index=k), name=f"channel_{k}")
                             
-                        for k,c in extra:
-                            self._calibration_[channel_axis_index]._data_.pop(k, None)
+                    elif len(self._calibration_[channel_axis_index].channels) > args[0].channels:
+                        self._calibration_[channel_axis_index].channels = self._calibration_[channel_axis_index].channels[:args[0].channels]
+#                         extra = list()
+#                         for k in range(args[0].channels, len(self._calibration_[channel_axis_index].channels)):
+#                             extra.append(self._calibration_[channel_axis_index].channels[k])
+#                             
+#                         for k,c in extra:
+#                             self._calibration_[channel_axis_index]._data_.pop(k, None)
                 
                 return
 
             elif isinstance(args[0], vigra.AxisTags):
                 self._axistags_ = args[0]
-                
-                self._calibration_ = [AxisCalibrationData(axinfo) for axinfo in args[0]]
-            
-                # the AxisInfo objects MUST be calibrated maunally (the
-                # AxisCalibrationData c'tor does NOT do this automatically)
-                #for k, axinfo in enumerate(self._axistags_):
-                    #self._calibration_[k].calibrateAxis(axinfo)
-                    
+                self._calibration_ = [AxisCalibrationData.new(axinfo) for axinfo in args[0]]
                 return
             
             elif isinstance(args[0], int):
@@ -1496,14 +1634,7 @@ class AxesCalibration(object):
                     raise ValueError(f"Cannot create an AxesCalibration object for {args[0]} axes")
                 
                 self._axistags_ = vigra.AxisTags(args[0])
-                
-                self._calibration_ = [AxisCalibrationData(axinfo) for axinfo in self._axistags_]
-                
-                # the AxisInfo objects MUST be calibrated maunally (the
-                # AxisCalibrationData c'tor does NOT do this automatically)
-                #for k, axinfo in enumerate(self._axistags_):
-                    #self._calibration_[k].calibrateAxis(axinfo)
-                    
+                self._calibration_ = [AxisCalibrationData.new(axinfo) for axinfo in self._axistags_]
                 return
                     
             else:
@@ -1520,14 +1651,13 @@ class AxesCalibration(object):
                 self._axistags_ = vigra.AxisTags()
                 for k, arg in enumerate(args):
                     if isinstance(arg, vigra.AxisInfo):
-                        cal = AxisCalibrationData(arg)
-                        #cal.calibrateAxis(arg) # MUST calibrate AxisInfo manually
+                        cal = AxisCalibrationData.new(arg)
                         self._axistags_.append(arg)
                         self._calibration_.append(cal)
                                         
                     elif isinstance(arg, str):
                         try:
-                            cal = AxisCalibrationData(arg)
+                            cal = AxisCalibrationData.new(arg)
                         except:
                             cal = AxisCalibrationData() #  create default UnknownAxisType
                             
@@ -1535,7 +1665,6 @@ class AxesCalibration(object):
                         self._calibration_.append(cal)
                         
                     elif isinstance(arg, AxisCalibrationData):
-                        #self._axistags_.append(arg.axisInfo) 
                         self._calibration_.append(arg)
                         
                     else:
