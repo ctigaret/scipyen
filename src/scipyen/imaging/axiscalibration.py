@@ -85,7 +85,7 @@ from core.quantities import (arbitrary_unit,
                             unitsConvertible,
                             )
 
-from core.datatypes import (is_numeric, is_numeric_string,)
+from core.datatypes import (is_numeric, is_numeric_string, MissingType)
 from core.constants import ( RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE, EQUAL_NAN)
 
 from core.utilities import (reverse_mapping_lookup, unique, counter_suffix,
@@ -109,10 +109,7 @@ from .axisutils import (axisTypeName,
                         getAxisTypeFlagsInt
                         )
 
-MissingType: typing.TypeAlias = type(dataclasses.MISSING)
-
 class ChannelCalibrationData: pass
-
 
 class CalSpec(typing.NamedTuple):
     origin:typing.Optional[typing.Union[numbers.Number, pq.Quantity, MissingType]] = None
@@ -132,7 +129,9 @@ class FullCalSpec(typing.NamedTuple):
     name:typing.Optional[str] = None
     index:int = 0
     
-@dataclass(slots=True, eq=False)
+# NOTE: 2025-04-17 13:28:42 
+# Don't use slots=True because it messes up the Descriptor functionality
+@dataclass(eq=False)
 class CalibrationData:
     r'''Superclass for AxisCalibrationData and ChannelCalibrationData'''
     
@@ -242,9 +241,6 @@ class CalibrationData:
                 # hence we need the fc_template field
                 s = self.fc_template.format(value)
                 
-            # elif isinstance(value, typing.Sequence) and all(isinstance(v, ChannelCalibrationData) for v in value):
-            #     ss.extend(list(map(lambda c: c.calibrationString, value)))
-                
             else:
                 # includes any int, str, pd.NA, None, bool, bytes, bytearray
                 s =f"{value}"
@@ -279,7 +275,8 @@ class CalibrationData:
                 
         return ret
                 
-@dataclass(slots=True, eq=False)
+# Don't use slots=True because it messes up the Descriptor functionality
+@dataclass(eq=False)
 class ChannelCalibrationData(CalibrationData):
     r""" Calibration for a channel in a Channels axis 
         
@@ -448,14 +445,13 @@ class AxisCalibrationUnitsDescriptor:
     This enforces the rule that only NonChannel axes have this attribute with a
     pq.Quantity value, while setting it to dataclasses.MISSING for a Channels
     axis."""
-    def __init__(self, *, default:pq.Quantity = pq.arbitrary_unit):
+    def __init__(self, *, default:typing.Union[pq.Quantity, MissingType, str] = pq.arbitrary_unit):
+        if isinstance(default, str):
+            default = scq.str2quantity(default)
         if isinstance(default, pq.Quantity):
-            if not scq.isScalar(default):
-                raise ValueError(f"Expecting a scalar Quantity; instead, got a Quantity array with {default.size} elements")
-            default = scq.ensureScalar(default)
-            
-        else:
-            raise TypeError(f"Expecting a Quantity; instead, got a {type(default).__name__}")
+            default = default.units # see NOTE: 2025-04-17 13:49:04 below
+        elif not isinstance(default, MissingType):
+            raise TypeError(f"Expecting a Quantity, a string representation of a Quantity, or dataclasses.MISSING; instead, got a {type(default).__name__}")
         
         self._default_ = default
         
@@ -469,24 +465,32 @@ class AxisCalibrationUnitsDescriptor:
         if not obj_axtype & vigra.AxisType.AllAxes:
             return
         if obj_axtype & vigra.AxisType.Channels:
-            scipywarn(f"The {self._name_} fields for a Channels axis is meaningless — try one of its Channel calibrations")
+            # scipywarn(f"The {self._name_} fields for a Channels axis is meaningless — try one of its Channel calibrations")
             return dataclasses.MISSING
-        return getattr(obj, self._name_, self._default_)
+        
+        ret = getattr(obj, self._name_, self._default_)
+        return ret
     
-    def __set__(self, obj, value:pq.Quantity):
+    def __set__(self, obj, value:typing.Union[pq.Quantity, str]):
+        # print(f"{self.__class__.__name__}.__set__: value = {value}")
         obj_axtype = getattr(obj, "type", None)
         if not obj_axtype & vigra.AxisType.AllAxes:
             scipywarn(f"The owner (a {type(obj).__name__}) has an invalid type attribute: {obj_axtype}")
             return
-        if obj_axtype & vigra.AxisType.Channels:
+        
+        elif obj_axtype & vigra.AxisType.Channels:
             setattr(obj, self._name_, dataclasses.MISSING)
         else:
+            if isinstance(value, str):
+                value = scq.str2quantity(value)
+                
             if isinstance(value, pq.Quantity):
-                if not scq.isScalar(value):
-                    raise ValueError(f"Expecting a scalar quantity; instead, got a Quantity array with {value.size} elements")
-                value = scq.ensureScalar(value)
+                # NOTE: 2025-04-17 13:49:04
+                # either Quantity.units or UnitQuantity.units returns a 
+                # UnitQuantity so no need to check if it is scalar 
+                value = value.units 
             else:
-                raise TypeError(f"Expecting a Quantity; instead, got a {type(value).__name__}")
+                raise TypeError(f"Expecting a Quantity, or a string representation of a Quantity; instead, got a {type(value).__name__}")
             setattr(obj, self._name_, value)
         
 class AxisCalibrationScalarDescriptor:
@@ -495,22 +499,20 @@ class AxisCalibrationScalarDescriptor:
     This enforces the rule that these attributes get numeric values only for 
     NonChannel axes, but are set to dataclasses.MISSING for Channels axes.
     """
-    def __init__(self, *, default:typing.Union[numbers.Number, pq.Quantity, MissingType]=0.0):
+    def __init__(self, *, default:typing.Union[numbers.Number, pq.Quantity, MissingType, str]=0.0):
+        if isinstance(default, str):
+            default = scq.str2quantity(default)
+            
         if isinstance(default, pq.Quantity):
             if not scq.isScalar(default):
                 raise ValueError(f"Expecting a scalar Quantity; instead, got a Quantity array with {default.size} elements")
             default = scq.ensureScalar(default).magnitude
             # NOTE: 2025-04-15 23:02:24
             # strip away the units
-            # ATTENTION: In contrast, in the __set__ we must ensure that if a
-            # quantity is passed it is scaled ot the current units
-            if "complex" in default.dtype.name:
-                default = complex(default)
-            else:
-                default = float(default)
+            default = scq.quantity2scalar(default)
             
-        elif not isinstance(default, (numbers.Number, MissingType)):
-            raise TypeError(f"Expecting a numbers.Number, or a scalar Quantity; instead, got {type(default).__name__}")
+        elif not isinstance(default, (numbers.Number, MissingType, str)):
+            raise TypeError(f"Expecting a numbers.Number, a scalar Quantity, or a string representation of a scalar quantity; instead, got {type(default).__name__}")
         
         self._default_ = default
         
@@ -525,12 +527,13 @@ class AxisCalibrationScalarDescriptor:
         if not obj_axtype & vigra.AxisType.AllAxes:
             return
         if obj_axtype & vigra.AxisType.Channels:
-            scipywarn(f"The {self._name_} fields for a Channels axis is meaningless — try one of its Channel calibrations")
+            # scipywarn(f"The {self._name_} fields for a Channels axis is meaningless — try one of its Channel calibrations")
             return datatypes.MISSING
         return getattr(obj, self._name_, self._default_)
     
-    def __set__(self, obj, value:typing.Optional[typing.Union[numbers.Number, pq.Quantity, MissingType]]=None):
+    def __set__(self, obj, value:typing.Union[numbers.Number, pq.Quantity, MissingType, str]):
         r"""Setter. The owner object must have a valid 'type' attribute"""
+        # print(f"{self.__class__.__name__}.__set__ value = {value}")
         obj_axtype = getattr(obj, "type", None)
         if not obj_axtype & vigra.AxisType.AllAxes:
             scipywarn(f"The owner (a {type(obj).__name__}) has an invalid type attribute: {obj_axtype}")
@@ -538,6 +541,8 @@ class AxisCalibrationScalarDescriptor:
         # NOTE: 2025-04-15 23:03:56
         # set this to MISSING in case obj is an AxisCalibrationData for a Channels axis
         if obj_axtype & vigra.AxisType.NonChannel:
+            if isinstance(value, str):
+                value = scq.str2quantity(value)
             if isinstance(value, pq.Quantity):
                 value  = scq.ensureScalar(value)
                 units = getattr(obj, "units", None)
@@ -548,22 +553,13 @@ class AxisCalibrationScalarDescriptor:
                     if value.units != units:
                         if scq.unitsConvertible(value, units):
                             value = value.rescale(units)
-                        elif scq.unitsConvertible(value, 1/units): # for 'resolution'
-                            value = value.rescale(1/units)
                         else:
                             raise TypeError(f"Value has {value.units} that are incompatible with the units of this object ({units})")
                         
-                value = value.magnitude
+                value = scq.quantity2scalar(value)
                 
-                if "complex" in value.dtype.name:
-                    value = complex(value)
-                else:
-                    # should work for float dtype and object dtypes that can be 
-                    # cast to float (e.g. arrays of fractions.Fraction)
-                    value = float(value) # will raise Error if conversion fails
-                    
-            elif not isinstance(value, (numbers.Number, MissingType, type(None))):
-                raise TypeError(f"Expecting a scalar Quantity or a numbers.Number; instead, got {type(value).__name__}")
+            elif not isinstance(value, (numbers.Number, MissingType, str)):
+                raise TypeError(f"Expecting a scalar Quantity, a numbers.Number or a string representation of a scalar Quantity; instead, got {type(value).__name__}")
             
             setattr(obj, self._name_, value)
         else:
@@ -571,7 +567,6 @@ class AxisCalibrationScalarDescriptor:
             setattr(obj, self._name_, dataclasses.MISSING)
         
 class AxisCalibrationChannelsDescriptor:
-    # def __init__(self, *, default:typing.Union[typing.Sequence, MissingType]=dataclasses.MISSING):
     def __init__(self, *, default:typing.Sequence=list()):
         self._default_ = list()
         # self._default_ = dataclasses.MISSING
@@ -642,7 +637,8 @@ class AxisCalibrationChannelsDescriptor:
         else:
             raise TypeError(f"Expecting a sequence; instead got {type()}")
 
-@dataclass(slots=True, eq=False)
+# Don't use slots=True because it messes up the Descriptor functionality
+@dataclass(eq=False)
 class AxisCalibrationData(CalibrationData):
     r"""Calibration data for an array axis.
         
@@ -677,11 +673,16 @@ class AxisCalibrationData(CalibrationData):
                 'index': int — the index of the axis in the array's dimensions
         
         • Fields specific for a NonChannel axis (see vigra.AxisType for details):
-            'units' : scalar pq.Quantity — the physical units associated with 
+            'units':    scalar pq.Quantity — the physical units associated with 
                 calibrated axis. 
-            'origin' : float or complex — the axis minimum coordinate, in axis units
+            'origin': float or complex — the axis minimum coordinate, in axis units
             'maximum': float or complex — the axis maximum coordinate, in axis units
-            'reslution': float or complex — the axis maximum coordinate in axis units⁻¹
+            'reslution': float or complex — the sampling resolution along the 
+                dimension of this axis. In other words, the physical units 
+                corresponding to one element along the axis coordinates — e.g., 
+                number of microns per pixel. Do not confuse with samplin "rate"
+                wich is the inverse of resolution (i.e., number or axis elements
+                for one physical unit).
         
             'channels' -> always an empty list for a NonChannel axis
         
@@ -700,31 +701,51 @@ class AxisCalibrationData(CalibrationData):
         WARNING about the 'units' field and related and scalar fields 
         'origin', 'maximum' and 'resolution':
         
-        The units associated with an AxisCalibrationData or ChannelCalibrationData
-        can be changed by assigning this field any python Quantity, but the scalar
+        When the units associated with an AxisCalibrationData or ChannelCalibrationData
+        are changed by assigning any python Quantity to this field, the scalar
         values for 'origin', 'maximum' and 'resolution' will NOT be recalculated 
         or rescaled. Therefore, 'origin', 'maximum' and 'resolution' values 
         should be recalculated as necessary and set to corerect values manually.
         
-        A Quantity can also be assigned directly to the 'origin', 'maximum' and 
-        'resolution', however:
+        A Quantity can also be assigned directly to the 'origin', 'maximum' or 
+        'resolution' field, however:
+        • Make sure you assign a Quantity scalar (i.e. magnitude * dimensionality,
+          where magnitude is a scalar), not a higher dimension Quantity array 
+          (unless it has just one element) and not a UnitQuantity, which by 
+          definition has a magnitude of 1. See python Quantities package
+          documentation for details about Quantity and UnitQuantity.
+          
         • The field will only store its "magnitude" (i.e. numerical value without
-        dimensionality) in the respective field
-        • If the units of the new value are different from the units of the 
-        calibration, but convertible to these, then the numerical value assigned
-        to the field will first be rescaled to the units of the calibration. If
-        the units of the new value are not convertible to the units of the 
-        calibration, an Exception will be raised.
+          dimensionality)
+        
+        • If the units of the new value are different from, but convertible to,
+          the units of the calibration object, the numerical value assigned to
+          the field will be rescaled to the units of the calibration object. 
+        
+        • If the units of the new value are not convertible to the units of the 
+          calibration object, an Exception will be raised.
         
         Therefore the recommended way to change a calibration is:
-        1) Assign new units
-        2) If the new units are convertible to the original units,
-            rescale each value of the scalar field to the new units, assign back
-            the resulting magnitude to the respective field .
-            ATTENTION: 'resolution' should correspond to the inverse of the 
-            calibration units!
-            Othwerise, makwe sure that the scalar field values make sense given
-            the new units.
+        
+        1) If the new units are convertible to the current units, assign rescaled
+            values to the fields before changing the calibration's units field.
+        
+            The AxisCalibrationData.rescale method does exactly this, so use it
+            instead.
+        
+            WARNING: Rescaling may incur a loss of precision and floating point
+            rounding errors.
+            
+        2) If the new units are completely different (say you want to change
+            a channel's calibration from picoampere — pq.pA — to millivolt —
+            pq.mV — because the acquisition assigned the wrong units to the channel
+            calibration data; or you want to change the units of a non-channel axis 
+            from micrometer — pq.um — to millisecond — pq.ms — because the acquisition
+            incorectly interpreted the axis as a Space not a Time axis) then just
+            assign a new Quantity (or UnitQuantity) to the calibration's 'units' 
+            field. The scalar values of the fields 'origin', 'maximum' and 'resolution'
+            will be left unchanged. Therefore, make sure that the scalar field 
+            values make sense given the new units.
         
     """
     
@@ -750,9 +771,13 @@ class AxisCalibrationData(CalibrationData):
     '''
     
     units:AxisCalibrationUnitsDescriptor = AxisCalibrationUnitsDescriptor(default=pq.arbitrary_unit)
-    # _units_:dataclasses.InitVar[pq.Quantity] = field(default=pq.arbitrary_unit)
     r'''The physical units
-    Currently, this must be set to MISSING for a Channels-type axis.
+    Currently, this is set (and fixed) to MISSING for a Channels-type axis.
+    
+    New units can be set by assigning a Quantity, UnitQuantity, or a string symbol
+    of the units (any invalid string will raise exception) e.g., "um" for micrometer
+    "pA" for picoampere, etc.
+    
     ''' 
     
     origin:AxisCalibrationScalarDescriptor = AxisCalibrationScalarDescriptor(default = 0.0)
@@ -767,18 +792,16 @@ class AxisCalibrationData(CalibrationData):
     
     resolution:AxisCalibrationScalarDescriptor = AxisCalibrationScalarDescriptor(default=1.0)
     # _resolution_:dataclasses.InitVar[numbers.Number] = 1.0
-    r'''The sampling resolution (in 1/axis units).
+    r'''The sampling resolution (in axis units).
     WARNING: Unlike the "resolution" field of a vigra.AxisInfo, where a value
     of 0 signals no defined resolution, here "resolution" represents the number
-    number of axis elements corresponding to a unit of axis physical coordinates,
-    e.g., number of pixels in a micrometer, etc.
+    of axis physical coordinates covered by one element along the axis — for
+    example, micrometers corresponding to one pixel.
 
     When the resolution is undetermined, the value of this field should be NaN here.
     
-    By default, this is set to 1.0 i.e., one axis element per axis physical unit
-    (e.g., one pixel per micrometer).
-    
-    You almost surely want to change this.
+    By default, this is set to 1.0 i.e., one axis physical units per axis element
+    (e.g., one micrometer per pixel).
     
     WARNING: This is set to MISSING for a Channels-type axis, regardless of what
     is passed to the constructor.
@@ -862,9 +885,9 @@ class AxisCalibrationData(CalibrationData):
         channels: typing.Optional[typing.Sequence[CalSpec | ChannelCalibrationData]] = None):
         r"""Factory for constructing an AxisCalibrationData using vigra.AxisInfo"""
         # NOTE: 2025-04-13 13:42:52
-        # in vigra.AxisInfo, a 'resolution' field 0.0 means axis resolution (in
-        # the sense of sampling resolution, which should be in (axis units)⁻¹ ) 
-        # is not defined !
+        # in vigra.AxisInfo, a 'resolution' field 0.0 means axis resolution, in
+        # the sense of sampling resolution, which should be in axis units, is not
+        # defined
         axtype = arg.typeFlags
         axkey = arg.key
         axres = 1. if arg.resolution == 0 else arg.resolution
@@ -1141,6 +1164,30 @@ class AxisCalibrationData(CalibrationData):
         
         return "".join(strlist)
     
+    @property
+    def calibratedOrigin(self) -> pq.Quantity | None:
+        r"""Axis origin, in physical units, for a NonChannel axis.
+            This property is None for a Channels axis.
+        """
+        if not self.isChannels:
+            return self.origin * self.units
+    
+    @property
+    def calibratedResolution(self) -> pq.Quantity | None:
+        r"""Axis resolution, in physical units, for a NonChannel axis.
+            This property is None for a Channels axis.
+        """
+        if not self.isChannels:
+            return self.resolution * self.units
+        
+    @property
+    def calibratedMaximum(self) -> pq.Quantity:
+        r"""Axis maximum, in physical units, for a NonChannel axis.
+            For a Channels axis this is None.
+        """
+        if not self.isChannels:
+            return self.maximum * self.units
+    
     @staticmethod
     def findCalibrationString(s:str) -> typing.Optional[tuple]:
         start = s.find("<axis_calibration>")
@@ -1152,7 +1199,32 @@ class AxisCalibrationData(CalibrationData):
                 stop = start + len("<axis_calibration>")
             return (start, stop)
         
-    def calibrateAxis(self, axinfo:vigra.AxisInfo):
+    def rescale(self, u:typing.Union[pq.Quantity, pq.dimensionality.Dimensionality, str]) -> None:
+        r"""Rescales the units and the scalar fields to new units.
+        The new units must be convertible to the current ones. 
+        For the general case of re-assigning completely different units, 
+        the fields must be recalculated manually after the units field is re-asigned.
+        
+        """
+        if isinstance(u, str):
+            u = scq.str2quantity(u)
+        if not scq.unitsConvertible(u, self.units):
+            raise ValueError(f"New units ({u}) are incompatible with current units ({self.units}) and therefore, the calibration cannot be rescaled.")
+            
+        # NOTE: 2025-04-17 10:44:36
+        # the next two calls will throw exceptions if self.units are not convertible
+        # to the new units
+        new_o = self.calibratedOrigin.rescale(u)
+        self.origin = scq.quantity2scalar(new_o)
+        new_m = self.calibratedMaximum.rescale(u)
+        self.maximum = scq.quantity2scalar(new_m)
+        if not self.isChannels:
+            new_r = self.calibratedResolution.rescale(u)
+            self.resolution = scq.quantity2scalar(new_r)
+            
+        self.units = u
+        
+    def calibrateAxis(self, axinfo:vigra.AxisInfo) -> vigra.AxisInfo:
         assert self.type == axinfo.typeFlags, f"Cannot apply a {self.type} axis calibration to a {axinfo.typeFlags} axis"
         
         description = axinfo.description.strip()
@@ -1166,11 +1238,83 @@ class AxisCalibrationData(CalibrationData):
             newDescr = " ".join([description, calStr])
             
         axinfo.description = newDescr
-        
         return axinfo
     
+    @staticmethod
+    def removeAxisCalibration(axinfo:vigra.AxisInfo) -> vigra.AxisInfo:
+        description = axinfo.description.strip()
+        start_stop = AxisCalibrationData.findCalibrationString(description)
+        if start_stop is not None:
+            newDescr = " ".join([description[:start_stop[0]],
+                        description[start_stop[1]:]])
+            axinfo.description = newDescr
+            
+        return axinfo
     
+    def calibratedCoordinate(self, value) -> pq.Quantity | None:
+        r"""Converts a axis coordinate to its value in physical units.
+            This is equvalent to the calibrated distance from the axis origin, 
+            along the axis dimension, for a NonChannels axis.
+            For Channels axis returns None
+        """
+        if self.isChannels:
+            return
+        if not isinstance(value, numbers.Number):
+            raise TypeError("expecting a scalar; got %s instead" % type(value).__name__)
+        return (value * self.resolution + self.origin) * self.units
+        
+    def calibratedMeasure(self, value:numbers.Number) -> pq.Quantity | None:
+        r"""Converts a value in number of samples along the axis, physical units.
+            Applies to a NonChannels axis. 
+            For Channels axis returns None
+        """
+        if self.isChannels:
+            return
+        if not isinstance(value, numbers.Number):
+            raise TypeError(f"Expecting a numbers.Number; got {type(value).__name__} instead")
+        return value * self.resolution * self.units
     
+    def coordinateInSamples(self, value:pq.Quantity) -> int | None:
+        r"""Converts a calibrated distance from axis origin to number of samples.
+            This performs the inverse of self.calibratedCoordinate.
+            Returns an int with rounding up (math.ceil function).
+            Applies to a NonChannels axis. 
+            For Channels axis returns None
+        """
+        if self.isChannels:
+            return
+        if not isinstance(value, pq.Quantity):
+            raise TypeError(f"Expecting a Quantity; got {type(value).__name__} instead")
+        
+        if scq.isScalar(value):
+            value = scq.ensureScalar(value)
+        else:
+            raise TypeError(f"Expecting a scalar Quantity; instead, got a {value.size}-sized Quantity")
+        
+        if value.units != self.units:
+            if not scq.unitsConvertible(value.units, self.units):
+                raise TypeError(f"Cannot convert between {value.units} and {self.units}")
+            value = value.rescale(self.units)
+        
+#         value_dim = pq.quantity.validate_dimensionality(value.units)
+#         my_dim = pq.quantity.validate_dimensionality(self.units)
+#         
+#         if value_dim != my_dim:
+#             cf = pq.quantity.get_conversion_factor(my_dim, value_dim)
+#             value *= cf
+            
+        return math.ceil((value - self.calibratedOrigin) / self.resolution)
+    
+    def measureInSamples(self, value: pq.Quantity) -> int | None:
+        r"""Converts a distance along the axis (in physical units) to samples.
+            Performs the inverse of calibratedMeasure.
+            Applies to a NonChannels axis. 
+            For Channels axis returns None
+        """
+        if self.isChannels:
+            return
+        return math.ceil(value/ self.resolution)
+
     @singledispatchmethod
     def channelCalibration(self, o):
         r"""Returns the ChannelCalibrationData for a specific channel.
