@@ -215,6 +215,19 @@ class CalibrationData:
         # print(f"param: {param}, txt: {txt}, value: {value}")
         return value
     
+    def _repr_pretty_(self, p, cycle):
+        if cycle:
+            p.text(f"{self.__class__.__name__}")
+        else:
+            with p.group(4, f"{self.__class__.__name__}:\n"):
+                for k, f in enumerate(dataclasses.fields(self)):
+                    if k == 0:
+                        p.text(f"    {f.name}: ")
+                    else:
+                        p.text(f"{f.name}: ")
+                    p.pretty(getattr(self, f.name, None))
+                    p.breakable()
+        
     def _to_xml_(self, param):
         # print(f"{self.__class__.__name__}_to_xml_(param = {param})")
         value = getattr(self, param, None)
@@ -661,6 +674,21 @@ class ChannelCalibrationData(CalibrationData):
         
         return "".join(strlist)
     
+    def _repr_pretty_(self, p, cycle):
+        if cycle:
+            p.text(f"{self.__class__.__name__}")
+        else:
+            g = 2
+            with p.group(g, f"{self.__class__.__name__}:\n"):
+                for k, f in enumerate(dataclasses.fields(self)):
+                    # p.text(f"{f.name}: ")
+                    if k == 0:
+                        p.text(f"{' '*p.indentation}{f.name}: ")
+                    else:
+                        p.text(f"{f.name}: ")
+                    p.pretty(getattr(self, f.name, None))
+                    p.break_()
+
     def rescale(self, u:typing.Union[pq.Quantity, pq.dimensionality.Dimensionality, str]) -> None:
         if isinstance(u, str):
             u = scq.str2quantity(u)
@@ -677,8 +705,14 @@ class ChannelCalibrationData(CalibrationData):
         self.units = u
         
     def calibratedValue(self, value) -> pq.Quantity:
-        r"""Aimply applied the physical units to the array value"""
+        r"""Simply applies the physical units to the array value"""
         return value * self.units
+    
+    def calibratedMeasure(self, value) -> pq.Quantity:
+        r"""Calls self.calibratedValue(value).
+        For backward compatibility.
+        """
+        return self.calibratedValue(value)
     
     @property
     def calibratedOrigin(self) -> pq.Quantity:
@@ -966,9 +1000,10 @@ class AxisCalibrationData(CalibrationData):
         a dict or a calibration string (xml-formatted) please use the "new" factory
         class methods.
         """
-        typeFlagKey = axisTypeSymbol(self.type)
-        if typeFlagKey != self.key:
-            self.key = typeFlagKey
+        # typeFlagKey = axisTypeSymbol(self.type)
+        # print(f"{self.__class__.__name__}.__post_init__: typeFlagKey = {typeFlagKey}")
+        # if typeFlagKey != self.key:
+        #     self.key = typeFlagKey
             
         # print(f"{self.__class__.__name__}.__post_init__: is Channels =  {self.isChannels}")
         if self.isChannels:
@@ -1031,18 +1066,20 @@ class AxisCalibrationData(CalibrationData):
         axkey = arg.key
         axres = 1. if arg.resolution == 0 else arg.resolution
         
+        # print(f"{cls.__name__}.new: axkey = {axkey}")
+        
         ischannels = axtype & vigra.AxisType.Channels
         
         cal_str_start_stop = cls.findCalibrationString(arg.description)
         
         if cal_str_start_stop is None:
             if ischannels:
-                ret = cls(type=axtype, key = axkey, name = axisTypeName(axtype), 
+                ret = cls(type = axtype, key = axkey, name = axisTypeName(axtype), 
                         units = dataclasses.MISSING, origin = dataclasses.MISSING,
                         maximum = dataclasses.MISSING, resolution = dataclasses.MISSING,
                         channels = list())
             else:
-                ret = cls(type=axtype, key = axkey, name = axisTypeName(axtype), 
+                ret = cls(type = axtype, key = axkey, name = axisTypeName(axtype), 
                         resolution = axres, channels=list())
                 
             
@@ -1341,6 +1378,33 @@ class AxisCalibrationData(CalibrationData):
             else:
                 stop = start + len("<axis_calibration>")
             return (start, stop)
+
+    def _repr_pretty_(self, p, cycle):
+        if cycle:
+            p.text(f"{self.__class__.__name__}")
+        else:
+            g = p.indentation+2
+            with p.group(g, f"{self.__class__.__name__}:\n"):
+                for k, f in enumerate(dataclasses.fields(self)):
+                    if f.name == "channels" and len(getattr(self, f.name, list())):
+                        with p.group(g, f"{f.name}:\n", ""):
+                            for kc, c in enumerate(getattr(self, f.name, list())):
+                                if kc == 0:
+                                    p.text(f"{' '*(g+2)}{kc}: ")
+                                else:
+                                    p.text(f"{kc}: ")
+                                p.pretty(c)
+                                p.break_()
+                    else:
+                        # print(f"p.indentation = {p.indentation}")
+                        # p.text(f"{f.name}: ")
+                        if k == 0:
+                            p.text(f"{' '*(g+2)}{f.name}: ")
+                        else:
+                            p.text(f"{f.name}: ")
+                            
+                        p.pretty(getattr(self, f.name, None))
+                    p.break_()
         
     def rescale(self, u:typing.Union[pq.Quantity, pq.dimensionality.Dimensionality, str]) -> None:
         r"""Rescales the units and the scalar fields to new units.
@@ -1505,6 +1569,9 @@ class AxisCalibrationData(CalibrationData):
                 return chCal[0]
         else:
             scipywarn("Not a Channels axis")
+            
+    def getChannelCalibration(self, o:int | str =0):
+        return self.channelCalibration(o) # alias for backward compatibility
             
 class AxesCalibration(object):
     r"""Encapsulates calibration of a set of axes.
@@ -1959,14 +2026,22 @@ class AxesCalibration(object):
     
     def __str__(self):
         repr_str = self.__repr__().split()
-        return "\n".join([f"{self.__repr__()} with {len(self._calibration_)} axes:"] + [cal.__str__() for cal in self._calibration_])
+        return "\n".join([f"{self.__repr__()} with {len(self._calibration_)} axes:"] + [f"{k}.\t" + cal.__str__()+"\n" for k, cal in enumerate(self._calibration_)])
     
     def _repr_pretty_(self, p, cycle):
-        p.text(f"{self.__class__.__name__} with {len(self._calibration_)} axes:")
-        p.breakable()
-        for cal in self._calibration_:
-            p.pretty(cal)
-        
+        if cycle:
+            p.text(f"{self.__class__.__name__} with {len(self._calibration_)} axes")
+        else:
+            g = 2
+            with p.group(g, f"{self.__class__.__name__} with {len(self._calibration_)} axes:\n"):
+                for k, cal in enumerate(self._calibration_):
+                    if k == 0:
+                        p.text(f"{' '*2}{k}: ")
+                    else:
+                        p.text(f"{k}: ")
+                    p.pretty(cal)
+                    p.break_()
+    
     def hasAxis(self, key):
         r"""Queries if the axis key is calibrated by this object
         """

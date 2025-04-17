@@ -1205,13 +1205,14 @@ def group2VigraArray(g:h5py.Group, cache:dict = {}):
                 
                 for k, (axdsetname, axdset) in enumerate(axes_group.items()):
                     axattrs = attrs2dict(axdset.attrs)
-                    axcaldata = AxisCalibrationData(key = axattrs["cal_key"],
-                                                    name = axattrs["cal_name"],
-                                                    units = axattrs["cal_units"],
-                                                    origin = axattrs["cal_origin"],
-                                                    resolution = axattrs["cal_resolution"],
-                                                    type = vigra.AxisType(axattrs["cal_type"])
-                                                    )
+                    axcaldata = AxisCalibrationData.new(axattrs["calibration"])
+                    # axcaldata = AxisCalibrationData(key = axattrs["cal_key"],
+                    #                                 name = axattrs["cal_name"],
+                    #                                 units = axattrs["cal_units"],
+                    #                                 origin = axattrs["cal_origin"],
+                    #                                 resolution = axattrs["cal_resolution"],
+                    #                                 type = vigra.AxisType(axattrs["cal_type"])
+                    #                                 )
                     axescalibrationdata.append(axcaldata)
                     
                     
@@ -1733,16 +1734,22 @@ def _(obj, axisindex:typing.Union[int, str]):
     
     axisinfo = obj.axistags[axisindex]
     
-    axiscal = AxisCalibrationData(axisinfo)
+    axiscal = AxisCalibrationData.new(axisinfo)
     
-    data = dict((f"cal_{k}", v) for k,v in axiscal.data.items()) # axiscal.data
+    # data = dict((f"cal_{k}", v) for k,v in axiscal.asdict().items()) # axiscal.data
+    # data = dict((f"cal_{k}", v) for k,v in axiscal.data.items()) # axiscal.data
     
     axdict = {"key": axisinfo.key,
               "typeFlags": axisinfo.typeFlags,
               "description": axisinfo.description,
-              "resolution": axisinfo.resolution}
+              "resolution": axisinfo.resolution,
+              "calibration": axiscal.calibrationString}
+    # axdict = {"key": axisinfo.key,
+    #           "typeFlags": axisinfo.typeFlags,
+    #           "description": axisinfo.description,
+    #           "resolution": axisinfo.resolution}
     
-    axdict.update(data)
+    # axdict.update(data)
     
     return makeAttrDict(**axdict)
     
@@ -1771,15 +1778,21 @@ def _(obj, axisindex:typing.Union[int, str]):
     
     axisinfo = obj[axisindex]
     
-    axiscal = AxisCalibrationData(axisinfo)
+    axiscal = AxisCalibrationData.new(axisinfo)
     
-    data = dict((f"cal_{k}", v) for k,v in axiscal.data.items()) # axiscal.data
+    # data = dict((f"cal_{k}", v) for k,v in axiscal.asdict().items()) # axiscal.data
+    # data = dict((f"cal_{k}", v) for k,v in axiscal.data.items()) # axiscal.data
     
     return makeAttrDict(key            = axisinfo.key,
                         typeFlags      = axisinfo.typeFlags,
                         description    = axisinfo.description, 
                         resolution     = axisinfo.resolution,
-                        **data)
+                        calibration    = axiscal.calibrationString)
+    # return makeAttrDict(key            = axisinfo.key,
+    #                     typeFlags      = axisinfo.typeFlags,
+    #                     description    = axisinfo.description, 
+    #                     resolution     = axisinfo.resolution,
+    #                     **data)
 
 @makeAxisDict.register(neo.core.dataobject.DataObject)
 def _(obj:neo.core.dataobject.DataObject, axisindex:int):
