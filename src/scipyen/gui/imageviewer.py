@@ -621,8 +621,7 @@ class AxesCalibrationDialog2(QDialog, Ui_AxesCalibrationDialog2):
                 continue # skip channel intensity calibration, for now
             self.axesMetaData[axisInfo.key]=dict()
             self.axesMetaData[axisInfo.key]["calibration"] = self.calibration[axisInfo.key]
-            dString = axisInfo.description
-            self.axesMetaData[axisInfo.key]["description"] = AxisCalibrationData.removeCalibrationString(dString)
+            self.axesMetaData[axisInfo.key]["description"] = AxisCalibrationData.getOriginalDescription(axisInfo)
             if isinstance(self.arrayshape, tuple):
                 self.axesMetaData[axisInfo.key]["length"] = self.arrayshape[self.axistags.index(axisInfo.key)]
             else:
@@ -2895,6 +2894,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             #
             
             img, _ = self._frameView_(self._displayedChannel_)
+            print(f"{self.__class__.__name__}._displayValueAtCoordinates: img axistags: {img.axistags}")
             
             viewWidthAxisIndex = img.axistags.index(wAxInfo.key)
             viewHeightAxisIndex = img.axistags.index(hAxInfo.key)
@@ -2956,7 +2956,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                     widthAxisKey = img.axistags[viewWidthAxisIndex].key 
                     heightAxisKey = img.axistags[viewHeightAxisIndex].key
                     
-                    if img.ndim > 2: # this is possible only when there is a channel axis!
+                    if img.ndim > 2: # ATTENTION: img is a slice view of the data !!!
+                        # WARNING: there may not be a real channel axis, here
                         if img.channels > 1:
                             val = [float(img.bindAxis("c", k)[x,y,...]) for k in range(img.channels)]
                             
@@ -2969,17 +2970,10 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                                 sval = "(%s)" % "; ".join(["%.2f" % v for v in val])
                         
                         else: 
-                            # NOTE: 2022-10-06 17:15:22
-                            # single channel => channelCalibration only has ONE channel
-                            # but WARNING: if calling with index argument, one MUST specify
-                            # the value of the channel's property, which is not always
-                            # what you expect.
-                            #
-                            # If in doubt, then just call without specifying the index
+                            # print(f"{self.__class__.__name__}._displayValueAtCoordinates: img axistags: {img.axistags}")
                             val = float(img[x,y])
                             if self._axes_calibration_:
                                 cval = self._axes_calibration_["c"].getChannelCalibration().calibratedMeasure(val)
-                                # cval = self._axes_calibration_["c"].getChannelCalibration()[1].calibratedMeasure(val)
                                 sval = "(%s)" % quantity2str(cval)
                             else:
                                 sval = "(%.2f)" % val
@@ -2993,8 +2987,12 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                                 zAxisKey = frameAxis.key
                                 
                                 if self._axes_calibration_:
-                                    cz = self._axes_calibration_[frameAxis.key].calibratedMeasure(self._current_frame_index_)
-                                    scz = quantity2str(cz)
+                                    frameAxisCal = self._axes_calibration_[frameAxis.key]
+                                    if frameAxisCal.isChannels:
+                                        scz = frameAxisCal.channels[self._current_frame_index_].name
+                                    else:
+                                        cz = self._axes_calibration_[frameAxis.key].calibratedMeasure(self._current_frame_index_)
+                                        scz = quantity2str(cz)
                                 else:
                                     scz = ""
                                 
@@ -3006,16 +3004,10 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                                     sval)
                             
                             else: # self.frameAxis is a tuple
-                                #frameAxis = tuple(self._data_.axistags.index(ax) for ax in self.frameAxis)
                                 if self._axes_calibration_:
                                     sz_cz = ", ".join([f"{ndx[0]}: {ndx[1]} ({quantity2str(self._axes_calibration_[self._data_.axistags[ndx[0]]].calibratedDistance(ndx[1]))})" for ndx in reversed(self.frameIndexBinding[self._current_frame_index_])])
                                 else:
                                     sz_cz = ", ".join([f"{ndx[0]}: {ndx[1]}" for ndx in reversed(self.frameIndexBinding[self._current_frame_index_])])
-                                
-                                #if self._axes_calibration_:
-                                    #sz_cz = ", ".join([f"{ndx[0].key}: {ndx[1]} ({quantity2str(self._axes_calibration_[ndx[0].key].calibratedDistance(ndx[1]))})" for ndx in reversed(self.frameIndexBinding[self._current_frame_index_])])
-                                #else:
-                                    #sz_cz = ", ".join([f"{ndx[0].key}: {ndx[1]}" for ndx in reversed(self.frameIndexBinding[self._current_frame_index_])])
                                 
                                 coordTxt = "%s<X: %d (%s: %s)%s, Y: %d (%s: %s)%s, Z: %d (%s)> %s" % \
                                     (crstxt, \
@@ -3065,7 +3057,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                     coordTxt = "%s<X: %d (%s: %s)%s> %.2f" % \
                         (crstxt, x, widthAxisKey, scx, swx, val)
                     
-            else:
+            else: # one of the coordinate is missing
                 c_list = list()
                 
                 if y is None:

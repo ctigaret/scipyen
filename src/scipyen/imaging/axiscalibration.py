@@ -177,6 +177,16 @@ class CalibrationData:
         return dataclasses.asdict(self)
     
     @property
+    def owner(self) -> AxisCalibrationData | None:
+        r"""Alias to self.parent"""
+        return self.parent
+    
+    @owner.setter
+    def owner(self, obj:typing.Optional[AxisCalibrationData]):
+        self.parent = obj
+    
+    
+    @property
     def calibrationString(self) -> str:
         fnames = tuple(filter(lambda x: x is not None, map(lambda f: self._to_xml_(f.name), dataclasses.fields(self))))
         return "".join(fnames)
@@ -225,6 +235,11 @@ class CalibrationData:
                         p.text(f"    {f.name}: ")
                     else:
                         p.text(f"{f.name}: ")
+                        
+                    # value = getattr(self, f.name, None)
+                    # if f.name == "parent" and isinstance(value, AxisCalibrationData):
+                    #     value = value.key if (isinstance(value.key, str) and len(value.key.strip())) else value.name if (isinstance(value.name, str) and len(value.name.strip())) else axisTypeStrings(value.type)
+                    # p.pretty(value)
                     p.pretty(getattr(self, f.name, None))
                     p.breakable()
         
@@ -511,6 +526,10 @@ class CalibrationChannelsDescriptor:
                 obj_size = getattr(obj, "size", 0)
                 chcals = list(filter(lambda x: isinstance(x, ChannelCalibrationData), map(lambda x: ChannelCalibrationData(**x._asdict()) if isinstance(x, CalSpec) else ChannelCalibrationData(**x) if isinstance(x, dict) else x if isinstance(x, ChannelCalibrationData) else None, value)))
                 if len(chcals):
+                    # NOTE: 2025-04-18 11:51:28
+                    # ensure the channel calibrations get this object as parent
+                    for chcal in chcals:
+                        chcal.parent = obj
                     if obj_size == 0 and len(chcals) > 1:
                         scipywarn(f"Mismatch between owner axis size (0), and {len(chcals)} ChannelCalibrationData objects being assigned; owner size will be adjusted")
                         setattr(obj, "size", len(chcals))
@@ -521,7 +540,7 @@ class CalibrationChannelsDescriptor:
                 else:
                     if len(chcals) == 0:
                         if obj_size == 0:
-                            chcals = [ChannelCalibrationData(name="channel_0")] # ensure a single ChannelCalibrationData
+                            chcals = [ChannelCalibrationData(name="channel_0", index=0, parent=obj)] # ensure a single ChannelCalibrationData
                         else:
                             # BUG: 2025-04-15 23:34:01 FIXME/TODO
                             # not sure this is a bug or feature ?!? surely poor design...
@@ -572,6 +591,9 @@ class ChannelCalibrationData(CalibrationData):
     
         'units':pq.Quantity = pq.arbitrary_unit (scalar), the physical units 
             associated with the values in this channel. See NOTE 3 below.
+        
+        'parent': AxisCalibrationData or None; the "owner" of this ChannelCalibrationData
+            object.
         
         NOTE 1: There is no 'resolution' field in this class.
         
@@ -646,8 +668,6 @@ class ChannelCalibrationData(CalibrationData):
             the resulting magnitude to the respective field .
             Othwerise, ATTENTION:  make sure that the scalar field values make 
             sense given the new units.
-         
-
     """
         
     index:int = 0 
@@ -661,12 +681,26 @@ class ChannelCalibrationData(CalibrationData):
     
     units:CalibrationUnitsDescriptor = CalibrationUnitsDescriptor(default=pq.arbitrary_unit)
     
+    parent:typing.Optional[AxisCalibrationData] = None
+    
+    def __post_init__(self):
+        r"""Performs a limitaed curation of the fields.
+        If name is not set, then it will be set to 'channel_<index>' where
+        <index> if the value of the 'index' attribute.
+    
+        NOTE: The value of the 'index' attribute is NOT checked; make sure 
+        that this value is unique among other channel calibration data in a given 
+        axis
+        """
+        if not isinstance(self.name, str) or len(self.name.strip()) == 0:
+            self.name = f"channel_{self.index}"
+    
     @property
     def calibrationString(self) -> str:
         name = self.name if isinstance(self.name, str) and len(self.name.strip()) else f"channel_{self.index}"
 
         strlist = [f"<{name}>"]
-        for param in sorted(map(lambda x: x.name, dataclasses.fields(self.__class__))):
+        for param in sorted(filter(lambda x: x!= "parent", map(lambda x: x.name, dataclasses.fields(self.__class__)))):
             txt = self._to_xml_(param)
             if isinstance(txt, str): 
                 strlist.append(txt)
@@ -686,7 +720,26 @@ class ChannelCalibrationData(CalibrationData):
                         p.text(f"{' '*p.indentation}{f.name}: ")
                     else:
                         p.text(f"{f.name}: ")
-                    p.pretty(getattr(self, f.name, None))
+                        
+                    value = getattr(self, f.name, None)
+                    if f.name == "parent":
+                        if isinstance(value, AxisCalibrationData):
+                            vkey = value.key if (isinstance(value.key, str) and len(value.key.strip())) else "?"
+                            vname = value.name if (isinstance(value.name, str) and len(value.name.strip())) else axisTypeStrings(value.type)
+                            # value = f"{type(value).__name__}: name = '{vname}' (index = {value.index}, key = '{vkey}')"
+                            p.text(type(value).__name__)
+                            p.text(" (")
+                            p.text("index = ")
+                            p.text(f"{value.index}")
+                            p.text(", name = ")
+                            p.text(f"'{vname}'")
+                            p.text(", key = ")
+                            p.text(f"'{vkey}'")
+                            p.text(")")
+                        else:
+                            p.text(None)
+                    else:
+                        p.pretty(value)
                     p.break_()
 
     def rescale(self, u:typing.Union[pq.Quantity, pq.dimensionality.Dimensionality, str]) -> None:
@@ -995,15 +1048,53 @@ class AxisCalibrationData(CalibrationData):
     '''
 
     def __post_init__(self):
-        r"""Further curates the fields after construction.
+        r"""Further curates the fields after construction:
+    
+        • for all axis types, tries to make the 'key' parameter as consistent as
+            possible given the axis type flag and its index
+            WARNING: This requires the 'type' and 'index' fields to be properly
+            set.
+    
+        • for a Channels axis, ensures that:
+            ∘ 'units', 'origin', 'maximum' and 'resolution' are set to MISSING
+                (they do not make sense here; instead, they need to be present in
+                the ChannelCalibrationData)
+    
+            ∘ if no channels are specified, a ChannelCalibrationData object is
+                constructed with default values 
+    
+            ∘ assigns this object as the parent for all ChannelCalibrationData
+                (this is something that the CalibrationChannelsDescriptor also 
+                does in its __set__ method; this means that a ChannelCalibrationData
+                object always get the owner object as its 'parent')
+    
+        • for a NonChannel axis, ensures that:
+            ∘ the 'channels' field is always an empty list, whic makes sense for
+                this type of axis.
+    
+            ∘ if the 'units' field is NOT a pq.Quantity, it will be set to the 
+                default units inferred from the axis type flag — for details,
+                see imaging.axisutils.axisTypeUnits() function.
+    
         NOTE: To create an AxisCalibrationData object from a vigra.AxisInfo object,
-        a dict or a calibration string (xml-formatted) please use the "new" factory
-        class methods.
+        a dict, or a calibration string (xml-formatted) please use the "new" 
+        factory class methods.
         """
-        # typeFlagKey = axisTypeSymbol(self.type)
+        typeFlagKey = axisTypeSymbol(self.type)
         # print(f"{self.__class__.__name__}.__post_init__: typeFlagKey = {typeFlagKey}")
-        # if typeFlagKey != self.key:
-        #     self.key = typeFlagKey
+        if not isinstance(self.key, str) or len(self.key.strip()) == 0:
+            self.key = typeFlagKey
+            
+        elif self.key == "?":
+            if self.isChannels:
+                self.key = "c"
+            else:
+                space_keys = ["x", "y", "z"]
+                if "s" in typeFlagKey:
+                    if self.index in range(3):
+                        typeFlagKey.replace("s", space_keys[self.index])
+                        
+                self.key = typeFlagKey
             
         # print(f"{self.__class__.__name__}.__post_init__: is Channels =  {self.isChannels}")
         if self.isChannels:
@@ -1013,13 +1104,17 @@ class AxisCalibrationData(CalibrationData):
             o = self.origin if isinstance(self.origin, numbers.Number) else 0.0
             
             # NOTE: 2025-04-16 17:37:15
-            # the linbe below adapts to ChannelCalibrationData using NaN unless a scalar value is given
+            # the line below adapts to ChannelCalibrationData using NaN unless a scalar value is given
             m = self.maximum if isinstance(self.maximum, numbers.Number) else math.nan 
             
             if len(self.channels) == 0:
                 self.channels = [ChannelCalibrationData(name="channel_0", units = u, 
                                                         origin = 0, maximum = m,
-                                                        index=0)]
+                                                        index=0, parent=self)]
+                
+            else:
+                for channel in self.channels:
+                    channel.parent = self
                 
             self.units = dataclasses.MISSING
             self.origin = dataclasses.MISSING
@@ -1040,6 +1135,9 @@ class AxisCalibrationData(CalibrationData):
                 self.channels.clear()
             else:
                 self.channels = list()
+                
+            if not isinstance(self.units, pq.Quantity) or self.units == pq.arbitrary_unit:
+                self.units = axisTypeUnits(self.type)
                 
     @singledispatchmethod
     @classmethod
@@ -1132,7 +1230,7 @@ class AxisCalibrationData(CalibrationData):
     @classmethod
     def _(cls, d:dict):
         if cls.isCalibration(d):
-            return cls(**d)
+            return cls(**d) # channels parents will be set in __post_init__
         
     @new.register(str)
     @classmethod
@@ -1448,13 +1546,28 @@ class AxisCalibrationData(CalibrationData):
         return axinfo
     
     @staticmethod
-    def removeAxisCalibration(axinfo:vigra.AxisInfo) -> vigra.AxisInfo:
-        description = axinfo.description.strip()
-        start_stop = AxisCalibrationData.findCalibrationString(description)
+    def getOriginalDescription(axinfo:vigra.AxisInfo) -> str:
+        return AxisCalibrationData.clearCalibrationFromString(axinfo.description.strip())
+        
+    @staticmethod
+    def clearCalibrationFromString(s:str) -> str:
+        start_stop = AxisCalibrationData.findCalibrationString(s)
         if start_stop is not None:
-            newDescr = " ".join([description[:start_stop[0]],
-                        description[start_stop[1]:]])
-            axinfo.description = newDescr
+            return " ".join([s[:start_stop[0]],
+                        s[start_stop[1]:]])
+        
+        return s
+        
+    @staticmethod
+    def removeAxisCalibration(axinfo:vigra.AxisInfo) -> vigra.AxisInfo:
+        d = AxisCalibrationData.getOriginalDescription(axinfo)
+        axinfo.description = d
+        # description = axinfo.description.strip()
+        # start_stop = AxisCalibrationData.findCalibrationString(description)
+        # if start_stop is not None:
+        #     newDescr = " ".join([description[:start_stop[0]],
+        #                 description[start_stop[1]:]])
+        #     axinfo.description = newDescr
             
         return axinfo
     
@@ -1570,7 +1683,7 @@ class AxisCalibrationData(CalibrationData):
         else:
             scipywarn("Not a Channels axis")
             
-    def getChannelCalibration(self, o:int | str =0):
+    def getChannelCalibration(self, o:int | str = 0):
         return self.channelCalibration(o) # alias for backward compatibility
             
 class AxesCalibration(object):
@@ -1637,7 +1750,7 @@ class AxesCalibration(object):
                 vigra.AxisInfo, XML-formatted calibration strings or 
                 AxisCalibrationData objects.
                 
-        NOTE: 
+        NOTE 1: 
         The AxisInfo objects used in the AxesCalibration's initialization WILL
         NOT gain a calibration string in their `description` attribute (i.e., 
         the AxisInfo will not be automatically 'calibrated').
@@ -1646,7 +1759,20 @@ class AxesCalibration(object):
         method in order to embed an XML-formatted calibration string into
         the AxisInfo `description` attribute.
         
-        
+        NOTE 2:
+        The form where a VigraArray is the first (and only) parameter also 
+        generates an AxisCalibrationData object for a "virtual" channels axis,
+        when the array does not contain such axis, i.e., when
+    
+            array.channelIndex == array.ndim
+    
+        In this case, calling calibrateAxes WILL insert a singleton Channels axis
+        into the axistags field of this AxesCalibration object.
+    
+        The effect of this is that the array will gain a Channels axistags even 
+        its dimensions are kept the same — this is allowed in vigra librar, and
+        allows attaching calibration data to the array values themselves.
+    
         """
         
         self.relative_tolerance = RELATIVE_TOLERANCE
@@ -1656,7 +1782,7 @@ class AxesCalibration(object):
         # NOTE 2021-10-25 10:27:54
         # keep this as a LIST - this to allow several axes with the same 
         # typeFlags (and key).
-        self._calibration_ = list()
+        self._axescalibrations_ = list()
         
         if len(args) == 1 and isinstance(args[0], (tuple, list , deque)):
             args = args[0]
@@ -1665,31 +1791,35 @@ class AxesCalibration(object):
             if isinstance(args[0], vigra.VigraArray):
                 self._axistags_ = args[0].axistags
                 
-                self._calibration_ = list(map(lambda x: AxisCalibrationData.new(x), args[0].axistags))
-                # self._calibration_ = [AxisCalibrationData(axinfo) for axinfo in args[0].axistags]
+                if args[0].channelIndex == args[0].ndim: # a real channel axis does NOT exist
+                    # will set up a channels axis calibrations with default values, further below
+                    if self._axistags_.channelIndex == len(self._axistags_):
+                        self._axistags_.insertChannelAxis() # this places the singleton Channels axis at the end of axistags
                 
-                #set up channel calibrations with default values:
-                if args[0].channelIndex != args[0].ndim: # real channel axis exists
-                    channel_axis_index = args[0].axistags.index("c")
-                    # Make sure we don't overwrite existing channel calibrations
-                    if len(self._calibration_[channel_axis_index].channels) < args[0].channels:
-                        for k in range(len(self._calibration_[channel_axis_index].channels), args[0].channels):
-                            self._calibration_[channel_axis_index].channels.append(ChannelCalibrationData(name=f"channel_{k}", index=k), name=f"channel_{k}")
-                            
-                    elif len(self._calibration_[channel_axis_index].channels) > args[0].channels:
-                        self._calibration_[channel_axis_index].channels = self._calibration_[channel_axis_index].channels[:args[0].channels]
-#                         extra = list()
-#                         for k in range(args[0].channels, len(self._calibration_[channel_axis_index].channels)):
-#                             extra.append(self._calibration_[channel_axis_index].channels[k])
-#                             
-#                         for k,c in extra:
-#                             self._calibration_[channel_axis_index]._data_.pop(k, None)
+                self._axescalibrations_ = list(map(lambda x: AxisCalibrationData.new(x), args[0].axistags))
                 
+                channel_axis_index = args[0].axistags.index("c")
+
+                # change ownership for the ChannelCalibrationData objects
+                for ch in self._axescalibrations_[channel_axis_index].channels:
+                    ch.parent = self._axescalibrations_[channel_axis_index]
+
+                # Make sure we don't overwrite existing channel calibrations
+                if len(self._axescalibrations_[channel_axis_index].channels) < args[0].channels:
+                    for k in range(len(self._axescalibrations_[channel_axis_index].channels), args[0].channels):
+                        self._axescalibrations_[channel_axis_index].channels.append(ChannelCalibrationData(index=k, parent=self._axescalibrations_[channel_axis_index]))
+                        
+                elif len(self._axescalibrations_[channel_axis_index].channels) > args[0].channels:
+                    self._axescalibrations_[channel_axis_index].channels = self._axescalibrations_[channel_axis_index].channels[:args[0].channels]
+                    
                 return
 
             elif isinstance(args[0], vigra.AxisTags):
+                # NOTE: 2025-04-18 13:38:42
+                # here I cannot check if the Channels axis is real or virtual
+                # because there no array data is supplied.
                 self._axistags_ = args[0]
-                self._calibration_ = [AxisCalibrationData.new(axinfo) for axinfo in args[0]]
+                self._axescalibrations_ = [AxisCalibrationData.new(axinfo) for axinfo in args[0]]
                 return
             
             elif isinstance(args[0], int):
@@ -1701,7 +1831,7 @@ class AxesCalibration(object):
                     raise ValueError(f"Cannot create an AxesCalibration object for {args[0]} axes")
                 
                 self._axistags_ = vigra.AxisTags(args[0])
-                self._calibration_ = [AxisCalibrationData.new(axinfo) for axinfo in self._axistags_]
+                self._axescalibrations_ = [AxisCalibrationData.new(axinfo) for axinfo in self._axistags_]
                 return
                     
             else:
@@ -1720,7 +1850,7 @@ class AxesCalibration(object):
                     if isinstance(arg, vigra.AxisInfo):
                         cal = AxisCalibrationData.new(arg)
                         self._axistags_.append(arg)
-                        self._calibration_.append(cal)
+                        self._axescalibrations_.append(cal)
                                         
                     elif isinstance(arg, str):
                         try:
@@ -1729,10 +1859,10 @@ class AxesCalibration(object):
                             cal = AxisCalibrationData() #  create default UnknownAxisType
                             
                         #self._axistags_.append(cal.axisInfo) 
-                        self._calibration_.append(cal)
+                        self._axescalibrations_.append(cal)
                         
                     elif isinstance(arg, AxisCalibrationData):
-                        self._calibration_.append(arg)
+                        self._axescalibrations_.append(arg)
                         
                     else:
                         if k == 0:
@@ -1745,13 +1875,13 @@ class AxesCalibration(object):
             raise RuntimeError("Axis calibration data is inconsistent with axis info objects")
         
     def __check_cal_axinfo__(self):
-        ret = len(self._axistags_) == len(self._calibration_)
+        ret = len(self._axistags_) == len(self._axescalibrations_)
         
         if ret:
-            ret &= all(cal.key in self._axistags_ for cal in self._calibration_)
+            ret &= all(cal.key in self._axistags_ for cal in self._axescalibrations_)
             
         if ret:
-            calkeys = (cal.key for cal in self._calibration_)
+            calkeys = (cal.key for cal in self._axescalibrations_)
             ret &= all(axinfo.key in calkeys for axinfo in self._axistags_)
             
         return ret
@@ -1759,22 +1889,22 @@ class AxesCalibration(object):
     def __iter__(self):
         r"""Iterates through the AxisCalibrationData objects contained within self
         """
-        yield from (cal for cal in self._calibration_ if cal.key in self._axistags_)
-        #yield from (cal.key for cal in self._calibration_ if cal.key in self._axistags_)
+        yield from (cal for cal in self._axescalibrations_ if cal.key in self._axistags_)
+        #yield from (cal.key for cal in self._axescalibrations_ if cal.key in self._axistags_)
         
     def __contains__(self, item):
         r"""Membership test.
-        item: CalibrationData, str (calibration key or name), or type flag 
+        item: AxisCalibrationData, str (calibration key or name), or type flag 
             (int or vigra.AxisType)
         """
         if isinstance(item, str):
-            return any(item in (getattr(cal, "key", None), getattr(cal, "name", None)) for cal in self._calibration_)
+            return any(item in (getattr(cal, "key", None), getattr(cal, "name", None)) for cal in self._axescalibrations_)
         
         elif isinstance(item, (int, vigra.AxisType)):
-            return item in (getattr(cal, "type", None) for cal in self._calibration_)
+            return item in (getattr(cal, "type", None) for cal in self._axescalibrations_)
         
         elif isinstance(item, CalibrationData):
-            return item in self._calibration_
+            return item in self._axescalibrations_
         
         return False
      
@@ -1813,15 +1943,15 @@ class AxesCalibration(object):
             index = index.key # a str
             
         if isinstance(index, (int, slice, range)):
-            return self._calibration_[index] # raises IndexError if inappropriate
+            return self._axescalibrations_[index] # raises IndexError if inappropriate
         
         elif isinstance(index, str):
             if index in self:
-                ret = [cal for cal in self._calibration_ if index in (cal.name, cal.key)]
+                ret = [cal for cal in self._axescalibrations_ if index in (cal.name, cal.key)]
                 if len(ret):
                     return ret[0]
-                
-                raise IndexError(f"Calibration for axis {index} not found")
+                ndx = f"'{index}" if isinstance(index, str) else f"{index}"
+                raise IndexError(f"Calibration for axis {ndx} not found")
                     
             elif index =="c": # Channels axis - not found in condition above so it's virtual
                 return AxisCalibrationData("c")
@@ -1839,14 +1969,14 @@ class AxesCalibration(object):
             if not isinstance(obj, AxisCalibrationData):
                 raise TypeError(f"Expecting an AxisCalibrationData object; got {type(obj).__name__} instead")
 
-            self._calibration_[item] = obj # raises corresponding exception for list API
+            self._axescalibrations_[item] = obj # raises corresponding exception for list API
             self._axistags_[item] = obj.axisInfo
             
         else:
             raise TypeError(f"Index must eb an int; got {type(index).__name} instead")
         
     def __len__(self):
-        return len(self._calibration_)
+        return len(self._axescalibrations_)
     
     def index(self, item:typing.Union[int, str]):
         r"""
@@ -1856,10 +1986,10 @@ class AxesCalibration(object):
             When item is 'c' returns the number of axes when no Channels axis exists
         """
         if isinstance(item, AxisCalibrationData):
-            return self._calibration_.index(item) # raises appropriate exception for list API
+            return self._axescalibrations_.index(item) # raises appropriate exception for list API
         
         elif isinstance(item, str):
-            ret = [k for k, c in enumerate(self._calibration_) if c.key == item ]
+            ret = [k for k, c in enumerate(self._axescalibrations_) if c.key == item ]
             if len(ret):
                 return ret[0]
             else:
@@ -2026,15 +2156,15 @@ class AxesCalibration(object):
     
     def __str__(self):
         repr_str = self.__repr__().split()
-        return "\n".join([f"{self.__repr__()} with {len(self._calibration_)} axes:"] + [f"{k}.\t" + cal.__str__()+"\n" for k, cal in enumerate(self._calibration_)])
+        return "\n".join([f"{self.__repr__()} with {len(self._axescalibrations_)} axes:"] + [f"{k}.\t" + cal.__str__()+"\n" for k, cal in enumerate(self._axescalibrations_)])
     
     def _repr_pretty_(self, p, cycle):
         if cycle:
-            p.text(f"{self.__class__.__name__} with {len(self._calibration_)} axes")
+            p.text(f"{self.__class__.__name__} with {len(self._axescalibrations_)} axes")
         else:
             g = 2
-            with p.group(g, f"{self.__class__.__name__} with {len(self._calibration_)} axes:\n"):
-                for k, cal in enumerate(self._calibration_):
+            with p.group(g, f"{self.__class__.__name__} with {len(self._axescalibrations_)} axes:\n"):
+                for k, cal in enumerate(self._axescalibrations_):
                     if k == 0:
                         p.text(f"{' '*2}{k}: ")
                     else:
@@ -2043,18 +2173,21 @@ class AxesCalibration(object):
                     p.break_()
     
     def hasAxis(self, key):
-        r"""Queries if the axis key is calibrated by this object
+        r"""Queries if the axis key is contained in the 'axistags' attribute.
+        WARNING: This does not guarantee that the axis is also calibrated.
+        To check if an axis with this key is also calibrated, call
+        'key in self'
         """
         if isinstance(key, vigra.AxisInfo):
             key = key.key
         
         return key in self.axiskeys and key in self._axistags_
     
-    @property
+    # @property
     def axiskeys(self):
         r"""A generator of axiskeys
         """
-        yield from (cal.key for cal in self._calibration_)
+        yield from (cal.key for cal in self._axescalibrations_)
     
     # @property
     def keys(self):
@@ -2063,18 +2196,21 @@ class AxesCalibration(object):
         yield from self.axiskeys
     
     @property
-    def axistags(self):
+    def axistags(self) -> vigra.AxisTags:
         r"""Read-only
         """
         return self._axistags_
     
     @property
-    def channels(self):
-        return len(self["c"].channels)
+    def channels(self) -> list:
+        if "c" in self:
+            return len(self["c"].channels)
+        else:
+            return list()
     
     @property
-    def calibrations(self):
-        return self._calibration_
+    def calibrations(self) -> list:
+        return self._axescalibrations_
     
     #@property
     def values(self):
@@ -2127,7 +2263,7 @@ class AxesCalibration(object):
         
         if index is None:
             self._axistags_.append(axInfo)
-            self._calibration_.append(cal)
+            self._axescalibrations_.append(cal)
             
         elif isinstance(index, int):
             if index < 0:
@@ -2135,11 +2271,11 @@ class AxesCalibration(object):
             
             if index == len(self.axistags):
                 self._axistags_.append(axInfo)
-                self._calibration_.append(cal)
+                self._axescalibrations_.append(cal)
                 
             elif index < len(self.axistags):
                 self._axistags_.insert(index, axInfo)
-                self._calibration_.insert(index, cal)
+                self._axescalibrations_.insert(index, cal)
                 
                 
         # parse calibration string from axisInfo, it if exists
@@ -2184,11 +2320,11 @@ class AxesCalibration(object):
                 
             axis = self._axistags_[key]
             
-        if key not in self._calibration_.keys():
+        if key not in self._axescalibrations_.keys():
             raise KeyError("Axis %s has no calibration data" % key)
                 
                 
-        self._calibration_.pop(key, None)
+        self._axescalibrations_.pop(key, None)
         del(self._axistags_[key])
         
     def synchronize(self):
@@ -2216,22 +2352,24 @@ class AxesCalibration(object):
         2) if the axistags have LOST an axis, its calibration data will be removed
         
         """
-        new_axes = [axInfo for axInfo in self._axistags_ if axInfo.key not in self._calibration_.keys()]
-        obsolete_keys = [key for key in self._calibration_.keys() if key not in self._axistags_.keys()]
+        new_axes = [axInfo for axInfo in self._axistags_ if axInfo.key not in self._axescalibrations_.keys()]
+        obsolete_keys = [key for key in self._axescalibrations_.keys() if key not in self._axistags_.keys()]
 
         for axInfo in new_axes:
             #self._initialize_calibration_with_axis_(axInfo)
             self.calibrateAxis(axInfo)
         
         for key in obsolete_keys:
-            self._calibration_.pop(key, None)
+            self._axescalibrations_.pop(key, None)
                 
         
     def calibrateAxes(self):
         r"""Attaches a calibration string to all axes registered with this object.
         """
         for k, ax in enumerate(self._axistags_):
-            self._calibration_[k].calibrateAxis(ax)
+            # in case a virtual channels axis was detected, this was added to the
+            # axistags in __init__
+            self._axescalibrations_[k].calibrateAxis(ax)
             
 def hasNameString(s):
     return AxesCalibration.hasNameString(s)

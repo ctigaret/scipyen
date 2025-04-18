@@ -613,7 +613,7 @@ def axisTypeSymbol(axisinfo:typing.Union[vigra.AxisInfo, vigra.AxisType, int],
     Returns:
     ========
     
-    A string key corresponding to the type flags in axisinfo object (in upper case).
+    A string key corresponding to the type flags in axisinfo object.
     
 
     CAUTION: These are recommended, and not fully enforced
