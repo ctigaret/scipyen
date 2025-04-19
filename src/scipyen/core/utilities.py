@@ -3497,6 +3497,20 @@ def summarize_object_properties(objname:str, obj:typing.Any, namespace="Internal
             memsz    = str(getsizeof(obj))
             memsztip = "memory size: "
             
+        elif hasattr(obj, "__len__"):
+            try:
+                sz = len(obj)
+            except:
+                sz = ""
+                
+            if isinstance(obj, vigra.AxisTags):
+                axes = repr(obj)
+                axestip = "axis tags: "
+                
+        elif isinstance(obj, vigra.AxisInfo):
+            axes = obj.key
+            axestip = "axis key: "
+            
         else:
             #vmemsize = QtGui.QStandardItem(str(getsizeof(obj)))
             memsz = str(getsizeof(obj))

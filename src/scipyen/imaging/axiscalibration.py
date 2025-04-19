@@ -1352,7 +1352,34 @@ class AxisCalibrationData(CalibrationData):
             return len(self.channels)
         
         return 0
-            
+    
+    @property
+    def channelCalibrations(self) -> list:
+        r"""Alias to self.channels.
+        for backward compatibility
+        This is empty in an AxisCalibrationData for a NonChannel axis.
+        """
+        return self.channels
+    
+    @property
+    def channelIndices(self) -> tuple:
+        r"""A tuple of channel indices, from their calibration data.
+        These include the virtual channel (if it exists).
+        
+        This tuple is empty if the AxisCalibrationData corresponds to a 
+        non-Channels axis.
+        """
+        return tuple(map(lambda c: c.index, self.channels))
+
+    @property
+    def channelNames(self):
+        r"""A tuple of channel names, from their calibration data.
+        These include the virtual channel (if it exists).
+        
+        This list is empty if the AxisCalibrationData corresponds to a 
+        non-Channels axis.
+        """
+        return tuple(map(lambda c: c.name, self.channels))
     @property
     def calibrationString(self) -> str:
         r"""
@@ -1749,6 +1776,11 @@ class AxesCalibration(object):
         *args = a vigra.VigraArray, a vigra.AxisTags, up to to five 
                 vigra.AxisInfo, XML-formatted calibration strings or 
                 AxisCalibrationData objects.
+    
+        Side effects:
+        =============
+        For a VigraArray WITHOUT a real channels axis, the AxesCalibration
+        object will append a singleton channels axis to the array.
                 
         NOTE 1: 
         The AxisInfo objects used in the AxesCalibration's initialization WILL
@@ -1766,13 +1798,6 @@ class AxesCalibration(object):
     
             array.channelIndex == array.ndim
     
-        In this case, calling calibrateAxes WILL insert a singleton Channels axis
-        into the axistags field of this AxesCalibration object.
-    
-        The effect of this is that the array will gain a Channels axistags even 
-        its dimensions are kept the same — this is allowed in vigra librar, and
-        allows attaching calibration data to the array values themselves.
-    
         """
         
         self.relative_tolerance = RELATIVE_TOLERANCE
@@ -1789,28 +1814,38 @@ class AxesCalibration(object):
         
         if len(args):
             if isinstance(args[0], vigra.VigraArray):
-                self._axistags_ = args[0].axistags
-                
-                if args[0].channelIndex == args[0].ndim: # a real channel axis does NOT exist
+                img = args[0]
+                if img.channelIndex == img.ndim: # a real channel axis does NOT exist
                     # will set up a channels axis calibrations with default values, further below
-                    if self._axistags_.channelIndex == len(self._axistags_):
-                        self._axistags_.insertChannelAxis() # this places the singleton Channels axis at the end of axistags
+                    img = img.insertChannelAxis()
+                    # NOTE: 2025-04-19 00:00:43
+                    # AVOID this as it will mess up the array!
+                    # if self._axistags_.channelIndex == len(self._axistags_):
+                    #     self._axistags_.insertChannelAxis() # this places the singleton Channels axis at the end of axistags
+                    
+                # create a copy of the image's axistags
+                self._axistags_ = vigra.AxisTags(list(map(lambda x: vigra.AxisInfo(key=x.key, 
+                                                                                   typeFlags=x.typeFlags, 
+                                                                                   resolution=x.resolution, 
+                                                                                   description=x.description), 
+                                                          img.axistags)))
                 
-                self._axescalibrations_ = list(map(lambda x: AxisCalibrationData.new(x), args[0].axistags))
                 
-                channel_axis_index = args[0].axistags.index("c")
+                self._axescalibrations_ = list(map(lambda x: AxisCalibrationData.new(x), self._axistags_))
+                
+                channel_axis_index = self._axistags_.index("c")
 
                 # change ownership for the ChannelCalibrationData objects
                 for ch in self._axescalibrations_[channel_axis_index].channels:
                     ch.parent = self._axescalibrations_[channel_axis_index]
 
                 # Make sure we don't overwrite existing channel calibrations
-                if len(self._axescalibrations_[channel_axis_index].channels) < args[0].channels:
-                    for k in range(len(self._axescalibrations_[channel_axis_index].channels), args[0].channels):
+                if len(self._axescalibrations_[channel_axis_index].channels) < img.channels:
+                    for k in range(len(self._axescalibrations_[channel_axis_index].channels), img.channels):
                         self._axescalibrations_[channel_axis_index].channels.append(ChannelCalibrationData(index=k, parent=self._axescalibrations_[channel_axis_index]))
                         
-                elif len(self._axescalibrations_[channel_axis_index].channels) > args[0].channels:
-                    self._axescalibrations_[channel_axis_index].channels = self._axescalibrations_[channel_axis_index].channels[:args[0].channels]
+                elif len(self._axescalibrations_[channel_axis_index].channels) > img.channels:
+                    self._axescalibrations_[channel_axis_index].channels = self._axescalibrations_[channel_axis_index].channels[:img.channels]
                     
                 return
 
@@ -1818,8 +1853,13 @@ class AxesCalibration(object):
                 # NOTE: 2025-04-18 13:38:42
                 # here I cannot check if the Channels axis is real or virtual
                 # because there no array data is supplied.
-                self._axistags_ = args[0]
-                self._axescalibrations_ = [AxisCalibrationData.new(axinfo) for axinfo in args[0]]
+                # create a copy of the axistags
+                self._axistags_ = vigra.AxisTags(list(map(lambda x: vigra.AxisInfo(key=x.key, 
+                                                                                   typeFlags=x.typeFlags, 
+                                                                                   resolution=x.resolution, 
+                                                                                   description=x.description), 
+                                                          args[0])))
+                self._axescalibrations_ = list(map(lambda x: AxisCalibrationData.new(x), self._axistags_))
                 return
             
             elif isinstance(args[0], int):
@@ -1830,8 +1870,9 @@ class AxesCalibration(object):
                 if args[0] <= 0:
                     raise ValueError(f"Cannot create an AxesCalibration object for {args[0]} axes")
                 
+                # create AxisTags
                 self._axistags_ = vigra.AxisTags(args[0])
-                self._axescalibrations_ = [AxisCalibrationData.new(axinfo) for axinfo in self._axistags_]
+                self._axescalibrations_ = list(map(lambda x: AxisCalibrationData.new(x), self._axistags_))
                 return
                     
             else:
@@ -1858,7 +1899,6 @@ class AxesCalibration(object):
                         except:
                             cal = AxisCalibrationData() #  create default UnknownAxisType
                             
-                        #self._axistags_.append(cal.axisInfo) 
                         self._axescalibrations_.append(cal)
                         
                     elif isinstance(arg, AxisCalibrationData):
@@ -2364,12 +2404,34 @@ class AxesCalibration(object):
                 
         
     def calibrateAxes(self):
-        r"""Attaches a calibration string to all axes registered with this object.
+        r"""Attaches a calibration string to all AxisInfo objects in self.axistags.
         """
         for k, ax in enumerate(self._axistags_):
             # in case a virtual channels axis was detected, this was added to the
             # axistags in __init__
             self._axescalibrations_[k].calibrateAxis(ax)
+            
+    def calibrateImage(self, img:vigra.VigraArray) -> vigra.VigraArray:
+        r"""Applies the axis calibrations to the given vigra array 'img'.
+        Returns a copy of 'img' with axistags containing calibration strings in their
+        description attributes.
+        
+        If 'img' does not contain a channels axis (i.e. channelIndex == array.ndims)
+        then the returned copy will receive a singleton channel axis.
+    
+    """
+        if img.channelIndex == img.ndim: # no real channels axis in img
+            img = img.insertChannelAxis()
+        else:
+            img = img.copy()
+            
+        for axtag in self.axistags:
+            if axtag.key in img.axistags:
+                imgAxTag = img.axistags[axtag.key]
+                self[axtag.key].calibrateAxis(imgAxTag)
+
+        return img
+                
             
 def hasNameString(s):
     return AxesCalibration.hasNameString(s)

@@ -1163,7 +1163,13 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.displayFrame()
         
     @property
-    def frameIndexBinding(self):
+    def frameIndexBinding(self) -> tuple:
+        r"""A tuple of tuples (frame_axis_index:int, bind_index:int).
+        Useful to bind the underlying vigra arry data at the bind_index along
+        the frame axis.
+        See documentation of vigra.VigraArray.bindAxis(…) for details.
+        For other types of underlying data this is (None, 0).
+        """
         if not isinstance(self._data_, vigra.VigraArray):
             return (None, 0)
         
@@ -1177,10 +1183,13 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         else:
             traversal = tuple(tuple((ax,i) for i in range(axSize)) for ax, axSize in zip(reversed(self.frameAxis), reversed(self._number_of_frames_)))
-            #traversal = tuple(tuple((ax,i) for i in range(axSize)) for ax, axSize in zip(self.frameAxis, self._number_of_frames_))
             return tuple(itertools.product(*traversal))
             
-        
+    @property
+    def data(self):
+        r"""Reference to the underlying data"""
+        return self._data_
+    
     @property
     def temporaryColorMap(self):
         r"""Name of a temporary colormap or None.
@@ -1700,7 +1709,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         
         if isinstance(self._data_, vigra.VigraArray):
-            self._currentFrameData_, _ = self._frameView_(self._displayedChannel_)
+            self._currentFrameData_, _ = self.frameView(self._displayedChannel_)
             
             imax = self._currentFrameData_.max()
             imin = self._currentFrameData_.min()
@@ -2230,6 +2239,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             #traceback.print_exc()
             return False
         
+    @safeWrapper
     def _applyColorTable_(self, image: vigra.VigraArray, colorMap:typing.Optional[colormaps.colors.Colormap]=None):
         r"""Applies the internal color table to the 2D array.
         
@@ -2263,6 +2273,9 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             if image.min() == image.max():
                 return image
             
+            # img = image.dropChannelAxis()
+            
+            # lrMapImage = vigra.colors.linearRangeMapping(img)
             lrMapImage = vigra.colors.linearRangeMapping(image)
             
             nMap = colormaps.colors.Normalize(vmin=0, vmax=255)
@@ -2272,6 +2285,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             sMap.set_array(range(256))
             cTable = sMap.to_rgba(range(256), bytes=True)
             #cFrame = vigra.colors.applyColortable(image.astype('uint32'), cTable)
+            
             if image.ndim > 2:
                 if image.channelIndex < image.ndim and image.channels > 1: # TODO FIXME
                     # NOTE 2017-10-05 14:17:00
@@ -2299,12 +2313,15 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             #if qimg.isGrayScale():
                 #q
     
-    def _frameView_(self, channel):
+    def frameView(self, channel):
         r"""Returns a slice (frame) of self._data_ along the self.frameAxis
         
-        If the slice contains np.nan returns a copy of the image slice.
+        If the slice contains np.nan returns a copy of the image slice, for 
+        display purposes.
         
         Otherwise, returns a REFERENCE to the image slice.
+        
+        Raises exception if self._data_is not a VigraArray.
         
         """
         if not isinstance(self._data_, vigra.VigraArray):
@@ -2315,7 +2332,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         if self.frameAxis is not None:
             # NOTE: 2019-11-13 13:52:46
-            # frameAxis is None only for 2D data arrays or 3D arrays with channel axis
+            # frameAxis is None only for 2D data arrays or 3D arrays with a 
+            # real channel axis
             index = self.frameIndexBinding[self._current_frame_index_]
             dimindices = [index]
         
@@ -2325,15 +2343,10 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                     # axis infos are now axis indices (ints)
                     # see  NOTE: 2021-12-02 10:39:54
                     img_view = img_view.bindAxis(ndx[0], ndx[1])
-                    #img_view = img_view.bindAxis(img_view.axistags.index(ndx[0].key), ndx[1])
                     
             else:
-                #print("in self._frameView_: index", index)
+                #print("in self.frameView: index", index)
                 img_view = img_view.bindAxis(index[0], index[1])
-                #img_view = img_view.bindAxis(img_view.axistags.index(index[0].key), index[1])
-            
-        #else:
-            #img_view = self._data_
             
         # up to now, img_view is a 2D slice view of self._data_, will _ALL_ available channels
             
@@ -2348,6 +2361,11 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             
             
         return img_view, dimindices
+    
+    @property
+    def frameData(self):
+        r"""Reference ot the current frame image data"""
+        return self._currentFrameData_
         
     @safeWrapper
     def displayFrame(self, channel_index = None, colorMap:typing.Optional[colormaps.colors.Colormap] = None, asAlphaChannel:bool=False):
@@ -2373,7 +2391,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             self._displayedChannel_ = channel_index
         
         if isinstance(self._data_, vigra.VigraArray):
-            self._currentFrameData_, _ = self._frameView_(channel_index) # this is an array view !
+            self._currentFrameData_, _ = self.frameView(channel_index) # this is an array view !
             
             if asAlphaChannel:
                 if self._currentFrameData_.channels == 1:
@@ -2397,10 +2415,6 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                                             axistags = vigra.VigraArray.defaultAxistags('xyc'))
                     
                     self.viewerWidget.view(frame.qimage(normalize=False))
-                    #if frame.min() == frame.max():
-                        #self.viewerWidget.view(frame.qimage(normalize=False))
-                    #else:
-                        #self.viewerWidget.view(frame.qimage(normalize=self._imageNormalize))
                     
             else:
                 if isinstance(colorMap, colormaps.colors.Colormap):
@@ -2742,7 +2756,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.imageToolBar = QtWidgets.QToolBar("Image Toolbar", self)
         self.imageToolBar.setObjectName("ImageViewerImageToolBar")
         self.imageToolBar.setMovable(False)
-        self.setAxesScalesAction = self.imageToolBar.addAction(QtGui.QIcon.fromTheme("settings-configure-symbolic"), "Axes scales")
+        self.setAxesScalesAction = self.imageToolBar.addAction(QtGui.QIcon.fromTheme("measure-symbolic"), "Axes scales")
         self.setAxesScalesAction.triggered.connect(self.slot_axesScales)
         
         self.addToolBar(QtCore.Qt.TopToolBarArea, self.imageToolBar)
@@ -2884,17 +2898,17 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             w = self._data_.shape[self.widthAxis]
             h = self._data_.shape[self.heightAxis]
             
+            
             # NOTE: 2021-12-02 10:57:24
             # this is now requires because of NOTE: 2021-12-02 10:39:54
             wAxInfo = self._data_.axistags[self.widthAxis]
             hAxInfo = self._data_.axistags[self.heightAxis]
             
-            #
             # below, img is a view NOT a copy !
             #
             
-            img, _ = self._frameView_(self._displayedChannel_)
-            print(f"{self.__class__.__name__}._displayValueAtCoordinates: img axistags: {img.axistags}")
+            img, _ = self.frameView(self._displayedChannel_)
+            # print(f"{self.__class__.__name__}._displayValueAtCoordinates: img axistags: {img.axistags}")
             
             viewWidthAxisIndex = img.axistags.index(wAxInfo.key)
             viewHeightAxisIndex = img.axistags.index(hAxInfo.key)
@@ -2956,7 +2970,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                     widthAxisKey = img.axistags[viewWidthAxisIndex].key 
                     heightAxisKey = img.axistags[viewHeightAxisIndex].key
                     
-                    if img.ndim > 2: # ATTENTION: img is a slice view of the data !!!
+                    # if img.ndim > 2: # ATTENTION: img is a slice view of the data !!!
+                    if self._data_.ndim > 2: # ATTENTION: img is a slice view of the data !!!
                         # WARNING: there may not be a real channel axis, here
                         if img.channels > 1:
                             val = [float(img.bindAxis("c", k)[x,y,...]) for k in range(img.channels)]
@@ -3397,6 +3412,14 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         self.displayFrame(channel_index)
         self._displayedChannel_ = channel_index
+        
+    @property
+    def displayedchannel(self) -> int | str:
+        r"""Index of the displayed channel (int) or the string 'all'.
+        Rwead-only. To display a given channel, or all channels, use
+        self.displayChannel()
+        """
+        return self._displayedChannel_
         
     def displayAllChannels(self):
         # see NOTE: 2018-09-25 23:06:55
