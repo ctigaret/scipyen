@@ -78,7 +78,8 @@ from core import utilities
 from core.prog import (safeWrapper, deprecation, iter_attribute,
                        filter_type, filterfalse_type, 
                        filter_attribute, filterfalse_attribute,
-                       filter_attr, filterfalse_attr)
+                       filter_attr, filterfalse_attr,
+                       scipywarn)
 
 from core import strutils as strutils
 from core import datatypes 
@@ -1186,9 +1187,24 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             return tuple(itertools.product(*traversal))
             
     @property
-    def data(self):
-        r"""Reference to the underlying data"""
+    def data(self) -> vigra.VigraArray | None:
+        r"""Reference to the underlying data. 
+        This does not include calibration data. Use self.dataWithCalibratedAxes
+        for this purpose.
+        """
         return self._data_
+    
+    @property
+    def dataWithCalibratedAxes(self):
+        """Underlying array with axes containing calibration data"""
+        if self._data_ is None:
+            return
+        
+        if self.axesCalibration:
+            return self.axesCalibration.calibrateImage(self._data_)
+
+        return self._data_
+            
     
     @property
     def temporaryColorMap(self):
@@ -1485,47 +1501,19 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     # helper for export slots
     
     def _export_scene_helper_(self, file_format):
-        if not isinstance(file_format, str) or file_format.strip().lower() not in ("svg", "tiff", "png"):
-            raise ValueError("Unsupported export file format %s" % file_format)
+        if file_format == "workspace":
+            img = self.frameData
+            if self.axesCalibration:
+                img = self.axesCalibration.calibrateImage(img)
+            self.exportDataToWorkspace(img, f"frame_image_data_{self.currentFrame}")
+            return
         
-        if file_format.strip().lower() == "svg":
-            file_filter = "Scalable Vector Graphics Files (*.svg)"
-            caption_suffix = "SVG"
-            
-        elif file_format.strip().lower() == "tiff":
-            file_filter = "TIFF Files (*.tif)"
-            caption_suffix = "TIFF"
-            qimg_format = QtGui.QImage.Format_ARGB32
-            
-        elif file_format.strip().lower() == "png":
-            file_filter = "Portable Network Graphics Files (*.png)"
-            caption_suffix = "PNG"
-            qimg_format = QtGui.QImage.Format_ARGB32
-            
-        else:
-            raise ValueError("Unsupported export file format %s" % file_format)
-
-        if sys.platform.startswith("win32"):
-            options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
-            kw = {"options":options}
-        else:
-            kw = {}
-
-        if self._scipyenWindow_ is not None:
-            targetDir = self._scipyenWindow_.currentDir
-            
-            fileName, _ = QtWidgets.QFileDialog.getSaveFileName(self,
-                                                                caption="Export figure as %s" % caption_suffix,
-                                                                filter = file_filter,
-                                                                directory = targetDir,
-                                                                **kw)
-            
-        else:
-            fileName, _ = QtWidgets.QFileDialog.getSaveFileName(self,
-                                                                caption="Export figure as %s" % caption_suffix,
-                                                                filter = file_filter,
-                                                                **kw)
-            
+        elif not isinstance(file_format, str) or file_format.strip().lower() not in ("svg", "tiff", "png", "hdf5", "pickle"):
+            scipywarn("Unsupported export file format %s" % file_format)
+            return
+        
+        fileName = self._getSaveFileName_(file_format)
+        
         if len(fileName) == 0:
             return
         
@@ -1551,10 +1539,11 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             self.viewerWidget.scene.render(painter)
             painter.end()
         
-        else:
+        elif file_format.strip().lower() in ("png", "tiff"):
+            # qimg_format = QtGui.QImage.Format_ARGB32
             out = QtGui.QImage(int(self.viewerWidget.scene.width()), 
                                int(self.viewerWidget.scene.height()),
-                               qimg_format)
+                               QtGui.QImage.Format_ARGB32)
             
             out.fill(QtCore.Qt.black)
             
@@ -1562,10 +1551,22 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             self.viewerWidget.scene.render(painter)
             painter.end()
             out.save(fileName, file_format.strip().lower(), 100)
+            
+        elif file_format.strip().lower() in ("hdf5", "pickle"):
+            img = self.frameData
+            if self.axesCalibration:
+                img = self.axesCalibration.calibrateImage(img)
+                
+            if file_format.strip().lower() == "hdf5":
+                pio.saveHDF5(img, fileName)
+            else:
+                pio.savePickleFile(img, fileName)
     
     @Slot()
     @safeWrapper
     def slot_exportSceneAsPNG(self):
+        r"""Exports the image in the current frame as a portable network graphics file.
+        The result includes rendered ROIs and cursors."""
         if self._data_ is None:
             return
         
@@ -1574,6 +1575,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     @Slot()
     @safeWrapper
     def slot_exportSceneAsSVG(self):
+        r"""Exports the image in the current frame as a scalable vector graphics file.
+        The result includes rendered ROIs and cursors."""
         if self._data_ is None:
             return
         
@@ -1582,6 +1585,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     @Slot()
     @safeWrapper
     def slot_exportSceneAsTIFF(self):
+        r"""Exports the image in the current frame as a TIFF file.
+        The result includes rendered ROIs and cursors."""
         if self._data_ is None:
             return
         
@@ -1589,34 +1594,149 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
     @Slot()
     @safeWrapper
-    def slot_saveTIFF(self):
+    def slot_exportFrameAsHDF5(self):
+        r"""Exports the image in the current frame as a HDF file.
+        The image (array) axes will include calibration data"""
         if self._data_ is None:
             return
+        self._export_scene_helper_("hdf5")
         
+    @Slot()
+    @safeWrapper
+    def slot_exportFrameAsPickle(self):
+        r"""Exports the image in the current frame as a Python pickle file.
+        The image (array) axes will include calibration data"""
+        if self._data_ is None:
+            return
+        self._export_scene_helper_("pickle")
+        
+    @Slot()
+    @safeWrapper
+    def slot_exportFrameToWorkspace(self):
+        r"""Exports the image of the current frame as a VigraArray in the workspace.
+        Ithe array axes will include calibration data"""
+        if self._data_ is None:
+            return
+        self._export_scene_helper_("workspace")
+        
+    def _getSaveFileName_(self, captionPrefix:str = "Save data", fileType:str = "TIFF"):
         if sys.platform.startswith("win32"):
             options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
             kw = {"options":options}
         else:
             kw = {}
+            
+        if not isinstance(fileType, str) or len(fileType.strip()) == 0:
+            return
+        
+        caption = ""
+        flt = ""
+        if fileType.strip().lower() == "TIFF":
+            caption = f"{captionPrefix} as TIFF"
+            flt = "TIFF Files (*.tif)"
+            
+        elif fileType.strip().lower() == "HDF5":
+            caption = f"{captionPrefix} as HDF5"
+            flt = "HDF5 Files (*.h5)"
+            
+        elif fileType.strip().lower() == "PNG":
+            caption = f"{captionPrefix} as PNG"
+            flt = "PNG Files (*.png)"
+
+        elif fileType.strip().lower() == "pickle":
+            caption = f"{captionPrefix} as Python Pickle"
+            flt = "Pickle Files (*.pkl)"
+            
+        elif fileType.strip().lower() == "svg":
+            caption = f"{captionPrefix} as Scalable Vector Graphics"
+            flt = "Scalable Vector Graphics Files (*.svg)"
+            
+        else:
+            scipywarn(f"Unsupported export file format: {fileType}")
+            return
 
         if self._scipyenWindow_ is not None:
             targetDir = self._scipyenWindow_.currentDir
             fileName, _ = QtWidgets.QFileDialog.getSaveFileName(self, 
-                                                                caption="Save image data as TIFF", 
-                                                                filter="TIFF Files (*.tif)",
+                                                                caption=caption, 
+                                                                filter=flt,
                                                                 directory=targetDir, **kw)
         else:
             fileName, _ = QtWidgets.QFileDialog.getSaveFileName(self, 
-                                                                caption="Save image data as TIFF", 
-                                                                filter="TIFF Files (*.tif)", **kw)
+                                                                caption=caption, 
+                                                                filter=flt, **kw)
+        return fileName
+        
+    @Slot()
+    @safeWrapper
+    def slot_saveTIFF(self):
+        if self._data_ is None:
+            return
+        
+        fileName = self._getSaveFileName_("TIFF")
         
         if len(fileName) == 0:
             return
         
-        #if image
-        
         pio.saveImageFile(self._data_, fileName)
         
+    @Slot()
+    @safeWrapper
+    def slot_saveHDF5(self):
+        r"""Saves the underlying data array as a HDF5 file.
+        The axes of the array will include calibration data.
+        """
+        if self._data_ is None:
+            return
+        
+        if self.axesCalibration:
+            data = self.axesCalibration.calibrateImage(self._data_)
+        else:
+            data = self._data_
+
+        fileName = self._getSaveFileName_("HDF5")
+        
+        if len(fileName) == 0:
+            return
+        
+        pio.saveHDF5(data, fileName)
+        
+    @Slot()
+    @safeWrapper
+    def slot_savePickle(self):
+        r"""Saves the underlying data array as a Python pickle file.
+        The axes of the array will include calibration data.
+        """
+        if self._data_ is None:
+            return
+        
+        if self.axesCalibration:
+            data = self.axesCalibration.calibrateImage(self._data_)
+        else:
+            data = self._data_
+
+        fileName = self._getSaveFileName_("HDF5")
+        
+        if len(fileName) == 0:
+            return
+        
+        pio.savePickleFile(data, fileName)
+        
+    @Slot()
+    @safeWrapper
+    def slot_dataToWorkspace(self):
+        r"""Exports underlying data array as a VigraArray to the workspace.
+        The array axes willl include calibration data
+        """
+        if self._data_ is None:
+            return
+        
+        if self.axesCalibration:
+            data = self.axesCalibration.calibrateImage(self._data_)
+        else:
+            data = self._data_
+            
+        self.exportDataToWorkspace(data, "data")
     
     @Slot()
     @safeWrapper
@@ -2293,7 +2413,10 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                     #cFrame = lrMapImage.copy()
                     return image
                 else:
-                    cFrame = vigra.colors.applyColortable(lrMapImage.astype('uint32'), cTable)
+                    lmi = lrMapImage.dropChannelAxis() # BUG 2025-04-19 09:29:24 why the next line still sees it with ndim=3?
+                    # print(f"{self.__class__.__name__}._applyColorTable_: lrMapImg.ndim: {lmi.ndim}")
+                    # print(f"{self.__class__.__name__}._applyColorTable_: lrMapImage.ndim: {lrMapImage.ndim}")
+                    cFrame = vigra.colors.applyColortable(lmi.astype('uint32').dropChannelAxis(), cTable)
                     
             else:
                 cFrame = vigra.colors.applyColortable(lrMapImage.astype('uint32'), cTable)
@@ -2364,7 +2487,20 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     
     @property
     def frameData(self):
-        r"""Reference ot the current frame image data"""
+        r"""Reference to the current frame image data.
+        This does NOT include axes calibration data. 
+        Instead, use self.frameDataWithCalibratedAxes"""
+        return self._currentFrameData_
+    
+    @property
+    def frameDataWithCalibratedAxes(self):
+        r"""Current frame image as an array with calibrated axes"""
+        if self._currentFrameData_ is None:
+            return
+        
+        if self.axesCalibration:
+            return self.axesCalibration.calibrateImage(self._currentFrameData_)
+        
         return self._currentFrameData_
         
     @safeWrapper
@@ -2554,7 +2690,13 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.actionExportAsPNG.triggered.connect(self.slot_exportSceneAsPNG)
         self.actionExportAsSVG.triggered.connect(self.slot_exportSceneAsSVG)
         self.actionExportAsTIFF.triggered.connect(self.slot_exportSceneAsTIFF)
+        self.actionExportAsHDF5.triggered.connect(self.slot_exportFrameAsHDF5)
+        self.actionExportAsPickle.triggered.connect(self.slot_exportFrameAsPickle)
+        self.actionExportToWorkspace.triggered.connect(self.slot_exportFrameToWorkspace)
         self.actionSaveTIFF.triggered.connect(self.slot_saveTIFF)
+        self.actionHDF5.triggered.connect(self.slot_saveHDF5)
+        self.actionPickle.triggered.connect(self.slot_savePickle)
+        self.actionTo_workspace.triggered.connect(self.slot_dataToWorkspace)
         
         self.displayMenu = QtWidgets.QMenu("Display", self)
         self.menubar.addMenu(self.displayMenu)
@@ -3469,7 +3611,9 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             
             displaychannel: int, "all", or None (default)
         '''
-        
+        # BUG: 2025-04-19 09:18:29 TODO/FIXME
+        # when loading a 2D image in a viewer previously used to view a 3D volume
+        # there are issues with the _applyColorTable_
         self._imageNormalize     = normalize
         self._imageGamma         = gamma
         

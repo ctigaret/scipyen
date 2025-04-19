@@ -156,7 +156,7 @@
      <x>0</x>
      <y>0</y>
      <width>691</width>
-     <height>28</height>
+     <height>27</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -170,12 +170,18 @@
      <addaction name="actionExportAsPNG"/>
      <addaction name="actionExportAsSVG"/>
      <addaction name="actionExportAsTIFF"/>
+     <addaction name="actionExportAsHDF5"/>
+     <addaction name="actionExportAsPickle"/>
+     <addaction name="actionExportToWorkspace"/>
     </widget>
     <widget class="QMenu" name="menuSave">
      <property name="title">
       <string>&amp;Save</string>
      </property>
      <addaction name="actionSaveTIFF"/>
+     <addaction name="actionHDF5"/>
+     <addaction name="actionPickle"/>
+     <addaction name="actionTo_workspace"/>
     </widget>
     <addaction name="separator"/>
     <addaction name="actionView"/>
@@ -279,6 +285,36 @@
    </property>
    <property name="whatsThis">
     <string>Refresh image display - only works for images in the workspace</string>
+   </property>
+  </action>
+  <action name="actionHDF5">
+   <property name="text">
+    <string>HDF5</string>
+   </property>
+  </action>
+  <action name="actionPickle">
+   <property name="text">
+    <string>Pickle</string>
+   </property>
+  </action>
+  <action name="actionExportAsHDF5">
+   <property name="text">
+    <string>HDF5</string>
+   </property>
+  </action>
+  <action name="actionExportAsPickle">
+   <property name="text">
+    <string>Pickle</string>
+   </property>
+  </action>
+  <action name="actionExportToWorkspace">
+   <property name="text">
+    <string>To workspace</string>
+   </property>
+  </action>
+  <action name="actionTo_workspace">
+   <property name="text">
+    <string>To workspace</string>
    </property>
   </action>
  </widget>
