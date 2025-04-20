@@ -973,8 +973,12 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     
     defaultGraphicsHoverColor = "red"
 
-    def __init__(self, data: (vigra.VigraArray, vigra.filters.Kernel2D, np.ndarray, QtGui.QImage, QtGui.QPixmap, tuple, list) = None, parent: (QtWidgets.QMainWindow, type(None)) = None, ID:(int, type(None)) = None, win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None, frame:(int, type(None)) = None, displayChannel = None, normalize: (bool, ) = False, gamma: (float, ) = 1.0, *args, **kwargs):
-
+    def __init__(self, data: (vigra.VigraArray, vigra.filters.Kernel2D, np.ndarray, QtGui.QImage, QtGui.QPixmap, tuple, list) = None, 
+                 parent: (QtWidgets.QMainWindow, type(None)) = None, ID:(int, type(None)) = None, 
+                 win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None, 
+                 frame:(int, type(None)) = None, 
+                 displayChannel = None, normalize: (bool, ) = False, gamma: (float, ) = 1.0, *args, **kwargs):
+        # print(f"{self.__class__.__name__}.__init__: data: {type(data).__name__}")
         self._image_width_ = 0
         self._image_height_ = 0
         self._imageNormalize             = None
@@ -1026,27 +1030,27 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         #self.nChannels                 = 1
         #self._current_frame_index_      = 0
         #self._number_of_frames_         = 1
-        self.tStride                    = 0
-        self.zStride                    = 0
-        self.userFrameAxisInfo          = None
+        self.tStride                        = 0
+        self.zStride                        = 0
+        self.userFrameAxisInfo              = None
         # NOTE: 2021-12-02 10:50:17
         # the 3 beow are int see NOTE: 2021-12-02 10:39:54
-        self.frameAxis                  = None
-        self.widthAxis                  = None # this is "visual" width which may not be on a spatial axis "x"
-        self.heightAxis                 = None # this is "visual" height which may not be on a spatial axis "y"
+        self.frameAxis                      = None
+        self.widthAxis                      = None # this is "visual" width which may not be on a spatial axis "x"
+        self.heightAxis                     = None # this is "visual" height which may not be on a spatial axis "y"
         #self.frameIterator              = None # ??? FIXME what's this for ???
-        self._currentZoom_              = 0
+        self._currentZoom_                  = 0
         #self.complexDisplay            = ComplexDisplay.real # one of "real", "imag", "dual" "abs", "phase" (cmath.phase), "arg"
-        self._currentFrameData_         = None
+        self._currentFrameData_             = None
         
         # QGraphicsLineItems -- outside the roi/cursor GraphicsObject framework!
-        self._scaleBarColor_             = QtGui.QColor(255, 255, 255)
-        self._xScaleBar_                 = None
-        self._xScaleBarTextItem_         = None
-        self._yScaleBar_                 = None
-        self._yScaleBarTextItem_         = None
-        self._scaleBarTextPen_           = QtGui.QPen(QtCore.Qt.SolidLine)
-        self._scaleBarPen_               = QtGui.QPen(QtGui.QBrush(self._scaleBarColor_, 
+        self._scaleBarColor_                = QtGui.QColor(255, 255, 255)
+        self._xScaleBar_                    = None
+        self._xScaleBarTextItem_            = None
+        self._yScaleBar_                    = None
+        self._yScaleBarTextItem_            = None
+        self._scaleBarTextPen_              = QtGui.QPen(QtCore.Qt.SolidLine)
+        self._scaleBarPen_                  = QtGui.QPen(QtGui.QBrush(self._scaleBarColor_, 
                                                                   QtCore.Qt.SolidPattern),
                                                      2.0,
                                                      cap = QtCore.Qt.RoundCap,
@@ -1054,17 +1058,19 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         #self.qsettings                   = QtCore.QSettings()
         
-        self._display_horizontal_scalebar_ = True
-        self._display_vertical_scalebar_   = True
+        self._display_horizontal_scalebar_  = True
+        self._display_vertical_scalebar_    = True
         
-        self._display_time_vertical_           = True
+        self._display_time_vertical_        = True
         
-        self._showsScaleBars_            = True
+        self._showsScaleBars_               = True
         
-        self._showsIntensityCalibration_ = False
+        self._showsIntensityCalibration_    = False
         
-        self._scaleBarOrigin_            = (0, 0)
-        self._scaleBarLength_            = (10,10)
+        self._scaleBarOrigin_               = (0, 0)
+        self._scaleBarLength_               = (10,10)
+        
+        self._asAlphaChannel_:bool          = False
         
         # NOTE: 2021-08-25 09:42:54
         # ScipyenFrameViewer initialization - also does the following:
@@ -1131,7 +1137,6 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                 self._colorMap = self._prevColorMap
             else:
                 self._colorMap = colormaps.get("grey")
-            #self.displayFrame()
             
         return self._colorMap.name
     
@@ -1161,7 +1166,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         if isinstance(getattr(self, "configurable_traits", None), DataBag):
             self.configurable_traits["ColorMap"] = cmap_name
         
-        self.displayFrame()
+        if self._data_ is not None:
+            self.displayFrame()
         
     @property
     def frameIndexBinding(self) -> tuple:
@@ -2296,6 +2302,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         # use axis indices instead of AxisInfo, in proposeLayout
         import io
         
+        # print(f"{self.__class__.__name__}._parseVigraArrayData_; img ndim = {img.ndim}, channels = {img.channels}, channelIndex = {img.channelIndex}")
+        
         if img is None:
             return False
         
@@ -2317,7 +2325,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             
         try:
             # there may be a previous image stored here
-            if self._data_ is not None and len(self.graphicsCursors) > 0: # parse width/height of previos image if any, to check against existing cursors
+            if self._data_ is not None and len(self.graphicsCursors) > 0: # parse width/height of previous image if any, to check against existing cursors
                 if self._data_.shape[layout.horizontalAxis] != img.shape[layout.horizontalAxis] or \
                     self._data_.shape[layout.verticalAxis] != img.shape[layout.verticalAxis]:
                     self.questionMessage("Imageviewer:", "New image geometry will invalidate existing cursors.\nLoad image and bring all cursors to center?")
@@ -2346,8 +2354,12 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             self.widthAxis  = layout.horizontalAxis
             self.heightAxis = layout.verticalAxis
             
-            with self.observed_vars.observer.hold_trait_notifications():
-                self.observed_vars["data"] = self._data_
+            # NOTE: 2025-04-20 11:50:31
+            # do NOT assign data to observables here!
+            # Instead, do it inset _data_ AFTER everything else is set up
+            # by _parseVigraArrayData_
+            # with self.observed_vars.observer.hold_trait_notifications():
+            #     self.observed_vars["data"] = self._data_
             
             return True
                 
@@ -2384,6 +2396,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             colorMap  = self._colorMap
             
         if isinstance(image, vigra.VigraArray):
+            # print(f"{self.__class__.__name__}._applyColorTable_: image ndim = {image.ndim}, channels = {image.channels}, channelIndex = {image.channelIndex}, dtype = {image.dtype}")
+            
             if not isinstance(colorMap, colormaps.colors.Colormap):
                 return image
             
@@ -2393,9 +2407,6 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             if image.min() == image.max():
                 return image
             
-            # img = image.dropChannelAxis()
-            
-            # lrMapImage = vigra.colors.linearRangeMapping(img)
             lrMapImage = vigra.colors.linearRangeMapping(image)
             
             nMap = colormaps.colors.Normalize(vmin=0, vmax=255)
@@ -2413,11 +2424,11 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                     #cFrame = lrMapImage.copy()
                     return image
                 else:
-                    lmi = lrMapImage.dropChannelAxis() # BUG 2025-04-19 09:29:24 why the next line still sees it with ndim=3?
-                    # print(f"{self.__class__.__name__}._applyColorTable_: lrMapImg.ndim: {lmi.ndim}")
-                    # print(f"{self.__class__.__name__}._applyColorTable_: lrMapImage.ndim: {lrMapImage.ndim}")
-                    cFrame = vigra.colors.applyColortable(lmi.astype('uint32').dropChannelAxis(), cTable)
-                    
+                    if image.channels == 1:
+                        lmi = lrMapImage.dropChannelAxis().astype('uint32')[:,:,0] 
+                    else:
+                        lmi = lrMapImage.bindAxis("c", 0).astype('uint32')[:,:,0] 
+                    cFrame = vigra.colors.applyColortable(lmi.astype('uint32'), cTable)
             else:
                 cFrame = vigra.colors.applyColortable(lrMapImage.astype('uint32'), cTable)
                 
@@ -2504,7 +2515,15 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         return self._currentFrameData_
         
     @safeWrapper
-    def displayFrame(self, channel_index = None, colorMap:typing.Optional[colormaps.colors.Colormap] = None, asAlphaChannel:bool=False):
+    def displayFrame(self, channel_index = None,
+                     colorMap:typing.Optional[colormaps.colors.Colormap] = None, 
+                     asAlphaChannel:typing.Optional[bool]=None):
+        # print(f"\n{self.__class__.__name__}.displayFrame call stack:")
+        # traceback.print_stack()
+        
+        if not isinstance(asAlphaChannel, bool):
+            asAlphaChannel = self._asAlphaChannel_
+        
         if channel_index is None:
             channel_index = self._displayedChannel_
             
@@ -2526,8 +2545,11 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         if channel_index is not self._displayedChannel_:
             self._displayedChannel_ = channel_index
         
+        # print(f"\n{self.__class__.__name__}.displayFrame (channel_index = {channel_index}, colorMap = {colorMap}, asAlphaChannel = {asAlphaChannel})")
+        
         if isinstance(self._data_, vigra.VigraArray):
             self._currentFrameData_, _ = self.frameView(channel_index) # this is an array view !
+            # print(f"\t{self.__class__.__name__}.displayFrame currentFrameData ndim = {self._currentFrameData_.ndim}, channels = {self._currentFrameData_.channels}, channelIndex = {self._currentFrameData_.channelIndex}")
             
             if asAlphaChannel:
                 if self._currentFrameData_.channels == 1:
@@ -2549,10 +2571,10 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                                                              self._currentFrameData_[Ellipsis,np.newaxis]),
                                                             axis=2),
                                             axistags = vigra.VigraArray.defaultAxistags('xyc'))
-                    
+                    # print(f"{self.__class__.__name__}.displayFrame asAlphaChannel, frame ndim = {frame.ndim}, channels = {frame.channels}, channelIndex = {franme.channelIndex}")
                     self.viewerWidget.view(frame.qimage(normalize=False))
                     
-            else:
+            else: 
                 if isinstance(colorMap, colormaps.colors.Colormap):
                     if self._currentFrameData_.channels == 1:
                         if self._currentFrameData_.channelIndex < self._currentFrameData_.ndim:
@@ -2981,11 +3003,12 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             selItems = d.selectedItemsText
             if len(selItems):
                 self.colorMap = selItems[0]
-            self.displayFrame()
+            # self.displayFrame()
             
         else:
             self.colorMap = self._prevColorMap
-            self.displayFrame()
+        
+        self.displayFrame()
 
     def _editImageBrightness(self):
         dlg = ImageBrightnessDialog(self)
@@ -3009,9 +3032,6 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         if self._data_ is None:
             return
         
-        #if self._currentFrameData_ is None:
-            #return
-            
         # NOTE: 2021-12-03 09:40:11 because self.frameAxis is now an int or a 
         # tuple of ints we need tpo convert these back to axisinfo
         
@@ -3194,12 +3214,28 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                     else: # ndim == 2
                         val = float(np.squeeze(img[x,y]))
                         
-                        coordTxt = "%s<X: %d (%s: %s)%s, Y: %d (%s: %s)%s> %.2f" % \
+                        sval = "%.2f" % val
+#                         if self._axes_calibration_:
+#                             # channelNdx = self._axes_calibration_["c"].channelIndices
+#                             cval = self._axes_calibration_["c"].getChannelCalibration().calibratedMeasure(val)
+#                             # cval = [self._axes_calibration_["c"].getChannelCalibration(channelNdx[k])[1].calibratedMeasure(val[k]) for k in range(img.channels)]
+#                             sval = quantity2str(cval)
+#                             
+#                         else:
+#                             sval = "%.2f" % val
+
+                        coordTxt = "%s<X: %d (%s: %s)%s, Y: %d (%s: %s)%s> %s" % \
                             (crstxt, \
                             x, widthAxisKey, scx, swx, \
                             y, heightAxisKey, scy, swy, \
-                            val)
+                            sval)
                     
+#                         coordTxt = "%s<X: %d (%s: %s)%s, Y: %d (%s: %s)%s> %.2f" % \
+#                             (crstxt, \
+#                             x, widthAxisKey, scx, swx, \
+#                             y, heightAxisKey, scy, swy, \
+#                             val)
+#                     
                 else: # ndim < 2 shouldn't realy get here, should we ?!?
                     val = float(img[x])
                     
@@ -3641,7 +3677,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             
         self._colorBar = None
         
-        self._axes_calibration_ = None
+        # force rebuilding an AxesCalibration object
+        self._axes_calibration_ = None 
                 
         if displayChannel is None:
             self._displayedChannel_      = "all"
@@ -3658,6 +3695,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             self._displayedChannel_ = displayChannel
 
         if isinstance(data, vigra.VigraArray):
+            # print(f"{self.__class__.__name__}._set_data_: data ndim: {data.ndim}, channels: {data.channels}, channelIndex: {data.channelIndex}")
             if isinstance(frameAxis, (int, str, vigra.AxisInfo)):
                 self.userFrameAxisInfo  = frameAxis
                 
@@ -3674,7 +3712,13 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                     self._axes_calibration_ = None
                     traceback.print_exc()
                 self._setup_channels_display_actions_()
-                self.displayFrame(asAlphaChannel=asAlphaChannel)
+                self._asAlphaChannel_ = asAlphaChannel
+                
+                # NOTE: 2025-04-20 11:51:40
+                # do NOT call this directly; instead, set up everything else in
+                # the UI, THEN assign data to observables, which will trigger a
+                # call to self.displayFrame(), see NOTE: 2025-04-20 11:51:18
+                # self.displayFrame(asAlphaChannel=asAlphaChannel)
                 
                 #totalFrames = self._number_of_frames_ if isinstance(self._number_of_frames_, int) else np.prod(self._number_of_frames_)
         
@@ -3684,6 +3728,13 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                 self.framesQSpinBox.setMaximum(self._number_of_frames_ - 1)
                 self.framesQSpinBox.setToolTip("Select frame.")
                 self.nFramesLabel.setText("of %d" % self._number_of_frames_)
+                
+                # NOTE: 2025-04-20 11:51:18, see NOTE: 2025-04-20 11:51:40
+                # this will trigger a call to self.displayFrame
+                #
+                # Like this, displayFrame gets called only ONCE when other 
+                # varables have been properly set up
+                self.observed_vars["data"] = self._data_
                 
   
         elif isinstance(data, (QtGui.QImage, QtGui.QPixmap)):

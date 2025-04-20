@@ -1287,7 +1287,6 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
             
             if hasattr(data, "modified") and isinstance(data.modified, bool):
                 data.modified=False
-            # self.displayFrame()
             
             self.statusBar().showMessage("Done!")
         
