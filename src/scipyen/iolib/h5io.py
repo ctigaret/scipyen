@@ -1200,76 +1200,73 @@ def group2VigraArray(g:h5py.Group, cache:dict = {}):
                 axdd = dict([(k,i) for k,i in axes_group.items()])
                 for k, (axdsetname, axdset) in enumerate(axes_group.items()):
                     axattrs = attrs2dict(axdset.attrs)
-                    axcaldata = AxisCalibrationData.new(axattrs["calibration"])
-                    axescalibrationdata.append(axcaldata)
+                    axcalStr = axattrs["calibration"]
+                    if isinstance(axcalStr, str) and len(axcalStr.strip()):
+                        s_s = AxisCalibrationData.findCalibrationString(axcalStr)
+                        if s_s is not None:
+                            axcaldata = AxisCalibrationData.new(axcalStr)
+                            axescalibrationdata.append(axcaldata)
         except:
             traceback.print_exc()
             axistags = vigra.defaultAxistags(data_array.ndim)
             
-        # NOTE: 2025-04-18 14:17:10
-        # The new axes calibration framework allows axistags having an extra
-        # (virtual) channel axis; accommodate this.
         axistags = vigra.AxisTags(*axinfos)
-        # if len(axistags) == data_array.ndim+1:
-        if len(axistags) > data_array.ndim:
-            if len(axistags) == data_array.ndim+1:
-                cIndex = axistags.channelIndex
-                if cIndex == data_array.ndim:
-                    # reducedAxinfos = list(filter(lambda x: x[1].typeFlags & vigra.AxisType.NonChannel, enumerate(axistags)))
-                    # reducedAxisTags = vigra.AxisTags(list(map(lambda x: x[1], reducedAxinfos)))
-                    # reducedAxinfos = list(filter(lambda x: x.typeFlags & vigra.AxisType.NonChannel, axistags))
-                    reducedAxinfos = list(filter(lambda x: x.typeFlags & vigra.AxisType.NonChannel, axinfos))
-                    reducedAxisTags = vigra.AxisTags(reducedAxinfos)
-                    ret = vigra.VigraArray(data_array, dtype = dtype, axistags = reducedAxisTags, order="V")
-                    ret.axistags.insertChannelAxis()
-                    # ret.axistags["c"] = axistags[cIndex]
-                    ret.axistags["c"] = axinfos[cIndex]
-                    
-                else:
-                    # going out on a limb, here...
-                    reducedAxinfos = axinfos[:data_array.ndim]
-                    extraAxisinfos = axinfos[data_array.ndim:]
-                    reducedAxisTags = vigra.AxisTags(reducedAxinfos)
-                    ret = vigra.VigraArray(data_array, dtype = dtype, axistags = reducedAxisTags, order="V")
-                    for axinfo in extraAxisinfos:
-                        ret.axistags.insert(len(ret.axistags), axinfo)
-                        
-            else:
-                reducedAxinfos = axinfos[:data_array.ndim]
-                extraAxisinfos = axinfos[data_array.ndim:]
-                reducedAxisTags = vigra.AxisTags(reducedAxinfos)
-                ret = vigra.VigraArray(data_array, dtype = dtype, axistags = reducedAxisTags, order="V")
-                for axinfo in extraAxisinfos:
-                    ret.axistags.insert(len(ret.axistags), axinfo)
-                
-        elif len(axistags) < data_array.ndim:
-            # going out on a limb, here, too...
-            tagslen = len(axistags)
-            for k in range(tagslen, data_array.ndim):
-                axistags.insert(len(axistags), vigra.AxisInfo())
-                
-            ret = vigra.VigraArray(data_array, dtype = dtype, axistags = axistags, order="V")
-            
-#             if len(axescalibrationdata) == ret.ndim and all(isinstance(v, AxisCalibrationData) for v in axescalibrationdata):
-#                 channelAxisCalibration = filter(lambda x: x.isChannel, axescalibrationdata)
-#                 if len(channelAxisCalibration):
-#                     channelAxisCalibration = channelAxisCalibration[0]
+#         # NOTE: 2025-04-18 14:17:10
+#         # The new axes calibration framework allows axistags having an extra
+#         # (virtual) channel axis; accommodate this.
+#         if len(axistags) > data_array.ndim:
+#             if len(axistags) == data_array.ndim+1:
+#                 cIndex = axistags.channelIndex
+#                 if cIndex == data_array.ndim:
+#                     # reducedAxinfos = list(filter(lambda x: x[1].typeFlags & vigra.AxisType.NonChannel, enumerate(axistags)))
+#                     # reducedAxisTags = vigra.AxisTags(list(map(lambda x: x[1], reducedAxinfos)))
+#                     # reducedAxinfos = list(filter(lambda x: x.typeFlags & vigra.AxisType.NonChannel, axistags))
+#                     reducedAxinfos = list(filter(lambda x: x.typeFlags & vigra.AxisType.NonChannel, axinfos))
+#                     reducedAxisTags = vigra.AxisTags(reducedAxinfos)
+#                     ret = vigra.VigraArray(data_array, dtype = dtype, axistags = reducedAxisTags, order="V")
+#                     ret.insertChannelAxis()
+#                     # ret.axistags["c"] = axistags[cIndex]
+#                     ret.axistags["c"] = axinfos[cIndex]
 #                     
-#                     for k, axcaldata in enumerate(axescalibrationdata):
-#                         if 
-#                         axcaldata.calibrateAxis(ret.axistags[k])
 #                 else:
-#                     scipywarn("Trouble finding a Channels AxisCalibrationData")
-#                     
-#                     for k, axcaldata in enumerate(axescalibrationdata):
-#                         axcaldata.calibrateAxis(ret.axistags[k])
-                
-        else:
-            ret = vigra.VigraArray(data_array, dtype = dtype, axistags = vigra.AxisTags(*axinfos), order="V")
+#                     # going out on a limb, here...
+#                     reducedAxinfos = axinfos[:data_array.ndim]
+#                     extraAxisinfos = axinfos[data_array.ndim:]
+#                     reducedAxisTags = vigra.AxisTags(reducedAxinfos)
+#                     ret = vigra.VigraArray(data_array, dtype = dtype, axistags = reducedAxisTags, order="V")
+#                     for axinfo in extraAxisinfos:
+#                         ret.axistags.insert(len(ret.axistags), axinfo)
+#                         
+#             else:
+#                 reducedAxinfos = axinfos[:data_array.ndim]
+#                 extraAxisinfos = axinfos[data_array.ndim:]
+#                 reducedAxisTags = vigra.AxisTags(reducedAxinfos)
+#                 ret = vigra.VigraArray(data_array, dtype = dtype, axistags = reducedAxisTags, order="V")
+#                 for axinfo in extraAxisinfos:
+#                     ret.axistags.insert(len(ret.axistags), axinfo)
+#                 
+#         elif len(axistags) < data_array.ndim:
+#             # going out on a limb, here, too...
+#             tagslen = len(axistags)
+#             for k in range(tagslen, data_array.ndim):
+#                 axistags.insert(len(axistags), vigra.AxisInfo())
+#                 
+#             ret = vigra.VigraArray(data_array, dtype = dtype, axistags = axistags, order="V")
+#             
+#         else:
+#             ret = vigra.VigraArray(data_array, dtype = dtype, axistags = vigra.AxisTags(*axinfos), order="V")
         
-        if len(axescalibrationdata) == ret.ndim and all(isinstance(v, AxisCalibrationData) for v in axescalibrationdata):
-            for k, axcaldata in enumerate(axescalibrationdata):
-                axcaldata.calibrateAxis(ret.axistags[k])
+        ret = vigra.VigraArray(data_array, dtype = dtype, axistags = vigra.AxisTags(*axinfos), order="V")
+        
+        axCal = AxesCalibration(axescalibrationdata)
+        
+        for axInfo in ret.axistags:
+            if axInfo.key in axCal:
+                axCal[axInfo.key].calibrateAxis(axInfo)
+        
+        # if len(axescalibrationdata):# == ret.ndim and all(isinstance(v, AxisCalibrationData) for v in axescalibrationdata):
+        #     for k, axcaldata in enumerate(axescalibrationdata):
+        #         axcaldata.calibrateAxis(ret.axistags[k])
             
         return ret
             
@@ -1778,30 +1775,19 @@ def _(obj, axisindex:typing.Union[int, str]):
     
     axisinfo = obj.axistags[axisindex]
     
-    axiscal = AxisCalibrationData.new(axisinfo)
-    
-    # data = dict((f"cal_{k}", v) for k,v in axiscal.asdict().items()) # axiscal.data
-    # data = dict((f"cal_{k}", v) for k,v in axiscal.data.items()) # axiscal.data
-    
     axdict = {"key": axisinfo.key,
               "typeFlags": axisinfo.typeFlags,
               "description": axisinfo.description,
-              "resolution": axisinfo.resolution,
-              "calibration": axiscal.calibrationString}
-    # axdict = {"key": axisinfo.key,
-    #           "typeFlags": axisinfo.typeFlags,
-    #           "description": axisinfo.description,
-    #           "resolution": axisinfo.resolution}
-    
-    # axdict.update(data)
+              "resolution": axisinfo.resolution}
+
+    start_stop = AxisCalibrationData.findCalibrationString(axisinfo.description)
+    if isinstance(start_stop, tuple) and len(start_stop):
+        start, stop = start_stop
+        axdict["calibration"] = axisinfo.description[start:stop]
+    else:
+        axdict["calibration"] = None
     
     return makeAttrDict(**axdict)
-    
-    # return makeAttrDict(key          = axisinfo.key,
-    #                     typeFlags    = axisinfo.typeFlags,
-    #                     description  = axisinfo.description, 
-    #                     resolution   = axisinfo.resolution, 
-    #                     **data)
     
 @makeAxisDict.register(vigra.AxisTags)
 def _(obj, axisindex:typing.Union[int, str]):
@@ -2135,7 +2121,6 @@ def _(obj, axisindex):
     return ret
 
 @safeWrapper
-# def makeAxisScale(obj, dset:h5py.Dataset, axesgroup:h5py.Group, dimindex:int,axisdict:dict,compression:str="gzip",chunks:bool=None,track_order=True):
 def makeAxisScale(obj, dset:h5py.Dataset, axesgroup:h5py.Group, dimindex:int,
                   compression:str="gzip",chunks:bool=None,track_order=True):
     r"""
@@ -3456,36 +3441,6 @@ def _(obj:dict, group, attrs, name, compression, chunks, track_order,
             
     return grp
     
-#     if all(isinstance(k, str) for k in obj.keys()):
-#         for k, element in obj.items():
-#         print(f"key {k} ({type(k).__name__}): element is a {type(element).__name__}")
-#             cached_entity = getCachedEntity(entity_cache, element)
-#             if isinstance(cached_entity, (h5py.Group, h5py.Dataset)):
-#                 grp[k] = cached_entity
-#             
-#             else:
-#                 element_entity = toHDF5(element, grp, k, compression = compression, chunks = chunks,
-#                                 track_order = track_order, entity_cache = entity_cache)
-#         print("")
-#     else:
-#         for k, (key, element) in enumerate(obj.items()):
-#         print(f"key {k} ({type(k).__name__}): element is a {type(element).__name__}")
-#         print(f"key {k}: element is a {type(element).__name__}")
-#             key_type = type(key)
-#             key_value_grp_name = f"{k}_{key_type.__name__}_key"
-#             key_value_grp = grp.create_group(key_value_grp_name, track_order=track_order)
-#             
-#             key_entity = toHDF5(key, key_value_grp ,"key", compression = compression, chunks = chunks,
-#                                 track_order = track_order, entity_cache = entity_cache)
-#             
-#             cached_entity = getCachedEntity(entity_cache, element)
-#             if isinstance(cached_entity, (h5py.Group, h5py.Dataset)):
-#                 key_value_grp["value"] = cached_entity
-#             else:
-#                 element_entity = toHDF5(element, key_value_grp, "value", compression = compression, chunks = chunks,
-#                                 track_order = track_order, entity_cache = entity_cache)
-#     return grp
-
 @makeGroup.register(collections.abc.Iterable)
 def _(obj:collections.abc.Iterable, group, attrs, name, compression, chunks, 
       track_order, entity_cache):

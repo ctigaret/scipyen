@@ -1503,6 +1503,12 @@ class AxisCalibrationData(CalibrationData):
             else:
                 stop = start + len("<axis_calibration>")
             return (start, stop)
+        
+    @staticmethod
+    def isCalibrated(o:vigra.AxisInfo) -> bool:
+        start_stop = AxisCalibrationData.findCalibrationString(o.description)
+        return start_stop is not None
+    
 
     def _repr_pretty_(self, p, cycle):
         if cycle:
@@ -1808,8 +1814,10 @@ class AxesCalibration(object):
         # keep this as a LIST - this to allow several axes with the same 
         # typeFlags (and key).
         self._axescalibrations_ = list()
+        self._axistags_ = None
         
         if len(args) == 1 and isinstance(args[0], (tuple, list , deque)):
+            # unpack args[0] when it is a single sequence
             args = args[0]
         
         if len(args):
@@ -1903,6 +1911,9 @@ class AxesCalibration(object):
                         
                     elif isinstance(arg, AxisCalibrationData):
                         self._axescalibrations_.append(arg)
+                        self._axistags_.append(vigra.AxisInfo(key = arg.key, typeFlags=arg.type, 
+                                                              resolution = arg.resolution if not arg.isChannels else 0.0,
+                                                              description=arg.name))
                         
                     else:
                         if k == 0:
@@ -1910,11 +1921,36 @@ class AxesCalibration(object):
                         else:
                             raise TypeError(f"{k}th argument is not a vigra.AxisInfo, str or AxisCalibrationData")
                         
-
         if not self.__check_cal_axinfo__():
             raise RuntimeError("Axis calibration data is inconsistent with axis info objects")
         
+    @property
+    def isValid(self):
+        r"""Checks validity of this AxesCalibration object.
+        The object is valid when all the conditions below are satisfied:
+        • 'axistags' property if a vigra.AxisTags object
+        • 'calibrations' property is a sequence of AxisCalibrationData objects
+        • 'axistags' and 'calibrations' have the same, non-zero, length
+        • all axis keys in the 'calibrations' sequence are present in the same 
+            order in the 'axistags' and vice-versa.
+        """
+        ret = isinstance(self._axistags_, vigra.AxisTags)
+        
+        if ret:
+            ret &= all(isinstance(v, AxisCalibrationData) for v in self._axescalibrations_)
+            
+        if ret:
+            ret &= len(self._axistags_) > 0 and len(self._axistags_) == len(self._axescalibrations_)
+            
+        if ret:
+            ret &= list(map(lambda x: x.key, self._axistags_)) == list(map(lambda x:x.key, self._axescalibrations_ ))
+        
+        return ret 
+        
     def __check_cal_axinfo__(self):
+        if (self._axistags_ is None or len(self._axistags_) == 0) and len(self._axescalibrations_) == 0:
+            return True
+        
         ret = len(self._axistags_) == len(self._axescalibrations_)
         
         if ret:

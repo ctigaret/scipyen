@@ -2415,13 +2415,11 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             
             sMap.set_array(range(256))
             cTable = sMap.to_rgba(range(256), bytes=True)
-            #cFrame = vigra.colors.applyColortable(image.astype('uint32'), cTable)
             
             if image.ndim > 2:
                 if image.channelIndex < image.ndim and image.channels > 1: # TODO FIXME
                     # NOTE 2017-10-05 14:17:00
                     # do NOT apply colormap to multi-band image
-                    #cFrame = lrMapImage.copy()
                     return image
                 else:
                     if image.channels == 1:
@@ -2438,16 +2436,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             return image
             # FIXME/TODO 2019-11-13 13:58:31
             # figure out how to apply color table to a QImage/QPixmap!
-            #if isinstance(image, QtGui.QPixmap):
-                #qimg = image.toImage()
-                
-            #else:
-                #qimg = image
-                
-            #if qimg.isGrayScale():
-                #q
     
-    def frameView(self, channel):
+    def frameView(self, channel:typing.Optional[typing.Union[int, str]] = None):
         r"""Returns a slice (frame) of self._data_ along the self.frameAxis
         
         If the slice contains np.nan returns a copy of the image slice, for 
@@ -2485,9 +2475,17 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         # up to now, img_view is a 2D slice view of self._data_, will _ALL_ available channels
             
         # get a channel view on the 2D slice view of self._data_
-        if isinstance(channel, int) and "c" in self._currentFrameData_.axistags and channel_index in range(self._currentFrameData_.channels):
-            img_view = img_view.bindAxis("c", channel)
-            
+        # if "c" in self._currentFrameData_.axistags:
+        if "c" in img_view.axistags:
+            if channel is None:
+                channel = 0
+                
+            if isinstance(channel, int) and channel in range(img_view.channels):
+                img_view = img_view.bindAxis("c", channel)
+                
+            elif not (isinstance(channel, str) and channel == "all"):
+                raise ValueError(f"'channel' must be an int or None; instead, got {channel}")
+                
         # check for NaNs
         if np.isnan(img_view).any():             # if there are nans
             img_view = img.view.copy()           # make a copy
@@ -3068,25 +3066,27 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             
             # below, img is a view NOT a copy !
             #
-            
-            img, _ = self.frameView(self._displayedChannel_)
+            #  NOTE: 2025-04-20 17:54:31 
+            # img is actually self._currentFrameData_
+            # img, _ = self.frameView(self._displayedChannel_) 
+            img = self.frameData
             # print(f"{self.__class__.__name__}._displayValueAtCoordinates: img axistags: {img.axistags}")
             
-            viewWidthAxisIndex = img.axistags.index(wAxInfo.key)
+            viewWidthAxisIndex  = img.axistags.index(wAxInfo.key)
             viewHeightAxisIndex = img.axistags.index(hAxInfo.key)
             
             viewW = img.shape[viewWidthAxisIndex]
             viewH = img.shape[viewHeightAxisIndex]
             
+            # ### BEGIN cursor information
             # NOTE: 2021-10-25 22:26:53
             # when given, wx and wy below are, horizontal & vertical cursor
             # windows, respectively
-            
+            #
             if wx is not None:
                 if self._axes_calibration_:
                     cwx = self._axes_calibration_[viewWidthAxisIndex].calibratedDistance(wx)
                     swx = " +/- %d (%s) " % (wx//2, quantity2str(cwx/2))
-                    
             else:
                 swx = ""
                 
@@ -3094,15 +3094,14 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                 if self._axes_calibration_:
                     cwy = self._axes_calibration_[viewHeightAxisIndex].calibratedDistance(wy)
                     swy = " +/- %d (%s) " % (wy//2, quantity2str(cwy/2))
-                    
             else:
                 swy = ""
             
             if crsId is not None:
                 crstxt = "%s " % (crsId)
-                
             else:
                 crstxt = ""
+            # ### END   cursor information
                 
             if x is not None and x >= w:
                 x = w-1
@@ -3140,7 +3139,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                             
                             if self._axes_calibration_:
                                 channelNdx = self._axes_calibration_["c"].channelIndices
-                                cval = [self._axes_calibration_["c"].getChannelCalibration(channelNdx[k])[1].calibratedMeasure(val[k]) for k in range(img.channels)]
+                                cval = [self._axes_calibration_["c"].getChannelCalibration(channelNdx[k]).calibratedMeasure(val[k]) for k in range(img.channels)]
                                 sval = "(%s)" % "; ".join(["%s" % quantity2str(v) for v in cval])
                                 
                             else:
@@ -3156,7 +3155,6 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                                 sval = "(%.2f)" % val
                             
                         if self.frameAxis is not None:
-                            #if isinstance(self.frameAxis, vigra.AxisInfo):
                             if isinstance(self.frameAxis, int):
                                 if self.frameAxis >= self._data_.ndim:
                                     raise RuntimeError(f"frame axis {self.frameAxis} not found in the image")
@@ -3195,11 +3193,16 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                                     
                         else:
                             if isinstance(val, float):
+                                if self._axes_calibration_:
+                                    cval = self._axes_calibration_["c"].getChannelCalibration().calibratedMeasure(val)
+                                    sval = "(%s)" % quantity2str(cval)
+                                else:
+                                    sval = "(%.2f)" % val
                                 coordTxt = "%s<X: %d (%s: %s)%s, Y: %d (%s: %s)%s> %s" % \
                                     (crstxt, \
                                     x, widthAxisKey, scx, swx, \
                                     y, heightAxisKey, scy, swy, \
-                                    val)
+                                    sval)
                                 
                             elif isinstance(val, (tuple, list)):
                                 valstr = "(" + " ".join(["%.2f" % v for v in val]) + ")"
@@ -3214,15 +3217,13 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                     else: # ndim == 2
                         val = float(np.squeeze(img[x,y]))
                         
-                        sval = "%.2f" % val
-#                         if self._axes_calibration_:
-#                             # channelNdx = self._axes_calibration_["c"].channelIndices
-#                             cval = self._axes_calibration_["c"].getChannelCalibration().calibratedMeasure(val)
-#                             # cval = [self._axes_calibration_["c"].getChannelCalibration(channelNdx[k])[1].calibratedMeasure(val[k]) for k in range(img.channels)]
-#                             sval = quantity2str(cval)
-#                             
-#                         else:
-#                             sval = "%.2f" % val
+                        # sval = "%.2f" % val
+                        if self._axes_calibration_:
+                            cval = self._axes_calibration_["c"].getChannelCalibration().calibratedMeasure(val)
+                            sval = "(%.2f)" % quantity2str(cval)
+                            
+                        else:
+                            sval = "(%.2f)" % val
 
                         coordTxt = "%s<X: %d (%s: %s)%s, Y: %d (%s: %s)%s> %s" % \
                             (crstxt, \
