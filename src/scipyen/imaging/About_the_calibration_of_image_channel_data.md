@@ -10,51 +10,80 @@ needs to be implemented elsewhere in Scipyen.
 
 ## NOTE: 2025-04-10 23:23:42 TODO
     
-    To store the algebraic expression for the transformation of pixel intensity
-    (a.u.)  into calibrated values consider:
-    • py-openmath
-    • openexpressions - simpler and more to the point of what I want to achieve?
-      example: estimate change in [Ca²⁺]ᵢ using Kd * ΔF/F / max(ΔF/F)
-          WARNING: openexpressions.Parser cannot parse expression strings containing
-          unicode characters!!!
+To store the algebraic expression for the transformation of pixel intensity
+(a.u.)  into calibrated values consider:
+- py-openmath
+- openexpressions - simpler and more to the point of what I want to achieve?
+
+- openexpressions in conjunction with sympy (simpyfy) to perform some algebraic
+    simplifications of the expression if needed
+
+- alternatives to openexpressions to consider
+    - https://github.com/louisfisch/mathematical-expression-parser
+    - pymep
+    - write your own parser using python's ast module
     
-          notation used:
-          Kd          -> 𝑲d
-          x           -> ΔF/F  = (𝑭-𝑭₀)/𝑭₀
-          xMax        -> max(ΔF/F) (i.e., fluorescence intensity at saturation)
+### Example using openexpressions to estimate change in [Ca²⁺]ᵢ
+The **expression** is:
+
+𝐾d × ΔF_F₀ / ΔF_F₀_max, where:
     
-          WARNING: background fluorescence must have been subtracted from both
-              𝑭 and 𝑭₀ ‼
-           
-          from openexpressions.Parser import Parser
-          math_parser = Parser()
-          expression = math_parser.parse("Kd * x / xMax")
-          this can be evaluated at a given pixel, with intensty 'x', e.g.:
-          y = expression.eval({'Kd':2.5 * pq.uM, 'x': 128, 'xMax': 2048})
-          -> y = array(0.625)*uM
-          NOTE: quantities ARE supported by the evaluation code
+𝐾d  is the dissociation constant of the non-ratiometric fluorescent Ca²⁺ dye
+
+ΔF_F₀ is the pixel intensity value ∝ fluorescence intensity change
+
+ΔF_F₀_max is the fluorescence intensity at saturating [Ca²⁺] obtained, e.g.,
+by imaging a pipette (or outflow from a pipette) with ***pCa*** buffer solutions
+containing either 0 [Ca²⁺] (for F₀) or saturating [Ca²⁺] (for Fₘₐₓ); these 
+images are used to calculate (Fₘₐₓ - F₀)/Fₘₐₓ.
+            
+**WARNING:** background fluorescence must have been subtracted from both
+    𝑭 and 𝑭₀ ‼
+
+For details about this formulae, see Helmchen (2011) CSH Protocols, below. 
+            
+***ATTENTION***: openexpressions.Parser cannot parse expression strings with
+unicode characters. Therefore we must introduce some shorthand, plain
+ASCII notations:
+
+Kd          -> 𝑲d
+
+x           -> ΔF/F₀ = (𝑭-𝑭₀)/𝑭₀ = ΔF_F₀  (i.e., pixel intensity value)
+
+xMax        -> (Fₘₐₓ - F₀)/Fₘₐₓ  = ΔF_F₀_max =  (i.e., fluorescence intensity
+                                                change at saturation)
+
+
+```python
+from openexpressions.Parser import Parser
+math_parser = Parser()
+expression = math_parser.parse("Kd * x / xMax")
+# this can be evaluated at a given pixel, with intensty 'x', e.g.:
+y = expression.eval({'Kd':2.5 * pq.uM, 'x': 128, 'xMax': 2048})
+-> y = array(0.625)*uM
+# NOTE: quantities ARE supported by the evaluation code
+```
+
+**WARNING:** for numpy arrays *do NOT use numpy ufuncs for vectorizing*; 
+just pass the array to the appropriate symbol in the call to eval, 
+e.g., given 'img' a 2D numpy array:
     
-          WARNING: for numpy arrays don't use numpy ufuncs for vectorizing; 
-          just pass the array to the appripriate symbol in the call to eval, 
-          e.g.:
-          img1 = expression.eval({'Kd':2.5 * pq.uM, 'x': img, 'xMax': img.max()})
+```python
+img1 = expression.eval({'Kd':2.5 * pq.uM, 'x': img, 'xMax': img.max()})
+```
+
+The result ('img1') is a quantity array.
+
+***CAUTION:*** when 'img' is a VigraArray, then you should create another 
+VigraArray from the result ('img1'), but be aware of the following:
     
-          img1 is a quantity array
-    
-          CAUTION: when the array in 'img' is a VigraArray, then you should create a 
-          VigraArray from the resulting array, but be aware of the following:
-          1) this will splice-out the quantity units
-          2) you MUST supply and axistags parameter to the VigraArray constructor
-          — this is the good time to apply a quantity calibration to the 
-          channel axis in the axistags destined for the result!
-          
-    • openexpressions in conjunction with sympy (simpyfy) to perform some algebraic
-      simplifications of the expression if needed
-    
-    • alternatives to openexpressions to consider
-      ∘ https://github.com/louisfisch/mathematical-expression-parser
-      ∘ pymep
-      ∘ write your own parser using python's ast module
+1. this will splice-out the quantity units
+
+2. you MUST supply an 'axistags' parameter to the VigraArray constructor
+— this is the good time to apply a quantity calibration to the 
+channel axis in the axistags destined for the result!
+
+---
 
 # Extract from Helmchen (2011) CSH Protocols RE: Ca²⁺ indicators
 

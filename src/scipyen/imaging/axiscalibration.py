@@ -595,6 +595,95 @@ class ChannelCalibrationData(CalibrationData):
         'parent': AxisCalibrationData or None; the "owner" of this ChannelCalibrationData
             object.
         
+        'expression': str or None - algebraic expression relating pixel value 'x'
+            to physical measure 'y'. 
+        
+            The expression is evaluated in the scope where the 'calibrated'
+            physical measure is calculated — this is can be:
+            • the scope of the imaging.axiscalibration module,
+            • anywhere else this expression might have to be evaluated: 
+                ∘ the module of a function call that evalutes it,
+                ∘ the Scipyen console workspace
+        
+            The expression can contain:
+            • literals of unary mathematical functions (i.e., that take one 
+            argument, e.g. sin, gamma, etc); these functions are defined in 
+            the math module of the standard Python library, or in the numpy
+            module; 
+                ∘ if evaluating directly, these function literals MUST be given 
+                    with the name of their defining module (e.g. math.sin, 
+                    math.gamma, np.sin) UNLESS they have been imported directly
+                    in the scope (namespace) where the expession is evaluated
+        
+                ∘ if using pymep, then the 'math.' module need not be 
+                    supplied
+        
+                ∘ openexpression does NOT easily/directly support mathematical
+                functions, just arithmetic operators (and boolean, in the boolean mode)
+                This seems quite powerful, but requires customization.
+        
+                ∘ binary of higher order functions can be transformed to unary
+                functions through the functools.partial (or functools.partialmethod)
+                functions; however, I am not yet sure if they can be parsed by
+                existing expression parsers (e.g., openexpressions, pymep, etc);
+                thus they are better used only when directly evaluating the
+                expression string, provided they are in the scope.
+        
+            • numeric literals will be parsed as constants in the expression
+                these can be scalars, or scalar Quantities; however, NOTE that
+                some parsers (openexpressions) do NOT directly support Quantity 
+                literals
+        
+                The workaround for openexpressions is to use a symbol for the 
+                Quantity units and then include that symbol in the evaluation 
+                "context", e.g. :
+        
+                mathematical expression: Kd * x / fMax
+        
+                where Kd = 2.3 μM a Quantity constant, fMax is a scalar constant, 
+                    say 4096
+        
+                This can be evaluated using openexpressions in several ways:
+        
+                a) s1 = "kd * x / xMax" 
+                   var1 = {"kd": 2.3*pq.uM, "x":<pixel value>, "xMax": 4096} 
+                   expr1 = openexpressions.Parser.Parser().parse(s1)
+                   expr1.eval(var1)
+        
+                   Here, both constants are given as symbols.
+        
+                b) s2 = "2.3 * um * x / xMax" 
+                   var2 = {"um": pq.uM, "x":<pixel value>, "xMax": 4096} 
+                   expr1 = openexpressions.Parser.Parser().parse(s2)
+                   expr2.eval(var2)
+        
+                   Here, magnitude of the quantity constant is given as numeric 
+                   literal, but its units are given as a symbol
+        
+                c) s3 = "2.3 * um * x / 4096" 
+                   var3 = {"um": pq.uM, "x":<pixel value>} 
+                   expr3 = openexpressions.Parser.Parser().parse(s3)
+                   expr3.eval(var3)
+
+                   Here, both constant are given as numeric literals; only the 
+                   units are passed as symbol
+        
+                In all three examples, the actual pixel value must be supplied
+                in the "context" dictionary mapped to the MANDATORY symbol 'x'
+                (lower case).
+        
+        
+            • symbol literals (name of constants)
+                ∘ when using direct evaulation, these symbols MUST be defined 
+                (i.e. bound to numerical values - scalar or arrays) in the scope
+                
+                ∘ when using openexpressions, these symbols must be supplied as
+                a dict (symbol ↦ value) to the eval method of the expression; 
+                this supports Quantity literals as values
+        
+                ∘ the only restriction here is that the symbol 'x' (lower case)
+                is reserved to the 'pixel' value in the array
+        
         NOTE 1: There is no 'resolution' field in this class.
         
         NOTE 2: The physical measure represented by the data points in one channel
@@ -630,8 +719,18 @@ class ChannelCalibrationData(CalibrationData):
         amplification, etc) before beng wuantized. This which makes the concept of
         "resolution", and its use, far less trivial that it may appear.
         
-        NOTE 3: This channel "calibration" simply attaches a physcial quantity to
-        the (discrete) values in the array. Therefore it should NOT be confused 
+        NOTE 3: This channel "calibration" attaches a physical quantity to
+        the (discrete) values in the array. The relation between the array data
+        elements ('pixel' intensities) and the physical measure is a transformation
+        ranging from the simplest identity transform (i.e. attaching a physical unit
+        to the 'pixel' value) to linear or non-linear expressions.
+        
+        In the former case, the pixel numerical value is unchanged; in the latter,
+        a completely new value is assigned¹ to the pixel.
+        
+        FIXME: re-write the documentation
+        
+        Therefore it should NOT be confused 
         with the physical calibration that sets up a map between the values of the 
         array's data points and the underlying quantity that generated the array's
         data. The latter is typically used to infer (or estimate) the physical 

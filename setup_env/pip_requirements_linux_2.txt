@@ -189,6 +189,7 @@ pytz
 pywin32 ; sys_platform == 'win32'
 openmath
 openexpressions
+pymep
 pyxdg
 qimage2ndarray
 ravenclaw
