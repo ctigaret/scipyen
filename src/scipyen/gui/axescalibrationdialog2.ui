@@ -9,8 +9,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>356</width>
-    <height>492</height>
+    <width>401</width>
+    <height>500</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -19,368 +19,8 @@
   <property name="modal">
    <bool>true</bool>
   </property>
-  <layout class="QGridLayout" name="gridLayout_3">
-   <item row="0" column="0">
-    <layout class="QHBoxLayout" name="horizontalLayout">
-     <item>
-      <widget class="QLabel" name="label">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Minimum" vsizetype="Preferred">
-         <horstretch>1</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="minimumSize">
-        <size>
-         <width>20</width>
-         <height>0</height>
-        </size>
-       </property>
-       <property name="text">
-        <string>A&amp;xis:</string>
-       </property>
-       <property name="buddy">
-        <cstring>axisIndexSpinBox</cstring>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QSpinBox" name="axisIndexSpinBox">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
-         <horstretch>1</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="minimumSize">
-        <size>
-         <width>20</width>
-         <height>0</height>
-        </size>
-       </property>
-       <property name="toolTip">
-        <string>Select axis index</string>
-       </property>
-       <property name="statusTip">
-        <string>Select axis index</string>
-       </property>
-       <property name="whatsThis">
-        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Select the axis to calibrate, given the index of the axis. &lt;/p&gt;&lt;p&gt;&lt;a href=&quot;https://numpy.org/doc/stable/index.html&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#72b925;&quot;&gt;Numpy arrays&lt;/span&gt;&lt;/a&gt; associate a Cartesian system of axes, which are indexed starting with 0. &lt;span style=&quot; font-style:italic;&quot;&gt;1D arrays have a single axis&lt;/span&gt;. &lt;/p&gt;&lt;p&gt;For generic numpy arrays with at least two dimensions, the first axis (axis 0) is the vertical axis: iterating along its dimension points to an array &amp;quot;row&amp;quot;. &lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;The &lt;a href=&quot;https://ukoethe.github.io/vigra/&quot;&gt;&lt;span style=&quot; font-weight:600; text-decoration: underline; color:#72b925;&quot;&gt;Vigra&lt;/span&gt;&lt;/a&gt; library introduces the VigraArray, an enhanced form of numpy arrays where each axis has defined semantic (e.g. , space, time, etc) encapsulated in the concept of AxisTags. It is often useful to attach a physical dimension to such axes (units of measure for distance, time, etc). &lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;A VigraArray can have an additional axis representing the &amp;quot;channel&amp;quot; axis. This is useful particularly for multi-band, or multi-channel, images. In single-band images the channel axis, when present, has size 1 (a &amp;quot;singleton&amp;quot; axis). It makes sense to attach units of measure to this axis, too, thus giving a physical meaning to the channel data, when appropriate.&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;Raster image data represented by classes in the &lt;a href=&quot;https://www.qt.io/&quot;&gt;&lt;span style=&quot; font-weight:600; text-decoration: underline; color:#72b925;&quot;&gt;Qt framework&lt;/span&gt;&lt;/a&gt; (QImage, QPixmap) by definition have only two axes corresponding to the Cartesian system of the image. &lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QLabel" name="axisInfoLabel">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
-         <horstretch>4</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="toolTip">
-        <string>Axis length (samples)</string>
-       </property>
-       <property name="frameShape">
-        <enum>QFrame::StyledPanel</enum>
-       </property>
-       <property name="frameShadow">
-        <enum>QFrame::Sunken</enum>
-       </property>
-       <property name="midLineWidth">
-        <number>1</number>
-       </property>
-       <property name="text">
-        <string/>
-       </property>
-       <property name="scaledContents">
-        <bool>true</bool>
-       </property>
-       <property name="wordWrap">
-        <bool>true</bool>
-       </property>
-       <property name="textInteractionFlags">
-        <set>Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
-       </property>
-       <property name="buddy">
-        <cstring>axisIndexSpinBox</cstring>
-       </property>
-      </widget>
-     </item>
-    </layout>
-   </item>
+  <layout class="QGridLayout" name="gridLayout_4">
    <item row="1" column="0">
-    <layout class="QHBoxLayout" name="horizontalLayout_2">
-     <item>
-      <widget class="QLabel" name="label_3">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Minimum" vsizetype="Preferred">
-         <horstretch>1</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="text">
-        <string>Channel:</string>
-       </property>
-       <property name="buddy">
-        <cstring>channelIndexSpinBox</cstring>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QSpinBox" name="channelIndexSpinBox">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
-         <horstretch>1</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="minimumSize">
-        <size>
-         <width>20</width>
-         <height>0</height>
-        </size>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QLabel" name="channelInfoLabel">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
-         <horstretch>4</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="frameShape">
-        <enum>QFrame::StyledPanel</enum>
-       </property>
-       <property name="frameShadow">
-        <enum>QFrame::Sunken</enum>
-       </property>
-       <property name="text">
-        <string/>
-       </property>
-       <property name="buddy">
-        <cstring>channelIndexSpinBox</cstring>
-       </property>
-      </widget>
-     </item>
-    </layout>
-   </item>
-   <item row="2" column="0">
-    <widget class="QGroupBox" name="calibrationGroupBox">
-     <property name="sizePolicy">
-      <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
-       <horstretch>1</horstretch>
-       <verstretch>0</verstretch>
-      </sizepolicy>
-     </property>
-     <property name="toolTip">
-      <string>Calibrate axis. Selected parameter below will be calculated based on the value of the other two</string>
-     </property>
-     <property name="title">
-      <string>Calibration</string>
-     </property>
-     <layout class="QGridLayout" name="gridLayout_2">
-      <item row="0" column="0">
-       <widget class="QLabel" name="label_5">
-        <property name="toolTip">
-         <string>Select a physical unit</string>
-        </property>
-        <property name="statusTip">
-         <string>Select a physical unit</string>
-        </property>
-        <property name="whatsThis">
-         <string>Select a physical unit</string>
-        </property>
-        <property name="text">
-         <string>Units:</string>
-        </property>
-       </widget>
-      </item>
-      <item row="0" column="1">
-       <widget class="QuantityChooserWidget" name="unitSelectionWidget" native="true"/>
-      </item>
-      <item row="1" column="0">
-       <widget class="QLabel" name="label_2">
-        <property name="text">
-         <string>Ori&amp;gin:</string>
-        </property>
-        <property name="buddy">
-         <cstring>originSpinBox</cstring>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="1">
-       <widget class="QDoubleSpinBox" name="originSpinBox">
-        <property name="toolTip">
-         <string>Axis origin in physical units</string>
-        </property>
-        <property name="statusTip">
-         <string>Axis origin in physical units</string>
-        </property>
-        <property name="whatsThis">
-         <string>Axis origin in physical units</string>
-        </property>
-        <property name="maximum">
-         <double>1000000.000000000000000</double>
-        </property>
-       </widget>
-      </item>
-      <item row="2" column="0" colspan="2">
-       <widget class="QGroupBox" name="groupBox">
-        <property name="toolTip">
-         <string>Selected parameter to calculate using the values of other two parameters.</string>
-        </property>
-        <property name="statusTip">
-         <string>Selected parameter to calculate using the values of other two parameters.</string>
-        </property>
-        <property name="whatsThis">
-         <string>Selected parameter to calculate using the values of other two parameters.</string>
-        </property>
-        <property name="title">
-         <string>Calculate</string>
-        </property>
-        <layout class="QGridLayout" name="gridLayout">
-         <item row="0" column="0">
-          <widget class="QRadioButton" name="resolutionRadioButton">
-           <property name="toolTip">
-            <string>Resolution (units / pixel)
-Select this to calculate it using Distance in pixels and Calibrated length.</string>
-           </property>
-           <property name="statusTip">
-            <string>Axis resolution (size of one pixel in calibrated units)</string>
-           </property>
-           <property name="whatsThis">
-            <string>Axis resolution (size of one pixel in calibrated units)</string>
-           </property>
-           <property name="text">
-            <string>Resolu&amp;tion</string>
-           </property>
-           <property name="checked">
-            <bool>true</bool>
-           </property>
-          </widget>
-         </item>
-         <item row="0" column="1">
-          <widget class="QDoubleSpinBox" name="resolutionSpinBox">
-           <property name="enabled">
-            <bool>true</bool>
-           </property>
-           <property name="toolTip">
-            <string>Axis resolution (size of one pixel in calibrated units)</string>
-           </property>
-           <property name="statusTip">
-            <string>Axis resolution (size of one pixel in calibrated units)</string>
-           </property>
-           <property name="whatsThis">
-            <string>Axis resolution (size of one pixel in calibrated units)</string>
-           </property>
-           <property name="readOnly">
-            <bool>false</bool>
-           </property>
-           <property name="decimals">
-            <number>4</number>
-           </property>
-           <property name="maximum">
-            <double>1000000.000000000000000</double>
-           </property>
-          </widget>
-         </item>
-         <item row="1" column="0">
-          <widget class="QRadioButton" name="pixelsDistanceRadioButton">
-           <property name="toolTip">
-            <string>Distance in pixels, along the selected axis.
-Select this to calculate it based on Resolution and Calibrated distance</string>
-           </property>
-           <property name="statusTip">
-            <string>Distance in pixels, along the selected axis.\nSelect this to calculate it based on Resolution and Calibrated distance</string>
-           </property>
-           <property name="whatsThis">
-            <string>Distance in pixels, along the selected axis.
-Select this to calculate it based on Resolution and Calibrated distance</string>
-           </property>
-           <property name="text">
-            <string>Distance in pixels</string>
-           </property>
-          </widget>
-         </item>
-         <item row="1" column="1">
-          <widget class="QSpinBox" name="pixelsDistanceSpinBox">
-           <property name="toolTip">
-            <string>Distance in pixels along the selected axis</string>
-           </property>
-           <property name="statusTip">
-            <string>Distance in pixels along the selected ax</string>
-           </property>
-           <property name="whatsThis">
-            <string>Distance in pixels along the selected ax</string>
-           </property>
-           <property name="maximum">
-            <number>1000000000</number>
-           </property>
-          </widget>
-         </item>
-         <item row="2" column="0">
-          <widget class="QRadioButton" name="calibratedDistanceRadioButton">
-           <property name="toolTip">
-            <string>Calibrated distance in physical units.
-Select this to calculate it based on Resolution and Distance in pixels</string>
-           </property>
-           <property name="statusTip">
-            <string>Calibrated distance in physical units.\nSelect this to calculate it based on Resolution and Distance in pixels</string>
-           </property>
-           <property name="whatsThis">
-            <string>Calibrated distance in physical units.
-Select this to calculate it based on Resolution and Distance in pixels</string>
-           </property>
-           <property name="text">
-            <string>Calibrated Distance</string>
-           </property>
-          </widget>
-         </item>
-         <item row="2" column="1">
-          <widget class="QDoubleSpinBox" name="calibratedDistanceSpinBox">
-           <property name="toolTip">
-            <string>Distance in calibrated units</string>
-           </property>
-           <property name="maximum">
-            <double>1000000.000000000000000</double>
-           </property>
-          </widget>
-         </item>
-        </layout>
-       </widget>
-      </item>
-     </layout>
-    </widget>
-   </item>
-   <item row="3" column="0">
-    <widget class="QLabel" name="label_4">
-     <property name="text">
-      <string>&amp;Description:</string>
-     </property>
-     <property name="buddy">
-      <cstring>axisDescriptionEdit</cstring>
-     </property>
-    </widget>
-   </item>
-   <item row="4" column="0">
-    <widget class="QPlainTextEdit" name="axisDescriptionEdit">
-     <property name="sizePolicy">
-      <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
-       <horstretch>0</horstretch>
-       <verstretch>1</verstretch>
-      </sizepolicy>
-     </property>
-     <property name="toolTip">
-      <string>Axis description</string>
-     </property>
-     <property name="placeholderText">
-      <string>Axis description</string>
-     </property>
-    </widget>
-   </item>
-   <item row="5" column="0">
     <widget class="QDialogButtonBox" name="buttonBox">
      <property name="orientation">
       <enum>Qt::Horizontal</enum>
@@ -388,6 +28,462 @@ Select this to calculate it based on Resolution and Distance in pixels</string>
      <property name="standardButtons">
       <set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set>
      </property>
+    </widget>
+   </item>
+   <item row="0" column="0">
+    <widget class="QTabWidget" name="tabWidget">
+     <property name="currentIndex">
+      <number>0</number>
+     </property>
+     <widget class="QWidget" name="tabWidgetPage1" native="true">
+      <attribute name="title">
+       <string>Axis</string>
+      </attribute>
+      <layout class="QGridLayout" name="gridLayout_3">
+       <item row="0" column="0">
+        <layout class="QHBoxLayout" name="horizontalLayout">
+         <item>
+          <widget class="QLabel" name="label">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Minimum" vsizetype="Preferred">
+             <horstretch>1</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
+           <property name="minimumSize">
+            <size>
+             <width>20</width>
+             <height>0</height>
+            </size>
+           </property>
+           <property name="text">
+            <string>Axis:</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QSpinBox" name="axisIndexSpinBox">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
+             <horstretch>1</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
+           <property name="minimumSize">
+            <size>
+             <width>20</width>
+             <height>0</height>
+            </size>
+           </property>
+           <property name="toolTip">
+            <string>Select axis index</string>
+           </property>
+           <property name="statusTip">
+            <string>Select axis index</string>
+           </property>
+           <property name="whatsThis">
+            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Select the axis to calibrate, given the index of the axis. &lt;/p&gt;&lt;p&gt;&lt;a href=&quot;https://numpy.org/doc/stable/index.html&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#72b925;&quot;&gt;Numpy arrays&lt;/span&gt;&lt;/a&gt; associate a Cartesian system of axes, which are indexed starting with 0. &lt;span style=&quot; font-style:italic;&quot;&gt;1D arrays have a single axis&lt;/span&gt;. &lt;/p&gt;&lt;p&gt;For generic numpy arrays with at least two dimensions, the first axis (axis 0) is the vertical axis: iterating along its dimension points to an array &amp;quot;row&amp;quot;. &lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;The &lt;a href=&quot;https://ukoethe.github.io/vigra/&quot;&gt;&lt;span style=&quot; font-weight:600; text-decoration: underline; color:#72b925;&quot;&gt;Vigra&lt;/span&gt;&lt;/a&gt; library introduces the VigraArray, an enhanced form of numpy arrays where each axis has defined semantic (e.g. , space, time, etc) encapsulated in the concept of AxisTags. It is often useful to attach a physical dimension to such axes (units of measure for distance, time, etc). &lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;A VigraArray can have an additional axis representing the &amp;quot;channel&amp;quot; axis. This is useful particularly for multi-band, or multi-channel, images. In single-band images the channel axis, when present, has size 1 (a &amp;quot;singleton&amp;quot; axis). It makes sense to attach units of measure to this axis, too, thus giving a physical meaning to the channel data, when appropriate.&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;Raster image data represented by classes in the &lt;a href=&quot;https://www.qt.io/&quot;&gt;&lt;span style=&quot; font-weight:600; text-decoration: underline; color:#72b925;&quot;&gt;Qt framework&lt;/span&gt;&lt;/a&gt; (QImage, QPixmap) by definition have only two axes corresponding to the Cartesian system of the image. &lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="axisInfoLabel">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+             <horstretch>4</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
+           <property name="toolTip">
+            <string>Axis length (samples)</string>
+           </property>
+           <property name="frameShape">
+            <enum>QFrame::StyledPanel</enum>
+           </property>
+           <property name="frameShadow">
+            <enum>QFrame::Sunken</enum>
+           </property>
+           <property name="midLineWidth">
+            <number>1</number>
+           </property>
+           <property name="text">
+            <string/>
+           </property>
+           <property name="scaledContents">
+            <bool>true</bool>
+           </property>
+           <property name="wordWrap">
+            <bool>true</bool>
+           </property>
+           <property name="textInteractionFlags">
+            <set>Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item row="1" column="0">
+        <widget class="QGroupBox" name="axisCalibrationGroupBox">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+           <horstretch>1</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="toolTip">
+          <string>Calibrate axis. Selected parameter below will be calculated based on the value of the other two</string>
+         </property>
+         <property name="title">
+          <string>Axis Calibration</string>
+         </property>
+         <layout class="QGridLayout" name="gridLayout_2">
+          <item row="0" column="0">
+           <widget class="QLabel" name="label_5">
+            <property name="toolTip">
+             <string>Select a physical unit</string>
+            </property>
+            <property name="statusTip">
+             <string>Select a physical unit</string>
+            </property>
+            <property name="whatsThis">
+             <string>Select a physical unit</string>
+            </property>
+            <property name="text">
+             <string>Axis units:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QuantityChooserWidget" name="axisUnitSelectionWidget" native="true"/>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="label_2">
+            <property name="text">
+             <string>Axis origin:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QDoubleSpinBox" name="axisOriginSpinBox">
+            <property name="toolTip">
+             <string>Axis origin in physical units</string>
+            </property>
+            <property name="statusTip">
+             <string>Axis origin in physical units</string>
+            </property>
+            <property name="whatsThis">
+             <string>Axis origin in physical units</string>
+            </property>
+            <property name="maximum">
+             <double>1000000.000000000000000</double>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="0">
+           <widget class="QLabel" name="label_8">
+            <property name="text">
+             <string>Axis name:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <widget class="QLineEdit" name="lineEdit_2"/>
+          </item>
+          <item row="3" column="0" colspan="2">
+           <widget class="QGroupBox" name="groupBox">
+            <property name="toolTip">
+             <string>Selected parameter to calculate using the values of other two parameters.</string>
+            </property>
+            <property name="statusTip">
+             <string>Selected parameter to calculate using the values of other two parameters.</string>
+            </property>
+            <property name="whatsThis">
+             <string>Selected parameter to calculate using the values of other two parameters.</string>
+            </property>
+            <property name="title">
+             <string>Calculate</string>
+            </property>
+            <layout class="QGridLayout" name="gridLayout">
+             <item row="0" column="0">
+              <widget class="QRadioButton" name="axisResolutionRadioButton">
+               <property name="toolTip">
+                <string>Resolution (units / pixel)
+Select this to calculate it using Distance in pixels and Calibrated length.</string>
+               </property>
+               <property name="statusTip">
+                <string>Axis resolution (size of one pixel in calibrated units)</string>
+               </property>
+               <property name="whatsThis">
+                <string>Axis resolution (size of one pixel in calibrated units)</string>
+               </property>
+               <property name="text">
+                <string>Resolu&amp;tion</string>
+               </property>
+               <property name="checked">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="1">
+              <widget class="QDoubleSpinBox" name="axisResolutionSpinBox">
+               <property name="enabled">
+                <bool>true</bool>
+               </property>
+               <property name="toolTip">
+                <string>Axis resolution (size of one pixel in calibrated units)</string>
+               </property>
+               <property name="statusTip">
+                <string>Axis resolution (size of one pixel in calibrated units)</string>
+               </property>
+               <property name="whatsThis">
+                <string>Axis resolution (size of one pixel in calibrated units)</string>
+               </property>
+               <property name="readOnly">
+                <bool>false</bool>
+               </property>
+               <property name="decimals">
+                <number>4</number>
+               </property>
+               <property name="maximum">
+                <double>1000000.000000000000000</double>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="0">
+              <widget class="QRadioButton" name="axisSampleDistanceRadioButton">
+               <property name="toolTip">
+                <string>Distance in samples, along the selected axis.
+Select this to calculate it based on Resolution and Calibrated distance</string>
+               </property>
+               <property name="statusTip">
+                <string>Distance in samples, along the selected axis.\nSelect this to calculate it based on Resolution and Calibrated distance</string>
+               </property>
+               <property name="whatsThis">
+                <string>Distance in samples, along the selected axis.
+Select this to calculate it based on Resolution and Calibrated distance</string>
+               </property>
+               <property name="text">
+                <string>Distance in samples</string>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="1">
+              <widget class="QSpinBox" name="axisSampleDistanceSpinBox">
+               <property name="toolTip">
+                <string>Distance in pixels along the selected axis</string>
+               </property>
+               <property name="statusTip">
+                <string>Distance in pixels along the selected ax</string>
+               </property>
+               <property name="whatsThis">
+                <string>Distance in pixels along the selected ax</string>
+               </property>
+               <property name="maximum">
+                <number>1000000000</number>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="0">
+              <widget class="QRadioButton" name="axisCalibratedDistanceRadioButton">
+               <property name="toolTip">
+                <string>Calibrated distance in physical units.
+Select this to calculate it based on Resolution and Distance in pixels</string>
+               </property>
+               <property name="statusTip">
+                <string>Calibrated distance in physical units.\nSelect this to calculate it based on Resolution and Distance in pixels</string>
+               </property>
+               <property name="whatsThis">
+                <string>Calibrated distance in physical units.
+Select this to calculate it based on Resolution and Distance in pixels</string>
+               </property>
+               <property name="text">
+                <string>Calibrated distance</string>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="1">
+              <widget class="QDoubleSpinBox" name="axisCalibratedDistanceSpinBox">
+               <property name="toolTip">
+                <string>Distance in calibrated units</string>
+               </property>
+               <property name="maximum">
+                <double>1000000.000000000000000</double>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item row="2" column="0">
+        <widget class="QPlainTextEdit" name="axisDescriptionEdit">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+           <horstretch>0</horstretch>
+           <verstretch>1</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="toolTip">
+          <string>Axis description</string>
+         </property>
+         <property name="placeholderText">
+          <string>Axis description</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="tabWidgetPage2" native="true">
+      <attribute name="title">
+       <string>Channels</string>
+      </attribute>
+      <layout class="QGridLayout" name="gridLayout_6">
+       <item row="0" column="0">
+        <layout class="QHBoxLayout" name="horizontalLayout_2">
+         <item>
+          <widget class="QLabel" name="label_3">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Minimum" vsizetype="Preferred">
+             <horstretch>1</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
+           <property name="text">
+            <string>Channel:</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QSpinBox" name="channelIndexSpinBox">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
+             <horstretch>1</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
+           <property name="minimumSize">
+            <size>
+             <width>20</width>
+             <height>0</height>
+            </size>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="channelInfoLabel">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+             <horstretch>4</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
+           <property name="frameShape">
+            <enum>QFrame::StyledPanel</enum>
+           </property>
+           <property name="frameShadow">
+            <enum>QFrame::Sunken</enum>
+           </property>
+           <property name="text">
+            <string/>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item row="1" column="0">
+        <widget class="QGroupBox" name="channelCalibrationGroupBox">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+           <horstretch>1</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="toolTip">
+          <string>Calibrate axis. Selected parameter below will be calculated based on the value of the other two</string>
+         </property>
+         <property name="title">
+          <string>Channel Calibration</string>
+         </property>
+         <layout class="QGridLayout" name="gridLayout_5">
+          <item row="0" column="0">
+           <widget class="QLabel" name="label_6">
+            <property name="toolTip">
+             <string>Select a physical unit</string>
+            </property>
+            <property name="statusTip">
+             <string>Select a physical unit</string>
+            </property>
+            <property name="whatsThis">
+             <string>Select a physical unit</string>
+            </property>
+            <property name="text">
+             <string>Units:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QuantityChooserWidget" name="channelUnitSelectionWidget" native="true"/>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="label_7">
+            <property name="text">
+             <string>Minimum:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QDoubleSpinBox" name="channelMinimumDoubleSpinBox"/>
+          </item>
+          <item row="2" column="0">
+           <widget class="QLabel" name="label_9">
+            <property name="text">
+             <string>Maximum:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <widget class="QDoubleSpinBox" name="channelMaximumDoubleSpinBox"/>
+          </item>
+          <item row="3" column="0" colspan="2">
+           <widget class="QPlainTextEdit" name="channelCalibrationFunctionTextEdit">
+            <property name="placeholderText">
+             <string extracomment="Example shown for Fluo5F">Channel calibration expression e.g. 2.3 * pq.micromolar * x / dF/F_max, where dF/F_max is a numeric dimensionless constant</string>
+            </property>
+           </widget>
+          </item>
+          <item row="4" column="0">
+           <widget class="QLabel" name="label_4">
+            <property name="text">
+             <string>Name:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="4" column="1">
+           <widget class="QLineEdit" name="lineEdit"/>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item row="2" column="0">
+        <widget class="QPlainTextEdit" name="channelDescriptionEdit">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+           <horstretch>0</horstretch>
+           <verstretch>1</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="toolTip">
+          <string>Channel description</string>
+         </property>
+         <property name="placeholderText">
+          <string>Channel description</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
     </widget>
    </item>
   </layout>

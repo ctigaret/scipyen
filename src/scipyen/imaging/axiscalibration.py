@@ -1822,7 +1822,10 @@ class AxesCalibration(object):
         
         if len(args):
             if isinstance(args[0], vigra.VigraArray):
-                img = args[0]
+                # img = args[0]
+                # NOTE: 2025-04-20 21:58:11
+                # work on a copy of the array; do NOT modify the original
+                img = args[0].copy()
                 if img.channelIndex == img.ndim: # a real channel axis does NOT exist
                     # will set up a channels axis calibrations with default values, further below
                     img = img.insertChannelAxis()
@@ -1841,20 +1844,28 @@ class AxesCalibration(object):
                 
                 self._axescalibrations_ = list(map(lambda x: AxisCalibrationData.new(x), self._axistags_))
                 
-                channel_axis_index = self._axistags_.index("c")
-
-                # change ownership for the ChannelCalibrationData objects
-                for ch in self._axescalibrations_[channel_axis_index].channels:
-                    ch.parent = self._axescalibrations_[channel_axis_index]
-
-                # Make sure we don't overwrite existing channel calibrations
-                if len(self._axescalibrations_[channel_axis_index].channels) < img.channels:
-                    for k in range(len(self._axescalibrations_[channel_axis_index].channels), img.channels):
-                        self._axescalibrations_[channel_axis_index].channels.append(ChannelCalibrationData(index=k, parent=self._axescalibrations_[channel_axis_index]))
-                        
-                elif len(self._axescalibrations_[channel_axis_index].channels) > img.channels:
-                    self._axescalibrations_[channel_axis_index].channels = self._axescalibrations_[channel_axis_index].channels[:img.channels]
-                    
+                for k, axInfo in enumerate(self._axistags_):
+                    if axInfo.typeFlags & vigra.AxisType.Channels:
+                        channel_axis_index = self._axistags_.index("c")
+                        if args[0].channelIndex == args[0].ndim:
+                            self._axescalibrations_[channel_axis_index].size = 0
+                        else:
+                            self._axescalibrations_[channel_axis_index].size = args[0].shape[channel_axis_index]
+                            
+                        # change ownership for the ChannelCalibrationData objects
+                        for ch in self._axescalibrations_[channel_axis_index].channels:
+                            ch.parent = self._axescalibrations_[channel_axis_index]
+                            
+                        # Make sure we don't overwrite existing channel calibrations
+                        if len(self._axescalibrations_[channel_axis_index].channels) < img.channels:
+                            for k in range(len(self._axescalibrations_[channel_axis_index].channels), img.channels):
+                                self._axescalibrations_[channel_axis_index].channels.append(ChannelCalibrationData(index=k, parent=self._axescalibrations_[channel_axis_index]))
+                                
+                        elif len(self._axescalibrations_[channel_axis_index].channels) > img.channels:
+                            self._axescalibrations_[channel_axis_index].channels = self._axescalibrations_[channel_axis_index].channels[:img.channels]
+                            
+                    else:
+                        self._axescalibrations_[k].size = img.shape[k]
                 return
 
             elif isinstance(args[0], vigra.AxisTags):
@@ -1868,6 +1879,11 @@ class AxesCalibration(object):
                                                                                    description=x.description), 
                                                           args[0])))
                 self._axescalibrations_ = list(map(lambda x: AxisCalibrationData.new(x), self._axistags_))
+                
+                for axCal in self._axescalibrations_:
+                    if axCal.type & vigra.AxisType.Channels:
+                        for ch in axCal.channels:
+                            ch.parent = axCal
                 return
             
             elif isinstance(args[0], int):
@@ -1881,6 +1897,10 @@ class AxesCalibration(object):
                 # create AxisTags
                 self._axistags_ = vigra.AxisTags(args[0])
                 self._axescalibrations_ = list(map(lambda x: AxisCalibrationData.new(x), self._axistags_))
+                for axCal in self._axescalibrations_:
+                    if axCal.type & vigra.AxisType.Channels:
+                        for ch in axCal.channels:
+                            ch.parent = axCal
                 return
                     
             else:
@@ -1921,6 +1941,11 @@ class AxesCalibration(object):
                         else:
                             raise TypeError(f"{k}th argument is not a vigra.AxisInfo, str or AxisCalibrationData")
                         
+                for axCal in self._axescalibrations_:
+                    if axCal.type & vigra.AxisType.Channels:
+                        for ch in axCal.channels:
+                            ch.parent = axCal
+                            
         if not self.__check_cal_axinfo__():
             raise RuntimeError("Axis calibration data is inconsistent with axis info objects")
         

@@ -251,307 +251,310 @@ class ImageBrightnessDialog(QDialog, Ui_TransformImageValueDialog):
         self.rangeMaxSpinBox.setValue(val)
         
 
-class AxesCalibrationDialog(QDialog, Ui_AxesCalibrationDialog):
-    DefaultResolution = 1.0
-    DefaultOrigin = 0.0
-    DefaultUnits = scq.pixel_unit
-    
-    def __init__(self, image:typing.Union[vigra.AxisTags, vigra.VigraArray], 
-                 calibration:typing.Optional[AxesCalibration] = None,
-                 pWin=None, parent=None):
-        super(AxesCalibrationDialog, self).__init__(parent)
-        
-        self.arrayshape=None
-        self._data_=None
-        
-        if isinstance(image, vigra.AxisTags):
-            self.axistags = image
-            self._data_ = None
-            self.calibration = AxesCalibration(self.axistags)
-            
-        elif isinstance(image, vigra.VigraArray):
-            self.axistags = image.axistags
-            self.arrayshape = image.shape
-            self._data_ = image
-            self.calibration = AxesCalibration(self.axistags)
-            
-        elif isinstance(image, AxesCalibration):
-            self.calibration = image
-            self._data_ = None
-            self.axistags = self.calibration.axistags
-            
-        elif isinstance(image, ((QtGui.QImage, QtGui.QPixmap))):
-            self._data_ = image
-            self.arrayshape = (image.width(), image.height())
-            if not isinstance(calibration, AxesCalibration):
-                self.calibration = AxesCalibration(vigra.VigraArray.defaultAxistags(2, noChannels=True))
-            else:
-                assert len(calibration.keys()) == 2, f"Unexpected number of axes in the calibration ({len(calibration.keys())}) for 2D data"
-                self.calibration = calibration
-            self.axistags = self.calibration.axistags
-            
-        elif isinstance(image, np.ndarray):
-            self._data_ = image
-            self.arrayshape = image.shape
-            if not isinstance(calibration, AxesCalibration):
-                self.calibration = AxesCalibration(vigra.VigraArray.defaultAxistags(image.ndim, noChannels=True))
-            else:
-                assert len(calibration.keys()) == image.ndim, f"Unexpected number of axes in the calibration ({len(calibration.keys())}) for an array with {image.ndim} axes"
-                self.calibration = calibration
-            self.axistags = self.calibration.axistags
-            
-        else:
-            raise TypeError(f"A {type(image).__name__} object is not an image")
-        
-        self.resolution = self.DefaultResolution
-        self.origin = self.DefaultOrigin
-        self.units =  self.DefaultUnits
-        
-        self.selectedAxisIndex = 0
-        
-        self.calibration = AxesCalibration(self.axistags)
-        
-        self.axesMetaData = dict()
-        
-        for axisInfo in self.axistags:
-            self.axesMetaData[axisInfo.key]=dict()
-            self.axesMetaData[axisInfo.key]["calibration"] = self.calibration[axisInfo.key]
-            self.axesMetaData[axisInfo.key]["description"] = axisInfo.description
-            if isinstance(self.arrayshape, tuple):
-                self.axesMetaData[axisInfo.key]["length"] = self.arrayshape[self.axistags.index(axisInfo.key)]
-            else:
-                self.axesMetaData[axisInfo.key]["length"] = 0
-            
-        self.units          = self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].units
-        self.origin         = self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].origin
-        self.resolution     = self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].resolution
-        self.description    = self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["description"]
-        self.axislength     = self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["length"]
-        
-        self._configureUI_()
-        
-    def _configureUI_(self):
-        self.setupUi(self)
-        
-        self.setWindowTitle("Calibrate axes")
-        
-        self.axisIndexSpinBox.setMaximum(len(self.axistags) -1)
-        
-        self.axisIndexSpinBox.setValue(self.selectedAxisIndex)
-        
-        if self.arrayshape is None:
-            self.axisInfoLabel.setText("Axis key: %s, type: %s" % (self.axistags[self.selectedAxisIndex].key, axisTypeName(self.axistags[self.selectedAxisIndex])))
-        else:
-            self.axisInfoLabel.setText("Axis key: %s, type: %s, length: %d" % (self.axistags[self.selectedAxisIndex].key, axisTypeName(self.axistags[self.selectedAxisIndex]), self.arrayshape[self.selectedAxisIndex]))
-            
-        self.unitsLineEdit.setClearButtonEnabled(True)
-        
-        self.unitsLineEdit.undoAvailable = True
-        
-        self.unitsLineEdit.redoAvailable = True
-        
-        self.unitsLineEdit.setText(self.units.__str__().split()[1])
-        
-        #self.unitsLineEdit.setValidator( datatypes.UnitsStringValidator())
-        
-        self.unitsLineEdit.editingFinished.connect(self.slot_unitsChanged)
-        
-        #self.unitsLineEdit.returnPressed.connect(self.slot_unitsChanged)
-        
-        self.axisIndexSpinBox.valueChanged[int].connect(self.slot_axisIndexChanged)
-        
-        self.originSpinBox.setValue(self.origin)
-        
-        self.originSpinBox.valueChanged[float].connect(self.slot_originChanged)
-        
-        self.resolutionRadioButton.setDown(True)
-        
-        self.resolutionRadioButton.toggled[bool].connect(self.slot_resolutionChecked)
-        
-        self.resolutionSpinBox.setValue(self.resolution)
-        
-        self.resolutionSpinBox.setReadOnly(True)
-        
-        self.pixelsDistanceRadioButton.toggled[bool].connect(self.slot_pixelsDistanceChecked)
-        
-        self.calibratedDistanceRadioButton.toggled[bool].connect(self.slot_calibratedDistanceChecked)
-        
-        self.resolutionSpinBox.valueChanged[float].connect(self.slot_resolutionChanged)
-        
-        self.pixelsDistanceSpinBox.setValue(self.axislength)
-        
-        self.pixelsDistanceSpinBox.valueChanged[int].connect(self.slot_pixelDistanceChanged)
-        
-        self.calibratedDistanceSpinBox.valueChanged[float].connect(self.slot_calibratedDistanceChanged)
-        
-        #self.axisDescriptionEdit.setUndoRedoEnabled(True)
-        
-        self.axisDescriptionEdit.plainText = self.description
-        
-        self.axisDescriptionEdit.textChanged.connect(self.slot_descriptionChanged)
-        
-        # NOTE 2025-04-05 22:00:05
-        # Actually DO allow editing even if the distance in pixel might be taken 
-        # from image dimensions. 
-        # One may already know how may physicat units a certian distance in pixels
-        # takes, even if this distance is different from the image size along the 
-        # selected axis. When imaging a calibration microscope scale, one can
-        # determine the distance in pixels between two bars on the scale, whereas
-        # read the calibrated distance between the two bars on the scale is already
-        # known; these two quantities are enough to calculate the resolution along
-        # the selected axis.
-        # if isinstance(self._data_, (np.ndarray, QtGui.QImage, QtGui.QPixmap)):
-            # disable these, because the axis length in pixels is fixed by the data
-            # self.pixelsDistanceSpinBox.setEnabled(False) 
-            # self.pixelsDistanceRadioButton.setEnabled(False)
-        
-    def updateFieldsFromAxis(self):
-        self.units          = self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].units
-        self.origin         = self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].origin
-        self.resolution     = self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].resolution
-        self.description    = self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["description"]
-        self.axislength     = self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["length"]
-
-        if self.arrayshape is None:
-            self.axisInfoLabel.setText("Axis key: %s, type: %s" % (self.axistags[self.selectedAxisIndex].key, axisTypeName(self.axistags[self.selectedAxisIndex])))
-        else:
-            self.axisInfoLabel.setText("Axis key: %s, type: %s, length: %d" % (self.axistags[self.selectedAxisIndex].key, axisTypeName(self.axistags[self.selectedAxisIndex]), self.arrayshape[self.selectedAxisIndex]))
-            
-        self.unitsLineEdit.setText(self.units.__str__().split()[1])
-        self.originSpinBox.setValue(self.origin)
-        self.resolutionSpinBox.setValue(self.resolution)
-        self.pixelsDistanceSpinBox.setValue(self.axislength)
-        self.calibratedDistanceSpinBox.setValue(self.resolution * self.pixelsDistanceSpinBox.value())
-        
-        if not self.resolutionRadioButton.isChecked():
-            self.slot_resolutionChanged(self.resolution)
-            # self.calibratedDistanceSpinBox.setValue(self.resolution * self.pixelsDistanceSpinBox.value())
-        # else:
-            # self.slot_resolutionChanged(self.resolution)
-    
-        self.axisDescriptionEdit.clear()
-        self.axisDescriptionEdit.plainText = self.description
-        
-    @Slot(int)
-    @safeWrapper
-    def slot_axisIndexChanged(self, value):
-        self.selectedAxisIndex = value
-        self.updateFieldsFromAxis()
-        #self.slot_updateAxesMetaData()
-        
-    @Slot()
-    @safeWrapper
-    def slot_unitsChanged(self):
-        try:
-            self.units = eval("1*%s" % (self.unitsLineEdit.text()), pq.__dict__)
-            #print("%s --> %s" % (self.unitsLineEdit.text(),self.units))
-        except:
-            pass
-            #print("Try again!")
-        
-        self.slot_updateAxesMetaData()
-
-    @Slot(bool)
-    @safeWrapper
-    def slot_resolutionChecked(self, value):
-        self.resolutionSpinBox.setReadOnly(value)
-        self.pixelsDistanceSpinBox.setReadOnly(not value)
-        self.calibratedDistanceSpinBox.setReadOnly(not value)
-    
-    @Slot(bool)
-    @safeWrapper
-    def slot_pixelsDistanceChecked(self, value):
-        self.pixelsDistanceSpinBox.setReadOnly(value)
-        self.resolutionSpinBox.setReadOnly(not value)
-        self.calibratedDistanceSpinBox.setReadOnly(not value)
-        
-    @Slot(bool)
-    @safeWrapper
-    def slot_calibratedDistanceChecked(self, value):
-        self.calibratedDistanceSpinBox.setReadOnly(value)
-        self.pixelsDistanceSpinBox.setReadOnly(not value)
-        self.resolutionSpinBox.setReadOnly(not value)
-    
-    @Slot()
-    @safeWrapper
-    def slot_updateAxesMetaData(self):
-        self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].units = \
-            eval("1*%s" % (self.unitsLineEdit.text()), pq.__dict__)
-        
-        self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].origin = \
-            self.origin
-        
-        self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].resolution = \
-            self.resolution
-        
-        self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["description"] = \
-            self.description
-    
-    @Slot(float)
-    @safeWrapper
-    def slot_originChanged(self, value):
-        self.origin = value
-        
-        self.slot_updateAxesMetaData()
-
-    @Slot(float)
-    @safeWrapper
-    def slot_resolutionChanged(self, value):
-        if self.pixelsDistanceRadioButton.isChecked(): # calculate distance in pixels
-            self.pixelsDistanceSpinBox.setValue(int(self.calibratedDistanceSpinBox.value() // value))
-            
-        elif self.calibratedDistanceRadioButton.isChecked(): # calculate calibrated distance
-            self.calibratedDistanceSpinBox.setValue(value * self.pixelsDistanceSpinBox.value())
-            
-        self.resolution = value
-        
-        self.slot_updateAxesMetaData()
-
-    @Slot(int)
-    @safeWrapper
-    def slot_pixelDistanceChanged(self, value):
-        if self.resolutionRadioButton.isChecked(): # calculate resolution
-            self.resolutionSpinBox.setValue(self.calibratedDistanceSpinBox.value() / value)
-            
-            self.resolution = self.resolutionSpinBox.value()
-            
-        elif self.calibratedDistanceRadioButton.isChecked(): # calculate calibrated distance
-            self.calibratedDistanceSpinBox.setValue(self.resolutionSpinBox.value() * value)
-    
-        self.slot_updateAxesMetaData()
-        
-    @Slot(float)
-    @safeWrapper
-    def slot_calibratedDistanceChanged(self, value):
-        if self.resolutionRadioButton.isChecked(): # calculate resolution
-            self.resolutionSpinBox.setValue(value / self.pixelsDistanceSpinBox.value())
-            
-            self.resolution = self.resolutionSpinBox.value()
-            
-        elif self.pixelsDistanceRadioButton.isChecked(): # calculate pixels distance
-            self.pixelsDistanceSpinBox.setValue(int(value // self.resolutionSpinBox.value()))
-        
-        self.slot_updateAxesMetaData()
-        
-    @Slot()
-    @safeWrapper
-    def slot_descriptionChanged(self):
-        self.description = self.axisDescriptionEdit.toPlainText()
-        self.slot_updateAxesMetaData()
-
-    def calculateResolution(self, pixels=None, distance=None):
-        if pixels is None:
-            pixels = self.pixelsDistanceSpinBox.value()
-            
-        if distance is None:
-            distance = self.calibratedDistanceSpinBox.value()
-            
-        self.resolution = distance / pixels
-        
-        self.resolutionSpinBox.setValue(self.resolution)
-
-        self.slot_updateAxesMetaData()
-        
+# class AxesCalibrationDialog(QDialog, Ui_AxesCalibrationDialog):
+#     DefaultResolution = 1.0
+#     DefaultOrigin = 0.0
+#     DefaultUnits = scq.pixel_unit
+#     
+#     def __init__(self, image:typing.Union[vigra.AxisTags, vigra.VigraArray], 
+#                  calibration:typing.Optional[AxesCalibration] = None,
+#                  pWin=None, parent=None):
+#         super(AxesCalibrationDialog, self).__init__(parent)
+#         
+#         self.arrayshape=None
+#         self._data_=None
+#         
+#         if isinstance(image, vigra.AxisTags):
+#             self.axistags = image
+#             self._data_ = None
+#             self.calibration = AxesCalibration(self.axistags)
+#             
+#         elif isinstance(image, vigra.VigraArray):
+#             self.axistags = image.axistags
+#             self.arrayshape = image.shape
+#             self._data_ = image
+#             self.calibration = AxesCalibration(self.axistags)
+#             
+#         elif isinstance(image, AxesCalibration):
+#             self.calibration = image
+#             self._data_ = None
+#             self.axistags = self.calibration.axistags
+#             
+#         elif isinstance(image, ((QtGui.QImage, QtGui.QPixmap))):
+#             self._data_ = image
+#             self.arrayshape = (image.width(), image.height())
+#             if not isinstance(calibration, AxesCalibration):
+#                 self.calibration = AxesCalibration(vigra.VigraArray.defaultAxistags(2, noChannels=True))
+#             else:
+#                 assert len(calibration.keys()) == 2, f"Unexpected number of axes in the calibration ({len(calibration.keys())}) for 2D data"
+#                 self.calibration = calibration
+#             self.axistags = self.calibration.axistags
+#             
+#         elif isinstance(image, np.ndarray):
+#             self._data_ = image
+#             self.arrayshape = image.shape
+#             if not isinstance(calibration, AxesCalibration):
+#                 self.calibration = AxesCalibration(vigra.VigraArray.defaultAxistags(image.ndim, noChannels=True))
+#             else:
+#                 assert len(calibration.keys()) == image.ndim, f"Unexpected number of axes in the calibration ({len(calibration.keys())}) for an array with {image.ndim} axes"
+#                 self.calibration = calibration
+#             self.axistags = self.calibration.axistags
+#             
+#         else:
+#             raise TypeError(f"A {type(image).__name__} object is not an image")
+#         
+#         self.resolution = self.DefaultResolution
+#         self.origin = self.DefaultOrigin
+#         self.units =  self.DefaultUnits
+#         
+#         self.selectedAxisIndex = 0
+#         
+#         self.calibration = AxesCalibration(self.axistags)
+#         
+#         self.axesMetaData = dict()
+#         
+#         for axisInfo in self.axistags:
+#             self.axesMetaData[axisInfo.key]=dict()
+#             self.axesMetaData[axisInfo.key]["calibration"] = self.calibration[axisInfo.key]
+#             self.axesMetaData[axisInfo.key]["description"] = axisInfo.description
+#             if isinstance(self.arrayshape, tuple):
+#                 self.axesMetaData[axisInfo.key]["length"] = self.arrayshape[self.axistags.index(axisInfo.key)]
+#             else:
+#                 self.axesMetaData[axisInfo.key]["length"] = 0
+#             
+#         self.units          = self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].units
+#         self.origin         = self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].origin
+#         self.resolution     = self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].resolution
+#         self.description    = self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["description"]
+#         self.axislength     = self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["length"]
+#         
+#         self._configureUI_()
+#         
+#     def _configureUI_(self):
+#         self.setupUi(self)
+#         
+#         self.setWindowTitle("Calibrate axes")
+#         
+#         self.axisIndexSpinBox.setMaximum(len(self.axistags) -1)
+#         
+#         self.axisIndexSpinBox.setValue(self.selectedAxisIndex)
+#         
+#         if self.arrayshape is None:
+#             self.axisInfoLabel.setText("Axis key: %s, type: %s" % (self.axistags[self.selectedAxisIndex].key, axisTypeName(self.axistags[self.selectedAxisIndex])))
+#         else:
+#             self.axisInfoLabel.setText("Axis key: %s, type: %s, length: %d" % (self.axistags[self.selectedAxisIndex].key, axisTypeName(self.axistags[self.selectedAxisIndex]), self.arrayshape[self.selectedAxisIndex]))
+#             
+#         self.unitsLineEdit.setClearButtonEnabled(True)
+#         
+#         self.unitsLineEdit.undoAvailable = True
+#         
+#         self.unitsLineEdit.redoAvailable = True
+#         
+#         self.unitsLineEdit.setText(self.units.__str__().split()[1])
+#         
+#         #self.unitsLineEdit.setValidator( datatypes.UnitsStringValidator())
+#         
+#         self.unitsLineEdit.editingFinished.connect(self.slot_unitsChanged)
+#         
+#         #self.unitsLineEdit.returnPressed.connect(self.slot_unitsChanged)
+#         
+#         self.axisIndexSpinBox.valueChanged[int].connect(self.slot_axisIndexChanged)
+#         
+#         self.axisOriginSpinBox.setValue(self.origin)
+#         
+#         self.axisOriginSpinBox.valueChanged[float].connect(self.slot_originChanged)
+#         
+#         self.axisResolutionRadioButton.setDown(True)
+#         
+#         self.axisResolutionRadioButton.toggled[bool].connect(self.slot_resolutionChecked)
+#         
+#         self.axisResolutionSpinBox.setValue(self.resolution)
+#         
+#         self.axisResolutionSpinBox.setReadOnly(True)
+#         
+#         self.axisSampleDistanceRadioButton.toggled[bool].connect(self.slot_pixelsDistanceChecked)
+#         
+#         self.axisCalibratedDistanceRadioButton.toggled[bool].connect(self.slot_calibratedDistanceChecked)
+#         
+#         self.axisResolutionSpinBox.valueChanged[float].connect(self.slot_resolutionChanged)
+#         
+#         self.axisSampleDistanceSpinBox.setValue(self.axislength)
+#         
+#         self.axisSampleDistanceSpinBox.valueChanged[int].connect(self.slot_pixelDistanceChanged)
+#         
+#         self.axisCalibratedDistanceSpinBox.valueChanged[float].connect(self.slot_calibratedDistanceChanged)
+#         
+#         #self.axisDescriptionEdit.setUndoRedoEnabled(True)
+#         
+#         self.axisDescriptionEdit.plainText = self.description
+#         
+#         self.axisDescriptionEdit.textChanged.connect(self.slot_descriptionChanged)
+#         
+#         # NOTE 2025-04-05 22:00:05
+#         # Actually DO allow editing even if the distance in pixel might be taken 
+#         # from image dimensions. 
+#         # One may already know how may physicat units a certian distance in pixels
+#         # takes, even if this distance is different from the image size along the 
+#         # selected axis. When imaging a calibration microscope scale, one can
+#         # determine the distance in pixels between two bars on the scale, whereas
+#         # read the calibrated distance between the two bars on the scale is already
+#         # known; these two quantities are enough to calculate the resolution along
+#         # the selected axis.
+#         # if isinstance(self._data_, (np.ndarray, QtGui.QImage, QtGui.QPixmap)):
+#             # disable these, because the axis length in pixels is fixed by the data
+#             # self.axisSampleDistanceSpinBox.setEnabled(False) 
+#             # self.axisSampleDistanceRadioButton.setEnabled(False)
+#         
+#     def updateFieldsFromAxis(self):
+#         self.units          = self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].units
+#         self.origin         = self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].origin
+#         self.resolution     = self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].resolution
+#         self.description    = self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["description"]
+#         self.axislength     = self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["length"]
+# 
+#         if self.arrayshape is None:
+#             self.axisInfoLabel.setText("Axis key: %s, type: %s" % (self.axistags[self.selectedAxisIndex].key, axisTypeName(self.axistags[self.selectedAxisIndex])))
+#         else:
+#             self.axisInfoLabel.setText("Axis key: %s, type: %s, length: %d" % (self.axistags[self.selectedAxisIndex].key, axisTypeName(self.axistags[self.selectedAxisIndex]), self.arrayshape[self.selectedAxisIndex]))
+#             
+#         self.unitsLineEdit.setText(self.units.__str__().split()[1])
+#         self.axisOriginSpinBox.setValue(self.origin)
+#         self.axisResolutionSpinBox.setValue(self.resolution)
+#         self.axisSampleDistanceSpinBox.setValue(self.axislength)
+#         self.axisCalibratedDistanceSpinBox.setValue(self.resolution * self.axisSampleDistanceSpinBox.value())
+#         
+#         if not self.axisResolutionRadioButton.isChecked():
+#             self.slot_resolutionChanged(self.resolution)
+#             # self.axisCalibratedDistanceSpinBox.setValue(self.resolution * self.axisSampleDistanceSpinBox.value())
+#         # else:
+#             # self.slot_resolutionChanged(self.resolution)
+#     
+#         self.axisDescriptionEdit.clear()
+#         self.axisDescriptionEdit.plainText = self.description
+#         
+#     @Slot(int)
+#     @safeWrapper
+#     def slot_axisIndexChanged(self, value):
+#         self.selectedAxisIndex = value
+#         self.updateFieldsFromAxis()
+#         #self.slot_updateAxesMetaData()
+#         
+#     @Slot()
+#     @safeWrapper
+#     def slot_unitsChanged(self):
+#         try:
+#             self.units = eval("1*%s" % (self.unitsLineEdit.text()), pq.__dict__)
+#             #print("%s --> %s" % (self.unitsLineEdit.text(),self.units))
+#         except:
+#             pass
+#             #print("Try again!")
+#         
+#         self.slot_updateAxesMetaData()
+# 
+#     @Slot(bool)
+#     @safeWrapper
+#     def slot_resolutionChecked(self, value):
+#         self.axisResolutionSpinBox.setReadOnly(value)
+#         self.axisSampleDistanceSpinBox.setReadOnly(not value)
+#         self.axisCalibratedDistanceSpinBox.setReadOnly(not value)
+#     
+#     @Slot(bool)
+#     @safeWrapper
+#     def slot_pixelsDistanceChecked(self, value):
+#         self.axisSampleDistanceSpinBox.setReadOnly(value)
+#         self.axisResolutionSpinBox.setReadOnly(not value)
+#         self.axisCalibratedDistanceSpinBox.setReadOnly(not value)
+#         
+#     @Slot(bool)
+#     @safeWrapper
+#     def slot_calibratedDistanceChecked(self, value):
+#         self.axisCalibratedDistanceSpinBox.setReadOnly(value)
+#         self.axisSampleDistanceSpinBox.setReadOnly(not value)
+#         self.axisResolutionSpinBox.setReadOnly(not value)
+#     
+#     @Slot()
+#     @safeWrapper
+#     def slot_updateAxesMetaData(self):
+#         calibration = self.calibration[self.axistags[self.selectedAxisIndex].key]
+#         axTypeFlags = self.axistags[self.selectedAxisIndex].typeFlags
+#         assert axTypeFlags == calibration.type, f"Mismatch between axis info type flags {axTypeFlags} and calibation type {calibration.type} for axis with key '{self.axistags[self.selectedAxisIndex].key}'"
+#         self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].units = \
+#             eval("1*%s" % (self.unitsLineEdit.text()), pq.__dict__)
+#         
+#         self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].origin = \
+#             self.origin
+#         
+#         self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].resolution = \
+#             self.resolution
+#         
+#         self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["description"] = \
+#             self.description
+#     
+#     @Slot(float)
+#     @safeWrapper
+#     def slot_originChanged(self, value):
+#         self.origin = value
+#         
+#         self.slot_updateAxesMetaData()
+# 
+#     @Slot(float)
+#     @safeWrapper
+#     def slot_resolutionChanged(self, value):
+#         if self.axisSampleDistanceRadioButton.isChecked(): # calculate distance in pixels
+#             self.axisSampleDistanceSpinBox.setValue(int(self.axisCalibratedDistanceSpinBox.value() // value))
+#             
+#         elif self.axisCalibratedDistanceRadioButton.isChecked(): # calculate calibrated distance
+#             self.axisCalibratedDistanceSpinBox.setValue(value * self.axisSampleDistanceSpinBox.value())
+#             
+#         self.resolution = value
+#         
+#         self.slot_updateAxesMetaData()
+# 
+#     @Slot(int)
+#     @safeWrapper
+#     def slot_pixelDistanceChanged(self, value):
+#         if self.axisResolutionRadioButton.isChecked(): # calculate resolution
+#             self.axisResolutionSpinBox.setValue(self.axisCalibratedDistanceSpinBox.value() / value)
+#             
+#             self.resolution = self.axisResolutionSpinBox.value()
+#             
+#         elif self.axisCalibratedDistanceRadioButton.isChecked(): # calculate calibrated distance
+#             self.axisCalibratedDistanceSpinBox.setValue(self.axisResolutionSpinBox.value() * value)
+#     
+#         self.slot_updateAxesMetaData()
+#         
+#     @Slot(float)
+#     @safeWrapper
+#     def slot_calibratedDistanceChanged(self, value):
+#         if self.axisResolutionRadioButton.isChecked(): # calculate resolution
+#             self.axisResolutionSpinBox.setValue(value / self.axisSampleDistanceSpinBox.value())
+#             
+#             self.resolution = self.axisResolutionSpinBox.value()
+#             
+#         elif self.axisSampleDistanceRadioButton.isChecked(): # calculate pixels distance
+#             self.axisSampleDistanceSpinBox.setValue(int(value // self.axisResolutionSpinBox.value()))
+#         
+#         self.slot_updateAxesMetaData()
+#         
+#     @Slot()
+#     @safeWrapper
+#     def slot_descriptionChanged(self):
+#         self.description = self.axisDescriptionEdit.toPlainText()
+#         self.slot_updateAxesMetaData()
+# 
+#     def calculateResolution(self, pixels=None, distance=None):
+#         if pixels is None:
+#             pixels = self.axisSampleDistanceSpinBox.value()
+#             
+#         if distance is None:
+#             distance = self.axisCalibratedDistanceSpinBox.value()
+#             
+#         self.resolution = distance / pixels
+#         
+#         self.axisResolutionSpinBox.setValue(self.resolution)
+# 
+#         self.slot_updateAxesMetaData()
+#         
 class AxesCalibrationDialog2(QDialog, Ui_AxesCalibrationDialog2):
     DefaultResolution = 1.0
     DefaultOrigin = 0.0
@@ -571,13 +574,19 @@ class AxesCalibrationDialog2(QDialog, Ui_AxesCalibrationDialog2):
         if isinstance(image, vigra.AxisTags):
             self.axistags = image
             self._data_ = None
-            self.calibration = AxesCalibration(self.axistags)
+            if isinstance(calibration, AxesCalibration):
+                self.calibration = calibration
+            else:
+                self.calibration = AxesCalibration(self.axistags)
             
         elif isinstance(image, vigra.VigraArray):
             self.axistags = image.axistags
             self.arrayshape = image.shape
             self._data_ = image
-            self.calibration = AxesCalibration(self.axistags)
+            if isinstance(calibration, AxesCalibration):
+                self.calibration = calibration
+            else:
+                self.calibration = AxesCalibration(image)
             
         elif isinstance(image, AxesCalibration):
             self.calibration = image
@@ -587,21 +596,22 @@ class AxesCalibrationDialog2(QDialog, Ui_AxesCalibrationDialog2):
         elif isinstance(image, ((QtGui.QImage, QtGui.QPixmap))):
             self._data_ = image
             self.arrayshape = (image.width(), image.height())
-            if not isinstance(calibration, AxesCalibration):
-                self.calibration = AxesCalibration(vigra.VigraArray.defaultAxistags(2, noChannels=True))
-            else:
+            if isinstance(calibration, AxesCalibration):
                 assert len(calibration.keys()) == 2, f"Unexpected number of axes in the calibration ({len(calibration.keys())}) for 2D data"
                 self.calibration = calibration
+            else:
+                self.calibration = AxesCalibration(vigra.VigraArray.defaultAxistags(2, noChannels=True))
+                
             self.axistags = self.calibration.axistags
             
         elif isinstance(image, np.ndarray):
             self._data_ = image
             self.arrayshape = image.shape
-            if not isinstance(calibration, AxesCalibration):
-                self.calibration = AxesCalibration(vigra.VigraArray.defaultAxistags(image.ndim, noChannels=True))
-            else:
+            if isinstance(calibration, AxesCalibration):
                 assert len(calibration.keys()) == image.ndim, f"Unexpected number of axes in the calibration ({len(calibration.keys())}) for an array with {image.ndim} axes"
                 self.calibration = calibration
+            else:
+                self.calibration = AxesCalibration(vigra.VigraArray.defaultAxistags(image.ndim, noChannels=True))
             self.axistags = self.calibration.axistags
             
         else:
@@ -613,29 +623,31 @@ class AxesCalibrationDialog2(QDialog, Ui_AxesCalibrationDialog2):
         
         self.selectedAxisIndex = 0
         
-        self.calibration = AxesCalibration(self.axistags)
-        
         self.axesMetaData = dict()
         
         for axisInfo in self.axistags:
-            if axisInfo.typeFlags & vigra.AxisType.Channels:
-                continue # skip channel intensity calibration, for now
             self.axesMetaData[axisInfo.key]=dict()
             self.axesMetaData[axisInfo.key]["calibration"] = self.calibration[axisInfo.key]
+            self.axesMetaData[axisInfo.key]["name"] = self.calibration[axisInfo.key].name
             self.axesMetaData[axisInfo.key]["description"] = AxisCalibrationData.getOriginalDescription(axisInfo)
             if isinstance(self.arrayshape, tuple):
                 self.axesMetaData[axisInfo.key]["length"] = self.arrayshape[self.axistags.index(axisInfo.key)]
             else:
                 self.axesMetaData[axisInfo.key]["length"] = 0
             
-        self.selectedAxisInfo   = self.axistags[self.selectedAxisIndex]
+        self.selectedAxisInfo:vigra.AxisInfo   = self.axistags[self.selectedAxisIndex]
+        self.selectedChannel:int = 0
         
         # TODO 2025-04-07 21:41:08 FIXME
         # channel intensity calibration
-        if self.selectedAxisInfo.typeFlags & vigra.AxisType.Channels == 0:
-            self.description        = self.axesMetaData[self.selectedAxisInfo.key]["description"]
-            self.axislength         = self.axesMetaData[self.selectedAxisInfo.key]["length"]
-            
+        self.description        = self.axesMetaData[self.selectedAxisInfo.key]["description"]
+        self.axislength         = self.axesMetaData[self.selectedAxisInfo.key]["length"] # constant, given the shape of the data array
+        
+        if self.selectedAxisInfo.typeFlags & vigra.AxisType.Channels:
+            self.units              = self.axesMetaData[self.selectedAxisInfo.key]["calibration"].channels[self.selectedChannel].units
+            self.origin             = self.axesMetaData[self.selectedAxisInfo.key]["calibration"].channels[self.selectedChannel].origin
+            self.resolution         = 0.0
+        else:
             self.units              = self.axesMetaData[self.selectedAxisInfo.key]["calibration"].units
             self.origin             = self.axesMetaData[self.selectedAxisInfo.key]["calibration"].origin
             self.resolution         = self.axesMetaData[self.selectedAxisInfo.key]["calibration"].resolution
@@ -647,16 +659,22 @@ class AxesCalibrationDialog2(QDialog, Ui_AxesCalibrationDialog2):
         
         self.setWindowTitle("Calibrate axes")
         
+        self.axisIndexSpinBox.setMinimum(0)
         self.axisIndexSpinBox.setMaximum(len(self.axistags) -1)
-        
         self.axisIndexSpinBox.setValue(self.selectedAxisIndex)
+        self.axisIndexSpinBox.valueChanged[int].connect(self.slot_axisIndexChanged)
         
         if self.arrayshape is None:
             self.axisInfoLabel.setText("Axis key: %s, type: %s" % (self.axistags[self.selectedAxisIndex].key, axisTypeName(self.axistags[self.selectedAxisIndex])))
         else:
             self.axisInfoLabel.setText("Axis key: %s, type: %s, length: %d" % (self.axistags[self.selectedAxisIndex].key, axisTypeName(self.axistags[self.selectedAxisIndex]), self.arrayshape[self.selectedAxisIndex]))
             
+        self.channelIndexSpinBox.setMinimum(0)
+        if "c" in self.calibration:
+            self.channelIndexSpinBox.setMaximum(len(self.calibration["c"].channels))
+            
         self.channelIndexSpinBox.setEnabled(self.selectedAxisInfo.typeFlags & vigra.AxisType.Channels)
+        self.channelIndexSpinBox.valueChanged[int].connect(self.slot_channelIndexChanged)
             
         # self.unitsLineEdit.setClearButtonEnabled(True)
         
@@ -672,34 +690,33 @@ class AxesCalibrationDialog2(QDialog, Ui_AxesCalibrationDialog2):
         
         # #self.unitsLineEdit.returnPressed.connect(self.slot_unitsChanged)
         
-        self.unitSelectionWidget.setValue(self.units)
-        self.unitSelectionWidget.unitChanged[object].connect(self.slot_unitsChanged)
+        self.axisUnitSelectionWidget.setValue(self.units)
+        self.axisUnitSelectionWidget.unitChanged[object].connect(self.slot_unitsChanged)
         
-        self.axisIndexSpinBox.valueChanged[int].connect(self.slot_axisIndexChanged)
         
-        self.originSpinBox.setValue(self.origin)
+        self.axisOriginSpinBox.setValue(self.origin)
         
-        self.originSpinBox.valueChanged[float].connect(self.slot_originChanged)
+        self.axisOriginSpinBox.valueChanged[float].connect(self.slot_originChanged)
         
-        self.resolutionRadioButton.setDown(True)
+        self.axisResolutionRadioButton.setDown(True)
         
-        self.resolutionRadioButton.toggled[bool].connect(self.slot_resolutionChecked)
+        self.axisResolutionRadioButton.toggled[bool].connect(self.slot_resolutionChecked)
         
-        self.resolutionSpinBox.setValue(self.resolution)
+        self.axisResolutionSpinBox.setValue(self.resolution)
         
-        self.resolutionSpinBox.setReadOnly(True)
+        self.axisResolutionSpinBox.setReadOnly(True)
         
-        self.pixelsDistanceRadioButton.toggled[bool].connect(self.slot_pixelsDistanceChecked)
+        self.axisSampleDistanceRadioButton.toggled[bool].connect(self.slot_pixelsDistanceChecked)
         
-        self.calibratedDistanceRadioButton.toggled[bool].connect(self.slot_calibratedDistanceChecked)
+        self.axisCalibratedDistanceRadioButton.toggled[bool].connect(self.slot_calibratedDistanceChecked)
         
-        self.resolutionSpinBox.valueChanged[float].connect(self.slot_resolutionChanged)
+        self.axisResolutionSpinBox.valueChanged[float].connect(self.slot_resolutionChanged)
         
-        self.pixelsDistanceSpinBox.setValue(self.axislength)
+        self.axisSampleDistanceSpinBox.setValue(self.axislength)
         
-        self.pixelsDistanceSpinBox.valueChanged[int].connect(self.slot_pixelDistanceChanged)
+        self.axisSampleDistanceSpinBox.valueChanged[int].connect(self.slot_pixelDistanceChanged)
         
-        self.calibratedDistanceSpinBox.valueChanged[float].connect(self.slot_calibratedDistanceChanged)
+        self.axisCalibratedDistanceSpinBox.valueChanged[float].connect(self.slot_calibratedDistanceChanged)
         
         #self.axisDescriptionEdit.setUndoRedoEnabled(True)
         
@@ -719,8 +736,8 @@ class AxesCalibrationDialog2(QDialog, Ui_AxesCalibrationDialog2):
         # the selected axis.
         # if isinstance(self._data_, (np.ndarray, QtGui.QImage, QtGui.QPixmap)):
             # disable these, because the axis length in pixels is fixed by the data
-            # self.pixelsDistanceSpinBox.setEnabled(False) 
-            # self.pixelsDistanceRadioButton.setEnabled(False)
+            # self.axisSampleDistanceSpinBox.setEnabled(False) 
+            # self.axisSampleDistanceRadioButton.setEnabled(False)
     
     def updateFieldsFromAxis(self):
         print(f"{self.__class__.__name__}.updateFieldsFromAxis: selected axis = {self.selectedAxisInfo.key}")
@@ -729,41 +746,56 @@ class AxesCalibrationDialog2(QDialog, Ui_AxesCalibrationDialog2):
         else:
             self.axisInfoLabel.setText("Axis key: %s, type: %s, length: %d" % (self.selectedAxisInfo.key, axisTypeName(self.selectedAxisInfo), self.arrayshape[self.selectedAxisIndex]))
             
+        sigBlock = list(map(lambda w: QtCore.QSignalBlocker(w), (self.axisUnitSelectionWidget,
+                                                                 self.axisOriginSpinBox,
+                                                                 self.axisResolutionSpinBox,
+                                                                 self.axisSampleDistanceSpinBox,
+                                                                 self.axisCalibratedDistanceSpinBox,
+                                                                 self.axisResolutionRadioButton,
+                                                                 self.axisSampleDistanceRadioButton,
+                                                                 self.axisCalibratedDistanceRadioButton,
+                                                                 self.axisDescriptionEdit.
+                                                                 self.channelUnitSelectionWidget,
+                                                                 self.channelOriginSpinBox,
+                                                                 self.channelCalibrationFunctionTextEdit)))
         # TODO 2025-04-07 21:41:08 FIXME
         # channel intensity calibration
         if self.selectedAxisInfo.typeFlags & vigra.AxisType.Channels:
-            self.unitSelectionWidget.setEnabled(False)
-            self.originSpinBox.setEnabled(False)
-            self.resolutionSpinBox.setEnabled(False)
-            self.pixelsDistanceSpinBox.setEnabled(False)
-            self.calibratedDistanceSpinBox.setEnabled(False)
-            self.resolutionRadioButton.setEnabled(False)
-            self.pixelsDistanceRadioButton.setEnabled(False)
-            self.calibratedDistanceRadioButton.setEnabled(False)
-            return 
-        else:
-            self.unitSelectionWidget.setEnabled(True)
-            self.originSpinBox.setEnabled(True)
-            self.resolutionSpinBox.setEnabled(True)
-            self.pixelsDistanceSpinBox.setEnabled(True)
-            self.calibratedDistanceSpinBox.setEnabled(True)
-            self.resolutionRadioButton.setEnabled(True)
-            self.pixelsDistanceRadioButton.setEnabled(True)
-            self.calibratedDistanceRadioButton.setEnabled(True)
+            self.axisUnitSelectionWidget.setEnabled(True)
+            self.axisOriginSpinBox.setEnabled(True)
+            self.axisResolutionSpinBox.setEnabled(False)
+            self.axisSampleDistanceSpinBox.setEnabled(False)
+            self.axisCalibratedDistanceSpinBox.setEnabled(False)
+            self.axisResolutionRadioButton.setEnabled(False)
+            self.axisSampleDistanceRadioButton.setEnabled(False)
+            self.axisCalibratedDistanceRadioButton.setEnabled(False)
             
-        self.units          = self.axesMetaData[self.selectedAxisInfo.key]["calibration"].units
-        self.origin         = self.axesMetaData[self.selectedAxisInfo.key]["calibration"].origin
-        self.resolution     = self.axesMetaData[self.selectedAxisInfo.key]["calibration"].resolution
+            self.units          = self.axesMetaData[self.selectedAxisInfo.key]["calibration"].channels[self.selectedChannel].units
+            self.origin         = self.axesMetaData[self.selectedAxisInfo.key]["calibration"].channels[self.selectedChannel].origin
+        else:
+            self.axisUnitSelectionWidget.setEnabled(True)
+            self.axisOriginSpinBox.setEnabled(True)
+            self.axisResolutionSpinBox.setEnabled(True)
+            self.axisSampleDistanceSpinBox.setEnabled(True)
+            self.axisCalibratedDistanceSpinBox.setEnabled(True)
+            self.axisResolutionRadioButton.setEnabled(True)
+            self.axisSampleDistanceRadioButton.setEnabled(True)
+            self.axisCalibratedDistanceRadioButton.setEnabled(True)
+            
+            self.units          = self.axesMetaData[self.selectedAxisInfo.key]["calibration"].units
+            self.origin         = self.axesMetaData[self.selectedAxisInfo.key]["calibration"].origin
+            self.resolution     = self.axesMetaData[self.selectedAxisInfo.key]["calibration"].resolution
+            
         self.description    = self.axesMetaData[self.selectedAxisInfo.key]["description"]
         self.axislength     = self.axesMetaData[self.selectedAxisInfo.key]["length"]
 
-        self.unitSelectionWidget.setValue(self.units)
-        self.originSpinBox.setValue(self.origin)
-        self.resolutionSpinBox.setValue(self.resolution)
-        self.pixelsDistanceSpinBox.setValue(self.axislength)
-        self.calibratedDistanceSpinBox.setValue(self.resolution * self.pixelsDistanceSpinBox.value())
+        self.axisUnitSelectionWidget.setValue(self.units)
+        self.axisOriginSpinBox.setValue(self.origin)
+        self.axisResolutionSpinBox.setValue(self.resolution)
+        self.axisSampleDistanceSpinBox.setValue(self.axislength)
+        self.axisCalibratedDistanceSpinBox.setValue(self.resolution * self.axisSampleDistanceSpinBox.value())
         
-        if not self.resolutionRadioButton.isChecked():
+        if not self.axisResolutionRadioButton.isChecked():
             self.slot_resolutionChanged(self.resolution)
     
         self.axisDescriptionEdit.clear()
@@ -774,6 +806,17 @@ class AxesCalibrationDialog2(QDialog, Ui_AxesCalibrationDialog2):
     def slot_axisIndexChanged(self, value):
         self.selectedAxisIndex = value
         self.selectedAxisInfo = self.axistags[self.selectedAxisIndex]
+        if self.selectedAxisInfo.typeFlags & vigra.AxisType.Channels and "c" in self.calibration:
+            sigBlock = QtCore.QSignalBlocker(self.channelIndexSpinBox)
+            self.channelIndexSpinBox.setMaximum(len(self.calibration["c"].channels)-1)
+            self.channelIndexSpinBox.setEnabled(True)
+        self.slot_updateAxesMetaData()
+        self.updateFieldsFromAxis()
+        
+    @Slot(int)
+    @safeWrapper
+    def slot_channelIndexChanged(self, value):
+        self.selectedChannel = value
         self.slot_updateAxesMetaData()
         self.updateFieldsFromAxis()
         
@@ -788,93 +831,90 @@ class AxesCalibrationDialog2(QDialog, Ui_AxesCalibrationDialog2):
     @Slot(bool)
     @safeWrapper
     def slot_resolutionChecked(self, value):
-        self.resolutionSpinBox.setReadOnly(value)
-        self.pixelsDistanceSpinBox.setReadOnly(not value)
-        self.calibratedDistanceSpinBox.setReadOnly(not value)
+        self.axisResolutionSpinBox.setReadOnly(value)
+        self.axisSampleDistanceSpinBox.setReadOnly(not value)
+        self.axisCalibratedDistanceSpinBox.setReadOnly(not value)
     
     @Slot(bool)
     @safeWrapper
     def slot_pixelsDistanceChecked(self, value):
-        self.pixelsDistanceSpinBox.setReadOnly(value)
-        self.resolutionSpinBox.setReadOnly(not value)
-        self.calibratedDistanceSpinBox.setReadOnly(not value)
+        self.axisSampleDistanceSpinBox.setReadOnly(value)
+        self.axisResolutionSpinBox.setReadOnly(not value)
+        self.axisCalibratedDistanceSpinBox.setReadOnly(not value)
         
     @Slot(bool)
     @safeWrapper
     def slot_calibratedDistanceChecked(self, value):
-        self.calibratedDistanceSpinBox.setReadOnly(value)
-        self.pixelsDistanceSpinBox.setReadOnly(not value)
-        self.resolutionSpinBox.setReadOnly(not value)
+        self.axisCalibratedDistanceSpinBox.setReadOnly(value)
+        self.axisSampleDistanceSpinBox.setReadOnly(not value)
+        self.axisResolutionSpinBox.setReadOnly(not value)
     
     @Slot()
     @safeWrapper
     def slot_updateAxesMetaData(self):
-        # units = self.unitSelectionWidget.value()
+        # units = self.axisUnitSelectionWidget.value()
         print(f"{self.__class__.__name__}.slot_updateAxesMetaData for {self.axistags[self.selectedAxisIndex].key}")
         # self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].units = \
         #     eval("1*%s" % (self.unitsLineEdit.text()), pq.__dict__)
         
         # TODO 2025-04-07 21:41:08 FIXME
         # channel intensity calibration
-        if self.selectedAxisInfo.typeFlags & vigra.AxisType.Channels:
-            return
+            # return
+            
+        calibration = self.calibration[self.selectedAxisInfo.key]
         
         self.axesMetaData[self.selectedAxisInfo.key]["description"] = self.description
         
-        self.axesMetaData[self.selectedAxisInfo.key]["calibration"].units = self.units
-        
-        self.axesMetaData[self.selectedAxisInfo.key]["calibration"].origin = self.origin
-        
-        self.axesMetaData[self.selectedAxisInfo.key]["calibration"].resolution = self.resolution
-        
-        # if self.axistags[self.selectedAxisIndex].typeFlags & vigra.AxisType.Channels:
-        #     self.axesMetaData[self.selectedAxisInfo.key]["calibration"]["channels"] = list()
-            
+        if self.selectedAxisInfo.typeFlags & vigra.AxisType.Channels:
+            self.axesMetaData[self.selectedAxisInfo.key]["calibration"].channels[self.selectedChannel].units = self.units
+            self.axesMetaData[self.selectedAxisInfo.key]["calibration"].channels[self.selectedChannel].origin = self.origin
+        else:
+            self.axesMetaData[self.selectedAxisInfo.key]["calibration"].units = self.units
+            self.axesMetaData[self.selectedAxisInfo.key]["calibration"].origin = self.origin
+            self.axesMetaData[self.selectedAxisInfo.key]["calibration"].resolution = self.resolution
         
     @Slot(float)
     @safeWrapper
     def slot_originChanged(self, value):
         self.origin = value
-        
         self.slot_updateAxesMetaData()
 
 
     @Slot(float)
     @safeWrapper
     def slot_resolutionChanged(self, value):
-        if self.pixelsDistanceRadioButton.isChecked(): # calculate distance in pixels
-            self.pixelsDistanceSpinBox.setValue(int(self.calibratedDistanceSpinBox.value() // value))
+        if self.axisSampleDistanceRadioButton.isChecked(): # calculate distance in pixels
+            self.axisSampleDistanceSpinBox.setValue(int(self.axisCalibratedDistanceSpinBox.value() // value))
             
-        elif self.calibratedDistanceRadioButton.isChecked(): # calculate calibrated distance
-            self.calibratedDistanceSpinBox.setValue(value * self.pixelsDistanceSpinBox.value())
+        elif self.axisCalibratedDistanceRadioButton.isChecked(): # calculate calibrated distance
+            self.axisCalibratedDistanceSpinBox.setValue(value * self.axisSampleDistanceSpinBox.value())
             
         self.resolution = value
-        
         self.slot_updateAxesMetaData()
 
     @Slot(int)
     @safeWrapper
     def slot_pixelDistanceChanged(self, value):
-        if self.resolutionRadioButton.isChecked(): # calculate resolution
-            self.resolutionSpinBox.setValue(self.calibratedDistanceSpinBox.value() / value)
+        if self.axisResolutionRadioButton.isChecked(): # calculate resolution
+            self.axisResolutionSpinBox.setValue(self.axisCalibratedDistanceSpinBox.value() / value)
             
-            self.resolution = self.resolutionSpinBox.value()
+            self.resolution = self.axisResolutionSpinBox.value()
             
-        elif self.calibratedDistanceRadioButton.isChecked(): # calculate calibrated distance
-            self.calibratedDistanceSpinBox.setValue(self.resolutionSpinBox.value() * value)
+        elif self.axisCalibratedDistanceRadioButton.isChecked(): # calculate calibrated distance
+            self.axisCalibratedDistanceSpinBox.setValue(self.axisResolutionSpinBox.value() * value)
     
         self.slot_updateAxesMetaData()
         
     @Slot(float)
     @safeWrapper
     def slot_calibratedDistanceChanged(self, value):
-        if self.resolutionRadioButton.isChecked(): # calculate resolution
-            self.resolutionSpinBox.setValue(value / self.pixelsDistanceSpinBox.value())
+        if self.axisResolutionRadioButton.isChecked(): # calculate resolution
+            self.axisResolutionSpinBox.setValue(value / self.axisSampleDistanceSpinBox.value())
             
-            self.resolution = self.resolutionSpinBox.value()
+            self.resolution = self.axisResolutionSpinBox.value()
             
-        elif self.pixelsDistanceRadioButton.isChecked(): # calculate pixels distance
-            self.pixelsDistanceSpinBox.setValue(int(value // self.resolutionSpinBox.value()))
+        elif self.axisSampleDistanceRadioButton.isChecked(): # calculate pixels distance
+            self.axisSampleDistanceSpinBox.setValue(int(value // self.axisResolutionSpinBox.value()))
         
         self.slot_updateAxesMetaData()
         
@@ -886,14 +926,14 @@ class AxesCalibrationDialog2(QDialog, Ui_AxesCalibrationDialog2):
 
     def calculateResolution(self, pixels=None, distance=None):
         if pixels is None:
-            pixels = self.pixelsDistanceSpinBox.value()
+            pixels = self.axisSampleDistanceSpinBox.value()
             
         if distance is None:
-            distance = self.calibratedDistanceSpinBox.value()
+            distance = self.axisCalibratedDistanceSpinBox.value()
             
         self.resolution = distance / pixels
         
-        self.resolutionSpinBox.setValue(self.resolution)
+        self.axisResolutionSpinBox.setValue(self.resolution)
 
         self.slot_updateAxesMetaData()
         
@@ -2919,7 +2959,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.imageToolBar.setObjectName("ImageViewerImageToolBar")
         self.imageToolBar.setMovable(False)
         self.setAxesScalesAction = self.imageToolBar.addAction(QtGui.QIcon.fromTheme("measure-symbolic"), "Axes scales")
-        self.setAxesScalesAction.triggered.connect(self.slot_axesScales)
+        self.setAxesScalesAction.triggered.connect(self.slot_editAxesScales)
         
         self.addToolBar(QtCore.Qt.TopToolBarArea, self.imageToolBar)
         
@@ -2943,7 +2983,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         pass
     
     @Slot()
-    def slot_axesScales(self):
+    def slot_editAxesScales(self):
         if isinstance(self._data_, (vigra.VigraArray, np.ndarray, QtGui.QImage, QtGui.QPixmap)):
             # dlg = AxesCalibrationDialog(self._data_)
             dlg = AxesCalibrationDialog2(self._data_)
@@ -2951,11 +2991,13 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             # dlg = AxesCalibrationDialog(self._axes_calibration_)
             dlg = AxesCalibrationDialog2(self._axes_calibration_)
             
+        # dlg.setModal(False)
+            
         if dlg.exec() > 0:
-            print(f"{self.__class__.__name__}.slot_axesScales: dlg.calibration = {dlg.calibration}")
+            # print(f"{self.__class__.__name__}.slot_editAxesScales: dlg.calibration = {dlg.calibration}")
             self._axes_calibration_ = dlg.calibration
-            if isinstance(self._data_, vigra.VigraArray):
-                self._axes_calibration_.calibrateAxes()
+            # if isinstance(self._data_, vigra.VigraArray):
+            #     self._axes_calibration_.calibrateAxes()
             self.displayFrame()
     
     @Slot(str)

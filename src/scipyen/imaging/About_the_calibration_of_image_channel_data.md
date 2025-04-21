@@ -176,12 +176,16 @@ where:
             
         • estimate
             
-            Δ[Ca²⁺]ᵢ = 𝑲d × (Δ𝑭/𝑭) / (Δ𝑭/𝑭)
-                                                    condition: (Δ𝑭/𝑭) << (Δ𝑭/𝑭)max
-                                                    
-            where Δ𝑭/𝑭 = (𝑭-𝑭₀) / 𝑭₀
+            Δ[Ca²⁺]ᵢ = 𝑲d × (Δ𝑭/𝑭) / (Δ𝑭/𝑭)max
+                                                condition: (Δ𝑭/𝑭) << (Δ𝑭/𝑭)max
+
+            where:
+                Δ𝑭/𝑭 = (𝑭-𝑭₀) / 𝑭₀ — typically, the pixel value in a Δ𝑭/𝑭 image
+                𝑭₀ = the background-subtracted pre-stimulus fluorescence level.
+                (Δ𝑭/𝑭)max — a constant obtained from imaging the flow from a
+                    a pipette with known dye concentration and standard pCa
+                    solutions with nominally 0 and saturating [Ca²⁺].
             
-            with 𝑭₀: the background-subtracted pre-stimulus fluorescence level.
 
             It may be difficult to determine the saturating fluorescence changes
             for low affinity dyes.

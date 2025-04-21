@@ -134,7 +134,7 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
         
     @Slot(int)
     def _slot_refresh_unitComboBox(self, value):
-        self._currentUnitsFamily = self._unitFamilies[self.unitFamilyComboBox.currentIndex()]
+        self._currentUnitsFamily = self._family_names[self.unitFamilyComboBox.currentIndex()]
         self._setupUnitCombo()
         self._currentUnit = self._currentUnitFamilyUnits[self.unitComboBox.currentIndex()]
         self.unitChanged.emit(self._currentUnit)
