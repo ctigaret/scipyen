@@ -3537,7 +3537,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
             
             epochData[epoch.letter] = epValues
             
-        return pd.DataFrame(epochData, index = rowIndex)
+        # return pd.DataFrame(epochData, index = rowIndex)
+        return pd.DataFrame(epochData, index = np.array(rowIndex))
         
     def getDigitalWaveform(self, sweep:int = 0,
                            dac:typing.Optional[typing.Union[ABFOutputConfiguration, int, str]]=None,

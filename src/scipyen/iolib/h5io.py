@@ -292,8 +292,31 @@ def pandasDtype2HF5Dtype(dtype, col, categorical_info:dict=None):
     except:
         print(col.name, dtype, dtype.type, type(col))
         raise
+    
+def getPandasCategories(obj:typing.Union[pd.DataFrame, pd.Series]):
+    categorical_info = dict()
+    obj_dtypes = obj.dtypes
+    
+    for col in obj.columns:
+        if "category" in str(obj[col].dtype):
+            categories = dtype.categories
+            ordered = dtype.ordered
+            if "object" in str(categories.dtype):
+                catlen = categories.dropna().str.len()
+                if catlen.any():
+                    col_dtype = h5py.string_dtype()
+                else:
+                    col_dtype = np.dtype("int64")
+                    
+            else:
+                col_dtype = categories.dtype
+            categorical_info[col] = {"categories": np.array(categories, dtype=col_dtype),
+                                            "ordered": 1 if dtype.ordered else 0, 
+                                            }
         
-def pandas2Structarray(obj):
+    return categorical_info
+        
+def pandas2Structarray(obj:typing.Union[pd.DataFrame, pd.Series]):
     r"""
     Convert a pandas DataFrame object to a numpy structured array.
     
@@ -348,13 +371,13 @@ def pandas2Structarray(obj):
     
     """
     # TODO/FIXME: 2022-10-12 15:11:09
-    # do we deal with multi-index and groupings at all ?!?
-    # if not, then we must FIXME this
+    # does this deal with multi-index and groupings at all ?!?
+    # if not, then I must FIXME this
     
     categorical_info = dict()
     
     # NOTE: 2021-12-13 22:16:37
-    # this always generates a DataFrame irrespective of whether 'obj' is a
+    # this always generates a new DataFrame irrespective of whether 'obj' is a
     # DataFrame or a Series
     obj_rndx = obj.reset_index() # pd.DataFrame
 
@@ -1694,7 +1717,7 @@ def makeDatasetAttrs(obj):
     return dict()
 
 @makeDatasetAttrs.register(np.ndarray)
-def _(obj):
+def _(obj:np.ndarray):
     attrs = dict()
     dtype = obj.dtype
     fields = dtype.fields
@@ -1705,7 +1728,7 @@ def _(obj):
     return makeAttrDict(**attrs)
 
 @makeDatasetAttrs.register(pq.Quantity)
-def _(obj):
+def _(obj:pq.Quantity):
     attrs = dict()
     attrs["dtype"] = jsonio.dtype2JSON(obj.dtype)
     attrs["units"] = obj.units
@@ -1713,7 +1736,7 @@ def _(obj):
     return makeAttrDict(**attrs)
 
 @makeDatasetAttrs.register(neo.core.dataobject.DataObject)
-def _(obj):
+def _(obj:neo.core.dataobject.DataObject):
     # NOTE: flag for deprecation:
     # these attributes are to be stored in the attrs of the parent entity
     # except for the dtype and units
@@ -1724,12 +1747,12 @@ def _(obj):
     return makeAttrDict(**ret)
 
 @makeDatasetAttrs.register(vigra.VigraArray)
-def _(obj):
+def _(obj:vigra.VigraArray):
    return makeAttrDict(dtype = jsonio.dtype2JSON(obj.dtype), 
                        axistags = obj.axistags.toJSON())
 
 @makeDatasetAttrs.register(datetime.timedelta)
-def _(obj):
+def _(obj:datetime.timedelta):
     attrs = dict()
     for attribute in ("days", "seconds", "microseconds"):
         attrs[attribute] = int(getattr(obj, attribute))
@@ -1759,7 +1782,7 @@ def makeAxisDict(obj, axisindex:int):
     raise NotImplementedError(f"makeAxisDict: {type(obj).__name__} objects are not yet supported")
 
 @makeAxisDict.register(vigra.VigraArray)
-def _(obj, axisindex:typing.Union[int, str]):
+def _(obj:vigra.VigraArray, axisindex:typing.Union[int, str]):
     from imaging import axisutils, axiscalibration
     from imaging.axiscalibration import (AxisCalibrationData, ChannelCalibrationData, AxesCalibration)
     if isinstance(axisindex, int):
@@ -1790,7 +1813,7 @@ def _(obj, axisindex:typing.Union[int, str]):
     return makeAttrDict(**axdict)
     
 @makeAxisDict.register(vigra.AxisTags)
-def _(obj, axisindex:typing.Union[int, str]):
+def _(obj:vigra.AxisTags, axisindex:typing.Union[int, str]):
     # each dimenson has its own axistag
     from imaging import axisutils, axiscalibration
     from imaging.axiscalibration import (AxisCalibrationData, ChannelCalibrationData, AxesCalibration)
@@ -1862,7 +1885,7 @@ def _(obj:neo.core.dataobject.DataObject, axisindex:int):
 
 # this below is not used ?!?
 @makeAxisDict.register(vigra.filters.Kernel1D)
-def _(obj, axisindex):
+def _(obj:vigra.filters.Kernel1D, axisindex):
     if axisindex < 0 or axisindex >= 2:
         raise ValueError(f"Invalid axis index {axisindex} for {type(obj).__name__} object")
     
@@ -1874,7 +1897,7 @@ def _(obj, axisindex):
     
 # this below is not used ?!?
 @makeAxisDict.register(vigra.filters.Kernel2D)
-def _(obj, axisindex):
+def _(obj:vigra.filters.Kernel2D, axisindex):
     if axisindex < 0 or axisindex >= 3:
         raise ValueError(f"Invalid axis index {axisindex} for {type(obj).__name__} object")
     ret = dict()
@@ -1895,7 +1918,7 @@ def makeNeoSignalAxisDict(obj, axisindex:int):
     raise NotImplementedError(f"makeNeoSignalAxisDict: {type(obj).__name__} objects are not supported")
 
 @makeNeoSignalAxisDict.register(neo.AnalogSignal)
-def _(obj, axisindex):
+def _(obj:neo.AnalogSignal, axisindex):
     # only two axes
     ret = dict()
     if axisindex == 0:
@@ -1919,7 +1942,7 @@ def _(obj, axisindex):
     return ret
 
 @makeNeoSignalAxisDict.register(DataSignal)
-def _(obj, axisindex):
+def _(obj:DataSignal, axisindex):
     # only two axes
     ret = dict()
     if axisindex == 0:
@@ -1946,7 +1969,7 @@ def _(obj, axisindex):
     return ret
 
 @makeNeoSignalAxisDict.register(neo.IrregularlySampledSignal)
-def _(obj, axisindex):
+def _(obj:neo.IrregularlySampledSignal, axisindex):
     # only two axes
     ret = dict()
     if axisindex == 0:
@@ -1967,7 +1990,7 @@ def _(obj, axisindex):
     return ret
 
 @makeNeoSignalAxisDict.register(IrregularlySampledDataSignal)
-def _(obj, axisindex):
+def _(obj:IrregularlySampledDataSignal, axisindex):
     ret = dict()
     if axisindex == 0:
         ret["origin"] = obj.t_start
@@ -1984,7 +2007,7 @@ def _(obj, axisindex):
     return ret
 
 @makeNeoSignalAxisDict.register(neo.ImageSequence)
-def _(obj, axisindex):
+def _(obj:neo.ImageSequence, axisindex):
     # three axes but NOTE: 
     # 𝟏 First axis (axis 0) is the time axis (one image "frame"/time point)
     # 
@@ -2036,7 +2059,7 @@ def makeNeoDataAxisDict(obj, axisindex):
     raise NotImplementedError(f"makeNeoDataAxisDict: {type(obj).__name__} objects are not supported")
     
 @makeNeoDataAxisDict.register(neo.SpikeTrain)
-def _(obj, axisindex):
+def _(obj:neo.SpikeTrain, axisindex):
     ret = dict()
     if axisindex == 0:
         ret["origin"] = obj.t_start
@@ -2057,7 +2080,7 @@ def _(obj, axisindex):
     return ret
 
 @makeNeoDataAxisDict.register(neo.Event)
-def _(obj, axisindex):
+def _(obj:neo.Event, axisindex):
     ret = dict()
     if axisindex == 0:
         ret["labels"] = obj.labels # labels are contained in the axis_0 attrs
@@ -2072,7 +2095,7 @@ def _(obj, axisindex):
     return ret
 
 @makeNeoDataAxisDict.register(DataMark) # includes TriggerEvent
-def _(obj, axisindex):
+def _(obj:DataMark, axisindex):
     ret = dict()
     if axisindex == 0:
         ret["labels"] = obj.labels # labels are contained in the axis_0 attrs
@@ -2088,7 +2111,7 @@ def _(obj, axisindex):
     return ret
 
 @makeNeoDataAxisDict.register(neo.Epoch)
-def _(obj, axisindex):
+def _(obj:neo.Epoch, axisindex):
     ret = dict()
     if axisindex == 0:
         ret["labels"] = obj.labels # labels are contained in the axis_0 attrs
@@ -2104,7 +2127,7 @@ def _(obj, axisindex):
     return ret
 
 @makeNeoDataAxisDict.register(DataZone)
-def _(obj, axisindex):
+def _(obj:DataZone, axisindex):
     ret = dict()
     if axisindex == 0:
         ret["labels"] = obj.labels # labels are contained in the axis_0 attrs
@@ -2327,15 +2350,28 @@ def _(obj:typing.Union[pd.DataFrame, pd.Series],
             group[target_name] = cached_entity # hard link
             return cached_entity
 
-        data, categorical_info, pandas_dtypes = pandas2Structarray(obj)
-
         entity = group.create_group(target_name,track_order=track_order)
+
+        # BUG: 2025-04-23 00:13:43 FIXME
+        # not sure storing as structarray is a good option; it messes up 
+        # returning byte strings for all elements
+        # data, categorical_info, pandas_dtypes = pandas2Structarray(obj)
+        # obj_entity = makeHDF5Dataset(data, entity, name="data",
+        #                              compression=compression,
+        #                              chunks=chunks,
+        #                              track_order=track_order,
+        #                              entity_cache = entity_cache)
         
-        obj_entity = makeHDF5Dataset(data, entity, name="data",
+        data = obj.to_dict()
+        categorical_info = getPandasCategories(obj)
+
+        
+        obj_entity = makeHDF5Group(data, entity, name="data",
                                      compression=compression,
                                      chunks=chunks,
                                      track_order=track_order,
                                      entity_cache = entity_cache)
+        
         
         if len(categorical_info):
             catgrp = makeHDF5Group(categorical_info, entity, name="categories",
@@ -3763,16 +3799,32 @@ def _(entity:h5py.Group, target_class:type, attrs:dict, cache:dict=dict()):
             
         elif target_class in (pd.DataFrame, pd.Series):
             # TODO multi-index types, groupings ?!?
-            data = np.array(entity["data"]) # a structarray
             
-            # names of the data fields; 
-            #"index" should aleready be there and represents the original
-            # index of the original DataFrame stored here...
-            names = [n for n in data.dtype.names if n != "index"]
+            # data = np.array(entity["data"]) # a structarray
+            # index = list(map(lambda n: n.decode() if isinstance(n, bytes) else n, data["index"]))
             
-            obj = target_class(data[names], index = data["index"])
-                
+            data = fromHDF5(entity["data"]) # a dict
+            
+            # TODO: 2025-04-23 00:33:52
+            # how to restore categories?
+            if isinstance(data, dict):
+                obj = target_class(data)
+            else: # "legacy" code via structarray:
+                try:
+                    # NOTE: see BUG: 2025-04-23 00:13:43 FIXME in objectToEntity[pd.DataFrame,pd.Series]
+                    # WARNING: Expect dataframe with contents as bytes...
+                    data = np.array(entity["data"]) # a structarray
+                    index = list(map(lambda n: n.decode() if isinstance(n, bytes) else n, data["index"]))
+                    # "index" should already be there and represents the original
+                    # index of the original DataFrame stored here...
+                    # names of the data fields; 
+                    names = [n for n in data.dtype.names if n != "index"]
+                    # print(f"objectFromEntity: target class = {target_class.__name__}, index = {index}, names = {names}")
+                    obj = target_class(data[names], index = index)
+                except:
+                    traceback.print_exc()
+            
         else:
-            obj = target_class # for now
+            obj = target_class() # for now
     
     return obj
