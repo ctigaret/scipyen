@@ -2348,7 +2348,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
         dac: ABFOutputConfiguration (i.e. a DAC output), str (DAC name), or 
             int (DAC physical index)
         sweep: index of the sweep; must be in the half-open interval [0, nSweeps)
-        holding: When True (default), timings include the sweep holding time
+        holding: When True (default), timings include the sweep holding time,
+            equivalent to the 1/64 × the number of samples in a sweep
         """
         dac, epoch = self._check_DAC_Epoch_(dac, epoch)
         units = epoch.firstDuration.units

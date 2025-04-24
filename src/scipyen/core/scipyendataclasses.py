@@ -392,8 +392,10 @@ class Organism(ScipyenDataclass):
     def __eq__(self, other) -> bool:
         return super().__eq__(other)
 
+class Tissue():pass # leave here for it to be detected in Kate symbol viewer
 Tissue = ScipyenDataclass
 
+class Organ():pass # leave here for it to be detected in Kate symbol viewer
 Organ = ScipyenDataclass
 
 @dataclass
@@ -997,6 +999,157 @@ class Schedule(ScipyenDataclass):
     @property
     def procedures(self):
         return [e.procedure for e in self.episodes]
+    
+# NOTE: 2025-04-24 15:19:57 
+# NOT Required - use dataclasses.is_dataclass
+# def isDataclass(o:object):
+#     if not isinstance(o, type):
+#         o = type(o)
+#         
+#     # CAUTION: 2025-04-24 15:06:14
+#     # _FIELDS might change in future python versions, breaking the code
+#     # the try ... except statement after the next line is more fool-proof, if 
+#     # not with overheads...
+#     return hasattr(o, dataclasses._FIELDS)
+#     # try:
+#     #     f = dataclasses.fields(o)
+#     #     return True
+#     # except:
+#     #     return False
+    
+def mergeDataclasses(typename:str, *args, **kwargs):
+    r"""
+Dynamically creates a new dataclass by merging fields from args.
+    
+Use as a convenience to pack parameters as a new dataclass type on-the-fly, 
+before instantiating the new class and passing the instance as parameter to a 
+function that expects it.
+    
+Parameters:
+===========
+    typename:str — name of the new type. Must not ne empty, and must be a valid
+        Python identifier; it will be capitalized if necessary.
+    
+    args: two or more dataclass types or instances
+    
+Var-keyword parameters:
+=======================
+    These are passed to the dataclasses.make_dataclass() function, see Python
+documentation for details.
+    When empty, these parameter get their dfault values as per dataclasses.make_dataclass.
+    
+Returns:
+=======
+A tuple containing:
+• the new type
+• an instance of the new type, if the new type can be instantiated (i.e. all its
+fields have default values), else None, in whch case the new type MUST be 
+instantiated separately, after "merging"
+    
+If any of the args are INSTANCES of a dataclass type, then the values of their
+parameters will be propagated in the returned instance of the new type.
+    
+Therefore one may avoid the need to instantiate the new type separately after
+"merging" by supplying instances of the original dataclasses, instead of their
+types, in args.
+    
+CAUTION: The dataclasses in args MUST have distinct field names. Fields in 
+subequent elements of 'args', that have the same name as fields in args[0] will
+be silently ignored. This means that this function should used to augment the 
+dataclass in args[0] with non-duplicate fields from the subsequent elements of 
+'args'.
+    
+NOTE:
+    1. Any dataclsses.InitVar type of fields in args will NOT be propagated to 
+    the new type. This means that the function will not be able to merge dataclasses
+    with complex constructors that reply on __post_init__ or InitVar-typed fields.
+    
+WARNING:
+    
+"""
+    from copy import deepcopy
+    from core.utilities import unique
+    
+    if not isinstance(typename, str):
+        raise TypeError(f"'typename' expected a str; instead, got a {type(typename).__name__}")
+    
+    if len(typename.strip()) == 0 or not typename.isidentifier():
+        raise ValueError(f"Invalid type name {typename}")
+    
+    if not all(dataclasses.is_dataclass(o) for o in args):
+        raise TypeError("Expecting a sequence of dataclasses")
+    
+    if len(args) < 2:
+        raise ValueError("At least two dataclass types or instances are required")
+    
+    # type_args = tuple(filter(lambda o: isinstance(o, type), args))
+#     instance_args = tuple(filter(lambda o: not isinstance(o, type), args))
+#     
+    fields = list(map(lambda f: (f.name, f.type, f), dataclasses.fields(args[0])))
+    
+    bases = list()
+    
+    master_dict = dict()
+    
+    if isinstance(args[0], type):
+        argfields = dataclasses.fields(args[0])
+        bases.extend(list(filter(lambda c: c != object, inspect.getmro(args[0]))))
+    else:
+        # not sure this is the right approach, because as_dict() recurses into 
+        # the fields themselves if they are  dataclasses, dicts, lists, and tuples 
+        # master_dict.update(args[0].as_dict()) 
+        for f in argfields:
+            master_dict[f.name] = deepcopy(getattr(args[0], f.name))
+            
+        bases.extend(list(filter(lambda c: c != object, inspect.getmro(type(args[0])))))
+            
+    for arg in args[1:]:
+        argfields = dataclasses.fields(arg)
+        f_0 = list(map(lambda f: f[0], fields))
+        # NOTE: 2025-04-24 22:03:31
+        # dataclasses.make_dataclass does NOT allow any field duplicates
+        fields.extend(list(map(lambda f: (f.name, f.type, f), filter(lambda x: x.name not in f_0, argfields))))
+        if isinstance(arg, type):
+            bases.extend(list(filter(lambda c: c != object, inspect.getmro(arg))))
+        else:
+            bases.extend(list(filter(lambda c: c != object, inspect.getmro(type(arg)))))
+            for f in argfields:
+                master_dict[f.name] = deepcopy(getattr(arg, f.name))
+            
+    bases = tuple(unique(bases))
+    
+    print(f"mergeDataclasses: bases = {bases}")
+    
+    kwargs.pop("bases", None)
+    
+    # NOTE: 2025-04-24 22:19:10
+    # avoit metaclass inheritance conflicts
+    newtype = dataclasses.make_dataclass(typename, fields, bases=(ScipyenDataclass, ), **kwargs)
+    # newtype = dataclasses.make_dataclass(typename, fields, **kwargs)
+    
+    nodefaults = list(filter(lambda f: f[2].default is dataclasses.MISSING and f[2].default_factory is dataclasses.MISSING,
+                             fields))
+    
+    if len(nodefaults) and not all(f[0] in master_dict.keys() for f in nodefaults):
+            # no value found for these fields in args, indicating that at least
+            # some of them were types, not instances
+            ret = None
+            
+    else:
+        ret = newtype(**master_dict)
+    
+    return newtype, ret
+        
+    # # reminder:
+    # # dataclasses.make_dataclass(cls_name, fields, *, bases=(),
+    # #                            namespace=None, init=True, 
+    # #                            repr=True, eq=True, order=False,
+    # #                            unsafe_hash=False, frozen=False, 
+    # #                            match_args=True, 
+    # #                            kw_only=False, 
+    # #                            slots=False, 
+    # #                            weakref_slot=False, 
+    # #                            module=None)
     
 __all__ = ("AdministrationRoute", "BiologicalSource", "Biometrics", "BioSourceType",
            "CellCompartment","CellCompartmentType", "Episode", "Organ", "Organism", 

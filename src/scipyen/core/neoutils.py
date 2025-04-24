@@ -2510,8 +2510,8 @@ def _(src: typing.Union[NeoObjectList, list, tuple, deque],
 def get_index_of_named_signal(
     src, names, stype=neo.AnalogSignal, silent=False
 ) -> typing.Sequence:
-    r"""Returns a list of indices of signals named as specified by 'names',
-    and contained in src.
+    r"""
+Returns a list of indices of signals named as specified by 'names', and contained in src.
 
     NOTE: This function is DEPRECATED in favor of normalized_index
     (which calls utlities.normalized_index).
@@ -2602,6 +2602,9 @@ def get_index_of_named_signal(
 
     Such signals will be skipped / missed!
     """
+    
+    scipywarn("WARNING: This function is DEPRECATED and will be removed in future Scipyen versions; plase use neoutils.normalized_index instead",
+            category=warnings.DeprecationWarning)
     # signal_collection = "%ss" % stype.__name__.lower()
     signal_collection = pluralize(stype.__name__.lower(), 2)
 
@@ -6953,7 +6956,7 @@ def extract_spike_train_waveforms(x: neo.SpikeTrain, waveunits: pq.Quantity, **k
 def intersect_annotations(A, B):
     r"""
     NOTE: This is a copy of the neo.core.baseneo.intersect_annotations
-    functions which is more relaxed when in comparing numpy.bool_ with bool
+    functions which is more relaxed when comparing numpy.bool_ with bool
     (normalizing to numpy.bool_)
 
     Original documentation follows:

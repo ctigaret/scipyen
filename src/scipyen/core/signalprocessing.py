@@ -1633,7 +1633,7 @@ def parse_step_waveform_signal(sig, method="state_levels", **kwargs):
     from scipy import cluster
     from scipy.signal import boxcar
 
-    warnings.warn(
+    scipywarn(
         "This function is DEPRECATED. Please use 'detect_boxcar'",
         category=warnings.DeprecationWarning,
     )
