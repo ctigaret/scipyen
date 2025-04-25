@@ -6730,7 +6730,7 @@ def getCurrentInjectionParameters(data:neo.Block,
     checkIinjEpoch = lambda x: x.type == pab.ABFEpochType.Step and x.firstLevel != 0 and x.deltaLevel != 0 and x.firstDuration > 0 and x.deltaDuration == 0
     
     if isinstance(epoch, (pab.ABFEpoch, int, str)):
-        dac, epoch = protocol._check_DAC_Epoch(dac, epoch)
+        dac, epoch = protocol.check_DAC_Epoch(dac, epoch)
         
         if not checkIinjEpoch(epoch):
             return

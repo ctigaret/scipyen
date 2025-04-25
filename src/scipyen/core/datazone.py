@@ -517,7 +517,11 @@ class Interval(ScipyenDataclass):
     # name of this interval
     name: str = "Interval"
     
-    # flag indicating what fields 't1' means
+    description: str = ""
+    
+    # flag indicating what fields 't1' means:
+    # when True, t0 and t1 are , respectively, the start and stop times in the interval
+    # when False, t0 and t1 are, respectively, the start time and duration (like neo.Epoch)
     extent: bool = False
     
     def __init__(self, t0: typing.Union[numbers.Number, pq.Quantity],
@@ -557,7 +561,7 @@ class Interval(ScipyenDataclass):
                            duration: bool = False):
         from . import neoutils
         import neo
-        interval = neoutils.get_epoch_interval(epoch, index, duration=False)
+        interval = neoutils.get_epoch_interval(epoch, index, duration=duration)
         if len(interval) == 2: # empty labels
             if isinstance(epoch.name, str) and len(epoch.name.strip()):
                 name = epoch.name

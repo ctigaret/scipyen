@@ -1712,9 +1712,26 @@ class ABFProtocol(ElectrophysiologyProtocol):
     def sweepTimes(self) -> pq.Quantity:
         return np.array(list(map(self.getSweepTime, range(self.nSweeps)))) * pq.s
     
-    def _check_DAC_Epoch_(self, 
+    def check_DAC_Epoch(self, 
                        dac:typing.Union[ABFOutputConfiguration, int, str],
                        epoch:typing.Optional[typing.Union[ABFEpoch, int, str]]=None) -> tuple:
+        r"""
+        Checks that:
+        
+        1. dac belongs to this protocol, when given as an ABFOutputConfiguration, or
+            points to an existing DAC in this protocol, when given as a str (DAC name)
+            or int (DAC physical index); 
+        
+        2. epoch belong to the specified dac, when given as an ABFEpoch, or 
+            points to a valid epoch in the specified dac, when given as a str 
+            (ABFEpoch 'letter') or int (APBEpoch index)
+        
+        Returns:
+        ========
+        A tuple (dac:ABFOutputConfiguration, epoch:ABFEpoch) both validated with
+        respect to their parent object.
+        
+    """
         if dac is None:
             dac = self.activeDACOutput
         else:
@@ -1724,9 +1741,14 @@ class ABFProtocol(ElectrophysiologyProtocol):
                 raise TypeError(f"Invalid DAC {dac}")
             
         if epoch is not None:
-            # print(f"{self.__class__.__name__}._check_DAC_Epoch_: dac{dac}, epoch: {epoch}")
+            # print(f"{self.__class__.__name__}.check_DAC_Epoch: dac{dac}, epoch: {epoch}")
             if isinstance(epoch, (int,str)):
                 epoch = dac.getEpoch(epoch)
+                
+            elif isinstance(epoch, ABFEpoch):
+                if epoch not in dac.epochs:
+                    raise ValueError(f"The specified epoch {epoch} does not belong to this dac ({dac.physicalIndex} ('{dac.name}'))")
+                
             if not isinstance(epoch, ABFEpoch) or epoch.number not in tuple(e.number for e in dac.epochs):
                 raise ValueError(f"Invalid epoch specified {epoch} for DAC ({dac.physicalIndex} ('{dac.name}')) with {len(dac.epochs)} epochs")
         
@@ -2234,19 +2256,19 @@ class ABFProtocol(ElectrophysiologyProtocol):
                                dac:typing.Union[ABFOutputConfiguration, int, str],
                                sweep:int=0, 
                                samples:bool=False) -> typing.Union[pq.Quantity, int]:
-        r"""Actual epoch duration (in time units or or samples) for the given sweep.
+        r"""Actual epoch duration (in time units or samples) for the given sweep.
         Takes into account first duration and delta duration, both defined in the 
         protocol, for the given DAC. 
         
         When delta duration != 0, the epoch's actual duration is the epoch's
-        first duration + delta duration × sweep index.
+        first duration + delta duration × sweep.
         
         To get the epoch's first duration just pass sweep = 0 to this method.
         
         (NOTE: sweep indexing starts at 0)
         
         """
-        dac, epoch = self._check_DAC_Epoch_(dac, epoch)
+        dac, epoch = self.check_DAC_Epoch(dac, epoch) 
 
         ret = epoch.firstDuration + sweep * epoch.deltaDuration
         if samples:
@@ -2257,7 +2279,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
                                     dac:typing.Union[ABFOutputConfiguration, int, str],
                                     samples:bool=False) -> typing.Union[pq.Quantity, int]:
         r"""Change in epoch duration (time units or samples) with each sweep"""
-        dac, epoch = self._check_DAC_Epoch_(dac, epoch)
+        dac, epoch = self.check_DAC_Epoch(dac, epoch)
         
         ret = epoch.deltaDuration
         if samples:
@@ -2268,7 +2290,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
                             dac:typing.Union[ABFOutputConfiguration, int, str],
                             sweep:int = 0,
                             ):
-        dac, epoch = self._check_DAC_Epoch_(dac, epoch)
+        dac, epoch = self.check_DAC_Epoch(dac, epoch)
         return epoch.firstLevel + sweep * epoch.deltaLevel
        
     def neoEpochForDAC(self, dac:typing.Union[ABFOutputConfiguration, int, str],
@@ -2387,8 +2409,15 @@ class ABFProtocol(ElectrophysiologyProtocol):
         sweep: index of the sweep; must be in the half-open interval [0, nSweeps)
         holding: When True (default), timings include the sweep holding time,
             equivalent to the 1/64 × the number of samples in a sweep
+        fromRunStart: When True, the ABFEpoch start time is calculated from the 
+            start of the run (thus taking into account the time elapsed during 
+            previous sweeps and including any inter-sweep interval)
+            Default is False.
+        samples:bool When True, return the start of Epoch in samples, rather than
+            time units.
+            Default is False.
         """
-        dac, epoch = self._check_DAC_Epoch_(dac, epoch)
+        dac, epoch = self.check_DAC_Epoch(dac, epoch)
         units = epoch.firstDuration.units
         
         # summate duration of all previous epochs (this always comes in time units)
@@ -2416,7 +2445,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
     def getEpochPulseCount(self, epoch:typing.Union[ABFEpoch, int, str],
                                  dac:typing.Union[ABFOutputConfiguration, int, str],
                                  sweep:int=0):
-        dac, epoch = self._check_DAC_Epoch_(dac, epoch)
+        dac, epoch = self.check_DAC_Epoch(dac, epoch)
         if float(epoch.pulsePeriod) == 0.:
             return 0
         return int(np.ceil(self.getEpochDuration(epoch, dac, sweep)/epoch.pulsePeriod))
@@ -2424,7 +2453,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
     def getEpochPulsePeriod(self, epoch:typing.Union[ABFEpoch, int, str],
                                   dac:typing.Union[ABFOutputConfiguration, int, str],
                                   samples:bool=False):
-        dac, epoch = self._check_DAC_Epoch_(dac, epoch)
+        dac, epoch = self.check_DAC_Epoch(dac, epoch)
         
         if samples:
             return scq.nSamples(epoch.pulsePeriod, self.samplingRate)
@@ -2437,7 +2466,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
                                  holding:bool=True,
                                  fromRunStart:bool=False,
                                  samples:bool=False) -> tuple:
-        dac, epoch = self._check_DAC_Epoch_(dac, epoch)
+        dac, epoch = self.check_DAC_Epoch(dac, epoch)
 
         pc = self.getEpochPulseCount(epoch, dac, sweep)
         pp = self.getEpochPulsePeriod(epoch, dac, samples)
@@ -2452,7 +2481,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
     def getEpochPulseWidth(self, epoch:typing.Union[ABFEpoch, int, str],
                                  dac:typing.Union[ABFOutputConfiguration, int, str],
                                  samples:bool=False) -> int:
-        dac, epoch = self._check_DAC_Epoch_(dac, epoch)
+        dac, epoch = self.check_DAC_Epoch(dac, epoch)
         if samples:
             return scq.nSamples(epoch.pulseWidth, self.samplingRate)
         return epoch.pulseWidth
@@ -2462,7 +2491,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         r"""Final analog value in the previous epoch"""
         # FIXME: 2023-09-18 23:34:27
         # this can become very expensive for many sweeps!
-        dac, _ = self._check_DAC_Epoch_(dac, None)
+        dac, _ = self.check_DAC_Epoch(dac, None)
         
         if len(dac.epochs) == 0 or sweep == 0:
             return dac.dacHoldingLevel
@@ -2480,7 +2509,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
             
     def getPreviousSweepLastDigitalLevel(self, dac:typing.Union[ABFOutputConfiguration, int, str],
                                          sweep:int, digChannel:int) -> pq.Quantity:
-        dac, _ = self._check_DAC_Epoch_(dac, None)
+        dac, _ = self.check_DAC_Epoch(dac, None)
         # BUG: 2024-10-23 01:49:44 FIXME
         # what is the last epoch digital level ?!?
         if len(dac.epochs) == 0 or sweep == 0:
@@ -2979,7 +3008,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         
         actualOutput = dac is None
             
-        dac, epoch = self._check_DAC_Epoch_(dac, epoch)
+        dac, epoch = self.check_DAC_Epoch(dac, epoch)
         
         hoDACActive = self.activeDACChannel not in (0,1)
         
@@ -3119,7 +3148,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         
         actualOutput = dac is None
             
-        dac, _ = self._check_DAC_Epoch_(dac, None)
+        dac, _ = self.check_DAC_Epoch(dac, None)
         
         digDACs = self.getDACsWithDigitalOutput()
         
@@ -3208,7 +3237,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         
         actualOutput = dac is None
             
-        dac, _ = self._check_DAC_Epoch_(dac, None)
+        dac, _ = self.check_DAC_Epoch(dac, None)
         
         # set of DAC physical indexes for those DACs where DIG output is configured
         # but not necesarily enabled
@@ -3397,7 +3426,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         
         actualOutput = dac is None
             
-        dac, _= self._check_DAC_Epoch_(dac, None) # when dac is None, dac is set to active DAC
+        dac, _= self.check_DAC_Epoch(dac, None) # when dac is None, dac is set to active DAC
         
         # a tuple of ABFEpoch numbers where digital outputs are defined:
         digEpochs = self.epochsWithDigitalOutput
@@ -3592,7 +3621,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         
         actualOutput = dac is None
             
-        dac, _ = self._check_DAC_Epoch_(dac, None)
+        dac, _ = self.check_DAC_Epoch(dac, None)
         
         # set of DAC physical indexes for those DACs where DIG output is configured
         # but not necesarily enabled
@@ -3890,7 +3919,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         
         actualOutput = dac is None
             
-        dac, epoch = self._check_DAC_Epoch_(dac, epoch)
+        dac, epoch = self.check_DAC_Epoch(dac, epoch)
         
         hoDACActive = self.activeDACChannel not in (0,1)
         
@@ -4159,7 +4188,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         
         actualOutput = dac is None
             
-        dac, _ = self._check_DAC_Epoch_(dac, None)
+        dac, _ = self.check_DAC_Epoch(dac, None)
         
         analogDACs = tuple(d for d in self.DACs if d.analogWaveformEnabled)
         
@@ -4225,7 +4254,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
                     return DataMark()
                 
     def getDACAnalogEvents(self, dac, sweep):
-        dac, _ = self._check_DAC_Epoch_(dac, None)
+        dac, _ = self.check_DAC_Epoch(dac, None)
         
         t0 = t1 = self.holdingTime.rescale(pq.s)
             
@@ -4267,7 +4296,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         
         actualOutput = dac is None
         
-        dac, epoch = self._check_DAC_Epoch_(dac, epoch)
+        dac, epoch = self.check_DAC_Epoch(dac, epoch)
 
         actualDuration = epoch.firstDuration + sweep * epoch.deltaDuration
         epochSamplesCount = scq.nSamples(actualDuration, self.samplingRate)
@@ -4382,7 +4411,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         
         actualOutput = dac is None
             
-        dac, _ = self._check_DAC_Epoch_(dac, None)
+        dac, _ = self.check_DAC_Epoch(dac, None)
         
         analogDACs = tuple(d for d in self.DACs if d.analogWaveformEnabled)
         
@@ -4494,7 +4523,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         """
         from iolib import pictio as pio
         
-        dac, _ = self._check_DAC_Epoch_(dac, None)
+        dac, _ = self.check_DAC_Epoch(dac, None)
         if sweep > 0 and dac.returnToHold:
             previousLevel = self.getPreviousSweepLastEpochLevel(dac,sweep)
         else:
@@ -4582,7 +4611,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         
         actualOutput = dac is None
             
-        dac, epoch = self._check_DAC_Epoch_(dac, epoch)
+        dac, epoch = self.check_DAC_Epoch(dac, epoch)
 
         actualDuration = epoch.firstDuration + sweep * epoch.deltaDuration
         epochSamplesCount = scq.nSamples(actualDuration, self.samplingRate)
@@ -6981,7 +7010,7 @@ class ABFOutputConfiguration:
         First duration, train rate and pulse duration are all > 0 (enforced by Clampex)
         """
         
-        dac, epoch = self._check_DAC_Epoch_(dac, epoch)
+        dac, epoch = self.check_DAC_Epoch(dac, epoch)
         return epoch.epochType == ABFEpochType.Pulse and epoch.firstLevel != 0 and \
             epoch.deltaLevel == 0 and epoch.deltaDuration == 0 and len(self.getUsedDigitalChannels(sweep, epoch)) == 0
     
