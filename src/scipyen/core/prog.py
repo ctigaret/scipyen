@@ -2624,6 +2624,10 @@ def is_class_defined_in_module(x: typing.Any, m: types.ModuleType):
         x_module = sys.modules[x.__module__]
 
     else:
+        xmod = x.__module__
+        if isinstance(xmod, types.ModuleType): # if this happens, the problem is somwehere up the call stack
+            xmod = xmod.__name__
+        # print(f"core.prog.is_class_defined_in_module: x.__module__ = {x.__module__} ({type(x.__module__).__name__})")
         x_rev_module_path = list(reversed(x.__module__.split(".")))
         for p in x_rev_module_path:
             if p in sys.modules:

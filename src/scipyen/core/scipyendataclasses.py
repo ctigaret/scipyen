@@ -1019,15 +1019,45 @@ class Schedule(ScipyenDataclass):
     
 def mergeDataclasses(typename:str, *args, **kwargs):
     r"""
-Dynamically creates a new dataclass by merging fields from args.
+Factory function for dynamics dataclasses.
+
+Purpose:
+========
+    
+The function creates a new dataclass-like type and, optionally, an instance of
+it, by merging fields from the dataclass elements in ``*args``. The elements may
+be either dataclass types or instances thereof.
     
 Use as a convenience to pack parameters as a new dataclass type on-the-fly, 
-before instantiating the new class and passing the instance as parameter to a 
-function that expects it.
+before instantiating it and passing the instance as parameter to a function that
+expects it.
+    
+ATTENTION: The new class is dynamically created, with the following implications:
+    
+When the function is called at the console or in script that is NOT imported as
+a module:
+    
+1) While it MAY be possible to save an instance of the new class to disk as HDF5
+file, reading it back in a subsequent session WILL FAIL (simply because the 
+new type is not available yet, unless the exact same type is defined by calling
+this function BEFORE loading the saved instance from HDF5)
+    
+2) Pickling and unpickling instances of the new class WILL FAIL for the same 
+reasons above.
+    
+As a workaround, create the new type in a module by calling this factory function
+AND pass the name of that module as thre value of the `module` keyword
+    
+I any case, make sure that the symbol to which the returned type is bound in the 
+calling namespac and the value of the ``typename`` parameter are not supplied by 
+other imported modules.
+    
+In general is a good idea that the symbol binding in the caller's namespace is 
+identical to the typename, both capitalized.
     
 Parameters:
 ===========
-    typename:str — name of the new type. Must not ne empty, and must be a valid
+    typename:str — name of the new type. Must not be empty, and must be a valid
         Python identifier; it will be capitalized if necessary.
     
     args: two or more dataclass types or instances
@@ -1036,7 +1066,13 @@ Var-keyword parameters:
 =======================
     These are passed to the dataclasses.make_dataclass() function, see Python
 documentation for details.
-    When empty, these parameter get their dfault values as per dataclasses.make_dataclass.
+When empty, these parameter get their dfault values as per 
+``dataclasses.make_dataclass``.
+    
+Typically one would use the `module` keyword parameter (with a str value) to 
+assign a module to the new type, other than the default ``scipyendataclasses``
+so that instances of the new type can be serialized (i.e., pickled and unpickled) 
+or exported to / loaded from HDF5 files (see above).
     
 Returns:
 =======
@@ -1064,7 +1100,7 @@ NOTE:
     the new type. This means that the function will not be able to merge dataclasses
     with complex constructors that reply on __post_init__ or InitVar-typed fields.
     
-WARNING:
+.. _[#]
     
 """
     from copy import deepcopy
@@ -1082,26 +1118,18 @@ WARNING:
     if len(args) < 2:
         raise ValueError("At least two dataclass types or instances are required")
     
-    # type_args = tuple(filter(lambda o: isinstance(o, type), args))
-#     instance_args = tuple(filter(lambda o: not isinstance(o, type), args))
-#     
     fields = list(map(lambda f: (f.name, f.type, f), dataclasses.fields(args[0])))
     
     bases = list()
     
     master_dict = dict()
     
-    if isinstance(args[0], type):
-        argfields = dataclasses.fields(args[0])
-        bases.extend(list(filter(lambda c: c != object, inspect.getmro(args[0]))))
-    else:
-        # not sure this is the right approach, because as_dict() recurses into 
-        # the fields themselves if they are  dataclasses, dicts, lists, and tuples 
-        # master_dict.update(args[0].as_dict()) 
+    argfields = dataclasses.fields(args[0])
+    
+    if not isinstance(args[0], type):
         for f in argfields:
             master_dict[f.name] = deepcopy(getattr(args[0], f.name))
-            
-        bases.extend(list(filter(lambda c: c != object, inspect.getmro(type(args[0])))))
+                
             
     for arg in args[1:]:
         argfields = dataclasses.fields(arg)
@@ -1109,31 +1137,22 @@ WARNING:
         # NOTE: 2025-04-24 22:03:31
         # dataclasses.make_dataclass does NOT allow any field duplicates
         fields.extend(list(map(lambda f: (f.name, f.type, f), filter(lambda x: x.name not in f_0, argfields))))
-        if isinstance(arg, type):
-            bases.extend(list(filter(lambda c: c != object, inspect.getmro(arg))))
-        else:
-            bases.extend(list(filter(lambda c: c != object, inspect.getmro(type(arg)))))
+                
+        if not isinstance(arg,type):
             for f in argfields:
                 master_dict[f.name] = deepcopy(getattr(arg, f.name))
             
-    bases = tuple(unique(bases))
+    kwargs.pop("bases", None) # enforce ScipyenDataclass as base class
     
-    print(f"mergeDataclasses: bases = {bases}")
-    
-    kwargs.pop("bases", None)
-    
-    # NOTE: 2025-04-24 22:19:10
-    # avoit metaclass inheritance conflicts
     newtype = dataclasses.make_dataclass(typename, fields, bases=(ScipyenDataclass, ), **kwargs)
-    # newtype = dataclasses.make_dataclass(typename, fields, **kwargs)
     
     nodefaults = list(filter(lambda f: f[2].default is dataclasses.MISSING and f[2].default_factory is dataclasses.MISSING,
                              fields))
     
     if len(nodefaults) and not all(f[0] in master_dict.keys() for f in nodefaults):
-            # no value found for these fields in args, indicating that at least
-            # some of them were types, not instances
-            ret = None
+        # no value found for these fields in args, indicating that at least
+        # some of them were types, not instances
+        ret = None
             
     else:
         ret = newtype(**master_dict)
