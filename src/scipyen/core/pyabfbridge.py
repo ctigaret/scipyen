@@ -2278,7 +2278,10 @@ class ABFProtocol(ElectrophysiologyProtocol):
                  fromRunStart:bool=False,
                  name:typing.Optional[str] = None,
                  description:typing.Optional[str] = None) -> neo.Epoch:
-        """Creates a neo.Epoch based on ABFEpoch(s) defined for a DAC at a specific sweep."""
+        """
+    Creates a neo.Epoch based on ABFEpoch(s) defined for a DAC at a specific sweep.
+    DEPRECATED — use dacEpochsToNeoEpoch
+    """
         if dac is None:
             dac = self.activeDAC
         elif isinstance(dac, (int, str)):
@@ -2313,7 +2316,13 @@ class ABFProtocol(ElectrophysiologyProtocol):
                          labels = labels, name=name, description=description)
     
     def dacEpochsToNeoEpoch(self, dac:typing.Union[ABFOutputConfiguration, int, str],
-                      sweep:int = 0):
+                      sweep:int = 0,
+                      epochs:typing.Optional[typing.Union[typing.Sequence[typing.Union[ABFEpoch, int, str]], ABFEpoch, int, str]] = None,
+                      holding:bool=True,
+                      fromRunStart:bool=False,
+                      name:typing.Optional[str] = None,
+                      description:typing.Optional[str] = None):
+        
         if isinstance(dac, (int, str)):
             dac = self.getDAC(dac)
             
@@ -2324,14 +2333,42 @@ class ABFProtocol(ElectrophysiologyProtocol):
         else:
             raise TypeError(f"'dac' expected tp be an ABFOutputConfiguration, int or str; got {type(dac).__name__} instead")
         
-        times = list(map(lambda epoch: self.getEpochStart(epoch, dac, sweep), dac.epochs))
-        durations = list(map(lambda epoch: self.getEpochDuration(epoch, dac, sweep), dac.epochs))
+        if epochs is None:
+            epochs = dac.epochs
+            
+        elif isinstance(epochs, typing.Sequence):
+            epochs = list(map(lambda x: x if isinstance(x, ABFEpoch) else dac.getEpoch(x), epochs))
+            
+        elif isinstance(epochs, (int, str)):
+            epochs = [dac.getEpoch(epochs)]
+            
+        elif isinstance(epochs, ABFEpoch):
+            epochs = [epochs]
+            
+        else:
+            raise TypeError(f"Invalid epochs specification: {epochs}")
         
-        labels = list(map(lambda epoch: epoch.letter, dac.epochs))
+#         times = list(map(lambda epoch: self.getEpochStart(epoch, dac, sweep, holding=holding, fromRunStart=fromRunStart), epochs))
+#         durations = list(map(lambda epoch: self.getEpochDuration(epoch, dac, sweep), epochs))
+#         
+#         labels = list(map(lambda epoch: epoch.letter, epochs))
+        
+        times, durations, labels = zip(*list(map(lambda epoch: (self.getEpochStart(epoch, dac, sweep, holding=holding, fromRunStart=fromRunStart),
+                                                           self.getEpochDuration(epoch, dac, sweep),
+                                                           epoch.letter), epochs)))
+        # self.getEpochDuration(epoch, dac, sweep), epochs))
+        
+        # labels = list(map(lambda epoch: epoch.letter, epochs))
+        
+        if not isinstance(name, str) or len(name.strip()) == 0:
+            name = f"{dac.name}_sweep_{sweep}_ABFEpochs"
+            
+        if not isinstance(description, str) or len(description.strip()) == 0:
+            description = f"ABFEpochs for DAC {dac.name} in sweep {sweep}"
         
         ret = neo.Epoch(times = times, durations = durations, labels = labels,
-                        units = times[0].units, name = f"{dac.name}_sweep_{sweep}_ABFEpochs",
-                        description = f"ABFEpochs for DAC {dac.name} in sweep {sweep}")
+                        units = times[0].units, name = name,
+                        description = description)
         
         return ret
     
