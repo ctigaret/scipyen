@@ -467,7 +467,7 @@ def _newInterval_(cls, t0 = None, t1 = None, units=None, labels=None,
     obj.segment=segment
     return obj
         
-class Interval(neo.DataObject):
+class Interval(DataObject):
     r"""
 """
     _parent_objects = ('Segment',)
