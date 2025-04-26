@@ -494,6 +494,7 @@ from core.typeenum import TypeEnum
 from core.triggerevent import (DataMark, TriggerEvent, TriggerEventType, MarkType)
 from core.triggerprotocols import TriggerProtocol
 from core.prog import scipywarn
+from core.datazone import Interval
 from ephys.ephys_protocol import ElectrophysiologyProtocol
 from core.neoutils import getAcquisitionInfo
 import pyabf
@@ -2337,14 +2338,68 @@ class ABFProtocol(ElectrophysiologyProtocol):
         return neo.Epoch(times = times, durations = durations, units=units, 
                          labels = labels, name=name, description=description)
     
-    def dacEpochsToNeoEpoch(self, dac:typing.Union[ABFOutputConfiguration, int, str],
-                      sweep:int = 0,
-                      epochs:typing.Optional[typing.Union[typing.Sequence[typing.Union[ABFEpoch, int, str]], ABFEpoch, int, str]] = None,
-                      holding:bool=True,
-                      fromRunStart:bool=False,
-                      name:typing.Optional[str] = None,
-                      description:typing.Optional[str] = None):
+    def dacEpochsToIntervals(self, 
+                             dac:typing.Union[ABFOutputConfiguration, int, str],
+                             epochs:typing.Optional[typing.Union[typing.Sequence[typing.Union[ABFEpoch, int, str]], ABFEpoch, int, str]] = None,
+                             sweep:int = 0,
+                             holding:bool=True,
+                             fromRunStart:bool=False,
+                             name:typing.Optional[str] = None,
+                             description:typing.Optional[str] = None,
+                             extent:bool=False,
+                             merge:bool=False) -> Interval:
+        r"""
+    Constructs core.datazone.Interval objects the the epochs of the given DAC.
+    Parameters:
+    ==========
+    dac
+    epochs
+    holding
+    fromRunStart
+    name
+    description
+    extent (False); when True, the interval holds start time and duration
+    """
+        if isinstance(dac, (int, str)):
+            dac = self.getDAC(dac)
+            
+        elif isinstance(dac, ABFOutputConfiguration):
+            if dac not in self.DACs:
+                raise ValueError("The specified DAC is not configured in this protocol")
+            
+        else:
+            raise TypeError(f"'dac' expected tp be an ABFOutputConfiguration, int or str; got {type(dac).__name__} instead")
         
+        if epochs is None:
+            epochs = dac.epochs
+            
+        elif isinstance(epochs, typing.Sequence):
+            epochs = list(map(lambda x: x if isinstance(x, ABFEpoch) else dac.getEpoch(x), epochs))
+            
+        elif isinstance(epochs, (int, str)):
+            epochs = [dac.getEpoch(epochs)]
+            
+        elif isinstance(epochs, ABFEpoch):
+            epochs = [epochs]
+            
+        else:
+            raise TypeError(f"Invalid epochs specification: {epochs}")
+
+    
+    def dacEpochsToNeoEpoch(self, 
+                            dac:typing.Union[ABFOutputConfiguration, int, str],
+                            epochs:typing.Optional[typing.Union[typing.Sequence[typing.Union[ABFEpoch, int, str]], ABFEpoch, int, str]] = None,
+                            sweep:int = 0,
+                            holding:bool=True,
+                            fromRunStart:bool=False,
+                            name:typing.Optional[str] = None,
+                            description:typing.Optional[str] = None,
+                            durations:bool=False) -> neo.Epoch:
+        r"""
+    Constructs a neo.Epoch object based on the ABFEpochs defined for the given DAC.
+    The neo.Epoch object 'times' and 'durations' attributes are derived from the 
+    ABF epochs' start times and actual durations.
+    """
         if isinstance(dac, (int, str)):
             dac = self.getDAC(dac)
             
@@ -2370,17 +2425,9 @@ class ABFProtocol(ElectrophysiologyProtocol):
         else:
             raise TypeError(f"Invalid epochs specification: {epochs}")
         
-#         times = list(map(lambda epoch: self.getEpochStart(epoch, dac, sweep, holding=holding, fromRunStart=fromRunStart), epochs))
-#         durations = list(map(lambda epoch: self.getEpochDuration(epoch, dac, sweep), epochs))
-#         
-#         labels = list(map(lambda epoch: epoch.letter, epochs))
-        
         times, durations, labels = zip(*list(map(lambda epoch: (self.getEpochStart(epoch, dac, sweep, holding=holding, fromRunStart=fromRunStart),
                                                            self.getEpochDuration(epoch, dac, sweep),
                                                            epoch.letter), epochs)))
-        # self.getEpochDuration(epoch, dac, sweep), epochs))
-        
-        # labels = list(map(lambda epoch: epoch.letter, epochs))
         
         if not isinstance(name, str) or len(name.strip()) == 0:
             name = f"{dac.name}_sweep_{sweep}_ABFEpochs"
@@ -2441,6 +2488,18 @@ class ABFProtocol(ElectrophysiologyProtocol):
             ret += sweepInterval * sweep
             
         return ret
+    
+    def getEpochStartStop(self, epoch:typing.Union[ABFEpoch, str, int], 
+                            dac:typing.Union[ABFOutputConfiguration, int, str],
+                            sweep:int = 0,
+                            holding:bool=True,
+                            fromRunStart:bool=False,
+                            samples:bool=False) -> typing.Tuple[typing.Union[pq.Quantity, int]]:
+        t0, t1 = (protocol.getEpochStart(epoch, dac, sweep, holding, fromRunStart, samples),
+                  protocol.getEpochDuration(epoch, dac, sweep, samples))
+        
+        t1 += t0
+        return (t0, t1)
             
     def getEpochPulseCount(self, epoch:typing.Union[ABFEpoch, int, str],
                                  dac:typing.Union[ABFOutputConfiguration, int, str],

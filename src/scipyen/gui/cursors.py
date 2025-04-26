@@ -22,6 +22,8 @@ import neo
 from core.prog import (safeWrapper, with_doc)
 from core.quantities import checkTimeUnits
 
+# FIXME 2025-04-26 14:13:52 
+# remove this class, as it does the ame thing as the new Interval with extent=True
 @dataclass
 class DataCursor:
     r"""Convenience structure for notional 1D cursor represented by a coordinate and a span"""

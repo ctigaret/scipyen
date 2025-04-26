@@ -449,85 +449,54 @@ class DataZone(neo.Epoch):
 class Interval(ScipyenDataclass):
     r"""Encapsulates an interval of a signal in a Cartesian axis system.
     This can be specified by two landmarks, or by a landmark and an extent
-    (or duration) - in this case is similar to a neo.Epoch or DataZone, except that
-    if specifies an unique interval (by comparison, neo.Epoch and DataZone objects
-    store TWO arrays, one for times and the other for the associated durations).
+    (or window) whch is symmetric around the landmark.
 
-    This class is intended to be a light-weight, convergent common data type useful
-    for accessing a signal region (a.k.a "slice") encapsulated in a neo.Epoch, 
-    DataZone or SignalCursor.
-            
-    Suppose you write a function to calculate a measure in a signal based on a cursor
-    or an epoch interval. Since a SignalCursor and a neo.Epoch are very different 
-    types, you may have to write two separate pieces of code for doing the same thing
-    i.e., to calculate something based on the signal values in the region defined by
-            
-        • the SignalCursor xwindow around its x coordinate
-        • the Epoch's interval defined by its time and duration.
-            
-    The separate pieces of code will differ in the way that the two parameters
-    ('x' and 'xwindow', for a SignalCursor, or times[k] and durations[k], for 
-    the kᵗʰ interval in an Epoch) are used to determine the start and stop times
-    of the signal regions where the calculation is to be made.
-            
-    An Interval object brings this to a common denominator, so that it can be used
-    directly instead of either a cursor or a Epoch's interval, although functions
-    using either types are available as well in the 'ephys.ephys' module in Scipyen.
-            
-    An Interval it that it allows storing Epoch intervals SEPARATELY, instead of 
-    storing the entire Epoch when that is not desired (one could extract one
-    interval from an Epoch and use it to construct another Epoch to be stored; 
-    however, the first part of this exercise is already done bny constructing an #
-    Interval).
-            
-    Another use of Interval is to store SignalCursor coordinates to files; since a
-    SignalCursor is a Qt object that handles graphic items, IT IS NOT SERIALIZABLE
-    HENCE IT CANNOT BE "PICKLED" or otherwise "saved" to a file.
-            
-    The only thing an Interval does not know about is the type of the cursor where 
-    the coordinates come from (i.e., vertical or horizontal) but that can be deduced 
-    from the context.
-
-    A croshair cursor, for example might be stored as a pair of
-    Interval objects according to an ad-hoc convention (e.g. the horizontal coordinates
-    first, then the vertical coordinates).
-            
     Changelog:
         2024-02-09 09:53:36 this is now mutable
             
     """
     
-    # NOTE: 2025-03-22 14:40:17
-    # because this inherits from ScipyenDataclass, none of the field below can be 
-    # non-default arguments (because they are added to the class definition AFTER
-    # those defined in ScipyenDataclass)
-    # 
-    # Therefore I make these as "default", but check for them in the custom __init__
-    # below.
-    
-    # first "time" point (left boundary, or 'start' time of the interval)
-    t0: typing.Union[numbers.Number, pq.Quantity] = dataclasses.field(default=None)
+    # first "time" point (left boundary, or 'start' time of the interval) when
+    # 'extend' is False, or the mid-point landmark when extent is True.
+    t0: np.ndarray = dataclasses.field(default=None)
     
     # this is either:
     # • the second time point (right boundary, or 'stop' time of the interval) 
     #       if 'extent' field (see below) is False, else
-    # • the 'extent' (or 'duration') of the interval
-    t1: typing.Union[numbers.Number, pq.Quantity] = dataclasses.field(default=None)
+    # • the 'extent' of the interval
+    t1: np.ndarray = dataclasses.field(default=None)
     
     # name of this interval
-    name: str = "Interval"
+    name: typing.Union[str, typing.Sequence[str], np.ndarray] = "Interval"
+    
+    units: pq.Quantity = dataclasses.field(default = pq.arbitrary_unit)
     
     description: str = ""
     
     # flag indicating what fields 't1' means:
-    # when True, t0 and t1 are , respectively, the start and stop times in the interval
-    # when False, t0 and t1 are, respectively, the start time and duration (like neo.Epoch)
+    # when 'extent' is False, t0 and t1 are, respectively, the start and stop times in the interval
+    # when 'extent' is True,  t0 and t1 are, respectively, the mid-point time and a symmetric "window" around the mid point
+    # By default, this is 'False'
     extent: bool = False
     
     def __init__(self, t0: typing.Union[numbers.Number, pq.Quantity],
                  t1: typing.Union[numbers.Number, pq.Quantity],
-                 name: str = "Interval", extent:bool=False):
-        OK = all(isinstance(v, numbers.Number) for v in (t0, t1)) or all(isinstance(v, pq.Quantity) and v.ndim==0 for v in (t0, t1))
+                 units: pq.Quantity, 
+                 name: str = "", 
+                 description:str = "",
+                 extent:bool=False):
+        units_ = None
+        if isinstance(t0, np.ndarray):
+            assert(t0.ndim ==1), f"t0 must be a 1D array"
+            if isinstance(t0, pq.Quantity):
+                units_ = t0.units
+                
+        # elif isinstance(t0, typing.Sequence) and all(isinstance(v, numbers.Num))
+            
+            
+            
+        
+        OK = all(isinstance(v, numbers.Number) for v in (t0, t1)) or all(isinstance(v, pq.Quantity) and v.ndim==1 for v in (t0, t1))
         
         if not OK:
             raise TypeError(f"Expecting scalar numbers or quantities")
@@ -540,40 +509,170 @@ class Interval(ScipyenDataclass):
                 t1 = t1.rescale(t0)
                 
         if extent:
-            if t1 < 0:
-                raise ValueError(f"extent {t1} must be > = 0)")
+            if np.any(t1 < 0):
+                # because the window around t0 cannot be negative
+                raise ValueError(f"extent must be > = 0)")
         else:
-            if t0 > t1:
-                raise ValueError(f"t0 ({t0}) should precede t1 ({t1})")
+            if np.any(t0 > t1):
+                raise ValueError(f"t0 should precede t1")
         
+        if isinstance(name, typing.Sequence):
+            if all(isinstance(v, str) and len(v.strip()) > 0 for v in name):
+                assert(len(name)) == len(t0)
+                name = np.array(name)
         if not isinstance(name, str) or len(name.strip()) == 0:
-            name = self.__class__.__name__
+            name = ""
 
         # super().__init__()
         self.t0 = t0
         self.t1 = t1
         self.name = name
+        self.description = description
         self.extent = extent
         
     @classmethod
     def from_epoch(cls:type, epoch: typing.Union[neo.Epoch, DataZone],  
-                           index: typing.Union[str, bytes, np.str_, int],
-                           duration: bool = False):
+                           index: typing.Optional[typing.Union[str, bytes, np.str_, int, typing.Sequence[typing.Union[str, bytes, np.str_, int]], np.ndarray, range, slice]] = None,
+                           extent: bool = False,
+                           merge:bool=False):
+        r"""
+    Interval factory from a neo.Epoch
+    
+    Parameters:
+    ===========
+    
+    :epoch:     The epoch from which the interval is to be constructed
+    :index:     Index of the epoch times and durations used to construct an
+                Interval. When None (default), all times and durations in the 
+                epoch will be used.
+    :extent:    When False (the default) the interval represents start & stop points
+                (inclusive)
+                When True, the Interval represents min-point and symmwtric window
+                around the mid-point.
+    :merge:     When False (default), if index is None and epoch times and 
+                durations have size > 1, each time/duration pair in the epoch
+                will be converted to a t0/t1 pair in the interval
+                When True, if index is None and epoch times and durations have 
+                size > 1, the result has a single t0/t1 pair based on the times
+                and durations of the first and last elements in epoch
+                
+                Ignored when index is not None, or when epoch times and durations 
+                are scalars (i.e. their size is 1)
+    """
         from . import neoutils
         import neo
-        interval = neoutils.get_epoch_interval(epoch, index, duration=duration)
-        if len(interval) == 2: # empty labels
-            if isinstance(epoch.name, str) and len(epoch.name.strip()):
-                name = epoch.name
-            else:
-                name = "Interval"
-            interval = tuple([*interval] + [name])
+        
+        if not isinstance(epoch, (neo.Epoch, DataZone)):
+            raise TypeError(
+                f"'epoch' expected to be a neo.Epoch; got {type(epoch).__name__} instead"
+            )
+        
+        if isinstance(index, (str, np.str_, bytes)):
+            if isinstance(index, bytes):
+                index = index.decode()
+
+            if index not in epoch.labels:
+                raise ValueError(f"Interval label {index} not found")
+
+            ndx = np.flatnonzero(epoch.labels == index)
+            epoch = epoch[ndx]
+
+        elif isinstance(index, int):
+            if index not in range(-len(epoch), len(epoch)):
+                raise ValueError(
+                    f"Invalid index {index} for an epoch with {len(epoch)} intervals"
+                )
+            ndx = np.array([index])
+            epoch = epoch[ndx]
             
-        return cls(*interval, extent=duration)
+        elif isinstance(index, typing.Sequence):
+            if all(isinstance(v, bytes) for v in index):
+                index = list(map(lambda v: v.decode()))
+                
+            if all(isinstance(v, (str, np.str_)) for v in index):
+                try:
+                    ndx = np.array(list(map(lambda v: np.flatnonzero(epoch.labels == v), index))).ravel()
+                except:
+                    print(f"'index' {index} contains invalid labels")
+                    raise
+            elif all(isinstance(v, int) for v in index):
+                ndx = np.array(index).ravel()
+            else:
+                raise TypeError(f"Invalid index specified: {index}")
+                
+            # ndx = np.array(list(map(lambda v: np.flatnonzero(epoch.labels == v.decode()) if isinstance(v, str, np.str_, bytes) else v)))
+            epoch = epoch[ndx]
+            
+        elif isinstance(index, (np.ndarray, slice, range)):
+            epoch = epoch[index]
+            
+        elif index is not None:
+            raise TypeError(
+                f"Invalid index type: {type(index).__name__}"
+            )
+        
+        t = epoch.times.flatten()[0]
+        d = epoch.durations.flatten()[0]
+        name = epoch.labels
+        # name = epoch.labels[ndx].flatten()[0] if ndx in range(epoch.labels.size) else epoch.labels[ndx]
+        
+        if merge and len(epoch) > 1:
+            if ndx is None:
+                # full duration: the very last start time + corresponding duration, minus the very first start time
+                d = t[-1]+durations[-1] + t[0] 
+                # the very first start time;
+                t = t[0] 
+                name = epoch.name
+                description = epoch.description
+            # else:
+            #     if 
+            
+        if extent:
+            t0, t1 = (t - d/2, t + d/2)
+            # intvl = (
+            #     (
+            #         epoch.times[ndx].flatten()[0],
+            #         epoch.durations[ndx].flatten()[0],
+            #         epoch.labels[ndx].flatten()[0],
+            #     )
+            #     if ndx in range(epoch.labels.size)
+            #     else (
+            #         epoch.times[ndx].flatten()[0],
+            #         epoch.durations[ndx].flatten()[0],
+            #         epoch.labels[ndx],
+            #     )
+            # )
+        else:
+            t0, t1 = (t, t+d)
+            # intvl = (
+            #     (
+            #         epoch.times[ndx].flatten()[0],
+            #         epoch.times[ndx].flatten()[0] + epoch.durations[ndx].flatten()[0],
+            #         epoch.labels[ndx].flatten()[0],
+            #     )
+            #     if ndx in range(epoch.labels.size)
+            #     else (
+            #         epoch.times[ndx].flatten()[0],
+            #         epoch.times[ndx],
+            #         flatten()[0] + epoch.durations[ndx].flatten()[0],
+            #     )
+            # )
+
+        # interval = neoutils.get_epoch_interval(epoch, index, duration=duration)
+        # if len(interval) == 2: # empty labels
+        #     if isinstance(epoch.name, str) and len(epoch.name.strip()):
+        #         name = epoch.name
+        #     else:
+        #         name = "Interval"
+        #     interval = tuple([*interval] + [name])
+        
+        # name = 
+            
+        return cls(t0, t1, name, extent=extent)
 
     
 def epoch2intervals(epoch: typing.Union[neo.Epoch, DataZone], keep_units:bool = True,
-                    duration:bool=True) -> typing.List[Interval]:
+                    duration:bool=False) -> typing.List[Interval]:
     r"""Generates a sequence of datatypes.Interval objects
     
     Each interval coresponds to the epoch's interval.

@@ -2673,8 +2673,13 @@ class SynapticPathway:
         
         return cls(**initkwargs)
     
+# FIXME 2025-04-26 14:10:24 
+# Interval.extent True means that:
+# interval.t0 is the mid point, 
+# interval.t1 is the symmetric window around the mid point!
 @dataclass
-class LocationMeasure:
+class LocationMeasure: 
+                        
     r"""Functor to calculate a signal measure at a location using a suitable function or functor.
 
     In turn, a `location` is an object with one of the following types ('locator' types):
