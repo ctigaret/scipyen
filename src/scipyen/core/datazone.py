@@ -470,6 +470,7 @@ def _newInterval_(cls, t0 = None, t1 = None, units=None, labels=None,
 class Interval(DataObject):
     r"""
 """
+    from core.datasignal import DataSignal
     _parent_objects = ('Segment',)
     _parent_attrs = ('segment',)
     _quantity_attr = ('t0', 't1')
@@ -1023,6 +1024,22 @@ class Interval(DataObject):
 
         return cls(t0, t1, unit=None, labels=labels, extent=extent, 
                   name=name, description=description, segment=segment)
+    
+    def toDomainSlices(self) -> np.ndarray:
+        r"""Returns a 2D Quantity array with (t0,t1) row-wise, for each interval"""
+        return np.transpose(np.vstack((self.t0, self.t1))) * self.units
+    
+    def sliceSignal(self, signal:typing.Union[neo.AnalogSignal, DataSignal],
+                    index=None) -> typing.Sequence:
+        domain_slices = self.toDomainSlices()
+        
+        if index is not None:
+            domain_slices = domain_slices[index,:]
+            
+        return tuple(map(lambda k: signal.time_slice(*domain_slices[k,:]), range(domain_slices.shape[0])))
+    
+    def reduceSignal(self, fun, signal, index):
+        pass
         
     def toNeoEpoch(self, enforceDataZone:bool=False, compensateExtent:bool=True) -> neo.Epoch | DataZone:
         r"""Export to neo.Epoch or DataZone
