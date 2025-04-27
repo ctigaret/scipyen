@@ -23,10 +23,11 @@ from core.prog import (safeWrapper, with_doc)
 from core.quantities import checkTimeUnits
 
 # FIXME 2025-04-26 14:13:52 
-# remove this class, as it does the ame thing as the new Interval with extent=True
+# remove this class, as it does the aame thing as the new Interval with extent=True
 @dataclass
 class DataCursor:
-    r"""Convenience structure for notional 1D cursor represented by a coordinate and a span"""
+    r"""Convenience structure for notional 1D cursor with a coordinate and span
+"""
     coord:typing.Union[float, pq.Quantity]
     span:typing.Union[float, pq.Quantity]
     name:str = ""
@@ -37,6 +38,7 @@ class SignalCursorTypes(enum.Enum):
     vertical    = (False, True)
     horizontal  = (True, False)
     crosshair   = (True, True)
+    point       = (False, False) # TODO 2025-04-27 23:04:31 implement me!
     
     
     @classmethod
@@ -83,7 +85,8 @@ class SignalCursorTypes(enum.Enum):
             
     @classmethod
     def getName(cls, value: tuple):
-        r"""Inverse-lookup for name of a signal cursor type given its value.
+        r"""Inverse-lookup for name of a signal cursor type given its value
+        as a tuple of bool for (horizontal, vertical) spine lines.
         
         Returns None if no signal cursor type is mapped to this value.
         """

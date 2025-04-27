@@ -883,11 +883,14 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         • all plots are contained in a pyqtgraph.GraphicsLayoutWidget which is 
             contained in the generic QWidget self.viewerWidgetContainer
         
-        • each "axis" is a pq.PlotItem; some relevant attributes :
-            ∘ vb → a pq.ViewBox
-        • the axes are contained in 
+        • each "axis" is a pg.PlotItem; some relevant attributes :
+            ∘ vb → a pg.ViewBox
             ∘ contained in self.signalsLayout - a pg.GraphicsLayout()
-            ∘ 
+        
+        • self.signalsLayout contains the scene(), a pg.GraphicsScene
+        
+        • a SignalCursor can be plotted in an axis, or directly in the scene
+        (across all axes)
         
         
         FIXME/TODO 2022-11-17 10:00:15
@@ -1537,6 +1540,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @cursorHoverColor.setter
     def cursorHoverColor(self, val:str):
         self._set_cursors_color(val, "hover")
+        
+    @property
+    def scene(self) -> pg.GraphicsScene:
+        r"""The graphics scene where axes are plotted."""
+        return self.signalsLayout.scene()
         
     # ### END properties
     
@@ -7457,7 +7465,7 @@ anything else       anything else       ❌
         return self.axes[index]
     
     def axis(self, index:typing.Union[int, str]):
-        r"""Calls self.plotItem(index) -- syntactic sugar
+        r"""Returns the axis with the given index or name
         """
         if isinstance(index, str):
             axnames = [ax.vb.name for ax in self.axes]

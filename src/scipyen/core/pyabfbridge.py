@@ -2349,7 +2349,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
                              extent:bool=False,
                              merge:bool=False) -> Interval:
         r"""
-    Constructs core.datazone.Interval objects the the epochs of the given DAC.
+    Constructs a core.datazone.Interval object from the epochs of the given DAC.
     Parameters:
     ==========
     dac
@@ -2358,7 +2358,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
     fromRunStart
     name
     description
-    extent (False); when True, the interval holds start time and duration
+    extent (False); see Interval documentation
+    merge (False); when True, the result holds one (t0, t1) interval.
     """
         if isinstance(dac, (int, str)):
             dac = self.getDAC(dac)
@@ -2384,6 +2385,10 @@ class ABFProtocol(ElectrophysiologyProtocol):
             
         else:
             raise TypeError(f"Invalid epochs specification: {epochs}")
+        
+        neoEpoch = self.dacEpochsToNeoEpoch(dac, epochs, sweep)
+        
+        return Interval.fromNeoEpoch(neoEpoch, index=None, extent = extent, merge = merge)
 
     
     def dacEpochsToNeoEpoch(self, 
