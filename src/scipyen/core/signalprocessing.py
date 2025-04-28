@@ -1549,14 +1549,32 @@ def convolve(sig:np.ndarray, w, **kwargs):
     sig : neo.AnalogSignal; if it has multiple channels, the convolution is
         applied for each channel
 
-    w : 1D array-like
+    w : 1D array-like: convlution window (or 'kernel')
     
     Var-keyword parameters:
     -----------------------
     name:str name of the resulting signal
-    mode, method : str — passed on to the scipy.signal.convolve function
+    units: pq.Quantity
     
-    NOTE: by default, mode is "valid"
+    mode, method : str — passed on to the scipy.signal.convolve function
+    NOTE: by default, these two parameters get the default values as 
+    specified in scipy.signal.convolve:
+    
+    `mode` = "valid"
+    `method` = "auto"
+    
+    restoreEnds:bool, default is True
+        The various modes of convolution will either append to ('full'), trim from
+        ('valid') or alter ('same') the ends of the signal.
+    
+        This parameter will restore the ends of the convolved signal such that,
+regardless of the convolution mode:
+    
+    1. the result will have the same number of samples along the axis of convolution
+    
+    2. the samples at both ends of the result retain the values in the original
+    signal; the number of samples affected equals half the number of samples 
+    in the kernel `w`: w.size//2.
     
     """
     # CHANGELOG 2025-04-28 17:38:52
@@ -1568,28 +1586,42 @@ def convolve(sig:np.ndarray, w, **kwargs):
     name = kwargs.pop("name", "")
 
     units = kwargs.pop("units", pq.dimensionless)
+    
+    restoreEnds = kwargs.pop("restoreEnds", True) == True
 
     # kwargs["mode"] = "same"  # force "same" mode for convolution
     
     nPad = w.size//2
-    mode = kwargs.get("mode", "same")
     
+    kwargs["mode"] = kwargs.get("mode", "valid")
+    # print(f"convolve mode = {mode}, nPad = {nPad}")
+    # kwargs["mode"] = mode
+    
+    # NOTE: 2025-04-28 21:43:13
+    # there is a reason to pass different modes; therefore correct the padding only when
+    # mode is "same"
     if isinstance(sig, (neo.AnalogSignal, DataSignal)):
         # nSamp = sig.shape[0]
         if sig.shape[1] == 1:
             cvl = convolve(sig.magnitude.flatten(), w, **kwargs)
             
-            if mode == "valid":
-                padLeft  = sig.magnitude[:nPad, 0].flatten()
-                padRight = sig.magnitude[-nPad:,0].flatten()
-                cvl = np.concatenate((padLeft, cvl, padRight))
-                
-            elif mode == "full":
-                cvl = cvl[nPad:-nPad]
-                
-            elif mode == "same":
-                cvl[:nPad]  = sig.magnitude[:nPad, 0].flatten()
-                cvl[-nPad:] = sig.magnitude[-nPad:,0].flatten()
+            if restoreEnds:
+                if kwargs["mode"] == "valid":
+                    padLeft  = sig.magnitude[:nPad, 0].flatten()
+                    padRight = sig.magnitude[-nPad:,0].flatten()
+                    cvl = np.concatenate((padLeft, cvl, padRight))
+                    
+                elif kwargs["mode"] == "full":
+                    # when 'full' signal is padded with window.size samples at both ends
+                    # remove extra window half-size and the remainder replace with the original
+                    # samples - will introduce errors than are smaller than if left unchanged
+                    cvl = cvl[nPad:-nPad]  
+                    cvl[:nPad]  = sig.magnitude[:nPad, 0].flatten()
+                    cvl[-nPad:] = sig.magnitude[-nPad:,0].flatten()
+                    
+                elif kwargs["mode"] == "same":
+                    cvl[:nPad]  = sig.magnitude[:nPad, 0].flatten()
+                    cvl[-nPad:] = sig.magnitude[-nPad:,0].flatten()
                 
             ret = sig.__class__(
                 cvl,
@@ -1603,23 +1635,26 @@ def convolve(sig:np.ndarray, w, **kwargs):
             csig = list(map(lambda k: convolve(sig.magnitude[:, k].flatten(), w, **kwargs)[:, np.newaxis],
                             range(sig.shape[1])))
             
-            if mode == "valid":
-                for k, cvl in enumerate(csig):
-                    padLeft  = sig.magnitude[:nPad, k].flatten()
-                    padRight = sig.magnitude[-nPad:,k].flatten()
-                    csig[k] = np.concatenate((padLeft, cvl, padRight))
-                    
-            elif mode == "full":
-                for k, cvl in enumerate(csig):
-                    csig[k] = cvl[nPad:-nPad]
-                    
-            elif more == "same":
-                for k, cvl in enumerate(csig):
-                    cvl[:nPad] =  sig.magnitude[:nPad, k].flatten()
-                    cvl[-nPad:] = sig.magnitude[-nPad:,k].flatten()
-                    csig[k] = cvl
+            if restoreEnds:
+                if kwargs["mode"] == "valid":
+                    for k, cvl in enumerate(csig):
+                        padLeft  = sig.magnitude[:nPad, k].flatten()
+                        padRight = sig.magnitude[-nPad:,k].flatten()
+                        csig[k] = np.concatenate((padLeft, cvl, padRight))
+                        
+                elif kwargs["mode"] == "full":
+                    for k, cvl in enumerate(csig):
+                        cvl = cvl[nPad:-nPad]
+                        cvl[:nPad]  = sig.magnitude[:nPad, 0].flatten()
+                        cvl[-nPad:] = sig.magnitude[-nPad:,0].flatten()
+                        csig[k] = cvl
+                        
+                elif kwargs["mode"] == "same":
+                    for k, cvl in enumerate(csig):
+                        cvl[:nPad] =  sig.magnitude[:nPad, k].flatten()
+                        cvl[-nPad:] = sig.magnitude[-nPad:,k].flatten()
+                        csig[k] = cvl
                 
-
             ret = sig.__class__(
                 np.concatenate(csig, axis=1),
                 units=sig.units,
@@ -1634,27 +1669,44 @@ def convolve(sig:np.ndarray, w, **kwargs):
         if sig.shape[1] == 1:
             ret = convolve(sig.magnitude.flatten() if isinstance(sig, pq.Quantity) else sig, w, **kwargs)[:,np.newaxis]
             
-            if mode == "valid":
-                padLeft = sig.magnitude[:nPad,0].flatten() if isinstance(sig, pq.Quantity) else sig[:nPad,0].flatten()
-                padRight = sig.magnitude[-nPad:,0].flatten() if isinstance(sig, pq.Quantty) else sig[-nPad:,0].flatten()
-                ret = np.concatenate((padLeft, ret, padRight))
-                
-            elif mode == "full":
-                ret = ret[nPad:-nPad,0]
+            if restoreEnds:
+                if kwargs["mode"] == "valid":
+                    padLeft = sig.magnitude[:nPad,0].flatten() if isinstance(sig, pq.Quantity) else sig[:nPad,0].flatten()
+                    padRight = sig.magnitude[-nPad:,0].flatten() if isinstance(sig, pq.Quantty) else sig[-nPad:,0].flatten()
+                    ret = np.concatenate((padLeft, ret, padRight))
+                    
+                elif kwargs["mode"] == "full":
+                    ret = ret[nPad:-nPad,0]
+                    ret[:nPad]  = sig.magnitude[:nPad, 0].flatten() if isinstance(sig, pq.Quantity) else sig[:nPad,0].flatten()
+                    ret[-nPad:] = sig.magnitude[-nPad:,0].flatten() if isinstance(sig, pq.Quantty) else sig[-nPad:,0].flatten()
+                    
+                elif kwargs["mode"] == "same":
+                    ret[:nPad]  = sig.magnitude[:nPad, 0].flatten() if isinstance(sig, pq.Quantity) else sig[:nPad,0].flatten()
+                    ret[-nPad:] = sig.magnitude[-nPad:,0].flatten() if isinstance(sig, pq.Quantty) else sig[-nPad:,0].flatten()
                 
         else:
             csig = list(map(lambda k: convolve(sig.magnitude[:,k].flatten() if isinstance(sig, pq.Quantity) else sig[:,k]),
                             range(sig.shape[1])))
-            
-            if mode == "valid":
-                for k, cvl in enumerate(csig):
-                    padLeft = sig.magnitude[:nPad, k].flatten() if isinstance(sig, pq.Quantity) else sig[:nPad, k].flatten()
-                    padRight = sig.magnitude[-nPad:, k].flatten() if isinstance(sig, pq.Quantity) else sig[-nPad:].flatten()
-                    csig[k] = np.concatenate((padLeft, cvl, padRight))
+            if restoreEnds:
+                if kwargs["mode"] == "valid":
+                    for k, cvl in enumerate(csig):
+                        padLeft = sig.magnitude[:nPad, k].flatten() if isinstance(sig, pq.Quantity) else sig[:nPad, k].flatten()
+                        padRight = sig.magnitude[-nPad:, k].flatten() if isinstance(sig, pq.Quantity) else sig[-nPad:].flatten()
+                        csig[k] = np.concatenate((padLeft, cvl, padRight))
+                        
+                elif kwargs["mode"] == "full":
+                    for k, cvl in enumerate(csig):
+                        cvl = cvl[nPad:-nPad, 0].flatten()
+                        cvl[:nPad]  = sig.magnitude[:nPad, 0].flatten() if isinstance(sig, pq.Quantity) else sig[:nPad,0].flatten()
+                        cvl[-nPad:] = sig.magnitude[-nPad:,0].flatten() if isinstance(sig, pq.Quantty) else sig[-nPad:,0].flatten()
+                        csig[k] = cvl
+                        
+                elif kwargs["mode"] == "same":
+                    for k, cvl in enumerate(csig):
+                        cvl[:nPad] =  sig.magnitude[:nPad, k].flatten() if isinstance(sig, pq.Quantity) else sig[:nPad, k].flatten()
+                        cvl[-nPad:] = sig.magnitude[-nPad:,k].flatten() if isinstance(sig, pq.Quantity) else sig[-nPad:].flatten()
+                        csig[k] = cvl
                     
-            elif mode == "full":
-                for k, cvl in enumerate(csig):
-                    csig[k] = cvl[nPad:-nPad, 0]
                     
             ret = np.concatenate(csig, axis=1)
             if isinstance(sig, pq.Quantity):
