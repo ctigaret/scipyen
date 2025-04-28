@@ -144,6 +144,10 @@ V. Generic indexing for the neo framework (provisional)
 
 
 """
+# TODO: 2025-04-28 11:30:18
+# revisit make_neo_object - augment with carrying over the 
+# array_annotations, annotations dict, file_origin, 
+# file_datetime, rec_datetime where appropriate
 
 #### BEGIN core python modules
 import traceback, datetime, numbers, inspect, warnings, typing, types
@@ -216,7 +220,8 @@ from .datasignal import (
     DataSignal,
     IrregularlySampledDataSignal,
 )
-from .datazone import DataZone, Interval
+from .datazone import (DataZone, Interval)
+
 from .triggerevent import (
     DataMark,
     TriggerEvent,
@@ -422,10 +427,40 @@ def _(data, t=0):
         labels=data.labels,
         units=data.units,
         name=data.name,
+        description = data.desscription,
+        segment = data.segment, 
+        array_annotations = data.array_annotations,
+        **annotations
     )
     ret.annotations.update(data.annotations)
     return ret
 
+@set_relative_time_start.register(Interval)
+def _(data, t=0):
+    if isinstance(t, pq.Quantity):
+        t.rescale(data.times.units)  # will raise if units are wrong wrt signal's domain
+
+    elif isinstance(t, numbers.Number):
+        t = t * data.times.units
+
+    klass = data.__class__
+    times = data.times - data.times[0] + t if len(data.times) else data.times
+    ret = klass(
+        times,
+        durations = data.durations,
+        units = data.units,
+        labels = data.labels,
+        extent = data.extent,
+        name = data.name,
+        description = data.description,
+        # file_origin = data.file_origin,
+        segment = data.segment,
+        array_annotations = data.array_annotations,
+        **data.annotations
+        
+    )
+    ret.annotations.update(data.annotations)
+    return ret
 
 @set_relative_time_start.register(neo.Event)
 @set_relative_time_start.register(DataMark)

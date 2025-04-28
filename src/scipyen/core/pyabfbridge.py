@@ -2338,10 +2338,10 @@ class ABFProtocol(ElectrophysiologyProtocol):
         return neo.Epoch(times = times, durations = durations, units=units, 
                          labels = labels, name=name, description=description)
     
-    def dacEpochsToIntervals(self, 
-                             dac:typing.Union[ABFOutputConfiguration, int, str],
-                             epochs:typing.Optional[typing.Union[typing.Sequence[typing.Union[ABFEpoch, int, str]], ABFEpoch, int, str]] = None,
-                             sweep:int = 0,
+    def dacEpochsToInterval(self, 
+                            dac:typing.Union[ABFOutputConfiguration, int, str],
+                            epochs:typing.Optional[typing.Union[typing.Sequence[typing.Union[ABFEpoch, int, str]], ABFEpoch, int, str]] = None,
+                            sweep:int = 0,
                              holding:bool=True,
                              fromRunStart:bool=False,
                              name:typing.Optional[str] = None,
@@ -2369,7 +2369,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
                 raise ValueError("The specified DAC is not configured in this protocol")
             
         else:
-            raise TypeError(f"'dac' expected tp be an ABFOutputConfiguration, int or str; got {type(dac).__name__} instead")
+            raise TypeError(f"'dac' expected to be an ABFOutputConfiguration, int or str; got {type(dac).__name__} instead")
         
         if epochs is None:
             epochs = dac.epochs

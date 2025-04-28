@@ -65,8 +65,13 @@ class DataZone(neo.Epoch):
                         ('relative', bool, 1, False))
 
     def __new__(cls, places=None, times=None, extents=None, durations=None, 
-                labels=None, units=None, name=None, description=None, 
-                file_origin=None, segment=None, relative=None,
+                labels:typing.Optional[typing.Union[str, typing.Sequence[str], np.ndarray]]=None, 
+                units:typing.Optional[pq.Quantity]=None, 
+                name:typing.Optional[str]=None, 
+                description:typing.Optional[str]=None, 
+                file_origin:typing.Optional[str]=None, 
+                segment:typing.Optional[int]=None, 
+                relative:typing.Optional[bool]=None,
                 array_annotations=None, **annotations):
         r"""
         """
@@ -528,10 +533,18 @@ coordinates are NOT restricted to time units.
                         ('labels', np.ndarray, 1, np.dtype('U')),
                         ('extent', bool, 1, False))
     
-    def __new__(cls, t0 = None, t1 = None, units=None, labels=None, 
-                extent:bool=None, name=None, description=None,
-                file_origin = None, segment = None,
-                array_annotations = None, **anotations):
+    def __new__(cls, t0 = None, t1 = None, 
+                units: typing.Optional[pq.Quantity]=None, 
+                labels: typing.Optional[typing.Union[str, typing.Sequence[str], np.ndarray]]=None, 
+                extent: typing.Optional[bool]=None, 
+                name: typing.Optional[str]=None,
+                description: typing.Optional[str]=None,
+                file_origin:typing.Optional[str] = None, 
+                segment: typing.Optional[int] = None,
+                array_annotations = None, 
+                **anotations):
+        # NOTE: 2025-04-28 11:19:22
+        # t0 is times; t1 is durations
         units_ = None
         if isinstance(t0, np.ndarray):
             assert(t0.ndim <= 1), "t0 must be a 1D array"
@@ -1091,8 +1104,8 @@ coordinates are NOT restricted to time units.
         pass
     
     def toSignalCursors(self,
-                        signalViewer: typing.optional[QtGui.QMainWindow] = None,
-                        axis: typing.Optional[typing.Union[pg.PlotItem, pg.GraphicsScene, type(dataclasses.MISING), int, str]]=None,
+                        signalViewer = None,
+                        axis: typing.Optional[typing.Union[pg.PlotItem, pg.GraphicsScene, type(dataclasses.MISSING), int, str]]=None,
                         **kwargs) -> typing.Sequence:
         r"""Creates vertical or horizontal SignalCursor objects from the sub-intervals.
         
@@ -1504,81 +1517,81 @@ def epoch2cursors(epoch: typing.Union[neo.Epoch, DataZone],
     
     return ret
 
-# def intervals2cursors(*args,
-#                       axis: typing.Optional[typing.Union[pg.PlotItem, pg.GraphicsScene]] = None, 
-#                       **kwargs):
-#     r"""Creates a sequence of SignalCursor objects from a sequence of intervals.
-#     The intervals in `args` are NOT Interval objects - please see Interval.toSignalCursors()
-#     
-#     WARNING: This function will be DEPRECATED
-#     
-# """
-#     from gui.signalviewer import SignalViewer
-#     from gui.cursors import SignalCursor, SignalCursorTypes
-#     from qtpy import QtGui, QtCore
-# 
-#     keep_units = kwargs.pop("keep_units", False)
-#     cursor_type = kwargs.pop("cursor_type", "vertical")
-#     
-#     if len(args) == 1 and isinstance(args[0], (tuple, list)) and all(isinstance(a, Interval) for a in args[0]):
-#         intervals = args[0]
-#         
-#     else:
-#         intervals = args
-#     
-#     
-#     # print(f"intervals2epoch intervals: {[(i, type(i)) for i in intervals]}")
-#     
-#     if not all(isinstance(a, Interval) for a in intervals):
-#         raise TypeError(f"Expecting a sequence of Interval objects")
-# 
-#     if not isinstance(keep_units, bool):
-#         keep_units = False
-#         
-#     def __strip_units__(v):
-#         return float(v.magnitude) if (isinstance(v, pq.Quantity) and not keep_units) else v
-#         
-#     ret = [(__strip_units__(i.t0+i.t1/2) if i.extent else __strip_units__(i.t0 + (i.t1 - i.t0)/2), __strip_units__(i.t1) if i.extent else __strip_units__(i.t1-i.t0), i.name) for i in intervals]
-# 
-#     signal_viewer = kwargs.pop("signal_viewer", None)
-#     
-#     if isinstance(axis, (pg.PlotItem, pg.GraphicsScene)):
-#         cursors = [SignalCursor(axis, x = t, window = d, cursorID=l,
-#                                 cursor_type=SignalCursorTypes.vertical,
-#                                 parent=axis, relative=True) for (t,d,l) in ret]
-#         
-#         if isinstance(signal_viewer, SignalViewer):
-#             if isinstance(axis, pg.PlotItem):
-#                 if axis not in signal_viewer.axes:
-#                     return cursors
-#                 
-#             elif isinstance(axis, pg.GraphicsScene):
-#                 if axis is not signal_viewer.signalsLayout.scene():
-#                     return cursors
-#                 
-#             cursorDict = signal_viewer.getSignalCursors(SignalCursorTypes.vertical)
-#             cursorPen = QtGui.QPen(QtGui.QColor(signal_viewer.cursorColors["vertical"]), 1, QtCore.Qt.SolidLine)
-#             cursorPen.setCosmetic(True)
-#             hoverPen = QtGui.QPen(QtGui.QColor(signal_viewer.cursorHoverColor), 1, QtCore.Qt.SolidLine)
-#             hoverPen.setCosmetic(True)
-#             linkedPen = QtGui.QPen(QtGui.QColor(signal_viewer.linkedCursorColors["vertical"]), 1, QtCore.Qt.SolidLine)
-#             linkedPen.setCosmetic(True)
-#             if isinstance(axis, pg.PlotItem):
-#                 cursorPrecision = signal_viewer.getAxis_xDataPrecision(axis)
-#             elif isinstance(axis, pg.GraphicsScene):
-#                 pi_precisions = [signal_viewer.getAxis_xDataPrecision(ax) for ax in signal_viewer.plotItems]
-#                 cursorPrecision = min(pi_precisions)
-#                 
-#             else: 
-#                 cursorPrecision = None
-#                
-#             for c in cursors:
-#                 signal_viewer.registerCursor(c, pen=cursorPen, hoverPen=hoverPen,
-#                                              linkedPen=linkedPen,
-#                                              precision=cursorPrecision,
-#                                              showValue = signal_viewer.cursorsShowValue)
-#         
-#         return cursors
-#     
-#     return ret
+def intervals2cursors(*args,
+                      axis: typing.Optional[typing.Union[pg.PlotItem, pg.GraphicsScene]] = None, 
+                      **kwargs):
+    r"""Creates a sequence of SignalCursor objects from a sequence of intervals.
+    The intervals in `args` are NOT Interval objects - please see Interval.toSignalCursors()
+    
+    WARNING: This function will be DEPRECATED
+    
+"""
+    from gui.signalviewer import SignalViewer
+    from gui.cursors import SignalCursor, SignalCursorTypes
+    from qtpy import QtGui, QtCore
+
+    keep_units = kwargs.pop("keep_units", False)
+    cursor_type = kwargs.pop("cursor_type", "vertical")
+    
+    if len(args) == 1 and isinstance(args[0], (tuple, list)) and all(isinstance(a, Interval) for a in args[0]):
+        intervals = args[0]
+        
+    else:
+        intervals = args
+    
+    
+    # print(f"intervals2epoch intervals: {[(i, type(i)) for i in intervals]}")
+    
+    if not all(isinstance(a, Interval) for a in intervals):
+        raise TypeError(f"Expecting a sequence of Interval objects")
+
+    if not isinstance(keep_units, bool):
+        keep_units = False
+        
+    def __strip_units__(v):
+        return float(v.magnitude) if (isinstance(v, pq.Quantity) and not keep_units) else v
+        
+    ret = [(__strip_units__(i.t0+i.t1/2) if i.extent else __strip_units__(i.t0 + (i.t1 - i.t0)/2), __strip_units__(i.t1) if i.extent else __strip_units__(i.t1-i.t0), i.name) for i in intervals]
+
+    signal_viewer = kwargs.pop("signal_viewer", None)
+    
+    if isinstance(axis, (pg.PlotItem, pg.GraphicsScene)):
+        cursors = [SignalCursor(axis, x = t, window = d, cursorID=l,
+                                cursor_type=SignalCursorTypes.vertical,
+                                parent=axis, relative=True) for (t,d,l) in ret]
+        
+        if isinstance(signal_viewer, SignalViewer):
+            if isinstance(axis, pg.PlotItem):
+                if axis not in signal_viewer.axes:
+                    return cursors
+                
+            elif isinstance(axis, pg.GraphicsScene):
+                if axis is not signal_viewer.signalsLayout.scene():
+                    return cursors
+                
+            cursorDict = signal_viewer.getSignalCursors(SignalCursorTypes.vertical)
+            cursorPen = QtGui.QPen(QtGui.QColor(signal_viewer.cursorColors["vertical"]), 1, QtCore.Qt.SolidLine)
+            cursorPen.setCosmetic(True)
+            hoverPen = QtGui.QPen(QtGui.QColor(signal_viewer.cursorHoverColor), 1, QtCore.Qt.SolidLine)
+            hoverPen.setCosmetic(True)
+            linkedPen = QtGui.QPen(QtGui.QColor(signal_viewer.linkedCursorColors["vertical"]), 1, QtCore.Qt.SolidLine)
+            linkedPen.setCosmetic(True)
+            if isinstance(axis, pg.PlotItem):
+                cursorPrecision = signal_viewer.getAxis_xDataPrecision(axis)
+            elif isinstance(axis, pg.GraphicsScene):
+                pi_precisions = [signal_viewer.getAxis_xDataPrecision(ax) for ax in signal_viewer.plotItems]
+                cursorPrecision = min(pi_precisions)
+                
+            else: 
+                cursorPrecision = None
+               
+            for c in cursors:
+                signal_viewer.registerCursor(c, pen=cursorPen, hoverPen=hoverPen,
+                                             linkedPen=linkedPen,
+                                             precision=cursorPrecision,
+                                             showValue = signal_viewer.cursorsShowValue)
+        
+        return cursors
+    
+    return ret
     
