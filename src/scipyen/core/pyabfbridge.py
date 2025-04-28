@@ -2342,12 +2342,12 @@ class ABFProtocol(ElectrophysiologyProtocol):
                             dac:typing.Union[ABFOutputConfiguration, int, str],
                             epochs:typing.Optional[typing.Union[typing.Sequence[typing.Union[ABFEpoch, int, str]], ABFEpoch, int, str]] = None,
                             sweep:int = 0,
-                             holding:bool=True,
-                             fromRunStart:bool=False,
-                             name:typing.Optional[str] = None,
-                             description:typing.Optional[str] = None,
-                             extent:bool=False,
-                             merge:bool=False) -> Interval:
+                            holding:bool=True,
+                            fromRunStart:bool=False,
+                            name:typing.Optional[str] = None,
+                            description:typing.Optional[str] = None,
+                            extent:bool=False,
+                            merge:bool=False) -> Interval:
         r"""
     Constructs a core.datazone.Interval object from the epochs of the given DAC.
     Parameters:

@@ -319,6 +319,9 @@ from imaging.axiscalibration import (AxesCalibration,
 from ephys import (ephys, membrane)
 from systems import *
 
+from gui.guiutils import (get_font_style, get_font_weight,)
+
+
 from . import interact
 from . import scipyen_colormaps as colormaps
 from . import consoles
@@ -1123,6 +1126,10 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     pluginActions = []
 
     defaultShellCacheSize = 10000
+    
+    _defaultUIFont:QtGui.QFont = QtWidgets.QApplication.font()
+    
+    _useDefaultQApplicationFont:bool = True
 
     _instance = None # NOTE: Singleton design pattern
     
@@ -1521,6 +1528,11 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self._user_plugins_dir = self._default_scipyen_user_plugins_dir
         # self._external_HDF5_viewer: str = str()         # NOTE: 2025-03-24 21:35:03 NOT USED
 
+        self._font = QtGui.QFont(self._defaultUIFont)
+        self._workspaceViewerFont = QtGui.QFont(self._defaultUIFont)
+        self._commandHistoryFont = QtGui.QFont(self._defaultUIFont)
+        
+        
         # BEGIN configurables; for each of these we define a read-write property
         # decorated with markConfigurable
         self._recentFiles = collections.OrderedDict()
@@ -1539,7 +1551,9 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self._script_manager_autolaunch = False
         self._auto_remove_viewers_ = False
         self._wspace_headers_ = [k for k in standard_obj_summary_headers if k != "Icon"]
-
+        
+        self._useSystemDefaultFont:bool = self._useDefaultQApplicationFont
+        
         # ### END configurables, but see NOTE:2022-01-28 23:16:57 below
 
         self.navPrevDir = collections.deque()
@@ -1767,6 +1781,9 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self._winFlagsCache_ = self.windowFlags()
                 
         self._updateConsolesEditor()
+        
+        sigBlock = QtCore.QSignalBlocker(self.actionUse_system_default_font)
+        self.actionUse_system_default_font.setChecked(self._useSystemDefaultFont)
 
     # BEGIN Properties
     
@@ -2228,6 +2245,152 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         signalBlockers = [QtCore.QSignalBlocker(w) for w in (self.viewFilesFilterToolBtn, self.hideFilesFilterToolBtn)]
         
         self.viewFilesFilterToolBtn.setChecked(self._showFilesFilter)
+        
+    @property
+    def uiFontFamily(self) -> str:
+        return self._font.family()
+    
+    @markConfigurable("UIFontFamily", "Qt")
+    @uiFontFamily.setter
+    def uiFontFamily(self, val:str):
+        self._font.setFamily(val)
+        self._updateFont()
+    
+    @property
+    def uiFontPointSize(self) -> int:
+        return int(self._font.pointSize())
+    
+    @markConfigurable("UIFontPointSize", "Qt")
+    @uiFontPointSize.setter
+    def uiFontPointSize(self, val:int):
+        self._font.setPointSize(val)
+        self._updateFont()
+    
+    @property
+    def uiFontStyle(self) -> int:
+        return int(self._font.style())
+    
+    @markConfigurable("UIFontStyle", "Qt")
+    @uiFontStyle.setter
+    def uiFontStyle(self, val:int):
+        self._font.setStyle(get_font_style(val))
+        self._updateFont()
+    
+    @property
+    def uiFontWeight(self) -> int:
+        return int(self._font.weight())
+    
+    @markConfigurable("UIFontWeight", "Qt")
+    @uiFontWeight.setter
+    def uiFontWeight(self, val:int):
+        self._font.setWeight(get_font_weight(val))
+        self._updateFont()
+    
+    @property
+    def workspaceFontFamily(self) -> str:
+        return self._workspaceViewerFont.family()
+    
+    @markConfigurable("WorkspaceFontFamily", "Qt")
+    @workspaceFontFamily.setter
+    def workspaceFontFamily(self, val:str):
+        self._workspaceViewerFont.setFamily(val)
+        self._updateWorkspaceItemsFont()
+    
+    @property
+    def workspaceFontPointSize(self) -> int:
+        return int(self._workspaceViewerFont.pointSize())
+    
+    @markConfigurable("WorkspaceFontPointSize", "Qt")
+    @workspaceFontPointSize.setter
+    def workspaceFontPointSize(self, val:int):
+        self._workspaceViewerFont.setPointSize(int(val))
+        self._updateWorkspaceItemsFont()
+    
+    @property
+    def workspaceFontStyle(self) -> int:
+        return int(self._workspaceViewerFont.style())
+    
+    @markConfigurable("WorkspaceFontStyle", "Qt")
+    @workspaceFontStyle.setter
+    def workspaceFontStyle(self, val:int):
+        self._workspaceViewerFont.setStyle(get_font_style(val))
+        self._updateWorkspaceItemsFont()
+    
+    @property
+    def workspaceFontWeight(self) -> int:
+        return int(self._workspaceViewerFont.weight())
+        
+    @markConfigurable("WorkspaceFontWeight", "Qt")
+    @workspaceFontWeight.setter
+    def workspaceFontWeight(self, val:int):
+        self._workspaceViewerFont.setWeight(get_font_weight(val))
+        self._updateWorkspaceItemsFont()
+    
+    @property
+    def historyFontFamily(self) -> str:
+        return self._commandHistoryFont.family()
+    
+    @markConfigurable("HistoryFontFamily", "Qt")
+    @historyFontFamily.setter
+    def historyFontFamily(self, val:str):
+        self._commandHistoryFont.setFamily(val)
+        self._updateHistoryViewFont()
+    
+    @property
+    def historyFontPointSize(self) -> int:
+        return int(self._commandHistoryFont.pointSize())
+    
+    @markConfigurable("HistoryFontPointSize", "Qt")
+    @historyFontPointSize.setter
+    def historyFontPointSize(self, val:int):
+        self._commandHistoryFont.setPointSize(val)
+        self._updateHistoryViewFont()
+    
+    @property
+    def historyFontStyle(self) -> int:
+        return int(self._commandHistoryFont.style())
+    
+    @markConfigurable("HistoryFontStyle", "Qt")
+    @historyFontStyle.setter
+    def historyFontStyle(self, val:int):
+        self._commandHistoryFont.setStyle(get_font_style(val))
+        self._updateHistoryViewFont()
+    
+    @property
+    def historyFontWeight(self) -> int:
+        return int(self._commandHistoryFont.weight())
+    
+    @markConfigurable("HiatoryFontWeight", "Qt")
+    @historyFontWeight.setter
+    def historyFontWeight(self, val:int):
+        self._commandHistoryFont.setWeight(get_font_weight(val))
+        self._updateHistoryViewFont()
+        
+    @property
+    def useSystemFont(self) -> bool:
+        return self._useSystemDefaultFont
+    
+    @markConfigurable("UseSystemFont", "Qt")
+    @useSystemFont.setter
+    def useSystemFont(self, val:bool):
+        self._useSystemDefaultFont = val == True
+        self._updateWorkspaceItemsFont()
+        self._updateHistoryViewFont()
+        
+    def _updateFont(self):
+        font = self._defaultUIFont if self._useSystemDefaultFont else self._font
+        self.setFont(font)
+        
+    def _updateWorkspaceItemsFont(self):
+        font = self._defaultUIFont if self._useSystemDefaultFont else self._workspaceViewerFont
+        self.workspaceModel.font = font
+        
+    def _updateHistoryViewFont(self):
+        font = self._defaultUIFont if self._useSystemDefaultFont else self._commandHistoryFont
+        it = QtWidgets.QTreeWidgetItemIterator(self.historyTreeWidget)
+        while isinstance(it.value(), QtWidgets.QTreeWidgetItem):
+            it.value().setFont(1, font)
+            it += 1 # advance the iterator
         
     @property
     def currentDir(self) -> str | pathlib.Path:
@@ -3320,6 +3483,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             sessionNo = None
 
             items = list()
+            
+            font = self._defaultUIFont if self._useSystemDefaultFont else self._commandHistoryFont
 
             for session, line, inline in hist:
                 if sessionNo is None or sessionNo != session:
@@ -3346,12 +3511,12 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                         sessionTimes = f" - {stopDateTime}"
 
                     sessionInfoText = f"{sessionInfo[0]}"
-                    # sessionItem = QtWidgets.QTreeWidgetItem(self.historyTreeWidget, [repr(sessionNo)])
                     sessionItem = QtWidgets.QTreeWidgetItem(self.historyTreeWidget, [sessionInfoText, sessionTimes])
-                    # sessionItem = QtWidgets.QTreeWidgetItem(self.historyTreeWidget, [sessionInfoText, "", startDateTime, stopDateTime])
+                    sessionItem.setFont(1, font)
                     items.append(sessionItem)
 
                 lineItem = QtWidgets.QTreeWidgetItem(sessionItem, [repr(line), inline])
+                lineItem.setFont(1, font)
                 items.append(lineItem)
 
             self.currentSessionTreeWidgetItem = QtWidgets.QTreeWidgetItem(
@@ -3606,10 +3771,14 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             # self._updateHistoryView_(self.executionCount-1, self.console.history_tail(1)[0])
 
     def _updateHistoryView_(self, lineno, val):
+        font = self._defaultUIFont if self._useSystemDefaultFont else self._commandHistoryFont
+        
         mustUpdateSessionID = self.currentSessionTreeWidgetItem.childCount() == 0
 
         item = QtWidgets.QTreeWidgetItem(
             self.currentSessionTreeWidgetItem, [repr(lineno), val])
+        
+        item.setFont(1, font) # only adjust font the actual command in history
 
         self.historyTreeWidget.addTopLevelItem(item)
         self.historyTreeWidget.scrollToItem(item)
@@ -4941,12 +5110,15 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         #     self._available_Qt_style_names_.extend(f"Qt{v.capitalize()}" for v in qdarktheme.get_themes())
 
         self.actionSet_Icon_Size.triggered.connect(self._slot_configureIconSize)
-
         self.actionGUI_Style.triggered.connect(self._slot_set_Application_style)
         self.actionSet_user_plugins_directory.triggered.connect(self._slot_set_Users_Plugins_directory)
         # self.actionConfigure_external_HDF_viewer.triggered.connect(self._slot_set_ExternalHDF5Viewer)
         self.actionAuto_launch_Script_Manager.toggled.connect(self._slot_set_scriptManagerAutoLaunch)
         self.actionAuto_delete_viewer.triggered.connect(self._slot_setAutoRemoveViewers)
+        
+        self.actionUse_system_default_font.toggled.connect(self._slot_setUseDefaultFont)
+        self.actionWorkplaceFont.triggered.connect(self._slot_chooseWorkplaceFont)
+        self.actionCommandHistoryFont.triggered.connect(self._slot_chooseHistoryFont)
         
         # ### BEGIN scripts menu
         # NOTE: 2024-09-21 14:55:07
@@ -7605,9 +7777,33 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     def _slot_test_gui_style(self, val: str):
         self._prev_gui_style_name = self._current_GUI_style_name
         self._do_apply_style(val)
-
-            # self._current_GUI_style_name = val
+        
+    @Slot(bool)
+    @safeWrapper
+    def _slot_setUseDefaultFont(self, val:bool):
+        self.useSystemFont = val==True
+        self.actionCommandHistoryFont.setEnabled(not self.useSystemFont)
+        self.actionWorkplaceFont.setEnabled(not self.useSystemFont)
             
+        
+    @Slot()
+    @safeWrapper
+    def _slot_chooseWorkplaceFont(self):
+        currentFont = self._workspaceViewerFont
+        selectedFont, ok = QtWidgets.QFontDialog.getFont(currentFont, self)
+        if ok:
+            self._workspaceViewerFont = selectedFont
+            self._updateWorkspaceItemsFont()
+    
+    @Slot()
+    @safeWrapper
+    def _slot_chooseHistoryFont(self):
+        currentFont = self._commandHistoryFont
+        selectedFont, ok = QtWidgets.QFontDialog.getFont(currentFont, self)
+        if ok:
+            self._commandHistoryFont = selectedFont
+            self._updateHistoryViewFont()
+
     def _do_apply_style(self, val:str):
         if val == "Default":
             styleProxy = MenuProxy(QtWidgets.QApplication.style())
