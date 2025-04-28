@@ -600,15 +600,15 @@ coordinates are NOT restricted to time units.
                 t1 = t1 * units
                 
         else:
-            if not isinstance(units, pq.Quantity):
-                raise TypeError("'units' must be a pq.Quantity")
+            if not isinstance(units, (pq.Quantity, pq.dimensionality.Dimensionality)):
+                raise TypeError(f"'units' must be a pq.Quantity; instead got {type(units)}")
 
-            if not all(isinstance(v. pq.quantity) for v in (t0, t1)):
+            if not all(isinstance(v, pq.Quantity) for v in (t0, t1)):
                 t0 = t0 * units
                 t1 = t1 * units
         
         if not isinstance(extent, bool):
-            raise TypeError("'extent' must be a bool")
+            extent = False
         if extent:
             if np.any(t1 < 0):
                 # because the window around t0 cannot be negative
@@ -680,13 +680,13 @@ coordinates are NOT restricted to time units.
         times = self.times.magnitude
         durations = self.durations.magnitude
         labels = np.array(self.labels)
-        description = self.description.copy()
-        segment = self.segment.copy() # an int !
+        description = str(self.description)
+        segment = int(self.segment) if isinstance(self.segment, int) else None # an int !
         array_annotations = deepcopy(self.array_annotations)
         extent = self.extent
         units = self.units
         
-        obj = self.duplicate_with_new_data(t0 = times, t1 = durations,
+        obj = self.__class__(t0 = times, t1 = durations,
                                            labels = labels, units = units)
         obj.description = description
         obj.array_annotations = array_annotations

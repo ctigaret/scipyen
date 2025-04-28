@@ -1540,7 +1540,7 @@ def estimate_dc(x_):
 
 
 @safeWrapper
-def convolve(sig, w, **kwargs):
+def convolve(sig:np.ndarray, w, **kwargs):
     r"""1D convolution of neo.AnalogSignal sig with kernel "w".
 
     Parameters:
@@ -1550,43 +1550,115 @@ def convolve(sig, w, **kwargs):
         applied for each channel
 
     w : 1D array-like
-
-    Var-keyword parameters are passed on to the scipy.signal.convolve function,
-    except for the "mode" which is always set to "same"
+    
+    Var-keyword parameters:
+    -----------------------
+    name:str name of the resulting signal
+    mode, method : str — passed on to the scipy.signal.convolve function
+    
+    NOTE: by default, mode is "valid"
+    
     """
-
+    # CHANGELOG 2025-04-28 17:38:52
+    # now also accepts DataSignal, numpy arrays and Quantity arrays
+    #
+    
     from scipy.signal import convolve
 
     name = kwargs.pop("name", "")
 
     units = kwargs.pop("units", pq.dimensionless)
 
-    kwargs["mode"] = "same"  # force "same" mode for convolution
+    # kwargs["mode"] = "same"  # force "same" mode for convolution
+    
+    nPad = w.size//2
+    mode = kwargs.get("mode", "same")
+    
+    if isinstance(sig, (neo.AnalogSignal, DataSignal)):
+        # nSamp = sig.shape[0]
+        if sig.shape[1] == 1:
+            cvl = convolve(sig.magnitude.flatten(), w, **kwargs)
+            
+            if mode == "valid":
+                padLeft  = sig.magnitude[:nPad, 0].flatten()
+                padRight = sig.magnitude[-nPad:,0].flatten()
+                cvl = np.concatenate((padLeft, cvl, padRight))
+                
+            elif mode == "full":
+                cvl = cvl[nPad:-nPad]
+                
+            elif mode == "same":
+                cvl[:nPad]  = sig.magnitude[:nPad, 0].flatten()
+                cvl[-nPad:] = sig.magnitude[-nPad:,0].flatten()
+                
+            ret = sig.__class__(
+                cvl,
+                units=sig.units,
+                t_start=sig.t_start,
+                sampling_period=sig.sampling_period,
+                name="%s convolved" % sig.name,
+            )
 
-    if sig.shape[1] == 1:
-        ret = neo.AnalogSignal(
-            convolve(sig.magnitude.flatten(), w, **kwargs),
-            units=sig.units,
-            t_start=sig.t_start,
-            sampling_period=sig.sampling_period,
-            name="%s convolved" % sig.name,
-        )
+        else:
+            csig = list(map(lambda k: convolve(sig.magnitude[:, k].flatten(), w, **kwargs)[:, np.newaxis],
+                            range(sig.shape[1])))
+            
+            if mode == "valid":
+                for k, cvl in enumerate(csig):
+                    padLeft  = sig.magnitude[:nPad, k].flatten()
+                    padRight = sig.magnitude[-nPad:,k].flatten()
+                    csig[k] = np.concatenate((padLeft, cvl, padRight))
+                    
+            elif mode == "full":
+                for k, cvl in enumerate(csig):
+                    csig[k] = cvl[nPad:-nPad]
+                    
+            elif more == "same":
+                for k, cvl in enumerate(csig):
+                    cvl[:nPad] =  sig.magnitude[:nPad, k].flatten()
+                    cvl[-nPad:] = sig.magnitude[-nPad:,k].flatten()
+                    csig[k] = cvl
+                
 
+            ret = sig.__class__(
+                np.concatenate(csig, axis=1),
+                units=sig.units,
+                t_start=sig.t_start,
+                sampling_period=sig.sampling_period,
+                name="%s convolved" % sig.name,
+            )
+
+        ret.annotations.update(sig.annotations)
+        
     else:
-        csig = [
-            convolve(sig[:, k].magnitude.flatten(), w, **kwargs)[:, np.newaxis]
-            for k in range(sig.shape[1])
-        ]
-
-        ret = neo.AnalogSignal(
-            np.concatenate(csig, axis=1),
-            units=sig.units,
-            t_start=sig.t_start,
-            sampling_period=sig.sampling_period,
-            name="%s convolved" % sig.name,
-        )
-
-    ret.annotations.update(sig.annotations)
+        if sig.shape[1] == 1:
+            ret = convolve(sig.magnitude.flatten() if isinstance(sig, pq.Quantity) else sig, w, **kwargs)[:,np.newaxis]
+            
+            if mode == "valid":
+                padLeft = sig.magnitude[:nPad,0].flatten() if isinstance(sig, pq.Quantity) else sig[:nPad,0].flatten()
+                padRight = sig.magnitude[-nPad:,0].flatten() if isinstance(sig, pq.Quantty) else sig[-nPad:,0].flatten()
+                ret = np.concatenate((padLeft, ret, padRight))
+                
+            elif mode == "full":
+                ret = ret[nPad:-nPad,0]
+                
+        else:
+            csig = list(map(lambda k: convolve(sig.magnitude[:,k].flatten() if isinstance(sig, pq.Quantity) else sig[:,k]),
+                            range(sig.shape[1])))
+            
+            if mode == "valid":
+                for k, cvl in enumerate(csig):
+                    padLeft = sig.magnitude[:nPad, k].flatten() if isinstance(sig, pq.Quantity) else sig[:nPad, k].flatten()
+                    padRight = sig.magnitude[-nPad:, k].flatten() if isinstance(sig, pq.Quantity) else sig[-nPad:].flatten()
+                    csig[k] = np.concatenate((padLeft, cvl, padRight))
+                    
+            elif mode == "full":
+                for k, cvl in enumerate(csig):
+                    csig[k] = cvl[nPad:-nPad, 0]
+                    
+            ret = np.concatenate(csig, axis=1)
+            if isinstance(sig, pq.Quantity):
+                ret *= sig.units
 
     return ret
 

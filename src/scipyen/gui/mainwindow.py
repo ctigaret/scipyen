@@ -3781,7 +3781,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         item = QtWidgets.QTreeWidgetItem(
             self.currentSessionTreeWidgetItem, [repr(lineno), val])
-        for col in range(item.columns()):
+        for col in range(item.columnCount()):
             item.setFont(col, font)
 
         self.historyTreeWidget.addTopLevelItem(item)
