@@ -1000,26 +1000,18 @@ class Schedule(ScipyenDataclass):
     def procedures(self):
         return [e.procedure for e in self.episodes]
     
-# NOTE: 2025-04-24 15:19:57 
-# NOT Required - use dataclasses.is_dataclass
-# def isDataclass(o:object):
-#     if not isinstance(o, type):
-#         o = type(o)
-#         
-#     # CAUTION: 2025-04-24 15:06:14
-#     # _FIELDS might change in future python versions, breaking the code
-#     # the try ... except statement after the next line is more fool-proof, if 
-#     # not with overheads...
-#     return hasattr(o, dataclasses._FIELDS)
-#     # try:
-#     #     f = dataclasses.fields(o)
-#     #     return True
-#     # except:
-#     #     return False
-    
-def mergeDataclasses(typename:str, *args, **kwargs):
+def isDataclass(o:object):
+    r"""Calls dataclasses.is_dataclass(o)
+    In case you forget there is such a function 😃
+"""
+    if not isinstance(o, type):
+        o = type(o)
+        
+    return dataclasses.is_dataclass(o)
+        
+def mergeDataclasses(typename:str, *args, **kwargs) -> type:
     r"""
-Factory function for dynamics dataclasses.
+Factory function for dynamic dataclass creation.
 
 Purpose:
 ========

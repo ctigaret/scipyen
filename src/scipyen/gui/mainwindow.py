@@ -2389,7 +2389,9 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         font = self._defaultUIFont if self._useSystemDefaultFont else self._commandHistoryFont
         it = QtWidgets.QTreeWidgetItemIterator(self.historyTreeWidget)
         while isinstance(it.value(), QtWidgets.QTreeWidgetItem):
-            it.value().setFont(1, font)
+            item = it.value()
+            for col in range(item.columnCount()):
+                item.setFont(col, font)
             it += 1 # advance the iterator
         
     @property
@@ -3512,11 +3514,13 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
                     sessionInfoText = f"{sessionInfo[0]}"
                     sessionItem = QtWidgets.QTreeWidgetItem(self.historyTreeWidget, [sessionInfoText, sessionTimes])
-                    sessionItem.setFont(1, font)
+                    for col in range(sessionItem.columnCount()):
+                        sessionItem.setFont(col, font)
                     items.append(sessionItem)
 
                 lineItem = QtWidgets.QTreeWidgetItem(sessionItem, [repr(line), inline])
-                lineItem.setFont(1, font)
+                for col in range(lineItem.columnCount()):
+                    lineItem.setFont(col, font)
                 items.append(lineItem)
 
             self.currentSessionTreeWidgetItem = QtWidgets.QTreeWidgetItem(
@@ -3777,8 +3781,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         item = QtWidgets.QTreeWidgetItem(
             self.currentSessionTreeWidgetItem, [repr(lineno), val])
-        
-        item.setFont(1, font) # only adjust font the actual command in history
+        for col in range(item.columns()):
+            item.setFont(col, font)
 
         self.historyTreeWidget.addTopLevelItem(item)
         self.historyTreeWidget.scrollToItem(item)

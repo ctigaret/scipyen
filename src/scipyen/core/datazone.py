@@ -675,6 +675,26 @@ coordinates are NOT restricted to time units.
 
     def _repr_pretty_(self, pp, cycle):
         super()._repr_pretty_(pp, cycle)
+        
+    def copy(self) -> typing.Self:
+        times = self.times.magnitude
+        durations = self.durations.magnitude
+        labels = np.array(self.labels)
+        description = self.description.copy()
+        segment = self.segment.copy() # an int !
+        array_annotations = deepcopy(self.array_annotations)
+        extent = self.extent
+        units = self.units
+        
+        obj = self.duplicate_with_new_data(t0 = times, t1 = durations,
+                                           labels = labels, units = units)
+        obj.description = description
+        obj.array_annotations = array_annotations
+        obj.segment = segment
+        obj.extent = extent
+        obj.annotations.update(self.annotations)
+        
+        return obj
     
     def rescale(self, units):
         '''
