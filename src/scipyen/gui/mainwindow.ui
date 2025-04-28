@@ -144,8 +144,8 @@
       <iconset theme="font-face-symbolic"/>
      </property>
      <addaction name="actionUse_system_default_font"/>
-     <addaction name="actionWorkplaceFont"/>
      <addaction name="actionCommandHistoryFont"/>
+     <addaction name="actionWorkplaceFont"/>
     </widget>
     <addaction name="actionAuto_launch_Script_Manager"/>
     <addaction name="menuCode_editor"/>
