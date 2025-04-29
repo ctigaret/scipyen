@@ -550,18 +550,22 @@ coordinates are NOT restricted to time units.
             assert(t0.ndim <= 1), "t0 must be a 1D array"
             if isinstance(t0, pq.Quantity):
                 units_ = t0.units
+            if t0.ndim == 0:
+                t0 = t0.flatten()
                 
         elif isinstance(t0, typing.Sequence) and all(isinstance(v, numbers.Number) for v in t0):
-            t0 = np.array(t0).ravel()
+            t0 = np.array(t0).flatten()
             
         elif isinstance(t0, numbers.Number):
-            t0 = np.array([t0])
+            t0 = np.array([t0]).flatten()
             
         else:
             raise TypeError(f"Invalid 't0' ({type(t0).__name__})")
         
         if isinstance(t1, np.ndarray):
             assert(t1.ndim <= 1), "t1 must be a 1D array"
+            if t1.ndim == 0:
+                t1 = t1.flatten()
             assert t1.size == t0.size, "t0 and t1 must have identical size"
             if isinstance(t1, pq.Quantity):
                 if isinstance(t0, pq.Quantity):
@@ -576,11 +580,11 @@ coordinates are NOT restricted to time units.
             
         elif isinstance(t1, typing.Sequence) and all(isinstance(v, numbers.Number) for v in t1):
             assert len(t1) == t0.size, "t0 and t1 must have identical size"
-            t1 = np.array(t1).ravel()
+            t1 = np.array(t1).flatten()
             
         elif isinstance(t1, numbers.Number):
             assert t0.size == 1, "t0 and t1 must have identical size"
-            t1 = np.array([t1])
+            t1 = np.array([t1]).flatten()
             
         else:
             raise TypeError(f"Invalid 't1' ({type(t1).__name__})")

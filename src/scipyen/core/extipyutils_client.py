@@ -758,7 +758,7 @@ def unpack_shell_channel_data(msg:dict) -> dict:
     string representation of the seriazied variable (as a byte string) or just 
     plain text information. 
     
-    In the former case, the fucntion de-serialized the bytes into a copy of the 
+    In the former case, the function de-serialized the bytes into a copy of the 
     variable and binds it to %s (i..e, the same identifier to which the variable 
     is bound in the remote namespace).
 

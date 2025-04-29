@@ -3471,6 +3471,9 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             self.shell.cache_size = self.defaultShellCacheSize
             self.stdout = self.ipkernel.stdout
 
+            # NOTE: 2019-08-03 17:03:03
+            # ### BEGIN populate the command history widget
+            
             # this is always 1 immediately after initialization
             self.executionCount = self.ipkernel.shell.execution_count
 
@@ -3478,16 +3481,24 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             self.historyAccessor = HistoryAccessor()
             # should not interfere with the history
 
-            # NOTE: 2019-08-03 17:03:03
-            # populate the command history widget
             hist = self.historyAccessor.search('*')
 
+            # session number
             sessionNo = None
 
+            # Sequence of QTreeWidgetItem objects holding the statements in the
+            # history
             items = list()
             
+            # NOTE: 2025-04-29 11:08:04
+            # customize font appearance on history tree items
             font = self._defaultUIFont if self._useSystemDefaultFont else self._commandHistoryFont
 
+            # populate the items list
+            # • create session QTreeWidgetItem (one for each session in history);
+            # • create QTreeWidgetItem for each statement in history, make it a 
+            #   child of the corresponding session QTreeWidgetItem;
+            # • apply custom font to all QTreeWidgetItem objects.
             for session, line, inline in hist:
                 if sessionNo is None or sessionNo != session:
                     sessionNo = session  # cache the session
@@ -3523,36 +3534,69 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                     lineItem.setFont(col, font)
                 items.append(lineItem)
 
+            # create a session QTreeWidgetItem for the current session and label
+            # it as "Current"
             self.currentSessionTreeWidgetItem = QtWidgets.QTreeWidgetItem(
                 self.historyTreeWidget, ["Current"])
 
+            # appent the current session QTreeWidgetItem to items
             items.append(self.currentSessionTreeWidgetItem)
 
             # NOTE: 2017-03-21 22:55:57 much better!
-            # connect signals emitted by the console when processing a drop event
+            # For the console to process a drop event with contents dragged from
+            # history tree widget, I ignore the QMimeData (see consoles module) 
+            # and just paste whatever text was selected in the history tree widget
+            # as text into the console window ('buffer'). The user needs to press
+            # "Return" or "Enter" to execute the statement. This is the same approach
+            # as the one used for dropping a text from an external source, and is
+            # deliberate: there is not guarantee that the etxt is syntactically correct
+            # or that it will be executed without error. The user has to place the 
+            # console text cursor after the dropped text, which will help them identify
+            # issues with the pasted code before pressing "Enter" for the code to 
+            # be executed.
+            
             self.console.historyItemsDropped.connect(self.slot_pasteHistorySelection)
             
+            # this ensures that whatever text is dragged onto the console from the
+            # workspace, only the variable name (symbol) in the workspace is seen
+            # by the console (and hence, presing Enter will typically display or
+            # ``repl`` that variable in the console window)
             self.console.workspaceItemsDropped.connect(self.slot_pasteWorkspaceSelection)
             
+            # this ensures that any file system item (folder, file) dropped onto
+            # the console triggers a change of working directory (if a folder) or
+            # the loading of that file in the workspace uing the default file loader
+            # defined in the pictio module.
             self.console.fileSystemItemsDropped.connect(self.slot_openSelectedFileItems)
             
+            # effectively delegates the loading of file system url (see above) 
+            # from the console to the code in ScipyenWindow.
             self.console.loadUrls[object, bool, QtCore.QPoint].connect(self.slot_loadDroppedURLs)
             
+            # as above
             self.console.pythonFileReceived[str, QtCore.QPoint].connect(self.slot_handlePythonTextFile)
             
             # self.console.sig_shell_msg_received[object].connect(self._slot_int_krn_shell_chnl_msg_recvd)
 
+            # ### BEGIN Populate historyTreeWidget with the ipython history
+            # NOTE: 2025-04-29 11:32:25 this WILL capture past sessions in the
+            # external ipyton console; this is because all that is IPython history 
+            # is stored in the same local database file in the user's home directory
             self.historyTreeWidget.insertTopLevelItems(0, items)
             
             self.historyTreeWidget.scrollToItem(self.currentSessionTreeWidgetItem)
             
             self.historyTreeWidget.setCurrentItem(self.currentSessionTreeWidgetItem)
+            self.historyTreeWidget.resizeColumnToContents(0)
+            # ### END   Populate historyTreeWidget with the ipython history
 
             # NOTE: until input has been enetered at the console, this is the LAST session on record NOT the current one!
             self.currentSessionID = self.historyAccessor.get_last_session_id()
 
             self.selectedSessionID = None
 
+            # ### END   populate the command history widget
+            
             # ------------------------------
             # set up a` COMMON workspace
             # ------------------------------
@@ -3666,21 +3710,17 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         
         self._updateConsolesEditor("internal")
         
-#         verstr = f"'Scipyen is using Qt {QtCore._qt_version}, neo {neo.__version__}, VIGRA {vigra.version}'"
-#         
-#         self.console.execute(f"print({verstr})", hidden=True)
-
-    # NOTE: 2016-03-20 21:18:32
-    # to run code inside the console and use the console as stdout,
-    # call console.execute(...)
-    #
-    # calling console.ipkernel.shell.run_cell(...) uses the system stdio
-    #
-    #
-    # FIXME -- why does it appear to execute only ONE print command?
     @Slot()
     @safeWrapper
     def _slot_helpOnConsole_(self):
+        # NOTE: 2016-03-20 21:18:32 REMEMBER:
+        # to run code inside the console and use the console as stdout,
+        # call console.execute(...)
+        #
+        # calling console.ipkernel.shell.run_cell(...) uses the system stdio
+        #
+        #
+        # FIXME -- why does it appear to execute only ONE print command?
         self.console.execute("console_info()")
 
     @Slot()
@@ -5287,12 +5327,19 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # END workspace view
 
         # BEGIN command history view
+        # NOTE: Upon launch it will get populated with Scipyen's history, during
+        # the execution of self._init_QtConsole_()
+        # So its resizeColumnToContents(0) method needs to be called once, in there.
+        #
+        # A new item (row) will be added with every statement executed at the 
+        # console, REGARDLESS of whether the execution was succesful or not.
+        #
         self.historyTreeWidget.setHeaderLabels(
-            ["Session, line:", "Statement, Date & time:"])
+            ["Session / Session Statement #:", "Session Date & Time / Session Statement:"])
         self.historyTreeWidget.itemActivated[QtWidgets.QTreeWidgetItem, int].connect(self.slot_historyItemActivated)
         self.historyTreeWidget.customContextMenuRequested[QtCore.QPoint].connect(self.slot_historyContextMenuRequest)
         self.historyTreeWidget.itemClicked[QtWidgets.QTreeWidgetItem, int].connect(self.slot_historyItemSelected)
-
+        self.historyTreeWidget.resizeColumnToContents(0)
         # END command history view
         self.setWindowTitle("Scipyen")
 

@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-r"""Module with housekeeping utilities for an external IPython kernel.
+r"""Housekeeping utilities for an external IPython kernel.
 
 To be run/imported inside a REMOTE ipython kernel (see extipyutils_client).
 
