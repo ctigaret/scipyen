@@ -29,11 +29,14 @@ def check_rise_decay_params(x):
 def generic_exp_decay(x, y0, α, x0, τ):
     r"""Realizes y = α × exp(-(x-x₀)/τ) + y₀
     
-    x: independent variable (e.g., time)
+x: independent variable (e.g., time)
+
+parameters: 
+    sequence of floats in the following order:
+
+y₀ (offset), α (scale), x₀ (onset), τ (time constant)
     
-    parameters: sequence of floats: y₀ (offset), α (scale), x₀ (onset), τ (time constant)
-    
-    """
+"""
 
 #     NOTE: Python 3 only supports a subset of the unicode character set for 
 #     identifiers (or variable names). 
@@ -55,69 +58,87 @@ def generic_exp_rise(x, y0, α, x0, τ):
     return α * (1 - np.exp(-(x-x0)/τ)) + y0
 
 def generic_exp_decay_model(x, parameters, **kwargs):
+    r"""Alias to generic_exp_decay, 
+with coefficients packed in an array-like object"""
     return generic_exp_decay(x, *parameters, **kwargs)
 
 def generic_exp_rise_model(x, parameters, **kwargs):
+    r"""Alias to generic_exp_rise, 
+with coefficients packed in an array-like object"""
     return generic_exp_rise(x, *parameters, **kwargs)
 
-def alphaFunction(x, parameters):
+def alphaFunction(x, α, β, x0, τ):
     r"""
-    The Alpha function: a single exponential rise and decay, both with the same 
-    time-constant (τ):
+The Alpha function.
+
+A single exponential rise and decay, both with the same time-constant (τ):
     
-    y = a + b⋅(x-x₀)⋅exp(-(x-x₀)/τ)/τ if x-x₀ >= 0 and a elsewhere
+y = α + β × (x-x₀) × exp(-(x-x₀)/τ)           where x-x₀ >= 0 
+    α                                           elsewhere
+
+where:
+    α  is the offset;
+
+    β  is the scale;
+
+    x₀ is the delay ("onset");
+
+    τ  is the time constant
+
+
+Parameters:
+===========
+x: predictor (independent variable) - 1D numpy ndarray
+a, b, x0, τ: see above 
+parameters: 1D array-like: numeric sequence (tuple, list, numpy array) with four
+    elements in the following order (see above for their meaning):
+
+            
+
+Returns:
+========
+1D numpy array (vector)
+
+Example: (run in Scipyen's console)
+========
+
+from core import models
+
+x = np.linspace(0.0,1.0, 1000);
+
+parameters = [0, -1, 0.05, 0.01];
+
+y = alphaFunction(x, *parameters)
+
+OR: 
+
+y = alphaFunction_model(x, parameters)
+
+plt.plot(x,y)
+
+"""
+    # NOTE: Python currently does not support unicode
+    # characters such as sub- or super-scripts, so please use 'x0', not 'x₀'
+    # in the code
     
-    where:
-        a  is the offset;
-    
-        b  is the scale;
-    
-        x₀ is the delay ("onset");
-    
-        τ  is the time constant
-    
-    
-    Parameters:
-    ===========
-    x: predictor (independent variable) - 1D numpy ndarray
-    
-    parameters: 1D numeric sequence (tuple, list, numpy array) of four elements:
-    
-                a, b, x₀, τ
-    
-    Returns:
-    ========
-    1D numpy array (vector)
-    
-    Example: (run in Scipyen's console)
-    ========
-    
-    from core import models
-    
-    x = np.linspace(0.0,1.0, 1000);
-    
-    parameters = [0, -1, 0.05, 0.01];
-    
-    y = alphaFunction(x, parameters)
-    
-    plt.plot(x,y)
-    
-    """
     
     # make sure x is a 1D array (vector)
     x = x.flatten()
     
     # unpack parameters
-    a, b, x0, tau = parameters
+    # α, b, x0, tau = parameters
     
-    xt = (x-x0)/tau
+    xt = (x-x0)/τ
     
-    y = np.full_like(x, a)
+    y = np.full_like(x, α)
     
-    y[xt>=0] = a + b * xt[xt>=0] * np.exp(-xt[xt>=0])
+    y[xt>=0] = α + β * xt[xt>=0] * np.exp(-xt[xt>=0])
     
     return y
 
+def alphaFunction_model(x, parameters, **kwargs):
+    r"""Alias to alphaFunction with coefficients packed in an array-like object"""
+    return alphaFunction(x, *parameters, **kwargs)
 
 def nsfa(x, parameters):
     r"""
@@ -139,7 +160,7 @@ def nsfa(x, parameters):
 
 def Clements_Bekkers_97(x, parameters, unit_amplitude:bool=False):
     r"""
-    Clements & Bekkers 1997 mEPSC waveform.
+    Clements & Bekkers 1997 mEPSC waveform (alphafunction-like).
 
     This approximates a single exponential rise and decay each with their own 
     time constant:
@@ -262,8 +283,10 @@ def CBsum(x, parameters):
     return y0 + y1
     
     
+def exp_rise_multi_decay_model(x, parameters, returnDecays = False):
+    return exp_rise_multi_decay(x, *parameters, returnDecays = returnDecays)
     
-def exp_rise_multi_decay(x, parameters, returnDecays = False):
+def exp_rise_multi_decay(x, *parameters, returnDecays = False):
     r""" Realization of a transient signal with a single exponential rise (r) and
         n exponential decays (d1..dn), at an onset (delay) x0 and a given 
         "DC" component (offset) o: 
@@ -393,13 +416,13 @@ def exp_rise_multi_decay(x, parameters, returnDecays = False):
         else:
             return y
 
-def compound_exp_rise_multi_decay(x, parameters, returnDecays = False):
+def compound_exp_rise_multi_decay(x, *parameters, returnDecays = False):
     r"""Compound transient signal -- linear sum of delayed single transient signals
     Arguments:
         x = 1D predictor vector
         
-        parameters = a list of parameter sequences where each sequence is as 
-                    defined for the parameters argument of exp_rise_multi_decay
+        parameters = coefficient sequences where each sequence is as defined for
+                    the `parameters` argument of exp_rise_multi_decay
         
     Returns:
         y   = realization of the compound signal model curve
@@ -436,7 +459,7 @@ def compound_exp_rise_multi_decay(x, parameters, returnDecays = False):
         for p in parameters:
             #print("p", p)
             
-            (yc_, ycd_) = exp_rise_multi_decay(x, p, True)
+            (yc_, ycd_) = exp_rise_multi_decay_model(x, p, True)
 
             y += yc_
             
@@ -449,7 +472,10 @@ def compound_exp_rise_multi_decay(x, parameters, returnDecays = False):
         
         else:
             return y, yc
-    
+        
+def compound_exp_rise_multi_decay_model(x, parameters, returnDecays = False):
+    return compound_exp_rise_multi_decay(x, *parameters, returnDecays = returnDecays)
+
 def Markwardt_Nilius(x, g, e, h, s):
     r"""Markwardt & Nilius model for voltage-gated Ca2+ channels I-V relationship
     See Markwardt & Nilius (1988), J Physiol (London)
@@ -714,91 +740,93 @@ def Frank_Fuortes2(x, irh, tau, x0):
 
     
 def Boltzmann(x, p, pos:bool=True):
-    r""" Realises y = 1/(1+exp(±(x₀ - x)/κ))
+    r""" Boltzmann function:
 
-    Function parameters:
-    ====================
-    x: float scalar (e.g., membrane voltage)
-    
-    p: array-like, float, with two elements: x₀ and κ (in THIS order)
-    
-    pos: bool, optional (default is True)
-        When True, the function uses a positive exponential argument (e.g. useful
-        to fit an activation curve)
-    
-        When False, the exponential argument is negative (e.g., useful to fit an 
-        inactivation curve)
-    
-    Returns:
-    ========
-    A scalar (e.g., membrane current)
-    
-    Notes:
-    ======
-    
-    Boltzmann's equation is commonly used to describe the voltage-dependent gating
-    of voltage-gated ion channels:
-    
-        Activation:
-    
-        Iₘ = 1/(1+exp((V½ - Vₘ)/κ))                                 (1)
+Realises y = 1/(1+exp(±(x₀ - x)/κ))
 
-        Inactivation:
-    
-        Iₘ = 1/(1+exp(-(V½ - Vₘ)/κ))                                (2)
-    
-    where:
-    
-    Iₘ can be:
-        ∘ the recorded membrane current at a range of Vₘ values, normalized to 
-            the maximal recorded current value
-    
-        ∘ fractional open time (for recordings from a small number of channels, 
-            see e.g., Magee & Johnston, JPhysiol, 1995) - by definition 
-            normalized.
-    
-        ∘ chord or slope conductance normalized to maximal value, e.g., see
-            Magee & Johnston 1995
-    
-        When all other channels are blocked, Iₘ is specific to the studied
-        channels.
-    
-    Vₘ is the membrane voltage
-    
-    V½ is the "half-maximum" voltage - the voltage where ensemble channel 
-    current is half the maximum, or where half of the channels are active
-    
-    κ is a "slope" factor; when fitting I-V (or G-V) relationships, κ usually is
-    𝒛𝑹𝑻/𝑭 (e.g., see Cui et al, 1997, J Gen Physiol), where:
-    
-    𝒛  apparent gating charge [C]
-    𝑻  temperature [K]
-    𝑹  molar gas constant 8.31446261815324 [J K⁻¹ mol⁻¹]
-    𝑭  Faraday constant 96485.33212331001 [C mol⁻¹]
+Parameters:
+==========
+x: float scalar (e.g., membrane voltage)
 
-    NOTE V½ and κ are often different for activation and inactivation
+p: array-like, with two float elements: x₀ and κ (in THIS order)
+
+pos: bool, optional (default is True) — the sign of the exponent:
+    When True, the function uses a positive exponential argument (e.g. useful
+    to fit an activation curve)
+
+    When False, the exponential argument is negative (e.g., useful to fit an 
+    inactivation curve)
+
+Returns:
+========
+A scalar (e.g., membrane current)
+
+Notes:
+======
+
+Boltzmann's equation is commonly used to describe the voltage-dependent gating
+of voltage-gated ion channels:
+
+    Activation:
+
+    Iₘ = 1/(1+exp((V½ - Vₘ)/κ))                                 (1)
+
+    Inactivation:
+
+    Iₘ = 1/(1+exp(-(V½ - Vₘ)/κ))                                (2)
+
+where:
+
+Iₘ can be:
+    ∘ the recorded membrane current at a range of Vₘ values, normalized to 
+        the maximal recorded current value
+
+    ∘ fractional open time (for recordings from a small number of channels, 
+        see e.g., Magee & Johnston, JPhysiol, 1995) - by definition 
+        normalized.
+
+    ∘ chord or slope conductance normalized to maximal value, e.g., see
+        Magee & Johnston 1995
+
+    When all other channels are blocked, Iₘ is specific to the studied
+    channels.
+
+Vₘ is the membrane voltage
+
+V½ is the "half-maximum" voltage - the voltage where ensemble channel 
+current is half the maximum, or where half of the channels are active
+
+κ is a "slope" factor; when fitting I-V (or G-V) relationships, κ usually is
+𝒛𝑹𝑻/𝑭 (e.g., see Cui et al, 1997, J Gen Physiol), where:
+
+𝒛  apparent gating charge [C]
+𝑻  temperature [K]
+𝑹  molar gas constant 8.31446261815324 [J K⁻¹ mol⁻¹]
+𝑭  Faraday constant 96485.33212331001 [C mol⁻¹]
+
+NOTE V½ and κ are often different for activation and inactivation
+
+Let ξ = (V½ - Vₘ)/κ
+
+
+Then:
+
+(Vₘ-V½)/κ = -ξ
+
+and:
+
+1/(1+exp(-ξ)) = 1/(1+1/exp(ξ)) = exp(ξ)/(1+exp(ξ)) = exp(ξ) × 1/(1+exp(ξ))
+|___________|                                                 |__________|
+inactivation                                                   activation
+
+(NOTE the change in sign of the exponential argument!)
+
+When fitting experimental data, the fitted parameters are x₀ and κ.
+
+The equation is also an empyrical model of the "gating" mechanism for 
+voltage dependent channels Naᵥ and Kᵥ in the Hodgkin-Huxley formalism.
     
-    Let ξ = (V½ - Vₘ)/κ
-    
-    
-    Then:
-    
-    (Vₘ-V½)/κ = -ξ
-    
-    and:
-    
-    1/(1+exp(-ξ)) = 1/(1+1/exp(ξ)) = exp(ξ)/(1+exp(ξ)) = exp(ξ) × 1/(1+exp(ξ))
-    |___________|                                                 |__________|
-    inactivation                                                   activation
-    
-    (NOTE the change in sign of the exponential argument!)
-    
-    When fitting experimental data, the fitted parameters are x₀ and κ.
-    
-    The equation is also an empyrical model of the "gating" mechanism for 
-    voltage dependent channels Naᵥ and Kᵥ in the Hodgkin-Huxley formalism.
-     
-    """
+"""
     
     x0, κ = p
     
@@ -814,7 +842,9 @@ def Boltzmann(x, p, pos:bool=True):
 def Heaviside(x:typing.Union[pq.Quantity, np.ndarray], 
               x0:typing.Union[float, pq.Quantity], 
               α:bool=True) -> np.ndarray:
-    r"""Heaviside (step) function
+    r"""Heaviside (step) function:
+    
+    Step transition between two levels (0 and 1)
     
     Parameters:
     ===========
@@ -871,13 +901,16 @@ def Heaviside(x:typing.Union[pq.Quantity, np.ndarray],
 def Heaviside2(x:typing.Union[pq.Quantity, np.ndarray], 
               x0:typing.Union[float, pq.Quantity], 
               level0:float=0., level1:float=1.) -> np.ndarray:
-    """Heaviside (step) function
+    """Heaviside (step) function - general version
+    
+    Step transition from level0 to level1. by default the levels are
+    0. and 1. (floats)
     
     Parameters:
     ===========
     x: domain vector
     x0: coordinate of the step change (in domain space)
-    level0, level1:float; optional, defaults are 0 anbd 1, respectively
+    level0, level1:float; optional, defaults are 0 and 1, respectively
         The initial and the final level of the step function.
         
     """
@@ -922,34 +955,38 @@ def Heaviside2(x:typing.Union[pq.Quantity, np.ndarray],
     
     
 def boxcar(x, p, up_first:bool=True):
+    r"""Boxcar function: 
+Two successive Heaviside (step) functions of opposite directions"""
     x0, x1 = p
     
     ud = [True, False] if up_first else [False, True]
     
     if x0 < x1:
-        print(f"x0 < x1 {x0 < x1}; up_first: {up_first}")
+        # print(f"x0 < x1 {x0 < x1}; up_first: {up_first}")
         #       up then down                                                        down then up
         return Heaviside(x, x0, ud[0]) * Heaviside(x, x1, ud[1])# if up_first else Heaviside(x, x0, False) + Heaviside(x, x1, True)
         
     else:
         print(f"x0 >= x1 {x0 >= x1}; up_first: {up_first}")
         return Heaviside(x, x0, ud[0]) * Heaviside(x, x1, ud[1])# if up_first else Heaviside(x, x1, False) + Heaviside(x, x0, True)
-        # return Heaviside(x, x0, False) + Heaviside(x, x1, True) if up_first else Heaviside(x, x1, False) + Heaviside(x, x0, True)
-        # return Heaviside(x, x0,False) * Heaviside(x, x1, True) if up_first else Heaviside(x, x1, False) + Heaviside(x, x0, True)
-        # return Heaviside(x, x1, True) * Heaviside(x, x0, False) if up_first else Heaviside(x, x1, False) + Heaviside(x, x0, True)
-        #      up follows down                                                  down follows up
-        # return Heaviside(x, x0, False) + Heaviside(x, x1, True) if up_first else Heaviside(x, x0, False) + Heaviside(x, x1, False)
-        
 
 def boxcar2(x, p, level0=0., level1=1.):
-    r""""""
+    r"""Boxcar function:
+Two successive Heaviside2 (step) functions (general versions) in opposite directions"""
     x0, x1 = p
     
     return Heaviside2(x, x0, level0, level1) + Heaviside2(x, x1, level1, level0)
 
-
-
 def ramp(x, p = (0., 0., 1., 1.)):
+    r"""Linear ramp from (x₀, y₀) to (x₁, y₁)
+
+Parameters:
+===========
+
+x: the domain vector (e.g. time vector) - numpy array
+p: the parameters in the specific order: (x₀, y₀, x₁, y₁)
+
+"""
     x0, y0, x1, y1 = p
     
     if isinstance(x, pq.Quantity):

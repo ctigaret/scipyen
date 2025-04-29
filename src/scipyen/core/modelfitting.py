@@ -49,7 +49,7 @@ from core import models # we're still developing this one
 class ModelExpression(object):
     r"""Class decorator to pass an expression to the model.
     
-    Can use this instead of directly hardcoding the expression in the definition
+    Can use this instead of directly hard-coding the expression in the definition
     if the fit model ::class::.
     
     This is useful to dynamically create new FitModel ::classes:: 
