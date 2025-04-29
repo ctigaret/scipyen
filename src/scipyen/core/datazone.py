@@ -544,7 +544,7 @@ coordinates are NOT restricted to time units.
                 array_annotations = None, 
                 **anotations):
         # NOTE: 2025-04-28 11:19:22
-        # t0 is times; t1 is durations
+        # t0 is times; t1 is durations;  all t1 >= 0
         units_ = None
         if isinstance(t0, np.ndarray):
             assert(t0.ndim <= 1), "t0 must be a 1D array"
@@ -613,9 +613,9 @@ coordinates are NOT restricted to time units.
             if np.any(t1 < 0):
                 # because the window around t0 cannot be negative
                 raise ValueError("t1 must contain only values > = 0")
-        else:
-            if np.any(t0 > t1):
-                raise ValueError("All values in t0 should precede corresponding values in t1")
+        # else:
+        #     if np.any(t0 > t1):
+        #         raise ValueError("All values in t0 should precede corresponding values in t1")
             
         if labels is None:
             labels = np.array([], dtype='U')
