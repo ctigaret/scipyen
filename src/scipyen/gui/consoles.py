@@ -3393,8 +3393,12 @@ class ScipyenConsoleWidget(ConsoleWidget):
         
     @safeWrapper
     def dropEvent(self, evt):
+        
         from textwrap import dedent
         src = evt.source()
+        mimeData = evt.mimeData()
+        dropAction = evt.dropAction()
+        # print(f"{self.__class__.__name__}.dropEvent: evt: dropAction = {dropAction}, mimeData = {mimeData.text()}")
         
         # NOTE: 2019-08-10 00:23:42
         # for drop events issued by mainWindow's workspace viewer and command

@@ -113,6 +113,19 @@ class ScipyenDataclass:
             return False
         
         return len(self.diff(other)) == 0
+    
+    def __contains__(self, val:str) -> bool:
+        r"""Test the existence of a field name in this instance
+    Parameters:
+    ===========
+    `val` : a string, the symbol (or name) of the field which is potentially 
+            defined in this instance's class
+    
+    Returns:
+    =======
+    True if a field with name suplied by `val` exists in this instance.
+    """
+        return val in map(lambda f: f.name, dataclasses.fields(self))
         
     def toHDF5(self, group:h5py.Group, name:str, oname:str, 
                        compression:str, chunks:bool, track_order:bool,
@@ -212,6 +225,19 @@ class ScipyenDataclass:
                     
         # print(f"### END {cls.__name__}.fromHDF5 \n\n")
         return cls(**kwargs)
+    
+    @classmethod
+    def contains(cls, val:str):
+        r"""Test the existence of a field name in this class
+    Parameters:
+    ===========
+    `val` : a string, the symbol (or name) of the field which is potentially defined in the class
+    
+    Returns:
+    =======
+    True if a field with name suplied by `val` exists in this class.
+    """
+        return val in map(lambda f: f.name, dataclasses.fields(cls))
 
 class CellCompartmentType(TypeEnum):
     r"""Follows SWC/CNIC specification augmented with 'spine', 'nucleus', 'nucleolus'. 
