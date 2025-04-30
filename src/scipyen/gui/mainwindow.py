@@ -319,7 +319,7 @@ from imaging.axiscalibration import (AxesCalibration,
 from ephys import (ephys, membrane)
 from systems import *
 
-from gui.guiutils import (get_font_style, get_font_weight,)
+from gui.guiutils import (get_font_style, get_font_weight, treeWidgetItems)
 
 
 from . import interact
@@ -2387,12 +2387,18 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         
     def _updateHistoryViewFont(self):
         font = self._defaultUIFont if self._useSystemDefaultFont else self._commandHistoryFont
-        it = QtWidgets.QTreeWidgetItemIterator(self.historyTreeWidget)
-        while isinstance(it.value(), QtWidgets.QTreeWidgetItem):
-            item = it.value()
+        for item in treeWidgetItems(self.historyTreeWidget):
             for col in range(item.columnCount()):
                 item.setFont(col, font)
-            it += 1 # advance the iterator
+        
+        # NOTE: 2025-04-30 10:04:57
+        # moved to gui.guiutils.treeWidgetItems()
+        # it = QtWidgets.QTreeWidgetItemIterator(self.historyTreeWidget)
+        # while isinstance(it.value(), QtWidgets.QTreeWidgetItem):
+        #     item = it.value()
+        #     for col in range(item.columnCount()):
+        #         item.setFont(col, font)
+        #     it += 1 # advance the iterator
         
     @property
     def currentDir(self) -> str | pathlib.Path:
@@ -3503,33 +3509,12 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 if sessionNo is None or sessionNo != session:
                     sessionNo = session  # cache the session
                     sessionInfo = self.historyAccessor.get_session_info(sessionNo)
-                    if isinstance(sessionInfo[1], datetime.datetime):
-                        startDateTime = f"{sessionInfo[1].date().isoformat()} {sessionInfo[1].time().isoformat()}"
-                    else:
-                        startDateTime = ""
-
-                    if isinstance(sessionInfo[2], datetime.datetime):
-                        stopDateTime = f"{sessionInfo[2].date().isoformat()} {sessionInfo[2].time().isoformat()}"
-                    else:
-                        stopDateTime = ""
-
-                    sessionTimes = " "
-
-                    if len(startDateTime):
-                        sessionTimes = f"{startDateTime} - "
-                        if len(stopDateTime):
-                            sessionTimes = f"{startDateTime} - {stopDateTime}"
-
-                    elif len(stopDateTime):
-                        sessionTimes = f" - {stopDateTime}"
-
-                    sessionInfoText = f"{sessionInfo[0]}"
-                    sessionItem = QtWidgets.QTreeWidgetItem(self.historyTreeWidget, [sessionInfoText, sessionTimes])
+                    sessionItem = QtWidgets.QTreeWidgetItem(self.historyTreeWidget, self._historySessionInfo_(sessionNo))
                     for col in range(sessionItem.columnCount()):
                         sessionItem.setFont(col, font)
                     items.append(sessionItem)
 
-                lineItem = QtWidgets.QTreeWidgetItem(sessionItem, [repr(line), inline])
+                lineItem = QtWidgets.QTreeWidgetItem(sessionItem, self._historyLineInfo_(line, inline))
                 for col in range(lineItem.columnCount()):
                     lineItem.setFont(col, font)
                 items.append(lineItem)
@@ -4045,8 +4030,106 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         saveHistorySelection = cm.addAction("Save...")
         saveHistorySelection.setToolTip("Save selected history to file")
         saveHistorySelection.triggered.connect(self._saveHistorySelection_)
+        
+    def _getHistorySessionCode_(self, item: QtWidgets.QTreeWidgetItem, /, 
+                                asString:bool=True,
+                                lineNumbers:bool=False,
+                                skipEmpty:bool=False):
+        r"""Gets the line codes from a selected session in the history tree widget.
+    This method does NOT access IPython history database
+    """
+        sessionNo = int(item.text(0))
+        sessionInfoText = item.text(1)
+        getChildText = lambda c: (c.text(0), c.text(1)) if lineNumbers else c.text(1)
+        ret = tuple(map(lambda k: getChildText(currentSessionItem.child(k)), range(currentSessionItem.childCount())))
+        if len(ret) == 0 and skipEmpty:
+            return tuple()
+        
+        if asString:
+            ret = (f"#\n# Session {sessionNo}: {sessionInfoText}\n#", ) + \
+                tuple(map(lambda t: f"{t[0]}: {t[1]}" if lineNumbers else f"{t}", ret))
+        
+        return ret
+        
+        
+    def _getCurrentSessionCode_(self, /, 
+                                asString:bool=True, lineNumbers:bool=False,
+                                skipEmpty:bool=False) -> typing.Union[str, typing.Sequence[str]]:
+        r"""Access 'Current' session in the historyTreeWidget"""
+        items = tuple(filter(lambda i: i.text(0) == "Current", treeWidgetItems(self.historyTreeWidget)))
+        
+        if len(items) == 0:
+            return tuple()
+        
+        currentSessionItem = items[0]
+        
+        getChildText = lambda c: (c.text(0), c.text(1)) if lineNumbers else c.text(1)
+        
+        ret = tuple(map(lambda k: getChildText(currentSessionItem.child(k)), range(currentSessionItem.childCount())))
+        
+        if len(ret) == 0 and skipEmpty:
+            return tuple()
+        
+        if asString:
+            now = datetime.datetime.now()
+            startDateTime = f"{now.date().isoformat()} {now.time().isoformat()}"
+            
+            ret = (f"#\n# Current session: {startDateTime} - \n#", ) + \
+                tuple(map(lambda t: f"{t[0]}: {t[1]}" if lineNumbers else f"{t}", ret))
+        
+        return ret
+            
+    def _getHistoryBlockAsCode_(self, magic:typing.Optional[str]=None, /, lineNumbers:bool = False,
+                                skipEmptySessions:bool=False,
+                                suggestTitle:bool=False) -> str:
+        r"""Generates a string by concatenating commands from the history.
+    Commands are selected in the Command History tree widget.
+        
+    Where there is NO selection, the entire IPython history is converted to a large
+    string with session headers followed by command code lines in that session.
+        
+    The session headers contain the session number, start date & time, and the 
+    stp date & time, and are commented. 
+        
+    The current session header contains the name "Current session" followed by
+    the start date & time.
+        
+    Dates and times are in ISO format.
 
-    def _getHistoryBlockAsCommand_(self, magic=None):
+    The resulting string can be pasted directly into the console, or saved as a 
+    python script file (*.py)
+        
+    Optionally, lines of code are adorned by line numbers (for publishing purposes).
+        
+    Optionally, empty sessions maye be skipped (i.e. sessions where no code was
+    executed at the console).
+        
+    This method accesses the IPyton history database.
+        
+    Parameters:
+    ==========
+    magic: optional, a mime type magic string when the code is to be "exported"
+        via drag and drop
+        WARNING: code for this is NOT finalized yet 
+        
+    Keyword Parameters:
+    ===================
+    lineNumbers: default is False; when True, prepend the line number to each line
+        of code. Line numbers start at 1 in every session
+        
+    skipEmptySessions: default is False; when True, empty sessions (including the 
+        current one) will be skipped from the output
+        
+    Returns:
+    ========
+    A string, or a tuple of strings (code, proposed title) if `suggestTitle` is True
+        
+"""
+        # TODO: 2025-04-30 11:49:34 FIXME
+        # finalize the drag mime type and the use of magic - is it still needed?
+        #
+        # NOTE: 2025-04-30 11:39:37
+        # magic is any mime 'magic' string to prepend to the selection list
         cmd = ""
         selectedItems = self.historyTreeWidget.selectedItems()
 
@@ -4056,35 +4139,63 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             selectionList = [magic]
 
         if len(selectedItems) == 0:
+            ret = self._getFullHistoryAsCode_(magic, lineNumbers = lineNumbers,
+                                            skipEmptySessions = skipEmptySessions)
             
-            hhs = self.historyAccessor.search('*')
-            
-            codes = [inline for (session, line, inline) in hhs]
-            
-            ret = self.questionMessage("Save history", f"Save the entire history ({len(codes)} lines of code)?")
-            
-            if ret != QtWidgets.QMessageBox.Yes:
-                return cmd 
-            
-            if magic is None:
-                cmd = "\n".join(codes) + "\n"
-            else:
-                cmd = " ".join(codes) + " "
-            
-            return cmd
-
-        # BEGIN do not delete -- revisit this
-        if len(selectedItems) == 1:
-            if selectedItems[0].parent() is None:  # a session node was selected
-                if selectedItems[0].text(0) == "Current":
-                    sessionNo = self.currentSessionID
-
-                else:
-                    sessionNo = int(selectedItems[0].text(0))
-
-                # when a "Node" is selected, get the entire list of selected children
-                selectionList += [selectedItems[0].child(k).text(1)
-                                  for k in range(selectedItems[0].childCount())]
+            if suggestTitle:
+                ret = (ret, "Full Command History")
+                
+            return ret
+        
+        pastSessions = list() # cache past sesion infos
+        
+        if len(selectedItems) == 1: #  single item was selected
+            if selectedItems[0].parent() is None:  # a session node was selected; returns
+                if selectedItems[0].text(0) == "Current": # returns current session
+                    # sessionNo = self.currentSessionID
+                    
+                    selectionList += list(self._getCurrentSessionCode_(asString=True,
+                                                                 lineNumbers = lineNumbers,
+                                                                 skipEmpty = skipEmptySessions))
+                    
+                    if magic is None:
+                        ret = "\n".join(selectionList) + "\n"
+                    else:
+                        ret = " ".join(selectionList) + "\n"
+                        
+                    if suggestTitle:
+                        ret = (ret, "Current session")
+                        
+                    return ret
+                    
+                else: # returns selected session
+                    # sessionNo = int(selectedItems[0].text(0))
+                    selectionList += list(self.__getHistorySessionCode_(selectedItems[0],
+                                                                        asString=True,
+                                                                        lineNumbers = lineNumbers,
+                                                                        skipEmpty = skipEmptySessions))
+                    if magic is None:
+                        ret = "\n".join(selectionList) + "\n"
+                    else:
+                        ret = " ".join(selectionList) + "\n"
+                        
+                    if suggestTitle:
+                        ret = (ret, f"Session {selectedItems[0].text(0)}")
+                        
+                    return ret
+                    
+                # NOTE: 2025-04-30 14:48:10 not executed, never reached
+#                 # when a "Node" is selected, get the entire list of selected children
+#                 getChildData = lambda c: f"{c.text(0)}: {c.text(1)}" if lineNumbers else f"{c.text(1)}"
+#                 
+#                 selectionList += list(map(lambda k: getChildData(selectedItems[0].child(k)), 
+#                                           range(selectedItems[0].childCount())))
+                # if lineNumbers:
+                #     selectionList += [selectedItems[0].child(k).text(1)
+                #                     for k in range(selectedItems[0].childCount())]
+                # else:
+                #     selectionList += [selectedItems[0].child(k).text(1)
+                #                     for k in range(selectedItems[0].childCount())]
 
             elif selectedItems[0].columnCount() > 1:  # a command node was selected
                 #  check-out its parent session number
@@ -4094,8 +4205,16 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
                 else:
                     sessionNo = int(selectedItems[0].parent().text(0))
-
-                selectionList.append(selectedItems[0].text(1))
+                    parent = selectedItems[0].parent()
+                    sname = parent.text(0)
+                    ptxt = f"#\n#{sname}: {parent.text(1)}\n#"
+                    if sname not in pastSessions:
+                        pastSessions.append(sname)
+                        selectionList.append(ptxt)
+                    
+                text = f"{selectedItems[0].text(0)}: {selectedItems[0].text(1)}" if lineNumbers else selectedItems[0].text(1)
+                selectionList.append(text)
+                # selectionList.append(selectedItems[0].text(1))
 
             else:  # not sure we'll ever reach this
                 return
@@ -4109,14 +4228,22 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             # but leave selectedSessionID unchanged
             self.selectedSessionID = self.currentSessionID
 
+            sessionNo = None
+            
             for item in selectedItems:
                 parent = item.parent()
 
                 if parent is None:              # this is a session item
+                    # do append session header for tractability
+                    selectionList.append(f"#\n#{item.text(0)}: {item.text(1)}\n")
                     continue                    # move on to the next
-
+                
                 # and its parent is a session item
                 ptxt = parent.text(0)
+                if ptxt not in pastSessions:
+                    if ptxt != "Current":
+                        pastSessions.append(ptxt)
+                        selectionList.append(f"#\n#{ptxt}: {parent.text(1)}\n#")
 
                 if ptxt != "Current":           # in fact a historic session item
                     sessionNo = int(ptxt)       # so get its session number
@@ -4126,18 +4253,22 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                     sessionNo = self.currentSessionID
 
                 lineNo = int(item.text(0))
+                
+                lineText = f"{lineNo}: {item.text(1)}" if lineNumbers else item.text(1)
+                
+                selectionList.append(lineText)
 
-                if magic is None:
-                    # append the command itself
-                    selectionList.append(item.text(1))
-                    # cmd = "\n".join(selectionList) + "\n"
-
-                else:
-                    if sessionNo != self.currentSessionID:
-                        selectionList.append("%s/%s" %
-                                             (sessionNo, repr(lineNo)))
-                    else:
-                        selectionList.append(repr(lineNo))
+                # if magic is None:
+                #     # append the command itself
+                #     selectionList.append(item.text(1))
+                #     # cmd = "\n".join(selectionList) + "\n"
+                # 
+                # else:
+                #     if sessionNo != self.currentSessionID:
+                #         selectionList.append("%s/%s" %
+                #                              (sessionNo, repr(lineNo)))
+                #     else:
+                #         selectionList.append(repr(lineNo))
 
                     # cmd = " ".join(selectionList) + "\n"
 
@@ -4147,53 +4278,147 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         else:
             cmd = " ".join(selectionList) + "\n"
 
-        # END
-            # sessionNo = self.currentSessionID
-
-        # for item in selectedItems:
-            # parent = item.parent()
-
-            # if parent is None:              # this is a session item
-            # continue                    # move on to the next
-
-            # ptxt = parent.text(0)           # and its parent is a session item
-
-            # if ptxt != "Current":           # in fact a historic session item
-            # sessionNo = int(ptxt)       # so get its session number
-            # else:
-            # sessionNo = self.currentSessionID # make sure we get back to the curent session ID
-
-            # lineNo = int(item.text(0))
-
-            # if magic is None:
-            # selectionList.append(item.text(1)) # append the command itself
-            # cmd = "\n".join(selectionList) + "\n"
-            # else:
-            # if sessionNo != self.currentSessionID:
-            # selectionList.append("%s/%s" % (sessionNo, repr(lineNo)))
-            # else:
-            # selectionList.append(repr(lineNo))
-            # cmd = " ".join(selectionList) + "\n"
-
-        # print(cmd)
+        if suggestTitle:
+            if len(pastSessions) == 1:
+                return (cmd, f"Session {pastSessions[0]}")
+            else:
+                return (cmd, "Command History")
         return cmd
 
     def _copyHistorySelection_(self):
-        cmd = self._getHistoryBlockAsCommand_()
+        cmd = self._getHistoryBlockAsCode_()
         # print(cmd)
         if isinstance(cmd, str) and len(cmd.strip()):
             self.app.clipboard().setText(cmd+"\n")
 
         else:
             self.app.clipboard().clear()  # don't leave gremlins
+            
+    def _getFullHistoryAsCode_(self,magic=None, /,  
+                            lineNumbers:bool = False, 
+                            skipEmptySessions:bool=False):
+        r"""Outputs ALL command history resident in IPython's database.
+    """
+        hhs = self.historyAccessor.search('*')
+        
+        sessions_with_codes = tuple(hhs)
+        
+        ret = self.questionMessage("Save history", f"Save the entire history ({len(sessions_with_codes)} lines)?")
+        
+        if ret != QtWidgets.QMessageBox.Yes:
+            return cmd 
+        
+        maxSession = max(map(lambda sc: sc[0], sessions_with_codes))
+        
+        codes = tuple(map(lambda s: self._getHistoryCodesForSession_(sessions_with_codes, s, 
+                                                                        withHeader=True, 
+                                                                        lineNumbers=lineNumbers,
+                                                                        skipEmpty = skipEmptySessions), 
+                            range(maxSession)))
+        
+        if skipEmptySessions:
+            codes = tuple(filter(lambda c: len(c) > 0, codes))
+        
+        # append the current session
+        current_code = self._getCurrentSessionCode_(asString = True, 
+                                                    lineNumbers = lineNumbers,
+                                                    skipEmpty = skipEmptySessions)
+        if not (skipEmptySessions and len(current_code) == 0):
+            codes += (current_code, )
+        
+        codes = itertools.chain.from_iterable(codes)
+        
+        if magic is None: # what is magic?
+            cmd = "\n".join(codes) + "\n"
+        else:
+            cmd = " ".join(codes) + " "
+        
+        return cmd
 
+    def _historySessionInfo_(self, session:int, /, asString:bool=False) -> typing.Union[str, typing.Sequence[str]] | None:
+        r"""Create a QTreeWidgetItem with session info.
+        The QTreeWidgetItem is owned by self.historyTreeWidget.
+        Alternatively, outputs a string for saving to file.
+    
+        WARNING: This method accesses the IPython history database
+        """
+        sessionInfo = self.historyAccessor.get_session_info(session)
+        if sessionInfo is None: # this is / should be the current session
+            sessionInfo = ("Current session", datetime.datetime.now(), None)
+            # return "" if asString else list()
+        
+        if isinstance(sessionInfo[1], datetime.datetime):
+            startDateTime = f"{sessionInfo[1].date().isoformat()} {sessionInfo[1].time().isoformat()}"
+        else:
+            startDateTime = ""
+
+        if isinstance(sessionInfo[2], datetime.datetime):
+            stopDateTime = f"{sessionInfo[2].date().isoformat()} {sessionInfo[2].time().isoformat()}"
+        else:
+            stopDateTime = ""
+
+        sessionTimes = " "
+
+        if len(startDateTime):
+            sessionTimes = f"{startDateTime} - "
+            if len(stopDateTime):
+                sessionTimes = f"{startDateTime} - {stopDateTime}"
+
+        elif len(stopDateTime):
+            sessionTimes = f" - {stopDateTime}"
+
+        sessionInfoText = f"{sessionInfo[0]}"
+        
+        if asString:
+            return f"#\n# Session {sessionInfoText}: {sessionTimes}\n#"
+
+        return [sessionInfoText, sessionTimes]
+     
+    def _historyLineInfo_(self, line:int, inline:str, /, 
+                          asString:bool = False, lineNumbers:bool = True) -> typing.Union[str, list[str]]:
+        r"""Returns the lines of code in a history session.
+    
+        WARNING: This method accesses the IPython history database.
+    
+    """
+        if asString:
+            if lineNumbers:
+                return f"{line}: {inline}"
+            else:
+                return inline
+            
+        return [repr(line), inline]
+    
+    def _getHistoryCodesForSession_(self, session_codes, session:int, /, 
+                                    withHeader:bool=True,
+                                    lineNumbers:bool=False,
+                                    skipEmpty:bool=False) -> tuple[str]:
+        r"""Merges session info and code lines for a sesion in history.
+    
+    Relies on sessino_codes created by accesing the IPython history database.
+    """
+        codes = tuple(map(lambda sc: self._historyLineInfo_(*sc[1:], asString=True, lineNumbers = lineNumbers),
+                          filter(lambda sc: sc[0] == session, session_codes)))
+        
+        if len(codes) == 0 and skipEmpty:
+            return tuple()
+        
+        if withHeader:
+            sessionHeader = self._historySessionInfo_(session, asString=True)
+            codes = (sessionHeader, ) + codes
+                
+        return codes
+    
     def _saveHistorySelection_(self):
-        cmd = self._getHistoryBlockAsCommand_()
+        # print(f"{self.__class__.__name__}._saveHistorySelection_")
+        cmd, title = self._getHistoryBlockAsCode_(suggestTitle=True)
 
         if isinstance(cmd, str) and len(cmd.strip()):
             fn, _ = self.chooseFile(caption="Save selected history to file",
                                     save=True,
-                                    fileFilter="Python source code (*.py);;Text Files (*.txt);;All files (*.*)")
+                                    fileName=title,
+                                    fileFilter="Python source code (*.py);;Text Files (*.txt);;All files (*.*)")#,
+                                    # initialFilter="Python source code")
             if len(fn.strip()):
                 pio.saveText(cmd+"\n", fn)
                 # with open(fn, mode="wt") as destfile:

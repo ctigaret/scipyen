@@ -507,7 +507,12 @@ class DirectoryObserver(QtCore.QObject):
         
 class FileIOGui(object):
     @safeWrapper
-    def chooseFile(self, caption:typing.Optional[str]=None, fileFilter:typing.Optional[str]=None, single:typing.Optional[bool]=True, save:bool=False, targetDir:typing.Optional[str]=None):
+    def chooseFile(self, caption:typing.Optional[str]=None, 
+                   fileFilter:typing.Optional[str]=None, 
+                   single:typing.Optional[bool]=True, 
+                   save:bool=False, 
+                   targetDir:typing.Optional[str]=None,
+                   **kwargs):
         r"""Launcher of file open dialog
         
         Parameters:
@@ -547,18 +552,30 @@ class FileIOGui(object):
         """
         from functools import partial
         
+        suggestedName = kwargs.pop("fileName", None)
+            
         if targetDir is None:
             targetDir = os.getcwd()
             
         if isinstance(targetDir, str):
             if len(targetDir.strip()) == 0 or not os.path.isdir(targetDir):
-                targetDir = os.getcwd()
+                targetDir = pathlib.Path(os.getcwd())
                 
+        elif isinstance(targetDir, pathlib.Path):
+            if not targetDir.exists():
+                targetDir = pathlib.Path(os.getcwd())
+                
+        if isinstance(suggestedName, str):
+            path = pathlib.Path(suggestedName)
+            targetDir = targetDir / path
+            
         if sys.platform.startswith("win32"):
             options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
             kw = {"options":options}
         else:
             kw = {}
+            
+        kw.update(kwargs)
 
         opener = QtWidgets.QFileDialog.getSaveFileName if save is True else QtWidgets.QFileDialog.getOpenFileName if single else QtWidgets.QFileDialog.getOpenFileNames
         
@@ -568,7 +585,7 @@ class FileIOGui(object):
         if isinstance(fileFilter, str) and len(fileFilter.strip()):
             opener = partial(opener, filter=fileFilter)
         
-        fn, fl = opener(parent=self, directory=targetDir, **kw)
+        fn, fl = opener(parent=self, directory=targetDir.as_posix(), **kw)
         
         return fn, fl
     
