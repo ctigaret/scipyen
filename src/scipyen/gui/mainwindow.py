@@ -4031,17 +4031,17 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         saveHistorySelection.setToolTip("Save selected history to file")
         saveHistorySelection.triggered.connect(self._saveHistorySelection_)
         
-    def _getHistorySessionCode_(self, item: QtWidgets.QTreeWidgetItem, /, 
+    def _getHistoryTreeWidgetSessionCode_(self, item: QtWidgets.QTreeWidgetItem, /, 
                                 asString:bool=True,
                                 lineNumbers:bool=False,
                                 skipEmpty:bool=False):
         r"""Gets the line codes from a selected session in the history tree widget.
-    This method does NOT access IPython history database
+    This method does NOT access IPython history database.
     """
         sessionNo = int(item.text(0))
         sessionInfoText = item.text(1)
         getChildText = lambda c: (c.text(0), c.text(1)) if lineNumbers else c.text(1)
-        ret = tuple(map(lambda k: getChildText(currentSessionItem.child(k)), range(currentSessionItem.childCount())))
+        ret = tuple(map(lambda k: getChildText(item.child(k)), range(item.childCount())))
         if len(ret) == 0 and skipEmpty:
             return tuple()
         
@@ -4052,7 +4052,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         return ret
         
         
-    def _getCurrentSessionCode_(self, /, 
+    def _getCodesForCurrentSession_(self, /, 
                                 asString:bool=True, lineNumbers:bool=False,
                                 skipEmpty:bool=False) -> typing.Union[str, typing.Sequence[str]]:
         r"""Access 'Current' session in the historyTreeWidget"""
@@ -4154,7 +4154,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 if selectedItems[0].text(0) == "Current": # returns current session
                     # sessionNo = self.currentSessionID
                     
-                    selectionList += list(self._getCurrentSessionCode_(asString=True,
+                    selectionList += list(self._getCodesForCurrentSession_(asString=True,
                                                                  lineNumbers = lineNumbers,
                                                                  skipEmpty = skipEmptySessions))
                     
@@ -4170,7 +4170,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                     
                 else: # returns selected session
                     # sessionNo = int(selectedItems[0].text(0))
-                    selectionList += list(self.__getHistorySessionCode_(selectedItems[0],
+                    selectionList += list(self._getHistoryTreeWidgetSessionCode_(selectedItems[0],
                                                                         asString=True,
                                                                         lineNumbers = lineNumbers,
                                                                         skipEmpty = skipEmptySessions))
@@ -4310,17 +4310,17 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         
         maxSession = max(map(lambda sc: sc[0], sessions_with_codes))
         
-        codes = tuple(map(lambda s: self._getHistoryCodesForSession_(sessions_with_codes, s, 
+        codes = tuple(map(lambda s: self._getCodesForHistorySession_(sessions_with_codes, s, 
                                                                         withHeader=True, 
                                                                         lineNumbers=lineNumbers,
                                                                         skipEmpty = skipEmptySessions), 
-                            range(maxSession)))
+                            range(1,maxSession+1)))
         
         if skipEmptySessions:
             codes = tuple(filter(lambda c: len(c) > 0, codes))
         
         # append the current session
-        current_code = self._getCurrentSessionCode_(asString = True, 
+        current_code = self._getCodesForCurrentSession_(asString = True, 
                                                     lineNumbers = lineNumbers,
                                                     skipEmpty = skipEmptySessions)
         if not (skipEmptySessions and len(current_code) == 0):
@@ -4389,13 +4389,13 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             
         return [repr(line), inline]
     
-    def _getHistoryCodesForSession_(self, session_codes, session:int, /, 
+    def _getCodesForHistorySession_(self, session_codes, session:int, /, 
                                     withHeader:bool=True,
                                     lineNumbers:bool=False,
                                     skipEmpty:bool=False) -> tuple[str]:
         r"""Merges session info and code lines for a sesion in history.
     
-    Relies on sessino_codes created by accesing the IPython history database.
+    Relies on session_codes created by accesing the IPython history database.
     """
         codes = tuple(map(lambda sc: self._historyLineInfo_(*sc[1:], asString=True, lineNumbers = lineNumbers),
                           filter(lambda sc: sc[0] == session, session_codes)))
@@ -4411,7 +4411,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     
     def _saveHistorySelection_(self):
         # print(f"{self.__class__.__name__}._saveHistorySelection_")
-        cmd, title = self._getHistoryBlockAsCode_(suggestTitle=True)
+        cmd, title = self._getHistoryBlockAsCode_(suggestTitle=True, skipEmptySessions=True)
 
         if isinstance(cmd, str) and len(cmd.strip()):
             fn, _ = self.chooseFile(caption="Save selected history to file",
