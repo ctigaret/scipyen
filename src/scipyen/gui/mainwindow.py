@@ -4409,6 +4409,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 
         return codes
     
+    @Slot()
     def _saveHistorySelection_(self):
         # print(f"{self.__class__.__name__}._saveHistorySelection_")
         cmd, title = self._getHistoryBlockAsCode_(suggestTitle=True, skipEmptySessions=True)
@@ -4422,6 +4423,34 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             if len(fn.strip()):
                 pio.saveText(cmd+"\n", fn)
                 # with open(fn, mode="wt") as destfile:
+                
+#     def _historyParser_(self): # TODO 2025-04-30 21:47:39
+#         cmd, title = self._getHistoryBlockAsCode_(suggestTitle=True, skipEmptySessions=True)
+#                 
+#     def _saveHistorySelectionThr_(self): # TODO 2025-04-30 21:47:39
+#         # print(f"{self.__class__.__name__}._saveHistorySelection_")
+#         cmd, title = self._getHistoryBlockAsCode_(suggestTitle=True, skipEmptySessions=True)
+# 
+#         if isinstance(cmd, str) and len(cmd.strip()):
+#             fn, _ = self.chooseFile(caption="Save selected history to file",
+#                                     save=True,
+#                                     fileName=title,
+#                                     fileFilter="Python source code (*.py);;Text Files (*.txt);;All files (*.*)")#,
+#                                     # initialFilter="Python source code")
+#             if len(fn.strip()):
+#                 pio.saveText(cmd+"\n", fn)
+#                 # with open(fn, mode="wt") as destfile:
+                
+    def _slot_CommandFromHistory_received(self, cmd):
+        if isinstance(cmd, str) and len(cmd.strip()):
+            fn, _ = self.chooseFile(caption="Save selected history to file",
+                                    save=True,
+                                    fileName=title,
+                                    fileFilter="Python source code (*.py);;Text Files (*.txt);;All files (*.*)")#,
+                                    # initialFilter="Python source code")
+            if len(fn.strip()):
+                pio.saveText(cmd+"\n", fn)
+        
 
     @Slot(QtCore.QModelIndex)
     @safeWrapper

@@ -1741,7 +1741,7 @@ def getMimeAndFileType(fileName:typing.Union[str, pathlib.Path]):
     # NOTE: 2020-02-16 18:15:34
     # 1) DETERMINE THE FILE TYPE
     # 1.1) try the python-magic first
-    if libmagic: # is not None:
+    if libmagic:
         # magic module is loaded
         try:
             # if os.path.isfile(fileName):

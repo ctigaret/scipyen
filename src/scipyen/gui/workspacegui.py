@@ -561,6 +561,9 @@ class FileIOGui(object):
             if len(targetDir.strip()) == 0 or not os.path.isdir(targetDir):
                 targetDir = pathlib.Path(os.getcwd())
                 
+            else:
+                targetDir = pathlib.Path(targetDir)
+                
         elif isinstance(targetDir, pathlib.Path):
             if not targetDir.exists():
                 targetDir = pathlib.Path(os.getcwd())
