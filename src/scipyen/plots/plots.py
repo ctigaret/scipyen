@@ -8,7 +8,7 @@ r"""Plot utitilies
 Functions for plotting with matplotlib and seaborn
 """
 #### BEGIN core python modules
-import numbers, typing, warnings
+import numbers, typing, warnings, traceback
 from functools import partial
 #### END core python modules
 
@@ -604,10 +604,27 @@ def plotVigraKernel(val, fig=None, label=None, xlabel=None, ylabel=None,
     
     return ret
 
-        
-        
-    
+def plot_normal_pdf(ax:Axes, stats_val:np.ndarray = np.linspace(-5, 5, 100), 
+                    **kwargs):
+    r"""See examples in
 
+` Scipy Skewness test  <https://docs.scipy.org/doc/scipy/tutorial/stats/hypothesis_skewtest.html#hypothesis-skewtest>`_ 
+
+and in 
+
+`scipy.stats.monte_carlo_test <https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.monte_carlo_test.html#scipy.stats.monte_carlo_test>`_
+
+ """
+    title = kwargs.pop("title", "Skew Test Null Distribution")
+    xlabel = kwargs.pop("xlabel", "statistic")
+    ylabel = kwargs.pop("ylabel", "probability density")
+    dist = stats.norm()
+    pdf = dist.pdf(stats_val)
+    ax.plot(stats_val, pdf)
+    ax.set_title(title)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    
 # NOTE: 2022-04-16 20:11:11 
 # from here on this is code from the matplotlib tutorial "origin and extend in imshow"
 def index_to_coordinate(index, extent, origin):

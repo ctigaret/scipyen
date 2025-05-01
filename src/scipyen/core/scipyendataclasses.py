@@ -126,6 +126,26 @@ class ScipyenDataclass:
     True if a field with name suplied by `val` exists in this instance.
     """
         return val in map(lambda f: f.name, dataclasses.fields(self))
+    
+    def merge(self, *others) -> typing.Self:
+        if len(others) == 0:
+            return self
+        
+        if not all(isDataclass(o) for o in others):
+            raise TypeError("Expecting instances of ScipyenDataclass")
+        
+        of = tuple(itertools.chain.from_iterable(tuple(map(lambda o: tuple(map(lambda f: (o, f.name), dataclasses.fields(o))), 
+                                                        (parameters, *extra_params)))))
+        
+        invalid_field_names = tuple(filter(lambda x: x[1] not in self))
+        
+        if len(invalid_field_names):
+            raise TypeError(f"Arguments contain the following fields which are invalid for this {type(self).__name__} instance: {invalid_field_names}")
+        
+        for (o, fname) in of:
+            setattr(self, fname, getattr(o, fname))
+            
+        return self
         
     def toHDF5(self, group:h5py.Group, name:str, oname:str, 
                        compression:str, chunks:bool, track_order:bool,
