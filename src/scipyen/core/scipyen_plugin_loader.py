@@ -401,6 +401,7 @@ def get_module(file_name:pathlib.Path, topdir: typing.Optional[pathlib.Path]=Non
     
 
 def check_load_module(spec, verb:bool=False, alias:typing.Optional[str] = None, register:bool=True) -> types.ModuleType:
+    # from importlib import _bootstrap
     if verb:
         print(f"check_load_module: spec = {spec}")
         
@@ -420,7 +421,17 @@ def check_load_module(spec, verb:bool=False, alias:typing.Optional[str] = None, 
     else: # module not found ⇒ create and load module
         try:
             module = importlib.util.module_from_spec(spec)
+            name = spec.name
+            parent_name = name.rpartition('.')[0]
+            if parent_name:
+                
             # print(f"check_load_module module from spec {spec} ⇒ {module}")
+            # print(f"spec.name {spec.name}, parent: {parent_name}")
+            # see library's importlib module
+            # level = 0
+            # if name.startswith('.'):
+            #     raise ValueError("Cannot do relative imports")
+            
             sys.modules[spec.name] = module
             if isinstance(alias, str) and len(alias.strip()) and alias.isidentifier():
                 sys.modules[alias] = module
@@ -442,8 +453,14 @@ def check_load_module(spec, verb:bool=False, alias:typing.Optional[str] = None, 
             
 
 def reload_plugin(obj:types.ModuleType) -> types.ModuleType:
+    # BUG: 2025-05-02 23:40:19 FIXME
+    # upon reloading, class definitions get re-executed and places at memory
+    # address distinct from their original (ie they get new ID) which makes 
+    # statements line isinstance(x, Y) fail after reloading even though successful
+    # after the first import of the module and Y.__name__ is the same!
     try:
         spec = importlib.util.find_spec(obj.__name__)
+        print(f"reload_plugin: spec found by importlib = {spec}")
     except:
         # NOTE: 2025-03-18 22:59:47
         # I dont't quite understand why __spec__ is re-set to None; compensating
@@ -456,7 +473,8 @@ def reload_plugin(obj:types.ModuleType) -> types.ModuleType:
             else:
                 setattr(obj, "__spec__", spec)
                 
-    spec.loader.exec_module(obj)
+    print(f"reload_plugin: spec = {spec}")
+    spec.loader.exec_module(obj) # I think this is the culprit, but there has to be a way to spot differences between old & new versions and replace only what has changed
     sys.modules[spec.name] = obj
     loaded_plugins[spec.name] = obj
     return obj

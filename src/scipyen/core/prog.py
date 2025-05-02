@@ -957,7 +957,7 @@ class SpecFinder(importlib_abc.MetaPathFinder):
     See https://stackoverflow.com/questions/62052359/modulespec-not-found-during-reload-for-programmatically-imported-file-in-differe
     """
 
-    def __init__(self, path_map: dict):
+    def __init__(self, path_map: dict=dict()):
         self.path_map = path_map
 
     def find_spec(self, fullname, path, target=None):
