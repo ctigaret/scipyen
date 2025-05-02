@@ -1045,7 +1045,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
             self._nRuns_   = info_dict["protocol"]["lRunsPerTrial"]
             self._nTrials_ = info_dict["protocol"]["lNumberOfTrials"]
             self._nTotalDataPoints_ = info_dict["sections"]["DataSection"]["llNumEntries"]
-            self._nDataPointsPerSweep_ = int(self._nTotalDataPoints_/self._nSweeps_/self._nADCChannels_)
+            self._nDataPointsPerSweep_ = int(info_dict["protocol"]["lNumSamplesPerEpisode"]/self._nADCChannels_)
+            # self._nDataPointsPerSweep_ = int(self._nTotalDataPoints_/self._nSweeps_/self._nADCChannels_)
             self._samplingRate_ = float(info_dict["sampling_rate"]) * pq.Hz
             self._sweepInterval_ = info_dict["protocol"]["fEpisodeStartToStart"] * pq.s
             self._averaging_ = ABFAveragingMode(info_dict["protocol"]["nAverageAlgorithm"]) # 0 = Cumulative; 1 = Most recent
@@ -2386,9 +2387,15 @@ class ABFProtocol(ElectrophysiologyProtocol):
         else:
             raise TypeError(f"Invalid epochs specification: {epochs}")
         
-        neoEpoch = self.dacEpochsToNeoEpoch(dac, epochs, sweep)
+        neoEpoch = self.dacEpochsToNeoEpoch(dac, epochs, sweep, holding = holding, 
+                                            fromRunStart = fromRunStart,
+                                            name = name,
+                                            description = description)
         
-        return Interval.fromNeoEpoch(neoEpoch, index=None, extent = extent, merge = merge)
+        return Interval.fromNeoEpoch(neoEpoch, index=None, extent = extent, 
+                                     merge = merge, 
+                                     name = name, 
+                                     description = description)
 
     
     def dacEpochsToNeoEpoch(self, 
@@ -2500,8 +2507,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
                             holding:bool=True,
                             fromRunStart:bool=False,
                             samples:bool=False) -> typing.Tuple[typing.Union[pq.Quantity, int]]:
-        t0, t1 = (protocol.getEpochStart(epoch, dac, sweep, holding, fromRunStart, samples),
-                  protocol.getEpochDuration(epoch, dac, sweep, samples))
+        t0, t1 = (self.getEpochStart(epoch, dac, sweep, holding, fromRunStart, samples),
+                  self.getEpochDuration(epoch, dac, sweep, samples))
         
         t1 += t0
         return (t0, t1)

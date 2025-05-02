@@ -108,6 +108,7 @@
      </property>
      <addaction name="actionView_Data_New_Window"/>
      <addaction name="actionView_Data"/>
+     <addaction name="actionDisplay_In_Console"/>
     </widget>
     <addaction name="menuSelected_Image_or_Volume"/>
    </widget>
@@ -221,11 +222,191 @@
     <number>8</number>
    </attribute>
    <widget class="QWidget" name="dockWidgetWorkspaceContents">
-    <layout class="QVBoxLayout" name="verticalLayout_3">
+    <layout class="QVBoxLayout" name="verticalLayout_2">
+     <item>
+      <layout class="QHBoxLayout" name="horizontalLayout_3">
+       <property name="spacing">
+        <number>0</number>
+       </property>
+       <item>
+        <widget class="QToolButton" name="copyVarnameToolBtn">
+         <property name="toolTip">
+          <string>Copy name</string>
+         </property>
+         <property name="statusTip">
+          <string>Copy name</string>
+         </property>
+         <property name="whatsThis">
+          <string>Copy name</string>
+         </property>
+         <property name="text">
+          <string>Copy name</string>
+         </property>
+         <property name="icon">
+          <iconset theme="edit-copy"/>
+         </property>
+         <property name="autoRaise">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QToolButton" name="sendVarnameToConsoleToolBtn">
+         <property name="toolTip">
+          <string>Send name to console</string>
+         </property>
+         <property name="statusTip">
+          <string>Send name to console</string>
+         </property>
+         <property name="whatsThis">
+          <string>Send name to console</string>
+         </property>
+         <property name="text">
+          <string>Copy to console</string>
+         </property>
+         <property name="icon">
+          <iconset theme="edit-paste-symbolic"/>
+         </property>
+         <property name="autoRaise">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QToolButton" name="renameVarnameToolBtn">
+         <property name="toolTip">
+          <string>Rename</string>
+         </property>
+         <property name="statusTip">
+          <string>Rename</string>
+         </property>
+         <property name="whatsThis">
+          <string>Rename</string>
+         </property>
+         <property name="text">
+          <string>Rename</string>
+         </property>
+         <property name="icon">
+          <iconset theme="edit-rename-symbolic"/>
+         </property>
+         <property name="autoRaise">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QToolButton" name="displayVariableToolBtn">
+         <property name="toolTip">
+          <string>Display object in console</string>
+         </property>
+         <property name="statusTip">
+          <string>Display object in console</string>
+         </property>
+         <property name="whatsThis">
+          <string>Display object in console</string>
+         </property>
+         <property name="text">
+          <string>Display in console</string>
+         </property>
+         <property name="icon">
+          <iconset theme="quickview-symbolic"/>
+         </property>
+         <property name="popupMode">
+          <enum>QToolButton::DelayedPopup</enum>
+         </property>
+         <property name="autoRaise">
+          <bool>true</bool>
+         </property>
+         <property name="arrowType">
+          <enum>Qt::NoArrow</enum>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QToolButton" name="saveVariableToolBtn">
+         <property name="toolTip">
+          <string>Save objects to disk</string>
+         </property>
+         <property name="statusTip">
+          <string>Save objects to disk</string>
+         </property>
+         <property name="whatsThis">
+          <string>Save objects to disk</string>
+         </property>
+         <property name="text">
+          <string>Save</string>
+         </property>
+         <property name="icon">
+          <iconset theme="document-save-symbolic"/>
+         </property>
+         <property name="autoRaise">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QToolButton" name="removeSelectedVarsToolBtn">
+         <property name="toolTip">
+          <string>Remove selected objects</string>
+         </property>
+         <property name="statusTip">
+          <string>Remove selected objects</string>
+         </property>
+         <property name="whatsThis">
+          <string>Remove selected objects</string>
+         </property>
+         <property name="text">
+          <string>Remove</string>
+         </property>
+         <property name="icon">
+          <iconset theme="edit-delete-symbolic"/>
+         </property>
+         <property name="autoRaise">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <spacer name="horizontalSpacer_3">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>40</width>
+           <height>20</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item>
+        <widget class="QToolButton" name="clearWorkspaceToolBtn">
+         <property name="statusTip">
+          <string>Clear workspace</string>
+         </property>
+         <property name="whatsThis">
+          <string>Clear workspace</string>
+         </property>
+         <property name="accessibleName">
+          <string>Clear workspace</string>
+         </property>
+         <property name="text">
+          <string>Clear workspace</string>
+         </property>
+         <property name="icon">
+          <iconset theme="edit-clear-all-symbolic"/>
+         </property>
+         <property name="autoRaise">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </item>
      <item>
       <widget class="QTableView" name="workspaceView">
        <property name="sizePolicy">
-        <sizepolicy hsizetype="MinimumExpanding" vsizetype="Preferred">
+        <sizepolicy hsizetype="MinimumExpanding" vsizetype="Expanding">
          <horstretch>0</horstretch>
          <verstretch>0</verstretch>
         </sizepolicy>
@@ -1052,7 +1233,7 @@ NOTE: you can click anywhere in the row to select</string>
   </action>
   <action name="actionView_Data">
    <property name="icon">
-    <iconset theme="quickview"/>
+    <iconset theme="fileview-preview-symbolic"/>
    </property>
    <property name="text">
     <string>In &amp;Current Window</string>
@@ -1366,6 +1547,20 @@ NOTE: you can click anywhere in the row to select</string>
   <action name="actionCommandHistoryFont">
    <property name="text">
     <string>Command History Font...</string>
+   </property>
+  </action>
+  <action name="actionDisplay_In_Console">
+   <property name="icon">
+    <iconset theme="quickview-symbolic"/>
+   </property>
+   <property name="text">
+    <string>Display In Console</string>
+   </property>
+   <property name="statusTip">
+    <string>Display In Console</string>
+   </property>
+   <property name="whatsThis">
+    <string>Display In Console</string>
    </property>
   </action>
  </widget>

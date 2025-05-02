@@ -986,6 +986,11 @@ coordinates are NOT restricted to time units.
             return pq.Quantity(self + self._t1)
         
     @property
+    def boundaries(self) -> tuple:
+        r"""Tuple (self.t0, self.t1)"""
+        return (self.t0, self.t1)
+        
+    @property
     def labels(self):
         return self._labels
 
@@ -1019,7 +1024,9 @@ coordinates are NOT restricted to time units.
                    epoch: typing.Union[neo.Epoch, DataZone],  
                    index: typing.Optional[typing.Union[str, bytes, np.str_, int, typing.Sequence[typing.Union[str, bytes, np.str_, int]], np.ndarray, range, slice]] = None,
                    extent: bool = False,
-                   merge: bool = False):
+                   merge: bool = False,
+                   name: typing.Optional[str] = None,
+                   description: typing.Optional[str] = None):
         r"""
         Factory for Interval using a neo.Epoch.
         
@@ -1094,8 +1101,8 @@ coordinates are NOT restricted to time units.
         t = epoch.times.flatten()
         d = epoch.durations.flatten()
         labels = epoch.labels
-        name = epoch.name
-        description = epoch.description
+        name = name if isinstance(name, str) and len(name.strip()) else epoch.name
+        description = description if isinstance(description, str) and len(description.strip()) else epoch.description
         segment = epoch.segment
         # name = epoch.labels[ndx].flatten()[0] if ndx in range(epoch.labels.size) else epoch.labels[ndx]
         

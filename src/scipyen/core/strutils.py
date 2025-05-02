@@ -415,6 +415,9 @@ def str2symbol(s: str) -> str:
 
     return s
 
+def str2identifier(s: str) -> str:
+    r"""Alias to str2symbol"""
+    return str2symbol(s)
 
 def strcat(a: str, b: str) -> str:
     r"""Just a convenience function for ''.join((a,b))"""

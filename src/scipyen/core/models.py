@@ -26,15 +26,16 @@ def check_rise_decay_params(x):
     
     return (len(x)-3) // 2
 
-def generic_exp_decay(x, y0, α, x0, τ):
-    r"""Realizes y = α × exp(-(x-x₀)/τ) + y₀
+def generic_exp_decay(x, α, β, x0, τ):
+    r"""Realizes y = α + β × exp(-(x-x₀)/τ)
     
-x: independent variable (e.g., time)
+Parameters:
+===========
+x: independent variable (e.g., time): 1D numpy array
 
-parameters: 
-    sequence of floats in the following order:
+coefficients are given as floats in the following order:
 
-y₀ (offset), α (scale), x₀ (onset), τ (time constant)
+α (offset), β (scale), x₀ (onset), τ (time constant)
     
 """
 
@@ -51,11 +52,20 @@ y₀ (offset), α (scale), x₀ (onset), τ (time constant)
 #     This works as well in jupyter qtconsole, but not in plain python REPL
     # y0, α, x0, τ = parameters
     
-    return α * np.exp(-(x-x0)/τ) + y0
+    return α + β * np.exp(-(x-x0)/τ)
 
-def generic_exp_rise(x, y0, α, x0, τ):
-    r"""Realizes α × [1 - exp(-(x-x₀)/τ)] + y₀"""
-    return α * (1 - np.exp(-(x-x0)/τ)) + y0
+def generic_exp_rise(x, α, β, x0, τ):
+    r"""Realizes α + β × [1 - exp(-(x-x₀)/τ)]
+
+Parameters:
+===========
+x: independent variable (e.g., time): 1D numpy array
+
+coefficients are given as floats in the following order:
+
+α (offset), β (scale), x₀ (onset), τ (time constant)
+"""
+    return α + β * (1 - np.exp(-(x-x0)/τ))
 
 def generic_exp_decay_model(x, parameters, **kwargs):
     r"""Alias to generic_exp_decay, 
@@ -72,10 +82,11 @@ def alphaFunction(x, α, β, x0, τ):
 The Alpha function.
 
 A single exponential rise and decay, both with the same time-constant (τ):
-    
-y = α + β × (x-x₀) × exp(-(x-x₀)/τ)           where x-x₀ >= 0 
-    α                                           elsewhere
 
+        /    
+    y = | α + β × (x-x₀) × exp(-(x-x₀)/τ)           where x-x₀ >= 0 
+        | α                                           elsewhere
+        \
 where:
     α  is the offset;
 

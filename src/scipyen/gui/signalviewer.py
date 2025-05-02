@@ -25,7 +25,7 @@
 # as if "relative" was False, in such cases).
 # 
 
-'''Signal viewer: enhanced signal plotter
+r'''Signal viewer: enhanced signal plotter
 
 Plots a multi-frame 1D signal (i.e. a matrix where each column is a `frame'), one frame at a time. 
 
@@ -100,6 +100,21 @@ quantities (for python 3)
 mpldatacursor (for python 3)
 
 '''
+
+# TODO: 2025-05-02 14:20:33
+# • when viewing a neo object:
+#   ∘ hide the frame navigation ui when viewing:
+#       ⋆ a neo.Block, or a sequence of neo.Segment objects, with only one segment
+#       ⋆ a neo.Segment, a single neo.DataObject with separateSignalChannels False
+#           or True and channels viewed on the same frame
+#
+# • hide the signals selection ui according to what signal types are available
+#
+# • provide code for viewing a neo.Group (!!!)
+#
+# • provide code for viewing neo.ImageSequence in ImageViewer.
+
+
 #### BEGIN core python modules
 #from __future__ import print_function
 
@@ -9539,7 +9554,8 @@ anything else       anything else       ❌
             if sig.name != self.signalAxis(0).vb.name:
                 self._register_plot_item_name_(self.signalAxis(0), sig.name)
                 
-            self.signalAxis(0).register(sig.name)
+            
+            # self.signalAxis(0).register(sig.name)
             self.signalAxis(0).setVisible(True)
                 
         self.plotTitleLabel.setText("", color = "#000000")

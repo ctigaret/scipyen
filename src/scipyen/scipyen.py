@@ -384,6 +384,9 @@ def main():
         # BEGIN 
         # 1. create the pyqt5 app
         app = QtWidgets.QApplication(sys.argv)
+        translator = QtCore.QTranslator(app)
+        translator.load(QtCore.QLocale.system(), "qtbase", "_", QtCore.QLibraryInfo.location(QtCore.QLibraryInfo.TranslationsPath))
+        app.installTranslator(translator)
         # NOTE: 2025-01-22 08:56:42
         # this needs to be here in prder ot initialize navigator widgets
         import gui.mainwindow as mainwindow

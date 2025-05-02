@@ -50,8 +50,8 @@ alternative: str — {"two-sided", "less", "greater"}; default = "two-sided"
 
 Returns
 =======
-𝑝 value of the Monte Carlo test: the propability that the data distibution is
-    different from a normal dstribution with mean 0
+𝑝 value of the Monte Carlo test: the propability that the data distribution is
+    drawn from a normal dstribution with mean 0
 """
     from plots.plots import plot_normal_pdf
     # remove var-keyword parameters that are alrady supplied or pre-set
@@ -80,7 +80,7 @@ Returns
     if ax:
         stats_val = np.linspace(-5, 5, 100)
         ax.clear()
-        plot_normal_pdf(ax, stats_val, title = title)
+        plot_normal_pdf(ax, stats_val, title = f"{title}: 𝒑 = {float(ret[0])}")
         ax.hist(ret.null_distribution, stats_val, density = True)
         ax.legend(['Normal distribution\n(Asymptotic approximation)',
                    f'Monte Carlo approximation\n{x.shape[0]} observations'])

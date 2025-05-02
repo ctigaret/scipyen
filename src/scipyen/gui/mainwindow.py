@@ -1566,7 +1566,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self._changesInWatchedDir_ = False
         self._monitoredDirsCache_ = dict()
         
-        
+        # ### BEGIN long comment - wrap it for KDE's Kate
         # NOTE: 2023-05-27 22:00:37
         # self._init_QtConsole_ will asign to self.workspace a reference to the 
         # user's shell namespace that the user has direct access to, inside the 
@@ -1592,6 +1592,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         #
         # The above rule applies to code run inside the GUI (i.e., NOT executed
         # in the console), where this interception is not implemented.
+        # ### END   long comment
         self.workspace = dict() 
         
         self._nonInteractiveVars_ = dict()
@@ -1784,6 +1785,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         
         sigBlock = QtCore.QSignalBlocker(self.actionUse_system_default_font)
         self.actionUse_system_default_font.setChecked(self._useSystemDefaultFont)
+        
+        # self.translator = QtCore.QTranslator(self)
 
     # BEGIN Properties
     
@@ -2660,6 +2663,11 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             if os.getenv("XDG_SESSION_TYPE").lower() == "wayland":
                 return
             super().activateWindow()
+            
+    def changeEvent(self, event):
+        if event.type() == QtCore.QEvent.LanguageChange:
+            self.retranslateUi(self)
+        super(ScipyenWindow, self).changeEvent(event)
 
     @safeWrapper
     def handle_mpl_figure_click(self, evt):
@@ -5049,6 +5057,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             
             msgBox.setWindowTitle(wintitle)
             msgBox.setText(prompt)
+            
+            self.retranslateUi(msgBox)
 
             ret = msgBox.exec()
 
@@ -5487,6 +5497,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         self.actionOpen.triggered.connect(self.slot_openFiles)
         self.actionView_Data.triggered.connect(self.slot_viewSelectedVar)
+        self.actionDisplay_In_Console.triggered.connect(self.slot_consoleDisplaySelectedVariables)
         self.actionView_Data_New_Window.triggered.connect(self.slot_viewSelectedVarInNewWindow)
         self.actionReload_Plugins.triggered.connect(self.slot_reloadPlugins)
         self.actionSave.triggered.connect(self.slot_saveFile)
@@ -5562,6 +5573,15 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.workspaceModel.itemChanged.connect(self.slot_variableItemNameChanged)
         
         self.workspaceModel.modelContentsChanged.connect(self.slot_updateWorkspaceView)
+        
+        self.copyVarnameToolBtn.clicked.connect(self.slot_copyWorkspaceSelection)
+        self.sendVarnameToConsoleToolBtn.clicked.connect(self.slot_pasteWorkspaceSelection)
+        self.renameVarnameToolBtn.clicked.connect(self.slot_renameWorkspaceVar)
+        self.displayVariableToolBtn.setMenu(self.menuSelected_Image_or_Volume)
+        self.saveVariableToolBtn.clicked.connect(self.slot_saveSelectedVariables)
+        self.removeSelectedVarsToolBtn.clicked.connect(self.slot_deleteSelectedWorkspaceObjects)
+        self.clearWorkspaceToolBtn.clicked.connect(self._slot_clearInternalWorkspace)
+        # self.actionDisplay_In_Console.triggered.connect(self.slot_consoleDisplaySelectedVariables)
         # END workspace view
 
         # BEGIN command history view
@@ -7912,14 +7932,14 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @Slot()
     def _slot_clearInternalWorkspace(self):
         varNames = self.workspaceModel.getDisplayedVariableNames()
-        prompt = "Remove all variables from the workspace?"
-        wintitle = "Delete variables"
+        prompt = self.tr("Remove all variables from the workspace?")
+        wintitle = self.tr("Delete variables")
         msgBox = QtWidgets.QMessageBox()
 
         msgBox.setWindowTitle(wintitle)
         msgBox.setIcon(QtWidgets.QMessageBox.Warning)
         msgBox.setText(prompt)
-        msgBox.setInformativeText("This operation cannot be undone!")
+        msgBox.setInformativeText(self.tr("This operation cannot be undone!"))
         msgBox.setStandardButtons(
             QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
         msgBox.setDefaultButton(QtWidgets.QMessageBox.No)
