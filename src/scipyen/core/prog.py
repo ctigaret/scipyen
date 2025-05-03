@@ -959,16 +959,42 @@ class SpecFinder(importlib_abc.MetaPathFinder):
 
     def __init__(self, path_map: dict=dict()):
         self.path_map = path_map
+        self._verbose:bool = False
+        # print(f"{self.__class__.__name__}.__init__: path_map = {path_map}\n")
 
     def find_spec(self, fullname, path, target=None):
+        if self._verbose:
+            print(f"{self.__class__.__name__}.find_spec (fullname = {fullname}, path = {path}, target = {target}):\n")
+            if len(self.path_map):
+                
+                print(f"\t*** {self.__class__.__name__}.path_map:\n")
+                for k,v in self.path_map.items():
+                    print(f"\t{k}: {v}")
+                print("\n\t***\n\n")
+                
         if fullname in self.path_map:
-            return importlib.util.spec_from_file_location(
-                fullname, self.path_map[fullname]
-            )
+            path = pathlib.Path(self.path_map[fullname])
+            if path.is_dir():
+                # this is a package
+                return importlib.util.spec_from_file_location(
+                    fullname, path.as_posix(),
+                    submodule_search_locations = [path.as_posix()]
+                )
+            elif path.suffix == ".py":
+                return importlib.util.spec_from_file_location(
+                    fullname, path.as_posix()
+                )
 
     def find_module(self, fullname, path):
         return
 
+    @property
+    def verbose(self) -> bool:
+        return self._verbose
+    
+    @verbose.setter
+    def verbose(self,val:bool):
+        self._verbose = isinstance(val, bool) and val == True
 
 # ### BEGIN module functions
 

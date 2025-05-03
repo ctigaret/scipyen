@@ -9042,6 +9042,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         For details, see the documentation of the core.scipyen_plugin_loader 
         module.
         '''
+        scipywarn("plugin loading has been temporarily disabled; check line 9045 in mainwindow.py")
+        return
         # print(f"{self.__class__.__name__}.slot_loadPlugins")
         # if self._pyinstaller_bundled_:
         #     scipyen_plugin_loader.find_bytecode_plugins()

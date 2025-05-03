@@ -330,7 +330,7 @@ def find_plugins(path:typing.Union[str, pathlib.Path],
     r"""Loads and located plugins in a directory tree rooted at `path`
     """
     if isinstance(path, pathlib.Path) and path.is_dir() and path.exists():
-        path = str(path.absolute())
+        path = path.absolute()
         
     elif not isinstance(path, str) or len(path.strip()) == 0 or not os.path.isdir(path) or not os.path.exists(path):
         prog.scipywarn(f"Expecting a string or a pathlib.Path for an absolute pathway to an existing directory; instead got {path} ")
@@ -340,7 +340,7 @@ def find_plugins(path:typing.Union[str, pathlib.Path],
         scipyendir = scipyendir.absolute()
         
     elif isinstance(scipyendir, str) and len(scipyendir.strip()) and os.path.isdir(scipyendir) and os.path.exists(scipyendir):
-        scipyendir = pathlib.Path(scipyendir)
+        scipyendir = pathlib.Path(scipyendir).absolute()
         
     else:
         prog.scipywarn(f"Invalid scipyendir parameter: {scipyendir} ")
@@ -349,38 +349,60 @@ def find_plugins(path:typing.Union[str, pathlib.Path],
     # NOTE: 2024-05-30 11:33:28
     # a better? version of the code after NOTE: 2023-06-28 21:13:30
     
-    topdir = pathlib.Path(path)
+    topdir = pathlib.Path(path).absolute()
+    
+    if topdir not in sys.path:
+        sys.path.append(topdir)
     
     if checkgit:
         sysutils.checkGitRepo(topdir, "Scipyen plugins")
     # print(f"scipyen_plugin_loader.find_plugins: topdir = {topdir}")
     
-    plugin_source_files = list(map(lambda x: pathlib.Path(x), list(filter(lambda x: os.path.splitext(x)[-1] in importlib.machinery.SOURCE_SUFFIXES and check_plugin_module(x), list(itertools.chain.from_iterable( (os.path.join(e[0], i) for i in e[2]) for e in os.walk(topdir)))))))
+    plugin_source_files = list(map(lambda x: pathlib.Path(x).absolute(), list(filter(lambda x: os.path.splitext(x)[-1] in importlib.machinery.SOURCE_SUFFIXES and check_plugin_module(x), list(itertools.chain.from_iterable( (os.path.join(e[0], i) for i in e[2]) for e in os.walk(topdir)))))))
     
-    # print(f"find_plugins: plugin_source_files = {plugin_source_files}")
+    # print(f"find_plugins: plugin_source_files = {plugin_source_files}\n")
     
     user_plugin_source_files = list(filter(lambda x: not x.is_relative_to(scipyendir), plugin_source_files))
-    # print(f"find_plugins: user_plugin_source_files = {user_plugin_source_files}")
+    # print(f"find_plugins: user_plugin_source_files = {user_plugin_source_files}\n")
     
     for file_name in plugin_source_files:
+        if not(pluginsSpecFinder.verbose):
+            pluginsSpecFinder.verbose = True
         get_module(file_name, topdir, file_name in user_plugin_source_files)
 
 def get_module(file_name:pathlib.Path, topdir: typing.Optional[pathlib.Path]=None,
                is_user_plugin:bool=True, alias:typing.Optional[str] = None) -> types.ModuleType:
-    # print(f"scipyen_plugin_loader.get_module: file_name = {file_name}, topdir = {topdir}")
+    if is_user_plugin:
+        print(f"scipyen_plugin_loader.get_module for user plugin(\n\tfile_name = {file_name},\n\ttopdir = {topdir},\n\talias = {alias})")
     module_name = inspect.getmodulename(file_name)
     if module_name is not None: # this will never be None, would it?
+        if is_user_plugin:
+            print(f"\tmodule_name: {module_name}\n")
         verb = False
-        pluginsSpecFinder.path_map[module_name] = file_name
+        pluginsSpecFinder.path_map[module_name] = file_name.as_posix()
         # if file_name in user_plugin_source_files:
         if is_user_plugin:
-            if isinstance(topdir, pathlib.Path):
-                file_directory = file_name.parent.relative_to(topdir)
+            assert(file_name.is_relative_to(topdir)), f"Plugin file {file_name} is not located in {topdir}"
+            package_module_path = module_name.split('.')
+            module_name = package_module_path[-1]
+            if len(package_module_path) > 1:
+                # topdir_parts = topdir.parts
+                parents = package_module_path[:-1]
+                file_directory = pathlib.Path(*parents)#.relative_to(topdir)
             else:
-                file_directory = None
-            if isinstance(file_directory, pathlib.Path) and len(file_directory.parts):
-                package_name_path = ".".join(file_directory.parts)
-                submodules_paths = list()
+                file_directory = file_name.parent
+            print(f"\tfile_directory: {file_directory}\n")
+            submodules_paths = list()
+            if isinstance(file_directory, pathlib.Path) and file_directory.exists() and file_directory.is_dir() and len(file_directory.parts):
+                parent_package_names = list()
+                if file_directory != topdir:
+                    ndx = file_name.parents.index(topdir)
+                    parent_dirs_below_topdir = file_name.parents[:,ndx]
+                    for p in parent_dirs_below_topdir:
+                        parent_package_names.append(p.name)
+                        
+                    
+                # package_name_path = ".".join(file_directory.parts)
                 p = file_name.relative_to(topdir)
                 while len(p.parts):
                     p = p.parent
@@ -390,10 +412,14 @@ def get_module(file_name:pathlib.Path, topdir: typing.Optional[pathlib.Path]=Non
                     module_name = package_name
                 else:
                     module_name = f"{package_name_path}.{module_name}" # NOTE: 2024-05-30 13:09:48 this is CRUCIAL
-                module_spec = importlib.util.spec_from_file_location(module_name, file_name, 
-                                                                        submodule_search_locations = submodules_paths)
-            else:
-                module_spec = importlib.util.spec_from_file_location(module_name, file_name)
+                
+            #     module_spec = importlib.util.spec_from_file_location(module_name, file_name, 
+            #                                                             submodule_search_locations = submodules_paths)
+            # else:
+            #     module_spec = importlib.util.spec_from_file_location(module_name, file_name)
+            print(f"\tsubmodules_paths: {submodules_paths}\n")
+            module_spec = importlib.util.spec_from_file_location(module_name, file_name, 
+                                                                    submodule_search_locations = submodules_paths)
         else:
             module_spec = importlib.util.spec_from_file_location(module_name, file_name)
             
@@ -423,7 +449,7 @@ def check_load_module(spec, verb:bool=False, alias:typing.Optional[str] = None, 
             module = importlib.util.module_from_spec(spec)
             name = spec.name
             parent_name = name.rpartition('.')[0]
-            if parent_name:
+            # if parent_name:
                 
             # print(f"check_load_module module from spec {spec} ⇒ {module}")
             # print(f"spec.name {spec.name}, parent: {parent_name}")
