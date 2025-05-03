@@ -239,7 +239,10 @@ __module_name__ = os.path.splitext(os.path.basename(__file__))[0]
 loaded_plugins = collections.OrderedDict()
 
 pluginsSpecFinder = prog.SpecFinder({})
-sys.meta_path.append(pluginsSpecFinder)
+# sys.meta_path.append(pluginsSpecFinder)
+
+plugin_source_files = list()
+user_plugin_source_files = list()
 
 # __avoid_modules__ = ("scipyen_start", "scipyen_plugin_loader")
 
@@ -329,6 +332,7 @@ def find_plugins(path:typing.Union[str, pathlib.Path],
                  checkgit:bool=False):
     r"""Loads and located plugins in a directory tree rooted at `path`
     """
+    # ### BEGIN check call parameters
     if isinstance(path, pathlib.Path) and path.is_dir() and path.exists():
         path = path.absolute()
         
@@ -345,30 +349,95 @@ def find_plugins(path:typing.Union[str, pathlib.Path],
     else:
         prog.scipywarn(f"Invalid scipyendir parameter: {scipyendir} ")
         return
+    # ### END   check call parameters
     
     # NOTE: 2024-05-30 11:33:28
     # a better? version of the code after NOTE: 2023-06-28 21:13:30
     
     topdir = pathlib.Path(path).absolute()
     
-    if topdir not in sys.path:
-        sys.path.append(topdir)
+    if topdir.as_posix() not in sys.path:
+        sys.path.append(topdir.as_posix())
     
     if checkgit:
         sysutils.checkGitRepo(topdir, "Scipyen plugins")
     # print(f"scipyen_plugin_loader.find_plugins: topdir = {topdir}")
     
-    plugin_source_files = list(map(lambda x: pathlib.Path(x).absolute(), list(filter(lambda x: os.path.splitext(x)[-1] in importlib.machinery.SOURCE_SUFFIXES and check_plugin_module(x), list(itertools.chain.from_iterable( (os.path.join(e[0], i) for i in e[2]) for e in os.walk(topdir)))))))
+    plugin_source_files[:] = list(map(lambda x: pathlib.Path(x).absolute(), list(filter(lambda x: os.path.splitext(x)[-1] in importlib.machinery.SOURCE_SUFFIXES and check_plugin_module(x), list(itertools.chain.from_iterable( (os.path.join(e[0], i) for i in e[2]) for e in os.walk(topdir)))))))
     
     # print(f"find_plugins: plugin_source_files = {plugin_source_files}\n")
     
-    user_plugin_source_files = list(filter(lambda x: not x.is_relative_to(scipyendir), plugin_source_files))
+    user_plugin_source_files[:] = list(filter(lambda x: not x.is_relative_to(scipyendir), plugin_source_files))
     # print(f"find_plugins: user_plugin_source_files = {user_plugin_source_files}\n")
     
+    modules = list()
+    
     for file_name in plugin_source_files:
-        if not(pluginsSpecFinder.verbose):
-            pluginsSpecFinder.verbose = True
-        get_module(file_name, topdir, file_name in user_plugin_source_files)
+        if file_name in user_plugin_source_files:
+            assert file_name.is_relative_to(topdir), f"The plugin source file {file_name} is not present in {topdir} or any of its subdirectories"
+            ndx = file_name.parents.index(topdir)
+            package_dotted_path = '.'.join(tuple(map(lambda p: p.stem, reversed(file_name.parents[:ndx]))))
+            module = import_module(file_name, package_dotted_path)
+        else:
+            module = import_module(file_name)
+            
+        modules.append(module)
+        
+        for m in modules:
+            load_module(m)
+        # if not(pluginsSpecFinder.verbose):
+        #     pluginsSpecFinder.verbose = True
+        # get_module(file_name, topdir, file_name in user_plugin_source_files)
+
+def import_module(file_name: pathlib.Path, package:typing.Optional[str] = None):
+    module_name = file_name.stem
+    parent_path_str = file_name.parent.as_posix()
+    if parent_path_str not in sys.path:
+        sys.path.append(parent_path_str)
+    module = importlib.import_module(module_name, package)
+    return check_load_module(module.__spec__)
+    
+def load_module(module:[types.ModuleType, prog.ModSpec], alias:typing.Optional[str] = None):
+    loadedmodule = prog.get_loaded_module(module)
+    if inspect.ismodule(loadedmodule): # alternative: if isinstance(loadedmodule, types.ModuleType):
+        if inspect.ismodule(module):
+            assert loadedmodule == module, f"Mismatch between {loadedmodule} and {module}"
+            
+        try:
+            reloaded_module = importlib.reload(loadedmodule) # CAUTION ``module`` may in fact be a spec
+        except:
+            traceback.print_exc()
+            
+        loaded_plugins[module.__name__] = module
+        # if isinstance(alias, str):
+        #     loaded_plugins[alias] = module
+            
+    else:
+        try:
+            if isinstance(module, prog.ModSpec): # ``module`` is in fact a module spec
+                spec = module
+                module = importlib.util.module_from_spec(spec)
+                if not hasattr(module, "__spec__"):
+                    setattr(module, "__spec__", spec)
+                # NOTE: 2025-03-18 23:00:46 see NOTE: 2025-03-18 22:59:47
+                setattr(module, "__pluginspec__", spec)
+                    
+            elif inspect.ismodule(module):
+                spec = module.__spec__
+                
+            else:
+                raise TypeError(f"Expecting a module or a module spec; instead, got a {type(module).__name__}")
+            
+            spec.loader.exec_module(module)
+            sys.modules[spec.name] = module
+            loaded_plugins[spec.name] = module
+            if isinstance(alias, str) and len(alias.strip()) and alias.isidentifier():
+                sys.modules[alias] = module
+                loaded_plugins[alias] = module
+                
+        except:
+            traceback.print_exc()
+        
 
 def get_module(file_name:pathlib.Path, topdir: typing.Optional[pathlib.Path]=None,
                is_user_plugin:bool=True, alias:typing.Optional[str] = None) -> types.ModuleType:
@@ -426,8 +495,9 @@ def get_module(file_name:pathlib.Path, topdir: typing.Optional[pathlib.Path]=Non
         return check_load_module(module_spec, verb, alias, True)
     
 
-def check_load_module(spec, verb:bool=False, alias:typing.Optional[str] = None, register:bool=True) -> types.ModuleType:
-    # from importlib import _bootstrap
+def check_load_module(spec, verb:bool=False, 
+                      alias:typing.Optional[str] = None, 
+                      register:bool=True) -> types.ModuleType:
     if verb:
         print(f"check_load_module: spec = {spec}")
         
@@ -449,15 +519,6 @@ def check_load_module(spec, verb:bool=False, alias:typing.Optional[str] = None, 
             module = importlib.util.module_from_spec(spec)
             name = spec.name
             parent_name = name.rpartition('.')[0]
-            # if parent_name:
-                
-            # print(f"check_load_module module from spec {spec} ⇒ {module}")
-            # print(f"spec.name {spec.name}, parent: {parent_name}")
-            # see library's importlib module
-            # level = 0
-            # if name.startswith('.'):
-            #     raise ValueError("Cannot do relative imports")
-            
             sys.modules[spec.name] = module
             if isinstance(alias, str) and len(alias.strip()) and alias.isidentifier():
                 sys.modules[alias] = module

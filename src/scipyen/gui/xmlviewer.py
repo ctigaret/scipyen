@@ -13,7 +13,7 @@ import sys, os, traceback, inspect, numbers
 from collections import OrderedDict
 
 # NOTE: use Python's re instead of QRegExp
-import re
+# import re
 
 import xml.parsers.expat
 import xml.etree

@@ -68,6 +68,8 @@ CALLABLE_TYPES = (
     types.ClassMethodDescriptorType,
 )
 
+class ModSpec: pass # to be picked up by Kate's symbolviewer
+ModSpec = importlib.machinery.ModuleSpec  # saves me some typing
 
 class NoData:
     r"""Empty placeholder class that signifies lack of any data.
@@ -2508,6 +2510,7 @@ def is_module_loaded(m: types.ModuleType):
 
 @singledispatch
 def get_loaded_module(m):
+    r"""Check that sys.modules contains module ``m`` or a module with spec ``m``"""
     raise NotImplementedError(
         f"This function is not implemented for {type(m).__name__} objects"
     )
@@ -2538,7 +2541,7 @@ def _(m: types.ModuleType):
     # attribute; this is useful to distinguish between "pure" runtime modules
     # and runtime modules created from a python source file.
     #
-    ModSpec = importlib.machinery.ModuleSpec  # saves me some typing
+    # ModSpec = importlib.machinery.ModuleSpec  # saves me some typing
     sysmodules = [v for v in sys.modules.values()]  # saves me some typing
     modname = m.__name__
     modspec = getattr(m, "__spec__", None)

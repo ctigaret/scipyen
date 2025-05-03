@@ -166,7 +166,7 @@ from functools import singledispatch
 import warnings
 import typing, types
 import difflib
-import re as _re
+# import re as _re
 from enum import Enum, IntEnum
 from abc import ABC
 import dataclasses
