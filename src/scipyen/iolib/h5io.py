@@ -1371,7 +1371,10 @@ def fromHDF5(entity:typing.Union[h5py.Group, h5py.Dataset], cache:dict=dict()):
         return cache[entity]
     
     attrs = attrs2dict(entity.attrs)
-    
+#     print(f"h5io.fromHDF5: entity {entity.name} attrs\n")
+#     for k,v in attrs.items():
+#         print(f"\t{k} ↦ {v} ({type(v)})")
+#     
     target_class = attrs["python_class"]
     
     object_decoder = inspect.getattr_static(target_class,"fromHDF5", None)
@@ -1386,7 +1389,7 @@ def fromHDF5(entity:typing.Union[h5py.Group, h5py.Dataset], cache:dict=dict()):
     return obj
 
 
-def attrs2dict(attrs:h5py.AttributeManager):
+def attrs2dict(attrs: h5py.AttributeManager):
     r"""Generates a dict object from a h5py Group or Dataset 'attrs' property.
     
     Althogh one can simply call `dict(attrs)` or `dict(attrs.items())`, 
@@ -1412,6 +1415,7 @@ def attrs2dict(attrs:h5py.AttributeManager):
             except:
                 module_name = attrs["module_name"]
                 type_name = attrs["type_name"]
+                # print(f"h5io.attrs2dict: module_name = {module_name}, type_name = {type_name}")
                 if type_name == "NoneType":
                     v = type(None)
                 elif type_name == "NAType":
@@ -1421,9 +1425,30 @@ def attrs2dict(attrs:h5py.AttributeManager):
                 else:
                     if module_name in sys.modules:
                         module = sys.modules[module_name]
-                        v = module.__dict__[type_name]
                     else:
-                        v = None
+                        # check if module_name has format 'package.module';
+                        # maybe things have moved around a bit, in the same package path
+                        # due to changes in import logic
+                        # NOTE: for now, only allow for a module previously
+                        # set into sys.modules as 'package.<subpackage.>.module'
+                        # to be found simply as 'module';
+                        # in the future I might inspect combinations of <subpackage[𝒌].>module
+                        # but it is too complicated.
+                        #
+                        # Anyway, such errors arise from rewriting import logic in
+                        # the plugins and / or inside the code, meaning that 
+                        # the HDF5 file should have been recreated to reflect the
+                        # new module layout
+                        if '.' in module_name:
+                            module_name = module_name.rpartition('.')[-1]
+                            if module_name in sys.modules:
+                                module = sys.modules[module_name]
+                        else:
+                            raise RuntimeError(f"A module named {module_name} was not found")
+                        
+                    v = module.__dict__[type_name]
+                    if isinstance(v, str):
+                        v = eval(v)
             
         elif k == "units":
             v  = jsonio.loads(v)
@@ -3615,6 +3640,7 @@ def _(entity:h5py.Dataset, target_class:type, attrs:dict, cache:dict=dict()):
         # no axes imply no Dataset dimscales either
         # most likely a scalar and therefore we attempt to instantiate
         # one as such
+        # print(f"h5io.objectFromEntity: target_class = {target_class} ({type(target_class)})")
         if target_class == type(None):
             obj = None
             
@@ -3733,6 +3759,9 @@ def _(entity:h5py.Group, target_class:type, attrs:dict, cache:dict=dict()):
         obj = bgbridge.Structure(**data)
         
     else:
+        if target_class is None:
+            raise ValueError("Target class is undetermined")
+        # print(f"h5io.objectFromEntity: target_class = {target_class}")
         mro = inspect.getmro(target_class)
         # print(f"h5io.objectFromEntity(Grup): target_class {target_class}")
         # if target_class == NeoObjectList:
