@@ -956,6 +956,7 @@ class Timer(object):
 
 class SpecFinder(importlib_abc.MetaPathFinder):
     r"""
+    DEPRECATED
     See https://stackoverflow.com/questions/62052359/modulespec-not-found-during-reload-for-programmatically-imported-file-in-differe
     """
 

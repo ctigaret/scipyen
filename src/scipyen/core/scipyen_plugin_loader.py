@@ -540,6 +540,7 @@ def check_load_module(spec, verb:bool=False,
             
 
 def reload_plugin(obj:types.ModuleType) -> types.ModuleType:
+    r""" DEPRECATED """
     # BUG: 2025-05-02 23:40:19 FIXME
     # upon reloading, class definitions get re-executed and places at memory
     # address distinct from their original (ie they get new ID) which makes 
@@ -568,6 +569,7 @@ def reload_plugin(obj:types.ModuleType) -> types.ModuleType:
 
 
 def reload(obj:types.ModuleType) -> types.ModuleType:
+    r""" DEPRECATED """
     try:
         return importlib.reload(obj)
     except:
