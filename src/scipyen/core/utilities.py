@@ -9,7 +9,7 @@
 Various utilities
 '''
 import traceback, re, itertools, functools, time, typing, warnings, operator, inspect
-import random, math, pprint, datetime
+import random, math, pprint, datetime, pathlib, sys
 from numbers import Number
 from sys import getsizeof, stderr
 from copy import (copy, deepcopy,)
@@ -3156,6 +3156,46 @@ def reverse_mapping_lookup(x:dict, y:typing.Any) -> typing.Optional[typing.Union
     else:
         return tuple()
     
+def library_for_module(x: str) -> str:
+    from core.workspacefunctions import getMainScipyenWindow
+    mainWindow = getMainScipyenWindow()
+    plugins_dir = None
+    scipyen_dir = None
+    if mainWindow:
+        plugins_dir = mainWindow.userPluginsDirectory
+        scipyen_dir = mainWindow._scipyendir_
+        
+    if "builtins" in x:
+        return "standard"
+    
+    if x in sys.modules:
+        xFile = sys.modules[x].__file__
+        
+        if hasattr(sys, "_MEIPASS") and sys._MEIPASS in xFile: # pyinstaller bundle
+                return "bundled application"
+            
+        else:
+            if (isinstance(scipyen_dir, str) and scipyen_dir in xFile) or ("scipyen/src/scipyen" in xFile):
+                return "'Scipyen'"
+            
+            elif "site-packages" in xFile:
+                p = pathlib.Path(xFile)
+                ndx = p.parts.index("site-packages")
+                return f"'{p.parts[ndx+1]}' package"
+            
+            elif f"{sys.platlibdir}/python" in xFile:
+                return "standard"
+            
+            elif isinstance(plugins_dir, str) and plugins_dir in xFile:
+                p = pathlib.Path(xFile)
+                subpath = pathlib.Path(*list(filter(lambda _p: _p not in pathlib.Path(plugins_dir).parts, p.parts)))
+                return f"user plugin '{subpath.as_posix()}'"
+            
+            else:
+                return "unknown"
+    else:
+        return "unknown"
+    
 def summarize_object_properties(objname:str, obj:typing.Any, namespace="Internal") -> dict:
     r"""Summary of object properties to be displayed in Scipyen workspace view.
     
@@ -3208,13 +3248,15 @@ def summarize_object_properties(objname:str, obj:typing.Any, namespace="Internal
     
     objtype = type(obj)
     typename = objtype.__name__
-    typemodulename = objtype.__module__
+    module_name = obj.__module__ if isinstance(obj, type) else objtype.__module__
+    module_library = library_for_module(module_name)
+        
     objcls = obj.__class__
     clsname = objcls.__name__
     
     # fqual = ".".join([objcls.__module__, clsname])
-    fqual = f"module: {typemodulename}"
-    # ttip = ".".join([typemodulename, typename])
+    fqual = f"module: {module_name}\nlibrary: {module_library}"
+    # ttip = ".".join([module_name, typename])
     ttip = f"{typename}"
     
     if isinstance(obj, (QtWidgets.QMainWindow, mpl.figure.Figure)):
