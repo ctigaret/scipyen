@@ -385,9 +385,6 @@ def find_plugins(path:typing.Union[str, pathlib.Path],
         
         for m in modules:
             load_module(m)
-        # if not(pluginsSpecFinder.verbose):
-        #     pluginsSpecFinder.verbose = True
-        # get_module(file_name, topdir, file_name in user_plugin_source_files)
 
 def import_module(file_name: pathlib.Path, package:typing.Optional[str] = None):
     module_name = file_name.stem
@@ -409,8 +406,6 @@ def load_module(module:[types.ModuleType, prog.ModSpec], alias:typing.Optional[s
             traceback.print_exc()
             
         loaded_plugins[module.__name__] = module
-        # if isinstance(alias, str):
-        #     loaded_plugins[alias] = module
             
     else:
         try:
@@ -441,6 +436,7 @@ def load_module(module:[types.ModuleType, prog.ModSpec], alias:typing.Optional[s
 
 def get_module(file_name:pathlib.Path, topdir: typing.Optional[pathlib.Path]=None,
                is_user_plugin:bool=True, alias:typing.Optional[str] = None) -> types.ModuleType:
+    r"""DEPRECATED """
     if is_user_plugin:
         print(f"scipyen_plugin_loader.get_module for user plugin(\n\tfile_name = {file_name},\n\ttopdir = {topdir},\n\talias = {alias})")
     module_name = inspect.getmodulename(file_name)
@@ -486,7 +482,7 @@ def get_module(file_name:pathlib.Path, topdir: typing.Optional[pathlib.Path]=Non
             #                                                             submodule_search_locations = submodules_paths)
             # else:
             #     module_spec = importlib.util.spec_from_file_location(module_name, file_name)
-            print(f"\tsubmodules_paths: {submodules_paths}\n")
+            # print(f"\tsubmodules_paths: {submodules_paths}\n")
             module_spec = importlib.util.spec_from_file_location(module_name, file_name, 
                                                                     submodule_search_locations = submodules_paths)
         else:

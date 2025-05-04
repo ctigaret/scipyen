@@ -3212,8 +3212,10 @@ def summarize_object_properties(objname:str, obj:typing.Any, namespace="Internal
     objcls = obj.__class__
     clsname = objcls.__name__
     
-    fqual = ".".join([objcls.__module__, clsname])
-    ttip = ".".join([typemodulename, typename])
+    # fqual = ".".join([objcls.__module__, clsname])
+    fqual = f"module: {typemodulename}"
+    # ttip = ".".join([typemodulename, typename])
+    ttip = f"{typename}"
     
     if isinstance(obj, (QtWidgets.QMainWindow, mpl.figure.Figure)):
         icon = QtGui.QIcon.fromTheme("window")
