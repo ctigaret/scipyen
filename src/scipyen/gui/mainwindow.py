@@ -5293,8 +5293,12 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             # NOTE: until then, we send the item's text to the shell by calling
             # NOTE: self.ipkernel.shell.run_cell(cmd, store_history=True, silent=False, shell_futures=True)
             # NOTE: see code comments in self.slot_initQtConsole()
-            self.ipkernel.shell.run_cell(
-                cmd, store_history=True, silent=False, shell_futures=True)
+            # self.ipkernel.shell.run_cell(
+            #     cmd, store_history=True, silent=False, shell_futures=True)
+            #
+            # NOTE: 2025-05-05 17:26:15
+            # Not sure about the above malarkey... What's wrong with this one below?
+            self.console.consoleWidget.execute(cmd, hidden=False, interactive=False)
             # NOTE: 2017-03-19 21:15:48 while this DOES go to the ipython's history
             # NOTE: it DOES NOT go to the self.console.history_tail therefore calling the slot_updateHistory slot
             # NOTE: won't work hence -- basically, console.history and shell history go out of sync
@@ -5309,11 +5313,6 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.statusBar().showMessage("Done!")
         # self.statusBar().clearMessage()
         self.setCursor(currentMouseCursor)
-        # NOTE: 2023-05-25 21:47:27
-        # don't call this anymore - let the workspaceModel deal with it;
-        # otherwise this may generate double entries in the workspace viewer
-        # (some race condition going on?)
-        # self.workspaceModel.update() 
 
     @Slot()
     def slot_Quit(self):
