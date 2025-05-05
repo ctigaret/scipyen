@@ -1618,6 +1618,32 @@ class PlacesMonitor(QtCore.QObject):
     @Slot()
     def slot_bookmarksChanged(self):
         self.sig_bookmarksChanged.emit()
+        
+def fractionalWindowSize(w:float, h:float, inches:bool=False):
+    r"""Return a window size (width, height) as a fraction of screen geometry.
+    w, h: fractions of screen width & height, respectively
+    inches: When False (default), return size (w, h) in pixels 
+            When True, return window size (w, h) in inches; 
+    
+"""
+    desktop = QtWidgets.QApplication.desktop()
+    geometry = desktop.screenGeometry(desktop.primaryScreen())
+    screen = QtWidgets.QApplication.screens()[desktop.primaryScreen()]
+    new_w = geometry.width() * w
+    new_h = geometry.height() * h
+    
+    if inches:
+        return windowSizeToInches(new_w, new_h)
+    
+    return int(new_w), int(new_h)
 
+def windowSizeToInches(w, h):
+    r"""Converts window size (width, height) from pixels to inches.
+Useful for matplotlib figures
+"""
+    desktop = QtWidgets.QApplication.desktop()
+    geometry = desktop.screenGeometry(desktop.primaryScreen())
+    screen = QtWidgets.QApplication.screens()[desktop.primaryScreen()]
+    return w/screen.logicalDotsPerInchX(), h/screen.logicalDotsPerInchY()
 
 DEFAULT_EDITOR = get_editor()

@@ -1371,9 +1371,9 @@ def fromHDF5(entity:typing.Union[h5py.Group, h5py.Dataset], cache:dict=dict()):
         return cache[entity]
     
     attrs = attrs2dict(entity.attrs)
-#     print(f"h5io.fromHDF5: entity {entity.name} attrs\n")
-#     for k,v in attrs.items():
-#         print(f"\t{k} ↦ {v} ({type(v)})")
+    # print(f"h5io.fromHDF5: entity {entity.name} attrs\n")
+    # for k,v in attrs.items():
+    #     print(f"\t{k} ↦ {v} ({type(v)})")
 #     
     target_class = attrs["python_class"]
     
@@ -2595,7 +2595,6 @@ def _(obj:enum.Enum,
       track_order:typing.Optional[bool] = True, 
       entity_cache:typing.Optional[dict]=None,
       **kwargs):
-    
         # we also can store Enums as HDF5 attr, see makeAttr in this module
         # → h5py.Dataset child of group,  with h5py.enum_dtype
         cached_entity = getCachedEntity(entity_cache, obj)
@@ -2710,6 +2709,27 @@ def _(obj:bgbridge.Structure,
                             chunks=chunks, track_order=track_order, 
                             entity_cache = entity_cache)
         
+        entity.attrs.update(obj_attrs)
+        
+        return entity
+    
+@objectToEntity.register(types.SimpleNamespace)
+def _(obj: types.SimpleNamespace,
+      obj_attrs:dict, group:h5py.Group, name:typing.Optional[str]=None,
+      target_name:typing.Optional[str]=None,
+      compression:typing.Optional[str]="gzip",
+      chunks:typing.Optional[bool]=None,
+      track_order:typing.Optional[bool] = True, 
+      entity_cache:typing.Optional[dict]=None,
+      **kwargs):
+        cached_entity = getCachedEntity(entity_cache, obj)
+        if isinstance(cached_entity, h5py.Group):
+            group[target_name] = cached_entity
+            return cached_entity
+        
+        # obj_data = obj.__dict__
+        entity = makeHDF5Group(obj.__dict__, group, name=name, compression = compression,
+                               chunks = chunks, track_order=track_order,entity_cache=entity_cache)
         entity.attrs.update(obj_attrs)
         
         return entity
@@ -3757,6 +3777,21 @@ def _(entity:h5py.Group, target_class:type, attrs:dict, cache:dict=dict()):
     elif target_class == bgbridge.Structure:
         data = dict(map(lambda k: (k, fromHDF5(entity[k], cache)), entity.keys()))
         obj = bgbridge.Structure(**data)
+        
+    elif target_class == types.SimpleNamespace:
+        data = dict()
+        for k in entity.keys():
+            if k.endswith("_key"):
+                # custom dict keys
+                key_value_grp = entity[k]
+                # exepect two entities: "key" and "value"
+                key = fromHDF5(key_value_grp["key"], {})
+                value = fromHDF5(key_value_grp["value"], cache)
+                data[key] = value
+            else:
+                # regular (sane) case of dict with str keys
+                data[k] = fromHDF5(entity[k], cache)
+        obj = types.SimpleNamespace(**data)
         
     else:
         if target_class is None:
