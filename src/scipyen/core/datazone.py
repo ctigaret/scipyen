@@ -533,7 +533,7 @@ coordinates are NOT restricted to time units.
                         ('labels', np.ndarray, 1, np.dtype('U')),
                         ('extent', bool, 1, False))
     
-    def __new__(cls, t0 = None, t1 = None, 
+    def __new__(cls, times = None, durations = None, 
                 units: typing.Optional[pq.Quantity]=None, 
                 labels: typing.Optional[typing.Union[str, typing.Sequence[str], np.ndarray]]=None, 
                 extent: typing.Optional[bool]=None, 
@@ -543,104 +543,99 @@ coordinates are NOT restricted to time units.
                 segment: typing.Optional[int] = None,
                 array_annotations = None, 
                 **anotations):
-        # NOTE: 2025-04-28 11:19:22
-        # t0 is times; t1 is durations;  all t1 >= 0
         units_ = None
-        if isinstance(t0, np.ndarray):
-            assert(t0.ndim <= 1), "t0 must be a 1D array"
-            if isinstance(t0, pq.Quantity):
-                units_ = t0.units
-            if t0.ndim == 0:
-                t0 = t0.flatten()
+        if isinstance(times, np.ndarray):
+            assert(times.ndim <= 1), "times must be a 1D array"
+            if isinstance(times, pq.Quantity):
+                units_ = times.units
+            if times.ndim == 0:
+                times = times.flatten()
                 
-        elif isinstance(t0, typing.Sequence) and all(isinstance(v, numbers.Number) for v in t0):
-            t0 = np.array(t0).flatten()
+        elif isinstance(times, typing.Sequence) and alltimes(isinstance(v, numbers.Number) for v in times):
+            times = np.array(times).flatten()
             
-        elif isinstance(t0, numbers.Number):
-            t0 = np.array([t0]).flatten()
+        elif isinstance(times, numbers.Number):
+            times = np.array([times]).flatten()
             
         else:
-            raise TypeError(f"Invalid 't0' ({type(t0).__name__})")
+            raise TypeError(f"Invalid 'times' ({type(times).__name__})")
         
-        if isinstance(t1, np.ndarray):
-            assert(t1.ndim <= 1), "t1 must be a 1D array"
-            if t1.ndim == 0:
-                t1 = t1.flatten()
-            assert t1.size == t0.size, "t0 and t1 must have identical size"
-            if isinstance(t1, pq.Quantity):
-                if isinstance(t0, pq.Quantity):
-                    if t1.units != t0.units:
-                        if unitsConvertible(t1, t0):
-                            t1 = t1.rescale(t0.units)
+        if isinstance(durations, np.ndarray):
+            assert(durations.ndim <= 1), "durations must be a 1D array"
+            if durations.ndim == 0:
+                durations = durations.flatten()
+            assert durations.size == times.size, "times and durations must have identical size"
+            if isinstance(durations, pq.Quantity):
+                if isinstance(times, pq.Quantity):
+                    if durations.units != times.units:
+                        if unitsConvertible(durations, times):
+                            durations = durations.rescale(times.units)
                         else:
-                            raise ValueError(f"Units of t1 ({t1.units}) are incompatible with those of t0 ({t0.units})")
+                            raise ValueError(f"Units of durations ({durations.units}) are incompatible with those of times ({times.units})")
                 else:
-                    units_ = t1.units
-                    t0 = t0 * t1.units
+                    units_ = durations.units
+                    times = times * durations.units
             
-        elif isinstance(t1, typing.Sequence) and all(isinstance(v, numbers.Number) for v in t1):
-            assert len(t1) == t0.size, "t0 and t1 must have identical size"
-            t1 = np.array(t1).flatten()
+        elif isinstance(durations, typing.Sequence) and all(isinstance(v, numbers.Number) for v in durations):
+            assert len(durations) == times.size, "times and durations must have identical size"
+            durations = np.array(durations).flatten()
             
-        elif isinstance(t1, numbers.Number):
-            assert t0.size == 1, "t0 and t1 must have identical size"
-            t1 = np.array([t1]).flatten()
+        elif isinstance(durations, numbers.Number):
+            assert times.size == 1, "times and durations must have identical size"
+            durations = np.array([durations]).flatten()
             
         else:
-            raise TypeError(f"Invalid 't1' ({type(t1).__name__})")
+            raise TypeError(f"Invalid 'durations' ({type(durations).__name__})")
         
-        if isinstance(t0, pq.Quantity) and not isinstance(t1, pq.Quantity):
-            t1 = t1 * t0.units
+        if isinstance(times, pq.Quantity) and not isinstance(durations, pq.Quantity):
+            durations = durations * times.units
         
         if isinstance(units_, pq.Quantity):
-            if all(isinstance(v, pq.Quantity) for v in (t0, t1)):
+            if all(isinstance(v, pq.Quantity) for v in (times, durations)):
                 # NOTE: 2025-04-27 10:39:14
                 # ignore silently
                 # if units is not None:
-                #     scipywarn("Ignoring 'unit' because t0 and t1 already have them")
+                #     scipywarn("Ignoring 'unit' because times and durations already have them")
                 units = units_
             else:
-                t0 = t0 * units
-                t1 = t1 * units
+                times = times * units
+                durations = durations * units
                 
         else:
             if not isinstance(units, (pq.Quantity, pq.dimensionality.Dimensionality)):
                 raise TypeError(f"'units' must be a pq.Quantity; instead got {type(units)}")
 
-            if not all(isinstance(v, pq.Quantity) for v in (t0, t1)):
-                t0 = t0 * units
-                t1 = t1 * units
+            if not all(isinstance(v, pq.Quantity) for v in (times, durations)):
+                times = times * units
+                durations = durations * units
         
         if not isinstance(extent, bool):
             extent = False
         if extent:
-            if np.any(t1 < 0):
-                # because the window around t0 cannot be negative
-                raise ValueError("t1 must contain only values > = 0")
-        # else:
-        #     if np.any(t0 > t1):
-        #         raise ValueError("All values in t0 should precede corresponding values in t1")
+            if np.any(durations < 0):
+                # because the window around times cannot be negative
+                raise ValueError("durations must contain only values > = 0")
             
         if labels is None:
             labels = np.array([], dtype='U')
 
         elif not isinstance(labels, np.ndarray):
             labels = np.array(labels)
-            if labels.size != t0.size and labels.size:
+            if labels.size != times.size and labels.size:
                 raise ValueError("Labels array has different length to times")
 
         if not isinstance(segment, (neo.Segment, type(None))):
             raise TypeError(f"'segment' expected to be a neo.Segment or None; instead, got {type(segment).__name__}")
 
-        obj = pq.Quantity.__new__(cls, t0, units = units.dimensionality)
+        obj = pq.Quantity.__new__(cls, times, units = units.dimensionality)
         obj._labels = labels
-        obj._t1 = t1
+        obj._t1 = durations
         obj._extent = extent == True
         obj._segment = segment
         
         return obj
     
-    def __init__(self, t0 = None, t1 = None, units=None, labels=None, 
+    def __init__(self, times = None, durations = None, units=None, labels=None, 
                 extent:bool=None, name=None, description=None,
                 file_origin = None, segment = None,
                 array_annotations = None, **annotations):
@@ -649,7 +644,7 @@ coordinates are NOT restricted to time units.
                             array_annotations = array_annotations,
                             **annotations)
         
-        self.__domain_name__ = cq.nameFromUnit(self.t0)
+        self.__domain_name__ = cq.nameFromUnit(self.times)
         
     def __reduce__(self):
         return _newInterval_, (self.__class__, pq.Quantity(self), self._t1, self.units,

@@ -139,7 +139,7 @@ from core.prog import (safeWrapper, signature2Dict, printStyled,
 from core import prog
 from core.traitcontainers import DataBag
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
-from core.datazone import DataZone
+from core.datazone import (DataZone, Interval)
 from core.triggerevent import (DataMark, TriggerEvent, TriggerEventType, MarkType)
 from core.triggerprotocols import TriggerProtocol
 import ephys
@@ -989,13 +989,15 @@ def group2neoDataObject(g:h5py.Group, target_class:type, cache:dict = {}):
         ∘ DataSignal
         ∘ IrregularlySampledDataSignal
         ∘ neo.ImageSequence
-        
-    • neo.Epoch
-    • DataZone
-    • neo.Event
-    • DataMark
-    • TriggerEvent
-    • neo.SpikeTrain
+    
+    • Non-signal objects:
+        ∘ neo.Epoch
+        ∘ DataZone
+        ∘ Interval
+        ∘ neo.Event
+        ∘ DataMark
+        ∘ TriggerEvent
+        ∘ neo.SpikeTrain
     
     """
     if g in cache:
@@ -1024,6 +1026,7 @@ def group2neoDataObject(g:h5py.Group, target_class:type, cache:dict = {}):
     ax0["time_dtype"]           = np.dtype(float)
     ax0["array_annotations"]    = None
     ax0["labels"]               = []
+    ax0["extent"]               = False  # Interval
     
 #     ax1 = dict()
 #     ax1["units"] = pq.dimensionless
@@ -1093,7 +1096,7 @@ def group2neoDataObject(g:h5py.Group, target_class:type, cache:dict = {}):
             ax0ds = axes_group.get("axis_0", None)
             
             if isinstance(ax0ds, h5py.Dataset):
-                # for Epoch and DataZone the durations ARE the data in axis_0 Dataset
+                # for Epoch, DataZone and Interval the durations ARE the data in axis_0 Dataset
                 ax0attrs = attrs2dict(ax0ds.attrs)
                 if ax0ds.shape is not None and len(ax0ds.shape) > 0:
                     durations = np.array(ax0ds)
@@ -1107,6 +1110,7 @@ def group2neoDataObject(g:h5py.Group, target_class:type, cache:dict = {}):
                 ax0["time_units"]           = ax0attrs.get("time_units", pq.s)
                 ax0["array_annotations"]    = ax0attrs.get("array_annotations", None)
                 ax0["labels"]               = ax0attrs.get("labels", [])
+                ax0["extent"]               = ax0attrs.get("extent", False)
                 
     # NOTE: 2022-10-09 13:36:56
     # briefly:
@@ -1165,7 +1169,16 @@ def group2neoDataObject(g:h5py.Group, target_class:type, cache:dict = {}):
     
     elif target_class in (neo.Epoch, DataZone):
         obj = target_class(times=times, durations=durations, labels=ax0["labels"], 
-                           units = ax0["units"], relative=ax0.get("relative", False))
+                           units = ax0["units"], relative=ax0.get("relative", False),
+                           segment=segment)
+    
+        for k,v in rec_attrs.items():
+            setattr(obj, k, v)
+            
+    elif target_class == Interval:
+        obj = target_class(times=times, durations=durations, units = ax0["units"],
+                           labels=ax0["labels"], extent=ax0.get("extent", False),
+                           segment=segment, )
     
         for k,v in rec_attrs.items():
             setattr(obj, k, v)
@@ -2140,11 +2153,28 @@ def _(obj:neo.Epoch, axisindex):
     ret = dict()
     if axisindex == 0:
         ret["labels"] = obj.labels # labels are contained in the axis_0 attrs
-        # ret["durations"] = obj.durations # durations ARE the axis_0 dataset
+        # ret["durations"] = obj.durations
         ret["time_units"] = obj.times.units
         ret["time_dtype"] = jsonio.dtype2JSON(obj.times.dtype)
         ret["units"] = obj.units
         ret["dtype"] = jsonio.dtype2JSON(obj.dtype)
+        
+    else:
+        raise ValueError(f"Invalid axis index {axisindex} for {type(obj).__name__} object")
+
+    return ret
+
+@makeNeoDataAxisDict.register(Interval)
+def _(obj:Interval, axisindex):
+    ret = dict()
+    if axisindex == 0:
+        ret["labels"] = obj.labels # labels are contained in the axis_0 attrs
+        # ret["durations"] = obj.durations 
+        ret["time_units"] = obj.times.units
+        ret["time_dtype"] = jsonio.dtype2JSON(obj.times.dtype)
+        ret["units"] = obj.units
+        ret["dtype"] = jsonio.dtype2JSON(obj.dtype)
+        ret["extent"] = obj.extent
         
     else:
         raise ValueError(f"Invalid axis index {axisindex} for {type(obj).__name__} object")
@@ -2157,7 +2187,7 @@ def _(obj:DataZone, axisindex):
     if axisindex == 0:
         ret["labels"] = obj.labels # labels are contained in the axis_0 attrs
         ret["relative"] = getattr(obj, "relative", False)
-        # ret["durations"] = obj.durations # durations ARE the axis_0 dataset
+        # # ret["durations"] = obj.durations
         ret["time_units"] = obj.times.units
         ret["time_dtype"] = jsonio.dtype2JSON(obj.times.dtype)
         ret["units"] = obj.units
@@ -2230,7 +2260,7 @@ def makeAxisScale(obj, dset:h5py.Dataset, axesgroup:h5py.Group, dimindex:int,
                                      chunks = chunks,
                                      track_order = track_order)
         
-    elif isinstance(obj, (neo.Epoch, DataZone)) and obj.size > 0:
+    elif isinstance(obj, (neo.Epoch, DataZone, Interval)) and obj.size > 0:
         axis_dset = toHDF5(obj.durations, axesgroup,
                                      name = axis_dset_name,
                                      compression = compression, 
@@ -3043,7 +3073,9 @@ def makeHDF5Dataset(obj, group: h5py.Group, name:typing.Optional[str]=None,
 
 @singledispatch
 def makeDataset(obj, group:h5py.Group, attrs:dict, name:str, 
-                compression:typing.Optional[str]="gzip", chunks:typing.Optional[bool] = None, track_order=True, entity_cache = None):
+                compression:typing.Optional[str]="gzip", 
+                chunks:typing.Optional[bool] = None, 
+                track_order=True, entity_cache = None):
     # for scalar objects only, and basic python sequences EXCEPT for strings
     # because reading back strings can be confused with stored bytes data
     cached_entity = getCachedEntity(entity_cache, obj)
@@ -3407,6 +3439,7 @@ def _(obj:neo.core.dataobject.DataObject, group, attrs, name, compression, chunk
             toHDF5(segment, group, name="segment", 
                            compression=compression, chunks=chunks,
                            track_order=track_order)
+            
     dset.attrs.update(attrs)
     storeEntityInCache(entity_cache, obj, dset)
     return dset
@@ -3451,7 +3484,7 @@ def _(obj:np.ndarray, group, attrs, name, compression, chunks, track_order,
         data = obj
         
     if obj.size == 1:
-        dset = group.create_dataset(name, data = data, track_order=track_order, compression = compression)
+        dset = group.create_dataset(name, data = data, track_order=track_order)#, compression = compression)
     else:
         dset = group.create_dataset(name, data = data, track_order=track_order, compression = compression, 
                                     chunks = chunks)
