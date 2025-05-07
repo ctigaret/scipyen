@@ -2222,8 +2222,8 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
     params = [offset, scale, delay, decay]
     
         
-    #popt, pcov = optimize.curve_fit(models.generic_exp_decay, vsagrise.times, np.squeeze(vsagrise), [offset, scale, delay, decay])
-    popt, pcov = optimize.curve_fit(models.generic_exp_decay, vsag10_90.times, np.squeeze(vsag10_90), params)
+    #popt, pcov = optimize.curve_fit(models.generic_single_exponential_decay, vsagrise.times, np.squeeze(vsagrise), [offset, scale, delay, decay])
+    popt, pcov = optimize.curve_fit(models.generic_single_exponential_decay, vsag10_90.times, np.squeeze(vsag10_90), params)
 
     #print("params ", params)
     #print("popt ", popt)
@@ -2233,7 +2233,7 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
     xx = np.linspace(float(vsag10_90.t_start), float(ssT0), int((float(ssT0)-float(vsag10_90.t_start))/vm.sampling_period))
     #xx = np.linspace(float(vsag10_90.times[0]), float(vsag10_90.times[-1]), vm.shape[0])
     
-    yy = models.generic_exp_decay(xx, *popt)
+    yy = models.generic_single_exponential_decay(xx, *popt)
     
     vsag10_90_extended_fit = neo.AnalogSignal(yy[:, np.newaxis], 
                                      units = pq.mV, \

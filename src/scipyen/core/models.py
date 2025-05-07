@@ -26,7 +26,28 @@ def check_rise_decay_params(x):
     
     return (len(x)-3) // 2
 
-def generic_exp_decay(x, α, β, x0, τ):
+def generic_multi_exponential_decay(x, α, β, x0, *τ):
+    r"""Realizes y = α + β × exp(-(x-x₀)/(∑τ)
+
+Where τ is a sequence of floats: the individual time constants, one for each decay
+    cmomponent; 
+    
+The other parameters are as for generic_single_exponential_decay
+"""
+    if len(τ) == 0:
+        raise ValueError(f"τ must be supplied")
+    elif len(τ) == 1:
+        return generic_single_exponential_decay(x, α, β, x0, τ[0])
+    else:
+        # λ = np.sum(list(map(lambda v: 1/v, τ)))
+        τc = np.prod(τ)/np.sum(τ)
+        
+    return α + β * np.exp(-(x-x0) / τc)
+
+def generic_multi_exponential_decay_model(x, parameters, **kwargs):
+    return generic_multi_exponential_decay(x, *parameters, **kwargs)
+
+def generic_single_exponential_decay(x, α, β, x0, τ):
     r"""Realizes y = α + β × exp(-(x-x₀)/τ)
     
 Parameters:
@@ -52,9 +73,10 @@ coefficients are given as floats in the following order:
 #     This works as well in jupyter qtconsole, but not in plain python REPL
     # y0, α, x0, τ = parameters
     
-    return α + β * np.exp(-(x-x0)/τ)
+    λ = 1/τ
+    return α + β * np.exp(-(x-x0)*λ)
 
-def generic_exp_rise(x, α, β, x0, τ):
+def generic_single_exponential_rise(x, α, β, x0, τ):
     r"""Realizes α + β × [1 - exp(-(x-x₀)/τ)]
 
 Parameters:
@@ -67,15 +89,15 @@ coefficients are given as floats in the following order:
 """
     return α + β * (1 - np.exp(-(x-x0)/τ))
 
-def generic_exp_decay_model(x, parameters, **kwargs):
-    r"""Alias to generic_exp_decay, 
+def generic_single_exponential_decay_model(x, parameters, **kwargs):
+    r"""Alias to generic_single_exponential_decay, 
 with coefficients packed in an array-like object"""
-    return generic_exp_decay(x, *parameters, **kwargs)
+    return generic_single_exponential_decay(x, *parameters, **kwargs)
 
-def generic_exp_rise_model(x, parameters, **kwargs):
-    r"""Alias to generic_exp_rise, 
+def generic_single_exponential_rise_model(x, parameters, **kwargs):
+    r"""Alias to generic_single_exponential_rise, 
 with coefficients packed in an array-like object"""
-    return generic_exp_rise(x, *parameters, **kwargs)
+    return generic_single_exponential_rise(x, *parameters, **kwargs)
 
 def alphaFunction(x, α, β, x0, τ):
     r"""

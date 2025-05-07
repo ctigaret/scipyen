@@ -685,7 +685,7 @@ coordinates are NOT restricted to time units.
         extent = self.extent
         units = self.units
         
-        obj = self.__class__(t0 = times, t1 = durations,
+        obj = self.__class__(times = times, durations = durations,
                                            labels = labels, units = units)
         obj.description = description
         obj.array_annotations = array_annotations

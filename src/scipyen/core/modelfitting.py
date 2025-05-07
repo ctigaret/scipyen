@@ -355,7 +355,7 @@ class ExponentialDecay2(FitModel):
 #     
 #     return (len(x)-3) // 2
 # 
-# def generic_exp_decay(x, offset, scale, delay, decay):
+# def generic_single_exponential_decay(x, offset, scale, delay, decay):
 #     r"""Realizes f(x) = scale * exp(-(x-delay)/decay) + offset
 #     """
 #     
