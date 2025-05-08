@@ -278,7 +278,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         # hashable, hence usable as dict key
         self.nodes[path] = node
         
-        typeStr_, desc, children, widget, typeTip = self.parse(data, predicate=predicate)
+        typeStr_, desc, children, widget, typeTip, showDescInParentNode= self.parse(data, predicate=predicate)
         
         if not isinstance(typeStr, str) or len(typeStr.strip()) == 0:
             typeStr = typeStr_
@@ -289,7 +289,8 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         node.setToolTip(0, nameTip)
         node.setText(1, typeStr)
         node.setToolTip(1, typeTip)
-        node.setText(2, desc)
+        if showDescInParentNode:
+            node.setText(2, desc)
         
         if isinstance(data, NestedFinder.nesting_types):
             if id(data) not in self._visited_.keys():
@@ -391,6 +392,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
             
         widget = None
         desc = ""
+        showDescInParentNode = True
         children = {}
         
         if data is None:
@@ -510,9 +512,10 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                 elif isinstance(data, enum.Enum):
                     desc = f"{data} ({data.name})"
                 else:
-                    desc = str(data)
+                    desc = str(data) # this becomes too clutered, but needs trimming in self.buildTree
+                    showDescInParentNode = False
                 
-            return typeStr, desc, children, widget, typeTip 
+            return typeStr, desc, children, widget, typeTip, showDescInParentNode
         
         except:
             # print(f"{self.__class__.__name__}.parse data type : {type(data).__name__}, data: {data}")

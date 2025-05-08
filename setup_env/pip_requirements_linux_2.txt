@@ -201,6 +201,7 @@ requests-toolbelt
 researchpy
 scikit-image
 scikit-learn
+scikit-guess
 opencv-contrib-python
 scipy
 seaborn

@@ -1063,28 +1063,54 @@ def fit_model(data, func, p0, *args, **kwargs):
     Applies scipy.optimize.least_squares to minimize the residuals between the 
     model function `func` and measurements in `data`.
     
+    WARNING: This function uses scipy.optimize.least_squares directly to perform
+    non-linear least-squares fitting (with or without constraints), and is highly
+    dependent on a good guess of the initial coefficient values.
+    
+    As an alternative for exponential decay fitting, you could try the scikit-guess
+    package.
+    
     Positional parameters:
     =====================
-    data: 1D array-like, numeric - the "dependent" variable to be fitted
+    data: 1D or 2D array-like, numeric - the "dependent" variable to be fitted.
+        When ``data`` is a 2D array, the variables must be arranged in columns,
+        with the number of rows being the number of observations. Think of it
+        as "channels" in a multi-channel signal.
+    
+        This can be a neo.AnalogSignal. If the signal has more than one channel,
+        the index of the channel to be fitted can be specified in the var-keyword 
+        ``channel``.
     
     func: python function that takes a scalar ('x') and a sequence ('p') of 
         model parameters, and returns a scalar; the signature is:
     
         func(x, p, /, *args, **kwargs)
     
-    p0: sequence of initial values for the model realized by `func` - in the same
-    order as expected by func
+        NOTE: This function can be one of the ``*_model`` functions defined in 
+        Scipyen's ``core.models`` module.
+    
+    p0: sequence of initial values for the coefficients in the model realized by
+    `func` - in the same order as expected by func
     
     Var-keyword parameters (**kwargs):
     =================================
     
-    x: the independent variable, array-like, with the same shape as `data`
+    x: the independent variable, array-like, with the same shape as `data`.
+        This is mandatory when ``data`` is a generic numpy array or Quantity array.
+    
+        When ``data`` is a neo.AnalogSignal, this can be omitted, because the 
+        signal object provides its own independent data (the "domain") in the 
+        ``times`` attribute.
+    
+    channel: int, default is 0; this is useful to select the channel from a 
+        multi-channel signal
     
     fargs: tuple with var-positional parameters to `func`
     
     fkwargs: dict with keyword parameters to `func`
     
     coef_names: tuple with model parameter names or symbols (str)
+    
     
     The following are passed directly to scipy.optimize.least_squares:
     bounds, jac, method, ftol, xtol, gtol, x_scale, loss, f_scale, max_nfev,
@@ -1128,6 +1154,7 @@ def fit_model(data, func, p0, *args, **kwargs):
     
     
     """
+    channel     = kwargs.pop("channel",     0)
     jac         = kwargs.pop("jac",         "2-point")
     bounds      = kwargs.pop("bounds",      (-np.inf, np.inf))
     method      = kwargs.pop("method",      "trf")
@@ -1158,6 +1185,11 @@ def fit_model(data, func, p0, *args, **kwargs):
     realDataNdx = ~np.isnan(data)
     
     if isinstance(data, neo.core.basesignal.BaseSignal):
+        if data.shape[1] > 1:
+            if channel < -data.shape[1] or channel >= data.shape[1]:
+                raise ValueError(f"Invalid channel specified ({channel}) for data with {data.shape[1]} channels")
+            data = data[:,channel]
+            
         ydata = data.magnitude[realDataNdx]
     
         realDataNdx = np.squeeze(realDataNdx)
@@ -1174,8 +1206,16 @@ def fit_model(data, func, p0, *args, **kwargs):
         if not isinstance(x, np.ndarray): 
             raise TypeError(f"When data is a numpy array, x must be given as a numpy array")
         
+        assert(data.ndim in (1,2)), f"Arrays with {data.ndim} dimensions are not supported"
+        
+        if data.ndim == 2 and data.shape[1] > 1:
+            if channel < -data.shape[1] or channel >= data.shape[1]:
+                raise ValueError(f"Invalid channel specified ({channel}) for data with {data.shape[1]} channels")
+            data = data[:,channel]
+            
         if x.shape != data.shape:
             raise ValueError(f"x shape {x.shape} is different to to data shape {data.shape}")
+        
         
         ydata = data[realDataNdx]
         xdata = x[realDataNdx]
@@ -1201,82 +1241,89 @@ def fit_model(data, func, p0, *args, **kwargs):
     lo = list()
     up = list()
     
-    l0 = bounds[0]
-    u0 = bounds[1]
-    
-    if isinstance(l0, numbers.Real):
-        lo = [l0] * len(p0)
+    if isinstance(bounds, typing.Sequence) and len(bounds) == 2:
+        l0 = bounds[0]
+        u0 = bounds[1]
         
-    elif isinstance(l0, (tuple, list)):
-        if len(l0) not in (1, len(p0)):
-            raise ValueError(f"Incorrect number of lower bounds; expecting 1 or {len(p0)}, got {len(l0)} instead")
-
-        if all(isinstance(l, numbers.Real) for l in l0):
-            if len(l0) == 1:
-                lo = [l0[0]] * len(p0)
-            else:
-                lo = [l for l in l0]
-
-        elif all(isinstance(l, np.ndarray) and l.size == 1 and l.dtype == np.dtype(float) for l in l0):
-            if len(l0) == 1:
-                lo = [float(l)] * len(p0)
-            else:
-                lo = [float(l) for l in l0]
-                
-    elif isinstance(l0, np.ndarray):
-        if l0.size not in (1, len(p0)):
-            raise ValueError(f"Incorrect number of lower bounds; expecting 1 or {len(p0)}, got {l0.size} instead")
-        
-        if not datatypes.is_vector(l0):
-            raise ValueError("Lower bounds must be a vector")
-        
-    elif isinstance(l0, pd.Series):
-        if len(l0) not in (1, len(p0)):
-            raise ValueError(f"Incorrect number of lower bounds; expecting 1 or {len(p0)}, got {l0.size} instead")
-        
-        lo = [float(l.magnitude) if isinstance(l, pq.Quantity) else float(l) for l in l0]
+        if isinstance(l0, numbers.Real):
+            lo = [l0] * len(p0)
             
-    else:
-        raise ValueError(f"Incorrect lower bounds specified {l0}")
-    
-    if isinstance(u0, numbers.Real):
-        up = [u0] * len(p0)
-        
-    elif isinstance(u0, (tuple, list)):
-        if len(u0) not in (1, len(p0)):
-            raise ValueError(f"Incorrect number of upper bounds; expecting 1 or {len(p0)}, got {len(u0)} instead")
+        elif isinstance(l0, (tuple, list)):
+            if len(l0) not in (1, len(p0)):
+                raise ValueError(f"Incorrect number of lower bounds; expecting 1 or {len(p0)}, got {len(l0)} instead")
 
-        if all(isinstance(l, numbers.Real) for l in u0):
-            if len(u0) == 1:
-                up = [u0[0]] * len(p0)
-            else:
-                up = [l for l in u0]
+            if all(isinstance(l, numbers.Real) for l in l0):
+                if len(l0) == 1:
+                    lo = [l0[0]] * len(p0)
+                else:
+                    lo = [l for l in l0]
 
-        elif all(isinstance(l, np.ndarray) and l.size == 1 and l.dtype == np.dtype(float) for l in u0):
-            if len(u0) == 1:
-                up = [float(l)] * len(p0)
-            else:
-                up = [float(l) for l in u0]
-                
-    elif isinstance(u0, np.ndarray):
-        if u0.size not in (1, len(p0)):
-            raise ValueError(f"Incorrect number of upper bounds; expecting 1 or {len(p0)}, got {u0.size} instead")
-        
-        if not  datatypes.is_vector(u0):
-            raise ValueError("Lower bounds must be a vector")
-        
-    elif isinstance(u0, pd.Series):
-        if len(u0) not in (1, len(p0)):
-            raise ValueError(f"Incorrect number of upper bounds; expecting 1 or {len(p0)}, got {u0.size} instead")
-        
-        up = [float(l.magnitude) if isinstance(l, pq.Quantity) else float(l) for l in u0]
+            elif all(isinstance(l, np.ndarray) and l.size == 1 and l.dtype == np.dtype(float) for l in l0):
+                if len(l0) == 1:
+                    lo = [float(l)] * len(p0)
+                else:
+                    lo = [float(l) for l in l0]
+                    
+        elif isinstance(l0, np.ndarray):
+            if l0.size not in (1, len(p0)):
+                raise ValueError(f"Incorrect number of lower bounds; expecting 1 or {len(p0)}, got {l0.size} instead")
             
-    else:
-        raise ValueError(f"Incorrect upper bounds specified {u0}")
+            if not datatypes.is_vector(l0):
+                raise ValueError("Lower bounds must be a vector")
+            
+        elif isinstance(l0, pd.Series):
+            if len(l0) not in (1, len(p0)):
+                raise ValueError(f"Incorrect number of lower bounds; expecting 1 or {len(p0)}, got {l0.size} instead")
+            
+            lo = [float(l.magnitude) if isinstance(l, pq.Quantity) else float(l) for l in l0]
+                
+        else:
+            raise ValueError(f"Incorrect lower bounds specified {l0}")
+        
+        if isinstance(u0, numbers.Real):
+            up = [u0] * len(p0)
+            
+        elif isinstance(u0, (tuple, list)):
+            if len(u0) not in (1, len(p0)):
+                raise ValueError(f"Incorrect number of upper bounds; expecting 1 or {len(p0)}, got {len(u0)} instead")
+
+            if all(isinstance(l, numbers.Real) for l in u0):
+                if len(u0) == 1:
+                    up = [u0[0]] * len(p0)
+                else:
+                    up = [l for l in u0]
+
+            elif all(isinstance(l, np.ndarray) and l.size == 1 and l.dtype == np.dtype(float) for l in u0):
+                if len(u0) == 1:
+                    up = [float(l)] * len(p0)
+                else:
+                    up = [float(l) for l in u0]
+                    
+        elif isinstance(u0, np.ndarray):
+            if u0.size not in (1, len(p0)):
+                raise ValueError(f"Incorrect number of upper bounds; expecting 1 or {len(p0)}, got {u0.size} instead")
+            
+            if not  datatypes.is_vector(u0):
+                raise ValueError("Lower bounds must be a vector")
+            
+        elif isinstance(u0, pd.Series):
+            if len(u0) not in (1, len(p0)):
+                raise ValueError(f"Incorrect number of upper bounds; expecting 1 or {len(p0)}, got {u0.size} instead")
+            
+            up = [float(l.magnitude) if isinstance(l, pq.Quantity) else float(l) for l in u0]
+                
+        else:
+            raise ValueError(f"Incorrect upper bounds specified {u0}")
+        
+        bounds = optimize.Bounds(lo, up, keep_feasible = [True] * len(lo))
+        
+    elif not isinstance(bounds, optimize.Bounds):
+        raise TypeError(f"'bounds' expected to be a pair of sequences or an optimize.Bounds object; instead, got a {type(bounds).__name__}")
     
+    # print(f"bounds: {bounds}")
     
-    bnds = (lo, up)
-    
+    # CAUTION: do NOT confuse x0 here with a delay coefficient; here, x0 is the 
+    # sequence of initial coefficient values
     res = optimize.least_squares(__cost_fun__, x0, args=(xdata, ydata), jac=jac,
                                  bounds = bounds, method=method, loss=loss,
                                  ftol=ftol, xtol=xtol, gtol=gtol, x_scale=x_scale,
@@ -1308,6 +1355,7 @@ def fit_model(data, func, p0, *args, **kwargs):
     result["Model"] = f"{func.__module__}.{func.__name__}"
     result["Fit"] = res
     result["Coefficients"] = res_x
+    result["InitialCoefficients"] = {"values": x0, "bounds": bounds}
     result["Coefficient Names"] = coef_names
     result["GoF"] = dict()
     result["GoF"]["Rsq"] = rsq
