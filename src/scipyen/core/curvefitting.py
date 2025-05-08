@@ -1109,7 +1109,7 @@ def fit_model(data, func, p0, *args, **kwargs):
     
     fkwargs: dict with keyword parameters to `func`
     
-    coef_names: tuple with model parameter names or symbols (str)
+    coeff_names: tuple with model parameter names or symbols (str)
     
     
     The following are passed directly to scipy.optimize.least_squares:
@@ -1222,20 +1222,20 @@ def fit_model(data, func, p0, *args, **kwargs):
     
     x0 = p0 # sequence of initial values for the model parameters
     
-    coef_names = kwargs.pop("coef_names", None)
+    coeff_names = kwargs.pop("coeff_names", None)
     
-    if isinstance(coef_names, typing.Sequence):
-        if len(coef_names) == 0:
-            coef_names = [f"Coefficient {k}" for k in range(len(p0))]
+    if isinstance(coeff_names, typing.Sequence):
+        if len(coeff_names) == 0:
+            coeff_names = [f"Coefficient {k}" for k in range(len(p0))]
         else:
-            if len(coef_names) < len(p0):
-                coef_names = tuple([n for n in coef_names] + [f"Coefficient_{k}" for k in range(len(p0)-len(coef_names))])
+            if len(coeff_names) < len(p0):
+                coeff_names = tuple([n for n in coeff_names] + [f"Coefficient_{k}" for k in range(len(p0)-len(coeff_names))])
                 
-            elif len(coef_names) > len(p0):
-                coef_names = coef_names[0:len(p0)]
+            elif len(coeff_names) > len(p0):
+                coeff_names = coeff_names[0:len(p0)]
                 
     else:
-        coef_names = [f"Coefficient {k}" for k in range(len(p0))]
+        coeff_names = [f"Coefficient {k}" for k in range(len(p0))]
         
             
     lo = list()
@@ -1356,7 +1356,7 @@ def fit_model(data, func, p0, *args, **kwargs):
     result["Fit"] = res
     result["Coefficients"] = res_x
     result["InitialCoefficients"] = {"values": x0, "bounds": bounds}
-    result["Coefficient Names"] = coef_names
+    result["Coefficient Names"] = coeff_names
     result["GoF"] = dict()
     result["GoF"]["Rsq"] = rsq
     result["GoF"]["R2adj"] = arsq
