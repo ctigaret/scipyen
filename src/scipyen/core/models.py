@@ -81,10 +81,10 @@ def check_rise_decay_params(x):
     
     return (len(x)-3) // 2
 
-def generic_multi_exponential_decay(x, α, β, x0, *τ):
-    r"""Realizes y = α + β × exp(-(x-x₀)/(τc)
+def generic_compound_exponential_decay(x, α, β, x0, *τ):
+    r"""Realizes y = α + β × exp(-(x-x₀)/τ₁) × exp(-(x-x₀)/τ₂) = α + β × exp(-(x-x₀)/τc)
     
-    Where τc = (τ₀ + τ₁)/(τ₀ × τ₁)
+    Where τc = (τ₀ × τ₁)/(τ₀ + τ₁)
 
 Where τ is a sequence of floats: the individual time constants, one for each decay
     cmomponent; 
@@ -101,8 +101,8 @@ The other parameters are as for generic_single_exponential_decay
         
     return α + β * np.exp(-(x-x0) / τc)
 
-def generic_multi_exponential_decay_model(x, parameters, **kwargs):
-    return generic_multi_exponential_decay(x, *parameters, **kwargs)
+def generic_compound_exponential_decay_model(x, parameters, **kwargs):
+    return generic_compound_exponential_decay(x, *parameters, **kwargs)
 
 def generic_single_exponential_decay(x, α, β, x0, τ):
     r"""Realizes y = α + β × exp(-(x-x₀)/τ)

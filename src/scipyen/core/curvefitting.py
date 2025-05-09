@@ -1370,3 +1370,225 @@ def fit_model(data, func, p0, *args, **kwargs):
     fittedCurve[realDataNdx] = fC
     
     return fittedCurve, result
+
+def guess_two_partial_exp(x, y, sort=True):
+    r""" y  = a + b × exp(xc) × exp(xd) 
+    
+    This function can be "trivialized" to a single exponential:
+    y  = a + b × exp(x(c+d)) = a + b × exp(xζ)
+    
+    However, here I consider this as a "branching" process where the decay is the 
+    net result of two individual decay "modes" occurring simultaneously, each with
+    its own  "partial" time constant. Even if this can be "trivialized" as above, 
+    finding ζ leaves us with an infinity of solutions in c & d.
+    
+    - d/dt 𝐍(t) = 𝐍λ₁ + 𝐍λ₂ = 𝐍(λ₁ + λ₂) with the solution:
+    
+    𝐍(t) = 𝐍₀ ⋅ exp(-t⋅(λ₁ + λ₂)) = 𝐍₀ ⋅ exp(-t⋅λᵪ)) where λᵪ = (λ₁ + λ₂)
+    
+    For such a "double-exponential" decay (as is also usually known, but prone
+    to being confused with a sum of two exponentials) I apply Jacquelin's 
+    method of using integral equations to reduce a non-linear least-squares 
+    (iterative) curve fitting problem to a linear system problem, thus bypassing 
+    the need to guess the initial values for the coefficients (the two time constants
+    AND the additive and multiplicative bias).
+    
+    It is likely that a least-squares iterative fitting approach would give
+    a much better result in terms of the sum of squared error; however, this function
+    is pretty quick and therefore helpful in guessing the initial coefficient values
+    for a non-linear least-squares fitting problem solver.
+    
+    NOTE: this is DIFFERENT from the ("true"?) double exponential function treated 
+    by Jacquelin, which is effectively a sum of exponentials, and not a product,
+    like here.
+    
+    NOTE: this function does NOT take into account a "delay" coefficient (see
+    core.curvefitting.fit_model() and core.models.generic_compound_exponential_decay()
+    functions in Scipyen) which — granted — introduces a further complication in 
+    the non-linear least squares problem (however, this later problem can be
+    annulled by setting the domain of a signal to start at 0 and fit with a version
+    of the model without "delay" coefficient)
+    
+    NOTE: the name of this function is chosen to avoid the ambiguity of the 
+    "double exponential" name, and to reflect the fact that in most circumstances
+    this function woold be used to determine the set of initial coefficient values
+    for a non-linear least-squares fitting problem using the biased product of
+    two exponentials
+    
+    NOTE: about time constants:
+    
+    The time constant τ of a decay process is the inverse of the coefficient at
+    the exponent. Thus, using the notations above, τ₁ = 1/λ₁ and τ₂ = 1/λ₂. It
+    follows that the COMBINED time constant τᵪ is:
+                              
+        τᵪ = (λ₁ + λ₂)⁻¹ = ---------------
+    
+    """
+    x,y = preprocess(x,y,sort)
+    
+    M = np.empty(y.shape + (4,))
+    
+    # Step 1
+    # this follows Jacquelin treatment of a single exponential function, which is
+    # the trivial form explained above.
+    #
+    # Because the two exponential factors are KEPT SEPARATE, we need two extra 
+    # terms in the linear equations (we have FOUR unknowns), such that the matrix 
+    # 𝐌 (see below) has four columns, which nevertheless are pairs of the same thing:
+    # M[:,:2] is x-x[0]; M[:,2:] is the Sk (numeric integral of y); the vector 𝐘
+    # stays the same (y-y[0]).
+    
+    M = np.empty(y.shape + (4, ))
+    
+    M[:,0] = M[:,1] = x-x[0]
+    M[0,2:] = 0.                    # first element in the numeric integral is always 0, read Jacquelin's paper
+    M[1:,2] = M[1:,2] = np.cumsum(0.5* np.diff(x) * (y[1:] + y[:-1]))
+    
+    # solve for A, B, c, d, where A = -ac; B = -ad
+    (A, B, c, d), *_ = scipy.linalg.lstsq(M, Y, overwrite_a=True, overwrite_b = False)
+    
+    # a = -A/c # might also use a = -B/d; they are close but NOT equal! Instead, use "a" from Step 2
+    
+    # Step 2: solve for a, b
+    # ### the system of equatios here is:
+    # ###   a₂ + b₂ × θ = y ≡ 1×a₂ + θ×b₂ = y.
+    # ###
+    # ### where θ = exp(xc)⋅exp(xd) = exp(x(c+d)), and we already know c and d
+    # ###   with the "unknowns" being a₂ and b₂, whereas the "coefficients" being 1 and θ
+    # ### hence
+    # ###   𝐌 ×  ⃗ξ  = y ( ⃗ξ  = the vector [a₂, b₂]) ⇒  ⃗ξ  = 𝐌⁻¹ ⋅ y 
+    # ### 
+    # dump the last two columns of M
+    M = M[:,:2]
+    
+    M[:,0] = 1.
+    M[:,1] = np.exp(x * (c+d))
+    
+    (a, b), *_ = scipy.linalg.lstsq(M, y, overwrite_a=True, overwrite_b=False)
+    
+    return np.array([a, b, c, d])
+    
+    # ### BEGIN snippet of skg.exp.exp_fit for one exponential
+    
+    
+    # ### BEGIN explanation for dummies
+    # ### Remember:
+    # ### in Jacquelin's paper the definite integral (∫ˣₓ₁,) x₁ is actually x[0]
+    # ### 
+    # ### eq 6 is the clincher: 
+    # ### 
+    # ### y - (a + b⋅exp(cx₁)) = -a⋅c(x-x₁) + c ⋅ ∫ˣₓ₁ y(u)du  i.e.:
+    # ### y - (a + b⋅exp(cx₁)) = -a⋅c(x-x₁) + c ⋅ S
+    # ### 
+    # ### where a + b⋅exp(cx₁) = y₁ = y[0]
+    # ### 
+    # ### with x₁ = x[0] ⟹ a + b⋅exp(cx[0]) = y[0], hence:
+    # ### 
+    # ### y - y[0] = -a⋅c(x-x[0]) + c ⋅ Sₖ, with Sₖ the numeric integral (eq 7):
+    # ### 
+    # ###                               S₀ = 0 for k == 0
+    # ###                               Sₖ = Sₖ₋₁ + 1/2 (yₖ + yₖ₋₁) (xₖ - xₖ₋₁) for k ∈ [1…n-1]
+    # ### 
+    # ### NOTE for below: let A = -ac, let B = c
+    # ### 
+    # ### y - y[0] = -a⋅c(x-x[0]) + c ⋅ Sₖ, with Sₖ the numeric integral (eq 7):
+    # ### 
+    # ### eq 9:
+    # ###
+    # ### Σⁿₖ₌₁ ε²ₖ = Σⁿₖ₌₁ (yₖ - y₁)² = Σⁿₖ₌₁ (A(xₖ - x₁) + BSₖ - (yₖ - y₁))² ↝ 0
+    # ### 
+    # ### becomes
+    # ### 
+    # ### Σⁿ⁻¹ₖ₌₀ ε²ₖ = Σⁿ⁻¹ₖ₌₀ (A(xₖ - x₀) + BSₖ - (yₖ - y₀))², with the A(⋯) and BSₖ terms in matrix M, and the (yₖ - y₀) term in vector Y
+    # ###
+    # ### The condition is to minimize ε i.e. Σⁿ⁻¹ₖ₌₀ ε²ₖ = 0 ⟹
+    # ###
+    # ### (yₖ - y₁) = A(xₖ - x₁) + BSₖ ≡ (y - y[0]) = A(x - x[0]) + BSₖ ≡
+    # ###                              ≡ 𝐘 = 𝐀𝒙 + BSₖ 
+    # ### For each 𝒙 we have:
+    # ### 
+    # ###   Ax + Bs = y ⇒ a system of 𝒏 linear equation (one for each xₖ, yₖ sample pairs)
+    # ### 
+    # ###  In matrix form: NOTE: here the "unknowns" are A and B (the "variables")
+    # ###   and the "coefficients" — "constants" are 
+    # ### 
+    # ###   𝒙 and 𝒔 on the lhs, and 𝒚 on the rhs
+    # ### 
+    # ###  albeit transorfmed as above: 𝒙 = x - x[0], 𝒚 = y - y[0], ans 𝒔 calculated as Sₖ above
+    # ###           
+    # ###          𝐌             coeffs         𝐘
+    # ###    _              _                _      _
+    # ###   |  x₀,    s₀     |    _   _     |  y₀,   |
+    # ###   |  x₁,    s₁     |   |  A  |    |  y₁,   |
+    # ###   |  x₂,    s₂     | ⋅ |     | =  |  y₂,   |
+    # ###   |  ⋮,     ⋮      |   |  B  |    |  ⋮,    |
+    # ###   |  xₙ₋₁,  sₙ₋₁   |   -    -     |  yₙ₋₁, |
+    # ###   -               -               -       -
+    # ### 
+    # ###   The solution is:
+    # ###               _              _ (-1)    _      _
+    # ###    _   _     |  x₀,    s₀     |       |  y₀,   |
+    # ###   |  A  |    |  x₁,    s₁     |       |  y₁,   |
+    # ###   |     | =  |  x₂,    s₂     |   ⋅   |  y₂,   |
+    # ###   |  B  |    |  ⋮,     ⋮      |       |  ⋮,    |
+    # ###   -    -     |  xₙ₋₁,  sₙ₋₁   |       |  yₙ₋₁, |
+    # ###              -               -        -       -
+    # ###  i.e.:
+    # ### 
+    # ###  coeffs = (A,B) = 𝐌⁻¹ ⋅ 𝐘 = inv(𝐌) * 𝐘    NOTE: coeffs is a two-vector of floats: (A, B)
+    # ### 
+    # ### ⟹ (A,B) = lstsq(𝐌, 𝐘)
+    # ###
+    # ### fill up the matrix 𝐌 with
+    # ### 
+    # ### Column 0: xₖ - x₀ (the <<factor>> of A)       Column 1: Sₖ (the <<factor>> of B)
+    # ###                                               Sₖ = Sₖ₋₁ + 1/2 (yₖ + yₖ₋₁) (xₖ - xₖ₋₁) eq 7 in Jacquelin's paper
+    # ###
+    # ### 0                                             0                                           # S₀ = 0
+    # ### x[1] - x[0]                                   ((x[1] - x[0]) * (y[1] + y[0]))/2 + 0       # S₀ + 1/2 (y₁ + y₀) (x₁ - x₀)
+    # ### x[2] - x[0]                                   ((x[2] - x[1]) * (y[2] + y[1]))/2 + 
+    # ###                                               ((x[1] - x[0]) * (y[1] + y[0]))/2 + 0       # S₁ + 1/2 (y₂ + y₁) (x₂ - x₁)
+    # ### ⋮                                             
+    # ### x[-1] - x[0]                                  cumsum(0.5 * diff(x) * (y[1:] + y[:-1]))
+    # ###
+    # ### i.e.
+    # ### Column 0:                                     Column 1:
+    # ### x - x[0]                                      cumsum(0.5 * diff(x) * (y[1:] + y[:-1]))
+    # ###
+    # ### and the 𝐘 vector is y - y[0]
+    # ###
+    # ### END   explanation for dummies
+    
+    # ### Step 1: find out the A = "-ac" and B = "c" coefficients
+    
+    # M = empty(y.shape + (2,), dtype=y.dtype)
+    # subtract(x, x[0], out=M[:, 0])                                    # ### place x-x[0] in 1st column, see above
+    # M[0, 1] = 0                                                       # ### place Sₖ     in 2nd column, see above
+    # cumsum(0.5 * diff(x) * (y[1:] + y[:-1]), out=M[1:, 1])            # ### set M[0,1] to 0 because S[0] = 0, see above
+    # 
+    # Y = y - y[0]                                                      # ### the 𝐘 vector
+    # 
+    # ### This is scipy.linalg.lstsq: computes least-squares solution to Ax = b
+    # ### i.e., solution is x such that |b - Ax| is minimized
+    # ### function syntax (basic): x = lstsq(A, b)
+    # ### 'A' (the 'lhs') here is M; 'b' (the 'rhs') here is Y
+    # (A, B), *_ = lstsq(M, Y, overwrite_a=True, overwrite_b=True)      # ### solve for A, B
+    # 
+    # a, c = -A / B, B                                                  # ### calculate coefficients a, c
+    # 
+    #
+    # ### Step 2: find out the "b" coefficient and the new "a"
+    #
+    # M[:, 0].fill(1.0)
+    # exp(c * x, out=M[:, 1])
+    # 
+    #
+    # (a, b), *_ = lstsq(M, y, overwrite_a=True, overwrite_b=False)
+    # 
+    # out = array([a, b, c])
+    # 
+    # return out
+    
+    # ### END   snippet of skg.exp.exp_fit for one exponential
+    
+    
