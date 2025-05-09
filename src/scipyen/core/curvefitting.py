@@ -1371,20 +1371,23 @@ def fit_model(data, func, p0, *args, **kwargs):
     
     return fittedCurve, result
 
-def guess_two_partial_exp(x, y, sort=True):
-    r""" y  = a + b × exp(xc) × exp(xd) 
+def guess_two_partial_exp(x:np.ndarray, y:np.ndarray, sort:bool=True):
+    r""" y  = a + b × exp(xc) × exp(xd)
     
     This function can be "trivialized" to a single exponential:
     y  = a + b × exp(x(c+d)) = a + b × exp(xζ)
     
     However, here I consider this as a "branching" process where the decay is the 
     net result of two individual decay "modes" occurring simultaneously, each with
-    its own  "partial" time constant. Even if this can be "trivialized" as above, 
-    finding ζ leaves us with an infinity of solutions in c & d.
+    its own  "partial" time constant.
     
     - d/dt 𝐍(t) = 𝐍λ₁ + 𝐍λ₂ = 𝐍(λ₁ + λ₂) with the solution:
     
     𝐍(t) = 𝐍₀ ⋅ exp(-t⋅(λ₁ + λ₂)) = 𝐍₀ ⋅ exp(-t⋅λᵪ)) where λᵪ = (λ₁ + λ₂)
+    
+    Even if this can be "trivialized" as above, only finding ζ leaves us with an 
+    infinity of solutions in c & d.
+    
     
     For such a "double-exponential" decay (as is also usually known, but prone
     to being confused with a sum of two exponentials) I apply Jacquelin's 
@@ -1398,33 +1401,46 @@ def guess_two_partial_exp(x, y, sort=True):
     is pretty quick and therefore helpful in guessing the initial coefficient values
     for a non-linear least-squares fitting problem solver.
     
-    NOTE: this is DIFFERENT from the ("true"?) double exponential function treated 
+    NOTE: This is DIFFERENT from the ("true"?) double exponential function treated 
     by Jacquelin, which is effectively a sum of exponentials, and not a product,
     like here.
     
-    NOTE: this function does NOT take into account a "delay" coefficient (see
+    NOTE: This function does NOT take into account a "delay" coefficient (see
     core.curvefitting.fit_model() and core.models.generic_compound_exponential_decay()
     functions in Scipyen) which — granted — introduces a further complication in 
     the non-linear least squares problem (however, this later problem can be
     annulled by setting the domain of a signal to start at 0 and fit with a version
     of the model without "delay" coefficient)
     
-    NOTE: the name of this function is chosen to avoid the ambiguity of the 
+    NOTE: The name of this function is chosen to avoid the ambiguity of the 
     "double exponential" name, and to reflect the fact that in most circumstances
-    this function woold be used to determine the set of initial coefficient values
+    this function would be used to determine the set of initial coefficient values
     for a non-linear least-squares fitting problem using the biased product of
     two exponentials
     
-    NOTE: about time constants:
+    NOTE: About time constants:
     
     The time constant τ of a decay process is the inverse of the coefficient at
     the exponent. Thus, using the notations above, τ₁ = 1/λ₁ and τ₂ = 1/λ₂. It
     follows that the COMBINED time constant τᵪ is:
-                              
-        τᵪ = (λ₁ + λ₂)⁻¹ = ---------------
+                            
+        τᵪ = (λ₁ + λ₂)⁻¹ = (τ₁ × τ₂ / (τ₁ + τ₂)
+    
+    Therefore, when applying this function to determine initial values for traditional
+    curve fitting, remember to calculate the inverse of the last two coefficients
+    returned.
+    
+    Parameters:
+    ===========
+    x, y, 1D vectors ie., with shape (N,)
+    sort:bool When True (default), x,y must have been sorted in increasing order
+        of x i.e., monotonically increasing in x, which is essential for the 
+        application of the integral equations method; this is usually "baked-in" 
+        in biological signals e.g. electrophysiology data, so the default is True.
+        When False, the data will be sorted accordingly...
     
     """
-    x,y = preprocess(x,y,sort)
+    x,y = skg_preprocess(x,y,sort)
     
     M = np.empty(y.shape + (4,))
     
@@ -1469,9 +1485,7 @@ def guess_two_partial_exp(x, y, sort=True):
     return np.array([a, b, c, d])
     
     # ### BEGIN snippet of skg.exp.exp_fit for one exponential
-    
-    
-    # ### BEGIN explanation for dummies
+    # ### BEGIN explanation for dummies (like myself)
     # ### Remember:
     # ### in Jacquelin's paper the definite integral (∫ˣₓ₁,) x₁ is actually x[0]
     # ### 
@@ -1558,7 +1572,7 @@ def guess_two_partial_exp(x, y, sort=True):
     # ### and the 𝐘 vector is y - y[0]
     # ###
     # ### END   explanation for dummies
-    
+
     # ### Step 1: find out the A = "-ac" and B = "c" coefficients
     
     # M = empty(y.shape + (2,), dtype=y.dtype)
@@ -1592,3 +1606,17 @@ def guess_two_partial_exp(x, y, sort=True):
     # ### END   snippet of skg.exp.exp_fit for one exponential
     
     
+def skg_preprocess(x,y, sort=True):
+    r"""skg._util.skg_preprocess copied shamelessly here"""
+
+    x = np.asfarray(x).ravel()
+    y = np.asfarray(y).ravel()
+    
+    assert x.shape == y.shape, "Vectors must have the same size"
+    
+    if not sort:
+        ind = np.argsort(x)
+        x = x[ind]
+        y = y[ind]
+        
+    return x, y

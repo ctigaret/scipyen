@@ -86,8 +86,17 @@ def generic_compound_exponential_decay(x, α, β, x0, *τ):
     
     Where τc = (τ₀ × τ₁)/(τ₀ + τ₁)
 
-Where τ is a sequence of floats: the individual time constants, one for each decay
-    cmomponent; 
+    Where τ is a sequence of floats: the individual time constants, one for each decay
+    component.
+    
+    Although it can be extended to a product of more than two exponentials, this is 
+    likely to introduce more errors/instability, and to make it harder for the solver
+    to converge on a solution.
+    
+    The function core.curvefitting.guess_two_partial_exp can be used to generate
+    initial coefficient values for a product of two exponentials, but be aware that
+    the last two values in the result of that function have to be inverted (1/x)
+    to be used as time constants.
     
 The other parameters are as for generic_single_exponential_decay
 """
