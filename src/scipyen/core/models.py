@@ -82,7 +82,9 @@ def check_rise_decay_params(x):
     return (len(x)-3) // 2
 
 def generic_multi_exponential_decay(x, α, β, x0, *τ):
-    r"""Realizes y = α + β × exp(-(x-x₀)/(∑τ)
+    r"""Realizes y = α + β × exp(-(x-x₀)/(τc)
+    
+    Where τc = (τ₀ + τ₁)/(τ₀ × τ₁)
 
 Where τ is a sequence of floats: the individual time constants, one for each decay
     cmomponent; 
