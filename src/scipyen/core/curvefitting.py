@@ -1378,35 +1378,86 @@ def guess_init_two_exp_sum(x:np.ndarray, y:np.ndarray, is_sorted:bool=True):
     Returns:
     ========
     4-tuple: (b, p, c, q)
+    WARNING: Work in progress, DO NOT USE
     """
     x,y = skg_preprocess(x,y,is_sorted)
     # ### params to optimize: p, q, b, c
-
-    M = np.empty(y.shape + (4, ))
-    M[:,3] = 1.
-    M[:,2] = x
-    M[0,1:] = 0
-    M[1:,1] = np.cumsum(0.5* np.diff(x) * (y[1:] + y[:-1]))
-    M[0,0] = 0.                   
-    M[1:,0] = np.cumsum(0.5* np.diff(x) * (M[1:,1] + M[:-1,1]))
     
-    (A, B, C, D), *_ = linalg.lstsq(M, y, overwrite_a=True, overwrite_b = False)
+    S = np.zeros(y.shape)
+    S[1:] = np.cumsum(0.5* np.diff(x) * (y[1:] + y[:-1]))
+    
+    SS = np.zeros(y.shape)
+    SS[1:] = np.cumsum(0.5* np.diff(x) * (S[1:] + S[:-1]))
+    M = np.zeros((4, 4))
+    M[0,0] = np.dot(SS, SS)
+    M[1,0] = np.dot(SS, S)
+    M[2,0] = np.dot(SS, x)
+    M[3,0] = np.sum(SS)
+    
+    M[0,1] = M[1,0]
+    M[1,1] = np.dot(S, S)
+    M[2,1] = np.dot(S, x)
+    M[3,1] = np.sum(S)
+    
+    M[0,2] = M[2,0]
+    M[1,2] = M[2,1]
+    M[2,2] = np.dot(x, x)
+    M[3,2] = np.sum(x)
+    
+    M[0,3] = M[3,0]
+    M[1,3] = M[3,1]
+    M[2,3] = M[2,3]
+    M[3,3] = y.shape[0]
+    
+    Y = np.array([np.dot(SS, y), np.dot(S, y), np.dot(x, y), np.sum(y)])
+    
+    (A, B, C, D), *_ = linalg.lstsq(M, Y, overwrite_a=True, overwrite_b = False)
     
     B2A = B**2 + 4*A
     
     p = 0.5 * (B + np.sqrt(B2A))
     q = 0.5 * (B - np.sqrt(B2A))
+
+    β = np.exp(p*x)
+    η = np.exp(q*x)
     
-    M = M[:,:2]
-    M[:,0] = np.exp(p * x)
-    M[:,1] = np.exp(q * x)
+    M = M[:2,:2]
+    M[0,0] = np.dot(β, β)
+    M[1,0] = np.dot(β, η)
+    M[0,1] = M[1,0]
+    M[1,1] = np.dot(η, η)
     
-    exp_p = np.exp(p * x)
-    exp_q = np.exp(p * x)
+    γ = np.array([np.dot(β, y), np.dot(η, y)])
     
-    (b, c), *_ = linalg.lstsq(M, y, overwrite_a=True, overwrite_b = False)
+    (b, c), *_ = linalg.lstsq(M, γ, overwrite_a=True, overwrite_b = False)
     
     return (b, c, p, q)
+    
+#     M = np.empty(y.shape + (4, ))
+#     M[:,3] = 1.
+#     M[:,2] = x
+#     M[0,:2] = 0
+#     M[1:,1] = np.cumsum(0.5* np.diff(x) * (y[1:] + y[:-1]))
+#     M[0,0] = 0.                   
+#     M[1:,0] = np.cumsum(0.5* np.diff(x) * (M[1:,1] + M[:-1,1]))
+#     
+#     (A, B, C, D), *_ = linalg.lstsq(M, y, overwrite_a=True, overwrite_b = False)
+#     
+#     B2A = B**2 + 4*A
+#     
+#     p = 0.5 * (B + np.sqrt(B2A))
+#     q = 0.5 * (B - np.sqrt(B2A))
+#     
+#     M = M[:,:2]
+#     M[:,0] = np.exp(p * x)
+#     M[:,1] = np.exp(q * x)
+#     
+#     exp_p = np.exp(p * x)
+#     exp_q = np.exp(p * x)
+#     
+#     (b, c), *_ = linalg.lstsq(M, y, overwrite_a=True, overwrite_b = False)
+#     
+#     return (b, c, p, q)
 
 def guess_init_two_exp_prod(x:np.ndarray, y:np.ndarray, is_sorted:bool=True):
     r""" y  = a + b × exp(xc) × exp(xd)
