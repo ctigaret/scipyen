@@ -18,7 +18,7 @@ import os, sys, traceback, warnings, numbers, collections, typing
 import numpy as np
 import quantities as pq
 import pandas as pd
-from scipy import cluster, optimize, signal, integrate #, where
+from scipy import cluster, optimize, signal, integrate, linalg #, where
 from core.vigra_patches import vigra
 import neo
 #### END 3rd party modules
@@ -1184,6 +1184,7 @@ def fit_model(data, func, p0, *args, **kwargs):
    
     realDataNdx = ~np.isnan(data)
     
+    # ### prepare the signal
     if isinstance(data, neo.core.basesignal.BaseSignal):
         if data.shape[1] > 1:
             if channel < -data.shape[1] or channel >= data.shape[1]:
@@ -1224,6 +1225,7 @@ def fit_model(data, func, p0, *args, **kwargs):
     
     coeff_names = kwargs.pop("coeff_names", None)
     
+    # ### prepare fit coefficients
     if isinstance(coeff_names, typing.Sequence):
         if len(coeff_names) == 0:
             coeff_names = [f"Coefficient {k}" for k in range(len(p0))]
@@ -1237,7 +1239,7 @@ def fit_model(data, func, p0, *args, **kwargs):
     else:
         coeff_names = [f"Coefficient {k}" for k in range(len(p0))]
         
-            
+    # ### prepare constraints (bounds)
     lo = list()
     up = list()
     
@@ -1371,7 +1373,7 @@ def fit_model(data, func, p0, *args, **kwargs):
     
     return fittedCurve, result
 
-def guess_two_partial_exp(x:np.ndarray, y:np.ndarray, sort:bool=True):
+def guess_init_two_exp_prod(x:np.ndarray, y:np.ndarray, is_sorted:bool=True):
     r""" y  = a + b × exp(xc) × exp(xd)
     
     This function can be "trivialized" to a single exponential:
@@ -1401,24 +1403,24 @@ def guess_two_partial_exp(x:np.ndarray, y:np.ndarray, sort:bool=True):
     is pretty quick and therefore helpful in guessing the initial coefficient values
     for a non-linear least-squares fitting problem solver.
     
-    NOTE: This is DIFFERENT from the ("true"?) double exponential function treated 
+    NOTE 1: This is DIFFERENT from the ("true"?) double exponential function treated 
     by Jacquelin, which is effectively a sum of exponentials, and not a product,
     like here.
     
-    NOTE: This function does NOT take into account a "delay" coefficient (see
+    NOTE 2: This function does NOT take into account a "delay" coefficient (see
     core.curvefitting.fit_model() and core.models.generic_compound_exponential_decay()
     functions in Scipyen) which — granted — introduces a further complication in 
     the non-linear least squares problem (however, this later problem can be
     annulled by setting the domain of a signal to start at 0 and fit with a version
     of the model without "delay" coefficient)
     
-    NOTE: The name of this function is chosen to avoid the ambiguity of the 
+    NOTE 3: The name of this function is chosen to avoid the ambiguity of the 
     "double exponential" name, and to reflect the fact that in most circumstances
     this function would be used to determine the set of initial coefficient values
     for a non-linear least-squares fitting problem using the biased product of
     two exponentials
     
-    NOTE: About time constants:
+    NOTE 4: About time constants:
     
     The time constant τ of a decay process is the inverse of the coefficient at
     the exponent. Thus, using the notations above, τ₁ = 1/λ₁ and τ₂ = 1/λ₂. It
@@ -1439,10 +1441,19 @@ def guess_two_partial_exp(x:np.ndarray, y:np.ndarray, sort:bool=True):
         in biological signals e.g. electrophysiology data, so the default is True.
         When False, the data will be sorted accordingly...
     
-    """
-    x,y = skg_preprocess(x,y,sort)
+    Returns:
+    ========
+    A 4-tuple of coefficients a, b, c, d.
+
+    The "c" and "d" coefficients are the inverse of exponential decay constants
+    (time constants, see NOTE 4). Therefore, to be used with the 
+    generic_compound_exponential_decay* functions in this module they must be
+    inverted (α = a, β = b, τ₁ = 1/c, τ₂ = 1/d)
     
-    M = np.empty(y.shape + (4,))
+    """
+    x,y = skg_preprocess(x,y,is_sorted)
+    
+    # M = np.empty(y.shape + (4,))
     
     # Step 1
     # this follows Jacquelin treatment of a single exponential function, which is
@@ -1458,10 +1469,12 @@ def guess_two_partial_exp(x:np.ndarray, y:np.ndarray, sort:bool=True):
     
     M[:,0] = M[:,1] = x-x[0]
     M[0,2:] = 0.                    # first element in the numeric integral is always 0, read Jacquelin's paper
-    M[1:,2] = M[1:,2] = np.cumsum(0.5* np.diff(x) * (y[1:] + y[:-1]))
+    M[1:,2] = M[1:,3] = np.cumsum(0.5* np.diff(x) * (y[1:] + y[:-1]))
+    
+    Y = y - y[0]
     
     # solve for A, B, c, d, where A = -ac; B = -ad
-    (A, B, c, d), *_ = scipy.linalg.lstsq(M, Y, overwrite_a=True, overwrite_b = False)
+    (A, B, c, d), *_ = linalg.lstsq(M, Y, overwrite_a=True, overwrite_b = False)
     
     # a = -A/c # might also use a = -B/d; they are close but NOT equal! Instead, use "a" from Step 2
     
@@ -1480,9 +1493,9 @@ def guess_two_partial_exp(x:np.ndarray, y:np.ndarray, sort:bool=True):
     M[:,0] = 1.
     M[:,1] = np.exp(x * (c+d))
     
-    (a, b), *_ = scipy.linalg.lstsq(M, y, overwrite_a=True, overwrite_b=False)
+    (a, b), *_ = linalg.lstsq(M, y, overwrite_a=True, overwrite_b=False)
     
-    return np.array([a, b, c, d])
+    return (a, b, c, d)
     
     # ### BEGIN snippet of skg.exp.exp_fit for one exponential
     # ### BEGIN explanation for dummies (like myself)
@@ -1606,7 +1619,7 @@ def guess_two_partial_exp(x:np.ndarray, y:np.ndarray, sort:bool=True):
     # ### END   snippet of skg.exp.exp_fit for one exponential
     
     
-def skg_preprocess(x,y, sort=True):
+def skg_preprocess(x,y, is_sorted=True):
     r"""skg._util.skg_preprocess copied shamelessly here"""
 
     x = np.asfarray(x).ravel()
@@ -1614,7 +1627,7 @@ def skg_preprocess(x,y, sort=True):
     
     assert x.shape == y.shape, "Vectors must have the same size"
     
-    if not sort:
+    if not is_sorted:
         ind = np.argsort(x)
         x = x[ind]
         y = y[ind]

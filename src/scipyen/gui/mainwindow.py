@@ -436,6 +436,7 @@ _valid_varname__regex_ = '^[A-Za-z_][A-Za-z0-9_]{1,30}$'
 #     u'\n\nAnd from the Pict package:\npictio --> pio\nsignalviewer --> sv\ndatatypes \nxmlutils' +\
 #     u'\n\nTherefore ipython line magics such as %pylab or %mtplotlib, although still available, are not necessary anymore\n'
 
+_scipyen_console_banner_ = "This is Scipyen's internal console, using:\n"
 
 _info_banner_ = ["\n*** NOTE: ***"]
 _info_banner_.append(
@@ -3475,7 +3476,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         #   to run_cell(...))
 
         if not isinstance(self.console, consoles.ScipyenConsole):
-            self.console = consoles.ScipyenConsole(scipyenWindow=self)
+            self.console = consoles.ScipyenConsole(scipyenWindow=self, banner=_scipyen_console_banner_)
             # self.console = consoles.ScipyenConsole(parent=self)
             self.console.executed.connect(self.slot_updateHistory)
             self.console.executed.connect(self.slot_updateCwd)

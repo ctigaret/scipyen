@@ -82,23 +82,41 @@ def check_rise_decay_params(x):
     return (len(x)-3) // 2
 
 def generic_compound_exponential_decay(x, α, β, x0, *τ):
-    r"""Realizes y = α + β × exp(-(x-x₀)/τ₁) × exp(-(x-x₀)/τ₂) = α + β × exp(-(x-x₀)/τc)
-    
-    Where τc = (τ₀ × τ₁)/(τ₀ + τ₁)
+    r"""Realizes
+                ₙ₋₁
+    y = α + β × Π  exp(-(x-x₀)/τₖ) = α + β × exp(-(x-x₀)/τᵪ)    , where:
+                ᵏ⁼⁰
 
-    Where τ is a sequence of floats: the individual time constants, one for each decay
-    component.
+    • τ is a sequence of floats with the individual time constants, one for
+    each decay component
+    • τᵪ is the "combined" decay time constant
+    • 𝑛 is the number of exponentials in the product above and the length of the
+        τ sequence
+
+    For two exponentials, this is (using python 0-based indexing):
     
-    Although it can be extended to a product of more than two exponentials, this is 
-    likely to introduce more errors/instability, and to make it harder for the solver
-    to converge on a solution.
+    τᵪ = (τ₀ × τ₁)/(τ₀ + τ₁), where τ₀ = τ[0] and τ₁ = τ[1] 
     
-    The function core.curvefitting.guess_two_partial_exp can be used to generate
-    initial coefficient values for a product of two exponentials, but be aware that
-    the last two values in the result of that function have to be inverted (1/x)
-    to be used as time constants.
+    Let:
+    λ₀ = 1/τ₀, λ₁ = 1/τ₁, λᵪ = λ₀ + λ₁ = 1/τ₀ + 1/τ₁ = (τ₀ + τ₁) / (τ₀ × τ₁)
     
-The other parameters are as for generic_single_exponential_decay
+    ⟹ τᵪ = 1/λᵪ = (τ₀ × τ₁ / (τ₀ + τ₁))
+    
+    Then:
+    exp(x / τ₀) × exp(x / τ₁) = exp(x × λ₀) × exp(x × λ₁) = 
+    exp(x × (λ₀ + λ₁))        = exp(x × λᵪ) = exp(x/τᵪ)
+    
+    Although it can be extended to a product of more than two exponentials, this 
+    is likely to introduce more errors/instability, and to make it harder for the
+    solver to converge on a solution.
+    
+    The function core.curvefitting.guess_init_two_exp_prod can be used to generate
+    initial coefficient values for a product of two exponentials, but be aware 
+    that the last two values in the result of that function have to be inverted 
+    (1/x) to be used as time constants (see documentation for guess_init_two_exp_prod()).
+    
+The other parameters are as for generic_single_exponential_decay.
+    
 """
     if len(τ) == 0:
         raise ValueError(f"τ must be supplied")

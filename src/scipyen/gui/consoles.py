@@ -73,7 +73,12 @@ from jupyter_client.localinterfaces import is_local_ip
 from jupyter_client.consoleapp import (
         JupyterConsoleApp, app_aliases, app_flags,
     )
-
+try:
+    from IPython.core.tips import pick_tip
+    ipythonHasTips = True
+except:
+    ipythonHasTips = False
+    
 from qtconsole.svg import save_svg, svg_to_clipboard, svg_to_image
 
 from tornado import ioloop
@@ -3321,6 +3326,7 @@ class ScipyenConsoleWidget(ConsoleWidget):
         
         '''
         self.mainWindow = kwargs.pop("mainWindow", None)
+        self.banner = kwargs.pop("banner", None)
         super().__init__(*args, **kwargs)
 
         self.kernel_manager = ScipyenInProcessKernelManager() # what if gui is NOT Qt?
@@ -3331,6 +3337,14 @@ class ScipyenConsoleWidget(ConsoleWidget):
         
         ## NOTE: 2016-03-20 14:37:37
         ## this must be set BEFORE start_channels is called
+        
+        # if isinstance(self.banner, str) and len(self.banner.strip()):
+        #     if ipythonHasTips:
+        #         tip = "Tip: {tip}\n".format(tip=pick_tip())
+        #         self.ipkernel.shell.banner2 = "\n".join([tip, self.banner])
+        #     else:
+        #         self.ipkernel.shell.banner2 = self.banner
+                
         ##self.ipkernel.shell.banner2 = "\n".join(ScipyenConsole.banner)
         #self.ipkernel.shell.banner2 = u'\n*** NOTE: ***\n\nUser variables created here in console be visible in the User variables tab of the PICT main window.\n' +\
         #u'\n\nThe Pict main window GUI object is accessible from the console as `mainWindow` or `mainWindow` (an alias of mainWindow)' +\
@@ -3358,7 +3372,8 @@ class ScipyenConsoleWidget(ConsoleWidget):
         # NOTE: 2021-07-18 10:17:26 - FIXME bug or feature?
         # the line below won't have effect unless the RichJupyterWidget is visible
         # e.g. after calling show()
-        #self.set_pygment(self._console_pygment) 
+        #self.set_pygment(self._console_pygment)
+        
         
     def _is_complete(self, source, interactive=True):
         # NOTE: 2021-09-21 16:41:04
@@ -3582,11 +3597,13 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     executed = Signal()
     
     def __init__(self, parent=None, **kwargs):
+        banner = kwargs.pop("banner", None)
         scipyenWindow = kwargs.pop("scipyenWindow", None) # take this out for below...
         super().__init__(parent=parent, **kwargs) # initializes QtWidgets.QMainWindow
         kwargs["scipyenWindow"] = scipyenWindow # ... then place back in kwargs for WorkspaceGuiMixin
         WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs) # initializes WorkspaceGuiMixin
-        self.consoleWidget = ScipyenConsoleWidget(mainWindow=self._scipyenWindow_) # from WorkspaceGuiMixin
+        self.consoleWidget = ScipyenConsoleWidget(mainWindow=self._scipyenWindow_, 
+                                                  banner=banner) # from WorkspaceGuiMixin
         # self.consoleWidget = ScipyenConsoleWidget(mainWindow=parent)
         self.consoleWidget.setAcceptDrops(True)
         self.setCentralWidget(self.consoleWidget)
@@ -3718,7 +3735,6 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     @Slot()
     def _slot_listMagics(self):
         self.ipkernel.shell.run_cell("%lsmagic")
-            
             
     @Slot()
     def _slot_saveToFile(self):

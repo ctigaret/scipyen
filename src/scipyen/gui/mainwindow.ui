@@ -381,6 +381,9 @@
        </item>
        <item>
         <widget class="QToolButton" name="clearWorkspaceToolBtn">
+         <property name="toolTip">
+          <string>Clear workspace</string>
+         </property>
          <property name="statusTip">
           <string>Clear workspace</string>
          </property>
