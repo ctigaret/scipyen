@@ -81,6 +81,11 @@ def check_rise_decay_params(x):
     
     return (len(x)-3) // 2
 
+def exponential_decay_sum(x, b, c, p, q):
+    return b*np.exp(-x*p) + c*np.exp(-x*q)
+
+
+
 def generic_compound_exponential_decay(x, α, β, x0, *τ):
     r"""Realizes
                 ₙ₋₁

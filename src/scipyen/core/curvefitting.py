@@ -1373,6 +1373,41 @@ def fit_model(data, func, p0, *args, **kwargs):
     
     return fittedCurve, result
 
+def guess_init_two_exp_sum(x:np.ndarray, y:np.ndarray, is_sorted:bool=True):
+    r"""y ( x ) = b exp( p x ) + c exp( q x)
+    Returns:
+    ========
+    4-tuple: (b, p, c, q)
+    """
+    x,y = skg_preprocess(x,y,is_sorted)
+    # ### params to optimize: p, q, b, c
+
+    M = np.empty(y.shape + (4, ))
+    M[:,3] = 1.
+    M[:,2] = x
+    M[0,1:] = 0
+    M[1:,1] = np.cumsum(0.5* np.diff(x) * (y[1:] + y[:-1]))
+    M[0,0] = 0.                   
+    M[1:,0] = np.cumsum(0.5* np.diff(x) * (M[1:,1] + M[:-1,1]))
+    
+    (A, B, C, D), *_ = linalg.lstsq(M, y, overwrite_a=True, overwrite_b = False)
+    
+    B2A = B**2 + 4*A
+    
+    p = 0.5 * (B + np.sqrt(B2A))
+    q = 0.5 * (B - np.sqrt(B2A))
+    
+    M = M[:,:2]
+    M[:,0] = np.exp(p * x)
+    M[:,1] = np.exp(q * x)
+    
+    exp_p = np.exp(p * x)
+    exp_q = np.exp(p * x)
+    
+    (b, c), *_ = linalg.lstsq(M, y, overwrite_a=True, overwrite_b = False)
+    
+    return (b, c, p, q)
+
 def guess_init_two_exp_prod(x:np.ndarray, y:np.ndarray, is_sorted:bool=True):
     r""" y  = a + b × exp(xc) × exp(xd)
     
@@ -1389,7 +1424,6 @@ def guess_init_two_exp_prod(x:np.ndarray, y:np.ndarray, is_sorted:bool=True):
     
     Even if this can be "trivialized" as above, only finding ζ leaves us with an 
     infinity of solutions in c & d.
-    
     
     For such a "double-exponential" decay (as is also usually known, but prone
     to being confused with a sum of two exponentials) I apply Jacquelin's 
@@ -1452,8 +1486,6 @@ def guess_init_two_exp_prod(x:np.ndarray, y:np.ndarray, is_sorted:bool=True):
     
     """
     x,y = skg_preprocess(x,y,is_sorted)
-    
-    # M = np.empty(y.shape + (4,))
     
     # Step 1
     # this follows Jacquelin treatment of a single exponential function, which is
