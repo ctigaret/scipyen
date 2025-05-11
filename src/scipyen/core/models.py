@@ -100,7 +100,7 @@ def generic_compound_exponential_decay(x, α, β, x0, *τ):
     each decay component
     • τᵪ is the "combined" decay time constant
     • 𝑛 is the number of exponentials in the product above and the length of the
-        τ sequence
+        τ sequence - currently, a maximum of two exponential is supported
 
     For two exponentials, this is (using python 0-based indexing):
     

@@ -1701,6 +1701,44 @@ def guess_init_two_exp_prod(x:np.ndarray, y:np.ndarray, is_sorted:bool=True):
     
     # ### END   snippet of skg.exp.exp_fit for one exponential
     
+def skg_exp_fit(x, y, is_sorted=True):
+    r"""implementation test skg.exp.exp_fit"""
+    x, y = skg_preprocess(x, y, is_sorted)
+    
+    # step 1
+    X = x-x[0]
+    _Y = y-y[0]
+    Sk = np.zeros(y.shape)
+    Sk[1:] = np.cumsum(0.5 * np.diff(x)*(y[1:] + y[:-1]))
+    XSk = np.dot(X, Sk)
+    _YX = np.dot(_Y, X)
+    _YSk = np.dot(_Y, Sk)
+    M = np.zeros((2,2))
+    M[0,0] = np.dot(X, X)
+    M[0,1] = XSk
+    M[1,0] = XSk
+    M[1,1] = np.dot(Sk, Sk)
+    
+    Y = np.array([_YX, _YSk])
+    
+    (A, B), *_ = linalg.lstsq(M, Y, overwrite_a=True, overwrite_b=True)
+    a, c = -A/B, B
+    
+    # step 2
+    n = y.shape[0]
+    θ = np.exp(c*x)
+    θsum = np.sum(θ)
+    M[0,0] = n
+    M[0,1] = θsum
+    M[1,0] = θsum
+    M[1,1] = np.dot(θ, θ)
+    
+    Y[0] = np.sum(y)
+    Y[1] = np.dot(y,θ)
+    
+    (a, b), *_ = linalg.lstsq(M, Y, overwrite_a=True, overwrite_b=False)
+
+    return (a, b, c)
     
 def skg_preprocess(x,y, is_sorted=True):
     r"""skg._util.skg_preprocess copied shamelessly here"""
