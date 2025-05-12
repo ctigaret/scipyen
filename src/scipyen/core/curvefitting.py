@@ -1374,42 +1374,185 @@ def fit_model(data, func, p0, *args, **kwargs):
     return fittedCurve, result
 
 def guess_init_two_exp_sum(x:np.ndarray, y:np.ndarray, is_sorted:bool=True):
-    r"""y ( x ) = b exp( p x ) + c exp( q x)
+    r"""y ( x ) = a + b exp( p x ) + c exp( q x)
+    Returns:
+    WARNING: Work in progress, DO NOT USE
+    ========
+    4-tuple: (a, b, p, c, q)
+    """
+    # 4-tuple: (b, p, c, q)
+    x,y = skg_preprocess(x,y,is_sorted)
+    # ### params to optimize: b, p, c, q
+    # ### params to optimize: a, b, p, c, q NOTE: 2025-05-12 10:07:03 - Lecca … Scarpa (2021) Math Meth Appl Sci 44: 10154 — 10171
+    
+    # see NOTE: 2025-05-12 10:07:03
+    # ###  ⃗θ = (a, b, c, p, q)
+    # ### y( ⃗θ;t ) = A⋅SS(t) + B⋅S(t) + C⋅t + D = a + b⋅exp(pt) + c⋅exp(qt)
+    # ### with A = pq; B = (p+q)
+    #
+    # ### but in Jacquelin's Double exponential regression paper:
+    # ### y(b, p, c, q; t) = -A⋅SS(t) + B⋅S(t) + C⋅t + D = b⋅exp(pt) + c⋅exp(qt)
+    # ### with A = -pq; B = -(p+q) !!!
+    
+    #                    ₙ₋₁
+    # all sums below are  Σ ⋅
+    #                    ⁱ⁼⁰
+    
+    # also, REMEMBER in numpy x @ y is np.dot(x,y) whebn both x, y are 1D vectors of compatible shapes
+    S = np.zeros(y.shape)
+    S[1:] = np.cumsum(0.5* np.diff(x) * (y[1:] + y[:-1])) # mid-point approximation (mid-point rule less error term f``(0.5*(xₖ - xₖ₋₁))(xₖ - xₖ₋₁)³/24)
+    
+    S2 = np.zeros(y.shape)          # SS in Lecca et al, and in Jacquelin
+    S2[1:] = np.cumsum(0.5* np.diff(x) * (S[1:] + S[:-1]))
+    
+    xx   = x  * x
+    S2S2 = np.dot(S2, S2)            # Σ(S2ᵢ*S2ᵢ)    = Σ(S2ᵢ²)
+    S2S  = np.dot(S2, S)             # Σ(S2ᵢ*Sᵢ) 
+    S2x  = np.dot(S2, x)             # Σ(S2ᵢ*xᵢ)
+    S2x2 = np.dot(S2, x**2)          # Σ(S2ᵢ*xᵢ²)    Lecca et al 2021
+    S2y  = np.dot(S2, y)             # Σ(S2ᵢ*yᵢ)
+    SS   = np.dot(S, S)              # Σ(Sᵢ²)
+    Sx   = np.dot(S, x)              # Σ(Sᵢ*xᵢ)    
+    Sx2  = np.dot(S, xx)             # Σ(Sᵢ*xᵢ²)     Lecca et al 2021
+    Sy   = np.dot(S, y)              # Σ(Sᵢ*yᵢ)
+    Σx2  = np.dot(x, x)              # Σ(xᵢ²)        Lecca et al 2021
+    Σx3  = np.dot(xx, x)             # Σ(xᵢ³)        Lecca et al 2021
+    Σx4  = np.dot(xx, xx)            # Σ(xᵢ⁴)        Lecca et al 2021
+    xy   = np.dot(x, y)              # Σ(xᵢ*yᵢ) = np.dot(x, y)
+    x2y  = np.dot(xx, y)             # Σ(xᵢ² * yᵢ)   Lecca et al 2021
+    ΣS   = S.sum()                   # Σ(Sᵢ)
+    ΣS2  = S2.sum()                  # Σ(S2ᵢ)
+    Σx   = x.sum()                   # Σ(xᵢ)
+    Σy   = y.sum()                   # Σ(yᵢ)
+    n    = x.shape[0]                # 
+    
+    # ### implementation of Lecca et al 2021 algorithm
+    
+    M = np.zeros((5,5)) # includes additive "bias"
+    
+                                                            #  _  NOTE: 𝑡 in Lecca is here 𝑥;                              ̅ 
+    M[0,:] = [S2S2,     S2S,    S2x2,   S2x,    ΣS2]        # | Σ(Sᵢ2²)      Σ(S2ᵢ*Sᵢ)    Σ(Sᵢ2*xᵢ²)   Σ(S2ᵢ*Sᵢ)     Σ(S2ᵢ) |           
+    M[1,:] = [S2S,      SS,     Sx2,    Sx,     ΣS]         # | Σ(S2ᵢ*Sᵢ)    Σ(Sᵢ²)       Σ(Sᵢ*xᵢ²)    Σ(Sᵢ*xᵢ)      Σ(Sᵢ)  |
+    M[2,:] = [S2x2,     Sx2,    Σx4,    Σx3,    Σx2]        # | Σ(S2ᵢ*xᵢ²)   Σ(Sᵢ*xᵢ²)    Σ(xᵢ⁴)       Σ(xᵢ³)        Σ(xᵢ²) |
+    M[3,:] = [S2x,      Sx,     Σx3,    Σx2,    Σx]         # | Σ(S2ᵢ*xᵢ)    Σ(Sᵢ*xᵢ)     Σ(xᵢ³)       Σ(xᵢ²)        Σ(xᵢ)  |
+    M[4,:] = [ΣS2,      ΣS,     Σx2,    Σx,     n]          # | Σ(S2ᵢ)       Σ(Sᵢ)        Σ(xᵢ²)       Σ(xᵢ)         n      |
+                                                            #  ̅                                                            ̅ 
+    
+    Y = np.array([S2y,  Sy,     x2y,    Σx2,    Σy])
+    
+    return (M, Y)
+    
+    (A, B, C, D, E), *_ = linalg.lstsq(M, Y, overwrite_a = True, overwrite_b = False)
+    
+    print(f"A = {A}, B = {B}, C = {C}, D = {D}")
+    
+    sqB2A = np.sqrt(B**2 + 4*A)
+
+    p = 0.5 * (B + sqB2A)
+    q = 0.5 * (B - sqB2A)
+    
+    print(f"p = {p}, q = {q}")
+    
+    β = np.exp(p*x)
+    η = np.exp(q*x)
+    
+    print(β, η)
+    
+    Σβ = β.sum()                            # Σ(βᵢ)
+    Ση = η.sum()                            # Σ(ηᵢ)
+    Σβη = β @ η         # np.dot(β, η)      # Σ(βᵢ * ηᵢ)
+    Σβ2 = β @ β         # np.dot(β, β)      # Σ(βᵢ * βᵢ)
+    Ση2 = η @ η         # np.dot(η, η)      # Σ(ηᵢ * ηᵢ)
+    Σβy = β @ y         # np.dot(β, y)      # Σ(βᵢ * yᵢ)
+    Σηy = η @ y         # np.dot(η, y)      # Σ(ηᵢ * yᵢ)
+    
+    Q = np.zeros((3,3))
+    Q[0,:] = [n,  Σβ,  Ση]
+    Q[1,:] = [Σβ, Σβ2, Σβη]
+    Q[2,:] = [Ση, Σβη, Ση2]
+    
+    V = np.array([Σy, Σβy, Σηy])
+    
+    (a, b, c), *_ = linalg.lstsq(Q, V, overwrite_a = True, overwrite_b = False)
+    
+    return (a, b, p, c, q)
+    
+def guess_init_two_exp_sum_J(x:np.ndarray, y:np.ndarray, is_sorted:bool=True):
+    r"""A crude implementation of Jacquelin's method of integral equation regression
+for the biexponential function
+    
+        y = b ⋅ exp(p𝑥) + c ⋅ exp(q𝑥)
+    
+    
+    CAUTION Only use as an initial guess for the time constants when fitting 
+    a biexponential decay model, with τ0 = 1/np.abs(P), and τ1 = 1/np.abs(q)
+    
+    The biexponential decay model is
+    
+        y = α + βexp(-x/τ0) + δexp(-x/τ1)
+    
+    It follows that τ0, τ1 must be > 0 (strictly), and the lower bounds for 
+    their initial values must be > 0
+    
     Returns:
     ========
-    4-tuple: (b, p, c, q)
-    WARNING: Work in progress, DO NOT USE
-    """
+    An approximation of b, p, c, q as a 4-tuple
+    
+    Of these, only p and q are of use , as above (NOTE that the biexponential
+    decay model contains an "additive bias" α which is NOT guessed; typically, 
+    this is the value of the first sample in the signal, or a "baseline" average)
+    
+    
+    
+    
+"""
+    # ### BEGIN crude implementation of Jacquelin
+    #
     x,y = skg_preprocess(x,y,is_sorted)
-    # ### params to optimize: p, q, b, c
     
     S = np.zeros(y.shape)
-    S[1:] = np.cumsum(0.5* np.diff(x) * (y[1:] + y[:-1]))
+    S[1:] = np.cumsum(0.5* np.diff(x) * (y[1:] + y[:-1])) # mid-point approximation (mid-point rule less error term f``(0.5*(xₖ - xₖ₋₁))(xₖ - xₖ₋₁)³/24)
     
-    SS = np.zeros(y.shape)
-    SS[1:] = np.cumsum(0.5* np.diff(x) * (S[1:] + S[:-1]))
+    S2 = np.zeros(y.shape)          # SS in Lecca et al, and in Jacquelin
+    S2[1:] = np.cumsum(0.5* np.diff(x) * (S[1:] + S[:-1]))
+    
+    S2S2  = np.dot(S2, S2)
+    S2S   = np.dot(S2, S)
+    S2x   = np.dot(S2, x)
+    S2y   = np.dot(S2, y)
+    S2sum = S2.sum()
+    SS    = np.dot(S, S)
+    Sx    = np.dot(S, x)
+    Sy    = np.dot(S, y)
+    Ssum  = S.sum()
+    xx    = np.dot(x, x)
+    xsum  = x.sum()
+    xy    = np.dot(x, y)
+    ysum  = y.sum()
+    n     = y.shape[0]
+    
     M = np.zeros((4, 4))
-    M[0,0] = np.dot(SS, SS)
-    M[1,0] = np.dot(SS, S)
-    M[2,0] = np.dot(SS, x)
-    M[3,0] = np.sum(SS)
+    M[0,0] = S2S2
+    M[1,0] = S2S
+    M[2,0] = S2x
+    M[3,0] = S2sum
     
     M[0,1] = M[1,0]
-    M[1,1] = np.dot(S, S)
-    M[2,1] = np.dot(S, x)
-    M[3,1] = np.sum(S)
+    M[1,1] = SS
+    M[2,1] = Sx
+    M[3,1] = Ssum
     
     M[0,2] = M[2,0]
     M[1,2] = M[2,1]
-    M[2,2] = np.dot(x, x)
-    M[3,2] = np.sum(x)
+    M[2,2] = xx
+    M[3,2] = xsum
     
     M[0,3] = M[3,0]
     M[1,3] = M[3,1]
     M[2,3] = M[2,3]
-    M[3,3] = y.shape[0]
+    M[3,3] = n
     
-    Y = np.array([np.dot(SS, y), np.dot(S, y), np.dot(x, y), np.sum(y)])
+    Y = np.array([S2y, Sy, xy, ysum])
     
     (A, B, C, D), *_ = linalg.lstsq(M, Y, overwrite_a=True, overwrite_b = False)
     
@@ -1421,43 +1564,48 @@ def guess_init_two_exp_sum(x:np.ndarray, y:np.ndarray, is_sorted:bool=True):
     β = np.exp(p*x)
     η = np.exp(q*x)
     
+    Σββ = np.dot(β, β)
+    Σβη = np.dot(β, η)
+    Σηη = np.dot(η, η)
+    Σβy = np.dot(β, y)
+    Σηy = np.dot(η, y)
     M = M[:2,:2]
-    M[0,0] = np.dot(β, β)
-    M[1,0] = np.dot(β, η)
-    M[0,1] = M[1,0]
-    M[1,1] = np.dot(η, η)
+    M[0,:] = [Σββ, Σβη]
+    M[1,:] = [Σβη, Σηη]
     
-    γ = np.array([np.dot(β, y), np.dot(η, y)])
+    Γ = np.array([Σβy, Σηy])
     
-    (b, c), *_ = linalg.lstsq(M, γ, overwrite_a=True, overwrite_b = False)
+    (b, c), *_ = linalg.lstsq(M, Γ, overwrite_a=True, overwrite_b = False)
     
     return (b, c, p, q)
+    #
+    # ### END   crude implementation of Jacuqelin
     
-#     M = np.empty(y.shape + (4, ))
-#     M[:,3] = 1.
-#     M[:,2] = x
-#     M[0,:2] = 0
-#     M[1:,1] = np.cumsum(0.5* np.diff(x) * (y[1:] + y[:-1]))
-#     M[0,0] = 0.                   
-#     M[1:,0] = np.cumsum(0.5* np.diff(x) * (M[1:,1] + M[:-1,1]))
-#     
-#     (A, B, C, D), *_ = linalg.lstsq(M, y, overwrite_a=True, overwrite_b = False)
-#     
-#     B2A = B**2 + 4*A
-#     
-#     p = 0.5 * (B + np.sqrt(B2A))
-#     q = 0.5 * (B - np.sqrt(B2A))
-#     
-#     M = M[:,:2]
-#     M[:,0] = np.exp(p * x)
-#     M[:,1] = np.exp(q * x)
-#     
-#     exp_p = np.exp(p * x)
-#     exp_q = np.exp(p * x)
-#     
-#     (b, c), *_ = linalg.lstsq(M, y, overwrite_a=True, overwrite_b = False)
-#     
-#     return (b, c, p, q)
+    M = np.empty(y.shape + (4, ))
+    M[:,3] = 1.
+    M[:,2] = x
+    M[0,:2] = 0
+    M[1:,1] = np.cumsum(0.5* np.diff(x) * (y[1:] + y[:-1]))
+    M[0,0] = 0.                   
+    M[1:,0] = np.cumsum(0.5* np.diff(x) * (M[1:,1] + M[:-1,1]))
+    
+    (A, B, C, D), *_ = linalg.lstsq(M, y, overwrite_a=True, overwrite_b = False)
+    
+    B2A = B**2 + 4*A
+    
+    p = 0.5 * (B + np.sqrt(B2A))
+    q = 0.5 * (B - np.sqrt(B2A))
+    
+    M = M[:,:2]
+    M[:,0] = np.exp(p * x)
+    M[:,1] = np.exp(q * x)
+    
+    exp_p = np.exp(p * x)
+    exp_q = np.exp(p * x)
+    
+    (b, c), *_ = linalg.lstsq(M, y, overwrite_a=True, overwrite_b = False)
+    
+    return (b, c, p, q)
 
 def guess_init_two_exp_prod(x:np.ndarray, y:np.ndarray, is_sorted:bool=True):
     r""" y  = a + b × exp(xc) × exp(xd)
@@ -1493,7 +1641,7 @@ def guess_init_two_exp_prod(x:np.ndarray, y:np.ndarray, is_sorted:bool=True):
     like here.
     
     NOTE 2: This function does NOT take into account a "delay" coefficient (see
-    core.curvefitting.fit_model() and core.models.generic_exponential_prod_decay()
+    core.curvefitting.fit_model() and core.models.generic_compound_exponential_decay()
     functions in Scipyen) which — granted — introduces a further complication in 
     the non-linear least squares problem (however, this later problem can be
     annulled by setting the domain of a signal to start at 0 and fit with a version
@@ -1532,7 +1680,7 @@ def guess_init_two_exp_prod(x:np.ndarray, y:np.ndarray, is_sorted:bool=True):
 
     The "c" and "d" coefficients are the inverse of exponential decay constants
     (time constants, see NOTE 4). Therefore, to be used with the 
-    generic_exponential_prod_decay* functions in this module they must be
+    generic_compound_exponential_decay* functions in this module they must be
     inverted (α = a, β = b, τ₁ = 1/c, τ₂ = 1/d)
     
     """

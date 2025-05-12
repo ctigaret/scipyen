@@ -85,6 +85,7 @@ def exponential_decay_sum(x, b, c, p, q):
     return b*np.exp(x*p) + c*np.exp(x*q)
 
 def generic_exponential_sum_decay(x, α, β0, β1, x0, τ0, τ1):
+    r"""Decay modelled as a bi-exponential with additive bias"""
     return α + β0 * np.exp(-(x-x0) / τ0) + β1 * np.exp(-(x-x0) / τ1)
 
 def generic_exponential_sum_decay_model(x, p):
