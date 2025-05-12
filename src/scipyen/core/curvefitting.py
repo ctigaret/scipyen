@@ -1493,7 +1493,7 @@ def guess_init_two_exp_prod(x:np.ndarray, y:np.ndarray, is_sorted:bool=True):
     like here.
     
     NOTE 2: This function does NOT take into account a "delay" coefficient (see
-    core.curvefitting.fit_model() and core.models.generic_compound_exponential_decay()
+    core.curvefitting.fit_model() and core.models.generic_exponential_prod_decay()
     functions in Scipyen) which — granted — introduces a further complication in 
     the non-linear least squares problem (however, this later problem can be
     annulled by setting the domain of a signal to start at 0 and fit with a version
@@ -1532,7 +1532,7 @@ def guess_init_two_exp_prod(x:np.ndarray, y:np.ndarray, is_sorted:bool=True):
 
     The "c" and "d" coefficients are the inverse of exponential decay constants
     (time constants, see NOTE 4). Therefore, to be used with the 
-    generic_compound_exponential_decay* functions in this module they must be
+    generic_exponential_prod_decay* functions in this module they must be
     inverted (α = a, β = b, τ₁ = 1/c, τ₂ = 1/d)
     
     """
