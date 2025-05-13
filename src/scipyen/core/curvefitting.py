@@ -1516,45 +1516,41 @@ for the biexponential function
     S2 = np.zeros(y.shape)          # SS in Lecca et al, and in Jacquelin
     S2[1:] = np.cumsum(0.5* np.diff(x) * (S[1:] + S[:-1]))
     
-    S2S2  = np.dot(S2, S2)
-    S2S   = np.dot(S2, S)
-    S2x   = np.dot(S2, x)
-    S2y   = np.dot(S2, y)
-    S2sum = S2.sum()
-    SS    = np.dot(S, S)
-    Sx    = np.dot(S, x)
-    Sy    = np.dot(S, y)
-    Ssum  = S.sum()
-    xx    = np.dot(x, x)
-    xsum  = x.sum()
-    xy    = np.dot(x, y)
-    ysum  = y.sum()
-    n     = y.shape[0]
+    S2S2  = np.dot(S2, S2)      # ΣSSₖ²
+    S2S   = np.dot(S2, S)       # ΣSSₖSₖ
+    S2x   = np.dot(S2, x)       # ΣSSₖxₖ
+    S2y   = np.dot(S2, y)       # ΣSSₖyₖ
+    S2sum = S2.sum()            # ΣSSₖ
+    SS    = np.dot(S, S)        # ΣSₖ²
+    Sx    = np.dot(S, x)        # ΣSₖxₖ
+    Sy    = np.dot(S, y)        # ΣSₖyₖ
+    Ssum  = S.sum()             # ΣSₖ
+    xx    = np.dot(x, x)        # Σxₖ²
+    xsum  = x.sum()             # Σxₖ
+    xy    = np.dot(x, y)        # Σxₖyₖ
+    ysum  = y.sum()             # Σyₖ
+    n     = y.shape[0]          # card(y) cardinality
+    
+    #               M                    soln        ⃗Y 
+    #  ⎵                           ⎵     ⎵ ⎵     ⎵      ⎵
+    # |  ΣSSₖ²  ΣSSₖSₖ  ΣSSₖxₖ ΣSSₖ |   | A |   | ΣSSₖyₖ |
+    # |  ΣSSₖSₖ ΣSₖ²    ΣSₖxₖ  ΣSₖ  | × | B | = | ΣSₖyₖ  |
+    # |  ΣSSₖxₖ ΣSₖxₖ   Σxₖ²   Σxₖ  |   | C |   | Σxₖyₖ  |
+    # |  ΣSSₖ   ΣSₖ     Σxₖ    n    |   | D |   | Σyₖ    |
+    #  ⎴                           ⎴     ⎴ ⎴     ⎴      ⎴
+    
     
     M = np.zeros((4, 4))
-    M[0,0] = S2S2
-    M[1,0] = S2S
-    M[2,0] = S2x
-    M[3,0] = S2sum
     
-    M[0,1] = M[1,0]
-    M[1,1] = SS
-    M[2,1] = Sx
-    M[3,1] = Ssum
-    
-    M[0,2] = M[2,0]
-    M[1,2] = M[2,1]
-    M[2,2] = xx
-    M[3,2] = xsum
-    
-    M[0,3] = M[3,0]
-    M[1,3] = M[3,1]
-    M[2,3] = M[2,3]
-    M[3,3] = n
+    M[0,:] = [S2S2,  S2S,  S2x,  S2sum]
+    M[1,:] = [S2S,   SS,   Sx,   Ssum ]
+    M[2,:] = [S2x,   Sx,   xx,   xsum ]
+    M[3,:] = [S2sum, Ssum, xsum, n    ]
     
     Y = np.array([S2y, Sy, xy, ysum])
     
-    (A, B, C, D), *_ = linalg.lstsq(M, Y, overwrite_a=True, overwrite_b = False)
+    # (A, B, C, D), *_ = linalg.lstsq(M, Y, overwrite_a=True, overwrite_b = False)
+    A, B, C, D = np.dot(np.linalg.pinv(M), Y)
     
     B2A = B**2 + 4*A
     
@@ -1575,11 +1571,13 @@ for the biexponential function
     
     Γ = np.array([Σβy, Σηy])
     
-    (b, c), *_ = linalg.lstsq(M, Γ, overwrite_a=True, overwrite_b = False)
+    # (b, c), *_ = linalg.lstsq(M, Γ, overwrite_a=True, overwrite_b = False)
     
-    return (b, c, p, q)
+    b, c = np.dot(np.linalg.pinv(M), Γ)#, overwrite_a=True, overwrite_b = False)
+    
+    return (b, c, p, q, A, B, C, D)
     #
-    # ### END   crude implementation of Jacuqelin
+    # ### END   crude implementation of Jacquelin
     
     M = np.empty(y.shape + (4, ))
     M[:,3] = 1.
@@ -1775,13 +1773,13 @@ def guess_init_two_exp_prod(x:np.ndarray, y:np.ndarray, is_sorted:bool=True):
     # ###  albeit transorfmed as above: 𝒙 = x - x[0], 𝒚 = y - y[0], ans 𝒔 calculated as Sₖ above
     # ###           
     # ###          𝐌             coeffs         𝐘
-    # ###    _              _                _      _
-    # ###   |  x₀,    s₀     |    _   _     |  y₀,   |
+    # ###    _              _                      
+    # ###   |  x₀,    s₀     |    _   _     ⎴  y₀,  ⎴
     # ###   |  x₁,    s₁     |   |  A  |    |  y₁,   |
     # ###   |  x₂,    s₂     | ⋅ |     | =  |  y₂,   |
     # ###   |  ⋮,     ⋮      |   |  B  |    |  ⋮,    |
     # ###   |  xₙ₋₁,  sₙ₋₁   |   -    -     |  yₙ₋₁, |
-    # ###   -               -               -       -
+    # ###    -               -               ⎵      ⎵
     # ### 
     # ###   The solution is:
     # ###               _              _ (-1)    _      _

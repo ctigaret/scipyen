@@ -797,7 +797,7 @@ def tiwt_purelet(image, nLevels, wavelet=None, sigma2=None, thr=None):
         
     Fy_lp = x[:,:,0,nLevels-1]
     
-    print(len(kernels_rev_g))
+    # print(len(kernels_rev_g))
     # reconstruct the residual low-pass
     for j in range(nLevels-1, -1, -1):
         print("j: ", j)
