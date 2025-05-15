@@ -263,3 +263,4 @@ brainglobe
 brainrender 
 brainglobe-segmentation
 scikit-bio
+fenics
