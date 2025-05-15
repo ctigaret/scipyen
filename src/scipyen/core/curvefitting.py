@@ -1927,7 +1927,7 @@ def skg_exp_fit(x, y, is_sorted=True):
     #                  ⎴                      ⎴      ⎴          ⎴ 
     # thus "solving"  ⃗𝐀 = 𝐌⁻¹ ×  ⃗𝐲  
     #
-    #   ⎵     ⎵        ⎵                      ⎵ ⁻¹     ⎵          ⎵ 
+    #   ⎵     ⎵        ⎵                      ⎵ ⁻¹   ⎵          ⎵ 
     #  |   A   |      |  x₀   - x₀     I(x₀)   |    |  y₀ - y₀   |
     #  |       |   =  |  x₁   - x₀     I(x₁)   | ×  |  y₁ - y₀   |
     #  |   B   |      |      ⋮           ⋮     |    |     ⋮      |
