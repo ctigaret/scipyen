@@ -1851,11 +1851,93 @@ def skg_exp_fit(x, y, is_sorted=True):
     r"""another implementation test skg.exp.exp_fit"""
     
     # ### NOTE: the original sckikit-guess slg.exp.exp_fit does:
-    # M = np.hstack(x_[:,np.newaxis], Sk[:,np.newaxis])
-    # with x_ and Sk as below, then solves via lstsq
+    # M = np.hstack(𝐱[:,np.newaxis], 𝐬[:,np.newaxis])
+    # with 𝐱 and 𝐬 defined as below, then solves via lstsq
     #
     # 𝐌 ×  ⃗𝐯 =  ⃗𝐲 
     #
+    # where: 
+    # 
+    # 𝐱 is x-x[0]; 
+    #                                   x
+    # 𝐬 is the numeric approximation of ∫f(u)du = a(x-x₀) + (b/c)(exp(cx)-exp(cx₀))
+    #                                   x₀
+    #   which is the definite integral of f(x) = a + b⋅exp(cx), the model functipn
+    # 
+    #
+    # In a nutshell, given the data vector  ⃗𝐲  and its domain (or independent 
+    # variable) vector  ⃗𝐱, Jaqcuelin's paper transforms the curve fitting problem
+    # of  ⃗𝐲 with the "model" function  ⃗𝐟 (x) above into a linear regression problem
+    # using integral equations in order to find out the coefficient set <a, b, c>
+    # that minimizes the sum of squared errors between the data  ⃗𝐲  and the model,
+    #  ⃗𝐟 (x):
+    #
+    # • the linear regression system is formed through approximating  ⃗𝐟 (x) by a
+    #   linear combination of integrals of  ⃗𝐟 (x):
+    #
+    #    ⃗𝐟 (x) = a + b⋅exp(c⋅ ⃗𝐱 )                                            (1)
+    #
+    #   ⟹ exp(c⋅ ⃗𝐱 ) = ( ⃗𝐟 (x)-a)/b                                          (2)
+    #
+    #            x
+    #    ⃗𝐈 (x) = ∫ ⃗𝐟 (u)du = ( ⃗𝐱 -x₀)⋅a + (exp(c⋅ ⃗𝐱 )-exp(cx₀))⋅b/c          (3)
+    #            x₀
+    #   
+    #   From (2) we replace exp(cx₀) in (3):
+    #   
+    #    ⃗𝐈 (x) = ( ⃗𝐱 -x₀)⋅a + (( ⃗𝐟 (x) - a)/b)⋅b/c - exp(cx₀)⋅b/c
+    #          = (a⋅c⋅ ⃗𝐱 - acx₀ +  ⃗𝐟 (x) - a - b⋅exp(c₀))/c
+    #          = ((ac⋅( ⃗𝐱 - x₀)) +  ⃗𝐟 (x) - f(x₀))/c                         (4)
+    #
+    # ⟹ c⋅ ⃗𝐈 (x) = ( ⃗𝐱 - x₀)⋅ac +  ⃗𝐟 (x) - f(x₀)                             (5)
+    #
+    # ⟹  ⃗𝐟 (x) - f(x₀) = -ac⋅( ⃗𝐱 - x₀) + c⋅ ⃗𝐈 (x)                            (6)
+    #
+    # Let A = -ac and B = c                                                  (7)
+    # then (6) becomes:
+    # 
+    #  ⃗𝐟 (x) - f(x₀) = A⋅( ⃗𝐱 - x₀) + B⋅ ⃗𝐈 (x)
+    #
+    # ⟹  ⃗𝐟 (x) = A⋅( ⃗𝐱 - x₀) + B⋅ ⃗𝐈 (x) + f(x₀)                              (8)
+    #
+    # The minimization problem: find A, B where 
+    #
+    #  Σ( ⃗𝛜² ) = Σ[( ⃗𝐟 (x) -  ⃗𝐲 )²]                                          (9)
+    #
+    # has a global minimum
+    #
+    # Assume f(x₀) = y₀; then (8) becomes
+    #
+    # Σ( ⃗𝛜² ) = Σ[(A⋅( ⃗𝐱 - x₀) + B⋅ ⃗𝐈 (x) + y₀ -  ⃗𝐲 )²]
+    #
+    #         = Σ[(A⋅( ⃗𝐱 - x₀) + B⋅ ⃗𝐈 (x) - ( ⃗𝐲 -y₀))²]                     (10)
+    #
+    # The approach in skg.exp.exp_fit is to treat (10) as a system of linear equations
+    # of the form  ⃗𝐀 ⋅ 𝐌 =  ⃗𝐲  and "solve" it in the least squares sense (``linalg.lstsq``)
+    #
+    # The matrix 𝐌 is the 𝒏 × 2 matrix [  ⃗𝐱 - x₀   ⃗𝐈 (x) ], and  ⃗𝐀 is the "solution":
+    #
+    # Step 1:
+    #      ⃗𝐀                  𝐌                           ⃗𝐲 
+    #   ⎵     ⎵        ⎵                      ⎵      ⎵          ⎵ 
+    #  |   A   |      |  x₀   - x₀     I(x₀)   |    |  y₀ - y₀   |
+    #  |       |   ×  |  x₁   - x₀     I(x₁)   | =  |  y₁ - y₀   |
+    #  |   B   |      |      ⋮           ⋮     |    |     ⋮      |
+    #   ⎴     ⎴       |  xₙ₋₁ - x₀     I(xₙ₋₁) |    |  yₙ₋₁ - y₀ |
+    #                  ⎴                      ⎴      ⎴          ⎴ 
+    # thus "solving"  ⃗𝐀 = 𝐌⁻¹ ×  ⃗𝐲  
+    #
+    #   ⎵     ⎵        ⎵                      ⎵ ⁻¹     ⎵          ⎵ 
+    #  |   A   |      |  x₀   - x₀     I(x₀)   |    |  y₀ - y₀   |
+    #  |       |   =  |  x₁   - x₀     I(x₁)   | ×  |  y₁ - y₀   |
+    #  |   B   |      |      ⋮           ⋮     |    |     ⋮      |
+    #   ⎴     ⎴       |  xₙ₋₁ - x₀     I(xₙ₋₁) |    |  yₙ₋₁ - y₀ |
+    #                  ⎴                      ⎴      ⎴          ⎴ 
+    #
+    # followed by calculating a, c from  ⃗𝐀  using (7)
+    #
+    # then in step 2 calculate b from a second system of equations obtained by 
+    # replacing c in (1)
     x, y = skg_preprocess(x, y, is_sorted)
     
     # step 1
@@ -1881,7 +1963,7 @@ def skg_exp_fit(x, y, is_sorted=True):
     #     | Σ(𝐱ₖ⋅Sₖ) Σ(𝐬ₖ²)   | ×  |  B  | = |  Σ(𝐲ₖ⋅𝐬ₖ) | ∎
     #      ⎴                 ⎴      ⎴   ⎴     ⎴         ⎴
 
-    M = np.zeros((2,2)) # Eq 11 in Jacquelin
+    M = np.zeros((2,2))        # Eq 11 in Jacquelin obtained through the normal equation method
     M[0,0] = np.dot(x, x)      # Σ(𝐱ₖ²)
     M[0,1] = xs                # Σ(𝐱ₖ⋅𝐬ₖ)
     M[1,0] = xs                # Σ(𝐱ₖ⋅𝐬ₖ)
