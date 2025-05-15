@@ -1848,41 +1848,65 @@ def guess_init_two_exp_prod(x:np.ndarray, y:np.ndarray, is_sorted:bool=True):
     # ### END   snippet of skg.exp.exp_fit for one exponential
     
 def skg_exp_fit(x, y, is_sorted=True):
-    r"""implementation test skg.exp.exp_fit"""
+    r"""another implementation test skg.exp.exp_fit"""
+    
+    # ### NOTE: the original sckikit-guess slg.exp.exp_fit does:
+    # M = np.hstack(x_[:,np.newaxis], Sk[:,np.newaxis])
+    # with x_ and Sk as below, then solves via lstsq
+    #
+    # 𝐌 ×  ⃗𝐯 =  ⃗𝐲 
+    #
     x, y = skg_preprocess(x, y, is_sorted)
     
     # step 1
-    X = x-x[0]
-    _Y = y-y[0]
-    Sk = np.zeros(y.shape)
-    Sk[1:] = np.cumsum(0.5 * np.diff(x)*(y[1:] + y[:-1]))
-    XSk = np.dot(X, Sk)
-    _YX = np.dot(_Y, X)
-    _YSk = np.dot(_Y, Sk)
+    s = np.zeros(y.shape)      #  ⃗𝐬 
+    s[1:] = np.cumsum(0.5 * np.diff(x)*(y[1:] + y[:-1]))
+    
+    x = x-x[0]                 #  ⃗𝐱 
+    y = y-y[0]                 #  ⃗𝐲 
+    
+    xs = np.dot(x, s)          # Σ(𝐱ₖ⋅𝐬ₖ)
+    yx = np.dot(y, x)          # Σ(𝐲ₖ⋅𝐱ₖ)
+    ys = np.dot(y, s)          # Σ(𝐲ₖ⋅𝐬ₖ)
+    
+    
+    #     Written as least squares problem (normal equation):
+    #
+    #     A⋅Σ(𝐱ₖ²)   + B⋅Σ(𝐱ₖ⋅𝐬ₖ) = Σ(𝐲ₖ⋅𝐱ₖ)
+    #     A⋅Σ(𝐱ₖ⋅𝐬ₖ) + B⋅Σ(𝐬ₖ²)   = Σ(𝐲ₖ⋅𝐬ₖ)
+    #     
+    #     and in matrix form:
+    #      ⎵                 ⎵      ⎵   ⎵     ⎵         ⎵
+    #     | Σ(𝐱ₖ²)   Σ(𝐱ₖ⋅𝐬ₖ) |    |  A  |   |  Σ(𝐲ₖ⋅𝐱ₖ) |
+    #     | Σ(𝐱ₖ⋅Sₖ) Σ(𝐬ₖ²)   | ×  |  B  | = |  Σ(𝐲ₖ⋅𝐬ₖ) | ∎
+    #      ⎴                 ⎴      ⎴   ⎴     ⎴         ⎴
+
     M = np.zeros((2,2)) # Eq 11 in Jacquelin
-    M[0,0] = np.dot(X, X)
-    M[0,1] = XSk
-    M[1,0] = XSk
-    M[1,1] = np.dot(Sk, Sk)
+    M[0,0] = np.dot(x, x)      # Σ(𝐱ₖ²)
+    M[0,1] = xs                # Σ(𝐱ₖ⋅𝐬ₖ)
+    M[1,0] = xs                # Σ(𝐱ₖ⋅𝐬ₖ)
+    M[1,1] = np.dot(s, s)      # Σ(𝐬ₖ²)
     
-    Y = np.array([_YX, _YSk])
+    Y = np.array([yx, ys])
     
-    (A, B), *_ = linalg.lstsq(M, Y, overwrite_a=True, overwrite_b=True)
+    # (A, B), *_ = linalg.lstsq(M, Y, overwrite_a=True, overwrite_b=True)
+    A, B = np.dot(np.linalg.pinv(M), Y)
     a, c = -A/B, B
     
     # step 2
     n = y.shape[0]
     θ = np.exp(c*x)
-    θsum = np.sum(θ)
+    θsum = np.sum(θ)           # Σ(𝛉ₖ)
     M[0,0] = n
     M[0,1] = θsum
     M[1,0] = θsum
-    M[1,1] = np.dot(θ, θ)
+    M[1,1] = np.dot(θ, θ)      # Σ(𝛉ₖ²)
     
-    Y[0] = np.sum(y)
-    Y[1] = np.dot(y,θ)
+    Y[0] = np.sum(y)           # Σ(𝐲ₖ)
+    Y[1] = np.dot(y,θ)         # Σ(𝐲ₖ⋅𝛉ₖ)
     
-    (a, b), *_ = linalg.lstsq(M, Y, overwrite_a=True, overwrite_b=False)
+    # (a, b), *_ = linalg.lstsq(M, Y, overwrite_a=True, overwrite_b=False)
+    a, b = np.dot(np.linalg.pinv(M), Y)
 
     return (a, b, c)
     
