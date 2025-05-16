@@ -81,15 +81,24 @@ def check_rise_decay_params(x):
     
     return (len(x)-3) // 2
 
-def exponential_decay_sum(x, b, c, p, q):
-    return b*np.exp(x*p) + c*np.exp(x*q)
+def biexponential_decay(x, β0, β1, τ0, τ1):
+    r"""Decay modelled as a bi-exponential"""
+    return β0 * np.exp(-x / τ0) + β1 * np.exp(-x / τ1)
 
-def generic_exponential_sum_decay(x, α, β0, β1, x0, τ0, τ1):
-    r"""Decay modelled as a bi-exponential with additive bias"""
+def biexponential_decay_model(x, p):
+    return biexponential_decay(x, *p)
+
+def biased_biexponential_decay(x, α, β0, β1, τ0, τ1):
+    return α + β0 * np.exp(-x / τ0) + β1 * np.exp(-x / τ1)
+
+def biased_biexponential_decay_model(x,p):
+    return biased_biexponential_decay(x, *p)
+    
+def generic_biexponential_decay(x, α, β0, β1, x0, τ0, τ1):
     return α + β0 * np.exp(-(x-x0) / τ0) + β1 * np.exp(-(x-x0) / τ1)
 
-def generic_exponential_sum_decay_model(x, p):
-    return generic_exponential_sum_decay(x, *p)
+def generic_biexponential_decay_model(x, p):
+    return generic_biexponential_decay(x, *p)
 
 def generic_exponential_prod_decay(x, α, β, x0, *τ):
     r"""Realizes

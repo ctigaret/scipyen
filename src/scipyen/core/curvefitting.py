@@ -1373,111 +1373,8 @@ def fit_model(data, func, p0, *args, **kwargs):
     
     return fittedCurve, result
 
-def guess_init_two_exp_sum(x:np.ndarray, y:np.ndarray, is_sorted:bool=True):
-    r"""y ( x ) = a + b exp( p x ) + c exp( q x)
-    Returns:
-    WARNING: Work in progress, DO NOT USE
-    ========
-    4-tuple: (a, b, p, c, q)
-    """
-    # 4-tuple: (b, p, c, q)
-    x,y = skg_preprocess(x,y,is_sorted)
-    # ### params to optimize: b, p, c, q
-    # ### params to optimize: a, b, p, c, q NOTE: 2025-05-12 10:07:03 - Lecca … Scarpa (2021) Math Meth Appl Sci 44: 10154 — 10171
     
-    # see NOTE: 2025-05-12 10:07:03
-    # ###  ⃗θ = (a, b, c, p, q)
-    # ### y( ⃗θ;t ) = A⋅SS(t) + B⋅S(t) + C⋅t + D = a + b⋅exp(pt) + c⋅exp(qt)
-    # ### with A = pq; B = (p+q)
-    #
-    # ### but in Jacquelin's Double exponential regression paper:
-    # ### y(b, p, c, q; t) = -A⋅SS(t) + B⋅S(t) + C⋅t + D = b⋅exp(pt) + c⋅exp(qt)
-    # ### with A = -pq; B = -(p+q) !!!
-    
-    #                    ₙ₋₁
-    # all sums below are  Σ ⋅
-    #                    ⁱ⁼⁰
-    
-    # also, REMEMBER in numpy x @ y is np.dot(x,y) whebn both x, y are 1D vectors of compatible shapes
-    S = np.zeros(y.shape)
-    S[1:] = np.cumsum(0.5* np.diff(x) * (y[1:] + y[:-1])) # mid-point approximation (mid-point rule less error term f``(0.5*(xₖ - xₖ₋₁))(xₖ - xₖ₋₁)³/24)
-    
-    S2 = np.zeros(y.shape)          # SS in Lecca et al, and in Jacquelin
-    S2[1:] = np.cumsum(0.5* np.diff(x) * (S[1:] + S[:-1]))
-    
-    xx   = x  * x
-    S2S2 = np.dot(S2, S2)            # Σ(S2ᵢ*S2ᵢ)    = Σ(S2ᵢ²)
-    S2S  = np.dot(S2, S)             # Σ(S2ᵢ*Sᵢ) 
-    S2x  = np.dot(S2, x)             # Σ(S2ᵢ*xᵢ)
-    S2x2 = np.dot(S2, x**2)          # Σ(S2ᵢ*xᵢ²)    Lecca et al 2021
-    S2y  = np.dot(S2, y)             # Σ(S2ᵢ*yᵢ)
-    SS   = np.dot(S, S)              # Σ(Sᵢ²)
-    Sx   = np.dot(S, x)              # Σ(Sᵢ*xᵢ)    
-    Sx2  = np.dot(S, xx)             # Σ(Sᵢ*xᵢ²)     Lecca et al 2021
-    Sy   = np.dot(S, y)              # Σ(Sᵢ*yᵢ)
-    Σx2  = np.dot(x, x)              # Σ(xᵢ²)        Lecca et al 2021
-    Σx3  = np.dot(xx, x)             # Σ(xᵢ³)        Lecca et al 2021
-    Σx4  = np.dot(xx, xx)            # Σ(xᵢ⁴)        Lecca et al 2021
-    xy   = np.dot(x, y)              # Σ(xᵢ*yᵢ) = np.dot(x, y)
-    x2y  = np.dot(xx, y)             # Σ(xᵢ² * yᵢ)   Lecca et al 2021
-    ΣS   = S.sum()                   # Σ(Sᵢ)
-    ΣS2  = S2.sum()                  # Σ(S2ᵢ)
-    Σx   = x.sum()                   # Σ(xᵢ)
-    Σy   = y.sum()                   # Σ(yᵢ)
-    n    = x.shape[0]                # 
-    
-    # ### implementation of Lecca et al 2021 algorithm
-    
-    M = np.zeros((5,5)) # includes additive "bias"
-    
-                                                            #  _  NOTE: 𝑡 in Lecca is here 𝑥;                              ̅ 
-    M[0,:] = [S2S2,     S2S,    S2x2,   S2x,    ΣS2]        # | Σ(Sᵢ2²)      Σ(S2ᵢ*Sᵢ)    Σ(Sᵢ2*xᵢ²)   Σ(S2ᵢ*Sᵢ)     Σ(S2ᵢ) |           
-    M[1,:] = [S2S,      SS,     Sx2,    Sx,     ΣS]         # | Σ(S2ᵢ*Sᵢ)    Σ(Sᵢ²)       Σ(Sᵢ*xᵢ²)    Σ(Sᵢ*xᵢ)      Σ(Sᵢ)  |
-    M[2,:] = [S2x2,     Sx2,    Σx4,    Σx3,    Σx2]        # | Σ(S2ᵢ*xᵢ²)   Σ(Sᵢ*xᵢ²)    Σ(xᵢ⁴)       Σ(xᵢ³)        Σ(xᵢ²) |
-    M[3,:] = [S2x,      Sx,     Σx3,    Σx2,    Σx]         # | Σ(S2ᵢ*xᵢ)    Σ(Sᵢ*xᵢ)     Σ(xᵢ³)       Σ(xᵢ²)        Σ(xᵢ)  |
-    M[4,:] = [ΣS2,      ΣS,     Σx2,    Σx,     n]          # | Σ(S2ᵢ)       Σ(Sᵢ)        Σ(xᵢ²)       Σ(xᵢ)         n      |
-                                                            #  ̅                                                            ̅ 
-    
-    Y = np.array([S2y,  Sy,     x2y,    Σx2,    Σy])
-    
-    return (M, Y)
-    
-    (A, B, C, D, E), *_ = linalg.lstsq(M, Y, overwrite_a = True, overwrite_b = False)
-    
-    print(f"A = {A}, B = {B}, C = {C}, D = {D}")
-    
-    sqB2A = np.sqrt(B**2 + 4*A)
-
-    p = 0.5 * (B + sqB2A)
-    q = 0.5 * (B - sqB2A)
-    
-    print(f"p = {p}, q = {q}")
-    
-    β = np.exp(p*x)
-    η = np.exp(q*x)
-    
-    print(β, η)
-    
-    Σβ = β.sum()                            # Σ(βᵢ)
-    Ση = η.sum()                            # Σ(ηᵢ)
-    Σβη = β @ η         # np.dot(β, η)      # Σ(βᵢ * ηᵢ)
-    Σβ2 = β @ β         # np.dot(β, β)      # Σ(βᵢ * βᵢ)
-    Ση2 = η @ η         # np.dot(η, η)      # Σ(ηᵢ * ηᵢ)
-    Σβy = β @ y         # np.dot(β, y)      # Σ(βᵢ * yᵢ)
-    Σηy = η @ y         # np.dot(η, y)      # Σ(ηᵢ * yᵢ)
-    
-    Q = np.zeros((3,3))
-    Q[0,:] = [n,  Σβ,  Ση]
-    Q[1,:] = [Σβ, Σβ2, Σβη]
-    Q[2,:] = [Ση, Σβη, Ση2]
-    
-    V = np.array([Σy, Σβy, Σηy])
-    
-    (a, b, c), *_ = linalg.lstsq(Q, V, overwrite_a = True, overwrite_b = False)
-    
-    return (a, b, p, c, q)
-    
-def guess_init_two_exp_sum_J(x:np.ndarray, y:np.ndarray, is_sorted:bool=True):
+def guess_init_biexp(x:np.ndarray, y:np.ndarray, is_sorted:bool=True):
     r"""A crude implementation of Jacquelin's method of integral equation regression
 for the biexponential function
     
@@ -1502,109 +1399,143 @@ for the biexponential function
     decay model contains an "additive bias" α which is NOT guessed; typically, 
     this is the value of the first sample in the signal, or a "baseline" average)
     
-    
-    
-    
 """
-    # ### BEGIN crude implementation of Jacquelin
+    # ### BEGIN implementation of Jacquelin
     #
     x,y = skg_preprocess(x,y,is_sorted)
+    # ξ = x-x[0]
+    ξ = x
     
-    S = np.zeros(y.shape)
-    S[1:] = np.cumsum(0.5* np.diff(x) * (y[1:] + y[:-1])) # mid-point approximation (mid-point rule less error term f``(0.5*(xₖ - xₖ₋₁))(xₖ - xₖ₋₁)³/24)
+    s = np.zeros(y.shape)
+    s[1:] = np.cumsum(0.5* np.diff(x) * (y[1:] + y[:-1])) # mid-point approximation (mid-point rule less error term f``(0.5*(xₖ - xₖ₋₁))(xₖ - xₖ₋₁)³/24)
     
-    S2 = np.zeros(y.shape)          # SS in Lecca et al, and in Jacquelin
-    S2[1:] = np.cumsum(0.5* np.diff(x) * (S[1:] + S[:-1]))
+    ss = np.zeros(y.shape) 
+    ss[1:] = np.cumsum(0.5* np.diff(x) * (s[1:] + s[:-1]))
     
-    S2S2  = np.dot(S2, S2)      # ΣSSₖ²
-    S2S   = np.dot(S2, S)       # ΣSSₖSₖ
-    S2x   = np.dot(S2, x)       # ΣSSₖxₖ
-    S2y   = np.dot(S2, y)       # ΣSSₖyₖ
-    S2sum = S2.sum()            # ΣSSₖ
-    SS    = np.dot(S, S)        # ΣSₖ²
-    Sx    = np.dot(S, x)        # ΣSₖxₖ
-    Sy    = np.dot(S, y)        # ΣSₖyₖ
-    Ssum  = S.sum()             # ΣSₖ
-    xx    = np.dot(x, x)        # Σxₖ²
-    xsum  = x.sum()             # Σxₖ
-    xy    = np.dot(x, y)        # Σxₖyₖ
-    ysum  = y.sum()             # Σyₖ
-    n     = y.shape[0]          # card(y) cardinality
+    Σssₖ2  = np.dot(ss, ss)
+    Σssₖsₖ = np.dot(ss, s) 
+    Σssₖξₖ = np.dot(ss, ξ) 
+    Σssₖyₖ = np.dot(ss, y) 
+    Σssₖ   = ss.sum()      
+    Σsₖ2   = np.dot(s, s)  
+    Σsₖξₖ  = np.dot(s, ξ)  
+    Σsₖyₖ  = np.dot(s, y)  
+    Σsₖ    = s.sum()       
+    Σξₖ2   = np.dot(ξ, x)  
+    Σξₖ    = ξ.sum()        
+    Σξₖyₖ  = np.dot(ξ, y)   
+    Σyₖ    = y.sum()        
+    n      = y.shape[0]     
     
-    #               M                    soln        ⃗Y 
-    #  ⎵                           ⎵     ⎵ ⎵     ⎵      ⎵
-    # |  ΣSSₖ²  ΣSSₖSₖ  ΣSSₖxₖ ΣSSₖ |   | A |   | ΣSSₖyₖ |
-    # |  ΣSSₖSₖ ΣSₖ²    ΣSₖxₖ  ΣSₖ  | × | B | = | ΣSₖyₖ  |
-    # |  ΣSSₖxₖ ΣSₖxₖ   Σxₖ²   Σxₖ  |   | C |   | Σxₖyₖ  |
-    # |  ΣSSₖ   ΣSₖ     Σxₖ    n    |   | D |   | Σyₖ    |
-    #  ⎴                           ⎴     ⎴ ⎴     ⎴      ⎴
+    # Step 1
+    𝐌ᵀ𝐌 = np.zeros((4, 4))
     
+    𝐌ᵀ𝐌[0,:] = [Σssₖ2,  Σssₖsₖ, Σssₖξₖ, Σssₖ]
+    𝐌ᵀ𝐌[1,:] = [Σssₖsₖ, Σsₖ2,   Σsₖξₖ,  Σsₖ ]
+    𝐌ᵀ𝐌[2,:] = [Σssₖξₖ, Σsₖξₖ,  Σξₖ2,   Σξₖ ]
+    𝐌ᵀ𝐌[3,:] = [Σssₖ,   Σsₖ,    Σξₖ,    n   ]
     
-    M = np.zeros((4, 4))
+    𝐌ᵀ𝚪 = np.array([Σssₖyₖ, Σsₖyₖ, Σξₖyₖ, Σyₖ])
     
-    M[0,:] = [S2S2,  S2S,  S2x,  S2sum]
-    M[1,:] = [S2S,   SS,   Sx,   Ssum ]
-    M[2,:] = [S2x,   Sx,   xx,   xsum ]
-    M[3,:] = [S2sum, Ssum, xsum, n    ]
+    A, B, C, D = np.dot(np.linalg.pinv(𝐌ᵀ𝐌), 𝐌ᵀ𝚪) # D «should» be y[0] 
     
-    Y = np.array([S2y, Sy, xy, ysum])
-    
-    # (A, B, C, D), *_ = linalg.lstsq(M, Y, overwrite_a=True, overwrite_b = False)
-    A, B, C, D = np.dot(np.linalg.pinv(M), Y)
-    
-    B2A = B**2 + 4*A
+    B2A = B**2 + 4*A # ∵ A = -pq and B = (p+q)
     
     p = 0.5 * (B + np.sqrt(B2A))
     q = 0.5 * (B - np.sqrt(B2A))
 
+    # Step 2
     β = np.exp(p*x)
     η = np.exp(q*x)
     
-    Σββ = np.dot(β, β)
-    Σβη = np.dot(β, η)
-    Σηη = np.dot(η, η)
-    Σβy = np.dot(β, y)
-    Σηy = np.dot(η, y)
-    M = M[:2,:2]
-    M[0,:] = [Σββ, Σβη]
-    M[1,:] = [Σβη, Σηη]
+    Σβₖ2  = np.dot(β, β) 
+    Σβₖηₖ = np.dot(β, η)
+    Σηₖ2  = np.dot(η, η)
+    Σβₖyₖ = np.dot(β, y)
+    Σηₖyₖ = np.dot(η, y)
     
-    Γ = np.array([Σβy, Σηy])
+    𝐌ᵀ𝐌   = 𝐌ᵀ𝐌[:2,:2]
+    𝐌ᵀ𝐌[0,:] = [Σβₖ2,  Σβₖηₖ]
+    𝐌ᵀ𝐌[1,:] = [Σβₖηₖ, Σηₖ2 ]
     
-    # (b, c), *_ = linalg.lstsq(M, Γ, overwrite_a=True, overwrite_b = False)
+    𝐌ᵀ𝚪 = np.array([Σβₖyₖ, Σηₖyₖ])
     
-    b, c = np.dot(np.linalg.pinv(M), Γ)#, overwrite_a=True, overwrite_b = False)
+    b, c = np.dot(np.linalg.pinv(𝐌ᵀ𝐌), 𝐌ᵀ𝚪)#, overwrite_a=True, overwrite_b = False)
     
-    return (b, c, p, q, A, B, C, D)
+    return (b, c, p, q)#, A, B, C, D)
+    # return (b, c, p, q, A, B, C, D)
     #
-    # ### END   crude implementation of Jacquelin
+    # ### END   implementation of Jacquelin 
     
-    M = np.empty(y.shape + (4, ))
-    M[:,3] = 1.
-    M[:,2] = x
-    M[0,:2] = 0
-    M[1:,1] = np.cumsum(0.5* np.diff(x) * (y[1:] + y[:-1]))
-    M[0,0] = 0.                   
-    M[1:,0] = np.cumsum(0.5* np.diff(x) * (M[1:,1] + M[:-1,1]))
+def guess_init_biased_biexp(x, y, is_sorted:bool=True):
+    x,y = skg_preprocess(x,y,is_sorted)
+    ξ = x
+    # ω = x*(0.5*x - x[0])
+    ω = 0.5*x**2
+    s = np.zeros(y.shape)
+    s[1:] = np.cumsum(0.5* np.diff(x) * (y[1:] + y[:-1])) # mid-point approximation (mid-point rule less error term f``(0.5*(xₖ - xₖ₋₁))(xₖ - xₖ₋₁)³/24)
+    ss = np.zeros(y.shape) 
+    ss[1:] = np.cumsum(0.5* np.diff(x) * (s[1:] + s[:-1]))
     
-    (A, B, C, D), *_ = linalg.lstsq(M, y, overwrite_a=True, overwrite_b = False)
+    Σssₖ2  = np.dot(ss, ss)
+    Σssₖsₖ = np.dot(ss, s) 
+    Σssₖξₖ = np.dot(ss, ξ) 
+    Σssₖωₖ = np.dot(ss, ω) 
+    Σssₖyₖ = np.dot(ss, y) 
+    Σssₖ   = ss.sum()      
+    Σsₖ2   = np.dot(s, s)  
+    Σsₖξₖ  = np.dot(s, ξ)  
+    Σsₖωₖ  = np.dot(s, ω)  
+    Σsₖyₖ  = np.dot(s, y)  
+    Σsₖ    = s.sum()       
+    Σξₖ2   = np.dot(ξ, ξ)  
+    Σξₖωₖ  = np.dot(ξ, ω)  
+    Σξₖ    = ξ.sum()        
+    Σξₖyₖ  = np.dot(ξ, y)   
+    Σωₖyₖ  = np.dot(ω, y)   
+    Σωₖ2   = np.dot(ω, ω)
+    Σωₖ    = ω.sum() 
+    Σyₖ    = y.sum()        
+    n      = y.shape[0]     
     
-    B2A = B**2 + 4*A
+    # Step 1
     
+    𝐌ᵀ𝐌 = np.zeros((5, 5))
+    𝐌ᵀ𝐌[0,:] = [Σssₖ2,  Σssₖsₖ, Σssₖξₖ, Σssₖωₖ, Σssₖ]
+    𝐌ᵀ𝐌[1,:] = [Σssₖsₖ, Σsₖ2,   Σsₖξₖ,  Σsₖωₖ,  Σsₖ ]
+    𝐌ᵀ𝐌[2,:] = [Σssₖξₖ, Σsₖξₖ,  Σξₖ2,   Σξₖωₖ,  Σξₖ ]
+    𝐌ᵀ𝐌[3,:] = [Σssₖωₖ, Σsₖωₖ,  Σξₖωₖ,  Σωₖ2,   Σωₖ ]
+    𝐌ᵀ𝐌[4,:] = [Σssₖ,   Σsₖ,    Σξₖ,    Σωₖ,    n   ]
+    
+    𝐌ᵀ𝚪 = np.array([Σssₖyₖ, Σsₖyₖ, Σξₖyₖ, Σωₖyₖ, Σyₖ])
+    
+    A, B, C, D, E = np.dot(np.linalg.pinv(𝐌ᵀ𝐌), 𝐌ᵀ𝚪)
+    B2A = B**2 + 4*A # ∵ A = -pq and B = (p+q)
     p = 0.5 * (B + np.sqrt(B2A))
     q = 0.5 * (B - np.sqrt(B2A))
     
-    M = M[:,:2]
-    M[:,0] = np.exp(p * x)
-    M[:,1] = np.exp(q * x)
+    # Step 2
+    β = np.exp(p*x)
+    η = np.exp(q*x)
+   
+    Σβₖ2  = np.dot(β, β) 
+    Σβₖηₖ = np.dot(β, η)
+    Σβₖ   = β.sum()
+    Σηₖ2  = np.dot(η, η)
+    Σηₖ   = η.sum()
+    Σβₖyₖ = np.dot(β, y)
+    Σηₖyₖ = np.dot(η, y)
     
-    exp_p = np.exp(p * x)
-    exp_q = np.exp(p * x)
+    𝐌ᵀ𝐌   = 𝐌ᵀ𝐌[:3,:3]
+    𝐌ᵀ𝐌[0,:] = [n,   Σβₖ,   Σηₖ  ]
+    𝐌ᵀ𝐌[0,:] = [Σβₖ, Σβₖ2,  Σβₖηₖ]
+    𝐌ᵀ𝐌[1,:] = [Σηₖ, Σβₖηₖ, Σηₖ2 ]
     
-    (b, c), *_ = linalg.lstsq(M, y, overwrite_a=True, overwrite_b = False)
+    𝐌ᵀ𝚪 = np.array([Σyₖ, Σβₖyₖ, Σηₖyₖ])
+    a, b, c = np.dot(np.linalg.pinv(𝐌ᵀ𝐌), 𝐌ᵀ𝚪)
     
-    return (b, c, p, q)
-
+    return a, b, p, c, q #, A, B, C, D, E
+    
 def guess_init_two_exp_prod(x:np.ndarray, y:np.ndarray, is_sorted:bool=True):
     r""" y  = a + b × exp(xc) × exp(xd)
     
