@@ -1726,269 +1726,362 @@ def guess_init_two_exp_prod(x:np.ndarray, y:np.ndarray, is_sorted:bool=True):
     
     return (a, b, c, d)
     
-    # ### BEGIN snippet of skg.exp.exp_fit for one exponential
-    # ### BEGIN explanation for dummies (like myself)
-    # ### Remember:
-    # ### in Jacquelin's paper the definite integral (∫ˣₓ₁,) x₁ is actually x[0]
-    # ### 
-    # ### eq 6 is the clincher: 
-    # ### 
-    # ### y - (a + b⋅exp(cx₁)) = -a⋅c(x-x₁) + c ⋅ ∫ˣₓ₁ y(u)du  i.e.:
-    # ### y - (a + b⋅exp(cx₁)) = -a⋅c(x-x₁) + c ⋅ S
-    # ### 
-    # ### where a + b⋅exp(cx₁) = y₁ = y[0]
-    # ### 
-    # ### with x₁ = x[0] ⟹ a + b⋅exp(cx[0]) = y[0], hence:
-    # ### 
-    # ### y - y[0] = -a⋅c(x-x[0]) + c ⋅ Sₖ, with Sₖ the numeric integral (eq 7):
-    # ### 
-    # ###                               S₀ = 0 for k == 0
-    # ###                               Sₖ = Sₖ₋₁ + 1/2 (yₖ + yₖ₋₁) (xₖ - xₖ₋₁) for k ∈ [1…n-1]
-    # ### 
-    # ### NOTE for below: let A = -ac, let B = c
-    # ### 
-    # ### y - y[0] = -a⋅c(x-x[0]) + c ⋅ Sₖ, with Sₖ the numeric integral (eq 7):
-    # ### 
-    # ### eq 9:
-    # ###
-    # ### Σⁿₖ₌₁ ε²ₖ = Σⁿₖ₌₁ (yₖ - y₁)² = Σⁿₖ₌₁ (A(xₖ - x₁) + BSₖ - (yₖ - y₁))² ↝ 0
-    # ### 
-    # ### becomes
-    # ### 
-    # ### Σⁿ⁻¹ₖ₌₀ ε²ₖ = Σⁿ⁻¹ₖ₌₀ (A(xₖ - x₀) + BSₖ - (yₖ - y₀))², with the A(⋯) and BSₖ terms in matrix M, and the (yₖ - y₀) term in vector Y
-    # ###
-    # ### The condition is to minimize ε i.e. Σⁿ⁻¹ₖ₌₀ ε²ₖ = 0 ⟹
-    # ###
-    # ### (yₖ - y₁) = A(xₖ - x₁) + BSₖ ≡ (y - y[0]) = A(x - x[0]) + BSₖ ≡
-    # ###                              ≡ 𝐘 = 𝐀𝒙 + BSₖ 
-    # ### For each 𝒙 we have:
-    # ### 
-    # ###   Ax + Bs = y ⇒ a system of 𝒏 linear equation (one for each xₖ, yₖ sample pairs)
-    # ### 
-    # ###  In matrix form: NOTE: here the "unknowns" are A and B (the "variables")
-    # ###   and the "coefficients" — "constants" are 
-    # ### 
-    # ###   𝒙 and 𝒔 on the lhs, and 𝒚 on the rhs
-    # ### 
-    # ###  albeit transorfmed as above: 𝒙 = x - x[0], 𝒚 = y - y[0], ans 𝒔 calculated as Sₖ above
-    # ###           
-    # ###          𝐌             coeffs         𝐘
-    # ###    _              _                      
-    # ###   |  x₀,    s₀     |    _   _     ⎴  y₀,  ⎴
-    # ###   |  x₁,    s₁     |   |  A  |    |  y₁,   |
-    # ###   |  x₂,    s₂     | ⋅ |     | =  |  y₂,   |
-    # ###   |  ⋮,     ⋮      |   |  B  |    |  ⋮,    |
-    # ###   |  xₙ₋₁,  sₙ₋₁   |   -    -     |  yₙ₋₁, |
-    # ###    -               -               ⎵      ⎵
-    # ### 
-    # ###   The solution is:
-    # ###               _              _ (-1)    _      _
-    # ###    _   _     |  x₀,    s₀     |       |  y₀,   |
-    # ###   |  A  |    |  x₁,    s₁     |       |  y₁,   |
-    # ###   |     | =  |  x₂,    s₂     |   ⋅   |  y₂,   |
-    # ###   |  B  |    |  ⋮,     ⋮      |       |  ⋮,    |
-    # ###   -    -     |  xₙ₋₁,  sₙ₋₁   |       |  yₙ₋₁, |
-    # ###              -               -        -       -
-    # ###  i.e.:
-    # ### 
-    # ###  coeffs = (A,B) = 𝐌⁻¹ ⋅ 𝐘 = inv(𝐌) * 𝐘    NOTE: coeffs is a two-vector of floats: (A, B)
-    # ### 
-    # ### ⟹ (A,B) = lstsq(𝐌, 𝐘)
-    # ###
-    # ### fill up the matrix 𝐌 with
-    # ### 
-    # ### Column 0: xₖ - x₀ (the <<factor>> of A)       Column 1: Sₖ (the <<factor>> of B)
-    # ###                                               Sₖ = Sₖ₋₁ + 1/2 (yₖ + yₖ₋₁) (xₖ - xₖ₋₁) eq 7 in Jacquelin's paper
-    # ###
-    # ### 0                                             0                                           # S₀ = 0
-    # ### x[1] - x[0]                                   ((x[1] - x[0]) * (y[1] + y[0]))/2 + 0       # S₀ + 1/2 (y₁ + y₀) (x₁ - x₀)
-    # ### x[2] - x[0]                                   ((x[2] - x[1]) * (y[2] + y[1]))/2 + 
-    # ###                                               ((x[1] - x[0]) * (y[1] + y[0]))/2 + 0       # S₁ + 1/2 (y₂ + y₁) (x₂ - x₁)
-    # ### ⋮                                             
-    # ### x[-1] - x[0]                                  cumsum(0.5 * diff(x) * (y[1:] + y[:-1]))
-    # ###
-    # ### i.e.
-    # ### Column 0:                                     Column 1:
-    # ### x - x[0]                                      cumsum(0.5 * diff(x) * (y[1:] + y[:-1]))
-    # ###
-    # ### and the 𝐘 vector is y - y[0]
-    # ###
-    # ### END   explanation for dummies
-
-    # ### Step 1: find out the A = "-ac" and B = "c" coefficients
-    
-    # M = empty(y.shape + (2,), dtype=y.dtype)
-    # subtract(x, x[0], out=M[:, 0])                                    # ### place x-x[0] in 1st column, see above
-    # M[0, 1] = 0                                                       # ### place Sₖ     in 2nd column, see above
-    # cumsum(0.5 * diff(x) * (y[1:] + y[:-1]), out=M[1:, 1])            # ### set M[0,1] to 0 because S[0] = 0, see above
-    # 
-    # Y = y - y[0]                                                      # ### the 𝐘 vector
-    # 
-    # ### This is scipy.linalg.lstsq: computes least-squares solution to Ax = b
-    # ### i.e., solution is x such that |b - Ax| is minimized
-    # ### function syntax (basic): x = lstsq(A, b)
-    # ### 'A' (the 'lhs') here is M; 'b' (the 'rhs') here is Y
-    # (A, B), *_ = lstsq(M, Y, overwrite_a=True, overwrite_b=True)      # ### solve for A, B
-    # 
-    # a, c = -A / B, B                                                  # ### calculate coefficients a, c
-    # 
-    #
-    # ### Step 2: find out the "b" coefficient and the new "a"
-    #
-    # M[:, 0].fill(1.0)
-    # exp(c * x, out=M[:, 1])
-    # 
-    #
-    # (a, b), *_ = lstsq(M, y, overwrite_a=True, overwrite_b=False)
-    # 
-    # out = array([a, b, c])
-    # 
-    # return out
-    
-    # ### END   snippet of skg.exp.exp_fit for one exponential
-    
 def skg_exp_fit(x, y, is_sorted=True):
-    r"""another implementation test skg.exp.exp_fit"""
+    r"""Alternative to skg.exp.exp_fit(…): 'Exponential fit of the form :math:`A + Be^{Cx}`.'
+    Implements
+    .. [1] Jacquelin, Jean. "\ :ref:`ref-reei`\ ",
+       :ref:`pp. 15-18. <reei2-sec2>`,
+       https://www.scribd.com/doc/14674814/Regressions-et-equations-integrales
+"""
     
-    # ### NOTE: the original sckikit-guess slg.exp.exp_fit does:
+    # ### BEGIN comparison with skg.exp.exp_fit in jupyter console:
+    #
+    # In [1]: %timeit a, b, c = skg.exp.exp_fit(x,y)
+    # 713 μs ± 8.01 μs per loop (mean ± std. dev. of 7 runs, 1,000 loops each)
+    # 
+    # In [2]: %timeit a1, b1, c1 = crvf.skg_exp_fit(x,y)
+    # 373 μs ± 7.87 μs per loop (mean ± std. dev. of 7 runs, 1,000 loops each)
+    #
+    # In [3]: assert np.all(np.isclose([a, b, c], [a1, b1, c1]))
+    #
+    # ### END   comparison with skg.exp.exp_fit:
+    
+    # ### BEGIN NOTE: What the original scikit-guess exp.exp_fit() function does:
+    #
     # M = np.hstack(𝐱[:,np.newaxis], 𝐬[:,np.newaxis])
     # with 𝐱 and 𝐬 defined as below, then solves via lstsq
     #
-    # 𝐌 ×  ⃗𝐯 =  ⃗𝐲 
+    # 𝐌 ×  ⃗𝛏𝐯 =  ⃗𝐲                                                           (†)
     #
     # where: 
     # 
-    # 𝐱 is x-x[0]; 
-    #                                   x
-    # 𝐬 is the numeric approximation of ∫f(u)du = a(x-x₀) + (b/c)(exp(cx)-exp(cx₀))
-    #                                   x₀
-    #   which is the definite integral of f(x) = a + b⋅exp(cx), the model functipn
+    #  ⃗𝛏 is  ⃗𝐱 - x[0]
+    #                                    
+    #  ⃗𝐬 is the numeric approximation of:
+    #
+    #   x 
+    #   ∫f(u)du = a(x-x₀) + (b/c)(exp(cx)-exp(cx₀))                          (‡)
+    #   x₀
+    #
+    # which is the definite integral of the model function f(x) = a + b⋅exp(cx)
     # 
+    # and  ⃗𝐲 is the "real data" vector
     #
-    # In a nutshell, given the data vector  ⃗𝐲  and its domain (or independent 
-    # variable) vector  ⃗𝐱, Jaqcuelin's paper transforms the curve fitting problem
-    # of  ⃗𝐲 with the "model" function  ⃗𝐟 (x) above into a linear regression problem
-    # using integral equations in order to find out the coefficient set <a, b, c>
-    # that minimizes the sum of squared errors between the data  ⃗𝐲  and the model,
-    #  ⃗𝐟 (x):
+    # In a nutshell, given the data vector  ⃗𝐲 and its domain (or independent 
+    # variable) vector  ⃗𝐱, Jaqcuelin's paper transforms the problem of fitting
+    # the "model" function  ⃗𝐟(x) through the data  ⃗𝐲  into a linear regression 
+    # problem that uses integral equations, in order to find out the coefficient 
+    # set {a, b, c} that minimizes the sum of squared errors between the data
+    # ⃗𝐲 and the model ⃗𝐟(x)
     #
-    # • the linear regression system is formed through approximating  ⃗𝐟 (x) by a
-    #   linear combination of integrals of  ⃗𝐟 (x):
+    # That is, it calculates an approximative solution to an integral equation.
     #
-    #    ⃗𝐟 (x) = a + b⋅exp(c⋅ ⃗𝐱 )                                            (1)
+    # • the linear regression system uses an approximation of  ⃗𝐟(x) by a
+    #   linear combination of integrals of the model function  ⃗𝐟(x):
     #
-    #   ⟹ exp(c⋅ ⃗𝐱 ) = ( ⃗𝐟 (x)-a)/b                                          (2)
+    #   ⃗𝐟(x) = a + b⋅exp(c⋅ ⃗𝐱)                                               (1)
+    #
+    #   From (1): exp(c⋅x₀) = (f(x₀)-a)/b                                    (2)
     #
     #            x
-    #    ⃗𝐈 (x) = ∫ ⃗𝐟 (u)du = ( ⃗𝐱 -x₀)⋅a + (exp(c⋅ ⃗𝐱 )-exp(cx₀))⋅b/c          (3)
+    #   ⃗𝐉(x) = ∫ ⃗𝐟(u)du = ( ⃗𝐱-x₀)⋅a + (exp(c⋅ ⃗𝐱)-exp(cx₀))⋅b/c               (3)
     #            x₀
     #   
-    #   From (2) we replace exp(cx₀) in (3):
+    #            x
+    #   ⃗𝐉(x) = ∫ ⃗𝐟(u)du = ( ⃗𝛏⋅a + (exp(c⋅ ⃗𝐱)-exp(cx₀))⋅b/c                  (3a)
+    #            x₀
     #   
-    #    ⃗𝐈 (x) = ( ⃗𝐱 -x₀)⋅a + (( ⃗𝐟 (x) - a)/b)⋅b/c - exp(cx₀)⋅b/c
-    #          = (a⋅c⋅ ⃗𝐱 - acx₀ +  ⃗𝐟 (x) - a - b⋅exp(c₀))/c
-    #          = ((ac⋅( ⃗𝐱 - x₀)) +  ⃗𝐟 (x) - f(x₀))/c                         (4)
+    #   In (3), replace exp(cx₀) with the rhs of (2):
+    #   
+    #   ⃗𝐉(x) = ( ⃗𝐱 - x₀)⋅a + (( ⃗𝐟(x) - a)/b)⋅b/c - exp(cx₀)⋅b/c
+    #        = (ac⋅ ⃗𝐱 - acx₀ +  ⃗𝐟(x) - a - b⋅exp(c₀))/c
+    #        = ((ac⋅( ⃗𝐱 - x₀)) +  ⃗𝐟(x) - f(x₀))/c                            (4)
     #
-    # ⟹ c⋅ ⃗𝐈 (x) = ( ⃗𝐱 - x₀)⋅ac +  ⃗𝐟 (x) - f(x₀)                             (5)
+    # ⟹ c⋅ ⃗𝐉(x) = ( ⃗𝐱 - x₀)⋅ac +  ⃗𝐟(x) - f(x₀)                               (5)
+    #   c⋅ ⃗𝐉(x) = ac⋅ ⃗𝛏 +  ⃗𝐟(x) - f(x₀)                                     (5a)
     #
-    # ⟹  ⃗𝐟 (x) - f(x₀) = -ac⋅( ⃗𝐱 - x₀) + c⋅ ⃗𝐈 (x)                            (6)
+    # ⟹ ⃗𝐟(x) - f(x₀) = -ac⋅( ⃗𝐱 - x₀) + c ⃗𝐉(x)                                (6)
+    #   ⃗𝐟(x) - f(x₀) = -ac⋅ ⃗𝛏 + c⋅ ⃗𝐉(x)                                     (6a)
     #
-    # Let A = -ac and B = c                                                  (7)
-    # then (6) becomes:
+    # In (6), let:
+    #
+    #   A = -ac                                                             (7a)
+    #   B = c                                                               (7b)
+    #
+    # then, (6) becomes:
     # 
-    #  ⃗𝐟 (x) - f(x₀) = A⋅( ⃗𝐱 - x₀) + B⋅ ⃗𝐈 (x)
+    #   ⃗𝐟(x) - f(x₀) = A⋅( ⃗𝐱 - x₀) + B⋅ ⃗𝐉(x)
     #
-    # ⟹  ⃗𝐟 (x) = A⋅( ⃗𝐱 - x₀) + B⋅ ⃗𝐈 (x) + f(x₀)                              (8)
+    # ⟹ ⃗𝐟(x) = A⋅( ⃗𝐱 - x₀) + B⋅ ⃗𝐉(x) + f(x₀)                                 (8)
+    #   ⃗𝐟(x) = A⋅ ⃗𝛏 + B⋅ ⃗𝐉(x) + f(x₀)                                       (8a)
     #
-    # The minimization problem: find A, B where 
+    # • The minimization problem: find A, B for the global minimum of (9) below:
     #
-    #  Σ( ⃗𝛜² ) = Σ[( ⃗𝐟 (x) -  ⃗𝐲 )²]                                          (9)
+    #           ₙ₋₁
+    #   Σ( ⃗𝛜²) = Σ(εₖ)² = Σ[( ⃗𝐟 (x) -  ⃗𝐲)²]                                  (9)
+    #           ᵏ⁼⁰
+    # Assuming f(x₀) = y₀, (9) becomes:
     #
-    # has a global minimum
+    #   Σ( ⃗𝛜² ) = Σ[(A⋅( ⃗𝐱 - x₀)    + B⋅ ⃗𝐉(x) + y₀ -  ⃗𝐲 )²]
     #
-    # Assume f(x₀) = y₀; then (8) becomes
+    #           = Σ[(A⋅( ⃗𝐱 - x₀)    + B⋅ ⃗𝐉(x) - ( ⃗𝐲 -y₀) )²]                (10)
+    #           = Σ[(A⋅ ⃗𝛏 + B⋅ ⃗𝐉(x) -  ⃗𝛄 )²]                               (10a)
+    #             with  ⃗𝛏 =  ⃗𝐱 - x₀ and  ⃗𝛄  =  ⃗𝐲 - y₀
     #
-    # Σ( ⃗𝛜² ) = Σ[(A⋅( ⃗𝐱 - x₀) + B⋅ ⃗𝐈 (x) + y₀ -  ⃗𝐲 )²]
+    # The approach in skg.exp.exp_fit is to treat (10) as a system of linear 
+    # equations:
     #
-    #         = Σ[(A⋅( ⃗𝐱 - x₀) + B⋅ ⃗𝐈 (x) - ( ⃗𝐲 -y₀))²]                     (10)
+    #   Σ[(A⋅( ⃗𝐱 - x₀) + B⋅ ⃗𝐈 (x) - ( ⃗𝐲 -y₀))²] = 0, i.e.:
+    #   Σ[(A⋅ ⃗𝛏 + B⋅ ⃗𝐈(x) -  ⃗𝛄)²] = 0
     #
-    # The approach in skg.exp.exp_fit is to treat (10) as a system of linear equations
-    # of the form  ⃗𝐀 ⋅ 𝐌 =  ⃗𝐲  and "solve" it in the least squares sense (``linalg.lstsq``)
+    # of the form  ⃗𝐯 ⋅ 𝐌 =  ⃗𝛄 and "solve" it (``linalg.lstsq``)
     #
-    # The matrix 𝐌 is the 𝒏 × 2 matrix [  ⃗𝐱 - x₀   ⃗𝐈 (x) ], and  ⃗𝐀 is the "solution":
+    # The matrix 𝐌 is the 𝒏 × 2 matrix [ ⃗𝐱 - x₀   ⃗𝐈(x) ] = [ ⃗𝛏   ⃗𝐈(x)], 
+    #           where 𝒏 is the cardinality of  ⃗𝐲  (same as that of  ⃗𝐱 )
+    # ⃗𝐯 is the "solution" vector [A B], with A = -ac and B = c,
     #
-    # Step 1:
-    #      ⃗𝐀                  𝐌                           ⃗𝐲 
-    #   ⎵     ⎵        ⎵                      ⎵      ⎵          ⎵ 
-    #  |   A   |      |  x₀   - x₀     I(x₀)   |    |  y₀ - y₀   |
-    #  |       |   ×  |  x₁   - x₀     I(x₁)   | =  |  y₁ - y₀   |
-    #  |   B   |      |      ⋮           ⋮     |    |     ⋮      |
-    #   ⎴     ⎴       |  xₙ₋₁ - x₀     I(xₙ₋₁) |    |  yₙ₋₁ - y₀ |
-    #                  ⎴                      ⎴      ⎴          ⎴ 
-    # thus "solving"  ⃗𝐀 = 𝐌⁻¹ ×  ⃗𝐲  
+    # Step 1: calculating a and c:
     #
-    #   ⎵     ⎵        ⎵                      ⎵ ⁻¹   ⎵          ⎵ 
-    #  |   A   |      |  x₀   - x₀     I(x₀)   |    |  y₀ - y₀   |
-    #  |       |   =  |  x₁   - x₀     I(x₁)   | ×  |  y₁ - y₀   |
-    #  |   B   |      |      ⋮           ⋮     |    |     ⋮      |
-    #   ⎴     ⎴       |  xₙ₋₁ - x₀     I(xₙ₋₁) |    |  yₙ₋₁ - y₀ |
-    #                  ⎴                      ⎴      ⎴          ⎴ 
+    #     ⃗𝐯       ×             𝐌              =       ⃗𝛄 :
+    #                ⎵                      ⎵     ⎵          ⎵ 
+    #               |  x₀   - x₀     I(x₀)   |   |  y₀ - y₀   |
+    #   ⎵      ⎵    |  x₁   - x₀     I(x₁)   | = |  y₁ - y₀   |
+    #  |  A  B  | × |      ⋮           ⋮     |   |     ⋮      |
+    #   ⎴      ⎴    |      ⋮           ⋮     |   |     ⋮      |
+    #               |  xₙ₋₁ - x₀     I(xₙ₋₁) |   |  yₙ₋₁ - y₀ |
+    #                ⎴                      ⎴     ⎴          ⎴ 
+    # i.e.,:
+    #                ⎵             ⎵     ⎵     ⎵ 
+    #               |  ξ₀   I(x₀)   |   |  γ₀   |
+    #   ⎵      ⎵    |  ξ₁   I(x₁)   | = |  γ₁   |
+    #  |  A  B  | × |  ⋮    ⋮       |   |  ⋮    |
+    #   ⎴      ⎴    |  ⋮    ⋮       |   |  ⋮    |
+    #               |  ξₙ₋₁ I(xₙ₋₁) |   |  γₙ₋₁ |
+    #                ⎴             ⎴     ⎴     ⎴ 
+    # thus, "solving"  ⃗𝐯 = 𝐌⁻¹ ×  ⃗𝐘:
     #
-    # followed by calculating a, c from  ⃗𝐀  using (7)
+    #     ⃗𝐯       =         𝐌⁻¹       ×     ⃗𝛄 :
     #
-    # then in step 2 calculate b from a second system of equations obtained by 
-    # replacing c in (1)
+    #                ⎵             ⎵ ⁻¹  ⎵     ⎵ 
+    #               |  ξ₀   I(x₀)   |   |  γ₀   |
+    #   ⎵      ⎵    |  ξ₁   I(x₁)   | × |  γ₁   |
+    #  |  A  B  | × |  ⋮    ⋮       |   |  ⋮    |
+    #   ⎴      ⎴    |  ⋮    ⋮       |   |  ⋮    |
+    #               |  ξₙ₋₁ I(xₙ₋₁) |   |  γₙ₋₁ |
+    #                ⎴             ⎴     ⎴     ⎴ 
+    #
+    # is followed by calculating a, c from  ⃗𝐯  using (7)
+    #
+    # Step 2: calculate b from a second system of equations obtained by 
+    # replacing c in (1):
+    #
+    # Again, this yields the following linear regression:
+    #
+    #  ₙ₋₁                       ₙ₋₁
+    #   Σ(εₖ)² = Σ( ⃗𝐟(x) -  ⃗𝐲)² = Σ(a+b⋅exp(c⋅xₖ) - yₖ)²                    (11)
+    #  ᵏ⁼⁰                       ᵏ⁼⁰
+    #
+    # In (11) let:
+    #
+    #   ⃗𝛉(x) = exp(c ⃗𝐱)                                                     (12)
+    #
+    # Then (11) becomes:
+    #
+    #  ₙ₋₁       ₙ₋₁                    ₙ₋₁    
+    #   Σ(εₖ)² =  Σ(a + b⋅θₖ - yₖ)²  =   Σ(a⋅1 + b⋅θₖ - yₖ)²                (13)
+    #  ᵏ⁼⁰       ᵏ⁼⁰                    ᵏ⁼⁰    
+    #
+    #  Which is also treated as a system of linear equations:
+    #
+    #      ⃗𝐰₁     ×      𝐌       =     ⃗𝐲 :
+    #                ⎵        ⎵     ⎵     ⎵ 
+    #               |  1₀ θ₀   |   |  y₀   |
+    #   ⎵      ⎵    |  1₁ θ₁   | = |  y₁   |
+    #  |  a  b  | × |  ⋮  ⋮    |   |  ⋮    |
+    #   ⎴      ⎴    |  ⋮  ⋮    |   |  ⋮    |
+    #               |  1  θₙ₋₁ |   |  yₙ₋₁ |
+    #                ⎴        ⎴    ⎴     ⎴ 
+    #
+    #  Solution: 
+    #      ⃗𝐰₁     =      𝐌⁻¹     ×     ⃗𝐲 :
+    #
+    #                ⎵        ⎵⁻¹   ⎵     ⎵ 
+    #               |  1₀ θ₀   |   |  y₀   |
+    #   ⎵      ⎵    |  1₁ θ₁   | × |  y₁   |
+    #  |  a  b  | = |  ⋮  ⋮    |   |  ⋮    |
+    #   ⎴      ⎴    |  ⋮  ⋮    |   |  ⋮    |
+    #               |  1  θₙ₋₁ |   |  yₙ₋₁ |
+    #                ⎴        ⎴     ⎴     ⎴ 
+    #
+    # And the function returns (a, b, c) with a,b from Step 2 and c from Step 1
+    # ∎
+    # ### END   NOTE: What the original scikit-guess exp.exp_fit() function does:
+    #
+    # ### BEGIN NOTE: THIS function uses the normal equtions method of Jacquelin:
+    #
+    # Step 1: find out a, c
+    # ---------------------
+    #
+    # In equation (10b) above:
+    #           ₙ₋₁
+    #   Σ( ⃗𝛜²) = Σ([(A⋅ ⃗𝛏 + B⋅ ⃗𝐈(x) -  ⃗𝛄 )²]
+    #           ᵏ⁼⁰
+    #
+    # can be rewritten as
+    #           ₙ₋₁
+    #   Σ( ⃗𝛜²) = Σ(εₖ)² = Σ[( ⃗𝐠(x) -  ⃗𝛄)²]                                  (14)
+    #           ᵏ⁼⁰
+    #
+    # where  ⃗𝐠(x)  = A⋅ ⃗𝛏 + B⋅ ⃗𝐈(x)
+    #
+    # Eq (14) is regarded as argmin ⃗𝛜(x) = ||𝐌⋅ ⃗𝐯 - 𝚪||₂, where  ⃗𝐯 is the 
+    # "solution" vector, and 𝚪 is the matrix [  ⃗𝛄 ].
+    #
+    # ∴  ⃗𝛜(x) = (𝐌⋅ ⃗𝐯 - 𝚪)ᵀ(𝐌⋅ ⃗𝐯 - 𝚪)                                       (15)
+    #
+    # By the normal equations theorem: ∇ ⃗𝛜(x) = 2𝐌ᵀ𝐌⋅ ⃗𝐯  - 2𝐌ᵀ⋅𝚪
+    #
+    # At the global mimimum, ∇ ⃗𝛜(x) = 0
+    #
+    # ∴ 𝐌ᵀ𝐌⋅ ⃗𝐯  = 𝐌ᵀ⋅𝚪                                                      (16)
+    #
+    #  𝐌 is the matrix [ ⃗𝛏   ⃗𝐬 ], where  ⃗𝛏 and ⃗𝐬  are as above
+    #  ⃗𝐯 is the solution vector [A B] with A, B as in (7)
+    #
+    #                 ₙ₋₁
+    # With Σ(⋅) being  Σ(⋅), ⃗𝐯 being [A, B]ᵀ and by definition of the dot product:
+    #                 ᵏ⁼⁰
+    #
+    #  ⃗𝐚⋅ ⃗𝐚 = Σ(aₖ²)
+    #         ᵏ
+    #  ⃗𝐚⋅ ⃗𝐛 = Σ(aₖbₖ)
+    #         ᵏ
+    #            𝐌ᵀ   ×      𝐌
+    #          ⎵   ⎵                  ⎵               ⎵     ⎵               ⎵
+    #         |  ⃗𝛏  |                |  ⃗𝛏 ⋅ ⃗𝛏   ⃗𝛏 ⋅ ⃗𝐬  |   | Σ(ξₖ²)  Σ(ξₖsₖ) |
+    #   𝐌ᵀ𝐌 = |     | ×  [ ⃗𝛏   ⃗𝐬 ] = |                 | = |                 |
+    #         |  ⃗𝐬  |                |  ⃗𝐬 ⋅ ⃗𝛏   ⃗𝐬 ⋅ ⃗𝐬  |   | Σ(ξₖsₖ) Σ(sₖ²)  |
+    #          ⎴   ⎴                  ⎴               ⎴     ⎴               ⎴
+    #
+    #  
+    #            𝐌ᵀ   ×  𝚪
+    #          ⎵   ⎵             ⎵       ⎵     ⎵       ⎵
+    #         |  ⃗𝛏  |           |  ⃗𝛏 ⋅ ⃗𝛄  |   | Σ(ξₖγₖ) |
+    #   𝐌ᵀ𝚪 = |     | × [ ⃗𝛄 ] = |         | = |         |
+    #         |  ⃗𝐬  |           |  ⃗𝐬 ⋅ ⃗𝛄  |   | Σ(sₖγₖ) |
+    #          ⎴   ⎴             ⎴       ⎴     ⎴       ⎴
+    # and 
+    #          ⎵ ⎵
+    #         | A |
+    #    ⃗𝐯  = |   |
+    #         | B |
+    #          ⎴ ⎴
+    # ∴ (15) can be written as:
+    #
+    #         𝐌ᵀ𝐌         ×   ⃗𝐯   =     𝐌ᵀ𝚪 
+    #  ⎵               ⎵     ⎵ ⎵     ⎵       ⎵
+    # | Σ(ξₖ²)  Σ(ξₖsₖ) |   | A |   | Σ(ξₖγₖ) |
+    # |                 | × |   | = |         |                             (17)
+    # | Σ(ξₖsₖ) Σ(sₖ²)  |   | B |   | Σ(sₖγₖ) |
+    #  ⎴               ⎴     ⎴ ⎴     ⎴       ⎴
+    # Solving for  ⃗𝐯  as above yields a, c
+    #
+    # Step 2: find out b
+    # ------------------
+    #
+    # This applies the normal equation method again:
+    #
+    # Reqrite eq (13) as
+    #
+    #           ₙ₋₁
+    #   Σ( ⃗𝛜²) = Σ(εₖ)² = Σ[( ⃗𝐠(x) -  ⃗𝐲)²]                                  (18)
+    #           ᵏ⁼⁰
+    # with
+    #   ⃗𝐠(x) = a + b⋅ ⃗𝛉  = a⋅ ⃗𝐈  + b⋅ ⃗𝛉 ,
+    #   ⃗𝛉 = exp(c⋅ ⃗𝐱 )
+    #   ⃗𝐈 the unit vector: I[k] = 1, k = 0 … n-1
+    #
+    # Let  ⃗𝐰 the "solution" vector [a b] at the global minimum of (18)
+    # 
+    # ∴ (16) becomes
+    #
+    #            𝐌ᵀ   ×      𝐌
+    #          ⎵   ⎵                  ⎵               ⎵     ⎵            ⎵
+    #         |  ⃗𝐈  |                |  ⃗𝐈 ⋅ ⃗𝐈   ⃗𝐈 ⋅ ⃗𝛉  |   | 𝒏     Σ(θₖ)  |
+    #   𝐌ᵀ𝐌 = |     | ×  [ ⃗𝐈   ⃗𝛉 ] = |                 | = |              | (19)
+    #         |  ⃗𝛉  |                |  ⃗𝛉 ⋅ ⃗𝐈   ⃗𝛉 ⋅ ⃗𝛉  |   | Σ(θₖ) Σ(θₖ²) |
+    #          ⎴   ⎴                  ⎴               ⎴     ⎴            ⎴
+    #
+    # remember:
+    #  1. the dot product of a unit vector with another vector is the sum of 
+    #     the elements of the 'other' vector
+    #  2. ∴ the dot product of a unit vector with itself is its cardinality
+    #  
+    #            𝐌ᵀ   ×  𝚪
+    #          ⎵   ⎵             ⎵       ⎵     ⎵       ⎵
+    #         |  ⃗𝐈  |           |  ⃗𝐈 ⋅ ⃗𝐲  |   | Σ(yₖ)   |
+    #   𝐌ᵀ𝚪 = |     | × [ ⃗𝐲 ] = |         | = |         |                   (20)
+    #         |  ⃗𝛉  |           |  ⃗𝛉 ⋅ ⃗𝐲  |   | Σ(θₖyₖ) |
+    #          ⎴   ⎴             ⎴       ⎴     ⎴       ⎴
+    # and 
+    #          ⎵ ⎵
+    #         | a |
+    #    ⃗𝐰  = |   |                                                         (21)
+    #         | b |
+    #          ⎴ ⎴
+    # And now, the linear regression is 𝐌ᵀ𝐌 ×  ⃗𝐰  = 𝐌ᵀ𝚪 
+    #
+    #  ⎵            ⎵     ⎵ ⎵     ⎵       ⎵
+    # | 𝒏     Σ(θₖ)  |   | a |   | Σ(yₖ)   |
+    # |              | × |   | = |         |                                (22)
+    # | Σ(θₖ) Σ(θₖ²) |   | a |   | Σ(θₖyₖ) |
+    #  ⎴            ⎴     ⎴ ⎴     ⎴       ⎴
+    # ### END   NOTE: What THIS function does:
     x, y = skg_preprocess(x, y, is_sorted)
     
-    # step 1
+    # ### BEGIN Step 1
+    #
     s = np.zeros(y.shape)      #  ⃗𝐬 
     s[1:] = np.cumsum(0.5 * np.diff(x)*(y[1:] + y[:-1]))
     
-    x = x-x[0]                 #  ⃗𝐱 
-    y = y-y[0]                 #  ⃗𝐲 
+    ξ = x-x[0]                 #  ⃗𝛏 
+    γ = y-y[0]                 #  ⃗𝛄 
     
-    xs = np.dot(x, s)          # Σ(𝐱ₖ⋅𝐬ₖ)
-    yx = np.dot(y, x)          # Σ(𝐲ₖ⋅𝐱ₖ)
-    ys = np.dot(y, s)          # Σ(𝐲ₖ⋅𝐬ₖ)
+    ξs = np.dot(ξ, s)          # Σ(ξₖ⋅sₖ) = Σ(ξₖsₖ)
+    γξ = np.dot(γ, ξ)          # Σ(γₖ⋅ξₖ) = Σ(ξₖγₖ)
+    γs = np.dot(γ, s)          # Σ(γₖ⋅sₖ) = Σ(sₖγₖ)
     
+    𝐌ᵀM = np.zeros((2,2))      # See eq (17) (Eq 11 in Jacquelin obtained 
+                               # through the normal equation method)
+                               
+    𝐌ᵀM[0,0] = np.dot(ξ, ξ)    # Σ(ξₖ²)
+    𝐌ᵀM[0,1] = ξs              # Σ(ξₖ⋅sₖ)
+    𝐌ᵀM[1,0] = ξs              # Σ(ξₖ⋅sₖ) = Σ(sₖ⋅ξₖ)
+    𝐌ᵀM[1,1] = np.dot(s, s)    # Σ(sₖ²)
     
-    #     Written as least squares problem (normal equation):
+    𝐌ᵀΓ = np.array([γξ, γs])
+    
+    𝐯 = np.dot(np.linalg.pinv(𝐌ᵀM), 𝐌ᵀΓ)
+    a, c = -𝐯[0]/𝐯[1], 𝐯[1]
+    
     #
-    #     A⋅Σ(𝐱ₖ²)   + B⋅Σ(𝐱ₖ⋅𝐬ₖ) = Σ(𝐲ₖ⋅𝐱ₖ)
-    #     A⋅Σ(𝐱ₖ⋅𝐬ₖ) + B⋅Σ(𝐬ₖ²)   = Σ(𝐲ₖ⋅𝐬ₖ)
-    #     
-    #     and in matrix form:
-    #      ⎵                 ⎵      ⎵   ⎵     ⎵         ⎵
-    #     | Σ(𝐱ₖ²)   Σ(𝐱ₖ⋅𝐬ₖ) |    |  A  |   |  Σ(𝐲ₖ⋅𝐱ₖ) |
-    #     | Σ(𝐱ₖ⋅Sₖ) Σ(𝐬ₖ²)   | ×  |  B  | = |  Σ(𝐲ₖ⋅𝐬ₖ) | ∎
-    #      ⎴                 ⎴      ⎴   ⎴     ⎴         ⎴
-
-    M = np.zeros((2,2))        # Eq 11 in Jacquelin obtained through the normal equation method
-    M[0,0] = np.dot(x, x)      # Σ(𝐱ₖ²)
-    M[0,1] = xs                # Σ(𝐱ₖ⋅𝐬ₖ)
-    M[1,0] = xs                # Σ(𝐱ₖ⋅𝐬ₖ)
-    M[1,1] = np.dot(s, s)      # Σ(𝐬ₖ²)
+    # ### END   Step 1
     
-    Y = np.array([yx, ys])
-    
-    # (A, B), *_ = linalg.lstsq(M, Y, overwrite_a=True, overwrite_b=True)
-    A, B = np.dot(np.linalg.pinv(M), Y)
-    a, c = -A/B, B
-    
-    # step 2
+    # ### BEGIN Step 2
+    #
     n = y.shape[0]
     θ = np.exp(c*x)
-    θsum = np.sum(θ)           # Σ(𝛉ₖ)
-    M[0,0] = n
-    M[0,1] = θsum
-    M[1,0] = θsum
-    M[1,1] = np.dot(θ, θ)      # Σ(𝛉ₖ²)
+    Σθ = np.sum(θ)                            # Σ(θₖ)
+    𝐌ᵀM[0,0] = n
+    𝐌ᵀM[0,1] = Σθ
+    𝐌ᵀM[1,0] = Σθ
+    𝐌ᵀM[1,1] = np.dot(θ, θ)                     # Σ(θₖ²)
     
-    Y[0] = np.sum(y)           # Σ(𝐲ₖ)
-    Y[1] = np.dot(y,θ)         # Σ(𝐲ₖ⋅𝛉ₖ)
+    𝐌ᵀΓ = np.array([np.sum(y), np.dot(y,θ)])    # Σ(yₖ) Σ(yₖ⋅θₖ)    see (20)
     
-    # (a, b), *_ = linalg.lstsq(M, Y, overwrite_a=True, overwrite_b=False)
-    a, b = np.dot(np.linalg.pinv(M), Y)
+    a, b = np.dot(np.linalg.pinv(𝐌ᵀM), 𝐌ᵀΓ)     # NOTE: unpack "solution"  ⃗𝐰  directly
+    #
+    # ### END   Step 2
 
     return (a, b, c)
     
