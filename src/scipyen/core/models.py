@@ -81,6 +81,12 @@ def check_rise_decay_params(x):
     
     return (len(x)-3) // 2
 
+def biexponential(x, β0, β1, λ0, λ1):
+    return β0 * np.exp(λ0 * x) + β1 * np.exp(λ1 * x)
+
+def biexponential_model(x, p):
+    return biexponential(x, *p)
+
 def biexponential_decay(x, β0, β1, τ0, τ1):
     r"""Decay modelled as a bi-exponential"""
     return β0 * np.exp(-x / τ0) + β1 * np.exp(-x / τ1)
