@@ -91,7 +91,7 @@ def biexponential_decay_model(x, p):
 def biased_biexponential_decay(x, α, β0, β1, τ0, τ1):
     return α + β0 * np.exp(-x / τ0) + β1 * np.exp(-x / τ1)
 
-def biased_biexponential_decay_model(x,p):
+def biased_biexponential_decay_model(x, p):
     return biased_biexponential_decay(x, *p)
     
 def generic_biexponential_decay(x, α, β0, β1, x0, τ0, τ1):
