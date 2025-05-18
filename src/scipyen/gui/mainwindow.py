@@ -4419,6 +4419,33 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         return codes
     
     @Slot()
+    def _historyToConsole_(self):
+        cmd, title = self._getHistoryBlockAsCode_(suggestTitle=True, skipEmptySessions=True,
+                                                  withHeader=False)
+        if isinstance(cmd, str) and len(cmd.strip()):
+            self.console.widget.writeText(cmd)
+        
+    @Slot()
+    def _execHistorySelection_(self):
+        cmd, title = self._getHistoryBlockAsCode_(suggestTitle=True, skipEmptySessions=True,
+                                                  withHeader=False)
+        if isinstance(cmd, str) and len(cmd.strip()):
+            self.statusBar().showMessage("Working...")
+            currentMouseCursor = self.cursor()
+            self.setCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
+            try:
+                self.console.consoleWidget.execute(cmd, hidden=False, interactive=False)
+                self.executionCount = self.ipkernel.shell.execution_count
+                self._updateHistoryView_(
+                    self.executionCount-1, self.ipkernel.shell.history_manager.input_hist_raw[-1])
+            except:
+                traceback.print_exc()
+                self.setCursor(currentMouseCursor)
+                raise()
+            self.statusBar().showMessage("Done!")
+            self.setCursor(currentMouseCursor)
+                    
+    @Slot()
     def _saveHistorySelection_(self):
         # print(f"{self.__class__.__name__}._saveHistorySelection_")
         cmd, title = self._getHistoryBlockAsCode_(suggestTitle=True, skipEmptySessions=True,
@@ -5221,7 +5248,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @Slot("QTreeWidgetItem*", int)
     @safeWrapper
     def slot_historyItemSelected(self, item, col):
-        r"""Triggered by a selcting an item in the Command History list.
+        r"""Triggered by selecting an item in the Command History list.
         Typically, this occurs after a single click on the item.
         """
         # only accept session items here (for now)
@@ -5302,8 +5329,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             self.console.consoleWidget.execute(cmd, hidden=False, interactive=False)
             # NOTE: 2017-03-19 21:15:48 while this DOES go to the ipython's history
             # NOTE: it DOES NOT go to the self.console.history_tail therefore calling the slot_updateHistory slot
-            # NOTE: won't work hence -- basically, console.history and shell history go out of sync
-            # NOTE: therefore we need to update OUR history manually
+            # NOTE: to avoid console.history and Scipyen's history going out of sync
+            # NOTE: therefore I need to update Scipyen's history manually
             self.executionCount = self.ipkernel.shell.execution_count
             self._updateHistoryView_(
                 self.executionCount-1, self.ipkernel.shell.history_manager.input_hist_raw[-1])
@@ -5312,8 +5339,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             self.setCursor(currentMouseCursor)
             raise()
         self.statusBar().showMessage("Done!")
-        # self.statusBar().clearMessage()
         self.setCursor(currentMouseCursor)
+        # self.statusBar().clearMessage()
 
     @Slot()
     def slot_Quit(self):
@@ -5542,7 +5569,9 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         
         self.sig_refreshRecentFilesMenu.connect(self._slot_refreshRecentFilesMenu_)
 
-        # BEGIN workspace view
+        # ### BEGIN workspace view
+        #
+        
         self.workspaceView.setShowGrid(False)
         self.workspaceView.setModel(self.workspaceModel)
         self.workspaceView.selectionModel().selectionChanged[QtCore.QItemSelection, QtCore.QItemSelection].connect(self.slot_selectionChanged)
@@ -5582,9 +5611,12 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.removeSelectedVarsToolBtn.clicked.connect(self.slot_deleteSelectedWorkspaceObjects)
         self.clearWorkspaceToolBtn.clicked.connect(self._slot_clearInternalWorkspace)
         # self.actionDisplay_In_Console.triggered.connect(self.slot_consoleDisplaySelectedVariables)
-        # END workspace view
+        
+        #
+        # ### END workspace view
 
-        # BEGIN command history view
+        # ### BEGIN command history view
+        #
         # NOTE: Upon launch it will get populated with Scipyen's history, during
         # the execution of self._init_QtConsole_()
         # So its resizeColumnToContents(0) method needs to be called once, in there.
@@ -5598,7 +5630,10 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.historyTreeWidget.customContextMenuRequested[QtCore.QPoint].connect(self.slot_historyContextMenuRequest)
         self.historyTreeWidget.itemClicked[QtWidgets.QTreeWidgetItem, int].connect(self.slot_historyItemSelected)
         self.historyTreeWidget.resizeColumnToContents(0)
-        # END command history view
+        
+        #
+        # ### END command history view
+        
         self.setWindowTitle("Scipyen")
 
         self.newViewersMenu = QtWidgets.QMenu("New", self)
@@ -5661,11 +5696,11 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # self.actionNewViewer.triggered.connect(self.slot_newViewer)
         # END do not delete: action for presenting a list of viewer types to choose from
 
-        # BEGIN Dock widgets management - it is good to know which one is on top
+        # ### BEGIN Dock widgets management - it is good to know which one is on top
         self.dockWidgetWorkspace.visibilityChanged[bool].connect(
             self.slot_dockWidgetVisibilityChanged)
 
-        # BEGIN file system view,  navigation widgets & actions
+        # ### BEGIN file system view,  navigation widgets & actions
         # self.fileSystemTreeView.setUniformRowHeights(True) # set in the ui file
         self.fileSystemTreeView.setModel(self.fileSystemModel)
         self.fileSystemTreeView.setAlternatingRowColors(True)
@@ -5761,10 +5796,20 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.varNameFilterFinderComboBox.lineEdit().addAction(self.removeVarNameFromFinderListAction,
                                                               QtWidgets.QLineEdit.TrailingPosition)
 
-        # END file system view,  navigation widgets & actions
-
-        # BEGIN command history filters
+        # ### END file system view,  navigation widgets & actions
+        
+        # ### BEGIN Command history
+        #
+        
+        self.historyCommandsExecuteToolButton.clicked.connect(self._execHistorySelection_)
+        self.historyCommandsToConsoleToolButton.clicked.connect(self._historyToConsole_)
+        self.saveHistoryToolbutton.clicked.connect(self._saveHistorySelection_)
+        self.copyHistoryCommands.clicked.connect(self._copyHistorySelection_)
+        
+        # ### BEGIN command history filters
         # filter/select commands from history combo
+        #
+        
         self.commandFinderComboBox.currentTextChanged[str].connect(
             self.slot_findCommand)
 
@@ -5783,23 +5828,33 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         self.commandFinderComboBox.lineEdit().addAction(self.removeItemFromCommandFinderListAction,
                                                         QtWidgets.QLineEdit.TrailingPosition)
+        #
+        # ### END command history filters
+        
+        #
+        # ### END   Command history
 
-        # END command history filters
-
-        # BEGIN console dock
+        # ### BEGIN console dock — NOT USED !
+        #
         self.consoleDockWidget = QtWidgets.QDockWidget(
             "Console", self, objectName="consoleDockWidget")
         self.consoleDockWidget.setAllowedAreas(QtCore.Qt.AllDockWidgetAreas)
         self.consoleDockWidget.setFeatures(QtWidgets.QDockWidget.DockWidgetMovable | QtWidgets.QDockWidget.DockWidgetFloatable)
         # self.consoleDockWidget.setFeatures(QtWidgets.QDockWidget.AllDockWidgetFeatures)# NOTE 2024-05-02 12:21:54 deprecated even in Qt 5 !!!
         self.consoleDockWidget.setVisible(False)
-        # END console dock
-        # END Dock widgets management
+        
+        #
+        # ### END console dock — NOT USED !
+        
+        #
+        # ### END Dock widgets management
 
-        # BEGIN miscellaneous
+        # ### BEGIN miscellaneous
+        #
         self.actionChoose_code_editor.triggered.connect(self._slot_chooseCodeEditor)
         self.actionUse_system_s_default_code_editor.triggered.connect(self._slot_setOverrideSystemEditor)
-        # END miscellaneous
+        #
+        # ### END miscellaneous
 
         # NOTE: 2021-08-17 12:36:49 TODO custom icon ?
         # see also NOTE: 2021-08-17 10:06:24 in scipyen.py

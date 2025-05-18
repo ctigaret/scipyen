@@ -3408,8 +3408,7 @@ class ScipyenConsoleWidget(ConsoleWidget):
         
     @safeWrapper
     def dropEvent(self, evt):
-        
-        from textwrap import dedent
+        # from textwrap import dedent
         src = evt.source()
         mimeData = evt.mimeData()
         dropAction = evt.dropAction()
