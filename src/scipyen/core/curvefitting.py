@@ -11,7 +11,7 @@ Harmonize the API (this is the role of the upcoming modelfitting.py module)
 """
 
 #### BEGIN core python modules
-import os, sys, traceback, warnings, numbers, collections, typing
+import os, sys, traceback, warnings, numbers, collections, typing, types
 #### END core python modules
 
 #### BEGIN 3rd party modules
@@ -1353,17 +1353,15 @@ def fit_model(data, func, p0, *args, **kwargs):
     rmse = np.sqrt(sse/fC.size)
     
     
-    result = collections.OrderedDict()
-    result["Model"] = f"{func.__module__}.{func.__name__}"
-    result["Fit"] = res
-    result["Coefficients"] = res_x
-    result["InitialCoefficients"] = {"values": x0, "bounds": bounds}
-    result["Coefficient Names"] = coeff_names
-    result["GoF"] = dict()
-    result["GoF"]["Rsq"] = rsq
-    result["GoF"]["R2adj"] = arsq
-    result["GoF"]["SSE"] = sse
-    result["GoF"]["RMSE"] = rmse
+    # result = collections.OrderedDict()
+    # NOTE: 2025-05-18 10:05:48 switching to SimpleNamespace
+    # TODO: 2025-05-18 10:06:06 propagate this to other fit_* functions in this module
+    result = types.SimpleNamespace({"ModelFunction": f"{func.__module__}.{func.__name__}",
+                                   "Fit": res,
+                                   "CoefficientNames": coeff_names,
+                                   "InitialCoefficients": types.SimpleNamespace({"values": x0, "bounds": bounds}),
+                                   "Coefficients": res_x,
+                                   "GoF": types.SimpleNamespace({"Rsq": rsq, "R2adj": arsq, "SSE": sse, "RMSE": rmse})})
     
     initialSupport = np.full((data.shape[0],), np.NaN)
     
