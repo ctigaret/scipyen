@@ -1465,7 +1465,8 @@ for the biexponential function
     #
     # ### END   implementation of Jacquelin 
     
-def guess_init_biased_biexp(x, y, is_sorted:bool=True):
+def guess_init_biased_biexp(x, y, is_sorted:bool=True):#
+    r"""returns a, b, p, c, q """
     x,y = skg_preprocess(x,y,is_sorted)
     ξ = x
     # ω = x*(0.5*x - x[0])
@@ -1507,7 +1508,7 @@ def guess_init_biased_biexp(x, y, is_sorted:bool=True):
     
     𝐌ᵀ𝚪 = np.array([Σssₖyₖ, Σsₖyₖ, Σξₖyₖ, Σωₖyₖ, Σyₖ])
     
-    A, B, C, D, E = np.dot(np.linalg.pinv(𝐌ᵀ𝐌), 𝐌ᵀ𝚪)
+    A, B, C, D, E = np.dot(np.linalg.pinv(𝐌ᵀ𝐌), 𝐌ᵀ𝚪) # BUG 2025-05-18 18:24:32 the problem here is that A must be ≥ 0!
     B2A = B**2 + 4*A # ∵ A = -pq and B = (p+q)
     p = 0.5 * (B + np.sqrt(B2A))
     q = 0.5 * (B - np.sqrt(B2A))
