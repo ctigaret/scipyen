@@ -2034,6 +2034,34 @@ def full_class_name(data):
 
     return ".".join([data.__module__, data.__name__])
 
+def unwind_type_sig(x, *t):
+    if isinstance(x, type):
+        if len(t):
+            return x in t
+        return (x, )
+    elif isinstance(x, (typing._GenericAlias, types.UnionType, types.GenericAlias)):
+        if len(t):
+            return any(v in x.__args__ or v in unwind_type_sig(x.__args__) for v in t)
+        return unwind_type_sig(x.__args__)
+    elif not isinstance(x, (tuple, list)):
+        return tuple()
+    
+    ret = list()
+    
+    for v in x:
+        if isinstance(v, typing._GenericAlias):
+            if len(t):
+                ret += list(unwind_type_sig(v.__args__)) + list(v.__args__)
+            else:
+                ret += list(unwind_type_sig(v.__args__))
+        elif isinstance(v, type):
+            ret.append(v)
+            
+    if len(t):
+        print(f"ret = {ret}")
+        return any(v in ret for v in t)
+    
+    return tuple(ret)
 
 def parent_types(data):
     r"""Returns a tuple of the immediate ancestor types of data.

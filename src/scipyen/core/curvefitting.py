@@ -11,7 +11,7 @@ Harmonize the API (this is the role of the upcoming modelfitting.py module)
 """
 
 #### BEGIN core python modules
-import os, sys, traceback, warnings, numbers, collections, typing, types
+import os, sys, traceback, warnings, numbers, collections, typing, types, inspect
 #### END core python modules
 
 #### BEGIN 3rd party modules
@@ -1157,6 +1157,8 @@ def fit_model(data, func, p0, *args, **kwargs):
     
     
     """
+    from dataclasses import MISSING # flag for badly-formed annotations
+    
     channel     = kwargs.pop("channel",     0)
     jac         = kwargs.pop("jac",         "2-point")
     bounds      = kwargs.pop("bounds",      (-np.inf, np.inf))
@@ -1180,7 +1182,26 @@ def fit_model(data, func, p0, *args, **kwargs):
     
     funcSignature = prog.signature2Dict(func)
     
-    if len(funcSignature["named"]) == 2 and "parameters" in
+    compress_annot = lambda x: x[0] if len(x) else MISSING
+    
+    assert funcSignature["named"] >= 1, f"Invalid func signature {funcSignature}"
+    
+    args_annots = list(map(lambda i: (i[0], i[1]), funcSignature["positional"].items())) + \
+                  list(map(lambda i: (i[0], compress_annot(tuple(set(i[1])-{inspect._empty}))), funcSignature["named"].items()))
+    
+    assert all(len(v) == 2 and v[1] not in (MISSING, inspect._empty) for v in args_annots), f"Bad or missing type annotations for 'func' {func}"
+
+    # check first argument
+    atypes = prog.unwind_type_sig(args_annots[0][1])
+    assert any(t in atypes for t in (np.ndarray, float)), f"First argument to 'func' {func} must be a float or an np.ndarray; instead, got {args_annots[0][1]}"
+        
+    if len(args_annots) == 2:
+        if not prog.unwind_type_sig(args_annots[1][1], list, tuple):
+            atypes = prog.unwind_type_sig(args_annots[1][1])
+        assert any(t in atypes for t in (np.ndarray, float)), f"Second argument to 'func' {func} must be a float or an np.ndarray; instead, got {args_annots[0][1]}"
+        assert (aa == typing.Sequence) or (isinstance(aa, typing._GenericAlias) and any(t in aa.__args__ for t in (np.ndarray, float))), f"Bad signature for argument '{args_annots[1][0]}'"
+        
+    # if len(funcSignature["named"]) == 1 and len(funcSignature["varpos"])"parameters" in
     
     def __cost_fun__(x0, t, y):  # returns residuals
         yf = func(t, *x0, **fkwargs)
@@ -1361,7 +1382,7 @@ def fit_model(data, func, p0, *args, **kwargs):
     rmse = np.sqrt(sse/fC.size)
     
     coefficients = types.SimpleNamespace({"Names": coeff_names,
-                                          "Initial:" types.SimpleNamespace({"values": x0, "bounds": bounds}),
+                                          "Initial": types.SimpleNamespace({"values": x0, "bounds": bounds}),
                                           "Fitted": res_x,
                                           "GoF": types.SimpleNamespace({"Rsq": rsq, "R2adj": arsq, "SSE": sse, "RMSE": rmse})})
     

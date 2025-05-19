@@ -163,7 +163,7 @@ The other parameters are as for generic_single_exponential_decay.
     return α + β * np.exp(-(x-x0) / τc)
 
 def generic_exponential_prod_decay_model(x:np.ndarray | float, 
-                                         parameters: typng.Sequence[float]) -> np.ndarray | float:
+                                         parameters: typing.Sequence[float]) -> np.ndarray | float:
     return generic_exponential_prod_decay(x, *parameters)
 
 def generic_single_exponential_decay(x:np.ndarray | float,
@@ -216,14 +216,14 @@ def generic_single_exponential_decay_model(x:np.ndarray | float,
 with coefficients packed in an array-like object"""
     return generic_single_exponential_decay(x, *parameters)
 
-def generic_single_exponential_rise_model(x:np.ndarray | float, 
+def generic_single_exponential_rise_model(x:np.ndarray | float, /, 
                                           parameters:typing.Sequence[float]) -> np.ndarray | float:
     r"""Alias to generic_single_exponential_rise, 
 with coefficients packed in an array-like object"""
     return generic_single_exponential_rise(x, *parameters)
 
 def alphaFunction(x:np.ndarray | float,
-                  α:float, β:float, x0:float, τ:float) -> np.ndarray | float:
+                  α:float, β:float, x0:float, τ:float, /) -> np.ndarray | float:
     r"""
 The Alpha function.
 
@@ -298,7 +298,8 @@ def alphaFunction_model(x:np.ndarray | float,
     r"""Alias to alphaFunction with coefficients packed in an array-like object"""
     return alphaFunction(x, *parameters)
 
-def nfsa(x:np.ndarray | float, i:float|pq.Quantity, n:float|pq.Quantity, b: float|pqQuantity) -> np.ndarray | float:
+def nfsa(x:np.ndarray | float, 
+         i:float|pq.Quantity, n:float|pq.Quantity, b: float|pq.Quantity) -> np.ndarray | float:
     r"""
         y = x * i - x²/N + b
     
@@ -416,8 +417,8 @@ def get_CB_scale_for_unit_amplitude(β:float, τ_rise:float, τ_decay:float, x0:
     return peak/yₘ
     
 def CBsum(x:np.ndarray | float, α:float, 
-          β₀:float, x₀₀:float, τ₀₀:float, τ₁₀:float, 
-          β₁:float, x₀₁:float, τ₀₁:float, τ₁₁:float) -> np.ndarray | float:
+          β0:float, x0_0:float, τ0_0:float, τ0_1:float, 
+          β1:float, x0_1:float, τ1_0:float, τ1_1:float) -> np.ndarray | float:
     r"""Realizes a sum of two Clements_Bekkers_97 functions, on x.
     
     Let 𝒙 a 1D domain vector:
@@ -442,9 +443,9 @@ def CBsum(x:np.ndarray | float, α:float,
         α, β₀, x₀₀, τ₀₀, τ₁₀, β₁, x₀₁, τ₀₁, τ₁₁
 
     """
-    y0 = Clements_Bekkers_97(x, α, β₀, x₀₀, τ₀₀, τ₁₀)
+    y0 = Clements_Bekkers_97(x, α, β0, x0_0, τ0_0, τ0_1)
     
-    y1 = Clements_Bekkers_97(x, 0., β₁, x₀₁, τ₀₁, τ₁₁)
+    y1 = Clements_Bekkers_97(x, 0., β1, x0_1, τ1_0, τ1_1)
     
     return y0 + y1
     
