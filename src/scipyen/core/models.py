@@ -72,7 +72,7 @@ import quantities as pq
 import numbers
 from core import quantities as scq
 
-def check_rise_decay_params(x):
+def check_rise_decay_params(x:typing.Sequence[float]):
     r"""Returns the number of decay components for a exp-rise-multi-decay transient.
     x = iterable with model parameters (see exp_rise_multi_decay())
     """
@@ -81,32 +81,41 @@ def check_rise_decay_params(x):
     
     return (len(x)-3) // 2
 
-def biexponential(x, β0, β1, λ0, λ1):
+def biexponential(x:typing.Union[np.ndarray, float], 
+                  β0:float, β1:float, λ0:float, λ1:float) -> np.ndarray | float:
     return β0 * np.exp(λ0 * x) + β1 * np.exp(λ1 * x)
 
-def biexponential_model(x, p):
+def biexponential_model(x:typing.Union[np.ndarray, float], 
+                        p:typing.Sequence[float]) -> np.ndarray | float:
     return biexponential(x, *p)
 
-def biexponential_decay(x, β0, β1, τ0, τ1):
+def biexponential_decay(x:typing.Union[np.ndarray, float], 
+                        β0:float, β1:float, τ0:float, τ1:float) -> np.ndarray | float:
     r"""Decay modelled as a bi-exponential"""
     return β0 * np.exp(-x / τ0) + β1 * np.exp(-x / τ1)
 
-def biexponential_decay_model(x, p):
+def biexponential_decay_model(x:typing.Union[np.ndarray, float], 
+                              p:typing.Sequence) -> np.ndarray | float:
     return biexponential_decay(x, *p)
 
-def biased_biexponential_decay(x, α, β0, β1, τ0, τ1):
+def biased_biexponential_decay(x:np.ndarray | float, 
+                               α:float, β0:float, β1:float, τ0:float, τ1:float) -> np.ndarray | float:
     return α + β0 * np.exp(-x / τ0) + β1 * np.exp(-x / τ1)
 
-def biased_biexponential_decay_model(x, p):
+def biased_biexponential_decay_model(x:typing.Union[np.ndarray, float], 
+                                     p:typing.Sequence[float]) -> np.ndarray | float:
     return biased_biexponential_decay(x, *p)
     
-def generic_biexponential_decay(x, α, β0, β1, x0, τ0, τ1):
+def generic_biexponential_decay(x: np.ndarray | float, 
+                                α:float, β0:float, β1:float, x0:float, τ0:float, τ1:float) -> np.ndarray | float:
     return α + β0 * np.exp(-(x-x0) / τ0) + β1 * np.exp(-(x-x0) / τ1)
 
-def generic_biexponential_decay_model(x, p):
+def generic_biexponential_decay_model(x:np.ndarray | float,
+                                      p:typing.Sequence[float]) -> np.ndarray | float:
     return generic_biexponential_decay(x, *p)
 
-def generic_exponential_prod_decay(x, α, β, x0, *τ):
+def generic_exponential_prod_decay(x: np.ndarray | float, 
+                                   α:float, β:float, x0:float, *τ) -> np.ndarray | float:
     r"""Realizes
                 ₙ₋₁
     y = α + β × Π  exp(-(x-x₀)/τₖ) = α + β × exp(-(x-x₀)/τᵪ)    , where:
@@ -153,10 +162,12 @@ The other parameters are as for generic_single_exponential_decay.
         
     return α + β * np.exp(-(x-x0) / τc)
 
-def generic_exponential_prod_decay_model(x, parameters, **kwargs):
-    return generic_exponential_prod_decay(x, *parameters, **kwargs)
+def generic_exponential_prod_decay_model(x:np.ndarray | float, 
+                                         parameters: typng.Sequence[float]) -> np.ndarray | float:
+    return generic_exponential_prod_decay(x, *parameters)
 
-def generic_single_exponential_decay(x, α, β, x0, τ):
+def generic_single_exponential_decay(x:np.ndarray | float,
+                                     α:float, β:float, x0:float, τ:float) -> np.ndarray | float:
     r"""Realizes y = α + β × exp(-(x-x₀)/τ)
     
 Parameters:
@@ -185,7 +196,8 @@ coefficients are given as floats in the following order:
     λ = 1/τ
     return α + β * np.exp(-(x-x0)*λ)
 
-def generic_single_exponential_rise(x, α, β, x0, τ):
+def generic_single_exponential_rise(x:np.ndarray | float, 
+                                    α:float, β:float, x0:float, τ:float) -> np.ndarray | float:
     r"""Realizes α + β × [1 - exp(-(x-x₀)/τ)]
 
 Parameters:
@@ -198,17 +210,20 @@ coefficients are given as floats in the following order:
 """
     return α + β * (1 - np.exp(-(x-x0)/τ))
 
-def generic_single_exponential_decay_model(x, parameters, **kwargs):
+def generic_single_exponential_decay_model(x:np.ndarray | float, 
+                                           parameters:typing.Sequence[float]) -> np.ndarray | float:
     r"""Alias to generic_single_exponential_decay, 
 with coefficients packed in an array-like object"""
-    return generic_single_exponential_decay(x, *parameters, **kwargs)
+    return generic_single_exponential_decay(x, *parameters)
 
-def generic_single_exponential_rise_model(x, parameters, **kwargs):
+def generic_single_exponential_rise_model(x:np.ndarray | float, 
+                                          parameters:typing.Sequence[float]) -> np.ndarray | float:
     r"""Alias to generic_single_exponential_rise, 
 with coefficients packed in an array-like object"""
-    return generic_single_exponential_rise(x, *parameters, **kwargs)
+    return generic_single_exponential_rise(x, *parameters)
 
-def alphaFunction(x, α, β, x0, τ):
+def alphaFunction(x:np.ndarray | float,
+                  α:float, β:float, x0:float, τ:float) -> np.ndarray | float:
     r"""
 The Alpha function.
 
@@ -278,11 +293,12 @@ plt.plot(x,y)
     
     return y
 
-def alphaFunction_model(x, parameters, **kwargs):
+def alphaFunction_model(x:np.ndarray | float, 
+                        parameters: typing.Sequence[float]) -> np.ndarray | float:
     r"""Alias to alphaFunction with coefficients packed in an array-like object"""
-    return alphaFunction(x, *parameters, **kwargs)
+    return alphaFunction(x, *parameters)
 
-def nsfa(x, parameters):
+def nfsa(x:np.ndarray | float, i:float|pq.Quantity, n:float|pq.Quantity, b: float|pqQuantity) -> np.ndarray | float:
     r"""
         y = x * i - x²/N + b
     
@@ -293,22 +309,27 @@ def nsfa(x, parameters):
         
     x = x.flatten()
     
-    i, N, b = parameters
+    return x*i - x**2 / N + b
     
-    y = x*i - x**2 / N + b
-    
-    return y
-   
 
-def Clements_Bekkers_97(x, parameters, unit_amplitude:bool=False):
+def nsfa_model(x:np.ndarray | float, parameters:typing.Sequence[float]) -> np.ndarray | float:
+    return nfsa(x, *p)
+
+def Clements_Bekkers_97(x:np.ndarray | float,
+                        α:float, β:float, x0:float, τ1:float, τ2:float,
+                        **kwargs) -> np.ndarray | float:
     r"""
     Clements & Bekkers 1997 mEPSC waveform (alphafunction-like).
 
     This approximates a single exponential rise and decay each with their own 
     time constant:
     
-    y = α + β × (1 - exp(-(x-x₀)/τ₁)) × exp(-(x-x₀)/τ₂) for x-x₀ >= 0, or α elsewhere
-    
+        /
+        | α + β × (1 - exp(-(x-x₀)/τ₁)) × exp(-(x-x₀)/τ₂) for x-x₀ >= 0, 
+    y = |
+        | α elsewhere
+        \
+            
     where:
         α  = offset (usually, 0.);
     
@@ -318,21 +339,19 @@ def Clements_Bekkers_97(x, parameters, unit_amplitude:bool=False):
     
         τ₁, τ₂ = time constants, respectively, for rise and decay
     
-    
     Parameters:
     ============
     x: predictor (independent variable e.g., time) - 1D numpy ndarray
 
-    parameters: 1D sequence (tuple, list, numpy array) of five float scalars:
-                α, β, x₀, τ₁ and τ₂
+    α, β, x₀, τ₁ and τ₂: float scalars, where:
+        α is considered in pA,
+        β is dimensionless,
+        x₀, τ₁ and τ₂ are considered in s
+
+        and τ₁ > 0 τ₂ > 0
     
-                where:
-                    α is considered in pA,
-                    β is dimensionless,
-                    x₀, τ₁ and τ₂ are considered in s
-    
-                and τ₁ > 0 τ₂ > 0
-    
+    Var-keyword parameters:
+    =======================
     unit_amplitude: optional, default is False
         When True, return a waveform with baseline 0 and peak value +1 , using 
         the given time constants τ₁ and τ₂
@@ -341,14 +360,14 @@ def Clements_Bekkers_97(x, parameters, unit_amplitude:bool=False):
     ========
     1D numpy array (vector)
     
-    
     """
+    unit_amplitude = kwargs.pop("unit_amplitude", False)
     if isinstance(x, pq.Quantity):
         x = x.magnitude
         
     x = x.flatten()
     
-    α, β, x0, τ1, τ2 = parameters
+    # α, β, x0, τ1, τ2 = parameters
     
     xx = x-x0
     
@@ -380,7 +399,11 @@ def Clements_Bekkers_97(x, parameters, unit_amplitude:bool=False):
     
     return y
 
-def get_CB_scale_for_unit_amplitude(β, τ_rise, τ_decay, x0=0.):
+def Clements_Bekkers_97_model(x:np.ndarray | float, parameters:typing.Sequence[float],
+                              unit_amplitude:bool=False) -> np.ndarray | float:
+    return Clements_Bekkers_97(x, *p, unit_amplitude = unit_amplitude)
+
+def get_CB_scale_for_unit_amplitude(β:float, τ_rise:float, τ_decay:float, x0:float = 0.):
     efunc       = lambda x, τ: np.exp(-x/τ)
     risefunc    = lambda x, τ: 1-efunc(x,τ)
     decayfunc   = efunc
@@ -392,7 +415,9 @@ def get_CB_scale_for_unit_amplitude(β, τ_rise, τ_decay, x0=0.):
     
     return peak/yₘ
     
-def CBsum(x, parameters):
+def CBsum(x:np.ndarray | float, α:float, 
+          β₀:float, x₀₀:float, τ₀₀:float, τ₁₀:float, 
+          β₁:float, x₀₁:float, τ₀₁:float, τ₁₁:float) -> np.ndarray | float:
     r"""Realizes a sum of two Clements_Bekkers_97 functions, on x.
     
     Let 𝒙 a 1D domain vector:
@@ -417,18 +442,21 @@ def CBsum(x, parameters):
         α, β₀, x₀₀, τ₀₀, τ₁₀, β₁, x₀₁, τ₀₁, τ₁₁
 
     """
+    y0 = Clements_Bekkers_97(x, α, β₀, x₀₀, τ₀₀, τ₁₀)
     
-    y0 = Clements_Bekkers_97(x, parameters[:5])
-    
-    y1 = Clements_Bekkers_97(x, (0., ) + tuple(parameters[5:])) # because this still expects five params
+    y1 = Clements_Bekkers_97(x, 0., β₁, x₀₁, τ₀₁, τ₁₁)
     
     return y0 + y1
     
+def CBsum_model(x:np.ndarray | float, parameters:typing.Sequence[float]) -> np.ndarray | float:
+    return CBsum(c, *parameters)
     
-def exp_rise_multi_decay_model(x, parameters, returnDecays = False):
+def exp_rise_multi_decay_model(x:np.ndarray|float, parameters:typing.Sequence[float], 
+                               returnDecays = False) -> np.ndarray | float:
     return exp_rise_multi_decay(x, *parameters, returnDecays = returnDecays)
     
-def exp_rise_multi_decay(x, *parameters, returnDecays = False):
+def exp_rise_multi_decay(x:np.ndarray|float, *parameters:float,
+                         **kwargs) -> np.ndarray|float:
     r""" Realization of a transient signal with a single exponential rise (r) and
         n exponential decays (d1..dn), at an onset (delay) x0 and a given 
         "DC" component (offset) o: 
@@ -504,7 +532,7 @@ def exp_rise_multi_decay(x, *parameters, returnDecays = False):
     """
     
     # NOTE: call np.squeeze on the argument BEFORE passing it to this function !!!
-    
+    returnDecays = kwargs.pop("returnDecays", False)
     nDecays = check_rise_decay_params(parameters)
     
     if isinstance(x, numbers.Real):
@@ -526,12 +554,6 @@ def exp_rise_multi_decay(x, *parameters, returnDecays = False):
         
         return y
             
-        #if returnDecays:
-            #return y, yd
-            
-        #else:
-            #return y
-        
     else:
         if x.ndim > 1:
             raise ValueError("Vector x must have exactly one dimension (i.e., a column vector)")

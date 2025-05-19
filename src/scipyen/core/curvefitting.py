@@ -1139,7 +1139,10 @@ def fit_model(data, func, p0, *args, **kwargs):
     Returns:
     ========
     
-    A tuple: (fitted curve, collections.OrderedDict) where:
+    WARNING: Since 2025-05-19 12:09:54 the second element in the tuple is a 
+    types.SimpleNamespace, and NOT a collections.OrderedDict anymore!
+    
+    A tuple: (fitted curve, types.SimpleNamespace) where:
     
     • fitted curve is the realization of the model in `func` using the fitted 
         parameters and the independent variable `x`
@@ -1174,8 +1177,13 @@ def fit_model(data, func, p0, *args, **kwargs):
     fargs       = kwargs.pop("fargs",       tuple())
     fkwargs     = kwargs.pop("fkwargs",     dict())
     
+    
+    funcSignature = prog.signature2Dict(func)
+    
+    if len(funcSignature["named"]) == 2 and "parameters" in
+    
     def __cost_fun__(x0, t, y):  # returns residuals
-        yf = func(t, x0, **fkwargs)
+        yf = func(t, *x0, **fkwargs)
         ret = y-yf
         
         return ret
@@ -1352,16 +1360,18 @@ def fit_model(data, func, p0, *args, **kwargs):
     
     rmse = np.sqrt(sse/fC.size)
     
+    coefficients = types.SimpleNamespace({"Names": coeff_names,
+                                          "Initial:" types.SimpleNamespace({"values": x0, "bounds": bounds}),
+                                          "Fitted": res_x,
+                                          "GoF": types.SimpleNamespace({"Rsq": rsq, "R2adj": arsq, "SSE": sse, "RMSE": rmse})})
+    
     
     # result = collections.OrderedDict()
     # NOTE: 2025-05-18 10:05:48 switching to SimpleNamespace
     # TODO: 2025-05-18 10:06:06 propagate this to other fit_* functions in this module
     result = types.SimpleNamespace({"ModelFunction": f"{func.__module__}.{func.__name__}",
                                    "Fit": res,
-                                   "CoefficientNames": coeff_names,
-                                   "InitialCoefficients": types.SimpleNamespace({"values": x0, "bounds": bounds}),
-                                   "Coefficients": res_x,
-                                   "GoF": types.SimpleNamespace({"Rsq": rsq, "R2adj": arsq, "SSE": sse, "RMSE": rmse})})
+                                   "Coefficients": coefficients})
     
     initialSupport = np.full((data.shape[0],), np.NaN)
     
