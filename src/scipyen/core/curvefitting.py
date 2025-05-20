@@ -1556,7 +1556,15 @@ def guess_init_biased_biexp(x, y, is_sorted:bool=True):#
     
     𝐌ᵀ𝚪 = np.array([Σssₖyₖ, Σsₖyₖ, Σξₖyₖ, Σωₖyₖ, Σyₖ])
     
-    A, B, C, D, E = np.dot(np.linalg.pinv(𝐌ᵀ𝐌), 𝐌ᵀ𝚪) # BUG 2025-05-18 18:24:32 the problem here is that A must be ≥ 0!
+    print("guess_init_biased_biexp step 1: ")
+    print(f"NaNs in MTM: {np.any(np.isnan(𝐌ᵀ𝐌))}")
+    print(f"Inf in MTM: {np.any(np.isinf(𝐌ᵀ𝐌))}")
+    print(f"NaNs in MTG: {np.any(np.isnan(𝐌ᵀΓ))}")
+    print(f"Inf in MTG: {np.any(np.isinf(𝐌ᵀΓ))}")
+    
+    σ, ν = optimize.nnls(𝐌ᵀ𝐌, 𝐌ᵀ𝚪)
+    A, B, C, D, E = σ
+    # A, B, C, D, E = np.dot(np.linalg.pinv(𝐌ᵀ𝐌), 𝐌ᵀ𝚪) # BUG 2025-05-18 18:24:32 the problem here is that A must be ≥ 0!
     B2A = B**2 + 4*A # ∵ A = -pq and B = (p+q)
     p = 0.5 * (B + np.sqrt(B2A))
     q = 0.5 * (B - np.sqrt(B2A))
@@ -1578,8 +1586,17 @@ def guess_init_biased_biexp(x, y, is_sorted:bool=True):#
     𝐌ᵀ𝐌[0,:] = [Σβₖ, Σβₖ2,  Σβₖηₖ]
     𝐌ᵀ𝐌[1,:] = [Σηₖ, Σβₖηₖ, Σηₖ2 ]
     
+    print("guess_init_biased_biexp step 2: ")
+    print(f"NaNs in MTM: {np.any(np.isnan(𝐌ᵀ𝐌))}")
+    print(f"Inf in MTM: {np.any(np.isinf(𝐌ᵀ𝐌))}")
+    print(f"NaNs in MTG: {np.any(np.isnan(𝐌ᵀΓ))}")
+    print(f"Inf in MTG: {np.any(np.isinf(𝐌ᵀΓ))}")
+    
     𝐌ᵀ𝚪 = np.array([Σyₖ, Σβₖyₖ, Σηₖyₖ])
-    a, b, c = np.dot(np.linalg.pinv(𝐌ᵀ𝐌), 𝐌ᵀ𝚪)
+    
+    σ, ν = optimize.nnls(𝐌ᵀ𝐌, 𝐌ᵀ𝚪)
+    a,b,c = σ
+    # a, b, c = np.dot(np.linalg.pinv(𝐌ᵀ𝐌), 𝐌ᵀ𝚪)
     
     return a, b, p, c, q #, A, B, C, D, E
     
