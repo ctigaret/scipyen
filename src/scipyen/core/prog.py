@@ -2034,34 +2034,57 @@ def full_class_name(data):
 
     return ".".join([data.__module__, data.__name__])
 
-def unwind_type_sig(x, *t):
+# def unwind_type_sig(x, *t, visited:set = set()):
+def unwind_type_sig(x, visited:set = set()):
+    """Unwinds type annotation to its component types.
+This includes special aliases defined in the ``types`` and ``typing`` standard 
+library modules.
+    
+    Parameters:
+    ===========
+    x: a type or a special type | type alias (e.g. types.Uniontype, types.GenericAlias)
+        or a list | tuple of such
+        
+        Typically this is found when inspecting a function annotation.
+    
+    visited: a set
+    
+    Returns:
+    ========
+    None - the function places te individual types inside the ```visited`` argument
+    which must be present in the caller's namespace (and is passed here by reference
+    as are all containers in Python).
+    
+    Side effects:
+    =============
+    Populates ``visited`` with the "elementary" types found.
+"""
+    assert isinstance(visited, set)
+    
+    print(type(x))
+    
     if isinstance(x, type):
-        if len(t):
-            return x in t
-        return (x, )
-    elif isinstance(x, (typing._GenericAlias, types.UnionType, types.GenericAlias)):
-        if len(t):
-            return any(v in x.__args__ or v in unwind_type_sig(x.__args__) for v in t)
-        return unwind_type_sig(x.__args__)
+        visited.add(x)
+        return
+    elif isinstance(x, (typing._GenericAlias, typing._SpecialGenericAlias, types.UnionType, types.GenericAlias)):
+        visited.add(x)
+        unwind_type_sig(x.__args__, visited = visited)
+        return
     elif not isinstance(x, (tuple, list)):
-        return tuple()
+        return
     
     ret = list()
     
     for v in x:
-        if isinstance(v, typing._GenericAlias):
-            if len(t):
-                ret += list(unwind_type_sig(v.__args__)) + list(v.__args__)
-            else:
-                ret += list(unwind_type_sig(v.__args__))
-        elif isinstance(v, type):
-            ret.append(v)
-            
-    if len(t):
-        print(f"ret = {ret}")
-        return any(v in ret for v in t)
-    
-    return tuple(ret)
+        visited.add(v)
+        if isinstance(v, type):
+            visited.add(v)
+        elif isinstance(v, (tuple, list)):
+            unwind_type_sig(v, visited=visited)
+        elif isinstance(v, (typing._GenericAlias, typing._SpecialGenericAlias, types.UnionType, types.GenericAlias)):
+            if hasattr(v, "__args__"):
+                unwind_type_sig(v.__args__, visited=visited)
+            visited.add(v)
 
 def parent_types(data):
     r"""Returns a tuple of the immediate ancestor types of data.
@@ -2076,8 +2099,8 @@ def parent_types(data):
     ========
     A tuple, possibly empty, with the immediate ancestor types of data
 
-    The tuple is useful in reconstructing the data's type (or data if itself is
-    a type).
+    The tuple is useful in reconstructing the data's type (or the data if itself,
+    if it is a type).
 
     """
     if not isinstance(data, type):

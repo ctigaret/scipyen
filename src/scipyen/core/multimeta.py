@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# SPDX-FileCopyrightText: 2013 The Authors, Python Cookbook 3rd Edition, O'Reilly <http://oreilly.com/catalog/errata.csp?isbn=9781449340377>
+# SPDX-FileCopyrightText: 2013 David Deazley and The Authors, Python Cookbook 3rd Edition, O'Reilly <http://oreilly.com/catalog/errata.csp?isbn=9781449340377>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 

@@ -1184,30 +1184,41 @@ def fit_model(data, func, p0, *args, **kwargs):
     
     compress_annot = lambda x: x[0] if len(x) else MISSING
     
-    assert funcSignature["named"] >= 1, f"Invalid func signature {funcSignature}"
-    
     args_annots = list(map(lambda i: (i[0], i[1]), funcSignature["positional"].items())) + \
                   list(map(lambda i: (i[0], compress_annot(tuple(set(i[1])-{inspect._empty}))), funcSignature["named"].items()))
     
+    assert len(args_annots) >= 1, f"Invalid func signature {funcSignature}"
     assert all(len(v) == 2 and v[1] not in (MISSING, inspect._empty) for v in args_annots), f"Bad or missing type annotations for 'func' {func}"
 
     # check first argument
-    atypes = prog.unwind_type_sig(args_annots[0][1])
+    atypes = set()
+    prog.unwind_type_sig(args_annots[0][1], atypes)
     assert any(t in atypes for t in (np.ndarray, float)), f"First argument to 'func' {func} must be a float or an np.ndarray; instead, got {args_annots[0][1]}"
         
+    to_unpack:bool = False
+    
     if len(args_annots) == 2:
-        if not prog.unwind_type_sig(args_annots[1][1], list, tuple):
-            atypes = prog.unwind_type_sig(args_annots[1][1])
-        assert any(t in atypes for t in (np.ndarray, float)), f"Second argument to 'func' {func} must be a float or an np.ndarray; instead, got {args_annots[0][1]}"
-        assert (aa == typing.Sequence) or (isinstance(aa, typing._GenericAlias) and any(t in aa.__args__ for t in (np.ndarray, float))), f"Bad signature for argument '{args_annots[1][0]}'"
-        
-    # if len(funcSignature["named"]) == 1 and len(funcSignature["varpos"])"parameters" in
+        atypes.clear()
+        prog.unwind_type_sig(args_annots[1][1], atypes)
+        # 1) is this a Sequence? then it must be unpacked
+        if any(t in atypes for t in (typing.Sequence, typing.Sequence[float|np.ndarray], typing.Sequence[float, typing.Sequence[np.ndarray]])):
+            to_unpack = True
+        else:
+            # only take scalar np.ndarrays or floats; cannot check for scalars
+            # as the arguments are not present, but check for types
+            assert any(t in atypes for t in (np.ndarray, float, np.ndarray | float)), f"Second argument to 'func' {func} should require a float or an np.ndarray, or a sequence of such; instead, got {args_annots[0][1]}"
+            
+    elif len(args_annots) > 2:
+        # only take scalar ndarrays or floats; here, only checking types as arguments 
+        # aren't available yet
+        for k, aa in enumerate(args_annots):
+            atypes.clear()
+            prog.unwind_type_sig(aa[1], atypes)
+            assert any(t in atypes for t in (np.ndarray, float, np.ndarray | float)), f"Argument {k+1} argument to 'func' {func} should require a float or an np.ndarray; instead, got {args_annots[0][1]}"
     
     def __cost_fun__(x0, t, y):  # returns residuals
-        yf = func(t, *x0, **fkwargs)
-        ret = y-yf
-        
-        return ret
+        yf = func(t, *x0, **fkwargs) if to_unpack else yf = func(t, x0, **fkwargs)
+        return y-yf
     
     args        = kwargs.pop("args",        ()) 
    
