@@ -1556,18 +1556,21 @@ def guess_init_biased_biexp(x, y, is_sorted:bool=True):#
     
     𝐌ᵀ𝚪 = np.array([Σssₖyₖ, Σsₖyₖ, Σξₖyₖ, Σωₖyₖ, Σyₖ])
     
-    print("guess_init_biased_biexp step 1: ")
-    print(f"NaNs in MTM: {np.any(np.isnan(𝐌ᵀ𝐌))}")
-    print(f"Inf in MTM: {np.any(np.isinf(𝐌ᵀ𝐌))}")
-    print(f"NaNs in MTG: {np.any(np.isnan(𝐌ᵀΓ))}")
-    print(f"Inf in MTG: {np.any(np.isinf(𝐌ᵀΓ))}")
-    
-    σ, ν = optimize.nnls(𝐌ᵀ𝐌, 𝐌ᵀ𝚪)
-    A, B, C, D, E = σ
-    # A, B, C, D, E = np.dot(np.linalg.pinv(𝐌ᵀ𝐌), 𝐌ᵀ𝚪) # BUG 2025-05-18 18:24:32 the problem here is that A must be ≥ 0!
+#     print("guess_init_biased_biexp step 1: ")
+#     print(f"NaNs in MTM: {np.any(np.isnan(𝐌ᵀ𝐌))}")
+#     print(f"Inf in MTM: {np.any(np.isinf(𝐌ᵀ𝐌))}")
+#     print(f"NaNs in MTG: {np.any(np.isnan(𝐌ᵀΓ))}")
+#     print(f"Inf in MTG: {np.any(np.isinf(𝐌ᵀΓ))}")
+#     
+    # BUG 2025-05-18 18:24:32 FIXME
+    # the problem here is that, both p and q, below, require B2A >= 0
+    # this means 4*A ≥ -(B**2) ≡ A ≥ -(B**2)/4
+    A, B, C, D, E = linalg.solve(𝐌ᵀ𝐌, 𝐌ᵀ𝚪) 
+    # σ, ν = optimize.nnls(𝐌ᵀ𝐌, 𝐌ᵀ𝚪) # NOTE: 2025-05-20 22:36:43 this constrains A, B, C, D, E to be >= 0 which is NOT what is required / actually is, to be avoided
+    # A, B, C, D, E = σ
     B2A = B**2 + 4*A # ∵ A = -pq and B = (p+q)
-    p = 0.5 * (B + np.sqrt(B2A))
-    q = 0.5 * (B - np.sqrt(B2A))
+    p = 0.5 * (B + np.sqrt(B2A)) if B2A >= 0 else 0.5*B # NOTE: 2025-05-20 22:31:50 dirty trick but living with it since this is just a rough guess and avoids BUG 2025-05-18 18:24:32
+    q = 0.5 * (B - np.sqrt(B2A)) if B2A >= 0 else 0.5*B
     
     # Step 2
     β = np.exp(p*x)
@@ -1586,16 +1589,18 @@ def guess_init_biased_biexp(x, y, is_sorted:bool=True):#
     𝐌ᵀ𝐌[0,:] = [Σβₖ, Σβₖ2,  Σβₖηₖ]
     𝐌ᵀ𝐌[1,:] = [Σηₖ, Σβₖηₖ, Σηₖ2 ]
     
-    print("guess_init_biased_biexp step 2: ")
-    print(f"NaNs in MTM: {np.any(np.isnan(𝐌ᵀ𝐌))}")
-    print(f"Inf in MTM: {np.any(np.isinf(𝐌ᵀ𝐌))}")
-    print(f"NaNs in MTG: {np.any(np.isnan(𝐌ᵀΓ))}")
-    print(f"Inf in MTG: {np.any(np.isinf(𝐌ᵀΓ))}")
-    
     𝐌ᵀ𝚪 = np.array([Σyₖ, Σβₖyₖ, Σηₖyₖ])
     
-    σ, ν = optimize.nnls(𝐌ᵀ𝐌, 𝐌ᵀ𝚪)
+    # print("guess_init_biased_biexp step 2: ")
+    # print(f"NaNs in MTM: {np.any(np.isnan(𝐌ᵀ𝐌))}")
+    # print(f"Inf in MTM: {np.any(np.isinf(𝐌ᵀ𝐌))}")
+    # print(f"NaNs in MTG: {np.any(np.isnan(𝐌ᵀΓ))}")
+    # print(f"Inf in MTG: {np.any(np.isinf(𝐌ᵀΓ))}")
+    
+    
+    σ, ν = optimize.nnls(𝐌ᵀ𝐌, 𝐌ᵀ𝚪) # NOTE: 2025-05-20 22:38:28 Here this IS OK because all coeffs in f(x) should be ≥ 0
     a,b,c = σ
+    # a, b, c = linalg.solve(𝐌ᵀ𝐌, 𝐌ᵀ𝚪) # likely to warn about ill-conditioned matrix
     # a, b, c = np.dot(np.linalg.pinv(𝐌ᵀ𝐌), 𝐌ᵀ𝚪)
     
     return a, b, p, c, q #, A, B, C, D, E
