@@ -30,7 +30,7 @@ import core.utilities as utilities
 import core.strutils as strutils
 from core.strutils import str2float
 
-from core.prog import (safeWrapper, )
+from core.prog import (safewrapper, )
 
 from core.triggerevent import (DataMark, MarkType, TriggerEvent, TriggerEventType)
 from core.triggerprotocols import TriggerProtocol
@@ -295,7 +295,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         self.tableView.verticalHeader().resizeSections(QtWidgets.QHeaderView.ResizeToContents)
         
     @Slot(QtCore.QPoint)
-    @safeWrapper
+    @safewrapper
     def slot_horizontal_header_context_menu_request(self, pos):
         #print("horizontal header context menu at pos %s" % pos)
         #print("clicked column %s" % self.tableView.columnAt(pos.x()))
@@ -319,7 +319,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         cm.exec(self.tableView.mapToGlobal(pos))
         
     @Slot(QtCore.QPoint)
-    @safeWrapper
+    @safewrapper
     def slot_vertical_header_context_menu_request(self, pos):
         if len(self.selectedRowIndexes) == 0:
             self.selectedRowIndex = self.tableView.rowAt(pos.x())
@@ -340,7 +340,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         cm.exec(self.tableView.mapToGlobal(pos))
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_copyColumnName(self):
         quote = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier)
         ret = ""
@@ -362,7 +362,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         QtWidgets.QApplication.instance().clipboard().setText(ret)
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_copyRowName(self):
         quote = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier)
         ret = ""
@@ -446,7 +446,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         
             
     # @Slot()
-    # @safeWrapper
+    # @safewrapper
     # def slot_copySelection(self):
     #     # TODO 2023-11-17 15:00:12
     #     quote = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier)
@@ -454,7 +454,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         
         
     @Slot(QtWidgets.QTableWidgetItem)
-    @safeWrapper
+    @safewrapper
     def slot_tableEdited(self, item):
         # TODO code for xarray.DataArray
         # TODO code for multi-indexed pandas data frames
@@ -515,7 +515,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
                 raise RuntimeError("cannot cast %s to %s" % (value, dataDType))
             
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_resizeSelectedRowsToContents(self):
         if not isinstance(self.selectedRowIndex, int):
             return
@@ -536,7 +536,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
             self.tableView.verticalHeader().resizeSection(self.selectedRowIndex, sizeHint)
 
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_resizeSelectedColumnsToContents(self):
         if not isinstance(self.selectedColumnIndex, int):
             return
@@ -557,7 +557,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
             self.tableView.horizontalHeader().resizeSection(self.selectedColumnIndex, sizeHint)
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_copySelection(self):
         quote = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier)
         withHeaders = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.AltModifier)
@@ -647,7 +647,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         QtGui.QGuiApplication.clipboard().setText("".join(selected_text))
     
     @Slot(QtCore.QPoint)
-    @safeWrapper
+    @safewrapper
     def slot_table_context_menu_requested(self, pos):
         #print("table_context_menu at pos %s" % pos)
         
@@ -908,7 +908,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             
     #def appendView()
     
-    @safeWrapper
+    @safewrapper
     def __getHeaderData__(self, section, orientation, role = QtCore.Qt.DisplayRole):
         try:
             if role not in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleTextRole):

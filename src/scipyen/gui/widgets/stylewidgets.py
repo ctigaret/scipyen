@@ -11,7 +11,7 @@ import numpy as np
 from qtpy import QtCore, QtGui, QtWidgets, QtXml, QtSvg
 from qtpy.QtCore import Signal, Slot, Property
 
-from core.prog import safeWrapper
+from core.prog import safewrapper
 from core.utilities import reverse_mapping_lookup
 
 from gui.painting_shared import (make_transparent_bg,
@@ -250,7 +250,7 @@ class PenComboBox(QtWidgets.QComboBox):
         self.setMaxVisibleItems(13)
         
     @Slot(int)
-    @safeWrapper
+    @safewrapper
     def _slotActivated(self, index:int):
         if self.styling == "stroke" and index == 0:
             from .quickdialog import (QuickDialog, OptionalStringInput)
@@ -278,7 +278,7 @@ class PenComboBox(QtWidgets.QComboBox):
         self.activated[object].emit(self._internalStyle)
 
     @Slot(int)
-    @safeWrapper
+    @safewrapper
     def _slotHighlighted(self, index:int):
         if index == 0:
             self._internalStyle = self._customStyle
@@ -659,7 +659,7 @@ class BrushComboBox(QtWidgets.QComboBox):
         painter.end()
         
     @Slot(int)
-    @safeWrapper
+    @safewrapper
     def _slotActivated(self, index:int):
         if self.count() == 0:
             return
@@ -739,7 +739,7 @@ class BrushComboBox(QtWidgets.QComboBox):
         self.activated[object].emit(self._internalStyle)
         
     @Slot(int)
-    @safeWrapper
+    @safewrapper
     def _slotHighlighted(self, index:int):
         gradientBrushIndex = [n for n in self._styles.keys()].index("Gradient...")
         pixmapBrushIndex = [n for n in self._styles.keys()].index("Pixmap...")
@@ -749,7 +749,7 @@ class BrushComboBox(QtWidgets.QComboBox):
         self.setToolTip(self.itemData(index, QtCore.Qt.ToolTipRole))
         
     @Slot(int)
-    @safeWrapper
+    @safewrapper
     def _slotGradientDialogFinished(self, value:int):
         if value == QtGui.QDialog.Accepted:
             qGradient, points = self._gradientDialog.qGradientWithPoints

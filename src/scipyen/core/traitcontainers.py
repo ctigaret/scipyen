@@ -26,7 +26,7 @@ from traitlets.utils.bunch import Bunch
 
 from .traitutils import (dynamic_trait, transform_link)
 
-from .prog import safeWrapper, timefunc, processtimefunc, timeblock
+from .prog import safewrapper, timefunc, processtimefunc, timeblock
 from .strutils import str2symbol
 
 

@@ -12,7 +12,7 @@ import sys, os, typing
 from qtpy import QtCore, QtGui, QtWidgets, QtSvg, QtNetwork, sip
 from qtpy.QtCore import Signal, Slot, Property
 from qtpy.uic import loadUiType as __loadUiType__
-from core.prog import safeWrapper, scipywarn, printStyled
+from core.prog import safewrapper, scipywarn, print_styled
 from core.sysutils import adapt_ui_path
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
@@ -38,7 +38,7 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
     sig_valueChanged = Signal(name="sig_valueChanged")
     
     def __init__(self, parent=None, **kwargs):
-        scipywarn(printStyled(f"The class {self.__class__.__name__} is deprecated", "yellow"))
+        scipywarn(print_styled(f"The class {self.__class__.__name__} is deprecated", "yellow"))
         QWidget.__init__(self, parent=parent)
         
         self._dataVarName = kwargs.pop("varname", "")

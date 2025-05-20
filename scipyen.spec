@@ -126,7 +126,7 @@ if sys.platform == "linux":
     sys.setrecursionlimit(sys.getrecursionlimit() * 5)
 
 
-def printStyled(s:str, color:str='yellow', bright:bool=True):
+def print_styled(s:str, color:str='yellow', bright:bool=True):
     c = getattr(colorama.Fore, color.upper())
     pre = f"{c}{colorama.Style.BRIGHT}" if bright else c
     return f"{pre}{s}{colorama.Style.RESET_ALL}"
@@ -266,7 +266,7 @@ if not myfile.is_absolute():
 # we are bundling from, and what is the local status of that branch
 mydir = myfile.parents[0]
 
-print(f"\n{printStyled('WARNING:', color='yellow')} External IPython consoles - including NEURON - are NOT yet supported by the bundled Scipyen\n\n")
+print(f"\n{print_styled('WARNING:', color='yellow')} External IPython consoles - including NEURON - are NOT yet supported by the bundled Scipyen\n\n")
 
 #def datafile(path, strip_path=True):
     #parts = path.split('/')

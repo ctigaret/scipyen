@@ -28,7 +28,7 @@ from qtpy.QtCore import Signal, Slot
 #### END 3rd party modules
 
 #### BEGIN scipyen modules
-from core.utilities import safeWrapper
+from core.utilities import safewrapper
 from core.traitcontainers import DataBag
 from core.triggerevent import (TriggerEvent, TriggerEventType, )
 from core.triggerprotocols import (TriggerProtocol,

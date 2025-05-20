@@ -20,7 +20,7 @@ import pandas as pd
 
 
 from core import (prog, traitcontainers, strutils, neoutils, models,)
-from core.prog import (safeWrapper, AttributeAdapter, NoData, BaseDescriptorValidator)
+from core.prog import (safewrapper, AttributeAdapter, NoData, BaseDescriptorValidator)
 from core.basescipyen import BaseScipyenData
 from core.traitcontainers import DataBag
 from core import quantities as cq
@@ -815,7 +815,7 @@ class AnalysisUnit(BaseScipyenData):
 #         
 #         self._parent_ = obj
             
-    @safeWrapper
+    @safewrapper
     def protocol(self, index:typing.Union[str, int]):
         r"""Returns a trigger protocol specified by "index".
         
@@ -877,7 +877,7 @@ class AnalysisUnit(BaseScipyenData):
         else:
             raise TypeError("'index' expected to be a str or an int; got %s instead" % type(name).__name__)
         
-    @safeWrapper
+    @safewrapper
     def getProtocols(self, names):
         if isinstance(names, (tuple, list)) and all([isinstance(n, str) for n in names]):
             pr_names = [p.name for p in self.protocols]
@@ -1398,7 +1398,7 @@ class ScanDataMetadataAdapter(AttributeAdapter):
             return
         self._parse_metadata_(obj, value)
         
-    @safeWrapper
+    @safewrapper
     def _parse_metadata_(self, obj, value:DataBag):
         r"""Sets up analysis type, parses metadata
         """
@@ -1818,7 +1818,7 @@ class ScanData(BaseScipyenData):
                                 kw))
         # return (_new_ScanData, (kw, ))
         
-    @safeWrapper
+    @safewrapper
     def __post_init__(self, *args, **kwargs):
         r"""Constructs a ScanData object.
         
@@ -2021,7 +2021,7 @@ class ScanData(BaseScipyenData):
             axcal = getattr(self, f"{what}AxesCalibration")[channel]
             axcal["c"].setChannelName(0, value)
     
-    #@safeWrapper
+    #@safewrapper
     def _parse_image_arrays_(self, scene, scans, sceneFrameAxis=None, scansFrameAxis=None):
         r"""Assigns image data to the scene and scans data sets.
         CAUTION: Also resets all the data derived or associated with the image
@@ -2116,7 +2116,7 @@ class ScanData(BaseScipyenData):
                 if isinstance(self._scene_block_, neo.Block) and len(self._scene_block_.segments):
                     embed_trigger_protocol(rev_p, self._scene_block_)
                 
-    @safeWrapper
+    @safewrapper
     def validateElectrophysiology(self, value):
         r"""Validates new electrophysiology data and proposes frames lookup.
         
@@ -2425,7 +2425,7 @@ class ScanData(BaseScipyenData):
         # public functions
         # ###
         
-    @safeWrapper
+    @safewrapper
     def copy(self):
         r"""
         FIXME/TODO adapt to a new scenario where all scene image data is a single
@@ -2793,7 +2793,7 @@ class ScanData(BaseScipyenData):
         
         return result
         
-    @safeWrapper
+    @safewrapper
     def resampleSceneData(self, resolution, axis=0, down=1000):
         r"""Resamples Scene data along a specified axis.
         
@@ -2808,7 +2808,7 @@ class ScanData(BaseScipyenData):
         """
         self.scene = [resampleImageAxis(img, resolution, axis=axis, p=down) for img in self.scene]
     
-    @safeWrapper
+    @safewrapper
     def resampleScansData(self, resolution, axis=0, down=1000):
         r"""
         FIXME/TODO adapt to a new scenario where all scene image data is a single
@@ -2832,7 +2832,7 @@ class ScanData(BaseScipyenData):
         elif isinstance(self.scans, (tuple, list)) and len(self.scans) > 0:
             self._scans_axes_calibrations_ = [AxesCalibration(img) for img in self.scans]
             
-    #@safeWrapper
+    #@safewrapper
     def concatenate(self, source, strict = False, pad_value = None, scanregions=False):#, resample=False, alignment=0):#, src_slice = None, other_slice = None, axis=None):
         r"""Concatenates "source" to this object (the "receiver").
         
@@ -3705,7 +3705,7 @@ class ScanData(BaseScipyenData):
     def addAnalysisUnit(self, *args):
         self.defineAnalysisUnit(*args)
     
-    @safeWrapper
+    @safewrapper
     def defineAnalysisUnit(self, landmark, scene=False, protocols=None):
         r"""
         Defines an AnalysisUnit object on a landmark in this ScanData.
@@ -3850,7 +3850,7 @@ class ScanData(BaseScipyenData):
             raise TypeError("landmark expected to be a pictgui.PlanarGraphics, or None; got %s instead" % type(landmark).__name__)
         
 
-    @safeWrapper
+    @safewrapper
     def hasAnalysisUnit(self, obj):
         r""" Checks for the existence of an analysis unit defined on a landmark.
         
@@ -3876,7 +3876,7 @@ class ScanData(BaseScipyenData):
             return False
             
         
-    @safeWrapper
+    @safewrapper
     def setAnalysisUnitDescriptor(self, obj, name, value):
         r"""
         Obj : either None, a string or an AnalysisUnit object
@@ -3909,7 +3909,7 @@ class ScanData(BaseScipyenData):
         
         
         
-    @safeWrapper
+    @safewrapper
     def getAnalysisUnitDescriptor(self, obj, name):
         r"""
         Obj : either None, a string or an AnalysisUnit object
@@ -3940,7 +3940,7 @@ class ScanData(BaseScipyenData):
             else:
                 raise ValueError("AnalysisUnit %s not found" % obj)
             
-    @safeWrapper
+    @safewrapper
     def removeAnalysisUnit(self, unitOrName, removeLandmark=True):
         r"""Removes a landmark-based analysis unit.
         
@@ -4198,7 +4198,7 @@ class ScanData(BaseScipyenData):
         
         return obj
         
-    @safeWrapper
+    @safewrapper
     def clearAnalysis(self, name=None):
         r"""Removes the analysis data signal associated with the named analysis unit, from the analysis data blocks.
         
@@ -4237,7 +4237,7 @@ class ScanData(BaseScipyenData):
                 self._remove_data_signal_from_block_(self.scansBlock, name)
                 self._remove_data_signal_from_block_(self.sceneBlock, name)
             
-    @safeWrapper
+    @safewrapper
     def clearAnalysisUnits(self, removeLandmarks=False):
         r"""Removes all defined analysis units, optionally the planar graphics associated with them
         """
@@ -4257,7 +4257,7 @@ class ScanData(BaseScipyenData):
     def defaultAnalysisUnit(self):
         return self.getAnalysisUnit()
     
-    @safeWrapper
+    @safewrapper
     def analysisUnitSignal(self, landmark=None):
         # TODO: get the signal computed on this analysis unit; the analysis results
         # if present, are embedded in the signal's annotations attribute
@@ -4277,7 +4277,7 @@ class ScanData(BaseScipyenData):
         #
         pass
             
-    @safeWrapper
+    @safewrapper
     
     def getAnalysisUnit(self, landmark=None):
         r"""Access an AnalysisUnit object defined in this ScanData object.
@@ -4348,7 +4348,7 @@ class ScanData(BaseScipyenData):
             raise TypeError("landmark expected to be a string, a pictgui.PlanarGraphics, or None; got %s instead" % type(landmark).__name__)
             
             
-    #@safeWrapper
+    #@safewrapper
     def extractAnalysisUnit(self, analysis_unit, average=False, 
                                 exclude_failures=False, 
                                 test_component="any", 
@@ -5754,7 +5754,7 @@ class ScanData(BaseScipyenData):
         #print("extract analysis units", result.name)
         return result
             
-    #@safeWrapper
+    #@safewrapper
     def adoptAnalysisOptions(self, source):
         if not isinstance(source, ScanData):
             raise TypeError("Expecting a ScanData object; got %s instead" % type(source).__name__)
@@ -5762,7 +5762,7 @@ class ScanData(BaseScipyenData):
         # NOTE: a local copy is made by the property setter
         self.analysisOptions = source.analysisOptions 
         
-    #@safeWrapper
+    #@safewrapper
     def adoptAnalysisUnits(self, source):
         r"""Imports copies of the landmark-based analysis units from the ScanData object "source".
         
@@ -5857,7 +5857,7 @@ class ScanData(BaseScipyenData):
                 
                 self._analysis_units_.add(new_unit)
         
-    @safeWrapper
+    @safewrapper
     def adoptScansCursors(self, source):
         r"""Adopts scan cursors from "source" ScanData object.
         
@@ -5948,7 +5948,7 @@ class ScanData(BaseScipyenData):
             self.scansCursors.clear()
             self.scansCursors.update(new_objects)
             
-    @safeWrapper
+    @safewrapper
     def adoptLandmark(self, source, name):
         import gui.pictgui as pgui
         from functools import partial as partial
@@ -6052,7 +6052,7 @@ class ScanData(BaseScipyenData):
             
         return new_obj
             
-    @safeWrapper
+    @safewrapper
     def adoptLandmarks(self, source, data = "all", landmark_type="all", clear=False):
         r"""Adopts landmarks from source.
         
@@ -6205,7 +6205,7 @@ class ScanData(BaseScipyenData):
             _landmarks_adopt_inner_(cursors, cursorstarget, clear)
 
         
-    @safeWrapper
+    @safewrapper
     def adoptSceneCursors(self, source, clear=False):
         r"""Adopts scene cursors from "source" ScanData object.
         
@@ -6280,7 +6280,7 @@ class ScanData(BaseScipyenData):
             self.sceneCursors.update(new_objects)
             
             
-    @safeWrapper
+    @safewrapper
     def adoptScansRois(self, source):
         r"""Adopts scan rois from "source" ScanData object.
         
@@ -6349,7 +6349,7 @@ class ScanData(BaseScipyenData):
             self.scansRois.clear()
             self.scansRois.update(new_objects)
             
-    @safeWrapper
+    @safewrapper
     def adoptSceneRois(self, source):
         r"""Adopts scene rois from "source" ScanData object.
         
@@ -6406,7 +6406,7 @@ class ScanData(BaseScipyenData):
             self.sceneRois.clear()
             self.sceneRois.update(new_objects)
             
-    @safeWrapper
+    @safewrapper
     def adoptGraphicsObjects(self, source):
         r"""Adopts _ALL_ graphics objects (cursors, rois) defined in source.
         
@@ -6467,7 +6467,7 @@ class ScanData(BaseScipyenData):
                 target.clear()
                 target.update(new_objects)
 
-    @safeWrapper
+    @safewrapper
     def adoptTriggerProtocols(self, src, imaging_source=False):
         r"""Parses trigger and adopts trigger protocols from the neo.Block object "src".
 
@@ -6626,7 +6626,7 @@ class ScanData(BaseScipyenData):
             if len(self._trigger_protocols_):
                 self._trigger_protocols_.sort(key=lambda x:x.segmentIndices()[0])
             
-    @safeWrapper
+    @safewrapper
     def clearTriggerProtocols(self):
         self._trigger_protocols_.clear()
         
@@ -6634,7 +6634,7 @@ class ScanData(BaseScipyenData):
         clear_events(self._scans_block_,         triggersOnly = True)
         clear_events(self._scene_block_,         triggersOnly = True)
         
-    @safeWrapper
+    @safewrapper
     def addTriggerProtocol(self, protocol, sort=False):
         r"""Adds a trigger protocol.
         
@@ -6758,7 +6758,7 @@ class ScanData(BaseScipyenData):
         """
         return self.triggerProtocol(index)
     
-    @safeWrapper
+    @safewrapper
     def triggerProtocol(self, nameOrSegmentIndex):
         r"""Accesses a trigger protocol in this ScanData, specified by name or frame.
         
@@ -6823,7 +6823,7 @@ class ScanData(BaseScipyenData):
         else:
             raise TypeError("expecting a string or an int; got %s instead" % type(nameOrSegmentIndex).__name__)
         
-    #@safeWrapper
+    #@safewrapper
     def getNamedTriggerProtocols(self, names):
         if isinstance(names, (tuple, list)) and all([isinstance(n, str) for n in names]):
             pr_names = [p.name for p in self._trigger_protocols_]
@@ -6843,7 +6843,7 @@ class ScanData(BaseScipyenData):
         else:
             raise TypeError("A str or a sequence of str was expected")
         
-    @safeWrapper
+    @safewrapper
     def addLandmark(self, obj, scans=True):
         r"""Adds a landmark (pictgui.PlanarGraphics object: cursor or ROI) to the image data.
         
@@ -6871,7 +6871,7 @@ class ScanData(BaseScipyenData):
             for o in obj.linkedObjects:
                 self.addLandmark(o)
                 
-    @safeWrapper
+    @safewrapper
     def renameAnalysisUnit(self, value, analysis_unit=None):
         r"""Rename the analysis unit to the string in 'value'
         
@@ -6996,7 +6996,7 @@ class ScanData(BaseScipyenData):
             
         return analysis_unit
         
-    @safeWrapper
+    @safewrapper
     def renameLandmark(self, landmark, name):
         r"""Changes the name of the landmark.
         If the landmark is used for an analysis unit, and its name differs from
@@ -7068,7 +7068,7 @@ class ScanData(BaseScipyenData):
             return landmark
         
 
-    @safeWrapper
+    @safewrapper
     def removeLandmark(self, landmark, scans=True, cursor=True):
         r"""Removes a landmark
         
@@ -7175,7 +7175,7 @@ class ScanData(BaseScipyenData):
         
         return landmark
         
-    @safeWrapper
+    @safewrapper
     def addCursor(self, cursor, scans=True):
         r"""Appends a cursor to the specified frame of the specified data subset.
         
@@ -7209,11 +7209,11 @@ class ScanData(BaseScipyenData):
         """
         self.setCursor(cursor, scans, True)
         
-    @safeWrapper
+    @safewrapper
     def addRoi(self, obj, scans=True):
         self.setRoi(obj, scans, True)
         
-    @safeWrapper
+    @safewrapper
     def getCursor(self, name, scans=True):
         r"""Returns a reference to a cursor, or None.
         
@@ -7245,41 +7245,41 @@ class ScanData(BaseScipyenData):
         except:
             traceback.print_exc()
             
-    @safeWrapper
+    @safewrapper
     def sceneCursor(self, name):
         if name in self.sceneCursors.keys():
             return self.sceneCursors[name]
         
-    @safeWrapper
+    @safewrapper
     def sceneRoi(self, name):
         if name in self.sceneRois.keys():
             return self.sceneRois[name]
         
-    @safeWrapper
+    @safewrapper
     def scansCursor(self, name):
         if name in self.scansCursors.keys():
             return self.scansCursors[name]
         
-    @safeWrapper
+    @safewrapper
     def scanCursor(self, name):
         r"""Same as scansCursor
         """
         if name in self.scanCursors.keys():
             return self.scanCursors[name]
         
-    @safeWrapper
+    @safewrapper
     def scansRoi(self, name):
         if name in self.scansRois.keys():
             return self.scansRois[name]
         
-    @safeWrapper
+    @safewrapper
     def scanRoi(self, name):
         r"""Same as scansRoi
         """
         if name in self.scanRois.keys():
             return self.scanRois[name]
         
-    @safeWrapper
+    @safewrapper
     def setCursor(self, cursor, scans=True, append=False):
         r"""Sets or appends a cursor to the specified frame in a specified data subset.
         
@@ -7351,7 +7351,7 @@ class ScanData(BaseScipyenData):
             
         return cursor.name
     
-    @safeWrapper
+    @safewrapper
     def removeChannel(self, name_or_index):
         try:
             self.removeScansChannel(name_or_index)
@@ -7367,7 +7367,7 @@ class ScanData(BaseScipyenData):
             traceback.print_exc()
             warnings.warn("Channel name %s not found in scene" % name_or_index, RuntimeWarning)
     
-    @safeWrapper
+    @safewrapper
     def removeScansChannel(self, name_or_index):
         if isinstance(name_or_index, str):
             if name_or_index not in self.scansChannelNames:
@@ -7384,7 +7384,7 @@ class ScanData(BaseScipyenData):
         del self._scans_[ch_index]
         self._scans_axes_calibrations_[:] = [AxesCalibration(img) for img in self._scans_]
             
-    @safeWrapper
+    @safewrapper
     def removeSceneChannel(self, name_or_index):
         if isinstance(name_or_index, str):
             if name_or_index not in self.sceneChannelNames:
@@ -7695,7 +7695,7 @@ class ScanData(BaseScipyenData):
         
         return self
     
-    #@safeWrapper
+    #@safewrapper
     def removeCursor(self, obj, scans=True):
         r"""Removes cursor obj from the data subset
         
@@ -7744,7 +7744,7 @@ class ScanData(BaseScipyenData):
             
         return obj
     
-    @safeWrapper
+    @safewrapper
     def removeCursors(self, scans=True):
         if scans:
             cursordict = self._scanscursors_
@@ -7763,7 +7763,7 @@ class ScanData(BaseScipyenData):
                 
         cursordict.clear()
             
-    @safeWrapper
+    @safewrapper
     def setCursors(self, *values, scans=True):
         r"""Constructs a nested dictionary of cursors.
         
@@ -7837,7 +7837,7 @@ class ScanData(BaseScipyenData):
                                                
             cursordict.clear()
             
-    @safeWrapper
+    @safewrapper
     def getRoi(self, name, scans=True):
         r"""Returns a reference to a roi, or None 
         
@@ -7871,7 +7871,7 @@ class ScanData(BaseScipyenData):
         except:
             traceback.print_exc()
     
-    @safeWrapper
+    @safewrapper
     def setRoi(self, roi, scans=True, append=False):
         r"""Sets or appends a roi to the specified frame in a specified data subset.
         
@@ -7934,7 +7934,7 @@ class ScanData(BaseScipyenData):
             
         return roi.name # why ? - answer to be used by the caller -- ?
         
-    @safeWrapper
+    @safewrapper
     def removeRoi(self, obj, scans=True):
         r"""Removes roi with roi ID (obj) "obj" from the data subset
 
@@ -7980,7 +7980,7 @@ class ScanData(BaseScipyenData):
         
         return obj
             
-    @safeWrapper
+    @safewrapper
     def removeRois(self, scans=True):
         if scans:
             roidict = self._scansrois_
@@ -7999,7 +7999,7 @@ class ScanData(BaseScipyenData):
                 
         roidict.clear()
             
-    @safeWrapper
+    @safewrapper
     def setRois(self, *values, scans=True):
         r"""Constructs a nested dictionary of rois.
         
@@ -8162,7 +8162,7 @@ class ScanData(BaseScipyenData):
         
         
             
-    #@safeWrapper
+    #@safewrapper
     def averageFrames(self, frame_index=None, protocol=None):
         r"""Returns a new ScanData containing frame-average of data from 
         specified frames, or all data if frame_index is None
@@ -8913,7 +8913,7 @@ def check_apiversion(data):
     return True
 
 
-@safeWrapper
+@safewrapper
 def scanDataOptions(detection_predicate=1.3, roi_width = 10, 
                   reference="Ch1", indicator="Ch2", 
                   bleed_ref_ind = 0, bleed_ind_ref = 0, 

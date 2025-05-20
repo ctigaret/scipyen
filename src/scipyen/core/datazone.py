@@ -18,7 +18,7 @@ from core import quantities as cq
 from core.quantities import (checkTimeUnits, unitsConvertible)
 from core.scipyendataclasses import ScipyenDataclass
 # from core.utilities import counter_suffix
-from .prog import (safeWrapper, with_doc, scipywarn)
+from .prog import (safewrapper, with_doc, scipywarn)
 from qtpy import QtWidgets
 
 def _newDataZone(cls, places=None, extents=None, labels=None, units=None,
@@ -1301,7 +1301,7 @@ def epoch2intervals(epoch: typing.Union[neo.Epoch, DataZone], keep_units:bool = 
     else:
         return [Interval(t, d if duration else t+d, l, duration) for (t,d,l) in zip(epoch.times.magnitude, epoch.durations.magnitude, labels)]
     
-@safeWrapper
+@safewrapper
 def intervals2epoch(*args, **kwargs):
     r"""Construct a neo.Epoch or DataZone from a sequence of Interval objects.
     All numeric values in the intervals must be python Quantities.
@@ -1388,7 +1388,7 @@ def intervals2epoch(*args, **kwargs):
     
     return klass(times, durations=durations, labels=labels, name=name)
     
-@safeWrapper
+@safewrapper
 def epoch2cursors(epoch: typing.Union[neo.Epoch, DataZone], 
                   signal_viewer: typing.Optional[QtWidgets.QMainWindow] = None, 
                   axis: typing.Optional[typing.Union[int, str, pg.PlotItem, pg.GraphicsScene]] = None, 

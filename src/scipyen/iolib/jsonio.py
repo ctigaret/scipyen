@@ -64,7 +64,7 @@ r""" JSON codecs
                 "varkw": dict, mapping name to value for any additional
                             keyword (var-keyword) parameters
                             
-                "signature": None, or dict (result of prog.signature2Dict)
+                "signature": None, or dict (result of prog.signature_as_dict)
             }
             
             The type factory will use the parameters in __args__, named and 
@@ -175,7 +175,7 @@ from traitlets.utils.importstring import import_item
 from traitlets import Bunch
 from core import quantities as scq
 from core import prog
-from core.prog import (signature2Dict, resolveObject, ArgumentError, CALLABLE_TYPES)
+from core.prog import (signature_as_dict, resolve_object, ArgumentError, CALLABLE_TYPES)
 
 # NOTE: 2021-12-25 15:45:55
 # unfortunately, orjson does not expose supported numpy types so we need to
@@ -212,7 +212,7 @@ def makeFuncStub(function:typing.Optional[typing.Union[CALLABLE_TYPES + (str, )]
     The result contains the following key/value pairs (see also general schema
     described in the module docstring):
     
-    "signature": dict, result of prog.signature2Dict
+    "signature": dict, result of prog.signature_as_dict
     
     "posonly": tuple: values of the positional only parameters,
         and of the "named" parameters without default value
@@ -255,7 +255,7 @@ def makeFuncStub(function:typing.Optional[typing.Union[CALLABLE_TYPES + (str, )]
         raise TypeError(f"Expecting a callable type, one of {CALLABLE_TYPES}; got {type(function).__name__} instead")
     
     try:
-        sig = signature2Dict(function)
+        sig = signature_as_dict(function)
     except:
         sig = {"name": function.__name__, "qualname": function.__qualname__, "module": function.__module__}
         
@@ -1198,7 +1198,7 @@ def json2python(jsonobj:typing.Union[list, tuple, dict]) -> typing.Any:
             if val == "None":
                 return None
             
-            ret = resolveObject(val["type_module"], val["type_name"])
+            ret = resolve_object(val["type_module"], val["type_name"])
             if ret == MISSING:
                 raise RuntimeError(f"Cannot resolve {'.'.join([val['type_module'], val['type_name']])}")
             
@@ -1209,14 +1209,14 @@ def json2python(jsonobj:typing.Union[list, tuple, dict]) -> typing.Any:
             modname = val["module"]
             qualname = val["qualname"]
             if qualname == name: # definitely a function
-                ret = resolveObject(val["module"], val["qualname"])
+                ret = resolve_object(val["module"], val["qualname"])
                 
             else: # might be a method
                 owner_type_name = ".".join(qualname.strip(".")[:-1]) 
-                owner = resolveObject(val["module"], owner_type_name)
+                owner = resolve_object(val["module"], owner_type_name)
                 if owner == MISSING:
                     # likely an unbound function, but check
-                    ret = resolveObject(val["module"], val["qualname"])
+                    ret = resolve_object(val["module"], val["qualname"])
                 
                 else:
                     ret = inspect.getattr_static(owner, name, MISSING)
@@ -1232,7 +1232,7 @@ def json2python(jsonobj:typing.Union[list, tuple, dict]) -> typing.Any:
             modname = val["module"]
             qualname = val["qualname"]
             owner_type_name = ".".join(qualname.strip(".")[:-1])
-            owner = resolveObject(val["module"], owner_type_name)
+            owner = resolve_object(val["module"], owner_type_name)
             if owner == MISSING:
                 raise RuntimeError(f"Cannot resolve {owner_type_name}")
 
@@ -1242,7 +1242,7 @@ def json2python(jsonobj:typing.Union[list, tuple, dict]) -> typing.Any:
             if val["instance_type"] == "dtype":
                 obj_type = np.dtype
             else:
-                obj_type = resolveObject(val["instance_module"], val["instance_type"])
+                obj_type = resolve_object(val["instance_module"], val["instance_type"])
 
             if obj_type is MISSING:
                 # NOTE: 2021-12-22 23:24:38 
@@ -1251,7 +1251,7 @@ def json2python(jsonobj:typing.Union[list, tuple, dict]) -> typing.Any:
                 # print(f"json2python type_factory_spec = {type_factory_spec}")
                 if isinstance(type_factory_spec, dict):
                     signature = type_factory_spec["signature"]
-                    type_factory_func = resolveObject(signature["module"], 
+                    type_factory_func = resolve_object(signature["module"], 
                                                       signature["qualname"])
                     
                     if type_factory_func == MISSING:
@@ -1295,7 +1295,7 @@ def json2python(jsonobj:typing.Union[list, tuple, dict]) -> typing.Any:
                 
                 if isinstance(signature, dict):
                     if isinstance(signature["module"], str) and len(signature["module"].strip()):
-                        obj_factory = resolveObject(signature["module"], 
+                        obj_factory = resolve_object(signature["module"], 
                                                     signature["qualname"])
                         
                     else:
@@ -1335,7 +1335,7 @@ def json2python(jsonobj:typing.Union[list, tuple, dict]) -> typing.Any:
                             return ret.view(obj_type)
                         
                         elif val["subtype"] == "recarray":
-                            arraytype = resolveObject("numpy", val["subtype"])
+                            arraytype = resolve_object("numpy", val["subtype"])
                             return ret.view(arraytype)
                         
                     else:

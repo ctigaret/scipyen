@@ -75,7 +75,7 @@ from qtpy.uic import loadUiType as __loadUiType__
 
 #### BEGIN scipyen core modules
 from core import utilities
-from core.prog import (safeWrapper, deprecation, iter_attribute,
+from core.prog import (safewrapper, deprecation, iter_attribute,
                        filter_type, filterfalse_type, 
                        filter_attribute, filterfalse_attribute,
                        filter_attr, filterfalse_attr,
@@ -433,14 +433,14 @@ class ImageBrightnessDialog(QDialog, Ui_TransformImageValueDialog):
 #         self.axisDescriptionEdit.plainText = self.description
 #         
 #     @Slot(int)
-#     @safeWrapper
+#     @safewrapper
 #     def slot_axisIndexChanged(self, value):
 #         self.selectedAxisIndex = value
 #         self.updateFieldsFromAxis()
 #         #self.slot_updateAxesMetaData()
 #         
 #     @Slot()
-#     @safeWrapper
+#     @safewrapper
 #     def slot_unitsChanged(self):
 #         try:
 #             self.units = eval("1*%s" % (self.unitsLineEdit.text()), pq.__dict__)
@@ -452,28 +452,28 @@ class ImageBrightnessDialog(QDialog, Ui_TransformImageValueDialog):
 #         self.slot_updateAxesMetaData()
 # 
 #     @Slot(bool)
-#     @safeWrapper
+#     @safewrapper
 #     def slot_resolutionChecked(self, value):
 #         self.axisResolutionSpinBox.setReadOnly(value)
 #         self.axisSampleDistanceSpinBox.setReadOnly(not value)
 #         self.axisCalibratedDistanceSpinBox.setReadOnly(not value)
 #     
 #     @Slot(bool)
-#     @safeWrapper
+#     @safewrapper
 #     def slot_pixelsDistanceChecked(self, value):
 #         self.axisSampleDistanceSpinBox.setReadOnly(value)
 #         self.axisResolutionSpinBox.setReadOnly(not value)
 #         self.axisCalibratedDistanceSpinBox.setReadOnly(not value)
 #         
 #     @Slot(bool)
-#     @safeWrapper
+#     @safewrapper
 #     def slot_calibratedDistanceChecked(self, value):
 #         self.axisCalibratedDistanceSpinBox.setReadOnly(value)
 #         self.axisSampleDistanceSpinBox.setReadOnly(not value)
 #         self.axisResolutionSpinBox.setReadOnly(not value)
 #     
 #     @Slot()
-#     @safeWrapper
+#     @safewrapper
 #     def slot_updateAxesMetaData(self):
 #         calibration = self.calibration[self.axistags[self.selectedAxisIndex].key]
 #         axTypeFlags = self.axistags[self.selectedAxisIndex].typeFlags
@@ -491,14 +491,14 @@ class ImageBrightnessDialog(QDialog, Ui_TransformImageValueDialog):
 #             self.description
 #     
 #     @Slot(float)
-#     @safeWrapper
+#     @safewrapper
 #     def slot_originChanged(self, value):
 #         self.origin = value
 #         
 #         self.slot_updateAxesMetaData()
 # 
 #     @Slot(float)
-#     @safeWrapper
+#     @safewrapper
 #     def slot_resolutionChanged(self, value):
 #         if self.axisSampleDistanceRadioButton.isChecked(): # calculate distance in pixels
 #             self.axisSampleDistanceSpinBox.setValue(int(self.axisCalibratedDistanceSpinBox.value() // value))
@@ -511,7 +511,7 @@ class ImageBrightnessDialog(QDialog, Ui_TransformImageValueDialog):
 #         self.slot_updateAxesMetaData()
 # 
 #     @Slot(int)
-#     @safeWrapper
+#     @safewrapper
 #     def slot_pixelDistanceChanged(self, value):
 #         if self.axisResolutionRadioButton.isChecked(): # calculate resolution
 #             self.axisResolutionSpinBox.setValue(self.axisCalibratedDistanceSpinBox.value() / value)
@@ -524,7 +524,7 @@ class ImageBrightnessDialog(QDialog, Ui_TransformImageValueDialog):
 #         self.slot_updateAxesMetaData()
 #         
 #     @Slot(float)
-#     @safeWrapper
+#     @safewrapper
 #     def slot_calibratedDistanceChanged(self, value):
 #         if self.axisResolutionRadioButton.isChecked(): # calculate resolution
 #             self.axisResolutionSpinBox.setValue(value / self.axisSampleDistanceSpinBox.value())
@@ -537,7 +537,7 @@ class ImageBrightnessDialog(QDialog, Ui_TransformImageValueDialog):
 #         self.slot_updateAxesMetaData()
 #         
 #     @Slot()
-#     @safeWrapper
+#     @safewrapper
 #     def slot_descriptionChanged(self):
 #         self.description = self.axisDescriptionEdit.toPlainText()
 #         self.slot_updateAxesMetaData()
@@ -802,7 +802,7 @@ class AxesCalibrationDialog2(QDialog, Ui_AxesCalibrationDialog2):
         self.axisDescriptionEdit.plainText = self.description
         
     @Slot(int)
-    @safeWrapper
+    @safewrapper
     def slot_axisIndexChanged(self, value):
         self.selectedAxisIndex = value
         self.selectedAxisInfo = self.axistags[self.selectedAxisIndex]
@@ -814,14 +814,14 @@ class AxesCalibrationDialog2(QDialog, Ui_AxesCalibrationDialog2):
         self.updateFieldsFromAxis()
         
     @Slot(int)
-    @safeWrapper
+    @safewrapper
     def slot_channelIndexChanged(self, value):
         self.selectedChannel = value
         self.slot_updateAxesMetaData()
         self.updateFieldsFromAxis()
         
     @Slot(object)
-    @safeWrapper
+    @safewrapper
     def slot_unitsChanged(self, value):
         print(f"{self.__class__.__name__}.slot_unitsChanged: value = {value}")
         self.units = value
@@ -829,28 +829,28 @@ class AxesCalibrationDialog2(QDialog, Ui_AxesCalibrationDialog2):
         self.slot_updateAxesMetaData()
 
     @Slot(bool)
-    @safeWrapper
+    @safewrapper
     def slot_resolutionChecked(self, value):
         self.axisResolutionSpinBox.setReadOnly(value)
         self.axisSampleDistanceSpinBox.setReadOnly(not value)
         self.axisCalibratedDistanceSpinBox.setReadOnly(not value)
     
     @Slot(bool)
-    @safeWrapper
+    @safewrapper
     def slot_pixelsDistanceChecked(self, value):
         self.axisSampleDistanceSpinBox.setReadOnly(value)
         self.axisResolutionSpinBox.setReadOnly(not value)
         self.axisCalibratedDistanceSpinBox.setReadOnly(not value)
         
     @Slot(bool)
-    @safeWrapper
+    @safewrapper
     def slot_calibratedDistanceChecked(self, value):
         self.axisCalibratedDistanceSpinBox.setReadOnly(value)
         self.axisSampleDistanceSpinBox.setReadOnly(not value)
         self.axisResolutionSpinBox.setReadOnly(not value)
     
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_updateAxesMetaData(self):
         # units = self.axisUnitSelectionWidget.value()
         print(f"{self.__class__.__name__}.slot_updateAxesMetaData for {self.axistags[self.selectedAxisIndex].key}")
@@ -874,14 +874,14 @@ class AxesCalibrationDialog2(QDialog, Ui_AxesCalibrationDialog2):
             self.axesMetaData[self.selectedAxisInfo.key]["calibration"].resolution = self.resolution
         
     @Slot(float)
-    @safeWrapper
+    @safewrapper
     def slot_originChanged(self, value):
         self.origin = value
         self.slot_updateAxesMetaData()
 
 
     @Slot(float)
-    @safeWrapper
+    @safewrapper
     def slot_resolutionChanged(self, value):
         if self.axisSampleDistanceRadioButton.isChecked(): # calculate distance in pixels
             self.axisSampleDistanceSpinBox.setValue(int(self.axisCalibratedDistanceSpinBox.value() // value))
@@ -893,7 +893,7 @@ class AxesCalibrationDialog2(QDialog, Ui_AxesCalibrationDialog2):
         self.slot_updateAxesMetaData()
 
     @Slot(int)
-    @safeWrapper
+    @safewrapper
     def slot_pixelDistanceChanged(self, value):
         if self.axisResolutionRadioButton.isChecked(): # calculate resolution
             self.axisResolutionSpinBox.setValue(self.axisCalibratedDistanceSpinBox.value() / value)
@@ -906,7 +906,7 @@ class AxesCalibrationDialog2(QDialog, Ui_AxesCalibrationDialog2):
         self.slot_updateAxesMetaData()
         
     @Slot(float)
-    @safeWrapper
+    @safewrapper
     def slot_calibratedDistanceChanged(self, value):
         if self.axisResolutionRadioButton.isChecked(): # calculate resolution
             self.axisResolutionSpinBox.setValue(value / self.axisSampleDistanceSpinBox.value())
@@ -919,7 +919,7 @@ class AxesCalibrationDialog2(QDialog, Ui_AxesCalibrationDialog2):
         self.slot_updateAxesMetaData()
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_descriptionChanged(self):
         self.description = self.axisDescriptionEdit.toPlainText()
         self.slot_updateAxesMetaData()
@@ -1388,7 +1388,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         return self.graphicsCursors
     
-    @safeWrapper
+    @safewrapper
     def imageCursor(self, value:typing.Optional[typing.Any]=None, *args, **kwargs):
         r"""Returns a list of pictgui.Cursor selected by one or more attributes.
         
@@ -1423,7 +1423,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         """
         return list(self.viewerWidget.imageCursor(value, *args, **kwargs))
 
-    @safeWrapper
+    @safewrapper
     def hasCursor(self, *args, **kwargs):
         r"""Tests for existence of a GraphicsObject cursor with specified ID or name (label).
         
@@ -1439,7 +1439,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         """
         return list(set(self.viewerWidget.rois))
     
-    @safeWrapper
+    @safewrapper
     def roi(self, value:typing.Optional[typing.Any]=None, *args, **kwargs):
         r"""Returns a list of PlanarGraphics ROI roi with a specific attribute value.
         
@@ -1474,7 +1474,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         """
         return list(set(self.viewerWidget.roi(value, *args, **kwargs)))
         
-    @safeWrapper
+    @safewrapper
     def hasRoi(self, *args, **kwargs):
         r"""Tests for existence of a PlanarGraphics ROI roi with a given attribute.
         
@@ -1609,7 +1609,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                 pio.savePickleFile(img, fileName)
     
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_exportSceneAsPNG(self):
         r"""Exports the image in the current frame as a portable network graphics file.
         The result includes rendered ROIs and cursors."""
@@ -1619,7 +1619,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self._export_scene_helper_("png")
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_exportSceneAsSVG(self):
         r"""Exports the image in the current frame as a scalable vector graphics file.
         The result includes rendered ROIs and cursors."""
@@ -1629,7 +1629,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self._export_scene_helper_("svg")
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_exportSceneAsTIFF(self):
         r"""Exports the image in the current frame as a TIFF file.
         The result includes rendered ROIs and cursors."""
@@ -1639,7 +1639,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self._export_scene_helper_("tiff")
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_exportFrameAsHDF5(self):
         r"""Exports the image in the current frame as a HDF file.
         The image (array) axes will include calibration data"""
@@ -1648,7 +1648,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self._export_scene_helper_("hdf5")
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_exportFrameAsPickle(self):
         r"""Exports the image in the current frame as a Python pickle file.
         The image (array) axes will include calibration data"""
@@ -1657,7 +1657,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self._export_scene_helper_("pickle")
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_exportFrameToWorkspace(self):
         r"""Exports the image of the current frame as a VigraArray in the workspace.
         Ithe array axes will include calibration data"""
@@ -1714,7 +1714,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         return fileName
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_saveTIFF(self):
         if self._data_ is None:
             return
@@ -1727,7 +1727,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         pio.saveImageFile(self._data_, fileName)
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_saveHDF5(self):
         r"""Saves the underlying data array as a HDF5 file.
         The axes of the array will include calibration data.
@@ -1748,7 +1748,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         pio.saveHDF5(data, fileName)
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_savePickle(self):
         r"""Saves the underlying data array as a Python pickle file.
         The axes of the array will include calibration data.
@@ -1769,7 +1769,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         pio.savePickleFile(data, fileName)
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_dataToWorkspace(self):
         r"""Exports underlying data array as a VigraArray to the workspace.
         The array axes willl include calibration data
@@ -1785,51 +1785,51 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.exportDataToWorkspace(data, "data")
     
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_editCursor(self):
         self.viewerWidget.slot_editAnyCursor()
     
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_editSelectedCursor(self):
         self.viewerWidget.slot_editSelectedCursor()
     
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_removeAllCursors(self):
         self.viewerWidget.slot_removeAllCursors()
 
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_removeSelectedCursor(self):
         self.viewerWidget._removeSelectedPlanarGraphics(True)
         # self.viewerWidget.slot_removeSelectedCursor()
     
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_removeAllRois(self):
         self.viewerWidget.slot_removeAllRois()
         
     @Slot(str)
-    @safeWrapper
+    @safewrapper
     def slot_removeRoi(self, roiId):
         self.removeRoi(roiId)
         # self.viewerWidget.slot_removeRoiByName(roiId)
 
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_removeSelectedRoi(self):
         self.viewerWidget._removeSelectedPlanarGraphics(False)
         # self.viewerWidget.slot_removeSelectedRoi()
     
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_zoomIn(self):
         self._currentZoom_ +=1
         self.viewerWidget.slot_zoom(2**self._currentZoom_)
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_zoomOriginal(self):
         self._currentZoom_ = 0
         self.viewerWidget.slot_zoom(2**self._currentZoom_)
@@ -1841,23 +1841,23 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.displayFrame()
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_refreshDataDisplay(self):
         self.displayFrame()
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_zoomOut(self):
         self._currentZoom_ -=1
         self.viewerWidget.slot_zoom(2**self._currentZoom_)
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_selectZoom(self):
         self.viewerWidget.interactiveZoom()
         
     @Slot(bool)
-    @safeWrapper
+    @safewrapper
     def slot_displayColorBar(self, value):
         if value:
             self._setup_color_bar_()
@@ -2065,7 +2065,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             
         
     @Slot(bool)
-    @safeWrapper
+    @safewrapper
     def slot_displayScaleBar(self, value):
         r"""
         """
@@ -2286,37 +2286,37 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     # be aware that here the coordinates are a list
     # which may contain cursor window size as well
     @Slot(str, list)
-    @safeWrapper
+    @safewrapper
     def slot_displayCursorPos(self, value, coords):
         self._displayValueAtCoordinates(coords, value)
 
     @Slot(int,int)
-    @safeWrapper
+    @safewrapper
     def slot_displayMousePos(self, x, y):
         self._displayValueAtCoordinates((x,y))
         
     @Slot(object)
-    @safeWrapper
+    @safewrapper
     def slot_graphicsObjectAdded(self, obj):
         self.signal_graphicsObjectAdded.emit(obj)
         
     @Slot(object)
-    @safeWrapper
+    @safewrapper
     def slot_graphicsObjectChanged(self, obj):
         self.signal_graphicsObjectChanged.emit(obj)
         
     @Slot(object)
-    @safeWrapper
+    @safewrapper
     def slot_graphicsObjectRemoved(self, obj):
         self.signal_graphicsObjectRemoved.emit(obj)
         
     @Slot(object)
-    @safeWrapper
+    @safewrapper
     def slot_graphicsObjectSelected(self, obj):
         self.signal_graphicsObjectSelected.emit(obj)
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_graphicsObjectDeselected(self):
         self.signal_graphicsObjectDeselected.emit()
         
@@ -2411,7 +2411,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             #traceback.print_exc()
             return False
         
-    @safeWrapper
+    @safewrapper
     def _applyColorTable_(self, image: vigra.VigraArray, colorMap:typing.Optional[colormaps.colors.Colormap]=None):
         r"""Applies the internal color table to the 2D array.
         
@@ -2552,7 +2552,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         return self._currentFrameData_
         
-    @safeWrapper
+    @safewrapper
     def displayFrame(self, channel_index = None,
                      colorMap:typing.Optional[colormaps.colors.Colormap] = None, 
                      asAlphaChannel:typing.Optional[bool]=None):
@@ -3001,7 +3001,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             self.displayFrame()
     
     @Slot(str)
-    @safeWrapper
+    @safewrapper
     def slot_testColorMap(self, item:str):
         # NOTE 2020-11-28 10:19:07
         # upgrade to matplotlib 3.x
@@ -3010,7 +3010,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             self.displayFrame(colorMap=colorMap)
           
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_chooseColorMap(self, *args):
         if self._data_ is None:
             return
@@ -3430,15 +3430,15 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     # public methods
     ####
     
-    @safeWrapper
+    @safewrapper
     def slot_removeCursorByName(self, crsId):
         self.removeCursor(crsId)
         
-    @safeWrapper
+    @safewrapper
     def slot_removeRoiByName(self, crsId):
         self.removeGraphicsObject(crsId)
         
-    @safeWrapper
+    @safewrapper
     def removeGraphicsObject(self, item:typing.Union[str, pgui.GraphicsObject]):
         r"""Removes a GraphicsObject from the viewer's scene.
         A GraphicsObject is a Qt graphics object used as frontend for a PlanarGraphics.
@@ -3467,7 +3467,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         elif isinstance(item, pgui.GraphicsObject) and item in objects:
             self.viewerWidget.slot_removeGraphicObject(item)
             
-    @safeWrapper
+    @safewrapper
     def removePlanarGraphics(self, item:typing.Union[str, pgui.PlanarGraphics]):
         r"""Removes a planar graphics from the viewer's scene.
         Parameters:
@@ -3489,7 +3489,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         if name in [o.name for o in objects]:
             self.viewerWidget._removePlanarGraphics(name)
                 
-    @safeWrapper
+    @safewrapper
     def removeCursor(self, item:typing.Union[str, pgui.Cursor]):
         objects = self.graphicsCursors
         if len(objects) == 0:
@@ -4157,7 +4157,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         return obj if returnGraphics else obj.backend
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_chooseCursorsColor(self):
         if isinstance(self.cursorsColor, QtGui.QColor):
             initial = self.cursorsColor
@@ -4172,7 +4172,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.setGraphicsObjectColor(color, "cursor")
 
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_chooseLinkedCursorsColor(self):
         if isinstance(self.cursorsColor, QtGui.QColor):
             initial = self.cursorsColor
@@ -4185,7 +4185,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.setGraphicsObjectColor(color, "linkedcursor")
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_chooseCursorLabelTextColor(self):
         if isinstance(self.cursorLabelTextColor, QtGui.QColor):
             initial = self.cursorLabelTextColor
@@ -4197,7 +4197,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.setGraphicsObjectColor(color, "cursorLabelText")
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_chooseLinkedCursorLabelTextColor(self):
         if isinstance(self.linkedCursorLabelTextColor, QtGui.QColor):
             initial = self.linkedCursorLabelTextColor
@@ -4209,7 +4209,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.setGraphicsObjectColor(color, "linkedcursorlabeltext")
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_chooseCursorLabelBGColor(self):
         # TODO/FIXME: 2021-05-12 09:33:30
         # not used yet
@@ -4224,7 +4224,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.setGraphicsObjectColor(color, "cursorLabelBackground")
             
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_chooseLinkedCursorBGColor(self):
         # TODO/FIXME: 2021-05-12 09:33:30
         # not used yet
@@ -4239,7 +4239,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.setGraphicsObjectColor(color, "cursorLabelBackground")
             
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_chooseRoisColor(self):
         if isinstance(self.roisColor, QtGui.QColor):
             initial = self.roisColor
@@ -4253,7 +4253,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_chooseLinkedRoisColor(self):
         if isinstance(self.linkedROIsColor, QtGui.QColor):
             initial = self.linkedROIsColor
@@ -4266,7 +4266,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.setGraphicsObjectColor(color, "linkedroi")
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_chooseRoisLabelTextColor(self):
         if isinstance(self.roiLabelTextColor, QtGui.QColor):
             initial = self.roiLabelTextColor
@@ -4279,7 +4279,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.setGraphicsObjectColor(color, "roilabeltext")
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_chooseLinkedRoisLabelTextColor(self):
         if isinstance(self.linkedROILabelTextColor, QtGui.QColor):
             initial = self.linkedROILabelTextColor
@@ -4292,7 +4292,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.setGraphicsObjectColor(color, "linkedroilabeltext")
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_chooseROILabelBGColor(self):
         # TODO/FIXME: 2021-05-12 09:33:30
         # not used yet
@@ -4307,12 +4307,12 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.setGraphicsObjectColor(color, "roilabelbackground")
         
     @Slot(bool)
-    @safeWrapper
+    @safewrapper
     def slot_setOpaqueCursorLabels(self, value):
         self.setOpaqueGraphicsLabel(cursors=True, opaque=value)
             
     @Slot(bool)
-    @safeWrapper
+    @safewrapper
     def slot_setOpaqueROILabels(self, value):
         self.setOpaqueGraphicsLabel(cursors=False, opaque=value)
             

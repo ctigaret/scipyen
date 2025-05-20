@@ -35,7 +35,7 @@ import core.datatypes
 import core.strutils as strutils
 from core.strutils import str2float
 
-from core.prog import (safeWrapper, )
+from core.prog import (safewrapper, )
 
 from core.triggerevent import (DataMark, MarkType, TriggerEvent, TriggerEventType)
 from core.triggerprotocols import TriggerProtocol

@@ -7,7 +7,7 @@ import os
 from qtpy import QtWidgets
 from gui.workspacegui import GuiMessages
 from gui.textviewer import TextViewer
-from core.prog import printStyled
+from core.prog import print_styled
 from iolib.pictio import loadTextFile
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
@@ -17,10 +17,10 @@ __text_file__ = os.path.join(__module_path__, "simple_plugin_text")
 __scipyen_plugin__ = None
 
 def my_plugin_function():
-    print(f"{printStyled('Hello world', 'green', True)}", file = mainWindow.console.stdout)
+    print(f"{print_styled('Hello world', 'green', True)}", file = mainWindow.console.stdout)
 
 def output_to_system_console():
-    print(f"{printStyled('Hello world', 'cyan', True)}")
+    print(f"{print_styled('Hello world', 'cyan', True)}")
 
 def helloWorld():
     r"""

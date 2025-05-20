@@ -205,7 +205,7 @@ from core.utilities import (get_nested_value, set_nested_value, counter_suffix,
                             yyMdd,
                             NestedFinder)
 
-from core.prog import (safeWrapper, safeGUIWrapper, scipywarn)
+from core.prog import (safewrapper, safeguiwrapper, scipywarn)
 #import core.datasignal as datasignal
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
 from core.datazone import DataZone
@@ -815,7 +815,7 @@ def mapScansVCToScenePCOnPath(v, p, path, span=None):
         p.x = point_x
         p.y = point_y
     
-#@safeWrapper
+#@safewrapper
 def epscatDiscriminator(base, peak, func, pred, predValue, predFunc):#, accFcnBase, accFcnPeak, predFcn, predicate):
     r"""
     base, peak: single-channel 2D vigra.VigraArray, neo.AnalogSignals, datasignal.DataSignals or 1D numpy.ndarrays
@@ -955,7 +955,7 @@ def analyseLSData(*args, **kwargs):
         for frame in range(data.scansFrames):
             analyseFrame(data, frame, **kwargs)
     
-#@safeWrapper
+#@safewrapper
 def analyseEPSCaT(lsdata, frame, indicator_channel_ndx, 
                   unit = None, reference_channel_ndx=None, do_fit = True,
                   detrend=False):
@@ -1871,7 +1871,7 @@ def analyseFrame(lsdata:ScanData, frame:int, unit=None, indicator_channel_ndx=No
     #lsdata.scansBlock.segments[frame].name = "Segment %d (%s)" % (frame, protocol.name)
     lsdata.scansBlock.segments[frame].name = "%s" % protocol.name
         
-#@safeWrapper
+#@safewrapper
 def computeLSCaT(roiRange, f0Range, ca_data, ref_data=None, detrend=False, name=None, description=None, units=pq.dimensionless, **annotations):
     r"""
     Generates an EPSCaT trace by calculating df/a or df/f on a linescan time series.
@@ -2054,7 +2054,7 @@ def computeLSCaT(roiRange, f0Range, ca_data, ref_data=None, detrend=False, name=
     
     return ret
 
-#@safeWrapper
+#@safewrapper
 def fitEPSCaT(data, p0, bounds, fitWindow = None, integration=None):
     r"""Fit EPSCaT model defined by p0 parameters through data.
     
@@ -3109,7 +3109,7 @@ def writeEPSCaTReport(result, filename):
         raise TypeError("Expecting a pandas.DataFrame or a python list; got %s instead" % type(result).__name__)
     
 
-@safeWrapper
+@safewrapper
 def detectRoisInProfile(profile, order, *args, **kwargs):
     if not isinstance(profile, (DataSignal, np.ndarray)):
         raise TypeError("Expecting a datatypes.DataBag or a numpy.ndarray; got %s instead" % type(profile).__name__)
@@ -4494,7 +4494,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             
         self._connect_slots_()
         
-    @safeWrapper
+    @safewrapper
     def _connect_slots_(self):
         self._connect_gui_slots_(self._menu_actions_gui_slots_)
         # self._connect_gui_slots_(self._common_data_fields_gui_signal_slots_)
@@ -4511,7 +4511,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self._connect_gui_slots_(self._process_buttons_gui_signal_slots_)
         self._connect_gui_slots_(self._analyse_buttons_gui_slots_)
         
-    @safeWrapper
+    @safewrapper
     def filterData(self, scene=True, scans=True):#, frames = None):
         r""" Filters data with functions selected in the "Filters" tab.
         
@@ -4701,7 +4701,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             
         #### END Threaded execution
             
-    @safeWrapper
+    @safewrapper
     @Slot(object)
     def slot_sceneProcessingDone(self, result):
         if self._data_ is None:
@@ -4719,7 +4719,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             
         self.slot_processingDone()
         
-    @safeWrapper
+    @safewrapper
     @Slot(object)
     def slot_scansProcessingDone(self, result):
         if self._data_ is None:
@@ -4738,7 +4738,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.slot_processingDone()
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_processingDone(self):
         if self._scene_processing_idle_ and self._scans_processing_idle_:
             self.generateScanRegionProfiles()
@@ -4893,7 +4893,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     # ###
     
     @Slot(float)
-    @safeWrapper
+    @safewrapper
     def slot_epscat_bleed_ind_ref_changed(self, value):
         if self._data_ is None or len(self._data_.analysisOptions) == 0:
             return
@@ -4908,7 +4908,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
     
     @Slot(float)
-    @safeWrapper
+    @safewrapper
     def slot_epscat_bleed_ref_ind_changed(self, value):
         if self._data_ is None or len(self._data_.analysisOptions) == 0:
             return
@@ -4922,7 +4922,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self._data_.analysisOptions["Channels"]["Bleed_ref_ind"] = value
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_openScanDataPickleFile(self):
         import mimetypes, io
         #from systems import PrairieView
@@ -5007,7 +5007,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.statusBar().showMessage("Done!")
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_import_data_wide_descriptors(self):
         from core.workspacefunctions import getvarsbytype
         
@@ -5050,7 +5050,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             self.displayFrame()
             
     @Slot(int)
-    @safeWrapper
+    @safewrapper
     def _slot_prairieViewImportGuiDone(self, value):
         if value:
             dlg = self.sender()
@@ -5061,7 +5061,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             self.statusBar().showMessage("Import PrairieView done!")
             
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_importPrairieView(self):
         import mimetypes, io
         from systems import PrairieView
@@ -5247,7 +5247,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.threadpool.start(worker)
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_adoptAnalysisOptionsFromScanData(self):
         from core.workspacefunctions import getvarsbytype
 
@@ -5289,7 +5289,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             self.statusBar().showMessage("Done!")
             
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_adoptTriggerProtocolsFromScanDataElectrophysiology(self):
         import io
         from core.workspacefunctions import getvarsbytype
@@ -5339,7 +5339,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             return
 
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_adoptTriggerProtocolsFromScanDataImaging(self):
         from core.workspacefunctions import getvarsbytype
         
@@ -5884,7 +5884,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             
     
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_analyseData(self):
         if self._data_ is None or len(self._data_.analysisOptions)==0:
             return
@@ -5913,7 +5913,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.threadpool.start(worker)
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_analyseCurrentFrame(self):
         if self._data_ is None or len(self._data_.analysisOptions)==0:
             return
@@ -5932,7 +5932,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_analyseCurrentLandmarkInCurrentFrame(self):
         if self._data_ is None or len(self._data_.analysisOptions) == 0:
             return
@@ -5980,7 +5980,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.statusBar().showMessage("Done!")
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_analyseCurrentLandmarkInFrames(self):
         if self._data_ is None or len(self._data_.analysisOptions) == 0:
             return
@@ -6047,7 +6047,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.threadpool.start(worker)
         
     @Slot(QtWidgets.QTableWidgetItem)
-    @safeWrapper
+    @safewrapper
     def slot_epscatParameterChanged(self, item):
         if self._data_ is None or len(self._data_.analysisOptions) == 0:
             return
@@ -6084,7 +6084,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             #self.statusBar().showMessage("Done!")
                 
     @Slot(str)
-    @safeWrapper
+    @safewrapper
     def slot_indicatorNameChanged(self, value):
         if self._data_ is None or len(self._data_.analysisOptions) == 0:
             return
@@ -6095,7 +6095,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self._data_.analysisOptions["IndicatorCalibration"]["Name"] = value
         
     @Slot(float)
-    @safeWrapper
+    @safewrapper
     def slot_indicatorKdChanged(self, value):
         if self._data_ is None or len(self._data_.analysisOptions) == 0:
             return
@@ -6110,7 +6110,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             self._data_.analysisOptions["IndicatorCalibration"]["Kd"] = value
         
     @Slot(float)
-    @safeWrapper
+    @safewrapper
     def slot_indicatorFminChanged(self, value):
         if self._data_ is None or len(self._data_.analysisOptions) == 0:
             return
@@ -6125,7 +6125,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             self._data_.analysisOptions["IndicatorCalibration"]["Fmin"] = value
         
     @Slot(float)
-    @safeWrapper
+    @safewrapper
     def slot_indicatorFmaxChanged(self, value):
         if self._data_ is None or len(self._data_.analysisOptions) == 0:
             return
@@ -6224,7 +6224,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.displayFrame()
             
     @Slot(float)
-    @safeWrapper
+    @safewrapper
     def slot_setBaseDiscriminationWindow(self, value):
         if self._data_ is None or len(self._data_.analysisOptions) == 0:
             return
@@ -6239,7 +6239,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.displayFrame()
             
     @Slot(float)
-    @safeWrapper
+    @safewrapper
     def slot_setPeakDiscriminationWindow(self, value):
         if self._data_ is None or len(self._data_.analysisOptions) == 0:
             return
@@ -6254,7 +6254,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.displayFrame()
             
     @Slot(float)
-    @safeWrapper
+    @safewrapper
     def slot_epscatDarkCurrentBeginChanged(self, value=None):
         if self._data_ is None or len(self._data_.analysisOptions) == 0:
             return
@@ -6268,7 +6268,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self._data_.analysisOptions["Intervals"]["DarkCurrent"][0] = value * pq.s
         
     @Slot(float)
-    @safeWrapper
+    @safewrapper
     def slot_epscatDarkCurrentEndChanged(self, value):
         if self._data_ is None or len(self._data_.analysisOptions) == 0:
             return
@@ -6279,7 +6279,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self._data_.analysisOptions["Intervals"]["DarkCurrent"][1] = value * pq.s
         
     @Slot(float)
-    @safeWrapper
+    @safewrapper
     def slot_epscatF0BeginChanged(self, value):
         if self._data_ is None or len(self._data_.analysisOptions) == 0:
             return
@@ -6290,7 +6290,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self._data_.analysisOptions["Intervals"]["F0"][0] = value * pq.s
         
     @Slot(float)
-    @safeWrapper
+    @safewrapper
     def slot_epscatF0EndChanged(self, value):
         if self._data_ is None or len(self._data_.analysisOptions) == 0:
             return
@@ -6301,7 +6301,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self._data_.analysisOptions["Intervals"]["F0"][1] = value * pq.s
         
     @Slot(float)
-    @safeWrapper
+    @safewrapper
     def slot_epscatFitBeginChanged(self, value):
         if self._data_ is None or len(self._data_.analysisOptions) == 0:
             return
@@ -6312,7 +6312,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self._data_.analysisOptions["Intervals"]["Fit"][0] = value * pq.s
     
     @Slot(float)
-    @safeWrapper
+    @safewrapper
     def slot_epscatFitEndChanged(self, value):
         if self._data_ is None or len(self._data_.analysisOptions) == 0:
             return
@@ -6323,7 +6323,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self._data_.analysisOptions["Intervals"]["Fit"][1] = value * pq.s
         
     @Slot(float)
-    @safeWrapper
+    @safewrapper
     def slot_epscatIntegralBeginChanged(self, value):
         if self._data_ is None or len(self._data_.analysisOptions) == 0:
             return
@@ -6334,7 +6334,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self._data_.analysisOptions["Intervals"]["Integration"][0] = value * pq.s
         
     @Slot(float)
-    @safeWrapper
+    @safewrapper
     def slot_epscatIntegralEndChanged(self, value):
         if self._data_ is None or len(self._data_.analysisOptions) == 0:
             return
@@ -6345,7 +6345,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self._data_.analysisOptions["Intervals"]["Integration"][1] = value * pq.s
         
     @Slot(int)
-    @safeWrapper
+    @safewrapper
     def slot_change_analysis_unit_state(self, state):
         if self._data_ is None:
             return
@@ -6359,7 +6359,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self._update_report_()
         
     @Slot(int)
-    @safeWrapper
+    @safewrapper
     def slot_toggleEPSCaTFit(self, value):
         if self._data_ is None:
             return
@@ -6371,7 +6371,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             self._data_.analysisOptions["Fitting"]["Fit"] = True
             
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_detectTriggers(self):
         import io
         if self._data_ is None:
@@ -6432,7 +6432,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_define_analysis_unit(self):
         if self._data_ is None:
             return
@@ -6444,7 +6444,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             #print("slot_define_analysis_unit selected unit", self._selected_analysis_unit_)
             self._define_analysis_unit_on_landmark_(self._selected_analysis_cursor_)
         
-    @safeWrapper
+    @safewrapper
     def _define_analysis_unit_on_landmark_(self, obj):
         if self._data_ is None:
             return
@@ -6462,7 +6462,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
             
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_remove_analysis_unit(self):
         #print("slot_remove_analysis_unit")
         if self._data_ is None:
@@ -6494,7 +6494,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.displayFrame()
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_remove_analysis_cursor(self):
         #print("slot_remove_analysis_cursor")
         if self._data_ is None:
@@ -6526,7 +6526,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.displayFrame()
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_showReportWindow(self):
         self._update_report_()
         self.reportWindow.show()
@@ -6590,7 +6590,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                         indices[k_] -= 1
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_addProtocol(self):
         if self._data_ is None:
             return
@@ -6646,7 +6646,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.displayFrame()
             
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_removeProtocol(self):
         if self._data_ is None:
             return
@@ -6666,7 +6666,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.displayFrame()
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_addEPSCaTComponent(self):
         # TODO
         item = self.epscatComponentsTableWidget.currentItem()
@@ -6674,7 +6674,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         #print("slot_addEPSCaTComponent currentItem row %d, col %d: %s" % (item.row(), item.column(), item.text()))
     
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_removeEPSCaTComponent(self):
         # TODO
         item = self.epscatComponentsTableWidget.currentItem()
@@ -6682,7 +6682,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         #print("slot_removeEPSCaTComponent currentItem row %d, col %d: %s" % (item.row(), item.column(), item.text()))
     
     @Slot(QtWidgets.QTableWidgetItem)
-    @safeWrapper
+    @safewrapper
     def slot_protocolTableEdited(self, item):
         r"""Modifies lsdata's TriggerProtocols directly.
         
@@ -6805,8 +6805,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.displayFrame()
             
     @Slot(int)
-    #@safeGUIWrapper
-    @safeWrapper
+    #@safeguiwrapper
+    @safewrapper
     def slot_epscatIndicatorChannelChanged(self, value):
         # NOTE: 2017-12-22 11:49:51
         # cannot assume a standardized data structure for analysisOptions
@@ -6823,7 +6823,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             
             
     @Slot(int)
-    @safeWrapper
+    @safewrapper
     def slot_epscatReferenceChannelChanged(self, value):
         if self._data_ is None or len(self._data_.analysisOptions) == 0:
             return
@@ -6833,7 +6833,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.displayFrame()
             
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_deleteAllAnalysisUnits(self):
         if self._data_ is None:
             return
@@ -6912,7 +6912,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             self.slot_setupLinescanCursorsInSpecifiedFrames()
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_deleteAnalysisUnits(self):
         if self._data_ is None:
             return
@@ -6951,7 +6951,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         self.displayFrame()
                 
-    @safeWrapper
+    @safewrapper
     def displayFrame(self):
         if self._data_ is None:
             return
@@ -7011,7 +7011,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             #if progressSignal is not None:
                 #progressSignal.emit(0)
                 
-    #@safeWrapper
+    #@safewrapper
     def collectAnalysisUnits(self, name_list, progressSignal=None):
         r"""
         name_list: a list of ScanData objects (variables) names in the workspace
@@ -7471,7 +7471,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         except Exception as e:
             traceback.print_exc()
         
-    @safeWrapper
+    @safewrapper
     @Slot()
     def slot_reportLSCaTResults(self):
         r"""Exports analysis result (pandas.DataFrame) to workspace.
@@ -7549,7 +7549,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         self.statusBar().showMessage("Done!")
         
-    @safeWrapper
+    @safewrapper
     @Slot()
     def slot_collectAnalysisUnits(self):
         from core.workspacefunctions import getvarsbytype
@@ -7583,7 +7583,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         self.threadpool.start(worker)
         
-    @safeWrapper
+    @safewrapper
     @Slot(object)
     def slot_collectAnalysisDone(self, obj):
         self._generic_work_idle_ = True
@@ -7630,7 +7630,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.qsettings.setValue("LSCaTAnalysis/ReportWindow_Geometry", self.reportWindow.geometry())
         self.qsettings.setValue("LSCaTAnalysis/ReportWindow_State", self.reportWindow.saveState())
                 
-    @safeWrapper
+    @safewrapper
     @Slot()
     def slot_exportCurrentAnalysisUnit(self):
         if self._data_ is None:
@@ -7703,7 +7703,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         
             
-    @safeWrapper
+    @safewrapper
     @Slot()
     def slot_exportAnalysisUnits(self):
         #QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
@@ -7736,7 +7736,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.unsetCursor()
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_processData(self):
         if self._data_ is None:
             return
@@ -7744,7 +7744,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.filterData()
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_processScene(self):
         if self._data_ is None:
             return
@@ -7752,7 +7752,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.filterData(scans=False)
     
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_processScans(self):
         if self._data_ is None:
             return
@@ -7761,7 +7761,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         
     @Slot(int)
-    @safeWrapper
+    @safewrapper
     def slot_gui_spinbox_select_cursor_by_index(self, index):
         r""" TODO FIXME Adapt to select/deselect AnalysisUnits
         or maybe create separate slots?
@@ -7838,7 +7838,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self._update_analysis_unit_ui_fields_()
             
     @Slot(str)
-    @safeWrapper
+    @safewrapper
     def slot_gui_changed_unit_type_string(self, val):
         if self._data_ is None:
             return
@@ -7855,7 +7855,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self._update_report_()
         
     @Slot(str)
-    @safeWrapper
+    @safewrapper
     def slot_gui_changed_genotype(self, val):
         if self._data_ is None:
             return
@@ -7874,7 +7874,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self._update_report_()
         
     @Slot(str)
-    @safeWrapper
+    @safewrapper
     def slot_gui_changed_sex(self, val):
         if self._data_ is None:
             return
@@ -7890,7 +7890,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self._update_report_()
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_gui_edit_analysis_unit_descriptors(self):
         r"""
         """
@@ -8200,7 +8200,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             self.displayFrame()
             
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_gui_add_unit(self):
         if self._data_ is None:
             return
@@ -8353,7 +8353,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.displayFrame()
                 
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_gui_changed_source_ID(self):
         if self._data_ is None:
             return
@@ -8400,7 +8400,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.displayFrame()
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_gui_age_changed(self):
         if self._data_ is None:
             return
@@ -8435,7 +8435,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             traceback.print_exc()
             
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_gui_changed_cell_name(self):
         if self._data_ is None:
             return
@@ -8482,7 +8482,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.displayFrame()
             
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_gui_changed_field_name(self):
         if self._data_ is None:
             return
@@ -8509,10 +8509,10 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.displayFrame()
         
     #@Slot(str)
-    #@safeWrapper
+    #@safewrapper
     #def slot_gui_changed_analysis_unit_name(self, newName):
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_gui_changed_analysis_unit_name(self):
         r"""Rename an analysis unit
         For landmark (PlanarGraphics) - based analysis units, this also changes
@@ -8559,7 +8559,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.displayFrame()
         
     @Slot(float)
-    @safeWrapper
+    @safewrapper
     def slot_gui_changed_cursor_x_pos(self, value):
         if len(self._data_.scansCursors) == 0:
             return
@@ -8583,7 +8583,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.displayFrame()
         
     @Slot(float)
-    @safeWrapper
+    @safewrapper
     def slot_gui_changed_cursor_y_pos(self, value):
         if len(self._data_.scansCursors) == 0:
             return
@@ -8606,7 +8606,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.displayFrame()
         
     @Slot(float)
-    @safeWrapper
+    @safewrapper
     def slot_gui_changed_cursor_xwindow(self, value):
         if len(self._data_.scansCursors) == 0:
             return
@@ -8629,7 +8629,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.displayFrame()
         
     @Slot(float)
-    @safeWrapper
+    @safewrapper
     def slot_gui_changed_cursor_ywindow(self, value):
         if len(self._data_.scansCursors) == 0:
             return
@@ -8653,7 +8653,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
     #@Slot(object, int)
     @Slot(object)
-    @safeWrapper
+    @safewrapper
     def slot_graphics_object_added_in_window(self, obj):
         r"""Slot to be connected to image viewer window signals emitted when a 
         GraphicsObject has been created in window
@@ -8764,7 +8764,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         
     @Slot(object)
-    @safeWrapper
+    @safewrapper
     def slot_graphics_object_changed_in_window(self, obj):
         r"""Triggered by direct interaction with a GraphicsObject cursor.
         Direct interaction means either that cursor was modified by mouse action,
@@ -8926,7 +8926,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             #__internal_set_opaque_label__(o, opaque)
             
     @Slot()
-    #@safeWrapper
+    #@safewrapper
     def slot_graphics_objects_deselected(self):
         if self._data_ is None:
             return
@@ -8965,7 +8965,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
     #@Slot(object, int)
     @Slot(object)
-    #@safeWrapper
+    #@safewrapper
     def slot_graphics_object_selected_in_window(self, obj):
         if self._data_ is None:
             return
@@ -9036,7 +9036,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             
     #@Slot(object, int)
     @Slot(object)
-    #@safeWrapper
+    #@safewrapper
     def slot_graphics_object_removed_in_window(self, obj):
         if self._data_ is None:
             return
@@ -9118,7 +9118,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     
     @Slot(int)
     @Slot(float)
-    @safeWrapper
+    @safewrapper
     def slot_filterParamChanged(self, value):
         if self._data_ is None:
             return
@@ -9232,7 +9232,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.displayFrame()
             
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_previewFilter(self): # TODO
         if self._data_ is None:
             return
@@ -9289,7 +9289,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 
     
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_pickleLSData(self):
         if self._data_ is None:
             return
@@ -9350,7 +9350,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             self.displayFrame()
                 
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_exportCopyToWorkspace(self):
         if self._data_ is None:
             return
@@ -9383,7 +9383,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             self.statusBar().showMessage("Done!")
         
     @Slot(int)
-    @safeWrapper
+    @safewrapper
     def slot_filterPageSelectionChanged(self, value):
         if self._data_ is None:
             return
@@ -9404,7 +9404,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.generateFilters()
                 
     @Slot(int)
-    @safeWrapper
+    @safewrapper
     def slot_displayFramesWithProtocol(self, val):
         if self._data_ is None:
             return
@@ -9412,7 +9412,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.displaySelectFrames()
 
     @Slot(int)
-    @safeWrapper
+    @safewrapper
     def slot_splineInterpolatorOrderChanged(self, val):
         self.scanline_spline_order = val
         if self._data_ is not None:
@@ -9422,7 +9422,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             
             
     @Slot(int)
-    @safeWrapper
+    @safewrapper
     def slot_showScanlineProfiles(self, val):
         if self._data_ is None:
             return
@@ -9453,12 +9453,12 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self._update_ui_fields_()
                 
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_enterWhatsThisMode(self):
         QtWidgets.QWhatsThis.enterWhatsThisMode()
         
     @Slot(int)
-    @safeWrapper
+    @safewrapper
     def _slot_frameChangedInChildViewer(self, value):
         r"""Captures frame index change in the child viewer
         Parameters:
@@ -9531,7 +9531,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                     win.currentFrame = frindex
                     
     @Slot(int)
-    @safeWrapper
+    @safewrapper
     def slot_setFrameNumber(self, value):
         r"""Connected to frameQSlider or framesQSpinBox signals.
         """
@@ -9622,7 +9622,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             traceback.print_exc()
             
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_setupLinescanCursorsInSpecifiedFrames(self):
         if self._data_ is None:
             return
@@ -9640,7 +9640,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.displayFrame()
             
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_setupLinescanCursorsInCurrentFrame(self):
         if self._data_ is None:
             return
@@ -9651,7 +9651,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.displayFrame()
             
     @Slot(int)
-    @safeWrapper
+    @safewrapper
     def slot_scanDisplayChannelChanged(self, value):
         if self._data_ is None:
             return
@@ -9683,7 +9683,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                         self._displayed_scene_channels_ = [self._data_.scansChannelNames[k]]
                         
     @Slot(int)
-    @safeWrapper
+    @safewrapper
     def slot_sceneDisplayChannelChanged(self, value):
         r"""When scene is a sequence of single-band data, send this to the display.
         
@@ -9714,7 +9714,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                         self._displayed_scene_channels_ = [self._data_.sceneChannelNames[k]]
                     
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_loadWorkspaceScanData(self):
         
         if isinstance(self._data_, ScanData) and len(self._data_.name.strip()):
@@ -9771,7 +9771,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             self._data_modifed_(True)
 
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_setDataName(self):
         
         value = strutils.str2symbol(self.scanDataNameLineEdit.text())
@@ -9802,7 +9802,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             
             #self.statusBar().showMessage("Done!")
             
-    @safeWrapper
+    @safewrapper
     def _check_for_linescan_data_(self, data):
         try:
             if not check_apiversion(data) and hasattr(data, "_upgrade_API_"):
@@ -9844,7 +9844,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             if getattr(win, "framesSpinner", None) is not None:
                 win.framesSpinner.setMaximum(nFrames)
         
-    @safeWrapper
+    @safewrapper
     def _init_data_viewers_(self, section:str):
         r"""Sets up the viewer(s) for a specific ScanData section
         Parameters:
@@ -9925,7 +9925,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 w.close()
             viewers.clear()
         
-    @safeWrapper
+    @safewrapper
     def _get_viewers_for_data_section(self, section:str) -> typing.Tuple[typing.Any]:
         r"""
         Parameters:
@@ -10025,7 +10025,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         # TODO 2022-11-05 15:04:37 is this still required ?!?
         pass
             
-    @safeWrapper
+    @safewrapper
     def _init_viewers_(self):
         r"""Sets up the data viewers.
         Calls self._init_data_viewers_ for each data component attribute in ScanData instance
@@ -10047,7 +10047,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         #for viewer in allviewers:
             #viewer.linkToViewers(*allviewers, broadcast=False)
         
-    @safeWrapper
+    @safewrapper
     def _data_modifed_(self, value=False):
         if not isinstance(self._data_, ScanData):
             return
@@ -10063,7 +10063,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         else:
             self.setWindowTitle("%s \u2014 LSCaT" % (self._data_.name))
         
-    @safeWrapper
+    @safewrapper
     def _display_scene_(self):
         #print("LSCaTWindow _display_scene_")
         if self._data_ is None:
@@ -10104,7 +10104,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         #self.sceneDisplayChannelComboBox.currentIndexChanged[int].connect(self.slot_sceneDisplayChannelChanged)
             
-    @safeWrapper
+    @safewrapper
     def _display_scans_block_(self):
         if self._data_ is None:
             return
@@ -10131,7 +10131,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             
         self.scansblockviewers[0].setWindowTitle("%s - %s" % ("Scan Data", self._data_.name))
     
-    @safeWrapper
+    @safewrapper
     def _display_scanline_profiles_(self):
         if self._data_ is None:
             return
@@ -10204,7 +10204,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 
         self.profileviewers[0].setWindowTitle(f"Scanline profiles {self._data_.name}")
         
-    @safeWrapper
+    @safewrapper
     def _display_ephys_(self):
         if self._data_ is None:
             return
@@ -10241,7 +10241,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             elif isinstance(self._frame_selector_, int):
                 self.ephysviewers[0].currentFrame = self._frame_selector_
 
-    @safeWrapper
+    @safewrapper
     def _trigger_events_detection_gui_(self, options, ephys_start, ephys_end, dlg = None, title = "Detect triggers"):
         
         if "TriggerEventDetection" not in options:
@@ -10617,18 +10617,18 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         else:
             return False, tuple()
         
-    @safeWrapper
+    @safewrapper
     def _refresh_image_displays_(self):
         for win in self.scansviewers + self.sceneviewers:
             win.displayFrame()
 
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_refreshAllDisplays(self):
         self.displayFrame()
 
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_refreshDataDisplay(self, showFiltered = True):
         r""" TODO/FIXME clean up this mess, 
         """
@@ -10637,7 +10637,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         self.displayFrame()
     
-    @safeWrapper
+    @safewrapper
     def _display_scans_(self):
         #print("_display_scans_")
         if self._data_ is None:
@@ -10671,7 +10671,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.scanDisplayChannelCombobox.addItems(["All channels"] + self._data_.scansChannelNames + ["Choose..."])
         self.scanDisplayChannelCombobox.setCurrentIndex(displayScanChannelGUINdx)
         
-    @safeWrapper
+    @safewrapper
     def _display_graphics_overlays_(self):
         #print("_display_graphics_overlays_")
         if self._data_ is None:
@@ -10689,7 +10689,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         self._display_scan_region_()
         
-    @safeWrapper
+    @safewrapper
     def _display_scan_region_(self):
         if self._data_ is None:
             return
@@ -10716,7 +10716,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                                         labelShowsPosition=False,
                                         autoSelect=False)
                         
-    @safeWrapper
+    @safewrapper
     def _display_graphics_objects_(self, rois=True, scene=True):
         r"""Displays a specified overlay type in a specific data subset.
         
@@ -10798,7 +10798,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                             #if gobj is not None:# it may be None if there is no image displayed in the window
                                 #gobj.setTransparentLabel(transparent_label)
                             
-    @safeWrapper
+    @safewrapper
     def _update_filter_ui_fields_(self):
         if self._data_ is None:
             return
@@ -10862,7 +10862,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         except Exception as e:
             traceback.print_exc()
 
-    @safeWrapper
+    @safewrapper
     def _update_analysis_unit_ui_fields_(self):
         r"""Updates GUI fields in Analysis unit groupbox _AND_ the results in the text viewer window
         """
@@ -11033,7 +11033,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         # see NOTE: 2018-09-25 22:19:58
         #self._connect_gui_slots_(self._analysis_unit_gui_signal_slots_)
             
-    @safeWrapper
+    @safewrapper
     def _update_ui_fields_(self):
         #print("LSCaTWindow._update_ui_fields_ BEGIN")
         #traceback.print_stack()
@@ -11418,7 +11418,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         #print("LSCaTWindow._update_ui_fields_ END")
         
-    @safeWrapper
+    @safewrapper
     def _parsedata_(self, newdata=None):#, varname=None):
         r"""Parses metainformation and then actually assigns the data to the _data_ attribute
         """
@@ -11487,7 +11487,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.generateScanRegionProfiles()
                                 
         
-    @safeWrapper
+    @safewrapper
     def autoSetupLinescanCursorsInFrame(self, frame, displayFrame=True):
         if self._data_ is None:
             return
@@ -11541,7 +11541,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         if displayFrame:
             self._display_graphics_objects_(rois=False, scene=False)
                 
-    @safeWrapper
+    @safewrapper
     def displaySelectFrames(self):
         if self._data_ is None or len(self._data_.triggers) == 0:
             return
@@ -11559,7 +11559,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
             self.displayFrame()
         
-    @safeWrapper
+    @safewrapper
     def setScansFilterFunction(self, channel, value, *args, **kwargs):
         r"""Sets the filtering function for the specified scans channel
         
@@ -11607,7 +11607,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         if len(kwargs) > 0:
             self._scans_filters_[channel]["kwargs"] = kwargs
             
-    @safeWrapper
+    @safewrapper
     def getSceneFilterFunction(self, channel):
         r"""Returns the function object for filtering the specified scene channel
         """
@@ -11632,7 +11632,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         # raises NameError if value does not resolve to a function
         return eval(self._scene_filters_[channel]["function"])
             
-    @safeWrapper
+    @safewrapper
     def setSceneFilterFunction(self, channel, value, *args, **kwargs):
         r"""Sets the filtering function for the specified scene channel
         
@@ -11678,7 +11678,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         if len(kwargs) > 0:
             self._scene_filters_[channel]["kwargs"] = kwargs
             
-    @safeWrapper
+    @safewrapper
     def getScansFilterFunction(self, channel):
         r"""Returns the function object for filtering the specified scans channel
         """
@@ -11703,7 +11703,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         # raises NameError if value does not resolve to a function
         return eval(self._scans_filters_[channel]["function"])
             
-    @safeWrapper
+    @safewrapper
     def generateFilters(self):
         r"""Generates filter specifications in ScanData
         
@@ -11810,7 +11810,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 self.setScansFilterFunction(indChannel, imgp.binomialFilter1D.__name__, \
                     self.binomialOrderScansIndSpinBox.value())
                 
-    @safeWrapper
+    @safewrapper
     def generateScanRegionProfiles(self):
         r"""
         FIXME/TODO adapt to a new scenario where all scene image data is a single
@@ -11832,7 +11832,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.generateScanRegionProfilesFromScans() 
         self.generateScanRegionProfilesFromScene() 
 
-    @safeWrapper
+    @safewrapper
     def generateScanRegionProfilesFromScene(self):
         r"""Generates scanline profiles from the scene rois
         
@@ -11926,7 +11926,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                         if not isinstance(target.segments[k].name, str) or len(target.segments[k].name.strip()) == 0:
                             target.segments[k].name = f"Sweep {k}"
                 
-    @safeWrapper
+    @safewrapper
     def generateScanRegionProfilesFromScans(self):
         r"""Generates scanline profiles from the linescans X axis average.
         
@@ -12013,7 +12013,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         else:
             warnings.warn("Data contains no scans!")
                 
-    @safeWrapper
+    @safewrapper
     def processData(self, progressSignal = None, setMaxSignal=None, **kwargs):#scene=True, channel = None, ):
         r"""Applies 2D filters frame-wise to raw scene or scans image data subsets.
         
@@ -12232,7 +12232,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         return result# , process_channel_names
 
-    @safeWrapper
+    @safewrapper
     def _update_protocol_display_(self):
         # TODO: connect protocol table editing to the trigger protocols values
         # see NOTE: 2018-09-25 22:19:58
@@ -12315,7 +12315,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 
         #self.protocolTableWidget.itemChanged[QtWidgets.QTableWidgetItem].connect(self.slot_protocolTableEdited, type = QtCore.Qt.QueuedConnection)
         
-    @safeWrapper
+    @safewrapper
     def setData(self, newdata = None, doc_title=None, **kwargs):
         r"""When newdata is None this resets everything to their defaults"""
         
@@ -12342,7 +12342,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             self._data_ = None
             
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_Quit(self):
         print("%s.slot_Quit %s" % (self.__class__.__name__, self.winTitle))
         self.close()
@@ -12523,7 +12523,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self._data_ = None
         self._data_var_name_ = None
                     
-    @safeWrapper
+    @safewrapper
     def _link_scans_vcursor_to_scene_pcursor_(self, obj):
         if self._data_ is None:
             return
@@ -12567,7 +12567,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         else:
             raise NotImplementedError("Mirror point cursors not implemented for %s" % self._data_.scanRegion.type)
     
-    @safeWrapper
+    @safewrapper
     def _selectDisplayChannels_(self, scene=True):
         if self._data_ is None:
             return
@@ -12584,7 +12584,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         return [chnames[k] for (k,v) in enumerate(ret) if v]
         
 
-    @safeWrapper
+    @safewrapper
     def _displayChannels_(self, scene=True, channels=None):
         r"""Display selected channels in scene or frame data.
         

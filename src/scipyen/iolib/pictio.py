@@ -68,7 +68,7 @@ from core import pyabfbridge as pab
 
 from core import (xmlutils, strutils, datasignal)#, neoepoch, neoevent)
 
-from core.prog import (ContextExecutor, safeWrapper,)
+from core.prog import (ContextExecutor, safewrapper,)
 
 from core.monkey import (check_neo_patch, 
                        identify_neo_patch,  import_relocated_module)
@@ -1093,7 +1093,7 @@ def loadAxonFile(fileName:typing.Union[str, pathlib.Path],
     except Exception as e:
         traceback.print_exc()
         
-@safeWrapper
+@safewrapper
 def importDataFrame(fileName:typing.Union[str, pathlib.Path]):
     fileType = getMimeAndFileType(fileName)[0]
     
@@ -1118,7 +1118,7 @@ def importDataFrame(fileName:typing.Union[str, pathlib.Path]):
     else:
         warnings.warn("Unsupported file type: %s" % fileType)
         
-@safeWrapper
+@safewrapper
 def loadPickleFile(fileName:typing.Union[str, pathlib.Path]) -> object:
     r"""Loads pickled data.
     ATTENTION: 
@@ -1169,7 +1169,7 @@ def loadPickleFile(fileName:typing.Union[str, pathlib.Path]) -> object:
 def loadPickle(fileName:typing.Union[str, pathlib.Path]) -> object:
     return loadPickleFile(fileName)
 
-@safeWrapper            
+@safewrapper            
 def savePickleFile(val, fileName:typing.Union[str, pathlib.Path], protocol=None):
     #if inspect.isfunction(val): # DO NOT attempt to pickle unbound functions
         #return
@@ -1380,7 +1380,7 @@ def saveText(s, fileName:typing.Union[str, pathlib.Path]):
     with open(fileName, mode="wt") as fileDest:
         fileDest.write(s)
             
-@safeWrapper
+@safewrapper
 def writeCsv(data, fileName:typing.Optional[typing.Union[str, pathlib.Path]]=None, 
              header=None):
     r"""Exports data to a csv (TAB-separated) file
@@ -1824,7 +1824,7 @@ def loadFile(fName:typing.Union[str, pathlib.Path]) -> object:
     value = fileLoader(fName)
     return value
     
-@safeWrapper
+@safewrapper
 def saveHDF5(data, fileName:typing.Union[str, pathlib.Path]):
     fileName = ensureExtension(fileName, ".h5")
     # (name,extn) = os.path.splitext(fileName)
@@ -1835,7 +1835,7 @@ def saveHDF5(data, fileName:typing.Union[str, pathlib.Path]):
         # h5io.toHDF5(data, h5file, name=os.path.basename(name))
         h5io.toHDF5(data, h5file, name=fileName.stem)
     
-@safeWrapper
+@safewrapper
 def save(*args:typing.Optional[typing.Any], name:typing.Optional[str]=None, ws:typing.Optional[dict]=None, mode:str="pkl", **kwargs):
     r"""Saves variable(s) in the current working directory.
     WARNING Do not confuse with IPython %save line magic

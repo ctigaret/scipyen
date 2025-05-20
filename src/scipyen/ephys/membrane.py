@@ -75,7 +75,7 @@ from core.basescipyen import BaseScipyenData
 from core.triggerevent import (TriggerEvent, TriggerEventType)
 from core.triggerprotocols import (TriggerProtocol, auto_define_trigger_events, auto_detect_trigger_protocols)
 
-from core.prog import (safeWrapper, with_doc, scipywarn, printStyled)
+from core.prog import (safewrapper, with_doc, scipywarn, print_styled)
 #from core.patchneo import *
 
 #### END Scipyen core modules
@@ -102,7 +102,7 @@ import ephys.ephys as ephys
 # NOTE: 2023-06-12 16:09:45
 # measure_Rs_Rin must be defined early so that it can be picked up by the with_doc
 # decorator, later
-@safeWrapper
+@safewrapper
 def measure_membrane_test(signal:typing.Union[neo.AnalogSignal, DataSignal],
                   command:typing.Union[neo.AnalogSignal, DataSignal, pq.Quantity, numbers.Number],
                   locations: typing.Optional[typing.Union[typing.Sequence[typing.Union[SignalCursor,type(MISSING)]],
@@ -617,7 +617,7 @@ def measure_Rs_Rin(im_signal:neo.AnalogSignal,
     else:
         return Rs, Rin
     
-@safeWrapper
+@safewrapper
 def segment_Rs_Rin(segment: neo.Segment, Im: typing.Union[str, int], 
                    Vm: typing.Union[str, int, pq.Quantity, float], 
                    regions: typing.Optional[typing.Union[neo.Epoch, typing.Tuple[SignalCursor, SignalCursor, SignalCursor]]] = None, 
@@ -771,7 +771,7 @@ def segment_Rs_Rin(segment: neo.Segment, Im: typing.Union[str, int],
     else:
         raise TypeError("Inappropriate type for 'regions' parameter: %s" % type(region).__name__)
     
-@safeWrapper
+@safewrapper
 def block_Rs_Rin(data:typing.Union[neo.Block,typing.Sequence[neo.Segment]], 
                  Im:typing.Union[str, int], 
                  Vm:typing.Union[str, int, pq.Quantity, float], 
@@ -849,7 +849,7 @@ def block_Rs_Rin(data:typing.Union[neo.Block,typing.Sequence[neo.Segment]],
     
     return Rs, Rin
     
-@safeWrapper
+@safewrapper
 def cursors_Rs_Rin(signal: typing.Union[neo.AnalogSignal, DataSignal], 
                    vstep: typing.Union[float, pq.Quantity], 
                    baseline: typing.Union[SignalCursor, tuple], 
@@ -989,7 +989,7 @@ def cursors_Rs_Rin(signal: typing.Union[neo.AnalogSignal, DataSignal],
     # return np.array([Rs, Rin]) * Rin.units
 
 @with_doc(measure_Rs_Rin, use_header=True)
-@safeWrapper
+@safewrapper
 def epoch_Rs_Rin(signal: typing.Union[neo.AnalogSignal, DataSignal], 
                  vstep: typing.Union[float, pq.Quantity], 
                  epoch: typing.Union[neo.Epoch, tuple], 
@@ -1057,7 +1057,7 @@ def epoch_Rs_Rin(signal: typing.Union[neo.AnalogSignal, DataSignal],
     
     return measure_Rs_Rin(signal, vstep, intervals, channel=channel, returnIdc=returnIdc)
         
-@safeWrapper
+@safewrapper
 def v_Nernst(x_out, x_in, z, temp):
     r"""Calculates Nernst potential for an ionic species X.
     
@@ -7426,7 +7426,7 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
             # ret["Depolarising_steps"].append(segment_result)
             ret["Current_injection_steps"].append(segment_result)
         
-        msg = printStyled(f"n***\nanalyse_AP_step_injection_series: {len(ret['Current_injection_steps'])} injection steps\n***\n")
+        msg = print_styled(f"n***\nanalyse_AP_step_injection_series: {len(ret['Current_injection_steps'])} injection steps\n***\n")
         print(f"{msg}")
     
         seg_times = [s.analogsignals[0].t_start for s in segments]

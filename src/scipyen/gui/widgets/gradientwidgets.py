@@ -9,7 +9,7 @@ from functools import partial
 from qtpy import QtCore, QtGui, QtWidgets, QtXml, QtSvg
 from qtpy.QtCore import Signal, Slot, Property
 
-from core.prog import safeWrapper
+from core.prog import safewrapper
 
 from core.utilities import (counter_suffix, reverse_dict, reverse_mapping_lookup)
 
@@ -660,7 +660,7 @@ class GradientRenderer(QtWidgets.QWidget):
         self._useRelativeFocalRadius = False
         self.update()
     
-    @safeWrapper
+    @safewrapper
     def paintEvent(self, e:QtGui.QPaintEvent) -> None:
         painter = QtGui.QPainter()
         painter.begin(self)
@@ -740,7 +740,7 @@ class GradientRenderer(QtWidgets.QWidget):
     def _restrictPoint(self, p:QtCore.QPointF) -> QtCore.QPointF:
         return restrict_point(p, self.width(), self.height())
             
-    @safeWrapper
+    @safewrapper
     def paint(self, p:QtGui.QPainter) -> None:
         # NOTE: 2021-05-27 08:17:19
         # not sure why, but if setting the painter brush to a gradient stored as

@@ -71,7 +71,7 @@ import serial.tools.list_ports as port_list
 import numpy as np
 
 import core.signalprocessing as sigp
-from core.prog import (scipywarn, printStyled)
+from core.prog import (scipywarn, print_styled)
 from core.datatypes import TypeEnum
 
 TriggerLabels = ["Off","RisingEdges","FallingEdges","BothEdges","FollowPulse"]
@@ -222,7 +222,7 @@ class CoolLEDpE12():
     def sendCommand(self, cmd: str, verbose:bool=True, collapse:bool=True):
         if not self.__serial_port__.is_open:
             scipywarn("The underlying serial port is closed; call method openPort() then call this method again.")
-            # printStyled("The underlying serial port is closed; call method openPort() then call this method again.", "red")
+            # print_styled("The underlying serial port is closed; call method openPort() then call this method again.", "red")
             return
         
         if not cmd.endswith("\n"):

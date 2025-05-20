@@ -152,7 +152,7 @@ from qtpy.QtCore import (Signal, Slot, Property,)
 from core import desktoputils as dutils
 from core import qtutils
 
-from core.prog import (safeWrapper, printStyled)
+from core.prog import (safewrapper, print_styled)
 from gui import guiutils
 from iolib import pictio
 
@@ -2050,13 +2050,13 @@ class CoreUrlNavigator(QtCore.QObject):
         historyIndex = self.adjustedHistoryIndex(historyIndex)
         return self._history_[historyIndex].url
     
-    @safeWrapper
+    @safewrapper
     def saveLocationState(self, state:object):
         oldLoc = self._history_[self._historyIndex_]
         newLoc = LocationData(oldLoc.url, state)
         self._history_[self._historyIndex_] = newLoc
         
-    @safeWrapper
+    @safewrapper
     def locationState(self, historyIndex:int = -1) -> object:
         historyIndex = self.adjustedHistoryIndex(historyIndex)
         return self._history_[historyIndex].state
@@ -2105,7 +2105,7 @@ class UrlNavigatorPathSelectorEventFilter(QtCore.QObject):
     def __init__(self, parent:QtCore.QObject):
         super().__init__(parent)
         
-    @safeWrapper
+    @safewrapper
     def eventFilter(self, menu:QtCore.QObject, evt:QtCore.QEvent):
         if isinstance(menu, QtWidgets.QMenu) and evt.type() == QtCore.QEvent.MouseButtonRelease and evt.button() == QtCore.Qt.MiddleButton:
             action = menu.activeAction()
@@ -3091,7 +3091,7 @@ class UrlNavigator(QtWidgets.QWidget):
     
     # TODO 2025-01-19 10:28:19 for below,
     # verify CoreUrlNavigator code
-    @safeWrapper
+    @safewrapper
     def saveLocationState(self, state:QtCore.QByteArray):
         # print(f"{self.__class__.__name__}.saveLocationState({state})")
         currentState = self._nav_p_._coreUrlNavigator_.locationState()
@@ -3099,7 +3099,7 @@ class UrlNavigator(QtWidgets.QWidget):
         
     # TODO 2025-01-19 10:28:19 for below,
     # verify CoreUrlNavigator code
-    @safeWrapper
+    @safewrapper
     def locationState(self, historyIndex:int = -1) -> QtCore.QByteArray:
         return self._nav_p_._coreUrlNavigator_.locationState(historyIndex)
         

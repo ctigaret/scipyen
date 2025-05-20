@@ -45,7 +45,7 @@ import core.datatypes
 import core.strutils as strutils
 from core.strutils import str2float
 
-from core.prog import (safeWrapper, )
+from core.prog import (safewrapper, )
 
 from core.triggerevent import (DataMark, MarkType, TriggerEvent, TriggerEventType)
 from core.triggerprotocols import TriggerProtocol
@@ -158,7 +158,7 @@ class TableEditor(ScipyenViewer):
             self._use_mpl_action_.setChecked(self._use_matplotlib_)
             
     @Slot(bool)
-    @safeWrapper
+    @safewrapper
     def _slot_use_mpl_toggled_(self, value):
         self._use_matplotlib_ = value
             
@@ -268,7 +268,7 @@ class TableEditor(ScipyenViewer):
         self.tableWidget.setData(self._data_)
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_exportAsCSVFile(self):
         if self._data_ is None:
             return
@@ -312,7 +312,7 @@ class TableEditor(ScipyenViewer):
         self.tableView.verticalHeader().resizeSections(QtWidgets.QHeaderView.ResizeToContents)
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_plotSelectedData(self):
         '''Plot table selection
         NOTE: 2019-09-06 10:30:36
@@ -333,7 +333,7 @@ class TableEditor(ScipyenViewer):
         
     # ### BEGIN don't delete yet
 #     @Slot()
-#     @safeWrapper
+#     @safewrapper
 #     def slot_customPlotSelectedColumns(self):
 #         if type(self._scipyenWindow_).__name__ != "ScipyenWindow":
 #             return
@@ -344,7 +344,7 @@ class TableEditor(ScipyenViewer):
     # ### END   don't delete yet
         
         
-    @safeWrapper
+    @safewrapper
     def plotData(self, *args, **kwargs):
         r"""Plots selected data.
         

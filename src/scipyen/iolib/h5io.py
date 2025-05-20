@@ -134,7 +134,7 @@ from neo.core.dataobject import ArrayDict
 
 from . import jsonio # brings the CustomEncoder type and the decode_hook function
 import core
-from core.prog import (safeWrapper, signature2Dict, printStyled,
+from core.prog import (safewrapper, signature_as_dict, print_styled,
                        parse_module_class_path, get_loaded_module)
 from core import prog
 from core.traitcontainers import DataBag
@@ -1701,7 +1701,7 @@ def makeObjAttrs(obj:typing.Any, oname:typing.Optional[str]=None):
         # this is contentious for functions provided by 3rd party libraries, 
         # because there is no pythonic access to their signatures
         # (e.g. Boost.python.functions)
-        return makeAttrDict(function_or_method = jsonio.dumps(prog.signature2Dict(obj)))
+        return makeAttrDict(function_or_method = jsonio.dumps(prog.signature_as_dict(obj)))
     
     if obj is None:
         return makeEntryName(obj), obj_attrs
@@ -2198,7 +2198,7 @@ def _(obj:DataZone, axisindex):
 
     return ret
 
-@safeWrapper
+@safewrapper
 def makeAxisScale(obj, dset:h5py.Dataset, axesgroup:h5py.Group, dimindex:int,
                   compression:str="gzip",chunks:bool=None,track_order=True):
     r"""
@@ -2764,7 +2764,7 @@ def _(obj: types.SimpleNamespace,
         
         return entity
         
-@safeWrapper
+@safewrapper
 def toHDF5(obj, group:h5py.Group, name:typing.Optional[str]=None,
             oname:typing.Optional[str]=None,
             compression:typing.Optional[str]="gzip",
@@ -3065,7 +3065,7 @@ def makeHDF5Dataset(obj, group: h5py.Group, name:typing.Optional[str]=None,
                             track_order = track_order, entity_cache = entity_cache)
         return dset
     except:
-        msg = printStyled(f"makeHDF5Dataset offending object: {obj} (type: {type(obj)}) for target name {target_name}",
+        msg = print_styled(f"makeHDF5Dataset offending object: {obj} (type: {type(obj)}) for target name {target_name}",
                           color="red", bright=True)
         print(f"{msg}")
         raise
@@ -3153,7 +3153,7 @@ def _(obj:str, group, attrs, name, compression, chunks, track_order, entity_cach
             #                             track_order=track_order)
             
     except:
-        msg = printStyled(f"makeDataset<str> offending object: {obj} (len: {len(obj)})",
+        msg = print_styled(f"makeDataset<str> offending object: {obj} (len: {len(obj)})",
                           color="red", bright=True)
         print(f"{msg}")
         raise
@@ -3183,7 +3183,7 @@ def _(obj:pathlib.Path, group, attrs, name, compression, chunks, track_order,
         # print(f"h5io.makeDataset({type(obj).__name__}): data: {data}, attrs: {attrs}")
             
     except:
-        msg = printStyled(f"makeDataset<str> offending object: {obj} (len: {len(obj)})",
+        msg = print_styled(f"makeDataset<str> offending object: {obj} (len: {len(obj)})",
                           color="red", bright=True)
         print(f"{msg}")
         raise
@@ -3216,7 +3216,7 @@ def _(obj:typing.Union[bytes, bytearray], group, attrs, name, compression, chunk
                                         chunks = chunks, track_order=track_order)
         
     except:
-        msg = printStyled(f"makeDataset<{type(obj).__name__}> offending object: {obj} (len: {len(obj)}) converted to {data}", 
+        msg = print_styled(f"makeDataset<{type(obj).__name__}> offending object: {obj} (len: {len(obj)}) converted to {data}", 
                           color="red", bright=True)
         print(f"{msg}")
         try:

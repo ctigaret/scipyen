@@ -29,7 +29,7 @@ from core import neoepoch
 from core.neoepoch import Epoch, _new_Epoch
 
 # print(f"_new_Epoch: {_new_Epoch.__name__} in {_new_Epoch.__module__}")
-from core.prog import (safeWrapper, signature2Dict, SpecFinder)
+from core.prog import (safewrapper, signature_as_dict, SpecFinder)
 
 neo_major, neo_minor, neo_micro = map(lambda x: int(x), neo.__version__.split("."))
 
@@ -55,7 +55,7 @@ def _patch_new_neo(original_f, *args, **kwargs):
     
     # print(f"_patch_new_neo original_f: {original_f}")
     
-    sig = signature2Dict(original_f)
+    sig = signature_as_dict(original_f)
     # print(f"originalsignature: {sig}\n")
     # print(f" {len(sig.positional)} positional parameters\n")
     sig_named = list(sig.named.keys())
@@ -167,7 +167,7 @@ def unpatch_channelindex():
         ndx = sys.meta_path.index(i)
         del sys.meta_path[ndx]
         
-@safeWrapper
+@safewrapper
 def patch_neo_new():
 #     from legacy.neo.core import channelindex
 #     neo.core.channelindex = channelindex
@@ -197,7 +197,7 @@ def patch_neo_new():
             traceback.print_exc()
             raise
             
-@safeWrapper
+@safewrapper
 def restore_neo_new():
     # unpatch_channelindex()
     for key, value in original.items():

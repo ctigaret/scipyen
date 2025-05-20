@@ -52,7 +52,7 @@ from core.workspacefunctions import validate_varname
 
 from core.utilities import NestedFinder
 
-from core.prog import (safeWrapper, safeGUIWrapper, )
+from core.prog import (safewrapper, safeguiwrapper, )
 
 from core.traitcontainers import (DataBag, DataBagTraitsObserver,)
 
@@ -297,7 +297,7 @@ class DataViewer(ScipyenViewer):
                 self._collapse_expand_Recursive(self.treeWidget.topLevelItem(k), current=False)
 
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_refreshDataDisplay(self):
         self._top_title_ = self._docTitle_ if (isinstance(self._docTitle_, str) and len(self._docTitle_.strip())) else "/"
         
@@ -315,7 +315,7 @@ class DataViewer(ScipyenViewer):
         self._populate_tree_widget_()
             
     @Slot(QtWidgets.QTreeWidgetItem, int)
-    @safeWrapper
+    @safewrapper
     def slot_itemDoubleClicked(self, item, column):
         from core.utilities import get_nested_value
         if self._scipyenWindow_ is None:
@@ -400,7 +400,7 @@ class DataViewer(ScipyenViewer):
         self._populate_tree_widget_()
         
     @Slot(QtCore.QPoint)
-    @safeWrapper
+    @safewrapper
     def slot_customContextMenuRequested(self, point):
         # FIXME/TODO copy to system clipboard? - what mime type? JSON data?
         if self._scipyenWindow_ is None: 
@@ -448,7 +448,7 @@ class DataViewer(ScipyenViewer):
         cm.popup(self.treeWidget.mapToGlobal(point), copyItemData)
         
         
-    @safeWrapper
+    @safewrapper
     def getSelectedPaths(self):
         items = self.treeWidget.selectedItems()
         
@@ -480,7 +480,7 @@ class DataViewer(ScipyenViewer):
                 
         return item_paths
         
-    @safeWrapper
+    @safewrapper
     def exportPathsToClipboard(self, item_paths):
         # print(f"{self.__class__.__name__}.exportPathsToClipboard({item_paths})")
         if self._scipyenWindow_ is None:
@@ -496,20 +496,20 @@ class DataViewer(ScipyenViewer):
             self._scipyenWindow_.app.clipboard().setText(item_paths[0])
             
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_collapseAll(self):
         for k in range(self.treeWidget.topLevelItemCount()):
             self._collapse_expand_Recursive(self.treeWidget.topLevelItem(k), current=False)
 
     
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_expandAll(self):
         for k in range(self.treeWidget.topLevelItemCount()):
             self._collapse_expand_Recursive(self.treeWidget.topLevelItem(k), expand=True, current=False)
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_copyPaths(self):
         if self._scipyenWindow_ is None:
             return
@@ -518,7 +518,7 @@ class DataViewer(ScipyenViewer):
         self.exportPathsToClipboard(item_paths)
 
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_exportItemPathToConsole(self):
         if self._scipyenWindow_ is None:
             return
@@ -528,7 +528,7 @@ class DataViewer(ScipyenViewer):
         self._scipyenWindow_.console.paste()
                 
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_exportItemDataToWorkspace(self):
         r"""Exports data from currently selected items to the workspace.
         
@@ -574,7 +574,7 @@ class DataViewer(ScipyenViewer):
         self._export_data_items_(items, fullPathAsName=fullPathAsName)
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_editItemData(self):
         # TODO: 2022-10-11 13:45:35
         from core.utilities import get_nested_value
@@ -586,7 +586,7 @@ class DataViewer(ScipyenViewer):
         
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_viewItemDataInNewWindow(self):
         from core.utilities import get_nested_value
         if self._scipyenWindow_ is None:
@@ -651,7 +651,7 @@ class DataViewer(ScipyenViewer):
                                                        newWindow=True)
     
     
-    @safeWrapper
+    @safewrapper
     def _parse_item_(self, item):
         item_name = item.text(0)
         # print(f"{self.__class__.__name__}._parse_item_({item}): item_name = {item_name}")
@@ -662,7 +662,7 @@ class DataViewer(ScipyenViewer):
         
         return item_name if (item_type_str == "str" or len(item_type_str.strip())==0) else eval("%s(%s)" % (item_type_str, item_name))
     
-    @safeWrapper
+    @safewrapper
     def _get_path_for_item_(self, item:QtWidgets.QTreeWidgetItem):#, as_expression:bool=True):
         r"""Returns a tree (indexing) path to item, as a list of 'nodes'.
         
@@ -713,7 +713,7 @@ class DataViewer(ScipyenViewer):
         
         return item_path
     
-    @safeWrapper
+    @safewrapper
     def _export_data_items_(self, items, fullPathAsName=False):
         r"""Export data displayed by their corresponding items, to workspace.
         

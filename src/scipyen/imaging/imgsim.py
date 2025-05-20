@@ -31,8 +31,8 @@ from core import (datatypes  , signalprocessing as sgp, curvefitting as crvf,
                   models, strutils, )
 
 # NOTE: 2020-10-08 09:45:31
-# inside core.utilities, safeWrapper below is imported from core.prog
-from core.utilities import (safeWrapper, counter_suffix, unique, )
+# inside core.utilities, safewrapper below is imported from core.prog
+from core.utilities import (safewrapper, counter_suffix, unique, )
 from core.quantities import (unitsConvertible, checkTimeUnits)
 
 #from .patchneo import neo

@@ -19,7 +19,7 @@ import numpy as np
 import quantities as pq
 import neo
 
-from core.prog import (safeWrapper, with_doc)
+from core.prog import (safewrapper, with_doc)
 from core.quantities import checkTimeUnits
 
 # FIXME 2025-04-26 14:13:52 
@@ -780,7 +780,7 @@ class SignalCursor(QtCore.QObject):
                     
     @Slot()
     @Slot(object)
-    @safeWrapper
+    @safewrapper
     def slot_positionChanged(self, evt=None):
         self.sig_cursorSelected.emit(self._cursorId_)
         
@@ -796,14 +796,14 @@ class SignalCursor(QtCore.QObject):
             self.sig_reportPosition.emit(self.ID)
             
     @Slot(tuple)
-    @safeWrapper
+    @safewrapper
     def slot_linkedPositionChanged(self, pos):
         signalBlockers = [QtCore.QSignalBlocker(c) for c in self._linked_cursors_]
         self.x = pos[0]
         self.y = pos[1]
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def _slot_line_selected_(self):
         if not self._follows_mouse_:
             self._is_selected_ = True
@@ -811,7 +811,7 @@ class SignalCursor(QtCore.QObject):
             
         
     @Slot(bool)
-    @safeWrapper
+    @safewrapper
     def slot_setSelected(self, val):
         if not self._follows_mouse_:
             if not isinstance(val, bool):
@@ -990,7 +990,7 @@ class SignalCursor(QtCore.QObject):
             return (self._vDataCursor_, )
             # return DataCursor(self._y_, self._vWin_)
             
-    @safeWrapper
+    @safewrapper
     def detach(self):
         if self._host_graphics_item_ is None:
             return
@@ -1239,7 +1239,7 @@ class SignalCursor(QtCore.QObject):
                 #print("_interpret_scene_mouse_events_ _dragging_", self._dragging_)
         
     @Slot(object)
-    @safeWrapper
+    @safewrapper
     def _slot_selected_in_scene_(self, evt):
         # NOTE: 2019-02-09 23:29:22
         # here, evt is a mouse event, NOT a QPointF!
@@ -1263,7 +1263,7 @@ class SignalCursor(QtCore.QObject):
         self.sig_doubleClicked.emit(self.ID)
             
     @Slot(object)
-    @safeWrapper
+    @safewrapper
     def _slot_mouse_event_(self, evt):
         r"""Workaround to synchronize movement of BOTH lines when mouse is dragged in the scene.
         Calls _interpret_scene_mouse_events_ in order to find out if any of the lines
@@ -1921,7 +1921,7 @@ class SignalCursor(QtCore.QObject):
         self.setVisible(False)
             
     
-@safeWrapper
+@safewrapper
 def cursors2epoch(*args, **kwargs):
     r"""Constructs a neo.Epoch from a sequence of SignalCursor objects.
     

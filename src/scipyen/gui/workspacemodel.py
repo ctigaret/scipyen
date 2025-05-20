@@ -54,7 +54,7 @@ from core.utilities import (summarize_object_properties,
                             )
 from core.strutils import (is_cached_output_varname, is_cached_input_varname)
 
-from core.prog import (safeWrapper, timefunc, processtimefunc, timeblock)
+from core.prog import (safewrapper, timefunc, processtimefunc, timeblock)
 from core.typeenum import TypeEnum
 # from jupyter_core.paths import jupyter_runtime_dir
 
@@ -1432,7 +1432,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             for col in range(self.columnCount()):
                 self.item(row, col).setData(self._displayFont, QtCore.Qt.FontRole)
 
-    @safeWrapper
+    @safewrapper
     def generateRowContents(self, dataname: str, 
                             data: object, 
                             namespace: str = "Internal"):
@@ -1873,7 +1873,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                         else:
                             self.updateRowFromProps(r, props)
 
-    @safeWrapper
+    @safewrapper
     def rowIndexForItemsWithProps(self, **kwargs):
         r"""Returns row indices for all items that satisfy specified properties.
 
@@ -1958,7 +1958,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             else:
                 return ret
 
-    @safeWrapper
+    @safewrapper
     def rowIndexForItemInWorkspace(self, name, Workspace="internal"):
         r"""Variant of rowIndexForItemsWithProps selecting row indices for variables
             in the internal workspace
@@ -1970,7 +1970,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
 
         pass
 
-    @safeWrapper
+    @safewrapper
     def rowIndexForNamedItemsWithProps(self, name, **kwargs):
         r"""Find the item named with "name" and optional property values
 

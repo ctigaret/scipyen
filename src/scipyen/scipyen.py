@@ -18,7 +18,7 @@ import faulthandler, warnings
 import xdg
 from xdg import IconTheme
 
-from core.prog import scipywarn, printStyled
+from core.prog import scipywarn, print_styled
 from core import sysutils
 
 my_conda_env = os.environ.get("CONDA_DEFAULT_ENV", None)
@@ -30,19 +30,19 @@ if isinstance(my_conda_env, str) and len(my_conda_env.strip()):
     conda_env_prefix = os.environ.get("CONDA_PREFIX", None)
 
     if my_conda_env == conda_env_prefix:
-        print(f"Scipyen is running in the conda environment {printStyled(my_conda_env, color='yellow')}\n")
+        print(f"Scipyen is running in the conda environment {print_styled(my_conda_env, color='yellow')}\n")
     else:
-        print(f"Scipyen is running in the conda environment {printStyled(my_conda_env, color='yellow')} (located at {printStyled(conda_env_prefix, color='green')})\n")
+        print(f"Scipyen is running in the conda environment {print_styled(my_conda_env, color='yellow')} (located at {print_styled(conda_env_prefix, color='green')})\n")
     
     if my_conda_env == "base":
         scipywarn("Scipyen should be run in its own conda environment.\n")
         
 elif isinstance(my_virtualenv, str) and len(my_virtualenv.strip()):
     # pass # OK
-    print(f"Scipyen is running in the virtualenv environment {printStyled(my_virtualenv, color='yellow')}\n")
+    print(f"Scipyen is running in the virtualenv environment {print_styled(my_virtualenv, color='yellow')}\n")
 
 elif getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
-    print(f"Scipyen is running in a {printStyled('PyInstaller bundle', color='yellow')}\n")
+    print(f"Scipyen is running in a {print_styled('PyInstaller bundle', color='yellow')}\n")
 else:
     raise RuntimeError("Scipyen must be run in a virtualenv virtual Python environment, a conda environment, or a PyInstaller bundle\n")
 
@@ -66,14 +66,14 @@ try:
             #     brComp = result[0]
             #     head, branches = brComp.split("## ")
             #     local, remote = branches.split("...")
-            #     local = printStyled(local, color="green")
-            #     remote = printStyled(remote, color="red")
-            #     msg = f"{printStyled('WARNING:', color='yellow')} Running {local} branch of the local Scipyen git repository in {printStyled(repoDir.as_posix(), color='blue')}, with status:"
+            #     local = print_styled(local, color="green")
+            #     remote = print_styled(remote, color="red")
+            #     msg = f"{print_styled('WARNING:', color='yellow')} Running {local} branch of the local Scipyen git repository in {print_styled(repoDir.as_posix(), color='blue')}, with status:"
             #     result[0] = "## "+local+"..."+remote
             #     if len(result) > 1:
             #         for k in range(1,len(result)):
             #             s = result[k]
-            #             head = printStyled(s[:2], color="red")
+            #             head = print_styled(s[:2], color="red")
             #             fileName = s[2:]
             #             result[k] = head+fileName
             # 

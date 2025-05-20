@@ -47,7 +47,7 @@ import matplotlib as mpl
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg,)
 
 from core import prog
-from .prog import safeWrapper, deprecation, with_doc, is_hashable
+from .prog import safewrapper, deprecation, with_doc, is_hashable
 
 from .strutils import get_int_sfx
 from .quantities import unitsConvertible
@@ -593,7 +593,7 @@ def hashiterable(x:typing.Iterable[typing.Any]) -> int:
          #102740977810.8254]
     #return ( (hash(type(v)) if isinstance(v, (list, deque, dict)) else gethash(v) ) * k ** p for v,k,p in zip(x, range(1, len(x)+1), itertools.cycle((-1,1))))
 
-@safeWrapper
+@safewrapper
 def gethash(x:typing.Any) -> int:
     r"""Calculates a hash-like figure for objects (including non-hashable types)
     To be used for object comparisons.
@@ -915,7 +915,7 @@ def total_size(o, handlers={}, verbose=False) -> int:
 # define this here BEFORE NestedFinder so that we can use it as default value for
 # comparator
 
-@safeWrapper
+@safewrapper
 def hash_identity_test(x,y) -> bool:
     return gethash(x) == gethash(y)
 
@@ -923,7 +923,7 @@ def similar_strings(a:str, b:str) -> bool:
     from difflib import SequenceMatcher
     return SequenceMatcher(None, a, b).ratio()
 
-@safeWrapper
+@safewrapper
 def safe_identity_test2(x, y) -> bool:
     r"""Uses SafeComparator object
     Work in progress, expect bugs!
@@ -1056,7 +1056,7 @@ def diff(x:object, y:object, showValues:bool=False, idcheck:bool=True) -> dict:
         
     return tuple()
 
-# @safeWrapper
+# @safewrapper
 def safe_identity_test(x:object, y:object, idcheck:bool=True,
                        equal_na:bool=True, equal_nan:bool=True) -> bool:
     r"""Test that symbols in x and y refer to identical Python objects.

@@ -62,7 +62,7 @@ from .prog import (timefunc, processtimefunc)
 #        if inspect.isclass(klass) and issubclass(traitlets.Instance):
 #            print(klass)
 
-from core.prog import safeWrapper
+from core.prog import safewrapper
 #from core.traitcontainers import DataBag # doesn't work because of recursion
 
 # NOTE: 2021-08-20 15:29:02
@@ -149,7 +149,7 @@ def _dynatrtyp_exec_body_(ns, setfn = traitlet_set, delfn=traitlet_delete):
     ns["set"] = setfn
     ns["__delete__"] = delfn
     
-#@safeWrapper
+#@safewrapper
 def adapt_args_kw(x, args, kw, allow_none): # where is this used ?!?
     # NOTE: 2020-09-05 14:23:43 some classes need special treatment for 
     # their default constructors (ie when *args and **kw are empty)

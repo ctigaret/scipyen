@@ -69,8 +69,8 @@ from qtpy.uic import loadUiType as __loadUiType__
 #### END 3rd party modules
 
 #### BEGIN scipyen modules
-from core.prog import (scipywarn, printStyled)
-from core.utilities import safeWrapper
+from core.prog import (scipywarn, print_styled)
+from core.utilities import safewrapper
 from core.traitcontainers import DataBag
 from core.triggerevent import (TriggerEvent, TriggerEventType, )
 from core.triggerprotocols import (TriggerProtocol,
@@ -1381,7 +1381,7 @@ class PVFrame(PVObject):
                     fdata_axis_0_cal.resolution = float(state["micronsPerPixel"]["XAxis"].value)
                     fdata_axis_0_cal.units = pq.um
                 else:
-                    scipywarn(f"Cannot get the μm / pixel for axis {printStyled(f'{fdata_axis_0_info}', 'yellow')} in frame {printStyled(f'frame {self.index}', 'yellow')}")
+                    scipywarn(f"Cannot get the μm / pixel for axis {print_styled(f'{fdata_axis_0_info}', 'yellow')} in frame {print_styled(f'frame {self.index}', 'yellow')}")
             
             # embed calibration string into axis_0_info's description
             fdata_axis_0_info = fdata_axis_0_cal.calibrateAxis(fdata_axis_0_info)
@@ -1429,7 +1429,7 @@ class PVFrame(PVObject):
                         fdata_axis_1_cal.resolution = float(state["micronsPerPixel"]["YAxis"].value)
                         fdata_axis_1_cal.units = pq.um
                     else:
-                        scipywarn(f"Cannot get the μm / pixel for axis {printStyled(f'{fdata_axis_1_info}', 'yellow')} in frame {printStyled(f'frame {self.index}', 'yellow')}")
+                        scipywarn(f"Cannot get the μm / pixel for axis {print_styled(f'{fdata_axis_1_info}', 'yellow')} in frame {print_styled(f'frame {self.index}', 'yellow')}")
                 
             # embed calibration string into axis_1_info's description
             fdata_axis_1_info = fdata_axis_1_cal.calibrateAxis(fdata_axis_1_info)
@@ -1511,7 +1511,7 @@ class PVFrame(PVObject):
                         sdata_axis_0_cal.resolution = float(state["micronsPerPixel"]["XAxis"].value)
                         sdata_axis_0_cal.units = pq.um
                     else:
-                        scipywarn(f"Cannot get the μm / pixel for axis {printStyled(f'{sdata_axis_0_info}', 'yellow')} in frame {printStyled(f'frame {self.index}', 'yellow')}")
+                        scipywarn(f"Cannot get the μm / pixel for axis {print_styled(f'{sdata_axis_0_info}', 'yellow')} in frame {print_styled(f'frame {self.index}', 'yellow')}")
                         
                 sdata_axis_0_info = sdata_axis_0_cal.calibrateAxis(sdata_axis_0_info)
                 
@@ -1540,7 +1540,7 @@ class PVFrame(PVObject):
                         sdata_axis_1_cal.resolution=float(state["micronsPerPixel"]["YAxis"].value)
                         sdata_axis_1_cal.units = pq.um
                     else:
-                        scipywarn(f"Cannot get the μm / pixel for axis {printStyled(f'{sdata_axis_1_info}', 'yellow')} in frame {printStyled(f'frame {self.index}', 'yellow')}")
+                        scipywarn(f"Cannot get the μm / pixel for axis {print_styled(f'{sdata_axis_1_info}', 'yellow')} in frame {print_styled(f'frame {self.index}', 'yellow')}")
                 sdata_axis_1_info = sdata_axis_1_cal.calibrateAxis(sdata_axis_1_info)
                 
                 if sdata.channelIndex == sdata.ndim:
@@ -3152,7 +3152,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
         pass
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def _slot_startTriggerEventDetectionGui(self):
         r"""Opens the trigger event detection dialog.
         The following signals are connected to this slot:
@@ -3226,7 +3226,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
         self.clearEvents = self.clearEventsCheckBox.isChecked()
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def _slot_setPVScanFileName(self):
         # connected to editing the PVScan field
         if "imported" in self.pvScanFileNameLineEdit.text():
@@ -3247,7 +3247,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
             self._scandata_ = None
                 
     @Slot()
-    @safeWrapper
+    @safewrapper
     def _slot_choosePVScanFile(self):
         signalblockers = [QtCore.QSignalBlocker(w) for w in (self.pvScanFileNameLineEdit, self.dataNameLineEdit)]
         fileFilter = ";;".join(["XML Files (*.xml)", "Pickle files (*.pkl)", "All files (*.*)"])
@@ -3270,7 +3270,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
             self._pvscan_ = None
 
     @Slot()
-    @safeWrapper
+    @safewrapper
     def _slot_setOptionsFileName(self):
         # connected to editing Options field
         if "imported" in self.optionsFileNameLineEdit.text():
@@ -3290,7 +3290,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
             # self.scanDataOptions = ScanDataOptions.default()
 
     @Slot()
-    @safeWrapper
+    @safewrapper
     def _slot_chooseOptionFile(self):
         signalblockers = [QtCore.QSignalBlocker(w) for w in (self.optionsFileNameLineEdit,)]
         caption = "Open ScanData Options file for %s" % self.scanDataVarName if (isinstance(self.scanDataVarName, str) and len(self.scanDataVarName.strip())) else "Open EPSCaT Options file"
@@ -3313,7 +3313,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
             self.scanDataOptions = None
             
     @Slot()
-    @safeWrapper
+    @safewrapper
     def _slot_setEphysFileNames(self):
         # NOTE: 2020-12-26 12:17:01 This always generates a list of str even if
         # the split results in only one element.
@@ -3331,7 +3331,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
             self._ephys_ = None
                 
     @Slot()
-    @safeWrapper
+    @safewrapper
     def _slot_chooseEphysFiles(self):
         signalblockers =[QtCore.QSignalBlocker(w) for w in (self.ephysFileNameLineEdit,)]
 
@@ -3358,14 +3358,14 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
                 self._ephys_ = None
     
     @Slot()
-    @safeWrapper
+    @safewrapper
     def _slot_setDataName(self):
         self.dataName = self.dataNameLineEdit.text()
         if len(self.dataName.strip()):
             self.scanDataVarName = strutils.str2symbol(self.dataName)
             
     @Slot()
-    @safeWrapper
+    @safewrapper
     def _slot_setProtocolFileName(self):
         if any([v in self.triggerProtocolFileNameLineEdit.text() for v in ("imported", "detected")]):
             return
@@ -3378,7 +3378,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
             self.triggerProtocols.clear()
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def _slot_chooseProtocolFile(self):
         signalblockers = [QtCore.QSignalBlocker(w) for w in (self.triggerProtocolFileNameLineEdit,)]
         targetdir = os.getcwd()
@@ -3396,7 +3396,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
             self.triggerProtocols.clear()
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def _slot_importPVScanFromWorkspace(self):
         vars_ = self.importWorkspaceData([xmlutils.xml.dom.minidom.Document, PVScan],
                                          title="Import PVScan",
@@ -3414,7 +3414,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
             self.pvScanFileNameLineEdit.setText("<imported>")
             
     @Slot()
-    @safeWrapper
+    @safewrapper
     def _slot_importOptionsFromWorkspace(self):
         vars_ = self.importWorkspaceData([ScanData, dict],
                                         title="Import Options",
@@ -3431,7 +3431,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
             self.optionsFileNameLineEdit.setText("<imported>")
             
     @Slot()
-    @safeWrapper
+    @safewrapper
     def _slot_importEphysFromWorkspace(self):
         vars_ = self.importWorkspaceData([ScanData, neo.Block, neo.Segment, 
                                           neo.AnalogSignal, tuple, list],
@@ -3481,7 +3481,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
             self.ephysFileNameLineEdit.setText("<imported>")
             
     @Slot()
-    @safeWrapper
+    @safewrapper
     def _slot_importProtocolFromWorkspace(self):
         vars_ = self.importWorkspaceData([ScanData, TriggerProtocol, tuple, list],
                                          title="Import Protocol",
@@ -3522,7 +3522,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
             
             data_segments = [k for k in range(self._scandata_.scansFrames)]
                 
-    @safeWrapper
+    @safewrapper
     def loadPVScan(self, fileName):
         if len(fileName) and os.path.isfile(fileName):
             mime_type, file_type, encoding = pio.getMimeAndFileType(fileName)
@@ -3557,7 +3557,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
         
         return False
     
-    @safeWrapper
+    @safewrapper
     def loadEphys(self, fileNamesList): # TODO 2024-07-28 09:49:36 streamline
         if len(fileNamesList):
             fileNamesList = [f for f in fileNamesList if len(f.strip())]
@@ -3616,7 +3616,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
         else:
             return False
     
-    @safeWrapper
+    @safewrapper
     def loadOptions(self, fileName): # TODO 2024-07-28 09:49:36 streamline
         # if len(fileName) and os.path.isfile(fileName) and "pickle" in pio.getMimeAndFileType(fileName)[0]:
         if len(fileName) == 0 or not os.path.isfile(fileName) or pio.getMimeAndFileType(fileName)[0] != "application/x-hdf":
@@ -3632,7 +3632,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
             
         return True
         
-    @safeWrapper
+    @safewrapper
     def loadProtocols(self, fileName):
         mime_type = pio.getMimeAndFileType(fileName)[0]
         
@@ -3681,7 +3681,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
         super().reject()
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_generateScanData(self):
         r"""Creates a ScanData object based on the loaded data files.
         The created ScanData object is available as the property `scandata` or 

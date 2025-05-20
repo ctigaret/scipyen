@@ -112,7 +112,7 @@ from traitlets.utils.bunch import Bunch
 import traitlets.config
 from .traitcontainers import DataBag
 from core import (traitutils, strutils)
-from core.prog import (safeWrapper, printStyled, scipywarn)
+from core.prog import (safewrapper, print_styled, scipywarn)
 from core.workspacefunctions import user_workspace
 from core.quantities import(quantity2str, str2quantity)
 from iolib.jsonio import (object2JSON, json2python)
@@ -526,7 +526,7 @@ def markConfigurable(confname:str, conftype:str="", setter:bool=True, default:ty
     
     return partial(wrapper, trn = trait_notifier)
     
-@safeWrapper
+@safewrapper
 def qSettingsGroupPfx(win:typing.Union[QMainWindow, QWidget, Figure]):
     r"""Generates a QSettings group name and, optionally, a prefix for a window.
     
@@ -608,7 +608,7 @@ def qSettingsGroupPfx(win:typing.Union[QMainWindow, QWidget, Figure]):
         
     return gname, pfx
 
-@safeWrapper
+@safewrapper
 def saveQSettingsKey(qsettings:QSettings, gname:str, pfx:str, key:str, val:typing.Any):
     if len(gname.strip()) == 0:
         gname = "General"
@@ -619,7 +619,7 @@ def saveQSettingsKey(qsettings:QSettings, gname:str, pfx:str, key:str, val:typin
     qsettings.setValue(key_name, val)
     qsettings.endGroup()
     
-@safeWrapper
+@safewrapper
 def loadQSettingsKey(qsettings:QSettings, gname:str, pfx:str, key:str, default:typing.Any):
     if len(gname.strip()) == 0:
         gname = "General"
@@ -1722,7 +1722,7 @@ def get_config_dir(configuration:confuse.Configuration=scipyen_config):
 def get_QtSettings_file():
     return ScipyenConfigurable.qsettings.fileName()
 
-@safeWrapper
+@safewrapper
 def write_config(config:typing.Optional[confuse.Configuration]=scipyen_config, filename:typing.Optional[str]=None, full:bool=True, redact:bool=False, as_default:bool=False, default_only:bool=False):
     r"""Saves Scipyen non-gui configuration options to an yaml file.
     Settings are saved implicitly to the config.yaml file located in the 

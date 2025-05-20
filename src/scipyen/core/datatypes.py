@@ -63,8 +63,8 @@ from neo.core.dataobject import (DataObject, ArrayDict,)
 from core import quantities as scq
 from core import xmlutils
 from core import strutils
-from core.prog import (safeWrapper, is_hashable, is_type_or_subclass, 
-                       ImmutableDescriptor, scipywarn, NoData, printStyled)
+from core.prog import (safewrapper, is_hashable, is_type_or_subclass, 
+                       ImmutableDescriptor, scipywarn, NoData, print_styled)
 # from core.datazone import DataZone # not needed here, and it may results in circular imports if called here
 from core.datasignal import (_new_DataSignal, _new_IrregularlySampledDataSignal, DataSignal, IrregularlySampledDataSignal)
 # from core import bgbridge

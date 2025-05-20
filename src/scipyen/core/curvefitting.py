@@ -1180,12 +1180,14 @@ def fit_model(data, func, p0, *args, **kwargs):
     fkwargs     = kwargs.pop("fkwargs",     dict())
     
     
-    funcSignature = prog.signature2Dict(func)
+    funcSignature = prog.signature_as_dict(func)
     
-    compress_annot = lambda x: x[0] if len(x) else MISSING
+    args_annots = prog.get_positional_named_annotations(func)
     
-    args_annots = list(map(lambda i: (i[0], i[1]), funcSignature["positional"].items())) + \
-                  list(map(lambda i: (i[0], compress_annot(tuple(set(i[1])-{inspect._empty}))), funcSignature["named"].items()))
+#     compress_annot = lambda x: x[0] if len(x) else MISSING
+#     
+#     args_annots = list(map(lambda i: (i[0], i[1]), funcSignature["positional"].items())) + \
+#                   list(map(lambda i: (i[0], compress_annot(tuple(set(i[1])-{inspect._empty}))), funcSignature["named"].items()))
     
     assert len(args_annots) >= 1, f"Invalid func signature {funcSignature}"
     assert all(len(v) == 2 and v[1] not in (MISSING, inspect._empty) for v in args_annots), f"Bad or missing type annotations for 'func' {func}"
@@ -1195,14 +1197,14 @@ def fit_model(data, func, p0, *args, **kwargs):
     prog.unwind_type_sig(args_annots[0][1], atypes)
     assert any(t in atypes for t in (np.ndarray, float)), f"First argument to 'func' {func} must be a float or an np.ndarray; instead, got {args_annots[0][1]}"
         
-    to_unpack:bool = False
+    to_unpack:bool = True
     
     if len(args_annots) == 2:
         atypes.clear()
         prog.unwind_type_sig(args_annots[1][1], atypes)
         # 1) is this a Sequence? then it must be unpacked
         if any(t in atypes for t in (typing.Sequence, typing.Sequence[float|np.ndarray], typing.Sequence[float, typing.Sequence[np.ndarray]])):
-            to_unpack = True
+            to_unpack = False
         else:
             # only take scalar np.ndarrays or floats; cannot check for scalars
             # as the arguments are not present, but check for types
@@ -1215,9 +1217,12 @@ def fit_model(data, func, p0, *args, **kwargs):
             atypes.clear()
             prog.unwind_type_sig(aa[1], atypes)
             assert any(t in atypes for t in (np.ndarray, float, np.ndarray | float)), f"Argument {k+1} argument to 'func' {func} should require a float or an np.ndarray; instead, got {args_annots[0][1]}"
-    
+        to_unpack = True
+        
+    # print(f"prog.fit_model: to_unpack = {to_unpack}")
+        
     def __cost_fun__(x0, t, y):  # returns residuals
-        yf = func(t, *x0, **fkwargs) if to_unpack else yf = func(t, x0, **fkwargs)
+        yf = func(t, *x0, **fkwargs) if to_unpack else func(t, x0, **fkwargs)
         return y-yf
     
     args        = kwargs.pop("args",        ()) 
@@ -1376,7 +1381,8 @@ def fit_model(data, func, p0, *args, **kwargs):
     
     res_x = list(res.x.flatten())
 
-    fC = func(xdata, res_x, *fargs, **fkwargs)
+    # generate the fitted curve
+    fC = func(xdata, *res_x, *fargs, **fkwargs) if to_unpack else func(xdata, *res_x, *fargs, **fkwargs)
     
     sst = np.sum( (ydata - ydata.mean()) ** 2.) # sum of squares about the mean in the data (total sum of squares)
     

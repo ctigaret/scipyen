@@ -9,7 +9,7 @@ import sys, os, typing
 from qtpy import QtCore, QtGui, QtWidgets, QtSvg
 from qtpy.QtCore import Signal, Slot, Property
 from qtpy.uic import loadUiType as __loadUiType__
-from core.prog import (safeWrapper, deprecation, iter_attribute,
+from core.prog import (safewrapper, deprecation, iter_attribute,
                        filter_type, filterfalse_type, 
                        filter_attribute, filterfalse_attribute,
                        filter_attr, filterfalse_attr)
@@ -1055,7 +1055,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     ####
     
     @Slot(int, str)
-    @safeWrapper
+    @safewrapper
     def slot_newROIConstructed(self, roiType, roiName):
         sender = self.sender()
         
@@ -1103,22 +1103,22 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         self.signalRoiAdded.emit(sender.backend)
             
     @Slot(object)
-    @safeWrapper
+    @safewrapper
     def slot_cursorChanged(self, obj):
         self.signalCursorChanged.emit(obj)
         
     @Slot(object)
-    @safeWrapper
+    @safewrapper
     def slot_roiChanged(self, obj):
         self.signalRoiChanged.emit(obj)
         
     @Slot(float)
-    @safeWrapper
+    @safewrapper
     def slot_zoom(self, val):
         self._zoomView(val)
         
     @Slot(float)
-    @safeWrapper
+    @safewrapper
     def slot_relativeZoom(self, val):
         newZoom = self.__zoomVal__ + val
         
@@ -1130,18 +1130,18 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         self._zoomView(newZoom)
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_editAnyCursor(self):
         self._cursorEditor()
 
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_editSelectedCursor(self):
         if self.selectedCursor is not None:
             self._cursorEditor(self.selectedCursor.ID)
             
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_editCursor(self):
         if self._cursorContextMenuSourceId is not None and self._cursorContextMenuSourceId in iter_attribute(self.graphicsCursors, "name"):
             self._cursorEditor(self._cursorContextMenuSourceId)
@@ -1159,20 +1159,20 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
                 cursor.backend.updateFrontends()
     
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_editRoi(self):
         # TODO: select a roi fromt the list then bring up a ROI edit dialog
         pass
     
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_editRoiProperties(self): # to always work on selected ROI
         # TODO bring up a ROI edit dialog
         # this MUST have a checkbox to allow shape editing when OK-ed
         pass
 
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_editRoiShape(self): # to always work on selected ROI!
         if self.selectedRoi is not None:
             self.selectedRoi.editMode = True
@@ -1180,7 +1180,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         
 
     @Slot(str, QtCore.QPoint)
-    @safeWrapper
+    @safewrapper
     def slot_graphicsObjectMenuRequested(self, objId, pos):
         if objId in iter_attribute(self.graphicsCursors,"name"):
             self._cursorContextMenuSourceId = objId
@@ -1215,7 +1215,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             cm.exec(pos)
             
     @Slot(str, bool)
-    @safeWrapper
+    @safewrapper
     def slot_setSelectedGraphicsObject(self, objId:str, sel:bool):
         # TODO 2021-05-10 13:31:27
         # do we want to have an unique selection among ALL the graphics items, 
@@ -1243,7 +1243,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         #else:
 
     @Slot(str, bool)
-    @safeWrapper
+    @safewrapper
     def slot_setSelectedCursor(self, cId:str, sel:bool):
         r"""To keep track of what cursor is selected, 
         independently of the underlying graphics view fw.
@@ -1260,7 +1260,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         self.signalGraphicsDeselected.emit()
             
     @Slot(str, bool)
-    @safeWrapper
+    @safewrapper
     def slot_setSelectedRoi(self, rId:str, sel:bool):
         if rId in iter_attribute(self.rois, "name"):
             if sel:
@@ -1274,56 +1274,56 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         self.signalGraphicsDeselected.emit()
             
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_newHorizontalCursor(self):
         obj = self.newGraphicsObject(pgui.HorizontalCursor)
         if obj is not None:
             self.signalCursorAdded.emit(obj.backend)
 
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_newPointCursor(self):
         obj = self.newGraphicsObject(pgui.PointCursor)
         if obj is not None:
             self.signalCursorAdded.emit(obj.backend)
     
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_newVerticalCursor(self):
         obj = self.newGraphicsObject(pgui.VerticalCursor)
         if obj is not None:
             self.signalCursorAdded.emit(obj.backend)
     
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_newCrosshairCursor(self):
         obj = self.newGraphicsObject(pgui.CrosshairCursor)
         if obj is not None:
             self.signalCursorAdded.emit(obj.backend)
     
     @Slot(str)
-    @safeWrapper
+    @safewrapper
     def slot_selectCursor(self, crsId):
         if crsId in iter_attribute(self.graphicsCursors, "name"):
             self.slot_setSelectedCursor(crsId, True)
       
     @Slot(str)
-    @safeWrapper
+    @safewrapper
     def slot_selectGraphicsObject(self, objId):
         self.slot_setSelectedGraphicsObject(objId)
       
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_receiveCursorUnlinkRequest(self):
         pass
     
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_receiveCursorLinkRequest(self):
         pass
     
     @Slot(str, "QPointF")
-    @safeWrapper
+    @safewrapper
     def slot_reportCursorPos(self, crsId, pos):
         if crsId in iter_attribute(self.graphicsCursors, "name"):
             obj = [o for o in self.imageCursor(crsId)]
@@ -1346,12 +1346,12 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
                                                     [np.floor(pos.x()), np.floor(pos.y()), obj.xwindow, obj.ywindow])
                 
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_removeCursors(self):
         self._removePlanarGraphics(cursors=True)
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_removeAllCursors(self):
         self._removeAllPlanarGraphics(cursors=True)
         for crs in filter(lambda x: isinstance(x.backend, pgui.Cursor), self.graphicsObjects):
@@ -1361,49 +1361,49 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         self.selectedCursor = None
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_removeSelectedCursor(self):
         self._removeSelectedPlanarGraphics(cursors=True)
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_removeCursor(self):
         names = iter_attribute(self.graphicsCursors, "name")
         if self._cursorContextMenuSourceId is not None and self._cursorContextMenuSourceId in names:
             self._removePlanarGraphics(_cursorContextMenuSourceId)
         
     @Slot(str)
-    @safeWrapper
+    @safewrapper
     def slot_removeCursorByName(self, crsId):
         self._removePlanarGraphics(crsId, True)
             
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_removeRois(self):
         self._removePlanarGraphics(cursors=False)
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_removeAllRois(self):
         self._removeAllPlanarGraphics(cursors=False)
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_removeAllGraphics(self):
         self._removeAllPlanarGraphics()
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_removeSelectedRoi(self):
         self._removeSelectedPlanarGraphics(cursors=False)
         
     @Slot(str)
-    @safeWrapper
+    @safewrapper
     def slot_removeRoiByName(self, roiId):
         self._removePlanarGraphics(roiId, False)
 
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_removeRoi(self):
         roiIDs = iter_attribute(self.rois, "name")
         if self._roiContextMenuSourceId is not None and self._roiContextMenuSourceId in roiIDs:
@@ -1484,7 +1484,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
 
     #### BEGIN public methods
     
-    @safeWrapper
+    @safewrapper
     def roi(self, value:typing.Optional[typing.Any]=None, attribute:str="name", 
             predicate:typing.Optional[typing.Callable[...,bool]]=lambda x,y: x == y, 
             **kwargs):
@@ -1555,7 +1555,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         
         return filter_attribute(ret, attribute, value, predicate)
         
-    @safeWrapper
+    @safewrapper
     def imageCursor(self, value:typing.Optional[typing.Any] = None, 
                      attribute:str="name",
                      predicate:typing.Optional[typing.Callable[...,bool]]=lambda x,y: x == y, 
@@ -1639,7 +1639,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         return filter_attribute(filter_type(self.planarGraphics, pgui.PointCursor), 
                                 attribute, value, predicate)
         
-    @safeWrapper
+    @safewrapper
     def hasCursor(self, crsid):
         r"""Tests for existence of a GraphicsObject cursor with given id or label.
         
@@ -1688,7 +1688,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             super().keyPressEvent(evt)
         evt.accept()
         
-    @safeWrapper
+    @safewrapper
     def mousePressEvent(self, evt):
         self.__mouse_pressed___ = True
         
@@ -1700,7 +1700,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         
         evt.accept()
     
-    @safeWrapper
+    @safewrapper
     def mouseReleaseEvent(self, evt):
         self.__mouse_pressed___ = True
         

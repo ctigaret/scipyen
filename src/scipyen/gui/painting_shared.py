@@ -28,7 +28,7 @@ except:
 # from qtpy import sip as sip  
 # import sip # for sip.cast
 
-from core.prog import safeWrapper
+from core.prog import safewrapper
 from core.traitcontainers import DataBag
 
 from .scipyen_colormaps import (qtGlobalColors, standardPalette,
@@ -270,7 +270,7 @@ def fromMimeData(mimeData:QtCore.QMimeData) -> QtGui.QColor:
         return QtGui.QColor(mimeData.text())
     return QtGui.QColor()
 
-@safeWrapper
+@safewrapper
 def createDrag(color:QtGui.QColor, dragSource:QtCore.QObject) -> QtGui.QDrag:
     drag = QtGui.QDrag(dragSource)
     mime = QtCore.QMimeData()
@@ -340,7 +340,7 @@ def make_checkers(color0:typing.Union[QtGui.QColor, QtCore.Qt.GlobalColor],
 def x_less_than(p1:QtCore.QPointF, p2:QtCore.QPointF) -> bool:
     return p1.x() < p2.x()
 
-@safeWrapper
+@safewrapper
 def makeCustomPathStroke(path:QtGui.QPainterPath,
                      dashes:list, width:numbers.Real=1.,
                      join:QtCore.Qt.PenJoinStyle=QtCore.Qt.MiterJoin,
@@ -359,7 +359,7 @@ def makeCustomPathStroke(path:QtGui.QPainterPath,
     
     return path
 
-@safeWrapper
+@safewrapper
 def gradient2radial(gradient:QtGui.QGradient, 
                    centerRadius:float = 1., 
                    focalRadius:float = 0.,
@@ -426,7 +426,7 @@ def gradient2radial(gradient:QtGui.QGradient,
 
 g2r = gradient2radial
     
-@safeWrapper
+@safewrapper
 def gradient2linear(gradient:QtGui.QGradient) -> QtGui.QLinearGradient:
     if isinstance(gradient, QtGui.QLinearGradient):
         return gradient
@@ -477,7 +477,7 @@ def gradient2linear(gradient:QtGui.QGradient) -> QtGui.QLinearGradient:
     
 g2l = gradient2linear
 
-@safeWrapper
+@safewrapper
 def gradient2conical(gradient:QtGui.QGradient) -> QtGui.QConicalGradient:
     if isinstance(gradient, QtGui.QConicalGradient):
         return gradient
@@ -1032,7 +1032,7 @@ class HoverPoints(QtCore.QObject):
     def setPointLock(self, pos:int, lock:LockType) -> None:
         self._locks[pos] = lock
        
-    @safeWrapper
+    @safewrapper
     def eventFilter(self, obj:QtCore.QObject, ev:QtCore.QEvent) -> bool:
         try:
             if obj == self._widget and self._enabled:
@@ -1240,7 +1240,7 @@ class HoverPoints(QtCore.QObject):
             traceback.print_exc()
             return False
         
-    @safeWrapper
+    @safewrapper
     def _paintPoints(self) -> None:
         p = QtGui.QPainter()
         p.begin(self._widget)
@@ -1522,7 +1522,7 @@ class ColorGradient():
     _required_attributes_ = ("_ID_","coordinates", "coordinateMode", "spreadMode", "stops", "type", )
     _qtclass_ = QtGui.QGradient
     
-    @safeWrapper
+    @safewrapper
     def _importQGradient_(self, g) -> typing.Union[QtGui.QLinearGradient,QtGui.QRadialGradient,QtGui.QConicalGradient]:
         # NOTE: 2021-06-24 12:05:00
         # below, if g is of a conforming type, no conversion occurs

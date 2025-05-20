@@ -56,7 +56,7 @@ from qtpy.QtCore import Signal, Slot, Property
 
 #### BEGIN pict.core modules
 from core.traitcontainers import DataBag
-from core.prog import (safeWrapper, deprecated,
+from core.prog import (safewrapper, deprecated,
                        timefunc, processtimefunc,)
 from core.workspacefunctions import debug_scipyen
 

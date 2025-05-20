@@ -37,9 +37,9 @@ from dataclasses import MISSING
 import numpy as np
 import pandas as pd
 
-from core.prog import (scipywarn, safeWrapper)
+from core.prog import (scipywarn, safewrapper)
 
-@safeWrapper
+@safewrapper
 def get_nearest_parent_common_name(t:Taxon):
     r"""Returns the common name of the taxon.
     If the taxon does not have a common name, then returns the common name of

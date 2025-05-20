@@ -12,7 +12,7 @@ from functools import (singledispatch, singledispatchmethod)
 from qtpy import QtCore, QtGui, QtWidgets, QtSvg, QtNetwork, sip
 from qtpy.QtCore import Signal, Slot, Property
 from qtpy.uic import loadUiType as __loadUiType__
-from core.prog import (safeWrapper, scipywarn, printStyled)
+from core.prog import (safewrapper, scipywarn, print_styled)
 from core.sysutils import adapt_ui_path
 from gui.widgets.cancellableqprogressbar import CancellableQProgressBar
 
@@ -394,10 +394,10 @@ class ScipyenNetworkManager(QtCore.QObject):
         
         if self._saveToFile_:
             fName = self._tempFile_.fileName() if self._tempFile_.isOpen() else self._outputFile_.fileName() if (isinstance(self._outputFile_, QtCore.QFile) and self._outputFile_.isOpen()) else ""
-            print(printStyled(f"Downloading {url.url()} to {fName} ...", "green",True))
+            print(print_styled(f"Downloading {url.url()} to {fName} ...", "green",True))
         else:
-            print(printStyled(f"Downloading {url.url()} ...", "green",True))
-            # print(printStyled(f"Handler: {self._replyHandler_} ...", "green",True))
+            print(print_styled(f"Downloading {url.url()} ...", "green",True))
+            # print(print_styled(f"Handler: {self._replyHandler_} ...", "green",True))
             
         self._downloadTime_.start()
         
@@ -459,7 +459,7 @@ class ScipyenNetworkManager(QtCore.QObject):
         netError = reply.error()
         self._networkError_ = netError
         if netError:
-            print(printStyled(f"{self.__class__.__name__}._startNextDownload: {reply.request().url().url()}: {getNetworkErrorName(netError)}", "red"))
+            print(print_styled(f"{self.__class__.__name__}._startNextDownload: {reply.request().url().url()}: {getNetworkErrorName(netError)}", "red"))
             self._resetProgressUI_(False)
             # self._progressUI_.reset() # clear progressbar
             # if isinstance(self._progressUI_, QtWidgets.QProgressBar) and self.scipyenWindow is not None:
@@ -526,7 +526,7 @@ class ScipyenNetworkManager(QtCore.QObject):
                         if not self._tempFile_.remove():
                             scipywarn(f"In {self.__class__.__name__}.slot_downloadFinished Failed to remove incomplete temporary file:\n {self._tempFile_.fileName()} ")
             else:
-                print(printStyled("Succeeded", "green", True))
+                print(print_styled("Succeeded", "green", True))
                 self._downloadedCount_ += 1
                 
         self._networkError_ = netError
@@ -559,7 +559,7 @@ class ScipyenNetworkManager(QtCore.QObject):
         
         netError = reply.error()
         if netError:
-            scipywarn(f"{printStyled(getNetworkErrorName(netError), 'yellow', True)} for {printStyled(url.url(), 'green', True)}")
+            scipywarn(f"{print_styled(getNetworkErrorName(netError), 'yellow', True)} for {print_styled(url.url(), 'green', True)}")
             
         reply.deleteLater()
         self._networkError_ = netError

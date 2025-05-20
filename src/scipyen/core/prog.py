@@ -1002,7 +1002,7 @@ class SpecFinder(importlib_abc.MetaPathFinder):
 # ### BEGIN module functions
 
 
-def signature2Dict(
+def signature_as_dict(
     sig,
     name: typing.Optional[str] = None,
     qualname: typing.Optional[str] = None,
@@ -1257,7 +1257,7 @@ def makeSignature(dct: Bunch) -> Signature:
 # return
 
 
-def signature2Str(
+def signature_as_str(
     f: typing.Union[types.FunctionType, inspect.Signature, Bunch],
     as_constructor: bool = False,
 ):
@@ -1266,11 +1266,11 @@ def signature2Str(
     Parameters:
     ----------
     f: function, inspect.Signature, or traitlets.Bunch (the latter being the
-        result of a signature2Dict() call)
+        result of a signature_as_dict() call)
 
     """
     if isinstance(f, (types.FunctionType, inspect.Signature)):
-        f = signature2Dict(f)
+        f = signature_as_dict(f)
 
     elif not isinstance(f, Bunch):
         raise TypeError(
@@ -1298,7 +1298,7 @@ def signature2Str(
     return "".join(func)
 
 
-def printStyled(s: str, color: str = "yellow", bright: bool = True):
+def print_styled(s: str, color: str = "yellow", bright: bool = True):
     c = getattr(colorama.Fore, color.upper())
     pre = f"{c}{colorama.Style.BRIGHT}" if bright else c
     return f"{pre}{s}{colorama.Style.RESET_ALL}"
@@ -2061,8 +2061,6 @@ library modules.
 """
     assert isinstance(visited, set)
     
-    print(type(x))
-    
     if isinstance(x, type):
         visited.add(x)
         return
@@ -2085,7 +2083,15 @@ library modules.
             if hasattr(v, "__args__"):
                 unwind_type_sig(v.__args__, visited=visited)
             visited.add(v)
-
+            
+def get_positional_named_annotations(f:typing.Union[types.FunctionType, types.MethodType]) -> list:
+    compress_annot = lambda x: x[0] if len(x) else MISSING
+    funcSignature = signature_as_dict(f)
+    if not isinstance(f, (types.FunctionType, types.MethodType)):
+        raise TypeError(f"Expecting a function or method; got {type(f).__name__} instead")
+    return list(map(lambda i: (i[0], i[1]), funcSignature["positional"].items())) + \
+            list(map(lambda i: (i[0], compress_annot(tuple(set(i[1])-{inspect._empty}))), funcSignature["named"].items()))
+        
 def parent_types(data):
     r"""Returns a tuple of the immediate ancestor types of data.
     The order is as specified in the data type's definition, if data is an
@@ -2145,7 +2151,7 @@ def deprecated(f, *args, **kwargs):
     return wrapper
 
 
-def safeWrapper(f, *args, **kwargs):
+def safewrapper(f, *args, **kwargs):
     @wraps(f)
     def wrapper(*args, **kwargs):
         try:
@@ -2159,7 +2165,7 @@ def safeWrapper(f, *args, **kwargs):
     return wrapper
 
 
-def safeGUIWrapper(f, *args, **kwargs):
+def safeguiwrapper(f, *args, **kwargs):
     @wraps(f)
     def wrapper(*args, **kwargs):
         try:
@@ -2499,7 +2505,7 @@ def __check_type__(
     return False
 
 
-def resolveObject(modName, objName):
+def resolve_object(modName, objName):
     r"""Returns an object based on object's symbol and module's name.
 
     The object's symbol 'objName' is expected to be defined at module level in
@@ -2534,7 +2540,7 @@ def resolveObject(modName, objName):
             return eval(objName, module.__dict__)
         except:
             # traceback.print_exc()
-            print(f"prog.resolveObject: objName = {objName}, module = {module}")
+            print(f"prog.resolve_object: objName = {objName}, module = {module}")
             return dataclasses.MISSING
 
     else:

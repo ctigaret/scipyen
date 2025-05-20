@@ -196,14 +196,14 @@ import matplotlib.pyplot as plt
 #### BEGIN pict.core modules
 
 from .prog import (
-    safeWrapper,
+    safewrapper,
     deprecation,
     filter_attr,
     filterfalse_attr,
     filter_type,
     filterfalse_type,
     iter_attribute,
-    signature2Dict,
+    signature_as_dict,
     with_doc,
     scipywarn,
 )
@@ -712,7 +712,7 @@ def _(obj, /, **kwargs):
     # "varpos":     mapping  *args name: None (one element)
     # "varkw":      mapping  **kwargs name : None (one element)
     # "returns":    for __new__ or __init__ always inspect._empty
-    signature = signature2Dict(type(obj).__init__)
+    signature = signature_as_dict(type(obj).__init__)
 
     # NOTE: 2021-11-23 10:36:53
     # obj._quantity_attr names the parameter for the actual numeric data
@@ -815,7 +815,7 @@ def _(obj, /, **kwargs):
     # "varpos":     mapping  *args name: None (one element)
     # "varkw":      mapping  **kwargs name : None (one element)
     # "returns":    for __new__ or __init__ always inspect._empty
-    signature = signature2Dict(type(obj).__new__)
+    signature = signature_as_dict(type(obj).__new__)
 
     attr_params = obj._necessary_attrs + obj._recommended_attrs
 
@@ -1169,7 +1169,7 @@ def getAcquisitionInfo(o: neo.Block) -> dict:
     return o.annotations
 
 
-@safeWrapper
+@safewrapper
 def assign_to_signal(
     dest: neo.AnalogSignal,
     src: [neo.AnalogSignal, pq.Quantity],
@@ -1244,7 +1244,7 @@ def assign_to_signal(
         )
 
 
-@safeWrapper
+@safewrapper
 def assign_to_signal_in_epoch(
     dest: neo.AnalogSignal,
     src: [neo.AnalogSignal, pq.Quantity],
@@ -1355,7 +1355,7 @@ def assign_to_signal_in_epoch(
         )
 
 
-@safeWrapper
+@safewrapper
 def get_signal_names_indices(
     data: typing.Union[neo.Segment, typing.Sequence], analog: bool = True
 ):
@@ -2541,7 +2541,7 @@ def _(src: typing.Union[NeoObjectList, list, tuple, deque],
     else:
         raise IndexError("Invalid indexing: %s" % index)
 
-# @safeWrapper
+# @safewrapper
 def get_index_of_named_signal(
     src, names, stype=neo.AnalogSignal, silent=False
 ) -> typing.Sequence:
@@ -2819,7 +2819,7 @@ def epoch_has_interval(
     return interval_name in epoch.labels
 
 
-# @safeWrapper
+# @safewrapper
 # def get_epoch_interval(
 #     epoch: typing.Union[neo.Epoch, DataZone],
 #     index: typing.Union[str, bytes, np.str_, int],
@@ -3111,7 +3111,7 @@ def get_sample_at_domain_value(data, x):
     return get_sample_at_time(data, x)
 
 
-@safeWrapper
+@safewrapper
 def get_time_slice(
     data,
     t0,
@@ -3749,7 +3749,7 @@ def splice_signals(*args, times=None):
         raise TypeError("Expecting signal objects")
 
 
-@safeWrapper
+@safewrapper
 def concatenate_signals(
     *args,
     axis: int = 1,
@@ -4481,7 +4481,7 @@ def _(obj, **kwargs):
 
 
 @with_doc(copy_with_data_subset, use_header=True)
-@safeWrapper
+@safewrapper
 def concatenate_blocks(*args, **kwargs):
     r"""Concatenates segments from neo.Block objects into a new neo.Block object.
 
@@ -5088,7 +5088,7 @@ def concatenate_blocks(*args, **kwargs):
     return ret
 
 
-@safeWrapper
+@safewrapper
 def get_events(
     *src: typing.Union[neo.Block, neo.Segment, typing.Sequence],
     as_dict: bool = False,
@@ -5993,7 +5993,7 @@ def clear_events(
     # s.events.clear()
 
 
-@safeWrapper
+@safewrapper
 def get_non_empty_events(sequence: (tuple, list)):
     from .triggerprotocols import TriggerEvent
 
@@ -6009,7 +6009,7 @@ def get_non_empty_events(sequence: (tuple, list)):
     return [e for e in sequence if len(e)]
 
 
-@safeWrapper
+@safewrapper
 def get_non_empty_spike_trains(sequence: (tuple, list)):
     if len(sequence) == 0:
         return list()
@@ -6020,7 +6020,7 @@ def get_non_empty_spike_trains(sequence: (tuple, list)):
     return [s for s in sequence if len(s)]
 
 
-@safeWrapper
+@safewrapper
 def get_non_empty_epochs(sequence: (tuple, list)):
     if len(sequence) == 0:
         return list()
@@ -7113,7 +7113,7 @@ def merge_annotations(A, *Bs):
     return merged
 
 
-# @safeWrapper
+# @safewrapper
 # def cursors2epoch(*args, **kwargs):
 #     r"""Constructs a neo.Epoch from a sequence of SignalCursor objects.
 #
@@ -7264,7 +7264,7 @@ def merge_annotations(A, *Bs):
 #     return klass(times=t, durations=d, labels=i, units=units, name=name)
 
 
-@safeWrapper
+@safewrapper
 def irregularsignal2epoch(sig, name=None, labels=None):
     r"""Constructs a neo.Epoch object from the times and durations in a neo.IrregularlySampledSignal
 
@@ -7375,7 +7375,7 @@ def __resample_to_add__(signal, new_signal):
     return ss
 
 
-@safeWrapper
+@safewrapper
 def aggregate_signals(
     *args, name_prefix: str, collectSD: bool = True, collectSEM: bool = True
 ):
@@ -7502,7 +7502,7 @@ def aggregate_signals(
     return ret
 
 
-@safeWrapper
+@safewrapper
 def average_irregular_signals(*args, fun=np.mean, name: typing.Optional[str] = None):
     if len(args) == 0:
         return
@@ -7555,7 +7555,7 @@ def average_irregular_signals(*args, fun=np.mean, name: typing.Optional[str] = N
     )
 
 
-# @safeWrapper
+# @safewrapper
 def average_signals(*args, fun=np.mean, name: typing.Optional[str] = None):
     r"""Returns an AnalogSignal containing the element-by-element average of several neo.AnalogSignals.
     All signals must be single-channel and have compatible shapes and sampling rates.
@@ -7622,7 +7622,7 @@ def __applyRecDateTime__(sgm, blk):
     return sgm
 
 
-# @safeWrapper
+# @safewrapper
 # def average_segments_old(*args, **kwargs):
 #     r"""Returns a list of Segment objects containing averages of the signals from
 #     each segment in args.
@@ -7835,7 +7835,7 @@ def __applyRecDateTime__(sgm, blk):
 #     return ret_seg
 
 
-@safeWrapper
+@safewrapper
 def average_segments(*args, **kwargs) -> typing.List[neo.Segment]:
     r"""Returns a list of Segment objects containing averages of the signals from
     each segment in args.
@@ -8081,7 +8081,7 @@ def average_segments(*args, **kwargs) -> typing.List[neo.Segment]:
     return ret_seg
 
 
-@safeWrapper
+@safewrapper
 def average_blocks_by_segments(*args, **kwargs):
     r"""Generates a neo.Block whose segments contains averages of the corresponding
     signals in the corresponding segments across a sequence of blocks.
@@ -8159,7 +8159,7 @@ def average_blocks_by_segments(*args, **kwargs):
     return ret
 
 
-@safeWrapper
+@safewrapper
 @with_doc(average_segments, use_header=True)
 def average_segments_in_block(data, **kwargs):
     r"""Returns a new neo.Block containing one segment which is the average¹ of
@@ -8306,7 +8306,7 @@ def average_segments_in_block(data, **kwargs):
 
 
 # def average_blocks_old(*args, **kwargs):
-@safeWrapper
+@safewrapper
 def average_blocks(*args, **kwargs) -> neo.Block:
     r"""Generates a block containing a averaged record from the *args.
     FIXME: must revisit this
@@ -8730,7 +8730,7 @@ def average_blocks(*args, **kwargs) -> neo.Block:
     return ret
 
 
-@safeWrapper
+@safewrapper
 def average_blocks_new(*args, **kwargs):
     r"""Generates a block containing a list of averaged AnalogSignal data from the *args.
     FIXME/TODO: revisit this 2023-05-22 18:43:31
@@ -9234,7 +9234,7 @@ def sampling_rate_or_period(rate, period):
     return rate
 
 
-@safeWrapper
+@safewrapper
 def parse_acquisition_metadata(
     data: neo.Block, configuration: [type(None), dict] = None
 ):

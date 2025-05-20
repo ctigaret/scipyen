@@ -60,7 +60,7 @@ from core.neoutils import (get_index_of_named_signal, remove_events, clear_event
                            is_same_as, get_events)
 
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal, )
-from core.prog import (safeWrapper, with_doc)
+from core.prog import (safewrapper, with_doc)
 from core.triggerevent import (TriggerEvent, TriggerEventType,)
 from core.traitcontainers import DataBag
 from core.signalprocessing import detect_boxcar
@@ -390,7 +390,7 @@ class TriggerProtocol:
         """
         return len(self.segmentIndices())
     
-    @safeWrapper
+    @safewrapper
     def hasSameEvents(self, other, rtol = RELATIVE_TOLERANCE, atol = ABSOLUTE_TOLERANCE, equal_nan = EQUAL_NAN):
         r"""Compares pre-, post- and photo- events with those from other TriggerProtocol.
         
@@ -674,11 +674,11 @@ class TriggerProtocol:
     def isempty(self):
         return len(self) == 0
     
-    # @safeWrapper
+    # @safewrapper
     # def copy(self):
     #     return TriggerProtocol(pre = self) # copy constructor
         
-    @safeWrapper
+    @safewrapper
     def updateSegmentIndex(self, value):
         r"""Update current segment index with the one specified in value.
         
@@ -940,7 +940,7 @@ class TriggerProtocol:
 #### BEGIN Module-level functions
 
 # @with_doc(detect_trigger_events, use_header=True)
-@safeWrapper
+@safewrapper
 def auto_define_trigger_events(src:typing.Union[neo.Block, neo.Segment, typing.Sequence[neo.Segment]],
                                event_type:typing.Union[str,TriggerEventType], 
                                analog_index:typing.Union[int,str], 
@@ -1217,7 +1217,7 @@ def get_trigger_events(*src:typing.Union[neo.Block, neo.Segment, typing.Sequence
     return get_events(*src, triggers=triggers, as_dict=as_dict, flat=flat, match=match)
 
 # @with_doc(detect_boxcar, use_header=True)
-@safeWrapper
+@safewrapper
 def detect_trigger_events(x, event_type, 
                           use_lo_hi=True, 
                           label=None, 
@@ -1518,7 +1518,7 @@ def embed_trigger_event(event, segment, clear=False):
     return segment
             
         
-@safeWrapper
+@safewrapper
 def embed_trigger_protocol(protocol:TriggerProtocol, 
                            target:typing.Union[neo.Block, neo.Segment, typing.Sequence[neo.Segment]], 
                            useProtocolSegments:bool=True, 
@@ -1647,7 +1647,7 @@ def embed_trigger_protocol(protocol:TriggerProtocol,
         segments[k].annotations["trigger_protocol"] = pr_name
 
 
-@safeWrapper
+@safewrapper
 def parse_trigger_protocols(src, return_source:typing.Optional[bool]=False):
     r"""Constructs a list of TriggerProtocol objects from embeded TriggerEvent objects.
     

@@ -25,7 +25,7 @@ from qtpy.QtCore import Signal, Slot, Property
 from core.typeenum import (TypeEnum, )
 from core.utilities import (reverse_mapping_lookup, reverse_dict, )
 from core.traitcontainers import DataBag
-from core.prog import (safeWrapper, deprecated,
+from core.prog import (safewrapper, deprecated,
                        timefunc, processtimefunc,filter_type)
 #from core.utilities import (unique, index_of,)
 from core.workspacefunctions import debug_scipyen

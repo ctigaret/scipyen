@@ -43,7 +43,7 @@ from core.workspacefunctions import validate_varname
 
 from core.utilities import NestedFinder
 
-from core.prog import (safeWrapper, safeGUIWrapper, )
+from core.prog import (safewrapper, safeguiwrapper, )
 
 from core.traitcontainers import (DataBag, DataBagTraitsObserver,)
 

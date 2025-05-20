@@ -180,7 +180,7 @@ from qtpy.QtCore import Signal, Slot, Property
 from core.typeenum import (TypeEnum, )
 from core.utilities import (reverse_mapping_lookup, reverse_dict, )
 from core.traitcontainers import DataBag
-from core.prog import (safeWrapper, deprecated,
+from core.prog import (safewrapper, deprecated,
                        timefunc, processtimefunc,filter_type)
 #from core.utilities import (unique, index_of,)
 from core.workspacefunctions import debug_scipyen
@@ -2352,7 +2352,7 @@ class PlanarGraphics():
                     
                 obj.updateFrontends()
         
-    @safeWrapper
+    @safewrapper
     def updateFrontends(self):
         r"""To be called after manual changes to this objects' descriptors.
         
@@ -3919,7 +3919,7 @@ class PlanarGraphics():
         """
         return self._linked_objects_
     
-    @safeWrapper
+    @safewrapper
     def unlinkFromObject(self, obj):
         r""" Breaks the link between this PlanarGraphics (self) and obj.
         
@@ -8580,7 +8580,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                                             })
                                 })
                          
-    @safeWrapper
+    @safewrapper
     def _defaultLinePen(self, selected:bool=False, linked:bool=False, cosmetic:bool=True):
         pen = QtGui.QPen(self.link_colors["%s" % linked].pen,
                          self.lnf_default_selection_styles_default["%s" % selected].pen.style,
@@ -8593,7 +8593,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
         return pen
     
-    @safeWrapper
+    @safewrapper
     def _defaultPointBrush(self, selected:bool=False, linked:bool=False):
         brush = QtGui.QBrush(QtGui.QColor(self.link_colors["%s" % linked].point).setAlpha(self.lnf_default_selection_styles_default["%s" % selected].pointBrushAlpha),
                              self.lnf_default_selection_styles_default["%s" % selected].point.style,
@@ -8601,7 +8601,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
         return brush
         
-    @safeWrapper
+    @safewrapper
     def _defaultTextPen(self, selected:bool=False, linked:bool=False, cosmetic:bool=True):
         pen = QtGui.QPen(self.link_colors["%s" % linked].text,
                          self.lnf_default_selection_styles_default["%s" % selected].text.style,
@@ -8614,7 +8614,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
         return pen
     
-    @safeWrapper
+    @safewrapper
     def _defaultLabelBrush(self, selected:bool=False, linked:bool=False):
         brush = QtGui.QBrush(self.link_colors["%s" % linked].brush,
                              self.lnf_default_selection_styles_default["%s" % selected].brush.style,
@@ -8622,7 +8622,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
         return brush
         
-    @safeWrapper
+    @safewrapper
     def _defaultControlLinePen(self, cosmetic:bool=True):
         pen = QtGui.QPen(self.lnf_control_default.pen.color,
                          self.lnf_control_default.pen.style,
@@ -8635,7 +8635,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
         return pen
     
-    @safeWrapper
+    @safewrapper
     def _defaultControlPointPen(self, cosmetic:bool=True):
         pen = QtGui.QPen(self.lnf_control_default.point.color,
                          self.lnf_control_default.point.style,
@@ -8648,7 +8648,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
         return pen
     
-    @safeWrapper
+    @safewrapper
     def _defaultControlPointBrush(self):
         brush = QtGui.QBrush(self.lnf_control_default.brush.color,
                              self.lnf_control_default.brush.style,
@@ -8656,7 +8656,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
         return brush
         
-    @safeWrapper
+    @safewrapper
     def _defaultControlTextPen(self, cosmetic:bool=True):
         pen = QtGui.Pen(self.lnf_control_default.text.color,
                         self.lnf_control_default.text.style,
@@ -8669,7 +8669,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
         return pen
         
-    @safeWrapper
+    @safewrapper
     def _defaultControlLabelBrush(self):
         brush = QtGui.QBrush(self.lnf_control_default.brush.color,
                              self.lnf_control_default.brush.style,
@@ -8696,7 +8696,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                             
         self._displayStr_ = nameStr
         
-    @safeWrapper
+    @safewrapper
     def _updateLabelRect_(self):
         r"""Calculates label bounding rectangle
         """
@@ -8935,7 +8935,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
     # TODO OPTIONAL: keyReleaseEvent (to move it by keyboard)
     # TODO OPTIONAL: hoverMoveEvent -- optional
     
-    @safeWrapper
+    @safewrapper
     def getShapePathElements(self):
         if isinstance(self._backend_, Cursor) or not self.hasState:
             return
@@ -8953,7 +8953,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             
         return paths
     
-    @safeWrapper
+    @safewrapper
     def __updateCachedPathFromBackend__(self):
         r"""No mapping transformations here, as the cached path is a copy of the
         _backend_'s state associated with the current frame.
@@ -8968,7 +8968,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
     def hide(self):
         self.setvibisle(False)
     
-    #@safeWrapper
+    #@safewrapper
     def boundingRect(self):
         r"""Mandatory to get the bounding rectangle of this item
         """
@@ -9191,7 +9191,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                                                         state.ywindow))
         return [vRect, hRect]
     
-    @safeWrapper
+    @safewrapper
     def shape(self):
         r""" Used in collision detection, etc.
         Currently return a path made of this item's bounding rectangle.
@@ -9360,7 +9360,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         # instead of "__paint__" in self.paint(...) - see NOTE: 2021-03-07 18:30:02
         self.__paint__(painter, styleOption, widget)
         
-    #@safeWrapper
+    #@safewrapper
     def __paint__(self, painter, styleOption, widget):
         r"""Does the actual painting of the item.
         Also called by self.update(), super().update() & scene.update()
@@ -9860,7 +9860,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         except Exception as exc:
             traceback.print_exc()
             
-    @safeWrapper
+    @safewrapper
     def itemChange(self, change, value):
         r"""Customizes the cursor movement by mouse or keyboard.
         
@@ -9965,7 +9965,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
 
         return super(GraphicsObject, self).itemChange(change, value)
 
-    @safeWrapper
+    @safewrapper
     def mousePressEvent(self, evt):
         r"""Mouse press event handler.
         
@@ -10231,7 +10231,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
         evt.accept()
 
-    @safeWrapper
+    @safewrapper
     def mouseMoveEvent(self, evt):
         r"""Mouse move event handler.
         
@@ -10399,7 +10399,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             
             self.selectMe.emit(self.ID, True)
 
-    @safeWrapper
+    @safewrapper
     def mouseReleaseEvent(self, evt):
         r"""Mouse release event handler
         """
@@ -10460,7 +10460,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
         evt.accept()
 
-    #@safeWrapper
+    #@safewrapper
     #"def" mouseDoubleClickEvent(self, evt):
         #r"""Mouse double-click event handler - do I need this ???
         #"""
@@ -10473,7 +10473,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
 
         #super(GraphicsObject, self).mouseDoubleClickEvent(evt)
 
-    @safeWrapper
+    @safewrapper
     def contextMenuEvent(self, evt):
         r"""
         #TODO: popup context menu => Edit, Link/Unlink, Remove
@@ -10486,7 +10486,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
         evt.accept()# so that this doesn't propagate to the underlying graphics items
         
-    @safeWrapper
+    @safewrapper
     def hoverEnterEvent(self, evt):
         if self._buildMode_:
             self.setCursor(QtGui.QCursor(QtCore.Qt.CrossCursor))
@@ -10504,7 +10504,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
         super(GraphicsObject, self).hoverEnterEvent(evt)
         
-    @safeWrapper
+    @safewrapper
     def hoverMoveEvent(self, evt):
         r"""Hover move event handler.
         
@@ -10591,14 +10591,14 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
         super(GraphicsObject, self).hoverMoveEvent(evt)
         
-    @safeWrapper
+    @safewrapper
     def hoverLeaveEvent(self, evt):
         self.unsetCursor()
         self.update()
         #print("hover leave position x %g, y %g" % (evt.pos().x(), evt.pos().y()))
         super(GraphicsObject, self).hoverLeaveEvent(evt)
             
-    @safeWrapper
+    @safewrapper
     def keyPressEvent(self, evt):
         # NOTE: 2017-06-29 08:44:34
         # "up" means move down (coordinates origin are top-left !!!)
@@ -10692,7 +10692,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         #self.update()
         
     @Slot(int)
-    @safeWrapper
+    @safewrapper
     def slotFrameChanged(self, val):
         self._currentframe_ = val
         if self._backend_ is not None:
@@ -10733,7 +10733,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             
         self.update()
         
-    @safeWrapper
+    @safewrapper
     def __updateBackendFromCachedPath__(self):
         r"""Updates the backend primitive from this object, it being a ROI
         TODO/FIXME for now only supports Ellipse, Rect, and Path backends
@@ -10777,7 +10777,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             except Exception as e:
                 traceback.print_exc()
                     
-    #@safeWrapper
+    #@safewrapper
     def removeFromWidget(self):
         r"""Call this to have the GraphicsObject remove itself from the GraphicsImageViewerWidget
         """

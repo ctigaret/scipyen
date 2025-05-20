@@ -24,7 +24,7 @@ from . import quantities as scq
 from . import datasignal as sds
 from .datasignal import DataSignal, IrregularlySampledDataSignal
 from . import prog as prog
-from .prog import safeWrapper, with_doc
+from .prog import safewrapper, with_doc
 #### END scipyen core modules
 
 
@@ -1539,7 +1539,7 @@ def estimate_dc(x_):
     return val
 
 
-@safeWrapper
+@safewrapper
 def convolve(sig:np.ndarray, w, **kwargs):
     r"""1D convolution of neo.AnalogSignal sig with kernel "w".
 
@@ -1715,7 +1715,7 @@ regardless of the convolution mode:
     return ret
 
 
-@safeWrapper
+@safewrapper
 def parse_step_waveform_signal(sig, method="state_levels", **kwargs):
     r"""Parse a step waveform -- containing two states ("high" and "low").
 
@@ -1829,7 +1829,7 @@ def parse_step_waveform_signal(sig, method="state_levels", **kwargs):
     return down, up, amplitude, centroids, label
 
 
-@safeWrapper
+@safewrapper
 def resample_pchip(sig, new_sampling_period, old_sampling_period=1):
     r"""Resample a signal using a piecewise cubic Hermite interpolating polynomial.
 
@@ -1985,7 +1985,7 @@ def resample_pchip(sig, new_sampling_period, old_sampling_period=1):
         return ret
 
 
-@safeWrapper
+@safewrapper
 def diff(sig, n=1, axis=-1, prepend=False, append=True):
     r"""Calculates the n-th discrete difference along the given axis.
 
@@ -2073,7 +2073,7 @@ def diff(sig, n=1, axis=-1, prepend=False, append=True):
     return ret
 
 
-@safeWrapper
+@safewrapper
 def gradient(
     sig: [neo.AnalogSignal, DataSignal, np.ndarray], n: int = 1, axis: int = 0
 ):
@@ -2149,7 +2149,7 @@ def gradient(
     return ret
 
 
-@safeWrapper
+@safewrapper
 def ediff1d(
     sig: [neo.AnalogSignal, DataSignal, np.ndarray],
     to_end: numbers.Number = 0,
@@ -2222,7 +2222,7 @@ def ediff1d(
     return ret
 
 
-@safeWrapper
+@safewrapper
 def forward_difference(
     sig: [neo.AnalogSignal, DataSignal, np.ndarray],
     n: int = 1,
@@ -2527,7 +2527,7 @@ def signal_to_noise(x, axis=None, ddof=None, db=True):
     return ret
 
 
-@safeWrapper
+@safewrapper
 def resample_poly(sig, new_rate, p=1000, window=("kaiser", 5.0)):
     r"""Resamples signal using a polyphase filtering.
 
@@ -2634,7 +2634,7 @@ def resample_poly(sig, new_rate, p=1000, window=("kaiser", 5.0)):
     return ret
 
 
-@safeWrapper
+@safewrapper
 def remove_signal_offset(sig):
     if not isinstance(sig, neo.AnalogSignal):
         raise TypeError(
@@ -2644,7 +2644,7 @@ def remove_signal_offset(sig):
     return sig - sig.min()
 
 
-@safeWrapper
+@safewrapper
 def batch_normalise_signals(*arg):
     ret = list()
     for sig in arg:
@@ -2653,7 +2653,7 @@ def batch_normalise_signals(*arg):
     return ret
 
 
-@safeWrapper
+@safewrapper
 def batch_remove_offset(*arg):
     ret = list()
     for sig in arg:
@@ -2662,7 +2662,7 @@ def batch_remove_offset(*arg):
     return ret
 
 
-@safeWrapper
+@safewrapper
 def peak_normalise_signal(
     sig: typing.Union[neo.AnalogSignal, np.ndarray],
     minVal: typing.Optional[typing.Union[numbers.Number, pq.Quantity]] = None,
@@ -2912,7 +2912,7 @@ def correlate(in1, in2, **kwargs):
         return corr
 
 
-@safeWrapper
+@safewrapper
 @with_doc(state_levels, use_header=True)
 def detect_boxcar(
     x: typing.Union[neo.AnalogSignal, DataSignal],

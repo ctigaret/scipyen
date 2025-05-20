@@ -44,7 +44,7 @@ import numpy as np
 from qtpy import QtCore, QtGui, QtWidgets, QtXml
 from qtpy.QtCore import Signal, Slot, Property
 
-from core.prog import safeWrapper
+from core.prog import safewrapper
 from core.utilities import reverse_mapping_lookup
 from gui.painting_shared import (standardPalette, standardPaletteDict, svgPalette,
                               getPalette, paletteQColor, qcolor,
@@ -97,7 +97,7 @@ class ColorPushButton(QtWidgets.QPushButton):
         self.setAcceptDrops(True)
         self.clicked.connect(self._chooseColor)
         
-    @safeWrapper
+    @safewrapper
     def initStyleOption(self, opt:QtWidgets.QStyleOptionButton):
         r"""Required in all concrete subclasses of QWidget
         """
@@ -163,7 +163,7 @@ class ColorPushButton(QtWidgets.QPushButton):
             sigblock = QtCore.QSignalBlocker(self)
             self.color = value
     
-    @safeWrapper
+    @safewrapper
     def paintEvent(self, ev:QtGui.QPaintEvent):
         painter = QtGui.QPainter(self)
         style = self.style()
@@ -200,25 +200,25 @@ class ColorPushButton(QtWidgets.QPushButton):
             focusOpt.backgroundColor = self.palette().window().color()
             style.drawPrimitive(QtWidgets.QStyle.PE_FrameFocusRect, focusOpt, painter, self)
         
-    @safeWrapper
+    @safewrapper
     def sizeHint(self):
         r"""Returns a QSize"""
         opt = QtWidgets.QStyleOptionButton()
         self.initStyleOption(opt)
         return self.style().sizeFromContents(QtWidgets.QStyle.CT_PushButton, opt, QtCore.QSize(16,16), self)
 
-    @safeWrapper
+    @safewrapper
     def minimumSizeHint(self):
         r"""Returns a QSize"""
         opt = QtWidgets.QStyleOptionButton()
         self.initStyleOption(opt)
         return self.style().sizeFromContents(QtWidgets.QStyle.CT_PushButton, opt, QtCore.QSize(8,8), self)
     
-    @safeWrapper
+    @safewrapper
     def dragEnterEvent(self, ev:QtGui.QDragEnterEvent):
         ev.setAccepted(canDecode(ev.mimeData()) and self.isEnabled())
     
-    @safeWrapper
+    @safewrapper
     def dropEvent(self, ev:QtGui.QDropEvent):
         # NOTE: 2021-05-14 21:39:47
         # is mimeData.hasColor() is a QVariant<QColor> which is converted by
@@ -231,7 +231,7 @@ class ColorPushButton(QtWidgets.QPushButton):
                 c.setAlpha(self._alpha)
             self.color = c
     
-    @safeWrapper
+    @safewrapper
     def keyPressEvent(self, ev:QtGui.QKeyEvent):
         key = ev.key() | int(ev.modifiers())
         
@@ -249,12 +249,12 @@ class ColorPushButton(QtWidgets.QPushButton):
         else:
             super().keyPressEvent(ev)
     
-    @safeWrapper
+    @safewrapper
     def mousePressEvent(self, ev:QtGui.QMouseEvent):
         self._mPos = ev.pos()
         super().mousePressEvent(ev)
     
-    @safeWrapper
+    @safewrapper
     def mouseMoveEvent(self, ev:QtGui.QMouseEvent):
         if ev.buttons() & QtCore.Qt.LeftButton and \
             (ev.pos() - self._mPos).manhattanLength() > QtWidgets.QApplication.startDragDistance():
@@ -448,11 +448,11 @@ class ColorComboBox(QtWidgets.QComboBox):
         
         # ### END initialization of Qt part
         
-    @safeWrapper
+    @safewrapper
     def dragEnterEvent(self, ev:QtGui.QDragEnterEvent):
         ev.setAccepted(canDecode(ev.mimeData()) and self.isEnabled())
     
-    @safeWrapper
+    @safewrapper
     def dropEvent(self, ev:QtGui.QDropEvent):
         # NOTE: 2021-05-14 21:39:47
         # is mimeData.hasColor() is a QVariant<QColor> which is converted by
@@ -465,19 +465,19 @@ class ColorComboBox(QtWidgets.QComboBox):
                 c.setAlpha(self._alpha)
             self.color = c
     
-    @safeWrapper
+    @safewrapper
     def mousePressEvent(self, ev:QtGui.QMouseEvent):
         self._mPos = ev.pos()
         super().mousePressEvent(ev)
     
-    @safeWrapper
+    @safewrapper
     def mouseMoveEvent(self, ev:QtGui.QMouseEvent):
         if ev.buttons() & QtCore.Qt.LeftButton and \
             (ev.pos() - self._mPos).manhattanLength() > QtWidgets.QApplication.startDragDistance():
             createDrag(self.color, self).exec_()
             self.setDown(False)
             
-    @safeWrapper
+    @safewrapper
     def keyPressEvent(self, ev:QtGui.QKeyEvent):
         key = ev.key() | int(ev.modifiers())
         
@@ -573,7 +573,7 @@ class ColorComboBox(QtWidgets.QComboBox):
             self.update()
     
     @Slot(int)
-    @safeWrapper
+    @safewrapper
     def _slotActivated(self, index:int):
         if index == 0:
             if self._alphaChannelEnabled:
@@ -616,7 +616,7 @@ class ColorComboBox(QtWidgets.QComboBox):
         self.activated[QtGui.QColor].emit(self._internalColor.qcolor)
     
     @Slot(int)
-    @safeWrapper
+    @safewrapper
     def _slotHighlighted(self, index:int):
         if index == 0:
             self._internalColor = self._customColor

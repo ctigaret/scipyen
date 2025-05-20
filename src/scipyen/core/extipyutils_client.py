@@ -73,7 +73,7 @@ messaging API.
 import os, sys, pickle, inspect, traceback, types, typing
 from functools import wraps
 from core.traitcontainers import DataBag
-from core.prog import safeWrapper
+from core.prog import safewrapper
 import qtpy
 
 qtPackages = ", ".join([p for p in qtpy.__dict__.keys() if p.startswith("Qt") and isinstance(qtpy.__dict__[p], types.ModuleType)])
@@ -153,7 +153,7 @@ init_commands.extend(
     "import core.strutils as strutils",
     "import core.data_analysis as anl",
     "from core.utilities import (summarize_object_properties,standard_obj_summary_headers,safe_identity_test, unique, index_of, gethash,NestedFinder, normalized_index)",
-    "from core.prog import (safeWrapper, deprecation, iter_attribute,filter_type, filterfalse_type, filter_attribute, filterfalse_attribute)",
+    "from core.prog import (safewrapper, deprecation, iter_attribute,filter_type, filterfalse_type, filter_attribute, filterfalse_attribute)",
     "from core import prog",
     "from core.traitcontainers import DataBag",
     "from core.triggerprotocols import TriggerProtocol",
@@ -743,7 +743,7 @@ def cmd_foreign_shell_ns_hidden_listing(namespace:str="Internal", as_call=True) 
     
 #### END call generators
 
-@safeWrapper
+@safewrapper
 def unpack_shell_channel_data(msg:dict) -> dict:
     r"""Extracts data shuttled from the remote kernel via " execute_reply" message.
     

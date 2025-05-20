@@ -51,7 +51,7 @@ import configparser # from standard library; Scipyen uses confuse from  pypi
 # import qasync
 # from qasync import asyncSlot
 
-from core.prog import scipywarn, printStyled, safeWrapper
+from core.prog import scipywarn, print_styled, safewrapper
 from core import taxonbridge, utilities
 from core import workspacefunctions as wf
 from core import quantities as scq
@@ -497,7 +497,7 @@ class BrainAtlasManager(QtCore.QObject):
         ret = self._extractAtlasArchive(target)
         if ret and self._atlas_name_to_initialize_ is not None:
             self._atlas = BrainGlobeAtlas(self._atlas_name_to_initialize_, check_latest=False)
-            print(f"{printStyled(f'{self._atlas_name_to_initialize_}', 'green')} was initialized")
+            print(f"{print_styled(f'{self._atlas_name_to_initialize_}', 'green')} was initialized")
             self._atlas_name_to_initialize_ = None
         
     def initAtlas(self, name:typing.Optional[str]=None):
@@ -631,7 +631,7 @@ class BrainAtlasManager(QtCore.QObject):
     def slot_networkOperationFinished(self):
         if isinstance(self.netMan, network.ScipyenNetworkManager):
             color = "yellow" if self.netMan.networkError else "green"
-            print(printStyled(f"{self.__class__.__name__} network operation finished with {self.netMan.networkErrorName}", color, True))
+            print(print_styled(f"{self.__class__.__name__} network operation finished with {self.netMan.networkErrorName}", color, True))
             
     def selectAtlasName(self, choices:typing.Optional[typing.Union[typing.Sequence[str], str]]=None,
                         retNone:bool=False,
@@ -1043,7 +1043,7 @@ class BrainAtlasManager(QtCore.QObject):
         else:
             raise TypeError(f"In {self.__class__.__name__}._slot_lastVersionsConfDownloaded: expecting a str or a pathlib.Path; indteag, got {type(o).__name__}")
     
-        print(printStyled(f"Latest atlas versions information was downloaded to {target.as_posix()}.", "green", True))
+        print(print_styled(f"Latest atlas versions information was downloaded to {target.as_posix()}.", "green", True))
         GuiMessages.informationMessage_static(self.scipyenWindow, 
                                                 f"{self.__class__.__name__}", 
                                                 f"Latest atlas versions information was downloaded to {target.as_posix()}.")

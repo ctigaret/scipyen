@@ -17,7 +17,7 @@ import matplotlib as mpl
 from qtpy import (QtCore, QtWidgets, QtGui)
 from qtpy.QtCore import (Signal, Slot, Property)
 
-from core.utilities import safeWrapper
+from core.utilities import safewrapper
 from core.workspacefunctions import (user_workspace, validate_varname, get_symbol_in_namespace)
 from core.scipyen_config import (ScipyenConfigurable, 
                                  syncQtSettings, 
@@ -27,7 +27,7 @@ from core.scipyen_config import (ScipyenConfigurable,
                                  confuse)
 from core import strutils, sysutils
 from core.strutils import InflectEngine
-from core.prog import (printStyled, scipywarn)
+from core.prog import (print_styled, scipywarn)
 import gui.quickdialog as qd
 from gui.itemslistdialog import ItemsListDialog
 import gui.pictgui as pgui
@@ -266,7 +266,7 @@ class DirectoryFileWatcher(QtCore.QObject):
                     if str(filepath) in self._source_.dirFileMonitor.files():
                         self._source_.dirFileMonitor.removePath(str(filepath))
         
-    @safeWrapper
+    @safewrapper
     @Slot()
     def slot_monitoredFileChanged(self, *args, **kwargs):
         # print(f"{self.__class__.__name__}._slot_monitoredFileChanged:\n\targs = {args}\n\t kwargs = {kwargs}\n\n")
@@ -345,7 +345,7 @@ class _X11WMBridge_(QtCore.QObject): # FIXME: 2023-05-08 21:39:42 not used !
             
 
 class GuiMessages(object):
-    @safeWrapper
+    @safewrapper
     def errorMessage(self, title:str, text:str):
         errMsgDlg = QtWidgets.QErrorMessage(self)
         errMsgDlg.setWindowTitle(title)
@@ -357,7 +357,7 @@ class GuiMessages(object):
         errMsgDlg.setWindowTitle(title)
         errMsgDlg.showMessage(text)
         
-    @safeWrapper
+    @safewrapper
     def criticalMessage(self, title, text, default=QtWidgets.QMessageBox.No):
         return QtWidgets.QMessageBox.critical(self, title, text)
     
@@ -365,7 +365,7 @@ class GuiMessages(object):
     def criticalMessage_static(obj:typing.Optional[QtWidgets.QWidget]=None, title:str="Critical", text:str="A critical error has occurred", default=QtWidgets.QMessageBox.No):
         return QtWidgets.QMessageBox.critical(obj, title, text)
         
-    @safeWrapper
+    @safewrapper
     def informationMessage(self, title, text, default=QtWidgets.QMessageBox.No):
         return QtWidgets.QMessageBox.information(self, title, text)
 
@@ -373,7 +373,7 @@ class GuiMessages(object):
     def informationMessage_static(obj:typing.Optional[QtWidgets.QWidget]=None, title:str="Information", text:str="", default=QtWidgets.QMessageBox.No):
         return QtWidgets.QMessageBox.information(obj, title, text)
         
-    @safeWrapper
+    @safewrapper
     def questionMessage(self, title, text, default=QtWidgets.QMessageBox.No):
         return QtWidgets.QMessageBox.question(self, title, text)
 
@@ -382,7 +382,7 @@ class GuiMessages(object):
         r"""Check the return value for equality to QtWidgets.QMessageBox.Yes"""
         return QtWidgets.QMessageBox.question(obj, title, text, defaultButton=default)
         
-    @safeWrapper
+    @safewrapper
     def warningMessage(self, title, text, default=QtWidgets.QMessageBox.No):
         return QtWidgets.QMessageBox.warning(self, title, text, defaultButton=default)
     
@@ -390,7 +390,7 @@ class GuiMessages(object):
     def warningMessage_static(obj:typing.Optional[QtWidgets.QWidget]=None, title:str="Warning", text:str="", default=QtWidgets.QMessageBox.No):
         return QtWidgets.QMessageBox.warning(obj, title, text, defaultButton=default)
         
-    @safeWrapper
+    @safewrapper
     def detailedMessage(self, title:str, text:str, info:typing.Optional[str]="", detail:typing.Optional[str]="", msgType:typing.Optional[typing.Union[str, QtGui.QPixmap]]="Critical"):
         r"""Detailed generic message dialog box
         title: str  = dialog title
@@ -506,7 +506,7 @@ class DirectoryObserver(QtCore.QObject):
     
         
 class FileIOGui(object):
-    @safeWrapper
+    @safewrapper
     def chooseFile(self, caption:typing.Optional[str]=None, 
                    fileFilter:typing.Optional[str]=None, 
                    single:typing.Optional[bool]=True, 
@@ -658,7 +658,7 @@ class FileIOGui(object):
         
         return fn, fl
     
-    @safeWrapper
+    @safewrapper
     def chooseDirectory(self, caption:typing.Optional[str]=None,targetDir:typing.Optional[str]=None):
         if sys.platform.startswith("win32"):
             options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
@@ -1219,7 +1219,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
 #         if isinstance(p, QtWidgets.QMainWindow):
 #             return p
     
-    @safeWrapper
+    @safewrapper
     def importWorkspaceData(self, dataTypes:typing.Union[typing.Type[typing.Any], typing.Sequence[typing.Type[typing.Any]]], title:str="Import from workspace", single:bool=True, preSelected:typing.Optional[str]=None, with_varName:bool=False):
         r"""Launches ItemsListDialog to import on or several workspace variables.
         
@@ -1268,7 +1268,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
             
         return list()
     
-    @safeWrapper
+    @safewrapper
     def exportDataToWorkspace(self, data:typing.Any, var_name:str, title:str="Export data to workspace"):
         newVarName = strutils.str2symbol(var_name)
         if self.isTopLevel and self.appWindow:
@@ -1388,7 +1388,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         # print(f"{self.__class__.__name__}._slot_breakLoop")
         self.loopControl["break"] = True
         
-    @safeWrapper
+    @safewrapper
     def loadFiles(self, filePaths:typing.Sequence[typing.Union[str, pathlib.Path]],
                        fileLoaderFn:typing.Callable, 
                        ioReaderFn:typing.Optional[typing.Callable]=None,
@@ -1409,7 +1409,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         workerThread.signals.signal_Finished.connect(progressDlg.reset)
         workerThread.start()
         
-    @safeWrapper
+    @safewrapper
     def saveObjects(self, objects:typing.Union[tuple, list],
                     saver:typing.Callable):
         

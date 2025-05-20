@@ -6,7 +6,7 @@
 r"""Breadth-first and depth-first search algorithms.
 """
 from collections import deque
-from core.prog import safeWrapper
+from core.prog import safewrapper
 from core.utilities import safe_identity_test, NestedFinder
 
 import numpy as np
@@ -362,7 +362,7 @@ def height(node):
     
     return rheight + 1
 
-@safeWrapper
+@safewrapper
 def find_leaf(src, leaf, key=True):
     r"""Search for a leaf object in src - depth-first
     Returns a mixed sequence of hashable objects and int.

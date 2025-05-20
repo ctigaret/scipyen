@@ -23,7 +23,7 @@ except:
     
 from qtpy.QtCore import (Signal, Slot, Property,)
 
-from core.utilities import safeWrapper
+from core.utilities import safewrapper
 # from core import workspacefunctions as wfunc
 # from .workspacegui import (WorkspaceGuiMixin, _X11WMBridge_, 
 #                            saveWindowSettings, loadWindowSettings)
@@ -785,7 +785,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
                     newreg_reply = dbusinterface.call("RegisterWindow", new_v, QtDBus.QDBusObjectPath(self._app_menu_[1]))
     
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_refreshDataDisplay(self):
         r"""Triggeres a refresh of the displayed information.
         Typical usage is to connect it to a signal emitted after data has been
@@ -1239,7 +1239,7 @@ class ScipyenFrameViewer(ScipyenViewer):
         """
         return self._frames_spinner_
     
-    @safeWrapper
+    @safewrapper
     def linkToViewers(self, *viewers, broadcast: bool = True):
         r"""Synchronizes frame navigation with the specified viewer(s).
         
@@ -1272,7 +1272,7 @@ class ScipyenFrameViewer(ScipyenViewer):
                     if v is not viewer and viewer not in v.linkedViewers: # avoid synchronizing to itself
                         v.linkedViewers.append(viewer)
     
-    @safeWrapper
+    @safewrapper
     def unlinkViewer(self, other):
         r"""Removes the bidirectional link with the other viewer.
         """
@@ -1283,7 +1283,7 @@ class ScipyenFrameViewer(ScipyenViewer):
             if other in self._linkedViewers_:
                 self._linkedViewers_.remove(other)
             
-    @safeWrapper
+    @safewrapper
     def unlinkFromViewers(self, *others):
         r"""Removes frame navigation synchronization with other viewers.
         
@@ -1315,7 +1315,7 @@ class ScipyenFrameViewer(ScipyenViewer):
             self._linkedViewers_.clear()
         
     @Slot(int)
-    @safeWrapper
+    @safewrapper
     def slot_setFrameNumber(self, value:typing.Union[int, type(MISSING), type(NA), type(None), float]):
         r"""Drives frame navigation from the GUI.
         

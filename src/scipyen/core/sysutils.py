@@ -7,7 +7,7 @@ r"""System and platform utilities
 """
 import os, sys, subprocess, shutil, platform, pathlib, typing
 from shutil import which
-from core.prog import printStyled
+from core.prog import print_styled
 # from core.desktoputils import (get_wm, get_desktop, get_dbus_service_names, 
 #                                is_kde_x11, is_kde_wayland, is_kde)
 
@@ -24,14 +24,14 @@ def checkGitRepo(path:pathlib.Path, label:str = "Scipyen"):
         brComp = result[0]
         head, branches = brComp.split("## ")
         local, remote = branches.split("...")
-        local = printStyled(local, color="green")
-        remote = printStyled(remote, color="red")
-        msg = f"{printStyled('WARNING:', color='yellow')} Running {local} branch of the local {label} git repository in {printStyled(path.as_posix(), color='blue')}, with status:"
+        local = print_styled(local, color="green")
+        remote = print_styled(remote, color="red")
+        msg = f"{print_styled('WARNING:', color='yellow')} Running {local} branch of the local {label} git repository in {print_styled(path.as_posix(), color='blue')}, with status:"
         result[0] = "## "+local+"..."+remote
         if len(result) > 1:
             for k in range(1,len(result)):
                 s = result[k]
-                head = printStyled(s[:2], color="red")
+                head = print_styled(s[:2], color="red")
                 fileName = s[2:]
                 result[k] = head+fileName
 

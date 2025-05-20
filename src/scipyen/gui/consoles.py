@@ -114,7 +114,7 @@ from qtconsole.manager import QtKernelManager
 import pkg_resources
 
 #from core import prog
-from core.prog import safeWrapper
+from core.prog import safewrapper
 from core.extipyutils_client import (init_commands, execute, ForeignCall,
                                     nrn_ipython_initialization_cmd,)
 from core.strutils import str2symbol
@@ -335,13 +335,13 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
         cursor.endEditBlock()
         
     
-    @safeWrapper
+    @safewrapper
     @Slot()
     def slot_clearConsole(self):
         self.clear()
         
         
-    @safeWrapper
+    @safewrapper
     @Slot()
     def slot_resetConsole(self):
         self.reset(clear=True)
@@ -1174,12 +1174,12 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
         """
         return True
 
-    @safeWrapper
+    @safewrapper
     def _save_settings_(self):
         #print("ExternalConsoleWindow._save_settings_")
         saveWindowSettings(self.qsettings, self)#, group_name=self.__class__.__name__)
             
-    @safeWrapper
+    @safewrapper
     def _save_tab_settings_(self, widget):
         return
         ndx = self.tab_widget.indexOf(widget)
@@ -1502,7 +1502,7 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
         cdict = self.get_connection_dict_for_workspace(ns_name)
         return cdict and isinstance(cdict["master"], dict) # definitely a locally managed kernel
         
-    @safeWrapper
+    @safewrapper
     def get_frontend(self, ndx):
         #print("ExternalConsoleWindow.get_frontend ndx =", ndx)
         if isinstance(ndx, int): # index of tab
@@ -1568,7 +1568,7 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
         else:
             raise TypeError("Expecting an int or a str; got %s instead" % type(ndx.__name__))
         
-    @safeWrapper
+    @safewrapper
     def prefix_tab_title(self, prefix, ndx):
         r"""Prepends prefix to the tab title for tabs with indices in ndx.
         Parameters:
@@ -1589,7 +1589,7 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
             new_title= "%s%s" % (prefix, old_title)
             self.tab_widget.setTabText(ndx, new_title)
             
-    @safeWrapper
+    @safewrapper
     def unprefix_tab_title(self, prefix, ndx):
         r"""Removes prefix from the tab title for tabs with indices in ndx.
         Parameters:
@@ -2320,7 +2320,7 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
         self.update_tab_bar_visibility()
 
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_kernel_client_started_channels(self):
         r"""Not in use
         """
@@ -2329,7 +2329,7 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
             self.sig_kernel_started_channels.emit(self._connections_[kc.connection_file])
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_kernel_client_stopped_channels(self):
         r"""Not in use
         """
@@ -2338,7 +2338,7 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
             self.sig_kernel_stopped_channels.emit(self._connections_[kc.connection_file])
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_kernel_restarted(self):
         r"""Re-sets the tag title after a kernel restart.
         
@@ -2357,7 +2357,7 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
                     
                 self.sig_kernel_restart.emit(self._connections_[km.connection_file])
         
-    @safeWrapper
+    @safewrapper
     @Slot(object)
     def slot_kernel_shell_chnl_msg_recvd(self, msg):
         #print(msg)
@@ -3017,7 +3017,7 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
     
     #### END some useful properties
     
-    @safeWrapper
+    @safewrapper
     def execute(self, *code:typing.Union[str, dict, tuple, list, ForeignCall], 
                 where : typing.Optional[typing.Union[int, str, RichJupyterWidget, QtKernelClient]]=None, 
                 redirect:typing.Optional[dict]=None, **kwargs):
@@ -3406,7 +3406,7 @@ class ScipyenConsoleWidget(ConsoleWidget):
         evt.acceptProposedAction();
         evt.accept()
         
-    @safeWrapper
+    @safewrapper
     def dropEvent(self, evt):
         # from textwrap import dedent
         src = evt.source()
@@ -3504,7 +3504,7 @@ class ScipyenConsoleWidget(ConsoleWidget):
                 
         evt.accept()
         
-    @safeWrapper
+    @safewrapper
     def __write_text_in_console_buffer__(self, text):
         from textwrap import dedent
         # NOTE:2019-08-02 13:59:26
@@ -3514,7 +3514,7 @@ class ScipyenConsoleWidget(ConsoleWidget):
             cursor = self._control.textCursor()
             self._insert_plain_text_into_buffer(cursor, dedent(text))
             
-    @safeWrapper
+    @safewrapper
     def writeText(self, text:typing.Union[str, typing.List[str], typing.Tuple[tuple]]):
         r"""Writes a text in console buffer
         """
