@@ -1569,7 +1569,11 @@ def guess_init_biased_biexp(x, y, is_sorted:bool=True):#
     # σ, ν = optimize.nnls(𝐌ᵀ𝐌, 𝐌ᵀ𝚪) # NOTE: 2025-05-20 22:36:43 this constrains A, B, C, D, E to be >= 0 which is NOT what is required / actually is, to be avoided
     # A, B, C, D, E = σ
     B2A = B**2 + 4*A # ∵ A = -pq and B = (p+q)
-    p = 0.5 * (B + np.sqrt(B2A)) if B2A >= 0 else 0.5*B # NOTE: 2025-05-20 22:31:50 dirty trick but living with it since this is just a rough guess and avoids BUG 2025-05-18 18:24:32
+    # NOTE: 2025-05-20 22:31:50 dirty trick and mathematically NOT justified,
+    # but avoids BUG 2025-05-18 18:24:32
+    # since this is intended for a rough "guesstimate" of inital coefficient
+    # values, I guess I can live with it
+    p = 0.5 * (B + np.sqrt(B2A)) if B2A >= 0 else 0.5*B 
     q = 0.5 * (B - np.sqrt(B2A)) if B2A >= 0 else 0.5*B
     
     # Step 2

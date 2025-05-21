@@ -120,6 +120,7 @@ from uuid import uuid4
 import json, pickle
 import h5py
 import numpy as np
+import scipy
 from core.vigra_patches import vigra
 import pandas as pd
 import quantities as pq
@@ -2355,6 +2356,45 @@ def _(obj:typing.Union[str, bytes, bytearray, np.ndarray, neo.core.spiketrainlis
     entity.attrs.update(obj_attrs)
     return entity
 
+@objectToEntity.register(scipy.optimize.Bounds)
+def _(obj:scipy.optimize.Bounds, 
+      obj_attrs:dict, group:h5py.Group, name:typing.Optional[str]=None,
+      target_name:typing.Optional[str]=None,
+      compression:typing.Optional[str]="gzip",
+      chunks:typing.Optional[bool]=None,
+      track_order:typing.Optional[bool] = True, 
+      entity_cache:typing.Optional[dict]=None,
+      **kwargs):
+    cached_entity = getCachedEntity(entity_cache, obj)
+        
+    if isinstance(cached_entity, h5py.Group):
+        group[target_name] = cached_entity # hard link
+        return cached_entity
+                
+    entity = group.create_group(target_name, track_order=track_order)
+   
+    lb_entity = makeHDF5Dataset(obj.lb, entity, name="lb", 
+                                       compression = compression,
+                                       chunks = chunks, 
+                                       track_order = track_order,
+                                       entity_cache = entity_cache)
+    ub_entity = makeHDF5Dataset(obj.ub, entity, name="ub", 
+                                       compression = compression,
+                                       chunks = chunks, 
+                                       track_order = track_order,
+                                       entity_cache = entity_cache)
+    kf_entity = makeHDF5Dataset(obj.keep_feasible, entity, name="keep_feasible", 
+                                       compression = compression,
+                                       chunks = chunks, 
+                                       track_order = track_order,
+                                       entity_cache = entity_cache)
+    
+    entity.attrs.update(obj_attrs)
+
+    storeEntityInCache(entity_cache, obj, entity)
+    
+    return entity
+
 @objectToEntity.register(vigra.filters.Kernel1D)
 @objectToEntity.register(vigra.filters.Kernel2D)
 def _(obj:typing.Union[vigra.filters.Kernel1D, vigra.filters.Kernel2D], 
@@ -2401,7 +2441,7 @@ def _(obj:typing.Union[pd.DataFrame, pd.Series],
         # TODO/FIXME: pandas_dtypes?
         cached_entity = getCachedEntity(entity_cache, obj)
         
-        if isinstance(cached_entity, h5py.Dataset):
+        if isinstance(cached_entity, h5py.Group): # shouldn't this be a Group?
             group[target_name] = cached_entity # hard link
             return cached_entity
 
@@ -3120,6 +3160,7 @@ def _(obj:type(None), group, attrs:dict, name:str, compression, chunks,
     storeEntityInCache(entity_cache, obj, dset)
     return dset
 
+
 @makeDataset.register(type(pd.NA))
 def _(obj:type(pd.NA), group, attrs:dict, name:str, compression, chunks, 
       track_order, entity_cache):
@@ -3826,6 +3867,12 @@ def _(entity:h5py.Group, target_class:type, attrs:dict, cache:dict=dict()):
                 data[k] = fromHDF5(entity[k], cache)
         obj = types.SimpleNamespace(**data)
         
+    elif target_class == scipy.optimize.Bounds:
+        lb = fromHDF5(entity["lb"], cache)
+        ub = fromHDF5(entity["ub"], cache)
+        keep_feasible = fromHDF5(entity["keep_feasible"], cache)
+        return target_class(lb, ub, keep_feasible)
+    
     else:
         if target_class is None:
             raise ValueError("Target class is undetermined")
