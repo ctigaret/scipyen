@@ -19,6 +19,7 @@ class ScipyenMagics(Magics):
     @needs_local_scope
     def exit(self, line, local_ns):
         r"""%exit line magic
+    Exits Scipyen application.
         """
         #if "mainWindow" in local_ns and isinstance(local_ns["mainWindow"], ScipyenWindow):
         if "mainWindow" in local_ns and local_ns["mainWindow"].__class__.__name__ == "ScipyenWindow":
@@ -29,7 +30,8 @@ class ScipyenMagics(Magics):
     @line_magic
     @needs_local_scope
     def quit(self, line, local_ns):
-        r"""%exit line magic
+        r"""%quit line magic
+    Exits Scipyen application (same as %exit line magic).
         """
         #if "mainWindow" in local_ns and isinstance(local_ns["mainWindow"], ScipyenWindow):
         if "mainWindow" in local_ns and local_ns["mainWindow"].__class__.__name__ == "ScipyenWindow":
@@ -40,7 +42,8 @@ class ScipyenMagics(Magics):
     @line_magic
     @needs_local_scope
     def external_ipython(self, line, local_ns):
-        r"""%external_ipython magic launches a separate Jupyter Qt Console process
+        r"""%external_ipython magic 
+    Launches a separate Jupyter Qt Console process
         """
         
         #if "mainWindow" in local_ns and isinstance(local_ns["mainWindow"], ScipyenWindow):
@@ -52,7 +55,8 @@ class ScipyenMagics(Magics):
     @line_magic
     @needs_local_scope
     def neuron_ipython(self, line, local_ns):
-        r"""%neuron_ipython magic launches a separate NEURON Python process
+        r"""%neuron_ipython magic 
+    Launches a separate NEURON Python process - only if NEURON python is installed
         """
         
         #if "mainWindow" in local_ns and isinstance(local_ns["mainWindow"], ScipyenWindow):
@@ -74,6 +78,9 @@ class ScipyenMagics(Magics):
     @line_magic
     @needs_local_scope
     def scipyendir(self, line, local_ns):
+        r"""%scipyendir magic 
+    Prints the directory where scipyen is installed.
+    """
         scipyen_settings = local_ns.get("scipyen_settings", None)
         ret = ""
         if isinstance(scipyen_settings, confuse.Configuration):
@@ -91,15 +98,18 @@ class ScipyenMagics(Magics):
     @line_magic
     @needs_local_scope
     def appdir(self, line, local_ns):
+        r"""Alias to %scipyendir line magic
+    Prints the directory where Scipyen is installed"""
         return self.scipyendir(line, local_ns)
     
     @line_magic
     @needs_local_scope
     def workspace(self, line, local_ns):
-        r"""%workspace magic returns a reference to the user namespace
+        r"""%workspace magic 
+    Returns a reference to the user namespace
         
-        Alternative function to use in your own codes: 
-            core.workspacefunctions.user_workspace()
+    Alternative function to use in your own codes: 
+        core.workspacefunctions.user_workspace()
         
         """
         return local_ns
@@ -142,9 +152,10 @@ class ScipyenMagics(Magics):
     @line_magic
     @needs_local_scope
     def clear(self, line, local_ns):
-        r"""Overrides zmq interactive shell 'clear' line magic
-        This is because in Scipyen with Python 3.10 'clear' clears the system 
-        console, NOT Scipyen's console.
+        r"""%clear line magic
+    Overrides the 'clear' line magic inherited from the zmq interactive shell. 
+    This is because in Scipyen with Python 3.10 'clear' clears the system console,
+    NOT Scipyen's console.
         """
         console = local_ns.get("console", None)
         if console.__class__.__name__ == 'ScipyenConsole':
@@ -153,40 +164,41 @@ class ScipyenMagics(Magics):
     @line_magic
     @needs_local_scope
     def view(self, line, local_ns):
-        r"""View the variable named in `line` using appropriate Scipyen viewers.
+        r"""%view line magic.
+    View the variable named in `line` using appropriate Scipyen viewers.
         
-        Parameters:
-        ==========
-        `line`: a str containing either:
-        
-            • one token - a valid variable name (symbol) - the variable will be
-                viewed in an appropriate synpien viewer; if no instance of viewer
-                is available one will be created; otherwise, an existing viewer
-                is used.
-        
-            • several comma- or space-separated tokens, where all tokens are 
-                valid Python symbols, with either:
-        
-                ∘ all being variable names (in which case, all variables are 
-                viewed in separate instances of their default viewer types)
-        
-                    Each of these variables will be viewed in a new instance of
-                their default viewer type
-        
-                ∘ all but the last token are variable names, and the last token
-                if a supported viewer _TYPE_ (i.e. class name).
-        
-                    Each of the variables will be viewed in a new instance of 
-                the specified viewer type (or a warning will be printed if the
-                specified viewer type is not appropriate for the given variable)
-        
-                ∘ all but the last token are variable names and the last token
-                    is '?' - in this case the macro will print a table of 
-                    viewer type names for each variable name specified in the line
-        
-        WARNING: Entering '?' by itself (not immediately after the magic name) 
-            will raise an error.
-        
+    Parameters:
+    ==========
+    `line`: a str containing either:
+    
+        • one token - a valid variable name (symbol) - the variable will be
+            viewed in an appropriate synpien viewer; if no instance of viewer
+            is available one will be created; otherwise, an existing viewer
+            is used.
+    
+        • several comma- or space-separated tokens, where all tokens are 
+            valid Python symbols, with either:
+    
+            ∘ all being variable names (in which case, all variables are 
+            viewed in separate instances of their default viewer types)
+    
+                Each of these variables will be viewed in a new instance of
+            their default viewer type
+    
+            ∘ all but the last token are variable names, and the last token
+            if a supported viewer _TYPE_ (i.e. class name).
+    
+                Each of the variables will be viewed in a new instance of 
+            the specified viewer type (or a warning will be printed if the
+            specified viewer type is not appropriate for the given variable)
+    
+            ∘ all but the last token are variable names and the last token
+                is '?' - in this case the macro will print a table of 
+                viewer type names for each variable name specified in the line
+    
+    WARNING: Entering '?' by itself (not immediately after the magic name) 
+        will raise an error.
+    
         """
         from gui.mainwindow import VTH
         mw = local_ns.get("mainWindow", None)
@@ -300,6 +312,7 @@ class ScipyenMagics(Magics):
     @line_magic
     @needs_local_scope
     def newView(self, line, local_ns):
+        r"""newView line magic"""
         mw = local_ns.get("mainWindow", None)
         if mw.__class__.__name__ == "ScipyenWindow":
             mw.showVariable(line)

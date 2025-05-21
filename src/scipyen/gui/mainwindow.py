@@ -436,10 +436,22 @@ _valid_varname__regex_ = '^[A-Za-z_][A-Za-z0-9_]{1,30}$'
 #     u'\n\nAnd from the Pict package:\npictio --> pio\nsignalviewer --> sv\ndatatypes \nxmlutils' +\
 #     u'\n\nTherefore ipython line magics such as %pylab or %mtplotlib, although still available, are not necessary anymore\n'
 
-from setuptools_scm import get_version
-version = get_version(root='..', relative_to=__file__)
+__verstr__ = None
+p = pathlib.Path(__scipyendir__)
+if p.parent.name == "src":
+    try:
+        __verstr__ = sysutils.getUnbuiltVersion(p)
+    except:
+        traceback.print_exc()
+    
+_scipyen_console_banner_ = f"Scipyen {__verstr__} internal console\n" if isinstance(__verstr__, str) and len(__verstr__.strip()) else "Scipyen internal console\n"
 
-_scipyen_console_banner_ = f"Scipyen {version} internal console\n"
+# # # try:
+# # #     # from setuptools_scm import get_version
+# # #     # __version__ = get_version(root='..', relative_to=__file__)
+# # # except:
+# # #     traceback.print_exc()
+# # #     _scipyen_console_banner_ = "Scipyen internal console\n"
 
 _info_banner_ = ["\n*** NOTE: ***"]
 _info_banner_.append(

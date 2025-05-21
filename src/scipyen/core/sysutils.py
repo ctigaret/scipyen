@@ -16,6 +16,11 @@ from core.prog import print_styled
 def adapt_ui_path(module_path, uifile):
     return os.path.join(module_path, uifile)
 
+def getUnbuiltVersion(path:pathlib.Path):
+    proc = subprocess.run([sys.executable, "-m", "setuptools_scm"], capture_output=True, cwd=path.as_posix())
+    if proc.returncode == 0:
+        return proc.stdout.decode().replace("\n", "")
+
 def checkGitRepo(path:pathlib.Path, label:str = "Scipyen"):
     gitTest = subprocess.run(["git", "-C", path.as_posix(), "status", "--short", "--branch"], capture_output=True)
 

@@ -33,4 +33,4 @@ Homepage = "https://github.com/ctigaret/scipyen"
 Issues = "https://github.com/ctigaret/scipyen/issues"
 
 [tool.setuptools_scm]
-version_file = "scipyen/_version.py"
+#version_file = "scipyen/_version.py"
