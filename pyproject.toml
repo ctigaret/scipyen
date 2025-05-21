@@ -4,7 +4,7 @@
 
 [project]
 name = "scipyen"
-# version = "0.0.1"
+version = "0.0.1"
 # dependencies = ["pygments"]
 readme = "README.md"
 authors = [{name="Cezar M. Tigaret", email="cezar.tigaret@gmail.com"}]
@@ -19,18 +19,16 @@ classifiers = [
     "Topic :: Data Analysis :: Software Development"
     ]
 license = {file = "GPL-3.0-or-later"}
-dynamic = ["version"]
-
 # license-files = ["LICENSES/*"]
 keywords = ["neuroscience", "electrophysiology", "patch-clamp", "two-photon"]
 
 [build-system]
-requires = ["setuptools>=64", "setuptools-scm>=8", "wheel"]
+requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project.urls]
 Homepage = "https://github.com/ctigaret/scipyen"
 Issues = "https://github.com/ctigaret/scipyen/issues"
 
-[tool.setuptools_scm]
-version_file = "scipyen/_version.py"
+# [project.entry-points."pygments.styles"]
+# KeplerDark = "keplerdark:KeplerDark"

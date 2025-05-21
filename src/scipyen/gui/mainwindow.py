@@ -436,10 +436,7 @@ _valid_varname__regex_ = '^[A-Za-z_][A-Za-z0-9_]{1,30}$'
 #     u'\n\nAnd from the Pict package:\npictio --> pio\nsignalviewer --> sv\ndatatypes \nxmlutils' +\
 #     u'\n\nTherefore ipython line magics such as %pylab or %mtplotlib, although still available, are not necessary anymore\n'
 
-from setuptools_scm import get_version
-version = get_version(root='..', relative_to=__file__)
-
-_scipyen_console_banner_ = f"Scipyen {version} internal console\n"
+_scipyen_console_banner_ = "This is Scipyen's internal console, using:\n"
 
 _info_banner_ = ["\n*** NOTE: ***"]
 _info_banner_.append(
