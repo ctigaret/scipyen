@@ -1635,7 +1635,9 @@ def guess_init_biased_biexp(x, y, is_sorted:bool=True):#
         p = 0.5 * (B + np.sqrt(B2A))
         q = 0.5 * (B - np.sqrt(B2A))
     else:
-        p = q =0.5 * B
+        p = np.abs(0.5 * (B + np.emath.sqrt(B2A)))
+        q = np.abs(0.5 * (B - np.emath.sqrt(B2A)))
+        # p = q =0.5 * B
         prog.scipywarn("The biexponential model looks unfeasible for the data")
 
     
