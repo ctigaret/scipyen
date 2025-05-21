@@ -439,8 +439,16 @@ _valid_varname__regex_ = '^[A-Za-z_][A-Za-z0-9_]{1,30}$'
 __verstr__ = None
 p = pathlib.Path(__scipyendir__)
 if p.parent.name == "src":
+    # NOTE: 2025-05-21 21:50:37
+    # This figures out if scipyen is being run off a local git repository; if it
+    # does, then outputs a brief message about the git branch begn used and its 
+    # status (modified, or not, etc)
+    # Then sets out a dynamic version based on the git branch, etc
+    # NOTE: this code was previously in the scipyen.py launcher script
     try:
-        __verstr__ = sysutils.getUnbuiltVersion(p)
+        repoDir = p.parent.parent
+        if sysutils.checkGitRepo(repoDir, "Scipyen"):
+            __verstr__ = sysutils.getUnbuiltVersion(p)
     except:
         traceback.print_exc()
     

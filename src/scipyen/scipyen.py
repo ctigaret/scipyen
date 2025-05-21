@@ -46,42 +46,42 @@ elif getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
 else:
     raise RuntimeError("Scipyen must be run in a virtualenv virtual Python environment, a conda environment, or a PyInstaller bundle\n")
 
-try:
-    # print(f"scipyen module: {__file__}")
-    # NOTE: 2025-03-26 09:02:01
-    # This figures out is scipyen is being run off a local git repository; if it
-    # does, then outputs a brief message about the git branch begn used and its 
-    # status (modified, or not, etc)
-    moduleFilePath = pathlib.Path(__file__)
-    moduleDir = moduleFilePath.parent
-    if moduleDir.name == "scipyen":
-        srcDir = moduleDir.parent
-        if srcDir.name == "src":
-            repoDir = srcDir.parent
-            sysutils.checkGitRepo(repoDir, "Scipyen") # will print out git branch status is available
-            # gitTest = subprocess.run(["git", "-C", repoDir.as_posix(), "status", "--short", "--branch"], capture_output=True)
-            # 
-            # if gitTest.returncode == 0:
-            #     result = gitTest.stdout.decode().split("\n")
-            #     brComp = result[0]
-            #     head, branches = brComp.split("## ")
-            #     local, remote = branches.split("...")
-            #     local = print_styled(local, color="green")
-            #     remote = print_styled(remote, color="red")
-            #     msg = f"{print_styled('WARNING:', color='yellow')} Running {local} branch of the local Scipyen git repository in {print_styled(repoDir.as_posix(), color='blue')}, with status:"
-            #     result[0] = "## "+local+"..."+remote
-            #     if len(result) > 1:
-            #         for k in range(1,len(result)):
-            #             s = result[k]
-            #             head = print_styled(s[:2], color="red")
-            #             fileName = s[2:]
-            #             result[k] = head+fileName
-            # 
-            #     result.insert(0, msg)
-            #     print("\n".join(result))
-except:
-    traceback.print_exc()
-    pass
+# try:
+#     # print(f"scipyen module: {__file__}")
+#     # NOTE: 2025-03-26 09:02:01
+#     # This figures out is scipyen is being run off a local git repository; if it
+#     # does, then outputs a brief message about the git branch begn used and its 
+#     # status (modified, or not, etc)
+#     moduleFilePath = pathlib.Path(__file__)
+#     moduleDir = moduleFilePath.parent
+#     if moduleDir.name == "scipyen":
+#         srcDir = moduleDir.parent
+#         if srcDir.name == "src":
+#             repoDir = srcDir.parent
+#             sysutils.checkGitRepo(repoDir, "Scipyen") # will print out git branch status is available
+#             # gitTest = subprocess.run(["git", "-C", repoDir.as_posix(), "status", "--short", "--branch"], capture_output=True)
+#             # 
+#             # if gitTest.returncode == 0:
+#             #     result = gitTest.stdout.decode().split("\n")
+#             #     brComp = result[0]
+#             #     head, branches = brComp.split("## ")
+#             #     local, remote = branches.split("...")
+#             #     local = print_styled(local, color="green")
+#             #     remote = print_styled(remote, color="red")
+#             #     msg = f"{print_styled('WARNING:', color='yellow')} Running {local} branch of the local Scipyen git repository in {print_styled(repoDir.as_posix(), color='blue')}, with status:"
+#             #     result[0] = "## "+local+"..."+remote
+#             #     if len(result) > 1:
+#             #         for k in range(1,len(result)):
+#             #             s = result[k]
+#             #             head = print_styled(s[:2], color="red")
+#             #             fileName = s[2:]
+#             #             result[k] = head+fileName
+#             # 
+#             #     result.insert(0, msg)
+#             #     print("\n".join(result))
+# except:
+#     traceback.print_exc()
+#     pass
 
 # print(f"Argv: {sys.argv}")
 

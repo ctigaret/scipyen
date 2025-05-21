@@ -21,7 +21,7 @@ def getUnbuiltVersion(path:pathlib.Path):
     if proc.returncode == 0:
         return proc.stdout.decode().replace("\n", "")
 
-def checkGitRepo(path:pathlib.Path, label:str = "Scipyen"):
+def checkGitRepo(path:pathlib.Path, label:str = "Scipyen") -> bool:
     gitTest = subprocess.run(["git", "-C", path.as_posix(), "status", "--short", "--branch"], capture_output=True)
 
     if gitTest.returncode == 0:
@@ -42,4 +42,7 @@ def checkGitRepo(path:pathlib.Path, label:str = "Scipyen"):
 
         result.insert(0, msg)
         print("\n".join(result))
+        return True
+    
+    return False
     
