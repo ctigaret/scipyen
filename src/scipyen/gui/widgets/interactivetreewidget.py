@@ -26,6 +26,7 @@ from qtpy.QtCore import Signal, Slot, Property
 import neo
 import quantities as pq
 import numpy as np
+import scipy
 import pandas as pd
 #### END 3rd party modules
 
@@ -62,7 +63,8 @@ from core.traitcontainers import (DataBag, DataBagTraitsObserver,)
 from gui.widgets.tablewidget import SimpleTableWidget
 from gui.widgets.tableeditorwidget import (TableEditorWidget, TabularDataModel,)
 
-SINGLETONS = (tuple(), None, math.inf, math.nan, np.inf, np.nan, MISSING, pd.NA)
+NOTREFERENCED = (tuple, type(None), type(MISSING), type(pd.NA))
+PODS = (bool, int, float, bytes, bytearray, str)
 
 # class InteractiveTreeWidget(DataTreeWidget):
 class InteractiveTreeWidget(QtWidgets.QTreeWidget):
@@ -155,7 +157,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         self.clear()
         self.widgets = []
         self.nodes = {}
-        #              data, parent,                   predicate,           hideRoot
+        #              data,                parent,                   …
         self.buildTree(self._private_data_, self.invisibleRootItem(), typeStr = dataTypeStr, predicate=predicate, hideRoot=hideRoot)
         self.expandToDepth(3)
         self.resizeColumnToContents(0)
@@ -191,7 +193,9 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         else:
             return data, False
         
-    def buildTree(self, data:object, parent:QtWidgets.QTreeWidgetItem, name:str="", nameTip:str="", typeStr = None, predicate=None, hideRoot:bool=False, path:tuple=()):
+    def buildTree(self, data:object, parent:QtWidgets.QTreeWidgetItem,
+                  name:str="", nameTip:str="", typeStr = None, predicate=None, 
+                  hideRoot:bool=False, path:tuple=()):
         r"""
         Overrides pyqtgraph.DataTreeWidget.buildTree()
         
@@ -278,7 +282,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         # hashable, hence usable as dict key
         self.nodes[path] = node
         
-        typeStr_, desc, children, widget, typeTip, showDescInParentNode= self.parse(data, predicate=predicate)
+        typeStr_, desc, children, widget, typeTip, showDescInParentNode = self.parse(data, predicate=predicate)
         
         if not isinstance(typeStr, str) or len(typeStr.strip()) == 0:
             typeStr = typeStr_
@@ -292,9 +296,13 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         if showDescInParentNode:
             node.setText(2, desc)
         
-        if isinstance(data, NestedFinder.nesting_types):
-            if id(data) not in self._visited_.keys():
-                self._visited_[id(data)] = (typeStr, path)
+        # NOTE: 2025-05-21 16:26:20 
+        # why not applying this rule to other kinds of data as well?
+        # if isinstance(data, NestedFinder.nesting_types):
+        #     if id(data) not in self._visited_.keys():
+        #         self._visited_[id(data)] = (typeStr, path)
+        if id(data) not in self._visited_.keys():
+            self._visited_[id(data)] = (typeStr, path)
             
         # Truncate description and add text box if needed
         if len(desc) > 100:
@@ -317,16 +325,13 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
             if isinstance(key, type):
                 keyrepr = f"{key.__module__}.{key.__name__}"
                 keytip = str(key)
-                #keytip = asUnicode(key)
                 
             elif type(key).__name__ == "instance":
                 keyrepr = key.__class__.__name__
                 keytip = str(key)
-                #keytip = asUnicode(key)
                 
             else:
                 keyrepr = str(key)
-                #keyrepr = asUnicode(key)
                 keytip = type(key).__name__
                 
             keyTypeTip = "key / index type: %s" % keytip
@@ -362,7 +367,6 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         """
         from pyqtgraph.widgets.DataTreeWidget import HAVE_METAARRAY
         from collections import OrderedDict
-        #from pyqtgraph.python2_3 import asUnicode
         from core.datatypes import (is_namedtuple, TypeEnum)
         
 #         print(f"{self.__class__.__name__}.parse data is a {type(data).__name__}")
@@ -395,31 +399,41 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         showDescInParentNode = True
         children = {}
         
-        if data is None:
-            typeStr = ""
-            return typeStr, desc, children, widget, typeTip 
-        
-        elif data is dataclasses.MISSING:
-            desc = str(MISSING)
-            return typeStr, desc, children, widget, typeTip 
-            
-        
-        # type-specific changes
-        try:
-            if isinstance(data, NestedFinder.nesting_types + (set,)):
-                if data not in SINGLETONS and id(data) in self._visited_.keys():
-                    objtype = self._visited_[id(data)][0]
-                    path = "/".join(list(self._visited_[id(data)][1]))
-                    if len(path.strip()) == 0:
-                        full_path = self.top_title
-                    else:
-                        if self.top_title == "/":
-                            full_path = "/" + path
-                        else:
-                            full_path = "/".join([self.top_title, path])
-                    desc = "<reference to %s at %s >" % (objtype, full_path)
+        # NOTE: 2025-05-21 16:27:56 see NOTE: 2025-05-21 16:26:20 
+        if type(data) not in NOTREFERENCED and type(data) not in PODS and id(data) in self._visited_.keys():
+            objtype = self._visited_[id(data)][0]
+            path = "/".join(list(self._visited_[id(data)][1]))
+            if len(path.strip()) == 0:
+                full_path = self.top_title
+            else:
+                if self.top_title == "/":
+                    full_path = "/" + path
                 else:
+                    full_path = "/".join([self.top_title, path])
+            desc = "<reference to %s at %s >" % (objtype, full_path)
+            return typeStr, desc, children, widget, typeTip, showDescInParentNode
+            
+        else:
+            if data is None:
+                typeStr = ""
+                return typeStr, desc, children, widget, typeTip, showDescInParentNode
+            
+            elif data is dataclasses.MISSING:
+                desc = str(MISSING)
+                return typeStr, desc, children, widget, typeTip, showDescInParentNode
+                
+#             elif type(data) in PODS:
+#                 desc = type(data).__name__
+                
+            # type-specific stuff
+            try:
+                if isinstance(data, NestedFinder.nesting_types + (set,)):
+                    # NOTE: 2025-05-21 16:15:26
+                    # here 'widget' is None — this will force the caller (i.e. buildTree)
+                    # to descend into the children of the data and build up a subtree
                     if isinstance(data, dict):
+                        # NOTE: 2025-05-21 16:17:37
+                        # 'widget' is None, here
                         desc = "length=%d" % len(data)
                         if isinstance(data, OrderedDict):
                             children = data
@@ -433,6 +447,8 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                             children = OrderedDict([items[k] for k in ndx])
                             
                     elif isinstance(data, (list, tuple, deque, set)):
+                        # NOTE: 2025-05-21 16:17:37
+                        # 'widget' is None, here
                         desc = "length=%d" % len(data)
                         # NOTE: 2021-07-24 14:57:02
                         # accommodate namedtuple types
@@ -440,84 +456,106 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                             children = data._asdict()
                         else:
                             children = OrderedDict(enumerate(data))
+                    
+                elif HAVE_METAARRAY and (hasattr(data, 'implements') and data.implements('MetaArray')):
+                    # NOTE: 2025-05-21 16:17:37
+                    # 'widget' is None, here
+                    children = OrderedDict([
+                        ('data', data.view(np.ndarray)),
+                        ('meta', data.infoCopy())
+                    ])
                 
-            elif HAVE_METAARRAY and (hasattr(data, 'implements') and data.implements('MetaArray')):
-                children = OrderedDict([
-                    ('data', data.view(np.ndarray)),
-                    ('meta', data.infoCopy())
-                ])
+                elif isinstance(data, types.SimpleNamespace):
+                    # NOTE: 2025-05-21 16:17:37
+                    # 'widget' is None, here
+                    children = data.__dict__
+                    desc = type(data).__name__
                 
-            elif isinstance(data, pd.DataFrame):
-                desc = "length=%d, columns=%d" % (len(data), len(data.columns))
-                widget = self._makeTableWidget_(data)
-                
-            elif isinstance(data, pd.Series):
-                desc = "length=%d, dtype=%s" % (len(data), data.dtype)
-                widget = self._makeTableWidget_(data)
-                
-            elif isinstance(data, pd.Index):
-                desc = "length=%d" % len(data)
-                widget = self._makeTableWidget_(data)
-                
-            elif isinstance(data, neo.core.dataobject.DataObject):
-                desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
-                if data.size == 1:
-                    widget = QtWidgets.QLabel(str(data))
-                else:
+                elif isinstance(data, pd.DataFrame):
+                    desc = "length=%d, columns=%d" % (len(data), len(data.columns))
                     widget = self._makeTableWidget_(data)
                     
-            elif isinstance(data, pq.Quantity):
-                desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
-                if data.size == 1:
-                    widget = QtWidgets.QLabel(str(data))
-                else:
+                elif isinstance(data, pd.Series):
+                    desc = "length=%d, dtype=%s" % (len(data), data.dtype)
                     widget = self._makeTableWidget_(data)
                     
-            elif isinstance(data, np.ndarray):
-                desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
-                widget = self._makeTableWidget_(data)
-                
-            elif isinstance(data, types.TracebackType):  ## convert traceback to a list of strings
-                frames = list(map(str.strip, traceback.format_list(traceback.extract_tb(data))))
-                widget = QtWidgets.QPlainTextEdit(str('\n'.join(frames)))
-                widget.setMaximumHeight(200)
-                widget.setReadOnly(True)
-                
-            elif isinstance(data, str):
-                if len(data)> 100:
-                    _data = data[:97] + "..."
-                    desc = f"string with {len(data)} characters"
-                    widget = QtWidgets.QPlainTextEdit(data)
+                elif isinstance(data, pd.Index):
+                    desc = "length=%d" % len(data)
+                    widget = self._makeTableWidget_(data)
+                    
+                elif isinstance(data, neo.core.dataobject.DataObject):
+                    desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
+                    if data.size == 1:
+                        widget = QtWidgets.QLabel(str(data))
+                    else:
+                        widget = self._makeTableWidget_(data)
+                        
+                elif isinstance(data, pq.Quantity):
+                    desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
+                    if data.size == 1:
+                        widget = QtWidgets.QLabel(str(data))
+                    else:
+                        widget = self._makeTableWidget_(data)
+                        
+                elif isinstance(data, np.ndarray):
+                    desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
+                    widget = self._makeTableWidget_(data)
+                    
+                elif isinstance(data, types.TracebackType):  ## convert traceback to a list of strings
+                    frames = list(map(str.strip, traceback.format_list(traceback.extract_tb(data))))
+                    widget = QtWidgets.QPlainTextEdit(str('\n'.join(frames)))
                     widget.setMaximumHeight(200)
                     widget.setReadOnly(True)
+                    
+                elif isinstance(data, scipy.optimize.Bounds):
+                    children = {"lb": data.lb, "ub": data.ub, "keep_feasible": data.keep_feasible}
+                    desc = type(data).__name__
+                    
+                elif isinstance(data, str):
+                    if len(data)> 100:
+                        _data = data[:97] + "..."
+                        desc = f"string with {len(data)} characters"
+                        widget = QtWidgets.QPlainTextEdit(data)
+                        widget.setMaximumHeight(200)
+                        widget.setReadOnly(True)
+                    else:
+                        desc = data
+                        
+                elif isinstance(data, (bool, int, bytes, bytearray)):
+                    desc = type(data).__name__
+                    widget = QtWidgets.QPlainTextEdit(str(data))
+                    widget.setMaximumHeight(200)
+                    widget.setReadOnly(True)
+                    
+                elif isinstance(data, float):
+                    desc = type(data).__name__
+                    widget = QtWidgets.QPlainTextEdit(f"{data}")
+                    widget.setMaximumHeight(200)
+                    widget.setReadOnly(True)
+                    
                 else:
-                    desc = data
-                
-            else:
-                # NOTE: 2022-12-30 14:26:46
-                # Descending into the data's members is too prone for infinite recurson.
-                # Hence, we STOP here (i.e. at first level).
-                # NOTE: 2025-03-10 23:08:04
-                # support for dataclasses — descend into their fields as if they were a dict
-                if dataclasses.is_dataclass(data):
-                    datafields = dataclasses.fields(data)
-                    # dataname = getattr(data, "name", "") 
-                    # if len(dataname.strip()) == 0:
-                    #     lbl = f"<{data.__class__.__name__}> object"
-                    # else:
-                    #     lbl = f"<{data.__class__.__name__}> object ({dataname})"
-                    lbl = f"<{data.__class__.__name__}> object"
-                    desc = " ".join([lbl, "with", f"{len(datafields)} fields"])
-                    children = OrderedDict(map(lambda x: (x.name, getattr(data, x.name)), datafields))
-                elif isinstance(data, enum.Enum):
-                    desc = f"{data} ({data.name})"
-                else:
-                    desc = str(data) # this becomes too clutered, but needs trimming in self.buildTree
-                    showDescInParentNode = False
-                
-            return typeStr, desc, children, widget, typeTip, showDescInParentNode
-        
-        except:
-            # print(f"{self.__class__.__name__}.parse data type : {type(data).__name__}, data: {data}")
-            raise
+                    # NOTE: 2022-12-30 14:26:46
+                    # Descending into the data's members is too prone for infinite recurson.
+                    # Hence, we STOP here (i.e. at first level).
+                    # NOTE: 2025-03-10 23:08:04
+                    # support for dataclasses — descend into their fields as if they were a dict
+                    if dataclasses.is_dataclass(data):
+                        datafields = dataclasses.fields(data)
+                        lbl = f"<{data.__class__.__name__}> object"
+                        desc = " ".join([lbl, "with", f"{len(datafields)} fields"])
+                        children = OrderedDict(map(lambda x: (x.name, getattr(data, x.name)), datafields))
+                        
+                    elif isinstance(data, enum.Enum):
+                        desc = f"{data} ({data.name})"
+                        
+                    else:
+                        # desc = str(data) # this becomes too clutered, but needs trimming in self.buildTree
+                        desc = type(data).__name__
+                        # showDescInParentNode = False
+                    
+                return typeStr, desc, children, widget, typeTip, showDescInParentNode
+            
+            except:
+                # print(f"{self.__class__.__name__}.parse data type : {type(data).__name__}, data: {data}")
+                raise
         

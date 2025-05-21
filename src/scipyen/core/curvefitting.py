@@ -1487,8 +1487,13 @@ for the biexponential function
     
     B2A = B**2 + 4*A # ∵ A = -pq and B = (p+q)
     
-    p = 0.5 * (B + np.sqrt(B2A))
-    q = 0.5 * (B - np.sqrt(B2A))
+    # NOTE: 2025-05-21 15:59:20 see NOTE: 2025-05-20 22:31:50
+    if B2A >= 0:
+        p = 0.5 * (B + np.sqrt(B2A))
+        q = 0.5 * (B - np.sqrt(B2A))
+    else:
+        p = q =0.5 * B
+        scipywarn("The biexponential model looks unfeasible for the data")
 
     # Step 2
     β = np.exp(p*x)
@@ -1569,12 +1574,18 @@ def guess_init_biased_biexp(x, y, is_sorted:bool=True):#
     # σ, ν = optimize.nnls(𝐌ᵀ𝐌, 𝐌ᵀ𝚪) # NOTE: 2025-05-20 22:36:43 this constrains A, B, C, D, E to be >= 0 which is NOT what is required / actually is, to be avoided
     # A, B, C, D, E = σ
     B2A = B**2 + 4*A # ∵ A = -pq and B = (p+q)
-    # NOTE: 2025-05-20 22:31:50 dirty trick and mathematically NOT justified,
+    # NOTE: 2025-05-20 22:31:50 
+    # This is a dirty trick and mathematically NOT justified,
     # but avoids BUG 2025-05-18 18:24:32
-    # since this is intended for a rough "guesstimate" of inital coefficient
-    # values, I guess I can live with it
-    p = 0.5 * (B + np.sqrt(B2A)) if B2A >= 0 else 0.5*B 
-    q = 0.5 * (B - np.sqrt(B2A)) if B2A >= 0 else 0.5*B
+    # Since this is intended for a rough "guesstimate" of inital coefficient
+    # values, I guess I can live with it...
+    if B2A >= 0:
+        p = 0.5 * (B + np.sqrt(B2A))
+        q = 0.5 * (B - np.sqrt(B2A))
+    else:
+        p = q =0.5 * B
+        scipywarn("The biexponential model looks unfeasible for the data")
+
     
     # Step 2
     β = np.exp(p*x)

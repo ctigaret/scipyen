@@ -12,6 +12,7 @@ Qt5-based viewer window for dict and subclasses
 from __future__ import print_function
 
 import os, warnings, types, traceback, itertools, inspect, dataclasses, numbers
+import typing
 from collections import deque
 from dataclasses import MISSING
 import math
