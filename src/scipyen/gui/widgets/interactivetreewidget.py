@@ -415,17 +415,17 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
             
         else:
             if data is None:
-                typeStr = ""
+                typeStr = "(None)"
                 return typeStr, desc, children, widget, typeTip, showDescInParentNode
             
             elif data is dataclasses.MISSING:
                 desc = str(MISSING)
                 return typeStr, desc, children, widget, typeTip, showDescInParentNode
+            
+            elif type(data) is type(pd.NA):
+                desc = str(pd.NA)
+                return typeStr, desc, children, widget, typeTip, showDescInParentNode
                 
-#             elif type(data) in PODS:
-#                 desc = type(data).__name__
-                
-            # type-specific stuff
             try:
                 if isinstance(data, NestedFinder.nesting_types + (set,)):
                     # NOTE: 2025-05-21 16:15:26
@@ -539,7 +539,11 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                     # Hence, we STOP here (i.e. at first level).
                     # NOTE: 2025-03-10 23:08:04
                     # support for dataclasses — descend into their fields as if they were a dict
-                    if dataclasses.is_dataclass(data):
+                    if isinstance(data, type):
+                        desc = type(data).__name__
+                        
+                    elif dataclasses.is_dataclass(data):
+                        # print(f"{self.__class__.__name__}.parse: data is a {type(data)}")
                         datafields = dataclasses.fields(data)
                         lbl = f"<{data.__class__.__name__}> object"
                         desc = " ".join([lbl, "with", f"{len(datafields)} fields"])
