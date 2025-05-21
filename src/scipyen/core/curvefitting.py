@@ -1518,16 +1518,68 @@ for the biexponential function
     #
     # ### END   implementation of Jacquelin 
     
+def gen_norm_matrices(x,y):
+    r"""for debugging; to remove"""
+    from scipy import linalg
+    ξ = x
+    # ω = x*(0.5*x - x[0])
+    ω = 0.5*ξ**2
+    s = np.zeros(y.shape)
+    s[1:] = np.cumsum(0.5* np.diff(ξ) * (y[1:] + y[:-1])) # mid-point approximation (mid-point rule less error term f``(0.5*(xₖ - xₖ₋₁))(xₖ - xₖ₋₁)³/24)
+    ss = np.zeros(y.shape) 
+    ss[1:] = np.cumsum(0.5* np.diff(ξ) * (s[1:] + s[:-1]))
+
+    Σssₖ2  = np.dot(ss, ss)
+    Σssₖsₖ = np.dot(ss, s) 
+    Σssₖξₖ = np.dot(ss, ξ) 
+    Σssₖωₖ = np.dot(ss, ω) 
+    Σssₖyₖ = np.dot(ss, y) 
+    Σssₖ   = ss.sum()      
+    Σsₖ2   = np.dot(s, s)  
+    Σsₖξₖ  = np.dot(s, ξ)  
+    Σsₖωₖ  = np.dot(s, ω)  
+    Σsₖyₖ  = np.dot(s, y)  
+    Σsₖ    = s.sum()       
+    Σξₖ2   = np.dot(ξ, ξ)  
+    Σξₖωₖ  = np.dot(ξ, ω)  
+    Σξₖ    = ξ.sum()        
+    Σξₖyₖ  = np.dot(ξ, y)   
+    Σωₖyₖ  = np.dot(ω, y)   
+    Σωₖ2   = np.dot(ω, ω)
+    Σωₖ    = ω.sum() 
+    Σyₖ    = y.sum()        
+    n      = y.shape[0]     
+    𝐌ᵀ𝐌 = np.zeros((5, 5))
+    𝐌ᵀ𝐌[0,:] = [Σssₖ2,  Σssₖsₖ, Σssₖξₖ, Σssₖωₖ, Σssₖ]
+    𝐌ᵀ𝐌[1,:] = [Σssₖsₖ, Σsₖ2,   Σsₖξₖ,  Σsₖωₖ,  Σsₖ ]
+    𝐌ᵀ𝐌[2,:] = [Σssₖξₖ, Σsₖξₖ,  Σξₖ2,   Σξₖωₖ,  Σξₖ ]
+    𝐌ᵀ𝐌[3,:] = [Σssₖωₖ, Σsₖωₖ,  Σξₖωₖ,  Σωₖ2,   Σωₖ ]
+    𝐌ᵀ𝐌[4,:] = [Σssₖ,   Σsₖ,    Σξₖ,    Σωₖ,    n   ]
+
+    𝐌ᵀ𝚪 = np.array([Σssₖyₖ, Σsₖyₖ, Σξₖyₖ, Σωₖyₖ, Σyₖ])
+    A, B, C, D, E = linalg.solve(𝐌ᵀ𝐌, 𝐌ᵀ𝚪)
+    𝐌ᵀ𝐌i = linalg.pinv(𝐌ᵀ𝐌)
+    B2A = B**2 + 4*A
+    ret = {"𝐌ᵀ𝐌":𝐌ᵀ𝐌, "𝐌ᵀ𝚪":𝐌ᵀ𝚪, "𝐌ᵀ𝐌i":𝐌ᵀ𝐌i, "A": A, "B": B, "B2A": B2A,
+    "C":C,"D":D, "E":E, "ξ": ξ, "ω": ω, "s": s, "ss": s, "Σssₖ2":Σssₖ2,
+    "Σssₖsₖ": Σssₖsₖ, "Σssₖξₖ": Σssₖξₖ, "Σssₖωₖ": Σssₖωₖ, "Σssₖyₖ": Σssₖyₖ,
+    "Σssₖ": Σssₖ, "Σsₖ2": Σsₖ2, "Σsₖξₖ": Σsₖξₖ, "Σsₖωₖ": Σsₖωₖ, "Σsₖyₖ": Σsₖyₖ,
+    "Σsₖ": Σsₖ, "Σξₖ2": Σξₖ2, "Σξₖωₖ": Σξₖωₖ, "Σξₖ": Σξₖ, "Σξₖyₖ": Σξₖyₖ, "Σωₖyₖ": Σωₖyₖ,
+    "Σωₖ2": Σωₖ2, "Σωₖ": Σωₖ, "Σωₖ": Σωₖ, "Σyₖ": Σyₖ, "n": n}
+    return ret
+
+
+    
 def guess_init_biased_biexp(x, y, is_sorted:bool=True):#
     r"""returns a, b, p, c, q """
     x,y = skg_preprocess(x,y,is_sorted)
     ξ = x
     # ω = x*(0.5*x - x[0])
-    ω = 0.5*x**2
+    ω = 0.5*ξ**2
     s = np.zeros(y.shape)
-    s[1:] = np.cumsum(0.5* np.diff(x) * (y[1:] + y[:-1])) # mid-point approximation (mid-point rule less error term f``(0.5*(xₖ - xₖ₋₁))(xₖ - xₖ₋₁)³/24)
+    s[1:] = np.cumsum(0.5* np.diff(ξ) * (y[1:] + y[:-1])) # mid-point approximation (mid-point rule less error term f``(0.5*(xₖ - xₖ₋₁))(xₖ - xₖ₋₁)³/24)
     ss = np.zeros(y.shape) 
-    ss[1:] = np.cumsum(0.5* np.diff(x) * (s[1:] + s[:-1]))
+    ss[1:] = np.cumsum(0.5* np.diff(ξ) * (s[1:] + s[:-1]))
     
     Σssₖ2  = np.dot(ss, ss)
     Σssₖsₖ = np.dot(ss, s) 
@@ -1584,7 +1636,7 @@ def guess_init_biased_biexp(x, y, is_sorted:bool=True):#
         q = 0.5 * (B - np.sqrt(B2A))
     else:
         p = q =0.5 * B
-        scipywarn("The biexponential model looks unfeasible for the data")
+        prog.scipywarn("The biexponential model looks unfeasible for the data")
 
     
     # Step 2
