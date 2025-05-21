@@ -51,6 +51,7 @@
 #pyside2
 #pyside6
 # qdarkstyle ; sys_platform == 'win32'
+setuptools-scm
 qasync
 aiohttp
 pyqtdarktheme
