@@ -1420,7 +1420,8 @@ def fit_model(data, func, p0, *args, **kwargs):
     return fittedCurve, result
 
     
-def guess_init_biexp(x:np.ndarray, y:np.ndarray, is_sorted:bool=True):
+def guess_init_biexp(x:np.ndarray, y:np.ndarray, is_sorted:bool=True, 
+                     return_feasible:bool=True):
     r"""A crude implementation of Jacquelin's method of integral equation regression
 for the biexponential function
     
@@ -1446,6 +1447,7 @@ for the biexponential function
     this is the value of the first sample in the signal, or a "baseline" average)
     
 """
+    is_feasible:bool = True
     # ### BEGIN implementation of Jacquelin
     #
     x,y = skg_preprocess(x,y,is_sorted)
@@ -1493,7 +1495,8 @@ for the biexponential function
         q = 0.5 * (B - np.sqrt(B2A))
     else:
         p = q =0.5 * B
-        scipywarn("The biexponential model looks unfeasible for the data")
+        is_feasible:bool = False
+        scipywarn("Linear regression with biexponential model looks unfeasible for the data")
 
     # Step 2
     β = np.exp(p*x)
@@ -1513,12 +1516,64 @@ for the biexponential function
     
     b, c = np.dot(np.linalg.pinv(𝐌ᵀ𝐌), 𝐌ᵀ𝚪)#, overwrite_a=True, overwrite_b = False)
     
-    return (b, c, p, q)#, A, B, C, D)
-    # return (b, c, p, q, A, B, C, D)
     #
     # ### END   implementation of Jacquelin 
     
-def gen_norm_matrices(x,y):
+    if return_feasible:
+        return b, c, p, q, is_feasible
+    return b, c, p, q
+    
+def gen_norm_matrices_biexp(x,y):
+    r"""for debugging; to remove"""
+    from scipy import linalg
+    x,y = skg_preprocess(x,y,is_sorted)
+    # ξ = x-x[0]
+    ξ = x
+    
+    s = np.zeros(y.shape)
+    s[1:] = np.cumsum(0.5* np.diff(x) * (y[1:] + y[:-1])) # mid-point approximation (mid-point rule less error term f``(0.5*(xₖ - xₖ₋₁))(xₖ - xₖ₋₁)³/24)
+    
+    ss = np.zeros(y.shape) 
+    ss[1:] = np.cumsum(0.5* np.diff(x) * (s[1:] + s[:-1]))
+    
+    Σssₖ2  = np.dot(ss, ss)
+    Σssₖsₖ = np.dot(ss, s) 
+    Σssₖξₖ = np.dot(ss, ξ) 
+    Σssₖyₖ = np.dot(ss, y) 
+    Σssₖ   = ss.sum()      
+    Σsₖ2   = np.dot(s, s)  
+    Σsₖξₖ  = np.dot(s, ξ)  
+    Σsₖyₖ  = np.dot(s, y)  
+    Σsₖ    = s.sum()       
+    Σξₖ2   = np.dot(ξ, x)  
+    Σξₖ    = ξ.sum()        
+    Σξₖyₖ  = np.dot(ξ, y)   
+    Σyₖ    = y.sum()        
+    n      = y.shape[0]     
+    
+    # Step 1
+    𝐌ᵀ𝐌 = np.zeros((4, 4))
+    
+    𝐌ᵀ𝐌[0,:] = [Σssₖ2,  Σssₖsₖ, Σssₖξₖ, Σssₖ]
+    𝐌ᵀ𝐌[1,:] = [Σssₖsₖ, Σsₖ2,   Σsₖξₖ,  Σsₖ ]
+    𝐌ᵀ𝐌[2,:] = [Σssₖξₖ, Σsₖξₖ,  Σξₖ2,   Σξₖ ]
+    𝐌ᵀ𝐌[3,:] = [Σssₖ,   Σsₖ,    Σξₖ,    n   ]
+    
+    𝐌ᵀ𝚪 = np.array([Σssₖyₖ, Σsₖyₖ, Σξₖyₖ, Σyₖ])
+    
+    A, B, C, D = np.dot(np.linalg.pinv(𝐌ᵀ𝐌), 𝐌ᵀ𝚪) # D «should» be y[0] 
+    
+    B2A = B**2 + 4*A # ∵ A = -pq and B = (p+q)
+    ret = {"𝐌ᵀ𝐌":𝐌ᵀ𝐌, "𝐌ᵀ𝚪":𝐌ᵀ𝚪, "𝐌ᵀ𝐌i":𝐌ᵀ𝐌i, "A": A, "B": B, "B2A": B2A,
+    "C":C,"D":D, "E":E, "ξ": ξ, "ω": ω, "s": s, "ss": s, "Σssₖ2":Σssₖ2,
+    "Σssₖsₖ": Σssₖsₖ, "Σssₖξₖ": Σssₖξₖ, "Σssₖyₖ": Σssₖyₖ,
+    "Σssₖ": Σssₖ, "Σsₖ2": Σsₖ2, "Σsₖξₖ": Σsₖξₖ, "Σsₖyₖ": Σsₖyₖ,
+    "Σsₖ": Σsₖ, "Σξₖ2": Σξₖ2, "Σξₖ": Σξₖ, "Σξₖyₖ": Σξₖyₖ, 
+    "Σyₖ": Σyₖ, "n": n}
+    return ret
+
+    
+def gen_norm_matrices_b_biexp(x,y):
     r"""for debugging; to remove"""
     from scipy import linalg
     ξ = x
@@ -1568,10 +1623,10 @@ def gen_norm_matrices(x,y):
     "Σωₖ2": Σωₖ2, "Σωₖ": Σωₖ, "Σωₖ": Σωₖ, "Σyₖ": Σyₖ, "n": n}
     return ret
 
-
-    
-def guess_init_biased_biexp(x, y, is_sorted:bool=True):#
+def guess_init_biased_biexp(x:np.ndarray, y:np.ndarray, is_sorted:bool=True, 
+                            return_feasible:bool=True):
     r"""returns a, b, p, c, q """
+    is_feasible:bool = True
     x,y = skg_preprocess(x,y,is_sorted)
     ξ = x
     # ω = x*(0.5*x - x[0])
@@ -1626,19 +1681,33 @@ def guess_init_biased_biexp(x, y, is_sorted:bool=True):#
     # σ, ν = optimize.nnls(𝐌ᵀ𝐌, 𝐌ᵀ𝚪) # NOTE: 2025-05-20 22:36:43 this constrains A, B, C, D, E to be >= 0 which is NOT what is required / actually is, to be avoided
     # A, B, C, D, E = σ
     B2A = B**2 + 4*A # ∵ A = -pq and B = (p+q)
-    # NOTE: 2025-05-20 22:31:50 
-    # This is a dirty trick and mathematically NOT justified,
-    # but avoids BUG 2025-05-18 18:24:32
-    # Since this is intended for a rough "guesstimate" of inital coefficient
-    # values, I guess I can live with it...
     if B2A >= 0:
         p = 0.5 * (B + np.sqrt(B2A))
         q = 0.5 * (B - np.sqrt(B2A))
     else:
-        p = np.abs(0.5 * (B + np.emath.sqrt(B2A)))
-        q = np.abs(0.5 * (B - np.emath.sqrt(B2A)))
+        # NOTE: 2025-05-20 22:31:50 
+        # This is a dirty trick and not sure if mathematically justified,
+        # but avoids BUG 2025-05-18 18:24:32
+        # 
+        # Basically, it allows for the situation where linear regression above
+        # generates A < -(B²/4), in which case the system of equations with
+        # p, q unknown:
+        #   p × q = -A
+        #   p + q =  B
+        # has no real solutions.
+        #
+        # Therefore, I take p, q as the absolute value of the complex solutions
+        # to the above.
+        #
+        # Since this is intended for a rough "guesstimate" of inital coefficient
+        # values, I guess I can live with it...
+        # p = np.abs(0.5 * (B + np.emath.sqrt(B2A)))
+        # q = np.abs(0.5 * (B - np.emath.sqrt(B2A)))
+        p = np.real(0.5 * (B + np.emath.sqrt(B2A)))
+        q = np.real(0.5 * (B - np.emath.sqrt(B2A)))
         # p = q =0.5 * B
-        prog.scipywarn("The biexponential model looks unfeasible for the data")
+        is_feasible = False
+        prog.scipywarn("Linear regression with biased biexponential model looks unfeasible for the data")
 
     
     # Step 2
@@ -1672,6 +1741,8 @@ def guess_init_biased_biexp(x, y, is_sorted:bool=True):#
     # a, b, c = linalg.solve(𝐌ᵀ𝐌, 𝐌ᵀ𝚪) # likely to warn about ill-conditioned matrix
     # a, b, c = np.dot(np.linalg.pinv(𝐌ᵀ𝐌), 𝐌ᵀ𝚪)
     
+    if return_feasible:
+        return a, b, p, c, q, is_feasible #, A, B, C, D, E
     return a, b, p, c, q #, A, B, C, D, E
     
 def guess_init_two_exp_prod(x:np.ndarray, y:np.ndarray, is_sorted:bool=True):

@@ -330,6 +330,18 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                 keyrepr = key.__class__.__name__
                 keytip = str(key)
                 
+            elif isinstance(data, types.SimpleNamespace):
+                keyrepr = f"{key}"
+                keytip = type(child_data).__name__
+                
+            elif isinstance(data, scipy.optimize.Bounds):
+                keyrepr = f"{key}"
+                keytip = type(child_data).__name__
+                
+            elif dataclasses.is_dataclass(data) and not isinstance(data, type):
+                keyrepr = f"{key}"
+                keytip = type(child_data).__name__
+                
             else:
                 keyrepr = str(key)
                 keytip = type(key).__name__

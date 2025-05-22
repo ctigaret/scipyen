@@ -655,13 +655,14 @@ class DataViewer(ScipyenViewer):
     @safewrapper
     def _parse_item_(self, item):
         item_name = item.text(0)
-        # print(f"{self.__class__.__name__}._parse_item_({item}): item_name = {item_name}")
+        print(f"{self.__class__.__name__}._parse_item_({item}): item_name = {item_name}")
         if len(item_name.strip()) == 0:
             return None
         
         item_type_str = item.toolTip(0).replace("key / index type: ", "")
         
-        return item_name if (item_type_str == "str" or len(item_type_str.strip())==0) else eval("%s(%s)" % (item_type_str, item_name))
+        return item_name if (item_type_str == "str" or len(item_type_str.strip())==0) else eval(f"{item_type_str}({item_name})")# % (item_type_str, item_name))
+        # return item_name if (item_type_str == "str" or len(item_type_str.strip())==0) else eval("%s(%s)" % (item_type_str, item_name))
     
     @safewrapper
     def _get_path_for_item_(self, item:QtWidgets.QTreeWidgetItem):#, as_expression:bool=True):
@@ -710,7 +711,7 @@ class DataViewer(ScipyenViewer):
 
         item_path.reverse()
         
-        # print(f"{self.__class__.__name__}._get_path_for_item_({item}): item_path = {item_path}")
+        print(f"{self.__class__.__name__}._get_path_for_item_({item}): item_path = {item_path}")
         
         return item_path
     
