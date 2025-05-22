@@ -269,6 +269,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
             node = parent 
         else:
             node = QtWidgets.QTreeWidgetItem([name, "", ""])
+            node.setData(0, QtCore.Qt.UserRole, type(data))
             parent.addChild(node)
             
         # print(f"{self.__class__.__name__}.buildTree: predicate = {predicate}")

@@ -56,6 +56,7 @@ from core.utilities import NestedFinder
 from core.prog import (safewrapper, safeguiwrapper, )
 
 from core.traitcontainers import (DataBag, DataBagTraitsObserver,)
+from core.scipyendataclasses import ScipyenDataclass
 
 # from gui.tableeditor import (TableEditorWidget, TabularDataModel,)
 
@@ -135,7 +136,9 @@ class DataViewer(ScipyenViewer):
                         AxesCalibration:0,
                         # neo.core.baseneo.BaseNeo:0,
                         ScanData:0, 
-                        TriggerProtocol:0}
+                        TriggerProtocol:0,
+                        types.SimpleNamespace:0,
+                        ScipyenDataclass:0}
     
     # view_action_name = "Object"
     
@@ -245,9 +248,6 @@ class DataViewer(ScipyenViewer):
         # to treat other data types as well.
         # Solutions to be implemented in the InteractiveTreeWidget in this module
         """
-        #if not isinstance(data, dict):
-            #data = data.__dict__
-        
         if inspect.isfunction(predicate):
             self.predicate=predicate
             
@@ -653,15 +653,27 @@ class DataViewer(ScipyenViewer):
     
     
     @safewrapper
-    def _parse_item_(self, item):
-        item_name = item.text(0)
-        print(f"{self.__class__.__name__}._parse_item_({item}): item_name = {item_name}")
-        if len(item_name.strip()) == 0:
-            return None
-        
-        item_type_str = item.toolTip(0).replace("key / index type: ", "")
-        
-        return item_name if (item_type_str == "str" or len(item_type_str.strip())==0) else eval(f"{item_type_str}({item_name})")# % (item_type_str, item_name))
+    def _parse_item_(self, item:QtWidgets.QTreeWidgetItem):
+        widgetPaths, widgetItems = zip(*list(self.treeWidget.nodes.items())) # treeWidget.nodes is a dict tuple[str] ↦ QTreeWidgetItem
+        if item in widgetItems:
+            ndx = widgetItems.index(item)
+            path_parts = widgetPaths[ndx]
+        else:
+            path_parts = None
+            
+        return path_parts
+#         item_name = item.text(0)
+#         print(f"{self.__class__.__name__}._parse_item_({item}): item_name = {item_name}")
+#         if len(item_name.strip()) == 0:
+#             return None
+#         
+#         item_data_type = item.data(0, QtCore.Qt.UserRole)
+#         print(f"{self.__class__.__name__}._parse_item_: {item_name} -> {item_data_type}")
+#         
+#         item_type_str = item.toolTip(0).replace("key / index type: ", "")
+#         
+#         # return item_name if (item_type_str == "str" or len(item_type_str.strip())==0) else eval(f"{item_type_str}({item_name})")# % (item_type_str, item_name))
+#         return item_name if item_data_type in (str, type(None)) else eval(f"{item_data_type}({item_name})")# % (item_type_str, item_name))
         # return item_name if (item_type_str == "str" or len(item_type_str.strip())==0) else eval("%s(%s)" % (item_type_str, item_name))
     
     @safewrapper
@@ -692,24 +704,39 @@ class DataViewer(ScipyenViewer):
             increasing nesting depth.
         
         """
-        item_path = list()
+        item_data_type = item.data(0, QtCore.Qt.UserRole)
+        if item_data_type is None:
+            item_data_type = item.parent().data(0, QtCore.Qt.UserRole)
+            
+        widgetPaths, widgetItems = zip(*list(self.treeWidget.nodes.items())) # treeWidget.nodes is a dict tuple[str] ↦ QTreeWidgetItem
         
-        ndx = self._parse_item_(item)
+        if item in widgetItems:
+            ndx = widgetItems.index(item)
+            path_parts = widgetPaths[ndx]
+        else:
+            path_parts = None
+            
+        return path_parts, item_data_type
+        # item_path = self._parse_item_(item)
         
-        if ndx is not None:
-            item_path.append(ndx)
-
-        parent = item.parent()
-        
-        while parent is not None:
-            if parent.parent() is not None:
-                ndx = self._parse_item_(parent)
-                if ndx is not None:
-                    item_path.append(ndx)
-                
-            parent = parent.parent()
-
-        item_path.reverse()
+#         item_path = list()
+#         
+#         ndx = self._parse_item_(item)
+#         
+#         if ndx is not None:
+#             item_path.append(ndx)
+# 
+#         parent = item.parent()
+#         
+#         while parent is not None:
+#             if parent.parent() is not None:
+#                 ndx = self._parse_item_(parent)
+#                 if ndx is not None:
+#                     item_path.append(ndx)
+#                 
+#             parent = parent.parent()
+# 
+#         item_path.reverse()
         
         print(f"{self.__class__.__name__}._get_path_for_item_({item}): item_path = {item_path}")
         
@@ -740,8 +767,8 @@ class DataViewer(ScipyenViewer):
         objects = list()
         
         for item in items:
-            path = self._get_path_for_item_(item)
-            # print(f"{self.__class__.__name__}_export_data_items_ path", path)
+            path, data_type = self._get_path_for_item_(item)
+            print(f"{self.__class__.__name__}_export_data_items_ path = {path}, type = {type}")
             
             if len(path) == 0:
                 continue
@@ -766,6 +793,7 @@ class DataViewer(ScipyenViewer):
                 else:
                     full_path = path
                     
+                print(f"{self.__class__.__name__}_export_data_items_ full_path = {full_path}")
                 name = strutils.str2symbol("_".join(["%s" % s for s in full_path]))
                 
             else:
@@ -773,6 +801,10 @@ class DataViewer(ScipyenViewer):
                 
             #print("name", name)
             src = self._obj_cache_[self._cache_index_][1]
+            obj = src
+            # for path_part in path: TODO 2025-05-22 22:08:01 finalze this
+                
+            
             if self.treeWidget.has_dynamic_private:
                 if isinstance(src, (tuple, list, deque)) and isinstance(path[-1], int):
                     objs = src[path-1]
@@ -786,7 +818,19 @@ class DataViewer(ScipyenViewer):
                     objs = [getattr(src, str(path[-1]), None)]
             else:
                 # objs = NestedFinder.getvalue(self._data_, path, single=True)
-                objs = NestedFinder.getvalue(src, path, single=True)
+                if src in NestedFinder.supported_hierarchical_types:
+                    objs = NestedFinder.getvalue(src, path, single=True) # this SHOULD deal with mapping objects
+                else:
+                    if isinstance(src, (tuple, list, deque)) and isinstance(path[-1], int):
+                        objs = src[path-1]
+                    elif dataclasses.is_dataclass(src):
+                        o = src
+                        for p in path:
+                            o = getattr(o, p, None)
+                            
+                        objs = [o]
+                    else:
+                        objs = [getattr(src, str(path[-1]), None)]
             
             if len(objs) == 0:
                 continue
