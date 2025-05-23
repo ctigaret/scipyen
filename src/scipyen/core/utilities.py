@@ -8,7 +8,7 @@
 '''
 Various utilities
 '''
-import traceback, re, itertools, functools, time, typing, warnings, operator, inspect
+import traceback, re, itertools, functools, time, typing, types, warnings, operator, inspect
 import random, math, pprint, datetime, pathlib, sys
 from numbers import Number
 from sys import getsizeof, stderr
@@ -1539,7 +1539,7 @@ class NestedFinder(object):
     
     """
     supported_collection_types = (np.ndarray, dict, list, tuple, deque, pd.Series, pd.DataFrame, pd.Index, set) # this implicitly includes namedtuple
-    supported_hierarchical_types = (dict, list, tuple, deque, set)
+    supported_hierarchical_types = (dict, list, tuple, deque, set, types.MappingProxyType)
     nesting_types = supported_hierarchical_types
     
     def __init__(self, src:typing.Optional[typing.Union[dict, list, tuple, deque]]=None, 

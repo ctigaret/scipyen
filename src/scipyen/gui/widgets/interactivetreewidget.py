@@ -11,6 +11,7 @@ r"""
 from __future__ import print_function
 
 import os, warnings, types, traceback, itertools, inspect, dataclasses, numbers
+import fractions, decimal
 import enum
 from collections import deque
 from dataclasses import MISSING
@@ -426,153 +427,157 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
             desc = "<reference to %s at %s >" % (objtype, full_path)
             return typeStr, desc, children, widget, typeTip, showDescInParentNode
             
-        else:
-            if data is None:
-                typeStr = "(None)"
-                return typeStr, desc, children, widget, typeTip, showDescInParentNode
+        if data is None:
+            typeStr = "(None)"
+            return typeStr, desc, children, widget, typeTip, showDescInParentNode
+        
+        elif data is dataclasses.MISSING:
+            desc = str(MISSING)
+            return typeStr, desc, children, widget, typeTip, showDescInParentNode
+        
+        elif type(data) is type(pd.NA):
+            desc = str(pd.NA)
+            return typeStr, desc, children, widget, typeTip, showDescInParentNode
             
-            elif data is dataclasses.MISSING:
-                desc = str(MISSING)
-                return typeStr, desc, children, widget, typeTip, showDescInParentNode
-            
-            elif type(data) is type(pd.NA):
-                desc = str(pd.NA)
-                return typeStr, desc, children, widget, typeTip, showDescInParentNode
+        try:
+            if isinstance(data, type):
+                desc = type(data).__name__
+                if isinstance(data, enum.EnumType):
+                    children = data.__members__
                 
-            try:
-                if isinstance(data, NestedFinder.nesting_types + (set,)):
-                    # NOTE: 2025-05-21 16:15:26
-                    # here 'widget' is None — this will force the caller (i.e. buildTree)
-                    # to descend into the children of the data and build up a subtree
-                    if isinstance(data, dict):
-                        # NOTE: 2025-05-21 16:17:37
-                        # 'widget' is None, here
-                        desc = "length=%d" % len(data)
-                        if isinstance(data, OrderedDict):
-                            children = data
-                            
-                        else:
-                            # NOTE: 2021-07-20 09:52:34
-                            # dict objects with mixed key types cannot be sorted
-                            # therefore we resort to an indexing vector
-                            ndx = [i[1] for i in sorted((str(k[0]), k[1]) for k in zip(data.keys(), range(len(data))))]
-                            items = [i for i in data.items()]
-                            children = OrderedDict([items[k] for k in ndx])
-                            
-                    elif isinstance(data, (list, tuple, deque, set)):
-                        # NOTE: 2025-05-21 16:17:37
-                        # 'widget' is None, here
-                        desc = "length=%d" % len(data)
-                        # NOTE: 2021-07-24 14:57:02
-                        # accommodate namedtuple types
-                        if is_namedtuple(data):
-                            children = data._asdict()
-                        else:
-                            children = OrderedDict(enumerate(data))
-                    
-                elif HAVE_METAARRAY and (hasattr(data, 'implements') and data.implements('MetaArray')):
+            elif isinstance(data, NestedFinder.nesting_types + (set,)):
+                # NOTE: 2025-05-21 16:15:26
+                # here 'widget' is None — this will force the caller (i.e. buildTree)
+                # to descend into the children of the data and build up a subtree
+                if isinstance(data, (dict, types.MappingProxyType)):
                     # NOTE: 2025-05-21 16:17:37
                     # 'widget' is None, here
-                    children = OrderedDict([
-                        ('data', data.view(np.ndarray)),
-                        ('meta', data.infoCopy())
-                    ])
-                
-                elif isinstance(data, types.SimpleNamespace):
-                    # NOTE: 2025-05-21 16:17:37
-                    # 'widget' is None, here
-                    children = data.__dict__
-                    desc = type(data).__name__
-                
-                elif isinstance(data, pd.DataFrame):
-                    desc = "length=%d, columns=%d" % (len(data), len(data.columns))
-                    widget = self._makeTableWidget_(data)
-                    
-                elif isinstance(data, pd.Series):
-                    desc = "length=%d, dtype=%s" % (len(data), data.dtype)
-                    widget = self._makeTableWidget_(data)
-                    
-                elif isinstance(data, pd.Index):
                     desc = "length=%d" % len(data)
-                    widget = self._makeTableWidget_(data)
-                    
-                elif isinstance(data, neo.core.dataobject.DataObject):
-                    desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
-                    if data.size == 1:
-                        widget = QtWidgets.QLabel(str(data))
+                    # NOTE: 2021-07-20 09:52:34
+                    # dict objects with mixed key types cannot be sorted
+                    # therefore we resort to an indexing vector
+                    ndx = [i[1] for i in sorted((str(k[0]), k[1]) for k in zip(data.keys(), range(len(data))))]
+                    items = [i for i in data.items()]
+                    children = OrderedDict([items[k] for k in ndx])
+#                         if isinstance(data, OrderedDict):
+#                             children = data
+#                             
+#                         else:
+#                             # NOTE: 2021-07-20 09:52:34
+#                             # dict objects with mixed key types cannot be sorted
+#                             # therefore we resort to an indexing vector
+#                             ndx = [i[1] for i in sorted((str(k[0]), k[1]) for k in zip(data.keys(), range(len(data))))]
+#                             items = [i for i in data.items()]
+#                             children = OrderedDict([items[k] for k in ndx])
+                        
+                elif isinstance(data, (list, tuple, deque, set)):
+                    # NOTE: 2025-05-21 16:17:37
+                    # 'widget' is None, here
+                    desc = "length=%d" % len(data)
+                    # NOTE: 2021-07-24 14:57:02
+                    # accommodate namedtuple types
+                    if is_namedtuple(data):
+                        children = data._asdict()
                     else:
-                        widget = self._makeTableWidget_(data)
-                        
-                elif isinstance(data, pq.Quantity):
-                    desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
-                    if data.size == 1:
-                        widget = QtWidgets.QLabel(str(data))
-                    else:
-                        widget = self._makeTableWidget_(data)
-                        
-                elif isinstance(data, np.ndarray):
-                    desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
-                    widget = self._makeTableWidget_(data)
-                    
-                elif isinstance(data, types.TracebackType):  ## convert traceback to a list of strings
-                    frames = list(map(str.strip, traceback.format_list(traceback.extract_tb(data))))
-                    widget = QtWidgets.QPlainTextEdit(str('\n'.join(frames)))
-                    widget.setMaximumHeight(200)
-                    widget.setReadOnly(True)
-                    
-                elif isinstance(data, scipy.optimize.Bounds):
-                    children = {"lb": data.lb, "ub": data.ub, "keep_feasible": data.keep_feasible}
-                    desc = type(data).__name__
-                    
-                elif isinstance(data, str):
-                    if len(data)> 100:
-                        _data = data[:97] + "..."
-                        desc = f"string with {len(data)} characters"
-                        widget = QtWidgets.QPlainTextEdit(data)
-                        widget.setMaximumHeight(200)
-                        widget.setReadOnly(True)
-                    else:
-                        desc = data
-                        
-                elif isinstance(data, (bool, int, bytes, bytearray)):
-                    desc = type(data).__name__
-                    widget = QtWidgets.QPlainTextEdit(str(data))
-                    widget.setMaximumHeight(200)
-                    widget.setReadOnly(True)
-                    
-                elif isinstance(data, float):
-                    desc = type(data).__name__
-                    widget = QtWidgets.QPlainTextEdit(f"{data}")
-                    widget.setMaximumHeight(200)
-                    widget.setReadOnly(True)
-                    
-                else:
-                    # NOTE: 2022-12-30 14:26:46
-                    # Descending into the data's members is too prone for infinite recurson.
-                    # Hence, we STOP here (i.e. at first level).
-                    # NOTE: 2025-03-10 23:08:04
-                    # support for dataclasses — descend into their fields as if they were a dict
-                    if isinstance(data, type):
-                        desc = type(data).__name__
-                        
-                    elif dataclasses.is_dataclass(data):
-                        # print(f"{self.__class__.__name__}.parse: data is a {type(data)}")
-                        datafields = dataclasses.fields(data)
-                        lbl = f"<{data.__class__.__name__}> object"
-                        desc = " ".join([lbl, "with", f"{len(datafields)} fields"])
-                        children = OrderedDict(map(lambda x: (x.name, getattr(data, x.name)), datafields))
-                        
-                    elif isinstance(data, enum.Enum):
-                        desc = f"{data} ({data.name})"
-                        
-                    else:
-                        # desc = str(data) # this becomes too clutered, but needs trimming in self.buildTree
-                        desc = type(data).__name__
-                        # showDescInParentNode = False
-                    
-                return typeStr, desc, children, widget, typeTip, showDescInParentNode
+                        children = OrderedDict(enumerate(data))
+                
+            elif HAVE_METAARRAY and (hasattr(data, 'implements') and data.implements('MetaArray')):
+                # NOTE: 2025-05-21 16:17:37
+                # 'widget' is None, here
+                # desc = type(data).__name__
+                children = OrderedDict([
+                    ('data', data.view(np.ndarray)),
+                    ('meta', data.infoCopy())
+                ])
             
-            except:
-                # print(f"{self.__class__.__name__}.parse data type : {type(data).__name__}, data: {data}")
-                raise
+            elif isinstance(data, types.SimpleNamespace):
+                lbl = f"<{data.__class__.__name__}> object"
+                desc = " ".join([lbl, "with", f"{len(data.__dict__)} members"])
+                # NOTE: 2025-05-21 16:17:37
+                # 'widget' is None, here
+                # desc = type(data).__name__
+                children = data.__dict__
+            
+            elif isinstance(data, pd.DataFrame):
+                desc = "length=%d, columns=%d" % (len(data), len(data.columns))
+                widget = self._makeTableWidget_(data)
+                
+            elif isinstance(data, pd.Series):
+                desc = "length=%d, dtype=%s" % (len(data), data.dtype)
+                widget = self._makeTableWidget_(data)
+                
+            elif isinstance(data, pd.Index):
+                desc = "length=%d" % len(data)
+                widget = self._makeTableWidget_(data)
+                
+            elif isinstance(data, neo.core.dataobject.DataObject):
+                desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
+                if data.size == 1:
+                    widget = QtWidgets.QLabel(str(data))
+                else:
+                    widget = self._makeTableWidget_(data)
+                    
+            elif isinstance(data, pq.Quantity):
+                if data.ndim == 0 or (data.ndim == 1 and data.size <= 1):
+                    desc = f"{data}"
+                else:
+                    desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
+                    widget = self._makeTableWidget_(data)
+                    # if data.size == 1:
+                    #     widget = QtWidgets.QLabel(str(data))
+                    # else:
+                    #     widget = self._makeTableWidget_(data)
+                    
+            elif isinstance(data, pq.dimensionality.Dimensionality):
+                desc = f"{data}"
+                
+            elif isinstance(data, np.ndarray):
+                if data.size == 1:
+                    desc = f"{data}"
+                else:
+                    desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
+                    widget = self._makeTableWidget_(data)
+                
+            elif isinstance(data, types.TracebackType):  ## convert traceback to a list of strings
+                frames = list(map(str.strip, traceback.format_list(traceback.extract_tb(data))))
+                widget = QtWidgets.QPlainTextEdit(str('\n'.join(frames)))
+                widget.setMaximumHeight(200)
+                widget.setReadOnly(True)
+                
+            elif isinstance(data, scipy.optimize.Bounds):
+                # desc = type(data).__name__
+                children = {"lb": data.lb, "ub": data.ub, "keep_feasible": data.keep_feasible}
+                
+            elif isinstance(data, (str, bytes, bytearray)):
+                if len(data)> 100:
+                    _data = data[:97] + "..."
+                    desc = f"{type(data)} with {len(data)} elements"
+                    txt = data if isinstance(data, str) else data.decode()
+                    widget = QtWidgets.QPlainTextEdit(txt)
+                    widget.setMaximumHeight(200)
+                    widget.setReadOnly(True)
+                else:
+                    desc = data
+                    
+            elif isinstance(data, (bool, int, float, complex, fractions.Fraction, decimal.Decimal, numbers.Number)):
+                desc = f"{data}"
+                
+            elif dataclasses.is_dataclass(data):
+                # print(f"{self.__class__.__name__}.parse: data is a {type(data)}")
+                datafields = dataclasses.fields(data)
+                lbl = f"<{data.__class__.__name__}> object"
+                desc = " ".join([lbl, "with", f"{len(datafields)} fields"])
+                children = OrderedDict(map(lambda x: (x.name, getattr(data, x.name)), datafields))
+                
+            elif isinstance(data, enum.Enum):
+                desc = f"{data} ({data.name})"
+                
+            else:
+                desc = type(data).__name__
+                
+            return typeStr, desc, children, widget, typeTip, showDescInParentNode
+        
+        except:
+            # print(f"{self.__class__.__name__}.parse data type : {type(data).__name__}, data: {data}")
+            raise
         

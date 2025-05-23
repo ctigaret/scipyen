@@ -1709,7 +1709,6 @@ def guess_init_biased_biexp(x:np.ndarray, y:np.ndarray, is_sorted:bool=True,
         is_feasible = False
         prog.scipywarn("Linear regression with biased biexponential model looks unfeasible for the data")
 
-    
     # Step 2
     β = np.exp(p*x)
     η = np.exp(q*x)
