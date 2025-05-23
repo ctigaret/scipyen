@@ -11,9 +11,11 @@ r"""
 from __future__ import print_function
 
 import os, warnings, types, traceback, itertools, inspect, dataclasses, numbers
+import datetime
 import fractions, decimal
 import enum
 from collections import deque
+import dataclasses
 from dataclasses import MISSING
 import math
 #### END core python modules
@@ -108,7 +110,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         self.setVerticalScrollMode(QtWidgets.QAbstractItemView.ScrollPerItem)
         self.setAlternatingRowColors(True)
         self.setColumnCount(3)
-        self.setHeaderLabels(['key / index', 'type', 'value / info'])
+        self.setHeaderLabels(['Object', 'Type', 'Value / Information'])
         self.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.headerItem().setToolTip(0, "Key or index of child data.\nThe type of the key or index is shown in their tooltip.")
         self.headerItem().setToolTip(1, "Type of child data mapped to a key or index.\nAdditional type information is shown in their tooltip.")
@@ -185,12 +187,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
     def _parse_data_(self, data) -> tuple:
         mro = inspect.getmro(type(data))
         if all(t not in self._supported_data_types_ for t in mro) and not inspect.isroutine(data) and data is not None:
-            if dataclasses.is_dataclass(data):
-                return self._parse_dataclass(data), True
-            elif isinstance(data, enum.Enum):
-                return data, True
-            else:
-                return datatypes.inspect_members(data, self.predicate), True
+            return datatypes.inspect_members(data, self.predicate), True
         else:
             return data, False
         
@@ -261,17 +258,23 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         # when called by super(self).setData() this is set to either:
         #
         # (a) the parent item, if hideRoot is True (when this method is called from
-        #   the parent item is the tree widget's invisible root item)
+        #   the parent item) is the tree widget's invisible root item
         #
         # (b) an item constructed on a string list for the three columns, added
         # to the 'parent' node passed to this method call
         #
-        if hideRoot:
-            node = parent 
-        else:
-            node = QtWidgets.QTreeWidgetItem([name, "", ""])
-            node.setData(0, QtCore.Qt.UserRole, type(data))
-            parent.addChild(node)
+        
+        # print(f"{self.__class__.__name__}.buildTree: hideRoot = {hideRoot}")
+        
+        # if hideRoot:
+        #     node = parent 
+        # else:
+        #     node = QtWidgets.QTreeWidgetItem([name, "", ""])
+        #     node.setData(0, QtCore.Qt.UserRole, type(data))
+        #     parent.addChild(node)
+        node = QtWidgets.QTreeWidgetItem([name, "", ""])
+        node.setData(0, QtCore.Qt.UserRole, type(data))
+        parent.addChild(node)
             
         # print(f"{self.__class__.__name__}.buildTree: predicate = {predicate}")
         
@@ -322,34 +325,56 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
             self.setItemWidget(subnode, 0, widget)
             self.setFirstItemColumnSpanned(subnode, True)
             
-        # recurse to children
+        # recurse into children (a dict)
         for key, child_data in children.items():
             if isinstance(key, type):
                 keyrepr = f"{key.__module__}.{key.__name__}"
-                keytip = str(key)
+                keytip = f"member type: {key}"
                 
             elif type(key).__name__ == "instance":
                 keyrepr = key.__class__.__name__
-                keytip = str(key)
+                keytip = f"member type: {key}"
+                # keytip = str(key)
                 
             elif isinstance(data, types.SimpleNamespace):
                 keyrepr = f"{key}"
-                keytip = type(child_data).__name__
+                keytip = f"member type: {type(child_data).__name__}"
                 
             elif isinstance(data, scipy.optimize.Bounds):
                 keyrepr = f"{key}"
-                keytip = type(child_data).__name__
+                keytip = f"member type: {type(child_data).__name__}"
                 
             elif dataclasses.is_dataclass(data) and not isinstance(data, type):
                 keyrepr = f"{key}"
-                keytip = type(child_data).__name__
+                keytip = f"field type: {type(child_data).__name__}"
                 
             else:
                 keyrepr = str(key)
-                keytip = type(key).__name__
+                keytip = f"object type: {type(key).__name__}"
                 
-            keyTypeTip = "key / index type: %s" % keytip
-            self.buildTree(child_data, node, keyrepr, keyTypeTip, predicate=predicate, path=path+(keyrepr,))
+            # BUG 2025-05-23 22:53:37 FIXME
+            # wehen enabling keyTip renderign stops -why ?
+            # keyTypeTip = "key / index / field type: %s" % keytip
+            
+            # parent_type = parent.data(0, QtCore.Qt.UserRole)
+            # if isinstance(child_data, type):
+            #     keyTypeTip = "member type: %s" % keytip
+            # elif isinstance(child_data, (list, tuple, deque, typing.Sequence)):
+            #     keyTypeTip = "index type: %s" % keytip
+            # elif isinstance(child_data, (dict, types.MappingProxyType)):
+            #     keyTypeTip = "key type: %s" % keytip
+            # elif isinstance(child_data, types.SimpleNamespace):
+            #     keyTypeTip = "member type: %s" % keytip
+            # elif dataclasses.is_dataclass(child_data):
+            #     keyTypeTip = "field type: %s" % keytip
+            # else:
+            #     keyTypeTip = "object type: %s" % keytip
+                
+                
+            #              data        parent, name, nameTip,
+            self.buildTree(child_data, node, keyrepr, predicate=predicate, path=path+(keyrepr,)) # so hideRoot is always False?
+            # self.buildTree(child_data, node, keyrepr, keyTip, predicate=predicate, path=path+(keyrepr,)) # so hideRoot is always False?
+            # self.buildTree(child_data, node, keyrepr, keyTypeTip, predicate=predicate, path=path+(keyrepr,)) # so hideRoot is always False?
 
     def parse(self, data, predicate=None, typeStr=None):
         r"""
@@ -411,7 +436,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         widget = None
         desc = ""
         showDescInParentNode = True
-        children = {}
+        children = dict()
         
         # NOTE: 2025-05-21 16:27:56 see NOTE: 2025-05-21 16:26:20 
         if type(data) not in NOTREFERENCED and type(data) not in PODS and id(data) in self._visited_.keys():
@@ -537,6 +562,9 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                 else:
                     desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
                     widget = self._makeTableWidget_(data)
+                    
+            elif isinstance(data, (datetime.datetime, datetime.date, datetime.time, datetime.timedelta, datetime.timezone)):
+                desc = f"{data}"
                 
             elif isinstance(data, types.TracebackType):  ## convert traceback to a list of strings
                 frames = list(map(str.strip, traceback.format_list(traceback.extract_tb(data))))

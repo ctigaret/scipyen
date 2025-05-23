@@ -142,7 +142,15 @@ class DataViewer(ScipyenViewer):
     
     # view_action_name = "Object"
     
-    def __init__(self, data: (object, type(None)) = None, parent: (QtWidgets.QMainWindow, type(None)) = None, ID:(int, type(None)) = None,  win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None, useTableEditor:bool = True, predicate = None, hideRoot:bool=False, *args, **kwargs):
+    def __init__(self, data: typing.Optional[object] = None, 
+                 parent: typing.Optional[QtWidgets.QMainWindow] = None, 
+                 ID: typing.Optional[int] = None,  
+                 win_title: typing.Optional[str] = None, 
+                 doc_title: typing.Optional[str] = None, 
+                 useTableEditor:bool = True, 
+                 predicate: typing.Optional[typing.Any] = None, 
+                 # hideRoot:bool=False, 
+                 *args, **kwargs):
         r"""
         Parameters:
         ===========
@@ -169,11 +177,11 @@ class DataViewer(ScipyenViewer):
             For example, see the 'is*' functions in Python's inspect module.
             Mostly useful with objects.
     
-        hideRoot: When false (default) the root of the tree hierarchy is displayed.
     
         *args, **kwargs ⇒ passed on to ScipyenViewer superclass.
     
         """
+        # hideRoot: When false (default) the root of the tree hierarchy is displayed.
         self._useTableEditor_ = useTableEditor
         
         if inspect.isfunction(predicate):
@@ -181,7 +189,7 @@ class DataViewer(ScipyenViewer):
         else:
             self.predicate=None
             
-        self.hideRoot = hideRoot
+        # self.hideRoot = hideRoot
         
         self._obj_cache_ = list()
         self._cache_index_ = 0
@@ -237,7 +245,8 @@ class DataViewer(ScipyenViewer):
         
         self.addToolBar(QtCore.Qt.TopToolBarArea, self.toolBar)
         
-    def _set_data_(self, data:object, predicate=None, hideRoot=False, *args, **kwargs):
+    # def _set_data_(self, data:object, predicate=None, hideRoot=False, *args, **kwargs):
+    def _set_data_(self, data:object, predicate=None, *args, **kwargs):
         r"""
         Display new data
         # TODO 2019-09-14 10:16:03: NOTE: 2021-10-03 13:10:00 SCRAP THAT
@@ -251,7 +260,7 @@ class DataViewer(ScipyenViewer):
         if inspect.isfunction(predicate):
             self.predicate=predicate
             
-        self.hideRoot = hideRoot
+        # self.hideRoot = hideRoot
         
         # print(f"{self.__class__.__name__}._set_data_ predicate = {self.predicate}")
         
@@ -289,9 +298,9 @@ class DataViewer(ScipyenViewer):
             self.treeWidget.setData(obj_tuple[1], 
                                     predicate = self.predicate, 
                                     top_title=obj_tuple[0], 
-                                    dataTypeStr=type(obj_tuple[1]).__name__, 
+                                    dataTypeStr=type(obj_tuple[1]).__name__)#, 
                                     # dataTypeStr=self._dataTypeStr_, 
-                                    hideRoot=self.hideRoot)
+                                    # hideRoot=self.hideRoot)
             self.docTitle = obj_tuple[0]
             
             for k in range(self.treeWidget.topLevelItemCount()):
@@ -662,19 +671,6 @@ class DataViewer(ScipyenViewer):
             path_parts = None
             
         return path_parts
-#         item_name = item.text(0)
-#         print(f"{self.__class__.__name__}._parse_item_({item}): item_name = {item_name}")
-#         if len(item_name.strip()) == 0:
-#             return None
-#         
-#         item_data_type = item.data(0, QtCore.Qt.UserRole)
-#         print(f"{self.__class__.__name__}._parse_item_: {item_name} -> {item_data_type}")
-#         
-#         item_type_str = item.toolTip(0).replace("key / index type: ", "")
-#         
-#         # return item_name if (item_type_str == "str" or len(item_type_str.strip())==0) else eval(f"{item_type_str}({item_name})")# % (item_type_str, item_name))
-#         return item_name if item_data_type in (str, type(None)) else eval(f"{item_data_type}({item_name})")# % (item_type_str, item_name))
-        # return item_name if (item_type_str == "str" or len(item_type_str.strip())==0) else eval("%s(%s)" % (item_type_str, item_name))
     
     @safewrapper
     def _get_path_for_item_(self, item:QtWidgets.QTreeWidgetItem):#, as_expression:bool=True):
