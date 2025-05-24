@@ -88,6 +88,9 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         first encountered reference - in depth-first order - is displayed)
     
     """
+    # NOTE: 2025-05-24 22:21:05
+    # child widgets are either None, TableEditorWidget, SimpleTableWidget, or QPlainTextEdit
+    
     def __init__(self, *args, **kwargs):
         r"""
         Keyword parameters (selective list):
@@ -120,12 +123,15 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         
         self.itemClicked.connect(self._slot_setLastActive)
         
+        self._widgetsWithSelection_ = set()
+        
     def _makeTableWidget_(self, data):
         if self._use_TableEditor_:
             widget = TableEditorWidget(parent=self)
             signalBlocker = QtCore.QSignalBlocker(widget.tableView)
             widget.tableView.model().setModelData(data)
             widget.readOnly=True
+            widget.sig_selectionChanged.connect(self._slot_tableEditorWidgetSelectionChanged)
         else:
             widget = SimpleTableWidget()
             widget.setData(data)
@@ -139,6 +145,23 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         # print(f"{self.__class__.__name__}<{self.parent().windowTitle()}, {self.parent().parent().windowTitle()}> _slot_setLastActive item {item.data(0,QtCore.Qt.DisplayRole)}")
         self._last_active_item_ = item.data(0,QtCore.Qt.DisplayRole)
         self._last_active_item_column_ = column
+        
+    @Slot()
+    def _slot_tableEditorWidgetSelectionChanged(self):
+        widget = self.sender()
+        if widget in self._widgetsWithSelection_:
+            indexes = widget.tableView.selectedIndexes()
+            if len(indexes) == 0:
+                self._widgetsWithSelection_.remove(widget)
+                
+            else:
+                pass # for now
+            # TODO 2025-05-24 22:56:01 
+            # finalize me - see tableeditorwidget
+            # also implement similar things in SimpleTableWidget, or get rid of that class
+            # also see is matrixviewer can be consolidated/merged in tableeditorwidget
+            
+        
         
     def setSupportedDataTypes(self, types:tuple):
         if isinstance(types, tuple) and len(types):
@@ -545,10 +568,6 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                 else:
                     desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
                     widget = self._makeTableWidget_(data)
-                    # if data.size == 1:
-                    #     widget = QtWidgets.QLabel(str(data))
-                    # else:
-                    #     widget = self._makeTableWidget_(data)
                     
             elif isinstance(data, pq.dimensionality.Dimensionality):
                 desc = f"{data}"

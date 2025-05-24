@@ -74,12 +74,15 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
     
     view_action_name = "Table"
     
+    sig_selectionChanged = Signal("name"="sig_selectionChanged")
+    
     #def __init__(self, model:typing.Optional[QtCore.QAbstractTableModel]=None, 
                  #parent:typing.Optional[QtWidgets.QMainWindow]=None) -> None:
     def __init__(self, parent:typing.Optional[QtWidgets.QMainWindow]=None) -> None:
         super().__init__(parent=parent)
         self._is_vigra_filter_kernel_ = False # needed in future implementations of editing functionality
         self._dataModel_ = TabularDataModel(parent=self)
+        self._selectedIndexes_ = list()
         
         # NOTE: 2021-10-18 09:32:45
         # ### BEGIN keep this  - you may re-enable the possibility to use custom tabular
@@ -225,7 +228,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
     @model.setter
     def model(self, md):
         self._dataModel_ = md
-        self.tabelView.setModel(self._dataModel_)
+        self.tableView.setModel(self._dataModel_)
         
     @property
     def readOnly(self):
@@ -274,6 +277,8 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         self.tableView.setAlternatingRowColors(True)
         self.tableView.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.tableView.customContextMenuRequested[QtCore.QPoint].connect(self.slot_table_context_menu_requested)
+        self.tableView.clicked[QtCore.QModelIndex].connect(self.slot_tableItemClicked)
+
 
         self.resizeColumnsToolButton.clicked.connect(self.slot_resizeAllColumnsToContents)
         self.resizeRowsToolButton.clicked.connect(self.slot_resizeAllRowsToContents)
@@ -282,6 +287,10 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         self.prevSliceToolbutton.clicked.connect(self._slot_prevSlice)
         self.nextSliceToolButton.setEnabled(False)
         self.nextSliceToolButton.clicked.connect(self._slot_nextSlice)
+        
+    @Slot(QtCore.QModelIndex)
+    def slot_tableItemClicked(self, index:QtCore.QModelIndex):
+        self.sig_selectionChanged.emit()
         
     @Slot()
     def slot_resizeAllColumnsToContents(self):
@@ -559,6 +568,10 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
     @Slot()
     @safewrapper
     def slot_copySelection(self):
+        # TODO: 2025-05-24 22:56:56
+        # copy data from the actual data, not the model's representation!
+        # i.e. if it's a Quantity, then return a Quantity, etc
+        
         quote = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier)
         withHeaders = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.AltModifier)
         commasep = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ControlModifier)
@@ -570,15 +583,26 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         if len(modelIndexes) == 0:
             return
         
+        # TODO: 2025-05-24 22:53:10
+        # 1) group modelIndexes by row
+        # 2) in each row group, sort model indexes by column
+        # 3) if smallest column is > 0, fill in with "\t" or ","
+        # OR:
+        # use the logic in withHeaders branch, below
+        
+        minRow = minCol = 0
+        minCol = min([m.column() for m in modelIndexes])
+        maxCol = max([m.column() for m in modelIndexes])
+        minRow = min([m.row() for m in modelIndexes])
+        maxRow = max([m.row() for m in modelIndexes])
+        
         selected_text = list()
         previous = modelIndexes[0]
         #selected_text.append(self._dataModel_.data(previous).toString())
         
-        minRow = minCol = 0
-        
         data = str(self._dataModel_.data(previous).value())
         if quote:
-            data = f"'{data}"
+            data = f"'{data}'"
         
         if withHeaders:
             # preallocate column & row names

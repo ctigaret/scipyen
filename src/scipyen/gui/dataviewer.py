@@ -699,7 +699,7 @@ class DataViewer(ScipyenViewer):
         itemWidget = self.treeWidget.itemWidget(item, 0)
         
         if itemWidget:
-            print(type(itemWidget).__name__
+            print(f"{self.__class__.__name__}._get_path_for_item_: itemWidget: {type(itemWidget).__name__}")
             
         
         path_parts = [element] # the pathay from root to branch tip
