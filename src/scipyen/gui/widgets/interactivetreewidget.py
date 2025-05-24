@@ -312,12 +312,12 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
             self._visited_[id(data)] = (typeStr, path)
             
         # Truncate description and add text box if needed
-        if len(desc) > 100:
-            desc = desc[:97] + '...'
-            if widget is None:
-                widget = QtWidgets.QPlainTextEdit(str(data))
-                widget.setMaximumHeight(200)
-                widget.setReadOnly(True)
+        # if len(desc) > 100:
+        #     desc = desc[:97] + '...'
+        #     if widget is None:
+        #         widget = QtWidgets.QPlainTextEdit(str(data))
+        #         widget.setMaximumHeight(200)
+        #         widget.setReadOnly(True)
         
         # Add widget to new subnode
         if widget is not None:
@@ -350,7 +350,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                 keyrepr = f"{key}"
                 keytip = f"field type: {type(child_data).__name__}"
                 
-            elif isinstance(data, (tuple,list, deque, typing.Sequence, dict, types.MappingProxyType)):
+            elif isinstance(data, (tuple, list, deque, typing.Sequence, dict, types.MappingProxyType)):
                 keyrepr = f"{key}"
                 keytip = f"index type: {type(key).__name__}" # this here is crucial; I want type of key not of what is mapped to it
                 
@@ -491,16 +491,6 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                     ndx = [i[1] for i in sorted((str(k[0]), k[1]) for k in zip(data.keys(), range(len(data))))]
                     items = [i for i in data.items()]
                     children = OrderedDict([items[k] for k in ndx])
-#                         if isinstance(data, OrderedDict):
-#                             children = data
-#                             
-#                         else:
-#                             # NOTE: 2021-07-20 09:52:34
-#                             # dict objects with mixed key types cannot be sorted
-#                             # therefore we resort to an indexing vector
-#                             ndx = [i[1] for i in sorted((str(k[0]), k[1]) for k in zip(data.keys(), range(len(data))))]
-#                             items = [i for i in data.items()]
-#                             children = OrderedDict([items[k] for k in ndx])
                         
                 elif isinstance(data, (list, tuple, deque, set)):
                     # NOTE: 2025-05-21 16:17:37

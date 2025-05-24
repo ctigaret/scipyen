@@ -3481,30 +3481,22 @@ def summarize_object_properties(objname:str, obj:typing.Any, namespace="Internal
             dtype = obj.dtype
             dtypestr = str(obj.dtype)
             dtypetip = f"{type(dtype).__module__}.{type(dtype).__name__}"
-            # dtypetip = ""
-            # dtypetip = "dtype: "
             
             if obj.size > 0:
                 try:
-                    if np.all(np.isnan(obj[:])):
-                        datamin = str(np.nan)
-                        
-                    else:
-                        datamin = str(np.nanmin(obj))
+                    datamin = str(np.nan) if np.all(np.isnan(obj.flatten())) else str(np.nanmin(obj))
                 except:
-                    pass
+                    traceback.print_exc()
+                    # pass
                     
                 mintip = "min: "
                     
                 try:
-                    if np.all(np.isnan(obj[:])):
-                        datamax = str(np.nan)
-                        
-                    else:
-                        datamax  = str(np.nanmax(obj))
+                    datamax = str(np.nan) if np.all(np.isnan(obj.flatten())) else str(np.nanmax(obj))
                         
                 except:
-                    pass
+                    traceback.print_exc()
+                    # pass
                 
                 maxtip = "max: "
                 

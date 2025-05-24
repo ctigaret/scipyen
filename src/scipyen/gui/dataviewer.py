@@ -248,14 +248,7 @@ class DataViewer(ScipyenViewer):
     # def _set_data_(self, data:object, predicate=None, hideRoot=False, *args, **kwargs):
     def _set_data_(self, data:object, predicate=None, *args, **kwargs):
         r"""
-        Display new data
-        # TODO 2019-09-14 10:16:03: NOTE: 2021-10-03 13:10:00 SCRAP THAT
-        # expand this to other hierarchical containers including those in
-        # the neo package (neo.Block, neo.Segment, neo.Unit, etc) and in the
-        # datatypes module (ScanData)
-        # FIXME you may want to override some of the pyqtgraph's DataTreeWidget
-        # to treat other data types as well.
-        # Solutions to be implemented in the InteractiveTreeWidget in this module
+        Displays new data
         """
         if inspect.isfunction(predicate):
             self.predicate=predicate
@@ -661,19 +654,19 @@ class DataViewer(ScipyenViewer):
                                                        newWindow=True)
     
     
-    @safewrapper
-    def _parse_item_(self, item:QtWidgets.QTreeWidgetItem):
-        widgetPaths, widgetItems = zip(*list(self.treeWidget.nodes.items())) # treeWidget.nodes is a dict tuple[str] ↦ QTreeWidgetItem
-        if item in widgetItems:
-            ndx = widgetItems.index(item)
-            path_parts = widgetPaths[ndx]
-        else:
-            path_parts = None
-            
-        return path_parts
+#     @safewrapper
+#     def _parse_item_(self, item:QtWidgets.QTreeWidgetItem):
+#         widgetPaths, widgetItems = zip(*list(self.treeWidget.nodes.items())) # treeWidget.nodes is a dict tuple[str] ↦ QTreeWidgetItem
+#         if item in widgetItems:
+#             ndx = widgetItems.index(item)
+#             path_parts = widgetPaths[ndx]
+#         else:
+#             path_parts = None
+#             
+#         return path_parts
     
     @safewrapper
-    def _get_path_for_item_(self, item:QtWidgets.QTreeWidgetItem):#, as_expression:bool=True):
+    def _get_path_for_item_(self, item:QtWidgets.QTreeWidgetItem, external:bool = False):#, as_expression:bool=True):
         r"""Returns a tree (indexing) path to item, as a list of 'nodes'.
         
         This EXCLUDES the top level parent.
@@ -700,44 +693,54 @@ class DataViewer(ScipyenViewer):
             increasing nesting depth.
         
         """
-        item_data_type = item.data(0, QtCore.Qt.UserRole)
-        if item_data_type is None:
-            item_data_type = item.parent().data(0, QtCore.Qt.UserRole)
+        from core.datatypes import is_namedtuple
+        
+        element = item.data(0, QtCore.Qt.DisplayRole)
+        itemWidget = self.treeWidget.itemWidget(item, 0)
+        
+        if itemWidget:
+            print(type(itemWidget).__name__
             
-        widgetPaths, widgetItems = zip(*list(self.treeWidget.nodes.items())) # treeWidget.nodes is a dict tuple[str] ↦ QTreeWidgetItem
         
-        if item in widgetItems:
-            ndx = widgetItems.index(item)
-            path_parts = widgetPaths[ndx]
-        else:
-            path_parts = None
-            
-        return path_parts, item_data_type
-        # item_path = self._parse_item_(item)
+        path_parts = [element] # the pathay from root to branch tip
         
-#         item_path = list()
-#         
-#         ndx = self._parse_item_(item)
-#         
-#         if ndx is not None:
-#             item_path.append(ndx)
-# 
-#         parent = item.parent()
-#         
-#         while parent is not None:
-#             if parent.parent() is not None:
-#                 ndx = self._parse_item_(parent)
-#                 if ndx is not None:
-#                     item_path.append(ndx)
-#                 
-#             parent = parent.parent()
-# 
-#         item_path.reverse()
+        expr = [element] # elements of the expression used to access for the 
+                         # object represented by the item;
+                         # the access expression will be constructed with appropriate
+                         # syntax for getitem getter, depening on the type of the parent
+                         # object that contains or references the object represented
+                         # by the item;
+                         #
+                         # if the dataViewer shows an object in the user namespace
+                         # (most common situation) then one can simply call
+                         # eval(accessexpr), where accessexpr is returned below
+                         # as ``access``
+                         
+        p = item.parent()
+        k: int = 0
+        while p is not None:
+            pdatatype = p.data(0, QtCore.Qt.UserRole)
+            element = p.data(0, QtCore.Qt.DisplayRole)
+            path_parts.append(element)
+            expr.append(element)
+            k += 1
+            if pdatatype in (typing.Sequence, tuple, list, dict, deque, types.MappingProxyType):
+                if is_namedtuple(pdatatype):
+                    expr[k-1] = f".{expr[k-1]}"
+                else:
+                    expr[k-1] = f"[{expr[k-1]}]"
+            else:
+                expr[k-1] = f".{expr[k-1]}"
+                
+            p = p.parent()
+                
+        path_parts.reverse()
+        expr.reverse()
+        access = "".join(expr) if external else "".join(expr[1:]) if len(expr)>1 else ""
         
-        print(f"{self.__class__.__name__}._get_path_for_item_({item}): item_path = {item_path}")
+        # print(f"{self.__class__.__name__}._get_path_for_item_: path_parts = {path_parts}, expr = {expr}, access = {access}")
+        return path_parts, access
         
-        return item_path
-    
     @safewrapper
     def _export_data_items_(self, items, fullPathAsName=False):
         r"""Export data displayed by their corresponding items, to workspace.
@@ -763,81 +766,27 @@ class DataViewer(ScipyenViewer):
         objects = list()
         
         for item in items:
-            path, data_type = self._get_path_for_item_(item)
+            path, access = self._get_path_for_item_(item)
             print(f"{self.__class__.__name__}_export_data_items_ path = {path}, type = {type}")
             
             if len(path) == 0:
                 continue
             
             if fullPathAsName:
-                # NOTE: 2021-08-17 09:35:10 the order is important:
-                # 1) cannot modify path here because it will be used to get
-                # the object -> use a temporary full path prepended with top 
-                # level item if available
-                #
-                # 2) cannot get the object first then figure out the name because
-                # NestedFinder.getvalue() consumes the path (so by the time name
-                # is built the path will be empty)
-                #
-                # in either case we need a temporary list - I guess the runtime
-                # penaly is minor
-                top_title = self.treeWidget.top_title
-                if isinstance(top_title, str) and len(top_title.strip()):
-                    full_path = [p for p in path]
-                    full_path.insert(0, top_title)
-                    
-                else:
-                    full_path = path
-                    
-                print(f"{self.__class__.__name__}_export_data_items_ full_path = {full_path}")
-                name = strutils.str2symbol("_".join(["%s" % s for s in full_path]))
+                # print(f"{self.__class__.__name__}_export_data_items_ full_path = {path}")
+                name = strutils.str2symbol("_".join(path))
                 
             else:
-                name = strutils.str2symbol("%s" % path[-1])
+                name = strutils.str2symbol(path[-1])
                 
             #print("name", name)
             src = self._obj_cache_[self._cache_index_][1]
-            obj = src
-            # for path_part in path: TODO 2025-05-22 22:08:01 finalze this
-                
             
-            if self.treeWidget.has_dynamic_private:
-                if isinstance(src, (tuple, list, deque)) and isinstance(path[-1], int):
-                    objs = src[path-1]
-                elif dataclasses.is_dataclass(src):
-                    o = src
-                    for p in path:
-                        o = getattr(o, p, None)
-                        
-                    objs = [o]
-                else:
-                    objs = [getattr(src, str(path[-1]), None)]
-            else:
-                # objs = NestedFinder.getvalue(self._data_, path, single=True)
-                if src in NestedFinder.supported_hierarchical_types:
-                    objs = NestedFinder.getvalue(src, path, single=True) # this SHOULD deal with mapping objects
-                else:
-                    if isinstance(src, (tuple, list, deque)) and isinstance(path[-1], int):
-                        objs = src[path-1]
-                    elif dataclasses.is_dataclass(src):
-                        o = src
-                        for p in path:
-                            o = getattr(o, p, None)
-                            
-                        objs = [o]
-                    else:
-                        objs = [getattr(src, str(path[-1]), None)]
+            obj = eval(f"src{access}")
             
-            if len(objs) == 0:
-                continue
-            
-            if len(objs) > 1:
-                raise RuntimeError("More than one value was returned")
-                
             names.append(name)
-            objects += objs
-                
-        
+            objects.append(obj)
+            
         if len(objects) == 0:
             return
         
