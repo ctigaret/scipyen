@@ -13,6 +13,7 @@ from __future__ import print_function
 import os, warnings, types, traceback, itertools, inspect, dataclasses, numbers
 import datetime
 import fractions, decimal
+import typing
 import enum
 from collections import deque
 import dataclasses
@@ -192,7 +193,8 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
             return data, False
         
     def buildTree(self, data:object, parent:QtWidgets.QTreeWidgetItem,
-                  name:str="", nameTip:str="", typeStr = None, predicate=None, 
+                  name:str="", nameTip:str="", typeStr:typing.Optional[str] = None, 
+                  predicate:typing.Optional[typing.Any]=None, 
                   hideRoot:bool=False, path:tuple=()):
         r"""
         Overrides pyqtgraph.DataTreeWidget.buildTree()
@@ -348,11 +350,15 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                 keyrepr = f"{key}"
                 keytip = f"field type: {type(child_data).__name__}"
                 
+            elif isinstance(data, (tuple,list, deque, typing.Sequence, dict, types.MappingProxyType)):
+                keyrepr = f"{key}"
+                keytip = f"index type: {type(key).__name__}" # this here is crucial; I want type of key not of what is mapped to it
+                
             else:
                 keyrepr = str(key)
                 keytip = f"object type: {type(key).__name__}"
                 
-            # BUG 2025-05-23 22:53:37 FIXME
+            # BUG 2025-05-23 22:53:37 FIXME - fixed by import typing
             # wehen enabling keyTip renderign stops -why ?
             # keyTypeTip = "key / index / field type: %s" % keytip
             
@@ -372,7 +378,8 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                 
                 
             #              data        parent, name, nameTip,
-            self.buildTree(child_data, node, keyrepr, predicate=predicate, path=path+(keyrepr,)) # so hideRoot is always False?
+            self.buildTree(child_data, node, name=keyrepr, nameTip = keytip, 
+                           predicate=predicate, path=path+(keyrepr,)) # so hideRoot is always False?
             # self.buildTree(child_data, node, keyrepr, keyTip, predicate=predicate, path=path+(keyrepr,)) # so hideRoot is always False?
             # self.buildTree(child_data, node, keyrepr, keyTypeTip, predicate=predicate, path=path+(keyrepr,)) # so hideRoot is always False?
 
