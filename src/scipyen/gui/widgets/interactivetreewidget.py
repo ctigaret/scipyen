@@ -149,8 +149,9 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
     @Slot()
     def _slot_tableEditorWidgetSelectionChanged(self):
         widget = self.sender()
+        indexes = widget.tableView.selectedIndexes()
+        # print(f"{self.__class__.__name__}._slot_tableEditorWidgetSelectionChanged: {len(indexes)} selected")
         if widget in self._widgetsWithSelection_:
-            indexes = widget.tableView.selectedIndexes()
             if len(indexes) == 0:
                 self._widgetsWithSelection_.remove(widget)
                 
@@ -160,8 +161,10 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
             # finalize me - see tableeditorwidget
             # also implement similar things in SimpleTableWidget, or get rid of that class
             # also see is matrixviewer can be consolidated/merged in tableeditorwidget
-            
-        
+        else:
+            if len(indexes):
+                self._widgetsWithSelection_.add(widget)
+        # print(f"{self.__class__.__name__}._slot_tableEditorWidgetSelectionChanged: {len(self._widgetsWithSelection_)} widgets with selection")
         
     def setSupportedDataTypes(self, types:tuple):
         if isinstance(types, tuple) and len(types):

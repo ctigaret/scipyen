@@ -74,7 +74,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
     
     view_action_name = "Table"
     
-    sig_selectionChanged = Signal("name"="sig_selectionChanged")
+    sig_selectionChanged = Signal(name="sig_selectionChanged")
     
     #def __init__(self, model:typing.Optional[QtCore.QAbstractTableModel]=None, 
                  #parent:typing.Optional[QtWidgets.QMainWindow]=None) -> None:
@@ -600,7 +600,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         previous = modelIndexes[0]
         #selected_text.append(self._dataModel_.data(previous).toString())
         
-        data = str(self._dataModel_.data(previous).value())
+        data = str(self._dataModel_.data(previous, QtCore.Qt.EditRole).value())
         if quote:
             data = f"'{data}'"
         
@@ -627,9 +627,9 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
             rowTexts[rowNdx,colNdx] = data
             
             for modelIndex in modelIndexes[1:]:
-                data = str(self._dataModel_.data(modelIndex).value())
+                data = str(self._dataModel_.data(modelIndex, QtCore.Qt.EditRole).value())
                 if quote:
-                    data = f"'{data}"
+                    data = f"'{data}'"
                 row = modelIndex.row()
                 rowNdx = row-minRow+1
                 col = modelIndex.column()
@@ -653,9 +653,9 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
             selected_text.append(data)
             
             for modelIndex in modelIndexes[1:]:
-                data = str(self._dataModel_.data(modelIndex).value())
+                data = str(self._dataModel_.data(modelIndex, QtCore.Qt.EditRole).value())
                 if quote:
-                    data = f"'{data}"
+                    data = f"'{data}'"
                 row = modelIndex.row()
                 col = modelIndex.column()
                 if row != previous.row():
@@ -838,7 +838,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
     def setModelData(self, data):
         #print("TabularDataModel setModelData")
         try:
-            if not isinstance(data, (pd.Series, pd.DataFrame, np.ndarray, type(None))):
+            if not isinstance(data, (pd.Series, pd.DataFrame, pd.Index, np.ndarray, type(None))):
                 raise TypeError("%s data is not yet supported" % type(data).__name__)
             
             #if isinstance(data, np.ndarray) and data.ndim > 2:
@@ -887,20 +887,20 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 
             elif isinstance(data, np.ndarray):
                 if data.ndim > 2:
-                    self._modelData_ = np.squeeze(data).reshape((data.shape[0], np.prod(data.shape[1:])))
+                    if all (v == 1 for v in data.shape[2:]):
+                        self._modelData_ = np.squeeze(data).reshape((data.shape[0], np.prod(data.shape[1:])))
+                    else:
+                        raise ValueError("Arrays with more than two dimensions and with non-singleton dimensions higher than 2 are not supported")
+                    # self._modelData_ = np.squeeze(data).reshape((data.shape[0], np.prod(data.shape[1:])))
                 else:
                     self._modelData_ = data
                     
                 if self._modelData_.ndim:
-                        
                     self._modelRows_ = self._modelData_.shape[0]
-                    
                     if self._modelData_.ndim > 1:
                         self._modelColumns_ = self._modelData_.shape[1]
-                        
                     else:
                         self._modelColumns_ = 1
-                    
                 else:
                     self._modelRows_ = 1
                     self._modelColumns_ = 1
@@ -1210,69 +1210,79 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 return QtCore.QVariant()
                 
             if isinstance(self._modelData_, pd.DataFrame):
-                ret = self._modelData_.iloc[row,col]
-                
-                ret_type = type(ret).__name__
-
-                if isinstance(ret, datetime.datetime):
-                    ret = ret.isoformat(" ")
+                val = self._modelData_.iloc[row,col]
+                ret_type = type(val).__name__
+                if isinstance(val, datetime):
+                    ret = val if role == QtCore.Qt.EditRole else val.isoformat(" ")
+                else:
+                    ret = val if role == QtCore.Qt.EditRole else f"{val}"
                 
             elif isinstance(self._modelData_, pd.Series):
-                ret = self._modelData_.iloc[row]
-                
-                ret_type = type(ret).__name__
-                
-                if isinstance(ret, datetime.datetime):
-                    ret = ret.isoformat(" ")
-                    
-            elif isinstance(self._modelData_, pd.Index):
-                ret = self._modelData_[row]
-                
-                ret_type = type(ret).__name__
+                val = self._modelData_.iloc[row,col]
+                ret_type = type(val).__name__
+                if isinstance(val, datetime):
+                    ret = val if role == QtCore.Qt.EditRole else val.isoformat(" ")
+                else:
+                    ret = val if role == QtCore.Qt.EditRole else f"{val}"
 
-                if isinstance(ret, datetime.datetime):
-                    ret = ret.isoformat(" ")
+            elif isinstance(self._modelData_, pd.Index):
+                # CAUTION 2025-05-25 09:09:00 
+                # when _modelData_ is the column index of a DataFrame, ``row`` 
+                # needs to be a column index!
+                val = self._modelData_.iloc[row,col]
+                ret_type = type(val).__name__
+                if isinstance(val, datetime):
+                    ret = val if role == QtCore.Qt.EditRole else val.isoformat(" ")
+                else:
+                    ret = val if role == QtCore.Qt.EditRole else f"{val}"
                     
             elif isinstance(self._modelData_, (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal, IrregularlySampledDataSignal)):
                 # NOTE: 2025-03-31 23:47:43 WRONG:
                 # use the times as the row index!
                 if col == 0:
-                    ret = self._modelData_.times[row]
-                    ret_type = type(ret).__name__
-                    
+                    val = self._modelData_.times[row]
                 else:
-                    ret = self._modelData_[row, col-1]
-                    ret_type = type(ret).__name__
-                    
-                if isinstance(ret, pq.Quantity):
-                    ret = ret.magnitude
+                    val = self._modelData_[row, col-1]
+
+                ret_type = type(val).__name__
+                
+                if isinstance(val, datetime.datetime):
+                    ret = val if role == QtCore.Qt.EditRole else ret.isoformat(" ")
+                else:
+                    ret = val if role == QtCore.Qt.EditRole else f"{val}"
                     
             elif isinstance(self._modelData_, np.ndarray):
                 if self._modelData_.ndim  == 0: # e.g. pq object
-                    ret = np.atleast_1d(self._modelData_)[row]
+                    val = np.atleast_1d(self._modelData_)[row]
                     
                 elif self._modelData_.ndim > 1:
-                    ret = self._modelData_[row, col]
+                    val = self._modelData_[row, col]
                     
                 else:
-                    ret = self._modelData_[row]
+                    val = self._modelData_[row]
                 
-                ret_type = type(ret).__name__
+                ret_type = type(val).__name__
 
-                if isinstance(ret, datetime.datetime):
-                    ret = ret.isoformat(" ")
+                if isinstance(val, datetime.datetime):
+                    ret = val if role == QtCore.Qt.EditRole else ret.isoformat(" ")
+                else:
+                    ret = val if role == QtCore.Qt.EditRole else f"{val}"
                 
             else:
                 return QtCore.QVariant()
+            
+            if role == QtCore.Qt.EditRole:
+                return QtCore.QVariant(val)
                 
-            if role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole):
+            elif role == QtCore.Qt.DisplayRole:
                 return QtCore.QVariant("%s" % ret)
             
             elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
                 return QtCore.QVariant(ret_type)
             
             elif role in (QtCore.Qt.UserRole, ):
-                return QtCore.QVariant(ret)
+                return QtCore.QVariant(val)
+                # return val
             
             else:
                 return QtCore.QVariant()
