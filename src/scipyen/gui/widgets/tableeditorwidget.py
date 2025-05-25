@@ -194,6 +194,10 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
     @selectedRowIndex.setter
     def selectedRowIndex(self, val:int):
         self._selectedRowIndex_ = val
+        
+    @property
+    def selectedIndexes(self):
+        return self.tableView.selectedIndexes()
     
     @property
     def currentSlice(self):

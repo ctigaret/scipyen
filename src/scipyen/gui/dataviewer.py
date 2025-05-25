@@ -765,98 +765,65 @@ class DataViewer(ScipyenViewer):
             # and use them to construct access pathways for them
             
             elementAccess = list() # for array-like data
+            accessList = list()
 
             if isinstance(widget, (TableEditorWidget, SimpleTableWidget)) and (isinstance(s, QtCore.QModelIndex) for s in leafSubSelection):
-                if issubclass(elementDataType, (pd.Index, pd.Series, pd.DataFrame, 
-                                        vigra.filters.Kernel1D, vigra.filters.Kernel2D,
-                                        np.ndarray)):
-                    rows = list(set(map(lambda s: s.row(), leafSubSelection)))
-                    row_col_ndx = dict()
-                    for row in rows:
-                        indexesForRow = list(filter(lambda s: s.row() == row, leafSubSelection))
-                        cols = list(map(lambda s: s.column(), indexesForRow))
-                        row_col_ndx[row] = cols
-                    
-                    continuousRows = np.all(np.diff(rows)==1)
-                    
-                    
-                    discontinuousRows = np.any(np.diff(rows)>1)
-                    
-                    if issubclass(elementDataType, (vigra.filters.Kernel1D, pd.Index, pd.Series)):
-                        if discontinuousRows:
-                            for row in rows:
-                                elementAccess.append(f"[{row}]")
-                        else:
-                            elementAccess.append(f"[{slice(rows[0], rows[-1]+1)}]")
-                            
-                    elif issubclass(elementDataType, (vigra.filters.Kernel2D, np.ndarray, pd.DataFrame)):
-                        if issubclass(elementDataType, neo.core.dataobject.DataObject):
-                            if discontinuousRows:
-                                rowNdx = "["
-                                for row in rows:
-                                    rowNdx.append(f"{row}")
-                                rowNdx.append("]")
-                                
-                            else:
-                                rowNdx = f"slice({rows[0]}, {rows[-1] + 1})"
-                                
-                            allContionuousCols = all(np.all(np.diff(c)>1) for c in row_col_ndx.values())
-                            minC = list(min(c) for c in row_col_ndx.values())
-                            maxC = list(max(c) for c in row_col_ndx.values())
-                            
-                            if all(mnc == minC[0] for mnc in minC)
-                            
-                            sameColsRange = allContionuousCols and all(min(c))
-                            # if allContionuousCols:
-                                
-                                
-                                
-                        if discontinuousRows:
-                            for row in rows:
-                                cols = row_col_ndx[row][0]
-                                if issubclass(elementDataType, neo.core.dataobject.DataObject);
-                                    if all(c == 0 for c in cols):
-                                        elementAccess.append(f"times[{row}]")
-                                    else:
-                                        if np.any(np.diff(cols)>1):
-                                            columnNdx = ["["]
-                                            for col in cols:
-                                                if col > 0:
-                                                    columnNdx.append(f"{col-1}")
-                                            columnNdx.append("]")
-                                            elementAccess.append(f"[{row}, {columnNdx}]")
-                                        else:
-                                            
-                                            elementAccess.append(f"[{row},{slice(cols[0], cols[-1]+1)}]")
-                                        elementAccess.append(f"times[{row}]")
-                                        elementAccess.append(f"[{col-1}]")
-                                else:
-                                    if np.any(np.diff(cols)>1):
-                                        for col in cols:
-                                            elementAccess.append(f"[{row}, {col}]")
-                                    else:
-                                        elementAccess.append(f"[{row},{slice(cols[0], cols[-1]+1)}]")
-                                    
-                        else:
-                            rowNdx = slice(rows[0], rows[-1]+1)
-                            allContionuousCols = all(np.all(np.diff(c)>1) for c in row_col_ndx.values())
-                            if allContionuousCols:
-                                elementAccess.append(f"[{rowNdx}, {slice(0,2)}]")
-                            else:
-                                for row in rows:
-                                    for col in row_col_ndx[row]:
-                                        elementAccess.append(f"[{rowNdx}, {col}]")
-                            
+                rowsSet = list(set(map(lambda i: i.row(), leafSubSelection)))
                 
-                if len(elementAccess):
-                    accessList = list()
-                    for eAccess in elementAccess:
-                        print(f"eAccess: {eAccess}")
-                        accessList.append(access+eAccess)
+                cols_by_rows = dict((r, list(map(lambda i: i.column(), filter(lambda i: i.row() == r, leafSubSelection)))) for r in rowsSet)
+                
+                continuousRows = np.all(np.diff(list(cols_by_rows.keys()))==1)
+                allContinuousColsPerRow = all(np.all(np.diff(cols)==1) for cols in cols_by_rows.values())
+                minColsPerRow = list(map(lambda c: min(c), cols_by_rows.values()))
+                maxColsPerRow = list(map(lambda c: max(c), cols_by_rows.values()))
+                hasSameColumnRangeAcrossRows = allContinuousColsPerRow and np.all(np.diff(minColsPerRow) == 0) and np.all(np.diff(maxColsPerRow) == 0)
+                hasContinuousSelection = continuousRows and hasSameColumnRangeAcrossRows
+                
+                if hasContinuousSelection:
+                    firstRow = min(cols_by_rows.keys())
+                    lastRow = max(cols_by_rows.keys())
+                    rowNdx = f"{slice(firstRow, lastRow+1)}"
+                    firstCol = min(minColsPerRow)
+                    lastCol = max(maxColsPerRow)
+                    if issubclass(elementDataType, (neo.core.dataobject.DataObject, pd.Series, pd.DataFrame)):
+                        # just use the row indexing to get a signal slice of all channels
+                        if firstCol == 0:
+                            # CAUTION: first column (column 0) depicts the signal's domain or Series/DataFrame index!
+                            # all continuous selection, here, implies that we take all
+                            # channels => will generate a new signal when eval'ed
+                            elementAccess.append(f"[{rowNdx}]")
+                        else:
+                            # filter out column 0 (for the signal's domain) and 
+                            # create colNdx to select channel data
+                            # when eval'ed, will also generate a signal
+                            channelCols = list(map(lambda cols: list(map(lambda c: c-1, cols)), cols_by_rows.values()))
+                            # we know this is continuous and with same range across the rows
+                            firstCol = min(list(map(lambda cols: min(cols), channelCols)))
+                            lastCol = max(list(map(lambda cols: max(cols), channelCols)))
+                            colNdx = f"{slice(firstCol, lastCol+1)}"
+                            elementAccess.append(f"[{rowNdx}, {colNdx}]")
+                    
+                    else: # generic ndarray
+                        colNdx = f"{slice(firstCol, lastCol+1)}"
+                        elementAccess.append(f"[{rowNdx}, {colNdx}, ...]")
                         
                 else:
-                    accessList = [access]
-                
+                    # use advanced indexing with integer arrays
+                    rowNdx = f"np.array({list(cols_by_rows.keys())})"
+                    if issubclass(elementDataType, (neo.core.dataobject.DataObject, pd.Series, pd.DataFrame)):        
+                        # filter out column 0 (for the signal's domain or Series/DataFrame row index) and 
+                        # create colNdx to select channel data
+                        # when eval'ed, will also generate a signal
+                        channelCols = list(map(lambda cols: list(map(lambda c: c-1, filter(lambda x: x>0, cols))), cols_by_rows.values()))
+                        colNdx = f"np.array({channelCols})"
+                        elementAccess.append(f"[{rowNdx}, {colNdx}]")
+                    else:
+                        channelCols = list(cols_by_rows.values())
+                        colNdx = f"np.array({channelCols})"
+                        elementAccess.append(f"[{rowNdx}, {colNdx}, ...]")
+
+                for eAccess in elementAccess:
+                    accessList.append(access + eAccess)
                 directAccess = True
                 
             elif isinstance(widget, (QtWidgets.QPlainTextEdit, QtWidgets.QTextEdit)) and all(isinstance(v, str) for v in leafSubSelection):
