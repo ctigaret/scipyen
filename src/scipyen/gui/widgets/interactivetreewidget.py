@@ -32,6 +32,7 @@ import quantities as pq
 import numpy as np
 import scipy
 import pandas as pd
+import vigra
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
@@ -131,7 +132,8 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
             signalBlocker = QtCore.QSignalBlocker(widget.tableView)
             widget.tableView.model().setModelData(data)
             widget.readOnly=True
-            widget.sig_selectionChanged.connect(self._slot_tableEditorWidgetSelectionChanged)
+            # don't delete; may be useful
+            # widget.sig_selectionChanged.connect(self._slot_tableEditorWidgetSelectionChanged)
         else:
             widget = SimpleTableWidget()
             widget.setData(data)
@@ -139,6 +141,31 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         widget.setMaximumHeight(200)
         
         return widget
+    
+    def getWidgetSelection(self, widget:QtWidgets.QWidget) -> list:
+        r"""Returns a list of selected QModelIndex for table widgets, or text for text widgets.
+        The caller should deal with these accordingly.
+    """
+        if isinstance(widget, TableEditorWidget):
+            return widget.tableView.selectedIndexes()
+        elif isinstance(widget, SimpleTableWidget):
+            return widget.selectedIndexes()
+        elif isinstance(widget, (QtWidgets.QPlainTextEdit, QtWidgets.QTextEdit)):
+            # NOTE: 2025-05-25 12:10:02
+            # QTextBrowser inherits from QTextEdit
+            textCursor = widget.textCursor()
+            if QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier:
+                selectedText = textCursor.selection().toPlainText()
+            else:
+                selectedText = textCursor.selectedText()
+                
+            if len(selectedText) == 0:
+                return list()
+            else:
+                return [selectedText]
+            
+        else:
+            return list()
     
     @Slot(QtWidgets.QTreeWidgetItem, int)
     def _slot_setLastActive(self, item, column):
@@ -581,6 +608,9 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                 else:
                     desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
                     widget = self._makeTableWidget_(data)
+                    
+            elif isinstance(data, (vigra.filters.Kernel1D, vigra.filters.Kernel2D)):
+                widget = self._makeTableWidget_(data)
                     
             elif isinstance(data, (datetime.datetime, datetime.date, datetime.time, datetime.timedelta, datetime.timezone)):
                 desc = f"{data}"

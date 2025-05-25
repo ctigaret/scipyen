@@ -182,7 +182,6 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
     def selectedColumnIndexes(self) -> list:
         return utilities.unique([ndx.column() for ndx in self.tableView.selectedIndexes()])
     
-    
     @property
     def selectedRowIndexes(self) -> list:
         return utilities.unique([ndx.row() for ndx in self.tableView.selectedIndexes()])
@@ -591,10 +590,11 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         # use the logic in withHeaders branch, below
         
         minRow = minCol = 0
-        minCol = min([m.column() for m in modelIndexes])
-        maxCol = max([m.column() for m in modelIndexes])
-        minRow = min([m.row() for m in modelIndexes])
-        maxRow = max([m.row() for m in modelIndexes])
+        # don't delete - may be useful later?
+        # minCol = min([m.column() for m in modelIndexes])
+        # maxCol = max([m.column() for m in modelIndexes])
+        # minRow = min([m.row() for m in modelIndexes])
+        # maxRow = max([m.row() for m in modelIndexes])
         
         selected_text = list()
         previous = modelIndexes[0]

@@ -52,9 +52,7 @@ from core.traitcontainers import (DataBag, DataBagTraitsObserver,)
 class SimpleTableWidget(TableWidget): # TableWidget imported from pyqtgraph
     r"""Another simple table widget, which allows zero-based row/column indices.
     
-    gui.widgets.tableeditorwidget.TableEditorWidget does that too, and more, but is too slow. 
-    
-    In contrast, pyqtgraph's TableWidget is much more efficient
+    Ultimatly inherits from QTableWidget
     
     """
     def __init__(self, *args, natural_row_index=False, natural_col_index=False, **kwds):

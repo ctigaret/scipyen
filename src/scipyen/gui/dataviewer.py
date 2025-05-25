@@ -28,6 +28,7 @@ import neo
 import quantities as pq
 import numpy as np
 import pandas as pd
+import vigra
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
@@ -197,6 +198,9 @@ class DataViewer(ScipyenViewer):
         self._top_title_ = ""
         
         self._dataTypeStr_ = None
+        
+        # contains data selected from child widgets (table, and text widgets)
+        self._subselections_ = list()
         
         super().__init__(data=data, parent=parent, win_title=win_title, doc_title = doc_title, ID=ID, *args, **kwargs)
         
@@ -695,12 +699,24 @@ class DataViewer(ScipyenViewer):
         """
         from core.datatypes import is_namedtuple
         
-        element = item.data(0, QtCore.Qt.DisplayRole)
-        itemWidget = self.treeWidget.itemWidget(item, 0)
+        self._subselections_.clear()
         
-        if itemWidget:
-            print(f"{self.__class__.__name__}._get_path_for_item_: itemWidget: {type(itemWidget).__name__}")
+        leafSubSelection = list()
+        widget = self.treeWidget.itemWidget(item, 0)
+        
+        if widget:
+            # special case - this is a child item with a widget showing the 
+            # contents of the data represented by the parent item!
+            # ∴ the item's parent is the actual data we're after !
+            leafSubSelection = self.treeWidget.getWidgetSelection(widget)
+            pItem = item.parent()
+            # element = pItem.data(0, QtCore.Qt.DisplayRole)
+            elementDataType = pItem.data(0, QtCore.Qt.UserRole)
+            item = pItem # this is crucial 
             
+        element = item.data(0, QtCore.Qt.DisplayRole)
+            
+        print(f"{self.__class__.__name__}._get_path_for_item_: element = {element}")
         
         path_parts = [element] # the pathay from root to branch tip
         
@@ -736,10 +752,122 @@ class DataViewer(ScipyenViewer):
                 
         path_parts.reverse()
         expr.reverse()
-        access = "".join(expr) if external else "".join(expr[1:]) if len(expr)>1 else ""
+        directAccess = True
         
+        access = "".join(expr) if external else "".join(expr[1:]) if len(expr)>1 else ""
+        print(f"access: {access}")
+        
+        if len(leafSubSelection):
+            # contents can be EITHER a list of QModelIndex (from a table widget)
+            # OR a list of strings
+            # when a list of QModelIndex, we need to get their row & column
+            # indexes (ATTENTION — these are in the context of the table widget)
+            # and use them to construct access pathways for them
+            
+            elementAccess = list() # for array-like data
+
+            if isinstance(widget, (TableEditorWidget, SimpleTableWidget)) and (isinstance(s, QtCore.QModelIndex) for s in leafSubSelection):
+                if issubclass(elementDataType, (pd.Index, pd.Series, pd.DataFrame, 
+                                        vigra.filters.Kernel1D, vigra.filters.Kernel2D,
+                                        np.ndarray)):
+                    rows = list(set(map(lambda s: s.row(), leafSubSelection)))
+                    row_col_ndx = dict()
+                    for row in rows:
+                        indexesForRow = list(filter(lambda s: s.row() == row, leafSubSelection))
+                        cols = list(map(lambda s: s.column(), indexesForRow))
+                        row_col_ndx[row] = cols
+                    
+                    continuousRows = np.all(np.diff(rows)==1)
+                    
+                    
+                    discontinuousRows = np.any(np.diff(rows)>1)
+                    
+                    if issubclass(elementDataType, (vigra.filters.Kernel1D, pd.Index, pd.Series)):
+                        if discontinuousRows:
+                            for row in rows:
+                                elementAccess.append(f"[{row}]")
+                        else:
+                            elementAccess.append(f"[{slice(rows[0], rows[-1]+1)}]")
+                            
+                    elif issubclass(elementDataType, (vigra.filters.Kernel2D, np.ndarray, pd.DataFrame)):
+                        if issubclass(elementDataType, neo.core.dataobject.DataObject):
+                            if discontinuousRows:
+                                rowNdx = "["
+                                for row in rows:
+                                    rowNdx.append(f"{row}")
+                                rowNdx.append("]")
+                                
+                            else:
+                                rowNdx = f"slice({rows[0]}, {rows[-1] + 1})"
+                                
+                            allContionuousCols = all(np.all(np.diff(c)>1) for c in row_col_ndx.values())
+                            minC = list(min(c) for c in row_col_ndx.values())
+                            maxC = list(max(c) for c in row_col_ndx.values())
+                            
+                            if all(mnc == minC[0] for mnc in minC)
+                            
+                            sameColsRange = allContionuousCols and all(min(c))
+                            # if allContionuousCols:
+                                
+                                
+                                
+                        if discontinuousRows:
+                            for row in rows:
+                                cols = row_col_ndx[row][0]
+                                if issubclass(elementDataType, neo.core.dataobject.DataObject);
+                                    if all(c == 0 for c in cols):
+                                        elementAccess.append(f"times[{row}]")
+                                    else:
+                                        if np.any(np.diff(cols)>1):
+                                            columnNdx = ["["]
+                                            for col in cols:
+                                                if col > 0:
+                                                    columnNdx.append(f"{col-1}")
+                                            columnNdx.append("]")
+                                            elementAccess.append(f"[{row}, {columnNdx}]")
+                                        else:
+                                            
+                                            elementAccess.append(f"[{row},{slice(cols[0], cols[-1]+1)}]")
+                                        elementAccess.append(f"times[{row}]")
+                                        elementAccess.append(f"[{col-1}]")
+                                else:
+                                    if np.any(np.diff(cols)>1):
+                                        for col in cols:
+                                            elementAccess.append(f"[{row}, {col}]")
+                                    else:
+                                        elementAccess.append(f"[{row},{slice(cols[0], cols[-1]+1)}]")
+                                    
+                        else:
+                            rowNdx = slice(rows[0], rows[-1]+1)
+                            allContionuousCols = all(np.all(np.diff(c)>1) for c in row_col_ndx.values())
+                            if allContionuousCols:
+                                elementAccess.append(f"[{rowNdx}, {slice(0,2)}]")
+                            else:
+                                for row in rows:
+                                    for col in row_col_ndx[row]:
+                                        elementAccess.append(f"[{rowNdx}, {col}]")
+                            
+                
+                if len(elementAccess):
+                    accessList = list()
+                    for eAccess in elementAccess:
+                        print(f"eAccess: {eAccess}")
+                        accessList.append(access+eAccess)
+                        
+                else:
+                    accessList = [access]
+                
+                directAccess = True
+                
+            elif isinstance(widget, (QtWidgets.QPlainTextEdit, QtWidgets.QTextEdit)) and all(isinstance(v, str) for v in leafSubSelection):
+                self._subselections_.append("".join(leafSubSelection))
+                accessList = [access]
+                directAccess = False
+        
+        else:
+            accessList = [access]
         # print(f"{self.__class__.__name__}._get_path_for_item_: path_parts = {path_parts}, expr = {expr}, access = {access}")
-        return path_parts, access
+        return path_parts, accessList, directAccess
         
     @safewrapper
     def _export_data_items_(self, items, fullPathAsName=False):
@@ -766,8 +894,8 @@ class DataViewer(ScipyenViewer):
         objects = list()
         
         for item in items:
-            path, access = self._get_path_for_item_(item)
-            print(f"{self.__class__.__name__}_export_data_items_ path = {path}, type = {type}")
+            path, access, direct = self._get_path_for_item_(item)
+            print(f"{self.__class__.__name__}_export_data_items_ path = {path}, access = {access}")
             
             if len(path) == 0:
                 continue
@@ -782,10 +910,27 @@ class DataViewer(ScipyenViewer):
             #print("name", name)
             src = self._obj_cache_[self._cache_index_][1]
             
-            obj = eval(f"src{access}")
+            if direct:
+                if len(access) > 1:
+                    for k, statement in enumerate(access):
+                        print(f"statement = {statement}")
+                        objects.append(eval(f"src{statement}"))
+                        names.append(f"{name}_{k}")
+                else:
+                    objects.append(eval(f"src{access[0]}"))
+                    names.append(name)
+            else:
+                if len(self._subselections_):
+                    if len(self._subselections_) > 1:
+                        for k, sel in self._subselections_:
+                            objects.append(sel)
+                            names.append(f"{name}_{k}")
+                    else:
+                        object.append(self._subselections_[0])
+                        names.append(name)
             
-            names.append(name)
-            objects.append(obj)
+            # names.append(name)
+            # objects.append(obj)
             
         if len(objects) == 0:
             return
