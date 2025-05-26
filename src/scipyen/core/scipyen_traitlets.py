@@ -1267,7 +1267,9 @@ class NeoDataObjectTrait(NeoBaseNeoTrait):
     
     def compare_elements(self, old_value, new_value):
         try:
-            result = np.all(super().compare_elements(old_value, new_value))
+            result = old_value.shape() == new_value.shape()
+            if result:
+                result = np.all(super().compare_elements(old_value, new_value))
             if result:
                 result = np.all(old_value.array_annotations == new_value.array_annotations)
                 
@@ -1315,7 +1317,6 @@ class NeoDataObjectTrait(NeoBaseNeoTrait):
             obj._notify_trait(self.name, old_value, new_value,
                               change_type=change_type)
             
-                
 class NeoAnalogSignalTrait(NeoDataObjectTrait):
     klass = neo.AnalogSignal
     info_text = f"Traitlet for {klass}"

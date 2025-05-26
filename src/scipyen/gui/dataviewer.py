@@ -11,8 +11,8 @@ Qt5-based viewer window for dict and subclasses
 #### BEGIN core python modules
 from __future__ import print_function
 
-import os, warnings, types, traceback, itertools, inspect, dataclasses, numbers
-import typing
+import os, sys, warnings, types, traceback, itertools, inspect
+import typing, dataclasses, numbers
 from collections import deque
 from dataclasses import MISSING
 import math
@@ -657,18 +657,6 @@ class DataViewer(ScipyenViewer):
                         self._scipyenWindow_.viewObject(obj, objname, 
                                                        newWindow=True)
     
-    
-#     @safewrapper
-#     def _parse_item_(self, item:QtWidgets.QTreeWidgetItem):
-#         widgetPaths, widgetItems = zip(*list(self.treeWidget.nodes.items())) # treeWidget.nodes is a dict tuple[str] ↦ QTreeWidgetItem
-#         if item in widgetItems:
-#             ndx = widgetItems.index(item)
-#             path_parts = widgetPaths[ndx]
-#         else:
-#             path_parts = None
-#             
-#         return path_parts
-    
     @safewrapper
     def _get_path_for_item_(self, item:QtWidgets.QTreeWidgetItem, external:bool = False):#, as_expression:bool=True):
         r"""Returns a tree (indexing) path to item, as a list of 'nodes'.
@@ -711,12 +699,13 @@ class DataViewer(ScipyenViewer):
             leafSubSelection = self.treeWidget.getWidgetSelection(widget)
             pItem = item.parent()
             # element = pItem.data(0, QtCore.Qt.DisplayRole)
-            elementDataType = pItem.data(0, QtCore.Qt.UserRole)
+            # elementDataType = pItem.data(0, QtCore.Qt.UserRole)
             item = pItem # this is crucial 
             
         element = item.data(0, QtCore.Qt.DisplayRole)
+        elementDataType = item.data(0, QtCore.Qt.UserRole)
             
-        print(f"{self.__class__.__name__}._get_path_for_item_: element = {element}")
+        # print(f"{self.__class__.__name__}._get_path_for_item_: element = {element}")
         
         path_parts = [element] # the pathay from root to branch tip
         
@@ -754,8 +743,8 @@ class DataViewer(ScipyenViewer):
         expr.reverse()
         directAccess = True
         
-        access = "".join(expr) if external else "".join(expr[1:]) if len(expr)>1 else ""
-        print(f"access: {access}")
+        access = ("".join(expr) if external else "".join(expr[1:]) if len(expr)>1 else "", "", elementDataType)
+        # print(f"access: {access}")
         
         if len(leafSubSelection):
             # contents can be EITHER a list of QModelIndex (from a table widget)
@@ -816,14 +805,14 @@ class DataViewer(ScipyenViewer):
                         # when eval'ed, will also generate a signal
                         channelCols = list(map(lambda cols: list(map(lambda c: c-1, filter(lambda x: x>0, cols))), cols_by_rows.values()))
                         colNdx = f"np.array({channelCols})"
-                        elementAccess.append(f"[{rowNdx}, {colNdx}]")
+                        elementAccess.append(f".as_array()[{rowNdx}, {colNdx}]")
                     else:
                         channelCols = list(cols_by_rows.values())
                         colNdx = f"np.array({channelCols})"
                         elementAccess.append(f"[{rowNdx}, {colNdx}, ...]")
 
                 for eAccess in elementAccess:
-                    accessList.append(access + eAccess)
+                    accessList.append((access[0], eAccess, elementDataType))
                 directAccess = True
                 
             elif isinstance(widget, (QtWidgets.QPlainTextEdit, QtWidgets.QTextEdit)) and all(isinstance(v, str) for v in leafSubSelection):
@@ -861,8 +850,8 @@ class DataViewer(ScipyenViewer):
         objects = list()
         
         for item in items:
-            path, access, direct = self._get_path_for_item_(item)
-            print(f"{self.__class__.__name__}_export_data_items_ path = {path}, access = {access}")
+            path, accessList, direct = self._get_path_for_item_(item)
+            # print(f"{self.__class__.__name__}_export_data_items_ path = {path}, access = {accessList}")
             
             if len(path) == 0:
                 continue
@@ -877,25 +866,50 @@ class DataViewer(ScipyenViewer):
             #print("name", name)
             src = self._obj_cache_[self._cache_index_][1]
             
-            if direct:
-                if len(access) > 1:
-                    for k, statement in enumerate(access):
-                        print(f"statement = {statement}")
-                        objects.append(eval(f"src{statement}"))
-                        names.append(f"{name}_{k}")
-                else:
-                    objects.append(eval(f"src{access[0]}"))
-                    names.append(name)
-            else:
-                if len(self._subselections_):
-                    if len(self._subselections_) > 1:
-                        for k, sel in self._subselections_:
-                            objects.append(sel)
+            try:
+                if direct:
+                    if len(accessList) > 1:
+                        for k, statement, eAccess, oType in enumerate(accessList):
+                            print(f"statement: {statement}, eAccess: {eAccess}, oType: {oType}")
+                            if len(eAccess):
+                                obj = eval(f"src{statement}{eAccess}")
+                                if issubclass(oType, pq.Quantity):
+                                    if not isinstance(obj, pq.Quantity):
+                                        srcObj = eval(f"src{statement}")
+                                        obj = obj * srcObj.units
+                            else:
+                                obj = eval(f"src{statement}")
+                            objects.append(obj)
+                            # objects.append(eval(f"src{statement}"))
                             names.append(f"{name}_{k}")
                     else:
-                        object.append(self._subselections_[0])
+                        statement, eAccess, oType = accessList[0]
+                        print(f"statement: {statement}, eAccess: {eAccess}, oType: {oType}")
+                        if len(eAccess):
+                            obj = eval(f"src{statement}{eAccess}")
+                            if issubclass(oType, pq.Quantity):
+                                if not isinstance(obj, pq.Quantity):
+                                    srcObj = eval(f"src{statement}")
+                                    obj = obj * srcObj.units
+                        else:
+                            obj = eval(f"src{statement}")
+                        objects.append(obj)
                         names.append(name)
-            
+                else:
+                    if len(self._subselections_):
+                        if len(self._subselections_) > 1:
+                            for k, sel in self._subselections_:
+                                objects.append(sel)
+                                names.append(f"{name}_{k}")
+                        else:
+                            object.append(self._subselections_[0])
+                            names.append(name)
+            except:
+                exc = sys.exception()
+                traceback.print_exc()
+                msg = "".join(traceback.format_exception_only(exc))
+                self.errorMessage(type(exc).__name__, msg)
+                raise()
             # names.append(name)
             # objects.append(obj)
             
