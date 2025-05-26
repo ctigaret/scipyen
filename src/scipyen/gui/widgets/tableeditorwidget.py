@@ -1216,7 +1216,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             if isinstance(self._modelData_, pd.DataFrame):
                 val = self._modelData_.iloc[row,col]
                 ret_type = type(val).__name__
-                if isinstance(val, datetime):
+                if isinstance(val, datetime.datetime):
                     ret = val if role == QtCore.Qt.EditRole else val.isoformat(" ")
                 else:
                     ret = val if role == QtCore.Qt.EditRole else f"{val}"
@@ -1224,7 +1224,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             elif isinstance(self._modelData_, pd.Series):
                 val = self._modelData_.iloc[row,col]
                 ret_type = type(val).__name__
-                if isinstance(val, datetime):
+                if isinstance(val, datetime.datetime):
                     ret = val if role == QtCore.Qt.EditRole else val.isoformat(" ")
                 else:
                     ret = val if role == QtCore.Qt.EditRole else f"{val}"
@@ -1235,7 +1235,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 # needs to be a column index!
                 val = self._modelData_.iloc[row,col]
                 ret_type = type(val).__name__
-                if isinstance(val, datetime):
+                if isinstance(val, datetime.datetime):
                     ret = val if role == QtCore.Qt.EditRole else val.isoformat(" ")
                 else:
                     ret = val if role == QtCore.Qt.EditRole else f"{val}"

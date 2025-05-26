@@ -215,7 +215,10 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         self.widgets = []
         self.nodes = {}
         #              data,                parent,                   …
-        self.buildTree(self._private_data_, self.invisibleRootItem(), typeStr = dataTypeStr, predicate=predicate, hideRoot=hideRoot)
+        self.buildTree(self._private_data_, self.invisibleRootItem(), 
+                       keyType = str,
+                       typeStr = dataTypeStr, 
+                       predicate=predicate, hideRoot=hideRoot)
         self.expandToDepth(3)
         self.resizeColumnToContents(0)
         
@@ -246,7 +249,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
             return data, False
         
     def buildTree(self, data:object, parent:QtWidgets.QTreeWidgetItem,
-                  name:str="", nameTip:str="", typeStr:typing.Optional[str] = None, 
+                  name:str="", keyType:type=str, nameTip:str="", typeStr:typing.Optional[str] = None, 
                   predicate:typing.Optional[typing.Any]=None, 
                   hideRoot:bool=False, path:tuple=()):
         r"""
@@ -327,8 +330,14 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         #     node = QtWidgets.QTreeWidgetItem([name, "", ""])
         #     node.setData(0, QtCore.Qt.UserRole, type(data))
         #     parent.addChild(node)
+        
+        # NOTE: 2025-05-26 19:36:29
+        # data in user role:
+        # column 0: type of the key (int or str) - except for the top child where key type is str
+        # column 1: type of the data represented by the child
         node = QtWidgets.QTreeWidgetItem([name, "", ""])
-        node.setData(0, QtCore.Qt.UserRole, type(data))
+        node.setData(1, QtCore.Qt.UserRole, type(data))
+        node.setData(0, QtCore.Qt.UserRole, str) # beause top item representation is a string and it is NOt used in indexing pathway to leaves
         parent.addChild(node)
             
         # print(f"{self.__class__.__name__}.buildTree: predicate = {predicate}")
@@ -382,6 +391,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
             
         # recurse into children (a dict)
         for key, child_data in children.items():
+            keyType = type(key)
             if isinstance(key, type):
                 keyrepr = f"{key.__module__}.{key.__name__}"
                 keytip = f"member type: {key}"
@@ -431,10 +441,8 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                 
                 
             #              data        parent, name, nameTip,
-            self.buildTree(child_data, node, name=keyrepr, nameTip = keytip, 
+            self.buildTree(child_data, node, name=keyrepr, keyType = keyType, nameTip = keytip, 
                            predicate=predicate, path=path+(keyrepr,)) # so hideRoot is always False?
-            # self.buildTree(child_data, node, keyrepr, keyTip, predicate=predicate, path=path+(keyrepr,)) # so hideRoot is always False?
-            # self.buildTree(child_data, node, keyrepr, keyTypeTip, predicate=predicate, path=path+(keyrepr,)) # so hideRoot is always False?
 
     def parse(self, data, predicate=None, typeStr=None):
         r"""

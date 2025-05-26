@@ -685,7 +685,7 @@ class DataViewer(ScipyenViewer):
                         self._scipyenWindow_.viewObject(obj, objname, 
                                                        newWindow=True)
     
-    @safewrapper
+    # @safewrapper
     def _get_path_for_item_(self, item:QtWidgets.QTreeWidgetItem, 
                             external:bool = False):#, as_expression:bool=True):
         r"""Returns a tree (indexing) path to item, as a list of 'nodes'.
@@ -716,190 +716,215 @@ class DataViewer(ScipyenViewer):
         """
         from core.datatypes import is_namedtuple
         from core.datatypes import subarray_type_map
-        self._subselections_.clear()
         
-        leafSubSelection = list()
-        widget = self.treeWidget.itemWidget(item, 0)
-        
-        if widget:
-            # special case - this is a child item with a widget showing the 
-            # contents of the data represented by the parent item!
-            # ∴ the item's parent is the actual data we're after !
-            leafSubSelection = self.treeWidget.getWidgetSelection(widget)
-            pItem = item.parent()
-            # element = pItem.data(0, QtCore.Qt.DisplayRole)
-            # elementDataType = pItem.data(0, QtCore.Qt.UserRole)
-            item = pItem # this is crucial 
+        try:
+            self._subselections_.clear()
             
-        element = item.data(0, QtCore.Qt.DisplayRole)
-        elementDataType = item.data(0, QtCore.Qt.UserRole)
-        targetDataType = dataclasses.MISSING # gets the data type resulting from the accessor
-            
-        # print(f"{self.__class__.__name__}._get_path_for_item_: element = {element}")
-        
-        path_parts = [element] # the pathay from root to branch tip
-        
-        expr = [element] # elements of the expression used to access for the 
-                         # object represented by the item;
-                         # the access expression will be constructed with appropriate
-                         # syntax for getitem getter, depening on the type of the parent
-                         # object that contains or references the object represented
-                         # by the item;
-                         #
-                         # if the dataViewer shows an object in the user namespace
-                         # (most common situation) then one can simply call
-                         # eval(accessexpr), where accessexpr is returned below
-                         # as ``access``
-                         
-        p = item.parent()
-        k: int = 0
-        while p is not None:
-            pdatatype = p.data(0, QtCore.Qt.UserRole)
-            element = p.data(0, QtCore.Qt.DisplayRole)
-            path_parts.append(element)
-            expr.append(element)
-            k += 1
-            if pdatatype in (typing.Sequence, tuple, list, dict, deque, types.MappingProxyType):
-                if is_namedtuple(pdatatype):
-                    expr[k-1] = f".{expr[k-1]}"
-                else:
-                    expr[k-1] = f"[{expr[k-1]}]"
-            else:
-                expr[k-1] = f".{expr[k-1]}"
-                
-            p = p.parent()
-                
-        path_parts.reverse()
-        expr.reverse()
-        directAccess = True
-        
-        access = ("".join(expr) if external else "".join(expr[1:]) if len(expr)>1 else "", "", elementDataType, targetDataType)
-        # print(f"access: {access}")
-        
-        if len(leafSubSelection):
-            # contents can be EITHER a list of QModelIndex (from a table widget)
-            # OR a list of strings
-            # when a list of QModelIndex, we need to get their row & column
-            # indexes (ATTENTION — these are in the context of the table widget)
-            # and use them to construct access pathways for them
-            
-            # accessors for array-like data:
-            # each accessor contains:
-            # call: empty string, ".iloc" or ".as_array()"
-            # row index: slice, or numpy array
-            # col index: slice, or numpy array
-            # higher index: Ellipsis or MISSING
-            # row index, col index and Ellipsis to be packed between [] following the call
-            # 
-            elementAccess = list() 
+            leafSubSelection = list()
+            widget = self.treeWidget.itemWidget(item, 0)
+    
+            # TODO: 2025-05-26 20:53:08 FIXME
+            # crunching through many model indexes is getting very slow, especially
+            # for large tabular data
+            # TODO: Consider using QItemSelection and QItemSelectionRange objects
             #
-            accessList = list()
-            # targetTypes = list()
+            if widget:
+                # special case - this is a child item with a widget showing the 
+                # contents of the data represented by the parent item!
+                # ∴ the item's parent is the actual data we're after !
+                leafSubSelection = self.treeWidget.getWidgetSelection(widget)
+                pItem = item.parent()
+                # element = pItem.data(0, QtCore.Qt.DisplayRole)
+                # elementDataType = pItem.data(0, QtCore.Qt.UserRole)
+                item = pItem # this is crucial 
+                
+            element = item.data(0, QtCore.Qt.DisplayRole)
+            elementDataType = item.data(1, QtCore.Qt.UserRole)
+            parentIndexType = item.data(0, QtCore.Qt.UserRole)
+            targetDataType = dataclasses.MISSING # gets the data type resulting from the accessor
+                
+            # print(f"{self.__class__.__name__}._get_path_for_item_: element = {element}")
+            
+            path_parts = [element] # the pathway from root to branch tip
+            
+            # elements of the expression used to access for the 
+            # object represented by the item;
+            # the access expression will be constructed with appropriate
+            # syntax for getitem getter, depening on the type of the parent
+            # object that contains or references the object represented
+            # by the item;
+            #
+            # if the dataViewer shows an object in the user namespace
+            # (most common situation) then one can simply call
+            # eval(accessexpr), where accessexpr is returned below
+            # as ``access``
+            # expr = [f"{element}" if parentIndexType == str else element]
+            expr = [element]
+                            
+            p = item.parent()
+            k: int = 0
+            while p is not None:
+                pdatatype = p.data(1, QtCore.Qt.UserRole)
+                pKeyType = p.data(0, QtCore.Qt.UserRole)
+                element = p.data(0, QtCore.Qt.DisplayRole)
+                path_parts.append(f"'{element}'" if pKeyType == str else element) 
+                # expr.append(f"'{element}'" if pKeyType == str else element)
+                expr.append(element)
+                k += 1
+                if pdatatype in (typing.Sequence, tuple, list, dict, deque, types.MappingProxyType):
+                    if is_namedtuple(pdatatype):
+                        expr[k-1] = f".{expr[k-1]}"
+                    elif issubclass(pdatatype, (dict, types.MappingProxyType)):
+                        expr[k-1] = f"['{expr[k-1]}']"
+                    else:
+                        expr[k-1] = f"[{expr[k-1]}]"
+                else:
+                    expr[k-1] = f".{expr[k-1]}"
+                    
+                p = p.parent()
+                    
+            path_parts.reverse()
+            expr.reverse()
+            directAccess = True
+            
+            access = ("".join(expr) if external else "".join(expr[1:]) if len(expr)>1 else "", "", elementDataType, targetDataType)
+            # print(f"access: {access}")
+            
+            if len(leafSubSelection):
+                # contents can be EITHER a list of QModelIndex (from a table widget)
+                # OR a list of strings
+                # when a list of QModelIndex, we need to get their row & column
+                # indexes (ATTENTION — these are in the context of the table widget)
+                # and use them to construct access pathways for them
+                
+                # accessors for array-like data:
+                # each accessor contains:
+                # call: empty string, ".iloc" or ".as_array()"
+                # row index: slice, or numpy array
+                # col index: slice, or numpy array
+                # higher index: Ellipsis or MISSING
+                # row index, col index and Ellipsis to be packed between [] following the call
+                # 
+                elementAccess = list() 
+                #
+                accessList = list()
+                # targetTypes = list()
 
-            if isinstance(widget, (TableEditorWidget, SimpleTableWidget)) and (isinstance(s, QtCore.QModelIndex) for s in leafSubSelection):
-                rowsSet = list(set(map(lambda i: i.row(), leafSubSelection)))
-                
-                cols_by_rows = dict((r, list(map(lambda i: i.column(), filter(lambda i: i.row() == r, leafSubSelection)))) for r in rowsSet)
-                
-                continuousRows = np.all(np.diff(list(cols_by_rows.keys()))==1)
-                allContinuousColsPerRow = all(np.all(np.diff(cols)==1) for cols in cols_by_rows.values())
-                minColsPerRow = list(map(lambda c: min(c), cols_by_rows.values()))
-                maxColsPerRow = list(map(lambda c: max(c), cols_by_rows.values()))
-                hasSameColumnRangeAcrossRows = allContinuousColsPerRow and np.all(np.diff(minColsPerRow) == 0) and np.all(np.diff(maxColsPerRow) == 0)
-                hasContinuousSelection = continuousRows and hasSameColumnRangeAcrossRows
-                
-                if hasContinuousSelection:
-                    firstRow = min(cols_by_rows.keys())
-                    lastRow = max(cols_by_rows.keys())
-                    # rowNdx = f"{slice(firstRow, lastRow+1)}"
-                    rowNdx = slice(firstRow, lastRow+1)
-                    firstCol = min(minColsPerRow)
-                    lastCol = max(maxColsPerRow)
-                    targetDataType = elementDataType
-                    if issubclass(elementDataType, (pq.Quantity, pd.Series, pd.DataFrame)):
-                        # just use the row indexing to get a signal slice of all channels
-                        if firstCol == 0:
-                            # CAUTION: first column (column 0) depicts the 
-                            # signal's domain or row index of the Series/DataFrame !
-                            # all continuous selection, here, implies that we take all
-                            # channels => will generate a new signal when eval'ed
-                            # elementAccess.append(f"[{rowNdx},:]")
-                            elementAccess.append(("", rowNdx, slice(firstCol, lastCol+1), dataclasses.MISSING))
-                        else:
-                            # filter out column 0 (for the signal's domain) and 
+                if isinstance(widget, (TableEditorWidget, SimpleTableWidget)) and (isinstance(s, QtCore.QModelIndex) for s in leafSubSelection):
+                    rowsSet = list(set(map(lambda i: i.row(), leafSubSelection)))
+                    
+                    cols_by_rows = dict((r, list(map(lambda i: i.column(), filter(lambda i: i.row() == r, leafSubSelection)))) for r in rowsSet)
+                    
+                    continuousRows = np.all(np.diff(list(cols_by_rows.keys()))==1)
+                    allContinuousColsPerRow = all(np.all(np.diff(cols)==1) for cols in cols_by_rows.values())
+                    minColsPerRow = list(map(lambda c: min(c), cols_by_rows.values()))
+                    maxColsPerRow = list(map(lambda c: max(c), cols_by_rows.values()))
+                    hasSameColumnRangeAcrossRows = allContinuousColsPerRow and np.all(np.diff(minColsPerRow) == 0) and np.all(np.diff(maxColsPerRow) == 0)
+                    hasContinuousSelection = continuousRows and hasSameColumnRangeAcrossRows
+                    
+                    if hasContinuousSelection:
+                        firstRow = min(cols_by_rows.keys())
+                        lastRow = max(cols_by_rows.keys())
+                        # rowNdx = f"{slice(firstRow, lastRow+1)}"
+                        rowNdx = slice(firstRow, lastRow+1)
+                        firstCol = min(minColsPerRow)
+                        lastCol = max(maxColsPerRow)
+                        targetDataType = elementDataType
+                        if issubclass(elementDataType, (pq.Quantity, pd.Series, pd.DataFrame)):
+                            # just use the row indexing to get a signal slice of all channels
+                            if firstCol == 0:
+                                # CAUTION: first column (column 0) depicts the 
+                                # signal's domain or row index of the Series/DataFrame !
+                                # all continuous selection, here, implies that we take all
+                                # channels => will generate a new signal when eval'ed
+                                # elementAccess.append(f"[{rowNdx},:]")
+                                if issubclass(elementDataType, (pd.Series, pd.DataFrame)):
+                                    elementAccess.append((".iloc", rowNdx, slice(firstCol, lastCol+1), dataclasses.MISSING))
+                                else:
+                                    elementAccess.append(("", rowNdx, slice(firstCol, lastCol+1), dataclasses.MISSING))
+                            else:
+                                # filter out column 0 (for the signal's domain) and 
+                                # create colNdx to select channel data
+                                # when eval'ed, will also generate a signal
+                                channelCols = list(map(lambda cols: list(map(lambda c: c-1, cols)), cols_by_rows.values()))
+                                # we know this is continuous and with same range across the rows
+                                firstCol = min(list(map(lambda cols: min(cols), channelCols)))
+                                lastCol = max(list(map(lambda cols: max(cols), channelCols)))
+                                colNdx = f"{slice(firstCol, lastCol+1)}"
+                                # elementAccess.append(f"[{rowNdx}, {colNdx}]")
+                                if issubclass(elementDataType, (pd.Series, pd.DataFrame)):
+                                    elementAccess.append((".iloc", rowNdx, colNdx, dataclasses.MISSING))
+                                else:
+                                    elementAccess.append(("", rowNdx, colNdx, dataclasses.MISSING))
+                        else: # generic ndarray or pd.Index
+                            # colNdx = f"{slice(firstCol, lastCol+1)}"
+                            colNdx = slice(firstCol, lastCol+1)
+                            # elementAccess.append(f"[{rowNdx}, {colNdx}, ...]")
+                            elementAccess.append(("", rowNdx, colNdx, Ellipsis))
+                            
+                    else:
+                        # use advanced indexing with integer arrays
+                        rowNdx = np.array(list(cols_by_rows.keys()))
+                        # if issubclass(elementDataType, (neo.core.dataobject.DataObject, pd.Series, pd.DataFrame)):        
+                        if issubclass(elementDataType, pq.Quantity):
+                            # filter out column 0 (for the signal's domain or the 
+                            # row index of the Series/DataFrame) 
                             # create colNdx to select channel data
                             # when eval'ed, will also generate a signal
-                            channelCols = list(map(lambda cols: list(map(lambda c: c-1, cols)), cols_by_rows.values()))
-                            # we know this is continuous and with same range across the rows
-                            firstCol = min(list(map(lambda cols: min(cols), channelCols)))
-                            lastCol = max(list(map(lambda cols: max(cols), channelCols)))
-                            colNdx = f"{slice(firstCol, lastCol+1)}"
-                            # elementAccess.append(f"[{rowNdx}, {colNdx}]")
-                            elementAccess.append(("", rowNdx, colNdx, dataclasses.MISSING))
-                    else: # generic ndarray or pd.Index
-                        # colNdx = f"{slice(firstCol, lastCol+1)}"
-                        colNdx = slice(firstCol, lastCol+1)
-                        # elementAccess.append(f"[{rowNdx}, {colNdx}, ...]")
-                        elementAccess.append(("", rowNdx, colNdx, Ellipsis))
-                        
-                else:
-                    # use advanced indexing with integer arrays
-                    rowNdx = np.array(list(cols_by_rows.keys()))
-                    # if issubclass(elementDataType, (neo.core.dataobject.DataObject, pd.Series, pd.DataFrame)):        
-                    if issubclass(elementDataType, pq.Quantity):
-                        # filter out column 0 (for the signal's domain or the 
-                        # row index of the Series/DataFrame) 
-                        # create colNdx to select channel data
-                        # when eval'ed, will also generate a signal
-                        if issubclass(elementDataType, neo.core.dataobject.DataObject):
-                            channelCols = list(map(lambda cols: list(map(lambda c: c-1, filter(lambda x: x>0, cols))), cols_by_rows.values()))
-                            colNdx = np.array(channelCols).flatten()
-                            hasDomainSelection = any(any(c==0 for c in cols) for cols in cols_by_rows.values())
-                            if hasDomainSelection:
-                                # elementAccess.append(f".as_array()[{rowNdx}, {colNdx}]") # include domain
-                                elementAccess.append((".as_array()", rowNdx, colNdx, dataclasses.MISSING)) # include domain
-                                if elementDataType in subarray_type_map:
-                                    targetDataType = subarray_type_map[elementDataType]
+                            if issubclass(elementDataType, neo.core.dataobject.DataObject):
+                                channelCols = list(map(lambda cols: list(map(lambda c: c-1, filter(lambda x: x>0, cols))), cols_by_rows.values()))
+                                colNdx = np.array(channelCols).flatten()
+                                hasDomainSelection = any(any(c==0 for c in cols) for cols in cols_by_rows.values())
+                                if hasDomainSelection:
+                                    # elementAccess.append(f".as_array()[{rowNdx}, {colNdx}]") # include domain
+                                    elementAccess.append((".as_array()", rowNdx, colNdx, dataclasses.MISSING)) # include domain
+                                    if elementDataType in subarray_type_map:
+                                        targetDataType = subarray_type_map[elementDataType]
+                                    else:
+                                        targetDataType = pq.Quantity
                                 else:
+                                    elementAccess.append((".as_array()", rowNdx, colNdx, dataclasses.MISSING))
+                                    # elementAccess.append(f".as_array()[{rowNdx}, {colNdx}]")
                                     targetDataType = pq.Quantity
                             else:
                                 elementAccess.append((".as_array()", rowNdx, colNdx, dataclasses.MISSING))
-                                # elementAccess.append(f".as_array()[{rowNdx}, {colNdx}]")
                                 targetDataType = pq.Quantity
-                        else:
-                            elementAccess.append((".as_array()", rowNdx, colNdx, dataclasses.MISSING))
-                            targetDataType = pq.Quantity
+                                
+                        elif issubclass(elementDataType, (pd.Series, pd.DataFrame)):
+                            channelCols = list(map(lambda cols: list(map(lambda c: c-1, filter(lambda x: x>0, cols))), cols_by_rows.values()))
+                            colNdx = np.array(channelCols).flatten()
+                            # indexing is selected automatically, by rowNdx
+                            elementAccess.append((".iloc", rowNdx, colNdx, dataclasses.MISSING))
+                            # iloc syntax generates the return type dynamicslly (either DataFrame or Series)
+                            targetDataType = dataclasses.MISSING 
+                            # hasDomainSelection = any(any(c==0 for c in cols) for cols in cols_by_rows.values())
                             
-                    elif issubclass(elementDataType, (pd.Series, pd.DataFrame)):
-                        channelCols = list(map(lambda cols: list(map(lambda c: c-1, filter(lambda x: x>0, cols))), cols_by_rows.values()))
-                        colNdx = np.array(channelCols).flatten()
-                        # indexing is selected automatically, by rowNdx
-                        elementAccess.append((".iloc", rowNdx, colNdx, dataclasses.MISSING))
-                        # iloc syntax generates the return type dynamicslly (either DataFrame or Series)
-                        targetDataType = dataclasses.MISSING 
-                        # hasDomainSelection = any(any(c==0 for c in cols) for cols in cols_by_rows.values())
-                        
-                    else: # generic ndarray and pd.Index
-                        channelCols = list(cols_by_rows.values())
-                        colNdx = np.array(channelCols).flatten()
-                        # colNdx = f"np.array({channelCols})"
-                        elementAccess.append(("", rowNdx, colNdx, Ellipsis))
-                        # elementAccess.append(f"[{rowNdx}, {colNdx}, ...]")
-                        targetDataType = elementDataType
+                        else: # generic ndarray and pd.Index
+                            channelCols = list(cols_by_rows.values())
+                            colNdx = np.array(channelCols).flatten()
+                            # colNdx = f"np.array({channelCols})"
+                            elementAccess.append(("", rowNdx, colNdx, Ellipsis))
+                            # elementAccess.append(f"[{rowNdx}, {colNdx}, ...]")
+                            targetDataType = elementDataType
 
-                for eAccess in elementAccess:
-                    accessList.append((access[0], eAccess, elementDataType, targetDataType))
-                directAccess = True
-                
-            elif isinstance(widget, (QtWidgets.QPlainTextEdit, QtWidgets.QTextEdit)) and all(isinstance(v, str) for v in leafSubSelection):
-                self._subselections_.append("".join(leafSubSelection))
+                    for eAccess in elementAccess:
+                        accessList.append((access[0], eAccess, elementDataType, targetDataType))
+                    directAccess = True
+                    
+                elif isinstance(widget, (QtWidgets.QPlainTextEdit, QtWidgets.QTextEdit)) and all(isinstance(v, str) for v in leafSubSelection):
+                    self._subselections_.append("".join(leafSubSelection))
+                    accessList = [access]
+                    directAccess = False
+            
+            else:
                 accessList = [access]
-                directAccess = False
-        
-        else:
-            accessList = [access]
-        # print(f"{self.__class__.__name__}._get_path_for_item_: path_parts = {path_parts}, expr = {expr}, access = {access}")
-        return path_parts, accessList, directAccess
+            # print(f"{self.__class__.__name__}._get_path_for_item_: path_parts = {path_parts}, expr = {expr}, access = {access}")
+            return path_parts, accessList, directAccess, True
+        except:
+            # exc = sys.exception()
+            # msg = "".join(traceback.format_exception_only(exc))
+            # self.errorMessage(type(exc).__name__, msg)
+            raise
         
     @safewrapper
     def _export_data_items_(self, items:list[QtWidgets.QTreeWidgetItem], 
@@ -928,12 +953,13 @@ class DataViewer(ScipyenViewer):
         
         for item in items:
             try:
-                path, accessList, direct = self._get_path_for_item_(item, path_only)
+                path, accessList, direct, success = self._get_path_for_item_(item, path_only)
             except:
                 exc = sys.exception()
                 msg = "".join(traceback.format_exception_only(exc))
                 self.errorMessage(type(exc).__name__, msg)
                 raise
+            
             # print(f"{self.__class__.__name__}_export_data_items_ path = {path}, access = {accessList}")
             
             if len(path) == 0:
@@ -946,7 +972,7 @@ class DataViewer(ScipyenViewer):
             else:
                 name = strutils.str2symbol(path[-1])
                 
-            #print("name", name)
+            # print(f"{self.__class__.__name__}_export_data_items_ name: {name}")
             src = self._obj_cache_[self._cache_index_][1]
             
             try:
@@ -1080,8 +1106,6 @@ class DataViewer(ScipyenViewer):
             
             if dlg.exec() == QtWidgets.QDialog.Accepted:
                 newVarName = namePrompt.text()
-                # FIXME 2021-10-03 22:17:29 this is really buggy!
-                #newVarName = validate_varname(namePrompt.text(), self._scipyenWindow_.workspace)
                 
                 self._scipyenWindow_.assignToWorkspace(newVarName, objects[0], check_name=False)
                 
