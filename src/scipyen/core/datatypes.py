@@ -148,7 +148,10 @@ neo_containernames = ("Block", "Segment",)
 signal_types = ('Quantity', 'AnalogSignal', 'IrregularlySampledSignal', 
                 'SpikeTrain', "DataSignal", "IrregularlySampledDataSignal",
                 "TriggerEvent",)
-                
+subarray_type_map = {neo.AnalogSignal: neo.IrregularlySampledSignal,
+                    DataSignal: IrregularlySampledDataSignal}
+        
+               
 ndarray_type = ndarray.__name__
 
 NUMPY_NUMERIC_KINDS = set("buifc")

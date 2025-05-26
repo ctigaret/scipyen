@@ -462,28 +462,56 @@ class DataViewer(ScipyenViewer):
         if len(items) == 0:
             return
         
-        item_paths = list()
+        return self._export_data_items_(items, path_only=True)
         
-        top_title = self.treeWidget.top_title
-        
-        if isinstance(self._data_, NestedFinder.nesting_types):
-            for item in items:
-                item_path = self._get_path_for_item_(item)
-                
-                expr = NestedFinder.paths2expression(self._data_, item_path)
-                
-                if len(top_title.strip()) > 0 and top_title not in (os.path.sep, "/"):
-                    expr = top_title+expr
-                
-                item_paths.append(expr)
-                
-        elif dataclasses.is_dataclass(self._data_):
-            for item in items:
-                item_path = self._get_path_for_item_(item)
-                expr = NestedFinder.paths2expression(self._data_, item_path)
-                if len(top_title.strip()) > 0 and top_title != ".":
-                    expr = top_title+expr
-                item_paths.append(expr)
+#         item_paths = list()
+#         
+#         top_title = self.treeWidget.top_title
+#         
+#         for item in items:
+#             try:
+#                 path, accessList, direct = self._get_path_for_item_(item)
+#             except:
+#                 exc = sys.exception()
+#                 msg = "".join(traceback.format_exception_only(exc))
+#                 self.errorMessage(type(exc).__name__, msg)
+#                 raise
+#             
+#             if len(path) == 0:
+#                 continue
+#             
+#             if len(accessList) > 1:
+#                 for k, statement, eAccess, oType, tType in enumerate(accessList):
+#                     
+#             
+#             item_paths.apend(path)
+#             
+# #             if fullPathAsName:
+# #                 # print(f"{self.__class__.__name__}_export_data_items_ full_path = {path}")
+# #                 name = strutils.str2symbol("_".join(path))
+# #                 
+# #             else:
+# #                 name = strutils.str2symbol(path[-1])
+#            
+#         
+#         if isinstance(self._data_, NestedFinder.nesting_types):
+#             for item in items:
+#                 item_path = self._get_path_for_item_(item)
+#                 
+#                 expr = NestedFinder.paths2expression(self._data_, item_path)
+#                 
+#                 if len(top_title.strip()) > 0 and top_title not in (os.path.sep, "/"):
+#                     expr = top_title+expr
+#                 
+#                 item_paths.append(expr)
+#                 
+#         elif dataclasses.is_dataclass(self._data_):
+#             for item in items:
+#                 item_path = self._get_path_for_item_(item)
+#                 expr = NestedFinder.paths2expression(self._data_, item_path)
+#                 if len(top_title.strip()) > 0 and top_title != ".":
+#                     expr = top_title+expr
+#                 item_paths.append(expr)
                 
         return item_paths
         
@@ -658,7 +686,8 @@ class DataViewer(ScipyenViewer):
                                                        newWindow=True)
     
     @safewrapper
-    def _get_path_for_item_(self, item:QtWidgets.QTreeWidgetItem, external:bool = False):#, as_expression:bool=True):
+    def _get_path_for_item_(self, item:QtWidgets.QTreeWidgetItem, 
+                            external:bool = False):#, as_expression:bool=True):
         r"""Returns a tree (indexing) path to item, as a list of 'nodes'.
         
         This EXCLUDES the top level parent.
@@ -686,7 +715,7 @@ class DataViewer(ScipyenViewer):
         
         """
         from core.datatypes import is_namedtuple
-        
+        from core.datatypes import subarray_type_map
         self._subselections_.clear()
         
         leafSubSelection = list()
@@ -704,6 +733,7 @@ class DataViewer(ScipyenViewer):
             
         element = item.data(0, QtCore.Qt.DisplayRole)
         elementDataType = item.data(0, QtCore.Qt.UserRole)
+        targetDataType = dataclasses.MISSING # gets the data type resulting from the accessor
             
         # print(f"{self.__class__.__name__}._get_path_for_item_: element = {element}")
         
@@ -743,7 +773,7 @@ class DataViewer(ScipyenViewer):
         expr.reverse()
         directAccess = True
         
-        access = ("".join(expr) if external else "".join(expr[1:]) if len(expr)>1 else "", "", elementDataType)
+        access = ("".join(expr) if external else "".join(expr[1:]) if len(expr)>1 else "", "", elementDataType, targetDataType)
         # print(f"access: {access}")
         
         if len(leafSubSelection):
@@ -753,8 +783,18 @@ class DataViewer(ScipyenViewer):
             # indexes (ATTENTION — these are in the context of the table widget)
             # and use them to construct access pathways for them
             
-            elementAccess = list() # for array-like data
+            # accessors for array-like data:
+            # each accessor contains:
+            # call: empty string, ".iloc" or ".as_array()"
+            # row index: slice, or numpy array
+            # col index: slice, or numpy array
+            # higher index: Ellipsis or MISSING
+            # row index, col index and Ellipsis to be packed between [] following the call
+            # 
+            elementAccess = list() 
+            #
             accessList = list()
+            # targetTypes = list()
 
             if isinstance(widget, (TableEditorWidget, SimpleTableWidget)) and (isinstance(s, QtCore.QModelIndex) for s in leafSubSelection):
                 rowsSet = list(set(map(lambda i: i.row(), leafSubSelection)))
@@ -771,16 +811,20 @@ class DataViewer(ScipyenViewer):
                 if hasContinuousSelection:
                     firstRow = min(cols_by_rows.keys())
                     lastRow = max(cols_by_rows.keys())
-                    rowNdx = f"{slice(firstRow, lastRow+1)}"
+                    # rowNdx = f"{slice(firstRow, lastRow+1)}"
+                    rowNdx = slice(firstRow, lastRow+1)
                     firstCol = min(minColsPerRow)
                     lastCol = max(maxColsPerRow)
-                    if issubclass(elementDataType, (neo.core.dataobject.DataObject, pd.Series, pd.DataFrame)):
+                    targetDataType = elementDataType
+                    if issubclass(elementDataType, (pq.Quantity, pd.Series, pd.DataFrame)):
                         # just use the row indexing to get a signal slice of all channels
                         if firstCol == 0:
-                            # CAUTION: first column (column 0) depicts the signal's domain or Series/DataFrame index!
+                            # CAUTION: first column (column 0) depicts the 
+                            # signal's domain or row index of the Series/DataFrame !
                             # all continuous selection, here, implies that we take all
                             # channels => will generate a new signal when eval'ed
-                            elementAccess.append(f"[{rowNdx}]")
+                            # elementAccess.append(f"[{rowNdx},:]")
+                            elementAccess.append(("", rowNdx, slice(firstCol, lastCol+1), dataclasses.MISSING))
                         else:
                             # filter out column 0 (for the signal's domain) and 
                             # create colNdx to select channel data
@@ -790,29 +834,61 @@ class DataViewer(ScipyenViewer):
                             firstCol = min(list(map(lambda cols: min(cols), channelCols)))
                             lastCol = max(list(map(lambda cols: max(cols), channelCols)))
                             colNdx = f"{slice(firstCol, lastCol+1)}"
-                            elementAccess.append(f"[{rowNdx}, {colNdx}]")
-                    
-                    else: # generic ndarray
-                        colNdx = f"{slice(firstCol, lastCol+1)}"
-                        elementAccess.append(f"[{rowNdx}, {colNdx}, ...]")
+                            # elementAccess.append(f"[{rowNdx}, {colNdx}]")
+                            elementAccess.append(("", rowNdx, colNdx, dataclasses.MISSING))
+                    else: # generic ndarray or pd.Index
+                        # colNdx = f"{slice(firstCol, lastCol+1)}"
+                        colNdx = slice(firstCol, lastCol+1)
+                        # elementAccess.append(f"[{rowNdx}, {colNdx}, ...]")
+                        elementAccess.append(("", rowNdx, colNdx, Ellipsis))
                         
                 else:
                     # use advanced indexing with integer arrays
-                    rowNdx = f"np.array({list(cols_by_rows.keys())})"
-                    if issubclass(elementDataType, (neo.core.dataobject.DataObject, pd.Series, pd.DataFrame)):        
-                        # filter out column 0 (for the signal's domain or Series/DataFrame row index) and 
+                    rowNdx = np.array(list(cols_by_rows.keys()))
+                    # if issubclass(elementDataType, (neo.core.dataobject.DataObject, pd.Series, pd.DataFrame)):        
+                    if issubclass(elementDataType, pq.Quantity):
+                        # filter out column 0 (for the signal's domain or the 
+                        # row index of the Series/DataFrame) 
                         # create colNdx to select channel data
                         # when eval'ed, will also generate a signal
+                        if issubclass(elementDataType, neo.core.dataobject.DataObject):
+                            channelCols = list(map(lambda cols: list(map(lambda c: c-1, filter(lambda x: x>0, cols))), cols_by_rows.values()))
+                            colNdx = np.array(channelCols).flatten()
+                            hasDomainSelection = any(any(c==0 for c in cols) for cols in cols_by_rows.values())
+                            if hasDomainSelection:
+                                # elementAccess.append(f".as_array()[{rowNdx}, {colNdx}]") # include domain
+                                elementAccess.append((".as_array()", rowNdx, colNdx, dataclasses.MISSING)) # include domain
+                                if elementDataType in subarray_type_map:
+                                    targetDataType = subarray_type_map[elementDataType]
+                                else:
+                                    targetDataType = pq.Quantity
+                            else:
+                                elementAccess.append((".as_array()", rowNdx, colNdx, dataclasses.MISSING))
+                                # elementAccess.append(f".as_array()[{rowNdx}, {colNdx}]")
+                                targetDataType = pq.Quantity
+                        else:
+                            elementAccess.append((".as_array()", rowNdx, colNdx, dataclasses.MISSING))
+                            targetDataType = pq.Quantity
+                            
+                    elif issubclass(elementDataType, (pd.Series, pd.DataFrame)):
                         channelCols = list(map(lambda cols: list(map(lambda c: c-1, filter(lambda x: x>0, cols))), cols_by_rows.values()))
-                        colNdx = f"np.array({channelCols})"
-                        elementAccess.append(f".as_array()[{rowNdx}, {colNdx}]")
-                    else:
+                        colNdx = np.array(channelCols).flatten()
+                        # indexing is selected automatically, by rowNdx
+                        elementAccess.append((".iloc", rowNdx, colNdx, dataclasses.MISSING))
+                        # iloc syntax generates the return type dynamicslly (either DataFrame or Series)
+                        targetDataType = dataclasses.MISSING 
+                        # hasDomainSelection = any(any(c==0 for c in cols) for cols in cols_by_rows.values())
+                        
+                    else: # generic ndarray and pd.Index
                         channelCols = list(cols_by_rows.values())
-                        colNdx = f"np.array({channelCols})"
-                        elementAccess.append(f"[{rowNdx}, {colNdx}, ...]")
+                        colNdx = np.array(channelCols).flatten()
+                        # colNdx = f"np.array({channelCols})"
+                        elementAccess.append(("", rowNdx, colNdx, Ellipsis))
+                        # elementAccess.append(f"[{rowNdx}, {colNdx}, ...]")
+                        targetDataType = elementDataType
 
                 for eAccess in elementAccess:
-                    accessList.append((access[0], eAccess, elementDataType))
+                    accessList.append((access[0], eAccess, elementDataType, targetDataType))
                 directAccess = True
                 
             elif isinstance(widget, (QtWidgets.QPlainTextEdit, QtWidgets.QTextEdit)) and all(isinstance(v, str) for v in leafSubSelection):
@@ -826,7 +902,8 @@ class DataViewer(ScipyenViewer):
         return path_parts, accessList, directAccess
         
     @safewrapper
-    def _export_data_items_(self, items, fullPathAsName=False):
+    def _export_data_items_(self, items:list[QtWidgets.QTreeWidgetItem], 
+                            fullPathAsName:bool=False, path_only:bool=False):
         r"""Export data displayed by their corresponding items, to workspace.
         
         Parameters:
@@ -850,7 +927,13 @@ class DataViewer(ScipyenViewer):
         objects = list()
         
         for item in items:
-            path, accessList, direct = self._get_path_for_item_(item)
+            try:
+                path, accessList, direct = self._get_path_for_item_(item, path_only)
+            except:
+                exc = sys.exception()
+                msg = "".join(traceback.format_exception_only(exc))
+                self.errorMessage(type(exc).__name__, msg)
+                raise
             # print(f"{self.__class__.__name__}_export_data_items_ path = {path}, access = {accessList}")
             
             if len(path) == 0:
@@ -869,52 +952,122 @@ class DataViewer(ScipyenViewer):
             try:
                 if direct:
                     if len(accessList) > 1:
-                        for k, statement, eAccess, oType in enumerate(accessList):
-                            print(f"statement: {statement}, eAccess: {eAccess}, oType: {oType}")
+                        for k, statement, eAccess, oType, tType in enumerate(accessList):
+                            # print(f"statement: {statement}, eAccess: {eAccess}, oType: {oType}, tType: {tType}")
                             if len(eAccess):
-                                obj = eval(f"src{statement}{eAccess}")
-                                if issubclass(oType, pq.Quantity):
-                                    if not isinstance(obj, pq.Quantity):
-                                        srcObj = eval(f"src{statement}")
-                                        obj = obj * srcObj.units
+                                call, rowNdx, colNdx, hiNdx = eAccess
+                                rNdx = f"np.array({list(rowNdx)})" if isinstance(rowNdx, np.ndarray) else f"{rowNdx}"
+                                cNdx = f"np.array({list(colNdx)})" if isinstance(colNdx, np.ndarray) else f"{colNdx}"
+                                accstmt = f"{call}[{rNdx}, {cNdx}]"
+                                if hiNdx is not dataclasses.MISSING:
+                                    if hiNdx == Ellipsis:
+                                        hNdx = ", ..."
+                                    elif isinstance(hiNdx, np.ndarray):
+                                        hNdx = f"np.array({list(hiNdx)})"
+                                    elif isinstance(hiNdx, slice):
+                                        hNdx = f"{hiNdx}"
+                                    accstmt = accstmt + f"{hNdx}"
+                                if path_only:
+                                    obj = f"{statement}{accstmt}"
+                                else:
+                                    obj = eval(f"src{statement}{accstmt}")
+                                    # if issubclass(oType, pq.Quantity):
+                                    if not isinstance(obj, oType):
+                                        if tType is not dataclasses.MISSING:
+                                            srcObj = eval(f"src{statement}")
+                                            if tType is pq.Quantity and oType is pq.Quantity:
+                                                obj = obj * srcObj.units
+                                            elif tType in (IrregularlySampledDataSignal, neo.IrregularlySampledSignal):
+                                                domain = srcObj.times[rowNdx]
+                                                obj = tType(times = domain, signal=obj,
+                                                            units = srcObj.units,
+                                                            time_units = srcObj.times.units)
                             else:
-                                obj = eval(f"src{statement}")
+                                if path_only:
+                                    obj = f"{statement}"
+                                else:
+                                    obj = eval(f"src{statement}")
                             objects.append(obj)
                             # objects.append(eval(f"src{statement}"))
                             names.append(f"{name}_{k}")
                     else:
-                        statement, eAccess, oType = accessList[0]
-                        print(f"statement: {statement}, eAccess: {eAccess}, oType: {oType}")
+                        statement, eAccess, oType, tType = accessList[0]
+                        # print(f"statement: {statement}, eAccess: {eAccess}, oType: {oType}, tType: {tType}")
                         if len(eAccess):
-                            obj = eval(f"src{statement}{eAccess}")
-                            if issubclass(oType, pq.Quantity):
-                                if not isinstance(obj, pq.Quantity):
-                                    srcObj = eval(f"src{statement}")
-                                    obj = obj * srcObj.units
+                            # unpack accessor elements
+                            call, rowNdx, colNdx, hiNdx = eAccess
+                            rNdx = f"np.array({list(rowNdx)})" if isinstance(rowNdx, np.ndarray) else f"{rowNdx}"
+                            cNdx = f"np.array({list(colNdx)})" if isinstance(colNdx, np.ndarray) else f"{colNdx}"
+                            accstmt = f"{call}[{rNdx}, {cNdx}]"
+                            if hiNdx is not dataclasses.MISSING:
+                                if hiNdx == Ellipsis:
+                                    hNdx = ", ..."
+                                elif isinstance(hiNdx, np.ndarray):
+                                    hNdx = f"np.array({list(hiNdx)})"
+                                elif isinstance(hiNdx, slice):
+                                    hNdx = f"{hiNdx}"
+                                accstmt = accstmt + f"{hNdx}"
+                                
+                            # print(f"accstmt: {accstmt}")
+                            if path_only:
+                                obj = f"{statement}{accstmt}"
+                            else:
+                                obj = eval(f"src{statement}{accstmt}")
+                                
+                                if not isinstance(obj, oType):
+                                    if tType is not dataclasses.MISSING:
+                                        srcObj = eval(f"src{statement}")
+                                        if tType is pq.Quantity and oType is pq.Quantity:
+                                            obj = obj * srcObj.units
+                                        elif tType in (IrregularlySampledDataSignal, neo.IrregularlySampledSignal):
+                                            domain = srcObj.times[rowNdx]
+                                            obj = tType(times = domain, signal=obj,
+                                                        units = srcObj.units,
+                                                    time_units = srcObj.times.units)
                         else:
-                            obj = eval(f"src{statement}")
+                            if path_only:
+                                obj = f"{statement}"
+                            else:
+                                obj = eval(f"src{statement}")
                         objects.append(obj)
                         names.append(name)
                 else:
-                    if len(self._subselections_):
-                        if len(self._subselections_) > 1:
-                            for k, sel in self._subselections_:
-                                objects.append(sel)
+                    if path_only:
+                        if len(accessList) > 1:
+                             for k, statement, eAccess, oType, tType in enumerate(accessList):
+                                obj = f"{statement}"
+                                objects.append(obj)
                                 names.append(f"{name}_{k}")
-                        else:
-                            object.append(self._subselections_[0])
-                            names.append(name)
+                                
+                        elif len(accessList) == 1:
+                            statement, eAccess, oType, tType = accessList[0]
+                            obj = f"{statement}"
+                            objects.append(obj)
+                            names.append(f"{name}_{k}")
+                            
+                    else:
+                        if len(self._subselections_):
+                            if len(self._subselections_) > 1:
+                                for k, sel in self._subselections_:
+                                    objects.append(sel)
+                                    names.append(f"{name}_{k}")
+                            else:
+                                object.append(self._subselections_[0])
+                                names.append(name)
             except:
                 exc = sys.exception()
-                traceback.print_exc()
+                # traceback.print_exc()
                 msg = "".join(traceback.format_exception_only(exc))
                 self.errorMessage(type(exc).__name__, msg)
-                raise()
+                raise
             # names.append(name)
             # objects.append(obj)
             
         if len(objects) == 0:
             return
+        
+        if path_only:
+            return objects
         
         if len(objects) == 1:
             dlg = quickdialog.QuickDialog(self, "Copy to workspace")

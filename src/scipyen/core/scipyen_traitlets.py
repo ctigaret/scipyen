@@ -1267,7 +1267,8 @@ class NeoDataObjectTrait(NeoBaseNeoTrait):
     
     def compare_elements(self, old_value, new_value):
         try:
-            result = old_value.shape() == new_value.shape()
+            result = old_value.shape == new_value.shape
+            
             if result:
                 result = np.all(super().compare_elements(old_value, new_value))
             if result:
