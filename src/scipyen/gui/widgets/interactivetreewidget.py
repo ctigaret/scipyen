@@ -68,7 +68,7 @@ from core.traitcontainers import (DataBag, DataBagTraitsObserver,)
 from gui.widgets.tablewidget import SimpleTableWidget
 from gui.widgets.tableeditorwidget import (TableEditorWidget, TabularDataModel,)
 
-NOTREFERENCED = (tuple, type(None), type(MISSING), type(pd.NA))
+NOTREFERENCED = (tuple, type(None), type(MISSING), type(pd.NA), type, pq.Quantity)
 PODS = (bool, int, float, bytes, bytearray, str)
 
 # class InteractiveTreeWidget(DataTreeWidget):
@@ -105,7 +105,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         self._supported_data_types_ = kwargs.pop("supported_data_types", tuple())
         if not isinstance(self._supported_data_types_, tuple) or not all(isinstance(v, type) for v in self._supported_data_types_):
             self._supported_data_types_ = tuple()
-        self._visited_ = dict()
+        self._visited_ = dict() #{}
         # self._visited_ = list()
         self.top_title = "/"
         self._last_active_item_ = None
@@ -249,6 +249,11 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         else:
             return data, False
         
+    def memoize(self, obj, path):
+        if id(obj) not in self._visited_:
+            idx = len(self._visited_)
+            self._visited_[id(obj)] = (idx, type(obj), path)
+       
     def buildTree(self, data:object, parent:QtWidgets.QTreeWidgetItem,
                   name:str="", keyType:type=str, nameTip:str="", typeStr:typing.Optional[str] = None, 
                   predicate:typing.Optional[typing.Any]=None, 
@@ -352,7 +357,9 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         # hashable, hence usable as dict key
         self.nodes[path] = node
         
-        typeStr_, desc, children, widget, typeTip, showDescInParentNode = self.parse(data, predicate=predicate)
+        typeStr_, desc, children, widget, typeTip, showDescInParentNode = self.parse(data, path, predicate=predicate)
+        
+        # print(f"{self.__class__.__name__}.buildTree for {type(data)} -> {len(children)} children")
         
         if not isinstance(typeStr, str) or len(typeStr.strip()) == 0:
             typeStr = typeStr_
@@ -381,11 +388,14 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         # # needs self._visited_ as a dict !
         # I am using this because this bug is far less annoying than the one 
         # without caching (BUG: 2025-05-27 17:51:58 )
-        data_type = type(data)
-        if data_type not in NOTREFERENCED + PODS:
-            data_id = id(data)
-            if data_id not in self._visited_.keys():
-                self._visited_[data_id] = (data_type, path)
+        # data_type = type(data)
+        # if not issubclass(type(data), NOTREFERENCED + PODS):
+        #     # self.memoize(data)
+        #     if id(data) not in self._visited_:
+        #         idx = len(self._visited_)
+        #         self._visited_[id(data)] = (idx, data_type, path)
+                
+        
         
         # NOTE: 2025-05-21 16:26:20 
         # why not applying this rule to other kinds of data as well?
@@ -455,7 +465,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
             self.buildTree(child_data, node, name=keyrepr, keyType = keyType, nameTip = keytip, 
                            predicate=predicate, path=path+(keyrepr,)) # so hideRoot is always False?
 
-    def parse(self, data, predicate=None, typeStr=None):
+    def parse(self, data, path, predicate=None, typeStr=None):
         r"""
         Overrides pyqtgraph.DataTreeWidget.parse()
         
@@ -484,21 +494,21 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         
         """
         from pyqtgraph.widgets.DataTreeWidget import HAVE_METAARRAY
-        from collections import OrderedDict
+        # from collections import OrderedDict
         from core.datatypes import (is_namedtuple, TypeEnum)
         
 #         print(f"{self.__class__.__name__}.parse data is a {type(data).__name__}")
 #         
 #         print(f"{self.__class__.__name__}.parse: predicate = {predicate}")
 
-        data_type = type(data)
+        # data_type = type(data)
 
         # NOTE: 2022-12-30 11:37:05
         # allow pre-empting the type string (e.g. when passed a dict created
         # dynamically from an object of some type)
         if not isinstance(typeStr, str):
             # defaults for all objects; ho
-            typeStr = data_type.__name__
+            typeStr = type(data).__name__
             typeTip = ""
         else:
             typeTip = typeStr
@@ -519,24 +529,31 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         showDescInParentNode = True
         children = dict()
         
+        
         # BUG: 2025-05-27 17:32:09 FIXME/TODO
         # checking for id() can have unexpected behaviour => object may be displayed as 
         # a reference to other object, when in fact it is not
         # NOTE: 2025-05-21 16:27:56 see NOTE: 2025-05-21 16:26:20 
-        if data_type not in NOTREFERENCED + PODS:
-            data_id = id(data)
-            if data_id in self._visited_.keys():
-                objtype = self._visited_[data_id][0]
-                path = "/".join(list(self._visited_[data_id][1]))
-                if len(path.strip()) == 0:
-                    full_path = self.top_title
-                else:
-                    if self.top_title == "/":
-                        full_path = "/" + path
+        if not issubclass(type(data), NOTREFERENCED + PODS): # or (isinstance(data, np.ndarray) and data.size<=1):
+            # data_id = id(data)
+            if id(data) in self._visited_:
+                x = self._visited_.get(id(data), None)
+                # print(x)
+                if x is not None:
+                    objtype = x[1]
+                    path = "/".join(list(x[2]))
+                    if len(path.strip()) == 0:
+                        full_path = self.top_title
                     else:
-                        full_path = "/".join([self.top_title, path])
-                desc = "<reference to %s at %s >" % (objtype.__name__, full_path)
-                return typeStr, desc, children, widget, typeTip, showDescInParentNode
+                        if self.top_title == "/":
+                            full_path = "/" + path
+                        else:
+                            full_path = "/".join([self.top_title, path])
+                    desc = "<reference to %s at %s >" % (objtype.__name__, full_path)
+                    return typeStr, desc, children, widget, typeTip, showDescInParentNode
+            else:
+                self.memoize(data, path)
+                
                 
             
         if data is None:
@@ -551,6 +568,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
             desc = str(pd.NA)
             return typeStr, desc, children, widget, typeTip, showDescInParentNode
             
+        # print(f"{self.__class__.__name__}.parse -> data_type: {data_type} ")
         try:
             if isinstance(data, type):
                 desc = type(data).__name__
@@ -558,10 +576,11 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                     children = data.__members__
                 
             elif isinstance(data, NestedFinder.nesting_types + (set,)):
+                # print(f"{self.__class__.__name__}.parse -> data_type is a nesting type ")
                 # NOTE: 2025-05-21 16:15:26
                 # here 'widget' is None — this will force the caller (i.e. buildTree)
                 # to descend into the children of the data and build up a subtree
-                if isinstance(data, (dict, types.MappingProxyType)):
+                if issubclass(type(data), (dict, types.MappingProxyType)):
                     # NOTE: 2025-05-21 16:17:37
                     # 'widget' is None, here
                     desc = "length=%d" % len(data)
@@ -570,9 +589,12 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                     # therefore we resort to an indexing vector
                     ndx = [i[1] for i in sorted((str(k[0]), k[1]) for k in zip(data.keys(), range(len(data))))]
                     items = [i for i in data.items()]
-                    children = OrderedDict([items[k] for k in ndx])
+                    # children = OrderedDict([items[k] for k in ndx])
+                    children = dict([items[k] for k in ndx])
+                    # print(f"desc for {type(data)}: {desc}")
+                    # print(f"{len(children)} for {type(data)}")
                         
-                elif isinstance(data, (list, tuple, deque, set)):
+                elif issubclass(type(data), (list, tuple, deque, set)):
                     # NOTE: 2025-05-21 16:17:37
                     # 'widget' is None, here
                     desc = "length=%d" % len(data)
@@ -581,16 +603,24 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                     if is_namedtuple(data):
                         children = data._asdict()
                     else:
-                        children = OrderedDict(enumerate(data))
+                        children = dict(enumerate(data))
+                        # children = OrderedDict(enumerate(data))
+                        
+                else:
+                    print("fallthrough")
                 
             elif HAVE_METAARRAY and (hasattr(data, 'implements') and data.implements('MetaArray')):
                 # NOTE: 2025-05-21 16:17:37
                 # 'widget' is None, here
                 # desc = type(data).__name__
-                children = OrderedDict([
+                children = dict([
                     ('data', data.view(np.ndarray)),
                     ('meta', data.infoCopy())
                 ])
+                # children = OrderedDict([
+                #     ('data', data.view(np.ndarray)),
+                #     ('meta', data.infoCopy())
+                # ])
             
             elif isinstance(data, types.SimpleNamespace):
                 lbl = f"<{data.__class__.__name__}> object"
@@ -693,7 +723,8 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                 datafields = dataclasses.fields(data)
                 lbl = f"<{data.__class__.__name__}> object"
                 desc = " ".join([lbl, "with", f"{len(datafields)} fields"])
-                children = OrderedDict(map(lambda x: (x.name, getattr(data, x.name)), datafields))
+                children = dict(map(lambda x: (x.name, getattr(data, x.name)), datafields))
+                # children = OrderedDict(map(lambda x: (x.name, getattr(data, x.name)), datafields))
                 
             elif isinstance(data, enum.Enum):
                 desc = f"{data} ({data.name})"
