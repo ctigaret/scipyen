@@ -218,7 +218,8 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         self.buildTree(self._private_data_, self.invisibleRootItem(), 
                        keyType = str,
                        typeStr = dataTypeStr, 
-                       predicate=predicate, hideRoot=hideRoot)
+                       predicate=predicate, hideRoot=hideRoot,
+                       path = ("/"))
         self.expandToDepth(3)
         self.resizeColumnToContents(0)
         
@@ -322,7 +323,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         # to the 'parent' node passed to this method call
         #
         
-        # print(f"{self.__class__.__name__}.buildTree: hideRoot = {hideRoot}")
+        print(f"{self.__class__.__name__}.buildTree: name = {name}, path = {path}")
         
         # if hideRoot:
         #     node = parent 
@@ -351,10 +352,13 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         # hashable, hence usable as dict key
         self.nodes[path] = node
         
-        typeStr_, desc, children, widget, typeTip, showDescInParentNode = self.parse(data, predicate=predicate)
+        typeStr_, desc, children, widget, typeTip, showDescInParentNode = self.parse(data, path, predicate=predicate)
         
         if not isinstance(typeStr, str) or len(typeStr.strip()) == 0:
             typeStr = typeStr_
+            
+        print(f"{self.__class__.__name__}.buildTree: typeStr: {typeStr}, desc: {desc}, typeTip: {typeTip}")
+        print(f"{self.__class__.__name__}.buildTree: children: {children}")
         
         # NOTE: 2022-03-04 09:04:50
         # nameTip is NOT set when this method is called by super().setData()
@@ -371,11 +375,19 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         #     if id(data) not in self._visited_.keys():
         #         self._visited_[id(data)] = (typeStr, path)
         
-        data_type =type(data)
-        if data_type not in NOTREFERENCED + PODS:
-            data_id = id(data)
-            if data_id not in self._visited_.keys():
-                self._visited_[data_id] = (data_type, path)
+        # data_type =type(data)
+#         if data_type not in NOTREFERENCED + PODS:
+#             data_id = id(data)
+#             if data_id not in self._visited_.keys():
+#                 self._visited_[data_id] = (data_type, path)
+#                 
+#             else:
+                
+        # if path not in self._visited_:
+        #     self._visited_[path] = data
+        # if data_type not in NOTREFERENCED + PODS:
+        #     if path not in self._visited_:
+        #         self._visited_[path] = data
             
         # Truncate description and add text box if needed
         # if len(desc) > 100:
@@ -403,7 +415,6 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
             elif type(key).__name__ == "instance":
                 keyrepr = key.__class__.__name__
                 keytip = f"member type: {key}"
-                # keytip = str(key)
                 
             elif isinstance(data, types.SimpleNamespace):
                 keyrepr = f"{key}"
@@ -425,30 +436,11 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                 keyrepr = str(key)
                 keytip = f"object type: {type(key).__name__}"
                 
-            # BUG 2025-05-23 22:53:37 FIXME - fixed by import typing
-            # wehen enabling keyTip renderign stops -why ?
-            # keyTypeTip = "key / index / field type: %s" % keytip
-            
-            # parent_type = parent.data(0, QtCore.Qt.UserRole)
-            # if isinstance(child_data, type):
-            #     keyTypeTip = "member type: %s" % keytip
-            # elif isinstance(child_data, (list, tuple, deque, typing.Sequence)):
-            #     keyTypeTip = "index type: %s" % keytip
-            # elif isinstance(child_data, (dict, types.MappingProxyType)):
-            #     keyTypeTip = "key type: %s" % keytip
-            # elif isinstance(child_data, types.SimpleNamespace):
-            #     keyTypeTip = "member type: %s" % keytip
-            # elif dataclasses.is_dataclass(child_data):
-            #     keyTypeTip = "field type: %s" % keytip
-            # else:
-            #     keyTypeTip = "object type: %s" % keytip
-                
-                
             #              data        parent, name, nameTip,
             self.buildTree(child_data, node, name=keyrepr, keyType = keyType, nameTip = keytip, 
                            predicate=predicate, path=path+(keyrepr,)) # so hideRoot is always False?
 
-    def parse(self, data, predicate=None, typeStr=None):
+    def parse(self, data, path, predicate=None, typeStr=None):
         r"""
         Overrides pyqtgraph.DataTreeWidget.parse()
         
@@ -485,6 +477,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
 #         print(f"{self.__class__.__name__}.parse: predicate = {predicate}")
 
         data_type = type(data)
+        print(f"{self.__class__.__name__}.parse: path = {path}, data_type: {data_type}")
 
         # NOTE: 2022-12-30 11:37:05
         # allow pre-empting the type string (e.g. when passed a dict created
@@ -512,27 +505,47 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         showDescInParentNode = True
         children = dict()
         
-        # NOTE: 2025-05-21 16:27:56 see NOTE: 2025-05-21 16:26:20 
-        # BUG: 2025-05-27 17:32:09 FIXME/TODO
-        # checking for id() can have unexpected behaviour => object may be displayed as 
-        # a reference to other object, when in fact it shouldn't
-        if data_type not in NOTREFERENCED + PODS:
-            data_id = id(data)
-            if data_id in self._visited_.keys():
-                objtype = self._visited_[data_id][0]
-                path = "/".join(list(self._visited_[data_id][1]))
-                if len(path.strip()) == 0:
-                    full_path = self.top_title
-                else:
-                    if self.top_title == "/":
-                        full_path = "/" + path
-                    else:
-                        full_path = "/".join([self.top_title, path])
-                desc = "<reference to %s at %s >" % (objtype.__name__, full_path)
-                return typeStr, desc, children, widget, typeTip, showDescInParentNode
+        if len(path.strip()) == 0:
+            full_path = self.top_title
+        else:
+            if self.top_title == "/":
+                full_path = "/" + path
+            else:
+                full_path = "/".join([self.top_title, path])
+         
+# ### BEGIN
+        # if path in self._visited_:
+        #     print(f"{self.__class__.__name__}.parse found path {path}")
+        #     desc = "<reference to %s at %s >" % (objtype.__name__, full_path)
+        #     objtype = self._visited_[path]
+        #     return typeStr, desc, children, widget, typeTip, showDescInParentNode
+        
+#         # NOTE: 2025-05-21 16:27:56 see NOTE: 2025-05-21 16:26:20 
+#         if data_type not in NOTREFERENCED + PODS:
+#             if len(path.strip()) == 0:
+#                 full_path = self.top_title
+#             else:
+#                 if self.top_title == "/":
+#                     full_path = "/" + path
+#                 else:
+#                     full_path = "/".join([self.top_title, path])
+#                     
+#             if path in self._visited_:
+#                 print(f"{self.__class__.__name__}.parse found path {path}")
+#                 desc = "<reference to %s at %s >" % (objtype.__name__, full_path)
+#                 objtype = self._visited_[path]
+#                 return typeStr, desc, children, widget, typeTip, showDescInParentNode
+                
+            # data_id = id(data)
+            # if data_id in self._visited_.keys():
+            #     objtype = self._visited_[data_id][0]
+            #     path = "/".join(list(self._visited_[data_id][1]))
+            #     desc = "<reference to %s at %s >" % (objtype.__name__, full_path)
+            #     return typeStr, desc, children, widget, typeTip, showDescInParentNode
             # else:
                 
-            
+# ### END
+
         if data is None:
             typeStr = "(None)"
             return typeStr, desc, children, widget, typeTip, showDescInParentNode

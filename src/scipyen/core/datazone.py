@@ -450,10 +450,10 @@ class DataZone(neo.Epoch):
                              .format(len(labels), self.size))
         self._labels = np.array(labels)
         
-def _newInterval_(cls, t0 = None, t1 = None, units=None, labels=None, 
+def _newInterval_(cls, times = None, durations = None, units=None, labels=None, 
                 extent:bool=None, name=None, description=None,
                 file_origin = None, segment = None,
-                array_annotations = None, anotations = None):
+                array_annotations = None, annotations = None):
     
     if not isinstance(annotations, dict):
         if annotations is None:
@@ -464,9 +464,9 @@ def _newInterval_(cls, t0 = None, t1 = None, units=None, labels=None,
             except:
                 annotations = dict() # just so that we aren't left hanging out
         
-    obj = Interval(t0=t0, t1=t1, units=units, labels=labels,
+    obj = Interval(times=times, durations=durations, units=units, labels=labels,
                    extent=extent, name=name, description=description,
-                   file_origin=file_origin,
+                   file_origin=file_origin, segment=segment,
                    array_annotations=array_annotations,
                    **annotations)
     obj.segment=segment
@@ -542,13 +542,12 @@ coordinates are NOT restricted to time units.
                 file_origin:typing.Optional[str] = None, 
                 segment: typing.Optional[int] = None,
                 array_annotations = None, 
-                **anotations):
+                **annotations):
         units_ = None
         if isinstance(times, np.ndarray):
             assert(times.ndim <= 1), "times must be a 1D array"
             if isinstance(times, pq.Quantity):
                 units_ = times.units
-            if times.ndim == 0:
                 times = times.flatten()
                 
         elif isinstance(times, typing.Sequence) and alltimes(isinstance(v, numbers.Number) for v in times):
