@@ -106,6 +106,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         if not isinstance(self._supported_data_types_, tuple) or not all(isinstance(v, type) for v in self._supported_data_types_):
             self._supported_data_types_ = tuple()
         self._visited_ = dict()
+        # self._visited_ = list()
         self.top_title = "/"
         self._last_active_item_ = None
         self._last_active_item_column_ = 0
@@ -365,18 +366,43 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         if showDescInParentNode:
             node.setText(2, desc)
         
+        # ### BEGIN About caching code
+        
+        # BUG: 2025-05-27 17:51:58 FIXME/TODO
+        # without the caching code below this work well, BUT:
+        # any container that is referenced as a member of itself will be prone
+        # to infinite recursion!
+        #
+        # I considered weakrefs, but NOT all object in Scipyen/Python support
+        # weak references!
+        
+        # NOTE: cahing code works but buggy, see BUG: 2025-05-27 17:32:09 FIXME/TODO
+        # # limtations to the id() builtin
+        # # needs self._visited_ as a dict !
+        # I am using this because this bug is far less annoying than the one 
+        # without caching (BUG: 2025-05-27 17:51:58 )
+        data_type = type(data)
+        if data_type not in NOTREFERENCED + PODS:
+            data_id = id(data)
+            if data_id not in self._visited_.keys():
+                self._visited_[data_id] = (data_type, path)
+        
         # NOTE: 2025-05-21 16:26:20 
         # why not applying this rule to other kinds of data as well?
         # if isinstance(data, NestedFinder.nesting_types):
         #     if id(data) not in self._visited_.keys():
         #         self._visited_[id(data)] = (typeStr, path)
         
-        data_type =type(data)
-        if data_type not in NOTREFERENCED + PODS:
-            data_id = id(data)
-            if data_id not in self._visited_.keys():
-                self._visited_[data_id] = (data_type, path)
-            
+        # BUG: 2025-05-27 17:51:14 this one breaks it all!
+        # # needs self._visited_ as a list
+        # data_type = type(data)
+        # if data_type not in NOTREFERENCED + PODS:
+        #     if data not in self._visited_:
+        #         self._visited_.append(data)
+        
+        # ### END   About caching code
+        
+        
         # Truncate description and add text box if needed
         # if len(desc) > 100:
         #     desc = desc[:97] + '...'
@@ -424,25 +450,6 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
             else:
                 keyrepr = str(key)
                 keytip = f"object type: {type(key).__name__}"
-                
-            # BUG 2025-05-23 22:53:37 FIXME - fixed by import typing
-            # wehen enabling keyTip renderign stops -why ?
-            # keyTypeTip = "key / index / field type: %s" % keytip
-            
-            # parent_type = parent.data(0, QtCore.Qt.UserRole)
-            # if isinstance(child_data, type):
-            #     keyTypeTip = "member type: %s" % keytip
-            # elif isinstance(child_data, (list, tuple, deque, typing.Sequence)):
-            #     keyTypeTip = "index type: %s" % keytip
-            # elif isinstance(child_data, (dict, types.MappingProxyType)):
-            #     keyTypeTip = "key type: %s" % keytip
-            # elif isinstance(child_data, types.SimpleNamespace):
-            #     keyTypeTip = "member type: %s" % keytip
-            # elif dataclasses.is_dataclass(child_data):
-            #     keyTypeTip = "field type: %s" % keytip
-            # else:
-            #     keyTypeTip = "object type: %s" % keytip
-                
                 
             #              data        parent, name, nameTip,
             self.buildTree(child_data, node, name=keyrepr, keyType = keyType, nameTip = keytip, 
@@ -512,10 +519,10 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         showDescInParentNode = True
         children = dict()
         
-        # NOTE: 2025-05-21 16:27:56 see NOTE: 2025-05-21 16:26:20 
         # BUG: 2025-05-27 17:32:09 FIXME/TODO
         # checking for id() can have unexpected behaviour => object may be displayed as 
-        # a reference to other object, when in fact it shouldn't
+        # a reference to other object, when in fact it is not
+        # NOTE: 2025-05-21 16:27:56 see NOTE: 2025-05-21 16:26:20 
         if data_type not in NOTREFERENCED + PODS:
             data_id = id(data)
             if data_id in self._visited_.keys():
@@ -530,7 +537,6 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                         full_path = "/".join([self.top_title, path])
                 desc = "<reference to %s at %s >" % (objtype.__name__, full_path)
                 return typeStr, desc, children, widget, typeTip, showDescInParentNode
-            # else:
                 
             
         if data is None:

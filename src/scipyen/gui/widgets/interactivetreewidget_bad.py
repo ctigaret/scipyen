@@ -105,7 +105,8 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         self._supported_data_types_ = kwargs.pop("supported_data_types", tuple())
         if not isinstance(self._supported_data_types_, tuple) or not all(isinstance(v, type) for v in self._supported_data_types_):
             self._supported_data_types_ = tuple()
-        self._visited_ = dict()
+        # self._visited_ = dict()
+        self._visited_ = list()
         self.top_title = "/"
         self._last_active_item_ = None
         self._last_active_item_column_ = 0
@@ -375,6 +376,10 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         #     if id(data) not in self._visited_.keys():
         #         self._visited_[id(data)] = (typeStr, path)
         
+        if data_type not in NOTREFERENCED + PODS:
+            if data not in self._visited_:
+                self._visited_.append(data)
+                
         # data_type =type(data)
 #         if data_type not in NOTREFERENCED + PODS:
 #             data_id = id(data)
