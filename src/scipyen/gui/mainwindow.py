@@ -4704,6 +4704,20 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         varnames = [self.workspaceModel.item(
             indexList[k].row(), 0).text() for k in range(len(indexList))]
 
+        pickleVars = cm.addAction("Save (pickle)")
+        pickleVars.setToolTip("Save selected variables as Pickle files.\nWARNING: Do not use pickle for long-term data storage!")
+        pickleVars.setStatusTip("Save selected variables as Pickle files.\nWARNING: Do not use pickle for long-term data storage!")
+        pickleVars.setWhatsThis("Save selected variables as Pickle files.\nWARNING: Do not use pickle for long-term data storage!")
+        pickleVars.triggered.connect(self.slot_pickleSelectedVariables)
+        pickleVars.hovered.connect(self._slot_showActionStatusMessage_)
+
+        saveVars = cm.addAction("Export as HDF5")
+        saveVars.setToolTip("Export selected variables as HDF5 files")
+        saveVars.setStatusTip("Export selected variables as HDF5 files")
+        saveVars.setWhatsThis("Export selected variables as HDF5 files")
+        saveVars.triggered.connect(self.slot_saveSelectedVariables)
+        saveVars.hovered.connect(self._slot_showActionStatusMessage_)
+
         if all([isinstance(self.workspace[v], (pd.DataFrame, pd.Series, neo.basesignal.BaseSignal, neo.SpikeTrain, np.ndarray))] for v in varnames):
             if not any([isinstance(self.workspace[v], np.ndarray) and self.workspace[v].ndim > 2 for v in varnames]):
                 exportCSVAction = cm.addAction(
@@ -4717,20 +4731,6 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                     "Export as comma-separated ASCII file")
                 exportCSVAction.hovered.connect(
                     self._slot_showActionStatusMessage_)
-
-        saveVars = cm.addAction("Save")
-        saveVars.setToolTip("Save selected variables as HDF5 files")
-        saveVars.setStatusTip("Save selected variables as HDF5 files")
-        saveVars.setWhatsThis("Save selected variables as HDF5 files")
-        saveVars.triggered.connect(self.slot_saveSelectedVariables)
-        saveVars.hovered.connect(self._slot_showActionStatusMessage_)
-
-        pickleVars = cm.addAction("Pickle")
-        pickleVars.setToolTip("Save selected variables as Pickle files.\nWARNING: Do not use pickle for long-term data storage!")
-        pickleVars.setStatusTip("Save selected variables as Pickle files.\nWARNING: Do not use pickle for long-term data storage!")
-        pickleVars.setWhatsThis("Save selected variables as Pickle files.\nWARNING: Do not use pickle for long-term data storage!")
-        pickleVars.triggered.connect(self.slot_pickleSelectedVariables)
-        pickleVars.hovered.connect(self._slot_showActionStatusMessage_)
 
         delVars = cm.addAction("Delete")
         delVars.setToolTip("Delete selected variables")
@@ -7301,6 +7301,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 # NOTE: 2024-06-01 16:52:57
                 # special case because we can export data to image file types
                 fileFilters = list()
+                fileFilters.append("Pickle (*pkl)")
                 fileFilters.append("HDF5 (*.h5)")
                 imageFileFilters = list()
                 imageFileFilters.append('All Image Types (' + ' '.join([''.join(i) for i in zip('*' * len(
@@ -7308,7 +7309,6 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 imageFileFilters.extend(
                     ['{I} (*.{i})'.format(I=i.upper(), i=i) for i in pio.SUPPORTED_IMAGE_TYPES])
                 fileFilters.extend(imageFileFilters)
-                fileFilters.append("Pickle (*pkl)")
                 fileFilt = ';;'.join(fileFilters)
 
                 # fileFilt = 'All Image Types (' + ' '.join([''.join(i) for i in zip('*' * len(pio.SUPPORTED_IMAGE_TYPES), '.' * len(pio.SUPPORTED_IMAGE_TYPES), pio.SUPPORTED_IMAGE_TYPES)]) + ');;' +\
@@ -7324,12 +7324,12 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
                 if targetDir is not None and targetDir != "" and os.path.exists(targetDir):
                     fileName, file_flt = QtWidgets.QFileDialog.getSaveFileName(
-                        self, caption=u'Save Image File', filter=fileFilt, directory=targetDir,
+                        self, caption=u'Save/Export to Image File', filter=fileFilt, directory=targetDir,
                         **kw)
 
                 else:
                     fileName, file_flt = QtWidgets.QFileDialog.getSaveFileName(
-                        self, caption=u'Save Image File', filter=fileFilt,
+                        self, caption=u'Save/Export to Image File', filter=fileFilt,
                         **kw)
 
                 if len(fileName) > 0:
@@ -7351,8 +7351,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
             else:
                 fileFilters = list()
-                fileFilters.append("HDF5 (*.h5)")
                 fileFilters.append("Pickle (*.pkl)")
+                fileFilters.append("HDF5 (*.h5)")
                 fileFilt = ';;'.join(fileFilters)
                 targetDir = self.recentDirectories[0]
 
@@ -7364,12 +7364,12 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
                 if targetDir is not None and targetDir != "" and os.path.exists(targetDir):
                     fileName, file_flt = QtWidgets.QFileDialog.getSaveFileName(
-                        self, caption=u'Save as', filter=fileFilt, directory=targetDir,
+                        self, caption=u'Save/Export as', filter=fileFilt, directory=targetDir,
                         **kw)
 
                 else:
                     fileName, file_flt = QtWidgets.QFileDialog.getSaveFileName(
-                        self, caption=u'Save as', filter=fileFilt,
+                        self, caption=u'Save/Export as', filter=fileFilt,
                         **kw)
 
                 if len(fileName) > 0:
