@@ -45,7 +45,7 @@ import imaging.scandata
 from imaging.scandata import (ScanData, AnalysisUnit)
 
 from core.triggerprotocols import TriggerProtocol
-from core.triggerevent import (TriggerEvent, TriggerEventType)
+from core.triggerevent import (DataMark, TriggerEvent, TriggerEventType)
 
 import core.datasignal as datasignal
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
@@ -370,8 +370,12 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         # if isinstance(data, NestedFinder.nesting_types):
         #     if id(data) not in self._visited_.keys():
         #         self._visited_[id(data)] = (typeStr, path)
-        if id(data) not in self._visited_.keys():
-            self._visited_[id(data)] = (typeStr, path)
+        
+        data_type =type(data)
+        if data_type not in NOTREFERENCED + PODS:
+            data_id = id(data)
+            if data_id not in self._visited_.keys():
+                self._visited_[data_id] = (data_type, path)
             
         # Truncate description and add text box if needed
         # if len(desc) > 100:
@@ -480,12 +484,14 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
 #         
 #         print(f"{self.__class__.__name__}.parse: predicate = {predicate}")
 
+        data_type = type(data)
+
         # NOTE: 2022-12-30 11:37:05
         # allow pre-empting the type string (e.g. when passed a dict created
         # dynamically from an object of some type)
         if not isinstance(typeStr, str):
             # defaults for all objects; ho
-            typeStr = type(data).__name__
+            typeStr = data_type.__name__
             typeTip = ""
         else:
             typeTip = typeStr
@@ -507,18 +513,22 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         children = dict()
         
         # NOTE: 2025-05-21 16:27:56 see NOTE: 2025-05-21 16:26:20 
-        if type(data) not in NOTREFERENCED and type(data) not in PODS and id(data) in self._visited_.keys():
-            objtype = self._visited_[id(data)][0]
-            path = "/".join(list(self._visited_[id(data)][1]))
-            if len(path.strip()) == 0:
-                full_path = self.top_title
-            else:
-                if self.top_title == "/":
-                    full_path = "/" + path
+        if data_type not in NOTREFERENCED + PODS:
+            data_id = id(data)
+            if data_id in self._visited_.keys():
+                objtype = self._visited_[data_id][0]
+                path = "/".join(list(self._visited_[data_id][1]))
+                if len(path.strip()) == 0:
+                    full_path = self.top_title
                 else:
-                    full_path = "/".join([self.top_title, path])
-            desc = "<reference to %s at %s >" % (objtype, full_path)
-            return typeStr, desc, children, widget, typeTip, showDescInParentNode
+                    if self.top_title == "/":
+                        full_path = "/" + path
+                    else:
+                        full_path = "/".join([self.top_title, path])
+                desc = "<reference to %s at %s >" % (objtype.__name__, full_path)
+                return typeStr, desc, children, widget, typeTip, showDescInParentNode
+            # else:
+                
             
         if data is None:
             typeStr = "(None)"
@@ -592,6 +602,28 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
             elif isinstance(data, pd.Index):
                 desc = "length=%d" % len(data)
                 widget = self._makeTableWidget_(data)
+                
+            elif isinstance(data, Interval):
+                desc = f"Interval '{data.name}' with {len(data)} subinterval(s)"
+                children = {"t0": data.t0, "t1": data.t1, "durations": data.durations, 
+                            "extent": data.extent, "labels": data.labels,
+                            "annotations": data.annotations,
+                            "description": data.description,
+                            }
+                
+            elif isinstance(data, (neo.Epoch, DataZone)):
+                desc = f"{type(data).__name__} '{data.name}' with {len(data)} subinterval(s)"
+                children = {"times": data.times, "durations": data.durations, 
+                            "labels": data.labels, "annotations": data.annotations,
+                            "description": data.description}
+                
+            elif isinstance(data, (neo.Event, DataMark, TriggerEvent)):
+                desc = f"{type(data).__name__} '{data.name}' with {len(data)} mark(s)"
+                children = {"times": data.times, "labels": data.labels}
+                if isinstance(data, (DataMark, TriggerEvent)):
+                    children.update({"type": data.type, "relative": data.relative})
+                chidren.update({"annotations": data.annotations,
+                              "description": data.description})
                 
             elif isinstance(data, neo.core.dataobject.DataObject):
                 desc = "shape=%s dtype=%s" % (data.shape, data.dtype)

@@ -595,7 +595,7 @@ coordinates are NOT restricted to time units.
                 # NOTE: 2025-04-27 10:39:14
                 # ignore silently
                 # if units is not None:
-                #     scipywarn("Ignoring 'unit' because times and durations already have them")
+                #     scipywarn("Ignoring 'units' because times and durations already have them")
                 units = units_
             else:
                 times = times * units
@@ -1110,7 +1110,7 @@ coordinates are NOT restricted to time units.
             
         t0, t1 = (t, d)
 
-        return cls(t0, t1, unit=None, labels=labels, extent=extent, 
+        return cls(t0, t1, units=None, labels=labels, extent=extent, 
                   name=name, description=description, segment=segment)
     
     def toDomainSlices(self) -> np.ndarray:

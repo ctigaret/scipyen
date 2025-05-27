@@ -1432,7 +1432,7 @@ class TriggerEvent(DataMark):
             times = self.times
             labels = self.labels
             
-        relativ = getattr(self, "relative", False)
+        relative = getattr(self, "relative", False)
         
         if to_epoch:
             if relative:
