@@ -68,7 +68,7 @@ from core.traitcontainers import (DataBag, DataBagTraitsObserver,)
 from gui.widgets.tablewidget import SimpleTableWidget
 from gui.widgets.tableeditorwidget import (TableEditorWidget, TabularDataModel,)
 
-NOTREFERENCED = (tuple, type(None), type(MISSING), type(pd.NA), type, pq.Quantity)
+NOTMEMOIZED = (tuple, type(None), type(MISSING), type(pd.NA), type, np.ndarray)
 PODS = (bool, int, float, bytes, bytearray, str)
 
 # class InteractiveTreeWidget(DataTreeWidget):
@@ -389,7 +389,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         # I am using this because this bug is far less annoying than the one 
         # without caching (BUG: 2025-05-27 17:51:58 )
         # data_type = type(data)
-        # if not issubclass(type(data), NOTREFERENCED + PODS):
+        # if not issubclass(type(data), NOTMEMOIZED + PODS):
         #     # self.memoize(data)
         #     if id(data) not in self._visited_:
         #         idx = len(self._visited_)
@@ -406,7 +406,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         # BUG: 2025-05-27 17:51:14 this one breaks it all!
         # # needs self._visited_ as a list
         # data_type = type(data)
-        # if data_type not in NOTREFERENCED + PODS:
+        # if data_type not in NOTMEMOIZED + PODS:
         #     if data not in self._visited_:
         #         self._visited_.append(data)
         
@@ -534,7 +534,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         # checking for id() can have unexpected behaviour => object may be displayed as 
         # a reference to other object, when in fact it is not
         # NOTE: 2025-05-21 16:27:56 see NOTE: 2025-05-21 16:26:20 
-        if not issubclass(type(data), NOTREFERENCED + PODS): # or (isinstance(data, np.ndarray) and data.size<=1):
+        if not issubclass(type(data), NOTMEMOIZED + PODS): # or (isinstance(data, np.ndarray) and data.size<=1):
             # data_id = id(data)
             if id(data) in self._visited_:
                 x = self._visited_.get(id(data), None)
@@ -623,7 +623,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                 # ])
             
             elif isinstance(data, types.SimpleNamespace):
-                lbl = f"<{data.__class__.__name__}> object"
+                lbl = f"{data.__class__.__name__} object"
                 desc = " ".join([lbl, "with", f"{len(data.__dict__)} members"])
                 # NOTE: 2025-05-21 16:17:37
                 # 'widget' is None, here
@@ -721,7 +721,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
             elif dataclasses.is_dataclass(data):
                 # print(f"{self.__class__.__name__}.parse: data is a {type(data)}")
                 datafields = dataclasses.fields(data)
-                lbl = f"<{data.__class__.__name__}> object"
+                lbl = f"{data.__class__.__name__} object"
                 desc = " ".join([lbl, "with", f"{len(datafields)} fields"])
                 children = dict(map(lambda x: (x.name, getattr(data, x.name)), datafields))
                 # children = OrderedDict(map(lambda x: (x.name, getattr(data, x.name)), datafields))
