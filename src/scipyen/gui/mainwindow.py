@@ -5016,9 +5016,9 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         if len(indexList) == 0:
             return
 
-        ret = self.questionMessage("Save data as pickle file", "Saving data as pickle file is not recommended for long-term data storage. Do you want to continue?")
-        if ret != QtWidgets.QMessageBox.Yes:
-            return
+        # ret = self.questionMessage("Save data as pickle file", "Saving data as pickle file is not recommended for long-term data storage. Do you want to continue?")
+        # if ret != QtWidgets.QMessageBox.Yes:
+        #     return
 
         varSet = set()
 
@@ -7344,9 +7344,10 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                             pio.saveHDF5(data, fileName)
 
                         else:
-                            ret = self.questionMessage("Save data as pickle file", "Saving data as pickle file is not recommended for long-term data storage. Do you want to continue?")
-                            if ret == QtWidgets.QMessageBox.Yes:
-                                pio.savePickleFile(data, fileName)
+                            pio.savePickleFile(data, fileName)
+                            # ret = self.questionMessage("Save data as pickle file", "Saving data as pickle file is not recommended for long-term data storage. Do you want to continue?")
+                            # if ret == QtWidgets.QMessageBox.Yes:
+                            #     pio.savePickleFile(data, fileName)
 
             else:
                 fileFilters = list()
@@ -7377,9 +7378,10 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                         pio.saveHDF5(data, fileName)
 
                     elif file_flt.startswith("Pickle"):
-                        ret = self.questionMessage("Save data as pickle file", "Saving data as pickle file is not recommended for long-term data storage. Do you want to continue?")
-                        if ret == QtWidgets.QMessageBox.Yes:
-                            pio.savePickleFile(data, fileName)
+                        pio.savePickleFile(data, fileName)
+                        # ret = self.questionMessage("Save data as pickle file", "Saving data as pickle file is not recommended for long-term data storage. Do you want to continue?")
+                        # if ret == QtWidgets.QMessageBox.Yes:
+                        #     pio.savePickleFile(data, fileName)
                             
                     else:
                         # print(f"{self.__class__.__name__}.slot_saveFile saving {varname} as {fileName} with type {file_flt}")
