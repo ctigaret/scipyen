@@ -92,6 +92,8 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
     # NOTE: 2025-05-24 22:21:05
     # child widgets are either None, TableEditorWidget, SimpleTableWidget, or QPlainTextEdit
     
+    _default_widget_height_ = 200
+    
     def __init__(self, *args, **kwargs):
         r"""
         Keyword parameters (selective list):
@@ -122,11 +124,23 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         self.headerItem().setToolTip(1, "Type of child data mapped to a key or index.\nAdditional type information is shown in their tooltip.")
         self.headerItem().setToolTip(2, "Value of child data, or its length\n(when data is a nested collection).\nNumpy arrays ar displayed as a table")
         
+        self._widget_height_ = self._default_widget_height_
         
         self.itemClicked.connect(self._slot_setLastActive)
         
         self._widgetsWithSelection_ = set()
         
+    @property
+    def widgetHeight(self) -> int:
+        return self._widget_height_
+    
+    @widgetHeight.setter
+    def widgetHeight(self, val:int):
+        if val < 10: 
+            return
+        self._widget_height_ = val
+        self._setAssociatedWidgetHeight_()
+    
     def _makeTableWidget_(self, data):
         if self._use_TableEditor_:
             widget = TableEditorWidget(parent=self)
@@ -139,12 +153,13 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
             widget = SimpleTableWidget()
             widget.setData(data)
             
-        widget.setMaximumHeight(200)
+        widget.setMaximumHeight(self._widget_height_)
         
         return widget
     
     def getWidgetSelection(self, widget:QtWidgets.QWidget) -> list:
-        r"""Returns a list of selected QModelIndex for table widgets, or text for text widgets.
+        r"""Returns a list of selected QModelIndex objects from widgets
+        asociated with tree items.
         The caller should deal with these accordingly.
     """
         if isinstance(widget, TableEditorWidget):
@@ -188,7 +203,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
             # TODO 2025-05-24 22:56:01 
             # finalize me - see tableeditorwidget
             # also implement similar things in SimpleTableWidget, or get rid of that class
-            # also see is matrixviewer can be consolidated/merged in tableeditorwidget
+            # also see if matrixviewer can be consolidated/merged in tableeditorwidget
         else:
             if len(indexes):
                 self._widgetsWithSelection_.add(widget)
@@ -197,6 +212,16 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
     def setSupportedDataTypes(self, types:tuple):
         if isinstance(types, tuple) and len(types):
             self._supported_data_types_ = types
+            
+    def _setAssociatedWidgetHeight_(self):
+        from gui.guiutils import treeWidgetItems
+        itemWidgets = list(filter(lambda w: w is not None, list(map(lambda i: self.itemWidget(i,0), 
+                                  treeWidgetItems(self)))))
+        
+        for w in itemWidgets:
+            w.setMaximumHeight(self._widget_height_)
+            w.resize(w.width(), self._widget_height_)
+        
     
     def setData(self, data, predicate=None, top_title:str = "", dataTypeStr = None, hideRoot=False):
         r"""data should be a dictionary."""

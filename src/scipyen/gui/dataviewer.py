@@ -246,6 +246,8 @@ class DataViewer(ScipyenViewer):
         expandAllAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("expand-all"), "Expand All")
         expandAllAction.triggered.connect(self.slot_expandAll)
         
+        # increaseWidgetHeight
+        
         self.goFirst = self.toolBar.addAction(QtGui.QIcon.fromTheme("go-first-symbolic"), "First view")
         self.goFirst.triggered.connect(self.slot_goFirst)
         self.goFirst.setEnabled(False)
@@ -323,20 +325,6 @@ class DataViewer(ScipyenViewer):
     @Slot()
     @safewrapper
     def slot_refreshDataDisplay(self):
-#         self._top_title_ = self._docTitle_ if (isinstance(self._docTitle_, str) and len(self._docTitle_.strip())) else "/"
-#         
-#         if len(self._obj_cache_):
-#             self._obj_cache_[0] = (self._data_, self._top_title_)
-#             if len(self._obj_cache_) > 1:
-#                 self._obj_cache_[1:] = []
-#                 
-#         else:
-#             self._obj_cache_.append((self._data_, self._top_title_))
-#         
-#         self._cache_index_ = 0
-#         for w in (self.goFirst, self.goBack, self.goNext):
-#             w.setEnabled(False)
-            
         self._populate_tree_widget_()
             
     @Slot(QtWidgets.QTreeWidgetItem, int)
