@@ -114,7 +114,7 @@ from qtconsole.manager import QtKernelManager
 import pkg_resources
 
 #from core import prog
-from core.prog import safewrapper
+from core.prog import (safewrapper, with_doc)
 from core.extipyutils_client import (init_commands, execute, ForeignCall,
                                     nrn_ipython_initialization_cmd,)
 from core.strutils import str2symbol
@@ -3810,7 +3810,11 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     def paste(self, *args, **kwargs):
         self.consoleWidget.paste(*args, **kwargs)
         
+    @with_doc(ConsoleWidget.execute, use_header=True)
     def execute(self, *args, **kwargs):
+        r"""Executes a statement (str).
+    Delegates to self.consoleWidget.execute(…)
+    """
         self.consoleWidget.execute(*args, **kwargs)
         
     def writeText(self, text):

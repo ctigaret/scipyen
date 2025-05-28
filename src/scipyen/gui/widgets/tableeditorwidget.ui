@@ -36,6 +36,9 @@
        <property name="icon">
         <iconset theme="resizecol"/>
        </property>
+       <property name="autoRaise">
+        <bool>true</bool>
+       </property>
       </widget>
      </item>
      <item>
@@ -55,6 +58,9 @@
        <property name="icon">
         <iconset theme="resizerow"/>
        </property>
+       <property name="autoRaise">
+        <bool>true</bool>
+       </property>
       </widget>
      </item>
      <item>
@@ -68,6 +74,9 @@
        <property name="icon">
         <iconset theme="go-previous"/>
        </property>
+       <property name="autoRaise">
+        <bool>true</bool>
+       </property>
       </widget>
      </item>
      <item>
@@ -80,6 +89,9 @@
        </property>
        <property name="icon">
         <iconset theme="go-next"/>
+       </property>
+       <property name="autoRaise">
+        <bool>true</bool>
        </property>
       </widget>
      </item>

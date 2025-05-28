@@ -8536,7 +8536,6 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             self.slot_viewSelectedVarInNewWindow()
             return
 
-        # varname = self.workspaceModel.currentItemName
         varname = self.currentVarItemName
 
         if varname is None:
@@ -8866,8 +8865,12 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
                 When True, displays the object in a new instance of a suitable viewer.
 
-        useSignalViewerForNdArrays when true, plot signals in signal viewer
+        askForParams when true, prompts a dialog with viewing parameters
+    (NOTE: this is viwer-specific and not fully implemented)
         """
+        # TODO: 2025-05-28 14:48:40
+        # implement viewing coniguration dialog for various viewers
+        # currently this is only partially implemented for SignalViewer
         # TODO: accommodate new viewer types - nearly DONE via VTH
 
         # NOTE: 2022-12-22 09:59:02
@@ -8963,19 +8966,6 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                     if chkb.selection():
                         plt.clf()
 
-            # if isinstance(obj, neo.core.basesignal.BaseSignal) and hasattr(obj, "times"):
-            #     plt.plot(obj.times, obj)
-            #     times_units_str = obj.times.units.dimensionality.string
-            #     xlabel = "" if times_units_str == "dimensionless" else f"{cq.nameFromUnit(obj.times.units)} ({obj.times.units.dimensionality.string})"
-            #     name = obj.name
-            #     if name is None or len(name.strip()) == 0:
-            #         name = cq.nameFromUnit(obj.units.dimensionality)
-            #         # name = cq.nameFromUnit(obj.units.dimensionality.string)
-            #     ylabel = f"{name} ({obj.units.dimensionality.string})"
-            #     plt.xlabel(xlabel)
-            #     plt.ylabel(ylabel)
-            #     if isinstance(objname, str) and len(objname.strip()):
-            #         plt.title(objname)
             if isinstance(obj, neo.core.basesignal.BaseSignal):
                 neoutils.plot_neo(obj, win)
                 # plt.plot(obj.times, obj)

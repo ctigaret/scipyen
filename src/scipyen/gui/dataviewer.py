@@ -59,21 +59,30 @@ from core.prog import (safewrapper, safeguiwrapper, )
 from core.traitcontainers import (DataBag, DataBagTraitsObserver,)
 from core.scipyendataclasses import ScipyenDataclass
 
+
+#### END pict.core modules
+
+#### BEGIN pict.gui modules
 # from gui.tableeditor import (TableEditorWidget, TabularDataModel,)
 
 from gui.widgets.interactivetreewidget import InteractiveTreeWidget
 from gui.widgets.tablewidget import SimpleTableWidget
 from gui.widgets.tableeditorwidget import (TableEditorWidget, TabularDataModel)
-
-#### END pict.core modules
-
-#### BEGIN pict.gui modules
 from gui.scipyenviewer import ScipyenViewer #, ScipyenFrameViewer
 from gui import quickdialog
 
 # from . import resources_rc
 # from . import icons_rc
 #### END pict.gui modules
+
+if "darwin" in sys.platform:
+    altKeyDescr = "<Option>"
+    ctrlKeyDescr = "<Command>"
+else:
+    altKeyDescr = "<ALT>"
+    ctrlKeyDescr = "<CTRL>"
+
+
 
 # NOTE: 2022-12-25 23:08:51
 # needed for the new plugins framework
@@ -192,7 +201,7 @@ class DataViewer(ScipyenViewer):
             
         # self.hideRoot = hideRoot
         
-        self._obj_cache_ = list()
+        self._obj_cache_ = list() # list of tuple(obj:typing.Any, name:str)
         self._cache_index_ = 0
         
         self._top_title_ = ""
@@ -201,6 +210,8 @@ class DataViewer(ScipyenViewer):
         
         # contains data selected from child widgets (table, and text widgets)
         self._subselections_ = list()
+        
+        self._obj_to_view_ = (dataclasses.MISSING, "")
         
         super().__init__(data=data, parent=parent, win_title=win_title, doc_title = doc_title, ID=ID, *args, **kwargs)
         
@@ -249,7 +260,6 @@ class DataViewer(ScipyenViewer):
         
         self.addToolBar(QtCore.Qt.TopToolBarArea, self.toolBar)
         
-    # def _set_data_(self, data:object, predicate=None, hideRoot=False, *args, **kwargs):
     def _set_data_(self, data:object, predicate=None, *args, **kwargs):
         r"""
         Displays new data
@@ -259,7 +269,8 @@ class DataViewer(ScipyenViewer):
             
         # self.hideRoot = hideRoot
         
-        # print(f"{self.__class__.__name__}._set_data_ predicate = {self.predicate}")
+        # # print(f"{self.__class__.__name__}._set_data_ predicate = {self.predicate}")
+        # print(f"{self.__class__.__name__}._set_data_ {type(data).__name__}")
         
         if data is not self._data_:
             # print(f"{self.__class__.__name__}._set_data_ data is a {type(data).__name__}")
@@ -267,38 +278,44 @@ class DataViewer(ScipyenViewer):
             self._dataTypeStr_ = type(self._data_).__name__
             self._top_title_ = self._docTitle_ if (isinstance(self._docTitle_, str) and len(self._docTitle_.strip())) else "/"
             
-            self._obj_cache_.clear()
-            self._cache_index_ = 0
-            for w in (self.goFirst, self.goBack, self.goNext):
-                w.setEnabled(False)
+            # self._obj_cache_.clear()
+            # self._cache_index_ = 0
+            # self._obj_cache_.append(data)
             
-            self._obj_cache_.append((self._top_title_, self._data_))
+            if self._check_cache_(self._data_, self._top_title_):
+                self._cache_index_ = self._get_cache_index_(self._data_, self._top_title_)
+                if self._cache_index_ is None:
+                    self._cache_index_ = 0
+            else:
+                self._obj_cache_.append((self._data_, self._top_title_))
+                self._cache_index_ = len(self._obj_cache_)-1 if len(self._obj_cache_) > 0 else 0
+            
+            for w in (self.goFirst, self.goBack):
+                w.setEnabled(len(self._obj_cache_) > 1)
+                
+            self.goNext.setEnabled(len(self._obj_cache_) > 1 and self._cache_index_ < len(self._obj_cache_)-1)
             
             self._populate_tree_widget_()
             
-            #if self.treeWidget.topLevelItemCount() == 1:
-                #self.treeWidget.topLevelItem(0).setText(0, top_title)
-                
             for k in range(self.treeWidget.topLevelItemCount()):
                 self._collapse_expand_Recursive(self.treeWidget.topLevelItem(k), current=False)
-                #self._collapseRecursive_(self.treeWidget.topLevelItem(k), collapseCurrent=False)
                 
         if kwargs.get("show", True):
             self.activateWindow()
             
     def _populate_tree_widget_(self):
         self.treeWidget.clear()
+        # print(f"{self.__class__.__name__}._populate_tree_widget_")
         if len(self._obj_cache_):
             if self._cache_index_ >= len(self._obj_cache_):
                 self._cache_index_ = len(self._obj_cache_) - 1
-            obj_tuple = self._obj_cache_[self._cache_index_]
-            self.treeWidget.setData(obj_tuple[1], 
+            obj, name = self._obj_cache_[self._cache_index_]
+            # print(f"{self.__class__.__name__}._populate_tree_widget_: obj: {type(obj)}, name: {name}")
+            self.treeWidget.setData(obj, 
                                     predicate = self.predicate, 
-                                    top_title=obj_tuple[0], 
-                                    dataTypeStr=type(obj_tuple[1]).__name__)#, 
-                                    # dataTypeStr=self._dataTypeStr_, 
-                                    # hideRoot=self.hideRoot)
-            self.docTitle = obj_tuple[0]
+                                    top_title = name, 
+                                    dataTypeStr=type(obj).__name__)#, 
+            self.docTitle = name
             
             for k in range(self.treeWidget.topLevelItemCount()):
                 self._collapse_expand_Recursive(self.treeWidget.topLevelItem(k), current=False)
@@ -306,76 +323,31 @@ class DataViewer(ScipyenViewer):
     @Slot()
     @safewrapper
     def slot_refreshDataDisplay(self):
-        self._top_title_ = self._docTitle_ if (isinstance(self._docTitle_, str) and len(self._docTitle_.strip())) else "/"
-        
-        if len(self._obj_cache_):
-            self._obj_cache_[0] = (self._top_title_, self._data_)
-            if len(self._obj_cache_) > 1:
-                self._obj_cache_[1:] = []
-                
-        else:
-            self._obj_cache_.append((self._top_title_, self._data_))
-        
-        self._cache_index_ = 0
-        for w in (self.goFirst, self.goBack, self.goNext):
-            w.setEnabled(False)
+#         self._top_title_ = self._docTitle_ if (isinstance(self._docTitle_, str) and len(self._docTitle_.strip())) else "/"
+#         
+#         if len(self._obj_cache_):
+#             self._obj_cache_[0] = (self._data_, self._top_title_)
+#             if len(self._obj_cache_) > 1:
+#                 self._obj_cache_[1:] = []
+#                 
+#         else:
+#             self._obj_cache_.append((self._data_, self._top_title_))
+#         
+#         self._cache_index_ = 0
+#         for w in (self.goFirst, self.goBack, self.goNext):
+#             w.setEnabled(False)
+            
         self._populate_tree_widget_()
             
     @Slot(QtWidgets.QTreeWidgetItem, int)
     @safewrapper
     def slot_itemDoubleClicked(self, item, column):
-        from core.utilities import get_nested_value
-        if self._scipyenWindow_ is None:
-            return
-        
-        # editor = self.treeWidget.openPersistentEditor(item, column)
-        # print(f"{self.__class__.__name__}.slot_itemDoubleClicked: editor = {editor}")
-        item_path = list()
-        item_path.append(item.text(0))
-        
-        parent = item.parent()
-        
-        while parent is not None:
-            item_path.append(parent.text(0))
-            parent = parent.parent()
-        
-        item_path.reverse()
-        # print(f"item_path {item_path}")
-        # obj = get_nested_value(self._data_, item_path[1:]) # because 1st item is the insivible root name
-        if self.treeWidget.has_dynamic_private:
-            obj = getattr(self._obj_cache_[self._cache_index_][1], item_path[-1], None)
-        else:
-            obj = get_nested_value(self._obj_cache_[self._cache_index_][1], item_path[1:]) # because 1st item is the insivible root name
-        
-        objname = " > ".join(item_path)
-        
-        newWindow = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier)
-        
-        # print(f"slot_itemDoubleClicked obj: {objname} =  {type(obj).__name__}")
-        if obj is None:
-            return
-        
-        if newWindow:
-            self._scipyenWindow_.viewObject(obj, objname, 
-                                        newWindow=newWindow)
-            
-        else:
-            if objname in tuple(t[0] for t in self._obj_cache_):
-                ndx = [k for k in range(len(self._obj_cache_)) if self._obj_cache_[k][0] == objname]
-                if len(ndx):
-                    self._cache_index_ = ndx[0]
-                
-            else:
-                self._obj_cache_.append((objname, obj))
-                self._cache_index_ = self._cache_index_ + 1
-                
-            for w in (self.goFirst, self.goBack):
-                w.setEnabled(len(self._obj_cache_) > 1)
-                
-            self.goNext.setEnabled(self._cache_index_ < len(self._obj_cache_)-1)
-            
-            self._populate_tree_widget_()
-            
+        objects, names = self._export_data_items_([item])
+        obj = objects[0]
+        name = names[0]
+        self._obj_to_view_ = (obj, name)
+        self.slot_viewItem()
+
     @Slot()
     def slot_goBack(self):
         self._cache_index_ = self._cache_index_ - 1
@@ -387,13 +359,15 @@ class DataViewer(ScipyenViewer):
             self._cache_index_ = len(self._obj_cache_) - 1
             
         self.goNext.setEnabled(self._cache_index_ < len(self._obj_cache_)-1)
-        self.goBack.setEnabled(self._cache_index_ >0)
+        self.goBack.setEnabled(self._cache_index_ > 0)
             
         self._populate_tree_widget_()
         
     @Slot()
     def slot_goFirst(self):
         self._cache_index_ = 0
+        self.goNext.setEnabled(self._cache_index_ < len(self._obj_cache_)-1)
+        self.goBack.setEnabled(self._cache_index_ > 0)
         self._populate_tree_widget_()
         
     @Slot()
@@ -409,13 +383,18 @@ class DataViewer(ScipyenViewer):
     @Slot(QtCore.QPoint)
     @safewrapper
     def slot_customContextMenuRequested(self, point):
+        from gui.mainwindow import VTH
+
         # FIXME/TODO copy to system clipboard? - what mime type? JSON data?
         if self._scipyenWindow_ is None: 
             return
         
-        indexList = self.treeWidget.selectedIndexes()
+        # indexList = self.treeWidget.selectedIndexes()
+        # if len(indexList) == 0:
+        #     return
         
-        if len(indexList) == 0:
+        items = self.treeWidget.selectedItems()
+        if len(items) == 0:
             return
         
         cm = QtWidgets.QMenu("Data operations", self)
@@ -425,19 +404,70 @@ class DataViewer(ScipyenViewer):
         copyItemData.setToolTip("Copy value(s) to workspace (SHIFT to assign full path as name)")
         copyItemData.setStatusTip("Copy value(s) to workspace (SHIFT to assign full path as name)")
         copyItemData.setWhatsThis("Copy value(s) to workspace (SHIFT to assign full path as name)")
-        copyItemData.triggered.connect(self.slot_exportItemDataToWorkspace)
+        copyItemData.triggered.connect(self.slot_exportToWorkspace)
         
         copyItemPath = cm.addAction("Copy path(s)")
         copyItemPath.triggered.connect(self.slot_copyPaths)
         
         sendToConsole = cm.addAction("Send path(s) to console")
-        sendToConsole.triggered.connect(self.slot_exportItemPathToConsole)
+        sendToConsole.triggered.connect(self.slot_exportToConsole)
         
-        viewItemData = cm.addAction("View")
-        viewItemData.setToolTip("View item in a separate window (SHIFT for a new window)")
-        viewItemData.setStatusTip("View item in a separate window (SHIFT for a new window)")
-        viewItemData.setWhatsThis("View item in a separate window (SHIFT for a new window)")
-        viewItemData.triggered.connect(self.slot_viewItemDataInNewWindow)
+        # NOTE: 2025-05-28 13:28:36
+        # to keep it simpl, restrict the option viewing the selected item, to
+        # the case where a single item is selected
+        if len(items) == 1:
+            # copied & adapted from mainwindow.ScipyenWindow
+            objects, names =  self._export_data_items_(items)
+            obj = objects[0]
+            name = names[0]
+            self._obj_to_view_ = (obj, name)
+            
+            viewItemData = cm.addAction("View")
+            # viewItemData.setToolTip("View item in a separate window (SHIFT for a new window)")
+            # viewItemData.setStatusTip("View item in a separate window (SHIFT for a new window)")
+            # viewItemData.setWhatsThis("View item in a separate window (SHIFT for a new window)")
+            viewItemData.setToolTip(
+                f"View using generic DataViewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+            viewItemData.setStatusTip(
+                f"View using generic DataViewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+            viewItemData.setWhatsThis(
+                f"View using generic DataViewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+            viewItemData.triggered.connect(self.slot_viewItem)
+            
+            if not issubclass(type(obj), QtWidgets.QWidget):
+                handler_specs = VTH.get_handler_spec(type(obj))
+                if len(handler_specs):
+                    specialViewMenu = cm.addMenu("View with")
+                    for handler_spec in handler_specs:
+                        action = specialViewMenu.addAction(handler_spec[1])
+                        action.setToolTip(
+                            f"View using {handler_spec[1]}; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+                        action.setStatusTip(
+                            f"View using {handler_spec[1]}; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+                        action.setWhatsThis(
+                            f"View using {handler_spec[1]}; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+                        action.triggered.connect(self.slot_autoSelectViewer)
+
+            cm.addSeparator()
+            viewInConsoleAction = cm.addAction("Display in console")
+            viewInConsoleAction.setToolTip("Display in console")
+            viewInConsoleAction.setStatusTip("Display in console")
+            viewInConsoleAction.setWhatsThis("Display in console")
+            
+            viewInConsoleAction.triggered.connect(
+                self.slot_showInConsole)
+            
+                # NOTE: 2025-05-28 14:17:01 
+                # this below is handled by slot_viewItem
+                # if "DataViewer" not in [h[0].__name__ for h in handler_specs]:
+                #     act = specialViewMenu.addAction("DataViewer")
+                #     act.setToolTip(
+                #         f"View using generic DataViewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+                #     act.setStatusTip(
+                #         f"View using generic DataViewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+                #     act.setWhatsThis(
+                #         f"View using generic DataViewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+                #     act.triggered.connect(self.slot_useDataViewer)
         
         # TODO: 2022-10-11 13:45:44
         # use itemAt (point) to get the index of the item, then if index is in
@@ -458,62 +488,9 @@ class DataViewer(ScipyenViewer):
     @safewrapper
     def getSelectedPaths(self):
         items = self.treeWidget.selectedItems()
-        
         if len(items) == 0:
             return
-        
         return self._export_data_items_(items, path_only=True)
-        
-#         item_paths = list()
-#         
-#         top_title = self.treeWidget.top_title
-#         
-#         for item in items:
-#             try:
-#                 path, accessList, direct = self._get_path_for_item_(item)
-#             except:
-#                 exc = sys.exception()
-#                 msg = "".join(traceback.format_exception_only(exc))
-#                 self.errorMessage(type(exc).__name__, msg)
-#                 raise
-#             
-#             if len(path) == 0:
-#                 continue
-#             
-#             if len(accessList) > 1:
-#                 for k, statement, eAccess, oType, tType in enumerate(accessList):
-#                     
-#             
-#             item_paths.apend(path)
-#             
-# #             if fullPathAsName:
-# #                 # print(f"{self.__class__.__name__}_export_data_items_ full_path = {path}")
-# #                 name = strutils.str2symbol("_".join(path))
-# #                 
-# #             else:
-# #                 name = strutils.str2symbol(path[-1])
-#            
-#         
-#         if isinstance(self._data_, NestedFinder.nesting_types):
-#             for item in items:
-#                 item_path = self._get_path_for_item_(item)
-#                 
-#                 expr = NestedFinder.paths2expression(self._data_, item_path)
-#                 
-#                 if len(top_title.strip()) > 0 and top_title not in (os.path.sep, "/"):
-#                     expr = top_title+expr
-#                 
-#                 item_paths.append(expr)
-#                 
-#         elif dataclasses.is_dataclass(self._data_):
-#             for item in items:
-#                 item_path = self._get_path_for_item_(item)
-#                 expr = NestedFinder.paths2expression(self._data_, item_path)
-#                 if len(top_title.strip()) > 0 and top_title != ".":
-#                     expr = top_title+expr
-#                 item_paths.append(expr)
-                
-        return item_paths
         
     @safewrapper
     def exportPathsToClipboard(self, item_paths):
@@ -554,7 +531,13 @@ class DataViewer(ScipyenViewer):
 
     @Slot()
     @safewrapper
-    def slot_exportItemPathToConsole(self):
+    def slot_exportToConsole(self):
+        r"""Export the paths from root to selected items, to the console.
+    Paths are exported as a statement that can be used to access the item inside
+    the root object visualized in the DataViewer, assuming this root object
+    exist in the workspace (and is bound to the same symbol as the root's name
+    in the DataViewer tree representation)
+    """
         if self._scipyenWindow_ is None:
             return
         
@@ -564,8 +547,8 @@ class DataViewer(ScipyenViewer):
                 
     @Slot()
     @safewrapper
-    def slot_exportItemDataToWorkspace(self):
-        r"""Exports data from currently selected items to the workspace.
+    def slot_exportToWorkspace(self):
+        r"""Exports data behind the currently selected items to the workspace.
         
         When a single item is selected, the user is presented with a Dialog to
         verify/modify the symbol (name) to which the data will be bound in the
@@ -606,8 +589,26 @@ class DataViewer(ScipyenViewer):
         if len(items) == 0:
             return
         
-        self._export_data_items_(items, fullPathAsName=fullPathAsName)
+        objects, names = self._export_data_items_(items, fullPathAsName=fullPathAsName)
         
+        if len(objects) == 1:
+            dlg = quickdialog.QuickDialog(self, "Copy to workspace")
+            namePrompt = quickdialog.StringInput(dlg, "Data name:")
+            namePrompt.variable.setClearButtonEnabled(True)
+            namePrompt.variable.redoAvailable=True
+            namePrompt.variable.undoAvailable=True
+            
+            namePrompt.setText(names[0])
+            
+            if dlg.exec() == QtWidgets.QDialog.Accepted:
+                newVarName = namePrompt.text()
+                
+                self._scipyenWindow_.assignToWorkspace(newVarName, objects[0], check_name=False)
+                
+        else:
+            for name, obj in zip(names, objects):
+                self._scipyenWindow_.assignToWorkspace(name, obj, check_name=False)
+
     @Slot()
     @safewrapper
     def slot_editItemData(self):
@@ -622,69 +623,124 @@ class DataViewer(ScipyenViewer):
         
     @Slot()
     @safewrapper
-    def slot_viewItemDataInNewWindow(self):
-        from core.utilities import get_nested_value
-        if self._scipyenWindow_ is None:
+    def slot_autoSelectViewer(self):
+        from gui.mainwindow import VTH
+
+        if "ScipyenWindow" not in type(self.scipyenWindow).__name__:
             return
         
-        items = self.treeWidget.selectedItems()
-        
-        if len(items) == 0:
+        if self._obj_to_view_[0] is dataclasses.MISSING or len(self._obj_to_view_[1].strip()) == 0:
             return
         
-        values = list()
+        newWindow = bool(
+            QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.AltModifier)
+        askForParams = bool(
+            QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ControlModifier)
         
-        item_paths = list()
+        variable, varname = self._obj_to_view_
         
-        full_item_paths = list()
+        action = self.sender()
+        actionName = action.text().replace("&", "")
+        handler_specs = VTH.get_handler_spec(type(self._obj_to_view_))
+        if len(handler_specs):
+            viewers = [spec[0]
+                       for spec in handler_specs if spec[1] == actionName]
+
+            if len(viewers):
+                viewer = viewers[0]
+
+                if not self.scipyenWindow.viewObject(variable, varname, winType=viewer,
+                                       newWindow=newWindow,
+                                       askForParams=askForParams):
+                    self._showInConsole_(variable)
+        else:
+            self._showInConsole_(variable)
         
-        useSignalViewerForNdArrays = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ControlModifier)
+        self._obj_to_view_ = (dataclasses.MISSING, "")
         
-        if isinstance(self._data_, (dict, tuple, list)):
-            for item in items:
-                item_path = list()
-                item_path.append(item.text(0))
-                
-                parent = item.parent()
-                
-                while parent is not None:
-                    item_path.append(parent.text(0))
-                    parent = parent.parent()
-                
-                item_path.reverse()
-                
-                value = get_nested_value(self._data_, item_path[1:]) # because 1st item is the insivible root name
-                
-                values.append(value)
-                
-                item_paths.append(item_path[-1]) # object names
-                
-                full_item_paths.append(item_path)
-                
-            if len(values):
-                if len(values) == 1:
-                    obj = values[0]
-                    #objname = strutils.str2symbol(item_paths[-1])
-                    newWindow = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier)
+    def _showInConsole_(self, obj):
+        if "ScipyenWindow" not in type(self.scipyenWindow).__name__:
+            return
+        try:
+            # NOTE 2025-05-28 14:22:51
+            # as the object may not exist in the workspace, it gets assigned
+            # there first, under a special name, then executed, and finally deleted
+            self.scipyenWindow.assignToWorkspace("____", obj)
+            self.scipyenWindow.console.execute("____")
+            self.scipyenWindow.console.execute("del ____", hidden=True, interactive=False)
+        except:
+            traceback.print_exc()
+            
+    def _check_cache_(self, obj:typing.Any, name:str) -> bool:
+        if isinstance(obj, np.ndarray):
+            for (o,n) in self._obj_cache_:
+                if isinstance(o, np.ndarray) and np.all(obj.flatten() == o.flatten()) and name == n:
+                    return True
+            return False
         
-                    objname = " \u3009".join(full_item_paths[0])
-                    
-                    # NOTE: 2019-09-09 22:15:45
-                    # cannot use the ScipyenWindow logic to fallback to showing
-                    # the variable in console using "execute()" because the
-                    # variable (or object) is NOT visible in user's workspace
-                    # FIXME how to do this?
-                    # WORKAROUND: for now, copy the variable to workspace and 
-                    # go from there
-                    self._scipyenWindow_.viewObject(obj, objname, 
-                                                   newWindow=newWindow)
-                    
-                else:
-                    for name, path, obj in zip(item_paths, full_item_paths, values):
-                        objname = " > ".join(path)
-                        self._scipyenWindow_.viewObject(obj, objname, 
-                                                       newWindow=True)
-    
+        elif isinstance(obj, (pd.Index, pd.DataFrame, pd.Series)):
+            for (o,n) in self._obj_cache_:
+                if isinstance(o, type(obj)) and np.all(obj == o) and name == n:
+                    return True
+            return False
+        else:
+            return (obj, name) in self._obj_cache_
+        
+    def _get_cache_index_(self, obj:typing.Any, name:str) -> int | None:
+        if isinstance(obj, np.ndarray):
+            for k, (o,n) in enumerate(self._obj_cache_):
+                if isinstance(o, np.ndarray) and np.all(obj.flatten() == o.flatten()) and name == n:
+                    return k
+            return
+        elif isinstance(obj, (pd.DataFrame, pd.Index, pd.Series)):
+            for k, (o,n) in enumerate(self._obj_cache_):
+                if isinstance(o, type(obj)) and np.all(obj == o) and name == n:
+                    return k
+            return
+        else:
+            if (obj, name) in self._obj_cache_:
+                return self._obj_cache_.index((obj, name))
+        
+    @Slot()
+    @safewrapper
+    def slot_showInConsole(self):
+        if self.scipyenWindow is None or "ScipyenWindow" not in type(self.scipyenWindow).__name__:
+            return
+        
+        if self._obj_to_view_[0] is dataclasses.MISSING or len(self._obj_to_view_[1].strip()) == 0:
+            return
+        
+        variable, varname = self._obj_to_view_
+        self._showInConsole_(variable)
+        self._obj_to_view_ = (dataclasses.MISSING, "")
+        
+    @Slot()
+    @safewrapper
+    def slot_viewItem(self):
+        # from core.utilities import get_nested_value
+        if self.scipyenWindow is None or "ScipyenWindow" not in type(self.scipyenWindow).__name__:
+            return
+        
+        if self._obj_to_view_[0] is dataclasses.MISSING or len(self._obj_to_view_[1].strip()) == 0:
+            return
+        
+        newWindow = bool(
+            QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.AltModifier)
+        askForParams = bool(
+            QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ControlModifier)
+        
+        variable, varname = self._obj_to_view_
+        
+        if newWindow:
+            if not self.scipyenWindow.viewObject(variable, varname, winType=self.__class__,
+                                    newWindow=True,
+                                    askForParams=askForParams):
+                self._showInConsole_(variable)
+        else:
+            self.view(variable, doc_title = varname)
+            
+        self._obj_to_view_ = (dataclasses.MISSING, "")
+        
     # @safewrapper
     def _get_path_for_item_(self, item:QtWidgets.QTreeWidgetItem, 
                             external:bool = False):#, as_expression:bool=True):
@@ -928,7 +984,7 @@ class DataViewer(ScipyenViewer):
         
     @safewrapper
     def _export_data_items_(self, items:list[QtWidgets.QTreeWidgetItem], 
-                            fullPathAsName:bool=False, path_only:bool=False):
+                            fullPathAsName:bool=False, path_only:bool=False) -> tuple[list]:
         r"""Export data displayed by their corresponding items, to workspace.
         
         Parameters:
@@ -972,8 +1028,7 @@ class DataViewer(ScipyenViewer):
             else:
                 name = strutils.str2symbol(path[-1])
                 
-            # print(f"{self.__class__.__name__}_export_data_items_ name: {name}")
-            src = self._obj_cache_[self._cache_index_][1]
+            src = self._obj_cache_[self._cache_index_][0] # ATTENTION: list of tuple(obj:typing.Any, name:str)
             
             try:
                 if direct:
@@ -1078,7 +1133,7 @@ class DataViewer(ScipyenViewer):
                                     objects.append(sel)
                                     names.append(f"{name}_{k}")
                             else:
-                                object.append(self._subselections_[0])
+                                objects.append(self._subselections_[0])
                                 names.append(name)
             except:
                 exc = sys.exception()
@@ -1086,8 +1141,6 @@ class DataViewer(ScipyenViewer):
                 msg = "".join(traceback.format_exception_only(exc))
                 self.errorMessage(type(exc).__name__, msg)
                 raise
-            # names.append(name)
-            # objects.append(obj)
             
         if len(objects) == 0:
             return
@@ -1095,23 +1148,27 @@ class DataViewer(ScipyenViewer):
         if path_only:
             return objects
         
-        if len(objects) == 1:
-            dlg = quickdialog.QuickDialog(self, "Copy to workspace")
-            namePrompt = quickdialog.StringInput(dlg, "Data name:")
-            namePrompt.variable.setClearButtonEnabled(True)
-            namePrompt.variable.redoAvailable=True
-            namePrompt.variable.undoAvailable=True
-            
-            namePrompt.setText(names[0])
-            
-            if dlg.exec() == QtWidgets.QDialog.Accepted:
-                newVarName = namePrompt.text()
-                
-                self._scipyenWindow_.assignToWorkspace(newVarName, objects[0], check_name=False)
-                
-        else:
-            for name, obj in zip(names, objects):
-                self._scipyenWindow_.assignToWorkspace(name, obj, check_name=False)
+        return objects, names
+        
+        # NOTE: 2025-05-28 13:57:47 
+        # moved to slot_exportToWorkspace
+#         if len(objects) == 1:
+#             dlg = quickdialog.QuickDialog(self, "Copy to workspace")
+#             namePrompt = quickdialog.StringInput(dlg, "Data name:")
+#             namePrompt.variable.setClearButtonEnabled(True)
+#             namePrompt.variable.redoAvailable=True
+#             namePrompt.variable.undoAvailable=True
+#             
+#             namePrompt.setText(names[0])
+#             
+#             if dlg.exec() == QtWidgets.QDialog.Accepted:
+#                 newVarName = namePrompt.text()
+#                 
+#                 self._scipyenWindow_.assignToWorkspace(newVarName, objects[0], check_name=False)
+#                 
+#         else:
+#             for name, obj in zip(names, objects):
+#                 self._scipyenWindow_.assignToWorkspace(name, obj, check_name=False)
 
     def _collapse_expand_Recursive(self, item, expand=False, current=True):
         if expand:
