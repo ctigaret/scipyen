@@ -1070,28 +1070,25 @@ Use as a convenience to pack parameters as a new dataclass type on-the-fly,
 before instantiating it and passing the instance as parameter to a function that
 expects it.
     
-ATTENTION: The new class is dynamically created, with the following implications:
-    
-When the function is called at the console or in script that is NOT imported as
-a module:
-    
-1) While it MAY be possible to save an instance of the new class to disk as HDF5
-file, reading it back in a subsequent session WILL FAIL (simply because the 
-new type is not available yet, unless the exact same type is defined by calling
-this function BEFORE loading the saved instance from HDF5)
-    
-2) Pickling and unpickling instances of the new class WILL FAIL for the same 
-reasons above.
-    
-As a workaround, create the new type in a module by calling this factory function
-AND pass the name of that module as thre value of the `module` keyword
-    
-I any case, make sure that the symbol to which the returned type is bound in the 
-calling namespac and the value of the ``typename`` parameter are not supplied by 
-other imported modules.
-    
-In general is a good idea that the symbol binding in the caller's namespace is 
-identical to the typename, both capitalized.
+ATTENTION: The new class is dynamically created, with the implication that, when
+the function is called at the console or in script that is NOT imported as a
+module (i.e., a "merged" dataclass type is generated "on the go"), while it MAY
+be possible to save an instance of the new class to disk as HDF5 file, or to 
+serialise it as pickle, reading it back in a subsequent session WILL FAIL 
+(simply because the new type is not available yet, unless the exact same 
+type is defined by calling this function BEFORE loading the saved instance from 
+HDF5 or pickle file)
+
+NOTE: This is not a problem for "merged" dataclass types defined in one of the 
+Scipyen's module automatically imported at the launch, or in a Scipyen plugin
+(the "plugin" modules are always imported at the start of a Scipyen session).
+
+However, any changes made to the definition of the merged dataclass (e.g. 
+change of field names) will invalidate the saved data. In this case, the
+merged dataclass will need to be instantiated again and the new "version"
+pickled, or saved to HDF5, to overwrite the old pickle/HDF5 file.
+
+WARNING: All dataclasses that are merged MUST have their field annotated.
     
 Parameters:
 ===========
@@ -1168,7 +1165,6 @@ NOTE:
         for f in argfields:
             master_dict[f.name] = deepcopy(getattr(args[0], f.name))
                 
-            
     for arg in args[1:]:
         argfields = dataclasses.fields(arg)
         f_0 = list(map(lambda f: f[0], fields))
