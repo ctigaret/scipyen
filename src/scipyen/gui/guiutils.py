@@ -5,7 +5,7 @@
 
 r"""Various helpers for GUI
 """
-import os, typing, warnings, math
+import sys, os, typing, warnings, math, io
 import numpy as np
 from core.utilities import get_least_pwr10
 from qtpy import (QtCore, QtWidgets, QtGui)
@@ -277,3 +277,16 @@ def treeWidgetItems(tree: QtWidgets.QTreeWidget):
     while isinstance(it.value(), QtWidgets.QTreeWidgetItem):
         yield it.value()
         it += 1
+
+def testme():
+    import pywt
+    old_stdout = sys.stdout
+    sys.stdout = buffer = io.StringIO()
+    
+    help(pywt.wavelist)
+
+    sys.stdout = old_stdout
+    
+    txt = buffer.getvalue()
+    
+    return txt

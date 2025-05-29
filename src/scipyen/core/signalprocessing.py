@@ -16,6 +16,7 @@ import scipy
 import pandas as pd
 import quantities as pq
 import neo
+import pywt
 #### END 3rd party modules
 
 #### BEGIN scipyen core modules
@@ -25,6 +26,8 @@ from . import datasignal as sds
 from .datasignal import DataSignal, IrregularlySampledDataSignal
 from . import prog as prog
 from .prog import safewrapper, with_doc
+
+from plots.plots import showWavelet
 #### END scipyen core modules
 
 

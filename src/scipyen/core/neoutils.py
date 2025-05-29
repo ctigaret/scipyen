@@ -229,7 +229,7 @@ from .triggerevent import (
 )
 
 from . import workspacefunctions
-from . import signalprocessing as sigp
+# from . import signalprocessing as sigp
 from . import utilities
 from core.utilities import (
     # normalized_index, # don't; it will be overridden by normalized_index in this module

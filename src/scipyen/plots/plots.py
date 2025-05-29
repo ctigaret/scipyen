@@ -1190,7 +1190,8 @@ def adjust_spines(ax, spines):
         # no xaxis ticks
         ax.xaxis.set_ticks([])
 
-def showWavelet(w:typing.Union[str, pywt.Wavelet], level:typing.Optional[int] = None):
+def showWavelet(w:typing.Union[str, pywt.Wavelet], level:typing.Optional[int] = None, /,
+                separate:bool=False):
     if isinstance(w, str):
         w = pywt.Wavelet(w)
     
@@ -1211,13 +1212,20 @@ def showWavelet(w:typing.Union[str, pywt.Wavelet], level:typing.Optional[int] = 
         ϕd, ψd, ϕr, ψr, x = w.wavefun(level = level)
         curves = {"x":x, "ϕ decomposition": ϕd, "ψ decomposition":ψd, "ϕ reconstruction": ϕr, "ψ reconstruction":ψr}
         
-    plt.clf()
-    plt.plot()
-    
-    for (key, item) in filter(lambda x: x[0] != "x", curves.items()):
-        plt.plot(curves["x"], item, label = key)
-        
-    plt.legend()
-    plt.title(f"'{w.name}' level = {level}")
+    if separate:
+        fig, axes = plt.subplots(len(curves)-1, 1, sharex=True)
+        for k, (key, item) in enumerate(filter(lambda x: x[0] != "x", curves.items())):
+            axes[k].plot(curves["x"], item, label = key)
+            axes[k].legend(loc="upper left")
+            if k == 0:
+                axes[k].set_title(f"'{w.name}' level = {level}")
+    else:
+        plt.clf()
+        for (key, item) in filter(lambda x: x[0] != "x", curves.items()):
+            plt.plot(curves["x"], item, label = key)
+            plt.legend()
+        plt.title(f"'{w.name}' level = {level}")
+            
+            
     
     

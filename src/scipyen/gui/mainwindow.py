@@ -4472,6 +4472,11 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             if len(fn.strip()):
                 pio.saveText(cmd+"\n", fn)
         
+    @Slot()
+    def _slot_testPythonHelp(self):
+        from guiutils import testme
+        txt = testme()
+        self.workspace["txt"] = txt
 
     @Slot(QtCore.QModelIndex)
     @safewrapper
@@ -5472,6 +5477,9 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.whatsThisAction = QtWidgets.QWhatsThis.createAction(self)
         self.whatsThisAction.setIcon(QtGui.QIcon.fromTheme("help-whatsthis"))
         self.menuHelp.addAction(self.whatsThisAction)
+        self.testPythonHelpAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("help-contextual"), "Python help test", self)
+        self.testPythonHelpAction.triggered.connect(self._slot_testPythonHelp)
+        self.menuHelp.addAction(self.testPythonHelpAction)
         # ### END Help menu
         
         self.actionQuit.triggered.connect(self.slot_Quit)

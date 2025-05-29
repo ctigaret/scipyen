@@ -63,7 +63,7 @@ from core.datasignal import (DataSignal, IrregularlySampledDataSignal, )
 from core.prog import (safewrapper, with_doc)
 from core.triggerevent import (TriggerEvent, TriggerEventType,)
 from core.traitcontainers import DataBag
-from core.signalprocessing import detect_boxcar
+# from core.signalprocessing import detect_boxcar
 
 #### BEGIN module-level default options
 DEFAULTS = DataBag()
@@ -1216,7 +1216,6 @@ def get_trigger_events(*src:typing.Union[neo.Block, neo.Segment, typing.Sequence
         
     return get_events(*src, triggers=triggers, as_dict=as_dict, flat=flat, match=match)
 
-# @with_doc(detect_boxcar, use_header=True)
 @safewrapper
 def detect_trigger_events(x, event_type, 
                           use_lo_hi=True, 
@@ -1250,7 +1249,13 @@ def detect_trigger_events(x, event_type,
     
     A datatypes.TriggerEvent object (essentially an array of time stamps)
     
+    See also:
+    =========
+    signalprocessing.detect_boxcar
+    
     """
+    from core.signalprocessing import detect_boxcar
+
     if not isinstance(x, (neo.AnalogSignal, DataSignal, np.ndarray)):
         raise TypeError("Expecting a neo.AnalogSignal, or a datasignal.DataSignal, or a np.ndarray as first parameter; got %s instead" % type(x).__name__)
     
@@ -1273,7 +1278,6 @@ def detect_trigger_events(x, event_type,
     if not isinstance(use_lo_hi, bool):
         raise TypeError("'use_lo_hi' parameter expected to be a boolean; got %s instead" % type(use_lo_hi).__name__)
    
-    # lo_hi, hi_lo, _, _ , _, upward = detect_boxcar(x)
     boxdetect = detect_boxcar(x)
     # print(f"triggerprotocols.detect_trigger_events boxdetect = {boxdetect}")
     lo_hi, hi_lo, _ampl, _lvl, _lbl, _up = boxdetect
@@ -1681,7 +1685,7 @@ def parse_trigger_protocols(src, return_source:typing.Optional[bool]=False):
     Individual TriggerEvent objects can be manually appended to the events 
         list of each neo.Segment.
     
-    Alternatively, the function detect_boxcar() can help generate 
+    Alternatively, the function signalprocessing.detect_boxcar() can help generate 
     TriggerEvent objects from specific neo.AnalogSignal arrays containing 
     trigger-like data (i.e., signals with transitions between a low and 
     a high state, e.g. rectangular pulses, or step functions).
