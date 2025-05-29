@@ -39,6 +39,8 @@ import neo
 from scipy import stats
 import quantities as pq
 from core.vigra_patches import vigra
+import pywt
+
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
@@ -1187,3 +1189,35 @@ def adjust_spines(ax, spines):
     else:
         # no xaxis ticks
         ax.xaxis.set_ticks([])
+
+def showWavelet(w:typing.Union[str, pywt.Wavelet], level:typing.Optional[int] = None):
+    if isinstance(w, str):
+        w = pywt.Wavelet(w)
+    
+    if not isinstance(w, pywt.Wavelet):
+        raise TypeError(f"Expecting a Wavelet; got {type(w).__name__} instead")
+    
+    if level is None:
+        level = 8 # pyqt default
+    elif isinstance(level, int):
+        assert level > 0, f"'level' must be > 0; instead, got {level}"
+    elif not isinstance(level, int):
+        raise TypeError(f"Expecting 'level' to be None or an int  > 0; instead, got {type(level).__name__}")
+    
+    if w.orthogonal:
+        ϕ, ψ, x = w.wavefun(level = level)
+        curves = {"x":x, "ϕ": ϕ, "ψ":ψ}
+    else:
+        ϕd, ψd, ϕr, ψr, x = w.wavefun(level = level)
+        curves = {"x":x, "ϕ decomposition": ϕd, "ψ decomposition":ψd, "ϕ reconstruction": ϕr, "ψ reconstruction":ψr}
+        
+    plt.clf()
+    plt.plot()
+    
+    for (key, item) in filter(lambda x: x[0] != "x", curves.items()):
+        plt.plot(curves["x"], item, label = key)
+        
+    plt.legend()
+    plt.title(f"'{w.name}' level = {level}")
+    
+    

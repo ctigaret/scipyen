@@ -1112,16 +1112,24 @@ coordinates are NOT restricted to time units.
         return cls(t0, t1, units=None, labels=labels, extent=extent, 
                   name=name, description=description, segment=segment)
     
-    def toDomainSlices(self) -> np.ndarray:
+    def toDomainSlices(self, shift:typing.Optional[pq.Quantity] = None) -> np.ndarray:
         r"""Returns a 2D Quantity array with (t0,t1) row-wise, for each interval"""
-        return np.transpose(np.vstack((self.t0, self.t1))) * self.units
+        if shift is None:
+            return np.transpose(np.vstack((self.t0, self.t1))) * self.units
+        else:
+            return np.transpose(np.vstack((self.t0+shift, self.t1+shift))) * self.units
     
     def sliceSignal(self, signal:typing.Union[neo.AnalogSignal, DataSignal],
                     index=None) -> typing.Sequence:
         domain_slices = self.toDomainSlices()
+        if np.any(domain_slices.flatten() < signal.t_start) :
+            domain_slices = self.toDomainSlices(signal.t_start)
+            
+        if np.any(domain_slices.flatten() > signal.t_stop):
+            raise ValueError(f"The interval {self.t0} — {self.t1} falls outside, or crosses, the signal's domain boundaries ({signal.t_start} — {signal.t_stop}). Consider shifting the interval first")
         
         if index is not None:
-            domain_slices = domain_slices[index,:]
+            domain_slices = domain_slices[index:]
             
         return tuple(map(lambda k: signal.time_slice(*domain_slices[k,:]), range(domain_slices.shape[0])))
     

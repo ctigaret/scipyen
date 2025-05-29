@@ -496,7 +496,6 @@ from core.triggerprotocols import TriggerProtocol
 from core.prog import scipywarn
 from core.datazone import Interval
 from ephys.ephys_protocol import ElectrophysiologyProtocol
-from core.neoutils import getAcquisitionInfo
 import pyabf
 from pyabf.abf1.headerV1 import HeaderV1
 from pyabf.abf2.headerV2 import HeaderV2
@@ -898,9 +897,11 @@ class ABFProtocol(ElectrophysiologyProtocol):
     # 
     from ephys.ephys import SynapticPathway
     from ephys.ephys import ClampMode
-    
+    from core.neoutils import getAcquisitionInfo
+
     def __init__(self, obj:typing.Optional[typing.Union[pyabf.ABF,neo.Block]]=None,
                  **kwargs):
+        from core.neoutils import getAcquisitionInfo
         super().__init__()
         
         if isinstance(obj, pyabf.ABF):
@@ -5002,6 +5003,8 @@ class ABFInputConfiguration:
             to logical channel 3; in the latter case we get the physical input
             channel IN3 matched to logical channel 2!
         """
+        from core.neoutils import getAcquisitionInfo
+
         adcName = ""
         
         adcUnits = None
@@ -5364,7 +5367,8 @@ class ABFOutputConfiguration:
                  epochs:typing.Optional[typing.Sequence[ABFEpoch]] = None,
                  stimulusFile:typing.Optional[typing.Union[str, pathlib.Path]] = None
                  ):
-        
+        from core.neoutils import getAcquisitionInfo
+
         self._epochs_ = list()
         
         if isinstance(obj, pyabf.ABF):
@@ -5574,6 +5578,8 @@ class ABFOutputConfiguration:
     
     @_init_epochs_.register(neo.Block)
     def _(self, obj:neo.Block):
+        from core.neoutils import getAcquisitionInfo
+
         assert sourcedFromABF(obj), "Object does not appear sourced from an ABF file"
         info_dict = getAcquisitionInfo(obj)
             
@@ -7530,7 +7536,8 @@ def getDIGPatterns(o:typing.Union[neo.Block, pyabf.ABF], reverse_banks:bool=Fals
 @getDIGPatterns.register(neo.Block)
 def _(obj:neo.Block, reverse_banks:bool=False, wrap:bool=False, 
       pack_str:bool=False, epoch_num:typing.Optional[int]=None) -> dict:
-    
+    from core.neoutils import getAcquisitionInfo
+
     # check of this neo.Block was read from an ABF file
     assert sourcedFromABF(obj), "Object does not appear to have been sourced from an ABF file"
     info_dict = getAcquisitionInfo(obj)
@@ -8244,6 +8251,8 @@ def _(obj:pyabf.ABF) -> int:
 
 @getABFversion.register(neo.Block)
 def _(obj:neo.Block) -> int:
+    from core.neoutils import getAcquisitionInfo
+
     info_dict = getAcquisitionInfo(obj)
     
     abf_version = info_dict.get("abf_version", None)
@@ -8288,6 +8297,8 @@ def _(obj:pyabf.ABF, useQuantities:bool=True) -> dict:
 
 @usedADCs.register(neo.Block)
 def _(obj:neo.Block, useQuantities:bool=True) -> dict:
+    from core.neoutils import getAcquisitionInfo
+
     assert sourcedFromABF(obj), "Object does not appear to be sourced from ABF"
     info_dict = getAcquisitionInfo(obj)
     return dict(map(lambda x: (x, (info_dict["listADCInfo"][x]["ADCChNames"].decode(),
@@ -8313,6 +8324,8 @@ def _(obj:pyabf.ABF, useQuantities:bool=True) -> dict:
     
 @usedDACs.register(neo.Block)
 def _(obj:neo.Block, useQuantities:bool=True) -> dict:
+    from core.neoutils import getAcquisitionInfo
+
     assert sourcedFromABF(obj), "Object does not appear to be sourced from ABF"
     info_dict = getAcquisitionInfo(obj)
     return dict(map(lambda d: (d["nDACNum"], (d["DACChNames"].decode(), unitStrAsQuantity(d["DACChUnits"].decode(), useQuantities))),

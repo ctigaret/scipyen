@@ -5,7 +5,7 @@
 
 r"""Processing of electrophysiology signal data.
 TODO: 2024-05-30 14:42:46
-extricate AP analysis code from here
+extricate AP analysis code from here, and move to membrane_properties plugin
 """
 
 #### BEGIN core python modules
@@ -1984,7 +1984,15 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
     
     # from scipy.signal import boxcar, convolve
     from scipy.signal import convolve
-    from scipy.signal.windows import boxcar
+    try:
+        major, minor, micro = tuple(map(lambda x: int(x), scipy.__version__.split('.')))
+        if minor < 7:
+            from scipy.signal import boxcar
+        else:
+            from scipy.signal.windows import boxcar
+    except:
+        from scipy.signal import boxcar
+    # from scipy.signal.windows import boxcar
     
     baseT0 = baseT1 = ssT0 = ssT1 = None
     
@@ -3083,7 +3091,15 @@ def analyse_AP_pulse_signal(signal, times,  tail=None, thr=20, atol=1e-8, smooth
                 derivative of the AP with respect to time.
     
     """
-    from scipy.signal import boxcar
+    try:
+        major, minor, micro = tuple(map(lambda x: int(x), scipy.__version__.split('.')))
+        if minor < 7:
+            from scipy.signal import boxcar
+        else:
+            from scipy.signal.windows import boxcar
+    except:
+        from scipy.signal import boxcar
+    # from scipy.signal import boxcar
     
     if not isinstance(signal, neo.AnalogSignal):
         raise TypeError("'signal' expected to be a neo.AnalogSignal; got %s instead" % type(signal).__name__)
@@ -4057,7 +4073,7 @@ def detect_AP_waveform_times(sig, thr=10, smooth_window=5,
     
     """
     try:
-        major, minor, dot = tuple(map(lambda x: int(x), scipy.__version__.split('.')))
+        major, minor, micro = tuple(map(lambda x: int(x), scipy.__version__.split('.')))
         if minor < 7:
             from scipy.signal import boxcar
         else:
@@ -4135,7 +4151,7 @@ def detect_AP_waveform_times(sig, thr=10, smooth_window=5,
     if w is not None:
         d2v_dt2_smooth = sigp.convolve(d2v_dt2, w)                   # and its smoothed version 
         d2v_dt2_smooth.name = "%s_2nd_derivative" % sig.name
-        
+
     else:
         d2v_dt2_smooth = d2v_dt2
         
@@ -6286,7 +6302,15 @@ def ap_duration_at_Vm(ap, value, **kwargs): #decay_ref, decay_intercept_approx="
 def ap_phase_plot_data(vm, dvdt=None, smooth_window=None):
     r"""Creates a DataSignal for a phase plot.
     """
-    from scipy.signal import boxcar
+    try:
+        major, minor, micro = tuple(map(lambda x: int(x), scipy.__version__.split('.')))
+        if minor < 7:
+            from scipy.signal import boxcar
+        else:
+            from scipy.signal.windows import boxcar
+    except:
+        from scipy.signal import boxcar
+    # from scipy.signal import boxcar
     
     if not isinstance(vm, neo.AnalogSignal):
         raise TypeError("Expecting a neo.AnalogSignal object; got %s instead" % (type(vm).__name__))
@@ -6344,7 +6368,15 @@ def analyse_AP_waveform(vm, dvdt=None, d2vdt2=None, ref_vm = None, ref_vm_relati
     dvdt
     d2vdt2
     """
-    from scipy.signal import boxcar
+    try:
+        major, minor, micro = tuple(map(lambda x: int(x), scipy.__version__.split('.')))
+        if minor < 7:
+            from scipy.signal import boxcar
+        else:
+            from scipy.signal.windows import boxcar
+    except:
+        from scipy.signal import boxcar
+    # from scipy.signal import boxcar
 
     if not isinstance(vm, neo.AnalogSignal):
         raise TypeError("Expecting a neo.AnalogSignal object; got %s instead" % (type(vm).__name__))

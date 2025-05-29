@@ -243,6 +243,7 @@ from core.utilities import (
 )
 
 from core.strutils import InflectEngine, pluralize
+# from core import pyabfbridge as pab
 
 #### END pict.core modules
 
@@ -305,6 +306,12 @@ if __debug__:
 
     __debug_count__ = 0
 
+# NOTE: 2025-05-29 13:31:13 
+# forward declarations needed to avoid importing pyabfbridge whivh would cause
+# circular import; both classes needed for getEpochStartStop, and these dummy
+# definitions will be overwritten by import pyabfbridge inside that function
+class ABFEpoch: pass
+class ABFProtocol: pass
 
 def copy_to_segment(obj: neo.core.dataobject.DataObject, new_seg: neo.Segment):
     new_obj = obj.copy()
@@ -1157,7 +1164,6 @@ def get_neo_version():
     # major, minor, dot = neo.version.version.split(".")
     major, minor, dot = importlib.metadata.version("neo").split(".")
     return eval(major), eval(minor), eval(dot)
-
 
 def getAcquisitionInfo(o: neo.Block) -> dict:
     r"""Retrieve the meta-data used to construct a protocol for this trial.
@@ -9368,3 +9374,46 @@ def plot_neo(
     
 def isABFTrial(data:neo.Block):
     return isinstance(data.annotations.get("generator", None), dict) and (data.annotations["generator"].get("abf_version", None) is not None)
+
+def getEpochStartStop(epoch:typing.Union[neo.Epoch, DataZone, Interval, typing.Sequence[pq.Quantity], ABFEpoch],
+                      protocol:typing.Optional[ABFProtocol] = None,
+                      dac:typing.Optional[typing.Union[str, int]] = None,
+                      sweep:typing.Union[int] = None) -> typing.Sequence[pq.Quantity]:
+    r"""Retrieve start and stop times from Epoch-like objects.
+These are neo.Epoch, datazone.DataZone, datazone.Interval, pyabfbridge.ABFEpoch
+"""
+    from core.pyabfbridge import (ABFEpoch, ABFProtocol)
+    
+    if isinstance(epoch, (int, str, ABFEpoch)):
+        if not isinstance(protocol, ABFProtocol):
+            raise TypeError(f"When epoch is a str or int, protocol is expected to be an ABFProtocol; instead, got {type(protocol).__name__}")
+        
+        dac, epoch = protocol.check_DAC_Epoch(dac, epoch)
+        
+        if not isinstance(sweep, int):
+            raise TypeError(f"When epoch is a str or int, sweep is expected to be an int; instead, got {type(sweep).__name__}")
+        
+        if sweep not in range(protocol.nSweeps):
+            raise ValueError(f"Invalid sweep index for a protocol with {protocol.nSweeps} sweeps")
+        
+        t0, t1 = (protocol.getEpochStart(epoch, dac, sweep), protocol.getEpochDuration(epoch, dac, sweep))
+        t1 += t0
+        
+    elif isinstance(epoch, (neo.Epoch, DataZone)):
+        if isinstance(epoch, DataZone):
+            assert(scq.unitsConvertible(epoch.times.units, pq.s)), f"'epoch' {epoch} expected to have been defined in the time domain; instead it has {epoch.times.units}"
+        assert len(epoch) == 1, f"Too many intervals ({len(epoch)}) in 'epoch' {epoch}, when only one was expected"
+        t0, t1 = epoch.times[0], epoch.times[0]+epoch.durations[0]
+        
+    elif isinstance(epoch, Interval):
+        t0, t1 = (epoch,t0, epoch.t1) if epoch.extent else (epoch.t0, epoch.t0+epoch.t1)
+        
+    elif isinstance(epoch, typing.Sequence):
+        if len(epoch) != 2:
+            raise ValueError(f"The 'epoch' sequence is expected to have exacly two elements; instead, got a sequence with {len(epoch)} elements.")
+        if not all(isinstance(v, pq.Quantity) and scq.unitsConvertible(v, pq.s) and scq.isScalar(v) for v in epoch):
+            raise TypeError(f"The 'epoch' sequence is expectd to contain scalar quantities with units of time")
+        
+        t0, t1 = min(epoch), max(epoch)
+        
+    return (t0, t1)

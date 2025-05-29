@@ -3080,13 +3080,15 @@ def detect_boxcar(
     # Currently this function does almost the same thing as parse_step_waveform_signal.
     # TODO 2023-06-18 22:10:21 merge codes into one function !
     from scipy import cluster, signal
-    from scipy.signal.windows import boxcar
-    # try:
-    #     from scipy.signal import boxcar
-    # except:
-    #     from scipy.signal.windows import boxcar
-    # finally:
-    #     raise
+    try:
+        major, minor, micro = tuple(map(lambda x: int(x), scipy.__version__.split('.')))
+        if minor < 7:
+            from scipy.signal import boxcar
+        else:
+            from scipy.signal.windows import boxcar
+    except:
+        from scipy.signal import boxcar
+    # from scipy.signal.windows import boxcar
 
     if not isinstance(x, neo.AnalogSignal):
         raise TypeError(
