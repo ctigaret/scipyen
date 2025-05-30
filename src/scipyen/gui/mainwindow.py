@@ -1504,6 +1504,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # self.currentViewers[mpl.figure.Figure] = None
 
         self.currentViewers = {mpl.figure.Figure: None}
+        
+        self.helpWidget = None
 
         # NOTE: 2023-01-08 16:14:26 - set this early !
         # this below is the same as:
@@ -4473,10 +4475,12 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 pio.saveText(cmd+"\n", fn)
         
     @Slot()
-    def _slot_testPythonHelp(self):
-        from guiutils import testme
-        txt = testme()
-        self.workspace["txt"] = txt
+    def _slot_PythonHelp(self):
+        # from guiutils import testme
+        from gui.pythonhelpwidget import PythonHelpWidget
+        if not isinstance(self.helpWidget, PythonHelpWidget):
+            self.helpWidget = PythonHelpWidget()
+        self.helpWidget.show()
 
     @Slot(QtCore.QModelIndex)
     @safewrapper
@@ -5477,8 +5481,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.whatsThisAction = QtWidgets.QWhatsThis.createAction(self)
         self.whatsThisAction.setIcon(QtGui.QIcon.fromTheme("help-whatsthis"))
         self.menuHelp.addAction(self.whatsThisAction)
-        self.testPythonHelpAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("help-contextual"), "Python help test", self)
-        self.testPythonHelpAction.triggered.connect(self._slot_testPythonHelp)
+        self.testPythonHelpAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("help-contextual"), "Python help", self)
+        self.testPythonHelpAction.triggered.connect(self._slot_PythonHelp)
         self.menuHelp.addAction(self.testPythonHelpAction)
         # ### END Help menu
         

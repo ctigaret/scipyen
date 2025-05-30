@@ -46,58 +46,6 @@ elif getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
 else:
     raise RuntimeError("Scipyen must be run in a virtualenv virtual Python environment, a conda environment, or a PyInstaller bundle\n")
 
-# try:
-#     # print(f"scipyen module: {__file__}")
-#     # NOTE: 2025-03-26 09:02:01
-#     # This figures out is scipyen is being run off a local git repository; if it
-#     # does, then outputs a brief message about the git branch begn used and its 
-#     # status (modified, or not, etc)
-#     moduleFilePath = pathlib.Path(__file__)
-#     moduleDir = moduleFilePath.parent
-#     if moduleDir.name == "scipyen":
-#         srcDir = moduleDir.parent
-#         if srcDir.name == "src":
-#             repoDir = srcDir.parent
-#             sysutils.checkGitRepo(repoDir, "Scipyen") # will print out git branch status is available
-#             # gitTest = subprocess.run(["git", "-C", repoDir.as_posix(), "status", "--short", "--branch"], capture_output=True)
-#             # 
-#             # if gitTest.returncode == 0:
-#             #     result = gitTest.stdout.decode().split("\n")
-#             #     brComp = result[0]
-#             #     head, branches = brComp.split("## ")
-#             #     local, remote = branches.split("...")
-#             #     local = print_styled(local, color="green")
-#             #     remote = print_styled(remote, color="red")
-#             #     msg = f"{print_styled('WARNING:', color='yellow')} Running {local} branch of the local Scipyen git repository in {print_styled(repoDir.as_posix(), color='blue')}, with status:"
-#             #     result[0] = "## "+local+"..."+remote
-#             #     if len(result) > 1:
-#             #         for k in range(1,len(result)):
-#             #             s = result[k]
-#             #             head = print_styled(s[:2], color="red")
-#             #             fileName = s[2:]
-#             #             result[k] = head+fileName
-#             # 
-#             #     result.insert(0, msg)
-#             #     print("\n".join(result))
-# except:
-#     traceback.print_exc()
-#     pass
-
-# print(f"Argv: {sys.argv}")
-
-# NOTE: 2024-05-02 10:22:39
-# optional use of Qt6 as PyQt5/6 or PySide2/6
-# but currently, force Qt5 (for now)
-# os.environ["QT_API"] = "pyqt5"
-# os.environ["PYQTGRAPH_QT_LIB"] = "PyQt5"
-# 
-# if len(sys.argv) > 1:
-#     if sys.argv[1].lower == "pyqt6":
-#         os.environ["QT_API"] = "pyqt6"
-#         os.environ["PYQTGRAPH_QT_LIB"] = "PyQt6"
-        
-
-
 if sys.platform.startswith("linux"):
     # NOTE: 2024-05-04 10:14:08
     # forcing xcb platform when running on Wayland, in Linux, because we want to
@@ -181,12 +129,6 @@ if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
                 print(line, end="")
     __bundled__ = True
     
-    # NOTE: 2024-05-31 11:10:49
-    # internal plugins which are NOT imported via the usual importlib mechanism
-    # are skipped by PyInstaller; hence we include their source files INSIDE the
-    # bundle; then we need to make sys aware of their location
-    # sys.path.append(os.path.join(sys._MEIPASS, 'src', 'scipyen'))
-
 else:
     # NOTE: 2024-05-02 10:24:48
     # running from a locally built environment under Windows
@@ -373,7 +315,7 @@ def main():
     
     # NOTE: 2021-08-17 10:02:20
     # this does not prevent crashes when exiting NEURON - leave here so
-    # that we know we tried and didn't work
+    # that we know we tried it and it didn't work
     #if sys.platform.startswith("linux"):
         #import subprocess
         #compl = subprocess.run(["xrdb", "-merge", os.path.join(__module_path__, "neuron_python",  "app-defaults", "nrniv")])
@@ -393,51 +335,13 @@ def main():
 
         app.setDesktopFileName("Scipyen")
 
-#         if sys.platform.startswith("win32"):
-#             # pass
-#             if hasQDarkTheme:
-#                 qdarktheme.setup_theme("auto") # NOTE: 2025-03-02 20:53:09
-#                                                # now, this can be called
-#
-#         elif sys.platform.startswith("linux"):
-#             # NOTE: 2024-05-04 10:16:33
-#             # reuired on Wayland so that the window manager decorates the windows
-#             # with the appropriate icon instead of using the generic Wayland one.
-#             # NOTE that this good to have even when forcing the use xcb platform
-#             # (see NOTE: 2024-05-04 10:14:08 above) as it conforms to the desktop
-#             # standards
-#             app.setDesktopFileName("Scipyen")
-
-
-        # NOTE: 2023-01-08 00:48:47
-        # avoid global menus - must be called AFTER we have an instance of app!
-        # QtCore.QCoreApplication.setAttribute(QtCore.Qt.AA_DontUseNativeMenuBar)
-        
-        # if has_breeze_resources_for_win32:
-        #     file = QtCore.QFile(":/dark/stylesheet.qss")
-        #     file.open(QtCore.QFile.ReadOnly | QtCore.QFile.Text)
-        #     stream = QtCore.QTextStream(file)
-        #     app.setStyleSheet(stream.readAll())
-            
-        
-        # NOTE: 2021-08-17 10:05:20
-        # explore the possibility to customize look and feel
-        # for now, we just use whatever the system uses
-        #app.setStyle(QtWidgets.QStyleFactory.create("Breeze"))
-        #app.setStyle(MyProxyStyle())
-        
         app.setApplicationName(scipyen_config.application_name)
         app.setOrganizationName(scipyen_config.organization_name)
         
-        #print(f"scipyen.main() global qsettings {qsettings.fileName()}")
-        
         gc.enable()
 
-        #import pudb
-        
         # 2. initialize main window
         mainWindow = mainwindow.ScipyenWindow(app)
-        # mainWindow = mainwindow.ScipyenWindow(app, bundled = __bundled__)# qsettings = qsettings)
         
         # NOTE: 2021-08-17 10:06:24 FIXME / TODO
         # come up with a nice icon?

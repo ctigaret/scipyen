@@ -278,15 +278,15 @@ def treeWidgetItems(tree: QtWidgets.QTreeWidget):
         yield it.value()
         it += 1
 
-def testme():
-    import pywt
-    old_stdout = sys.stdout
-    sys.stdout = buffer = io.StringIO()
-    
-    help(pywt.wavelist)
-
-    sys.stdout = old_stdout
-    
-    txt = buffer.getvalue()
-    
-    return txt
+# def testme():
+#     import pywt
+#     old_stdout = sys.stdout
+#     sys.stdout = buffer = io.StringIO()
+#     
+#     help(pywt.wavelist)
+# 
+#     sys.stdout = old_stdout
+#     
+#     txt = buffer.getvalue()
+#     
+#     return txt

@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
+# $Id: pythonhelpwidget.py $
 # SPDX-FileCopyrightText: 2025 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""
+r""" A QWidget to facilitate access to Python's help system, in parallel, and
+not interfering with, your console workflow.
 """
 import sys, os, typing, traceback, inspect, subprocess
 from qtpy import QtCore, QtGui, QtWidgets, QtSvg, QtNetwork, sip
@@ -20,6 +22,7 @@ Ui_PythonHelpWidget, QWidget = __loadUiType__(__ui_path__)
 
 class _PythonHelpThread_(QtCore.QThread):
     ready = Signal(str, name="ready")
+    # threadRunning = Signal(str, name="threadRunning")
     
     def __init__(self, parent: QtCore.QObject):
         QtCore.QThread.__init__(self, parent)
@@ -31,10 +34,11 @@ class _PythonHelpThread_(QtCore.QThread):
     def run(self):
         if isinstance(self.helpCommand, str) and len(self.helpCommand.strip()):
             cmdParts = self.helpCommand.split(" ")
-            fullcmd = [sys.executable, "-m", "pydoc"] + cmdParts
+            fullcmd = [sys.executable, "-Xfrozen_modules=off", "-m", "pydoc"] + cmdParts
+            self.ready.emit("Please wait...")
             self.helpProcess = subprocess.run(fullcmd, capture_output=True)
-            if self.helpProcess.returncode == 0:
-                reply = self.helpProcess.stdout.decode()
+            reply = self.helpProcess.stdout.decode()
+            if isinstance(reply, str) and len(reply.strip()):
                 out = list()
                 out += ['<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"',
                         '    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">',
@@ -71,12 +75,22 @@ class _PythonHelpThread_(QtCore.QThread):
                     items = reply.replace("\n", "<br>")
                     out.append(items)
                     out.append("</body>")
+                    
                 out.append("</html>")
                 reply = "\n".join(out)
                     
+            else:
+                reply = ""
+            if self.helpProcess.returncode == 0:
                 self.ready.emit(reply)
             else:
-                scipywarn(f"Process returned {self.helpProcess.returncode}: {self.helpProcess.stderr}")
+                scipywarn(f"Help subprocess returned {self.helpProcess.returncode}: {self.helpProcess.stderr}")
+                reply = self.helpProcess.stdout.decode()
+                if len(reply):
+                    self.ready.emit(reply)
+                else:
+                    self.ready.emit("")
+                
             self.helpCommand = None
 
 class PythonHelpWidget(QWidget, WorkspaceGuiMixin, Ui_PythonHelpWidget):
