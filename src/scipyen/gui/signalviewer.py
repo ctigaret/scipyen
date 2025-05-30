@@ -6,25 +6,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# TODO: 2024-07-27 22:46:05
-# implement plotting of landmarks with domain coordinates given as values relative
-# to a signal's domain start; currently, these are DataZone, DataMark and
-# TriggerEvent (this feature has been implemented on 2024-07-27 22:49:52). However,
-# the default behaviour of these landmakrs is to have absolute values (therefore
-# compatible to old API) so plotting them should work as usual. The new attribute
-# "relative" of these classes indicates whether the domain coordinate is relative
-# to the "start" of aotional signal, or not. What needs implementing here is
-# correctly plotting landmarks where the "relative" attribute is True (currently,
-# the plotting mechanism ignores this attribute).
-#
-# NOTE: this is quite tricky, as it means postponing the plotting of landmarks
-# until after all signals in the corresponding frame have been plotted (or, at 
-# least, parsed). In addition, to support plotting of standalone landmarks with
-# "relative" attribute set to True (i.e., plot them without any reference signals)
-# should assume a notional signal domain "start" at 0 (i.e., treat the landmarks
-# as if "relative" was False, in such cases).
-# 
-
 r'''Signal viewer: enhanced signal plotter
 
 Plots a multi-frame 1D signal (i.e. a matrix where each column is a `frame'), one frame at a time. 
@@ -113,6 +94,25 @@ mpldatacursor (for python 3)
 # • provide code for viewing a neo.Group (!!!)
 #
 # • provide code for viewing neo.ImageSequence in ImageViewer.
+
+# TODO: 2024-07-27 22:46:05
+# implement plotting of landmarks with domain coordinates given as values relative
+# to a signal's domain start; currently, these are DataZone, DataMark and
+# TriggerEvent (this feature has been implemented on 2024-07-27 22:49:52). However,
+# the default behaviour of these landmakrs is to have absolute values (therefore
+# compatible to old API) so plotting them should work as usual. The new attribute
+# "relative" of these classes indicates whether the domain coordinate is relative
+# to the "start" of aotional signal, or not. What needs implementing here is
+# correctly plotting landmarks where the "relative" attribute is True (currently,
+# the plotting mechanism ignores this attribute).
+#
+# NOTE: this is quite tricky, as it means postponing the plotting of landmarks
+# until after all signals in the corresponding frame have been plotted (or, at 
+# least, parsed). In addition, to support plotting of standalone landmarks with
+# "relative" attribute set to True (i.e., plot them without any reference signals)
+# should assume a notional signal domain "start" at 0 (i.e., treat the landmarks
+# as if "relative" was False, in such cases).
+# 
 
 
 #### BEGIN core python modules

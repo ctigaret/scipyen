@@ -5634,7 +5634,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # console, REGARDLESS of whether the execution was succesful or not.
         #
         self.historyTreeWidget.setHeaderLabels(
-            ["Session / Session Statement #:", "Session Date & Time / Session Statement:"])
+            ["Session / Line #:", "Session Date & Time / Statement:"])
         self.historyTreeWidget.itemActivated[QtWidgets.QTreeWidgetItem, int].connect(self.slot_historyItemActivated)
         self.historyTreeWidget.customContextMenuRequested[QtCore.QPoint].connect(self.slot_historyContextMenuRequest)
         self.historyTreeWidget.itemClicked[QtWidgets.QTreeWidgetItem, int].connect(self.slot_historyItemSelected)

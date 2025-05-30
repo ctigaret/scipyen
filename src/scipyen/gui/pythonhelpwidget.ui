@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>PythonHelpWidget</class>
+ <widget class="QWidget" name="PythonHelpWidget">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>400</width>
+    <height>300</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Python help</string>
+  </property>
+  <property name="windowIcon">
+   <iconset theme="help-browser"/>
+  </property>
+  <layout class="QGridLayout" name="gridLayout">
+   <item row="0" column="0">
+    <widget class="QLineEdit" name="queryLineEdit">
+     <property name="toolTip">
+      <string>Query help on a Python thing</string>
+     </property>
+     <property name="statusTip">
+      <string>Query help on a Python thing</string>
+     </property>
+     <property name="whatsThis">
+      <string>Query help on a Python thing</string>
+     </property>
+     <property name="clearButtonEnabled">
+      <bool>true</bool>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="0">
+    <widget class="QTextBrowser" name="helpDisplay">
+     <property name="acceptDrops">
+      <bool>false</bool>
+     </property>
+     <property name="readOnly">
+      <bool>true</bool>
+     </property>
+     <property name="placeholderText">
+      <string>Enter a help topic in the field above (e.g., &quot;topics&quot;, &quot;pywt.Wavelet&quot;, etc)</string>
+     </property>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

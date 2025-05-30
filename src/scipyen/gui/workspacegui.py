@@ -199,10 +199,6 @@ class DirectoryFileWatcher(QtCore.QObject):
         # files = [v for v in value if v.is_file() and v.parent == self._watchedDir_]
         self._removedFiles_[:] = files[:] # may clear this; below we only send if not empty
 
-        # if hasattr(self._source_, "console"):
-        #     txt = f"{self.__class__.__name__}.slot_filesRemoved {self._removedFiles_}\n"
-        #     self._source_.console.writeText(txt)
-
         if len(files):
             if self.observer is not None :
                 self.observer.removedFiles(self._removedFiles_)
