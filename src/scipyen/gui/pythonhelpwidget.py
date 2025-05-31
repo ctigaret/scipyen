@@ -8,6 +8,7 @@ r""" A QWidget to facilitate access to Python's help system, in parallel, and
 not interfering with, your console workflow.
 """
 import sys, os, typing, traceback, inspect, subprocess
+from collections import deque
 from qtpy import QtCore, QtGui, QtWidgets, QtSvg, QtNetwork, sip
 from qtpy.QtCore import Signal, Slot, Property
 from qtpy.uic import loadUiType as __loadUiType__
@@ -39,8 +40,9 @@ class _PythonHelpThread_(QtCore.QThread):
         doc = QtGui.QTextDocument()
         if isinstance(self.helpCommand, str) and len(self.helpCommand.strip()):
             cmdParts = self.helpCommand.split(" ")
-            if any(s in cmdParts for s in ("modules", "module")):
-                doc.setHtml(helputils.listmodules("Package modules", 
+            # if any(s in cmdParts for s in ("modules", "module")):
+            if "modules" in cmdParts:
+                doc.setHtml(helputils.format_infos("Package modules", 
                                                   "Here is a list of discovered modules. In the field above type 'module' and one of the names below for details",
                                                   self.columns))
                 self.ready.emit(doc)
@@ -56,6 +58,8 @@ class _PythonHelpThread_(QtCore.QThread):
                 except subprocess.CalledProcessError as e:
                     reply = e.output.decode()
                     errors = e.stderr.decode()
+                    if "No Python documentation found" in reply:
+                        pass
                     scipywarn(f"Subprocess returned {e.returncode}")
                     scipywarn(f"Errors:\n{errors}")
                 except:
@@ -106,20 +110,101 @@ class PythonHelpWidget(QWidget, WorkspaceGuiMixin, Ui_PythonHelpWidget):
         self._helpThread_ = _PythonHelpThread_(self)
         self._helpThread_.message[str].connect(self._slot_displayMessage)
         self._helpThread_.ready[QtGui.QTextDocument].connect(self._slot_displayReply)
+        self._queryHistory_ = deque()
         self._configureUI_()
         
         
     def _configureUI_(self):
         self.setupUi(self)
-        self.queryLineEdit.returnPressed.connect(self._slot_processQuery)
+        self.removQueryAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("edit-delete"),
+                                                                "Remove this query from history",
+                                                                self.queryComboBox.lineEdit())
+        self.removQueryAction.setToolTip("Remove this query from history")
+        self.removQueryAction.triggered.connect(self._slot_removeCurrentQuery)
+        self.clearQueryHistoryAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("final_activity"),
+                                                           "Clear query list",
+                                                           self.queryComboBox.lineEdit())
+        self.clearQueryHistoryAction.setToolTip("Clear query list")
+        self.clearQueryHistoryAction.triggered.connect(self._slot_clearQueryHistory)
+        self.queryComboBox.lineEdit().setClearButtonEnabled(True)
+        self.queryComboBox.lineEdit().redoAvailable = True
+        self.queryComboBox.lineEdit().undoAvailable = True
+        self.queryComboBox.lineEdit().addAction(self.clearQueryHistoryAction,
+                                                QtWidgets.QLineEdit.TrailingPosition)
+        self.queryComboBox.lineEdit().addAction(self.removQueryAction,
+                                     QtWidgets.QLineEdit.TrailingPosition)
+        self.queryComboBox.lineEdit().returnPressed.connect(self._slot_processQuery)
+        self.queryComboBox.currentIndexChanged[int].connect(self._slot_processQueryNdx)
+        
+        self.prevToolButton.clicked.connect(self._slot_prevQuery)
+        self.nextToolButton.clicked.connect(self._slot_nextQuery)
         
         
     @Slot()
     def _slot_processQuery(self):
-        query = self.queryLineEdit.text()
+        query = self.queryComboBox.lineEdit().text()
         if len(query.strip()):
+            # if query not in self._queryHistory_:
+            #     self._queryHistory_.append(query)
+            if self.queryComboBox.count() > 0:
+                # NOTE: 2025-05-31 22:22:42
+                # insert policy is insertAtTop
+                self.nextToolButton.setEnabled(self.queryComboBox.currentIndex() > 0)
+                self.prevToolButton.setEnabled(self.queryComboBox.currentIndex() < self.queryComboBox.count()-1)
+            else:
+                self.prevToolButton.setEnabled(False)
+                self.nextToolButton.setEnabled(False)
+                
             self._helpThread_.helpCommand = query
             self._helpThread_.run()
+            
+    @Slot(int)
+    def _slot_processQueryNdx(self, index:int):
+        query = self.queryComboBox.itemText(index)
+        if len(query.strip()):
+            # if query not in self._queryHistory_:
+            #     self._queryHistory_.append(query)
+            if self.queryComboBox.count() > 0:
+                # NOTE: 2025-05-31 22:22:42
+                # insert policy is insertAtTop
+                self.nextToolButton.setEnabled(self.queryComboBox.currentIndex() > 0)
+                self.prevToolButton.setEnabled(self.queryComboBox.currentIndex() < self.queryComboBox.count()-1)
+            else:
+                self.prevToolButton.setEnabled(False)
+                self.nextToolButton.setEnabled(False)
+            # if len(self._queryHistory_) > 0:
+            #     ndx = self._queryHistory_.index(query)
+            #     self.prevToolButton.setEnabled(ndx > 0)
+            #     self.nextToolButton.setEnabled(ndx < len(self._queryHistory_)-1)
+            # else:
+            #     self.prevToolButton.setEnabled(False)
+            #     self.nextToolButton.setEnabled(False)
+            self._helpThread_.helpCommand = query
+            self._helpThread_.run()
+            
+    @Slot()
+    def _slot_nextQuery(self):
+        index = self.queryComboBox.currentIndex() - 1
+        if index >= 0:
+            self.queryComboBox.setCurrentIndex(index)
+            
+    @Slot()
+    def _slot_prevQuery(self):
+        index = self.queryComboBox.currentIndex() + 1
+        if index < self.queryComboBox.count():
+            self.queryComboBox.setCurrentIndex(index)
+            
+    @Slot()
+    def _slot_removeCurrentQuery(self):
+        index = self.queryComboBox.currentIndex()
+        signalBlocker = QtCore.QSignalBlocker(self.queryComboBox)
+        self.queryComboBox.removeItem(index)
+        
+    @Slot()
+    def _slot_clearQueryHistory(self):
+        signalBlocker = QtCore.QSignalBlocker(self.queryComboBox)
+        self.queryComboBox.clear()
+        
         
     @Slot(str)
     def _slot_displayMessage(self, txt:str):

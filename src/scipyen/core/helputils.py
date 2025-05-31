@@ -55,30 +55,24 @@ NOTE: The resulted string MUST be embedded somewhere between <body> </body> HTML
     out.append("</table>")
     
     return "\n".join(out)
-      
-def listmodules(title:str, header:str, columns:int = 4) -> str:
-    # infos = list(filter(lambda s: "." not in s, map(lambda i: i.name, walk_packages())))
-    infos = list(filter(lambda i: "." not in i.name, walk_packages()))
+
+def help_query_scipyen(items:list[str]):
+    env_pkginfos, env_nonpkginfos, scipyen_pkginfos, scipyen_nonpkginfos, plugins = listmodules()
+    # env_pkgnames = list(map(lambda i: i.name, env_pkginfos))
+    # env_nonpkgnames = list(map(lambda i: i.name, env_nonpkginfos))
+    scipyen_pkgnames = list(map(lambda i: i.name, scipyen_pkginfos))
+    scipyen_nonpkgnames =list(map(lambda i: i.name, scipyen_nonpkginfos))
     
-    userPluginsInfos = list()
-    pluginNames = tuple()
-    mainWindow = getMainScipyenWindow()
-    scipyeninfos = list(filter(lambda i: _scipyendir_ in i.module_finder.path, infos))
-    envinfos = list(filter(lambda i: _scipyendir_ not in i.module_finder.path, infos))
-    if isinstance(mainWindow, QtWidgets.QMainWindow) and type(mainWindow).__name__ == "ScipyenWindow":
-        userPluginsInfos = list(filter(lambda i: mainWindow.userPluginsDirectory in i.module_finder.path, infos))
-        pluginNames = mainWindow.pluginNames
-        scipyeninfos = list(filter(lambda i: i.name not in pluginNames, scipyeninfos))
-        
-    scipyen_pkginfos = list(filter(lambda i: i.ispkg, scipyeninfos))
-    scipyen_nonpkginfos = list(filter(lambda i: not i.ispkg, scipyeninfos))
-    
-    env_pkginfos = list(filter(lambda i: i.ispkg, envinfos))
-    env_nonpkginfos = list(filter(lambda i: not i.ispkg, envinfos))
-        
-        
-        
-    
+    for item in items:
+        if isinstance(item, str) and len(item.strip()):
+            if item in scipyen_pkgnames:
+                index = scipyen_pkgnames.index[item]
+                info = scipyen_pkginfos[index]
+                
+            
+
+def format_infos(title:str, header:str, columns:int = 4) -> str:
+    env_pkginfos, env_nonpkginfos, scipyen_pkginfos, scipyen_nonpkginfos, plugins = listmodules()
     out = list()
     out += ['<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"',
             '    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">',
@@ -102,10 +96,34 @@ def listmodules(title:str, header:str, columns:int = 4) -> str:
     out.append("<h4>Scipyen's non-package modules:</h4>")
     out.append(make_HTML_table(list(sorted(map(lambda i: i.name, scipyen_nonpkginfos))), columns))
     out.append("<p>")
-    if len(pluginNames):
+    if len(plugins):
         out.append("<h4>Scipyen's plugin modules:</h4>")
-        out.append(make_HTML_table(list(sorted(tuple(pluginNames))), columns))
+        out.append(make_HTML_table(list(sorted(tuple(plugins.keys()))), columns))
         out.append("<p>")
     out.append("</body>")
     out.append("</html>")
     return "\n".join(out)
+
+def listmodules() -> tuple:
+    # infos = list(filter(lambda s: "." not in s, map(lambda i: i.name, walk_packages())))
+    infos = list(filter(lambda i: "." not in i.name, walk_packages()))
+    
+    userPluginsInfos = list()
+    plugins = dict()
+    mainWindow = getMainScipyenWindow()
+    scipyeninfos = list(filter(lambda i: _scipyendir_ in i.module_finder.path, infos))
+    envinfos = list(filter(lambda i: _scipyendir_ not in i.module_finder.path, infos))
+    if isinstance(mainWindow, QtWidgets.QMainWindow) and type(mainWindow).__name__ == "ScipyenWindow":
+        userPluginsInfos = list(filter(lambda i: mainWindow.userPluginsDirectory in i.module_finder.path, infos))
+        plugins = mainWindow.plugins
+        scipyeninfos = list(filter(lambda i: i.name not in plugins, scipyeninfos))
+        
+    scipyen_pkginfos = list(filter(lambda i: i.ispkg, scipyeninfos))
+    scipyen_nonpkginfos = list(filter(lambda i: not i.ispkg, scipyeninfos))
+    
+    env_pkginfos = list(filter(lambda i: i.ispkg, envinfos))
+    env_nonpkginfos = list(filter(lambda i: not i.ispkg, envinfos))
+        
+        
+    return env_pkginfos, env_nonpkginfos, scipyen_pkginfos, scipyen_nonpkginfos, plugins
+    

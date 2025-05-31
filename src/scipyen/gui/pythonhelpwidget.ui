@@ -18,20 +18,62 @@
   </property>
   <layout class="QGridLayout" name="gridLayout">
    <item row="0" column="0">
-    <widget class="QLineEdit" name="queryLineEdit">
-     <property name="toolTip">
-      <string>Query help on a Python thing</string>
-     </property>
-     <property name="statusTip">
-      <string>Query help on a Python thing</string>
-     </property>
-     <property name="whatsThis">
-      <string>Query help on a Python thing</string>
-     </property>
-     <property name="clearButtonEnabled">
-      <bool>true</bool>
-     </property>
-    </widget>
+    <layout class="QHBoxLayout" name="horizontalLayout">
+     <item>
+      <widget class="QComboBox" name="queryComboBox">
+       <property name="toolTip">
+        <string>Help query</string>
+       </property>
+       <property name="editable">
+        <bool>true</bool>
+       </property>
+       <property name="insertPolicy">
+        <enum>QComboBox::InsertAtTop</enum>
+       </property>
+       <property name="placeholderText">
+        <string>Type a query</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QToolButton" name="prevToolButton">
+       <property name="enabled">
+        <bool>false</bool>
+       </property>
+       <property name="toolTip">
+        <string>Previous page</string>
+       </property>
+       <property name="text">
+        <string>Previous</string>
+       </property>
+       <property name="icon">
+        <iconset theme="go-previous"/>
+       </property>
+       <property name="autoRaise">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QToolButton" name="nextToolButton">
+       <property name="enabled">
+        <bool>false</bool>
+       </property>
+       <property name="toolTip">
+        <string>Forward page</string>
+       </property>
+       <property name="text">
+        <string>Forward</string>
+       </property>
+       <property name="icon">
+        <iconset theme="go-next"/>
+       </property>
+       <property name="autoRaise">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+    </layout>
    </item>
    <item row="1" column="0">
     <widget class="QTextBrowser" name="helpDisplay">
