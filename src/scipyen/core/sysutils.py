@@ -4,6 +4,7 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 r"""System and platform utilities
+NOTE: This does NOT relate to the standard library's ``sys`` module.
 """
 import os, sys, subprocess, shutil, platform, pathlib, typing
 from shutil import which

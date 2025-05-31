@@ -5,7 +5,8 @@
 
 r"""
 Helper functions and classes for programming, including:
-decorators, context managers, and descriptor validators.
+package/module management, decorators, context managers, and 
+descriptor validators.
 
 
 """
@@ -15,12 +16,13 @@ decorators, context managers, and descriptor validators.
 import pprint
 
 from abc import ABC, abstractmethod
+import importlib, inspect, pathlib, warnings, operator, functools
 from importlib import abc as importlib_abc
+import pkgutil
 import enum, io, os, re, itertools, sys, time, traceback, types, typing
 from types import SimpleNamespace
 import collections
 from collections import deque
-import importlib, inspect, pathlib, warnings, operator, functools
 from warnings import WarningMessage
 from inspect import Parameter, Signature
 
@@ -68,7 +70,7 @@ CALLABLE_TYPES = (
     types.ClassMethodDescriptorType,
 )
 
-class ModSpec: pass # to be picked up by Kate's symbolviewer
+class ModSpec: pass # to be picked up in Kate editor's symbolviewer plugin
 ModSpec = importlib.machinery.ModuleSpec  # saves me some typing
 
 class NoData:
@@ -2885,3 +2887,37 @@ class with_doc:
         )
 
         return "\n".join(indlines)
+
+def get_top_level_modules() -> tuple:
+    r"""Returns a tuple of locatable modules:
+    (package modules, non-package modules)
+"""
+    infos = list(pkgutil.iter_modules())
+    packages = list(filter(lambda i: i.ispkg, infos))
+    nonpackages = list(filter(lambda i: not i.ispkg, infos))
+    
+    return packages, nonpackages
+
+def get_modules() -> tuple:
+    infos = list(walk_packages())
+    packages = list(filter(lambda i: i.ispkg, infos))
+    nonpackages = list(filter(lambda i: not i.ispkg, infos))
+    return packages, nonpackages
+    
+def get_specs(infos:list) -> list:
+    r"""Returns a list of module specs using the ModuleInfo in infos."""
+    return list(map(lambda i: importlib.util.find_spec(i.name), infos))
+
+def walk_packages(path=None, prefix=''):
+    def seen(p, m={}):
+        if p in m:
+            return True
+        m[p] = True
+
+    for info in pkgutil.iter_modules(path, prefix):
+        yield info
+        if info.ispkg:
+            path = [(pathlib.Path(info.module_finder.path)/info.name).as_posix()]
+            # print(f"name: {info.name} -> path: {path}")
+            path = [p for p in path if not seen(p)]
+            yield from walk_packages(path, info.name+".")

@@ -21,11 +21,8 @@ class ScipyenMagics(Magics):
         r"""%exit line magic
     Exits Scipyen application.
         """
-        #if "mainWindow" in local_ns and isinstance(local_ns["mainWindow"], ScipyenWindow):
         if "mainWindow" in local_ns and local_ns["mainWindow"].__class__.__name__ == "ScipyenWindow":
             local_ns["mainWindow"].slot_Quit()
-            
-        #return line
     
     @line_magic
     @needs_local_scope
@@ -33,24 +30,17 @@ class ScipyenMagics(Magics):
         r"""%quit line magic
     Exits Scipyen application (same as %exit line magic).
         """
-        #if "mainWindow" in local_ns and isinstance(local_ns["mainWindow"], ScipyenWindow):
         if "mainWindow" in local_ns and local_ns["mainWindow"].__class__.__name__ == "ScipyenWindow":
             local_ns["mainWindow"].slot_Quit()
             
-        #return line
-    
     @line_magic
     @needs_local_scope
     def external_ipython(self, line, local_ns):
         r"""%external_ipython magic 
     Launches a separate Jupyter Qt Console process
         """
-        
-        #if "mainWindow" in local_ns and isinstance(local_ns["mainWindow"], ScipyenWindow):
         if "mainWindow" in local_ns and local_ns["mainWindow"].__class__.__name__ == "ScipyenWindow":
             local_ns["mainWindow"]._init_ExternalIPython_()
-            
-        #return line
     
     @line_magic
     @needs_local_scope
@@ -58,12 +48,8 @@ class ScipyenMagics(Magics):
         r"""%neuron_ipython magic 
     Launches a separate NEURON Python process - only if NEURON python is installed
         """
-        
-        #if "mainWindow" in local_ns and isinstance(local_ns["mainWindow"], ScipyenWindow):
         if "mainWindow" in local_ns and local_ns["mainWindow"].__class__.__name__ == "ScipyenWindow":
             local_ns["mainWindow"]._init_ExternalIPython_(new="neuron")
-            
-        #return line
         
 #     @line_magic
 #     @needs_local_scope

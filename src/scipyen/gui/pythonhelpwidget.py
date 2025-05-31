@@ -11,8 +11,10 @@ import sys, os, typing, traceback, inspect, subprocess
 from qtpy import QtCore, QtGui, QtWidgets, QtSvg, QtNetwork, sip
 from qtpy.QtCore import Signal, Slot, Property
 from qtpy.uic import loadUiType as __loadUiType__
+from core import prog
 from core.prog import safewrapper, safeguiwrapper, scipywarn
 from core.sysutils import adapt_ui_path
+from core import helputils
 from gui.workspacegui import WorkspaceGuiMixin
 # import numpy as np # cheeky
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
@@ -21,7 +23,9 @@ __ui_path__ = adapt_ui_path(__module_path__,'pythonhelpwidget.ui')
 Ui_PythonHelpWidget, QWidget = __loadUiType__(__ui_path__)
 
 class _PythonHelpThread_(QtCore.QThread):
-    ready = Signal(str, name="ready")
+    # ready = Signal(str, name="ready")
+    ready = Signal(QtGui.QTextDocument, name="ready")
+    message = Signal(str, name="ready")
     # threadRunning = Signal(str, name="threadRunning")
     
     def __init__(self, parent: QtCore.QObject):
@@ -32,67 +36,55 @@ class _PythonHelpThread_(QtCore.QThread):
         self.width = 80
 
     def run(self):
+        doc = QtGui.QTextDocument()
         if isinstance(self.helpCommand, str) and len(self.helpCommand.strip()):
             cmdParts = self.helpCommand.split(" ")
-            fullcmd = [sys.executable, "-Xfrozen_modules=off", "-m", "pydoc"] + cmdParts
-            self.ready.emit("Please wait...")
-            self.helpProcess = subprocess.run(fullcmd, capture_output=True)
-            reply = self.helpProcess.stdout.decode()
-            if isinstance(reply, str) and len(reply.strip()):
-                out = list()
-                out += ['<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"',
-                        '    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">',
-                        '<html>',]
-                if self.helpCommand in ("keywords", "symbols", "topics"):
-                    parts = reply.split("help.")
-                    parts[0] += "help."
-                    items = list(sorted(map(lambda x: x.strip(), filter(lambda x: len(x.strip()), parts[1].replace("\n", " ").split(" ")))))
-                    out += ["<head>", 
-                            f"<title>{parts[0]}</title>", 
-                            '<meta> name="generator" content="Kate Editor"</meta>', 
-                            "</head>"]
-                    out.append("<body>")
-                    out.append(f"<h3>{parts[0]}</h3>")
-                    out.append("<table>")
-                    k = 0
-                    while k < len(items):
-                        c = 0
-                        while c < self.columns:
-                            if k == len(items):
-                                break
-                            if c == 0:
-                                out.append("<tr>")
-                            out += ["<td>", items[k], "</td>"]
-                            k += 1
-                            if c == 3:
-                                out.append("</tr>")
-                            c += 1
-                                
-                    out.append("</table>")
-                    out.append("</body>")
-                else:
-                    out.append("<body>")
-                    items = reply.replace("\n", "<br>")
-                    out.append(items)
-                    out.append("</body>")
-                    
-                out.append("</html>")
-                reply = "\n".join(out)
-                    
+            if any(s in cmdParts for s in ("modules", "module")):
+                doc.setHtml(helputils.listmodules("Package modules", 
+                                                  "Here is a list of discovered modules. In the field above type 'module' and one of the names below for details",
+                                                  self.columns))
+                self.ready.emit(doc)
+                return
             else:
-                reply = ""
-            if self.helpProcess.returncode == 0:
-                self.ready.emit(reply)
-            else:
-                scipywarn(f"Help subprocess returned {self.helpProcess.returncode}: {self.helpProcess.stderr}")
-                reply = self.helpProcess.stdout.decode()
-                if len(reply):
-                    self.ready.emit(reply)
-                else:
-                    self.ready.emit("")
+                fullcmd = [sys.executable, "-Xfrozen_modules=off", "-m", "pydoc"] + cmdParts
+                self.message.emit("Please wait...")
+                reply = None
+                errors = None
+                try:
+                    self.helpProcess = subprocess.run(fullcmd, capture_output=True, check=True)
+                    reply = self.helpProcess.stdout.decode()
+                except subprocess.CalledProcessError as e:
+                    reply = e.output.decode()
+                    errors = e.stderr.decode()
+                    scipywarn(f"Subprocess returned {e.returncode}")
+                    scipywarn(f"Errors:\n{errors}")
+                except:
+                    traceback.print_exc() 
                 
+                if isinstance(reply, str) and len(reply.strip()):
+                    if self.helpCommand in ("keywords", "symbols", "topics"):
+                        out = list()
+                        out += ['<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"',
+                                '    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">',
+                                '<html>',]
+                        parts = reply.split("help.")
+                        parts[0] += "help."
+                        out += ["<head>", 
+                                f"<title>{parts[0]}</title>", 
+                                '<meta> name="generator" content="Kate Editor"</meta>', 
+                                "</head>"]
+                        out.append("<body>")
+                        out.append(f"<h3>{parts[0]}</h3>")
+                        out.append(helputils.make_HTML_table(parts[1], self.columns))
+                        out.append("</body>")
+                        out.append("</html>")
+                        doc.setHtml("\n".join(out))
+                    else:
+                        doc.setMarkdown(reply)
+                
+            self.ready.emit(doc)
             self.helpCommand = None
-
+                
 class PythonHelpWidget(QWidget, WorkspaceGuiMixin, Ui_PythonHelpWidget):
     _instance = None # singleton pattern
     
@@ -112,7 +104,8 @@ class PythonHelpWidget(QWidget, WorkspaceGuiMixin, Ui_PythonHelpWidget):
         WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs)
         
         self._helpThread_ = _PythonHelpThread_(self)
-        self._helpThread_.ready[str].connect(self._slot_displayHelp)
+        self._helpThread_.message[str].connect(self._slot_displayMessage)
+        self._helpThread_.ready[QtGui.QTextDocument].connect(self._slot_displayReply)
         self._configureUI_()
         
         
@@ -129,10 +122,23 @@ class PythonHelpWidget(QWidget, WorkspaceGuiMixin, Ui_PythonHelpWidget):
             self._helpThread_.run()
         
     @Slot(str)
-    def _slot_displayHelp(self, txt):
+    def _slot_displayMessage(self, txt:str):
         if len(txt.strip()):
-            self.helpDisplay.setHtml(txt)
-            # self.helpDisplay.setPlainText(txt)
+            self.helpDisplay.setPlainText(txt)
         else:
             self.helpDisplay.clear()
         
+    @Slot(QtGui.QTextDocument)
+    @Slot(str)
+    def _slot_displayReply(self, doc:typing.Union[QtGui.QTextDocument, str]):
+        if isinstance(doc, QtGui.QTextDocument):
+            if doc.isEmpty():
+                self.helpDisplay.clear()
+            else:
+                self.helpDisplay.setDocument(doc)
+                
+        elif isinstance(doc, str):
+            if len(doc.strip()):
+                self.helpDisplay.setPlainText(doc)
+            else:
+                self.helpDisplay.clear()
