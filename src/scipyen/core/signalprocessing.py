@@ -27,7 +27,7 @@ from .datasignal import DataSignal, IrregularlySampledDataSignal
 from . import prog as prog
 from .prog import safewrapper, with_doc
 
-from plots.plots import showWavelet
+from plots.plots import plot_wavelet
 #### END scipyen core modules
 
 
