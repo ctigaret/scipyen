@@ -1190,8 +1190,9 @@ def adjust_spines(ax, spines):
         # no xaxis ticks
         ax.xaxis.set_ticks([])
 
-def showWavelet(w:typing.Union[str, pywt.Wavelet, pywt.ContinuousWavelet], /,level:typing.Optional[int] = None,
-                length:typing.Optional[int] = None, what:str="functions", separate:bool=False, newfig:bool=False) -> tuple:
+def plot_wavelet(w:typing.Union[str, pywt.Wavelet, pywt.ContinuousWavelet], /,level:typing.Optional[int] = None,
+                length:typing.Optional[int] = None, what:str="functions", 
+                separate:bool=False, newfig:bool=False) -> tuple:
     r"""Plots a wavelet.
     For discrete wavelets, the funtion plots either the scaling (ϕ) and wavelet 
 (ψ) functions, or tthe wavelet decoomposition and reconstruction filters.
@@ -1289,6 +1290,7 @@ def showWavelet(w:typing.Union[str, pywt.Wavelet, pywt.ContinuousWavelet], /,lev
         fig = plt.figure()
     else:
         fig = plt.gcf() # reuse the current figure
+        
     fig.clf() 
     
     if separate:
@@ -1297,23 +1299,32 @@ def showWavelet(w:typing.Union[str, pywt.Wavelet, pywt.ContinuousWavelet], /,lev
             
             dec_curves = curves["Decomposition"]
             for k, (key, item) in enumerate(filter(lambda x: x[0] not in ("x", "title"), dec_curves.items())):
-                ax[k,0].stem(dec_curves["x"], item, label = key)
+                if what=="functions":
+                    ax[k,0].plot(dec_curves["x"], item, label = key)
+                else:
+                    ax[k,0].stem(dec_curves["x"], item, label = key)
                 ax[k,0].legend(loc="upper left")
                 if k == 0:
                     ax[k].set_title(dec_curves["title"])
                     
             rec_curves = curves["Reconstruction"]
             for k, (key, item) in enumerate(filter(lambda x: x[0] not in ("x", "title"), rec_curves.items())):
-                ax[k,0].stem(rec_curves["x"], item, label = key)
+                if what=="functions":
+                    ax[k,0].plot(rec_curves["x"], item, label = key)
+                else:
+                    ax[k,0].stem(rec_curves["x"], item, label = key)
                 ax[k,0].legend(loc="upper left")
                 if k == 0:
                     ax[k].set_title(rec_curves["title"])
             
         else:
             ax = fig.subplots(len(curves)-2, 1, sharex=True)
-            print(f"{len(ax)} axes")
+            # print(f"{len(ax)} axes")
             for k, (key, item) in enumerate(filter(lambda x: x[0] not in ("x", "title"), curves.items())):
-                ax[k].plot(curves["x"], item, label = key)
+                if what == "functions":
+                    ax[k].plot(curves["x"], item, label = key)
+                else:
+                    ax[k].stem(curves["x"], item, label = key)
                 ax[k].legend(loc="upper left")
                 if k == 0:
                     ax[k].set_title(curves["title"])
@@ -1323,20 +1334,78 @@ def showWavelet(w:typing.Union[str, pywt.Wavelet, pywt.ContinuousWavelet], /,lev
             ax = fig.subplots(1, 2, sharey=True)
             dec_curves = curves["Decomposition"]
             for (key, item) in filter(lambda x: x[0] not in ("x", "title"), dec_curves.items()):
-                ax[0,0].stem(dec_curves["x"], item, label = key)
+                if what == "functions":
+                    ax[0,0].plot(dec_curves["x"], item, label = key)
+                else:
+                    ax[0,0].stem(dec_curves["x"], item, label = key)
             ax[0,0].set_title(dec_curves["title"])
             
             rec_curves = curves["Reconstruction"]
             for (key, item) in filter(lambda x: x[0] not in ("x", "title"), rec_curves.items()):
-                ax[0,1].stem(rec_curves["x"], item, label = key)
+                if what == "functions":
+                    ax[0,1].plot(rec_curves["x"], item, label = key)
+                else:
+                    ax[0,1].stem(rec_curves["x"], item, label = key)
             ax[0,1].set_title(rec_curves["title"])
         else:            
             ax = fig.gca()
             for (key, item) in filter(lambda x: x[0] not in ("x", "title"), curves.items()):
-                ax.plot(curves["x"], item, label = key)
+                if what == "functions":
+                    ax.plot(curves["x"], item, label = key)
+                else:
+                    ax.stem(curves["x"], item, label = key)
                 ax.legend()
             ax.set_title(curves["title"])
             
     return fig, ax
     
+def plot_wavedec(coeffs, raster:bool=True, newfig:bool=False,
+                 extent:int = 1000, **kwargs):
+    r"""Raster plot of 1D multiscale wavelet decomposition.
+Adapted from Answer # 1 (JohanC) below:
+https://stackoverflow.com/questions/60934996/visualization-of-wavelets-coefficients-using-python
+
+Parameters:
+===========
+coeffs: list of approximation and detail coefficient arrays as returned by
+    pywt.wavedec
+
+Var-keyword parameters:
+=======================
+As expected by matplotlib.pyplot.imshow;
+
+"""
+    cmap = kwargs.get("cmap", "inferno")
+    aspect = kwargs.get("aspect", "auto")
+    interpolation = kwargs.get("interpolation", "nearest")
+    nLevels = len(coeffs)-1
+
+    if newfig:
+        fig = plt.figure()
+    else:
+        fig = plt.gcf() # reuse the current figure
+        
+    fig.clf()
     
+    if raster:
+        for i, ci in enumerate(coeffs):
+            plt.imshow(ci.reshape(1, -1), extent=[0, extent, i+0.5, i+1.5], 
+                    cmap=cmap, aspect=aspect, interpolation=interpolation)
+            # plt.imshow(ci.reshape(1, -1), 
+            #             cmap=cmap, aspect=aspect, interpolation=interpolation)
+        plt.ylim(0.5, len(coeffs) + 0.5)
+        plt.yticks(range(1, len(coeffs) + 1), [f"A{nLevels}"] + list(map(lambda l: f"D{l}", reversed(range(1, nLevels+1)))))
+
+    else:
+        ax = fig.subplots(len(coeffs), 1)
+        for k in list(reversed(range(len(coeffs)))):
+            axndx = len(coeffs)-1-k
+            c = coeffs[k]
+            ax[axndx].plot(np.arange(len(c)), c)
+            ax[axndx].set_ylabel(f"A{len(coeffs)-1}" if k == 0 else f"D{axndx+1}")
+            # ax[k].legend()s
+        
+    
+
+
+        

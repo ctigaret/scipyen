@@ -65,7 +65,8 @@ class _PythonHelpThread_(QtCore.QThread):
                     if "No Python documentation found" in reply:
                         pass
                     scipywarn(f"Subprocess returned {e.returncode}")
-                    scipywarn(f"Errors:\n{errors}")
+                    if len(errors.strip()):
+                        scipywarn(f"Errors:\n{errors}")
                 except:
                     traceback.print_exc() 
                 
@@ -73,8 +74,8 @@ class _PythonHelpThread_(QtCore.QThread):
                     if self.helpCommand in ("keywords", "symbols", "topics"):
                         out = list()
                         out += ['<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"',
-                                '    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">',
-                                '<html>',]
+                                '    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">']
+                        out.append('<html>')
                         parts = reply.split("help.")
                         parts[0] += "help."
                         out += ["<head>", 
@@ -88,7 +89,23 @@ class _PythonHelpThread_(QtCore.QThread):
                         out.append("</html>")
                         doc.setHtml("\n".join(out))
                     else:
-                        doc.setMarkdown(reply)
+                        out = list()
+                        out += ['<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"',
+                                '    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">']
+                        out.append('<html>')
+                        out += ["<head>", 
+                                f"<title>{self.helpCommand}</title>", 
+                                '<meta> name="generator" content="Kate Editor"</meta>', 
+                                "</head>"]
+                        out.append("<body>")
+                        body = reply.replace("\n", "<br>\n")
+                        out.append(body)
+                        out.append("</body>")
+                        out.append("</html>")
+                        doc.setHtml("\n".join(out))
+                        # print(reply.split("\n"))
+                        # doc.setMarkdown(reply)
+                        # doc.setHtml(reply)
                 
             self.ready.emit(doc)
             self.helpCommand = None
