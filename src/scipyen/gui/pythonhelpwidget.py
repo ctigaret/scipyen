@@ -6,6 +6,7 @@
 
 r""" A QWidget to facilitate access to Python's help system, in parallel, and
 not interfering with, your console workflow.
+TODO: Work in progress...
 """
 import sys, os, typing, traceback, inspect, subprocess
 from collections import deque
@@ -37,6 +38,9 @@ class _PythonHelpThread_(QtCore.QThread):
         self.width = 80
 
     def run(self):
+        # TODO: 2025-06-01 12:42:08
+        # delegate to core.helputils when the subprocess below fails
+        # try to see what IPython is doing
         doc = QtGui.QTextDocument()
         if isinstance(self.helpCommand, str) and len(self.helpCommand.strip()):
             cmdParts = self.helpCommand.split(" ")

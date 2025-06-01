@@ -56,7 +56,8 @@ NOTE: The resulted string MUST be embedded somewhere between <body> </body> HTML
     
     return "\n".join(out)
 
-def help_query_scipyen(items:list[str]):
+def help_query_scipyen(items:list[str]): 
+    # TODO 2025-06-01 12:41:50 finalize me
     env_pkginfos, env_nonpkginfos, scipyen_pkginfos, scipyen_nonpkginfos, plugins = listmodules()
     # env_pkgnames = list(map(lambda i: i.name, env_pkginfos))
     # env_nonpkgnames = list(map(lambda i: i.name, env_nonpkginfos))
@@ -69,7 +70,14 @@ def help_query_scipyen(items:list[str]):
                 index = scipyen_pkgnames.index[item]
                 info = scipyen_pkginfos[index]
                 
-            
+def help_data_workspace(items:list[str]):
+    # TODO 2025-06-01 12:41:50 finalize me
+    if len(items) == 0 or not all(isinstance(i, str) for i in items):
+        scipywarn(f"Invalid items for help_data_workspace: {items}")
+        return
+    
+    
+
 
 def format_infos(title:str, header:str, columns:int = 4) -> str:
     env_pkginfos, env_nonpkginfos, scipyen_pkginfos, scipyen_nonpkginfos, plugins = listmodules()
