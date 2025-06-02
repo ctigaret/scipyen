@@ -76,7 +76,7 @@ def help_data_workspace(items:list[str]):
         scipywarn(f"Invalid items for help_data_workspace: {items}")
         return
     
-def format_infos(title:str, header:str, columns:int = 4) -> str:
+def module_infos(title:str, header:str, columns:int = 4) -> str:
     env_pkginfos, env_nonpkginfos, scipyen_pkginfos, scipyen_nonpkginfos, plugins = listmodules()
     out = list()
     out += ['<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"',
@@ -239,3 +239,8 @@ ns: the namepace where modules have been imported
     
     return "\n".join(txt)
 
+def cli():
+    print(sys.argv)
+
+if __name__ == '__main__':
+    cli()

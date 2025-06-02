@@ -46,13 +46,18 @@ class _PythonHelpThread_(QtCore.QThread):
             cmdParts = self.helpCommand.split(" ")
             # if any(s in cmdParts for s in ("modules", "module")):
             if "modules" in cmdParts:
-                doc.setHtml(helputils.format_infos("Package modules", 
+                doc.setHtml(helputils.module_infos("Package modules", 
                                                   "Here is a list of discovered modules. In the field above type 'module' and one of the names below for details",
                                                   self.columns))
                 self.ready.emit(doc)
                 return
             else:
+                # NOTE: 2025-06-02 17:02:10
+                # do NOT delete the next line - it works (kind of)
                 fullcmd = [sys.executable, "-Xfrozen_modules=off", "-m", "pydoc"] + cmdParts
+                # NOTE: 2025-06-02 17:01:56
+                # testing, don;t delete
+                # fullcmd = [sys.executable, "-Xfrozen_modules=off", "-m", helputils.__name__] + cmdParts
                 self.message.emit("Please wait...")
                 reply = None
                 errors = None
