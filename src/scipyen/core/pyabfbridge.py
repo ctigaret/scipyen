@@ -488,7 +488,7 @@ import neo
 from dataclasses import MISSING
 from collections import namedtuple
 
-from core import quantities as scq
+from core import scipyen_quantities as scq
 from core import datatypes, strutils, utilities
 from core.typeenum import TypeEnum
 from core.triggerevent import (DataMark, TriggerEvent, TriggerEventType, MarkType)

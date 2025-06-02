@@ -215,7 +215,7 @@ from .constants import (
     EQUAL_NAN,
 )
 
-from .quantities import unitsConvertible, checkTimeUnits, nameFromUnit
+from .scipyen_quantities import unitsConvertible, checkTimeUnits, nameFromUnit
 from .datasignal import (
     DataSignal,
     IrregularlySampledDataSignal,

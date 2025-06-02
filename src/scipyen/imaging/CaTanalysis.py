@@ -187,7 +187,7 @@ import core.models as models
 import core.signalprocessing as sgp
 import core.neoutils as neoutils
 
-from core.quantities import (arbitrary_unit, checkTimeUnits, unitsConvertible, 
+from core.scipyen_quantities import (arbitrary_unit, checkTimeUnits, unitsConvertible, 
                             unitQuantityFromNameOrSymbol, )
 from core.datatypes import UnitTypes
 from core.workspacefunctions import validate_varname

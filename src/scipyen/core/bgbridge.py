@@ -54,7 +54,7 @@ import configparser # from standard library; Scipyen uses confuse from  pypi
 from core.prog import scipywarn, print_styled, safewrapper
 from core import taxonbridge, utilities
 from core import workspacefunctions as wf
-from core import quantities as scq
+from core import scipyen_quantities as scq
 # import gui.pictgui as pgui # avoid circular import
 from gui.widgets.cancellableqprogressbar import CancellableQProgressBar
 from iolib import network

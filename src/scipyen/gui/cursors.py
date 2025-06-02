@@ -12,7 +12,7 @@ from dataclasses import (dataclass, MISSING)
 
 from qtpy import (QtCore, QtGui, QtWidgets,) 
 from qtpy.QtCore import (Signal, Slot, )
-from gui.pyqtgraph_patch import pyqtgraph as pg
+from core.pyqtgraph_patch import pyqtgraph as pg
 from gui import guiutils as guiutils
 
 import numpy as np
@@ -20,7 +20,7 @@ import quantities as pq
 import neo
 
 from core.prog import (safewrapper, with_doc)
-from core.quantities import checkTimeUnits
+from core.scipyen_quantities import checkTimeUnits
 
 # FIXME 2025-04-26 14:13:52 
 # remove this class, as it does the aame thing as the new Interval with extent=True

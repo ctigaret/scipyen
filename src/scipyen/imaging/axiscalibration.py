@@ -74,8 +74,8 @@ from traitlets import Bunch
 
 from core import datatypes, xmlutils
 from core.xmlutils import getChildren as getXMLChildren
-from core import quantities as scq
-from core.quantities import (arbitrary_unit, 
+from core import scipyen_quantities as scq
+from core.scipyen_quantities import (arbitrary_unit, 
                             space_frequency_unit,
                             angle_frequency_unit,
                             channel_unit,

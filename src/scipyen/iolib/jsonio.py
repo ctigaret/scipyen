@@ -173,7 +173,7 @@ import neo
 from core.vigra_patches import vigra
 from traitlets.utils.importstring import import_item
 from traitlets import Bunch
-from core import quantities as scq
+from core import scipyen_quantities as scq
 from core import prog
 from core.prog import (signature_as_dict, resolve_object, ArgumentError, CALLABLE_TYPES)
 
@@ -680,7 +680,7 @@ def _(o:pd.CategoricalDtype):
 @object2JSON.register(pq.UnitQuantity)
 def _(o:pq.UnitQuantity):
     hdr, ret = makeJSONStub(o)
-    factory = makeFuncStub("core.quantities.unitQuantityFromNameOrSymbol")
+    factory = makeFuncStub("core.scipyen_quantities.unitQuantityFromNameOrSymbol")
     factory["posonly"] = (o.dimensionality.string, )
     ret["factory"] = factory
     return {hdr:ret}

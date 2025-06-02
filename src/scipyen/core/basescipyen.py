@@ -17,9 +17,9 @@ import h5py
 from core.vigra_patches import vigra
 import pandas as pd
 from traitlets.utils.importstring import import_item
-from core import quantities as cq
+from core import scipyen_quantities as cq
 from core.triggerprotocols import TriggerProtocol
-from core.quantities import unitsConvertible
+from core.scipyen_quantities import unitsConvertible
 
 # from core.datatypes import * # clashes with datetime class imported from datetime module !!!
 from core.typeenum import TypeEnum

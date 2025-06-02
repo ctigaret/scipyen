@@ -8,7 +8,7 @@ r""" A QWidget to facilitate access to Python's help system, in parallel, and
 not interfering with, your console workflow.
 TODO: Work in progress...
 """
-import sys, os, typing, traceback, inspect, subprocess
+import sys, os, io, typing, traceback, inspect, subprocess, pydoc, runpy
 from collections import deque
 from qtpy import QtCore, QtGui, QtWidgets, QtSvg, QtNetwork, sip
 from qtpy.QtCore import Signal, Slot, Property
@@ -67,11 +67,26 @@ class _PythonHelpThread_(QtCore.QThread):
                 except subprocess.CalledProcessError as e:
                     reply = e.output.decode()
                     errors = e.stderr.decode()
+                    retcode = e.returncode
                     if "No Python documentation found" in reply:
-                        pass
-                    scipywarn(f"Subprocess returned {e.returncode}")
-                    if len(errors.strip()):
-                        scipywarn(f"Errors:\n{errors}")
+                        # print("Trying my own...")
+                        try:
+                            # fullcmd = [sys.executable, "-Xfrozen_modules=off", helputils.__file__] + cmdParts
+                            fullcmd = [sys.executable, "-B", helputils.__file__] + cmdParts
+                            # print(f"executing {fullcmd}")
+                            self.helpProcess = subprocess.run(fullcmd, capture_output=True, check=True)
+                            reply = self.helpProcess.stdout.decode()
+                        except subprocess.CalledProcessError as e1:
+                            reply = e.output.decode()
+                            errors = e.stderr.decode()
+                            retcode = e1.returncode
+                            scipywarn(f"Subprocess returned {retcode}")
+                            if len(errors.strip()):
+                                scipywarn(f"Errors:\n{errors}")
+                    else:
+                        scipywarn(f"Subprocess returned {retcode}")
+                        if len(errors.strip()):
+                            scipywarn(f"Errors:\n{errors}")
                 except:
                     traceback.print_exc() 
                 
@@ -89,7 +104,11 @@ class _PythonHelpThread_(QtCore.QThread):
                                 "</head>"]
                         out.append("<body>")
                         out.append(f"<h3>{parts[0]}</h3>")
-                        out.append(helputils.make_HTML_table(parts[1], self.columns))
+                        if "symbols" in self.helpCommand:
+                            cols = len(pydoc.Helper.symbols)//3 + len(pydoc.Helper.symbols) % 3
+                        else:
+                            cols = self.columns
+                        out.append(helputils.make_HTML_table(parts[1], cols))
                         out.append("</body>")
                         out.append("</html>")
                         doc.setHtml("\n".join(out))
@@ -137,11 +156,22 @@ class PythonHelpWidget(QWidget, WorkspaceGuiMixin, Ui_PythonHelpWidget):
         self._helpThread_.message[str].connect(self._slot_displayMessage)
         self._helpThread_.ready[QtGui.QTextDocument].connect(self._slot_displayReply)
         self._queryHistory_ = deque()
+        try:
+            with io.StringIO() as bf:
+                helper = pydoc.Helper(output = bf)
+                helper.intro()
+                self.intro_msg = bf.getvalue()
+                parts = list(map(lambda s: s.replace("\n", " "), self.intro_msg.split("\n\n")))
+                self.intro_msg = "\n\n".join(parts[:-1])
+                
+        except:
+            self.intro_msg = 'Enter a help topic in the field above (e.g., "topics", "pywt.Wavelet", etc)'
         self._configureUI_()
         
         
     def _configureUI_(self):
         self.setupUi(self)
+        self.helpDisplay.setPlaceholderText(self.intro_msg)
         self.removQueryAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("edit-delete"),
                                                                 "Remove this query from history",
                                                                 self.queryComboBox.lineEdit())
@@ -160,11 +190,16 @@ class PythonHelpWidget(QWidget, WorkspaceGuiMixin, Ui_PythonHelpWidget):
         self.queryComboBox.lineEdit().addAction(self.removQueryAction,
                                      QtWidgets.QLineEdit.TrailingPosition)
         self.queryComboBox.lineEdit().returnPressed.connect(self._slot_processQuery)
+        self.queryComboBox.lineEdit().textChanged[str].connect(self._slot_queryTextChanged)
         self.queryComboBox.currentIndexChanged[int].connect(self._slot_processQueryNdx)
         
         self.prevToolButton.clicked.connect(self._slot_prevQuery)
         self.nextToolButton.clicked.connect(self._slot_nextQuery)
         
+    @Slot(str)
+    def _slot_queryTextChanged(self, text:str):
+        if len(text.strip()) == 0:
+            self.helpDisplay.clear()
         
     @Slot()
     def _slot_processQuery(self):
@@ -188,23 +223,14 @@ class PythonHelpWidget(QWidget, WorkspaceGuiMixin, Ui_PythonHelpWidget):
     def _slot_processQueryNdx(self, index:int):
         query = self.queryComboBox.itemText(index)
         if len(query.strip()):
-            # if query not in self._queryHistory_:
-            #     self._queryHistory_.append(query)
             if self.queryComboBox.count() > 0:
                 # NOTE: 2025-05-31 22:22:42
-                # insert policy is insertAtTop
+                # insert policy of my combobox here is insertAtTop
                 self.nextToolButton.setEnabled(self.queryComboBox.currentIndex() > 0)
                 self.prevToolButton.setEnabled(self.queryComboBox.currentIndex() < self.queryComboBox.count()-1)
             else:
                 self.prevToolButton.setEnabled(False)
                 self.nextToolButton.setEnabled(False)
-            # if len(self._queryHistory_) > 0:
-            #     ndx = self._queryHistory_.index(query)
-            #     self.prevToolButton.setEnabled(ndx > 0)
-            #     self.nextToolButton.setEnabled(ndx < len(self._queryHistory_)-1)
-            # else:
-            #     self.prevToolButton.setEnabled(False)
-            #     self.nextToolButton.setEnabled(False)
             self._helpThread_.helpCommand = query
             self._helpThread_.run()
             

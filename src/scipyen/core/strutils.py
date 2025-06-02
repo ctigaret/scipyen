@@ -535,7 +535,7 @@ def numbers2str(
 
     """
 
-    from core.quantities import quantity2str
+    from core.scipyen_quantities import quantity2str
 
     if value is None:
         return ""

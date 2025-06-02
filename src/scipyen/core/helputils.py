@@ -8,10 +8,12 @@ r"""
 Helper script to replace pydoc "modules" & "apropos" invocation
 in order to bypass the issues related to importing problematic modules.
 """
+# WARNING: 2025-06-02 22:55:00
+# DO NOT import any of scipyen's modules here, so that this can be run in a 
+# separate python process
+
 import sys, os, typing, inspect, types, importlib
 from qtpy import QtCore, QtWidgets
-from core.prog import (safewrapper, safeguiwrapper, scipywarn, print_styled, walk_packages, get_qt_api_for_python)
-from core.workspacefunctions import getMainScipyenWindow
 
 # NOTE: 2025-05-31 17:15:38
 # do NOT place this file deeper than one level below scipyen directory
@@ -23,11 +25,12 @@ _scipyendir_ = os.path.dirname(__module_path__)
 # 
 # my_virtualenv = os.environ.get("VIRTUAL_ENV", None)
 
-def make_HTML_table(msg:str|list[str], cols:int) -> str:
+def make_HTML_table(msg:str|list[str], cols:typing.Optional[int] = None) -> str:
     r"""Formats a message to be displayed in a HTML table with ``cols`` columns.
 Useful when the message contains a list of names, keywords, etc.
 NOTE: The resulted string MUST be embedded somewhere between <body> </body> HTML tags. 
 """
+    from core.prog import scipywarn
     if isinstance(msg, str):
         items = list(sorted(map(lambda x: x.strip(), filter(lambda x: len(x.strip()), msg.replace("\n", " ").split(" ")))))
     elif isinstance(msg, list) and all(isinstance(s, str) for s in msg):
@@ -35,9 +38,11 @@ NOTE: The resulted string MUST be embedded somewhere between <body> </body> HTML
     else:
         scipywarn(f"Expecting a str ot a list of str; instead got {type(msg).__name__}")
         return "<table></table>"
-    
+    # print(f"{len(items)} items, with {max(tuple(len(i) for i in items))}")
     out = list()
-    out.append("<table>")
+    out.append("<table style='width:100%'>")
+    # if cols is None:
+        
     k = 0
     while k < len(items):
         c = 0
@@ -45,10 +50,12 @@ NOTE: The resulted string MUST be embedded somewhere between <body> </body> HTML
             if k == len(items):
                 break
             if c == 0:
+                # out.append("<tr style='width:100%'>")
                 out.append("<tr>")
+            # out += ["<td style='width:100%'>", items[k], "</td>"]
             out += ["<td>", items[k], "</td>"]
             k += 1
-            if c == 3:
+            if c == cols-1:
                 out.append("</tr>")
             c += 1
                 
@@ -56,25 +63,26 @@ NOTE: The resulted string MUST be embedded somewhere between <body> </body> HTML
     
     return "\n".join(out)
 
-def help_query_scipyen(items:list[str]): 
-    # TODO 2025-06-01 12:41:50 finalize me
-    env_pkginfos, env_nonpkginfos, scipyen_pkginfos, scipyen_nonpkginfos, plugins = listmodules()
-    # env_pkgnames = list(map(lambda i: i.name, env_pkginfos))
-    # env_nonpkgnames = list(map(lambda i: i.name, env_nonpkginfos))
-    scipyen_pkgnames = list(map(lambda i: i.name, scipyen_pkginfos))
-    scipyen_nonpkgnames =list(map(lambda i: i.name, scipyen_nonpkginfos))
-    
-    for item in items:
-        if isinstance(item, str) and len(item.strip()):
-            if item in scipyen_pkgnames:
-                index = scipyen_pkgnames.index[item]
-                info = scipyen_pkginfos[index]
-                
-def help_data_workspace(items:list[str]):
-    # TODO 2025-06-01 12:41:50 finalize me
-    if len(items) == 0 or not all(isinstance(i, str) for i in items):
-        scipywarn(f"Invalid items for help_data_workspace: {items}")
-        return
+# def help_query_scipyen(items:list[str]): 
+#     # TODO 2025-06-01 12:41:50 finalize me
+#     env_pkginfos, env_nonpkginfos, scipyen_pkginfos, scipyen_nonpkginfos, plugins = listmodules()
+#     # env_pkgnames = list(map(lambda i: i.name, env_pkginfos))
+#     # env_nonpkgnames = list(map(lambda i: i.name, env_nonpkginfos))
+#     scipyen_pkgnames = list(map(lambda i: i.name, scipyen_pkginfos))
+#     scipyen_nonpkgnames =list(map(lambda i: i.name, scipyen_nonpkginfos))
+#     
+#     for item in items:
+#         if isinstance(item, str) and len(item.strip()):
+#             if item in scipyen_pkgnames:
+#                 index = scipyen_pkgnames.index[item]
+#                 info = scipyen_pkginfos[index]
+#                 
+# def help_data_workspace(items:list[str]):
+#     # TODO 2025-06-01 12:41:50 finalize me
+#     from core.prog import scipywarn
+#     if len(items) == 0 or not all(isinstance(i, str) for i in items):
+#         scipywarn(f"Invalid items for help_data_workspace: {items}")
+#         return
     
 def module_infos(title:str, header:str, columns:int = 4) -> str:
     env_pkginfos, env_nonpkginfos, scipyen_pkginfos, scipyen_nonpkginfos, plugins = listmodules()
@@ -110,7 +118,9 @@ def module_infos(title:str, header:str, columns:int = 4) -> str:
     return "\n".join(out)
 
 def listmodules() -> tuple:
-    # infos = list(filter(lambda s: "." not in s, map(lambda i: i.name, walk_packages())))
+    from core.workspacefunctions import getMainScipyenWindow
+    from core.prog import walk_packages
+   # infos = list(filter(lambda s: "." not in s, map(lambda i: i.name, walk_packages())))
     infos = list(filter(lambda i: "." not in i.name, walk_packages()))
     
     userPluginsInfos = list()
@@ -138,7 +148,7 @@ Parameters:
 ==========
 ns: the namepace where modules have been imported
 """
-    from core.prog import get_module_version
+    from core.prog import (get_module_version, walk_packages, get_qt_api_for_python)
     import IPython
     # modules = dict(filter(lambda i: inspect.ismodule(i[1]), ns.items()))
     
@@ -239,8 +249,37 @@ ns: the namepace where modules have been imported
     
     return "\n".join(txt)
 
-def cli():
-    print(sys.argv)
+def run_help_command(cmd:str) -> str | None:
+    import pydoc, importlib, types, traceback
+    if not isinstance(cmd, str) or len(cmd.strip()) == 0:
+        return
+    
+    # NOTE: stock pydoc will only report on packages
+    # Here I need to break this down into package.<subpackage.>module
+    # and get the documentation of module
+    if "." in cmd:
+        try:
+            module = importlib.import_module(cmd)
+            helper = pydoc.Helper()
+            helper.help(module.__name__)
+        except:
+            traceback.print_exc()
+                
+    else:
+        helper = pydoc.Helper()
+        helper.help(cmd)
+
+def run():
+    if _scipyendir_ not in sys.path:
+        sys.path.append(_scipyendir_)
+    # print(f"helputils: sys.argv = {sys.argv}")
+    if len(sys.argv) > 1:
+        cmdList = list(filter(lambda s: "-X" not in s, sys.argv[1:]))
+        print(f"helputils: help command: {cmdList}")
+        run_help_command(" ".join(cmdList))
+    # print(f"sys.path = {sys.path}")
+        
 
 if __name__ == '__main__':
-    cli()
+    print("running helputils as a script")
+    run()

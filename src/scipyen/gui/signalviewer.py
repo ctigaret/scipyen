@@ -179,7 +179,7 @@ from iolib import pictio as pio
 #### BEGIN pict.core modules
 import core.signalprocessing as sgp
 from core import (xmlutils, strutils, neoutils, )
-import core.quantities as scq
+import core.scipyen_quantities as scq
 from core.neoutils import (get_domain_name,
                            get_non_empty_spike_trains,
                            get_non_empty_events,
@@ -220,7 +220,7 @@ from ephys import ephys as ephys
 
 #### BEGIN gui modules
 #from . import imageviewer as iv
-from gui.pyqtgraph_patch import pyqtgraph as pg
+from core.pyqtgraph_patch import pyqtgraph as pg
 from gui import guiutils as guiutils
 from gui import pictgui as pgui
 from gui import quickdialog as qd

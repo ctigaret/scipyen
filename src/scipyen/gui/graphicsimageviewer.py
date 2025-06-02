@@ -16,7 +16,7 @@ from core.prog import (safewrapper, deprecation, iter_attribute,
 from core.sysutils import adapt_ui_path
 from core.vigra_patches import vigra
 from gui import pictgui as pgui
-from gui.pyqtgraph_patch import pyqtgraph as pgraph
+from core.pyqtgraph_patch import pyqtgraph as pgraph
 from gui import painting_shared
 from collections import ChainMap, namedtuple, defaultdict
 

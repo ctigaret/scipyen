@@ -114,7 +114,7 @@ from .traitcontainers import DataBag
 from core import (traitutils, strutils)
 from core.prog import (safewrapper, print_styled, scipywarn)
 from core.workspacefunctions import user_workspace
-from core.quantities import(quantity2str, str2quantity)
+from core.scipyen_quantities import(quantity2str, str2quantity)
 from iolib.jsonio import (object2JSON, json2python)
 
 def quantity_representer(dumper, data):

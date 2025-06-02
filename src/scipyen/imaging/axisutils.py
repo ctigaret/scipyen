@@ -42,8 +42,8 @@ from core.vigra_patches import vigra
 import quantities as pq
 from core.utilities import (reverse_mapping_lookup, unique,)
 
-from core import quantities as cq
-from core.quantities import (space_frequency_unit, 
+from core import scipyen_quantities as cq
+from core.scipyen_quantities import (space_frequency_unit, 
                             angle_frequency_unit, 
                                     channel_unit, 
                                     arbitrary_unit,

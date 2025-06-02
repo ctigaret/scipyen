@@ -55,7 +55,7 @@ from neo.core.dataobject import (DataObject, ArrayDict,)
 
 from core.constants import (RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE, EQUAL_NAN)
 
-from core.quantities import (checkTimeUnits, unitsConvertible, QuantityDescriptorValidator)
+from core.scipyen_quantities import (checkTimeUnits, unitsConvertible, QuantityDescriptorValidator)
 from core.neoutils import (get_index_of_named_signal, remove_events, clear_events,
                            is_same_as, get_events)
 

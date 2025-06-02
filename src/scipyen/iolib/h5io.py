@@ -146,7 +146,7 @@ from core.triggerprotocols import TriggerProtocol
 import ephys
 from ephys import ephys
 
-from core.quantities import(arbitrary_unit, 
+from core.scipyen_quantities import(arbitrary_unit, 
                             pixel_unit, 
                             channel_unit,
                             space_frequency_unit,

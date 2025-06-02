@@ -60,7 +60,7 @@ from dataclasses import MISSING
 from traitlets import Bunch
 import numpy as np
 import quantities as pq
-from gui.pyqtgraph_patch import pyqtgraph as pgraph
+from core.pyqtgraph_patch import pyqtgraph as pgraph
 import neo
 from core.vigra_patches import vigra
 from pandas import NA
@@ -83,8 +83,8 @@ from core.prog import (safewrapper, deprecation, iter_attribute,
 
 from core import strutils as strutils
 from core import datatypes 
-from core import quantities as scq
-from core.quantities import quantity2str
+from core import scipyen_quantities as scq
+from core.scipyen_quantities import quantity2str
 from core.traitcontainers import DataBag
 from core.scipyen_config import markConfigurable
 from core.sysutils import adapt_ui_path

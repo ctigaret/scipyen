@@ -24,7 +24,7 @@ from neo.core.dataobject import (DataObject, ArrayDict,)
 from core.typeenum import TypeEnum
 from core.constants import (RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE, EQUAL_NAN,)
 from core.prog import scipywarn
-from core.quantities import checkTimeUnits
+from core.scipyen_quantities import checkTimeUnits
 #from core.utilities import unique
 
 def _new_DataMark(cls, places = None, labels=None, units=None, name=None, 

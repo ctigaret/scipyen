@@ -6,7 +6,7 @@
 import pyqtgraph, os
 
 pyqtgraph.setConfigOptions(background="w", foreground="k", editorCommand="kate")
-from gui import pyqtgraph_symbols # to register custom symbols
+from core import pyqtgraph_symbols # to register custom symbols
 
 
 

@@ -23,8 +23,8 @@ from core import (prog, traitcontainers, strutils, neoutils, models,)
 from core.prog import (safewrapper, AttributeAdapter, NoData, BaseDescriptorValidator)
 from core.basescipyen import BaseScipyenData
 from core.traitcontainers import DataBag
-from core import quantities as cq
-from core.quantities import(arbitrary_unit, 
+from core import scipyen_quantities as cq
+from core.scipyen_quantities import(arbitrary_unit, 
                             pixel_unit, 
                             channel_unit,
                             space_frequency_unit,

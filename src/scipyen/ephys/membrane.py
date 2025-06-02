@@ -66,8 +66,8 @@ import plots.plots as plots
 import core.datasignal as datasignal
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
 from core.datazone import (DataZone, Interval)
-from core import quantities as scq
-from core.quantities import unitsConvertible
+from core import scipyen_quantities as scq
+from core.scipyen_quantities import unitsConvertible
 import core.neoutils as neoutils
 from core.basescipyen import BaseScipyenData
 # from core.utilities import unique
@@ -9562,7 +9562,7 @@ def PSCwaveform(model_parameters, units=pq.pA, t_start=0*pq.s, duration=0.02*pq.
     
     """
     
-    from core import models, quantities # not to be confused with pq!!!
+    from core import models, scipyen_quantities # not to be confused with pq!!!
     
     x = np.linspace(t_start, t_start + duration, num=int(sampling_rate * duration))
     
@@ -9573,7 +9573,7 @@ def PSCwaveform(model_parameters, units=pq.pA, t_start=0*pq.s, duration=0.02*pq.
     
     dstring = f"Clements_Bekkers_97 α={model_parameters[0]}, β={model_parameters[1]}, x₀={model_parameters[2]}, τ₁={model_parameters[3]}, τ₂={model_parameters[4]}"
     
-    if quantities.checkTimeUnits(x):
+    if scipyen_quantities.checkTimeUnits(x):
         klass = neo.AnalogSignal
     else:
         klass = DataSignal

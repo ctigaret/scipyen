@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-from gui.pyqtgraph_patch import pyqtgraph as pg
+from core.pyqtgraph_patch import pyqtgraph as pg
 from qtpy import (QtCore, QtWidgets, QtGui)
 
 # each spike is a small vertical line centered at 0.0, height of 1

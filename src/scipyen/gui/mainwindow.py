@@ -254,7 +254,7 @@ from core.utilities import (summarize_object_properties,
 import core.curvefitting as crvf
 import core.data_analysis as anl
 import core.desktoputils as desktoputils
-import core.quantities as cq
+import core.scipyen_quantities as cq
 import core.strutils as strutils
 import core.signalprocessing as sigp
 import core.sysutils as sysutils
@@ -334,7 +334,7 @@ from iolib import h5io, jsonio, network, navigation
 from iolib import pictio as pio
 
 
-from gui.pyqtgraph_patch import pyqtgraph as pg
+from core.pyqtgraph_patch import pyqtgraph as pg
 
 # from gui.cursors import (DataCursor, SignalCursor, SignalCursorTypes)
 # END scipyen modules

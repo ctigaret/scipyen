@@ -743,7 +743,7 @@ class DescriptorGenericValidator(BaseDescriptorValidator):
 
     def _check_value_special_criteria_(self, value, crit: dict):
         from core.utilities import unique
-        from core.quantities import unitsConvertible
+        from core.scipyen_quantities import unitsConvertible
 
         if len(crit) == 0:
             return
@@ -2310,7 +2310,7 @@ def is_type_or_subclass(x, y):
 
 
 def __check_array_attribute__(rt, param):
-    from core.quantities import unitsConvertible
+    from core.scipyen_quantities import unitsConvertible
 
     # print(f"rt = {rt}; param = {param}")
     if rt["default_value"] is not None:

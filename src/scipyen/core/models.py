@@ -70,7 +70,7 @@ import typing
 import numpy as np
 import quantities as pq
 import numbers
-from core import quantities as scq
+from core import scipyen_quantities as scq
 
 def check_rise_decay_params(x:typing.Sequence[float]):
     r"""Returns the number of decay components for a exp-rise-multi-decay transient.

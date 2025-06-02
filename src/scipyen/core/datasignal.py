@@ -17,7 +17,7 @@ from neo.core.basesignal import BaseSignal
 from neo.core import container
 from neo.core.dataobject import DataObject, ArrayDict
 
-from core.quantities import (unitsConvertible, nameFromUnit)
+from core.scipyen_quantities import (unitsConvertible, nameFromUnit)
 from core.strutils import is_path #, is_pathname_valid
 
 
@@ -1647,7 +1647,7 @@ class IrregularlySampledDataSignal(BaseSignal):
         '''
         Equality test (==)
         '''
-        from core import quantities as scq
+        from core import scipyen_quantities as scq
         if isinstance(other, self.__class__):
             if len(self) != len(other):
                 return False

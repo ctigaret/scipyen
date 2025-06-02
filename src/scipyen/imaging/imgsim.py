@@ -33,7 +33,7 @@ from core import (datatypes  , signalprocessing as sgp, curvefitting as crvf,
 # NOTE: 2020-10-08 09:45:31
 # inside core.utilities, safewrapper below is imported from core.prog
 from core.utilities import (safewrapper, counter_suffix, unique, )
-from core.quantities import (unitsConvertible, checkTimeUnits)
+from core.scipyen_quantities import (unitsConvertible, checkTimeUnits)
 
 #from .patchneo import neo
 from neo.core import baseneo

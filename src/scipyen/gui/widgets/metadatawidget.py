@@ -20,7 +20,7 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 import math, datetime
 import numpy as np
 import quantities as pq
-from core import quantities as scq
+from core import scipyen_quantities as scq
 from core import strutils
 from core.datatypes import UnitTypes, GENOTYPES
 import pandas as pd

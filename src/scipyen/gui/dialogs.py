@@ -10,7 +10,7 @@ r"""Some common-use dialogs for metadata in Scipyen
 import os, math, typing
 import numpy as np
 import quantities as pq
-from core import quantities as scq
+from core import scipyen_quantities as scq
 from core import strutils
 import pandas as pd
 

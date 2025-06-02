@@ -403,7 +403,7 @@ class TableEditor(ScipyenViewer):
         
         """
         from core.prog import scipywarn
-        from core import quantities as scq
+        from core import scipyen_quantities as scq
         
         data, column_headers = self.getSelectedData()
         

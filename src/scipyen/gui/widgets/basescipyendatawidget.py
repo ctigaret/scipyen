@@ -5,7 +5,7 @@ import os, math, typing, datetime, dataclasses
 from dataclasses import MISSING
 import numpy as np
 import quantities as pq
-from core import quantities as scq
+from core import scipyen_quantities as scq
 from core import strutils
 from core.datatypes import UnitTypes, GENOTYPES, NoData
 from core.basescipyen import BaseScipyenData

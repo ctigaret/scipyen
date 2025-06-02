@@ -20,7 +20,7 @@ from gui.painting_shared import (FontStyleType, standardQtFontStyles,
 from gui import quickdialog as qd
 from gui.guiutils import (InftyDoubleValidator, ComplexValidator, validatorString)
 
-from core import quantities as scq
+from core import scipyen_quantities as scq
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 

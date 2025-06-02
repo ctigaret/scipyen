@@ -47,7 +47,7 @@ from copy import copy
 #### END core python modules
 
 #### BEGIN 3rd party modules
-from gui.pyqtgraph_patch import pyqtgraph as pg
+from core.pyqtgraph_patch import pyqtgraph as pg
 import numpy as np
 
 from qtpy import QtCore, QtGui, QtWidgets, QtXml

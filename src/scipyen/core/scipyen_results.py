@@ -13,9 +13,9 @@ import quantities as pq
 import neo
 from core.vigra_patches import vigra
 from traitlets.utils.importstring import import_item
-from core import quantities as cq
+from core import scipyen_quantities as cq
 from core.triggerprotocols import TriggerProtocol
-from core.quantities import unitsConvertible
+from core.scipyen_quantities import unitsConvertible
 
 class ScipyenResults(BaseScipyenData):
     r"""TODO: 2022-11-18 14:46:04

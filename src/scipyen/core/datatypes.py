@@ -60,7 +60,7 @@ from neo.core.dataobject import (DataObject, ArrayDict,)
 #### END 3rd party modules
 
 #### BEGIN pict.core.modules
-from core import quantities as scq
+from core import scipyen_quantities as scq
 from core import xmlutils
 from core import strutils
 from core.prog import (safewrapper, is_hashable, is_type_or_subclass, 

@@ -17,7 +17,7 @@ import numpy as np
 import quantities as pq
 from neo import (Block, Segment,)
 
-from core.quantities import (arbitrary_unit, checkTimeUnits, unitsConvertible,
+from core.scipyen_quantities import (arbitrary_unit, checkTimeUnits, unitsConvertible,
                             unitQuantityFromNameOrSymbol,quantity2str,)
 
 from core.datatypes import UnitTypes

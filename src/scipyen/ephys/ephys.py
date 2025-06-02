@@ -187,7 +187,7 @@ import pandas as pd
 # import pyabf
 import matplotlib as mpl
 # import pyqtgraph as pg
-from gui.pyqtgraph_patch import pyqtgraph as pg
+from core.pyqtgraph_patch import pyqtgraph as pg
 from qtpy import (QtGui, QtCore, QtWidgets)
 from qtpy.QtCore import (Signal, Slot, )
 #### END 3rd party modules
@@ -220,8 +220,8 @@ from core.utilities import (safewrapper,
                             GeneralIndexType)
 
 from core.neoutils import (get_index_of_named_signal, concatenate_blocks)
-from core import quantities as scq
-from core.quantities import (unitsConvertible, checkTimeUnits, 
+from core import scipyen_quantities as scq
+from core.scipyen_quantities import (unitsConvertible, checkTimeUnits, 
                              checkElectricalCurrentUnits, 
                              checkElectricalPotentialUnits,
                              checkRescale)

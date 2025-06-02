@@ -21,7 +21,7 @@ import pywt
 
 #### BEGIN scipyen core modules
 from . import curvefitting as crvf
-from . import quantities as scq
+from . import scipyen_quantities as scq
 from . import datasignal as sds
 from .datasignal import DataSignal, IrregularlySampledDataSignal
 from . import prog as prog

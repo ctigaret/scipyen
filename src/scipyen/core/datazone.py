@@ -14,8 +14,8 @@ from neo.core.baseneo import BaseNeo, merge_annotations
 from neo.core.dataobject import DataObject, ArrayDict
 import pyqtgraph as pg
 
-from core import quantities as cq
-from core.quantities import (checkTimeUnits, unitsConvertible)
+from core import scipyen_quantities as cq
+from core.scipyen_quantities import (checkTimeUnits, unitsConvertible)
 from core.scipyendataclasses import ScipyenDataclass
 # from core.utilities import counter_suffix
 from .prog import (safewrapper, with_doc, scipywarn)

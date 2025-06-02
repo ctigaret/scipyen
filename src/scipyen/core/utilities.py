@@ -50,7 +50,7 @@ from core import prog
 from .prog import safewrapper, deprecation, with_doc, is_hashable
 
 from .strutils import get_int_sfx
-from .quantities import unitsConvertible
+from .scipyen_quantities import unitsConvertible
 # from .datazone import DataZone
 
 # NOTE: 2021-07-24 15:03:53
@@ -3165,34 +3165,40 @@ def library_for_module(x: str) -> str:
         plugins_dir = mainWindow.userPluginsDirectory
         scipyen_dir = mainWindow._scipyendir_
         
-    if "builtins" in x:
-        return "standard"
+    if any(s in x for s in ("builtin", "built-in")):
+        return "standard (built-in)"
     
     if x in sys.modules:
-        xFile = sys.modules[x].__file__
+        xFile = getattr(sys.modules[x], "__file__", getattr(sys.modules[x], "__name__", None))
         
-        if hasattr(sys, "_MEIPASS") and sys._MEIPASS in xFile: # pyinstaller bundle
-                return "bundled application"
-            
-        else:
-            if (isinstance(scipyen_dir, str) and scipyen_dir in xFile) or ("scipyen/src/scipyen" in xFile):
-                return "'Scipyen'"
-            
-            elif "site-packages" in xFile:
-                p = pathlib.Path(xFile)
-                ndx = p.parts.index("site-packages")
-                return f"'{p.parts[ndx+1]}' package"
-            
-            elif f"{sys.platlibdir}/python" in xFile:
-                return "standard"
-            
-            elif isinstance(plugins_dir, str) and plugins_dir in xFile:
-                p = pathlib.Path(xFile)
-                subpath = pathlib.Path(*list(filter(lambda _p: _p not in pathlib.Path(plugins_dir).parts, p.parts)))
-                return f"user plugin '{subpath.as_posix()}'"
-            
+        if isinstance(xFile, str):
+            if pathlib.Path(xFile).exists():
+                if hasattr(sys, "_MEIPASS") and sys._MEIPASS in xFile: # pyinstaller bundle
+                        return "bundled application"
+                    
+                else:
+                    if (isinstance(scipyen_dir, str) and scipyen_dir in xFile) or ("scipyen/src/scipyen" in xFile):
+                        return "'Scipyen'"
+                    
+                    elif "site-packages" in xFile:
+                        p = pathlib.Path(xFile)
+                        ndx = p.parts.index("site-packages")
+                        return f"'{p.parts[ndx+1]}' package"
+                    
+                    elif f"{sys.platlibdir}/python" in xFile:
+                        return "standard"
+                    
+                    elif isinstance(plugins_dir, str) and plugins_dir in xFile:
+                        p = pathlib.Path(xFile)
+                        subpath = pathlib.Path(*list(filter(lambda _p: _p not in pathlib.Path(plugins_dir).parts, p.parts)))
+                        return f"user plugin '{subpath.as_posix()}'"
+                    
+                    else:
+                        return "unknown"
             else:
-                return "unknown"
+                return f"{xFile} (built-in)"
+        else:
+            return "unknown"
     else:
         return "unknown"
     
