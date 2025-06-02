@@ -259,6 +259,7 @@ def run_help_command(cmd:str) -> str | None:
     # and get the documentation of module
     if "." in cmd:
         try:
+            print(f"executing importlib.import_module({cmd})")
             module = importlib.import_module(cmd)
             helper = pydoc.Helper()
             helper.help(module.__name__)
