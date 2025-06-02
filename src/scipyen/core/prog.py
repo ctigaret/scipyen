@@ -2732,7 +2732,110 @@ def is_class_defined_in_module(x: typing.Any, m: types.ModuleType):
 
     return x_module.__spec__.origin == m.__spec__.origin
 
+def get_module_version(p:typing.Union[types.ModuleType, str]) -> str:
+    # print(f"prog.get_module_version: {p}")
+    if isinstance(p, str):
+        if p in sys.modules:
+            p = sys.modules[p]
+        else:
+            try:
+                p = importlib.import_module(p) 
+            except:
+                traceback.print_exc()
+                return ""
+            
+    elif isinstance(p, types.ModuleType):
+        if p.__name__ in sys.modules:
+            p = sys.modules[p.__name__]
+        else:
+            try:
+                p = importlib.import_module(p) 
+            except:
+                traceback.print_exc()
+                return ""
+    else:
+        raise TypeError(f"Expecting a module or a module name; instead, got {type(p).__name__}")
+    
+    if hasattr(p, "version"):
+        if isinstance(p.version, types.ModuleType):
+            if hasattr(p.version, "full_version"):
+                return str(p.version.full_version)
+            elif hasattr(p.version, "version"):
+                return str(p.version.version)
+            else:
+                return ""
+            
+        else:
+            return str(p.version)
+        
+    else:
+        # return str(p.__version__) if hasattr(p,"__version__") else ""
+        # print(f"\tversion {p.__version__}")
+        return getattr(p,"__version__", "")
+    
 
+def get_qt_api_for_python(module:types.ModuleType) -> str:
+    hasPg = False
+    try: 
+        pg = importlib.import_module("pyqtgraph")
+        hasPg = True
+    except:
+        traceback.print_exc()
+        pass
+    try:
+        if module.__name__ not in sys.modules:
+            module = importlib.import_module(module.__name__)
+
+        # version = getattr(module, "__version__", "")
+        
+        if module.__name__ == "qtpy":
+            QtCore = importlib.import_module("qtpy.QtCore")
+            qtVersion = QtCore.qVersion()
+            # NOTE: 2025-06-02 14:48:57
+            # the module might have been passed here as generated from its spec
+            # (i.e., not executed) — in this case, there is no "API" attribute,
+            # and no __version__ attribute (the latter is the case for ANY module
+            # generated from spec and NOT executed), which are set up automatically
+            pyqtAPI = getattr(module, "API", os.environ.get("QT_API", "pyqt5").lower())
+            if hasPg:
+                pyqtAPI = getattr(pg.Qt, pyqtAPI.upper(), pyqtAPI)
+                
+            if pyqtAPI.lower() in ("pyqt5", "pyqt6"):
+                pyqtAPIver = f" {pyqtAPI} {QtCore.PYQT_VERSION_STR}, Qt {qtVersion}"
+            elif pyqtAPI.lower() in ("PySide2", "PySide6"):
+                try:
+                    pyside = importlib.import_module(pyqtAPI.lower())
+                    pyqtAPIver = f" {pyqtAPI} {pyside.__version__}, Qt {qtVersion}"
+                except:
+                    pyqtAPIver = f" Qt {qtVersion}"
+            else:
+                pyqtAPIver = f" Qt {qtVersion}"
+                
+        elif any(module.__name__.lower().startswith(s) for s in ("pyside", "pyqt")):
+            QtCore = importlib.import_module(f"{module.__name__}.QtCore")
+            qtVersion = QtCore.qVersion()
+                
+            if module.__name__.lower().startswith("pyside"):
+                pyqtAPIver = f" {module.__name__} {module.__version__}, Qt {qtVersion}"
+                
+            elif module.__name__.lower().startswith("pyqt"):
+                QtCore = importlib.import_module(f"{module.__name__}.QtCore")
+                pyqtAPIver = f" {module.__name__} {QtCore.PYQT_VERSION_STR}, Qt {qtVersion}"
+                        
+            else:
+                pyqtAPIver = f" Qt {qtVersion}"
+        else:
+            pyqtAPIver = f" Qt {qtVersion}"
+            
+        return pyqtAPIver
+            
+    except:
+        traceback.print_exc()
+        return ""
+    
+# def pretty_format_tb_output(str):
+    
+    
 def parse_module_class_path(x: str) -> typing.Union[type, types.ModuleType]:
     from core.utilities import unique
 

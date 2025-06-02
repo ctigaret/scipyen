@@ -46,6 +46,8 @@ elif getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
 else:
     raise RuntimeError("Scipyen must be run in a virtualenv virtual Python environment, a conda environment, or a PyInstaller bundle\n")
 
+os.environ["FORCE_COLOR"] = "1"
+
 if sys.platform.startswith("linux"):
     # NOTE: 2024-05-04 10:14:08
     # forcing xcb platform when running on Wayland, in Linux, because we want to
