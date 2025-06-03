@@ -17,7 +17,7 @@ fail
 
 """
 # TODO: 2025-06-03 14:56:22 FIXME
-# 0. Resolve package and module aliases
+# 0. Implement interface to IPython's '?' help system
 #
 # 1. delegate all calls to appropriate functions in `helputils` module.
 # (for example, this is done for calling pydoc helper on a StringIO, for
@@ -197,10 +197,11 @@ class PythonHelpWidget(QWidget, WorkspaceGuiMixin, Ui_PythonHelpWidget):
                 msg = bf.getvalue()
                 parts = list(map(lambda s: s.replace("\n", " "), msg.split("\n\n")))
                 parts = parts[:-1]
-                parts.append("\n".join(["Scipyen-specific NOTE:",
-                              "----------------------",
-                              "Packages and modules must be entered by their names, and not by alias: e.g., search for 'scipyenviewer', not 'sv'. Alternatively one can supply a logical 'packge.<sub>module.class.method' hierarchy",
-                              "(Expect many bugs 😦)"]))
+                parts.append("\n".join(["Scipyen-specific NOTES:",
+                                        "---------------------- ",
+                                        "Queries for Python objects must be entered by their fully-qualified names, and not by alias: e.g., search for 'gui.scipyenviewer' and not for 'scipyenviewer', or whatever alias there may be, such as 'sv', etc.",
+                                        "This window is not a substitute to the Python 'help' command or IPython's help system ('?<object>') at the console, but it does 'free' up the console during such queries.",
+                                        "(Expect many bugs 😦)"]))
                 self.intro_msg = "\n\n".join(parts)
                 
         except:
