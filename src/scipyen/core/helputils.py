@@ -7,13 +7,17 @@
 r"""
 Helper script to replace pydoc "modules" & "apropos" invocation
 in order to bypass the issues related to importing problematic modules.
+
+Meant to be used by gui.pythonhelpwidget
 """
 # WARNING: 2025-06-02 22:55:00
 # DO NOT import any of scipyen's modules here, so that this can be run in a 
 # separate python process
 
-import sys, os, typing, inspect, types, importlib
+import sys, os, typing, inspect, types, importlib, io
 from qtpy import QtCore, QtWidgets
+# let's try this:
+# from gui.mainwindow import *
 
 # NOTE: 2025-05-31 17:15:38
 # do NOT place this file deeper than one level below scipyen directory
@@ -249,38 +253,76 @@ ns: the namepace where modules have been imported
     
     return "\n".join(txt)
 
+def format_common_help_reply(msg:str):
+    parts = msg.split("\n")
+    # parts[0] has "Help on 'package'|'module' <name>" or "Help on <type of the thing> 'in' <parent's name>"
+    pp = parts[0].split(" ")
+    if "in" in pp:
+        ndx = pp.index("in")
+        pp[ndx-1] = f"<strong>{pp[ndx-1]}</strong>"
+        pp[ndx+1] = f"<strong>{pp[ndx+1][:-1]}</strong>:"
+    else:
+        pp[-1] = f"<strong>{pp[-1][:-1]}</strong>:"
+        
+    # parts[0] = f"<h3>{' '.join(pp)}</h3>"
+    parts[0] = ' '.join(pp)
+    
+    for k,p in enumerate(parts[1:]):
+        if p.isupper():
+            parts[k+1] = f"<p style='color:BlueViolet>{p}</p>"
+            
+    return "<br>\n".join(parts)
+    
+
+# def run_help_command(cmd:str, output:typing.optional[io.TextIOBase] = None) -> str | None:
 def run_help_command(cmd:str) -> str | None:
     import pydoc, importlib, types, traceback
+    from core.workspacefunctions import user_workspace
+    # from gui import mainwindow # this has aliases to important modules
     if not isinstance(cmd, str) or len(cmd.strip()) == 0:
         return
+#     
+#     d = globals()
+#     d.update(mainwindow.__dict__)
+    
+    
+    with io.StringIO() as bf:
+        helper = pydoc.Helper(output = bf)
+        try:
+            helper.help(cmd)
+            return bf.getvalue()
+        except:
+            traceback.print_exc()
     
     # NOTE: stock pydoc will only report on packages
     # Here I need to break this down into package.<subpackage.>module
     # and get the documentation of module
-    if "." in cmd:
-        try:
-            print(f"executing importlib.import_module({cmd})")
-            module = importlib.import_module(cmd)
-            helper = pydoc.Helper()
-            helper.help(module.__name__)
-        except:
-            traceback.print_exc()
-                
-    else:
-        helper = pydoc.Helper()
-        helper.help(cmd)
+    
+    
+#     if "." in cmd:
+#         try:
+#             print(f"executing importlib.import_module({cmd})")
+#             module = importlib.import_module(cmd)
+#             helper = pydoc.Helper()
+#             helper.help(module.__name__)
+#         except:
+#             traceback.print_exc()
+#                 
+#     else:
+#         helper = pydoc.Helper()
+#         helper.help(cmd)
 
-def run():
-    if _scipyendir_ not in sys.path:
-        sys.path.append(_scipyendir_)
-    # print(f"helputils: sys.argv = {sys.argv}")
-    if len(sys.argv) > 1:
-        cmdList = list(filter(lambda s: "-X" not in s, sys.argv[1:]))
-        print(f"helputils: help command: {cmdList}")
-        run_help_command(" ".join(cmdList))
-    # print(f"sys.path = {sys.path}")
-        
-
-if __name__ == '__main__':
-    print("running helputils as a script")
-    run()
+# def run():
+#     if _scipyendir_ not in sys.path:
+#         sys.path.append(_scipyendir_)
+#     # print(f"helputils: sys.argv = {sys.argv}")
+#     if len(sys.argv) > 1:
+#         cmdList = list(filter(lambda s: "-X" not in s, sys.argv[1:]))
+#         print(f"helputils: help command: {cmdList}")
+#         run_help_command(" ".join(cmdList))
+#     # print(f"sys.path = {sys.path}")
+#         
+# 
+# if __name__ == '__main__':
+#     print("running helputils as a script")
+#     run()
