@@ -4,10 +4,49 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-r""" A QWidget to facilitate access to Python's help system, in parallel, and
-not interfering with, your console workflow.
-TODO: Work in progress...
+r""" A QWidget offering a veru basic — yet workable — interface to Python's help.
+
+Allow accessing Python's help in parallel (and without interfering) with the 
+user's workflow at Scipyen console.
+
+WARNING:
+package names, modules and submodules MUST be passed by their real name, and NOT
+by alias; e.g. typing "signalviewer" will correctly show a help message for that 
+module, but typing "sv" (which is an alias for signalviewr in the workspacw) will
+fail
+
 """
+# TODO: 2025-06-03 14:56:22 FIXME
+# 0. Resolve package and module aliases
+#
+# 1. delegate all calls to appropriate functions in `helputils` module.
+# (for example, this is done for calling pydoc helper on a StringIO, for
+# objects NOT found by running python3 in a subprocess)
+#
+# 2. migrate all formating code below to `helputils` module.
+#
+# 3. careful how to deal with `apropos` and `apropos -k` help commands: pydoc 
+# is loading ALL packages it can find; when run from Scipyen, this WILL crash
+# crash the application (I guess this is because it loads & executes Qt5-dependent
+# code while already running in a Qt5 event loop already)
+# 
+# NOTE: This is the very reason why calling pydoc in a subprocess seemed
+# like a good idea. The downside is that Scipyen modules are not to be 
+# seen in this approach.
+# 
+# NOTE: The alternative is loading/executing helputils as a standalone
+# module in a separate python subprocess, but it opens another big can of worms 
+# related to various circular/incomplete imports (which are avoided when
+# Scipyen is launched normally). While this may merit some investigation
+# (with the potential of massive restructuring the source code tree) I 
+# think it is more worthy to try to delegate as much as possible to
+# 'helputils' module within the same (current) process while avoiding pydoc
+# quirks...
+# 
+# For now, thus provides a very basic — yet workable — interface to python's
+# help system, which is enough to have it as a help window at hand.
+#
+#
 import sys, os, io, typing, traceback, inspect, subprocess, pydoc, runpy
 from collections import deque
 from qtpy import QtCore, QtGui, QtWidgets, QtSvg, QtNetwork, sip
@@ -38,10 +77,8 @@ class _PythonHelpThread_(QtCore.QThread):
         self.width = 80
 
     def run(self):
-        # TODO: 2025-06-01 12:42:08
-        # delegate to core.helputils when the subprocess below fails
-        # try to see what IPython is doing
         doc = QtGui.QTextDocument()
+        reformat:bool = False
         if isinstance(self.helpCommand, str) and len(self.helpCommand.strip()):
             cmdParts = self.helpCommand.split(" ")
             # if any(s in cmdParts for s in ("modules", "module")):
@@ -64,25 +101,19 @@ class _PythonHelpThread_(QtCore.QThread):
                 try:
                     self.helpProcess = subprocess.run(fullcmd, capture_output=True, check=True)
                     reply = self.helpProcess.stdout.decode()
+                    reformat = True
                 except subprocess.CalledProcessError as e:
                     reply = e.output.decode()
                     errors = e.stderr.decode()
                     retcode = e.returncode
                     if "No Python documentation found" in reply:
-                        # print("Trying my own...")
                         try:
-                            # fullcmd = [sys.executable, "-Xfrozen_modules=off", helputils.__file__] + cmdParts
-                            fullcmd = [sys.executable, "-B", helputils.__file__] + cmdParts
-                            # print(f"executing {fullcmd}")
-                            self.helpProcess = subprocess.run(fullcmd, capture_output=True, check=True)
-                            reply = self.helpProcess.stdout.decode()
-                        except subprocess.CalledProcessError as e1:
-                            reply = e.output.decode()
-                            errors = e.stderr.decode()
-                            retcode = e1.returncode
-                            scipywarn(f"Subprocess returned {retcode}")
-                            if len(errors.strip()):
-                                scipywarn(f"Errors:\n{errors}")
+                            reply = helputils.run_help_command(" ".join(cmdParts))
+                            reformat = True
+                            # reply = helputils.format_common_help_reply(helputils.run_help_command(" ".join(cmdParts)))
+                            # reformat = False
+                        except:
+                            traceback.print_exc()
                     else:
                         scipywarn(f"Subprocess returned {retcode}")
                         if len(errors.strip()):
@@ -122,7 +153,10 @@ class _PythonHelpThread_(QtCore.QThread):
                                 '<meta> name="generator" content="Kate Editor"</meta>', 
                                 "</head>"]
                         out.append("<body>")
-                        body = reply.replace("\n", "<br>\n")
+                        if reformat:
+                            body = reply.replace("\n", "<br>\n")
+                        else:
+                            body = reply
                         out.append(body)
                         out.append("</body>")
                         out.append("</html>")
@@ -160,9 +194,14 @@ class PythonHelpWidget(QWidget, WorkspaceGuiMixin, Ui_PythonHelpWidget):
             with io.StringIO() as bf:
                 helper = pydoc.Helper(output = bf)
                 helper.intro()
-                self.intro_msg = bf.getvalue()
-                parts = list(map(lambda s: s.replace("\n", " "), self.intro_msg.split("\n\n")))
-                self.intro_msg = "\n\n".join(parts[:-1])
+                msg = bf.getvalue()
+                parts = list(map(lambda s: s.replace("\n", " "), msg.split("\n\n")))
+                parts = parts[:-1]
+                parts.append("\n".join(["Scipyen-specific NOTE:",
+                              "----------------------",
+                              "Packages and modules must be entered by their names, and not by alias: e.g., search for 'scipyenviewer', not 'sv'. Alternatively one can supply a logical 'packge.<sub>module.class.method' hierarchy",
+                              "(Expect many bugs 😦)"]))
+                self.intro_msg = "\n\n".join(parts)
                 
         except:
             self.intro_msg = 'Enter a help topic in the field above (e.g., "topics", "pywt.Wavelet", etc)'
