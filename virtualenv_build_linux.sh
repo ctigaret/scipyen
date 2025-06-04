@@ -570,7 +570,59 @@ function dopyqt6 ()
     fi
 }
 
+function dopyside6()
+{
+    if [[ -z "$VIRTUAL_ENV" ]] ; then
+        echo -e "Not in an active environment! Goodbye!\n"
+        exit 1
+    fi
+}
 
+    if [ ! -r ${VIRTUAL_ENV}/.pyside6build_done ] || [[ $reinstall_pyside6 -gt 0 ]] ; then
+        if [[ $build_pyside6 -gt 0 ]] ; then
+            mkdir -p ${VIRTUAL_ENV}/src && cd ${VIRTUAL_ENV}/src
+            git clone https://code.qt.io/pyside/pyside-setup
+            cd pyside-setup && git checkout 6.9
+            pip install -r requirements.txt
+            pip install -r requirements-doc.txt
+            # NOTE: 2025-06-04 10:00:25 trouble:
+            # 1. how to programmatically locate qtpaths below?
+            # 2. even with the path to qtpaths 'hardcoded', 'setup.py' seems to 
+            # prepend the path to the virtualenv environment and recreate the
+            # virtualenv environment tree inside 'build' subdirectory of hte local git repo
+            # only to later complain that it cannot find 
+#             setup.py/prepare_packages:  [Errno 2] No such file or directory: '/home/user/pyside6env/src/pyside-setup/build/pyside6env/install/lib/python3.13/site-packages/PySide6'
+#             error: [Errno 2] No such file or directory: '/home/user/pyside6env/src/pyside-setup/build/pyside6env/install/lib/python3.13/site-packages/PySide6'
+#             Traceback (most recent call last):
+#             File "/home/user/pyside6env/src/pyside-setup/setup.py", line 43, in <module>
+#                 setup_runner.run_setup()
+#                 ~~~~~~~~~~~~~~~~~~~~~~^^
+#             File "/home/user/pyside6env/src/pyside-setup/build_scripts/setup_runner.py", line 264, in run_setup
+#                 raise RuntimeError(msg)
+#             RuntimeError: 
+#             setup.py invocation failed with exit code: 1.
+# 
+# 
+#             setup.py invocation was: /home/user/pyside6env/bin/python setup.py build --qtpaths=/usr/lib64/qt6/bin/qtpaths --build-tests --ignore-git --parallel=8 --internal-build-type=pyside6
+            
+#             python setup.py build --qtpaths=/usr/lib64/qt6/bin/qtpaths --build-tests --ignore-git --parallel=8
+
+            # Trying build with cmake
+            # fails miserably:
+#             /home/cezar/pyside6env/src/pyside-setup/sources/pyside6/qtexampleicons/module.c:4:10: fatal error: Python.h: No such file or directory
+#                 4 | #include <Python.h>
+#                 |          ^~~~~~~~~~
+#             compilation terminated.
+#             gmake[2]: *** [sources/pyside6/qtexampleicons/CMakeFiles/QtExampleIcons.dir/build.make:99: sources/pyside6/qtexampleicons/CMakeFiles/QtExampleIcons.dir/module.c.o] Error 1
+#             gmake[1]: *** [CMakeFiles/Makefile2:15381: sources/pyside6/qtexampleicons/CMakeFiles/QtExampleIcons.dir/all] Error 2
+#           ...
+#             [  7%] Linking CXX static library ../../../tests/libapiextractor.a
+#             [  7%] Built target apiextractor
+#             gmake: *** [Makefile:136: all] Error 2
+
+            
+        fi
+    fi
 
 function dovigra ()
 {
@@ -1013,19 +1065,19 @@ for i in "$@" ; do
         shift
         ;;
         --with_pyqt6)
-        with_pyqt6=1
-        build_pyqt6=0 
         with_pyqt5=0
         build_pyqt5=0 
+        with_pyqt6=1
+        build_pyqt6=0 
         with_pyside6=0
         build_pyside6=0
         shift
         ;;
         --with_pyside6)
-        with_pyqt6=0
-        build_pyqt6=0 
         with_pyqt5=0
         build_pyqt5=0 
+        with_pyqt6=0
+        build_pyqt6=0 
         with_pyside6=1
         build_pyside6=0
         shift
@@ -1040,10 +1092,10 @@ for i in "$@" ; do
         shift
         ;;
         --build_pyqt6)
-        with_pyqt6=1
-        build_pyqt6=1
         with_pyqt5=0
         build_pyqt5=0 
+        with_pyqt6=1
+        build_pyqt6=1
         with_pyside6=0
         build_pyside6=0
         shift
@@ -1102,8 +1154,12 @@ for i in "$@" ; do
             build_pyside6=0
             ;;
             pyqt6)
+            reinstall_pyqt5=0
+            build_pyqt5=0
             reinstall_pyqt6=1
             build_pyqt6=0
+            reinstall_pyside6=0
+            build_pyside6=0
             ;;
             build_pyqt6)
             reinstall_pyqt5=0
@@ -1269,11 +1325,11 @@ if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
     # may take a while until conda packages are also uptodate :)
     # • splitting pip package installation in two batches (installpipreqs_part1 & installpipreqs_part2
     # see changelog above)
-    dopyqt5 
+#     dopyqt5 
     
     # NOTE: 2025-03-13 11:01:07 TODO/FIXME
 #     dopyqt6 
-#     dopyside6 # TODO
+    dopyside6 # TODO
 
     installpipreqs_part2
 
