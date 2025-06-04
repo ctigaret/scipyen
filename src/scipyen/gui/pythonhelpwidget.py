@@ -110,8 +110,6 @@ class _PythonHelpThread_(QtCore.QThread):
                         try:
                             reply = helputils.run_help_command(" ".join(cmdParts))
                             reformat = True
-                            # reply = helputils.format_common_help_reply(helputils.run_help_command(" ".join(cmdParts)))
-                            # reformat = False
                         except:
                             traceback.print_exc()
                     else:

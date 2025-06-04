@@ -273,33 +273,30 @@ def format_common_help_reply(msg:str):
             
     return "<br>\n".join(parts)
     
-
-# def run_help_command(cmd:str, output:typing.optional[io.TextIOBase] = None) -> str | None:
+    
 def run_help_command(cmd:str) -> str | None:
     import pydoc, importlib, types, traceback
     from core.workspacefunctions import user_workspace
     # from gui import mainwindow # this has aliases to important modules
     if not isinstance(cmd, str) or len(cmd.strip()) == 0:
         return
-#     
-#     d = globals()
-#     d.update(mainwindow.__dict__)
-    
-    
+
+    # return pydoc.render_doc(eval(cmd), title = cmd, forceload = 1, renderer = pydoc.html)
+
     with io.StringIO() as bf:
-        # try an alternative here:
-        t = sys.stdout
-        sys.stdout = bf
-        helper = pydoc.Helper()
-        # helper = pydoc.Helper(output = bf)
+        # try an alternative here: NOPE
+        # # t = sys.stdout
+        # # sys.stdout = bf
+        # # helper = pydoc.Helper()
+        helper = pydoc.Helper(output = bf)
         try:
             helper.help(cmd)
-            # return bf.getvalue()
-            return sys.stdout.getvalue()
+            return bf.getvalue()
+            # # return sys.stdout.getvalue()
         except:
             traceback.print_exc()
             
-        sys.stdout = t
+        # # sys.stdout = t
     
     # NOTE: stock pydoc will only report on packages
     # Here I need to break this down into package.<subpackage.>module

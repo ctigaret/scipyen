@@ -1131,7 +1131,7 @@ def nameFromUnit(u, as_key:bool=False):
         else:
             return f"Compound Quantity {u.dimensionality.string}" if not as_key else "?"
         
-def checkQuantityParam(x:typing.Union[numbers.Number, pq.Quantity, np.ndarray, typing.Sequence[numbers.Number]], name:str,  
+def checkQuantity(x:typing.Union[numbers.Number, pq.Quantity, np.ndarray, typing.Sequence[numbers.Number]], name:str,  
                        units:pq.Quantity, 
                        shape:typing.Optional[tuple[int]] = None,
                        size:typing.Optional[int]=None, 
