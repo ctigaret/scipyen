@@ -287,12 +287,19 @@ def run_help_command(cmd:str) -> str | None:
     
     
     with io.StringIO() as bf:
-        helper = pydoc.Helper(output = bf)
+        # try an alternative here:
+        t = sys.stdout
+        sys.stdout = bf
+        helper = pydoc.Helper()
+        # helper = pydoc.Helper(output = bf)
         try:
             helper.help(cmd)
-            return bf.getvalue()
+            # return bf.getvalue()
+            return sys.stdout.getvalue()
         except:
             traceback.print_exc()
+            
+        sys.stdout = t
     
     # NOTE: stock pydoc will only report on packages
     # Here I need to break this down into package.<subpackage.>module

@@ -5,13 +5,16 @@
 
 r"""
 This modules complements the Quantities package with additional unit quantities
-and exposes some much needed constants (as shorthand¹, but NOTE that values are
-slightly different - TODO/FIXME):
+and exposes some much needed constants as shorthand¹:
+
 R   : universal gas constant (molar gas constant)  8.31446261815324 * J/(K mol)
+
 F   : Faraday constant 96485.33212331001 C/mol
+
 qe  : elementary charge 1.602176634e-19 C
+
 N_A : Avogadro constant 6.02214076e23 mol⁻¹
-    (NAME avoids clashes with pandas.NA "not available" type)
+    ('N_A' chosen to avoid clashes with pandas.NA)
 
 ¹ NOTE: These are aready contained in the "constants" module of the Quantities 
 package, as UnitConstant objects, but some are bound to rather "verbose" symbols
@@ -29,7 +32,8 @@ code will BREAK things. If you modify this module, please restart Scipyen.
 
 
 """
-import inspect, typing, traceback, warnings, types, dataclasses
+# NOTE that some constant values are slightly different here:
+import inspect, typing, traceback, warnings, types, dataclasses, numbers
 from math import (log, inf, nan)
 from pandas import NA
 from numpy import log10
@@ -1126,6 +1130,248 @@ def nameFromUnit(u, as_key:bool=False):
 
         else:
             return f"Compound Quantity {u.dimensionality.string}" if not as_key else "?"
+        
+def checkQuantityParam(x:typing.Union[numbers.Number, pq.Quantity, np.ndarray, typing.Sequence[numbers.Number]], name:str,  
+                       units:pq.Quantity, 
+                       shape:typing.Optional[tuple[int]] = None,
+                       size:typing.Optional[int]=None, 
+                       ndim:typing.Optional[int] = None,
+                       dtype:typing.Union[np.dtype, dataclasses.MISSING]=dataclasses.MISSING) -> pq.Quantity:
+    r"""Check validity of an object as a Quantity, or convertibility to a Quantity
+    
+    Parameters:
+    ===========
+    x               The parameter value to check
+                    When a numbers.Number, it will be converted directly to a 
+                    Quantity with ``units`` (see below) unless 
+                    ``size`` > 1
+    
+                    When a sequence of numbers.Number or a NumPy array, it will
+                    be converted directly to a Quantity with ``units``
+                    unless:
+                    a) the length of the sequence or the size fo the array does 
+                        not match ``size``
+                    b) the array dimensions do not match ``ndim`` (if
+                        specified)
+                    c) the array shape does not match ``shape`` (if 
+                        specified)
+    
+                    In addition, when a sequence, it must be convertible to a
+                    NumPy array.
+    
+                    CAUTION: Sequences of numbers can be nested to 'emulate' 
+                    multi-dimensional arrays, but they must resolve to a homogeneous 
+                    (i.e. N-D rectangular) shape in order to be converted to an array.
+    
+                    When the sequence shape cannot be canverted to a NumPy array 
+                    this function will the stopped with the ValueError raised by the 
+                    NumPy library (with a somewhat opaque message)
+    
+                    CAUTION: Tuples may result in arrays with a different shape
+                    or event dimensionless array so are best avoided here.
+    
+                    CAUTION: Sequence of non-numeric objects, or numpy arrays with
+                    invalid data types (dtype) will cause the Quantities package
+                    to raise 
+    
+    name            the name of the parameter
+    
+    units  The units expected for this parameter; if ``x`` is a Quantity
+                    with different units, a rescale to the expected units will be 
+                    attempted which will raise a TypeError if the units cannot be
+                    converted.
+    
+    shape  The expected shape of the Quantity array; Default is None.
+    
+                    When specified, `size` and ``ndim`` are ignored.
+    
+    size   The size (i.e. number of elements in the Quantity array)
+                    size == 1 signifies a scalar (see example below)
+    
+                    Default is None; values < 1 are illegal
+    
+                    Applicable only when ``x` is a Quantity
+    
+    ndim  The number of array dimensions (NOT the dimensionality of the physical quantity!)
+    
+                    Optional, default is None.
+    
+                    When None, the dimensions of ``x`` (when a Quantity) are not
+                    checked, unless ``shape`` is specified. 
+    
+                    When both ``shape`` and ``ndim`` are given,
+                    ``shape`` takes precedence.
+    
+                    NOTE: For scalar Quantity objects, this can be an value >= 0
+                    see the examples below.
+    
+    dtype  The dtype of the data in the array; default is dataclasses.MISSING
+                    Quantities make sense mostly when defined as float arrays,
+                    but technically it is possible to have Quantities as int,
+                    complex numbers, or rationals (fractions).  
+    
+                    In general the only check that is done is to ensure that
+                    ``x`` when given as a NumPy array does not have invalid
+                    dtype (e.g. object: np.dtype("<O") or string: np.dtype("<U"))
+    
+    Returns:
+    =========
+    
+    A Python Quantity with ``x`` s its magnitude
+    
+    Example:
+    ========
+    In:  a = 1*pq.pA
+
+    In:  a
+    Out: array(1.) * pA
+    
+    In:  a.size
+    Out: 1
+    
+    In:  a.ndim
+    Out: 0
+
+but:
+
+    In:  b = [1]*pq.pA
+    
+    In:  b
+    Out: array([1.]) * pA
+
+    In:  b.size
+    Out: 1
+
+    In:  b.ndim
+    Out: 1
+
+and:
+    In:  c = array([[1.]]) * pA
+
+    In:  c
+    Out: array([[1.]]) * pA
+
+    In:  c.size
+    Out: 1
+
+    In:  c.ndim
+    Out: 2
+"""
+    # ### BEGIN verify parameters for this function
+    #
+    if not isinstance(units, pq.Quantity):
+        raise TypeError(f"Expecting a pq.Quantity for 'units'; instead, got a {type(units).__name__}")
+    
+    if isinstance(size, int):
+        if size < 1:
+            raise ValueError("0-sized values don't make sense!")
+        
+    elif size is not None:
+        raise TypeError(f"Expecting an int, or None, for 'size'; instead, got a {type(size).__name__}")
+    
+
+    if not isinstance(ndim, (int, type(None))):
+        raise TypeError(f"Expecting an int or None for 'ndim'; instead, got a {type(ndim).__name__}")
+        
+    if isinstance(shape, typing.Sequence):
+        if len(shape) == 0:
+            shape = None
+            
+        elif not all(isinstance(v, int) for v in shape):
+            raise ValueError(f"'shape' must be a sequence of ints', instead, got a sequence with {set(list(map(lambda v: type(v).__name__)))}")
+        
+    elif shape is not None:
+        raise TypeError(f"c, or None; instead, got {type(shape).__name__}")
+    
+    if isinstance(ndim, int):
+        if ndim < 0:
+            raise ValueError(f"'ndim' value {ndim} is invalid")
+            
+    # take over size and ndim
+    if shape is not None:
+        ndim = len(shape)
+        size = np.prod(shape)
+        shape_msg = f"a Quantity array with shape: {shape}"
+    else:
+        if ndim is not None:
+            shape_msg = f"a Quantity array with {ndim} dimensions"
+        else:
+            shape_msg = ""
+            
+        if size is not None:
+            size_msg = "a scalar Quantity" if size == 1 else f"a Quantity array with size: {size}"
+        else:
+            size_msg = ""
+    
+    if dtype is not dataclasses.MISSING:
+        if not isinstance(dtype, np.dtype):
+            raise TypeError(f"'dtype' must be a NumPy dtype; instead, got a {type(dtype)}.__name__")
+    
+    #
+    # ### END   verify parameters for this function
+        
+    # ### BEGIN actual code
+    #
+    
+    # ### BEGIN convert x
+    #
+    if isinstance(x, numbers.Number):
+        x *= units
+    
+    elif isinstance(x, typing.Sequence):
+        try:
+            x = np.array(x) * units # raises ValueError if sequence has an inhomogeneous shape, or invalid dtype
+        except:
+            traceback.print_exc()
+            raise ValueError(f"Cannot convert the sequence in 'x' to a Quantity array")
+        
+    elif isinstance(x, pq.Quantity):
+        if x.size != size:
+            raise ValueError(f"{name} expected to be {size_msg}; instead got a Quantity array with size: {x.size}")
+        
+        if isinstance(ndim, int) and x.ndim != ndim:
+            raise ValueError(f"{name} expected to be a Quantity array with {ndim} dimensions; instad, got {x.ndim} dimensions")
+        
+        if x.units != units:
+            if not unitsConvertible(x.units, units):
+                raise TypeError(f"{name} expected to be a Quantity with {units.dimensionality}; instead, got {x.units.dimensionality}")
+            return x.rescale(units)
+        
+    elif isinstance(x, np.ndarray):
+        x *= units
+        
+    else:
+        raise TypeError(f"{name} expected to be a real number, a Python Quantity, a sequence of numbers or a NumPy array; got {type(x).__name__} instead")
+    
+    #
+    # ### END   convert x
+    
+    # ### BEGIN check shape/size/ndim
+    #
+    
+    if shape is not None:
+        if x.shape != shape:
+            raise ValueError(f"'x' does not resolve to a {shape_msg}")
+    else:
+        if size is not None:
+            if x.size != size:
+                raise ValueError(f"'x' does not resolve to a {size_msg}")
+            
+        if ndim is not None:
+            if x.ndim != ndim:
+                raise ValueError(f"'x' does not resolve to a {shape_msg}")
+            
+        if dtype is not None:
+            if x.dtype != dype:
+                raise ValueError(f"'x' has data type {x.dtype} instead of the expected {dtype}")
+                
+    #
+    # ### END   check shape/size/ndim
+    
+    return x
+    
+    #
+    # ### END   actual, code
         
 def checkDosageUnits(value):
     if not isinstance(value, (pq.UnitQuantity, pq.Quantity)):

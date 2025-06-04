@@ -4503,8 +4503,9 @@ def detect_AP_waveforms_in_train(sig, iinj,
     Var-keyword parameters (**kwargs)
     ---------------------------------
     t_start, t_stop: start, stop time of the spiketrain - relevant when detection
-        takes place on a slice of the original signal; these values should reflect 
-        the entire extend of the original signal
+        takes place on a tiem slice of the original signal; 
+        these values are required for the construction of the SpikeTrain object
+            to coover the entire extent of the original Vₘ signal.
         
         Optional; default values are taken from `sig`.
     
