@@ -1326,11 +1326,11 @@ and:
             raise ValueError(f"Cannot convert the sequence in 'x' to a Quantity array")
         
     elif isinstance(x, pq.Quantity):
-        if x.size != size:
-            raise ValueError(f"{name} expected to be {size_msg}; instead got a Quantity array with size: {x.size}")
-        
-        if isinstance(ndim, int) and x.ndim != ndim:
-            raise ValueError(f"{name} expected to be a Quantity array with {ndim} dimensions; instad, got {x.ndim} dimensions")
+#         if isinstance(size, int) and x.size != size:
+#             raise ValueError(f"{name} expected to be {size_msg}; instead got a Quantity array with size: {x.size}")
+#         
+#         if isinstance(ndim, int) and x.ndim != ndim:
+#             raise ValueError(f"{name} expected to be a Quantity array with {ndim} dimensions; instad, got {x.ndim} dimensions")
         
         if x.units != units:
             if not unitsConvertible(x.units, units):
@@ -1346,7 +1346,7 @@ and:
     #
     # ### END   convert x
     
-    # ### BEGIN check shape/size/ndim
+    # ### BEGIN check shape/size/ndim/dtype
     #
     
     if shape is not None:
@@ -1361,8 +1361,8 @@ and:
             if x.ndim != ndim:
                 raise ValueError(f"'x' does not resolve to a {shape_msg}")
             
-        if dtype is not None:
-            if x.dtype != dype:
+        if dtype is not dataclasses.MISSING:
+            if x.dtype != dtype:
                 raise ValueError(f"'x' has data type {x.dtype} instead of the expected {dtype}")
                 
     #

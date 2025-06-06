@@ -4845,7 +4845,7 @@ def detect_AP_waveforms_in_train(sig, iinj,
     # ap_rise_stops, but see NOTE: 2019-04-29 11:13:46 for why we don't use that
     #
 
-    # NBOTE: 2019-05-03 13:32:22
+    # NOTE: 2019-05-03 13:32:22
     # get the values at the peaks
     ap_peak_values = np.array([w.max() for w in ap_waveform_signals]) * sig.units # must do this because we c'truct a new numpy array!
     
