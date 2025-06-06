@@ -4756,6 +4756,7 @@ def detect_AP_waveforms_in_train(sig, iinj,
     ap_fast_rise_start_times, ap_fast_rise_stop_times, ap_fast_rise_durations, ap_peak_times, dv_dt, d2v_dt2 = ap_waveform_times
     
     # print(f"detect_AP_waveforms_in_train: sig.units = {sig.units}")
+    #
     # ### END detect APs by thresholding
     
     train_annotations = dict()
@@ -4983,96 +4984,6 @@ def detect_AP_waveforms_in_train(sig, iinj,
             
             rise_refVm_x, decay_refVm_x = ref_crossings["AP_durations_at_Ref_Vm"]
             
-            # rise_onset_Vm_x, decay_onset_Vm_x = get_AP_waveform_crossings(w, ap_Vm_onset_values[k],
-            #                                                               ref_name = "onset",
-            #                                                               step_index = step_index,
-            #                                                               wave_index = k)
-            
-            # hm_rise_x, hm_decay_x = get_AP_waveform_crossings(w, vm_at_half_max[k],
-            #                                                     ref_name = "half-max",
-            #                                                     step_index = step_index,
-            #                                                     wave_index = k)
-            
-            # qm_rise_x, qm_decay_x = get_AP_waveform_crossings(w, vm_at_quart_max[k],
-            #                                                     ref_name = "quarter-max",
-            #                                                     step_index = step_index,
-            #                                                     wave_index = k)
-            
-            # tm_rise_x, tm_decay_x = get_AP_waveform_crossings(w, vm_at_third_max[k],
-            #                                                     ref_name = "third-max",
-            #                                                     step_index = step_index,
-            #                                                     wave_index = k)
-            
-            # rise_refVm_x, decay_refVm_x = get_AP_waveform_crossings(w, reference_Vm,
-            #                                                     ref_name = f"reference {reference_Vm}",
-            #                                                     step_index = step_index,
-            #                                                     wave_index = k)
-            # NOTE: 2024-01-28 10:19:58
-            # Detecting AP wave crossings at 0 mV:
-            # • when Vm onset appears to be < 0 mV then AP waveform crosses
-            #   0 mV at least during rise and typically also during decay
-            #
-            # • when Vm onset appears to be > 0 mV (WARNING this indicates 
-            #   something wrong happened with the recording) then take the 
-            #   onset as reference value.
-            #
-            # if ap_Vm_onset_values[k] < 0 * w.units:
-            #     rise_0mV_x, decay_0mV_x = get_AP_waveform_crossings(w, 0 * w.units,
-            #                                                         ref_name = f"zero",
-            #                                                         step_index = step_index,
-            #                                                         wave_index = k)
-            # else:
-            #     rise_0mV_x, decay_0mV_x = get_AP_waveform_crossings(w, ap_Vm_onset_values[k],
-            #                                                         ref_name = f"onset for zero",
-            #                                                         step_index = step_index,
-            #                                                         wave_index = k)
-            
-            #print("find AP >= 0 Vm")
-            # NOTE: 2019-04-25 13:48:32
-            # do the same for Vm = 0 mV
-            #rise_0mV_x, decay_0mV_x, rise_0mV_slope, decay_0mV_slope = __wave_interp_root_near_val__(w, 0 * w.units)
-#             if decay_onset_Vm_x is np.nan:
-#                 print(f"detect_AP_waveforms_in_train {step_index}, wave {k}: decay_onset_Vm_x = {decay_onset_Vm_x}")
-#                 # waveform is likely on a rising baseline
-#                 # there are two alternative workarounds:
-#                 # (a) extrapolate a straight line from the point on half-max and 
-#                 #   find its intercept with the Vm onset value
-#                 if decay_intercept_approx.strip().lower() == "linear":
-#                     #print("decay_ref", decay_ref)
-#                     if isinstance(decay_ref, str):
-#                         if decay_ref == "hm":
-#                             #print("hm_decay_slope", hm_decay_slope)
-#                             decay_onset_Vm_x = (ap_Vm_onset_values.magnitude[k] - vm_at_half_max.magnitude[k]) / hm_decay_slope + hm_decay_x
-#                             
-#                         elif decay_ref == "qm":
-#                             decay_onset_Vm_x = (ap_Vm_onset_values.magnitude[k] - vm_at_quart_max.magnitude[k]) / qm_decay_slope + qm_decay_x
-#                             
-#                         else:
-#                             decay_onset_Vm_x = (ap_Vm_onset_values.magnitude[k] - 0) / decay_0mV_slope + decay_0mV_x
-#                             
-#                     else:
-#                         decay_onset_Vm_x = (ap_Vm_onset_values.magnitude[k] - decay_ref.magnitude) / decay_0mV_slope + decay_0mV_x
-#                         
-#                 # (b) determine a "pseudo-baseline" and use that as the onset Vm on the 
-#                 # decay side
-#                 else:
-#                     [lo, hi], _,_,_ = sigp.state_levels(w)
-#                     _,_,_,decay_onset_Vm_x,decay_onset_Vm_y,decay_onset_slope = ap_waveform_roots(w, lo)
-#                 
-#                 print(f"detect_AP_waveforms_in_train {step_index}, wave {k}: estimated decay_onset_Vm_x = {decay_onset_Vm_x}")
-                
-#             if isinstance(reference_Vm, pq.Quantity):
-#                 if reference_Vm >= ap_Vm_onset_values[k]:
-#                     rise_refVm_x, rise_refVm_y, rise_refVm_slope, decay_refVm_x, decay_refVm_y, decay_refVm_slope = ap_waveform_roots(w, reference_Vm)
-#                     
-#                     times_of_refVm_on_rise.append(rise_refVm_x)
-#                     times_of_refVm_on_decay.append(decay_refVm_x)
-#                     
-#                 else:
-#                     warnings.warn("cannot measure duration of waveform %d at Vm %s < onset Vm (%s)" % (k, reference_Vm, ap_Vm_onset_values[k]))
-#                     times_of_refVm_on_rise.append(np.nan)
-#                     times_of_refVm_on_decay.append(np.nan)
-                    
             times_of_refVm_on_rise.append(rise_refVm_x)
             times_of_refVm_on_decay.append(decay_refVm_x)
             
@@ -5254,7 +5165,9 @@ def detect_AP_waveforms_in_train(sig, iinj,
         ap_waveforms = ap_waveform_signals[0].magnitude.T
         ap_wave_times = np.linspace(0, ap_waveform_signals[0].duration.magnitude, num=len(ap_waveform_signals[0])) * sig.times.units
         maxWaveformLength = np.nan
-
+    #
+    #### END   Collect AP values
+    
     # spike train where eack "spike" is the beginning of the waveform 
     # "CONTAINING" a single AP
     #

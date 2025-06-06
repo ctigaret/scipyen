@@ -2123,19 +2123,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                             symbolStyle,
                                             **labelStyle)
                 
-                
-            
             elif all(isinstance(v, neo.SpikeTrain) for v in entities_list):
                 entities_axis.clear()
-                #### BEGIN debug
-                # print(f"1704 plot spike train")
-                # print(f"{self.__class__.__name__}._plot_discrete_entities_ stack trace:")
-                # stack = inspect.stack()
-                # for s in stack:
-                #     print(f"\tcaller\t {s.function}")
-                # traceback.print_stack(limit=8)
-                #### ENBD debug
-                
                 for k_train, train in enumerate(entities_list):
                     data_name = getattr(train, "name", None)
                     data_name = data_name if isinstance(data_name, str) and len(data_name.strip()) else "%d" % k_train
@@ -8451,13 +8440,6 @@ anything else       anything else       ❌
             xLink = ax.vb.linkedView(0)
             if isinstance(xLink, pg.ViewBox):
                 aa = [a for a in self.axes if a.vb == xLink]
-                # if xLink.isVisible():
-                #     aa = [a for a in self.axes if a.vb == xLink]
-                # else:
-                #     # continue
-                #     if isinstance(refAxis, pg.PlotItem):
-                #         aa = [refAxis]
-                    
                 ax.vb.blockLink(True)
                 xLink.blockLink(True)
                 
@@ -8525,6 +8507,7 @@ anything else       anything else       ❌
         r"""Common landing zone for SpikeTrainList or collection of SpikeTrain.
         Actual plotting delegated to _plot_discrete_entities_.
         """
+        standaloneTrains = self._yData_ is trains
         # plot all spike trains stacked in a single axis
         if self._plot_spiketrains_:
             if isinstance(trains, neo.SpikeTrain):
@@ -8540,6 +8523,8 @@ anything else       anything else       ❌
                 obj_ = trains
                 
             if len(obj_):
+                t_min = min(list(map(lambda t: t.t_start, obj_)))
+                t_max = max(list(map(lambda t: t.t_start, obj_)))
                 # NOTE: 2023-05-16 23:02:20:
                 # is this is a new frame, then call the actual function (_plot_discrete_entities_)
                 # otherwise, just set the entities axis visible
@@ -8549,6 +8534,9 @@ anything else       anything else       ❌
                     self._spiketrains_axis_.update()
                     
                 self.spikeTrainsAxis.setVisible(True)
+                if standaloneTrains:
+                    self.spikeTrainsAxis.vb.setXRange(t_min.magnitude, t_max.magnitude,
+                                                      padding=0)
             else:
                 self.spikeTrainsAxis.setVisible(False)
         else:

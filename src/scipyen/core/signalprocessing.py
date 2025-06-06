@@ -1831,7 +1831,6 @@ def parse_step_waveform_signal(sig, method="state_levels", **kwargs):
 
     return down, up, amplitude, centroids, label
 
-
 @safewrapper
 def resample_pchip(sig, new_sampling_period, old_sampling_period=1):
     r"""Resample a signal using a piecewise cubic Hermite interpolating polynomial.

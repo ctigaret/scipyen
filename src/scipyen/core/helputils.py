@@ -160,15 +160,15 @@ ns: the namepace where modules have been imported
     modnames = tuple(map(lambda m: m.name, modinfos))
     
     address_map = {"Data Analysis": {
-                                     "numpy":      ("NumPy", "https://numpy.org", "The fundamental package for scientific computing with Python"),
-                                     "scipy":   ("SciPy", "https://scipy.org", "Fundamental algorithms for scientific computing in Python"),
-                                     "quantities":      ("Quantities", "https://github.com/python-quantities/python-quantities", "A Python package for handling physical quantities."),
-                                     "vigra":   ("vigra", "http://ukoethe.github.io/vigra", "The VIGRA Computer Vision Library"),
-                                     "neo":     ("Neo", "https://neuralensemble.org/neo", "Neo is a package for representing electrophysiology data in Python"),
+                                     "numpy":       ("NumPy", "https://numpy.org", "The fundamental package for scientific computing with Python"),
+                                     "scipy":       ("SciPy", "https://scipy.org", "Fundamental algorithms for scientific computing in Python"),
+                                     "quantities":  ("Quantities", "https://github.com/python-quantities/python-quantities", "A Python package for handling physical quantities."),
+                                     "vigra":       ("vigra", "http://ukoethe.github.io/vigra", "The VIGRA Computer Vision Library"),
+                                     "neo":         ("Neo", "https://neuralensemble.org/neo", "Neo is a package for representing electrophysiology data in Python"),
                                      "pandas":      ("pandas", "https://pandas.pydata.org", "Open source data analysis and manipulation tool"),
-                                     "h5py":    ("h5py", "https://www.h5py.org", "HDF5 for Python"),
-                                     "pyABF":   ("pyABF", "https://github.com/swharden/pyABF", "A simple Python interface for Axon Binary Format (ABF) files"),
-                                     "pywt":    ("PyWavelets", "https://pywavelets.readthedocs.io/en/latest/index.html", "Wavelet Transforms in Python"),
+                                     "h5py":        ("h5py", "https://www.h5py.org", "HDF5 for Python"),
+                                     "pyABF":       ("pyABF", "https://github.com/swharden/pyABF", "A simple Python interface for Axon Binary Format (ABF) files"),
+                                     "pywt":        ("PyWavelets", "https://pywavelets.readthedocs.io/en/latest/index.html", "Wavelet Transforms in Python"),
                                      },
                     "User Interface & Plotting Frameworks": {"matplotlib": ("Matplotlib", "https://matplotlib.org", "MatplotLib: Visualization with Python"),
                                                              "seaborn": ("seaborn", "https://seaborn.pydata.org", "Statistical data visualization"),
@@ -272,6 +272,8 @@ def format_common_help_reply(msg:str):
             parts[k+1] = f"<p style='color:BlueViolet>{p}</p>"
             
     return "<br>\n".join(parts)
+
+# def split_logical_path(p:str):
     
     
 def run_help_command(cmd:str) -> str | None:
@@ -284,20 +286,13 @@ def run_help_command(cmd:str) -> str | None:
     # return pydoc.render_doc(eval(cmd), title = cmd, forceload = 1, renderer = pydoc.html)
 
     with io.StringIO() as bf:
-        # try an alternative here: NOPE
-        # # t = sys.stdout
-        # # sys.stdout = bf
-        # # helper = pydoc.Helper()
         helper = pydoc.Helper(output = bf)
         try:
             helper.help(cmd)
             return bf.getvalue()
-            # # return sys.stdout.getvalue()
         except:
             traceback.print_exc()
-            
-        # # sys.stdout = t
-    
+
     # NOTE: stock pydoc will only report on packages
     # Here I need to break this down into package.<subpackage.>module
     # and get the documentation of module
