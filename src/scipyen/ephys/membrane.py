@@ -4510,7 +4510,7 @@ def detect_AP_waveforms_in_train(sig, iinj,
         Optional; default values are taken from `sig`.
     
     step_index: int; optional, default is None
-        When given, is represents the inex of the step current depolarization
+        When given, is represents the index of the step current depolarization
         in a series — used in feedback messages (warnings, errors, etc)
     
         
