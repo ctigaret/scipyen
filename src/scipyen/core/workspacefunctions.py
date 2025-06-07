@@ -421,6 +421,8 @@ NOTE: The function was designed to complement the %who, %who_ls and %whos
 
 def assignin(variable:object, varname:str, ws:typing.Optional[dict]=None):
     r"""Assign variable as varname in workspace ws"""
+    # TODO: 2025-06-07 17:39:06
+    # consider shell.push(…) as alternative
     user_ws = user_workspace()
     if ws is None:
         ws = user_ws

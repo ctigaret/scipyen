@@ -52,6 +52,7 @@ from collections import deque
 from qtpy import QtCore, QtGui, QtWidgets, QtSvg, QtNetwork, sip
 from qtpy.QtCore import Signal, Slot, Property
 from qtpy.uic import loadUiType as __loadUiType__
+from IPython.core.interactiveshell import InteractiveShell
 from core import prog
 from core.prog import safewrapper, safeguiwrapper, scipywarn
 from core.sysutils import adapt_ui_path
@@ -69,8 +70,9 @@ class _PythonHelpThread_(QtCore.QThread):
     message = Signal(str, name="ready")
     # threadRunning = Signal(str, name="threadRunning")
     
-    def __init__(self, parent: QtCore.QObject):
+    def __init__(self, parent: QtCore.QObject, shell:InteractiveShell):
         QtCore.QThread.__init__(self, parent)
+        self.shell = shell
         self.helpCommand = None
         self.helpProcess = None
         self.columns = 4
@@ -108,7 +110,7 @@ class _PythonHelpThread_(QtCore.QThread):
                     retcode = e.returncode
                     if "No Python documentation found" in reply:
                         try:
-                            reply = helputils.run_help_command(" ".join(cmdParts))
+                            reply = helputils.run_help_command(" ".join(cmdParts), self.shell)
                             reformat = True
                         except:
                             traceback.print_exc()
@@ -175,7 +177,8 @@ class PythonHelpWidget(QWidget, WorkspaceGuiMixin, Ui_PythonHelpWidget):
             
         return cls._instance
         
-    def __init__(self, parent:typing.Optional[QtWidgets.QMainWindow] = None, **kwargs):
+    def __init__(self, shell:InteractiveShell, parent:typing.Optional[QtWidgets.QMainWindow] = None,
+                 **kwargs):
         # if sys.platform.startswith("win32") or os.name == "nt" or platform.uname().system == "Windows":
         #     parent = None
         # elif sys.platform.startswith("linux") and os.getenv("XDG_SESSION_TYPE").lower() == "wayland":
@@ -184,7 +187,7 @@ class PythonHelpWidget(QWidget, WorkspaceGuiMixin, Ui_PythonHelpWidget):
         super(QWidget, self).__init__(parent)
         WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs)
         
-        self._helpThread_ = _PythonHelpThread_(self)
+        self._helpThread_ = _PythonHelpThread_(self, shell)
         self._helpThread_.message[str].connect(self._slot_displayMessage)
         self._helpThread_.ready[QtGui.QTextDocument].connect(self._slot_displayReply)
         self._queryHistory_ = deque()

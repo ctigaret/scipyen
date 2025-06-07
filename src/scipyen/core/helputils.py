@@ -14,7 +14,10 @@ Meant to be used by gui.pythonhelpwidget
 # DO NOT import any of scipyen's modules here, so that this can be run in a 
 # separate python process
 
-import sys, os, typing, inspect, types, importlib, io
+import sys, os, typing, inspect, types, importlib, io, dataclasses, inspect
+from functools import (singledispatch, partial)
+from contextlib import redirect_stdout
+from IPython.core.interactiveshell import InteractiveShell
 from qtpy import QtCore, QtWidgets
 # let's try this:
 # from gui.mainwindow import *
@@ -273,55 +276,73 @@ def format_common_help_reply(msg:str):
             
     return "<br>\n".join(parts)
 
-# def split_logical_path(p:str):
+def dummy_pager(self, data, start, screen_lines, out = None):
+    if isinstance(data, dict):
+        data = data['text/plain']
+        
+    print(f"data: {data}", file=out)
+    # return data
     
-    
-def run_help_command(cmd:str) -> str | None:
+
+def run_help_command(cmd:str, shell:typing.Optional[object]=None) -> str | None:
     import pydoc, importlib, types, traceback
-    from core.workspacefunctions import user_workspace
-    # from gui import mainwindow # this has aliases to important modules
     if not isinstance(cmd, str) or len(cmd.strip()) == 0:
         return
 
     # return pydoc.render_doc(eval(cmd), title = cmd, forceload = 1, renderer = pydoc.html)
 
+    ret = None
+    
     with io.StringIO() as bf:
         helper = pydoc.Helper(output = bf)
         try:
             helper.help(cmd)
-            return bf.getvalue()
+            ret = bf.getvalue()
         except:
             traceback.print_exc()
 
-    # NOTE: stock pydoc will only report on packages
-    # Here I need to break this down into package.<subpackage.>module
-    # and get the documentation of module
-    
-    
-#     if "." in cmd:
-#         try:
-#             print(f"executing importlib.import_module({cmd})")
-#             module = importlib.import_module(cmd)
-#             helper = pydoc.Helper()
-#             helper.help(module.__name__)
-#         except:
-#             traceback.print_exc()
-#                 
-#     else:
-#         helper = pydoc.Helper()
-#         helper.help(cmd)
-
-# def run():
-#     if _scipyendir_ not in sys.path:
-#         sys.path.append(_scipyendir_)
-#     # print(f"helputils: sys.argv = {sys.argv}")
-#     if len(sys.argv) > 1:
-#         cmdList = list(filter(lambda s: "-X" not in s, sys.argv[1:]))
-#         print(f"helputils: help command: {cmdList}")
-#         run_help_command(" ".join(cmdList))
-#     # print(f"sys.path = {sys.path}")
-#         
-# 
-# if __name__ == '__main__':
-#     print("running helputils as a script")
-#     run()
+# # #     if isinstance(ret, str) and "No Python documentation found" in ret and isinstance(shell, InteractiveShell):
+# # #         ipyret = None
+# # #         
+# # #         unwrap = lambda c: c if c in ("?", "??") else c[1:] if (c.startswith("?") and len(c) > 1) else c[:-1] if (c.endswith("?") and len(c) > 1) else c
+# # #         unwrapped = unwrap(cmd)
+# # #         print(f"found {unwrap(cmd)}: {unwrap(cmd) in shell.user_ns}") 
+# # #         bf = io.StringIO()
+# # #         ipycmd = unwrapped if (unwrapped.startswith("?") or unwrapped.endswith("?")) else f"?{unwrapped}"
+# # #         # shell.get_ipython().run_cell(ipycmd)
+# # #         original_pager = shell.hooks["show_in_pager"]
+# # #         new_pager = partial(dummy_pager, out = bf)
+# # #         # original_pager = shell.hooks["show_in_pager"]
+# # #         shell.set_hook("show_in_pager", new_pager)
+# # #         shell.run_cell(ipycmd)
+# # #         shell.set_hook("show_in_pager", original_pager)
+# # #         ipyret = bf.getvalue()
+# # #         bf.close()
+# # #         # with io.StringIO() as bf:
+# # #         #     original_pager = shell.hooks["show_in_pager"]
+# # #         #     new_pager = partial(dummy_pager, out = bf)
+# # #         #     # original_pager = shell.hooks["show_in_pager"]
+# # #         #     shell.set_hook("show_in_pager", new_pager)
+# # #         #     shell.run_cell(ipycmd)
+# # #         #     shell.set_hook("show_in_pager", original_pager)
+# # #         #     ipyret = bf.getvalue()
+# # #         # kstdout.flush()
+# # #         # with io.StringIO() as bf:
+# # #         #     shell.kernel.stdout = bf
+# # #         #     shell.run_cell(ipycmd)
+# # #         #     bf.flush()
+# # #         #     ipyret = bf.getvalue()
+# # #         #     shell.kernel.stdout = kstdout
+# # #             
+# # #         print(f"ipyret: {ipyret}")
+# # #             
+# # #         if isinstance(ipyret, str):
+# # #             ret = ipyret
+            
+            
+            
+    if isinstance(ret, str) and any(v in ret for v in ("No Python documentation found", "not found")):
+        ret += "\nCheck the spelling; you may need to enter a valid dotted path e.g. 'package.module.object.member'"
+        
+    return ret
+                

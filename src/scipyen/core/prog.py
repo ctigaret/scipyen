@@ -3001,6 +3001,93 @@ def get_top_level_modules() -> tuple:
     
     return packages, nonpackages
 
+@singledispatch
+def locate_obj_by_identifier(where:object, n:str) -> object:
+    import dataclasses
+    if not (isinstance(value, str) and all(isidentifier(a) for a in value.split("."))):
+        raise ValueError("A valid identifier string or dotted path was expected")
+    if '.' in n:
+        n = p.rpartition('.')[-1]
+    if n in where.__dict__:
+        return where.__dict__[n]
+    
+    elif dataclasses.is_dataclass(where):
+        flds = datalasses.fields(where)
+        fldnames = list(map(lambda f: f.name, flds)) 
+        if n in fldnames:
+            return flds[fldnames.index(n)]
+        
+    else:
+        members = dict(inspect.getmembers(where))
+        if n in members:
+            return members[n]
+        
+# @locate_obj_by_identifier.register(types.ModuleType)
+# def _(where:types.ModuleType, n:str) -> object:
+#     if not (isinstance(value, str) and all(isidentifier(a) for a in value.split("."))):
+#         raise ValueError("A valid identifier string or dotted path was expected")
+#     if '.' in n:
+#         n = p.rpartition('.')[-1]
+
+@locate_obj_by_identifier.register(types.NoneType)
+def _(where:types.NoneType, n:str) -> object:
+    if not (isinstance(value, str) and all(isidentifier(a) for a in value.split("."))):
+        raise ValueError("A valid identifier string or dotted path was expected")
+    
+    if '.' in n:
+        n = p.rpartition('.')[-1]
+    
+    modules = list()
+    in_modules = list()
+    nl_modules = list()
+    in_nlmodules = list()
+    if n in sys.modules:
+        modules.append(sys.modules[n])
+    else:
+        for m in sys.modules.values():
+            o = locate_obj_by_identifier(m, n)
+            if o:
+                in_modules.append(o)
+        
+    if len(modules) == 0 and len(in_modules) == 0:
+        nlmodinfos = get_not_loaded_modules()
+        nn = list(filter(lambda i: i.name == n, nlmodinfos))
+        if len(nn):
+            for mi in nn:
+                try:
+                    spec = mi.module_finder.find_spec(mi.name)
+                    m = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(m)
+                    if m:
+                        nl_modules.append(m)
+                except:
+                    traceback_print_exc()
+                    
+        else:
+            for mi in nlmodinfos:
+                try:
+                    spec = mi.module_finder.find_spec(mi.name)
+                    m = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(m)
+                    o = locate_obj_by_identifier(m, n)
+                    if o:
+                        in_nlmodules.append(o)
+                except:
+                    traceback.print_exc()
+        
+
+def get_loaded_modules() -> list:
+    r"""This is redundant, since we always have direct access to sys.modules...
+"""
+    infos = list(walk_packages())
+    return list(filter(lambda i: i.name in sys.modules, infos))
+
+def get_not_loaded_modules() -> list:
+    r"""This is more useful that the other one...
+"""
+    infos = list(walk_packages())
+    return list(filter(lambda i: i.name not in sys.modules, infos))
+
 def get_modules() -> tuple:
     infos = list(walk_packages())
     packages = list(filter(lambda i: i.ispkg, infos))

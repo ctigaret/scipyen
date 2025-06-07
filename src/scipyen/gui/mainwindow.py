@@ -4502,7 +4502,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # from guiutils import testme
         from gui.pythonhelpwidget import PythonHelpWidget
         if not isinstance(self.helpWidget, PythonHelpWidget):
-            self.helpWidget = PythonHelpWidget()
+            self.helpWidget = PythonHelpWidget(self.shell)
         self.helpWidget.show()
 
     @Slot(QtCore.QModelIndex)
