@@ -43,7 +43,6 @@ from traitlets.utils.importstring import import_item
 from traitlets import Bunch
 
 import numpy as np
-import neo, vigra
 import quantities as pq
 import pandas as pd
 
@@ -742,6 +741,7 @@ class DescriptorGenericValidator(BaseDescriptorValidator):
                 self._check_value_special_criteria_(value, criterion)
 
     def _check_value_special_criteria_(self, value, crit: dict):
+        import vigra
         from core.utilities import unique
         from core.scipyen_quantities import unitsConvertible
 
@@ -2219,42 +2219,9 @@ def processtimefunc(func):
     return wrapper
 
 
-# NOTE: 2023-06-02 13:11:28
-# this below deprecated in favour of our own with_doc class (see above)
-# def with_doc_after(f):
-#     r"""TODO/FIXME
-#     see for example vigra.arraytypes._preserve_doc decorator
-#     """
-#     def wrap(func):
-#         @wraps(func)
-#         def wrapper(*args, **kwargs):
-#             func.__doc__ = "\n".join([func.__doc__, f.__doc__])
-#             print(func.__doc__)
-#             return func
-#         return wrapper
-#     return wrap
-
-
-# def cli_export(name:str):
-# def wrapper(f):
-# if inspect.isfunction(f):
-# fname = f.__name__
-# if fname.startswith("slot_"):
-# exname = fname.replace("slot_", "")
-
-# elif fname.startswith("slot"):
-# exname = fname.replace("slot", ""))
-
-# else:
-# exname = fname
-
-# return f
-# return wrapper
-
 # ### END Decorators
 
 # ### BEGIN Context managers
-
 
 @contextmanager
 def timeblock(label, verbose: bool = True):
@@ -2310,6 +2277,7 @@ def is_type_or_subclass(x, y):
 
 
 def __check_array_attribute__(rt, param):
+    import vigra
     from core.scipyen_quantities import unitsConvertible
 
     # print(f"rt = {rt}; param = {param}")

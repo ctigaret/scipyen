@@ -262,6 +262,15 @@ function installpipreqs_part1 ()
         exit 1
     fi
     
+#     if [[ ( $with_pyside6 -eq 1 ) || ( $build_pyside6 -eq 1 ) ]] ; then
+    if [[ $with_pyside6 -eq 1 ]] ; then
+        reqfile="$installscriptdir"/pip_requirements_linux_1_pyside6_pypi.txt
+    elif [[ $build_pyside6 -eq 1 ]] ; then
+        reqfile="$installscriptdir"/pip_requirements_linux_1_pyside6_build.txt
+    else
+        reqfile="$installscriptdir"/pip_requirements_linux_1.txt
+    fi
+    
     if [ ! -r ${VIRTUAL_ENV}/.pips1_done ] || [[ $reinstall_pips -gt 0 ]] ; then
         # NOTE: since around Jan 2023 sklearn has been deprecated in favour of 
         # scikit-learn, such that an error message is issued whenever pip tries
@@ -277,7 +286,7 @@ function installpipreqs_part1 ()
         
         echo -e "Using ${python_executable} as `whoami` to install PyPI packages\n"
         
-        ${python_executable} -m pip install -r "$installscriptdir"/pip_requirements_linux_1.txt
+        ${python_executable} -m pip install -r "$reqfile"
         
         if [[ $? -ne 0 ]] ; then
             echo -e "Cannot install required packages from PyPI. Bailing out. Goodbye!\n"
@@ -570,7 +579,22 @@ function dopyqt6 ()
     fi
 }
 
-
+function dopyside6 ()
+{
+    if [[ -z "$VIRTUAL_ENV" ]] ; then
+        echo -e "Not in an active environment! Goodbye!\n"
+        exit 1
+    fi
+    
+    if [ ! -r ${VIRTUAL_ENV}/.pyqt6done ] || [[ $reinstall_pyside6 -eq 1 ]] ; then
+        if [[ $build_pyside6 -eq 1 ]]; then
+            echo "not yet"
+            exit 1
+        else
+            pip install PySide6
+        fi
+    fi
+}
 
 function dovigra ()
 {
@@ -633,16 +657,29 @@ function dovigra ()
 
 function make_desktop_entry ()
 {
-if [ ! -r ${VIRTUAL_ENV}/.desktop_done ] || [[ $reinstall_desktop -gt 0 ]] ; then
-if [[ `id -u` -eq 0 ]] ; then
-target_dir=/usr/local/bin
-else
 target_dir=${HOME}/bin
+if [[ $with_pyside6 -eq 1 ]] ; then
+    desktopfile=Scipyen-pyside6-pypi.desktop
+    scriptfile=${target_dir}/scipyen-pysid6-pypi
+elif [[ $build_pyside6 -eq 1 ]] ; then
+    desktopfile=Scipyen-pyside6-build.desktop
+    scriptfile=${target_dir}/scipyen-pysid6-build
+else 
+    desktopfile=Scipyen.desktop
+    scriptfile=${target_dir}/scipyen
 fi
+
+if [ ! -r ${VIRTUAL_ENV}/.desktop_done ] || [[ $reinstall_desktop -gt 0 ]] ; then
+# if [[ `id -u` -eq 0 ]] ; then
+# target_dir=/usr/local/bin
+# else
+# fi
 tmpfiledir=$(mktemp -d)
 # tmpfile=${tmpfiledir}/cezartigaret-Scipyen.desktop
-tmpfile=${tmpfiledir}/Scipyen.desktop
-script=${target_dir}/scipyen
+# tmpfile=${tmpfiledir}/Scipyen.desktop
+# script=${target_dir}/scipyen
+tmpfile=${tmpfiledir}/${desktopfile}
+script=${target_dir}/${scriptfile}
 echo -e "Script to execute: ${script}"
 cat<<END > ${tmpfile}
 [Desktop Entry]
@@ -843,7 +880,6 @@ function make_scipyenrc ()
 # also sourced from ${HOME}/.bashrc in order for the function 'scipyact' to be
 # readily available to the user, at the console.
 #
-echo -e "\nCreating .scipyenrc\n"
 
 if [[ -z "$VIRTUAL_ENV" ]] ; then
     echo -e "Not in an active environment! Goodbye!\n"
@@ -852,14 +888,28 @@ fi
 
 dt=`date '+%Y-%m-%d_%H-%M-%s'`
 
+if [[ $with_pyside6 -eq 1 ]] ; then
+    rcfile=${HOME}/.scipyen_pyside6_pypi_rc
+elif [[ $build_pyside6 -eq 1 ]] ; then
+    rcfile=${HOME}/.scipyen_pyside6_build_rc
+else 
+    rcfile=${HOME}/.scipyenrc
+fi
+
+echo -e "\nCreating ${rcfile}\n"
+
 py_exec=${python_exec}
-if [ -r ${HOME}/.scipyenrc ] ; then
+# if [ -r ${HOME}/.scipyenrc ] ; then
+if [ -r ${rcfile} ] ; then
 # make a backup copy of .scipyenrc
 shopt -s lastpipe
-echo "Copying ${HOME}/.scipyenrc to ${HOME}/.scipyenrc.$dt"
-cp ${HOME}/.scipyenrc ${HOME}/.scipyenrc.$dt
+# echo "Copying ${HOME}/.scipyenrc to ${HOME}/.scipyenrc.$dt"
+# cp ${HOME}/.scipyenrc ${HOME}/.scipyenrc.$dt
+echo "Copying ${rcfile} to ${rcfile}.$dt"
+cp ${rcfile} ${rcfile}.$dt
 fi
-cat<<END > ${HOME}/.scipyenrc
+# cat<<END > ${HOME}/.scipyenrc
+cat<<END > ${rcfile}
 scipyact () {
 source ${VIRTUAL_ENV}/bin/activate
 export LD_LIBRARY_PATH=${VIRTUAL_ENV}/lib:${VIRTUAL_ENV}/lib64:$LD_LIBRARY_PATH
@@ -871,10 +921,19 @@ shopt -u lastpipe
 
 function update_bashrc () 
 {
+if [[ $with_pyside6 -eq 1 ]] ; then
+    rcfile=${HOME}/.scipyen_pyside6_pypi_rc
+elif [[ $build_pyside6 -eq 1 ]] ; then
+    rcfile=${HOME}/.scipyen_pyside6_build_rc
+else 
+    rcfile=${HOME}/.scipyenrc
+fi
+
 dt=`date '+%Y-%m-%d_%H-%M-%s'`
+
 if [ ! -r ${HOME}/.bashrc ]; then
 cat<<END > ${HOME}/.bashrc
-source ${HOME}/.scipyenrc
+source ${rcfile}
 END
 echo ".bashrc has been created in ${HOME}"
 echo "Sourcing ${HOME}/.bashrc"
@@ -882,20 +941,46 @@ source ${HOME}/.bashrc
 else
 shopt -s lastpipe
 # check if .scipyenrc is sourced from .bashrc
-cat ${HOME}/.bashrc | grep "source ${HOME}/.scipyenrc" | read source_set
+# cat ${HOME}/.bashrc | grep "source ${HOME}/.scipyenrc" | read source_set
+cat ${HOME}/.bashrc | grep "source ${rcfile}" | read source_set
 # echo "source_set="$source_set
 if [ -z "${source_set}" ]; then
 # .scipyenrc not sourced from .bashrc => backup .bashrc, then append a line to
 # source .scipyenrc in there
 echo "Copying ${HOME}/.bashrc to ${HOME}/.bashrc.$dt"
 cp ${HOME}/.bashrc ${HOME}/.bashrc.$dt
-echo "source ${HOME}/.scipyenrc" >> ${HOME}/.bashrc
+# echo "source ${HOME}/.scipyenrc" >> ${HOME}/.bashrc
+echo "source ${rcfile}/" >> ${HOME}/.bashrc
 echo ".bashrc has been modified in ${HOME}"
 echo "Sourcing ${HOME}/.bashrc"
 source ${HOME}/.bashrc
 fi
 shopt -u lastpipe
 fi
+# if [ ! -r ${HOME}/.bashrc ]; then
+# cat<<END > ${HOME}/.bashrc
+# source ${HOME}/.scipyenrc
+# END
+# echo ".bashrc has been created in ${HOME}"
+# echo "Sourcing ${HOME}/.bashrc"
+# source ${HOME}/.bashrc
+# else
+# shopt -s lastpipe
+# # check if .scipyenrc is sourced from .bashrc
+# cat ${HOME}/.bashrc | grep "source ${HOME}/.scipyenrc" | read source_set
+# # echo "source_set="$source_set
+# if [ -z "${source_set}" ]; then
+# # .scipyenrc not sourced from .bashrc => backup .bashrc, then append a line to
+# # source .scipyenrc in there
+# echo "Copying ${HOME}/.bashrc to ${HOME}/.bashrc.$dt"
+# cp ${HOME}/.bashrc ${HOME}/.bashrc.$dt
+# echo "source ${HOME}/.scipyenrc" >> ${HOME}/.bashrc
+# echo ".bashrc has been modified in ${HOME}"
+# echo "Sourcing ${HOME}/.bashrc"
+# source ${HOME}/.bashrc
+# fi
+# shopt -u lastpipe
+# fi
 }
 
 function get_pyver ()
@@ -913,17 +998,33 @@ IFS=$oldifs
 
 function make_launch_script () 
 {
-    # force the use of XCB platform abstraction plugin in Qt
 target_dir=${HOME}/bin
+
+if [[ $with_pyside6 -eq 1 ]] ; then
+    scriptfile=${target_dir}/scipyen-pyside6-pypi
     
+elif [[ $build_pyside6 -eq 1 ]] ; then
+    scriptfile=${target_dir}/scipyen-pyside6-build
+    
+else 
+    scriptfile=${target_dir}/scipyen
+fi
+
+echo -e "\nCreating ${scriptfile} launch script \n"
+
 mkdir -p ${target_dir}
-if [ -r ${target_dir}/scipyen ] ; then
+# if [ -r ${target_dir}/scipyen ] ; then
+#     dt=`date '+%Y-%m-%d_%H-%M-%s'`
+#     mv ${target_dir}/scipyen ${target_dir}/scipyen.$dt
+# fi
+if [ -r ${scriptfile} ] ; then
     dt=`date '+%Y-%m-%d_%H-%M-%s'`
-    mv ${target_dir}/scipyen ${target_dir}/scipyen.$dt
+    mv ${scriptfile} ${scriptfile}.$dt
 fi
 shopt -s lastpipe
 
-cat <<END > ${target_dir}/scipyen 
+# cat <<END > ${target_dir}/scipyen 
+cat <<END > ${scriptfile} 
 #! /bin/sh
 if [ -z \${VIRTUAL_ENV} ]; then
 source ${virtual_env}/bin/activate
@@ -944,11 +1045,14 @@ fi
 ${python_executable} -Xfrozen_modules=off ${scipyensrcdir}/scipyen.py "\$*"
 END
 shopt -u lastpipe
-chmod +x ${target_dir}/scipyen 
+# chmod +x ${target_dir}/scipyen 
+chmod +x ${scriptfile}
 echo -e "Scipyen startup script created in ${target_dir} \n"
 }
 
-#### Execution starts here ###
+#### BEGIN Main script action happens here ###
+#
+
 if [[ `id -u` -eq 0 ]] ; then
 echo -e "This script MUST be run as regular user, NOT as root!"
 exit 1
@@ -957,7 +1061,7 @@ fi
 SECONDS=0
 get_pyver
 
-virtual_env_pfx="scipyenv"
+virtual_env_pfx="scipyenv_test"
 install_dir=${HOME}
 realscript=`realpath $0`
 scipyendir=`dirname "$realscript"`
@@ -986,6 +1090,12 @@ reinstall_pips=0
 reinstall_desktop=0
 refresh_git_repos=0
 make_dist=0
+
+target_dir=${HOME}/bin
+
+rcfile=${HOME}/.scipyenrc
+scriptfile=${target_dir}/scipyen
+desktopfile=Scipyen.desktop
 
 for i in "$@" ; do
     case $i in
@@ -1208,6 +1318,14 @@ fi
 
 echo -e "Will install in ${install_dir}" 
 
+# if  [[ ( $with_pyside6 -eq 1 ) || ( $build_pyside6 -eq 1 ) ]] ; then
+if  [[ $with_pyside6 -eq 1 ]] ; then
+    virtual_env_pfx=${virtual_env_pfx}_pyside6_pypi
+elif [[  $build_pyside6 -eq 1 ]] ; then
+    virtual_env_pfx=${virtual_env_pfx}_pyside6_builds
+fi
+
+
 if ! [ -v VIRTUAL_ENV ] ; then
     virtual_env=${install_dir}/${virtual_env_pfx}
     python_exec="python${major}.${minor}"
@@ -1269,7 +1387,12 @@ if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
     # may take a while until conda packages are also uptodate :)
     # • splitting pip package installation in two batches (installpipreqs_part1 & installpipreqs_part2
     # see changelog above)
-    dopyqt5 
+    
+    if  [[ ( $with_pyside6 -eq 1 ) || ( $build_pyside6 -eq 1 ) ]]  ; then
+        dopyside6
+    else
+        doipyqt5 
+    fi
     
     # NOTE: 2025-03-13 11:01:07 TODO/FIXME
 #     dopyqt6 
@@ -1312,8 +1435,10 @@ t=$(( t % 60))
 seconds=$(( t ))
 
 echo "Execution time was $days days, $hours hours, $minutes minutes and $seconds seconds"
-echo "Before using Scipyen, either restart the terminal, or call 'source ~/.scipyenrc'"
+echo "Before using Scipyen, either restart the terminal, or call 'source ${rcfile}'"
 
+#
+#### END   Main script action happens here ###
 
 
 
