@@ -109,6 +109,13 @@ def _patch_new_neo(original_f, *args, **kwargs):
             
     if not isinstance(var[annotations_index], dict):
         var[annotations_index] = dict()
+        
+    # tmpdict = dict()
+    # for key in var[annotations_index].keys():
+    #     if isinstance(key, str):
+    #         tmpdict[key] = var[annotations_index]
+    #     if not isinstance(key, str):
+            
             
     # print(f" {Fore.YELLOW}{original_f.__name__}{Style.RESET_ALL} will be called with {len(var)} arguments:")
     for k in range(len(var)):

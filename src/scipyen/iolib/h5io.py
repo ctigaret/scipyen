@@ -417,15 +417,6 @@ def __check_make_entity_args__(obj, oname, entity_cache):
     
     return target_name, obj_attrs, entity_cache
 
-# def storeEntityInReadingCache(s:dict, obj:typing.Any, entity:typing.Union[h5py.Group, h5py.Dataset]):
-#     if not isinstance(s, dict):
-#         return
-#     
-#     if not isinstance(entity, (h5py.Group, h5py.Dataset)):
-#         return
-#     
-#     s[id(obj)] = (obj, entity)
-
 def storeEntityInCache(s:dict, obj:typing.Any, entity:typing.Union[h5py.Group, h5py.Dataset]):
     r"""Keeps of cache of HDF5-endoced objects and their HDF5 entities.
     
@@ -444,17 +435,11 @@ def storeEntityInCache(s:dict, obj:typing.Any, entity:typing.Union[h5py.Group, h
     if not isinstance(entity, (h5py.Group, h5py.Dataset)):
         return
     
-    # obj_hash = gethash(obj)
-    # s[obj_hash] = entity
-    
     s[id(obj)] = entity
 
 def getCachedEntity(cache:dict, obj:typing.Any):
     if not isinstance(cache, dict) or len(cache) == 0:
         return
-    
-    # obj_hash = gethash(obj)
-    # return cache.get(obj_hash, None)
     
     return cache.get(id(obj), None)
     
@@ -2259,14 +2244,16 @@ def makeAxisScale(obj, dset:h5py.Dataset, axesgroup:h5py.Group, dimindex:int,
                                      name = axis_dset_name,
                                      compression = compression, 
                                      chunks = chunks,
-                                     track_order = track_order)
+                                     track_order = track_order,
+                                     do_cache = False)
         
     elif isinstance(obj, (neo.Epoch, DataZone, Interval)) and obj.size > 0:
         axis_dset = toHDF5(obj.durations, axesgroup,
                                      name = axis_dset_name,
                                      compression = compression, 
                                      chunks = chunks,
-                                     track_order = track_order)
+                                     track_order = track_order,
+                                     do_cache = False)
     else:
         axis_dset = axesgroup.create_dataset(axis_dset_name, data=h5py.Empty("f"))
         
@@ -2811,6 +2798,7 @@ def toHDF5(obj, group:h5py.Group, name:typing.Optional[str]=None,
             chunks:typing.Optional[bool]=None,
             track_order:typing.Optional[bool] = True, 
             entity_cache:typing.Optional[dict]=None,
+            do_cache:bool=True,
             **kwargs):# -> typing.Union[h5py.Group, h5py.Dataset]:
     r"""
     Encodes Python objects into a HDF5 entity (Group or Dataset).
@@ -3062,7 +3050,7 @@ def toHDF5(obj, group:h5py.Group, name:typing.Optional[str]=None,
     if isinstance(name, str) and len(name.strip()):
         target_name = name
         
-    if not isinstance(entity_cache, dict):
+    if not isinstance(entity_cache, dict) and do_cache:
         entity_cache = dict()
     
     # NOTE: 2024-12-15 09:06:21
@@ -3073,14 +3061,18 @@ def toHDF5(obj, group:h5py.Group, name:typing.Optional[str]=None,
         entity = group.create_dataset(target_name, data = h5py.Empty("f"))
         entity.attrs.update(obj_attrs)
         
-        return entity
     
     else:
-        return objectToEntity(obj, obj_attrs=obj_attrs, group=group, name=name, 
+        entity = objectToEntity(obj, obj_attrs=obj_attrs, group=group, name=name, 
                               target_name=target_name,
                               compression=compression, chunks=chunks,
                               track_order=track_order, entity_cache=entity_cache,
                               **kwargs)
+        
+        if isinstance(entity_cache, dict) and id(obj) not in entity_cache and do_cache:
+            storeEntityInCache(entity_cache, obj, entity)
+            
+    return entity
 
 def makeHDF5Dataset(obj, group: h5py.Group, name:typing.Optional[str]=None, 
                     compression:typing.Optional[str]="gzip", 
@@ -3562,8 +3554,7 @@ def makeGroup(obj, group:h5py.Group, attrs:dict, name:str,
     raise NotImplementedError(f"Objects of type {type(obj).__name__} are not supported")
     
 @makeGroup.register(dict)
-def _(obj:dict, group, attrs, name, compression, chunks, track_order, 
-      entity_cache):
+def _(obj:dict, group, attrs, name, compression, chunks, track_order, entity_cache):
     cached_entity = getCachedEntity(entity_cache, obj)
     
     if isinstance(cached_entity, h5py.Group):
@@ -3588,6 +3579,7 @@ def _(obj:dict, group, attrs, name, compression, chunks, track_order,
                             track_order = track_order, entity_cache = entity_cache)
         
         cached_entity = getCachedEntity(entity_cache, element)
+        
         if isinstance(cached_entity, (h5py.Group, h5py.Dataset)):
             key_value_grp["value"] = cached_entity
         else:
@@ -3597,8 +3589,7 @@ def _(obj:dict, group, attrs, name, compression, chunks, track_order,
     return grp
     
 @makeGroup.register(collections.abc.Iterable)
-def _(obj:collections.abc.Iterable, group, attrs, name, compression, chunks, 
-      track_order, entity_cache):
+def _(obj:collections.abc.Iterable, group, attrs, name, compression, chunks, track_order, entity_cache):
     # tuple, list deque, etc
     cached_entity = getCachedEntity(entity_cache, obj)
     
@@ -3622,20 +3613,18 @@ def _(obj:collections.abc.Iterable, group, attrs, name, compression, chunks,
             
     return grp
 
-@makeGroup.register(ephys.SynapticPathway) # TODO/FIXME 2024-06-18 14:46:55
-def _(obj:ephys.SynapticPathway, group, attrs, name, compression, chunks, 
-      track_order, entity_cache):
-    cached_entity = getCachedEntity(entity_cache, obj)
-    
-    if isinstance(cached_entity, h5py.Group):
-        group[target_name] = cached_entity
-        return cached_entity
-    
-    measurements = [m for m in obj.measurements]
+# @makeGroup.register(ephys.SynapticPathway) # TODO/FIXME 2024-06-18 14:46:55
+# def _(obj:ephys.SynapticPathway, group, attrs, name, compression, chunks, track_order, entity_cache):
+#     cached_entity = getCachedEntity(entity_cache, obj)
+#     
+#     if isinstance(cached_entity, h5py.Group):
+#         group[target_name] = cached_entity
+#         return cached_entity
+#     
+#     measurements = [m for m in obj.measurements]
     
 @makeGroup.register(NeoObjectList)
-def _(obj:NeoObjectList, group, attrs, name, compression, chunks, 
-      track_order, entity_cache):
+def _(obj:NeoObjectList, group, attrs, name, compression, chunks, track_order, entity_cache):
     cached_entity = getCachedEntity(entity_cache, obj)
     if isinstance(cached_entity, h5py.Group):
         group[target_name] = cached_entity
@@ -3660,11 +3649,8 @@ def _(obj:NeoObjectList, group, attrs, name, compression, chunks,
             
     return grp
         
-        
 @makeGroup.register(neo.core.container.Container)
-def _(obj:neo.core.container.Container, group, attrs, name, compression, chunks, 
-      track_order, entity_cache):
-    
+def _(obj:neo.core.container.Container, group, attrs, name, compression, chunks, track_order, entity_cache):
     objname = getattr(obj, "name", None)
     cached_entity = getCachedEntity(entity_cache, obj)
     
