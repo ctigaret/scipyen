@@ -58,6 +58,8 @@ import qtpy
 # print(f"In module: {__name__}: QT_API = {os.environ['QT_API']}, qtpy.API = {qtpy.API}, qtpy.API_NAME = {qtpy.API_NAME}")
 # might have to force this:
 qtpy.API = os.environ["QT_API"]
+print(f"Using QT API: {qtpy.API}")
+
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork,)
 from qtpy.QtCore import (Signal, Slot, Property,)
 from qtpy.uic import loadUiType
@@ -66,7 +68,6 @@ try:
     has_sip = True
 except:
     has_sip = False
-# import sip
 
 # BEGIN About QStyle plugins
 # WARNING: 2024-09-26 15:44:57
@@ -630,7 +631,7 @@ else:
 
     __UI_ScriptManagerWindow__, _ = loadUiType(os.path.join(__module_path__, "scriptmanagerwindow.ui"))
 
-    __UI_AboutLicense__, _ = loadUiType(os.path.join(__module_path__, "AboutLicense.ui"))
+    __UI_AboutLicense__, _ = loadUiType(os.path.join(__module_path__, "AboutDialog.ui"))
 
 
 class WorkspaceViewer(QtWidgets.QTableView):
@@ -5708,7 +5709,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             tw = (w for w in itertools.chain(*(a.associatedWidgets()
                 for a in tbactions)) if w is not self.toolBar)
         else:
-            tw = (w for w in itertools.chain(*(a.associatedObjects()
+            # tw = (w for w in itertools.chain(*(a.associatedObjects()
+            tw = (w for w in itertools.chain(*(a.associatedWidgets()
                 for a in tbactions)) if w is not self.toolBar)
 
         for w in tw:

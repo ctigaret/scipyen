@@ -1002,13 +1002,17 @@ target_dir=${HOME}/bin
 
 if [[ $with_pyside6 -eq 1 ]] ; then
     scriptfile=${target_dir}/scipyen-pyside6-pypi
+    launchcmd="${scipyensrcdir}/scipyen.py pyside6"
     
 elif [[ $build_pyside6 -eq 1 ]] ; then
     scriptfile=${target_dir}/scipyen-pyside6-build
+    launchcmd="${scipyensrcdir}/scipyen.py pyside6"
     
 else 
     scriptfile=${target_dir}/scipyen
+    launchcmd=${scipyensrcdir}/scipyen.py
 fi
+
 
 echo -e "\nCreating ${scriptfile} launch script \n"
 
@@ -1042,8 +1046,9 @@ if [ -r $scipyensrcdir/neuron_python/app-defaults/nrniv ] ; then
 xrdb -merge $scipyensrcdir/neuron_python/app-defaults/nrniv
 fi
 fi
-${python_executable} -Xfrozen_modules=off ${scipyensrcdir}/scipyen.py "\$*"
+${python_executable} -Xfrozen_modules=off ${launchcmd} "\$*"
 END
+# ${python_executable} -Xfrozen_modules=off ${scipyensrcdir}/scipyen.py "\$*"
 shopt -u lastpipe
 # chmod +x ${target_dir}/scipyen 
 chmod +x ${scriptfile}
