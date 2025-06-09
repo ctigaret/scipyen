@@ -64,6 +64,13 @@ from functools import singledispatch
 # add XMl text viewer, schema viewer and xquery editor
 
 # 2016-08-16 09:30:07
+import qtpy as QtAPI
+QtAPI.API = os.environ["QT_API"]
+if os.environ["QT_API"] == "pyside6":
+    import PySide6
+    QtAPI = PySide6
+else:
+    pass
 from qtpy import (QtCore, QtWidgets, QtXml, QtGui, )
 from qtpy.QtCore import (Signal, Slot, )
 # NOTE: use Python re instead of QRegExp

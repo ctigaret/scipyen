@@ -6,10 +6,17 @@
 # -*- coding: utf-8 -*-
 r"""Pyqtgraph-based cursors for signal viewers
 """
-import collections, enum, numbers, typing
+import collections, enum, numbers, typing, os
 import dataclasses
 from dataclasses import (dataclass, MISSING)
 
+import qtpy as QtAPI
+QtAPI.API = os.environ["QT_API"]
+if os.environ["QT_API"] == "pyside6":
+    import PySide6
+    QtAPI = PySide6
+else:
+    pass
 from qtpy import (QtCore, QtGui, QtWidgets,) 
 from qtpy.QtCore import (Signal, Slot, )
 from core.pyqtgraph_patch import pyqtgraph as pg

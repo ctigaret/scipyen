@@ -11,6 +11,8 @@ import os
 #### END core python modules
 
 #### BEGIN 3rd party modules
+import qtpy as QtAPI
+QtAPI.API = os.environ["QT_API"]
 from qtpy import QtCore, QtGui, QtWidgets
 from qtpy.QtCore import Signal, Slot, Property
 #### END 3rd party modules

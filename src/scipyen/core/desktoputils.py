@@ -72,6 +72,14 @@ from traitlets.utils.bunch import Bunch
 # import xml.etree.ElementTree as ET
 from xml.dom import minidom
 
+import qtpy as QtAPI
+QtAPI.API = os.environ["QT_API"]
+if os.environ["QT_API"] == "pyside6":
+    import PySide6
+    QtAPI = PySide6
+else:
+    pass
+
 
 from qtpy import (
     QtCore,

@@ -23,6 +23,15 @@ from operator import attrgetter, itemgetter, methodcaller
 from collections import OrderedDict, deque
 import dataclasses
 
+import qtpy as QtAPI
+QtAPI.API = os.environ["QT_API"]
+if os.environ["QT_API"] == "pyside6":
+    import PySide6
+    QtAPI = PySide6
+else:
+    pass
+from qtpy import QtWidgets
+
 from core.prog import (with_doc, scipywarn)
 from core.strutils import (is_glob, is_regexp)
 
@@ -469,7 +478,6 @@ def getMainScipyenWindow() -> object:
     Returns None if the SciyenWindow instance is not found
     
     """
-    from qtpy import QtWidgets
     ret = None
     ws = user_workspace()
     if ws is not None:
@@ -495,7 +503,6 @@ def getMainScipyenWindow() -> object:
 
 def getCallSource() -> object:
     # FIXME
-    from qtpy import QtWidgets
     ret = None
     frame_records = inspect.getouterframes(inspect.currentframe())
     for (n,f) in enumerate(frame_records):

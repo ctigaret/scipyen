@@ -49,7 +49,16 @@ fail
 #
 import sys, os, io, typing, traceback, inspect, subprocess, pydoc, runpy
 from collections import deque
-from qtpy import QtCore, QtGui, QtWidgets, QtSvg, QtNetwork, sip
+
+import qtpy as QtAPI
+QtAPI.API = os.environ["QT_API"]
+if os.environ["QT_API"] == "pyside6":
+    import PySide6
+    QtAPI = PySide6
+else:
+    pass
+
+from qtpy import QtCore, QtGui, QtWidgets, QtSvg, QtNetwork
 from qtpy.QtCore import Signal, Slot, Property
 from qtpy.uic import loadUiType as __loadUiType__
 from IPython.core.interactiveshell import InteractiveShell
@@ -60,7 +69,7 @@ from core import helputils
 from gui.workspacegui import WorkspaceGuiMixin
 # import numpy as np # cheeky
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
-__ui_path__ = adapt_ui_path(__module_path__,'pythonhelpwidget.ui')
+__ui_path__ = adapt_ui_path(__module_path__,'pythonhelpwidget_qt6.ui')
 
 Ui_PythonHelpWidget, QWidget = __loadUiType__(__ui_path__)
 

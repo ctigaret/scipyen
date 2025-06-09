@@ -3,7 +3,15 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
+import os
 from core.pyqtgraph_patch import pyqtgraph as pg
+import qtpy as QtAPI
+QtAPI.API = os.environ["QT_API"]
+if os.environ["QT_API"] == "pyside6":
+    import PySide6
+    QtAPI = PySide6
+else:
+    pass
 from qtpy import (QtCore, QtWidgets, QtGui)
 
 # each spike is a small vertical line centered at 0.0, height of 1

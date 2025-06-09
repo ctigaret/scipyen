@@ -163,6 +163,13 @@ from IPython.core.magic import (Magics, magics_class, line_magic,
 #### BEGIN 3rd party modules
 from traitlets import Bunch
 
+import qtpy as QtAPI
+QtAPI.API = os.environ["QT_API"]
+if os.environ["QT_API"] == "pyside6":
+    import PySide6
+    QtAPI = PySide6
+else:
+    pass
 from qtpy import QtCore, QtGui, QtWidgets, QtXml
 from qtpy.QtCore import Signal, Slot
 from qtpy.uic import loadUiType as __loadUiType__ 

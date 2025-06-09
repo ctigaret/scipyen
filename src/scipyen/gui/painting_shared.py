@@ -10,7 +10,13 @@ from pprint import pprint
 from traitlets import Bunch
 
 import numpy as np
-import qtpy
+import qtpy as QtAPI
+QtAPI.API = os.environ["QT_API"]
+if os.environ["QT_API"] == "pyside6":
+    import PySide6
+    QtAPI = PySide6
+else:
+    pass
 from qtpy import QtCore, QtGui, QtWidgets, QtXml, QtSvg
 from qtpy.QtCore import Signal, Slot, Property
 
@@ -72,7 +78,7 @@ FontWeightType = typing.Union[int, QtGui.QFont.Weight]
 #
 #
 #
-# print(f"In module: {__name__}: QT_API = {os.environ['QT_API']}, qtpy.API = {qtpy.API}, qtpy.API_NAME = {qtpy.API_NAME}")
+# print(f"In module: {__name__}: QT_API = {os.environ['QT_API']}, QtAPI.API = {QtAPI.API}, QtAPI.API_NAME = {QtAPI.API_NAME}")
 standardQtFontStyles = Bunch(sorted(((name, val) for name, val in vars(QtGui.QFont).items() if isinstance(val, QtGui.QFont.Style)), 
                                     key = lambda x: x[0]))
 standardQtFontWeights = Bunch(sorted(((name, val) for name, val in vars(QtGui.QFont).items() if isinstance(val, QtGui.QFont.Weight)), 

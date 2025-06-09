@@ -31,7 +31,7 @@ import numbers
 import math
 import dataclasses
 from dataclasses import (dataclass, KW_ONLY, MISSING, field)
-import sys
+import sys, os
 import time, datetime
 import traceback
 import typing
@@ -45,6 +45,14 @@ from copy import (deepcopy, copy,)
 #### END core python modules
 
 #### BEGIN 3rd party modules
+
+import qtpy as QtAPI
+QtAPI.API = os.environ["QT_API"]
+if os.environ["QT_API"] == "pyside6":
+    import PySide6
+    QtAPI = PySide6
+else:
+    pass
 from qtpy import (QtGui, QtCore, QtWidgets,)
 import numpy as np
 from numpy import ndarray

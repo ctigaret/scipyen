@@ -3,6 +3,13 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
+import qtpy as QtAPI
+QtAPI.API = os.environ["QT_API"]
+if os.environ["QT_API"] == "pyside6":
+    import PySide6
+    QtAPI = PySide6
+else:
+    pass
 from qtpy import QtCore, QtGui, QtWidgets, QtXml, QtSvg
 from qtpy.QtCore import Signal, Slot, Property
 # from qtpy.QtCore import Signal, Slot, QEnum, Property

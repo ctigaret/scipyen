@@ -92,17 +92,24 @@ if sys.platform.startswith("linux"):
 # then add the corresponding plugins dir to QT_PLUGINS_PATH
 # so we won't have to build qt locally anymore, by the installer
 
+# NOTE: 2025-06-09 22:08:56
+# restrict support for pyqt5, pyqt6, and pyside6 ONLY
+# pyqt5 remains the default (for now)
+#
 if len(sys.argv) > 1:
     if "pyqt6" in sys.argv:
         os.environ["QT_API"] = "pyqt6"
         os.environ["PYQTGRAPH_QT_LIB"] = "PyQt6"
         os.environ["FORCE_QT_API"] = "1"
         
-    elif "pyside2" in sys.argv:
-        os.environ["QT_API"] = "pyside2" # for up to Qt5
-        os.environ["PYQTGRAPH_QT_LIB"] = "PySide2"
-        os.environ["FORCE_QT_API"] = "1"
-        
+#     elif "pyside2" in sys.argv:
+#         os.environ["QT_API"] = "pyside2" # for up to Qt5
+#         os.environ["PYQTGRAPH_QT_LIB"] = "PySide2"
+#         os.environ["FORCE_QT_API"] = "1"
+#         
+#     if os.environ["QT_API"] == "pyside2":
+#         scipywarn("PySide2 support is not fully implemented; expect trouble")
+
     elif "pyside6" in sys.argv:
         os.environ["QT_API"] = "pyside6"
         os.environ["PYQTGRAPH_QT_LIB"] = "PySide6"
@@ -141,23 +148,28 @@ else:
 #### END core python modules
 
 #### BEGIN 3rd party modules
-
+import qtpy as QtAPI
+QtAPI.API = os.environ["QT_API"]
+if os.environ["QT_API"] == "pyside6":
+    import PySide6
+    QtAPI = PySide6
+else:
+    pass
+import qtpy as QtAPI
+print(f"scipyen.py: QtAPI.API is {QtAPI.API}")
 if os.environ["QT_API"] in ("pyqt5", "pyqt6"):
     from qtpy import sip
     has_sip = True
 else:
     has_sip = False
+    
+print(f"scipyen.py: QtAPI.API is now {QtAPI.API}")
 
 # NOTE: 2024-05-02 09:46:11
 # you still need the QT_API in the environment
 from qtpy import (QtCore, QtWidgets, QtGui, )
-# from PyQt5 import (QtCore, QtWidgets, QtGui, )
-# print(f"Scipyen is using Qt version {QtCore._qt_version}\n")
 
 from core.prog import scipywarn
-
-if os.environ["QT_API"] == "pyside2":
-    scipywarn("PySide2 support is not fully implemented; expect trouble")
 
 # hasQDarkTheme = False
 # try:

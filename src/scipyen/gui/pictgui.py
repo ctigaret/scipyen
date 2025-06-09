@@ -50,6 +50,13 @@ from copy import copy
 from core.pyqtgraph_patch import pyqtgraph as pg
 import numpy as np
 
+import qtpy as QtAPI
+QtAPI.API = os.environ["QT_API"]
+if os.environ["QT_API"] == "pyside6":
+    import PySide6
+    QtAPI = PySide6
+else:
+    pass
 from qtpy import QtCore, QtGui, QtWidgets, QtXml
 from qtpy.QtCore import Signal, Slot, Property
 #### END 3rd party modules

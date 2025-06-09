@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-import collections, numbers, typing, itertools, dataclasses
+import collections, numbers, typing, itertools, dataclasses, os
 from dataclasses import dataclass
 from copy import deepcopy, copy
 
@@ -19,6 +19,13 @@ from core.scipyen_quantities import (checkTimeUnits, unitsConvertible)
 from core.scipyendataclasses import ScipyenDataclass
 # from core.utilities import counter_suffix
 from .prog import (safewrapper, with_doc, scipywarn)
+import qtpy as QtAPI
+QtAPI.API = os.environ["QT_API"]
+if os.environ["QT_API"] == "pyside6":
+    import PySide6
+    QtAPI = PySide6
+else:
+    pass
 from qtpy import QtWidgets
 
 def _newDataZone(cls, places=None, extents=None, labels=None, units=None,
@@ -1151,7 +1158,6 @@ coordinates are NOT restricted to time units.
     """
         from gui.signalviewer import SignalViewer
         from gui.cursors import SignalCursor, SignalCursorTypes
-        from qtpy import QtGui, QtCore
         
         keep_units = kwargs.pop("keep_units", False)
         cursor_type = SignalCursorTypes.getType(kwargs.pop("cursor_type", "vertical"))
@@ -1451,7 +1457,6 @@ def epoch2cursors(epoch: typing.Union[neo.Epoch, DataZone],
     
     from gui.signalviewer import SignalViewer
     from gui.cursors import SignalCursor, SignalCursorTypes
-    from qtpy import QtGui, QtCore
 
     keep_units = kwargs.pop("keep_units", False)
     if not isinstance(keep_units, bool):
@@ -1561,7 +1566,6 @@ def intervals2cursors(*args,
 """
     from gui.signalviewer import SignalViewer
     from gui.cursors import SignalCursor, SignalCursorTypes
-    from qtpy import QtGui, QtCore
 
     keep_units = kwargs.pop("keep_units", False)
     cursor_type = kwargs.pop("cursor_type", "vertical")

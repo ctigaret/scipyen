@@ -8,6 +8,13 @@ r"""Various helpers for GUI
 import sys, os, typing, warnings, math, io
 import numpy as np
 from core.utilities import get_least_pwr10
+import qtpy as QtAPI
+QtAPI.API = os.environ["QT_API"]
+if os.environ["QT_API"] == "pyside6":
+    import PySide6
+    QtAPI = PySide6
+else:
+    pass
 from qtpy import (QtCore, QtWidgets, QtGui)
 from gui.painting_shared import (FontStyleType, standardQtFontStyles, 
                                  FontWeightType, standardQtFontWeights)

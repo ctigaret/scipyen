@@ -9,16 +9,24 @@ import sys, os, typing, collections, pathlib, tarfile, dataclasses
 import inspect, functools, traceback
 from dataclasses import MISSING
 from functools import (singledispatch, singledispatchmethod)
-import qtpy
-if qtpy.API in ("pyside6", ):
-    from qtpy import Shiboken
-from qtpy import QtCore, QtGui, QtWidgets, QtSvg, QtNetwork, sip
-from qtpy.QtCore import Signal, Slot, Property
-from qtpy.uic import loadUiType as __loadUiType__
+import qtpy as QtAPI
+QtAPI.API = os.environ["QT_API"]
+if os.environ["QT_API"] == "pyside6":
+    import PySide6
+    from PySide6 import Shiboken
+    QtType = typing.TypeVar("QtType", bound="Shiboken.Object")
+    from PySide6 import QtCore, QtGui, QtWidgets, QtSvg, QtNetwork
+    from PySide6.QtCore import Signal, Slot, Property
+    from PySide6.uic import loadUiType as __loadUiType__
+else:
+    from qtpy import sip
+    QtType = typing.TypeVar("QtType", bound = "sip.wrappertype")
+    from qtpy import QtCore, QtGui, QtWidgets, QtSvg, QtNetwork, sip
+    from qtpy.QtCore import Signal, Slot, Property
+    from qtpy.uic import loadUiType as __loadUiType__
 from core.prog import (safewrapper, scipywarn, print_styled)
 from core.sysutils import adapt_ui_path
 from gui.widgets.cancellableqprogressbar import CancellableQProgressBar
-
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
 QtReplyNetworkErrors = dict((name, val) for name, val in vars(QtNetwork.QNetworkReply).items() if isinstance(val, QtNetwork.QNetworkReply.NetworkError))
@@ -37,7 +45,7 @@ class ScipyenNetworkManager(QtCore.QObject):
     
     def __init__(self, timeout_ms:int=QtNetwork.QNetworkRequest.DefaultTransferTimeoutConstant,
                  replyHandler:typing.Optional[typing.Callable] = None,
-                 progressUIFactory:typing.Optional[sip.wrappertype]=None,
+                 progressUIFactory:typing.Optional[QtType]=None,
                  parent:typing.Optional[QtCore.QObject] = None):
                  # verbose:bool=False,
                  # parent:typing.Optional[QtCore.QObject] = None):
@@ -149,7 +157,7 @@ class ScipyenNetworkManager(QtCore.QObject):
             
         self._maxDownloadSizeForProgressBar = val
         
-    def getProgressUIFactory(self, downloadSize:int) -> sip.wrappertype:
+    def getProgressUIFactory(self, downloadSize:int) -> QtType:
         factory = self._setUIFactory()
         print(f"{self.__class__.__name__}.getProgressUIFactory: factory = {factory}")
         ui_cancellable = self._isCancellableProgressUI(factory)
@@ -276,12 +284,12 @@ class ScipyenNetworkManager(QtCore.QObject):
         else:
             self._networkReply_ = None
             
-    def _isCancellableProgressUI(self, factory:sip.wrappertype) -> bool:
+    def _isCancellableProgressUI(self, factory:QtType) -> bool:
         cancel_sigs = list(filter(lambda x: x[0]=="canceled", inspect.getmembers_static(factory, predicate=lambda x: isinstance(x, QtCore.Signal))))
         return len(cancel_sigs)==1
             
-    def _setUIFactory(self) -> sip.wrappertype:
-        if isinstance(self._userDefinedProgressUIFactory_, sip.wrappertype):
+    def _setUIFactory(self) -> QtType:
+        if isinstance(self._userDefinedProgressUIFactory_, QtType):
             self._progressUIFactory_ = self._userDefinedProgressUIFactory_
             
         if self.scipyenWindow is None:

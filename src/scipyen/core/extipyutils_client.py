@@ -74,9 +74,17 @@ import os, sys, pickle, inspect, traceback, types, typing
 from functools import wraps
 from core.traitcontainers import DataBag
 from core.prog import safewrapper
-import qtpy
 
-qtPackages = ", ".join([p for p in qtpy.__dict__.keys() if p.startswith("Qt") and isinstance(qtpy.__dict__[p], types.ModuleType)])
+import qtpy as QtAPI
+QtAPI.API = os.environ["QT_API"]
+if os.environ["QT_API"] == "pyside6":
+    import PySide6
+    QtAPI = PySide6
+else:
+    pass
+print(f"extipyutils_client: QT API is {QtAPI.API}")
+
+qtPackages = ", ".join([p for p in QtAPI.__dict__.keys() if p.startswith("Qt") and isinstance(QtAPI.__dict__[p], types.ModuleType)])
 
 #from contextlib import contextmanager
 #print(sys.path)
@@ -126,6 +134,7 @@ init_commands = [
 init_commands.extend(
     [
     "".join(["sys.path.insert(2, '", __scipyen_path__, "')"]),
+    "import sys, os"
     "import signal, pickle, json, csv",
     "import numpy as np",
     "import scipy",
@@ -133,6 +142,13 @@ init_commands.extend(
     "import seaborn as sb",
     "from importlib import reload",
     "from pprint import pprint",
+    "import qtpy as QtAPI",
+    "QtAPI.API = os.environ['QT_API']",
+    "if os.environ['QT_API'] == 'pyside6':",
+    "    import PySide6",
+    "    QtAPI = PySide6",
+    "else:",
+    "    pass",
     f"from qtpy import ({qtPackages})",
     "import matplotlib as mpl",
     "mpl.rcParams['savefig.format'] = 'svg'",

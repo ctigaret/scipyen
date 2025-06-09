@@ -48,10 +48,20 @@ Useful to have even when vigranumpy is not installed.
 #########################################################################
 import os, typing, inspect, math
 import numpy as np
-import qtpy.QtCore as QtCore
-import qtpy.QtGui as QtGui
-import qtpy.QtWidgets as QtWidgets
-from qtpy.QtCore import QObject, Signal, Slot
+import qtpy as QtAPI
+QtAPI.API = os.environ["QT_API"]
+if os.environ["QT_API"] == "pyside6":
+    import PySide6
+    QtAPI = PySide6
+    import PySide6.QtCore as QtCore
+    import PySide6.QtGui as QtGui
+    import PySide6.QtWidgets as QtWidgets
+    from PySide6.QtCore import QObject, Signal, Slot
+else:
+    import qtpy.QtCore as QtCore
+    import qtpy.QtGui as QtGui
+    import qtpy.QtWidgets as QtWidgets
+    from qtpy.QtCore import QObject, Signal, Slot
 
 from gui.guiutils import(InftyDoubleValidator, ComplexValidator, UnitsStringValidator)
 

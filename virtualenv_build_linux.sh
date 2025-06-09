@@ -1066,7 +1066,7 @@ fi
 SECONDS=0
 get_pyver
 
-virtual_env_pfx="scipyenv_test"
+virtual_env_pfx="scipyenv"
 install_dir=${HOME}
 realscript=`realpath $0`
 scipyendir=`dirname "$realscript"`

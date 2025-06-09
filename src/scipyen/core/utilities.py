@@ -9,7 +9,7 @@
 Various utilities
 '''
 import traceback, re, itertools, functools, time, typing, types, warnings, operator, inspect
-import random, math, pprint, datetime, pathlib, sys
+import random, math, pprint, datetime, pathlib, sys, os
 from numbers import Number
 from sys import getsizeof, stderr
 from copy import (copy, deepcopy,)
@@ -44,6 +44,13 @@ import pyqtgraph # for their own eq operator
 import matplotlib as mpl
 #import language_tool_python
 
+import qtpy as QtAPI
+QtAPI.API = os.environ["QT_API"]
+if os.environ["QT_API"] == "pyside6":
+    import PySide6
+    QtAPI = PySide6
+else:
+    pass
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg,)
 
 from core import prog

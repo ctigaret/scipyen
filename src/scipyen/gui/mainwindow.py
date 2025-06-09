@@ -54,20 +54,25 @@ from collections import deque, ChainMap
 # BEGIN 3rd party modules
 
 # BEGIN PyQtxxx and utilities for setting GUI appearance
-import qtpy
-# print(f"In module: {__name__}: QT_API = {os.environ['QT_API']}, qtpy.API = {qtpy.API}, qtpy.API_NAME = {qtpy.API_NAME}")
+# print(f"In module: {__name__}: QT_API = {os.environ['QT_API']}, QtAPI.API = {QtAPI.API}, QtAPI.API_NAME = {QtAPI.API_NAME}")
 # might have to force this:
-qtpy.API = os.environ["QT_API"]
-print(f"Using QT API: {qtpy.API}")
+import qtpy as QtAPI
+QtAPI.API = os.environ["QT_API"]
+if os.environ["QT_API"] == "pyside6":
+    import PySide6
+    QtAPI = PySide6
+else:
+    pass
+print(f"gui.mainwindow using QT API: {QtAPI.API}")
 
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork,)
 from qtpy.QtCore import (Signal, Slot, Property,)
 from qtpy.uic import loadUiType
-try:
-    from qtpy import sip as sip
-    has_sip = True
-except:
-    has_sip = False
+# try:
+#     from qtpy import sip as sip
+#     has_sip = True
+# except:
+#     has_sip = False
 
 # BEGIN About QStyle plugins
 # WARNING: 2024-09-26 15:44:57
@@ -500,118 +505,13 @@ _info_banner_.append(
 def console_info():
     print("\n".join(_info_banner_))
     
-# def get_module_version(p:typing.Union[types.ModuleType, str]) -> str:
-#     if isinstance(p, str):
-#         try:
-#             p = importlib.import_module(p) 
-#         except:
-#             return ""
-#         
-#     if hasattr(p, "version"):
-#         if isinstance(p.version, types.ModuleType):
-#             if hasattr(p.version, "full_version"):
-#                 return str(p.version.full_version)
-#             else:
-#                 return ""
-#             
-#         else:
-#             return str(p.version)
-#         
-#     else:
-#         return str(p.__version__) if hasattr(p,"__version__") else ""
-#     
-# def infoSoftwareComponents() -> str:
-#     import qtpy, IPython, pywt
-#     
-#     _upa = qtpy.API.upper()
-#     
-#     if hasattr(pg.Qt, _upa):
-#         pyqtAPI = getattr(pg.Qt, _upa)
-#     else:
-#         pyqtAPI = qtpy.API
-#         
-#     if pyqtAPI in ("PyQt5", "PyQt6"):
-#         pyqtAPIver = f" {pyqtAPI} {QtCore.PYQT_VERSION_STR}, Qt {QtCore._qt_version}"
-#         
-#     elif pyqtAPI in ("PySide2", "PySide6"):
-#         try:
-#             pyside = importlib.import_module(pyqtAPI.lower())
-#             pyqtAPIver = f" {pyqtAPI} {pyside.__version__}, Qt {QtCore._qt_version}"
-#         except:
-#             pyqtAPIver = f" Qt {QtCore._qt_version}"
-#                 
-#     else:
-#         pyqtAPIver = f" Qt {QtCore._qt_version}"
-#     
-#     
-#     txt = list()
-#     
-#     txt += ['<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"',
-#             '    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">',
-#             '<html>',
-#             '<head>',
-#             '<title>Third Party Software Available or Used in Scipyen</title>',
-#             '<meta charset="utf-8"/>',
-#             '<meta> name="generator" content="Kate Editor"</meta>',
-#             '</head>',
-#             '<body>',
-#             '<h2>Third Party Software in Scipyen¹</h2>',
-#             '(Click on the links below, for credits & licenses)']
-#     
-#     txt.append('<h3>Environment</h3>')
-#     txt.append(f'<ul> <a href="https://www.python.org/">Python™</a> {sys.version} </ul>')
-#     txt.append(f'<ul> <a href="https://ipython.org/">IPython</a> Interactive Computing {get_module_version(IPython)} </ul>')
-#     txt.append(f'<ul> <a href="https://pypi.org/project/qtconsole/">qtconsole</a> Jupyter QtConsole {get_module_version("qtconsole")} </ul>')
-#     
-#     if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
-#         pyinstaller_bundle = pathlib.Path(sys._MEIPASS)
-#         if pyinstaller_bundle.name == "_internal":
-#             bundle_name = pathlib.Path(sys._MEIPASS).parent.name
-#         else:
-#             bundle_name = pathlib.Path(sys._MEIPASS).parent.name
-#             
-#         txt.append(f'<ul> Running in a <a href="https://pyinstaller.org/en/stable/">PyInstaller</a> bundle: </ul>')
-#         txt.append(f'<ul> &emsp; {bundle_name} </ul>')
-#     
-#     txt.append('<h3>Data Analysis</h3>')
-#     txt.append(f'<ul> <a href="https://neuralensemble.org/neo/">neo</a> {get_module_version(neo)} </ul>')
-#     txt.append(f'<ul> <a href="https://github.com/swharden/pyABF">pyABF</a> {get_module_version(pab.pyabf)} </ul>')
-#     txt.append(f'<ul> <a href="http://ukoethe.github.io/vigra/">vigra</a> - VIGRA Computer Vision Library {get_module_version(vigra)} </ul>')
-#     
-#     txt.append(f'<ul> <a href="https://numpy.org">NumPy</a> {get_module_version(np)} </ul>')
-#     txt.append(f'<ul> <a href="https://scipy.org/">SciPy</a> {get_module_version(scipy)} </ul>')
-#     txt.append(f'<ul> <a href="https://www.sympy.org/">SymPy</a> {get_module_version(sympy)} </ul>')
-#     txt.append(f'<ul> <a href="https://www.h5py.org/">h5py</a> HDF5 for Python {get_module_version(h5py)} </ul>')
-#     txt.append(f'<ul> <a href="https://pandas.pydata.org/">{pd.__name__}</a> {get_module_version(pd)} </ul>')
-#     txt.append(f'<ul> <a href="https://github.com/python-quantities/python-quantities">{pq.__name__}</a> {get_module_version(pq)} </ul>')
-#     txt.append(f'<ul> <a href="https://pywavelets.readthedocs.io/en/latest/index.html">{pywt.__name__}</a> {get_module_version(pywt)} </ul>')
-#     
-#     txt.append('<h3>User Interface & Plotting Frameworks</h3>')
-#     txt.append(f'<ul> <a href="https://matplotlib.org/">matplotlib</a> - An object-oriented plotting library {get_module_version(mpl)} </ul>')
-#     txt.append(f'<ul> <a href="https://seaborn.pydata.org/">{sb.__name__}</a> {get_module_version(sb)} </ul>')
-#     
-#     txt.append(f'<ul> <a href="https://github.com/spyder-ide/qtpy">qtpy</a> {get_module_version(qtpy)}, {pyqtAPIver} - (see also "About Qt")</ul>')
-#     txt.append(f'<ul> <a href="https://www.pyqtgraph.org/">PyQtGraph</a> - Scientific Graphics and GUI Library for Python {get_module_version(pg)}</ul>')
-#     txt.append('<ul> <a href="https://develop.kde.org/frameworks/breeze-icons/">Breeze Icons</a> copyright KDE and licenced under the GNU LGPL version 3 or later</ul>')
-# 
-# 
-#     txt.append("<p>¹Used or available for use at the console — this is not an exhaustive list, and excludes libraries installed after Scipyen's installation.</p>")
-#     txt.append("</body>")
-#     txt.append("</html>")
-#     
-#     
-#     
-#     
-#     return "\n".join(txt)
-
 # BUG: 2025-01-22 00:01:41 FIXME:
 # WARNING: 2025-01-22 08:55:40 RESOLVED
-# in scipyen.py by impporting this module AFTER the QApplication is initialized
+# in scipyen.py by importing this module AFTER the QApplication is initialized
 # see NOTE: 2025-01-22 08:56:42
 # QWidget: Must construct a QApplication before a QWidget
 from iolib.navigation import navigator
 
-# _mainwindow_ui_file = "mainwindow_nav.ui"
 _mainwindow_ui_file = "mainwindow.ui"
 
 
@@ -2734,7 +2634,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         Parameters:
         -----------
 
-        winClass : str, type, or sip.wrappertype
+        winClass : str, type, or sip.wrappertype, or Shiboken.Object (for PySide6)
             The only acceptable type is mpl.figure.Figure (where mpl is an alias to matplotlib)
 
             The only acceptable sip.wrappertype objects are the ones loaded by 
@@ -5705,6 +5605,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         tbactions = (self.newViewersAction, self.consolesAction,
                      self.scriptsAction, self.applicationsAction, 
                      self.helpTbAction, self.settingsAction)
+        
         if os.environ["QT_API"] in ("pyqt5", "pyside2"):
             tw = (w for w in itertools.chain(*(a.associatedWidgets()
                 for a in tbactions)) if w is not self.toolBar)

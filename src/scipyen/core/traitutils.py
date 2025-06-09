@@ -12,7 +12,7 @@ I'm sure there are lots of BUG(s) and/or redundant code - definitely needs
 cleaning up...
 """
 
-import enum
+import enum, os
 from enum import (EnumMeta, Enum, IntEnum, )
 import contextlib, traceback
 
@@ -24,6 +24,13 @@ import typing
 from collections import deque
 from functools import (partial, partialmethod)
 
+import qtpy as QtAPI
+QtAPI.API = os.environ["QT_API"]
+if os.environ["QT_API"] == "pyside6":
+    import PySide6
+    QtAPI = PySide6
+else:
+    pass
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg,)
     
 import traitlets

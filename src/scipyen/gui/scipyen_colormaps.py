@@ -74,6 +74,13 @@ import matplotlib.mlab as mlb
 from matplotlib import cm as cm
 from matplotlib import colors as colors
 from traitlets import Bunch
+import qtpy as QtAPI
+QtAPI.API = os.environ["QT_API"]
+if os.environ["QT_API"] == "pyside6":
+    import PySide6
+    QtAPI = PySide6
+else:
+    pass
 from qtpy import QtCore, QtGui
 
 try:

@@ -138,6 +138,13 @@ from urllib.parse import urlparse, urlsplit
 from collections import namedtuple, deque
 from dataclasses import MISSING
 from enum import Enum, IntEnum
+import qtpy as QtAPI
+QtAPI.API = os.environ["QT_API"]
+if os.environ["QT_API"] == "pyside6":
+    import PySide6
+    QtAPI = PySide6
+else:
+    pass
 try:
     from qtpy import sip as sip # for sip.cast
     has_sip = True
