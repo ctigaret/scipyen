@@ -9,9 +9,10 @@ import sys, os, typing, collections, pathlib, tarfile, dataclasses
 import inspect, functools, traceback
 from dataclasses import MISSING
 from functools import (singledispatch, singledispatchmethod)
-from qtpy import QtCore, QtGui, QtWidgets, QtSvg, QtNetwork, sip
-if qtpy.API in ("pyqt5", ):
+import qtpy
+if qtpy.API in ("pyside6", ):
     from qtpy import Shiboken
+from qtpy import QtCore, QtGui, QtWidgets, QtSvg, QtNetwork, sip
 from qtpy.QtCore import Signal, Slot, Property
 from qtpy.uic import loadUiType as __loadUiType__
 from core.prog import (safewrapper, scipywarn, print_styled)
