@@ -54,16 +54,17 @@ from collections import OrderedDict
 from warnings import warn
 
 
-import qtpy as QtAPI
-QtAPI.API = os.environ["QT_API"]
+import qtpy
+qtpy.API = os.environ["QT_API"]
 if os.environ["QT_API"] == "pyside6":
     import PySide6
-    QtAPI = PySide6
+    from PySide6 import (QtCore, QtGui, QtWidgets, )
+    from PySide6.QtCore import (Signal, Slot, )
+    QAction = QtGui.QAction
 else:
-    pass
-from qtpy import (QtCore, QtGui, QtWidgets, )
-from qtpy.QtCore import (Signal, Slot, )
-
+    from qtpy import (QtCore, QtGui, QtWidgets, )
+    from qtpy.QtCore import (Signal, Slot, )
+    QAction = QtWidgets.QAction
 #### BEGIN ipython/jupyter modules
 from traitlets.config.application import boolean_flag
 from traitlets.config.application import catch_config_error
@@ -92,9 +93,6 @@ from tornado import ioloop
 from tornado.queues import Queue
 
 import zmq
-
-# from qtpy import sip as sip
-# import sip
 
 from pygments import styles as pstyles
 #from pygments import style as pstyle
@@ -849,7 +847,7 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
         So it is up to the user of the ExternalConsoleWindow instance to take care
         of that - see ExternalIPython.init_qt_elements
         """
-        self.new_nrn_kernel_tab_act = QtWidgets.QAction("New Tab with New &Kernel + NEURON",
+        self.new_nrn_kernel_tab_act = QAction("New Tab with New &Kernel + NEURON",
             self,
             shortcut="Ctrl+K",
             triggered=self.create_neuron_tab
@@ -867,7 +865,7 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
         ctrl = "Meta" if sys.platform.startswith('darwin') else "Ctrl"
         kernel_menu_separators = [a for a in self.kernel_menu.actions() if a.isSeparator()]
         
-        self.initialize_neuron_act = QtWidgets.QAction("S&tart NEURON in current Kernel",
+        self.initialize_neuron_act = QAction("S&tart NEURON in current Kernel",
                                                        self,
                                                        shortcut=ctrl+"N",
                                                        triggered=self.start_neuron_in_current_tab
@@ -888,7 +886,7 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
         
         style_group = QtWidgets.QActionGroup(self)
         
-        actions = [QtWidgets.QAction("{}".format(s), self, triggered = partial(self._set_syntax_style, s)) for s in PYGMENT_STYLES]
+        actions = [QAction("{}".format(s), self, triggered = partial(self._set_syntax_style, s)) for s in PYGMENT_STYLES]
         
         for action in actions:
             action.setCheckable(True)
@@ -902,12 +900,12 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
         self.colors_menu = self.view_menu.addMenu("Console colors")
         colors_group = QtWidgets.QActionGroup(self)
         for c in self.active_frontend.available_colors:
-            action = QtWidgets.QAction("{}".format(c), self,
+            action = QAction("{}".format(c), self,
                                        triggered = partial(self._set_syntax_style, c))
-            # action = QtWidgets.QAction("{}".format(c), self,
+            # action = QAction("{}".format(c), self,
             #                            triggered = lambda v, val=c:
             #                                self._set_syntax_style(colors=val))
-            # action = QtWidgets.QAction("{}".format(c), self,
+            # action = QAction("{}".format(c), self,
             #                            triggered = lambda v, val=c:
             #                                self.active_frontend._set_syntax_style(colors=val))
             action.setCheckable(True)
@@ -921,7 +919,7 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
         self.sb_menu = self.view_menu.addMenu("Scrollbar position")
         sb_group = QtWidgets.QActionGroup(self)
         for s in self.active_frontend.scrollbar_positions.values():
-            action = QtWidgets.QAction("{}".format(s), self,
+            action = QAction("{}".format(s), self,
                                        triggered = lambda v, val = s:
                                            self.active_frontend._set_sb_pos(val=val))
             action.setCheckable(True)
@@ -932,7 +930,7 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
                 action.setChecked(True)
                 self.sb_menu.setDefaultAction(action)
             
-        self.choose_font_act = QtWidgets.QAction("Font", self, shortcut=ctrl+"F",
+        self.choose_font_act = QAction("Font", self, shortcut=ctrl+"F",
                                                  triggered = self.choose_font)
         
         self.add_menu_action(self.view_menu, self.choose_font_act)
@@ -3461,7 +3459,7 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             
             style_group = QtWidgets.QActionGroup(self)
             
-            actions = [QtWidgets.QAction("{}".format(s), self, triggered = partial(self.active_frontend._set_syntax_style, s)) for s in PYGMENT_STYLES]
+            actions = [QAction("{}".format(s), self, triggered = partial(self.active_frontend._set_syntax_style, s)) for s in PYGMENT_STYLES]
             
             for action in actions:
                 action.setCheckable(True)
@@ -3473,7 +3471,7 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             # for style in available_syntax_styles:
 #             for style in PYGMENT_STYLES:
 #                 print(f"{self.__class__.__name__}._configureUI_ adding menu item for pygment {style}")
-#                 action = QtWidgets.QAction("{}".format(style), self,
+#                 action = QAction("{}".format(style), self,
 #                                        triggered=lambda v:
 #                                            self.active_frontend._set_syntax_style(val=style))
 #                                            # self.active_frontend._slot_setSyntaxStyle(style))
@@ -3488,7 +3486,7 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         self.colors_menu = self.settings_menu.addMenu("Console Colors")
         colors_group = QtWidgets.QActionGroup(self)
         for c in self.active_frontend.available_colors:
-            action = QtWidgets.QAction("{}".format(c), self,
+            action = QAction("{}".format(c), self,
                                        triggered = lambda:
                                            self.active_frontend._set_console_colors(c))
             action.setCheckable(True)
@@ -3502,7 +3500,7 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         self.sb_menu = self.settings_menu.addMenu("Scrollbar Position")
         sb_group = QtWidgets.QActionGroup(self)
         for s in self.active_frontend.scrollbar_positions.values():
-            action = QtWidgets.QAction("{}".format(s), self,
+            action = QAction("{}".format(s), self,
                                        triggered = lambda v, val = s:
                                            self.active_frontend._set_sb_pos(val=val))
             action.setCheckable(True)
@@ -3513,13 +3511,13 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
                 action.setChecked(True)
                 self.sb_menu.setDefaultAction(action)
 
-        self.choose_font_act = QtWidgets.QAction("Console Font", self, shortcut=ctrl+"F",
+        self.choose_font_act = QAction("Console Font", self, shortcut=ctrl+"F",
                                                  triggered = self.choose_font)
         
         self.settings_menu.addAction(self.choose_font_act)
         self.addAction(self.choose_font_act)
         
-        self.set_console_scrollbackAction = QtWidgets.QAction("Console scroll back",
+        self.set_console_scrollbackAction = QAction("Console scroll back",
                                                               self, shortcut=ctrl+"L",
                                                               triggered = self.set_scrollBack)
         

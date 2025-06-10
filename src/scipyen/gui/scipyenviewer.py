@@ -12,23 +12,21 @@ from abc import (ABC, ABCMeta, abstractmethod,)
 from traitlets import Bunch
 #from abc import (abstractmethod,)
 
-import qtpy as QtAPI
-QtAPI.API = os.environ["QT_API"]
+has_qtdbus = False
+import qtpy
+qtpy.API = os.environ["QT_API"]
 if os.environ["QT_API"] == "pyside6":
     import PySide6
-    QtAPI = PySide6
-else:
-    pass
-from qtpy import (QtCore, QtWidgets, QtGui)
-
-has_qtdbus = False
-try:
-    from qtpy import QtDBus
+    from PySide6 import (QtCore, QtWidgets, QtGui)
+    from PySide6 import QtDBus
+    from PySide6.QtCore import (Signal, Slot, Property,)
     has_qtdbus = True
-except:
-    has_qtdbus = False
-    
-from qtpy.QtCore import (Signal, Slot, Property,)
+else:
+    from qtpy import (QtCore, QtWidgets, QtGui)
+    from qtpy import QtDBus
+    from qtpy.QtCore import (Signal, Slot, Property,)
+    has_qtdbus = True
+
 
 from core.utilities import safewrapper
 # from core import workspacefunctions as wfunc

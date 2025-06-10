@@ -74,14 +74,14 @@ import matplotlib.mlab as mlb
 from matplotlib import cm as cm
 from matplotlib import colors as colors
 from traitlets import Bunch
-import qtpy as QtAPI
-QtAPI.API = os.environ["QT_API"]
+
+import qtpy
+qtpy.API = os.environ["QT_API"]
 if os.environ["QT_API"] == "pyside6":
     import PySide6
-    QtAPI = PySide6
+    from PySide6 import QtCore, QtGui
 else:
-    pass
-from qtpy import QtCore, QtGui
+    from qtpy import QtCore, QtGui
 
 try:
     import cmocean # some cool palettes/luts

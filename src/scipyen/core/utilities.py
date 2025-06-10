@@ -44,14 +44,13 @@ import pyqtgraph # for their own eq operator
 import matplotlib as mpl
 #import language_tool_python
 
-import qtpy as QtAPI
-QtAPI.API = os.environ["QT_API"]
+import qtpy
+qtpy.API = os.environ["QT_API"]
 if os.environ["QT_API"] == "pyside6":
     import PySide6
-    QtAPI = PySide6
+    from PySide6 import (QtCore, QtGui, QtWidgets, QtXml, QtSvg,)
 else:
-    pass
-from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg,)
+    from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg,)
 
 from core import prog
 from .prog import safewrapper, deprecation, with_doc, is_hashable

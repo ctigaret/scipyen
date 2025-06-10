@@ -19,14 +19,13 @@ from core.scipyen_quantities import (checkTimeUnits, unitsConvertible)
 from core.scipyendataclasses import ScipyenDataclass
 # from core.utilities import counter_suffix
 from .prog import (safewrapper, with_doc, scipywarn)
-import qtpy as QtAPI
-QtAPI.API = os.environ["QT_API"]
+import qtpy
+qtpy.API = os.environ["QT_API"]
 if os.environ["QT_API"] == "pyside6":
     import PySide6
-    QtAPI = PySide6
+    from PySide6 import QtWidgets
 else:
-    pass
-from qtpy import QtWidgets
+    from qtpy import QtWidgets
 
 def _newDataZone(cls, places=None, extents=None, labels=None, units=None,
              name=None, segment=None, description=None, file_origin=None,

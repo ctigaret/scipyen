@@ -14,18 +14,18 @@ from core import scipyen_quantities as scq
 from core import strutils
 import pandas as pd
 
-import qtpy as QtAPI
-QtAPI.API = os.environ["QT_API"]
+import qtpy
+qtpy.API = os.environ["QT_API"]
 if os.environ["QT_API"] == "pyside6":
     import PySide6
-    QtAPI = PySide6
+    from PySide6 import QtCore, QtGui, QtWidgets
+    from PySide6.QtCore import Signal, Slot, Property
 else:
+    from qtpy import QtCore, QtGui, QtWidgets
+    from qtpy.QtCore import Signal, Slot, Property
     pass
-from qtpy import QtCore, QtGui, QtWidgets
-from qtpy.QtCore import Signal, Slot, Property
-# from qtpy.QtCore import Signal, Slot, QEnum, Property
-from qtpy.uic import loadUiType
 
+from qtpy.uic import loadUiType
 from gui import quickdialog as qd
 from gui.workspacegui import (GuiMessages, WorkspaceGuiMixin)
 

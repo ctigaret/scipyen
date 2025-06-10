@@ -4,10 +4,16 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 import os
-import qtpy as QtAPI
-QtAPI.API = os.environ["QT_API"]
-from qtpy import QtCore, QtGui, QtWidgets, QtSvg
-from qtpy.QtCore import Signal, Slot
+import qtpy
+qtpy.API = os.environ["QT_API"]
+if os.environ["QT_API"] == "pyside6":
+    import PySide6
+    from PySide6 import QtCore, QtGui, QtWidgets, QtSvg
+    from PySide6.QtCore import Signal, Slot
+else:
+    from qtpy import QtCore, QtGui, QtWidgets, QtSvg
+    from qtpy.QtCore import Signal, Slot
+    
 from qtpy.uic import loadUiType as __loadUiType__
 
 import typing, os

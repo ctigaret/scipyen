@@ -101,16 +101,24 @@ import quantities as pq
 
 import matplotlib as mpl # needed to expose the mro of Figure.canvas
 from matplotlib.figure import Figure
-import qtpy as QtAPI
-QtAPI.API = os.environ["QT_API"]
+import qtpy
+qtpy.API = os.environ["QT_API"]
 if os.environ["QT_API"] == "pyside6":
     import PySide6
-    QtAPI = PySide6
+    from PySide6 import (QtCore, QtGui, QtWidgets, QtXml, QtSvg,)
+    from PySide6.QtWidgets import (QWidget, QMainWindow)
+    from PySide6.QtCore import QSettings # NOTE: 2024-05-03 09:26:33 QVariant not available in PySide
+    application_name = "Scipyen-PySide6"
+    organization_name = "Scipyen-PySide6"
+
+    
 else:
-    pass
-from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg,)
-from qtpy.QtWidgets import (QWidget, QMainWindow)
-from qtpy.QtCore import QSettings # NOTE: 2024-05-03 09:26:33 QVariant not available in PySide
+    from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg,)
+    from qtpy.QtWidgets import (QWidget, QMainWindow)
+    from qtpy.QtCore import QSettings # NOTE: 2024-05-03 09:26:33 QVariant not available in PySide
+    application_name = "Scipyen"
+    organization_name = "Scipyen"
+
 
 from IPython.lib.pretty import pprint
 
@@ -177,9 +185,6 @@ confuse.yaml_util.Loader.add_constructor("tag:pq.Quantity", quantity_constructor
 # with other package-specific configurations, in particular those that rely
 # on environment variables (e.g. pyqtgraph)
 # END NOTE: 2021-01-10 13:17:58
-
-application_name = "Scipyen"
-organization_name = "Scipyen"
 
 global scipyen_config
 scipyen_config = confuse.LazyConfig(application_name, "scipyen_defaults")

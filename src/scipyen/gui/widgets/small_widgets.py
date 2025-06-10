@@ -11,15 +11,15 @@ import numpy as np
 import quantities as pq
 import pandas as pd
 from core.utilities import get_least_pwr10
-import qtpy as QtAPI
-QtAPI.API = os.environ["QT_API"]
+import qtpy
+qtpy.API = os.environ["QT_API"]
 if os.environ["QT_API"] == "pyside6":
     import PySide6
-    QtAPI = PySide6
+    from PySide6 import (QtCore, QtWidgets, QtGui)
+    from PySide6.QtCore import Signal, Slot, Property
 else:
-    pass
-from qtpy import (QtCore, QtWidgets, QtGui)
-from qtpy.QtCore import Signal, Slot, Property
+    from qtpy import (QtCore, QtWidgets, QtGui)
+    from qtpy.QtCore import Signal, Slot, Property
 from qtpy.uic import loadUiType
 from gui.painting_shared import (FontStyleType, standardQtFontStyles, 
                                  FontWeightType, standardQtFontWeights)

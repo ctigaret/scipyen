@@ -102,14 +102,6 @@ if len(sys.argv) > 1:
         os.environ["PYQTGRAPH_QT_LIB"] = "PyQt6"
         os.environ["FORCE_QT_API"] = "1"
         
-#     elif "pyside2" in sys.argv:
-#         os.environ["QT_API"] = "pyside2" # for up to Qt5
-#         os.environ["PYQTGRAPH_QT_LIB"] = "PySide2"
-#         os.environ["FORCE_QT_API"] = "1"
-#         
-#     if os.environ["QT_API"] == "pyside2":
-#         scipywarn("PySide2 support is not fully implemented; expect trouble")
-
     elif "pyside6" in sys.argv:
         os.environ["QT_API"] = "pyside6"
         os.environ["PYQTGRAPH_QT_LIB"] = "PySide6"
@@ -148,26 +140,23 @@ else:
 #### END core python modules
 
 #### BEGIN 3rd party modules
-import qtpy as QtAPI
-QtAPI.API = os.environ["QT_API"]
+import qtpy
+qtpy.API = os.environ["QT_API"]
 if os.environ["QT_API"] == "pyside6":
     import PySide6
-    QtAPI = PySide6
-else:
-    pass
-import qtpy as QtAPI
-print(f"scipyen.py: QtAPI.API is {QtAPI.API}")
-if os.environ["QT_API"] in ("pyqt5", "pyqt6"):
-    from qtpy import sip
-    has_sip = True
-else:
+    from PySide6 import (QtCore, QtWidgets, QtGui, )
+    appName = "Scipyen-PySide6"
     has_sip = False
-    
-print(f"scipyen.py: QtAPI.API is now {QtAPI.API}")
+else:
+    from qtpy import sip
+    from qtpy import (QtCore, QtWidgets, QtGui, )
+    appName = "Scipyen"
+    has_sip = True
+
+print(f"scipyen.py: qtpy.API is {qtpy.API}")
 
 # NOTE: 2024-05-02 09:46:11
 # you still need the QT_API in the environment
-from qtpy import (QtCore, QtWidgets, QtGui, )
 
 from core.prog import scipywarn
 
@@ -338,16 +327,16 @@ def main():
 
     try:
         # BEGIN 
-        # 1. create the pyqt5 app
+        # 1. create the app
         app = QtWidgets.QApplication(sys.argv)
         translator = QtCore.QTranslator(app)
         translator.load(QtCore.QLocale.system(), "qtbase", "_", QtCore.QLibraryInfo.location(QtCore.QLibraryInfo.TranslationsPath))
         app.installTranslator(translator)
         # NOTE: 2025-01-22 08:56:42
-        # this needs to be here in prder ot initialize navigator widgets
+        # this needs to be here in order to initialize navigator widgets
         import gui.mainwindow as mainwindow
 
-        app.setDesktopFileName("Scipyen")
+        app.setDesktopFileName(appName)
 
         app.setApplicationName(scipyen_config.application_name)
         app.setOrganizationName(scipyen_config.organization_name)
@@ -355,7 +344,7 @@ def main():
         gc.enable()
 
         # 2. initialize main window
-        mainWindow = mainwindow.ScipyenWindow(app)
+        mainWindow = mainwindow.ScipyenWindow()
         
         # NOTE: 2021-08-17 10:06:24 FIXME / TODO
         # come up with a nice icon?

@@ -9,21 +9,21 @@ import sys, os, typing, collections, pathlib, tarfile, dataclasses
 import inspect, functools, traceback
 from dataclasses import MISSING
 from functools import (singledispatch, singledispatchmethod)
-import qtpy as QtAPI
-QtAPI.API = os.environ["QT_API"]
+import qtpy
+qtpy.API = os.environ["QT_API"]
 if os.environ["QT_API"] == "pyside6":
     import PySide6
     from PySide6 import Shiboken
-    QtType = typing.TypeVar("QtType", bound="Shiboken.Object")
     from PySide6 import QtCore, QtGui, QtWidgets, QtSvg, QtNetwork
     from PySide6.QtCore import Signal, Slot, Property
-    from PySide6.uic import loadUiType as __loadUiType__
+    QtType = typing.TypeVar("QtType", bound="Shiboken.Object")
 else:
     from qtpy import sip
-    QtType = typing.TypeVar("QtType", bound = "sip.wrappertype")
     from qtpy import QtCore, QtGui, QtWidgets, QtSvg, QtNetwork, sip
     from qtpy.QtCore import Signal, Slot, Property
-    from qtpy.uic import loadUiType as __loadUiType__
+    QtType = typing.TypeVar("QtType", bound = "sip.wrappertype")
+    
+from qtpy.uic import loadUiType as __loadUiType__
 from core.prog import (safewrapper, scipywarn, print_styled)
 from core.sysutils import adapt_ui_path
 from gui.widgets.cancellableqprogressbar import CancellableQProgressBar

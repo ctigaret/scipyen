@@ -58,15 +58,15 @@ from core.prog import (safewrapper, timefunc, processtimefunc, timeblock)
 from core.typeenum import TypeEnum
 # from jupyter_core.paths import jupyter_runtime_dir
 
-import qtpy as QtAPI
-QtAPI.API = os.environ["QT_API"]
+import qtpy
+qtpy.API = os.environ["QT_API"]
 if os.environ["QT_API"] == "pyside6":
     import PySide6
-    QtAPI = PySide6
+    from PySide6 import QtCore, QtGui, QtWidgets
+    from PySide6.QtCore import Signal, Slot
 else:
-    pass
-from qtpy import QtCore, QtGui, QtWidgets
-from qtpy.QtCore import Signal, Slot
+    from qtpy import QtCore, QtGui, QtWidgets
+    from qtpy.QtCore import Signal, Slot
 
 
 class WorkspaceVarChange(TypeEnum):

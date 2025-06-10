@@ -47,15 +47,15 @@ from scipy import optimize, cluster
 #     ProgressBar = None
 
 # NOTE: 2019-07-29 13:09:02 do I really need these 2 lines?
-import qtpy as QtAPI
-QtAPI.API = os.environ["QT_API"]
+import qtpy
+qtpy.API = os.environ["QT_API"]
 if os.environ["QT_API"] == "pyside6":
     import PySide6
-    QtAPI = PySide6
+    from PySide6 import QtCore, QtGui, QtWidgets, QtSvg
+    from PySide6.QtCore import Signal, Slot, Property
 else:
-    pass
-from qtpy import QtCore, QtGui, QtWidgets, QtSvg
-from qtpy.QtCore import Signal, Slot, Property
+    from qtpy import QtCore, QtGui, QtWidgets, QtSvg
+    from qtpy.QtCore import Signal, Slot, Property
 
 import neo
 

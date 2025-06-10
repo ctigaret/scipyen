@@ -43,16 +43,17 @@ import numpy as np
 import pandas as pd
 import quantities as pq
 
-import qtpy as QtAPI
-QtAPI.API = os.environ["QT_API"]
+import qtpy
+qtpy.API = os.environ["QT_API"]
 if os.environ["QT_API"] == "pyside6":
     import PySide6
-    QtAPI = PySide6
-else:
-    pass
+    from PySide6 import (QtCore, QtWidgets, QtGui)
+    from PySide6.QtCore import (Signal, Slot, Property)
     
-from qtpy import (QtCore, QtWidgets, QtGui)
-from qtpy.QtCore import (Signal, Slot, Property)
+else:
+    from qtpy import (QtCore, QtWidgets, QtGui)
+    from qtpy.QtCore import (Signal, Slot, Property)
+    
 
 import configparser # from standard library; Scipyen uses confuse from  pypi
                     # so don't "confuse" them(!)

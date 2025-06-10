@@ -4,15 +4,15 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 import os
-from core.pyqtgraph_patch import pyqtgraph as pg
-import qtpy as QtAPI
-QtAPI.API = os.environ["QT_API"]
+import qtpy
+qtpy.API = os.environ["QT_API"]
 if os.environ["QT_API"] == "pyside6":
     import PySide6
-    QtAPI = PySide6
+    from PySide6 import (QtCore, QtWidgets, QtGui)
 else:
-    pass
-from qtpy import (QtCore, QtWidgets, QtGui)
+    from qtpy import (QtCore, QtWidgets, QtGui)
+
+from core.pyqtgraph_patch import pyqtgraph as pg
 
 # each spike is a small vertical line centered at 0.0, height of 1
 spike_Symbol = QtGui.QPainterPath(QtCore.QPointF(0.0, -0.5))

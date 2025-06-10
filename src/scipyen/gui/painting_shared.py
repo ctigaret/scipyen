@@ -10,24 +10,24 @@ from pprint import pprint
 from traitlets import Bunch
 
 import numpy as np
-import qtpy as QtAPI
-QtAPI.API = os.environ["QT_API"]
+import qtpy
+qtpy.API = os.environ["QT_API"]
 if os.environ["QT_API"] == "pyside6":
     import PySide6
-    QtAPI = PySide6
+    from PySide6 import QtCore, QtGui, QtWidgets, QtXml, QtSvg
+    from PySide6.QtCore import Signal, Slot, Property
+    has_sip = False
 else:
-    pass
-from qtpy import QtCore, QtGui, QtWidgets, QtXml, QtSvg
-from qtpy.QtCore import Signal, Slot, Property
-
-# for sip.cast:
-has_sip = False
-# if os.environ["QT_API"] in ("pyqt5", "pyqt6"):
-try:
+    from qtpy import QtCore, QtGui, QtWidgets, QtXml, QtSvg
+    from qtpy.QtCore import Signal, Slot, Property
     from qtpy import sip as sip
     has_sip = True
-except:
-    has_sip = False
+
+# # for sip.cast:
+# has_sip = False
+# # if os.environ["QT_API"] in ("pyqt5", "pyqt6"):
+# try:
+# except:
     
 # else:
 #     sip = None

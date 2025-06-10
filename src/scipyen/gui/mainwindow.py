@@ -56,17 +56,19 @@ from collections import deque, ChainMap
 # BEGIN PyQtxxx and utilities for setting GUI appearance
 # print(f"In module: {__name__}: QT_API = {os.environ['QT_API']}, QtAPI.API = {QtAPI.API}, QtAPI.API_NAME = {QtAPI.API_NAME}")
 # might have to force this:
-import qtpy as QtAPI
-QtAPI.API = os.environ["QT_API"]
+import qtpy
+qtpy.API = os.environ["QT_API"]
 if os.environ["QT_API"] == "pyside6":
     import PySide6
-    QtAPI = PySide6
+    from PySide6 import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork,)
+    from PySide6.QtCore import (Signal, Slot, Property,)
+    QAction = QtGui.QAction
 else:
-    pass
-print(f"gui.mainwindow using QT API: {QtAPI.API}")
+    from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork,)
+    from qtpy.QtCore import (Signal, Slot, Property,)
+    QAction = QtWidgets.QAction
+print(f"gui.mainwindow using QT API: {qtpy.API}")
 
-from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork,)
-from qtpy.QtCore import (Signal, Slot, Property,)
 from qtpy.uic import loadUiType
 # try:
 #     from qtpy import sip as sip
@@ -1383,16 +1385,19 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     # alive at any time; however, this behaviour propagates to its subclasses 
     # also (if any)
     
-    def __new__(cls:typing.Self, app: QtWidgets.QApplication, 
-                 parent: typing.Optional[QtWidgets.QWidget] = None, *args, **kwargs) -> typing.Self:
+    # def __new__(cls:typing.Self, app: QtWidgets.QApplication, 
+    #              parent: typing.Optional[QtWidgets.QWidget] = None, *args, **kwargs) -> typing.Self:
+    def __new__(cls:typing.Self, parent: typing.Optional[QtWidgets.QWidget] = None, *args, **kwargs) -> typing.Self:
         if not hasattr(cls, "_instance") or not isinstance(cls._instance, cls):
-            cls._instance = super(ScipyenWindow, cls).__new__(cls, app, parent, *args, **kwargs)
+            cls._instance = super(ScipyenWindow, cls).__new__(cls, parent, *args, **kwargs)
+            # cls._instance = super(ScipyenWindow, cls).__new__(cls, app, parent, *args, **kwargs)
             
         return cls._instance
     
     # @processtimefunc
-    def __init__(self, app: QtWidgets.QApplication, 
-                 parent: typing.Optional[QtWidgets.QWidget] = None, *args, **kwargs):
+    # def __init__(self, app: QtWidgets.QApplication, 
+    #              parent: typing.Optional[QtWidgets.QWidget] = None, *args, **kwargs):
+    def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None, *args, **kwargs):
         r"""Scipyen's main window initializer (constructor).
 
         Parameters:
@@ -1432,17 +1437,14 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.helpWidget = None
 
         # NOTE: 2023-01-08 16:14:26 - set this early !
-        # this below is the same as:
-        # • app.instance()
-        # • QtWidgets.qApp.instance()
-        # i.e. the global singleton instance of the QApplication running Scipyen
-        self.app = app
+        # the global singleton instance of the QApplication running Scipyen
+        self.app = QtWidgets.QApplication.instance()
         
         # self._pyinstaller_bundled_ = kwargs.pop("pyinstaller_bundled", False)
         self._pyinstaller_bundled_ = getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS")
         
         # NOTE: 2022-12-25 10:41:12
-        # a mapping of plugin_module ↦ {plugin_module_function ↦ QtWidgets.QAction}
+        # a mapping of plugin_module ↦ {plugin_module_function ↦ QAction}
         self._ui_plugins_ = dict()
         
         self._userenv_varname_ = "USERPROFILE" if sys.platform.startswith("win32") else "HOME"
@@ -5378,10 +5380,10 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # menuScripts is now def'ed in the ui file
         # self.menuScripts = QtWidgets.QMenu("Scripts", self)
         # self.menubar.insertMenu(self.menuHelp.menuAction(), self.menuScripts)
-        self.actionScriptRun = QtWidgets.QAction(QtGui.QIcon.fromTheme("system-run"), "Run...", self)
+        self.actionScriptRun = QAction(QtGui.QIcon.fromTheme("system-run"), "Run...", self)
         self.actionScriptRun.triggered.connect(self.slot_runPythonScript)
         self.menuScripts.addAction(self.actionScriptRun)
-        self.actionScriptToConsole = QtWidgets.QAction(QtGui.QIcon.fromTheme("scriptnew"), "To Console...", self)
+        self.actionScriptToConsole = QAction(QtGui.QIcon.fromTheme("scriptnew"), "To Console...", self)
         self.actionScriptToConsole.triggered.connect(self.slot_pastePythonScript)
         self.menuScripts.addAction(self.actionScriptToConsole)
         self.menuScripts.addSeparator()
@@ -5389,7 +5391,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.recentScriptsMenu.setIcon(QtGui.QIcon.fromTheme("document-open-recent"))
         self.menuScripts.addMenu(self.recentScriptsMenu)
         self.menuScripts.addSeparator()
-        self.actionManageScripts = QtWidgets.QAction(QtGui.QIcon.fromTheme("scriptnew"), "Script Manager", self)
+        self.actionManageScripts = QAction(QtGui.QIcon.fromTheme("scriptnew"), "Script Manager", self)
         self.actionManageScripts.triggered.connect(self.slot_showScriptsManagerWindow)
         self.menuScripts.addAction(self.actionManageScripts)
         # END scripts menu
@@ -5405,7 +5407,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.whatsThisAction = QtWidgets.QWhatsThis.createAction(self)
         self.whatsThisAction.setIcon(QtGui.QIcon.fromTheme("help-whatsthis"))
         self.menuHelp.addAction(self.whatsThisAction)
-        self.testPythonHelpAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("help-contextual"), "Python help", self)
+        self.testPythonHelpAction = QAction(QtGui.QIcon.fromTheme("help-contextual"), "Python help", self)
         self.testPythonHelpAction.triggered.connect(self._slot_PythonHelp)
         self.menuHelp.addAction(self.testPythonHelpAction)
         # ### END Help menu
@@ -5414,20 +5416,20 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         
         self.actionOpen_System_Terminal.triggered.connect(self.slot_openCurrentDirInSystemTerminal)
 
-        self.actionConsole = QtWidgets.QAction(QtGui.QIcon.fromTheme("scriptnew"), "Scipyen Console", self)
+        self.actionConsole = QAction(QtGui.QIcon.fromTheme("scriptnew"), "Scipyen Console", self)
         
         self.actionConsole.triggered.connect(self.slot_initQtConsole)
         self.menuConsoles.addAction(self.actionConsole)
 
         if not self._pyinstaller_bundled_:
-            self.actionExternalIPython = QtWidgets.QAction(QtGui.QIcon.fromTheme("scriptnew"), "External IPython", self)
+            self.actionExternalIPython = QAction(QtGui.QIcon.fromTheme("scriptnew"), "External IPython", self)
         
             self.actionExternalIPython.triggered.connect(self.slot_launchExternalIPython)
         
             self.menuConsoles.addAction(self.actionExternalIPython)
 
             if has_neuron:
-                self.actionExternalNrnIPython = QtWidgets.QAction(
+                self.actionExternalNrnIPython = QAction(
                     QtGui.QIcon.fromTheme("scriptnew"), "External IPython for NEURON", self)
                 self.actionExternalNrnIPython.triggered.connect(
                     self.slot_launchExternalNeuronIPython)
@@ -5438,7 +5440,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             
             self.menuConsoles.addMenu(self.menuWith_Running_Kernel)
             
-            self.actionRunning_IPython = QtWidgets.QAction(
+            self.actionRunning_IPython = QAction(
                 QtGui.QIcon.fromTheme("scriptnew"), "Choose kernel ...", self)
             
             self.actionRunning_IPython.triggered.connect(
@@ -5447,7 +5449,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             self.menuWith_Running_Kernel.addAction(self.actionRunning_IPython)
 
             if has_neuron:
-                self.actionRunning_IPython_for_Neuron = QtWidgets.QAction(
+                self.actionRunning_IPython_for_Neuron = QAction(
                     QtGui.QIcon.fromTheme("scriptnew"), "Choose kernel and launch NEURON", self)
                 
                 self.actionRunning_IPython_for_Neuron.triggered.connect(
@@ -5676,7 +5678,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         self.fileSystemFilter.lineEdit().setClearButtonEnabled(True)
 
-        self.removeFileFilterFromListAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("edit-delete"),
+        self.removeFileFilterFromListAction = QAction(QtGui.QIcon.fromTheme("edit-delete"),
                                                                 "Remove this filter from history",
                                                                 self.fileSystemFilter.lineEdit())
 
@@ -5684,7 +5686,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         self.removeFileFilterFromListAction.triggered.connect(self.slot_removeFileFilterFromHistory)
 
-        self.clearFileFilterListAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("final_activity"),
+        self.clearFileFilterListAction = QAction(QtGui.QIcon.fromTheme("final_activity"),
                                                            "Clear filter list",
                                                            self.fileSystemFilter.lineEdit())
 
@@ -5725,7 +5727,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.varNameFilterFinderComboBox.lineEdit().undoAvailable = True
         self.varNameFilterFinderComboBox.lineEdit().redoAvailable = True
 
-        self.removeVarNameFromFinderListAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("edit-delete"),
+        self.removeVarNameFromFinderListAction = QAction(QtGui.QIcon.fromTheme("edit-delete"),
                                                                    "Remove item from list",
                                                                    self.varNameFilterFinderComboBox.lineEdit())
 
@@ -5758,7 +5760,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.commandFinderComboBox.lineEdit().undoAvailable = True
         self.commandFinderComboBox.lineEdit().redoAvailable = True
 
-        self.removeItemFromCommandFinderListAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("edit-delete"),
+        self.removeItemFromCommandFinderListAction = QAction(QtGui.QIcon.fromTheme("edit-delete"),
                                                                        "Remove item from list",
                                                                        self.commandFinderComboBox.lineEdit())
 
@@ -5981,7 +5983,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         
         dirsNames = list(self._recentDirectories)[startIndex : lastIndex]
         
-        dirsActions = list(map(lambda x: QtWidgets.QAction(guiutils.csqueeze(x.replace('&', '&&'), 60), self), dirsNames))
+        dirsActions = list(map(lambda x: QAction(guiutils.csqueeze(x.replace('&', '&&'), 60), self), dirsNames))
 
         if self.currentDirectory in dirsNames:
             currentIndex = dirsNames.index(self.currentDirectory)
@@ -6474,8 +6476,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # print("ScipyenWindow.slot_chDirString: \nval = %s; \nprotocol = %s; \ntarget = %s" % (val, protocol, target))
         self.slot_changeDirectory(target)
         
-    @Slot(QtWidgets.QAction, QtCore.Qt.MouseButton)
-    def slot_recentDirActivated(self, action:QtWidgets.QAction, button:QtCore.Qt.MouseButton):
+    @Slot(QAction, QtCore.Qt.MouseButton)
+    def slot_recentDirActivated(self, action:QAction, button:QtCore.Qt.MouseButton):
         result = action.data() 
         path = pathlib.Path(self._recentDirectories[result]).absolute() #.resolve()   # the path to the subdirectory pointed to by the action
         url = QtCore.QUrl(path.as_uri())
@@ -6488,7 +6490,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         r"""Convergence for all directory navigation in ScipyenWindow"""
         # print(f"MainWindow.slot_changeDirectory(targetDir = {targetDir})")
         if targetDir is None:
-            if isinstance(self.sender(), QtWidgets.QAction):
+            if isinstance(self.sender(), QAction):
                 targetDir = str(self.sender().text())
 
         if isinstance(targetDir, str) and "&" in targetDir:
@@ -6869,7 +6871,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @Slot()
     @safewrapper
     def _slot_runRecentPythonScript_(self):
-        if isinstance(self.sender(), QtWidgets.QAction):
+        if isinstance(self.sender(), QAction):
             s_name = str(self.sender().text())
 
             if "&" in s_name:
@@ -7043,7 +7045,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         inside self.loadDiskFile to select the appropriate file opening code.
         '''
         action = self.sender()
-        if isinstance(action, QtWidgets.QAction):
+        if isinstance(action, QAction):
             itemText = str(action.text()).replace('&', '')
             pathPart = itemText.split('[')[-1]
             fName = pathPart.split(']')[0]
@@ -8257,7 +8259,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @safewrapper
     def _slot_showActionStatusMessage_(self):
         action = self.sender()
-        if isinstance(action, QtWidgets.QAction):
+        if isinstance(action, QAction):
             action.showStatusText(self)
 
     @Slot()
@@ -8981,7 +8983,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             for module, moduleDict in self._ui_plugins_.items():
                 if isinstance(moduleDict, dict) and len(moduleDict) > 0:
                     for func, action in moduleDict.items():
-                        if inspect.isfunction(func) and isinstance(action, QtWidgets.QAction):
+                        if inspect.isfunction(func) and isinstance(action, QAction):
                             parentMenuOrMenuBar = action.parent()
                             if isinstance(parentMenuOrMenuBar, QtWidgets.QMenu):
                                 parents.append(parentMenuOrMenuBar)
@@ -9110,7 +9112,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                             if beforeActionLabel in labels:
                                 beforeNdx = labels.index(beforeActionLabel)
                                 beforeAction = actions[beforeNdx]
-                                newAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("window"),v[0])
+                                newAction = QAction(QtGui.QIcon.fromTheme("window"),v[0])
                                 newAction.triggered.connect(
                                     self.slot_newViewerMenuAction)
                                 self.newViewersMenu.insertAction(
@@ -9148,7 +9150,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
     def _installPluginFunction_(self, f: types.FunctionType, menuItemLabel: str, 
                                 parentMenu: QtWidgets.QMenu, 
-                                before: typing.Optional[QtWidgets.QAction] = None, 
+                                before: typing.Optional[QAction] = None, 
                                 n_outputs=None, inArgTypes=None):
         ''' Creates a QAction for calling the module-level function `f`.
         Implements the actual logic of installing individual plugin functions 
@@ -9166,7 +9168,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         parentMenu: the QMenu where the QAction will be created.
 
-        before: QtWidgets.QAction. Optional, default is None.
+        before: QAction. Optional, default is None.
             When present, the new action will be inserted in the parent menu 
                 before this one (useufl to have the actions sorted e.g., by name)
             When None (the default) the new action willl be appended to the end
@@ -9250,8 +9252,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         elif arg_defaults is None:
             arg_defaults = [None for k in range(len(arg_names))]
 
-        if isinstance(before, QtWidgets.QAction):
-            newAction = QtWidgets.QAction(menuItemLabel)
+        if isinstance(before, QAction):
+            newAction = QAction(menuItemLabel)
             parentMenu.insertAction(before, newAction)
         else:
             newAction = parentMenu.addAction(menuItemLabel)
@@ -9294,7 +9296,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
                 3.a) if the key is maped to a module-level function (see
                     below) then adds a menu item (action - basically a 
-                    QtWidgets.QAction) named "Special" which will, when
+                    QAction) named "Special" which will, when
                     triggered, will call the module-level function
                     to which this key is mapped.
 
@@ -9388,7 +9390,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                                     ff, item, parentMenu, before=beforeAction)
                                 # if "simple_plugin" in v[0]:
                                 #     print(f"menuAction: {menuAction}")
-                                if isinstance(menuAction, QtWidgets.QAction):
+                                if isinstance(menuAction, QAction):
                                     pluginMenuActions.append((menuAction, ff))
 
                             elif isinstance(ff, (tuple, list)):
@@ -9398,7 +9400,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                                         if inspect.isfunction(f):
                                             menuAction = self._installPluginFunction_(
                                                 f, f.__name__, newMenu)
-                                            if isinstance(menuAction, QtWidgets.QAction):
+                                            if isinstance(menuAction, QAction):
                                                 pluginMenuActions.append(
                                                     (menuAction, f))
                                         else:
@@ -9407,7 +9409,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                                 else:
                                     menuAction = self._installPluginFunction_(
                                         ff[0], item, parentMenu)
-                                    if isinstance(menuAction, QtWidgets.QAction):
+                                    if isinstance(menuAction, QAction):
                                         pluginMenuActions.append(
                                             (menuAction, ff[0]))
 
@@ -9436,7 +9438,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
                 menuAction = self._installPluginFunction_(
                     ff, ff.__name__, newMenu)
-                if isinstance(menuAction, QtWidgets.QAction):
+                if isinstance(menuAction, QAction):
                     pluginMenuActions.append((menuAction, ff))
 
             elif isinstance(ff, (tuple, list)):
@@ -9446,7 +9448,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                     if inspect.isfunction(ff[0]):
                         menuAction = self._installPluginFunction_(
                             ff[0], ff[0].__name__, newMenu)
-                        if isinstance(menuAction, QtWidgets.QAction):
+                        if isinstance(menuAction, QAction):
                             pluginMenuActions.append((menuAction, ff[0]))
                     else:
                         raise TypeError("function object expected")
@@ -9457,15 +9459,15 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                         if inspect.isfunction(f):
                             menuAction = self._installPluginFunction_(
                                 f, f.__name__, newMenu)
-                            if isinstance(menuAction, QtWidgets.QAction):
+                            if isinstance(menuAction, QAction):
                                 pluginMenuActions.append((menuAction, f))
                         else:
                             raise TypeError("function object expected")
 
         return pluginMenuActions
     
-    def _crawl_plugin_UI_menu(self, act:QtWidgets.QAction) -> str:
-        if not isinstance(act, QtWidgets.QAction):
+    def _crawl_plugin_UI_menu(self, act:QAction) -> str:
+        if not isinstance(act, QAction):
             return str()
         menu_path = deque()
         

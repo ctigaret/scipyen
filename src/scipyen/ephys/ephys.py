@@ -188,15 +188,15 @@ import pandas as pd
 import matplotlib as mpl
 # import pyqtgraph as pg
 from core.pyqtgraph_patch import pyqtgraph as pg
-import qtpy as QtAPI
-QtAPI.API = os.environ["QT_API"]
+import qtpy
+qtpy.API = os.environ["QT_API"]
 if os.environ["QT_API"] == "pyside6":
     import PySide6
-    QtAPI = PySide6
+    from PySide6 import (QtGui, QtCore, QtWidgets)
+    from PySide6.QtCore import (Signal, Slot, )
 else:
-    pass
-from qtpy import (QtGui, QtCore, QtWidgets)
-from qtpy.QtCore import (Signal, Slot, )
+    from qtpy import (QtGui, QtCore, QtWidgets)
+    from qtpy.QtCore import (Signal, Slot, )
 #### END 3rd party modules
 
 #### BEGIN pict.core modules

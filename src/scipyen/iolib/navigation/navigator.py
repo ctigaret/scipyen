@@ -138,22 +138,22 @@ from urllib.parse import urlparse, urlsplit
 from collections import namedtuple, deque
 from dataclasses import MISSING
 from enum import Enum, IntEnum
-import qtpy as QtAPI
-QtAPI.API = os.environ["QT_API"]
+import qtpy
+qtpy.API = os.environ["QT_API"]
 if os.environ["QT_API"] == "pyside6":
     import PySide6
-    QtAPI = PySide6
+    from PySide6 import (QtCore, QtGui, QtWidgets, QtXml, QtSvg)
+    from PySide6.QtCore import (Signal, Slot, Property,)
+    QAction = QtGui.QAction
+    has_sip = False
 else:
-    pass
-try:
+    from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg)
+    from qtpy.QtCore import (Signal, Slot, Property,)
     from qtpy import sip as sip # for sip.cast
     has_sip = True
-except:
-    has_sip = False
+    QAction = QtWidgets.QAction
 # import sip # for sip.isdeleted() - not used yet, but beware
 from traitlets.utils.bunch import Bunch
-from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg)
-from qtpy.QtCore import (Signal, Slot, Property,)
 # from qtpy.uic import loadUiType
 
 from core import desktoputils as dutils
@@ -732,9 +732,9 @@ class UrlComboBox(QtWidgets.QComboBox):
     #     compObj.setModelSorting(QtWidgets.QCompleter.CaseSensitivelySortedModel)
                     
 class UrlNavigatorMenu(QtWidgets.QMenu):
-    sig_urlDropped = Signal(QtWidgets.QAction, QtGui.QDropEvent, 
+    sig_urlDropped = Signal(QAction, QtGui.QDropEvent, 
                             name="sig_urlDropped")
-    mouseButtonClicked = Signal(QtWidgets.QAction, QtCore.Qt.MouseButton, 
+    mouseButtonClicked = Signal(QAction, QtCore.Qt.MouseButton, 
                                     name="mouseButtonClicked")
     def __init__(self, title:typing.Optional[str] = None, 
                  parent:typing.Optional[QtWidgets.QWidget] = None):
@@ -1165,7 +1165,7 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         
         subDirsNames = list(map(lambda x: x.name, self._subDirs_[startIndex : lastIndex]))
         
-        subDirsActions = list(map(lambda x: QtWidgets.QAction(guiutils.csqueeze(x.replace('&', '&&'), 60), self), subDirsNames))
+        subDirsActions = list(map(lambda x: QAction(guiutils.csqueeze(x.replace('&', '&&'), 60), self), subDirsNames))
 
         if self._subDir_ in subDirsNames:
             currentIndex = subDirsNames.index(self._subDir_)
@@ -1491,15 +1491,15 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
             
         self._subDirsJob_.start()
         
-    @Slot(QtWidgets.QAction, QtGui.QDropEvent)
-    def slot_urlsDropped(self, action:QtWidgets.QAction, event:QtGui.QDropEvent):
+    @Slot(QAction, QtGui.QDropEvent)
+    def slot_urlsDropped(self, action:QAction, event:QtGui.QDropEvent):
         result = action.data().toInt()
         path = self._subDirs_[result]
         url = QtCore.QUrl(path.as_uri())
         self.urlsDroppedOnNavButton.emit(url, event)
     
-    @Slot(QtWidgets.QAction)
-    def slot_menuActionTriggered(self, action:QtWidgets.QAction):
+    @Slot(QAction)
+    def slot_menuActionTriggered(self, action:QAction):
         # mouseButtons = QtWidgets.QApplication.mouseButtons()
         # result = action.data().toInt()    
         # NOTE: 2025-01-20 21:36:48
@@ -1512,8 +1512,8 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         url = QtCore.QUrl(path.as_uri())
         self.navigatorButtonActivated.emit(url, QtCore.Qt.LeftButton, QtCore.Qt.NoModifier)
     
-    @Slot(QtWidgets.QAction, QtCore.Qt.MouseButton)
-    def slot_menuActionClicked(self, action:QtWidgets.QAction, button:QtCore.Qt.MouseButton):
+    @Slot(QAction, QtCore.Qt.MouseButton)
+    def slot_menuActionClicked(self, action:QAction, button:QtCore.Qt.MouseButton):
         r"""Invoked by mouse clicking on a subdirectories menu entry.
         """
         # NOTE: 2025-01-21 09:06:45 see NOTE: 2025-01-21 08:59:29
@@ -1714,7 +1714,7 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
 
 class PlacesMenu(QtWidgets.QMenu):
     # UrlNavigatorMenu w/o D&D
-    mouseButtonClicked = Signal(QtWidgets.QAction, QtCore.Qt.MouseButton, 
+    mouseButtonClicked = Signal(QAction, QtCore.Qt.MouseButton, 
                                     name="mouseButtonClicked")
     
     def __init__(self, title:typing.Optional[str] = None, 
@@ -1843,7 +1843,7 @@ class PlacesButton(UrlNavigatorButtonBase):
         lastIndex = min(nAvailableItems, maxIndex)
         
         for k, (key, val) in enumerate(actionsMap.items()):
-            action = QtWidgets.QAction(key, menu)
+            action = QAction(key, menu)
             if isinstance(val, QtCore.QUrl):
                 action.setData(val.toString())
                 if val == navigator.locationUrl():
@@ -1855,14 +1855,14 @@ class PlacesButton(UrlNavigatorButtonBase):
                 
             menu.addAction(action)
 #             if k == 0:# and sys.platform.startswith("linux"):
-#                 action0 = QtWidgets.QAction("Places", menu)
+#                 action0 = QAction("Places", menu)
 #                 action0.setSeparator(True)
 #                 menu.addAction(action0)
 #             if k in range(startIndex, lastIndex):
 #                 if key.lower().startswith("separator"):
 #                     menu.addSeparator()
 #                 else:
-#                     action = QtWidgets.QAction(key, menu)
+#                     action = QAction(key, menu)
 #                     if isinstance(val, QtCore.QUrl):
 #                         action.setData(val.toString())
 #                         if val == navigator.locationUrl():
@@ -1880,15 +1880,15 @@ class PlacesButton(UrlNavigatorButtonBase):
             self.initMenu(subMenu, actionsMap, maxIndex, nItems)
             menu.addMenu(subMenu)
         
-    @Slot(QtWidgets.QAction, QtCore.Qt.MouseButton)
-    def slot_menuActionClicked(self, action:QtWidgets.QAction, button:QtCore.Qt.MouseButton):
+    @Slot(QAction, QtCore.Qt.MouseButton)
+    def slot_menuActionClicked(self, action:QAction, button:QtCore.Qt.MouseButton):
         navigator = self.parent()
         assert qtutils.isQObjectAlive(navigator), f"Parent object was deleted"
         url = QtCore.QUrl(action.data())
         navigator.setLocationUrl(url)
         
-    @Slot(QtWidgets.QAction)
-    def slot_menuActionTriggered(self, action:QtWidgets.QAction):
+    @Slot(QAction)
+    def slot_menuActionTriggered(self, action:QAction):
         navigator = self.parent()
         assert qtutils.isQObjectAlive(navigator), f"Parent object was deleted"
         url = QtCore.QUrl(action.data())
@@ -2381,7 +2381,7 @@ class _UrlNavigator_(QtCore.QObject):
 #         # (openPlaceSelectorMenu)
 #         
 #         for key, val in actionsDataMap.items():
-#             action = QtWidgets.QAction(key, popup)
+#             action = QAction(key, popup)
 #             action.setData(val.toString())
 #             if val == self._nav_.locationUrl():
 #                 font = QtGui.QFont(action.font())
@@ -2443,7 +2443,7 @@ class _UrlNavigator_(QtCore.QObject):
             if key is MISSING:
                 popup.addSeparator()
             else:
-                action = QtWidgets.QAction(key, popup)
+                action = QAction(key, popup)
                 # NOTE: 2025-01-21 16:45:50
                 # val is a QtCore.QUrl;
                 # the action stores its string in data (in Qt a QVariant, but in

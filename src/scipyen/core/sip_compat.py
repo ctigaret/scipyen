@@ -3,23 +3,21 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-import qtpy as QtAPI
-QtAPI.API = os.environ["QT_API"]
+import qtpy
+qtpy.API = os.environ["QT_API"]
 if os.environ["QT_API"] == "pyside6":
     import PySide6
-    QtAPI = PySide6
+    from PySide6 import QtCore, QtGui, QtWidgets, QtXml, QtSvg
+    from PySide6.QtCore import Signal, Slot, Property
+    # from qtpy.QtCore import Signal, Slot, QEnum, Property
+    has_sip = False
 else:
-    pass
-from qtpy import QtCore, QtGui, QtWidgets, QtXml, QtSvg
-from qtpy.QtCore import Signal, Slot, Property
-# from qtpy.QtCore import Signal, Slot, QEnum, Property
-
-try:
+    from qtpy import QtCore, QtGui, QtWidgets, QtXml, QtSvg
+    from qtpy.QtCore import Signal, Slot, Property
+    # from qtpy.QtCore import Signal, Slot, QEnum, Property
     from qtpy import sip as sip
     has_sip = True
-except:
-    has_sip = False
-    
+
 def no_sip_autoconversion(klass):
     r"""Decorator for classes to suppresses sip autoconversion of Qt to Python
     types.

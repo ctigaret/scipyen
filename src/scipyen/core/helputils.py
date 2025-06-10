@@ -18,14 +18,13 @@ import sys, os, typing, inspect, types, importlib, io, dataclasses, inspect
 from functools import (singledispatch, partial)
 from contextlib import redirect_stdout
 from IPython.core.interactiveshell import InteractiveShell
-import qtpy as QtAPI
-QtAPI.API = os.environ["QT_API"]
+import qtpy
+qtpy.API = os.environ["QT_API"]
 if os.environ["QT_API"] == "pyside6":
     import PySide6
-    QtAPI = PySide6
+    from PySide6 import QtCore, QtWidgets
 else:
-    pass
-from qtpy import QtCore, QtWidgets
+    from qtpy import QtCore, QtWidgets
 # let's try this:
 # from gui.mainwindow import *
 

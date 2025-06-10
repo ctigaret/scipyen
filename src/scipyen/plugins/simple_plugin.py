@@ -4,14 +4,14 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 import os
-import qtpy as QtAPI
-QtAPI.API = os.environ["QT_API"]
+import qtpy
+qtpy.API = os.environ["QT_API"]
 if os.environ["QT_API"] == "pyside6":
     import PySide6
-    QtAPI = PySide6
+    from PySide6 import QtWidgets
 else:
-    pass
-from qtpy import QtWidgets
+    from qtpy import QtWidgets
+
 from gui.workspacegui import GuiMessages
 from gui.textviewer import TextViewer
 from core.prog import print_styled

@@ -32,14 +32,13 @@ from copy import (deepcopy, copy,)
 #### END core python modules
 
 #### BEGIN 3rd party modules
-import qtpy as QtAPI
-QtAPI.API = os.environ["QT_API"]
+import qtpy
+qtpy.API = os.environ["QT_API"]
 if os.environ["QT_API"] == "pyside6":
     import PySide6
-    QtAPI = PySide6
+    from PySide6 import (QtGui, QtCore, QtWidgets,)
 else:
-    pass
-from qtpy import (QtGui, QtCore, QtWidgets,)
+    from qtpy import (QtGui, QtCore, QtWidgets,)
 import numpy as np
 from numpy import ndarray
 import numpy.matlib as mlib

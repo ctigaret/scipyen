@@ -48,11 +48,10 @@ Useful to have even when vigranumpy is not installed.
 #########################################################################
 import os, typing, inspect, math
 import numpy as np
-import qtpy as QtAPI
-QtAPI.API = os.environ["QT_API"]
+import qtpy
+qtpy.API = os.environ["QT_API"]
 if os.environ["QT_API"] == "pyside6":
     import PySide6
-    QtAPI = PySide6
     import PySide6.QtCore as QtCore
     import PySide6.QtGui as QtGui
     import PySide6.QtWidgets as QtWidgets

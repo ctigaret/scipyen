@@ -50,17 +50,18 @@ fail
 import sys, os, io, typing, traceback, inspect, subprocess, pydoc, runpy
 from collections import deque
 
-import qtpy as QtAPI
-QtAPI.API = os.environ["QT_API"]
+import qtpy
+qtpy.API = os.environ["QT_API"]
 if os.environ["QT_API"] == "pyside6":
     import PySide6
-    QtAPI = PySide6
+    from PySide6 import QtCore, QtGui, QtWidgets, QtSvg, QtNetwork
+    from PySide6.QtCore import Signal, Slot, Property
 else:
-    pass
+    from qtpy import QtCore, QtGui, QtWidgets, QtSvg, QtNetwork
+    from qtpy.QtCore import Signal, Slot, Property
 
-from qtpy import QtCore, QtGui, QtWidgets, QtSvg, QtNetwork
-from qtpy.QtCore import Signal, Slot, Property
 from qtpy.uic import loadUiType as __loadUiType__
+
 from IPython.core.interactiveshell import InteractiveShell
 from core import prog
 from core.prog import safewrapper, safeguiwrapper, scipywarn

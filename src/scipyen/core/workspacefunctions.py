@@ -23,14 +23,13 @@ from operator import attrgetter, itemgetter, methodcaller
 from collections import OrderedDict, deque
 import dataclasses
 
-import qtpy as QtAPI
-QtAPI.API = os.environ["QT_API"]
+import qtpy
+qtpy.API = os.environ["QT_API"]
 if os.environ["QT_API"] == "pyside6":
     import PySide6
-    QtAPI = PySide6
+    from PySide6 import QtWidgets
 else:
-    pass
-from qtpy import QtWidgets
+    from qtpy import QtWidgets
 
 from core.prog import (with_doc, scipywarn)
 from core.strutils import (is_glob, is_regexp)

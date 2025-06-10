@@ -30,15 +30,15 @@ import xml.dom.minidom
 
 # 2016-08-16 09:30:07
 # NOTE FIXME QtXml is not actively maintained anymore in Qt >= 5.5 ?!
-import qtpy as QtAPI
-QtAPI.API = os.environ["QT_API"]
+import qtpy
+qtpy.API = os.environ["QT_API"]
 if os.environ["QT_API"] == "pyside6":
     import PySide6
-    QtAPI = PySide6
+    from PySide6 import (QtCore, QtWidgets, QtXml, QtGui, )
+    from PySide6.QtCore import (Signal, Slot, )
 else:
-    pass
-from qtpy import (QtCore, QtWidgets, QtXml, QtGui, )
-from qtpy.QtCore import (Signal, Slot, )
+    from qtpy import (QtCore, QtWidgets, QtXml, QtGui, )
+    from qtpy.QtCore import (Signal, Slot, )
 
 
 #### END 3rd party modules

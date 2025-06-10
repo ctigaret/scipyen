@@ -172,15 +172,15 @@ from copy import copy
 import numpy as np
 import scipy
 from traitlets import Bunch
-import qtpy as QtAPI
-QtAPI.API = os.environ["QT_API"]
+import qtpy
+qtpy.API = os.environ["QT_API"]
 if os.environ["QT_API"] == "pyside6":
     import PySide6
-    QtAPI = PySide6
+    from PySide6 import QtCore, QtGui, QtWidgets, QtXml
+    from PySide6.QtCore import Signal, Slot, Property
 else:
-    pass
-from qtpy import QtCore, QtGui, QtWidgets, QtXml
-from qtpy.QtCore import Signal, Slot, Property
+    from qtpy import QtCore, QtGui, QtWidgets, QtXml
+    from qtpy.QtCore import Signal, Slot, Property
 #### END 3rd party modules
 
 #### BEGIN core modules

@@ -10,15 +10,16 @@ import collections, enum, numbers, typing, os
 import dataclasses
 from dataclasses import (dataclass, MISSING)
 
-import qtpy as QtAPI
-QtAPI.API = os.environ["QT_API"]
+import qtpy
+qtpy.API = os.environ["QT_API"]
 if os.environ["QT_API"] == "pyside6":
     import PySide6
-    QtAPI = PySide6
+    from PySide6 import (QtCore, QtGui, QtWidgets,) 
+    from PySide6.QtCore import (Signal, Slot, )
 else:
-    pass
-from qtpy import (QtCore, QtGui, QtWidgets,) 
-from qtpy.QtCore import (Signal, Slot, )
+    from qtpy import (QtCore, QtGui, QtWidgets,) 
+    from qtpy.QtCore import (Signal, Slot, )
+
 from core.pyqtgraph_patch import pyqtgraph as pg
 from gui import guiutils as guiutils
 
