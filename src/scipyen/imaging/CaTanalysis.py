@@ -167,12 +167,19 @@ import qtpy
 qtpy.API = os.environ["QT_API"]
 if os.environ["QT_API"] == "pyside6":
     import PySide6
-    from PySide6 import QtCore, QtGui, QtWidgets, QtXml
-    from PySide6.QtCore import Signal, Slot
+    from PySide6 import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork,)
+    from PySide6.QtCore import (Signal, Slot, Property,)
+    from PySide6.QtUiTools import loadUiType as __loadUiType__ # -- A-HA!
+    QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    QShortcut = QtGui.QShortcut
 else:
-    from qtpy import QtCore, QtGui, QtWidgets, QtXml
-    from qtpy.QtCore import Signal, Slot
-from qtpy.uic import loadUiType as __loadUiType__ 
+    from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork,)
+    from qtpy.QtCore import (Signal, Slot, Property,)
+    from qtpy.uic import loadUiType as __loadUiType__
+    QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
 
 import numpy as np
 import pandas as pd
@@ -3936,11 +3943,11 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         # WARNING Manually-added GUI objects that need to be signal-slot connected, 
         # WARNING must be defined HERE !!!
         
-        self.addProtocolAction = QtWidgets.QAction("Add protocol", self)
-        self.removeProtocolAction = QtWidgets.QAction("Remove protocol", self)
+        self.addProtocolAction = QAction("Add protocol", self)
+        self.removeProtocolAction = QAction("Remove protocol", self)
         
-        self.addEPSCaTAction = QtWidgets.QAction("Add component", self)
-        self.removeEPSCaTAction = QtWidgets.QAction("Remove component", self)
+        self.addEPSCaTAction = QAction("Add component", self)
+        self.removeEPSCaTAction = QAction("Remove component", self)
         
         # NOTE: too complex to treat here: FIXME TODO
         self._filter_gui_slots_ = [
@@ -4113,8 +4120,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         ####
         # BEGIN Units toolbar actions
-        self.unitsToolbar.actionTriggered[QtWidgets.QAction].connect(self.slot_unitsToolbarAction)
-        self.fileToolbar.actionTriggered[QtWidgets.QAction].connect(self.slot_fileToolbarAction)
+        self.unitsToolbar.actionTriggered[QAction].connect(self.slot_unitsToolbarAction)
+        self.fileToolbar.actionTriggered[QAction].connect(self.slot_fileToolbarAction)
         # END Units toolbar actions
         ####
         
@@ -6878,7 +6885,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         self.displayFrame()
         
-    @Slot(QtWidgets.QAction)
+    @Slot(QAction)
     def slot_fileToolbarAction(self, action):
         if action  == self.actionToolbarOpenFile:
             self.slot_openScanDataPickleFile()
@@ -6893,7 +6900,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             self.slot_pickleLSData()
             
         
-    @Slot(QtWidgets.QAction)
+    @Slot(QAction)
     def slot_unitsToolbarAction(self, action):
         #print(action)
         if action == self.actionImportUnits:

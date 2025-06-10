@@ -364,5 +364,6 @@ def main():
 if __name__ == '__main__':
     if sys.version_info.major < 3 or sys.version_info.minor < 9:
         raise OSError(f"Scipyen requires Python >= 3.9 but the script is using {sys.version}")
+    # print(f"sys.argv: {sys.argv}")
     main()
     

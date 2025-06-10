@@ -12,11 +12,12 @@ if os.environ["QT_API"] == "pyside6":
     import PySide6
     from PySide6 import QtCore, QtGui, QtWidgets, QtSvg
     from PySide6.QtCore import Signal, Slot, Property
+    from PySide6.QtUiTools import loadUiType as __loadUiType__
 else:
     from qtpy import QtCore, QtGui, QtWidgets, QtSvg
     from qtpy.QtCore import Signal, Slot, Property
+    from qtpy.uic import loadUiType as __loadUiType__
 
-from qtpy.uic import loadUiType as __loadUiType__
 from core.prog import safewrapper
 from core.sysutils import adapt_ui_path
 

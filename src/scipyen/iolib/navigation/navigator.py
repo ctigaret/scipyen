@@ -289,8 +289,13 @@ def getSystemArchiveMimeTypes():# TODO
 def firstChildUrl(lastUrl:QtCore.QUrl, currentUrl:QtCore.QUrl):
     # NOTE: 2025-01-02 14:53:22
     # TODO consider a more pythonic alernative
-    adjustedLastUrl = lastUrl.adjusted(QtCore.QUrl.StripTrailingSlash)
-    adjustedCurrentUrl = currentUrl.adjusted(QtCore.QUrl.StripTrailingSlash)
+    if os.environ["QT_API"] == "pyside6":
+        # url = QtCore.QUrl(newUrl.adjusted(QtCore.QUrl.FullyDecoded))
+        adjustedLastUrl = lastUrl.adjusted(QtCore.QUrl.FullyDecoded)
+        adjustedCurrentUrl = currentUrl.adjusted(QtCore.QUrl.FullyDecoded)
+    else:
+        adjustedLastUrl = lastUrl.adjusted(QtCore.QUrl.StripTrailingSlash)
+        adjustedCurrentUrl = currentUrl.adjusted(QtCore.QUrl.StripTrailingSlash)
     
     if not adjustedCurrentUrl.isParentOf(adjustedLastUrl):
         return QtCore.QUrl()
@@ -395,7 +400,15 @@ def upUrl(url:QtCore.QUrl):
     
     if url.hasFragment():
         u.setFragment("")
-    
+
+    if os.environ["QT_API"] == "pyside6":
+        # url = QtCore.QUrl(newUrl.adjusted(QtCore.QUrl.FullyDecoded))
+        # adjustedLastUrl = lastUrl.adjusted(QtCore.QUrl.FullyDecoded)
+        # adjustedCurrentUrl = currentUrl.adjusted(QtCore.QUrl.FullyDecoded)
+        # parentDir = pathlib.Path(u.adjusted(QtCore.QUrl.FullyDecoded)).parent
+        parentDir = pathlib.Path(u.toLocalFile()).parent
+        return QtCore.QUrl(parentDir.as_posix())
+     
     return u.adjusted(QtCore.QUrl.StripTrailingSlash).adjusted(QtCore.QUrl.RemoveFilename)
     
 def upPath(path:pathlib.Path) -> pathlib.Path:
@@ -868,7 +881,10 @@ class UrlNavigatorButtonBase(QtWidgets.QPushButton):
     def foregroundColor(self):
         isHighlighted = self.isDisplayHintEnabled(DisplayHint.EnteredHint) or self.isDisplayHintEnabled(DisplayHint.DraggedHint) or self.isDisplayHintEnabled(DisplayHint.PopupActiveHint)
         
-        foregroundColor = self.palette().color(QtGui.QPalette.Foreground)
+        if os.environ["QT_API"] == "pyside6":
+            foregroundColor = self.palette().color(QtGui.QPalette.Normal, QtGui.QPalette.ButtonText)
+        else:
+            foregroundColor = self.palette().color(QtGui.QPalette.Foreground)
         
         alpha = 255 if self._active_ else 128
         
@@ -1946,7 +1962,10 @@ class CoreUrlNavigator(QtCore.QObject):
         super().__init__(parent)
         if not isinstance(url, QtCore.QUrl):
             url = QtCore.QUrl()
-        adjUrl = QtCore.QUrl(url.adjusted(QtCore.QUrl.NormalizePathSegments))
+        if os.environ["QT_API"] == "pyside6":
+            adjUrl = QtCore.QUrl(url.adjusted(QtCore.QUrl.FullyDecoded))
+        else:
+            adjUrl = QtCore.QUrl(url.adjusted(QtCore.QUrl.NormalizePathSegments))
         # NOTE: 2023-05-03 23:48:23
         # Originally, a list of LocationData structs.
         # Here, this is a NamedTuple with the fields "url" and "state"
@@ -1973,7 +1992,10 @@ class CoreUrlNavigator(QtCore.QObject):
         if newUrl == self.locationUrl():
             return
         
-        url = newUrl.adjusted(QtCore.QUrl.NormalizePathSegments)
+        if os.environ["QT_API"] == "pyside6":
+            url = QtCore.QUrl(newUrl.adjusted(QtCore.QUrl.FullyDecoded))
+        else:
+            url = QtCore.QUrl(newUrl.adjusted(QtCore.QUrl.NormalizePathSegments))
         
         firstUrlChild = firstChildUrl(self.locationUrl(), url)
         
@@ -2008,7 +2030,10 @@ class CoreUrlNavigator(QtCore.QObject):
         # this is a LocationData
         data = self._history_[self._historyIndex_]
         
-        isUrlEqual = url.matches(self.locationUrl(), QtCore.QUrl.StripTrailingSlash) or (not url.isValid() and url.matches(data.url, QtCore.QUrl.StripTrailingSlash))
+        if os.environ["QT_API"] == "pyside6":
+            isUrlEqual = url.matches(self.locationUrl(), QtCore.QUrl.FullyDecoded) or (not url.isValid() and url.matches(data.url, QtCore.QUrl.FullyDecoded))
+        else:
+            isUrlEqual = url.matches(self.locationUrl(), QtCore.QUrl.StripTrailingSlash) or (not url.isValid() and url.matches(data.url, QtCore.QUrl.StripTrailingSlash))
         
         if isUrlEqual:
             return
@@ -2020,7 +2045,10 @@ class CoreUrlNavigator(QtCore.QObject):
             self._historyIndex_ = 0
 
         assert self._historyIndex_ == 0
-        self._history_.insert(0, LocationData(url.adjusted(QtCore.QUrl.StripTrailingSlash), None)) # CAUTION: is it OK for state to be None ?!?
+        if os.environ["QT_API"] == "pyside6":
+            self._history_.insert(0, LocationData(url.adjusted(QtCore.QUrl.FullyDecoded), None)) # CAUTION: is it OK for state to be None ?!?
+        else:
+            self._history_.insert(0, LocationData(url.adjusted(QtCore.QUrl.StripTrailingSlash), None)) # CAUTION: is it OK for state to be None ?!?
         
         historyMax = 100 # TODO make configurable -> link with mainWindow !!!
         
@@ -2038,7 +2066,12 @@ class CoreUrlNavigator(QtCore.QObject):
     def isCompressedPath(self, url:QtCore.QUrl, archiveMimeTypes:list = list()):
         # NOTE: KIO KCoreUrlNavigatorPrivate API
         db = QtCore.QMimeDatabase()
-        mime = db.mimeTypeForUrl(QtCore.QUrl(url.toString(QtCore.QUrl.StripTrailingSlash)))
+        if os.environ["QT_API"] == "pyside6":
+            # url = QtCore.QUrl(newUrl.adjusted(QtCore.QUrl.FullyDecoded))
+            mime = db.mimeTypeForUrl(QtCore.QUrl(url.toString()))
+        else:
+            mime = db.mimeTypeForUrl(QtCore.QUrl(url.toString(QtCore.QUrl.StripTrailingSlash)))
+            
         
         return any(mime.inherits(archiveType) for archiveType in archiveMimeTypes)
         
@@ -2914,7 +2947,10 @@ class _UrlNavigator_(QtCore.QObject):
             self._nav_.setTabOrder(self._dropDownButton_, self._navButtons_[0])
             self._nav_.setTabOrder(self._navButtons_[-1], self._toggleEditableMode_)
         
-        ptxt = currentUrl.toDisplayString(QtCore.QUrl.RemoveScheme | QtCore.QUrl.NormalizePathSegments | QtCore.QUrl.RemoveAuthority).replace("///", "/");
+        if os.environ["QT_API"] == "pyside6":
+            ptxt = currentUrl.toDisplayString().replace("///", "/");
+        else:
+            ptxt = currentUrl.toDisplayString(QtCore.QUrl.RemoveScheme | QtCore.QUrl.NormalizePathSegments | QtCore.QUrl.RemoveAuthority).replace("///", "/");
         
         self._dropDownButton_.setToolTip(f"Go to any location on the path {ptxt}")
         self.updateButtonVisibility()
@@ -2968,7 +3004,10 @@ class _UrlNavigator_(QtCore.QObject):
             url = self._navButtons_[0].url()
             
             # FIXME 2025-01-20 16:51:28 ajust according to "place"
-            visible = (not url.matches(upUrl(url), QtCore.QUrl.StripTrailingSlash)) and url.scheme() not in ("baloosearch", "filenamesearch")
+            if os.environ["QT_API"] == "pyside6":
+                visible = (not url.matches(upUrl(url), QtCore.QUrl.FullyDecoded)) and url.scheme() not in ("baloosearch", "filenamesearch")
+            else:
+                visible = (not url.matches(upUrl(url), QtCore.QUrl.StripTrailingSlash)) and url.scheme() not in ("baloosearch", "filenamesearch")
             self._dropDownButton_.setVisible(visible)
             
         self.updateTabOrder()

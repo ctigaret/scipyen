@@ -16,14 +16,15 @@ if os.environ["QT_API"] == "pyside6":
     from PySide6 import Shiboken
     from PySide6 import QtCore, QtGui, QtWidgets, QtSvg, QtNetwork
     from PySide6.QtCore import Signal, Slot, Property
+    from PySide6.QtUiTools import loadUiType as __loadUiType__
     QtType = typing.TypeVar("QtType", bound="Shiboken.Object")
 else:
     from qtpy import sip
     from qtpy import QtCore, QtGui, QtWidgets, QtSvg, QtNetwork, sip
     from qtpy.QtCore import Signal, Slot, Property
+    from qtpy.uic import loadUiType as __loadUiType__
     QtType = typing.TypeVar("QtType", bound = "sip.wrappertype")
     
-from qtpy.uic import loadUiType as __loadUiType__
 from core.prog import (safewrapper, scipywarn, print_styled)
 from core.sysutils import adapt_ui_path
 from gui.widgets.cancellableqprogressbar import CancellableQProgressBar

@@ -1046,9 +1046,15 @@ if [ -r $scipyensrcdir/neuron_python/app-defaults/nrniv ] ; then
 xrdb -merge $scipyensrcdir/neuron_python/app-defaults/nrniv
 fi
 fi
+END
+if [[ ( $with_pyside6 -eq 1 ) || ( $build_pyside6 -eq 1 ) ]] ; then
+cat <<END >> ${scriptfile} 
+export QT_API="pyside6"
+END
+fi
+cat <<END >> ${scriptfile} 
 ${python_executable} -Xfrozen_modules=off ${launchcmd} "\$*"
 END
-# ${python_executable} -Xfrozen_modules=off ${scipyensrcdir}/scipyen.py "\$*"
 shopt -u lastpipe
 # chmod +x ${target_dir}/scipyen 
 chmod +x ${scriptfile}

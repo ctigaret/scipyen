@@ -2697,6 +2697,9 @@ def is_class_defined_in_module(x: typing.Any, m: types.ModuleType):
         # dynamically generated - in which case it would NOT have been found in
         # any of th currently importd modules anyway
         return False
+    
+    elif x_module.__spec__ is None:
+        return False
 
     return x_module.__spec__.origin == m.__spec__.origin
 

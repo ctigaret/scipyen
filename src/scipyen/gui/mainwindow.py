@@ -62,14 +62,19 @@ if os.environ["QT_API"] == "pyside6":
     import PySide6
     from PySide6 import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork,)
     from PySide6.QtCore import (Signal, Slot, Property,)
+    from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    QShortcut = QtGui.QShortcut
 else:
     from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork,)
     from qtpy.QtCore import (Signal, Slot, Property,)
+    from qtpy.uic import loadUiType
     QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
 print(f"gui.mainwindow using QT API: {qtpy.API}")
 
-from qtpy.uic import loadUiType
 # try:
 #     from qtpy import sip as sip
 #     has_sip = True
@@ -2201,6 +2206,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     
     @property
     def uiFontStyle(self) -> int:
+        if os.environ["QT_API"] == "pyside6":
+            return int(self._font.style().value)
         return int(self._font.style())
     
     @markConfigurable("UIFontStyle", "Qt")
@@ -2241,6 +2248,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     
     @property
     def workspaceFontStyle(self) -> int:
+        if os.environ["QT_API"] == "pyside6":
+            return int(self._workspaceViewerFont.style().value)
         return int(self._workspaceViewerFont.style())
     
     @markConfigurable("WorkspaceFontStyle", "Qt")
@@ -2281,6 +2290,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     
     @property
     def historyFontStyle(self) -> int:
+        if os.environ["QT_API"] == "pyside6":
+            return int(self._commandHistoryFont.style().value)
         return int(self._commandHistoryFont.style())
     
     @markConfigurable("HistoryFontStyle", "Qt")
@@ -3827,7 +3838,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                           QtCore.QSignalBlocker(self.workspaceModel),
                           QtCore.QSignalBlocker(self.workspaceView.selectionModel())]
 
-        varname = self.currentVarItemName
+        varname = getattr(self, "currentVarItemName", None)
 
         if varname is None:
             indexList = self.workspaceView.selectedIndexes()
@@ -5474,7 +5485,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # Shortcut to delete selected items in workspaceView
         # thanks to QtCentre forum (J-P Nurmi)
 
-        self.keyDeleteStuff = QtWidgets.QShortcut(
+        self.keyDeleteStuff = QShortcut(
             QtGui.QKeySequence(QtGui.QKeySequence.Delete), self)
         self.keyDeleteStuff.activated.connect(self.slot_keyDeleteStuff)
 
@@ -5612,19 +5623,25 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             tw = (w for w in itertools.chain(*(a.associatedWidgets()
                 for a in tbactions)) if w is not self.toolBar)
         else:
-            # tw = (w for w in itertools.chain(*(a.associatedObjects()
-            tw = (w for w in itertools.chain(*(a.associatedWidgets()
+            tw = (w for w in itertools.chain(*(a.associatedObjects()
+            # tw = (w for w in itertools.chain(*(a.associatedWidgets()
                 for a in tbactions)) if w is not self.toolBar)
 
         for w in tw:
             w.setPopupMode(QtWidgets.QToolButton.InstantPopup)
             
-        self.tbOpen = [w for w in self.actionOpen.associatedWidgets() if isinstance(w, QtWidgets.QToolButton)][0]
+        if os.environ["QT_API"] in ("pyqt5", "pyside2"):
+            self.tbOpen = [w for w in self.actionOpen.associatedWidgets() if isinstance(w, QtWidgets.QToolButton)][0]
+        else:
+            self.tbOpen = [w for w in self.actionOpen.associatedObjects() if isinstance(w, QtWidgets.QToolButton)][0]
         
         self.tbOpen.setPopupMode(QtWidgets.QToolButton.MenuButtonPopup)
         self.tbOpen.setMenu(self.recentFilesMenu)
         
-        self.tbChDir = [w for w in self.actionChange_Working_Directory.associatedWidgets() if isinstance(w, QtWidgets.QToolButton)][0]
+        if os.environ["QT_API"] in ("pyqt5", "pyside2"):
+            self.tbChDir = [w for w in self.actionChange_Working_Directory.associatedWidgets() if isinstance(w, QtWidgets.QToolButton)][0]
+        else:
+            self.tbChDir = [w for w in self.actionChange_Working_Directory.associatedObjects() if isinstance(w, QtWidgets.QToolButton)][0]
         self.tbChDir.setPopupMode(QtWidgets.QToolButton.MenuButtonPopup)
         self.tbChDir.setMenu(self.recentDirectoriesMenu)
         
@@ -9032,6 +9049,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         if len(scipyen_plugin_loader.loaded_plugins) > 0:
             viewers = list()  # list of (name, class) tuples
             for module_name, module in scipyen_plugin_loader.loaded_plugins.items():
+                # print(f"{self.__class__.__name__}.slot_loadPlugins: {module_name}, {module}")
                 # maps module name to the tuple (module file, menu dict)
                 # menu dict in turn maps a menu tree structure (a '|'-separated string) to a function defined in the plugin
                 # NOTE: 2022-12-23 09:06:36
@@ -9062,11 +9080,11 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 # 
                 #
                 if inspect.isfunction(getattr(module, "init_scipyen_plugin", None)):
-                    # print(f"slot_loadPlugins self-advertising module {module.__name__}")
                     # NOTE: 2022-12-25 21:10:19
                     # create/update the menus as provided by the plugin module
                     menudict = collections.OrderedDict(
                         [(module.__name__, (module.__file__, module.init_scipyen_plugin()))])
+                    print(f"slot_loadPlugins self-advertising module {module.__name__}, menu dict: {menudict}")
                     if len(menudict) > 0:
                         for (k, v) in menudict.items():
                             # v[0] is the module.__file__ 

@@ -854,9 +854,13 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         
     @Slot(dict)
     def _slot_cacheInternalVariableChange_(self, change):
-        name = change.name
-        change_type = change.get("change_type", change.type)
-        
+        if isinstance(change, Bunch):
+            name = change.name
+            change_type = change.type
+        else:
+            name = change["name"]
+            change_type = change["change_type"]
+            
         if change_type == "new":
             self.__changes__[name] = WorkspaceVarChange.New
         elif change_type in ("remove", "removed"):

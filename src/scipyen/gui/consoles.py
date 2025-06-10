@@ -61,10 +61,14 @@ if os.environ["QT_API"] == "pyside6":
     from PySide6 import (QtCore, QtGui, QtWidgets, )
     from PySide6.QtCore import (Signal, Slot, )
     QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    QShortcut = QtGui.QShortcut
 else:
     from qtpy import (QtCore, QtGui, QtWidgets, )
     from qtpy.QtCore import (Signal, Slot, )
     QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
 #### BEGIN ipython/jupyter modules
 from traitlets.config.application import boolean_flag
 from traitlets.config.application import catch_config_error
@@ -281,13 +285,13 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
         self.available_colors = ("nocolor", "linux", "lightbg")
         self.scrollbar_positions = Bunch({QtCore.Qt.LeftToRight: "right",
                                            QtCore.Qt.RightToLeft: "left"})
-        self.clear_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL | QtCore.Qt.SHIFT | QtCore.Qt.Key_K), self)
-        # self.clear_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL + QtCore.Qt.SHIFT + QtCore.Qt.Key_K), self)
+        self.clear_shortcut = QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL | QtCore.Qt.SHIFT | QtCore.Qt.Key_K), self)
+        # self.clear_shortcut = QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL + QtCore.Qt.SHIFT + QtCore.Qt.Key_K), self)
         
         self.clear_shortcut.activated.connect(self.slot_clearConsole)
         
-        self.reset_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL | QtCore.Qt.SHIFT | QtCore.Qt.ALT | QtCore.Qt.Key_K), self)
-        # self.reset_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL + QtCore.Qt.SHIFT + QtCore.Qt.ALT + QtCore.Qt.Key_K), self)
+        self.reset_shortcut = QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL | QtCore.Qt.SHIFT | QtCore.Qt.ALT | QtCore.Qt.Key_K), self)
+        # self.reset_shortcut = QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL + QtCore.Qt.SHIFT + QtCore.Qt.ALT + QtCore.Qt.Key_K), self)
         self.reset_shortcut.activated.connect(self.slot_resetConsole)
 #         
 #         self.kind = "plain"
@@ -884,7 +888,7 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
         
         self.syntax_style_menu.clear()
         
-        style_group = QtWidgets.QActionGroup(self)
+        style_group = QActionGroup(self)
         
         actions = [QAction("{}".format(s), self, triggered = partial(self._set_syntax_style, s)) for s in PYGMENT_STYLES]
         
@@ -898,7 +902,7 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
        
         
         self.colors_menu = self.view_menu.addMenu("Console colors")
-        colors_group = QtWidgets.QActionGroup(self)
+        colors_group = QActionGroup(self)
         for c in self.active_frontend.available_colors:
             action = QAction("{}".format(c), self,
                                        triggered = partial(self._set_syntax_style, c))
@@ -917,7 +921,7 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
                 
         scrollbar_pos = ("left", "right")
         self.sb_menu = self.view_menu.addMenu("Scrollbar position")
-        sb_group = QtWidgets.QActionGroup(self)
+        sb_group = QActionGroup(self)
         for s in self.active_frontend.scrollbar_positions.values():
             action = QAction("{}".format(s), self,
                                        triggered = lambda v, val = s:
@@ -3126,6 +3130,11 @@ class ScipyenConsoleWidget(ConsoleWidget):
         self.kernel_manager.start_kernel()
         self.kernel_manager.kernel.eventloop = None
         self.ipkernel = self.kernel_manager.kernel
+        # if os.environ["QT_API"].lower() in ("pyqt6", "pyside6"):
+        #     qtgui = "qt6"
+        # else:
+        #     qtgui = "qt5"
+            
         self.ipkernel.gui = "qt"
         
         ## NOTE: 2016-03-20 14:37:37
@@ -3457,7 +3466,7 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         if len(PYGMENT_STYLES):
             self.syntax_style_menu = self.settings_menu.addMenu("Syntax Style")
             
-            style_group = QtWidgets.QActionGroup(self)
+            style_group = QActionGroup(self)
             
             actions = [QAction("{}".format(s), self, triggered = partial(self.active_frontend._set_syntax_style, s)) for s in PYGMENT_STYLES]
             
@@ -3484,7 +3493,7 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
 #                     self.syntax_style_menu.setDefaultAction(action)
 
         self.colors_menu = self.settings_menu.addMenu("Console Colors")
-        colors_group = QtWidgets.QActionGroup(self)
+        colors_group = QActionGroup(self)
         for c in self.active_frontend.available_colors:
             action = QAction("{}".format(c), self,
                                        triggered = lambda:
@@ -3498,7 +3507,7 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         
         scrollbar_pos = ("left", "right")
         self.sb_menu = self.settings_menu.addMenu("Scrollbar Position")
-        sb_group = QtWidgets.QActionGroup(self)
+        sb_group = QActionGroup(self)
         for s in self.active_frontend.scrollbar_positions.values():
             action = QAction("{}".format(s), self,
                                        triggered = lambda v, val = s:

@@ -13,12 +13,16 @@ import qtpy
 qtpy.API = os.environ["QT_API"]
 if os.environ["QT_API"] == "pyside6":
     import PySide6
-    from PySide6 import QtCore, QtGui, QtWidgets, QtSvg, QtNetwork, sip
+    from PySide6 import QtCore, QtGui, QtWidgets, QtSvg, QtNetwork
     from PySide6.QtCore import Signal, Slot, Property
+    from PySide6.QtUiTools import loadUiType as __loadUiType__
+    has_sip = False
 else:
     from qtpy import QtCore, QtGui, QtWidgets, QtSvg, QtNetwork, sip
     from qtpy.QtCore import Signal, Slot, Property
-from qtpy.uic import loadUiType as __loadUiType__
+    from qtpy.uic import loadUiType as __loadUiType__
+    from qtpy import sip
+    has_sip = True
 from core.prog import safewrapper, scipywarn, print_styled
 from core.sysutils import adapt_ui_path
 

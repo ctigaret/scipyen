@@ -146,8 +146,11 @@ init_commands.extend(
     "qtpy.API = os.environ['QT_API']",
     "if os.environ['QT_API'] == 'pyside6':",
     "    import PySide6",
-    "from qtpy.uic import loadUiType",
-    f"from qtpy import ({qtPackages})",
+    "    from PySide6.QtUiTools import loadUType",
+    f"    from PySide6 import {qtPackages}"
+    "else:"
+    "    from qtpy.uic import loadUiType",
+    f"   from qtpy import ({qtPackages})",
     "import matplotlib as mpl",
     "mpl.rcParams['savefig.format'] = 'svg'",
     "mpl.rcParams['xtick.direction'] = 'in'",

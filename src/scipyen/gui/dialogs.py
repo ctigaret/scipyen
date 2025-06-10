@@ -20,12 +20,12 @@ if os.environ["QT_API"] == "pyside6":
     import PySide6
     from PySide6 import QtCore, QtGui, QtWidgets
     from PySide6.QtCore import Signal, Slot, Property
+    from PySide6.QtUiTools import loadUiType
 else:
     from qtpy import QtCore, QtGui, QtWidgets
     from qtpy.QtCore import Signal, Slot, Property
-    pass
+    from qtpy.uic import loadUiType
 
-from qtpy.uic import loadUiType
 from gui import quickdialog as qd
 from gui.workspacegui import (GuiMessages, WorkspaceGuiMixin)
 

@@ -15,7 +15,6 @@ if os.environ["QT_API"] == "pyside6":
     from PySide6 import (QtCore, QtWidgets, QtGui)
 else:
     from qtpy import (QtCore, QtWidgets, QtGui)
-    pass
 
 from gui.painting_shared import (FontStyleType, standardQtFontStyles, 
                                  FontWeightType, standardQtFontWeights)
@@ -195,7 +194,10 @@ def get_elided_text(s:str, w:int):
 def get_text_width(s:str, fm:typing.Optional[QtGui.QFontMetrics]=None, flags=QtCore.Qt.TextSingleLine, tabStops = 0, tabArray=None):
     if not isinstance(fm, QtGui.QFontMetrics):
         fm = get_current_font_metrics()
-    sz = fm.size(flags, s, tabStops=tabStops, tabArray=tabArray)
+    if os.environ["QT_API"] == "pyside6":
+        sz = fm.size(flags, s, tabStops)
+    else:
+        sz = fm.size(flags, s, tabStops=tabStops, tabArray=tabArray)
     return sz.width()
 
 def get_text_height(s:str, flags=QtCore.Qt.TextSingleLine, tabStops = 0, tabArray=None):
