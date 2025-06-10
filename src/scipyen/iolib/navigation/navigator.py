@@ -1640,7 +1640,17 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         
         options = QtWidgets.QStyleOptionMenuItem()
         options.initFrom(self)
-        desktopHeight = QtWidgets.QApplication.desktop().height()
+        desktopHeight = guiutils.getDesktopHeight()
+        # if os.environ["QT_API"] == "pyside6":
+        #     cpos = QtGui.QCursor.pos()
+        #     screen = QtWidgets.QApplication.screenAt(pos)
+        #     if(screen):
+        #         desktopHeight = screen.geometry().height()
+        #     else:
+        #         scipywarn("No screens found!")
+        #         return
+        # else:
+        #     desktopHeight = QtWidgets.QApplication.desktop().height()
         availableSpace = desktopHeight - pos.y()
         menuItemHeight = self.style().sizeFromContents(QtWidgets.QStyle.CT_MenuItem,
                                                        options, self.size(), self).height()
@@ -1838,7 +1848,8 @@ class PlacesButton(UrlNavigatorButtonBase):
         
         options = QtWidgets.QStyleOptionMenuItem()
         options.initFrom(self)
-        desktopHeight = QtWidgets.QApplication.desktop().height()
+        # desktopHeight = QtWidgets.QApplication.desktop().height()
+        desktopHeight = guiutils.getDesktopHeight()
         availableSpace = desktopHeight - pos.y()
         menuItemHeight = self.style().sizeFromContents(QtWidgets.QStyle.CT_MenuItem,
                                                        options, self.size(), self).height()

@@ -513,11 +513,19 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
         # see sb_menu in _supplement_view_menu_
         self.scrollBarPosition = val
         
-    def _set_syntax_style(self, val): # slot for menu action
+    def _set_syntax_style(self, val, *args, **kwargs): # slot for menu action
         r"""Used as slot for Syntax style menu action
         """
         # print(f"{self.__class__.__name__}._set_syntax_style({val})")
         self.syntaxStyle = val
+        
+    @Slot()
+    def _slot_set_syntax_style(self):
+        r"""Slot for PySide6"""
+        action = self.sender()
+        styleName = action.text()
+        print(f"{self.__class__.__name__}._slot_set_syntax_style: styleName {styleName}")
+        self._set_syntax_style(styleName)
 
     # @Slot(str)
     # def _slot_setSyntaxStyle(self, stylename:str):
@@ -890,7 +898,10 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
         
         style_group = QActionGroup(self)
         
-        actions = [QAction("{}".format(s), self, triggered = partial(self._set_syntax_style, s)) for s in PYGMENT_STYLES]
+        if os.environ["QT_API"] == "pyside6":
+            actions = [QAction("{}".format(s), self, triggered = self._slot_set_syntax_style) for s in PYGMENT_STYLES]
+        else:
+            actions = [QAction("{}".format(s), self, triggered = partial(self._set_syntax_style, s)) for s in PYGMENT_STYLES]
         
         for action in actions:
             action.setCheckable(True)
@@ -904,14 +915,10 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
         self.colors_menu = self.view_menu.addMenu("Console colors")
         colors_group = QActionGroup(self)
         for c in self.active_frontend.available_colors:
-            action = QAction("{}".format(c), self,
-                                       triggered = partial(self._set_syntax_style, c))
-            # action = QAction("{}".format(c), self,
-            #                            triggered = lambda v, val=c:
-            #                                self._set_syntax_style(colors=val))
-            # action = QAction("{}".format(c), self,
-            #                            triggered = lambda v, val=c:
-            #                                self.active_frontend._set_syntax_style(colors=val))
+            if os.environ["QT_API"] == "pyside6":
+                action = QAction("{}".format(c), self, triggered = self._slot_set_syntax_style)
+            else:
+                action = QAction("{}".format(c), self, triggered = partial(self._set_syntax_style, c))
             action.setCheckable(True)
             colors_group.addAction(action)
             self.colors_menu.addAction(action)
@@ -3601,7 +3608,10 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         
     def choose_font(self):
         currentFont = self.consoleFont
-        selectedFont, ok = QtWidgets.QFontDialog.getFont(currentFont, self)
+        if os.environ["QT_API"] == "pyside6":
+            ok, selectedFont = QtWidgets.QFontDialog.getFont(currentFont, self)
+        else:
+            selectedFont, ok = QtWidgets.QFontDialog.getFont(currentFont, self)
         if ok:
             self.active_frontend.font = selectedFont
         

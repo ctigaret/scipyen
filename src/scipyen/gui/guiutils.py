@@ -97,6 +97,29 @@ class ComplexValidator(InftyDoubleValidator):
             else:
                 return (QtGui.QValidator.Invalid, s, pos)
                         
+def getDesktopScreen():
+    if os.environ["QT_API"] == "pyside6":
+        return QtWidgets.QApplication.primaryScreen()
+    else:
+        desktop = QtWidgets.QApplication.desktop()
+        # geometry = desktop.screenGeometry(desktop.primaryScreen())
+        return  QtWidgets.QApplication.screens()[desktop.primaryScreen()]
+        
+                        
+def getDesktopHeight():
+    return getDesktopGeometry().height()
+
+def getDesktopGeometry():
+    if os.environ["QT_API"] == "pyside6":
+        pos = QtGui.QCursor.pos()
+        screen = QtWidgets.QApplication.screenAt(pos)
+        if(screen):
+            return screen.geometry()
+        else:
+            raise RuntimeError("No screens found!")
+    else:
+        return QtWidgets.QApplication.desktop().geometry()
+    
 def validatorString(val:typing.Union[QtGui.QValidator.State, int]):
     r"""String representation of a QValidator.State value
     """
@@ -143,7 +166,9 @@ def getPlotItemDataBoundaries(item:pg.PlotItem):
         
     return [[xmin, xmax], [ymin, ymax]]
     
-        
+def getMenuActionsTree(w: typing.Optional[QtWidgets.QWidget] = None):
+    return dict(map(lambda a: (a.text().replace("&", ""), (a, getMenuActionsTree(a.menu()))), w.actions())) if w else None
+
 def get_QDoubleSpinBox_params(x:typing.Sequence):
     r"""Return stepSize and decimals for a QDoubleSpinBox given x.
 

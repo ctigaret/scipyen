@@ -1642,9 +1642,11 @@ def fractionalWindowSize(w:float, h:float, inches:bool=False):
             When True, return window size (w, h) in inches; 
     
 """
-    desktop = QtWidgets.QApplication.desktop()
-    geometry = desktop.screenGeometry(desktop.primaryScreen())
-    screen = QtWidgets.QApplication.screens()[desktop.primaryScreen()]
+    from gui import guiutils
+    # desktop = QtWidgets.QApplication.desktop()
+    # geometry = desktop.screenGeometry(desktop.primaryScreen())
+    # screen = QtWidgets.QApplication.screens()[desktop.primaryScreen()]
+    geometry = guiutils.getDesktopGeometry()
     new_w = geometry.width() * w
     new_h = geometry.height() * h
     
@@ -1657,9 +1659,10 @@ def windowSizeToInches(w, h):
     r"""Converts window size (width, height) from pixels to inches.
 Useful for matplotlib figures
 """
-    desktop = QtWidgets.QApplication.desktop()
-    geometry = desktop.screenGeometry(desktop.primaryScreen())
-    screen = QtWidgets.QApplication.screens()[desktop.primaryScreen()]
+    # desktop = QtWidgets.QApplication.desktop()
+    # # geometry = desktop.screenGeometry(desktop.primaryScreen())
+    # screen = QtWidgets.QApplication.screens()[desktop.primaryScreen()]
+    screen = guiutils.getDesktopScreen()
     return w/screen.logicalDotsPerInchX(), h/screen.logicalDotsPerInchY()
 
 DEFAULT_EDITOR = get_editor()

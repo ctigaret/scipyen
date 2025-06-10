@@ -9098,6 +9098,17 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                                         module, pluginMenuActions)
                             else:
                                 raise TypeError("Incompatible Plugin Key")
+                            # if os.environ["QT_API"] == "pyside6":
+                            #     pass
+                            # else:
+                            #     if (isinstance(k, str) and len(k) > 0):
+                            #         pluginMenuActions = self.installPluginMenu(k, v)
+                            #         # print(f"{self.__class__.__name__}.slot_loadPlugins pluginMenuActions = {pluginMenuActions}")
+                            #         if len(pluginMenuActions):
+                            #             self._cachePluginActions_(
+                            #                 module, pluginMenuActions)
+                            #     else:
+                            #         raise TypeError("Incompatible Plugin Key")
 
                 if inspect.isfunction(getattr(module, "load_ipython_extension", None)):
                     module.load_ipython_extension(self.ipkernel.shell)
@@ -9375,8 +9386,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
                 for item in menuPathList:
                     currentMenu = self._locateMenuByItemText_(parentMenu, item)
-                    siblingActionLabels = [i.text().replace(
-                        '&', '') for i in parentMenu.actions()]
+                    siblingActionLabels = [i.text().replace('&', '') for i in parentMenu.actions()]
                     # print(f"item {item}, siblingActionLabels: {siblingActionLabels}")
                     if currentMenu is None:
                         # last item is the menu item (action)
