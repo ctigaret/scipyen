@@ -13,8 +13,10 @@ qtpy.API = os.environ["QT_API"]
 if os.environ["QT_API"] == "pyside6":
     import PySide6
     from PySide6 import (QtCore, QtWidgets, QtGui)
+    QAction = QtGui.QAction
 else:
     from qtpy import (QtCore, QtWidgets, QtGui)
+    QAction = QtWidgets.QAction
 
 from gui.painting_shared import (FontStyleType, standardQtFontStyles, 
                                  FontWeightType, standardQtFontWeights)

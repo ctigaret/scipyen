@@ -145,6 +145,7 @@ if os.environ["QT_API"] == "pyside6":
     from PySide6 import (QtCore, QtGui, QtWidgets, QtXml, QtSvg)
     from PySide6.QtCore import (Signal, Slot, Property,)
     QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
     has_sip = False
 else:
     from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg)
@@ -152,6 +153,7 @@ else:
     from qtpy import sip as sip # for sip.cast
     has_sip = True
     QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
 # import sip # for sip.isdeleted() - not used yet, but beware
 from traitlets.utils.bunch import Bunch
 # from qtpy.uic import loadUiType
@@ -640,14 +642,21 @@ class UrlComboBox(QtWidgets.QComboBox):
         
         signalBlocker = QtCore.QSignalBlocker(self)
         
-        urlToInsert = url.toString(QtCore.QUrl.StripTrailingSlash)
+        if os.environ["QT_API"] == "pyside6":
+            urlToInsert = url.toString(QtCore.QUrl.PrettyDecoded)
+        else:
+            urlToInsert = url.toString(QtCore.QUrl.StripTrailingSlash)
         
         # checks for duplicates
         for k, v in self.itemMapper.items():
             # if urlToInsert == v.toString(QtCore.QUrl.StripTrailingSlash):
             # WARNING: 2025-01-19 20:20:46
             # v is a UrlComboItem which here is a namedtuple
-            if urlToInsert == v.url.toString(QtCore.QUrl.StripTrailingSlash):
+            if os.environ["QT_API"] == "pyside6":
+                v_str = v.url.toString(QtCore.QUrl.PrettyDecoded)
+            else:
+                v_str = v.url.toString(QtCore.QUrl.StripTrailingSlash)
+            if urlToInsert == v_str:
                 self.setCurrentIndex(k) # NOTE: 2025-01-19 20:22:50 self inherits QComboBox !!!
                 
                 if self._mode_ == UrlComboMode.Directories:
@@ -2619,8 +2628,12 @@ class _UrlNavigator_(QtCore.QObject):
         # isTabSignal = self._nav_.isSignalConnected(QtCore.QMetaMethod.fromSignal(self._nav_.tabRequested)) # not used
         # isWindowSignal = self._nav_.isSignalConnected(QtCore.QMEtaMethod.fromSignal(self._nav_.newWindowRequested)) # not used
         
-        isTabSignal = self._nav_.receivers(self._nav_.tabRequested) > 0
-        isWindowSignal = self._nav_.receivers(self._nav_.newWindowRequested) > 0
+        if os.environ["QT_API"] == "pyside6":
+            isTabSignal = self._nav_.receivers("self._nav_.tabRequested") > 0
+            isWindowSignal = self._nav_.receivers("self._nav_.newWindowRequested") > 0
+        else:
+            isTabSignal = self._nav_.receivers(self._nav_.tabRequested) > 0
+            isWindowSignal = self._nav_.receivers(self._nav_.newWindowRequested) > 0
         
         if isTabSignal or isWindowSignal:
             for button in self._navButtons_:
@@ -2642,7 +2655,7 @@ class _UrlNavigator_(QtCore.QObject):
         navigateAction = popup.addAction("Navigate")
         navigateAction.setCheckable(True)
         
-        modeGroup = QtWidgets.QActionGroup(popup)
+        modeGroup = QActionGroup(popup)
         modeGroup.addAction(editAction)
         modeGroup.addAction(navigateAction)
         
