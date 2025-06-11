@@ -404,8 +404,12 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
         #     traceback.print_exc()
             
     def guiSetScrollBack(self):
-        value, ok = QtWidgets.QInputDialog.getInt(self, "Scrollback size (lines)", "Number of scrollback lines (-1 for unlimited)",
-                                             value = self.scrollBackSize, min = -1)
+        if os.environ["QT_API"] == "pyside6":
+            value, ok = QtWidgets.QInputDialog.getInt(self, "Scrollback size (lines)", "Number of scrollback lines (-1 for unlimited)",
+                                                value = self.scrollBackSize, minValue = -1)
+        else:
+            value, ok = QtWidgets.QInputDialog.getInt(self, "Scrollback size (lines)", "Number of scrollback lines (-1 for unlimited)",
+                                                value = self.scrollBackSize, min = -1)
         if ok:
             self.scrollBackSize = value
         
