@@ -1615,6 +1615,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.fileSystemModel = QtWidgets.QFileSystemModel(parent=self)
 
         self.workspaceModel = WorkspaceModel(self.shell, parent=self,
+                                             user_ns_hidden = self.workspace,
                                              mpl_figure_close_callback=self.handle_mpl_figure_close,
                                              mpl_figure_click_callback=self.handle_mpl_figure_click,
                                              mpl_figure_enter_callback=self.handle_mpl_figure_enter)
@@ -1626,7 +1627,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         # NOTE: 2020-10-22 13:30:54
         # self._nonInteractiveVars_ is updated in _init_QtConsole_()
-        self.workspaceModel.user_ns_hidden.update(self._nonInteractiveVars_)
+        # self.workspaceModel.user_ns_hidden.update(self._nonInteractiveVars_)
 
         # holds references to workspace objects that should NOT be visibile in
         # the workspace viewer - this includes viewer classes
@@ -1682,7 +1683,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # finally, inject references to self and the workspace into relevant
         # NOTE: 2024-05-29 14:04:11
         # plugin modules already have this injected by slot_loadPlugins
-        ws_aware_modules = (membrane,pgui, sigp, imgp, crvf, plots)
+        ws_aware_modules = (membrane, pgui, sigp, imgp, crvf, plots)
         # ws_aware_modules = (pgui, sigp, imgp, crvf, plots)
 
         for m in ws_aware_modules:
@@ -1711,11 +1712,6 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.currentVarItem = None
         self.currentVarItemName = None
         
-        # if sys.platform.startswith("win32"):
-        #     if isinstance(self, QtWidgets.QMainWindow):
-        #         flags = self.windowFlags() | QtCore.Qt.WindowStaysOnTopHint
-        #         self.setWindowFlags(flags);
-        
         self._winFlagsCache_ = self.windowFlags()
                 
         self._updateConsolesEditor()
@@ -1723,6 +1719,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         sigBlock = QtCore.QSignalBlocker(self.actionUse_system_default_font)
         self.actionUse_system_default_font.setChecked(self._useSystemDefaultFont)
         
+        self._nonInteractiveVars_.update([i for i in self.workspace.items()])
+        # self.workspaceModel.user_ns_hidden.update(self._nonInteractiveVars_)
         # self.translator = QtCore.QTranslator(self)
 
     # BEGIN Properties
@@ -3632,7 +3630,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             # assigning a variable to a symbol bound to one of these variables
             # -- effectively "overwriting" them.
 
-            self._nonInteractiveVars_.update([i for i in self.workspace.items()])
+            # self._nonInteractiveVars_.update([i for i in self.workspace.items()])
 
             # --------------------------
             # finally, customize console window title and show it
@@ -9390,7 +9388,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 
                 pMenu = self.menuBar()
                 for k, p in enumerate(menuPathList):
-                    action = self._findAction_(pMenu)
+                    action = self._findAction_(pMenu, p)
                     if action: # action found pMenu[0]
                         if action.menu(): # action has menu
                             # if p is the last in menuPath, then create action directly

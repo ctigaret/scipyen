@@ -64,6 +64,7 @@ if os.environ["QT_API"] == "pyside6":
     import PySide6
     from PySide6 import QtCore, QtGui, QtWidgets
     from PySide6.QtCore import Signal, Slot
+    from PySide6 import Shiboken
 else:
     from qtpy import QtCore, QtGui, QtWidgets
     from qtpy.QtCore import Signal, Slot
@@ -1292,7 +1293,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         #
         # 3.1. establish which variables have been removed ⇒ del_vars
         #
-        # symbols presend in the namespace
+        # symbols present in the namespace
         current_user_varnames = set(ns.keys())
         # varnames that are currently monitored
         observed_varnames = set(self.internalVariablesMonitor.keys())
@@ -1363,8 +1364,12 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     def _slot_itemGuiObjectTitleChanged(self, val:str):
         r"""For dynamic update of 1st line of tooltip of items representing a QWidget"""
         obj = self.sender()
-        if not isinstance(obj, QtWidgets.QWidget):
-            return
+        if os.environ["QT_API"] == "pyside6":
+            if not isinstance(obj, (QtWidgets.QWidget,Shiboken.Object)):
+                return
+        else:
+            if not isinstance(obj, QtWidgets.QWidget):
+                return
         
         # print(f"{self.__class__.__name__}._slot_itemGuiObjectTitleChanged obj: {obj}, str: {val}")
         

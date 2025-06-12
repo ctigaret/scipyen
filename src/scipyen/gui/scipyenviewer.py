@@ -356,34 +356,36 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             dbusinterface = QtDBus.QDBusInterface(service_name, service_path,
                                                   interface)
             dbusinterface.setTimeout(100)
-            
-            # v = QtCore.QVariant(self._wm_id_)
-            v = QtCore.QVariant(int(self.winId()))
-            
-            if v.convert(QtCore.QVariant.UInt): # NOTE: 2023-01-08 23:10:14 MUST convert to UInt
-                # NOTE: 2023-01-08 22:58:38
-                # When all OK, result should be a list with:
-                # • str: address of the connection on DBus (e.g.: ':1.383')
-                # • str: The path to the object which implements the com.canonical.dbusmenu interface.
-                #           (e.g., /MenuBar/4') as a str (NOT QDBusObjectPath!) 
-                #
-                #       If you use QDBusViewer, the address points to /MenuBar/x 
-                #       where x is an int >= 1, and it has the following interfaces:
-                #       ∘ com.canonical.dbusmenu (AHA!)
-                #       ∘ the next three are generic and present on all objects on DBus
-                #           ▷ org.freedesktop.DBus.Properties
-                #           ▷ org.freedesktop.DBus.Introspectable
-                #           ▷ org.freedesktop.DBus.Peer
-                #
+            if os.environ["QT_API"] == "pyside6":
+                v = int(self.winId())
                 result = dbusinterface.call("GetMenuForWindow", v).arguments()
-            
-                if len(result) == 1: # oops!
-                    # warnings.warn(result[0])
-                    return
-            
-                    # address, objpath = result
-            
-                return result
+            else:
+                v = QtCore.QVariant(int(self.winId()))
+                
+                if v.convert(QtCore.QVariant.UInt): # NOTE: 2023-01-08 23:10:14 MUST convert to UInt
+                    # NOTE: 2023-01-08 22:58:38
+                    # When all OK, result should be a list with:
+                    # • str: address of the connection on DBus (e.g.: ':1.383')
+                    # • str: The path to the object which implements the com.canonical.dbusmenu interface.
+                    #           (e.g., /MenuBar/4') as a str (NOT QDBusObjectPath!) 
+                    #
+                    #       If you use QDBusViewer, the address points to /MenuBar/x 
+                    #       where x is an int >= 1, and it has the following interfaces:
+                    #       ∘ com.canonical.dbusmenu (AHA!)
+                    #       ∘ the next three are generic and present on all objects on DBus
+                    #           ▷ org.freedesktop.DBus.Properties
+                    #           ▷ org.freedesktop.DBus.Introspectable
+                    #           ▷ org.freedesktop.DBus.Peer
+                    #
+                    result = dbusinterface.call("GetMenuForWindow", v).arguments()
+                
+                    if len(result) == 1: # oops!
+                        # warnings.warn(result[0])
+                        return
+                
+                        # address, objpath = result
+                
+                    return result
             
     def update_title(self, doc_title: typing.Optional[str] = None, 
                      win_title: typing.Optional[str] = None, 

@@ -48,7 +48,7 @@ import qtpy
 qtpy.API = os.environ["QT_API"]
 if os.environ["QT_API"] == "pyside6":
     import PySide6
-    from PySide6 import (QtCore, QtGui, QtWidgets, QtXml, QtSvg,)
+    from PySide6 import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, Shiboken)
 else:
     from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg,)
 

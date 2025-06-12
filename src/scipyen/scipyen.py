@@ -330,7 +330,10 @@ def main():
         # 1. create the app
         app = QtWidgets.QApplication(sys.argv)
         translator = QtCore.QTranslator(app)
-        translator.load(QtCore.QLocale.system(), "qtbase", "_", QtCore.QLibraryInfo.location(QtCore.QLibraryInfo.TranslationsPath))
+        if os.environ["QT_API"] == "pyside6":
+            translator.load(QtCore.QLocale.system(), "qtbase", "_", QtCore.QLibraryInfo.path(QtCore.QLibraryInfo.TranslationsPath))
+        else:
+            translator.load(QtCore.QLocale.system(), "qtbase", "_", QtCore.QLibraryInfo.location(QtCore.QLibraryInfo.TranslationsPath))
         app.installTranslator(translator)
         # NOTE: 2025-01-22 08:56:42
         # this needs to be here in order to initialize navigator widgets
