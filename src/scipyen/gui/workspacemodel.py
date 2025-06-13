@@ -107,6 +107,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                  mpl_figure_enter_callback=None):
         # make sure parent is passed from ScipyenWindow as an instance of ScipyenWindow
         super(WorkspaceModel, self).__init__(parent)
+        # self._first_run_ = True
 
         self.threadpool = QtCore.QThreadPool()
         
@@ -1147,7 +1148,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
 
     def preRunCell(self, info):
         r"""Use this function EXCLUSIVELY for debugging"""
-        print(f"\n{self.__class__.__name__}.preRunCell info = {info}")
+        # print(f"\n{self.__class__.__name__}.preRunCell info = {info}")
 
     def postRunCell(self, result):
         # print(f"\n{self.__class__.__name__}.postRunCell result = {result}")
@@ -1757,6 +1758,11 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         internal variable monitor which triggers Ui updates already.
 
         """
+#         print(f"{self.__class__.__name__}.update: _first_run_: {self._first_run_}")
+#         if self._first_run_:
+#             self._first_run_ = False
+#             return
+#         
         # currently displayed variables in the viewer widget
         displayed_var_names = set(self.getDisplayedVariableNames())
         

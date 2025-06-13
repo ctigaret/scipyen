@@ -61,7 +61,7 @@ qtpy.API = os.environ["QT_API"]
 isPySide6 = False
 if os.environ["QT_API"] == "pyside6":
     import PySide6
-    from PySide6 import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork,)
+    from PySide6 import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, Shiboken)
     from PySide6.QtCore import (Signal, Slot, Property,)
     from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
@@ -1614,7 +1614,150 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         self.fileSystemModel = QtWidgets.QFileSystemModel(parent=self)
 
+        self.currentVarItem = None
+        self.currentVarItemName = None
+        
+        self._winFlagsCache_ = self.windowFlags()
+                
+        # NOTE: 2021-08-17 12:45:10 TODO
+        # to be used with _run_loop_process_, which at the moment is not used
+        # anywhere - keep available as app-wide threadpool for various sub-apps
+        self.threadpool = QtCore.QThreadPool()
+
+
+        # NOTE: singleton design pattern
+        # see traitlets.config.SingletonConfigurable
+        self.__class__._instance = self  
+
+
+#         # ### BEGIN works in PyQt5
+#         
+#         self.workspaceModel = WorkspaceModel(self.shell, parent=self,
+#                                              user_ns_hidden = self.workspace,
+#                                              mpl_figure_close_callback=self.handle_mpl_figure_close,
+#                                              mpl_figure_click_callback=self.handle_mpl_figure_click,
+#                                              mpl_figure_enter_callback=self.handle_mpl_figure_enter)
+#         
+#         self.workspaceModel.workingDir.connect(self._slot_workdirChangedInConsole)
+#         
+#         # signal inherited from WindowManager
+#         self.sig_windowRemoved.connect(self.slot_windowRemoved)
+# 
+#         # NOTE: 2020-10-22 13:30:54
+#         # self._nonInteractiveVars_ is updated in _init_QtConsole_()
+#         # self.workspaceModel.user_ns_hidden.update(self._nonInteractiveVars_)
+# 
+#         # holds references to workspace objects that should NOT be visibile in
+#         # the workspace viewer - this includes viewer classes
+#         self.user_ns_hidden = self.workspaceModel.user_ns_hidden
+# 
+#         self.shell.events.register("pre_execute", self.workspaceModel.preExecute)
+#         # self.shell.events.register("post_execute", self.workspaceModel.post_execute)
+#         self.shell.events.register("post_run_cell", self.workspaceModel.postRunCell)
+#         
+#         # NOTE: 2023-06-04 10:49:56
+#         # for debugging only; comment out for relese
+#         # self.shell.events.register("pre_run_cell", self.workspaceModel.preRunCell)
+# 
+#         # NOTE: 2021-01-06 17:22:45
+#         # A lot of things happen up to here which depend on an initialized bare-bones
+#         # UI; hence setupUi is early (see NOTE: WARNING 2021-09-16 14:32:03).
+#         #
+#         # _configureUI_ must be called NOW, to initialize additional UI elements
+#         # and signal-slot connections NOT defined in the *.ui file
+#         #
+#         # NOTE: 2024-05-29 13:01:37 
+#         # this approach IS DIFFERENT from the "regular" child windows that 
+#         # inherit from ScipyenViewer
+#         self._configureUI_()
+# 
+#         # NOTE:2022-01-28 23:16:57
+#         # when collections are modified directly (instead of setting via
+#         # property setter, see  NOTE:FIXME:2022-01-28 23:11:59) the
+#         # configurable_traits are NOT populated/notified!
+#         # Hence I need to force this here
+# 
+#         if isinstance(getattr(self, "configurable_traits", None), DataBag):
+#             self.configurable_traits["RecentScripts"] = self._recentScripts
+# 
+#         # With all UI elements and their signal-slot connections in place we can
+#         # now apply stored settings, including the 'state' of the ScipyenWindow
+#         # object (which is an instance of QMainWindow)
+#         #
+#         self.loadSettings()
+# 
+#         self.activeDockWidget = self.dockWidgetWorkspace
+# 
+#         # -----------------
+#         # connect widget actions through signal/slot mechanism
+#         # NOTE: 2017-07-04 16:28:52
+#         # do not delete: this is the first code where self.cwd is defined & initiated!
+#         self.cwd = os.getcwd()
+# 
+#         # NOTE: 2016-03-20 14:49:05
+#         # Quit the Qt app when Scipyen main window is closed
+#         self.app.destroyed.connect(self.slot_Quit)
+# 
+#         # finally, inject references to self and the workspace into relevant
+#         # NOTE: 2024-05-29 14:04:11
+#         # plugin modules already have this injected by slot_loadPlugins
+#         ws_aware_modules = (membrane, pgui, sigp, imgp, crvf, plots)
+#         # ws_aware_modules = (pgui, sigp, imgp, crvf, plots)
+# 
+#         for m in ws_aware_modules:
+#             # NOTE: 2022-12-23 10:47:39
+#             # some modules provide plugin functionality which will trigger these
+#             # injections -- see slot_loadPlugins
+#             if not hasattr(m, "mainWindow"):
+#                 m.__dict__["mainWindow"] = self
+# 
+#             if not hasattr(m, "workspace"):
+#                 m.__dict__["workspace"] = self.workspace
+# 
+#         # NOTE: 2021-08-17 12:45:10 TODO
+#         # to be used with _run_loop_process_, which at the moment is not used
+#         # anywhere - keep available as app-wide threadpool for various sub-apps
+#         self.threadpool = QtCore.QThreadPool()
+# 
+#         # NOTE: singleton design pattern
+#         # see traitlets.config.SingletonConfigurable
+#         self.__class__._instance = self  
+# 
+#         # NOTE: 2024-05-29 13:04:00
+#         # Asynchronously launch the plugin loading mechanism
+#         self.startPluginLoad.emit()
+# 
+#         self.currentVarItem = None
+#         self.currentVarItemName = None
+#         
+#         self._winFlagsCache_ = self.windowFlags()
+#                 
+#         self._updateConsolesEditor()
+#         
+#         sigBlock = QtCore.QSignalBlocker(self.actionUse_system_default_font)
+#         self.actionUse_system_default_font.setChecked(self._useSystemDefaultFont)
+#         
+#         # ### BEGIN debug 2025-06-13 09:05:41
+#         if os.environ["QT_API"] == "pyside6":
+#             ooo = list(filter(lambda v: isinstance(v, type) and Shiboken.Object in inspect.getmro(v), self.workspace.values() ))
+#             print(f"In {self.__class__.__name__}.__init__:\nooo: {ooo}")
+#         # ### END   debug 2025-06-13 09:05:41
+#         
+#         self._nonInteractiveVars_.update([i for i in self.workspace.items()])
+#         self.workspaceModel.user_ns_hidden.update(self._nonInteractiveVars_)
+#         # self.translator = QtCore.QTranslator(self)
+#         
+#         # ### END   works in PyQt5
+
+        if isinstance(getattr(self, "configurable_traits", None), DataBag):
+            self.configurable_traits["RecentScripts"] = self._recentScripts
+
+         # NOTE: 2020-10-22 13:30:54
+        # self._nonInteractiveVars_ is updated in _init_QtConsole_()
+        self._nonInteractiveVars_.update([i for i in self.workspace.items()])
+        
         self.workspaceModel = WorkspaceModel(self.shell, parent=self,
+                                             # user_ns_hidden = self._nonInteractiveVars_,
                                              user_ns_hidden = self.workspace,
                                              mpl_figure_close_callback=self.handle_mpl_figure_close,
                                              mpl_figure_click_callback=self.handle_mpl_figure_click,
@@ -1622,17 +1765,6 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         
         self.workspaceModel.workingDir.connect(self._slot_workdirChangedInConsole)
         
-        # signal inherited from WindowManager
-        self.sig_windowRemoved.connect(self.slot_windowRemoved)
-
-        # NOTE: 2020-10-22 13:30:54
-        # self._nonInteractiveVars_ is updated in _init_QtConsole_()
-        # self.workspaceModel.user_ns_hidden.update(self._nonInteractiveVars_)
-
-        # holds references to workspace objects that should NOT be visibile in
-        # the workspace viewer - this includes viewer classes
-        self.user_ns_hidden = self.workspaceModel.user_ns_hidden
-
         self.shell.events.register("pre_execute", self.workspaceModel.preExecute)
         # self.shell.events.register("post_execute", self.workspaceModel.post_execute)
         self.shell.events.register("post_run_cell", self.workspaceModel.postRunCell)
@@ -1659,8 +1791,6 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # configurable_traits are NOT populated/notified!
         # Hence I need to force this here
 
-        if isinstance(getattr(self, "configurable_traits", None), DataBag):
-            self.configurable_traits["RecentScripts"] = self._recentScripts
 
         # With all UI elements and their signal-slot connections in place we can
         # now apply stored settings, including the 'state' of the ScipyenWindow
@@ -1668,17 +1798,11 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         #
         self.loadSettings()
 
-        self.activeDockWidget = self.dockWidgetWorkspace
-
         # -----------------
         # connect widget actions through signal/slot mechanism
         # NOTE: 2017-07-04 16:28:52
         # do not delete: this is the first code where self.cwd is defined & initiated!
         self.cwd = os.getcwd()
-
-        # NOTE: 2016-03-20 14:49:05
-        # Quit the Qt app when Scipyen main window is closed
-        self.app.destroyed.connect(self.slot_Quit)
 
         # finally, inject references to self and the workspace into relevant
         # NOTE: 2024-05-29 14:04:11
@@ -1696,33 +1820,28 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             if not hasattr(m, "workspace"):
                 m.__dict__["workspace"] = self.workspace
 
-        # NOTE: 2021-08-17 12:45:10 TODO
-        # to be used with _run_loop_process_, which at the moment is not used
-        # anywhere - keep available as app-wide threadpool for various sub-apps
-        self.threadpool = QtCore.QThreadPool()
-
-        # NOTE: singleton design pattern
-        # see traitlets.config.SingletonConfigurable
-        self.__class__._instance = self  
-
         # NOTE: 2024-05-29 13:04:00
         # Asynchronously launch the plugin loading mechanism
         self.startPluginLoad.emit()
 
-        self.currentVarItem = None
-        self.currentVarItemName = None
-        
-        self._winFlagsCache_ = self.windowFlags()
-                
         self._updateConsolesEditor()
         
         sigBlock = QtCore.QSignalBlocker(self.actionUse_system_default_font)
         self.actionUse_system_default_font.setChecked(self._useSystemDefaultFont)
         
-        self._nonInteractiveVars_.update([i for i in self.workspace.items()])
-        # self.workspaceModel.user_ns_hidden.update(self._nonInteractiveVars_)
+        # ### BEGIN debug 2025-06-13 09:05:41
+        # if os.environ["QT_API"] == "pyside6":
+        #     ooo = list(filter(lambda v: isinstance(v, type) and Shiboken.Object in inspect.getmro(v), self.workspace.values() ))
+        #     print(f"In {self.__class__.__name__}.__init__:\nooo: {ooo}")
+        # ### END   debug 2025-06-13 09:05:41
+        
+        self.workspaceModel.user_ns_hidden.update(self._nonInteractiveVars_)
         # self.translator = QtCore.QTranslator(self)
+        # holds references to workspace objects that should NOT be visibile in
+        # the workspace viewer - this includes viewer classes
+        self.user_ns_hidden = self.workspaceModel.user_ns_hidden
 
+        
     # BEGIN Properties
     
     @property
@@ -5811,7 +5930,20 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         #
         self.actionChoose_code_editor.triggered.connect(self._slot_chooseCodeEditor)
         self.actionUse_system_s_default_code_editor.triggered.connect(self._slot_setOverrideSystemEditor)
-        #
+
+        self.activeDockWidget = self.dockWidgetWorkspace
+
+        # NOTE: 2016-03-20 14:49:05
+        # Quit the Qt app when Scipyen main window is closed
+        self.app.destroyed.connect(self.slot_Quit)
+
+        # 
+        # ### END   miscellaneous
+ 
+ # signal inherited from WindowManager
+        self.sig_windowRemoved.connect(self.slot_windowRemoved)
+
+       #
         # ### END miscellaneous
 
         # NOTE: 2021-08-17 12:36:49 TODO custom icon ?
