@@ -146,7 +146,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
 
         self.internalVariablesMonitor = DataBag(allow_none=True, mutable_types=True)
         self.internalVariablesMonitor.verbose = True
-        self.internalVariablesMonitor.observe(self.internalVariablesListenerCB)
+        # self.internalVariablesMonitor.observe(self.internalVariablesListenerCB)
 
         # NOTE: 2021-01-28 17:47:36 TODO to complete observables here
         # management of workspaces in external kernels
@@ -843,8 +843,20 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                 self.preExecute()
                 namespace[new_name] = obj
                 self.postRunCell(Bunch(success=True))
+                
+    def enableInternalVariableObserver(self, enable:bool = True):
+        if enable:
+            self.internalVariablesMonitor.unobserve(self.noopCB)
+            self.internalVariablesMonitor.observe(self.internalVariablesListenerCB)
+        else:
+            self.internalVariablesMonitor.unobserve(self.internalVariablesListenerCB)
+            self.internalVariablesMonitor.observe(self.noopCB)
             
-    def internalVariablesListenerCB(self, change):
+    def noopCB(self, change:dict):
+        r"""No-op callback"""
+        return
+    
+    def internalVariablesListenerCB(self, change:dict):
         r"""Callback for notifications from the workspace monitor.
         Emits self.internalVariableChanged signal
         """
@@ -1453,6 +1465,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     def generateRowContents(self, dataname: str, 
                             data: object, 
                             namespace: str = "Internal"):
+        # print(f"{self.__class__.__name__}.generateRowContents(dataname={dataname})")
         obj_props = summarize_object_properties(dataname, data, namespace=namespace)
         return self.genRowFromPropDict(obj_props)
 
@@ -1462,7 +1475,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         r"""Returns a row of QStandardItems
         """
         # print(f"genRowFromPropDict obj_props = {obj_props}")
-        # print(f"Object Type: {obj_props['Object Type']['display']}")
+        # print(f"{self.__class__.__name__}.genRowFromPropDict:\n-> Object Type: {obj_props['Object Type']['display']}")
         # headers = [k for k in standard_obj_summary_headers if k != "Icon"]
         ret = [self._generateModelItemForObject_(obj_props[key],
                                                   editable=(key == "Name"),
@@ -1483,7 +1496,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         If row index is not valid, returns the empty string (if strings is True)
         or None
         '''
-
+        
         if row is None or row >= self.rowCount() or row < 0:
             return "" if asStrings else None
 
@@ -1554,7 +1567,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # TODO 2020-07-30 22:18:35 merge & factor code for both internal and foreign
         # kernels (make use of the ns parameter)
         #
-        # print(f"{self.__class__.__name__}.updateRowForVariable2 dataname = {dataname}, ns_name={ns_name}")
+        print(f"{self.__class__.__name__}.updateRowForVariable2 dataname = {dataname}, ns_name={ns_name}")
         if dataname not in ns:
             return
         

@@ -21,7 +21,8 @@ from inspect import getcallargs, isfunction, ismethod
 from functools import partial
 from pprint import pformat
 import traitlets
-from traitlets import (HasTraits, TraitType, Int, Bool, All, observe, Undefined)
+from traitlets import (HasTraits, TraitType, Int, Bool, All, observe, Undefined,
+                       parse_notifier_name)
 from traitlets.utils.bunch import Bunch
 
 from .traitutils import (dynamic_trait, transform_link)
@@ -385,8 +386,15 @@ class DataBag(Bunch):
         else:
             dd = kwargs
 
-        traits = dict(
-            map(lambda x: (x[0], self._make_trait_(x[1])), dd.items()))
+        # TODO: 2025-06-14 13:56:18 FIXME
+        # avoid observing Shiboken.Object and Ui_* types
+        # otherwise I MUST find a way to avoid populating the workspace model/viewer
+        # with loaded PySide6 classes
+        
+        # if len(dd):
+        #     print(f"{self.__class__.__name__}.__init__: dd: {list(dd.keys())}")
+        
+        traits = dict(map(lambda x: (x[0], self._make_trait_(x[1])), dd.items()))
 
         self.__hidden__.length = len(traits)
 
@@ -1064,7 +1072,24 @@ class DataBag(Bunch):
         self.__observer__.observe(handler, names=names, type=type)
 
     def unobserve(self, handler, names=All, type="change"):
-        self.__observer__.unobserve(handler, names=names, type=type)
+        # NOTE 2025-06-14 17:43:24 reminder of what this does, in HasTraits:
+        # def _remove_notifiers(
+        #     self, handler: t.Callable[..., t.Any] | None, name: Sentinel | str, type: str | Sentinel
+        # ) -> None:
+        #     try:
+        #         if handler is None:
+        #             del self._trait_notifiers[name][type]
+        #         else:
+        #             self._trait_notifiers[name][type].remove(handler)
+        #     except KeyError:
+        #         pass
+        
+        tn = self.__observer__._trait_notifiers
+        for name in parse_notifier_name(names):
+            if name in tn:
+                if type in tn[name]:
+                    if handler in self.__observer__._trait_notifiers[name][type]:
+                        self.__observer__.unobserve(handler, names=names, type=type)
 
     def link(self, name, other, other_name):
         r"""Links trait named 'name' to the trait 'other_name' in 'other'.

@@ -1738,9 +1738,9 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 #         self.actionUse_system_default_font.setChecked(self._useSystemDefaultFont)
 #         
 #         # ### BEGIN debug 2025-06-13 09:05:41
-#         if os.environ["QT_API"] == "pyside6":
-#             ooo = list(filter(lambda v: isinstance(v, type) and Shiboken.Object in inspect.getmro(v), self.workspace.values() ))
-#             print(f"In {self.__class__.__name__}.__init__:\nooo: {ooo}")
+        # if os.environ["QT_API"] == "pyside6":
+        #     ooo = list(filter(lambda v: isinstance(v, type) and Shiboken.Object in inspect.getmro(v), self.workspace.values() ))
+        #     print(f"In {self.__class__.__name__}.__init__:\nooo: {ooo}")
 #         # ### END   debug 2025-06-13 09:05:41
 #         
 #         self._nonInteractiveVars_.update([i for i in self.workspace.items()])
@@ -1831,8 +1831,10 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         
         # ### BEGIN debug 2025-06-13 09:05:41
         # if os.environ["QT_API"] == "pyside6":
-        #     ooo = list(filter(lambda v: isinstance(v, type) and Shiboken.Object in inspect.getmro(v), self.workspace.values() ))
+        #     ooo = list(filter(lambda v: isinstance(v, type) and (hasattr(v, "setupUi") or Shiboken.Object in inspect.getmro(v)), self.workspace.values() ))
+        #     print("\n******")
         #     print(f"In {self.__class__.__name__}.__init__:\nooo: {ooo}")
+        #     print("******\n")
         # ### END   debug 2025-06-13 09:05:41
         
         self.workspaceModel.user_ns_hidden.update(self._nonInteractiveVars_)
@@ -1840,6 +1842,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # holds references to workspace objects that should NOT be visibile in
         # the workspace viewer - this includes viewer classes
         self.user_ns_hidden = self.workspaceModel.user_ns_hidden
+        
+        self.workspaceModel.enableInternalVariableObserver(True)
 
         
     # BEGIN Properties
@@ -9230,15 +9234,15 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                             else:
                                 raise TypeError("Incompatible Plugin Key")
 
-                if inspect.isfunction(getattr(module, "load_ipython_extension", None)):
-                    module.load_ipython_extension(self.ipkernel.shell)
-                    
-                # NOTE: 2024-05-31 14:14:00
-                # make this plugin available at the console
-                # WARNING this is likely to create symbols bound to the same object
-                mname = module_name.split('.')[-1]
-                if mname not in self.workspace:
-                    self.workspaceModel.bindObjectInNamespace(mname, module, hidden=True)
+                    if inspect.isfunction(getattr(module, "load_ipython_extension", None)):
+                        module.load_ipython_extension(self.ipkernel.shell)
+                        
+                    # NOTE: 2024-05-31 14:14:00
+                    # make this plugin available at the console
+                    # WARNING this is likely to create symbols bound to the same object
+                    mname = module_name.split('.')[-1]
+                    if mname not in self.workspace:
+                        self.workspaceModel.bindObjectInNamespace(mname, module, hidden=True)
 
             if len(viewers):
                 sortedViewers = sorted(viewers, key=lambda x: x[0])

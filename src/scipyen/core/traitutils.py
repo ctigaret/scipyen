@@ -28,7 +28,7 @@ import qtpy
 qtpy.API = os.environ["QT_API"]
 if os.environ["QT_API"] == "pyside6":
     import PySide6
-    from PySide6 import (QtCore, QtGui, QtWidgets, QtXml, QtSvg,)
+    from PySide6 import (QtCore, QtGui, QtWidgets, QtXml, QtSvg,Shiboken)
 else:
     from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg,)
     
@@ -97,6 +97,7 @@ def traitlet_set(instance, obj, value):
     """
     #new_value = instance._validate(obj, value)
     new_value = value # skip validation
+            
     silent = True
     change_type="modified"
     
@@ -107,6 +108,12 @@ def traitlet_set(instance, obj, value):
         silent = False
         change_type = "new"
     
+    # NOTE: 2025-06-14 13:39:57 in PySide6 I need to deal with
+    # Shiboken.ObjectType and with Ui_* types created by loadUiType
+    if os.environ["QT_API"] == "pyside6":
+        if isinstance(value, type) and (hasattr(value, "setupUi") or issubclass(value,Shiboken.Object)):
+            silent = True
+            
     # NOTE: 2023-06-14 08:49:55
     # always notify here - this is relevan, because:
     # a) notifies when an existing trait is set to None
