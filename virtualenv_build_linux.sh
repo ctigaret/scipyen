@@ -996,6 +996,36 @@ EOF
 IFS=$oldifs
 }
 
+function get_qtpaths ()
+{
+declare -a ver_array
+qtpaths_exec=`which qtpaths`
+ver_array=( `qtpaths-exec --qt-version` )
+qtver=${ver_array}
+oldifs=$IFS
+IFS=-.
+read major minor micro <<EOF
+${qtver##*-}
+EOF
+IFS=$oldifs
+if [[ ${major} -lt 6 ]] ; then
+qtpaths_exec=`which qtpaths6`
+ver_array=( `qtpaths-exec --qt-version` )
+qtver=${ver_array}
+oldifs=$IFS
+IFS=-.
+read major minor micro <<EOF
+${qtver##*-}
+EOF
+IFS=$oldifs
+fi
+if [[ ${major} -ne 6 ]] ; then
+echo "Cannot find qtpaths for Qt6. Bailing out..."
+exit 1
+fi
+full_path_to_qtpaths=`readlink -f ${qtpaths_exec}`
+}
+
 function make_launch_script () 
 {
 target_dir=${HOME}/bin
