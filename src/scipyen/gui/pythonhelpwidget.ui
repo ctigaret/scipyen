@@ -16,6 +16,15 @@
   <property name="windowIcon">
    <iconset theme="help-browser"/>
   </property>
+  <property name="toolTip">
+   <string>Help viewer</string>
+  </property>
+  <property name="statusTip">
+   <string>Help viewer</string>
+  </property>
+  <property name="whatsThis">
+   <string>Help viewer</string>
+  </property>
   <layout class="QGridLayout" name="gridLayout">
    <item row="0" column="0">
     <layout class="QHBoxLayout" name="horizontalLayout">

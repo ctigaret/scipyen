@@ -52,15 +52,21 @@ from collections import deque
 
 import qtpy
 qtpy.API = os.environ["QT_API"]
+isPySide6 = False
 if os.environ["QT_API"] == "pyside6":
     import PySide6
-    from PySide6 import QtCore, QtGui, QtWidgets, QtSvg, QtNetwork
+    from PySide6 import QtCore, QtGui, QtWidgets, QtSvg, QtNetwork, Shiboken
     from PySide6.QtCore import Signal, Slot, Property
     from PySide6.QtUiTools import loadUiType as __loadUiType__
+    QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    isPySide6 = True
 else:
     from qtpy import QtCore, QtGui, QtWidgets, QtSvg, QtNetwork
     from qtpy.QtCore import Signal, Slot, Property
     from qtpy.uic import loadUiType as __loadUiType__
+    QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
 
 
 from IPython.core.interactiveshell import InteractiveShell
@@ -71,7 +77,10 @@ from core import helputils
 from gui.workspacegui import WorkspaceGuiMixin
 # import numpy as np # cheeky
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
-__ui_path__ = adapt_ui_path(__module_path__,'pythonhelpwidget_qt6.ui')
+if isPySide6:
+    __ui_path__ = adapt_ui_path(__module_path__,'pythonhelpwidget_qt6.ui')
+else:
+    __ui_path__ = adapt_ui_path(__module_path__,'pythonhelpwidget.ui')
 
 Ui_PythonHelpWidget, QWidget = __loadUiType__(__ui_path__)
 
@@ -194,8 +203,11 @@ class PythonHelpWidget(QWidget, WorkspaceGuiMixin, Ui_PythonHelpWidget):
         #     parent = None
         # elif sys.platform.startswith("linux") and os.getenv("XDG_SESSION_TYPE").lower() == "wayland":
         #     parent = None
-            
-        super(QWidget, self).__init__(parent)
+        # print(f"{self.__class__.__name__}.__init__ -> parent is {type(parent)}")
+        if os.environ["QT_API"] == "pyside6":
+            super().__init__(parent)
+        else:
+            super(QWidget, self).__init__(parent)
         WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs)
         
         self._helpThread_ = _PythonHelpThread_(self, shell)
@@ -224,12 +236,12 @@ class PythonHelpWidget(QWidget, WorkspaceGuiMixin, Ui_PythonHelpWidget):
     def _configureUI_(self):
         self.setupUi(self)
         self.helpDisplay.setPlaceholderText(self.intro_msg)
-        self.removQueryAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("edit-delete"),
+        self.removQueryAction = QAction(QtGui.QIcon.fromTheme("edit-delete"),
                                                                 "Remove this query from history",
                                                                 self.queryComboBox.lineEdit())
         self.removQueryAction.setToolTip("Remove this query from history")
         self.removQueryAction.triggered.connect(self._slot_removeCurrentQuery)
-        self.clearQueryHistoryAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("final_activity"),
+        self.clearQueryHistoryAction = QAction(QtGui.QIcon.fromTheme("final_activity"),
                                                            "Clear query list",
                                                            self.queryComboBox.lineEdit())
         self.clearQueryHistoryAction.setToolTip("Clear query list")
