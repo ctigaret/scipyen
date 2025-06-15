@@ -8250,7 +8250,10 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @safewrapper
     def _slot_chooseWorkplaceFont(self):
         currentFont = self._workspaceViewerFont
-        selectedFont, ok = QtWidgets.QFontDialog.getFont(currentFont, self)
+        if os.environ["QT_API"] == "pyside6":
+            ok, selectedFont = QtWidgets.QFontDialog.getFont(currentFont, self)
+        else:
+            selectedFont, ok = QtWidgets.QFontDialog.getFont(currentFont, self)
         if ok:
             self._workspaceViewerFont = selectedFont
             self._updateWorkspaceItemsFont()
@@ -8259,7 +8262,10 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @safewrapper
     def _slot_chooseHistoryFont(self):
         currentFont = self._commandHistoryFont
-        selectedFont, ok = QtWidgets.QFontDialog.getFont(currentFont, self)
+        if os.environ["QT_API"] == "pyside6":
+            ok, selectedFont = QtWidgets.QFontDialog.getFont(currentFont, self)
+        else:
+            selectedFont, ok = QtWidgets.QFontDialog.getFont(currentFont, self)
         if ok:
             self._commandHistoryFont = selectedFont
             self._updateHistoryViewFont()
