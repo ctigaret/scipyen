@@ -224,7 +224,11 @@ function makevirtenv ()
         fi
     else
         # putative virtual environment directory not found => need to generate one
-        ${python_executable} -m virtualenv --python ${python_executable} $virtual_env
+        if [ -z ${uv_exec} ] ; then
+            ${python_executable} -m virtualenv --python ${python_executable} $virtual_env
+        else
+            ${uv_exec} venv --python ${python_executable} $virtual_env 
+        fi
         
         if [[ $? -ne 0 ]] ; then
             # the above attempt failed => bail out
@@ -284,9 +288,13 @@ function installpipreqs_part1 ()
         #
         export SKLEARN_ALLOW_DEPRECATED_SKLEARN_PACKAGE_INSTALL=True 
         
-        echo -e "Using ${python_executable} as `whoami` to install PyPI packages\n"
+#         echo -e "Using ${python_executable} as `whoami` to install PyPI packages\n"
         
-        ${python_executable} -m pip install -r "$reqfile"
+        if [ -z ${uv_exec} ] ; then
+            ${python_executable} -m pip install -r "$reqfile"
+        else
+            ${uv_exec} pip install -r "$reqfile"
+        fi
         
         if [[ $? -ne 0 ]] ; then
             echo -e "Cannot install required packages from PyPI. Bailing out. Goodbye!\n"
@@ -319,9 +327,13 @@ function installpipreqs_part2 ()
         #
         export SKLEARN_ALLOW_DEPRECATED_SKLEARN_PACKAGE_INSTALL=True 
         
-        echo -e "Using ${python_executable} as `whoami` to install PyPI packages\n"
+#         echo -e "Using ${python_executable} as `whoami` to install PyPI packages\n"
         
-        ${python_executable} -m pip install -r "$installscriptdir"/pip_requirements_linux_2.txt
+        if [ -z ${uv_exec} ] ; then
+            ${python_executable} -m pip install -r "$installscriptdir"/pip_requirements_linux_2.txt
+        else
+            ${uv_exec} pip install -r "$installscriptdir"/pip_requirements_linux_2.txt
+        fi
         
         if [[ $? -ne 0 ]] ; then
             echo -e "Cannot install required packages from PyPI. Bailing out. Goodbye!\n"
@@ -579,6 +591,10 @@ function dopyqt6 ()
     fi
 }
 
+function buildppyside6 ()
+{
+}
+
 function dopyside6 ()
 {
     if [[ -z "$VIRTUAL_ENV" ]] ; then
@@ -586,12 +602,16 @@ function dopyside6 ()
         exit 1
     fi
     
-    if [ ! -r ${VIRTUAL_ENV}/.pyqt6done ] || [[ $reinstall_pyside6 -eq 1 ]] ; then
+    if [ ! -r ${VIRTUAL_ENV}/.pyside6done ] || [[ $reinstall_pyside6 -eq 1 ]] ; then
         if [[ $build_pyside6 -eq 1 ]]; then
             echo "not yet"
             exit 1
         else
-            pip install PySide6
+            if [ -z ${uv_exec} ] ; then
+                pip install PySide6
+            else
+                ${uv_exec} pip install PySide6
+            fi
         fi
     fi
 }
@@ -1101,6 +1121,8 @@ fi
 # start_time=`date +%s`
 SECONDS=0
 get_pyver
+uv_exec=`which uv`
+
 
 virtual_env_pfx="scipyenv"
 install_dir=${HOME}
@@ -1363,7 +1385,7 @@ echo -e "Will install in ${install_dir}"
 if  [[ $with_pyside6 -eq 1 ]] ; then
     virtual_env_pfx=${virtual_env_pfx}_pyside6_pypi
 elif [[  $build_pyside6 -eq 1 ]] ; then
-    virtual_env_pfx=${virtual_env_pfx}_pyside6_builds
+    virtual_env_pfx=${virtual_env_pfx}_pyside6_build
 fi
 
 
