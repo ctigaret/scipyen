@@ -268,9 +268,11 @@ function installpipreqs_part1 ()
     
 #     if [[ ( $with_pyside6 -eq 1 ) || ( $build_pyside6 -eq 1 ) ]] ; then
     if [[ $with_pyside6 -eq 1 ]] ; then
-        reqfile="$installscriptdir"/pip_requirements_linux_1_pyside6_pypi.txt
-    elif [[ $build_pyside6 -eq 1 ]] ; then
-        reqfile="$installscriptdir"/pip_requirements_linux_1_pyside6_build.txt
+        if [[ $build_pyside6 -eq 1 ]] ; then
+            reqfile="$installscriptdir"/pip_requirements_linux_1_pyside6_build.txt
+        else
+            reqfile="$installscriptdir"/pip_requirements_linux_1_pyside6_pypi.txt
+        fi
     else
         reqfile="$installscriptdir"/pip_requirements_linux_1.txt
     fi
