@@ -62,13 +62,13 @@ function show_help ()
     echo -e "--with_coreneuron\twhen '--build_neuron' is passed, build local neuron with coreneuron; by default coreneuron is not used.\n"
     echo -e "--with_pyqt5\t\tInstall PyQt5 from PyPI\n"
     echo -e "--build_pyqt5\t\tBuild a PyQt5 wheel locally and install it (recommended)\n"
-    echo -e "--with_pyqt6\t\tInstall PyQt6 from PyPI (recommended)\n"
-    echo -e "--build_pyqt6\t\tBuild a PyQt6 wheel locally and install it \n"
+    echo -e "--with_pyside6\t\tInstall PySide6 ans Shiboken from PyPI (recommended)\n"
+    echo -e "--build_pyside6\t\tBuild a PySide6 and Shiboken wheels locally and install them \n"
     echo -e "--refresh_repos\t When '--refresh_repos' is passed, local repository clones will be refreshed before rebuilding\n"
     echo -e "\tNOTE: This applies to vigra and to local neuron build only\n"
     echo -e "--jobs=N\t\tNumber of parallel tasks during building PyQt5 and neuron; default is 4; set to 0 to disable parallel build\n"
     echo -e "--reinstall=NAME\t\t\tRe-install/re-building NAME, where NAME is one of:\n"
-    echo -e "\tpips, pyqt5, build_pyqt5, pyqt6, build_pyqt6, vigra, neuron, or desktopentry;\n"
+    echo -e "\tpips, pyqt5, build_pyqt5, pyside6, build_pyside6, vigra, neuron, or desktopentry;\n"
     echo -e "\t(this option can be passed more than once)\n"
     echo -e "--install=NAME\t\t Alias to --reinstall option above; use it to "
     echo -e "\tinstall optional libraries AFTER building Scipyen's virtual environment\n "
@@ -591,10 +591,6 @@ function dopyqt6 ()
     fi
 }
 
-function buildppyside6 ()
-{
-}
-
 function dopyside6 ()
 {
     if [[ -z "$VIRTUAL_ENV" ]] ; then
@@ -604,8 +600,66 @@ function dopyside6 ()
     
     if [ ! -r ${VIRTUAL_ENV}/.pyside6done ] || [[ $reinstall_pyside6 -eq 1 ]] ; then
         if [[ $build_pyside6 -eq 1 ]]; then
-            echo "not yet"
-            exit 1
+            get_qtpaths
+            cd ${VIRTUAL_ENV}
+            mkdir -p src && cd src
+            # create build directory
+            mkdir pyside6-build && cd pyside6-build
+            # pre-create build sub directory as expected by setup.py in pyside-setup
+            # BUT: make sure install/lib and install/lib64 point to the same directory
+            # i.e., make lib64 a symbolic link to lib
+            build_venv_subdir=`basename ${VIRTUAL_ENV}`
+            mkdir ${build_venv_subdir} && cd ${build_venv_subdir}
+            mkdir -p install && cd install
+            mkdir -p lib
+            ln -s lib lib64
+            base_build_dir=${VIRTUAL_ENV}/src/pyside6-build
+            cd ${VIRTUAL_ENV}/src
+            git clone https://code.qt.io/pyside/pyside-setup
+            cd pyside-setup && git checkout 6.9
+            if [ -z ${uv_exec} ] ; then
+                pip install -r requirements.txt
+                pip install -r requirements-doc.txt
+                pip install -r requirements-coin.txt
+            else
+                ${uv_exec} pip install -r requirements.txt
+                ${uv_exec} pip install -r requirements-doc.txt
+                ${uv_exec} pip install -r requirements-coin.txt
+            fi
+            qtinfopatch=${installscriptdir}/pyside6/qtinfo.diff
+            patch build_scripts/qtinfo.py ${qtinfopatch}
+
+            if [ -z ${uv_exec} ] ; then
+                python setup.py build --qtpaths=${full_path_to_qtpaths} --build-tests --build-base=${base_build_dir} --parallel=8
+            else
+                uv run setup.py build --qtpaths=${full_path_to_qtpaths} --build-tests --build-base=${base_build_dir} --parallel=8
+            fi
+            
+            if [[ $? -ne 0 ]] ; then
+                echo -e "\nCould not build PySide6. Goodbye!\n"
+                exit 1
+            fi
+            build_dir=${base_build_dir}/`basename ${VIRTUAL_ENV}`
+            python create_wheels.py --no-examples --build-dir=${build_dir}
+            
+            if [[ $? -ne 0 ]] ; then
+                echo -e "\nCould not create PySide6 wheels. Goodbye!\n"
+                exit 1
+            fi
+            
+            if [ -z ${uv_exec} ] ; then
+                pip install ${VIRTUAL_ENV}/src/pyside-setup/dist/*.whl
+            else
+                uv pip install ${VIRTUAL_ENV}/src/pyside-setup/dist/*.whl
+            fi
+            
+            if [[ $? -ne 0 ]] ; then
+                echo -e "\nCould not install PySide6 wheels. Goodbye!\n"
+                exit 1
+            else
+                echo -e "\nPySide6 wheel have been successfully built and installed"
+            fi
+            
         else
             if [ -z ${uv_exec} ] ; then
                 pip install PySide6
@@ -909,10 +963,12 @@ fi
 dt=`date '+%Y-%m-%d_%H-%M-%s'`
 
 if [[ $with_pyside6 -eq 1 ]] ; then
-    rcfile=${HOME}/.scipyen_pyside6_pypi_rc
-elif [[ $build_pyside6 -eq 1 ]] ; then
-    rcfile=${HOME}/.scipyen_pyside6_build_rc
-else 
+    if [[ $build_pyside6 -eq 1 ]] ; then
+        rcfile=${HOME}/.scipyen_pyside6_build_rc
+    else 
+        rcfile=${HOME}/.scipyen_pyside6_pypi_rc
+    fi
+else
     rcfile=${HOME}/.scipyenrc
 fi
 
@@ -1020,7 +1076,7 @@ function get_qtpaths ()
 {
 declare -a ver_array
 qtpaths_exec=`which qtpaths`
-ver_array=( `qtpaths-exec --qt-version` )
+ver_array=( `${qtpaths_exec} --qt-version` )
 qtver=${ver_array}
 oldifs=$IFS
 IFS=-.
@@ -1030,7 +1086,7 @@ EOF
 IFS=$oldifs
 if [[ ${major} -lt 6 ]] ; then
 qtpaths_exec=`which qtpaths6`
-ver_array=( `qtpaths-exec --qt-version` )
+ver_array=( `${qtpaths_exec} --qt-version` )
 qtver=${ver_array}
 oldifs=$IFS
 IFS=-.
@@ -1040,7 +1096,7 @@ EOF
 IFS=$oldifs
 fi
 if [[ ${major} -ne 6 ]] ; then
-echo "Cannot find qtpaths for Qt6. Bailing out..."
+# echo "Cannot find qtpaths for Qt6. Bailing out..."
 exit 1
 fi
 full_path_to_qtpaths=`readlink -f ${qtpaths_exec}`
@@ -1051,14 +1107,15 @@ function make_launch_script ()
 target_dir=${HOME}/bin
 
 if [[ $with_pyside6 -eq 1 ]] ; then
-    scriptfile=${target_dir}/scipyen-pyside6-pypi
-    launchcmd="${scipyensrcdir}/scipyen.py pyside6"
-    
-elif [[ $build_pyside6 -eq 1 ]] ; then
-    scriptfile=${target_dir}/scipyen-pyside6-build
-    launchcmd="${scipyensrcdir}/scipyen.py pyside6"
-    
-else 
+    if [[ $build_pyside6 -eq 1 ]] ; then
+        scriptfile=${target_dir}/scipyen-pyside6-build
+        launchcmd="${scipyensrcdir}/scipyen.py pyside6"
+        
+    else 
+        scriptfile=${target_dir}/scipyen-pyside6-pypi
+        launchcmd="${scipyensrcdir}/scipyen.py pyside6"
+    fi
+else
     scriptfile=${target_dir}/scipyen
     launchcmd=${scipyensrcdir}/scipyen.py
 fi
@@ -1383,11 +1440,12 @@ echo -e "Will install in ${install_dir}"
 
 # if  [[ ( $with_pyside6 -eq 1 ) || ( $build_pyside6 -eq 1 ) ]] ; then
 if  [[ $with_pyside6 -eq 1 ]] ; then
-    virtual_env_pfx=${virtual_env_pfx}_pyside6_pypi
-elif [[  $build_pyside6 -eq 1 ]] ; then
-    virtual_env_pfx=${virtual_env_pfx}_pyside6_build
+    if [[  $build_pyside6 -eq 1 ]] ; then
+        virtual_env_pfx=${virtual_env_pfx}_pyside6_build
+    else
+        virtual_env_pfx=${virtual_env_pfx}_pyside6_pypi
+    fi
 fi
-
 
 if ! [ -v VIRTUAL_ENV ] ; then
     virtual_env=${install_dir}/${virtual_env_pfx}
@@ -1482,7 +1540,11 @@ if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
     
     # NOTE: install console color schemes
     cd $scipyendir/src/scipyen/gui/scipyen_console_styles
-    pip install .
+    if [ -x ${uv_exec} ] ; then
+        pip install .
+    else
+        ${uv_exec} pip install .
+    fi
     cd $scipyendir
     
 fi
@@ -1499,6 +1561,7 @@ seconds=$(( t ))
 
 echo "Execution time was $days days, $hours hours, $minutes minutes and $seconds seconds"
 echo "Before using Scipyen, either restart the terminal, or call 'source ${rcfile}'"
+echo "Scipyen can be launched by calling ${scriptfile}"
 
 #
 #### END   Main script action happens here ###
