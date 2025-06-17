@@ -5,24 +5,28 @@ import os, inspect, warnings, traceback, datetime, typing
 #### END core python modules
 
 #### BEGIN 3rd party modules
+__has_PySide6__ = False
+if os.environ["QT_API"] == "pyside6":
+    import PySide6
+    from PySide6 import QtCore, QtGui, QtWidgets
+    from PySide6.QtCore import Signal, Slot, Property
+    from PySide6.QtUiTools import loadUiType as __loadUiType__
+    import qtpy
+    qtpy.API = os.environ["QT_API"]
+    __has_PySide6__ = True
+else:
+    import qtpy
+    qtpy.API = os.environ["QT_API"]
+    from qtpy import QtCore, QtGui, QtWidgets
+    from qtpy.QtCore import Signal, Slot, Property
+    from qtpy.uic import loadUiType as __loadUiType__
+
 import pandas as pd
 import quantities as pq
 #import xarray as xa
 import numpy as np
 import neo
 from core.vigra_patches import vigra
-
-import qtpy
-qtpy.API = os.environ["QT_API"]
-if os.environ["QT_API"] == "pyside6":
-    import PySide6
-    from PySide6 import QtCore, QtGui, QtWidgets
-    from PySide6.QtCore import Signal, Slot, Property
-    from PySide6.QtUiTools import loadUiType as __loadUiType__
-else:
-    from qtpy import QtCore, QtGui, QtWidgets
-    from qtpy.QtCore import Signal, Slot, Property
-    from qtpy.uic import loadUiType as __loadUiType__
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -54,7 +58,7 @@ from core.sysutils import adapt_ui_path
 #### BEGIN pict.gui modules
 from gui.scipyenviewer import ScipyenViewer #, ScipyenFrameViewer
 from gui import quickdialog
-from gui import resources_rc
+# from gui import resources_rc
 # from gui import icons_rc
 #### END pict.gui modules
 

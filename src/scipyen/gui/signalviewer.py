@@ -140,16 +140,18 @@ from traitlets import Bunch
 #### END core python modules
 
 #### BEGIN 3rd party modules
-import qtpy
-qtpy.API = os.environ["QT_API"]
-__hasPySide6__=False
+__has_PySide6__=False
 if os.environ["QT_API"] == "pyside6":
     import PySide6
     from PySide6 import QtCore, QtGui, QtWidgets, QtSvg
     from PySide6.QtCore import Signal, Slot
     from PySide6.QtUiTools import loadUiType as __loadUiType__
-    __hasPySide6__=True
+    import qtpy
+    qtpy.API = os.environ["QT_API"]
+    __has_PySide6__=True
 else:
+    import qtpy
+    qtpy.API = os.environ["QT_API"]
     from qtpy import QtCore, QtGui, QtWidgets, QtSvg
     from qtpy.QtCore import Signal, Slot
     from qtpy.uic import loadUiType as __loadUiType__

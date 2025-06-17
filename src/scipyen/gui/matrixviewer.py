@@ -12,12 +12,16 @@ Qt5-based viewer window for two dimensional ndarrays
 import os
 import numpy as np
 from core.vigra_patches import vigra
-import qtpy
-qtpy.API = os.environ["QT_API"]
+__has_PySide6__ = False
 if os.environ["QT_API"] == "pyside6":
     import PySide6
     from PySide6 import QtCore, QtWidgets, QtGui
+    import qtpy
+    qtpy.API = os.environ["QT_API"]
+    __has_PySide6__ = True
 else:
+    import qtpy
+    qtpy.API = os.environ["QT_API"]
     from qtpy import QtCore, QtWidgets, QtGui
 #### END 3rd party modules
 

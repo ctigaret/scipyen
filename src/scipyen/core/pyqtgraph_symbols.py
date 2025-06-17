@@ -4,12 +4,16 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 import os
-import qtpy
-qtpy.API = os.environ["QT_API"]
+__has_PySide6__ = False
 if os.environ["QT_API"] == "pyside6":
     import PySide6
     from PySide6 import (QtCore, QtWidgets, QtGui)
+    import qtpy
+    qtpy.API = os.environ["QT_API"]
+    __has_PySide6__ = True
 else:
+    import qtpy
+    qtpy.API = os.environ["QT_API"]
     from qtpy import (QtCore, QtWidgets, QtGui)
 
 from core.pyqtgraph_patch import pyqtgraph as pg

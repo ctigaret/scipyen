@@ -18,14 +18,17 @@ import quantities as pq
 import numpy as np
 import neo
 from core.vigra_patches import vigra
-
-import qtpy
-qtpy.API = os.environ["QT_API"]
+__has_PySide6__ = False
 if os.environ["QT_API"] == "pyside6":
     import PySide6
     from PySide6 import QtCore, QtGui, QtWidgets
     from PySide6.QtCore import Signal, Slot, Property
+    import qtpy
+    qtpy.API = os.environ["QT_API"]
+    __has_PySide6__ = True
 else:
+    import qtpy
+    qtpy.API = os.environ["QT_API"]
     from qtpy import QtCore, QtGui, QtWidgets
     from qtpy.QtCore import Signal, Slot, Property
 
@@ -57,7 +60,7 @@ from core.datatypes import array_slice
 #### BEGIN pict.gui modules
 # from .scipyenviewer import ScipyenViewer #, ScipyenFrameViewer
 # from . import quickdialog
-from gui import resources_rc
+# from gui import resources_rc
 # from gui import icons_rc
 #### END pict.gui modules
 

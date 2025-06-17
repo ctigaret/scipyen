@@ -23,13 +23,17 @@ import numpy as np
 import quantities as pq
 import neo
 from core.vigra_patches import vigra
-import qtpy
-qtpy.API = os.environ["QT_API"]
+__has_PySide6__ = False
 if os.environ["QT_API"] == "pyside6":
     import PySide6
     from PySide6 import (QtCore, QtWidgets, QtGui,)
     from PySide6.QtCore import Signal, Slot
+    import qtpy
+    qtpy.API = os.environ["QT_API"]
+    __has_PySide6__ = True
 else:
+    import qtpy
+    qtpy.API = os.environ["QT_API"]
     from qtpy import (QtCore, QtWidgets, QtGui,)
     from qtpy.QtCore import Signal, Slot
 #### END 3rd party modules
@@ -54,7 +58,7 @@ import core.datatypes
 
 import iolib.pictio as pio
 
-from gui import resources_rc # as resources_rc
+# from gui import resources_rc # as resources_rc
 # from gui import icons_rc
 from gui import quickdialog as qd
 from gui.triggerdetectgui import TriggerDetectDialog, TriggerDetectWidget

@@ -11,17 +11,20 @@ from dataclasses import MISSING
 from abc import (ABC, ABCMeta, abstractmethod,)
 from traitlets import Bunch
 #from abc import (abstractmethod,)
-
+__has_PySide6__ = False
 has_qtdbus = False
-import qtpy
-qtpy.API = os.environ["QT_API"]
 if os.environ["QT_API"] == "pyside6":
     import PySide6
     from PySide6 import (QtCore, QtWidgets, QtGui)
     from PySide6 import QtDBus
     from PySide6.QtCore import (Signal, Slot, Property,)
+    import qtpy
+    qtpy.API = os.environ["QT_API"]
+    __has_PySide6__ = True
     has_qtdbus = True
 else:
+    import qtpy
+    qtpy.API = os.environ["QT_API"]
     from qtpy import (QtCore, QtWidgets, QtGui)
     from qtpy import QtDBus
     from qtpy.QtCore import (Signal, Slot, Property,)

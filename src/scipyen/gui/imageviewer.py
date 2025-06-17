@@ -69,13 +69,13 @@ import matplotlib as mpl
 
 import qtpy
 qtpy.API = os.environ["QT_API"]
-__hasPySide6__ = False
+__has_PySide6__ = False
 if os.environ["QT_API"] == "pyside6":
     import PySide6
     from PySide6 import QtCore, QtGui, QtWidgets, QtSvg
     from PySide6.QtCore import Signal, Slot, Property
     from PySide6.QtUiTools import loadUiType as __loadUiType__
-    __hasPySide6__ = True
+    __has_PySide6__ = True
 else:
     from qtpy import QtCore, QtGui, QtWidgets, QtSvg
     from qtpy.QtCore import Signal, Slot, Property
@@ -1101,7 +1101,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self._yScaleBar_                    = None
         self._yScaleBarTextItem_            = None
         self._scaleBarTextPen_              = QtGui.QPen(QtCore.Qt.SolidLine)
-        if __hasPySide6__:
+        if __has_PySide6__:
             self._scaleBarPen_ = QtGui.QPen(QtGui.QBrush(self._scaleBarColor_,
                                                          QtCore.Qt.SolidPattern),
                                             2.0, 

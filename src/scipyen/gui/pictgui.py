@@ -47,19 +47,22 @@ from copy import copy
 #### END core python modules
 
 #### BEGIN 3rd party modules
-from core.pyqtgraph_patch import pyqtgraph as pg
-import numpy as np
-
-import qtpy
-qtpy.API = os.environ["QT_API"]
+__has_PySide6__ = False
 if os.environ["QT_API"] == "pyside6":
     import PySide6
     from PySide6 import QtCore, QtGui, QtWidgets, QtXml
     from PySide6.QtCore import Signal, Slot, Property
+    import qtpy
+    qtpy.API = os.environ["QT_API"]
+    __has_PySide6__ = True
 else:
+    import qtpy
+    qtpy.API = os.environ["QT_API"]
     from qtpy import QtCore, QtGui, QtWidgets, QtXml
     from qtpy.QtCore import Signal, Slot, Property
-    pass
+    
+from core.pyqtgraph_patch import pyqtgraph as pg
+import numpy as np
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
@@ -72,7 +75,7 @@ from core.workspacefunctions import debug_scipyen
 
 #### BEGIN pict.gui modules
 from . import quickdialog
-from . import resources_rc # OK this is resources_rc.py
+# from . import resources_rc # OK this is resources_rc.py
 # from . import icons_rc
 # NOTE: 2023-07-12 09:23:22 are these needed here? FIXME/TODO
 from .planargraphics import (Arc, ArcMove, Cubic, Cursor, Ellipse, Line, Move, Path,

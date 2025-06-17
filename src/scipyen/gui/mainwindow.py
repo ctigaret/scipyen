@@ -56,9 +56,7 @@ from collections import deque, ChainMap
 # BEGIN PyQtxxx and utilities for setting GUI appearance
 # print(f"In module: {__name__}: QT_API = {os.environ['QT_API']}, QtAPI.API = {QtAPI.API}, QtAPI.API_NAME = {QtAPI.API_NAME}")
 # might have to force this:
-import qtpy
-qtpy.API = os.environ["QT_API"]
-isPySide6 = False
+__has_PySide6__ = False
 if os.environ["QT_API"] == "pyside6":
     import PySide6
     from PySide6 import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, Shiboken)
@@ -67,8 +65,12 @@ if os.environ["QT_API"] == "pyside6":
     QAction = QtGui.QAction
     QActionGroup = QtGui.QActionGroup
     QShortcut = QtGui.QShortcut
-    isPySide6 = True
+    import qtpy
+    qtpy.API = os.environ["QT_API"]
+    __has_PySide6__ = True
 else:
+    import qtpy
+    qtpy.API = os.environ["QT_API"]
     from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork,)
     from qtpy.QtCore import (Signal, Slot, Property,)
     from qtpy.uic import loadUiType
@@ -322,7 +324,7 @@ from . import scipyen_colormaps as colormaps
 from . import consoles
 from . import scipyenviewer
 from . import quickdialog as qd
-from . import resources_rc #as resources_rc
+# from . import resources_rc #as resources_rc
 # from . import icons_rc
 from . import pictgui as pgui
 from . import xmlviewer as xv
@@ -9228,14 +9230,14 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                     # create/update the menus as provided by the plugin module
                     menudict = collections.OrderedDict([(module.__name__, (module.__file__, module.init_scipyen_plugin()))])
                     if len(menudict) > 0:
-                        # if isPySide6:
+                        # if __has_PySide6__:
                         #     print(f"slot_loadPlugins menus for {module.__name__}, menu dict: {menudict}")
                         for (k, v) in menudict.items():
                             # v[0] is the module.__file__ 
                             # we restrict to regular plugin files, by REQUIRING that
                             # this is a file TODO: 2024-05-29 17:15:26 check it exists !
                             if (isinstance(k, str) and len(k) > 0):
-                                pluginMenuActions = self.installPluginMenuPySide6(k, v) if isPySide6 else self.installPluginMenu(k, v)
+                                pluginMenuActions = self.installPluginMenuPySide6(k, v) if __has_PySide6__ else self.installPluginMenu(k, v)
                                 # print(f"{self.__class__.__name__}.slot_loadPlugins pluginMenuActions = {pluginMenuActions}")
                                 if len(pluginMenuActions):
                                     self._cachePluginActions_(module, pluginMenuActions)
@@ -9302,7 +9304,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             menu tree)
         (c) itemText is the empty string ('') because it denotes a separator
         '''
-        if isPySide6:
+        if __has_PySide6__:
             if qtutils.isQObjectAlive(parent):
                 parentAM = list(map(lambda a: (a.text().replace('&', ''), a.menu()), filter(lambda a: qtutils.isQObjectAlive(a), parent.actions())))
                 if len(parentAM):

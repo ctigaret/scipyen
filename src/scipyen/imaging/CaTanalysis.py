@@ -163,8 +163,7 @@ from IPython.core.magic import (Magics, magics_class, line_magic,
 #### BEGIN 3rd party modules
 from traitlets import Bunch
 
-import qtpy
-qtpy.API = os.environ["QT_API"]
+__has_PySide6__ = False
 if os.environ["QT_API"] == "pyside6":
     import PySide6
     from PySide6 import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork,)
@@ -173,7 +172,12 @@ if os.environ["QT_API"] == "pyside6":
     QAction = QtGui.QAction
     QActionGroup = QtGui.QActionGroup
     QShortcut = QtGui.QShortcut
+    import qtpy
+    qtpy.API = os.environ["QT_API"]
+    __has_PySide6__ = True
 else:
+    import qtpy
+    qtpy.API = os.environ["QT_API"]
     from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork,)
     from qtpy.QtCore import (Signal, Slot, Property,)
     from qtpy.uic import loadUiType as __loadUiType__
@@ -250,7 +254,7 @@ import gui.scipyenviewer as scipyenviewer
 from gui.scipyenviewer import (ScipyenViewer, ScipyenFrameViewer)
 from gui.workspacegui import (WorkspaceGuiMixin, saveWindowSettings, loadWindowSettings)
 from gui.itemslistdialog import ItemsListDialog
-from gui import resources_rc
+# from gui import resources_rc
 # from gui import resources_rc
 #### END pict.gui modules
 
