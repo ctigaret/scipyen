@@ -142,11 +142,13 @@ from traitlets import Bunch
 #### BEGIN 3rd party modules
 import qtpy
 qtpy.API = os.environ["QT_API"]
+__hasPySide6__=False
 if os.environ["QT_API"] == "pyside6":
     import PySide6
     from PySide6 import QtCore, QtGui, QtWidgets, QtSvg
     from PySide6.QtCore import Signal, Slot
     from PySide6.QtUiTools import loadUiType as __loadUiType__
+    __hasPySide6__=True
 else:
     from qtpy import QtCore, QtGui, QtWidgets, QtSvg
     from qtpy.QtCore import Signal, Slot
@@ -541,7 +543,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         r"""SignalViewer constructor.
         TODO: Write docstring!
         """
-        super(QMainWindow, self).__init__(parent)
+        # print(f"{self.__class__.__name__}.__init__: parent is {type(parent)}")
+        # super(QtWidgets.QMainWindow, self).__init__(parent=parent)
         
         self.threadpool = QtCore.QThreadPool()
         

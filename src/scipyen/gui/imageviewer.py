@@ -69,11 +69,13 @@ import matplotlib as mpl
 
 import qtpy
 qtpy.API = os.environ["QT_API"]
+__hasPySide6__ = False
 if os.environ["QT_API"] == "pyside6":
     import PySide6
     from PySide6 import QtCore, QtGui, QtWidgets, QtSvg
     from PySide6.QtCore import Signal, Slot, Property
     from PySide6.QtUiTools import loadUiType as __loadUiType__
+    __hasPySide6__ = True
 else:
     from qtpy import QtCore, QtGui, QtWidgets, QtSvg
     from qtpy.QtCore import Signal, Slot, Property
@@ -1099,11 +1101,18 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self._yScaleBar_                    = None
         self._yScaleBarTextItem_            = None
         self._scaleBarTextPen_              = QtGui.QPen(QtCore.Qt.SolidLine)
-        self._scaleBarPen_                  = QtGui.QPen(QtGui.QBrush(self._scaleBarColor_, 
-                                                                  QtCore.Qt.SolidPattern),
-                                                     2.0,
-                                                     cap = QtCore.Qt.RoundCap,
-                                                     join = QtCore.Qt.RoundJoin)
+        if __hasPySide6__:
+            self._scaleBarPen_ = QtGui.QPen(QtGui.QBrush(self._scaleBarColor_,
+                                                         QtCore.Qt.SolidPattern),
+                                            2.0, 
+                                            c = QtCore.Qt.RoundCap,
+                                            j = QtCore.Qt.RoundJoin)
+        else:
+            self._scaleBarPen_                  = QtGui.QPen(QtGui.QBrush(self._scaleBarColor_, 
+                                                                    QtCore.Qt.SolidPattern),
+                                                        2.0,
+                                                        cap = QtCore.Qt.RoundCap,
+                                                        join = QtCore.Qt.RoundJoin)
         
         #self.qsettings                   = QtCore.QSettings()
         
