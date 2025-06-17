@@ -1031,12 +1031,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.signalsLayout = pg.GraphicsLayout()
         self.signalsLayout.layout.setVerticalSpacing(0)
 
-        styleHint = QtWidgets.QStyle.SH_DitherDisabledText
         
         # NOTE: 2023-04-26 08:41:30
         # goodbye to self.fig - one less symbol to worry about - just assign 
         # directly to self.viewerWidget
         self.viewerWidget = pg.GraphicsLayoutWidget(parent = self.viewerWidgetContainer) 
+        styleHint = QtWidgets.QStyle.SH_DitherDisabledText
         self.viewerWidget.style().styleHint(styleHint)
         
         #self.viewerWidgetLayout.addWidget(self.viewerWidget)
