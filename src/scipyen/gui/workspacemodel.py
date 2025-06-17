@@ -815,15 +815,19 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         if namespace != self.shell.user_ns:
             warnings.warn("Currently, only the internal workspace is supported")
             return
-        
+        # print(f"{self.__class__.__name__}.unbindObjectInNamespace(varname = {varname})")
+        # print(f"{varname} is observed: {varname in self.internalVariablesMonitor.keys()}")
         if varname in namespace:
             if varname not in self.user_ns_hidden:
                 # NOTE: 2023-06-07 08:34:57
                 # emulates a console execution
                 self.preExecute()
                 obj = namespace.pop(varname)
+                # self.__changes__[varname]=WorkspaceVarChange.Removed
                 self.postRunCell(Bunch(success=True))
                 return obj
+            
+        # print(f"{self.__class__.__name__}.unbindObjectInNamespace(varname = {varname}) not found")
             
     def rebindObjectInNamespace(self, old_name:str, new_name:str,
                                 namespace:typing.Optional[dict] = None):
@@ -864,6 +868,9 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # QtCore.QTimer.singleShot(0, self._observe_wrapper_)
         # connected to self._slot_internalVariableChanged_, def'ed below
         # print(f"\n{self.__class__.__name__}.internalVariablesListenerCB({change})")
+        if change.type not in ("remove", "removed"):
+            if change.name not in self.shell.user_ns:
+                change.type = "remove"
         self.internalVariableChanged.emit(change)
         
     @Slot(dict)
@@ -874,6 +881,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         else:
             name = change["name"]
             change_type = change["change_type"]
+            
+        # print(f"{self.__class__.__name__}._slot_cacheInternalVariableChange_: change_type = {change_type}")
             
         if change_type == "new":
             self.__changes__[name] = WorkspaceVarChange.New
@@ -1161,8 +1170,9 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     def preRunCell(self, info):
         r"""Use this function EXCLUSIVELY for debugging"""
         # print(f"\n{self.__class__.__name__}.preRunCell info = {info}")
+        pass
 
-    def postRunCell(self, result):
+    def postRunCell(self, result:Bunch):
         # print(f"\n{self.__class__.__name__}.postRunCell result = {result}")
         if hasattr(result, "result"):
             # NOTE: 2023-06-06 12:56:44
@@ -1792,6 +1802,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
 
         # names still in internalVariablesMonitor but not in user namespace anymore
         del_vars = observed_varnames - current_user_varnames
+        # print(f"{self.__class__.__name__}.updateModel del_vars = {del_vars}")
 
         # current variable names in the namespace, which should be available to
         # the user - CAUTION this scales with 𝒪(n) !
@@ -1837,6 +1848,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         r"""Triggered by self.sig_startAsyncUpdate signal.
         This signal is emitted by self.update() and self._updateModel_()
         """
+        # print(f"{self.__class__.__name__}._slot_updateModelAsync_ -> self.__changes__ = {self.__changes__}")
         if len(self.__changes__) == 0:
             return
         

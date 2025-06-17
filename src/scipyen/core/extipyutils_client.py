@@ -83,7 +83,7 @@ if os.environ["QT_API"] == "pyside6":
 else:
     qtPackages = ", ".join([p for p in qtpy.__dict__.keys() if p.startswith("Qt") and isinstance(qtpy.__dict__[p], types.ModuleType)])
 
-print(f"extipyutils_client: QT API is {qtpy.API}")
+# print(f"extipyutils_client: QT API is {qtpy.API}")
 
 
 #from contextlib import contextmanager

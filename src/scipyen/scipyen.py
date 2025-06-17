@@ -153,7 +153,8 @@ else:
     appName = "Scipyen"
     has_sip = True
 
-print(f"scipyen.py: qtpy.API is {qtpy.API}")
+if os.environ["QT_API"] != "pyqt5":
+    print(f"scipyen.py: qtpy.API is {qtpy.API}")
 
 # NOTE: 2024-05-02 09:46:11
 # you still need the QT_API in the environment

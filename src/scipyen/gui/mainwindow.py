@@ -75,7 +75,9 @@ else:
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
-print(f"gui.mainwindow using QT API: {qtpy.API}")
+    
+# if os.environ["QT_API"] != "pyqt5":
+#     print(f"gui.mainwindow using QT API: {qtpy.API}")
 
 # try:
 #     from qtpy import sip as sip

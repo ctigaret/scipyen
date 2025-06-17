@@ -765,8 +765,7 @@ class DataBag(Bunch):
                 # make sure we notify
                 obs._notify_trait(key, old_value, Undefined, "removed")
 
-            object.__getattribute__(self, "__hidden__")[
-                "length"] = len(obs.traits())
+            object.__getattribute__(self, "__hidden__")["length"] = len(obs.traits())
 
         except:
             raise  # KeyError("%s" % key)
