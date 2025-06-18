@@ -619,6 +619,7 @@ function dopyside6 ()
             cd ${VIRTUAL_ENV}/src
             git clone https://code.qt.io/pyside/pyside-setup
             cd pyside-setup && git checkout 6.9
+#             cd pyside-setup && git checkout 6.8
             if [ -z ${uv_exec} ] ; then
                 pip install -r requirements.txt
                 pip install -r requirements-doc.txt
