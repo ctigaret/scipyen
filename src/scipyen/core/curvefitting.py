@@ -858,15 +858,18 @@ def scale_fit_wave2(x, y, p0 = (1,0)):
     return res
     
 def fit_nsfa(data, p0, **kwargs):
-    r"""Fit the parabola y = x * i - x²/N + b through the observed variable data.
+    r"""Fit the parabola y = x * i - x²/N + b through the data.
     Parameters:
     ===========
-    data: the observed variable
-    p0: tuple with the model parameters i, N, b
+    data: the observed variable — the variance of the current (peak-scaled decays)
+    p0: tuple with the model parameters i₀, N₀, b₀
+    
+    Reminder:
+    x = 
     
     Var-keyword parameters:
     =======================
-    x: the independent variable
+    x: the independent variable — the "mean current" in the variance vs current plot
     
     The following are passed directly to scipy.optimize.least_squares:
     bounds, jac, method, ftol, xtol, gtol, x_scale, loss, f_scale, max_nfev,
@@ -892,6 +895,10 @@ def fit_nsfa(data, p0, **kwargs):
     jac_sparsity = None
     verbose      = 0
     
+    References:
+    ===========
+    Benke & Collingridge, Sigworth, etc
+    
     
     """
     jac         = kwargs.pop("jac",         "2-point")
@@ -912,7 +919,7 @@ def fit_nsfa(data, p0, **kwargs):
     x           = kwargs.pop("x",           None)
     
     def __cost_fun__(x, t, y, *args, **kwargs):  # returns residuals
-        yf = models.nsfa(t, x)
+        yf = models.nsfa(t, *x)
         
         ret = y-yf
         
@@ -1035,7 +1042,7 @@ def fit_nsfa(data, p0, **kwargs):
     
     res_x = list(res.x.flatten())
 
-    fC = models.nsfa(xdata, res_x)
+    fC = models.nsfa(xdata, *res_x)
     
     sst = np.sum( (ydata - ydata.mean()) ** 2.)
     

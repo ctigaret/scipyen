@@ -298,7 +298,7 @@ def alphaFunction_model(x:np.ndarray | float,
     r"""Alias to alphaFunction with coefficients packed in an array-like object"""
     return alphaFunction(x, *parameters)
 
-def nfsa(x:np.ndarray | float, 
+def nsfa(x:np.ndarray | float, 
          i:float|pq.Quantity, n:float|pq.Quantity, b: float|pq.Quantity) -> np.ndarray | float:
     r"""
         y = x * i - x²/N + b
@@ -310,7 +310,7 @@ def nfsa(x:np.ndarray | float,
         
     x = x.flatten()
     
-    return x*i - x**2 / N + b
+    return x*i - x**2 / n + b
     
 
 def nsfa_model(x:np.ndarray | float, parameters:typing.Sequence[float]) -> np.ndarray | float:

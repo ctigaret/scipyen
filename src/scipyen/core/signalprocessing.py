@@ -2673,7 +2673,7 @@ def peak_normalise_signal(
     minIndex: typing.Optional[int] = None,
     maxIndex: typing.Optional[int] = None,
 ):
-    r"""Returns a peak-normalized copy of the I(V) curve
+    r"""Returns a peak-normalized copy of the signal
 
     Positional parameters:
     ----------------------
