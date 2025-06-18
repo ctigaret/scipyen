@@ -266,13 +266,20 @@ function installpipreqs_part1 ()
         exit 1
     fi
     
-#     if [[ ( $with_pyside6 -eq 1 ) || ( $build_pyside6 -eq 1 ) ]] ; then
     if [[ $with_pyside6 -eq 1 ]] ; then
         if [[ $build_pyside6 -eq 1 ]] ; then
             reqfile="$installscriptdir"/pip_requirements_linux_1_pyside6_build.txt
         else
             reqfile="$installscriptdir"/pip_requirements_linux_1_pyside6_pypi.txt
         fi
+        
+    elif [[ $with_pyst6 -eq 1 ]] ; then
+        if [[ $build_pyqt6 -eq 1 ]] ; then
+            reqfile="$installscriptdir"/pip_requirements_linux_1_pyqt6_build.txt
+        else
+            reqfile="$installscriptdir"/pip_requirements_linux_1_pyqt6_pypi.txt
+        fi
+        
     else
         reqfile="$installscriptdir"/pip_requirements_linux_1.txt
     fi
@@ -481,7 +488,7 @@ function dopyqt6 ()
     fi
     
     if [ ! -r ${VIRTUAL_ENV}/.pyqt6done ] || [[ $reinstall_pyqt6 -gt 0 ]]; then
-        if [[ $build_pyqt6 -gt 0 ]] ; then
+        if [[ $build_pyqt6 -eq 1 ]] ; then
             mkdir -p ${VIRTUAL_ENV}/src && cd ${VIRTUAL_ENV}/src
             
             findqmake6
@@ -588,7 +595,11 @@ function dopyqt6 ()
                 fi
             fi
         else
-            pip install pyqt6
+            if [ -z ${uv_exec} ] ; then
+                pip install pyqt6
+            else
+                ${uv_exec} pip install pyqt6
+            fi
         fi
     fi
 }
@@ -736,12 +747,22 @@ function make_desktop_entry ()
 {
 target_dir=${HOME}/bin
 if [[ $with_pyside6 -eq 1 ]] ; then
-    desktopfile=Scipyen-pyside6-pypi.desktop
-    scriptfile=${target_dir}/scipyen-pysid6-pypi
-elif [[ $build_pyside6 -eq 1 ]] ; then
-    desktopfile=Scipyen-pyside6-build.desktop
-    scriptfile=${target_dir}/scipyen-pysid6-build
-else 
+    if [[ $build_pyside6 -eq 1 ]] ; then
+        desktopfile=Scipyen-pyside6-build.desktop
+        scriptfile=${target_dir}/scipyen-pyside6-build
+    else 
+        desktopfile=Scipyen-pyside6-pypi.desktop
+        scriptfile=${target_dir}/scipyen-pyside6-pypi
+    fi
+elif [[ $with_pyqt6 -eq 1 ]] ; then
+    if [[ $build_pyqt6 -eq 1 ]] ; then
+        desktopfile=Scipyen-pyqt6-build.desktop
+        scriptfile=${target_dir}/scipyen-pyqt6-build
+    else 
+        desktopfile=Scipyen-pyqt6-pypi.desktop
+        scriptfile=${target_dir}/scipyen-pyqt6-pypi
+    fi
+else
     desktopfile=Scipyen.desktop
     scriptfile=${target_dir}/scipyen
 fi
@@ -1001,10 +1022,19 @@ shopt -u lastpipe
 function update_bashrc () 
 {
 if [[ $with_pyside6 -eq 1 ]] ; then
-    rcfile=${HOME}/.scipyen_pyside6_pypi_rc
-elif [[ $build_pyside6 -eq 1 ]] ; then
-    rcfile=${HOME}/.scipyen_pyside6_build_rc
-else 
+    if [[ $build_pyside6 -eq 1 ]] ; then
+        rcfile=${HOME}/.scipyen_pyside6_build_rc
+    else 
+        rcfile=${HOME}/.scipyen_pyside6_pypi_rc
+    fi
+    
+elif [[ $with_pyqt5 -eq 1 ]] ; then
+    if [[ $build_pyqt6 -eq 1 ]] ; then
+        rcfile=${HOME}/.scipyen_pyqt6_build_rc
+    else
+        rcfile=${HOME}/.scipyen_pyqt6_pypi_rc
+    fi
+else
     rcfile=${HOME}/.scipyenrc
 fi
 
@@ -1118,6 +1148,16 @@ if [[ $with_pyside6 -eq 1 ]] ; then
         scriptfile=${target_dir}/scipyen-pyside6-pypi
         launchcmd="${scipyensrcdir}/scipyen.py pyside6"
     fi
+
+elif [[ $with_pyqt6 -eq 1 ]] ; then
+    if [[ $build_pyqt6 -eq 1 ]] ; then
+        scriptfile=${target_dir}/scipyen-pyqt6-build
+        launchcmd="${scipyensrcdir}/scipyen.py pyqt6"
+    else
+        scriptfile=${target_dir}/scipyen-pyqt6-pypi
+        launchcmd="${scipyensrcdir}/scipyen.py pyqt6"
+    fi
+
 else
     scriptfile=${target_dir}/scipyen
     launchcmd=${scipyensrcdir}/scipyen.py
@@ -1448,6 +1488,12 @@ if  [[ $with_pyside6 -eq 1 ]] ; then
     else
         virtual_env_pfx=${virtual_env_pfx}_pyside6_pypi
     fi
+elif [[ $with_pyqt6 -eq 1 ]] ; then
+    if [[ $build_pyqt6 -eq 1 ]] ; then
+        virtual_env_pfx=${virtual_env_pfx}_pyqt6_build
+    else
+        virtual_env_pfx=${virtual_env_pfx}_pyqt6_pypi
+    fi
 fi
 
 if ! [ -v VIRTUAL_ENV ] ; then
@@ -1514,8 +1560,10 @@ if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
     
     if  [[ ( $with_pyside6 -eq 1 ) || ( $build_pyside6 -eq 1 ) ]]  ; then
         dopyside6
+    elif [[ ( $with_pyqt6 -eq 1 ) || ( $build_pyqt6 -eq 1 ) ]] ; then
+        dopyqt6
     else
-        doipyqt5 
+        dopyqt5 
     fi
     
     # NOTE: 2025-03-13 11:01:07 TODO/FIXME

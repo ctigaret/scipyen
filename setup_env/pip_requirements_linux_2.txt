@@ -158,6 +158,7 @@ nose
 notebook
 notebook_shim
 nuitka
+numba
 numpy           
 octave_kernel
 pandas
