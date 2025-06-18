@@ -5746,7 +5746,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                      self.scriptsAction, self.applicationsAction, 
                      self.helpTbAction, self.settingsAction)
         
-        if os.environ["QT_API"] in ("pyqt5", "pyside2"):
+        if os.environ["QT_API"] in ("pyqt5", "pyqt6"):
             tw = (w for w in itertools.chain(*(a.associatedWidgets()
                 for a in tbactions)) if w is not self.toolBar)
         else:
@@ -5757,7 +5757,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         for w in tw:
             w.setPopupMode(QtWidgets.QToolButton.InstantPopup)
             
-        if os.environ["QT_API"] in ("pyqt5", "pyside2"):
+        if os.environ["QT_API"] in ("pyqt5", "pyqt6"):
             self.tbOpen = [w for w in self.actionOpen.associatedWidgets() if isinstance(w, QtWidgets.QToolButton)][0]
         else:
             self.tbOpen = [w for w in self.actionOpen.associatedObjects() if isinstance(w, QtWidgets.QToolButton)][0]
@@ -5765,7 +5765,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.tbOpen.setPopupMode(QtWidgets.QToolButton.MenuButtonPopup)
         self.tbOpen.setMenu(self.recentFilesMenu)
         
-        if os.environ["QT_API"] in ("pyqt5", "pyside2"):
+        if os.environ["QT_API"] in ("pyqt5", "pyqt6"):
             self.tbChDir = [w for w in self.actionChange_Working_Directory.associatedWidgets() if isinstance(w, QtWidgets.QToolButton)][0]
         else:
             self.tbChDir = [w for w in self.actionChange_Working_Directory.associatedObjects() if isinstance(w, QtWidgets.QToolButton)][0]

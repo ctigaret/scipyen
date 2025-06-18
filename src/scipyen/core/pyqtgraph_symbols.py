@@ -4,17 +4,31 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 import os
-__has_PySide6__ = False
+__has_PySide6__=False
 if os.environ["QT_API"] == "pyside6":
     import PySide6
-    from PySide6 import (QtCore, QtWidgets, QtGui)
+    from PySide6 import QtCore, QtGui, QtWidgets, QtSvg
+    from PySide6.QtCore import Signal, Slot
+    from PySide6.QtUiTools import loadUiType as __loadUiType__
     import qtpy
     qtpy.API = os.environ["QT_API"]
-    __has_PySide6__ = True
+    os.environ["PYQTGRAPH_QT_LIB"] = "PySide6"
+    os.environ["FORCE_QT_API"] = "1"
+    __has_PySide6__=True
+elif os.environ["QT_API"] == "pyqt6":
+    import qtpy
+    qtpy.API = os.environ["QT_API"]
+    os.environ["PYQTGRAPH_QT_LIB"] = "PyQt6"
+    os.environ["FORCE_QT_API"] = "1"
+    from qtpy import QtCore, QtGui, QtWidgets, QtSvg
+    from qtpy.QtCore import Signal, Slot
+    from qtpy.uic import loadUiType as __loadUiType__
 else:
     import qtpy
     qtpy.API = os.environ["QT_API"]
-    from qtpy import (QtCore, QtWidgets, QtGui)
+    from qtpy import QtCore, QtGui, QtWidgets, QtSvg
+    from qtpy.QtCore import Signal, Slot
+    from qtpy.uic import loadUiType as __loadUiType__
 
 from core.pyqtgraph_patch import pyqtgraph as pg
 

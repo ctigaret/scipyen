@@ -11,7 +11,17 @@ if os.environ["QT_API"] == "pyside6":
     from PySide6.QtUiTools import loadUiType as __loadUiType__
     import qtpy
     qtpy.API = os.environ["QT_API"]
+    os.environ["PYQTGRAPH_QT_LIB"] = "PySide6"
+    os.environ["FORCE_QT_API"] = "1"
     __has_PySide6__=True
+elif os.environ["QT_API"] == "pyqt6":
+    import qtpy
+    qtpy.API = os.environ["QT_API"]
+    os.environ["PYQTGRAPH_QT_LIB"] = "PyQt6"
+    os.environ["FORCE_QT_API"] = "1"
+    from qtpy import QtCore, QtGui, QtWidgets, QtSvg
+    from qtpy.QtCore import Signal, Slot
+    from qtpy.uic import loadUiType as __loadUiType__
 else:
     import qtpy
     qtpy.API = os.environ["QT_API"]

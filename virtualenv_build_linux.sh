@@ -273,7 +273,7 @@ function installpipreqs_part1 ()
             reqfile="$installscriptdir"/pip_requirements_linux_1_pyside6_pypi.txt
         fi
         
-    elif [[ $with_pyst6 -eq 1 ]] ; then
+    elif [[ $with_pyqt6 -eq 1 ]] ; then
         if [[ $build_pyqt6 -eq 1 ]] ; then
             reqfile="$installscriptdir"/pip_requirements_linux_1_pyqt6_build.txt
         else

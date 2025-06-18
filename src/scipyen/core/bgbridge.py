@@ -43,14 +43,16 @@ import numpy as np
 import pandas as pd
 import quantities as pq
 
-import qtpy
-qtpy.API = os.environ["QT_API"]
 if os.environ["QT_API"] == "pyside6":
     import PySide6
+    import qtpy
+    qtpy.API = os.environ["QT_API"]
     from PySide6 import (QtCore, QtWidgets, QtGui)
     from PySide6.QtCore import (Signal, Slot, Property)
     
 else:
+    import qtpy
+    qtpy.API = os.environ["QT_API"]
     from qtpy import (QtCore, QtWidgets, QtGui)
     from qtpy.QtCore import (Signal, Slot, Property)
     

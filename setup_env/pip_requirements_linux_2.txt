@@ -158,7 +158,7 @@ nose
 notebook
 notebook_shim
 nuitka
-numba
+numba>=0.60.0 # needed to get llvmlite and brainglobe installed un environemnts using python 3.13.3
 numpy           
 octave_kernel
 pandas

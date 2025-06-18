@@ -50,7 +50,5 @@ MarkupSafe
 dbus-python ; sys_platform == "linux"
 Pillow
 PyLEMS
-# PyQt-builder ; sys_platform == 'linux'
-# Pyqt5-sip ; sys_platform == 'linux'
-# qtpy
+llvmlite
 

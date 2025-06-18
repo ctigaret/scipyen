@@ -46,12 +46,14 @@ from copy import (deepcopy, copy,)
 
 #### BEGIN 3rd party modules
 
-import qtpy
-qtpy.API = os.environ["QT_API"]
 if os.environ["QT_API"] == "pyside6":
     import PySide6
     from PySide6 import (QtGui, QtCore, QtWidgets,)
+    import qtpy
+    qtpy.API = os.environ["QT_API"]
 else:
+    import qtpy
+    qtpy.API = os.environ["QT_API"]
     from qtpy import (QtGui, QtCore, QtWidgets,)
     
 import numpy as np
