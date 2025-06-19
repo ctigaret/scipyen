@@ -96,22 +96,22 @@ if sys.platform.startswith("linux"):
 # restrict support for pyqt5, pyqt6, and pyside6 ONLY
 # pyqt5 remains the default (for now)
 #
-if len(sys.argv) > 1:
-    if "pyqt6" in sys.argv:
-        os.environ["QT_API"] = "pyqt6"
-        os.environ["PYQTGRAPH_QT_LIB"] = "PyQt6"
-        os.environ["FORCE_QT_API"] = "1"
-        
-    elif "pyside6" in sys.argv:
-        os.environ["QT_API"] = "pyside6"
-        os.environ["PYQTGRAPH_QT_LIB"] = "PySide6"
-        os.environ["FORCE_QT_API"] = "1"
-        
-    else:
-        os.environ["QT_API"] = "pyqt5"
-        os.environ["PYQTGRAPH_QT_LIB"] = "PyQt5"
-        os.environ["FORCE_QT_API"] = "1"
-        
+# if len(sys.argv) > 1:
+#     if "pyqt6" in sys.argv:
+#         os.environ["QT_API"] = "pyqt6"
+#         os.environ["PYQTGRAPH_QT_LIB"] = "PyQt6"
+#         os.environ["FORCE_QT_API"] = "1"
+#         
+#     elif "pyside6" in sys.argv:
+#         os.environ["QT_API"] = "pyside6"
+#         os.environ["PYQTGRAPH_QT_LIB"] = "PySide6"
+#         os.environ["FORCE_QT_API"] = "1"
+#         
+#     else:
+#         os.environ["QT_API"] = "pyqt5"
+#         os.environ["PYQTGRAPH_QT_LIB"] = "PyQt5"
+#         os.environ["FORCE_QT_API"] = "1"
+#         
 
 #import cProfile
 __version__ = "0.0.1"

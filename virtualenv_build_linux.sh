@@ -1200,6 +1200,16 @@ END
 if [[ ( $with_pyside6 -eq 1 ) || ( $build_pyside6 -eq 1 ) ]] ; then
 cat <<END >> ${scriptfile} 
 export QT_API="pyside6"
+export PYQTGRAPH_QT_LIB="PySide6"
+export FORCE_QT_API="1"
+
+END
+elif [[ ( $with_pyqt6 -eq 1 ) || ( $build_pyqt6 -eq 1 ) ]] ; then
+cat <<END >> ${scriptfile} 
+export QT_API="pyqt6"
+export PYQTGRAPH_QT_LIB="PyQt6"
+export FORCE_QT_API="1"
+
 END
 fi
 cat <<END >> ${scriptfile} 
