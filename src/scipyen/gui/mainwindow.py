@@ -54,25 +54,23 @@ from collections import deque, ChainMap
 # BEGIN 3rd party modules
 
 # BEGIN PyQtxxx and utilities for setting GUI appearance
-# print(f"In module: {__name__}: QT_API = {os.environ['QT_API']}, QtAPI.API = {QtAPI.API}, QtAPI.API_NAME = {QtAPI.API_NAME}")
-# might have to force this:
+import qtpy
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
+from qtpy.QtCore import (Signal, Slot, Property,)
 __has_PySide6__ = False
+__has_PyQt6__ =False
 if os.environ["QT_API"] == "pyside6":
+    __has_PySide6__ = True
     import PySide6
-    from PySide6 import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, Shiboken)
-    from PySide6.QtCore import (Signal, Slot, Property,)
+    from PySide6 import Shiboken
+    # from PySide6.QtCore import (Signal, Slot, Property,)
     from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
     QActionGroup = QtGui.QActionGroup
     QShortcut = QtGui.QShortcut
-    import qtpy
-    qtpy.API = os.environ["QT_API"]
-    __has_PySide6__ = True
 else:
-    import qtpy
-    qtpy.API = os.environ["QT_API"]
-    from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork,)
-    from qtpy.QtCore import (Signal, Slot, Property,)
+    if os.environ["QT_API"] == "pyqt6":
+        __has_PyQt6__ = True
     from qtpy.uic import loadUiType
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
@@ -1429,7 +1427,12 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         parent: QtWidgets.QWidget or None (default).
         """
         # WindowManager.__init__(self, parent)
-        super().__init__(parent)
+        # super().__init__(parent=parent)
+        
+        if __has_PyQt6__:
+            QtWidgets.QMainWindow.__init__(parent)
+        else:
+            super().__init__(parent)
 
         # gui_viewers defined in gui package (see gui/__init__.py)
         # self.viewers = dict(map(lambda x: (x, list()), gui_viewers))
@@ -1586,6 +1589,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         else:
             WorkspaceGuiMixin.__init__(self, parent=self)  # , settings=settings)
             self.scriptsManager = ScriptManager(parent=self)
+            
         self.scriptsManager.signal_executeScript[str].connect(
             self._slot_runPythonScriptFromManager)
         self.scriptsManager.signal_importScript[str].connect(

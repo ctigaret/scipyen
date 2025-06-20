@@ -141,6 +141,7 @@ from traitlets import Bunch
 
 #### BEGIN 3rd party modules
 __has_PySide6__=False
+__has_PyQt6__ = False
 if os.environ["QT_API"] == "pyside6":
     import PySide6
     from PySide6 import QtCore, QtGui, QtWidgets, QtSvg
@@ -148,8 +149,8 @@ if os.environ["QT_API"] == "pyside6":
     from PySide6.QtUiTools import loadUiType as __loadUiType__
     import qtpy
     qtpy.API = os.environ["QT_API"]
-    os.environ["PYQTGRAPH_QT_LIB"] = "PySide6"
-    os.environ["FORCE_QT_API"] = "1"
+    # os.environ["PYQTGRAPH_QT_LIB"] = "PySide6"
+    # os.environ["FORCE_QT_API"] = "1"
     __has_PySide6__=True
 elif os.environ["QT_API"] == "pyqt6":
     import qtpy
@@ -159,6 +160,7 @@ elif os.environ["QT_API"] == "pyqt6":
     from qtpy import QtCore, QtGui, QtWidgets, QtSvg
     from qtpy.QtCore import Signal, Slot
     from qtpy.uic import loadUiType as __loadUiType__
+    __has_PyQt6__ = True
 else:
     import qtpy
     qtpy.API = os.environ["QT_API"]

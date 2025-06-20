@@ -9,25 +9,39 @@ import sys, os, typing, collections, pathlib, tarfile, dataclasses
 import inspect, functools, traceback
 from dataclasses import MISSING
 from functools import (singledispatch, singledispatchmethod)
+
 import qtpy
-qtpy.API = os.environ["QT_API"]
+from qtpy import (QtCore, QtNetwork)
+from qtpy.QtCore import (Signal, Slot, Property)
+
+__has_PySide6__ = False
+__has_PyQt6__  = False
 if os.environ["QT_API"] == "pyside6":
-    import PySide6
-    from PySide6 import Shiboken
-    from PySide6 import QtCore, QtGui, QtWidgets, QtSvg, QtNetwork
-    from PySide6.QtCore import Signal, Slot, Property
-    from PySide6.QtUiTools import loadUiType as __loadUiType__
-    QtType = typing.TypeVar("QtType", bound="Shiboken.Object")
+    __has_PySide6__ = True
+    QtType = typing.TypeVar("QtType", bound = "Shiboken.Object")
+elif os.environ["QT_API"] == "pyqt6":
+    __has_PyQt6__ = True
+    from qtpy import sip
+    __has_sip__ = True
+    QtType = typing.TypeVar("QtType", bound = "sip.wrappertype")
 else:
     from qtpy import sip
-    from qtpy import QtCore, QtGui, QtWidgets, QtSvg, QtNetwork, sip
-    from qtpy.QtCore import Signal, Slot, Property
-    from qtpy.uic import loadUiType as __loadUiType__
+    __has_sip__ = True
     QtType = typing.TypeVar("QtType", bound = "sip.wrappertype")
     
 from core.prog import (safewrapper, scipywarn, print_styled)
 from core.sysutils import adapt_ui_path
 from gui.widgets.cancellableqprogressbar import CancellableQProgressBar
+__module_path__ = os.path.abspath(os.path.dirname(__file__))
+
+QtReplyNetworkErrors = dict((name, val) for name, val in vars(QtNetwork.QNetworkReply).items() if isinstance(val, QtNetwork.QNetworkReply.NetworkError))
+
+QDefaultTransferTimeoutConstant = QtNetwork.QNetworkRequest.TransferTimeoutConstant.DefaultTransferTimeoutConstant
+    
+from core.prog import (safewrapper, scipywarn, print_styled)
+from core.sysutils import adapt_ui_path
+from gui.widgets.cancellableqprogressbar import CancellableQProgressBar
+
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
 QtReplyNetworkErrors = dict((name, val) for name, val in vars(QtNetwork.QNetworkReply).items() if isinstance(val, QtNetwork.QNetworkReply.NetworkError))
@@ -44,7 +58,7 @@ class ScipyenNetworkManager(QtCore.QObject):
     sig_networkError = Signal(object,name="sig_networkError")
     defaultMaxDownloadSizeForProgressBar = 2147483647
     
-    def __init__(self, timeout_ms:int=QtNetwork.QNetworkRequest.DefaultTransferTimeoutConstant,
+    def __init__(self, timeout_ms:int = QDefaultTransferTimeoutConstant,
                  replyHandler:typing.Optional[typing.Callable] = None,
                  progressUIFactory:typing.Optional[QtType]=None,
                  parent:typing.Optional[QtCore.QObject] = None):

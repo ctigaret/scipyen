@@ -1142,26 +1142,27 @@ target_dir=${HOME}/bin
 if [[ $with_pyside6 -eq 1 ]] ; then
     if [[ $build_pyside6 -eq 1 ]] ; then
         scriptfile=${target_dir}/scipyen-pyside6-build
-        launchcmd="${scipyensrcdir}/scipyen.py pyside6"
+#         launchcmd="${scipyensrcdir}/scipyen.py pyside6"
         
     else 
         scriptfile=${target_dir}/scipyen-pyside6-pypi
-        launchcmd="${scipyensrcdir}/scipyen.py pyside6"
+#         launchcmd="${scipyensrcdir}/scipyen.py pyside6"
     fi
 
 elif [[ $with_pyqt6 -eq 1 ]] ; then
     if [[ $build_pyqt6 -eq 1 ]] ; then
         scriptfile=${target_dir}/scipyen-pyqt6-build
-        launchcmd="${scipyensrcdir}/scipyen.py pyqt6"
+#         launchcmd="${scipyensrcdir}/scipyen.py pyqt6"
     else
         scriptfile=${target_dir}/scipyen-pyqt6-pypi
-        launchcmd="${scipyensrcdir}/scipyen.py pyqt6"
+#         launchcmd="${scipyensrcdir}/scipyen.py pyqt6"
     fi
 
 else
     scriptfile=${target_dir}/scipyen
-    launchcmd=${scipyensrcdir}/scipyen.py
+#     launchcmd=${scipyensrcdir}/scipyen.py
 fi
+launchcmd=${scipyensrcdir}/scipyen.py
 
 
 echo -e "\nCreating ${scriptfile} launch script \n"
@@ -1211,6 +1212,7 @@ export PYQTGRAPH_QT_LIB="PyQt6"
 export FORCE_QT_API="1"
 
 END
+
 fi
 cat <<END >> ${scriptfile} 
 ${python_executable} -Xfrozen_modules=off ${launchcmd} "\$*"

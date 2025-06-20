@@ -13,16 +13,38 @@ from pprint import pprint
 #### BEGIN Configurable objects with traitlets.config
 from traitlets import (config, Bunch)
 #### END Configurable objects with traitlets.config
-import matplotlib as mpl
 import qtpy
-qtpy.API = os.environ["QT_API"]
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
+from qtpy.QtCore import (Signal, Slot, Property,)
+__has_PySide6__ = False
+__has_PyQt6__ =False
 if os.environ["QT_API"] == "pyside6":
+    __has_PySide6__ = True
     import PySide6
-    from PySide6 import (QtCore, QtWidgets, QtGui)
-    from PySide6.QtCore import (Signal, Slot, Property)
+    from PySide6 import Shiboken
+    # from PySide6.QtCore import (Signal, Slot, Property,)
+    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    QShortcut = QtGui.QShortcut
 else:
-    from qtpy import (QtCore, QtWidgets, QtGui)
-    from qtpy.QtCore import (Signal, Slot, Property)
+    if os.environ["QT_API"] == "pyqt6":
+        __has_PyQt6__ = True
+    from qtpy.uic import loadUiType
+    QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
+    
+import matplotlib as mpl
+# import qtpy
+# qtpy.API = os.environ["QT_API"]
+# if os.environ["QT_API"] == "pyside6":
+#     import PySide6
+#     from PySide6 import (QtCore, QtWidgets, QtGui)
+#     from PySide6.QtCore import (Signal, Slot, Property)
+# else:
+#     from qtpy import (QtCore, QtWidgets, QtGui)
+#     from qtpy.QtCore import (Signal, Slot, Property)
 
 from core.utilities import safewrapper
 from core.workspacefunctions import (user_workspace, validate_varname, get_symbol_in_namespace)

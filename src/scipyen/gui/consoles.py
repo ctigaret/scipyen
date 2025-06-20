@@ -53,22 +53,42 @@ from functools import partial, partialmethod
 from collections import OrderedDict
 from warnings import warn
 
-
 import qtpy
-qtpy.API = os.environ["QT_API"]
+from qtpy import (QtCore, QtGui, QtWidgets)
+from qtpy.QtCore import (Signal, Slot)
+
+__has_PySide6__ = False
+__has_PyQt6__  = False
 if os.environ["QT_API"] == "pyside6":
-    import PySide6
-    from PySide6 import (QtCore, QtGui, QtWidgets, )
-    from PySide6.QtCore import (Signal, Slot, )
+    __has_PySide6__ = True
+    # QtType = typing.TypeVar("QtType", bound = "Shiboken.Object")
     QAction = QtGui.QAction
     QActionGroup = QtGui.QActionGroup
     QShortcut = QtGui.QShortcut
-else:
-    from qtpy import (QtCore, QtGui, QtWidgets, )
-    from qtpy.QtCore import (Signal, Slot, )
+elif os.environ["QT_API"] == "pyqt6":
+    __has_PyQt6__ = True
+    from qtpy import sip
+    __has_sip__ = True
+    # QtType = typing.TypeVar("QtType", bound = "sip.wrappertype")
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
+else:
+    from qtpy import sip
+    __has_sip__ = True
+    QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
+    # QtType = typing.TypeVar("QtType", bound = "sip.wrappertype")
+
+has_qtdbus = False
+try:
+    from qtpy import QtDBus
+
+    has_qtdbus = True
+except:
+    pass
+
 #### BEGIN ipython/jupyter modules
 from traitlets.config.application import boolean_flag
 from traitlets.config.application import catch_config_error
@@ -147,8 +167,12 @@ else:
 
 #makeConfigurable = WorkspaceGuiMixin.makeConfigurable
 
-consoleLayoutDirection = OrderedDict(sorted(( (name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.LayoutDirection) ) , 
-                                            key = lambda x: x[1]))
+if __has_PyQt6__ or __has_PySide6__:
+    consoleLayoutDirection = OrderedDict(sorted(( (name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.LayoutDirection) ) , 
+                                                key = lambda x: x[1].value))
+else:
+    consoleLayoutDirection = OrderedDict(sorted(( (name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.LayoutDirection) ) , 
+                                                key = lambda x: x[1]))
 # if os.environ["QT_API"] in ("pyqt5", "pyside2"):
 #     consoleLayoutDirection = OrderedDict(sorted(( (name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.LayoutDirection) ) , 
 #                                                 key = lambda x: x[1]))

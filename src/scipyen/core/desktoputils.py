@@ -73,43 +73,23 @@ from traitlets.utils.bunch import Bunch
 from xml.dom import minidom
 
 import qtpy
-qtpy.API = os.environ["QT_API"]
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg)
+from qtpy.QtCore import (Signal, Slot, Property)
+
+__has_PySide6__ = False
+__has_PyQt6__  = False
 if os.environ["QT_API"] == "pyside6":
-    import PySide6
-    from PySide6 import (
-        QtCore,
-        QtGui,
-        QtWidgets,
-        QtXml,
-        QtSvg,
-    )
-    from PySide6.QtCore import (
-        Signal,
-        Slot,
-        Property,
-    )
-
+    __has_PySide6__ = True
+    # QtType = typing.TypeVar("QtType", bound = "Shiboken.Object")
+elif os.environ["QT_API"] == "pyqt6":
+    __has_PyQt6__ = True
+    from qtpy import sip
+    __has_sip__ = True
+    # QtType = typing.TypeVar("QtType", bound = "sip.wrappertype")
 else:
-    from qtpy import (
-        QtCore,
-        QtGui,
-        QtWidgets,
-        QtXml,
-        QtSvg,
-    )
-    from qtpy.QtCore import (
-        Signal,
-        Slot,
-        Property,
-    )
-
-
-# import pyudev
-import quantities as pq
-import numpy as np
-
-from iolib.navigation import filesystems
-from iolib.navigation.filesystems import pathStrLen, pathLen, pathToQUrl, urlToPath
+    from qtpy import sip
+    __has_sip__ = True
+    # QtType = typing.TypeVar("QtType", bound = "sip.wrappertype")
 
 has_qtdbus = False
 try:
@@ -118,6 +98,13 @@ try:
     has_qtdbus = True
 except:
     pass
+
+# import pyudev
+import quantities as pq
+import numpy as np
+
+from iolib.navigation import filesystems
+from iolib.navigation.filesystems import pathStrLen, pathLen, pathToQUrl, urlToPath
 
 SCHEMAS = ("file", "recentlyused", "remote", "search", "tags", "timeline", "trash")
 
@@ -333,16 +320,26 @@ class StandardLocationInfo:
     def hidden(self) -> bool:
         return self._hidden_
 
-
-StandardDesktopLocationsQt = tuple(
-    sorted(
-        inspect.getmembers(
-            QtCore.QStandardPaths,
-            predicate=lambda x: isinstance(x, QtCore.QStandardPaths.StandardLocation),
-        ),
-        key=lambda x: x[1],
+if __has_PyQt6__ or __has_PySide6__:
+    StandardDesktopLocationsQt = tuple(
+        sorted(
+            inspect.getmembers(
+                QtCore.QStandardPaths,
+                predicate=lambda x: isinstance(x, QtCore.QStandardPaths.StandardLocation),
+            ),
+            key=lambda x: x[1].value,
+        )
     )
-)
+else:
+    StandardDesktopLocationsQt = tuple(
+        sorted(
+            inspect.getmembers(
+                QtCore.QStandardPaths,
+                predicate=lambda x: isinstance(x, QtCore.QStandardPaths.StandardLocation),
+            ),
+            key=lambda x: x[1],
+        )
+    )
 
 
 StandardDesktopLocationQtInfos = tuple(

@@ -10,13 +10,22 @@ from pprint import pprint
 from traitlets import Bunch
 
 import numpy as np
-import qtpy
-qtpy.API = os.environ["QT_API"]
+# import qtpy
+# print(os.environ["QT_API"])
+__has_PySide6__ = False
+__has_PyQt6__ = False
 if os.environ["QT_API"] == "pyside6":
     import PySide6
     from PySide6 import QtCore, QtGui, QtWidgets, QtXml, QtSvg
     from PySide6.QtCore import Signal, Slot, Property
     has_sip = False
+    __has_PySide6__ = True
+elif os.environ["QT_API"] == "pyqt6":
+    from qtpy import QtCore, QtGui, QtWidgets, QtXml, QtSvg
+    from qtpy.QtCore import Signal, Slot, Property
+    from qtpy import sip as sip
+    __has_PyQt6__ = True
+    
 else:
     from qtpy import QtCore, QtGui, QtWidgets, QtXml, QtSvg
     from qtpy.QtCore import Signal, Slot, Property
@@ -84,121 +93,73 @@ standardQtFontStyles = Bunch(sorted(((name, val) for name, val in vars(QtGui.QFo
 standardQtFontWeights = Bunch(sorted(((name, val) for name, val in vars(QtGui.QFont).items() if isinstance(val, QtGui.QFont.Weight)), 
                                      key = lambda x: x[0]))
 
+if __has_PyQt6__:
+    standardQtPenStyles = Bunch(sorted(((name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.PenStyle) and val.value < 10),
+                            key = lambda x: x[1].value))
+    standardQtPenJoinStyles = Bunch(sorted(((name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.PenJoinStyle) and val.value <= 256),
+                            key = lambda x: x[1].value))
+    standardQtPenCapStyles = Bunch(sorted(((name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.PenCapStyle) and val.value <= 32),
+                            key = lambda x: x[1].value))
+    validQtGradientTypes = Bunch(sorted(((name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Type) and value.value < 3),
+                                        key = lambda x: x[1].value))
+    
+    standardQtGradientTypes = Bunch(sorted(( (name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Type)),
+                                        key = lambda x: x[1].value))
+    standardQtBrushStyles = Bunch(sorted(((name, value) for name, value in vars(QtCore.Qt).items() if isinstance(value, QtCore.Qt.BrushStyle)),
+                                            key = lambda x: x[1].value))
 
-standardQtPenStyles = Bunch(sorted(((name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.PenStyle) and val < 10),
-                        key = lambda x: x[1]))
+    standardQtBrushPatterns = Bunch(sorted(((name, value) for name, value in standardQtBrushStyles.items() if all((s not in name for s in ("Gradient", "Texture")))),
+                                            key = lambda x: x[1].value))
 
-standardQtPenJoinStyles = Bunch(sorted(((name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.PenJoinStyle) and val <= 256),
-                        key = lambda x: x[1]))
+    standardQtBrushGradients = Bunch(sorted(((name, value) for name, value in standardQtBrushStyles.items() if "Gradient" in name),
+                                            key = lambda x: x[1].value))
 
-standardQtPenCapStyles = Bunch(sorted(((name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.PenCapStyle) and val <= 32),
-                        key = lambda x: x[1]))
+    standardQtBrushTextures = Bunch(sorted(((name, value) for name, value in standardQtBrushStyles.items() if "Texture" in name),
+                                            key = lambda x: x[1].value))
 
-standardQtGradientPresets = Bunch(sorted(( (name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Preset) and name != "NumPresets")))
+    qPainterCompositionModes = Bunch(sorted(((name, value) for name, value in vars(QtGui.QPainter).items() if isinstance(value, QtGui.QPainter.CompositionMode)), 
+                                            key = lambda x: x[1].value))
 
-standardQtGradientSpreads = Bunch(sorted(( (name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Spread) )))
+    standardQtGradientPresets = Bunch(sorted(( (name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Preset) and name != "NumPresets"),
+                                             key = lambda x: x[1].value))
 
-standardQtGradientTypes = Bunch(sorted(( (name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Type)),
-                                    key = lambda x: x[1]))
-validQtGradientTypes = Bunch(sorted(((name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Type) and value < 3),
-                                    key = lambda x: x[1]))
+    standardQtGradientSpreads = Bunch(sorted(( (name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Spread) ),
+                                             key = lambda x: x[1].value))
 
-standardQtBrushStyles = Bunch(sorted(((name, value) for name, value in vars(QtCore.Qt).items() if isinstance(value, QtCore.Qt.BrushStyle)),
+else:
+    standardQtPenStyles = Bunch(sorted(((name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.PenStyle) and val < 10),
+                            key = lambda x: x[1]))
+
+    standardQtPenJoinStyles = Bunch(sorted(((name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.PenJoinStyle) and val <= 256),
+                            key = lambda x: x[1]))
+
+    standardQtPenCapStyles = Bunch(sorted(((name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.PenCapStyle) and val <= 32),
+                            key = lambda x: x[1]))
+
+    validQtGradientTypes = Bunch(sorted(((name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Type) and value < 3),
                                         key = lambda x: x[1]))
-
-standardQtBrushPatterns = Bunch(sorted(((name, value) for name, value in standardQtBrushStyles.items() if all((s not in name for s in ("Gradient", "Texture")))),
+    
+    standardQtGradientTypes = Bunch(sorted(( (name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Type)),
                                         key = lambda x: x[1]))
+    
+    standardQtBrushStyles = Bunch(sorted(((name, value) for name, value in vars(QtCore.Qt).items() if isinstance(value, QtCore.Qt.BrushStyle)),
+                                            key = lambda x: x[1]))
 
-standardQtBrushGradients = Bunch(sorted(((name, value) for name, value in standardQtBrushStyles.items() if "Gradient" in name),
-                                        key = lambda x: x[1]))
+    standardQtBrushPatterns = Bunch(sorted(((name, value) for name, value in standardQtBrushStyles.items() if all((s not in name for s in ("Gradient", "Texture")))),
+                                            key = lambda x: x[1]))
 
-standardQtBrushTextures = Bunch(sorted(((name, value) for name, value in standardQtBrushStyles.items() if "Texture" in name),
-                                        key = lambda x: x[1]))
+    standardQtBrushGradients = Bunch(sorted(((name, value) for name, value in standardQtBrushStyles.items() if "Gradient" in name),
+                                            key = lambda x: x[1]))
 
-qPainterCompositionModes = Bunch(sorted(((name, value) for name, value in vars(QtGui.QPainter).items() if isinstance(value, QtGui.QPainter.CompositionMode)), 
-                                        key = lambda x: x[1]))
-# if os.environ["QT_API"] in ("pyqt5", "pyside2"):
-#     standardQtFontStyles = Bunch(sorted(((name, val) for name, val in vars(QtGui.QFont).items() if isinstance(val, QtGui.QFont.Style)), key = lambda x: x[1]))
-#     standardQtFontWeights = Bunch(sorted(((name, val) for name, val in vars(QtGui.QFont).items() if isinstance(val, QtGui.QFont.Weight)), key = lambda x: x[1]))
-#     
-# 
-#     standardQtPenStyles = Bunch(sorted(((name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.PenStyle) and val < 10),
-#                             key = lambda x: x[1]))
-# 
-#     standardQtPenJoinStyles = Bunch(sorted(((name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.PenJoinStyle) and val <= 256),
-#                             key = lambda x: x[1]))
-# 
-#     standardQtPenCapStyles = Bunch(sorted(((name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.PenCapStyle) and val <= 32),
-#                             key = lambda x: x[1]))
-#     
-#     standardQtGradientPresets = Bunch(sorted(( (name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Preset) and name != "NumPresets")))
-# 
-#     standardQtGradientSpreads = Bunch(sorted(( (name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Spread) )))
-# 
-#     standardQtGradientTypes = Bunch(sorted(( (name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Type)),
-#                                         key = lambda x: x[1]))
-#     validQtGradientTypes = Bunch(sorted(((name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Type) and value < 3),
-#                                         key = lambda x: x[1]))
-# 
-#     standardQtBrushStyles = Bunch(sorted(((name, value) for name, value in vars(QtCore.Qt).items() if isinstance(value, QtCore.Qt.BrushStyle)),
-#                                             key = lambda x: x[1]))
-# 
-#     standardQtBrushPatterns = Bunch(sorted(((name, value) for name, value in standardQtBrushStyles.items() if all((s not in name for s in ("Gradient", "Texture")))),
-#                                             key = lambda x: x[1]))
-# 
-#     standardQtBrushGradients = Bunch(sorted(((name, value) for name, value in standardQtBrushStyles.items() if "Gradient" in name),
-#                                             key = lambda x: x[1]))
-# 
-#     standardQtBrushTextures = Bunch(sorted(((name, value) for name, value in standardQtBrushStyles.items() if "Texture" in name),
-#                                             key = lambda x: x[1]))
-# 
-#     qPainterCompositionModes = Bunch(sorted(((name, value) for name, value in vars(QtGui.QPainter).items() if isinstance(value, QtGui.QPainter.CompositionMode)), 
-#                                             key = lambda x: x[1]))
-# else:
-#     # NOTE: 2024-05-02 11:33:12 FIXME
-#     # the various Qt namespace enums below are more like regular Python enums in PyQt6 (via qtpy)
-#     # standardQtFontStyles = Bunch(sorted(((name, val) for name, val in QtGui.QFont.Style._member_map_.items()), key = lambda x: x[1].value)) 
-#     standardQtFontStyles = Bunch(sorted(((k.name, k.val) for k in QtGui.QFont.Style), key = lambda x: x[1].value)) 
-# 
-#     # standardQtFontWeights = Bunch(sorted(((name, val) for name, val in QtGui.QFont.Weight._member_map_.items()), key = lambda x: x[1].value))
-#     standardQtFontWeights = Bunch(sorted(((k.name, k.val) for k in QtGui.QFont.Weight), key = lambda x: x[1].value))
-# 
-#     # standardQtPenStyles = Bunch(sorted(((name,val) for name, val in QtCore.Qt.PenStyle._member_map_.items() if val.value < 10),key = lambda x: x[1].value))
-#     standardQtPenStyles = Bunch(sorted(((k.name,k.val) for k in QtCore.Qt.PenStyle if val.value < 10), key = lambda x: x[1].value))
-# 
-#     # standardQtPenJoinStyles = Bunch(sorted(((name,val) for name, val in QtCore.Qt.PenJoinStyle._member_map_.items() if val.value <= 256),key = lambda x: x[1].value))
-#     standardQtPenJoinStyles = Bunch(sorted(((k.name,k.val) for k in QtCore.Qt.PenJoinStyle if val.value <= 256),key = lambda x: x[1].value))
-# 
-#     # standardQtPenCapStyles = Bunch(sorted(((name,val) for name, val in QtCore.Qt.PenCapStyle._member_map_.items() if val.value <= 32),key = lambda x: x[1].value))
-#     standardQtPenCapStyles = Bunch(sorted(((k.name,k.val) for k in QtCore.Qt.PenCapStyle if val.value <= 32), key = lambda x: x[1].value))
-#     
-#     # standardQtGradientPresets = Bunch(sorted(( (name, value) for name, value in QtGui.QGradient.Preset._member_map_.items() if name != "NumPresets")))
-#     standardQtGradientPresets = Bunch(sorted(((k.name, k.value) for k in QtGui.QGradient.Preset if name != "NumPresets")))
-# 
-#     # standardQtGradientSpreads = Bunch(sorted(( (name, value) for name, value in QtGui.QGradient.Spread._member_map_.items())))
-#     standardQtGradientSpreads = Bunch(sorted(( (k.name, k.value) for k in QtGui.QGradient.Spread)))
-# 
-#     # standardQtGradientTypes = Bunch(sorted(( (name, value) for name, value in QtGui.QGradient.Type._member_map_.items()),key = lambda x: x[1].value))
-#     standardQtGradientTypes = Bunch(sorted(( (k.name, k.value) for k in QtGui.QGradient.Type), key = lambda x: x[1].value))
-#     
-#     # validQtGradientTypes = Bunch(sorted(((name, value) for name, value in QtGui.QGradient.Type._member_map_.items() if value.value < 3),key = lambda x: x[1].value))
-#     validQtGradientTypes = Bunch(sorted(((k.name, k.value) for k in QtGui.QGradient.Type if value.value < 3), key = lambda x: x[1].value))
-# 
-#     # standardQtBrushStyles = Bunch(sorted(((name, value) for name, value in QtCore.Qt.BrushStyle._member_map_.items()),key = lambda x: x[1].value))
-#     standardQtBrushStyles = Bunch(sorted(((k.name, k.value) for k in QtCore.Qt.BrushStyle), key = lambda x: x[1].value))
-# 
-#     standardQtBrushPatterns = Bunch(sorted(((name, value) for name, value in standardQtBrushStyles.items() if all((s not in name for s in ("Gradient", "Texture")))),
-#                                             key = lambda x: x[1].value))
-# 
-#     standardQtBrushGradients = Bunch(sorted(((name, value) for name, value in standardQtBrushStyles.items() if "Gradient" in name),
-#                                             key = lambda x: x[1].value))
-# 
-#     standardQtBrushTextures = Bunch(sorted(((name, value) for name, value in standardQtBrushStyles.items() if "Texture" in name),
-#                                             key = lambda x: x[1].value))
-# 
-#     qPainterCompositionModes = Bunch(sorted(((name, value) for name, value in vars(QtGui.QPainter).items() if isinstance(value, QtGui.QPainter.CompositionMode)), 
-#                                             key = lambda x: x[1].value))
-# 
+    standardQtBrushTextures = Bunch(sorted(((name, value) for name, value in standardQtBrushStyles.items() if "Texture" in name),
+                                            key = lambda x: x[1]))
+
+    qPainterCompositionModes = Bunch(sorted(((name, value) for name, value in vars(QtGui.QPainter).items() if isinstance(value, QtGui.QPainter.CompositionMode)), 
+                                            key = lambda x: x[1]))
+
+    standardQtGradientPresets = Bunch(sorted(( (name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Preset) and name != "NumPresets")))
+
+    standardQtGradientSpreads = Bunch(sorted(( (name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Spread) )))
 
 customDashStyles = {"Custom": [10., 5., 10., 5., 10., 5., 1., 5., 1., 5., 1., 5.]}
 

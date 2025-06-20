@@ -138,6 +138,46 @@ from urllib.parse import urlparse, urlsplit
 from collections import namedtuple, deque
 from dataclasses import MISSING
 from enum import Enum, IntEnum
+
+import qtpy
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg)
+from qtpy.QtCore import (Signal, Slot, Property,)
+
+__has_PySide6__ = False
+__has_PyQt6__  = False
+if os.environ["QT_API"] == "pyside6":
+    __has_PySide6__ = True
+    # QtType = typing.TypeVar("QtType", bound = "Shiboken.Object")
+    QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    QShortcut = QtGui.QShortcut
+    QKeyboardModifiers = QtCore.Qt.KeyboardModifiers
+elif os.environ["QT_API"] == "pyqt6":
+    __has_PyQt6__ = True
+    from qtpy import sip
+    __has_sip__ = True
+    # QtType = typing.TypeVar("QtType", bound = "sip.wrappertype")
+    QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
+    QKeyboardModifiers = QtCore.Qt.KeyboardModifier
+else:
+    from qtpy import sip
+    __has_sip__ = True
+    QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
+    QKeyboardModifiers = QtCore.Qt.KeyboardModifiers
+    # QtType = typing.TypeVar("QtType", bound = "sip.wrappertype")
+
+has_qtdbus = False
+try:
+    from qtpy import QtDBus
+
+    has_qtdbus = True
+except:
+    pass
+
 import qtpy
 qtpy.API = os.environ["QT_API"]
 if os.environ["QT_API"] == "pyside6":
@@ -978,7 +1018,7 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
     urlsDroppedOnNavButton = Signal(QtCore.QUrl, QtGui.QDropEvent, 
                                     name = "urlsDroppedOnNavButton")
     navigatorButtonActivated = Signal(QtCore.QUrl, QtCore.Qt.MouseButton, 
-                                      QtCore.Qt.KeyboardModifiers, 
+                                      QKeyboardModifiers, 
                                       name = "navigatorButtonActivated")
     startedTextResolving = Signal(name = "startedTextResolving")
     finishedTextResolving = Signal(name = "finishedTextResolving")
@@ -2575,8 +2615,8 @@ class _UrlNavigator_(QtCore.QObject):
         # not sure we need this either...
         self.slotApplyUrl(QtCore.QUrl.fromUserInput(text))
         
-    @Slot(QtCore.QUrl, QtCore.Qt.MouseButton, QtCore.Qt.KeyboardModifiers)
-    def slotNavigatorButtonClicked(self, url:QtCore.QUrl, button:QtCore.Qt.MouseButton, modifiers:QtCore.Qt.KeyboardModifiers):
+    @Slot(QtCore.QUrl, QtCore.Qt.MouseButton, QKeyboardModifiers)
+    def slotNavigatorButtonClicked(self, url:QtCore.QUrl, button:QtCore.Qt.MouseButton, modifiers:QKeyboardModifiers):
         # KUrlNavigatorPrivate
 #         if ((button & QtCore.Qt.MiddleButton) and (modifiers & QtCore.Qt.ShiftModifier)) or ((button & QtCore.Qt.LeftButton) and (modifiers & (QtCore.Qt.ControlModifier | QtCore.Qt.ShiftModifier))):
 #             self._nav_.activeTabRequested.emit(url) # TODO: to trigger navigation in MainWindow
@@ -3423,8 +3463,8 @@ class UrlNavigator(QtWidgets.QWidget):
         if isinstance(button, UrlNavigatorButton):
             self.dropUrls(url, evt, button)
             
-    @Slot(QtCore.QUrl, QtCore.Qt.KeyboardModifiers)
-    def _slot_navigatorButtonActivated(self, url:QtCore.QUrl, modifiers:QtCore.Qt.KeyboardModifiers):
+    @Slot(QtCore.QUrl, QKeyboardModifiers)
+    def _slot_navigatorButtonActivated(self, url:QtCore.QUrl, modifiers:QKeyboardModifiers):
         # button = self.sender()
         btn = QtWidgets.QApplication.mouseButtons()
         
