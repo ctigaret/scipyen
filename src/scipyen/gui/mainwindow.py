@@ -1029,17 +1029,10 @@ class AboutDialog(QtWidgets.QDialog, __UI_AboutLicense__):
             QtGui.QDesktopServices.openUrl(link)
                 
         
-# class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, DirectoryObserver, WorkspaceGuiMixin):
-# class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin):
     ''' Main pict GUI window
     '''
-
-    # TODO:2024-05-19 10:59:43
-    # finalize workspacegui.DirectoryObserver and inherit from it
-    # see NOTE: 2024-05-19 10:58:13 TODO in gui/workspacegui.py
-    # NOTE: 2021-08-23 10:36:14 WindowManager inherits from __QMainWindow__ which
-    # is QtWidgets.QMainWindow
+    _instance = None
     workspaceChanged = Signal()
     startPluginLoad = Signal()
     sig_refreshRecentFilesMenu = Signal()
@@ -1398,10 +1391,12 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     # def __new__(cls:typing.Self, app: QtWidgets.QApplication, 
     #              parent: typing.Optional[QtWidgets.QWidget] = None, *args, **kwargs) -> typing.Self:
     def __new__(cls:typing.Self, parent: typing.Optional[QtWidgets.QWidget] = None, *args, **kwargs) -> typing.Self:
+        # print(f"{cls.__name__}.__new__(parent={parent}, *args={args}, **kwargs={kwargs})")
         if not hasattr(cls, "_instance") or not isinstance(cls._instance, cls):
             cls._instance = super(ScipyenWindow, cls).__new__(cls, parent, *args, **kwargs)
-            # cls._instance = super(ScipyenWindow, cls).__new__(cls, app, parent, *args, **kwargs)
             
+        # print(f"\t{cls.__name__}._instance = {cls._instance}")
+        
         return cls._instance
     
     # @processtimefunc
@@ -1430,11 +1425,11 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # WindowManager.__init__(self, parent)
         # super().__init__(parent=parent)
         
-        if __has_PyQt6__:
-            breakpoint()
-            QtWidgets.QMainWindow.__init__(self)
-        else:
-            super().__init__(parent)
+        # if __has_PyQt6__:
+        #     QtWidgets.QMainWindow.__init__(self)
+        # else:
+        #     super().__init__(parent)
+        super().__init__(parent)
 
         # gui_viewers defined in gui package (see gui/__init__.py)
         # self.viewers = dict(map(lambda x: (x, list()), gui_viewers))
