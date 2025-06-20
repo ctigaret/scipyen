@@ -4,13 +4,33 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 import os
+
 import qtpy
-qtpy.API = os.environ["QT_API"]
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
+from qtpy.QtCore import (Signal, Slot, Property,)
+__has_PySide6__ = False
+__has_PyQt6__ = False
+__has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
+    __has_PySide6__ = True
     import PySide6
-    from PySide6 import QtWidgets
+    from PySide6 import Shiboken
+    # from PySide6.QtCore import (Signal, Slot, Property,)
+    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    QShortcut = QtGui.QShortcut
 else:
-    from qtpy import QtWidgets
+    if os.environ["QT_API"] == "pyqt6":
+        __has_PyQt6__ = True
+        
+    from qtpy import sip
+    from qtpy.uic import loadUiType
+    QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
+    __has_sip__ = True
+    
 
 from gui.workspacegui import GuiMessages
 from gui.textviewer import TextViewer

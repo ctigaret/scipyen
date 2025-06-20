@@ -101,25 +101,43 @@ import quantities as pq
 
 import matplotlib as mpl # needed to expose the mro of Figure.canvas
 from matplotlib.figure import Figure
+
 import qtpy
-qtpy.API = os.environ["QT_API"]
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
+from qtpy.QtCore import (Signal, Slot, Property,)
+__has_PySide6__ = False
+__has_PyQt6__ = False
+__has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
+    __has_PySide6__ = True
     import PySide6
-    from PySide6 import (QtCore, QtGui, QtWidgets, QtXml, QtSvg,)
-    from PySide6.QtWidgets import (QWidget, QMainWindow)
-    from PySide6.QtCore import QSettings # NOTE: 2024-05-03 09:26:33 QVariant not available in PySide
+    from PySide6 import Shiboken
+    # from PySide6.QtCore import (Signal, Slot, Property,)
+    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    QShortcut = QtGui.QShortcut
+else:
+    if os.environ["QT_API"] == "pyqt6":
+        __has_PyQt6__ = True
+        
+    from qtpy import sip
+    from qtpy.uic import loadUiType
+    QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
+    __has_sip__ = True
+
+if __has_PySide6__:
     application_name = "Scipyen-PySide6"
     organization_name = "Scipyen-PySide6"
-
-    
+elif __has_PyQt6__:
+    application_name = "Scipyen-PyQt6"
+    organization_name = "Scipyen-PyQt6"
 else:
-    from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg,)
-    from qtpy.QtWidgets import (QWidget, QMainWindow)
-    from qtpy.QtCore import QSettings # NOTE: 2024-05-03 09:26:33 QVariant not available in PySide
     application_name = "Scipyen"
     organization_name = "Scipyen"
-
-
+    
 from IPython.lib.pretty import pprint
 
 import traitlets
@@ -539,7 +557,7 @@ def markConfigurable(confname:str, conftype:str="", setter:bool=True, default:ty
     return partial(wrapper, trn = trait_notifier)
     
 @safewrapper
-def qSettingsGroupPfx(win:typing.Union[QMainWindow, QWidget, Figure]):
+def qSettingsGroupPfx(win:typing.Union[QtWidgets.QMainWindow, QtWidgets.QWidget, Figure]):
     r"""Generates a QSettings group name and, optionally, a prefix for a window.
     
     Parameters:
@@ -598,7 +616,7 @@ def qSettingsGroupPfx(win:typing.Union[QMainWindow, QWidget, Figure]):
     """
     pfx = ""
     
-    if isinstance(win, QMainWindow):
+    if isinstance(win, QtWidgets.QMainWindow):
         #if isinstance(win, WorkspaceGuiMixin): 
         # cannot have here this as importing gui.workspacegui would trigger 
         # recursive import cycles
@@ -621,7 +639,7 @@ def qSettingsGroupPfx(win:typing.Union[QMainWindow, QWidget, Figure]):
     return gname, pfx
 
 @safewrapper
-def saveQSettingsKey(qsettings:QSettings, gname:str, pfx:str, key:str, val:typing.Any):
+def saveQSettingsKey(qsettings:QtCore.QSettings, gname:str, pfx:str, key:str, val:typing.Any):
     if len(gname.strip()) == 0:
         gname = "General"
     # key_name = "%s%s" % (pfx, key)
@@ -632,7 +650,7 @@ def saveQSettingsKey(qsettings:QSettings, gname:str, pfx:str, key:str, val:typin
     qsettings.endGroup()
     
 @safewrapper
-def loadQSettingsKey(qsettings:QSettings, gname:str, pfx:str, key:str, default:typing.Any):
+def loadQSettingsKey(qsettings:QtCore.QSettings, gname:str, pfx:str, key:str, default:typing.Any):
     if len(gname.strip()) == 0:
         gname = "General"
     key_name = "%s%s" % (pfx, key)
@@ -649,7 +667,7 @@ def loadQSettingsKey(qsettings:QSettings, gname:str, pfx:str, key:str, default:t
     # print(f"loadQSettingsKey group: {gname}, key: {key}, value: {ret} ({type(ret).__name__})")
     return ret
 
-def syncQtSettings(qsettings:QSettings, win:typing.Union[QMainWindow, QWidget, Figure], 
+def syncQtSettings(qsettings:QtCore.QSettings, win:typing.Union[QtWidgets.QMainWindow, QtWidgets.QWidget, Figure], 
                    group_name:typing.Optional[str]=None,
                    prefix:typing.Optional[str]=None, 
                    save:bool=True):

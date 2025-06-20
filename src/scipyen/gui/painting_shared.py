@@ -18,7 +18,7 @@ if os.environ["QT_API"] == "pyside6":
     import PySide6
     from PySide6 import QtCore, QtGui, QtWidgets, QtXml, QtSvg
     from PySide6.QtCore import Signal, Slot, Property
-    has_sip = False
+    __has_sip__ = False
     __has_PySide6__ = True
 elif os.environ["QT_API"] == "pyqt6":
     from qtpy import QtCore, QtGui, QtWidgets, QtXml, QtSvg
@@ -30,10 +30,10 @@ else:
     from qtpy import QtCore, QtGui, QtWidgets, QtXml, QtSvg
     from qtpy.QtCore import Signal, Slot, Property
     from qtpy import sip as sip
-    has_sip = True
+    __has_sip__ = True
 
 # # for sip.cast:
-# has_sip = False
+# __has_sip__ = False
 # # if os.environ["QT_API"] in ("pyqt5", "pyqt6"):
 # try:
 # except:
@@ -226,7 +226,7 @@ def canDecode(mimeData:QtCore.QMimeData) -> bool:
     return False
 
 def fromMimeData(mimeData:QtCore.QMimeData) -> QtGui.QColor:
-    if has_sip:
+    if __has_sip__:
         from core import sip_compat
         return sip_compat.fromMimeData(mimeData)
     
@@ -348,7 +348,7 @@ def gradient2radial(gradient:QtGui.QGradient,
     elif isinstance(gradient, QtGui.QGradient):
         # see NOTE: 2021-09-16 17:55:08
         if gradient.type() == QtGui.QGradient.RadialGradient:
-            if has_sip:
+            if __has_sip__:
                 ret = sip.cast(gradient, QtGui.QRadialGradient)
             else:
                 ret = gradient
@@ -356,7 +356,7 @@ def gradient2radial(gradient:QtGui.QGradient,
             ret.setFocalRadius(focalRadius)
         
         if gradient.type() == QtGui.QGradient.LinearGradient:
-            if has_sip:
+            if __has_sip__:
                 g = sip.cast(gradient, QtGui.QLinearGradient)
             else:
                 g = gradient
@@ -370,7 +370,7 @@ def gradient2radial(gradient:QtGui.QGradient,
             #ret = QtGui.QRadialGradient(l.p1(), centerRadius, l.p2(), focalRadius)
             
         elif gradient.type() == QtGui.QGradient.ConicalGradient:
-            if has_sip:
+            if __has_sip__:
                 g = sip.cast(gradient, QtGui.QConicalGradient)
             else:
                 g = gradient
@@ -410,12 +410,12 @@ def gradient2linear(gradient:QtGui.QGradient) -> QtGui.QLinearGradient:
         # NOTE: 2021-09-16 17:55:08
         # type() for a generic QGradient by default returns QtGui.QGradient.LinearGradient
         if gradient.type() == QtGui.QGradient.LinearGradient:
-            if has_sip:
+            if __has_sip__:
                 return sip.cast(gradient, QtGui.QLinearGradient)
             return gradient
         
         if gradient.type() == QtGui.QGradient.RadialGradient:
-            if has_sip:
+            if __has_sip__:
                 g = sip.cast(gradient, QtGui.QRadialGradient)
             else:
                 g = gradient
@@ -423,7 +423,7 @@ def gradient2linear(gradient:QtGui.QGradient) -> QtGui.QLinearGradient:
             
             
         elif gradient.type() == QtGui.QGradient.ConicalGradient:
-            if has_sip:
+            if __has_sip__:
                 g = sip.cast(gradient, QtGui.QConicalGradient)
             else:
                 g = gradient
@@ -460,13 +460,13 @@ def gradient2conical(gradient:QtGui.QGradient) -> QtGui.QConicalGradient:
     elif isinstance(gradient, QtGui.QGradient):
         # see NOTE: 2021-09-16 17:55:08
         if gradient.type() == QtGui.QGradient.ConicalGradient:
-            if has_sip:
+            if __has_sip__:
                 return sip.cast(gradient, QtGui.QConicalGradient)
             return gradient
         
         if gradient.type() == QtGui.QGradient.LinearGradient:
             # g = QtGui.QLinearGradient
-            if has_sip:
+            if __has_sip__:
                 g = sip.cast(gradient, QtGui.QLinearGradient)
             else:
                 g = gradient
@@ -474,7 +474,7 @@ def gradient2conical(gradient:QtGui.QGradient) -> QtGui.QConicalGradient:
             ret = QtGui.QConicalGradient(l.p1(), l.angle())
             
         elif gradient.type() == QtGui.QGradient.RadialGradient:
-            if has_sip:
+            if __has_sip__:
                 g = sip.cast(gradient, QtGui.QRadialGradient)
             else:
                 g = gradient
@@ -529,19 +529,19 @@ def gradientCoordinates(x:QtGui.QGradient, precision:typing.Optional[int]=None) 
     
     elif isinstance(x, QtGui.QGradient):
         if x.type() & QtGui.QGradient.LinearGradient:
-            if has_sip:
+            if __has_sip__:
                 x_ = sip.cast(x, QtGui.QLinearGradient)
             else:
                 x_ = x
             return linearcoords(x_, precision)
         elif x.type() & QtGui.QGradient.RadialGradient:
-            if has_sip:
+            if __has_sip__:
                 x_ = sip.cast(x, QtGui.QRadialGradient)
             else:
                 x_ = x
             return radialcoords(x_, precision)
         elif x.type() & QtGui.QGradient.ConicalGradient:
-            if has_sip:
+            if __has_sip__:
                 x_ = sip.cast(x, QtGui.QConicalGradient)
             else:
                 x_ = x
@@ -728,7 +728,7 @@ def normalizeGradient(gradient:QtGui.QGradient, rect:typing.Union[QtCore.QRect, 
         raise TypeError("Expecting a concrete QGradient subtype; got %s instead" % type(g).__name__)
         
 def comboDelegateBrush(index:QtCore.QModelIndex, role:int) -> QtGui.QBrush:
-    if has_sip:
+    if __has_sip__:
         from core import sip_compat
         return sip_compat.comboDelegateBrush(index, role)
     
@@ -1007,7 +1007,7 @@ class HoverPoints(QtCore.QObject):
                     #if len(self._fingerPointMapping) == 0: # see # NOTE 2021-05-21 21:29:33 touchscreens
                         #return True
                     
-                    if has_sip:
+                    if __has_sip__:
                         me = sip.cast(ev, QtGui.QMouseEvent)
                     else:
                         me = ev
@@ -1114,7 +1114,7 @@ class HoverPoints(QtCore.QObject):
                         #return True
                     pos = QtCore.QPointF(ev.pos())
                     
-                    if has_sip:
+                    if __has_sip__:
                         me = sip.cast(ev, QtGui.QMouseEvent)
                     else:
                         me = ev
@@ -1178,7 +1178,7 @@ class HoverPoints(QtCore.QObject):
                     #pass # see NOTE 2021-05-21 21:29:33 skipped code for touchscreens
                     
                 elif ev.type() == QtCore.QEvent.Resize:
-                    if has_sip:
+                    if __has_sip__:
                         e = sip.cast(ev, QtGui.QResizeEvent)
                     else:
                         e = ev

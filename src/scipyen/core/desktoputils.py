@@ -77,27 +77,35 @@ from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg)
 from qtpy.QtCore import (Signal, Slot, Property)
 
 __has_PySide6__ = False
-__has_PyQt6__  = False
+__has_PyQt6__ = False
+__has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
-    # QtType = typing.TypeVar("QtType", bound = "Shiboken.Object")
-elif os.environ["QT_API"] == "pyqt6":
-    __has_PyQt6__ = True
-    from qtpy import sip
-    __has_sip__ = True
-    # QtType = typing.TypeVar("QtType", bound = "sip.wrappertype")
+    import PySide6
+    from PySide6 import Shiboken
+    # from PySide6.QtCore import (Signal, Slot, Property,)
+    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    QShortcut = QtGui.QShortcut
 else:
+    if os.environ["QT_API"] == "pyqt6":
+        __has_PyQt6__ = True
+        
     from qtpy import sip
+    from qtpy.uic import loadUiType
+    QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
     __has_sip__ = True
-    # QtType = typing.TypeVar("QtType", bound = "sip.wrappertype")
+    
 
-has_qtdbus = False
+__has_qtdbus__ = False
 try:
     from qtpy import QtDBus
-
-    has_qtdbus = True
+    __has_qtdbus__ = True
 except:
-    pass
+    __has_qtdbus__ = False
 
 # import pyudev
 import quantities as pq
@@ -494,7 +502,7 @@ def get_dbus_service_names(what: str = "session"):
     if platform.system() != "Linux":
         return
 
-    if not has_qtdbus:
+    if not __has_qtdbus__:
         scipywarn("No QtDBus on this platform")
         return
 

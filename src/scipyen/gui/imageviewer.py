@@ -60,27 +60,39 @@ from dataclasses import MISSING
 from traitlets import Bunch
 import numpy as np
 import quantities as pq
-from core.pyqtgraph_patch import pyqtgraph as pgraph
 import neo
 from core.vigra_patches import vigra
 from pandas import NA
 #from core.vigra_patches import vigra.pyqt 
-import matplotlib as mpl
 
 import qtpy
-qtpy.API = os.environ["QT_API"]
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
+from qtpy.QtCore import (Signal, Slot, Property,)
 __has_PySide6__ = False
+__has_PyQt6__ = False
+__has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
-    import PySide6
-    from PySide6 import QtCore, QtGui, QtWidgets, QtSvg
-    from PySide6.QtCore import Signal, Slot, Property
-    from PySide6.QtUiTools import loadUiType as __loadUiType__
     __has_PySide6__ = True
+    import PySide6
+    from PySide6 import Shiboken
+    # from PySide6.QtCore import (Signal, Slot, Property,)
+    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    QShortcut = QtGui.QShortcut
 else:
-    from qtpy import QtCore, QtGui, QtWidgets, QtSvg
-    from qtpy.QtCore import Signal, Slot, Property
-    from qtpy.uic import loadUiType as __loadUiType__
+    if os.environ["QT_API"] == "pyqt6":
+        __has_PyQt6__ = True
+        
+    from qtpy import sip
+    from qtpy.uic import loadUiType
+    QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
+    __has_sip__ = True
     
+from core.pyqtgraph_patch import pyqtgraph as pgraph
+import matplotlib as mpl
 
 #### END 3rd party modules
 
@@ -153,12 +165,12 @@ import qimage2ndarray
 from qimage2ndarray import gray2qimage, array2qimage, alpha_view, rgb_view, byte_view
 
 # used for ImageWindow below
-Ui_ImageViewerWindow, QMainWindow = __loadUiType__(adapt_ui_path(__module_path__, 'imageviewer.ui'))
+Ui_ImageViewerWindow, QMainWindow = loadUiType(adapt_ui_path(__module_path__, 'imageviewer.ui'))
 
-Ui_AxesCalibrationDialog, QDialog = __loadUiType__(adapt_ui_path(__module_path__, "axescalibrationdialog.ui"))
-Ui_AxesCalibrationDialog2, QDialog = __loadUiType__(adapt_ui_path(__module_path__, "axescalibrationdialog2.ui"))
+Ui_AxesCalibrationDialog, QDialog = loadUiType(adapt_ui_path(__module_path__, "axescalibrationdialog.ui"))
+Ui_AxesCalibrationDialog2, QDialog = loadUiType(adapt_ui_path(__module_path__, "axescalibrationdialog2.ui"))
 
-Ui_TransformImageValueDialog, QDialog = __loadUiType__(adapt_ui_path(__module_path__,"transformimagevaluedialog.ui"))
+Ui_TransformImageValueDialog, QDialog = loadUiType(adapt_ui_path(__module_path__,"transformimagevaluedialog.ui"))
 
 class ComplexDisplay(Enum):
     r"""

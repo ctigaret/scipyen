@@ -68,24 +68,24 @@ if os.environ["QT_API"] == "pyside6":
 elif os.environ["QT_API"] == "pyqt6":
     __has_PyQt6__ = True
     from qtpy import sip
-    __has_sip__ = True
+    ____has_sip____ = True
     # QtType = typing.TypeVar("QtType", bound = "sip.wrappertype")
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
 else:
     from qtpy import sip
-    __has_sip__ = True
+    ____has_sip____ = True
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
     # QtType = typing.TypeVar("QtType", bound = "sip.wrappertype")
 
-has_qtdbus = False
+__has_qtdbus__ = False
 try:
     from qtpy import QtDBus
 
-    has_qtdbus = True
+    __has_qtdbus__ = True
 except:
     pass
 

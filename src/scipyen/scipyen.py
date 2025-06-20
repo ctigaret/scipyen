@@ -141,24 +141,40 @@ else:
 
 #### BEGIN 3rd party modules
 import qtpy
-qtpy.API = os.environ["QT_API"]
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
+from qtpy.QtCore import (Signal, Slot, Property,)
+__has_PySide6__ = False
+__has_PyQt6__ = False
+__has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
+    __has_PySide6__ = True
     import PySide6
-    from PySide6 import (QtCore, QtWidgets, QtGui, )
-    appName = "Scipyen-PySide6"
-    has_sip = False
+    from PySide6 import Shiboken
+    # from PySide6.QtCore import (Signal, Slot, Property,)
+    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    QShortcut = QtGui.QShortcut
 else:
+    if os.environ["QT_API"] == "pyqt6":
+        __has_PyQt6__ = True
+        
     from qtpy import sip
-    from qtpy import (QtCore, QtWidgets, QtGui, )
+    from qtpy.uic import loadUiType
+    QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
+    __has_sip__ = True
+    
+print(f"scipyen.py: qtpy.API is {qtpy.API}")
+
+if __has_PySide6__:
+    appName = "Scipyen-PySide6"
+elif __has_PyQt6__:
+    appName = "Scipyen-PyQt6"
+else:
     appName = "Scipyen"
-    has_sip = True
-
-if os.environ["QT_API"] != "pyqt5":
-    print(f"scipyen.py: qtpy.API is {qtpy.API}")
-
-# NOTE: 2024-05-02 09:46:11
-# you still need the QT_API in the environment
-
+    
 from core.prog import scipywarn
 
 # hasQDarkTheme = False

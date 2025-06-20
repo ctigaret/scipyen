@@ -9,26 +9,38 @@ import sys, os, typing, collections, pathlib, tarfile, dataclasses
 import inspect, functools, traceback
 from dataclasses import MISSING
 from functools import (singledispatch, singledispatchmethod)
-
 import qtpy
-from qtpy import (QtCore, QtNetwork)
-from qtpy.QtCore import (Signal, Slot, Property)
-
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
+from qtpy.QtCore import (Signal, Slot, Property,)
 __has_PySide6__ = False
-__has_PyQt6__  = False
+__has_PyQt6__ = False
+__has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
-    QtType = typing.TypeVar("QtType", bound = "Shiboken.Object")
-elif os.environ["QT_API"] == "pyqt6":
-    __has_PyQt6__ = True
+    import PySide6
+    from PySide6 import Shiboken
+    # from PySide6.QtCore import (Signal, Slot, Property,)
+    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    QShortcut = QtGui.QShortcut
+else:
+    if os.environ["QT_API"] == "pyqt6":
+        __has_PyQt6__ = True
+        
     from qtpy import sip
+    from qtpy.uic import loadUiType
+    QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
     __has_sip__ = True
+    
+if __has_sip__:
     QtType = typing.TypeVar("QtType", bound = "sip.wrappertype")
 else:
-    from qtpy import sip
-    __has_sip__ = True
-    QtType = typing.TypeVar("QtType", bound = "sip.wrappertype")
+    QtType = typing.TypeVar("QtType", bound = "Shiboken.Object")
     
+
 from core.prog import (safewrapper, scipywarn, print_styled)
 from core.sysutils import adapt_ui_path
 from gui.widgets.cancellableqprogressbar import CancellableQProgressBar

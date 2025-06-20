@@ -11,24 +11,38 @@ from dataclasses import MISSING
 from abc import (ABC, ABCMeta, abstractmethod,)
 from traitlets import Bunch
 #from abc import (abstractmethod,)
+import qtpy
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, QtDBus)
+from qtpy.QtCore import (Signal, Slot, Property,)
 __has_PySide6__ = False
-has_qtdbus = False
+__has_PyQt6__ = False
+__has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
-    import PySide6
-    from PySide6 import (QtCore, QtWidgets, QtGui)
-    from PySide6 import QtDBus
-    from PySide6.QtCore import (Signal, Slot, Property,)
-    import qtpy
-    qtpy.API = os.environ["QT_API"]
     __has_PySide6__ = True
-    has_qtdbus = True
+    import PySide6
+    from PySide6 import Shiboken
+    # from PySide6.QtCore import (Signal, Slot, Property,)
+    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    QShortcut = QtGui.QShortcut
 else:
-    import qtpy
-    qtpy.API = os.environ["QT_API"]
-    from qtpy import (QtCore, QtWidgets, QtGui)
+    if os.environ["QT_API"] == "pyqt6":
+        __has_PyQt6__ = True
+        
+    from qtpy import sip
+    from qtpy.uic import loadUiType
+    QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
+    __has_sip__ = True
+    
+__has_qtdbus__ = False
+try:
     from qtpy import QtDBus
-    from qtpy.QtCore import (Signal, Slot, Property,)
-    has_qtdbus = True
+    __has_qtdbus__ = True
+except:
+    __has_qtdbus__ = False
 
 
 from core.utilities import safewrapper
@@ -272,12 +286,12 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         # if not QtWidgets.qApp.testAttribute(QtCore.Qt.AA_DontUseNativeMenuBar):
         if not QtWidgets.QApplication.instance().testAttribute(QtCore.Qt.AA_DontUseNativeMenuBar):
             # if "startplasma" in sysutils.get_desktop() or "KDE" in sysutils.get_desktop("desktop"):
-            # if sysutils.is_kde_x11() and has_qtdbus:
+            # if sysutils.is_kde_x11() and __has_qtdbus__:
             # NOTE: 2024-11-08 09:44:58
             # accomodate wayland sessions (eveb when run with QT_QPA_PLATFORM=xcb,
             # the session reported by QApplication is wayland if the WM is using wayland)
-            # if sysutils.is_kde() and has_qtdbus:
-            if desktoputils.is_kde() and has_qtdbus:
+            # if sysutils.is_kde() and __has_qtdbus__:
+            if desktoputils.is_kde() and __has_qtdbus__:
                 appMenuServiceNames = list(name for name in QtDBus.QDBusConnection.sessionBus().interface().registeredServiceNames().value() if "AppMenu" in name)
                 
                 if len(appMenuServiceNames):

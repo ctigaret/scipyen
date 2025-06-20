@@ -81,9 +81,9 @@ else:
 
 # try:
 #     from qtpy import sip as sip
-#     has_sip = True
+#     __has_sip__ = True
 # except:
-#     has_sip = False
+#     __has_sip__ = False
 
 # BEGIN About QStyle plugins
 # WARNING: 2024-09-26 15:44:57
@@ -523,12 +523,12 @@ def console_info():
 # QWidget: Must construct a QApplication before a QWidget
 from iolib.navigation import navigator
 
-_mainwindow_ui_file = "mainwindow.ui"
+_mainwindow_ui_file = "mainwindow_qt6.ui" if __has_PyQt6__ else "mainwindow.ui"
 
 
 if os.environ["QT_API"] in ("pyqt5", "pyside2"):
     # Form class,        Base class
-    __UI_MainWindow__, __QMainWindow__ = loadUiType(os.path.join(__module_path__, _mainwindow_ui_file), 
+    __UI_MainWindow__, _ = loadUiType(os.path.join(__module_path__, _mainwindow_ui_file), 
                                                     from_imports=True, import_from="gui")
 
     __UI_ScriptManagerWindow__, _ = loadUiType(os.path.join(__module_path__, "scriptmanagerwindow.ui"), 
@@ -1030,7 +1030,8 @@ class AboutDialog(QtWidgets.QDialog, __UI_AboutLicense__):
                 
         
 # class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, DirectoryObserver, WorkspaceGuiMixin):
-class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
+# class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
+class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin):
     ''' Main pict GUI window
     '''
 
@@ -1430,7 +1431,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # super().__init__(parent=parent)
         
         if __has_PyQt6__:
-            QtWidgets.QMainWindow.__init__(parent)
+            breakpoint()
+            QtWidgets.QMainWindow.__init__(self)
         else:
             super().__init__(parent)
 

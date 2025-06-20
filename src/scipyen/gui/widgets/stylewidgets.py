@@ -7,16 +7,32 @@ from traitlets import Bunch
 from enum import IntEnum
 
 import numpy as np
-
 import qtpy
-qtpy.API = os.environ["QT_API"]
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
+from qtpy.QtCore import (Signal, Slot, Property,)
+__has_PySide6__ = False
+__has_PyQt6__ = False
+__has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
+    __has_PySide6__ = True
     import PySide6
-    from PySide6 import QtCore, QtGui, QtWidgets, QtXml, QtSvg
-    from PySide6.QtCore import Signal, Slot, Property
+    from PySide6 import Shiboken
+    # from PySide6.QtCore import (Signal, Slot, Property,)
+    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    QShortcut = QtGui.QShortcut
 else:
-    from qtpy import QtCore, QtGui, QtWidgets, QtXml, QtSvg
-    from qtpy.QtCore import Signal, Slot, Property
+    if os.environ["QT_API"] == "pyqt6":
+        __has_PyQt6__ = True
+        
+    from qtpy import sip
+    from qtpy.uic import loadUiType
+    QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
+    __has_sip__ = True
+    
 
 from core.prog import safewrapper
 from core.utilities import reverse_mapping_lookup

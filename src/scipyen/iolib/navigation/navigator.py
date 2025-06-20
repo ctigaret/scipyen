@@ -142,61 +142,40 @@ from enum import Enum, IntEnum
 import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg)
 from qtpy.QtCore import (Signal, Slot, Property,)
-
 __has_PySide6__ = False
 __has_PyQt6__  = False
+__has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
+    import PySide6
+    from PySide6 import Shiboken
+    from PySide6.QtUiTools import loadUiType # -- A-HA!
     # QtType = typing.TypeVar("QtType", bound = "Shiboken.Object")
     QAction = QtGui.QAction
     QActionGroup = QtGui.QActionGroup
     QShortcut = QtGui.QShortcut
     QKeyboardModifiers = QtCore.Qt.KeyboardModifiers
-elif os.environ["QT_API"] == "pyqt6":
-    __has_PyQt6__ = True
+else:
+    if os.environ["QT_API"] == "pyqt6":
+        __has_PyQt6__ = True
     from qtpy import sip
-    __has_sip__ = True
+    ____has_sip____ = True
     # QtType = typing.TypeVar("QtType", bound = "sip.wrappertype")
+    from qtpy.uic import loadUiType
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
     QKeyboardModifiers = QtCore.Qt.KeyboardModifier
-else:
-    from qtpy import sip
-    __has_sip__ = True
-    QAction = QtWidgets.QAction
-    QActionGroup = QtWidgets.QActionGroup
-    QShortcut = QtWidgets.QShortcut
-    QKeyboardModifiers = QtCore.Qt.KeyboardModifiers
-    # QtType = typing.TypeVar("QtType", bound = "sip.wrappertype")
 
-has_qtdbus = False
+__has_qtdbus__ = False
 try:
     from qtpy import QtDBus
 
-    has_qtdbus = True
+    __has_qtdbus__ = True
 except:
     pass
 
-import qtpy
-qtpy.API = os.environ["QT_API"]
-if os.environ["QT_API"] == "pyside6":
-    import PySide6
-    from PySide6 import (QtCore, QtGui, QtWidgets, QtXml, QtSvg)
-    from PySide6.QtCore import (Signal, Slot, Property,)
-    QAction = QtGui.QAction
-    QActionGroup = QtGui.QActionGroup
-    has_sip = False
-else:
-    from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg)
-    from qtpy.QtCore import (Signal, Slot, Property,)
-    from qtpy import sip as sip # for sip.cast
-    has_sip = True
-    QAction = QtWidgets.QAction
-    QActionGroup = QtWidgets.QActionGroup
-# import sip # for sip.isdeleted() - not used yet, but beware
 from traitlets.utils.bunch import Bunch
-# from qtpy.uic import loadUiType
 
 from core import desktoputils as dutils
 from core import qtutils

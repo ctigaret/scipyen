@@ -13,17 +13,32 @@ solution by https://stackoverflow.com/users/2001654/musicamante
 """
 import os
 import qtpy
-qtpy.API = os.environ["QT_API"]
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
+from qtpy.QtCore import (Signal, Slot, Property,)
+__has_PySide6__ = False
+__has_PyQt6__ = False
+__has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
+    __has_PySide6__ = True
     import PySide6
-    from PySide6 import QtCore, QtGui, QtWidgets, QtSvg
-    from PySide6.QtCore import Signal, Slot, Property
-    from PySide6.QtUiTools import loadUiType as __loadUiType__
+    from PySide6 import Shiboken
+    # from PySide6.QtCore import (Signal, Slot, Property,)
+    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    QShortcut = QtGui.QShortcut
 else:
-    from qtpy import QtCore, QtGui, QtWidgets, QtSvg
-    from qtpy.QtCore import Signal, Slot, Property
-    from qtpy.uic import loadUiType as __loadUiType__
+    if os.environ["QT_API"] == "pyqt6":
+        __has_PyQt6__ = True
+        
+    from qtpy import sip
+    from qtpy.uic import loadUiType
+    QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
+    __has_sip__ = True
     
+
 
 
 class MenuProxy(QtWidgets.QProxyStyle):

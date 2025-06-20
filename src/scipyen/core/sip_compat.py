@@ -4,19 +4,46 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 import qtpy
-qtpy.API = os.environ["QT_API"]
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
+from qtpy.QtCore import (Signal, Slot, Property,)
+__has_PySide6__ = False
+__has_PyQt6__ = False
+__has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
+    __has_PySide6__ = True
     import PySide6
-    from PySide6 import QtCore, QtGui, QtWidgets, QtXml, QtSvg
-    from PySide6.QtCore import Signal, Slot, Property
-    # from qtpy.QtCore import Signal, Slot, QEnum, Property
-    has_sip = False
+    from PySide6 import Shiboken
+    # from PySide6.QtCore import (Signal, Slot, Property,)
+    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    QShortcut = QtGui.QShortcut
 else:
-    from qtpy import QtCore, QtGui, QtWidgets, QtXml, QtSvg
-    from qtpy.QtCore import Signal, Slot, Property
-    # from qtpy.QtCore import Signal, Slot, QEnum, Property
-    from qtpy import sip as sip
-    has_sip = True
+    if os.environ["QT_API"] == "pyqt6":
+        __has_PyQt6__ = True
+        
+    from qtpy import sip
+    from qtpy.uic import loadUiType
+    QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
+    __has_sip__ = True
+    
+
+# import qtpy
+# qtpy.API = os.environ["QT_API"]
+# if os.environ["QT_API"] == "pyside6":
+#     import PySide6
+#     from PySide6 import QtCore, QtGui, QtWidgets, QtXml, QtSvg
+#     from PySide6.QtCore import Signal, Slot, Property
+#     # from qtpy.QtCore import Signal, Slot, QEnum, Property
+#     __has_sip__ = False
+# else:
+#     from qtpy import QtCore, QtGui, QtWidgets, QtXml, QtSvg
+#     from qtpy.QtCore import Signal, Slot, Property
+#     # from qtpy.QtCore import Signal, Slot, QEnum, Property
+#     from qtpy import sip as sip
+#     __has_sip__ = True
 
 def no_sip_autoconversion(klass):
     r"""Decorator for classes to suppresses sip autoconversion of Qt to Python
@@ -36,10 +63,10 @@ def no_sip_autoconversion(klass):
         def wrapper(*args, **kwargs):
             # import sip
             # only works with pyqt5/6
-            if has_sip:
+            if __has_sip__:
                 oldValue = sip.enableautoconversion(klass, False)
             ret = func(*args, *kwargs)
-            if has_sip:
+            if __has_sip__:
                 sip.enableautoconversion(klass, oldValue)
             return ret
         return wrapper

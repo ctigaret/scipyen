@@ -49,18 +49,31 @@ Useful to have even when vigranumpy is not installed.
 import os, typing, inspect, math
 import numpy as np
 import qtpy
-qtpy.API = os.environ["QT_API"]
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
+from qtpy.QtCore import (Signal, Slot, Property,)
+__has_PySide6__ = False
+__has_PyQt6__ = False
+__has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
+    __has_PySide6__ = True
     import PySide6
-    import PySide6.QtCore as QtCore
-    import PySide6.QtGui as QtGui
-    import PySide6.QtWidgets as QtWidgets
-    from PySide6.QtCore import QObject, Signal, Slot
+    from PySide6 import Shiboken
+    # from PySide6.QtCore import (Signal, Slot, Property,)
+    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    QShortcut = QtGui.QShortcut
 else:
-    import qtpy.QtCore as QtCore
-    import qtpy.QtGui as QtGui
-    import qtpy.QtWidgets as QtWidgets
-    from qtpy.QtCore import QObject, Signal, Slot
+    if os.environ["QT_API"] == "pyqt6":
+        __has_PyQt6__ = True
+        
+    from qtpy import sip
+    from qtpy.uic import loadUiType
+    QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
+    __has_sip__ = True
+    
 
 from gui.guiutils import(InftyDoubleValidator, ComplexValidator, UnitsStringValidator)
 

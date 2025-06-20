@@ -36,15 +36,6 @@ else:
     QShortcut = QtWidgets.QShortcut
     
 import matplotlib as mpl
-# import qtpy
-# qtpy.API = os.environ["QT_API"]
-# if os.environ["QT_API"] == "pyside6":
-#     import PySide6
-#     from PySide6 import (QtCore, QtWidgets, QtGui)
-#     from PySide6.QtCore import (Signal, Slot, Property)
-# else:
-#     from qtpy import (QtCore, QtWidgets, QtGui)
-#     from qtpy.QtCore import (Signal, Slot, Property)
 
 from core.utilities import safewrapper
 from core.workspacefunctions import (user_workspace, validate_varname, get_symbol_in_namespace)

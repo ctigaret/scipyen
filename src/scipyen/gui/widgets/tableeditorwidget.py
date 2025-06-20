@@ -5,21 +5,32 @@ import os, inspect, warnings, traceback, datetime, typing
 #### END core python modules
 
 #### BEGIN 3rd party modules
+import qtpy
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
+from qtpy.QtCore import (Signal, Slot, Property,)
 __has_PySide6__ = False
+__has_PyQt6__ = False
+__has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
-    import PySide6
-    from PySide6 import QtCore, QtGui, QtWidgets
-    from PySide6.QtCore import Signal, Slot, Property
-    from PySide6.QtUiTools import loadUiType as __loadUiType__
-    import qtpy
-    qtpy.API = os.environ["QT_API"]
     __has_PySide6__ = True
+    import PySide6
+    from PySide6 import Shiboken
+    # from PySide6.QtCore import (Signal, Slot, Property,)
+    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    QShortcut = QtGui.QShortcut
 else:
-    import qtpy
-    qtpy.API = os.environ["QT_API"]
-    from qtpy import QtCore, QtGui, QtWidgets
-    from qtpy.QtCore import Signal, Slot, Property
-    from qtpy.uic import loadUiType as __loadUiType__
+    if os.environ["QT_API"] == "pyqt6":
+        __has_PyQt6__ = True
+        
+    from qtpy import sip
+    from qtpy.uic import loadUiType
+    QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
+    __has_sip__ = True
+    
 
 import pandas as pd
 import quantities as pq
@@ -71,8 +82,7 @@ __ui_path__ = adapt_ui_path(__module_path__, "tableeditorwidget.ui")
 
 __module_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
-Ui_TableEditorWidget, QWidget = __loadUiType__(__ui_path__)
-# Ui_TableEditorWidget, QWidget = __loadUiType__(os.path.join(__module_path__, "tableeditorwidget.ui"))
+Ui_TableEditorWidget, QWidget = loadUiType(__ui_path__)
 
 class TableEditorWidget(QWidget, Ui_TableEditorWidget):
     # TODO 2019-11-01 22:57:01

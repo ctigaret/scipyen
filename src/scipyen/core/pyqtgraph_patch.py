@@ -3,31 +3,31 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 import os
-__has_PySide6__=False
+import qtpy
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
+from qtpy.QtCore import (Signal, Slot, Property,)
+__has_PySide6__ = False
+__has_PyQt6__ = False
+__has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
+    __has_PySide6__ = True
     import PySide6
-    from PySide6 import QtCore, QtGui, QtWidgets, QtSvg
-    from PySide6.QtCore import Signal, Slot
-    from PySide6.QtUiTools import loadUiType as __loadUiType__
-    import qtpy
-    qtpy.API = os.environ["QT_API"]
-    os.environ["PYQTGRAPH_QT_LIB"] = "PySide6"
-    os.environ["FORCE_QT_API"] = "1"
-    __has_PySide6__=True
-elif os.environ["QT_API"] == "pyqt6":
-    import qtpy
-    qtpy.API = os.environ["QT_API"]
-    os.environ["PYQTGRAPH_QT_LIB"] = "PyQt6"
-    os.environ["FORCE_QT_API"] = "1"
-    from qtpy import QtCore, QtGui, QtWidgets, QtSvg
-    from qtpy.QtCore import Signal, Slot
-    from qtpy.uic import loadUiType as __loadUiType__
+    from PySide6 import Shiboken
+    # from PySide6.QtCore import (Signal, Slot, Property,)
+    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    QShortcut = QtGui.QShortcut
 else:
-    import qtpy
-    qtpy.API = os.environ["QT_API"]
-    from qtpy import QtCore, QtGui, QtWidgets, QtSvg
-    from qtpy.QtCore import Signal, Slot
-    from qtpy.uic import loadUiType as __loadUiType__
+    if os.environ["QT_API"] == "pyqt6":
+        __has_PyQt6__ = True
+        
+    from qtpy import sip
+    from qtpy.uic import loadUiType
+    QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
+    __has_sip__ = True
 
 import pyqtgraph
 

@@ -2746,6 +2746,7 @@ def get_module_version(p:typing.Union[types.ModuleType, str]) -> str:
     
 
 def get_qt_api_for_python(module:types.ModuleType) -> str:
+    r"""Introspection of the Qt API for help purposes, NOT to guide GUI code"""
     hasPg = False
     try: 
         pg = importlib.import_module("pyqtgraph")

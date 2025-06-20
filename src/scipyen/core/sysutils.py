@@ -9,10 +9,6 @@ NOTE: This does NOT relate to the standard library's ``sys`` module.
 import os, sys, subprocess, shutil, platform, pathlib, typing
 from shutil import which
 from core.prog import print_styled
-# from core.desktoputils import (get_wm, get_desktop, get_dbus_service_names, 
-#                                is_kde_x11, is_kde_wayland, is_kde)
-
-# from qtpy.QtCore import (Signal, Slot, Property,)
 
 def adapt_ui_path(module_path, uifile):
     return os.path.join(module_path, uifile)

@@ -17,26 +17,40 @@ Meant to be used by gui.pythonhelpwidget
 import sys, os, typing, inspect, types, importlib, io, dataclasses, inspect
 from functools import (singledispatch, partial)
 from contextlib import redirect_stdout
-from IPython.core.interactiveshell import InteractiveShell
+
 import qtpy
-qtpy.API = os.environ["QT_API"]
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
+from qtpy.QtCore import (Signal, Slot, Property,)
+__has_PySide6__ = False
+__has_PyQt6__ = False
+__has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
+    __has_PySide6__ = True
     import PySide6
-    from PySide6 import QtCore, QtWidgets
+    from PySide6 import Shiboken
+    # from PySide6.QtCore import (Signal, Slot, Property,)
+    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    QShortcut = QtGui.QShortcut
 else:
-    from qtpy import QtCore, QtWidgets
-# let's try this:
-# from gui.mainwindow import *
+    if os.environ["QT_API"] == "pyqt6":
+        __has_PyQt6__ = True
+        
+    from qtpy import sip
+    from qtpy.uic import loadUiType
+    QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
+    __has_sip__ = True
+
+
+from IPython.core.interactiveshell import InteractiveShell
 
 # NOTE: 2025-05-31 17:15:38
 # do NOT place this file deeper than one level below scipyen directory
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 _scipyendir_ = os.path.dirname(__module_path__)
-
-# my_conda_env = os.environ.get("CONDA_DEFAULT_ENV", None)
-# conda_env_prefix = os.environ.get("CONDA_PREFIX", None)
-# 
-# my_virtualenv = os.environ.get("VIRTUAL_ENV", None)
 
 def make_HTML_table(msg:str|list[str], cols:typing.Optional[int] = None) -> str:
     r"""Formats a message to be displayed in a HTML table with ``cols`` columns.

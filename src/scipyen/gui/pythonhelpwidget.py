@@ -49,24 +49,32 @@ fail
 #
 import sys, os, io, typing, traceback, inspect, subprocess, pydoc, runpy
 from collections import deque
-
 import qtpy
-qtpy.API = os.environ["QT_API"]
-isPySide6 = False
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
+from qtpy.QtCore import (Signal, Slot, Property,)
+__has_PySide6__ = False
+__has_PyQt6__ = False
+__has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
+    __has_PySide6__ = True
     import PySide6
-    from PySide6 import QtCore, QtGui, QtWidgets, QtSvg, QtNetwork, Shiboken
-    from PySide6.QtCore import Signal, Slot, Property
-    from PySide6.QtUiTools import loadUiType as __loadUiType__
+    from PySide6 import Shiboken
+    # from PySide6.QtCore import (Signal, Slot, Property,)
+    from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
     QActionGroup = QtGui.QActionGroup
-    isPySide6 = True
+    QShortcut = QtGui.QShortcut
 else:
-    from qtpy import QtCore, QtGui, QtWidgets, QtSvg, QtNetwork
-    from qtpy.QtCore import Signal, Slot, Property
-    from qtpy.uic import loadUiType as __loadUiType__
+    if os.environ["QT_API"] == "pyqt6":
+        __has_PyQt6__ = True
+        
+    from qtpy import sip
+    from qtpy.uic import loadUiType
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
+    __has_sip__ = True
+    
 
 
 from IPython.core.interactiveshell import InteractiveShell
@@ -82,7 +90,7 @@ if isPySide6:
 else:
     __ui_path__ = adapt_ui_path(__module_path__,'pythonhelpwidget.ui')
 
-Ui_PythonHelpWidget, QWidget = __loadUiType__(__ui_path__)
+Ui_PythonHelpWidget, QWidget = loadUiType(__ui_path__)
 
 class _PythonHelpThread_(QtCore.QThread):
     # ready = Signal(str, name="ready")
