@@ -1062,6 +1062,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     _defaultUIFont:QtGui.QFont = QtWidgets.QApplication.font()
     
     _useDefaultQApplicationFont:bool = True
+    
+    _defaultIconSize_ = 16
+
 
     _instance = None # NOTE: Singleton design pattern
     
@@ -1783,6 +1786,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # self.shell.events.register("post_execute", self.workspaceModel.post_execute)
         self.shell.events.register("post_run_cell", self.workspaceModel.postRunCell)
         
+        self._lockedToolBar:bool = True
+        self._guiIconSize_ = self._defaultIconSize_
+        
         # NOTE: 2023-06-04 10:49:56
         # for debugging only; comment out for relese
         # self.shell.events.register("pre_run_cell", self.workspaceModel.preRunCell)
@@ -1804,6 +1810,14 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # property setter, see  NOTE:FIXME:2022-01-28 23:11:59) the
         # configurable_traits are NOT populated/notified!
         # Hence I need to force this here
+        
+        self._defaultTbIconSize = self.toolBar.iconSize()
+        self._defaultTbButtonStyle = self.toolBar.toolButtonStyle() # a Qt.ToolButtonStyle
+
+        # NOTE: 2025-06-21 16:49:12
+        # variables I think depend on all GUI bits being initialized in setupUi
+        self._tbIconSize:QtCore.QSize = self.toolBar.iconSize()
+        self._tbButtonStyle:QtCore.Qt.ToolButtonStyle = self.toolBar.toolButtonStyle()
 
 
         # With all UI elements and their signal-slot connections in place we can
@@ -2040,6 +2054,174 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     @navigatorEditable.setter
     def navigatorEditable(self, value:bool):
         self.navigator.setUrlEditable(value is True)
+
+    @property
+    def toolBarLocked(self) -> bool:
+        return not self.toolBar.isMovable()
+    
+    @markConfigurable("ToolBarLocked", "Qt")
+    @toolBarLocked.setter
+    def toolBarLocked(self, val:bool):
+        self._lockedToolBar = val is True
+        signalBlocker = QtCore.QSignalBlocker(self.lockToolBarAction)
+        self.lockToolBarAction.setChecked(self._lockedToolBar)
+        self.toolBar.setMovable(not self._lockedToolBar)
+        
+    @Slot(bool)
+    def _slot_changeToolBarLockedState(self, val:bool):
+        # print(f"{self.__class__.__name__}._slot_changeToolBarLockedState(val={val})")
+        self.toolBarLocked = val is True
+        
+    @property
+    def toolBarIconSize(self) -> QtCore.QSize:
+        return self.toolBar.iconSize() # QMainWindow API
+    
+    @markConfigurable("ToolbarIconSize", "Qt")
+    @toolBarIconSize.setter
+    def toolBarIconSize(self, val:QtCore.QSize):
+        # print(f"{self.__class__.__name__}.toolBarIconSize.setter(val = {val})")
+        self._tbIconSize = val
+        self.toolBar.setIconSize(val)
+        signalBlocker = QtCore.QSignalBlocker(self.toolBarIconSizeActionGroup)
+        if self._tbIconSize == self._defaultTbIconSize:
+            self.defaultToolBarIconSizeAction.setChecked(True)
+        elif self._tbIconSize == QtCore.QSize(16,16):
+            self.smallToolBarIconSizeAction.setChecked(True)
+        elif self._tbIconSize == QtCore.QSize(22,22):
+            self.mediumToolBarIconSizeAction.setChecked(True)
+        elif self._tbIconSize == QtCore.QSize(32,32):
+            self.largeToolBarIconSizeAction.setChecked(True)
+        elif self._tbIconSize == QtCore.QSize(48, 48):
+            self.hugeToolBarIconSizeAction.setChecked(True)
+        else:
+            for action in [self.defaultToolBarIconSizeAction, self.smallToolBarIconSizeAction,
+                       self.mediumToolBarIconSizeAction, self.largeToolBarIconSizeAction,
+                       self.hugeToolBarIconSizeAction]:
+                action.setChecked(False)
+            
+    @Slot(QAction)
+    def _slot_setToolBarIconSize(self, val:QAction):
+        # signalBlocker = QtCore.QSignalBlocker(self.toolBarIconSizeActionGroup)
+        if val == self.defaultToolBarIconSizeAction:
+            self.toolBarIconSize = self._defaultTbIconSize
+        elif val == self.smallToolBarIconSizeAction:
+            self.toolBarIconSize = QtCore.QSize(16,16)
+        elif val == self.mediumToolBarIconSizeAction:
+            self.toolBarIconSize = QtCore.QSize(22,22)
+        elif val == self.largeToolBarIconSizeAction:
+            self.toolBarIconSize = QtCore.QSize(32,32)
+        elif val == self.hugeToolBarIconSizeAction:
+            self.toolBarIconSize = QtCore.QSize(48,48)
+            
+    @property
+    def toolBarButtonStyle(self) -> QtCore.Qt.ToolButtonStyle:
+        return self.toolBar.toolButtonStyle()
+    
+    @markConfigurable("ToolbarButtonStyle")
+    @toolBarButtonStyle.setter
+    def toolBarButtonStyle(self, val:QtCore.Qt.ToolButtonStyle):
+        self._tbButtonStyle = val
+        self.toolBar.setToolButtonStyle(val)
+        signalBlocker = QtCore.QSignalBlocker(self.toolBarIconSizeActionGroup)
+        if self._tbButtonStyle == self._defaultTbButtonStyle:
+            self.defaultToolBarToolButtonStyleAction.setChecked(True)
+        elif self._tbButtonStyle == QtCore.Qt.ToolButtonIconOnly:
+            self.iconsOnlyToolBarToolButtonStyleAction.setChecked(True)
+        elif self._tbButtonStyle == QtCore.Qt.ToolButtonTextOnly:
+            self.textOnlyToolBarToolButtonStyleAction.setChecked(True)
+        elif self._tbButtonStyle == QtCore.Qt.ToolButtonTextBesideIcon:
+            self.textUnderIconsToolBarToolButtonStyleAction.setChecked(True)
+        
+    @Slot(QAction)
+    def _slot_setToolBarToolButtonStyle(self, val:QAction):
+        if val == self.defaultToolBarToolButtonStyleAction:
+            self.toolBarButtonStyle = self._defaultTbButtonStyle
+        elif val == self.iconsOnlyToolBarToolButtonStyleAction:
+            self.toolBarButtonStyle = QtCore.Qt.ToolButtonIconOnly
+        elif val == self.textOnlyToolBarToolButtonStyleAction:
+            self.toolBarButtonStyle = QtCore.Qt.ToolButtonTextOnly
+        elif val == self.textAlongsideIconsToolBarToolButtonStyleAction:
+            self.toolBarButtonStyle = QtCore.Qt.ToolButtonTextBesideIcon
+        elif val == self.textUnderIconsToolBarToolButtonStyleAction:
+            self.toolBarButtonStyle = QtCore.Qt.ToolButtonTextUnderIcon
+    
+    @Slot()
+    def _slot_configureIconSize(self):
+        # icon_sizes = [16, 22, 32, 48]
+        # texts = [f"{k}x{k}" for k in icon_sizes]
+        icon_sizes = {"Small":16, "Medium":22, "Large":32, "Huge":48}
+        texts = list(map(lambda i: f"{i[0]} ({i[1]}×{i[1]})", icon_sizes.items()))
+        dlg = qd.QuickDialog(self, "Set Icon Size", True, False)
+        cb = qd.QuickDialogComboBox(dlg, "Icon Size:")
+        dlg.addWidget(cb)
+        cb.setItems(texts)
+        currentIS = self.iconSize().width()
+        
+        if currentIS not in icon_sizes.values():
+            if currentIS <= 16:
+                currentIS = 16
+            elif currentIS <= 22:
+                currentIS = 22
+            elif currentIS <= 32: 
+                currentIS = 32
+            else:
+                currentIS = 48
+        # print(f"currentIS = {currentIS}")
+        # print(f"ndx = {icon_sizes.index(currentIS)}")
+        selected = list(icon_sizes.values()).index(currentIS)
+            
+        cb.setCurrentIndex(selected)
+        
+        dlg.resize(-1,-1)
+        
+        if dlg.exec() > 0:
+            # newVal = icon_sizes[cb.value()]
+            newVal = list(icon_sizes.values())[cb.value()]
+            
+        else:
+            newVal = currentIS
+            
+        self.guiIconSize = newVal
+
+    @property
+    def guiIconSize(self) -> int:
+        return self._guiIconSize_
+    
+    def _set_icon_Size(self, val:int):
+        iconSize = QtCore.QSize(val, val)
+        ww = list(filter(lambda w: isinstance(w, (QtWidgets.QMainWindow, QtWidgets.QDockWidget)), self.app.allWidgets()))
+        for w in ww:
+            if isinstance(w, QtWidgets.QMainWindow):
+                w.setIconSize(iconSize)
+            if __has_PySide6__:
+                btns = w.findChildren(QtWidgets.QToolButton) + w.findChildren(QtWidgets.QPushButton)
+            else:
+                btns = w.findChildren((QtWidgets.QToolButton, QtWidgets.QPushButton))
+            for b in btns:
+                b.setIconSize(iconSize)
+            
+    @markConfigurable("GUIIconsize", "Qt")
+    @guiIconSize.setter
+    def guiIconSize(self, val:int):
+        # print(f"{self.__class__.__name__}.guiIconSize = {val}")
+        val = int(val)
+        self._guiIconSize_ = val
+        if val not in [16,22,32,48]:
+            if val <= 16:
+                val = 16
+            elif val <= 22:
+                val = 22
+            elif val <= 32: 
+                val = 32
+            else:
+                val = 48
+        
+        self._set_icon_Size(val)
+        
+        # toolbars = tuple(p[0] for p in inspect.getmembers_static(self, lambda x: isinstance(x, (QtWidgets.QToolBar, QtWidgets.QToolButton))))
+        # for t in toolbars:
+        #     getattr(self,t).setIconSize(QtCore.QSize(val, val))
+
 
     @property
     def consoleDocked(self):
@@ -5512,7 +5694,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # elif hasQDarkTheme:
         #     self._available_Qt_style_names_.extend(f"Qt{v.capitalize()}" for v in qdarktheme.get_themes())
 
-        self.actionSet_Icon_Size.triggered.connect(self._slot_configureIconSize)
+        self.actionSet_Icon_Size.triggered.connect(self._slot_configureIconSize) # slot inherited from WorkspaceGuiMixin
         self.actionGUI_Style.triggered.connect(self._slot_set_Application_style)
         self.actionSet_user_plugins_directory.triggered.connect(self._slot_set_Users_Plugins_directory)
         # self.actionConfigure_external_HDF_viewer.triggered.connect(self._slot_set_ExternalHDF5Viewer)
@@ -5747,7 +5929,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.refreshViewAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("view-refresh"), "Refresh Active View")
         self.refreshViewAction.triggered.connect(self.slot_refreshView)
         # NOTE: 2024-06-01 18:08:54
-        # whats this action should be the last action added to the toolbar
+        # 'whats this' action should be the last action added to the toolbar
         self.helpTbAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("help-contents"), "Help")
         self.helpTbAction.setMenu(self.menuHelp)
         # self.toolBar.addAction(self.whatsThisAction)
@@ -5781,9 +5963,41 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         self.tbChDir.setPopupMode(QtWidgets.QToolButton.MenuButtonPopup)
         self.tbChDir.setMenu(self.recentDirectoriesMenu)
+
+        self.lockToolBarAction = QAction(QtGui.QIcon.fromTheme("lock-symbolic"), "Lock Toolbar Positions", self)
+        self.lockToolBarAction.setCheckable(True)
+        self.lockToolBarAction.setChecked(self._lockedToolBar)
+        self.lockToolBarAction.toggled[bool].connect(self._slot_changeToolBarLockedState)
         
-        # self.toolBar.removeAction(self.actionChange_Working_Directory)
-        # self.toolBar.insertAction(self.actionChange_Working_Directory, self.actionSave)
+        # ### BEGIN toolbar button style
+        #
+        self.toolBarToolButtonStyleActionGroup = QActionGroup(self)
+        self.toolBarToolButtonStyleActionGroup.setExclusive(True)
+        self.defaultToolBarToolButtonStyleAction = QAction("Default", self.toolBarToolButtonStyleActionGroup)
+        self.iconsOnlyToolBarToolButtonStyleAction = QAction("Icons Only", self.toolBarToolButtonStyleActionGroup)
+        self.textOnlyToolBarToolButtonStyleAction = QAction("Text Only", self.toolBarToolButtonStyleActionGroup)
+        self.textAlongsideIconsToolBarToolButtonStyleAction = QAction("Text Alongside Icons", self.toolBarToolButtonStyleActionGroup)
+        self.textUnderIconsToolBarToolButtonStyleAction = QAction("Text Under Icons", self.toolBarToolButtonStyleActionGroup)
+        self.toolBarToolButtonStyleActionGroup.setEnabled(True)
+        self.toolBarToolButtonStyleActionGroup.triggered[QAction].connect(self._slot_setToolBarToolButtonStyle)
+        #
+        # ### END   toolbar button style
+        
+        # ### BEGIN toolbar icon size
+        #
+        self.toolBarIconSizeActionGroup = QActionGroup(self)
+        self.toolBarIconSizeActionGroup.setExclusive(True)
+        self.defaultToolBarIconSizeAction = QAction("Default", self.toolBarIconSizeActionGroup)
+        self.defaultToolBarIconSizeAction.setChecked(True)
+        self.smallToolBarIconSizeAction = QAction("Small (16×16)", self.toolBarIconSizeActionGroup)
+        self.mediumToolBarIconSizeAction = QAction("Medium (22×22)", self.toolBarIconSizeActionGroup)
+        self.largeToolBarIconSizeAction = QAction("Large (32×32)", self.toolBarIconSizeActionGroup)
+        self.hugeToolBarIconSizeAction = QAction("Huge (48×48)", self.toolBarIconSizeActionGroup)
+        self.toolBarIconSizeActionGroup.setEnabled(True)
+        self.toolBarIconSizeActionGroup.triggered[QAction].connect(self._slot_setToolBarIconSize)
+        #
+        # ### END   toolbar icon size
+        
 
         # BEGIN do not delete: action for presenting a list of viewer types to choose from
         # self.menuViewer.addSeparator()
@@ -6215,6 +6429,30 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         event.accept()
 
         self.statusbar.clearMessage()
+        
+    @safewrapper
+    def createPopupMenu(self) -> QtWidgets.QMenu:
+        r"""Extend toolbar popup menu with style options"""
+        menu = super().createPopupMenu()
+        menu.addSection("Toolbar Settings")
+        # text position
+        textPositionMenu = menu.addMenu("Text Position")
+        for action in [self.defaultToolBarToolButtonStyleAction,
+                       self.iconsOnlyToolBarToolButtonStyleAction,
+                       self.textOnlyToolBarToolButtonStyleAction,
+                       self.textAlongsideIconsToolBarToolButtonStyleAction,
+                       self.textUnderIconsToolBarToolButtonStyleAction]:
+            textPositionMenu.addAction(action)
+        # icon size
+        iconSizeMenu = menu.addMenu("Icon Size")
+        for action in [self.defaultToolBarIconSizeAction, self.smallToolBarIconSizeAction,
+                       self.mediumToolBarIconSizeAction, self.largeToolBarIconSizeAction,
+                       self.hugeToolBarIconSizeAction]:
+            iconSizeMenu.addAction(action)
+        menu.addAction(self.lockToolBarAction)
+            
+        return menu
+        
 
     @Slot(object, bool, QtCore.QPoint)
     @safewrapper

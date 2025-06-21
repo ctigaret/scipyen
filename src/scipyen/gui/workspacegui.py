@@ -997,8 +997,6 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
     
     _owncfg = Bunch()
     
-    _defaultIconSize_ = 16
-    
     def workspaceSymbolForData(self, data):
         ws = self.appWindow.workspace
         return get_symbol_in_namespace(data, ws)        
@@ -1012,8 +1010,6 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
     the 'parent' parameter is checked to see whether itselt is Scipyen main window
     """
         self._scipyenWindow_ = None
-        
-        self._guiIconSize_ = self._defaultIconSize_
         
         self._fileLoadWorker_ = None
         self._fileLoadController_ = None
@@ -1033,9 +1029,6 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         
         if isinstance(scipyenWindow, QtWidgets.QMainWindow) and type(scipyenWindow).__name__ == "ScipyenWindow":
             self._scipyenWindow_ = scipyenWindow
-            
-        # elif isinstance(parent, QtWidgets.QMainWindow) and type(parent).__name__ == "ScipyenWindow":
-        #     self._scipyenWindow_   = parent
             
         elif isinstance(parent_obj, QtWidgets.QMainWindow) and type(parent_obj).__name__ == "ScipyenWindow":
             self._scipyenWindow_   = parent_obj
@@ -1130,65 +1123,68 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         # return self._scipyenWindow_.__class__.__name__ == "ScipyenWindow"
         # return self.appWindow is not None and self.appWindow is self._scipyenWindow_
                 
-    @Slot()
-    def _slot_configureIconSize(self):
-        icon_sizes = [16, 22, 32, 48]
-        texts = [f"{k}x{k}" for k in icon_sizes]
-        dlg = qd.QuickDialog(self, "Set Icon Size", True, False)
-        cb = qd.QuickDialogComboBox(dlg, "Icon Size:")
-        dlg.addWidget(cb)
-        cb.setItems(texts)
-        currentIS = self.iconSize().width()
-        
-        if currentIS not in icon_sizes:
-            if currentIS <= 16:
-                currentIS = 16
-            elif currentIS <= 22:
-                currentIS = 22
-            elif currentIS <= 32: 
-                currentIS = 32
-            else:
-                currentIS = 48
-        print(f"currentIS = {currentIS}")
-        print(f"ndx = {icon_sizes.index(currentIS)}")
-        selected = icon_sizes.index(currentIS)
-            
-        cb.setCurrentIndex(selected)
-        
-        dlg.resize(-1,-1)
-        
-        if dlg.exec() > 0:
-            newVal = icon_sizes[cb.value()]
-            
-        else:
-            newVal = currentIS
-            
-        self.guiIconSize = newVal
-
-    @property
-    def guiIconSize(self) -> int:
-        return self._guiIconSize_
-    
-    @markConfigurable("GUIIconsize", "Qt")
-    @guiIconSize.setter
-    def guiIconSize(self, val:int):
-        val = int(val)
-        if val not in [16,22,32,48]:
-            if val <= 16:
-                val = 16
-            elif val <= 22:
-                val = 22
-            elif val <= 32: 
-                val = 32
-            else:
-                val = 48
-        
-        self.setIconSize(QtCore.QSize(val, val))
-        
-        toolbars = tuple(p[0] for p in inspect.getmembers_static(self, lambda x: isinstance(x, (QtWidgets.QToolBar, QtWidgets.QToolButton))))
-        for t in toolbars:
-            getattr(self,t).setIconSize(QtCore.QSize(val, val))
-
+#     @Slot()
+#     def _slot_configureIconSize(self):
+#         # icon_sizes = [16, 22, 32, 48]
+#         # texts = [f"{k}x{k}" for k in icon_sizes]
+#         icon_sizes = {"Small":16, "Medium":22, "Large":32, "Huge":48}
+#         texts = list(map(lambda i: f"{i[0]} ({i[1]}×{i[1]})", icon_sizes.items()))
+#         dlg = qd.QuickDialog(self, "Set Icon Size", True, False)
+#         cb = qd.QuickDialogComboBox(dlg, "Icon Size:")
+#         dlg.addWidget(cb)
+#         cb.setItems(texts)
+#         currentIS = self.iconSize().width()
+#         
+#         if currentIS not in icon_sizes.values():
+#             if currentIS <= 16:
+#                 currentIS = 16
+#             elif currentIS <= 22:
+#                 currentIS = 22
+#             elif currentIS <= 32: 
+#                 currentIS = 32
+#             else:
+#                 currentIS = 48
+#         # print(f"currentIS = {currentIS}")
+#         # print(f"ndx = {icon_sizes.index(currentIS)}")
+#         selected = list(icon_sizes.values()).index(currentIS)
+#             
+#         cb.setCurrentIndex(selected)
+#         
+#         dlg.resize(-1,-1)
+#         
+#         if dlg.exec() > 0:
+#             # newVal = icon_sizes[cb.value()]
+#             newVal = list(icon_sizes.values())[cb.value()]
+#             
+#         else:
+#             newVal = currentIS
+#             
+#         self.guiIconSize = newVal
+# 
+#     @property
+#     def guiIconSize(self) -> int:
+#         return self._guiIconSize_
+#     
+#     @markConfigurable("GUIIconsize", "Qt")
+#     @guiIconSize.setter
+#     def guiIconSize(self, val:int):
+#         val = int(val)
+#         if val not in [16,22,32,48]:
+#             if val <= 16:
+#                 val = 16
+#             elif val <= 22:
+#                 val = 22
+#             elif val <= 32: 
+#                 val = 32
+#             else:
+#                 val = 48
+#         
+#         self.setIconSize(QtCore.QSize(val, val))
+#         
+#         toolbars = tuple(p[0] for p in inspect.getmembers_static(self, lambda x: isinstance(x, (QtWidgets.QToolBar, QtWidgets.QToolButton))))
+#         for t in toolbars:
+#             getattr(self,t).setIconSize(QtCore.QSize(val, val))
+# 
     @property
     def appWindow(self):
         r"""The parent application window of this window.
