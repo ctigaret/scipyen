@@ -454,6 +454,16 @@ class GuiMessages(object):
             msgbox.setDetailedText(detail)
             
         return msgbox.exec()
+    
+    @safewrapper
+    def selectFont(self, default:typing.Optional[QtGui.QFont] = QtWidgets.QApplication.font()) -> QtGui.QFont | None:
+        if __has_PySide6__:
+            ok, selectedFont = QtWidgets.QFontDialog.getFont(default, self)
+        else:
+            selectedFont, ok = QtWidgets.QFontDialog.getFont(default, self)
+            
+        if ok:
+            return selectedFont
        
     @staticmethod
     def detailedMessage_static(obj:typing.Optional[QtWidgets.QWidget]=None, 
@@ -1044,7 +1054,10 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
                 frame_records = inspect.getouterframes(inspect.currentframe())
                 for (n,f) in enumerate(frame_records):
                     if "ScipyenWindow" in f[0].f_globals:
-                        self._scipyenWindow_ = f[0].f_globals["ScipyenWindow"].instance()
+                        if __has_PyQt6__:
+                            self._scipyenWindow_ = f[0].f_globals["ScipyenWindow"]
+                        else:
+                            self._scipyenWindow_ = f[0].f_globals["ScipyenWindow"].instance()
                         break
                     
         self._appWindow_ = None

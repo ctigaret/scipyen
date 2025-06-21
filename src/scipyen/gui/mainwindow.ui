@@ -1180,8 +1180,11 @@ NOTE: you can click anywhere in the row to select</string>
      <verstretch>0</verstretch>
     </sizepolicy>
    </property>
+   <property name="acceptDrops">
+    <bool>false</bool>
+   </property>
    <property name="windowTitle">
-    <string>toolBar</string>
+    <string>ScipyenMainToolBar</string>
    </property>
    <property name="toolTip">
     <string>Save variables to HDF5 file</string>

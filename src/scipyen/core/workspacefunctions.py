@@ -512,7 +512,10 @@ def getMainScipyenWindow() -> object:
         frame_records = inspect.getouterframes(inspect.currentframe())
         for (n,f) in enumerate(frame_records):
             if "ScipyenWindow" in f[0].f_globals:
-                ret = f[0].f_globals["ScipyenWindow"].instance()
+                if __has_PyQt6__:
+                    ret = f[0].f_globals["ScipyenWindow"]
+                else:
+                    ret = f[0].f_globals["ScipyenWindow"].instance()
                 break
             
     if ret is None:
@@ -533,17 +536,26 @@ def getCallSource() -> object:
     frame_records = inspect.getouterframes(inspect.currentframe())
     for (n,f) in enumerate(frame_records):
         if "ScipyenWindow" in f[0].f_globals:
-            ret = f[0].f_globals["ScipyenWindow"].instance()
+            if __has_PyQt6__:
+                ret = f[0].f_globals["ScipyenWindow"]
+            else:
+                ret = f[0].f_globals["ScipyenWindow"].instance()
             break
     if ret is None:
         for (n,f) in enumerate(frame_records):
             if "ScipyenConsole" in f[0].f_globals:
-                ret = f[0].f_globals["ScipyenConsole"].instance()
+                if __has_PyQt6__:
+                    ret = f[0].f_globals["ScipyenConsole"]
+                else:
+                    ret = f[0].f_globals["ScipyenConsole"].instance()
                 break
     if ret is None:
         for (n,f) in enumerate(frame_records):
             if "ExternalConsoleWindow" in f[0].f_globals:
-                ret = f[0].f_globals["ExternalConsoleWindow"].instance()
+                if __has_PyQt6__:
+                    ret = f[0].f_globals["ExternalConsoleWindow"]
+                else:
+                    ret = f[0].f_globals["ExternalConsoleWindow"].instance()
                 break
             
     return ret

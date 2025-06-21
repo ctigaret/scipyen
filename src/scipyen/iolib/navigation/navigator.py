@@ -909,7 +909,8 @@ class UrlNavigatorButtonBase(QtWidgets.QPushButton):
     def foregroundColor(self):
         isHighlighted = self.isDisplayHintEnabled(DisplayHint.EnteredHint) or self.isDisplayHintEnabled(DisplayHint.DraggedHint) or self.isDisplayHintEnabled(DisplayHint.PopupActiveHint)
         
-        if os.environ["QT_API"] == "pyside6":
+        # if os.environ["QT_API"] == "pyside6":
+        if __has_PyQt6__ or __has_PySide6__:
             foregroundColor = self.palette().color(QtGui.QPalette.Normal, QtGui.QPalette.ButtonText)
         else:
             foregroundColor = self.palette().color(QtGui.QPalette.Foreground)

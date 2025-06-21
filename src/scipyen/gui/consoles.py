@@ -970,16 +970,15 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
                 self.sb_menu.setDefaultAction(action)
             
         self.choose_font_act = QAction("Font", self, shortcut=ctrl+"F",
-                                                 triggered = self.choose_font)
+                                                 triggered = self.chooseFont)
         
         self.add_menu_action(self.view_menu, self.choose_font_act)
         
-    def choose_font(self):
+    def chooseFont(self):
         currentFont = self.consoleFont
-        selectedFont, ok = QtWidgets.QFontDialog.getFont(currentFont, self)
-        if ok:
+        selectedFont = self.selectFont(currentFont)
+        if isinstance(selectedFont, QtGui.QFont):
             self.active_frontend.font = selectedFont
-            
         
     def _load_settings_(self):
         #print("ExternalConsoleWindow._load_settings_()")
@@ -3556,7 +3555,7 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
                 self.sb_menu.setDefaultAction(action)
 
         self.choose_font_act = QAction("Console Font", self, shortcut=ctrl+"F",
-                                                 triggered = self.choose_font)
+                                                 triggered = self.chooseFont)
         
         self.settings_menu.addAction(self.choose_font_act)
         self.addAction(self.choose_font_act)
@@ -3634,13 +3633,10 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         if self.active_frontend and hasattr(self.active_frontend, "guiSetScrollBack"):
             self.active_frontend.guiSetScrollBack()
         
-    def choose_font(self):
+    def chooseFont(self):
         currentFont = self.consoleFont
-        if os.environ["QT_API"] == "pyside6":
-            ok, selectedFont = QtWidgets.QFontDialog.getFont(currentFont, self)
-        else:
-            selectedFont, ok = QtWidgets.QFontDialog.getFont(currentFont, self)
-        if ok:
+        selectedFont = self.selectFont(currentFont)
+        if isinstance(selectedFont, QtGui.QFont):
             self.active_frontend.font = selectedFont
         
     def closeEvent(self,evt):

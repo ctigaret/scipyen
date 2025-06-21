@@ -523,7 +523,8 @@ def console_info():
 # QWidget: Must construct a QApplication before a QWidget
 from iolib.navigation import navigator
 
-_mainwindow_ui_file = "mainwindow_qt6.ui" if __has_PyQt6__ else "mainwindow.ui"
+# _mainwindow_ui_file = "mainwindow_qt6.ui" if __has_PyQt6__ else "mainwindow.ui"
+_mainwindow_ui_file = "mainwindow.ui"
 
 
 if os.environ["QT_API"] in ("pyqt5", "pyside2"):
@@ -1090,6 +1091,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
     @classmethod
     def instance(cls:typing.Self, *args, **kwargs) -> typing.Self:
+        if __has_PyQt6__:
+            return
         # NOTE: Singleton design pattern
         if cls._instance is None:
             inst = cls(*args, **kwargs)
@@ -1388,16 +1391,22 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     # alive at any time; however, this behaviour propagates to its subclasses 
     # also (if any)
     
-    # def __new__(cls:typing.Self, app: QtWidgets.QApplication, 
-    #              parent: typing.Optional[QtWidgets.QWidget] = None, *args, **kwargs) -> typing.Self:
-    def __new__(cls:typing.Self, parent: typing.Optional[QtWidgets.QWidget] = None, *args, **kwargs) -> typing.Self:
-        # print(f"{cls.__name__}.__new__(parent={parent}, *args={args}, **kwargs={kwargs})")
-        if not hasattr(cls, "_instance") or not isinstance(cls._instance, cls):
-            cls._instance = super(ScipyenWindow, cls).__new__(cls, parent, *args, **kwargs)
+    # NOTE: 2025-06-20 23:27:26 WARNING
+    # this crashes in PyQt6!
+    if not __has_PyQt6__:
+        # def __new__(cls:typing.Self, app: QtWidgets.QApplication, 
+        #              parent: typing.Optional[QtWidgets.QWidget] = None, *args, **kwargs) -> typing.Self:
+        def __new__(cls:typing.Self, parent: typing.Optional[QtWidgets.QWidget] = None, *args, **kwargs) -> typing.Self:
+            # print(f"{cls.__name__}.__new__(parent={parent}, *args={args}, **kwargs={kwargs})")
+            if not hasattr(cls, "_instance") or not isinstance(cls._instance, cls):
+                if __has_PyQt6__:
+                    cls._instance = super(ScipyenWindow, cls).__new__(cls, parent)
+                else:
+                    cls._instance = super(ScipyenWindow, cls).__new__(cls, parent, *args, **kwargs)
+                
+            # print(f"\t{cls.__name__}._instance = {cls._instance}")
             
-        # print(f"\t{cls.__name__}._instance = {cls._instance}")
-        
-        return cls._instance
+            return cls._instance
     
     # @processtimefunc
     # def __init__(self, app: QtWidgets.QApplication, 
@@ -2334,7 +2343,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     
     @property
     def uiFontStyle(self) -> int:
-        if os.environ["QT_API"] == "pyside6":
+        if __has_PyQt6__ or __has_PySide6__:
             return int(self._font.style().value)
         return int(self._font.style())
     
@@ -2376,7 +2385,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     
     @property
     def workspaceFontStyle(self) -> int:
-        if os.environ["QT_API"] == "pyside6":
+        if __has_PyQt6__ or __has_PySide6__:
             return int(self._workspaceViewerFont.style().value)
         return int(self._workspaceViewerFont.style())
     
@@ -2418,7 +2427,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     
     @property
     def historyFontStyle(self) -> int:
-        if os.environ["QT_API"] == "pyside6":
+        if __has_PyQt6__ or __has_PySide6__:
             return int(self._commandHistoryFont.style().value)
         return int(self._commandHistoryFont.style())
     
@@ -5747,29 +5756,29 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                      self.scriptsAction, self.applicationsAction, 
                      self.helpTbAction, self.settingsAction)
         
-        if os.environ["QT_API"] in ("pyqt5", "pyqt6"):
-            tw = (w for w in itertools.chain(*(a.associatedWidgets()
+        if __has_PyQt6__ or __has_PySide6__:
+            tw = (w for w in itertools.chain(*(a.associatedObjects()
                 for a in tbactions)) if w is not self.toolBar)
         else:
-            tw = (w for w in itertools.chain(*(a.associatedObjects()
-            # tw = (w for w in itertools.chain(*(a.associatedWidgets()
+            tw = (w for w in itertools.chain(*(a.associatedWidgets()
                 for a in tbactions)) if w is not self.toolBar)
-
+            
         for w in tw:
             w.setPopupMode(QtWidgets.QToolButton.InstantPopup)
             
-        if os.environ["QT_API"] in ("pyqt5", "pyqt6"):
-            self.tbOpen = [w for w in self.actionOpen.associatedWidgets() if isinstance(w, QtWidgets.QToolButton)][0]
-        else:
+        if __has_PyQt6__ or __has_PySide6__:
             self.tbOpen = [w for w in self.actionOpen.associatedObjects() if isinstance(w, QtWidgets.QToolButton)][0]
-        
+        else:
+            self.tbOpen = [w for w in self.actionOpen.associatedWidgets() if isinstance(w, QtWidgets.QToolButton)][0]
+            
         self.tbOpen.setPopupMode(QtWidgets.QToolButton.MenuButtonPopup)
         self.tbOpen.setMenu(self.recentFilesMenu)
         
-        if os.environ["QT_API"] in ("pyqt5", "pyqt6"):
-            self.tbChDir = [w for w in self.actionChange_Working_Directory.associatedWidgets() if isinstance(w, QtWidgets.QToolButton)][0]
-        else:
+        if __has_PyQt6__ or __has_PySide6__:
             self.tbChDir = [w for w in self.actionChange_Working_Directory.associatedObjects() if isinstance(w, QtWidgets.QToolButton)][0]
+        else:
+            self.tbChDir = [w for w in self.actionChange_Working_Directory.associatedWidgets() if isinstance(w, QtWidgets.QToolButton)][0]
+
         self.tbChDir.setPopupMode(QtWidgets.QToolButton.MenuButtonPopup)
         self.tbChDir.setMenu(self.recentDirectoriesMenu)
         
@@ -8254,12 +8263,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     @Slot()
     @safewrapper
     def _slot_chooseWorkplaceFont(self):
-        currentFont = self._workspaceViewerFont
-        if os.environ["QT_API"] == "pyside6":
-            ok, selectedFont = QtWidgets.QFontDialog.getFont(currentFont, self)
-        else:
-            selectedFont, ok = QtWidgets.QFontDialog.getFont(currentFont, self)
-        if ok:
+        currentFont = self._commandHistoryFont
+        selectedFont = self.selectFont(currentFont)
+        if isinstance(selectedFont, QtGui.QFont):
             self._workspaceViewerFont = selectedFont
             self._updateWorkspaceItemsFont()
     
@@ -8267,11 +8273,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     @safewrapper
     def _slot_chooseHistoryFont(self):
         currentFont = self._commandHistoryFont
-        if os.environ["QT_API"] == "pyside6":
-            ok, selectedFont = QtWidgets.QFontDialog.getFont(currentFont, self)
-        else:
-            selectedFont, ok = QtWidgets.QFontDialog.getFont(currentFont, self)
-        if ok:
+        selectedFont = self.selectFont(currentFont)
+        if isinstance(selectedFont, QtGui.QFont):
             self._commandHistoryFont = selectedFont
             self._updateHistoryViewFont()
 

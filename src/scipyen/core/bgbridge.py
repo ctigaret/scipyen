@@ -272,18 +272,6 @@ class BrainAtlasManager(QtCore.QObject):
             
         self.scipyenWindow = wf.getMainScipyenWindow()
         
-        # ws = wf.user_workspace()
-        # # self._user_ns_ = ws
-        # if ws is not None:
-        #     self.scipyenWindow = ws["mainWindow"]
-        # else:
-        #     # self._user_ns_ = dict()
-        #     frame_records = inspect.getouterframes(inspect.currentframe())
-        #     for (n,f) in enumerate(frame_records):
-        #         if "ScipyenWindow" in f[0].f_globals:
-        #             self.scipyenWindow = f[0].f_globals["ScipyenWindow"].instance()
-        #             break
-        
     @classmethod
     def hasBrainGlobeAtlasAPI(self)->bool:
         from gui.workspacegui import GuiMessages
