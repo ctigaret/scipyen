@@ -205,7 +205,7 @@ scikit-image
 scikit-learn
 scikit-guess
 opencv-contrib-python
-scipy
+scipy<1.16.0
 seaborn
 shapely
 scscp

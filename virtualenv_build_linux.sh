@@ -751,7 +751,7 @@ function dovigra ()
             echo -e "Cannot build vigra; check console output. Bailing out. Goodbye!\n"
             exit 1
         else
-            echo "VIGRA installed on "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.vigra_done
+            echo -e "VIGRA installed on "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.vigra_done
             echo -e "\n\n=====================\n# Building vigra DONE!\n=====================\n\n"
         fi
     fi
@@ -1184,10 +1184,6 @@ launchcmd=${scipyensrcdir}/scipyen.py
 echo -e "\nCreating ${scriptfile} launch script \n"
 
 mkdir -p ${target_dir}
-# if [ -r ${target_dir}/scipyen ] ; then
-#     dt=`date '+%Y-%m-%d_%H-%M-%s'`
-#     mv ${target_dir}/scipyen ${target_dir}/scipyen.$dt
-# fi
 if [ -r ${scriptfile} ] ; then
     dt=`date '+%Y-%m-%d_%H-%M-%s'`
     mv ${scriptfile} ${scriptfile}.$dt

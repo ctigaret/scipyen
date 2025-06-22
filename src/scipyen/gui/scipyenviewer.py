@@ -373,7 +373,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             dbusinterface = QtDBus.QDBusInterface(service_name, service_path,
                                                   interface)
             dbusinterface.setTimeout(100)
-            if os.environ["QT_API"] == "pyside6":
+            if __has_PyQt6__ or __has_PySide6__:
                 v = int(self.winId())
                 result = dbusinterface.call("GetMenuForWindow", v).arguments()
             else:

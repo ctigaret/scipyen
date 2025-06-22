@@ -76,15 +76,6 @@ else:
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
     
-# if os.environ["QT_API"] != "pyqt5":
-#     print(f"gui.mainwindow using QT API: {qtpy.API}")
-
-# try:
-#     from qtpy import sip as sip
-#     __has_sip__ = True
-# except:
-#     __has_sip__ = False
-
 # BEGIN About QStyle plugins
 # WARNING: 2024-09-26 15:44:57
 #
@@ -190,7 +181,10 @@ import seaborn as sb  # statistical data visualization
 
 # BEGIN matplotlib modules
 import matplotlib as mpl
-
+if __has_PyQt6__ or __has_PySide6__: # still doesn't seem to work properly? see NOTE: 2025-06-22 22:38:23 in ScipyenWindow.newViewer(…)
+    mpl.use("qtagg")
+else:
+    mpl.use("qt5agg")
 from matplotlib._pylab_helpers import Gcf as Gcf
 import matplotlib.mlab as mlb
 import matplotlib.pyplot as plt
@@ -447,7 +441,8 @@ if p.parent.name == "src":
     except:
         traceback.print_exc()
     
-_scipyen_console_banner_ = f"Scipyen {__verstr__} internal console\n" if isinstance(__verstr__, str) and len(__verstr__.strip()) else "Scipyen internal console\n"
+_qt_python_verstr_ = f"PySide6 ({PySide6.__version__})" if __has_PySide6__ else f"{'PyQt6' if __has_PyQt6__ else 'PyQt5'} ({qtpy.PYQT_VERSION})"
+_scipyen_console_banner_ = f"Scipyen {__verstr__} internal console, with {_qt_python_verstr_}\n" if isinstance(__verstr__, str) and len(__verstr__.strip()) else f"Scipyen internal console, with {_qt_python_verstr_}\n"
 
 # # # try:
 # # #     # from setuptools_scm import get_version
@@ -526,8 +521,15 @@ from iolib.navigation import navigator
 # _mainwindow_ui_file = "mainwindow_qt6.ui" if __has_PyQt6__ else "mainwindow.ui"
 _mainwindow_ui_file = "mainwindow.ui"
 
+if __has_PyQt6__ or __has_PySide6__:
+    # Form class,        Base class
+    __UI_MainWindow__, __QMainWindow__ = loadUiType(os.path.join(__module_path__, _mainwindow_ui_file))
 
-if os.environ["QT_API"] in ("pyqt5", "pyside2"):
+    __UI_ScriptManagerWindow__, _ = loadUiType(os.path.join(__module_path__, "scriptmanagerwindow.ui"))
+
+    __UI_AboutLicense__, _ = loadUiType(os.path.join(__module_path__, "AboutDialog.ui"))
+
+else:
     # Form class,        Base class
     __UI_MainWindow__, _ = loadUiType(os.path.join(__module_path__, _mainwindow_ui_file), 
                                                     from_imports=True, import_from="gui")
@@ -537,14 +539,6 @@ if os.environ["QT_API"] in ("pyqt5", "pyside2"):
     
     __UI_AboutLicense__, _ = loadUiType(os.path.join(__module_path__, "AboutDialog.ui"),
                                         from_imports=True, import_from="gui")
-else:
-    # Form class,        Base class
-    __UI_MainWindow__, __QMainWindow__ = loadUiType(os.path.join(__module_path__, _mainwindow_ui_file))
-
-    __UI_ScriptManagerWindow__, _ = loadUiType(os.path.join(__module_path__, "scriptmanagerwindow.ui"))
-
-    __UI_AboutLicense__, _ = loadUiType(os.path.join(__module_path__, "AboutDialog.ui"))
-
 
 class WorkspaceViewer(QtWidgets.QTableView):
     r"""Inherits QTableView with customized drag & drop
@@ -2820,6 +2814,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     @property
     def scipyenEditor(self):
         return self._scipyenEditor
+    
+    @property
+    def scipyenDir(self):
+        return self._scipyendir_
 
     @markConfigurable("ScipyenEditor", "Qt")
     @scipyenEditor.setter
@@ -3020,7 +3018,14 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             for key, val in kwargs.items():
                 if key in fig_init_params:
                     fig_kwargs[key] = val
-
+                    
+            # NOTE: 2025-06-22 22:38:23
+            # looks like I still need to to this, here...
+            if __has_PyQt6__ or __has_PySide6__:
+                mpl.use("qtagg")
+            else:
+                mpl.use("qt5agg") # this seems to be the default...
+                
             win = plt.figure(*args, **fig_kwargs)
 
             workspace_win_varname = f"Figure{win.number}"
@@ -3141,12 +3146,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         if backend_mod is None:
             scipywarn(f"{self.__class__.__name__}._adopt_mpl_figure - cannot establish the backend used")
             return
-
-#                 backend_class = getattr(backend_mod, f"_Backend{backend_name}", getattr(backend_mod, "_Backend", None))
-#                     
-#                 if backend_class is None:
-#                     scipywarn(f"{self.__class__.__name__}._adopt_mpl_figure - cannot establish the backend used")
-            
             
         class backend_mod(backend_super_class):
             locals().update(vars(backend_mod))

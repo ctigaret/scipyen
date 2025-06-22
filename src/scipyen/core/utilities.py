@@ -3196,7 +3196,8 @@ def library_for_module(x: str) -> str:
     scipyen_dir = None
     if mainWindow:
         plugins_dir = mainWindow.userPluginsDirectory
-        scipyen_dir = mainWindow._scipyendir_
+        # scipyen_dir = mainWindow._scipyendir_
+        scipyen_dir = mainWindow.scipyenDir
         
     if any(s in x for s in ("builtin", "built-in")):
         return "standard (built-in)"

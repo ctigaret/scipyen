@@ -45,7 +45,14 @@ from collections import ChainMap, namedtuple, defaultdict
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
-Ui_GraphicsImageViewerWidget, QWidget = loadUiType(adapt_ui_path(__module_path__,'graphicsimageviewer.ui'))
+if __has_PyQt6__:
+    # why is this working with PyQt6 ...
+    uifile = 'graphicsimageviewer_qt6.ui'
+else:
+    # while this is NOT, yet it works with PySide6?
+    uifile = 'graphicsimageviewer.ui'
+    
+Ui_GraphicsImageViewerWidget, QWidget = loadUiType(adapt_ui_path(__module_path__, uifile))
 
 class GraphicsImageViewerScene(QtWidgets.QGraphicsScene):
     signalMouseAt = Signal(int,int,name="signalMouseAt")

@@ -22,7 +22,7 @@ import pkgutil
 import enum, io, os, re, itertools, sys, time, traceback, types, typing
 from types import SimpleNamespace
 import collections
-from collections import deque
+from collections import (deque, namedtuple)
 from warnings import WarningMessage
 from inspect import Parameter, Signature
 
@@ -68,6 +68,12 @@ CALLABLE_TYPES = (
     types.MethodDescriptorType,
     types.ClassMethodDescriptorType,
 )
+
+class Versiontuple3: pass  # to be picked up in Kate editor's symbolviewer plugin
+VersionTuple3 = namedtuple("VersionTuple3", ["major", "minor", "micro"])
+class Versiontuple4: pass  # to be picked up in Kate editor's symbolviewer plugin
+VersionTuple4 = namedtuple("VersionTuple4", ["major", "minor", "micro","dot"])
+
 
 class ModSpec: pass # to be picked up in Kate editor's symbolviewer plugin
 ModSpec = importlib.machinery.ModuleSpec  # saves me some typing
@@ -2804,9 +2810,6 @@ def get_qt_api_for_python(module:types.ModuleType) -> str:
     except:
         traceback.print_exc()
         return ""
-    
-# def pretty_format_tb_output(str):
-    
     
 def parse_module_class_path(x: str) -> typing.Union[type, types.ModuleType]:
     from core.utilities import unique

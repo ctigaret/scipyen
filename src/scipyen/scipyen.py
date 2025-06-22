@@ -166,7 +166,7 @@ else:
     QShortcut = QtWidgets.QShortcut
     __has_sip__ = True
     
-print(f"scipyen.py: qtpy.API is {qtpy.API}")
+# # print(f"scipyen.py: qtpy.API is {qtpy.API}")
 
 if __has_PySide6__:
     appName = "Scipyen-PySide6"

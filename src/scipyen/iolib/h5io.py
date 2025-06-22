@@ -136,7 +136,8 @@ from neo.core.dataobject import ArrayDict
 from . import jsonio # brings the CustomEncoder type and the decode_hook function
 import core
 from core.prog import (safewrapper, signature_as_dict, print_styled,
-                       parse_module_class_path, get_loaded_module)
+                       parse_module_class_path, get_loaded_module, 
+                       get_module_version, VersionTuple3)
 from core import prog
 from core.traitcontainers import DataBag
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
@@ -212,6 +213,14 @@ from gui.pictgui import (Arc, ArcMove, CrosshairCursor, Cubic, Ellipse,
 # during development: set this to True then insert print statements after
 # 'if __DEBUG__:' clause
 __DEBUG__=False
+
+__numpyver__ = VersionTuple3(*list(map(lambda v: int(v), get_module_version(np).split("."))))
+
+if __numpyver__.major >= 2:
+    numpyfloat = np.float64
+else:
+    numpyfloat = np.float_
+
 
 try:
     numpystr = np.str_
@@ -1391,7 +1400,7 @@ def fromHDF5(entity:typing.Union[h5py.Group, h5py.Dataset], cache:dict=dict()):
 def attrs2dict(attrs: h5py.AttributeManager):
     r"""Generates a dict object from a h5py Group or Dataset 'attrs' property.
     
-    Althogh one can simply call `dict(attrs)` or `dict(attrs.items())`, 
+    Although one can simply call `dict(attrs)` or `dict(attrs.items())`, 
     this function also decodes the items of `attrs` to reverse the actions of 
     makeObjAttrs and makeDataTypeAttrs.
     
@@ -1459,10 +1468,9 @@ def attrs2dict(attrs: h5py.AttributeManager):
             v = None
         
         elif hasattr(v, "dtype"):
+            # print(f"attrs2dict: dtype is {v.dtype}")
             if v.dtype == h5py.string_dtype():
                 v = list(v)
-                # v = v.decode("utf-8")
-                # v = np.array(v, dtype=np.dtype("U"))[()]
                 
             elif v.dtype.kind == "O":
                 if type(v[()]) == bytes:
@@ -1477,7 +1485,8 @@ def attrs2dict(attrs: h5py.AttributeManager):
             elif v.dtype == np.dtype(np.int_) and v.size == 1:
                 v = int(v) if v.ndim == 0 else int(v[0])
                 
-            elif v.dtype == np.dtype(np.float_) and v.size == 1:
+            # elif v.dtype == np.dtype(np.float_) and v.size == 1:
+            elif v.dtype == np.dtype(numpyfloat) and v.size == 1:
                 v = float(v) if v.ndim == 0 else float(v[0])
                 
             elif np.any(np.iscomplex(v)) and v.size == 1:
