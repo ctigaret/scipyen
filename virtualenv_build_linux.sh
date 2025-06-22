@@ -583,7 +583,11 @@ function dopyqt6 ()
                 echo -e "No wheel file found in "$(pwd)" - goodbye!\n"
                 exit 1
             else
-                ${py_exec} -m pip install --force-reinstall ${wheel_file}
+                if [ -z ${uv_exec} ] ; then
+                    pip install --force-reinstall ${wheel_file}
+                else
+                    ${uv_exec} pip install --force-reinstall ${wheel_file} 
+                fi
                 
                 if [[ $? -ne 0 ]] ; then
                     echo -e "Cannot install the PyQt6 wheel; check console output. Goodbye!\n"
@@ -591,10 +595,6 @@ function dopyqt6 ()
                 else
                     echo "PyQt6 built and installed "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.pyqt6done
                     echo -e "\n\n=====================\n# Pyqt6 installed!\n=====================\n\n"
-                    
-    #                 echo -e "\n\n Installing PyQtDataVisualization\n\n"
-    #                 # NOTE: WARNING: 2023-07-19 00:12:27 avoid this !!!! 
-    #                 pip install PyQtDataVisualization
                 fi
             fi
         else
@@ -740,7 +740,12 @@ function dovigra ()
                       -DPython_EXECUTABLE:FILEPATH=`which python` \
                       -DCMAKE_INSTALL_PREFIX=$VIRTUAL_ENV -DCMAKE_SKIP_INSTALL_RPATH=1 -DCMAKE_SKIP_RPATH=1 -DWITH_BOOST_GRAPH=1 -DWITH_BOOST_THREAD=1 -DWITH_HDF5=1 -DWITH_OPENEXR=1 -DWITH_VIGRANUMPY=1 -DLIB_SUFFIX=64 ../vigra
         
-        make && make install
+        if [[ $njobs -gt 0 ]] ; then
+            make --jobs=$njobs && make install
+        else
+            make && make install
+        fi
+        
         
         if [[ $? -ne 0 ]] ; then
             echo -e "Cannot build vigra; check console output. Bailing out. Goodbye!\n"
