@@ -2105,7 +2105,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 else:
                     xLabel = f"{get_domain_name(entities_list[0])}"
                     
-                yLabel = "Events"
+                # NOTE: 2025-06-22 23:05:52
+                # these below ALL inherit from neo.Event!!!
+                if all(isinstance(v, (DataMark, TriggerEvent)) for v in entities_list):
+                    yLabel = "Triggers"
+                else:
+                    yLabel = "Events"
                 
                 symbolStyle["symbol"] = eventsSymbol
                 
@@ -2126,27 +2131,27 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                             symbolStyle,
                                             **labelStyle)
                 
-            elif all(isinstance(v, (DataMark, TriggerEvent)) for v in entities_list):
-                xdimstr = scq.shortSymbol(entities_list[0].times.units.dimensionality)
-                if len(xdimstr):
-                    xLabel = f"{get_domain_name(entities_list[0])} ({xdimstr})"
-                else:
-                    xLabel = f"{get_domain_name(entities_list[0])}"
-                    
-                yLabel = "Triggers" if all(isinstance(v, TriggerEvent) for v in entities_list) else "Data marks"
-                
-                symbolStyle["symbol"] = eventsSymbol
-                
-                if len(entities_list) > 1:
-                    symbolStyle["pen"] = cycle(self.defaultLineColorsList)
-                    symbolStyle["color"] = cycle(self.defaultLineColorsList)
-                
-                self._plot_events_or_marks_(entities_list, entities_axis, 
-                                            xLabel, yLabel, 
-                                            minX, maxX, adapt_X_range, 
-                                            height_interval, 
-                                            symbolStyle,
-                                            **labelStyle)
+#             elif all(isinstance(v, (DataMark, TriggerEvent)) for v in entities_list):
+#                 xdimstr = scq.shortSymbol(entities_list[0].times.units.dimensionality)
+#                 if len(xdimstr):
+#                     xLabel = f"{get_domain_name(entities_list[0])} ({xdimstr})"
+#                 else:
+#                     xLabel = f"{get_domain_name(entities_list[0])}"
+#                     
+#                 yLabel = "Triggers" if all(isinstance(v, TriggerEvent) for v in entities_list) else "Data marks"
+#                 
+#                 symbolStyle["symbol"] = eventsSymbol
+#                 
+#                 if len(entities_list) > 1:
+#                     symbolStyle["pen"] = cycle(self.defaultLineColorsList)
+#                     symbolStyle["color"] = cycle(self.defaultLineColorsList)
+#                 
+#                 self._plot_events_or_marks_(entities_list, entities_axis, 
+#                                             xLabel, yLabel, 
+#                                             minX, maxX, adapt_X_range, 
+#                                             height_interval, 
+#                                             symbolStyle,
+#                                             **labelStyle)
                 
             elif all(isinstance(v, neo.SpikeTrain) for v in entities_list):
                 entities_axis.clear()
