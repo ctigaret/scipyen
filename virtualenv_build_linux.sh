@@ -651,6 +651,7 @@ function dopyside6 ()
                     python setup.py build --qtpaths=${full_path_to_qtpaths} --build-tests --build-base=${base_build_dir} --parallel=$njobs
                 else
                     uv run setup.py build --qtpaths=${full_path_to_qtpaths} --build-tests --build-base=${base_build_dir} --parallel=$njobs
+                fi
             else
                 if [ -z ${uv_exec} ] ; then
                     python setup.py build --qtpaths=${full_path_to_qtpaths} --build-tests --build-base=${base_build_dir}
