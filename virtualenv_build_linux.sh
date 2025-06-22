@@ -498,18 +498,22 @@ function dopyqt6 ()
                 exit 1
             fi
             
-            # NOTE: 2023-06-25 10:56:34 
+           # NOTE: 2023-06-25 10:56:34 
             # when we are root, make sure to use the virtual environment's python 
             # executable here
+            py_exec="$VIRTUAL_ENV/bin/${python_exec}"
+            sip_wheel_exec="$VIRTUAL_ENV/bin/sip-wheel"
             if [[ `id -u` -eq 0 ]] ; then
-                py_exec="$VIRTUAL_ENV/bin/${python_exec}"
-                sip_wheel_exec="$VIRTUAL_ENV/bin/sip-wheel"
-            else
-                py_exec=${python_exec}
-                sip_wheel_exec=sip-wheel
+                echo -e "\n****\nCannot run as administrator!\n****\n"
+                exit 1
+#                 py_exec="$VIRTUAL_ENV/bin/${python_exec}"
+#                 sip_wheel_exec="$VIRTUAL_ENV/bin/sip-wheel"
+#             else
+#                 py_exec=${python_exec}
+#                 sip_wheel_exec=sip-wheel
             fi
             
-            echo "Using ${py_exec} as `whoami` to build PyQt6"
+#             echo "Using ${py_exec} as `whoami` to build PyQt6"
             
             # NOTE: locate_pyqt6_src.py uses distlib to locate the (latest) source 
             # archive (i.e., the sdist) of PyQt6 - its file name typically ends with
@@ -517,7 +521,7 @@ function dopyqt6 ()
             pyqt6_src_url=`${py_exec} $installscriptdir/locate_pyqt6_src.py`
             pyqt6_src=`basename $pyqt6_src_url`
             
-            pyqt6_src_dir=${pyqt6_src%.tar.gz}
+            pyqt6_src_dir=${VIRTUAL_ENV}/src/${pyqt6_src%.tar.gz}
             
             echo "PyQt6 source is in "${pyqt6_src_dir}
             
@@ -538,7 +542,7 @@ function dopyqt6 ()
             fi
             
             # NOTE: good practice is to create an out-of-source build tree, » ...
-            pyqt6_build_dir="PyQt6-build"
+            pyqt6_build_dir=${VIRTUAL_ENV}/src/"PyQt6-build"
             
             # NOTE: clear build dir if it exists -- best to start fresh
             if [ -d ${pyqt6_build_dir} ] ; then
@@ -557,11 +561,11 @@ function dopyqt6 ()
             # cores in your system seems to be a good choice), or
             # • remove the --jobs option altogether
             if [[ $njobs -gt 0 ]] ; then
-                ${sip_wheel_exec} --qmake=${qmake6_binary} --confirm-license --jobs $njobs --qt-shared --verbose --build-dir ../PyQt6-build --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --pep484-pyi
+                ${sip_wheel_exec} --verbose --build-dir ${pyqt6_build_dir} --qmake ${qmake6_binary} --confirm-license --license-dir ${pyqt6_src_dir}/sip --jobs $njobs
             else
-                ${sip_wheel_exec} --qmake=${qmake6_binary} --confirm-license --qt-shared --verbose --build-dir ../PyQt6-build --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --pep484-pyi
+                ${sip_wheel_exec} --verbose --build-dir ${pyqt6_build_dir} --qmake ${qmake6_binary} --confirm-license --license-dir ${pyqt6_src_dir}/sip
             fi
-
+            
             if [[ $? -ne 0 ]] ; then
                 echo -e "sip Cannot build a PyQt6 wheel. Bailing out. Goodbye!\n"
                 echo -e "You might want to upgrade sip and PyQt6-sip in this environment\n"
@@ -1578,10 +1582,6 @@ if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
         dopyqt5 
     fi
     
-    # NOTE: 2025-03-13 11:01:07 TODO/FIXME
-#     dopyqt6 
-#     dopyside6 # TODO
-
     installpipreqs_part2
 
     dovigra
