@@ -647,10 +647,17 @@ function dopyside6 ()
             qtinfopatch=${installscriptdir}/pyside6/qtinfo.diff
             patch build_scripts/qtinfo.py ${qtinfopatch}
 
-            if [ -z ${uv_exec} ] ; then
-                python setup.py build --qtpaths=${full_path_to_qtpaths} --build-tests --build-base=${base_build_dir} --parallel=8
+            if [[ $njobs -gt 0 ]] ; then
+                if [ -z ${uv_exec} ] ; then
+                    python setup.py build --qtpaths=${full_path_to_qtpaths} --build-tests --build-base=${base_build_dir} --parallel=$njobs
+                else
+                    uv run setup.py build --qtpaths=${full_path_to_qtpaths} --build-tests --build-base=${base_build_dir} --parallel=$njobs
             else
-                uv run setup.py build --qtpaths=${full_path_to_qtpaths} --build-tests --build-base=${base_build_dir} --parallel=8
+                if [ -z ${uv_exec} ] ; then
+                    python setup.py build --qtpaths=${full_path_to_qtpaths} --build-tests --build-base=${base_build_dir}
+                else
+                    uv run setup.py build --qtpaths=${full_path_to_qtpaths} --build-tests --build-base=${base_build_dir}
+                fi
             fi
             
             if [[ $? -ne 0 ]] ; then
@@ -1261,7 +1268,7 @@ with_pyside6=0
 build_pyside6=0
 reinstall_pyside6=0
 install_fenicsx=0
-njobs=4
+njobs=`nproc --all`
 reinstall_vigra=0
 reinstall_neuron=0
 reinstall_fenicsx=0
