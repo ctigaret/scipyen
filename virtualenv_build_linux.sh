@@ -384,18 +384,19 @@ function dopyqt5 ()
                 exit 1
             fi
             
+            # NOTE: 2025-06-22 14:57:15
+            # DON'T WORK AS ROOT !
+            py_exec="$VIRTUAL_ENV/bin/${python_exec}"
+            sip_wheel_exec="$VIRTUAL_ENV/bin/sip-wheel"
             # NOTE: 2023-06-25 10:56:34 
             # when we are root, make sure to use the virtual environment's python 
             # executable here
             if [[ `id -u` -eq 0 ]] ; then
-                py_exec="$VIRTUAL_ENV/bin/${python_exec}"
-                sip_wheel_exec="$VIRTUAL_ENV/bin/sip-wheel"
-            else
-                py_exec=${python_exec}
-                sip_wheel_exec=sip-wheel
+                echo -e "\n****\nCannot run as administrator!\n****\n"
+                exit 1
             fi
             
-            echo "Using ${py_exec} as user `whoami` to build PyQt5"
+#             echo "Using ${py_exec} as user `whoami` to build PyQt5"
             
             pyqt5_src_url=`${py_exec} $installscriptdir/locate_pyqt5_src.py`
             pyqt5_src=`basename $pyqt5_src_url`
@@ -456,7 +457,8 @@ function dopyqt5 ()
             fi
             
             # NOTE: check is a wheel file has been produced; the filename typically
-            # ends in .whl » if found then call pip to install it inside the 
+            # ends in .whl and nis located in the source tree, NOT in the build tree!
+            # » if found then call pip to install it inside the 
             # environment ⟶ IT WORKS!
             wheel_file=`ls | grep whl`
             if [ -z ${wheel_file} ] ; then
@@ -498,7 +500,9 @@ function dopyqt6 ()
                 exit 1
             fi
             
-           # NOTE: 2023-06-25 10:56:34 
+            # NOTE: 2025-06-22 14:57:15
+            # DON'T WORK AS ROOT !
+            # NOTE: 2023-06-25 10:56:34 
             # when we are root, make sure to use the virtual environment's python 
             # executable here
             py_exec="$VIRTUAL_ENV/bin/${python_exec}"
@@ -506,11 +510,6 @@ function dopyqt6 ()
             if [[ `id -u` -eq 0 ]] ; then
                 echo -e "\n****\nCannot run as administrator!\n****\n"
                 exit 1
-#                 py_exec="$VIRTUAL_ENV/bin/${python_exec}"
-#                 sip_wheel_exec="$VIRTUAL_ENV/bin/sip-wheel"
-#             else
-#                 py_exec=${python_exec}
-#                 sip_wheel_exec=sip-wheel
             fi
             
 #             echo "Using ${py_exec} as `whoami` to build PyQt6"
