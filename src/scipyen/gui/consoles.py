@@ -159,7 +159,7 @@ from gui.scipyen_console_styles import *
 
 from gui.guiutils import (get_font_style, get_font_weight,)
 
-if sys.version_info.minor < 11:
+if sys.version_info.minor < 11:# or __has_PyQt6__ or __has_PySide6__:
     from core import scipyen_inprocess_3_10
     from core.scipyen_inprocess_3_10 import ScipyenInProcessKernel
 else:
@@ -3162,13 +3162,9 @@ class ScipyenConsoleWidget(ConsoleWidget):
 
         self.kernel_manager = ScipyenInProcessKernelManager() # what if gui is NOT Qt?
         self.kernel_manager.start_kernel()
-        self.kernel_manager.kernel.eventloop = None
+        if not (__has_PyQt6__ or __has_PySide6__):
+            self.kernel_manager.kernel.eventloop = None
         self.ipkernel = self.kernel_manager.kernel
-        # if os.environ["QT_API"].lower() in ("pyqt6", "pyside6"):
-        #     qtgui = "qt6"
-        # else:
-        #     qtgui = "qt5"
-            
         self.ipkernel.gui = "qt"
         
         ## NOTE: 2016-03-20 14:37:37
