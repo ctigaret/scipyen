@@ -111,6 +111,7 @@ try:
 except:
     ipythonHasTips = False
     
+
 from qtconsole.svg import save_svg, svg_to_clipboard, svg_to_image
 
 from tornado import ioloop
@@ -134,7 +135,8 @@ from qtconsole.jupyter_widget import JupyterWidget # for use in the External Con
 # logic, including drag'n drop
 from qtconsole.rich_jupyter_widget import RichJupyterWidget 
 
-from qtconsole.inprocess import QtInProcessKernelManager # for the Scipyen's internal console
+from qtconsole.inprocess import (QtInProcessKernelManager, # for the Scipyen's internal console
+                                 QtInProcessKernelClient)
 from qtconsole.mainwindow import (MainWindow, background,)
 from qtconsole.client import QtKernelClient
 from qtconsole.manager import QtKernelManager
@@ -161,7 +163,8 @@ from gui.guiutils import (get_font_style, get_font_weight,)
 
 if sys.version_info.minor < 11:# or __has_PyQt6__ or __has_PySide6__:
     from core import scipyen_inprocess_3_10
-    from core.scipyen_inprocess_3_10 import ScipyenInProcessKernel
+    from core.scipyen_inprocess import ScipyenInProcessKernel_3_10
+    ScipyenInProcessKernel = ScipyenInProcessKernel_3_10
 else:
     ScipyenInProcessKernel = InProcessKernel
 
@@ -290,14 +293,42 @@ class ScipyenInProcessKernelManager(QtInProcessKernelManager):
     
     Workaround for a bug (?) in InProcessKernel API.
     
-    See ScipyenInProcessKernel docstring.
+    See ScipyenInProcessKernel_3_10 docstring.
     
     """
-    client_class = 'qtconsole.inprocess.QtInProcessKernelClient'
+    # client_class = 'qtconsole.inprocess.QtInProcessKernelClient'
+    client_class = __module__ + '.ScipyenInProcessKernelClient'
     
     def start_kernel(self, **kwds):
         self.kernel = ScipyenInProcessKernel(parent=self, session=self.session)
 
+class ScipyenInProcessKernelClient(QtInProcessKernelClient):
+    def _dispatch_to_kernel(self, msg):
+        """Send a message to the kernel and handle a reply.
+        NOTE: 2025-06-23 23:36:49 Cezar Tigaret
+        Does away with the RuntimeError thrown by asyncio.get_running_loop()
+        inherited from jupyter_core.utils.run_sync that crept up in / around
+        jupyter_core 5.8.1
+        """
+        kernel = self.kernel
+        if kernel is None:
+            msg = "Cannot send request. No kernel exists."
+            raise RuntimeError(msg)
+
+        stream = kernel.shell_stream
+        self.session.send(stream, msg)
+        msg_parts = stream.recv_multipart()
+        # if run_sync is not None:
+        #     dispatch_shell = run_sync(kernel.dispatch_shell)
+        #     dispatch_shell(msg_parts)
+        # else:
+        #     loop = asyncio.get_event_loop()  # type:ignore[unreachable]
+        #     loop.run_until_complete(kernel.dispatch_shell(msg_parts))
+        loop = asyncio.get_event_loop()  # type:ignore[unreachable]
+        loop.run_until_complete(kernel.dispatch_shell(msg_parts))
+        idents, reply_msg = self.session.recv(stream, copy=False)
+        self.shell_channel.call_handlers_later(reply_msg)
+    
 class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
     r"""
     """
@@ -3160,12 +3191,16 @@ class ScipyenConsoleWidget(ConsoleWidget):
         self.banner = kwargs.pop("banner", None)
         super().__init__(*args, **kwargs)
 
-        self.kernel_manager = ScipyenInProcessKernelManager() # what if gui is NOT Qt?
+        self.kernel_manager = ScipyenInProcessKernelManager() 
+        # self.kernel_manager = QtInProcessKernelManager()
         self.kernel_manager.start_kernel()
-        if not (__has_PyQt6__ or __has_PySide6__):
-            self.kernel_manager.kernel.eventloop = None
+        # if not (__has_PyQt6__ or __has_PySide6__):
+        #     self.kernel_manager.kernel.eventloop = None
         self.ipkernel = self.kernel_manager.kernel
-        self.ipkernel.gui = "qt"
+        
+        # NOTE: 2025-06-23 23:18:10
+        # see NOTE: 2025-06-23 23:16:11 below
+        # self.ipkernel.gui = "qt" 
         
         ## NOTE: 2016-03-20 14:37:37
         ## this must be set BEFORE start_channels is called
@@ -3192,10 +3227,19 @@ class ScipyenConsoleWidget(ConsoleWidget):
         # NOTE: 2019-08-07 16:34:58
         # enforce qt5 backend for matplotlib
         # see NOTE: 2019-08-07 16:34:23 
-        if os.environ["QT_API"].lower() in ("pyqt6", "pyside6"):
-            self.ipkernel.shell.run_line_magic("matplotlib", "qt6")
+        # if os.environ["QT_API"].lower() in ("pyqt6", "pyside6"):
+        # if __has_PyQt6__ or __has_PySide6__:
+        #     self.ipkernel.shell.run_line_magic("matplotlib", "qt6")
+        # else:
+        #     self.ipkernel.shell.run_line_magic("matplotlib", "qt5")
+        
+        # NOTE: 2025-06-23 23:16:11
+        if __has_PyQt6__ or __has_PySide6__:
+            self.ipkernel.shell.enable_gui("qt6")
+            self.ipkernel.shell.enable_matplotlib("qt6") # -> selects "qtagg" as backend
         else:
-            self.ipkernel.shell.run_line_magic("matplotlib", "qt5")
+            self.ipkernel.shell.enable_gui("qt5")
+            self.ipkernel.shell.enable_matplotlib("qt5") # -> selects "qt5agg" as backend
         
         self.drop_cache=None
         

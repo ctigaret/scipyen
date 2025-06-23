@@ -6,7 +6,7 @@
 import asyncio, inspect, sys, time
 from ipykernel.jsonutil import json_clean
 from ipykernel.inprocess.ipkernel import InProcessKernel
-class ScipyenInProcessKernel(InProcessKernel):
+class ScipyenInProcessKernel_3_10(InProcessKernel):
     r"""Workaround the following exception when using InProcessKernel (see below).
     
     Traceback (most recent call last):
@@ -115,3 +115,4 @@ class ScipyenInProcessKernel(InProcessKernel):
                 # this apparently fixes the issue at NOTE: 2022-03-05 16:04:03
                 await self._abort_queues() 
 
+   
