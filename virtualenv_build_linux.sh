@@ -465,7 +465,11 @@ function dopyqt5 ()
                 echo -e "No wheel file found in "$(pwd)" - goodbye!\n"
                 exit 1
             else
-                ${py_exec} -m pip install --force-reinstall ${wheel_file}
+                if [ -z ${uv_exec} ] ; then
+                    pip install --force-reinstall ${wheel_file}
+                else
+                    ${uv_exec} pip install --force-reinstall ${wheel_file} 
+                fi
                 
                 if [[ $? -ne 0 ]] ; then
                     echo -e "Cannot install the PyQt5 wheel; check console output. Goodbye!\n"
