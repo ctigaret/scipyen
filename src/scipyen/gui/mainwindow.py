@@ -3741,6 +3741,15 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
             self.ipkernel = self.console.consoleWidget.ipkernel
             self.shell = self.ipkernel.shell
+            
+            # NOTE: 2025-06-23 18:38:10
+            if __has_PyQt6__ or __has_PySide6__:
+                self.shell.enable_gui("qt6")
+                self.shell.enable_matplotlib("qt6") # -> selects "qtagg" as backend
+            else:
+                self.shell.enable_gui("qt5")
+                self.shell.enable_matplotlib("qt5") # -> selects "qt5agg" as backend
+                
             self.shell.cache_size = self.defaultShellCacheSize
             self.stdout = self.ipkernel.stdout
 
@@ -3878,7 +3887,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             # below
             #
 
-
+            # NOTE: 2025-06-23 18:41:04
+            # consider using shell API e.g.:
+            # • "push": shell.push(variables, interactive=True) 
+            #       pass interactive=False for "hidden" variables?
             # NOTE: 2020-11-12 12:51:36
             # used by %scipyen_debug line magic
             self.workspace["SCIPYEN_DEBUG"] = False
