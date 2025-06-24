@@ -1566,12 +1566,13 @@ class IrregularlySampledDataSignal(BaseSignal):
             values_str_list = self.as_array().__repr__().replace("array(", "").replace(")", "").replace("[[", "[").replace("]]", "]").replace(",", "").split("\n")
             
             times_str_list = np.array(self.times).__repr__().replace("array(", "").replace(")", "").replace("[", "").replace("]", "").replace(",", "").split()
-            if len(times_str_list) == 0:
+            if len(times_str_list) == 0 or len(values_str_list) == 0:
                 reps_str_list = [""]
             else:
                 max_len = max([len(s) for s in times_str_list])
-                
-                repr_str_list = ["%s       %s" % (times_str_list[k].rjust(max_len), values_str_list[k].lstrip()) for k in range(len(times_str_list))]
+                min_elems = min(len(values_str_list), len(times_str_list))
+                # print(f"{self.__class__.__name__}.__repr__: min_elems = {min_elems}")
+                repr_str_list = ["%s       %s" % (times_str_list[k].rjust(max_len), values_str_list[k].lstrip()) for k in range(min_elems)]
             
         repr_str_list.insert(0, "%s       %s" % ("Domain", "Signal"))
         repr_str_list.append("* %s       * %s" % (self.times.units, self.units))

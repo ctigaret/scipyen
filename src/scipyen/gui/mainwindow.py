@@ -1617,12 +1617,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # current session, in the command history tree widget
         self.currentSessionTreeWidgetItem = None
 
-        # NOTE: 2018-10-07 21:12:14
-        # (re)initialize self.workspace, self._nonInteractiveVars_,
-        # self.ipkernel, self.console and self.shell so it must be called before
-        # setting the workspace model
-        self._init_QtConsole_()
-
         self.fileSystemModel = QtWidgets.QFileSystemModel(parent=self)
 
         self.currentVarItem = None
@@ -1635,10 +1629,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # anywhere - keep available as app-wide threadpool for various sub-apps
         self.threadpool = QtCore.QThreadPool()
 
-
-        # NOTE: singleton design pattern
-        # see traitlets.config.SingletonConfigurable
-        self.__class__._instance = self  
 
 
 #         # ### BEGIN works in PyQt5
@@ -1763,23 +1753,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         if isinstance(getattr(self, "configurable_traits", None), DataBag):
             self.configurable_traits["RecentScripts"] = self._recentScripts
 
-         # NOTE: 2020-10-22 13:30:54
-        # self._nonInteractiveVars_ is updated in _init_QtConsole_()
-        self._nonInteractiveVars_.update([i for i in self.workspace.items()])
-        
-        self.workspaceModel = WorkspaceModel(self.shell, parent=self,
-                                             # user_ns_hidden = self._nonInteractiveVars_,
-                                             user_ns_hidden = self.workspace,
-                                             mpl_figure_close_callback=self.handle_mpl_figure_close,
-                                             mpl_figure_click_callback=self.handle_mpl_figure_click,
-                                             mpl_figure_enter_callback=self.handle_mpl_figure_enter)
-        
-        self.workspaceModel.workingDir.connect(self._slot_workdirChangedInConsole)
-        
-        self.shell.events.register("pre_execute", self.workspaceModel.preExecute)
-        # self.shell.events.register("post_execute", self.workspaceModel.post_execute)
-        self.shell.events.register("post_run_cell", self.workspaceModel.postRunCell)
-        
         self._lockedToolBar:bool = True
         self._guiIconSize_ = self._defaultIconSize_
         
@@ -1814,11 +1787,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self._tbButtonStyle:QtCore.Qt.ToolButtonStyle = self.toolBar.toolButtonStyle()
 
 
-        # With all UI elements and their signal-slot connections in place we can
-        # now apply stored settings, including the 'state' of the ScipyenWindow
-        # object (which is an instance of QMainWindow)
-        #
-        self.loadSettings()
 
         # -----------------
         # connect widget actions through signal/slot mechanism
@@ -1842,11 +1810,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             if not hasattr(m, "workspace"):
                 m.__dict__["workspace"] = self.workspace
 
-        # NOTE: 2024-05-29 13:04:00
-        # Asynchronously launch the plugin loading mechanism
-        self.startPluginLoad.emit()
-
-        self._updateConsolesEditor()
         
         sigBlock = QtCore.QSignalBlocker(self.actionUse_system_default_font)
         self.actionUse_system_default_font.setChecked(self._useSystemDefaultFont)
@@ -1859,6 +1822,27 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         #     print("******\n")
         # ### END   debug 2025-06-13 09:05:41
         
+        self._init_QtConsole_() # also instantiates self.shell, etc
+        # NOTE: 2025-06-24 21:49:54
+        # update this NOW, see NOTE: 2025-06-24 21:49:03
+        self._nonInteractiveVars_.update([i for i in self.workspace.items()])
+        
+        # NOTE: 2025-06-24 21:57:40
+        # WorkspaceModel needs the shell's user_ns hence it has to be instantiated
+        # AFTER _init_QtConsole_()
+        self.workspaceModel = WorkspaceModel(self.shell, parent=self,
+                                             # user_ns_hidden = self._nonInteractiveVars_,
+                                             user_ns_hidden = self.workspace,
+                                             mpl_figure_close_callback=self.handle_mpl_figure_close,
+                                             mpl_figure_click_callback=self.handle_mpl_figure_click,
+                                             mpl_figure_enter_callback=self.handle_mpl_figure_enter)
+        
+        self.workspaceModel.workingDir.connect(self._slot_workdirChangedInConsole)
+        
+        self.shell.events.register("pre_execute", self.workspaceModel.preExecute)
+        # self.shell.events.register("post_execute", self.workspaceModel.post_execute)
+        self.shell.events.register("post_run_cell", self.workspaceModel.postRunCell)
+        
         self.workspaceModel.user_ns_hidden.update(self._nonInteractiveVars_)
         # self.translator = QtCore.QTranslator(self)
         # holds references to workspace objects that should NOT be visibile in
@@ -1866,7 +1850,29 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.user_ns_hidden = self.workspaceModel.user_ns_hidden
         
         self.workspaceModel.enableInternalVariableObserver(True)
+        
+        # NOTE: 2025-06-24 22:05:04
+        # used to be called from self._configureUI_, but not anymore
+        self.workspaceView.setModel(self.workspaceModel)
+        self.workspaceView.selectionModel().selectionChanged[QtCore.QItemSelection, QtCore.QItemSelection].connect(self.slot_selectionChanged)
+        self.workspaceModel.itemChanged.connect(self.slot_variableItemNameChanged)
+        self.workspaceModel.modelContentsChanged.connect(self.slot_updateWorkspaceView)
+        
+        # With all UI elements and their signal-slot connections in place we can
+        # now apply stored settings, including the 'state' of the ScipyenWindow
+        # object (which is an instance of QMainWindow)
+        #
+        self.loadSettings()
 
+        # NOTE: 2024-05-29 13:04:00
+        # Asynchronously launch the plugin loading mechanism
+        self.startPluginLoad.emit()
+
+        self._updateConsolesEditor()
+
+        # NOTE: singleton design pattern
+        # see traitlets.config.SingletonConfigurable
+        self.__class__._instance = self  
         
     # BEGIN Properties
     
@@ -3690,9 +3696,16 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         "mainWindow.console" and "mainwindow.ipkernel").
 
         The Scipyen's user workspace is the same as the shell's namespace
-        (self.ipkernel.shell.user_ns)
-        The shell namespace is the same as the user's workspace.
+        (self.ipkernel.shell.user_ns).
+        
+        However, shell.kernel.user_ns is None!
+        
         """
+        
+        # NOTE: 2025-06-24 21:43:22
+        # Here, user's workspace is shell.user_ns, shell.kernel.user_ns,
+        # which is None
+        
 
         # creates a Qt console with an embedded ipython kernel
         # i.e. a QtInProcessKernelManager
@@ -3864,6 +3877,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             #
             # see NOTE: 2023-05-27 22:00:37 about manipulating variables in the 
             # workspace and updating the workspace model automatically
+            #
+            # see NOTE: 2025-06-24 21:43:22
             self.workspace = self.ipkernel.shell.user_ns
 
             # NOTE: 2023-05-27 22:19:46
@@ -3905,7 +3920,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             self.workspace["external_console"] = self.external_console
             self.workspace["user_home_environment_var"] = self._userenv_varname_
             self.workspace["user_home"] = self._user_home_
-            # print("exit" in self.ipkernel.shell.user_ns)
 
             # NOTE 2020-07-09 11:36:34
             # Override ExitAutocall objects in this kernel in order to let the
@@ -3931,10 +3945,12 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             # TODO/FIXME 2019-08-04 11:06:16
             # this does not override ipython's exit:
             # this will have to be called as %exit line magic (i.e. automagic doesn't work)
+            # see also NOTE 2020-07-09 11:36:34
             self.ipkernel.shell.register_magics(ScipyenMagics)
 
             # NOTE: 2020-11-29 15:57:08
-            # this imports current module in the user workspace as well
+            # this imports current module and all of its contents in the user 
+            # workspace as well
 
             impcmd = ' '.join(
                 ['from', "".join(["gui.", __module_file_name__]), 'import *'])
@@ -3942,8 +3958,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             self.ipkernel.shell.run_cell(impcmd)
 
             self.ipkernel.shell.run_cell("h5py.enable_ipython_completer()")
-            # if has_hdf5:
-            # self.ipkernel.shell.run_cell("h5py.enable_ipython_completer()")
 
             # hide the variables added to the workspace so far (e.g., ipkernel,
             # console, shell, and imported modules) so that they don't show in
@@ -3952,6 +3966,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             # assigning a variable to a symbol bound to one of these variables
             # -- effectively "overwriting" them.
 
+            # NOTE: 2025-06-24 21:49:03
+            # the line below work better if called AFTER _init_QtConsole_()
             # self._nonInteractiveVars_.update([i for i in self.workspace.items()])
 
             # --------------------------
@@ -4766,7 +4782,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         if source_ns != "Internal":  # avoid standard menu for data in remote kernels
             # TODO separate menu for variables in remote namespaces
-            return
+            return # TODO 2025-06-24 22:17:01 FIXME -> copy variable to usr w'space or display in external console?
 
         self.currentVarItem, self.currentVarItemName = self._getWorkspaceVarItemAndName_(ndx)
 
@@ -5110,10 +5126,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         else:
             self.currentVarItemName = None
             self.currentVarItem = None
-            # self.workspaceModel.itemChanged.connect(self.slot_variableItemNameChanged)
-            # self.workspaceModel.currentItemName = ""
-            # self.workspaceModel.currentItem = None
-            # self.workspaceModel.itemChanged.connect(self.slot_variableItemNameChanged)
 
     @Slot("QStandardItem*")
     @safewrapper
@@ -5845,8 +5857,16 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         #
         
         self.workspaceView.setShowGrid(False)
-        self.workspaceView.setModel(self.workspaceModel)
-        self.workspaceView.selectionModel().selectionChanged[QtCore.QItemSelection, QtCore.QItemSelection].connect(self.slot_selectionChanged)
+        
+        # ### BEGIN
+        # NOTE: 2025-06-24 22:03:52
+        # Next two lines henceforth called AFTER workspaceModel initialization, which is AFTER
+        # self._init_QtConsole_, which now is AFTER self._configureUI_()
+        # furthermore, workspaceView.selectionModel() REQUIRES the presence of a 
+        # item model for the workspaceView
+        # ### END
+        # self.workspaceView.setModel(self.workspaceModel)
+        # self.workspaceView.selectionModel().selectionChanged[QtCore.QItemSelection, QtCore.QItemSelection].connect(self.slot_selectionChanged)
         # NOTE 2021-07-28 14:26:09
         # avoid editing by db-click
         self.workspaceView.setEditTriggers(QtWidgets.QAbstractItemView.EditKeyPressed)
@@ -5871,9 +5891,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # make this configurable (and locale-dependent?)
         self.workspaceView.horizontalHeader().setDefaultAlignment(QtCore.Qt.AlignLeft)
 
-        self.workspaceModel.itemChanged.connect(self.slot_variableItemNameChanged)
-        
-        self.workspaceModel.modelContentsChanged.connect(self.slot_updateWorkspaceView)
+        # NOTE: 2025-06-24 22:09:00 see NOTE: 2025-06-24 22:03:52
+        # self.workspaceModel.itemChanged.connect(self.slot_variableItemNameChanged)
+        # self.workspaceModel.modelContentsChanged.connect(self.slot_updateWorkspaceView)
         
         self.copyVarnameToolBtn.clicked.connect(self.slot_copyWorkspaceSelection)
         self.sendVarnameToConsoleToolBtn.clicked.connect(self.slot_pasteWorkspaceSelection)

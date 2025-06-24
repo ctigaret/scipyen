@@ -994,37 +994,9 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         
         self.cached_vars = dict([item for item in self.shell.user_ns.items(
         ) if self.isDisplayable(self.shell.user_ns, *item)])
-
-#         # NOTE: 2023-01-28 13:27:47
-#         # we also take a snapshot of the mpl figures
-#         # first, capture those registered in pyplot/pylab
-#         # REMEMBER Gcf holds references to instances of FigureManager concrete subclasses
-#         # self.cached_mpl_figs_in_internal = set(
-#         #     fig_manager.canvas.figure for fig_manager in Gcf.figs.values())
-#         self.gcf_figs.clear()
-#         self.gcf_figs.update(
-#             fig_manager.canvas.figure for fig_manager in Gcf.figs.values())
-#         
-#         # if len(self.gcf_figs):
-#         #     print(f"\n{self.__class__.__name__}.preExecute figs in Gcf = {self.gcf_figs}")
-# 
-#         # NOTE: 2023-01-29 23:30:32
-#         # all figures created outside pyplot are now adopted for management under
-#         # pyplot (see mainwindow.WindowManager._adopt_mpl_figure() method, called
-#         # by code inside post_execute, below)
-#         
-#         # self.cached_mpl_figs_in_internal.clear()
-#         # self.cached_mpl_figs_in_internal.update(v[1] for v in self.cached_vars.items() 
-#         #                                         if isinstance(v[1], mpl.figure.Figure)
-#         #                                         and self.isDisplayable(self.shell.user_ns, *v))
-#         
-#         # for v in self.cached_vars.values():
-#         #     if isinstance(v, mpl.figure.Figure):
-#         #         # self.cached_mpl_figs_in_internal is a set so duplicates won't be added
-#         #         print(f"\n{self.__class__.__name__}.preExecute fig in cached vars: {v}")
-#         #         self.cached_mpl_figs_in_internal.add(v)
-# 
-#         # print(f"\npreExecute cached figs {self.cached_mpl_figs_in_internal}")
+        
+        print(f"In {self.__class__.__name__}.preExecute:")
+        print(f"\t{len(self.cached_vars)} cached_vars")
 
         # NOTE: 2023-06-07 08:39:15
         # at this stage there may be variables not cached but still monitored
@@ -1034,6 +1006,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             cached_set = set(self.cached_vars)
 
             observed_not_cached = observed_set - cached_set
+            print(f"\t{len(observed_not_cached)} observed_not_cached")
             for var in observed_not_cached:
                 self.internalVariablesMonitor.pop(var, None)
 
@@ -1188,7 +1161,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         pass
 
     def postRunCell(self, result:Bunch):
-        # print(f"\n{self.__class__.__name__}.postRunCell result = {result}")
+        print(f"\n{self.__class__.__name__}.postRunCell result = {result}")
         if hasattr(result, "result"):
             # NOTE: 2023-06-06 12:56:44
             # this is bound to the symbol "_" in the internal namespace, by IPython
@@ -1338,7 +1311,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # varnames that have been removed 
         del_vars = observed_varnames - current_user_varnames
         
-        # print(f"{self.__class__.__name__}._updateModel_ del_vars = {del_vars}")
+        print(f"{self.__class__.__name__}._updateModel_ del_vars = {del_vars}")
 
         # 3.2. now, remove these from the DataBag of observed variables (self.internalVariablesMonitor)
         #
@@ -1641,6 +1614,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self.updateRow(row, v_row)
 
     def updateRow(self, rowindex, newrowdata):
+        # print(f"{self.__class__.__name__}.updateRow(rowindex = {rowindex}, newrowdata = {newrowdata})")
         originalRow = self.getRowContents(rowindex, asStrings=False)
         # print("updateRow originalRow as str", self.getRowContents(rowindex, asStrings=True))
         if originalRow is not None:
@@ -1870,6 +1844,11 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         removals = list(filter(lambda x: x[1] == WorkspaceVarChange.Removed, self.__changes__.items()))
         additions = list(filter(lambda x: x[1] == WorkspaceVarChange.New, self.__changes__.items()))
         modifications = list(filter(lambda x: x[1] == WorkspaceVarChange.Modified, self.__changes__.items()))
+        
+        print(f"{self.__class__.__name__}._slot_updateModelAsync_: {len(modifications)} modifications")
+        if len(modifications):
+            for modification in modifications:
+                print(f"{modification}")
         
         for item in removals:
             self._varChanges_callbacks_[item[1]](item[0])

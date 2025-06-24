@@ -300,6 +300,16 @@ class ScipyenInProcessKernelManager(QtInProcessKernelManager):
     client_class = __module__ + '.ScipyenInProcessKernelClient'
     
     def start_kernel(self, **kwds):
+        r"""Starts the ipython kernel.
+        For Python version < 3.11,  the kernel is 
+            core.scipyen_inprocess.ScipyenInProcessKernel_3_10
+    
+        For Python version >= 3.11, the kernel is 
+            ipykernel.inprocess.ipkernel.InProcessKernel
+        """
+        # NOTE: 2025-06-24 21:39:05
+        # ScipyenInProcessKernel is an alias to ScipyenInProcessKernel_3_10
+        # or to stock InProcessKernel
         self.kernel = ScipyenInProcessKernel(parent=self, session=self.session)
 
 class ScipyenInProcessKernelClient(QtInProcessKernelClient):
