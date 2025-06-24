@@ -85,10 +85,11 @@ from core import helputils
 from gui.workspacegui import WorkspaceGuiMixin
 # import numpy as np # cheeky
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
-if isPySide6:
-    __ui_path__ = adapt_ui_path(__module_path__,'pythonhelpwidget_qt6.ui')
-else:
-    __ui_path__ = adapt_ui_path(__module_path__,'pythonhelpwidget.ui')
+# if __has_PySide6__:
+#     __ui_path__ = adapt_ui_path(__module_path__,'pythonhelpwidget_qt6.ui')
+# else:
+#     __ui_path__ = adapt_ui_path(__module_path__,'pythonhelpwidget.ui')
+__ui_path__ = adapt_ui_path(__module_path__,'pythonhelpwidget.ui')
 
 Ui_PythonHelpWidget, QWidget = loadUiType(__ui_path__)
 
