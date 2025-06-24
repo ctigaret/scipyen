@@ -442,7 +442,7 @@ if p.parent.name == "src":
         traceback.print_exc()
     
 _qt_python_verstr_ = f"PySide6 ({PySide6.__version__})" if __has_PySide6__ else f"{'PyQt6' if __has_PyQt6__ else 'PyQt5'} ({qtpy.PYQT_VERSION})"
-_scipyen_console_banner_ = f"Scipyen {__verstr__} internal console, with {_qt_python_verstr_}\n" if isinstance(__verstr__, str) and len(__verstr__.strip()) else f"Scipyen internal console, with {_qt_python_verstr_}\n"
+_scipyen_console_banner_ = f"Scipyen {__verstr__} internal console using {_qt_python_verstr_}\n" if isinstance(__verstr__, str) and len(__verstr__.strip()) else f"Scipyen internal console using {_qt_python_verstr_}\n"
 
 # # # try:
 # # #     # from setuptools_scm import get_version
