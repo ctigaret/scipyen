@@ -892,12 +892,12 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     def _slot_cacheInternalVariableChange_(self, change):
         if isinstance(change, Bunch):
             name = change.name
-            change_type = change.type
+            change_type = getattr(change, "change_type", change.type)
         else:
             name = change["name"]
             change_type = change["change_type"]
             
-        # print(f"{self.__class__.__name__}._slot_cacheInternalVariableChange_: change_type = {change_type}")
+        print(f"{self.__class__.__name__}._slot_cacheInternalVariableChange_: for variable {name}: change_type = {change_type}")
             
         if change_type == "new":
             self.__changes__[name] = WorkspaceVarChange.New
@@ -907,7 +907,10 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             self.__changes__[name] = WorkspaceVarChange.Modified
         else:   # for legacy (traitlets.TraitType-style) notifications
                 # that lack 'change_type' attribute
-            self.__changes__[name] = WorkspaceVarChange.Modified
+            if name not in self.shell.user_ns:
+                self.__changes__[name] = WorkspaceVarChange.New
+            else:
+                self.__changes__[name] = WorkspaceVarChange.Modified
             
         # print(f"\n{self.__class__.__name__}._slot_cacheInternalVariableChange_ self.__changes__ = {self.__changes__} and {name} is in workspace: {name in self.shell.user_ns}")
 
@@ -995,8 +998,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self.cached_vars = dict([item for item in self.shell.user_ns.items(
         ) if self.isDisplayable(self.shell.user_ns, *item)])
         
-        print(f"In {self.__class__.__name__}.preExecute:")
-        print(f"\t{len(self.cached_vars)} cached_vars")
+        # print(f"In {self.__class__.__name__}.preExecute:")
+        # print(f"\t{len(self.cached_vars)} cached_vars")
 
         # NOTE: 2023-06-07 08:39:15
         # at this stage there may be variables not cached but still monitored
@@ -1006,7 +1009,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             cached_set = set(self.cached_vars)
 
             observed_not_cached = observed_set - cached_set
-            print(f"\t{len(observed_not_cached)} observed_not_cached")
+            # print(f"\t{len(observed_not_cached)} observed_not_cached")
             for var in observed_not_cached:
                 self.internalVariablesMonitor.pop(var, None)
 
@@ -1161,7 +1164,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         pass
 
     def postRunCell(self, result:Bunch):
-        print(f"\n{self.__class__.__name__}.postRunCell result = {result}")
+        # print(f"\n{self.__class__.__name__}.postRunCell result = {result}")
         if hasattr(result, "result"):
             # NOTE: 2023-06-06 12:56:44
             # this is bound to the symbol "_" in the internal namespace, by IPython
@@ -1311,7 +1314,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # varnames that have been removed 
         del_vars = observed_varnames - current_user_varnames
         
-        print(f"{self.__class__.__name__}._updateModel_ del_vars = {del_vars}")
+        # print(f"{self.__class__.__name__}._updateModel_ del_vars = {del_vars}")
 
         # 3.2. now, remove these from the DataBag of observed variables (self.internalVariablesMonitor)
         #
@@ -1375,7 +1378,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     def _slot_itemGuiObjectTitleChanged(self, val:str):
         r"""For dynamic update of 1st line of tooltip of items representing a QWidget"""
         obj = self.sender()
-        if os.environ["QT_API"] == "pyside6":
+        if __has_PySide6__:
             if not isinstance(obj, (QtWidgets.QWidget,Shiboken.Object)):
                 return
         else:

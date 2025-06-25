@@ -140,7 +140,8 @@ def getDesktopHeight():
     return getDesktopGeometry().height()
 
 def getDesktopGeometry():
-    if os.environ["QT_API"] == "pyside6":
+    # if os.environ["QT_API"] == "pyside6":
+    if __has_PyQt6__ or __has_PySide6__:
         pos = QtGui.QCursor.pos()
         screen = QtWidgets.QApplication.screenAt(pos)
         if(screen):

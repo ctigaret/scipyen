@@ -83,7 +83,7 @@ import quantities as pq
 from core import datasignal
 from core.scipyen_quantities import unitsConvertible
 from core.utilities import gethash, safe_identity_test
-from .prog import (timefunc, processtimefunc)
+from .prog import (timefunc, processtimefunc, brief_repr)
 
 # NOTE :2021-08-20 09:50:52
 # to figure out traitlets classes use the following idioms:
@@ -123,6 +123,7 @@ def traitlet_set(instance, obj, value):
     This is supposed to also detect changes in the order of elements in sequences.
     WARNING: Slows down execution
     """
+    print(f"core.traitutils.traitlet_set(instance={instance} (with name {instance.name}), obj={obj}, value={brief_repr(value)})")
     #new_value = instance._validate(obj, value)
     new_value = value # skip validation
             
@@ -131,25 +132,29 @@ def traitlet_set(instance, obj, value):
     
     if instance.name and instance.name in obj._trait_values and instance.name in obj.traits():
         old_value = obj._trait_values[instance.name]
+        # if new_value is old_value:
+        #     silent = True
     else:
+        change_type = "new"
         old_value = instance.default_value
         silent = False
-        change_type = "new"
+        
+    print(f"\told_value={brief_repr(old_value)} -> new value is old value: {old_value is new_value}")
     
     # NOTE: 2025-06-14 13:39:57 in PySide6 I need to deal with
     # Shiboken.ObjectType and with Ui_* types created by loadUiType
-    if os.environ["QT_API"] == "pyside6":
+    if __has_PySide6__:
         if isinstance(value, type) and (hasattr(value, "setupUi") or issubclass(value,Shiboken.Object)):
             silent = True
             
     # NOTE: 2023-06-14 08:49:55
-    # always notify here - this is relevan, because:
+    # always notify here - this is relevant, because:
     # a) notifies when an existing trait is set to None
-    # b) notifies when a new trait with nderlying value of None is set 
+    # b) notifies when a new trait with underlying value of None is set 
     # therefore this will enable e.g., showing up symbols bound to None, in
     # any monitored mappings (such as the workspace)
     if new_value is None: # and old_value is None:
-        change_type = "modified" # don't EVER use new 'cause will trigger duplications in some listeners
+        change_type = "modified" # don't EVER use "new" here 'cause will trigger duplications in some listeners
         obj._trait_values[instance.name] = new_value
         obj._notify_trait(instance.name, old_value, new_value, 
                           change_type = change_type)
@@ -161,6 +166,7 @@ def traitlet_set(instance, obj, value):
             if isinstance(new_value, QtCore.QObject):
                 return
             new_hash = gethash(new_value)
+            old_hash = gethash(old_value)
             #print("\told %s (hash %s)\n\tnew %s (hash %s)" % (old_value, instance.hashed, new_value, new_hash))
             #print(instance.name, "old hashed", instance.hashed, "new_hash", new_hash)
             silent = bool(new_hash == instance.hashed)
@@ -550,270 +556,3 @@ class transform_link(traitlets.link):
         self.target[0].unobserve(self._update_source, names=self.target[1])
         self.source, self.target = None, None
         
-# def trait_from_type(x, *args, **kwargs):
-#     r"""Generates a TraitType for object x.
-#     
-#     Prerequisites: Except for enum types (enum.Enum and enumIntEnum)
-#     x.__class__ should define a "copy constructor", e.g.:
-#     
-#     x = SomeClass()
-#     
-#     y = SomeClass(x)    # copy constructor semantics when x and y are of the same type 
-#                         # x may be a subclass/superclass of y, or another type
-#     
-#     For types derived from builtin types, this is taken care of by the python 
-#     library. Anything else needs a bit of work.
-#     
-#     Options:
-#     --------
-#     
-#     allow_none: bool default is False
-#     content_traits:bool, default is False
-#     content_allow_none:bool, default is whatever allow_none is
-#     
-#     """
-#     allow_none = kwargs.pop("allow_none", False)
-#     content_traits = kwargs.pop("content_traits", True)
-#     content_allow_none = kwargs.pop("content_allow_none", allow_none)
-#     
-#     immediate_class = getmro(x.__class__)[0]
-#     # NOTE 2020-07-07 14:42:22
-#     # to prevent "slicing" of derived classes, 
-#     
-#     arg = [x] + [a for a in args]
-#     
-#     args = tuple(arg)
-#     
-#     kw = kwargs
-#     
-#     if x is None:
-#         return Any()
-#     
-#     elif isinstance(x, bool):
-#         if immediate_class != bool:
-#             # preserve its immediate :class:, otherwise this will slice subclasses
-#             return Instance(klass = x.__class__, args=args, kw=kw, allow_none = allow_none)
-#         
-#         return Bool(default_value=x, allow_none = allow_none)
-#     
-#     elif isinstance(x, int):
-#         if immediate_class != int:
-#             return Instance(klass = x.__class__, args=args, kw=kw, allow_none = allow_none)
-#         
-#         return Int(default_value=x, allow_none = allow_none)
-#     
-#     elif isinstance(x, float):
-#         if immediate_class != float:
-#             return Instance(klass = x.__class__, args=args, kw=kw, allow_none = allow_none)
-#         
-#         return Float(default_value=x, allow_none = allow_none)
-#     
-#     elif isinstance(x, complex):
-#         if immediate_class != complex:
-#             return Instance(klass = x.__class__, args=args, kw=kw, allow_none = allow_none)
-#         
-#         return Complex(default_value=x, allow_none = allow_none)
-#     
-#     elif isinstance(x, bytes):
-#         if immediate_class != bytes:
-#             return Instance(klass = x.__class__, args=args, kw=kw, allow_none = allow_none)
-#         
-#         return Bytes(default_value=x, allow_none = allow_none)
-#     
-#     elif isinstance(x, str):
-#         if immediate_class != str:
-#             return Instance(klass = x.__class__, args=args, kw=kw, allow_none = allow_none)
-#         
-#         return Unicode(default_value=x, allow_none = allow_none)
-#     
-#     elif isinstance(x, list):
-#         if content_traits:
-#             traits = [trait_from_type(v, allow_none=allow_none, content_traits=content_traits) for v in x]
-#         else:
-#             traits = None
-#             
-#         if immediate_class != list:
-#             return Instance(klass = x.__class__, args=args, kw=kw, allow_none = allow_none)
-#         
-#         traitklass = new_class("ListTrait", bases = (List,), exec_body = new_trait_callback)
-#         return traitklass(default_value = x, allow_none = allow_none)
-#         #return TestTrait(default_value = x, traits = traits, allow_none = allow_none)
-#         #return ListTrait(default_value = x, traits = traits, allow_none = allow_none)
-#         #return List(default_value=x, allow_none = allow_none)
-#     
-#     elif isinstance(x, set):
-#         if immediate_class != set:
-#             return Instance(klass = x.__class__, args=args, kw=kw, allow_none = allow_none)
-#         
-#         return Set(default_value = x, allow_none = allow_none)
-#     
-#     elif isinstance(x, tuple):
-#         if immediate_class != tuple:
-#             return Instance(klass = x.__class__, args=args, kw=kw, allow_none = allow_none)
-#         
-#         return Tuple(default_value = x, allow_none = allow_none)
-#     
-#     elif isinstance(x, dict):
-#         # NOTE 2021-08-19 11:33:03
-#         # for Dict, traits is a mapping of dict keys to their corresponding traits
-#         if content_traits:
-#             traits = dict((k, trait_from_type(v, allow_none = allow_none, content_traits=content_traits)) for k,v in x.items()) 
-#         else:
-#             traits = None
-#             
-#         if immediate_class != dict:
-#             # preserve its immediate :class:, otherwise this will slice subclasses
-#             return Instance(klass = x.__class__, args=args, kw=kw, allow_none = allow_none)
-#         
-#         return Dict(default_value=x, traits=traits, allow_none = allow_none)
-#         #return Dict(default_value=x, allow_none = allow_none)
-#     
-#     elif isinstance(x, enum.EnumMeta):
-#         return UseEnum(x, allow_none = allow_none)
-#     
-#     else:
-#         #immediate_class = getmro(x.__class__)[0]
-#         if immediate_class.__name__ == "type": # trait encapsulates a type, not an instance
-#             return Type(klass=x, default_value = immediate_class, allow_none = allow_none)
-#         
-#         else: # trait encapsulates an instance
-#             # NOTE: 2020-09-05 14:23:43 some classes need special treatment for 
-#             # their default constructors (ie when *args and **kw are empty)
-#             # so far we plan to implement this for the following:
-#             # vigra.VigraArray, vigra.AxisInfo, vigra.AxisTags,
-#             # neo.ChannelIndex, neo.AnalogSignal, neo.IrregularlySampledSignal,
-#             # neo.ImageSequence, neo.SpikeTrain
-#             # datasignal.DataSignal, datasignal.IrregularlySampledDataSignal,
-#             # pandas.Series, pandas.DataFrame
-#             if isinstance(x, vigra.AxisInfo):
-#                 if "key" not in kw:
-#                     kw["key"] = x.key
-#                     
-#                 if "typeFlags" not in kw:
-#                     kw["typeflags"] = x.typeFlags
-#                     
-#                     
-#                 if "resolution" not in kw:
-#                     kw["resolution"] = x.resolution
-#                     
-#                 if "description" not in kw:
-#                     kw["description"] = x.description
-#                     
-#             elif isinstance(x, vigra.AxisTags):
-#                 if len(args) == 0:
-#                     args = (x, ) # copy c'tor
-#                 
-#             elif isinstance(x, vigra.VigraArray):
-#                 if len(args) == 0:
-#                     args = (x, ) # can be a copy constructor
-#                     
-#                 if "dtype" not in kw:
-#                     kw["dtype"] = x.dtype
-#                     
-#                 if "order" not in kw:
-#                     kw["order"] = x.order
-#                     
-#                 if "axistags" not in kw:
-#                     kw["axistags"] = None # calls VigraArray.defaultAxistags or uses x.axistags if they exist
-#                     
-#             #elif isinstance(x, neo.ChannelIndex):
-#                 #if len(args) == 0:
-#                     #args = (x.index, )
-#                     
-#                 #for attr in x._all_attrs:
-#                     #if attr[0] != "index":
-#                         #if attr[0] not in kw:
-#                             #kw[attr[0]] = getattr(x, attr[0])
-#                         
-#             elif isinstance(x, (neo.AnalogSignal, datasignal.DataSignal)):
-#                 if len(args) == 0:
-#                     args = (x,) # takes units & time units from x
-#                     
-#                 for attr in x._all_attrs:
-#                     if attr[0] != "signal":
-#                         if attr[0] not in kw:
-#                             kw[attr[0]] = getattr(x, attr[0])
-#                         
-#             elif isinstance(x, (neo.IrregularlySampledSignal, datasignal.IrregularlySampledDataSignal)):
-#                 if len(args) < 2:
-#                     args = (x.times, x,)
-#                     
-#                 for attr in x._all_attrs:
-#                     if attr[0] not in ("times", "signal"):
-#                         if attr[0] not in kw:
-#                             kw[attr[0]] = getattr(x, attr[0])
-#                         
-#             elif isinstance(x, neo.SpikeTrain):
-#                 if len(args)  == 0:
-#                     args = (x.times, x.t_stop,)
-#                     
-#                 for attr in x._all_attrs:
-#                     if attr[0] not in ("times", "t_stop"):
-#                         if attr[0] not in kw:
-#                             kw[attr[0]] = getattr(x, attr[0])
-#                         
-#             elif isinstance(x, neo.ImageSequence):
-#                 if len(args) == 0:
-#                     args = (x, )
-#                     
-#                 for attr in x._all_attrs:
-#                     if attr[0] != "image_data":
-#                         if attr[0] not in kw:
-#                             kw[attr[0]] = getattr(x, attr[0])
-#                 
-#             elif isinstance(x, (neo.Block, neo.Segment)):
-#                 if len(args) == 0:
-#                     args = (x, )
-#                     
-#             #elif isinstance(x, (neo.Block, neo.Segment, neo.Unit)):
-#                 #if len(args) == 0:
-#                     #args = (x, )
-#                     
-#             elif isinstance(x, (neo.Epoch, neo.Event)):
-#                 for attr in x._all_attrs:
-#                     if attr[0] not in kw:
-#                         kw[attr[0]] = getattr(x, attr[0])
-#                         
-#             elif isinstance(x, pq.Quantity):
-#                 if "units" not in kw:
-#                     kw["units"] = x.units
-#                 
-#                 if "dtype" not in kw:
-#                     kw["dtype"] = x.dtype
-#                     
-#                 if "buffer" not in kw:
-#                     kw["buffer"] = x.data
-#                 
-#                 kw["default_value"] = x
-#                 
-#                 kw["allow_none"] = allow_none
-#                 
-#                 return QuantityTrait(x, **kw)
-#                 
-#             elif isinstance(x, np.ndarray):
-#                 #shp = tuple(list(x.shape))
-#                 
-#                 if "dtype" not in kw:
-#                     kw["dtype"] = x.dtype
-#                     
-#                 if "buffer" not in kw:
-#                     kw["buffer"] = x.data
-#                     
-#                 kw["default_value"] = x
-#                 kw["allow_none"] = allow_none
-#                 
-#                 return NdarrayTrait(x, **kw)
-#                     
-#             elif isinstance(x, pd.DataFrame):
-#                 if len(args) == 0:
-#                     args = (x, )
-#                 
-#             elif isinstance(x, pd.Series):
-#                 if len(args) == 0:
-#                     args = (x, )
-#                     
-#                 
-#             trait = Instance(klass = x.__class__, args=args, kw=kw, allow_none = allow_none)
-#             trait.default_value = x
-#             return trait
-#     

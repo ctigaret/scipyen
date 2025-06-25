@@ -2480,6 +2480,9 @@ def __check_type__(
 
     return False
 
+def brief_repr(obj:typing.Any) -> str:
+    return f"{type(obj).__name__} at {hex(id(obj))}"
+
 
 def resolve_object(modName, objName):
     r"""Returns an object based on object's symbol and module's name.

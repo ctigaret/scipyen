@@ -98,16 +98,25 @@ class DataBagTraitsObserver(HasTraits):
             Expects a change_type (str) as one of: "modified", "new", "removed".
             By default, this is "modified". 
         """
+        if old_value is new_value:
+            return
         self.notify_change(
             Bunch(
                 name=name,
                 old=old_value,
                 new=new_value,
                 owner=self,
-                type="change",
+                type="change", # this must ALWAYS be set to "change"
+                # type=change_type,
+                # type="",
                 change_type=change_type,
                 )
             )
+            
+    def notify_change(self, change:Bunch) -> None:
+        # if "change_type" not in change:
+            
+        return self._notify_observers(change)
 
     def remove_trait(self, traitname:str, traitobject:TraitType):
         r"""Unbinds a TraitType instance from an attribute of self.

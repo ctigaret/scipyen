@@ -350,9 +350,9 @@ class ListTrait(List, ScipyenTraitTypeMixin):
         if self.name and self.name in obj._trait_values and self.name in obj.traits():
             old_value = obj._trait_values[self.name]
         else:
+            change_type="new"
             old_value = self.default_value
             silent=False
-            change_type="new"
 
         try:
             if any(not isinstance(v, self.klass) for v in (new_value, old_value)):
