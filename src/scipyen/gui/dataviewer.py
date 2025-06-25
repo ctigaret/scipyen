@@ -79,7 +79,7 @@ from core.prog import (safewrapper, safeguiwrapper, )
 
 from core.traitcontainers import (DataBag, DataBagTraitsObserver,)
 from core.scipyendataclasses import ScipyenDataclass
-
+from core.scipyen_config import markConfigurable
 
 #### END pict.core modules
 
@@ -281,7 +281,30 @@ class DataViewer(ScipyenViewer):
         self.goNext.triggered.connect(self.slot_goNext)
         self.goNext.setEnabled(False)
         
+        self.changeWidgetsHeightAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("object-height-symbolic"), "Change widget heights")
+        self.changeWidgetsHeightAction.triggered.connect(self.slot_changeWidgetsHeights)
         self.addToolBar(QtCore.Qt.TopToolBarArea, self.toolBar)
+        
+    @property
+    def widgetsHeight(self) -> int:
+        return self.treeWidget.widgetHeight
+    
+    @markConfigurable("WidgetsHeight", "Qt")
+    @widgetsHeight.setter
+    def widgetsHeight(self, val:int):
+        self.treeWidget.widgetHeight = val
+        
+    def slot_changeWidgetsHeights(self):
+        dlg = quickdialog.QuickDialog(self, "Adjust Children Height")
+        valuePrompt = quickdialog.IntegerInput(dlg, "Height (pixels)")
+        valuePrompt.variable.setClearButtonEnabled(True)
+        valuePrompt.variable.redoAvailable=True
+        valuePrompt.variable.undoAvailable=True
+        valuePrompt.setValue(f"{self.treeWidget.widgetHeight}")
+        if dlg.exec() == QtWidgets.QDialog.Accepted:
+            newValue = valuePrompt.value()
+            self.treeWidget.widgetHeight = newValue
+        
         
     def _set_data_(self, data:object, predicate=None, *args, **kwargs):
         r"""

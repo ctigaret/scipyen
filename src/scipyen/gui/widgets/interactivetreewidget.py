@@ -150,6 +150,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         self.headerItem().setToolTip(2, "Value of child data, or its length\n(when data is a nested collection).\nNumpy arrays ar displayed as a table")
         
         self._widget_height_ = self._default_widget_height_
+        self.setUniformRowHeights(False)
         
         self.itemClicked.connect(self._slot_setLastActive)
         
@@ -259,11 +260,15 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         from gui.guiutils import treeWidgetItems
         itemWidgets = list(filter(lambda w: w is not None, list(map(lambda i: self.itemWidget(i,0), 
                                   treeWidgetItems(self)))))
+        # itemWidgets = list(filter(lambda w: w is not None, list(map(lambda i: (i, self.itemWidget(i,0)), 
+        #                           treeWidgetItems(self)))))
         
         for w in itemWidgets:
-            w.setMaximumHeight(self._widget_height_)
-            w.resize(w.width(), self._widget_height_)
-        
+            if not isinstance(w, QtWidgets.QLabel):
+            # if not isinstance(w[1], QtWidgets.QLabel):
+                # row = self.indexFromItem(w[0]).row()
+                w.setMaximumHeight(self._widget_height_)
+                w.resize(w.width(), self._widget_height_)
     
     def setData(self, data, predicate=None, top_title:str = "", dataTypeStr = None, hideRoot=False):
         r"""data should be a dictionary."""

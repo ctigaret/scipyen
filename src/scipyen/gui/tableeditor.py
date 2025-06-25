@@ -140,9 +140,6 @@ class TableEditor(ScipyenViewer):
                  *args, **kwargs) -> None:
         super().__init__(data=data, parent=parent, win_title=win_title, doc_title = doc_title, ID=ID, *args, **kwargs) # calls _configureUI_ and loadSettings
 
-        #self.tableWidget = TableEditorWidget()
-        #self.setCentralWidget(self.tableWidget)
-        
         self.selectedColumnIndex      = None
         self.selectedRowIndex         = None
         
@@ -152,6 +149,15 @@ class TableEditor(ScipyenViewer):
         # impletement pyqtgraph plotting as alternative
         self._use_matplotlib_         = True
         
+        if __has_PySide6__:
+            btns = self.tableWidget.findChildren(QtWidgets.QToolButton) + self.findChildren(QtWidgets.QPushButton)
+        else:
+            btns = self.tableWidget.findChildren((QtWidgets.QToolButton, QtWidgets.QPushButton))
+        
+        for b in btns:
+            if b.iconSize() != self._scipyenWindow_.iconSize():
+                b.setIconSize(self._scipyenWindow_.iconSize())
+        
         if self._data_ is not None:
             self._viewData_()
             
@@ -159,6 +165,49 @@ class TableEditor(ScipyenViewer):
         self.toolBar.setMovable(False)
         self.toolBar.setVisible(True)
             
+    # ### BEGIN toolbar menu TODO 2025-06-25 23:11:32 FINALIZE ME - DO NOT DELETE
+#     @safewrapper
+#     def createPopupMenu(self) -> QtWidgets.QMenu:
+#         r"""Extend toolbar popup menu with style options"""
+#         menu = super().createPopupMenu()
+#         menu.addSection("Toolbar Settings")
+#         # text position
+#         textPositionMenu = menu.addMenu("Text Position")
+#         for action in [self.defaultToolBarToolButtonStyleAction,
+#                        self.iconsOnlyToolBarToolButtonStyleAction,
+#                        self.textOnlyToolBarToolButtonStyleAction,
+#                        self.textAlongsideIconsToolBarToolButtonStyleAction,
+#                        self.textUnderIconsToolBarToolButtonStyleAction]:
+#             textPositionMenu.addAction(action)
+#         # icon size
+#         iconSizeMenu = menu.addMenu("Icon Size")
+#         for action in [self.defaultToolBarIconSizeAction, self.smallToolBarIconSizeAction,
+#                        self.mediumToolBarIconSizeAction, self.largeToolBarIconSizeAction,
+#                        self.hugeToolBarIconSizeAction]:
+#             iconSizeMenu.addAction(action)
+#         menu.addAction(self.lockToolBarAction)
+#             
+#         return menu
+# 
+#     @property
+#     def toolBarLocked(self) -> bool:
+#         return not self.toolBar.isMovable()
+#     
+#     @markConfigurable("ToolBarLocked", "Qt")
+#     @toolBarLocked.setter
+#     def toolBarLocked(self, val:bool):
+#         self._lockedToolBar = val is True
+#         signalBlocker = QtCore.QSignalBlocker(self.lockToolBarAction)
+#         self.lockToolBarAction.setChecked(self._lockedToolBar)
+#         self.toolBar.setMovable(not self._lockedToolBar)
+#         
+#     @Slot(bool)
+#     def _slot_changeToolBarLockedState(self, val:bool):
+#         # print(f"{self.__class__.__name__}._slot_changeToolBarLockedState(val={val})")
+#         self.toolBarLocked = val is True
+#
+    # ### END   toolbar menu TODO 2025-06-25 23:11:32 FINALIZE ME - DO NOT DELETE
+        
     def _save_viewer_settings_(self):
         if type(self._scipyenWindow_).__name__ == "ScipyenWindow":
             self.qsettings.setValue("/".join([self.__class__.__name__, "UseMatplotlib"]), "%s" % self._use_matplotlib_)
@@ -252,8 +301,8 @@ class TableEditor(ScipyenViewer):
         plotDataAction.triggered.connect(self.slot_plotSelectedData)
         
         self.addToolBar(self.toolBar)
-        self.toolBar.setVisible(True)
-        self.toolBar.setMovable(False)
+        # self.toolBar.setVisible(True)
+        # self.toolBar.setMovable(False)
         
     def clear(self):
         pass # what's this for? do I really need it?

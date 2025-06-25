@@ -90,7 +90,10 @@ class MatrixViewer(ScipyenViewer):
         
     def _configureUI_(self):
         self.fileMenu = self.menuBar().addMenu("&File")
-        self.fileMenu.addAction("&Save As...", self.saveAsFile, "Ctrl+Sift+S")
+        if __has_PyQt6__ or __has_PySide6__:
+            self.fileMenu.addAction("&Save As...", "Ctrl+Shift+S", self.saveAsFile)
+        else:
+            self.fileMenu.addAction("&Save As...", self.saveAsFile, "Ctrl+Shift+S")
         
         self._tableWidget = QtWidgets.QTableWidget(self)
         #self._tableWidget.setSortingEnabled(False) # this IS the default!

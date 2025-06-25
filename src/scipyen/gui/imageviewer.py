@@ -3212,7 +3212,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                             if self._axes_calibration_:
                                 channelNdx = self._axes_calibration_["c"].channelIndices
                                 cval = [self._axes_calibration_["c"].getChannelCalibration(channelNdx[k]).calibratedMeasure(val[k]) for k in range(img.channels)]
-                                sval = "(%s)" % "; ".join(["%s" % quantity2str(v) for v in cval])
+                                sval = "(%s)" % "; ".join([quantity2str(v) for v in cval])
                                 
                             else:
                                 sval = "(%s)" % "; ".join(["%.2f" % v for v in val])
@@ -3222,7 +3222,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                             val = float(img[x,y])
                             if self._axes_calibration_:
                                 cval = self._axes_calibration_["c"].getChannelCalibration().calibratedMeasure(val)
-                                sval = "(%s)" % quantity2str(cval)
+                                sval = quantity2str(cval)
                             else:
                                 sval = "(%.2f)" % val
                             
@@ -3267,7 +3267,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                             if isinstance(val, float):
                                 if self._axes_calibration_:
                                     cval = self._axes_calibration_["c"].getChannelCalibration().calibratedMeasure(val)
-                                    sval = "(%s)" % quantity2str(cval)
+                                    sval = quantity2str(cval)
                                 else:
                                     sval = "(%.2f)" % val
                                 coordTxt = "%s<X: %d (%s: %s)%s, Y: %d (%s: %s)%s> %s" % \
@@ -3292,7 +3292,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                         # sval = "%.2f" % val
                         if self._axes_calibration_:
                             cval = self._axes_calibration_["c"].getChannelCalibration().calibratedMeasure(val)
-                            sval = "(%.2f)" % quantity2str(cval)
+                            sval = quantity2str(cval)
                             
                         else:
                             sval = "(%.2f)" % val
@@ -3303,12 +3303,6 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                             y, heightAxisKey, scy, swy, \
                             sval)
                     
-#                         coordTxt = "%s<X: %d (%s: %s)%s, Y: %d (%s: %s)%s> %.2f" % \
-#                             (crstxt, \
-#                             x, widthAxisKey, scx, swx, \
-#                             y, heightAxisKey, scy, swy, \
-#                             val)
-#                     
                 else: # ndim < 2 shouldn't realy get here, should we ?!?
                     val = float(img[x])
                     

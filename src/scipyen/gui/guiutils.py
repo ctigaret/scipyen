@@ -338,7 +338,8 @@ def get_font_weight(val:typing.Union[str, FontWeightType]) -> typing.Union[int, 
         return QtGui.QFont.Normal
     
 def treeWidgetItems(tree: QtWidgets.QTreeWidget):
-    r"""Generator that iterates the QTreeWidgetItems in a QTreeWidget 'tree'"""
+    r"""Generator that iterates the QTreeWidgetItems in a QTreeWidget 'tree'
+    """
     it = QtWidgets.QTreeWidgetItemIterator(tree)
     while isinstance(it.value(), QtWidgets.QTreeWidgetItem):
         yield it.value()
