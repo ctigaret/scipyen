@@ -85,10 +85,6 @@ from core import helputils
 from gui.workspacegui import WorkspaceGuiMixin
 # import numpy as np # cheeky
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
-# if __has_PySide6__:
-#     __ui_path__ = adapt_ui_path(__module_path__,'pythonhelpwidget_qt6.ui')
-# else:
-#     __ui_path__ = adapt_ui_path(__module_path__,'pythonhelpwidget.ui')
 __ui_path__ = adapt_ui_path(__module_path__,'pythonhelpwidget.ui')
 
 Ui_PythonHelpWidget, QWidget = loadUiType(__ui_path__)
@@ -197,26 +193,25 @@ class _PythonHelpThread_(QtCore.QThread):
             self.ready.emit(doc)
             self.helpCommand = None
                 
-class PythonHelpWidget(QWidget, WorkspaceGuiMixin, Ui_PythonHelpWidget):
+class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin, ):
     _instance = None # singleton pattern
     
-    def __new__(cls, *args, **kwargs):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls, *args, **kwargs)
-            
-        return cls._instance
+    # NOTE: 2025-06-25 16:45:49
+    # see NOTE: 2025-06-20 23:27:26 WARNING in gui.mainwindow
+    if not __has_PyQt6__:
+        def __new__(cls, *args, **kwargs):
+            if cls._instance is None:
+                cls._instance = super().__new__(cls, *args, **kwargs)
+                
+            return cls._instance
         
     def __init__(self, shell:InteractiveShell, parent:typing.Optional[QtWidgets.QMainWindow] = None,
                  **kwargs):
-        # if sys.platform.startswith("win32") or os.name == "nt" or platform.uname().system == "Windows":
-        #     parent = None
-        # elif sys.platform.startswith("linux") and os.getenv("XDG_SESSION_TYPE").lower() == "wayland":
-        #     parent = None
-        # print(f"{self.__class__.__name__}.__init__ -> parent is {type(parent)}")
-        if os.environ["QT_API"] == "pyside6":
+        if __has_PySide6__:# or __has_PyQt6__:
             super().__init__(parent)
         else:
-            super(QWidget, self).__init__(parent)
+            super(QtWidgets.QWidget, self).__init__(parent)
+            
         WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs)
         
         self._helpThread_ = _PythonHelpThread_(self, shell)
@@ -239,8 +234,9 @@ class PythonHelpWidget(QWidget, WorkspaceGuiMixin, Ui_PythonHelpWidget):
                 
         except:
             self.intro_msg = 'Enter a help topic in the field above (e.g., "topics", "pywt.Wavelet", etc)'
-        self._configureUI_()
         
+        self._configureUI_()
+        self.__class__._instance = self
         
     def _configureUI_(self):
         self.setupUi(self)

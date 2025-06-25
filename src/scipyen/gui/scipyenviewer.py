@@ -345,11 +345,57 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         
         self._app_menu_ = self.getAppMenu()
         
+        self._setIconSize(self.scipyenWindow.iconSize())
+        self._setToolBarIconSize(self.scipyenWindow.toolBarIconSize)
+        self._setToolBarButtonStyle(self.scipyenWindow.toolBarButtonStyle)
+        
     #def mousePressEvent(self, evt):
         #if sys.platform.startswith("win32"):
             #self.activateWindow()
         #super().mousePressEvent(evt)
-
+        
+    def _setIconSize(self, val:typing.Optional[QtCore.QSize] = None) -> None:
+        if not isinstance(val, QtCore.QSize):
+            val = self.scipyenWindow.iconSize()
+        if self.iconSize() != val:
+            self.setIconSize(val)
+            if __has_PySide6__:
+                btns = self.findChildren(QtWidgets.QToolButton) + self.findChildren(QtWidgets.QPushButton)
+            else:
+                btns = self.findChildren((QtWidgets.QToolButton, QtWidgets.QPushButton))
+            for b in btns:
+                if b.iconSize() != val:
+                    b.setIconSize(val)
+                
+    def _setToolBarIconSize(self, val:typing.Optional[QtCore.QSize]=None) -> None:
+        if not isinstance(val, QtCore.QSize):
+            val = self.scipyenWindow.toolBarIconSize
+            
+        if hasattr(self, "toolBar") and isinstance(self.toolBar, QtWidgets.QToolBar):
+            if self.toolBar.iconSize() != val:
+                self.toolBar.setIconSize(val)
+            
+        else:
+            toolbars = self.findChildren(QtWidgets.QToolBar)
+            for b in toolbars:
+                if b.iconSize() != val:
+                    b.setIconSize(val)
+            
+    def _setToolBarButtonStyle(self, val:typing.Optional[QtCore.Qt.ToolButtonStyle]) -> None:
+        if not isinstance(val, QtCore.Qt.ToolButtonStyle):
+            val = self.scipyenWindow.toolBarButtonStyle
+            
+        if hasattr(self, "toolBar") and isinstance(self.toolBar, QtWidgets.QToolBar):
+            if self.toolBar.toolButtonStyle() != val:
+                self.toolBar.setToolButtonStyle(val)
+            
+        else:
+            toolbars = self.findChildren(QtWidgets.QToolBar)
+            for b in toolbars:
+                if b.toolButtonStyle() != val:
+                    b.setToolButtonStyle(val)
+        
+            
     def requestActivate(self):
         r"""workaround wayland"""
         if os.getenv("XDG_SESSION_TYPE").lower() == "wayland":

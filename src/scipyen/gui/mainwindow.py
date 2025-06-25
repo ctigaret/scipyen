@@ -326,6 +326,7 @@ from . import signalviewer as sv
 from . import matrixviewer as matview
 from . import imageviewer as iv
 from . import dataviewer as dv
+from gui.pythonhelpwidget import PythonHelpWidget
 
 from .consoles import styles, pstyles
 from .cursors import (SignalCursor, SignalCursorTypes,DataCursor, 
@@ -518,7 +519,6 @@ def console_info():
 # QWidget: Must construct a QApplication before a QWidget
 from iolib.navigation import navigator
 
-# _mainwindow_ui_file = "mainwindow_qt6.ui" if __has_PyQt6__ else "mainwindow.ui"
 _mainwindow_ui_file = "mainwindow.ui"
 
 if __has_PyQt6__ or __has_PySide6__:
@@ -1391,10 +1391,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     # NOTE: 2025-06-20 23:27:26 WARNING
     # this crashes in PyQt6!
     if not __has_PyQt6__:
-        # def __new__(cls:typing.Self, app: QtWidgets.QApplication, 
-        #              parent: typing.Optional[QtWidgets.QWidget] = None, *args, **kwargs) -> typing.Self:
         def __new__(cls:typing.Self, parent: typing.Optional[QtWidgets.QWidget] = None, *args, **kwargs) -> typing.Self:
-            # print(f"{cls.__name__}.__new__(parent={parent}, *args={args}, **kwargs={kwargs})")
             if not hasattr(cls, "_instance") or not isinstance(cls._instance, cls):
                 if __has_PyQt6__:
                     cls._instance = super(ScipyenWindow, cls).__new__(cls, parent)
@@ -1451,8 +1448,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         self.currentViewers = {mpl.figure.Figure: None}
         
-        self.helpWidget = None
-
         # NOTE: 2023-01-08 16:14:26 - set this early !
         # the global singleton instance of the QApplication running Scipyen
         self.app = QtWidgets.QApplication.instance()
@@ -1629,132 +1624,13 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # anywhere - keep available as app-wide threadpool for various sub-apps
         self.threadpool = QtCore.QThreadPool()
 
-
-
-#         # ### BEGIN works in PyQt5
-#         
-#         self.workspaceModel = WorkspaceModel(self.shell, parent=self,
-#                                              user_ns_hidden = self.workspace,
-#                                              mpl_figure_close_callback=self.handle_mpl_figure_close,
-#                                              mpl_figure_click_callback=self.handle_mpl_figure_click,
-#                                              mpl_figure_enter_callback=self.handle_mpl_figure_enter)
-#         
-#         self.workspaceModel.workingDir.connect(self._slot_workdirChangedInConsole)
-#         
-#         # signal inherited from WindowManager
-#         self.sig_windowRemoved.connect(self.slot_windowRemoved)
-# 
-#         # NOTE: 2020-10-22 13:30:54
-#         # self._nonInteractiveVars_ is updated in _init_QtConsole_()
-#         # self.workspaceModel.user_ns_hidden.update(self._nonInteractiveVars_)
-# 
-#         # holds references to workspace objects that should NOT be visibile in
-#         # the workspace viewer - this includes viewer classes
-#         self.user_ns_hidden = self.workspaceModel.user_ns_hidden
-# 
-#         self.shell.events.register("pre_execute", self.workspaceModel.preExecute)
-#         # self.shell.events.register("post_execute", self.workspaceModel.post_execute)
-#         self.shell.events.register("post_run_cell", self.workspaceModel.postRunCell)
-#         
-#         # NOTE: 2023-06-04 10:49:56
-#         # for debugging only; comment out for relese
-#         # self.shell.events.register("pre_run_cell", self.workspaceModel.preRunCell)
-# 
-#         # NOTE: 2021-01-06 17:22:45
-#         # A lot of things happen up to here which depend on an initialized bare-bones
-#         # UI; hence setupUi is early (see NOTE: WARNING 2021-09-16 14:32:03).
-#         #
-#         # _configureUI_ must be called NOW, to initialize additional UI elements
-#         # and signal-slot connections NOT defined in the *.ui file
-#         #
-#         # NOTE: 2024-05-29 13:01:37 
-#         # this approach IS DIFFERENT from the "regular" child windows that 
-#         # inherit from ScipyenViewer
-#         self._configureUI_()
-# 
-#         # NOTE:2022-01-28 23:16:57
-#         # when collections are modified directly (instead of setting via
-#         # property setter, see  NOTE:FIXME:2022-01-28 23:11:59) the
-#         # configurable_traits are NOT populated/notified!
-#         # Hence I need to force this here
-# 
-#         if isinstance(getattr(self, "configurable_traits", None), DataBag):
-#             self.configurable_traits["RecentScripts"] = self._recentScripts
-# 
-#         # With all UI elements and their signal-slot connections in place we can
-#         # now apply stored settings, including the 'state' of the ScipyenWindow
-#         # object (which is an instance of QMainWindow)
-#         #
-#         self.loadSettings()
-# 
-#         self.activeDockWidget = self.dockWidgetWorkspace
-# 
-#         # -----------------
-#         # connect widget actions through signal/slot mechanism
-#         # NOTE: 2017-07-04 16:28:52
-#         # do not delete: this is the first code where self.cwd is defined & initiated!
-#         self.cwd = os.getcwd()
-# 
-#         # NOTE: 2016-03-20 14:49:05
-#         # Quit the Qt app when Scipyen main window is closed
-#         self.app.destroyed.connect(self.slot_Quit)
-# 
-#         # finally, inject references to self and the workspace into relevant
-#         # NOTE: 2024-05-29 14:04:11
-#         # plugin modules already have this injected by slot_loadPlugins
-#         ws_aware_modules = (membrane, pgui, sigp, imgp, crvf, plots)
-#         # ws_aware_modules = (pgui, sigp, imgp, crvf, plots)
-# 
-#         for m in ws_aware_modules:
-#             # NOTE: 2022-12-23 10:47:39
-#             # some modules provide plugin functionality which will trigger these
-#             # injections -- see slot_loadPlugins
-#             if not hasattr(m, "mainWindow"):
-#                 m.__dict__["mainWindow"] = self
-# 
-#             if not hasattr(m, "workspace"):
-#                 m.__dict__["workspace"] = self.workspace
-# 
-#         # NOTE: 2021-08-17 12:45:10 TODO
-#         # to be used with _run_loop_process_, which at the moment is not used
-#         # anywhere - keep available as app-wide threadpool for various sub-apps
-#         self.threadpool = QtCore.QThreadPool()
-# 
-#         # NOTE: singleton design pattern
-#         # see traitlets.config.SingletonConfigurable
-#         self.__class__._instance = self  
-# 
-#         # NOTE: 2024-05-29 13:04:00
-#         # Asynchronously launch the plugin loading mechanism
-#         self.startPluginLoad.emit()
-# 
-#         self.currentVarItem = None
-#         self.currentVarItemName = None
-#         
-#         self._winFlagsCache_ = self.windowFlags()
-#                 
-#         self._updateConsolesEditor()
-#         
-#         sigBlock = QtCore.QSignalBlocker(self.actionUse_system_default_font)
-#         self.actionUse_system_default_font.setChecked(self._useSystemDefaultFont)
-#         
-#         # ### BEGIN debug 2025-06-13 09:05:41
-        # if os.environ["QT_API"] == "pyside6":
-        #     ooo = list(filter(lambda v: isinstance(v, type) and Shiboken.Object in inspect.getmro(v), self.workspace.values() ))
-        #     print(f"In {self.__class__.__name__}.__init__:\nooo: {ooo}")
-#         # ### END   debug 2025-06-13 09:05:41
-#         
-#         self._nonInteractiveVars_.update([i for i in self.workspace.items()])
-#         self.workspaceModel.user_ns_hidden.update(self._nonInteractiveVars_)
-#         # self.translator = QtCore.QTranslator(self)
-#         
-#         # ### END   works in PyQt5
-
         if isinstance(getattr(self, "configurable_traits", None), DataBag):
             self.configurable_traits["RecentScripts"] = self._recentScripts
 
         self._lockedToolBar:bool = True
         self._guiIconSize_ = self._defaultIconSize_
+        self._workspaceIconSize_ = self._defaultIconSize_
+        self._fileSystemIconSize_ = self._defaultIconSize_
         
         # NOTE: 2023-06-04 10:49:56
         # for debugging only; comment out for relese
@@ -1786,8 +1662,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self._tbIconSize:QtCore.QSize = self.toolBar.iconSize()
         self._tbButtonStyle:QtCore.Qt.ToolButtonStyle = self.toolBar.toolButtonStyle()
 
-
-
         # -----------------
         # connect widget actions through signal/slot mechanism
         # NOTE: 2017-07-04 16:28:52
@@ -1813,14 +1687,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         
         sigBlock = QtCore.QSignalBlocker(self.actionUse_system_default_font)
         self.actionUse_system_default_font.setChecked(self._useSystemDefaultFont)
-        
-        # ### BEGIN debug 2025-06-13 09:05:41
-        # if os.environ["QT_API"] == "pyside6":
-        #     ooo = list(filter(lambda v: isinstance(v, type) and (hasattr(v, "setupUi") or Shiboken.Object in inspect.getmro(v)), self.workspace.values() ))
-        #     print("\n******")
-        #     print(f"In {self.__class__.__name__}.__init__:\nooo: {ooo}")
-        #     print("******\n")
-        # ### END   debug 2025-06-13 09:05:41
         
         self._init_QtConsole_() # also instantiates self.shell, etc
         # NOTE: 2025-06-24 21:49:54
@@ -1870,6 +1736,13 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         self._updateConsolesEditor()
 
+        self.helpWidget = None
+        self.pythonHelpWindow = None
+
+
+        # self.pythonHelpWindow = QtWidgets.QMainWindow(self)
+        # self.helpWidget = PythonHelpWidget(self.shell, self.pythonHelpWindow)
+        # self.pythonHelpWindow.setCentralWidget(self.helpWidget)
         # NOTE: singleton design pattern
         # see traitlets.config.SingletonConfigurable
         self.__class__._instance = self  
@@ -2098,6 +1971,11 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                        self.mediumToolBarIconSizeAction, self.largeToolBarIconSizeAction,
                        self.hugeToolBarIconSizeAction]:
                 action.setChecked(False)
+        ww = list(filter(lambda w: isinstance(w, QtWidgets.QMainWindow), self.app.allWidgets()))
+        for w in ww:
+            toolbars = w.findChildren(QtWidgets.QToolBar)
+            for b in toolbars:
+                b.setIconSize(val)
             
     @Slot(QAction)
     def _slot_setToolBarIconSize(self, val:QAction):
@@ -2146,6 +2024,124 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             self.toolBarButtonStyle = QtCore.Qt.ToolButtonTextUnderIcon
     
     @Slot()
+    def _slot_workSpaceIconSize(self):
+        icon_sizes = {"Small":16, "Medium":22, "Large":32, "Huge":48}
+        texts = list(map(lambda i: f"{i[0]} ({i[1]}×{i[1]})", icon_sizes.items()))
+        dlg = qd.QuickDialog(self, "Set Icon Size", True, False)
+        cb = qd.QuickDialogComboBox(dlg, "Icon Size:")
+        dlg.addWidget(cb)
+        cb.setItems(texts)
+        currentIS = self.fileSystemTreeView.iconSize().width()
+        
+        if currentIS not in icon_sizes.values():
+            if currentIS <= 16:
+                currentIS = 16
+            elif currentIS <= 22:
+                currentIS = 22
+            elif currentIS <= 32: 
+                currentIS = 32
+            else:
+                currentIS = 48
+        selected = list(icon_sizes.values()).index(currentIS)
+            
+        cb.setCurrentIndex(selected)
+        
+        dlg.resize(-1,-1)
+        
+        if dlg.exec() > 0:
+            # newVal = icon_sizes[cb.value()]
+            newVal = list(icon_sizes.values())[cb.value()]
+            
+        else:
+            newVal = currentIS
+            
+        self.workSpaceIconSize = newVal
+        
+    @property
+    def workSpaceIconSize(self) -> int:
+        self._workspaceIconSize_ = self.workspaceView.iconSize().width()
+        return self._workspaceIconSize_
+    
+    def _set_workspace_icon_Size(self, val:int):
+        iconSize = QtCore.QSize(val, val)
+        self.workspaceView.setIconSize(iconSize)
+        
+    @markConfigurable("WorkSpaceViewIconSize", "Qt")
+    @workSpaceIconSize.setter
+    def workSpaceIconSize(self, val:int):
+        val = int(val)
+        if val not in [16,22,32,48]:
+            if val <= 16:
+                val = 16
+            elif val <= 22:
+                val = 22
+            elif val <= 32: 
+                val = 32
+            else:
+                val = 48
+        self._workspaceIconSize_ = val
+        self._set_workspace_icon_Size(val)
+
+    @Slot()
+    def _slot_fileSystemIconSize(self):
+        icon_sizes = {"Small":16, "Medium":22, "Large":32, "Huge":48}
+        texts = list(map(lambda i: f"{i[0]} ({i[1]}×{i[1]})", icon_sizes.items()))
+        dlg = qd.QuickDialog(self, "Set Icon Size", True, False)
+        cb = qd.QuickDialogComboBox(dlg, "Icon Size:")
+        dlg.addWidget(cb)
+        cb.setItems(texts)
+        currentIS = self.fileSystemTreeView.iconSize().width()
+        
+        if currentIS not in icon_sizes.values():
+            if currentIS <= 16:
+                currentIS = 16
+            elif currentIS <= 22:
+                currentIS = 22
+            elif currentIS <= 32: 
+                currentIS = 32
+            else:
+                currentIS = 48
+        selected = list(icon_sizes.values()).index(currentIS)
+            
+        cb.setCurrentIndex(selected)
+        
+        dlg.resize(-1,-1)
+        
+        if dlg.exec() > 0:
+            # newVal = icon_sizes[cb.value()]
+            newVal = list(icon_sizes.values())[cb.value()]
+            
+        else:
+            newVal = currentIS
+            
+        self.fileSystemIconSize = newVal
+        
+    @property
+    def fileSystemIconSize(self) -> int:
+        self._fileSystemIconSize_ = self.fileSystemTreeView.iconSize().width()
+        return self._fileSystemIconSize_
+    
+    def _set_filesystem_icon_size(self, val:int):
+        iconSize = QtCore.QSize(val, val)
+        self.fileSystemTreeView.setIconSize(iconSize)
+        
+    @markConfigurable("FileSystemViewerIconSize", "Qt")
+    @fileSystemIconSize.setter
+    def fileSystemIconSize(self, val:int):
+        val = int(val)
+        if val not in [16,22,32,48]:
+            if val <= 16:
+                val = 16
+            elif val <= 22:
+                val = 22
+            elif val <= 32: 
+                val = 32
+            else:
+                val = 48
+        self._fileSystemIconSize_ = val
+        self._set_filesystem_icon_size(val)
+    
+    @Slot()
     def _slot_configureIconSize(self):
         # icon_sizes = [16, 22, 32, 48]
         # texts = [f"{k}x{k}" for k in icon_sizes]
@@ -2182,6 +2178,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             newVal = currentIS
             
         self.guiIconSize = newVal
+        
 
     @property
     def guiIconSize(self) -> int:
@@ -2205,7 +2202,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     def guiIconSize(self, val:int):
         # print(f"{self.__class__.__name__}.guiIconSize = {val}")
         val = int(val)
-        self._guiIconSize_ = val
         if val not in [16,22,32,48]:
             if val <= 16:
                 val = 16
@@ -2215,6 +2211,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 val = 32
             else:
                 val = 48
+        self._guiIconSize_ = val
         
         self._set_icon_Size(val)
         
@@ -4751,11 +4748,18 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         
     @Slot()
     def _slot_PythonHelp(self):
-        # from guiutils import testme
+        # # from guiutils import testme
         from gui.pythonhelpwidget import PythonHelpWidget
-        if not isinstance(self.helpWidget, PythonHelpWidget):
-            self.helpWidget = PythonHelpWidget(self.shell)
-        self.helpWidget.show()
+        if not isinstance(self.pythonHelpWindow, QtWidgets.QMainWindow):
+            self.pythonHelpWindow = QtWidgets.QMainWindow(self)
+            self.pythonHelpWindow.setWindowTitle("Scipyen — Python help")
+            if not isinstance(self.helpWidget, QtWidgets.QWidget):
+                self.helpWidget = PythonHelpWidget(self.shell, self.pythonHelpWindow)
+            self.pythonHelpWindow.setCentralWidget(self.helpWidget)
+        self.pythonHelpWindow.show()
+        # if not isinstance(self.helpWidget, PythonHelpWidget):
+        #     self.helpWidget = PythonHelpWidget(self.shell)
+        # self.helpWidget.show()
 
     @Slot(QtCore.QModelIndex)
     @safewrapper
@@ -5712,6 +5716,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.actionSet_Icon_Size.triggered.connect(self._slot_configureIconSize) # slot inherited from WorkspaceGuiMixin
         self.actionGUI_Style.triggered.connect(self._slot_set_Application_style)
         self.actionSet_user_plugins_directory.triggered.connect(self._slot_set_Users_Plugins_directory)
+        self.actionFile_SystemIconSize.triggered.connect(self._slot_fileSystemIconSize)
+        self.actionWorkspaceIconSize.triggered.connect(self._slot_workSpaceIconSize)
         # self.actionConfigure_external_HDF_viewer.triggered.connect(self._slot_set_ExternalHDF5Viewer)
         self.actionAuto_launch_Script_Manager.toggled.connect(self._slot_set_scriptManagerAutoLaunch)
         self.actionAuto_delete_viewer.triggered.connect(self._slot_setAutoRemoveViewers)

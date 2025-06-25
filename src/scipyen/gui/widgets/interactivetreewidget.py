@@ -80,7 +80,7 @@ from core.datazone import (DataZone, Interval)
 
 from core import xmlutils, strutils
 
-from core.workspacefunctions import validate_varname
+from core.workspacefunctions import (validate_varname, user_workspace)
 
 #from core.utilities import (get_nested_value, set_nested_value, counter_suffix, )
 
@@ -154,6 +154,23 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         self.itemClicked.connect(self._slot_setLastActive)
         
         self._widgetsWithSelection_ = set()
+        
+        self._scipyenWindow_ = None
+        
+        ws = user_workspace()
+        
+        if ws is not None:
+            self._scipyenWindow_ = ws["mainWindow"]
+            
+        else:
+            frame_records = inspect.getouterframes(inspect.currentframe())
+            for (n,f) in enumerate(frame_records):
+                if "ScipyenWindow" in f[0].f_globals:
+                    if __has_PyQt6__:
+                        self._scipyenWindow_ = f[0].f_globals["ScipyenWindow"]
+                    else:
+                        self._scipyenWindow_ = f[0].f_globals["ScipyenWindow"].instance()
+                    break
         
     @property
     def widgetHeight(self) -> int:
@@ -518,7 +535,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
             self.buildTree(child_data, node, name=keyrepr, keyType = keyType, nameTip = keytip, 
                            predicate=predicate, path=path+(keyrepr,)) # so hideRoot is always False?
 
-    def parse(self, data, path, predicate=None, typeStr=None):
+    def parse(self, data, path, predicate=None, typeStr=None) -> tuple:
         r"""
         Overrides pyqtgraph.DataTreeWidget.parse()
         
@@ -607,8 +624,6 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
             else:
                 self.memoize(data, path)
                 
-                
-            
         if data is None:
             typeStr = "(None)"
             return typeStr, desc, children, widget, typeTip, showDescInParentNode
@@ -784,6 +799,16 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                 
             else:
                 desc = type(data).__name__
+                
+            if widget and self._scipyenWindow_:
+                if __has_PySide6__:
+                    btns = self.findChildren(QtWidgets.QToolButton) + self.findChildren(QtWidgets.QPushButton)
+                else:
+                    btns = self.findChildren((QtWidgets.QToolButton, QtWidgets.QPushButton))
+                
+                for b in btns:
+                    if b.iconSize() != self._scipyenWindow_.iconSize():
+                        b.setIconSize(self._scipyenWindow_.iconSize())
                 
             return typeStr, desc, children, widget, typeTip, showDescInParentNode
         
