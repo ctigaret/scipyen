@@ -73,8 +73,6 @@ from core import xmlutils, strutils
 
 from core.workspacefunctions import validate_varname
 
-#from core.utilities import (get_nested_value, set_nested_value, counter_suffix, )
-
 from core.utilities import NestedFinder
 
 from core.prog import (safewrapper, safeguiwrapper, )

@@ -476,11 +476,11 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
             self.widgets.append(widget)
             subnode = QtWidgets.QTreeWidgetItem(["", "", ""])
             node.addChild(subnode)
-            # self.setFirstItemColumnSpanned(subnode, True) # obsolete !!!
             self.setItemWidget(subnode, 0, widget)
             modelndx = self.indexFromItem(subnode)
             parentndx = self.indexFromItem(node)
             self.setFirstColumnSpanned(modelndx.row(), parentndx, True)
+            # self.setFirstItemColumnSpanned(subnode, True) # obsolete !!!
             
         # recurse into children (a dict)
         for key, child_data in children.items():
