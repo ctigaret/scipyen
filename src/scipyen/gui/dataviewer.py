@@ -45,23 +45,6 @@ else:
     QShortcut = QtWidgets.QShortcut
     __has_sip__ = True
     
-
-# __has_PySide6__ = False
-# import qtpy
-# qtpy.API = os.environ["QT_API"]
-# if os.environ["QT_API"] == "pyside6":
-#     import PySide6
-#     from PySide6 import QtCore, QtGui, QtWidgets
-#     from PySide6.QtCore import Signal, Slot, Property
-#     import qtpy
-#     qtpy.API = os.environ["QT_API"]
-#     __has_PySide6__ = True
-# else:
-#     import qtpy
-#     qtpy.API = os.environ["QT_API"]
-#     from qtpy import QtCore, QtGui, QtWidgets
-#     from qtpy.QtCore import Signal, Slot, Property
-
 from pyqtgraph import (DataTreeWidget, TableWidget, )
 
 import neo
