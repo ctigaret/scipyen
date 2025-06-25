@@ -7574,7 +7574,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             if fileReader is None:
                 fileReader = pio.getLoaderForFile(fName)
 
-            # print(f"{self.__class__.__name__}.loadDiskFile: fileReader = {fileReader}")
+            # print(f"\n{self.__class__.__name__}.loadDiskFile: fileReader = {fileReader}, updateUi = {updateUi}")
             if fileReader is None:
                 return False
 

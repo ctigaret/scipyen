@@ -123,7 +123,7 @@ def traitlet_set(instance, obj, value):
     This is supposed to also detect changes in the order of elements in sequences.
     WARNING: Slows down execution
     """
-    print(f"core.traitutils.traitlet_set(instance={instance} (with name {instance.name}), obj={obj}, value={brief_repr(value)})")
+    # print(f"\ncore.traitutils.traitlet_set(instance={instance} (with name {instance.name}), obj={obj}, value={brief_repr(value)})")
     #new_value = instance._validate(obj, value)
     new_value = value # skip validation
             
@@ -139,7 +139,7 @@ def traitlet_set(instance, obj, value):
         old_value = instance.default_value
         silent = False
         
-    print(f"\told_value={brief_repr(old_value)} -> new value is old value: {old_value is new_value}")
+    # print(f"\told_value={brief_repr(old_value)} -> new value is old value: {old_value is new_value}")
     
     # NOTE: 2025-06-14 13:39:57 in PySide6 I need to deal with
     # Shiboken.ObjectType and with Ui_* types created by loadUiType

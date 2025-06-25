@@ -33,6 +33,7 @@ from .strutils import str2symbol
 
 class DataBagTraitsObserver(HasTraits):
     def __init__(self, *args, **kwargs):
+        self.parent = kwargs.pop("parent", None)
         super().__init__(*args, **kwargs)
         self._verbose_ = False
         # self._traits_dict_cached_ = {}
@@ -98,7 +99,11 @@ class DataBagTraitsObserver(HasTraits):
             Expects a change_type (str) as one of: "modified", "new", "removed".
             By default, this is "modified". 
         """
-        if old_value is new_value:
+        # if "WorkspaceModel" in type(self.parent.parent).__name__:
+        #     print(f"\n{self.__class__.__name__}._notify_trait(name={name}, change_type={change_type})")
+        if new_value is old_value and change_type != "new":
+            # if "WorkspaceModel" in type(self.parent.parent).__name__:
+            #     print(f"\tnew value is old value -> nothing to do")
             return
         self.notify_change(
             Bunch(
@@ -275,7 +280,7 @@ class DataBag(Bunch):
     #   d.mutable_types = True
 
     hidden_traits = ("length", "use_mutable",
-                     "use_casting", "allow_none", "verbose")
+                     "use_casting", "allow_none", "verbose", "parent")
 
     # @staticmethod
     @classmethod
@@ -372,10 +377,12 @@ class DataBag(Bunch):
         use_casting takes precedence over mutable_types.
 
         """
-        obs = DataBagTraitsObserver()
+        obs = DataBagTraitsObserver(parent=self)
+        parent = kwargs.pop("__parent__", None)
         hid = self.__class__._make_hidden(**kwargs)
         object.__setattr__(self, "__observer__", obs)
         object.__setattr__(self, "__hidden__", hid)
+        object.__setattr__(self, "__parent__", parent)
         # self.__observer__ = DataBagTraitsObserver()
         # NOTE: so that derived types can use their OWN hidden_traits
         # self.__hidden__ = self.__class__._make_hidden(**kwargs)
@@ -836,6 +843,10 @@ class DataBag(Bunch):
         r"""The HasTraits observer. Read-only
         """
         return self.__observer__
+    
+    @property
+    def parent(self) -> typing.Any:
+        return self.__parent__
 
     def as_dict(self):
         r"""Dictionary of trait values
@@ -1024,7 +1035,7 @@ class DataBag(Bunch):
     def copy(self):
         r"""Creates a deep copy of this DataBag object.
 
-        In: bag1=databag.DataBag({"a":1, "b":2})                                                             
+        In: bag1=databag.DataBag(None, {"a":1, "b":2})                                                             
 
         In: bag1                                                                                             
         Out: {'a': 1, 'b': 2}
