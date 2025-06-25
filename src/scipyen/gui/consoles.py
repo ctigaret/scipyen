@@ -1010,9 +1010,10 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
                 action.setChecked(True)
                 self.sb_menu.setDefaultAction(action)
             
-        self.choose_font_act = QAction("Font", self, shortcut=ctrl+"F",
-                                                 triggered = self.chooseFont)
-        
+        # self.choose_font_act = QAction("Font", self, shortcut=ctrl+"F",
+        #                                          triggered = self.chooseFont)
+        self.choose_font_act = QAction("Font", self, triggered = self.chooseFont)
+        self.choose_font_act.setIcon(QtGui.QIcon.fromTheme("font-face-symbolic"))
         self.add_menu_action(self.view_menu, self.choose_font_act)
         
     def chooseFont(self):
@@ -3604,15 +3605,19 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
                 action.setChecked(True)
                 self.sb_menu.setDefaultAction(action)
 
-        self.choose_font_act = QAction("Console Font", self, shortcut=ctrl+"F",
-                                                 triggered = self.chooseFont)
+        # self.choose_font_act = QAction("Console Font", self, shortcut=ctrl+"F",
+        #                                          triggered = self.chooseFont)
+        self.choose_font_act = QAction("Console Font", self, triggered = self.chooseFont)
+        self.choose_font_act.setIcon(QtGui.QIcon.fromTheme("font-face-symbolic"))
         
         self.settings_menu.addAction(self.choose_font_act)
         self.addAction(self.choose_font_act)
         
+        # self.set_console_scrollbackAction = QAction("Console scroll back",
+        #                                                       self, shortcut=ctrl+"L",
+        #                                                       triggered = self.set_scrollBack)
         self.set_console_scrollbackAction = QAction("Console scroll back",
-                                                              self, shortcut=ctrl+"L",
-                                                              triggered = self.set_scrollBack)
+                                                              self, triggered = self.set_scrollBack)
         
         self.settings_menu.addAction(self.set_console_scrollbackAction)
         self.addAction(self.set_console_scrollbackAction)

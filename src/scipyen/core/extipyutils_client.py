@@ -155,7 +155,7 @@ init_commands = [
 init_commands.extend(
     [
     "".join(["sys.path.insert(2, '", __scipyen_path__, "')"]),
-    "import sys, os"
+    "import sys, os",
     "import signal, pickle, json, csv",
     "import numpy as np",
     "import scipy",
@@ -174,7 +174,7 @@ init_commands.extend(
     "    import PySide6",
     "    from PySide6 import Shiboken",
     "    from PySide6.QtUiTools import loadUiType", # -- A-HA!
-    f"    from PySide6 import {qtPackages}"
+    f"    from PySide6 import {qtPackages}",
     "    QAction = QtGui.QAction",
     "    QActionGroup = QtGui.QActionGroup",
     "    QShortcut = QtGui.QShortcut",
@@ -187,7 +187,7 @@ init_commands.extend(
     "    QActionGroup = QtWidgets.QActionGroup",
     "    QShortcut = QtWidgets.QShortcut",
     "    __has_sip__ = True",
-    f"   from qtpy import ({qtPackages})",
+    f"    from qtpy import ({qtPackages})",
     "import matplotlib as mpl",
     "mpl.rcParams['savefig.format'] = 'svg'",
     "mpl.rcParams['xtick.direction'] = 'in'",
@@ -236,8 +236,10 @@ init_commands.extend([
     "del u_ns"
     ])
 
+gui_magic = "%gui qt" if __has_PyQt6__ or __has_PySide6__ else "%gui qt5"
+
 init_scipyen_qt_gui = [
-    "%gui qt5"
+    gui_magic,
     "import gui as scipyengui",
     ]
 
