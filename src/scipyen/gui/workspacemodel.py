@@ -159,7 +159,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # attribute of the manager's `canvas` attribute, which is a reference to
         # the figure's canvas
 
-        self.internalVariablesMonitor = DataBag(allow_none=True, mutable_types=True)
+        self.internalVariablesMonitor = DataBag(allow_none=True, mutable_types=True,
+                                                __parent__ = self)
         self.internalVariablesMonitor.verbose = True
         # self.internalVariablesMonitor.observe(self.internalVariablesListenerCB)
 
@@ -168,7 +169,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # details in self.updateForeignNamespace docstring
         self._foreign_workspace_count_ = -1
 
-        # self.foreign_namespaces = DataBag(allow_none=True, mutable_types=True)
+        # self.foreign_namespaces = DataBag(self, allow_none=True, mutable_types=True)
         self.foreign_namespaces = dict()
         # BUG: 2021-08-19 21:45:17 FIXME
         # self.foreign_namespaces.observe(self._foreignNamespacesCountChanged_, names="length")
@@ -803,8 +804,10 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             namespace = self.shell.user_ns
             
         if namespace != self.shell.user_ns:
-            warnings.warn("Currently, only the internal workspace is supported")
+            scipywarn("Currently, only the internal workspace is supported")
             return
+        
+        # print(f"\n{self.__class__.__name__}.bindObjectInNamespace(varname={varname}, hidden={hidden})")
         
         # NOTE: 2023-05-27 22:24:04
         # If needed, store a reference in self.user_ns_hidden, so that it won't 
@@ -897,7 +900,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             name = change["name"]
             change_type = change["change_type"]
             
-        print(f"{self.__class__.__name__}._slot_cacheInternalVariableChange_: for variable {name}: change_type = {change_type}")
+        # print(f"\n{self.__class__.__name__}._slot_cacheInternalVariableChange_: for variable {name}: change_type = {change_type}")
             
         if change_type == "new":
             self.__changes__[name] = WorkspaceVarChange.New
@@ -997,9 +1000,9 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         
         self.cached_vars = dict([item for item in self.shell.user_ns.items(
         ) if self.isDisplayable(self.shell.user_ns, *item)])
-        
-        # print(f"In {self.__class__.__name__}.preExecute:")
-        # print(f"\t{len(self.cached_vars)} cached_vars")
+#         
+#         print(f"\nIn {self.__class__.__name__}.preExecute:")
+#         print(f"\t{len(self.cached_vars)} cached_vars")
 
         # NOTE: 2023-06-07 08:39:15
         # at this stage there may be variables not cached but still monitored
@@ -1840,7 +1843,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         r"""Triggered by self.sig_startAsyncUpdate signal.
         This signal is emitted by self.update() and self._updateModel_()
         """
-        # print(f"{self.__class__.__name__}._slot_updateModelAsync_ -> self.__changes__ = {self.__changes__}")
+        # print(f"\n{self.__class__.__name__}._slot_updateModelAsync_ -> self.__changes__ = {self.__changes__}")
         if len(self.__changes__) == 0:
             return
         
@@ -1848,7 +1851,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         additions = list(filter(lambda x: x[1] == WorkspaceVarChange.New, self.__changes__.items()))
         modifications = list(filter(lambda x: x[1] == WorkspaceVarChange.Modified, self.__changes__.items()))
         
-        print(f"{self.__class__.__name__}._slot_updateModelAsync_: {len(modifications)} modifications")
+        # print(f"\n{self.__class__.__name__}._slot_updateModelAsync_: {len(modifications)} modifications")
         if len(modifications):
             for modification in modifications:
                 print(f"{modification}")

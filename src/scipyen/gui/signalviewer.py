@@ -893,7 +893,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         super().__init__(data=None, parent=parent, ID=ID, win_title=win_title, 
                          doc_title=doc_title, *args, **kwargs)
         
-        self.observed_vars = DataBag(allow_none=True, mutable_types=True)
+        self.observed_vars = DataBag(allow_none=True, mutable_types=True,
+                                     __parent__ = self)
         
         self.observed_vars.verbose = True
         self.observed_vars.observe(self.var_observer)
