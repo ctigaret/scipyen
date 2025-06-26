@@ -1047,10 +1047,11 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
                 frame_records = inspect.getouterframes(inspect.currentframe())
                 for (n,f) in enumerate(frame_records):
                     if "ScipyenWindow" in f[0].f_globals:
-                        if __has_PyQt6__:
-                            self._scipyenWindow_ = f[0].f_globals["ScipyenWindow"]
-                        else:
-                            self._scipyenWindow_ = f[0].f_globals["ScipyenWindow"].instance()
+                        # if __has_PyQt6__:
+                        #     self._scipyenWindow_ = f[0].f_globals["ScipyenWindow"]
+                        # else:
+                        #     self._scipyenWindow_ = f[0].f_globals["ScipyenWindow"].instance()
+                        self._scipyenWindow_ = f[0].f_globals["ScipyenWindow"].instance()
                         break
                     
         self._appWindow_ = None

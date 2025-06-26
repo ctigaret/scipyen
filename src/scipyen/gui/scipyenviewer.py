@@ -345,7 +345,9 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         
         self._app_menu_ = self.getAppMenu()
         
-        self._setIconSize(self.scipyenWindow.iconSize())
+        # print(f"ScipyenViewer[{self.__class__.__name__}].__init__: self.scipyenWindow = {self.scipyenWindow}")
+        
+        self._setIconSize(self._scipyenWindow_.iconSize())
         self._setToolBarIconSize(self.scipyenWindow.toolBarIconSize)
         self._setToolBarButtonStyle(self.scipyenWindow.toolBarButtonStyle)
         

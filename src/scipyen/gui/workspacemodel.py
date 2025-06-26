@@ -1852,9 +1852,9 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         modifications = list(filter(lambda x: x[1] == WorkspaceVarChange.Modified, self.__changes__.items()))
         
         # print(f"\n{self.__class__.__name__}._slot_updateModelAsync_: {len(modifications)} modifications")
-        if len(modifications):
-            for modification in modifications:
-                print(f"{modification}")
+        # if len(modifications):
+        #     for modification in modifications:
+        #         print(f"{modification}")
         
         for item in removals:
             self._varChanges_callbacks_[item[1]](item[0])

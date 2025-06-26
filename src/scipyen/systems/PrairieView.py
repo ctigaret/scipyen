@@ -2930,7 +2930,9 @@ class PVScan(PVObject):
 # NOTE: 2020-11-30 23:45:00
 # place the mixin before other base classes so that it is initialized
 # then super(...).__init__ it
-class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, ):
+# class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, ):
+#     sig_protocolRemoved = Signal(int, name="sig_protocolRemoved")
+class PrairieViewImporter(QtWidgets.QDialog, __UI_PrairieImporter, WorkspaceGuiMixin):
     sig_protocolRemoved = Signal(int, name="sig_protocolRemoved")
     
     def __init__(self, parent=None,
@@ -2985,7 +2987,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
         # later delete actions on these objects will throw exceptions)
         #
         # see also scipyen gui.mainwindow.ScipyenWindow.slot_importPrairieView()
-        super(__QDialog__, self).__init__(parent)
+        super().__init__(parent)
         WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs)
         #super(WorkspaceGuiMixin, self).__init__(parent, **kwargs)
         
@@ -3114,7 +3116,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
         self.buildScandataToolButton.clicked.connect(self.slot_generateScanData)
         
         # NOTE: 2021-10-09 23:55:03
-        # belowl self._scipyenWindow_ is inherited from WorkspaceGuiMixin (initialized)
+        # below self._scipyenWindow_ is inherited from WorkspaceGuiMixin (initialized)
         self.ephysPreview = sv.SignalViewer(win_title = "Trigger Events Detection")
         
         #self.ephysPreview = sv.SignalViewer(parent = self._scipyenWindow_, 

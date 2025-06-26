@@ -1088,8 +1088,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
     @classmethod
     def instance(cls:typing.Self, *args, **kwargs) -> typing.Self:
-        if __has_PyQt6__:
-            return
+        # if __has_PyQt6__:
+        #     return
         # NOTE: Singleton design pattern
         if cls._instance is None:
             inst = cls(*args, **kwargs)
@@ -1434,6 +1434,11 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         #     super().__init__(parent)
         super().__init__(parent)
 
+        # NOTE: singleton design pattern
+        # see traitlets.config.SingletonConfigurable
+        self.__class__._instance = self  
+        
+
         # gui_viewers defined in gui package (see gui/__init__.py)
         # self.viewers = dict(map(lambda x: (x, list()), gui_viewers))
         # for matplotlib figures
@@ -1743,10 +1748,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # self.pythonHelpWindow = QtWidgets.QMainWindow(self)
         # self.helpWidget = PythonHelpWidget(self.shell, self.pythonHelpWindow)
         # self.pythonHelpWindow.setCentralWidget(self.helpWidget)
-        # NOTE: singleton design pattern
-        # see traitlets.config.SingletonConfigurable
-        self.__class__._instance = self  
-        
+
     # BEGIN Properties
     
     @property

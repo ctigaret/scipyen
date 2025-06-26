@@ -158,6 +158,11 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         
         self._scipyenWindow_ = None
         
+        
+        #  NOTE: 2025-06-26 21:29:48
+        # list of (QtCore.QModelIndex, QtWidgets.QWidget) tuples, where the QTreeWidgetItem associates a QWidget
+        self._widgetIndexes_ = list()
+        
         ws = user_workspace()
         
         if ws is not None:
@@ -173,16 +178,16 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                         self._scipyenWindow_ = f[0].f_globals["ScipyenWindow"].instance()
                     break
         
-    @property
-    def widgetHeight(self) -> int:
-        return self._widget_height_
-    
-    @widgetHeight.setter
-    def widgetHeight(self, val:int):
-        if val < 10: 
-            return
-        self._widget_height_ = val
-        self._setAssociatedWidgetHeight_()
+#     @property
+#     def widgetHeight(self) -> int:
+#         return self._widget_height_
+#     
+#     @widgetHeight.setter
+#     def widgetHeight(self, val:int):
+#         if val < 10: 
+#             return
+#         self._widget_height_ = val
+#         self._setAssociatedWidgetHeight_()
     
     def _makeTableWidget_(self, data):
         if self._use_TableEditor_:
@@ -256,19 +261,39 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         if isinstance(types, tuple) and len(types):
             self._supported_data_types_ = types
             
-    def _setAssociatedWidgetHeight_(self):
-        from gui.guiutils import treeWidgetItems
-        itemWidgets = list(filter(lambda w: w is not None, list(map(lambda i: self.itemWidget(i,0), 
-                                  treeWidgetItems(self)))))
-        # itemWidgets = list(filter(lambda w: w is not None, list(map(lambda i: (i, self.itemWidget(i,0)), 
-        #                           treeWidgetItems(self)))))
-        
-        for w in itemWidgets:
-            if not isinstance(w, QtWidgets.QLabel):
-            # if not isinstance(w[1], QtWidgets.QLabel):
-                # row = self.indexFromItem(w[0]).row()
-                w.setMaximumHeight(self._widget_height_)
-                w.resize(w.width(), self._widget_height_)
+#     def _setAssociatedWidgetHeight_(self):
+#         from gui.guiutils import treeWidgetItems
+#         # itemWidgets = list(filter(lambda w: w is not None, list(map(lambda i: self.itemWidget(i,0), 
+#         #                           treeWidgetItems(self)))))
+#         
+#         # NOTE: 2025-06-26 21:25:55
+#         # Sequence of (QtWidgets.QTreeWidgetItem, QtWidgets.QWidget) tuples
+#         itemWidgets = list(filter(lambda w: w[1] is not None and not isinstance(w[1], QtWidgets.QLabel), list(map(lambda i: (i, self.itemWidget(i,0)), 
+#                                   treeWidgetItems(self)))))
+#         
+#         if len(itemWidgets) == 0:
+#             return
+#         
+#         # self._widgetIndexes_.clear()
+#         
+#         self._widgetIndexes_ = list(map(lambda i: (self.indexFromItem(i[0]).parent(), i[1]), itemWidgets))
+#         
+#         for w in itemWidgets:
+#             # if not isinstance(w, QtWidgets.QLabel):
+#                 # w.setMaximumHeight(self._widget_height_)
+#                 # w.resize(w.width(), self._widget_height_)
+#             if not isinstance(w[1], QtWidgets.QLabel):
+#                 w[1].setMaximumHeight(self._widget_height_)
+#                 w[1].resize(w[1].width(), self._widget_height_)
+#                 
+#     def sizeHintForIndex(self, index:QtCore.QModelIndex) -> QtCore.QSize:
+#         indexes = list(map(lambda i: i[0], self._widgetIndexes_))
+#         if len(self._widgetIndexes_) and index in indexes:
+#             ndx = indexes.index(index)
+#             return self._widgetIndexes_[ndx][1].size()
+# 
+#         return super().sizeHintForIndex(index)
+            
     
     def setData(self, data, predicate=None, top_title:str = "", dataTypeStr = None, hideRoot=False):
         r"""data should be a dictionary."""

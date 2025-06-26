@@ -281,30 +281,30 @@ class DataViewer(ScipyenViewer):
         self.goNext.triggered.connect(self.slot_goNext)
         self.goNext.setEnabled(False)
         
-        self.changeWidgetsHeightAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("object-height-symbolic"), "Change widget heights")
-        self.changeWidgetsHeightAction.triggered.connect(self.slot_changeWidgetsHeights)
+        # self.changeWidgetsHeightAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("object-height-symbolic"), "Change widget heights")
+        # self.changeWidgetsHeightAction.triggered.connect(self.slot_changeWidgetsHeights)
         self.addToolBar(QtCore.Qt.TopToolBarArea, self.toolBar)
         
-    @property
-    def widgetsHeight(self) -> int:
-        return self.treeWidget.widgetHeight
-    
-    @markConfigurable("WidgetsHeight", "Qt")
-    @widgetsHeight.setter
-    def widgetsHeight(self, val:int):
-        self.treeWidget.widgetHeight = val
+#     @property
+#     def widgetsHeight(self) -> int:
+#         return self.treeWidget.widgetHeight
+#     
+#     @markConfigurable("WidgetsHeight", "Qt")
+#     @widgetsHeight.setter
+#     def widgetsHeight(self, val:int):
+#         self.treeWidget.widgetHeight = val
         
-    def slot_changeWidgetsHeights(self):
-        dlg = quickdialog.QuickDialog(self, "Adjust Children Height")
-        valuePrompt = quickdialog.IntegerInput(dlg, "Height (pixels)")
-        valuePrompt.variable.setClearButtonEnabled(True)
-        valuePrompt.variable.redoAvailable=True
-        valuePrompt.variable.undoAvailable=True
-        valuePrompt.setValue(f"{self.treeWidget.widgetHeight}")
-        if dlg.exec() == QtWidgets.QDialog.Accepted:
-            newValue = valuePrompt.value()
-            self.treeWidget.widgetHeight = newValue
-        
+#     def slot_changeWidgetsHeights(self):
+#         dlg = quickdialog.QuickDialog(self, "Adjust Children Height")
+#         valuePrompt = quickdialog.IntegerInput(dlg, "Height (pixels)")
+#         valuePrompt.variable.setClearButtonEnabled(True)
+#         valuePrompt.variable.redoAvailable=True
+#         valuePrompt.variable.undoAvailable=True
+#         valuePrompt.setValue(f"{self.treeWidget.widgetHeight}")
+#         if dlg.exec() == QtWidgets.QDialog.Accepted:
+#             newValue = valuePrompt.value()
+#             self.treeWidget.widgetHeight = newValue
+#         
         
     def _set_data_(self, data:object, predicate=None, *args, **kwargs):
         r"""
@@ -458,12 +458,9 @@ class DataViewer(ScipyenViewer):
             # viewItemData.setToolTip("View item in a separate window (SHIFT for a new window)")
             # viewItemData.setStatusTip("View item in a separate window (SHIFT for a new window)")
             # viewItemData.setWhatsThis("View item in a separate window (SHIFT for a new window)")
-            viewItemData.setToolTip(
-                f"View using generic DataViewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
-            viewItemData.setStatusTip(
-                f"View using generic DataViewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
-            viewItemData.setWhatsThis(
-                f"View using generic DataViewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+            viewItemData.setToolTip(f"View using generic DataViewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+            viewItemData.setStatusTip(f"View using generic DataViewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+            viewItemData.setWhatsThis(f"View using generic DataViewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
             viewItemData.triggered.connect(self.slot_viewItem)
             
             if not issubclass(type(obj), QtWidgets.QWidget):
@@ -472,12 +469,9 @@ class DataViewer(ScipyenViewer):
                     specialViewMenu = cm.addMenu("View with")
                     for handler_spec in handler_specs:
                         action = specialViewMenu.addAction(handler_spec[1])
-                        action.setToolTip(
-                            f"View using {handler_spec[1]}; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
-                        action.setStatusTip(
-                            f"View using {handler_spec[1]}; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
-                        action.setWhatsThis(
-                            f"View using {handler_spec[1]}; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+                        action.setToolTip(f"View using {handler_spec[1]}; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+                        action.setStatusTip(f"View using {handler_spec[1]}; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+                        action.setWhatsThis(f"View using {handler_spec[1]}; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
                         action.triggered.connect(self.slot_autoSelectViewer)
 
             cm.addSeparator()
@@ -664,19 +658,18 @@ class DataViewer(ScipyenViewer):
         if self._obj_to_view_[0] is dataclasses.MISSING or len(self._obj_to_view_[1].strip()) == 0:
             return
         
-        newWindow = bool(
-            QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.AltModifier)
-        askForParams = bool(
-            QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ControlModifier)
+        newWindow = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.AltModifier)
+        askForParams = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ControlModifier)
         
         variable, varname = self._obj_to_view_
         
         action = self.sender()
         actionName = action.text().replace("&", "")
-        handler_specs = VTH.get_handler_spec(type(self._obj_to_view_))
+        # handler_specs = VTH.get_handler_spec(type(self._obj_to_view_))
+        handler_specs = VTH.get_handler_spec(type(variable))
+        # print(f"{self.__class__.__name__}.slot_autoSelectViewer: hanler_specs -> {handler_specs}")
         if len(handler_specs):
-            viewers = [spec[0]
-                       for spec in handler_specs if spec[1] == actionName]
+            viewers = [spec[0] for spec in handler_specs if spec[1] == actionName]
 
             if len(viewers):
                 viewer = viewers[0]
