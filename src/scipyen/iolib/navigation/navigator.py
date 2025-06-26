@@ -947,10 +947,13 @@ class UrlNavigatorToggleButton(UrlNavigatorButtonBase):
     
     def enterEvent(self, evt:QtGui.QEnterEvent):
         super().enterEvent(evt)
+        if not self.isChecked():
+            self._pixmap_ = QtGui.QIcon.fromTheme("edit-entry-symbolic").pixmap(QtCore.QSize(self._iconSize_, self._iconSize_).expandedTo(self.iconSize()))
         self.updateCursor()
     
     def leaveEvent(self, evt:QtCore.QEvent):
         super().leaveEvent(evt)
+        self._pixmap_ = None
         self.setCursor(QtCore.Qt.ArrowCursor)
     
     def paintEvent(self, evt:QtGui.QPaintEvent):
@@ -965,15 +968,20 @@ class UrlNavigatorToggleButton(UrlNavigatorButtonBase):
             if self._pixmap_ is None:
                 self._pixmap_ = QtGui.QIcon.fromTheme("dialog-ok").pixmap(QtCore.QSize(self._iconSize_, self._iconSize_).expandedTo(self.iconSize()))
                 
-            self.style().drawItemPixmap(painter, self.rect(), QtCore.Qt.AlignCenter, self._pixmap_)
+            self.style().drawItemPixmap(painter, self.rect(), QtCore.Qt.AlignRight, self._pixmap_)
+            # self.style().drawItemPixmap(painter, self.rect(), QtCore.Qt.AlignCenter, self._pixmap_)
             
         elif self.isDisplayHintEnabled(DisplayHint.EnteredHint):
+            # self.drawHoverBackground(painter)
             painter.setPen(QtCore.Qt.NoPen)
             painter.setBrush(self.palette().color(self.foregroundRole()))
             
             verticalGap = 4
             caretWidth = 2
             x = 0 if self.layoutDirection() == QtCore.Qt.LeftToRight else buttonWidth - caretWidth
+            
+            if isinstance(self._pixmap_, QtGui.QPixmap):
+                self.style().drawItemPixmap(painter, self.rect(), QtCore.Qt.AlignRight, self._pixmap_)
             
             painter.drawRect(x, verticalGap, caretWidth, buttonHeight - 2 * verticalGap)
     
