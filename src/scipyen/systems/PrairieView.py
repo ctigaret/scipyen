@@ -1386,7 +1386,9 @@ class PVFrame(PVObject):
             
             # NOTE: 2021-10-26 15:48:42
             
-            fdata_axis_0_cal  = AxisCalibrationData(fdata_axis_0_info)
+            # fdata_axis_0_cal  = AxisCalibrationData(fdata_axis_0_info)
+            fdata_axis_0_cal  = AxisCalibrationData.new(fdata_axis_0_info)
+            print(f"{self.__class__.__name__}.__call__: calibration -> {fdata_axis_0_cal.type}")
             if self.versionString < "5.5":
                 fdata_axis_0_cal.resolution = float(self.state["micronsPerPixel_XAxis"].value)
             else:
@@ -1421,13 +1423,13 @@ class PVFrame(PVObject):
                                              typeFlags=vigra.AxisType.Time, 
                                              resolution = self.state.attributes["scanlinePeriod"])
                 
-                fdata_axis_1_cal  = AxisCalibrationData(fdata_axis_1_info)
+                fdata_axis_1_cal  = AxisCalibrationData.new(fdata_axis_1_info)
                 fdata_axis_1_cal.units = pq.s
                 
             else:
                 fdata_axis_1_info = fdata.axistags[1] # by default vigra behaviour is Space 
                 
-                fdata_axis_1_cal = AxisCalibrationData(fdata_axis_1_info)
+                fdata_axis_1_cal = AxisCalibrationData.new(fdata_axis_1_info)
                 if self.versionString < "5.5":
                     fdata_axis_1_cal.resolution = float(self.state["micronsPerPixel_YAxis"].value)
                 else:
@@ -1472,7 +1474,7 @@ class PVFrame(PVObject):
                 
             fdata_axis_2_info.description = self.files[k]["channelName"]
             
-            fdata_axis_2_cal = AxisCalibrationData(fdata_axis_2_info)
+            fdata_axis_2_cal = AxisCalibrationData.new(fdata_axis_2_info)
             fdata_axis_2_cal.addChannelCalibration(ChannelCalibrationData(index = self.files[k]["channel"],
                                                                           name=self.files[k]["channelName"]),
                                                    name=self.files[k]["channelName"],
@@ -1508,7 +1510,7 @@ class PVFrame(PVObject):
                     sdata.insertChannelAxis() # make sure there is a channel axis
                     
                 sdata_axis_0_info = sdata.axistags[0]
-                sdata_axis_0_cal = AxisCalibrationData(sdata_axis_0_info)
+                sdata_axis_0_cal = AxisCalibrationData.new(sdata_axis_0_info)
                 if self.versionString < "5.5":
                     sdata_axis_0_cal.resolution = float(self.state["micronsPerPixel_XAxis"].value)
                 else:
@@ -1537,7 +1539,7 @@ class PVFrame(PVObject):
                 sdata_axis_0_info = sdata_axis_0_cal.calibrateAxis(sdata_axis_0_info)
                 
                 sdata_axis_1_info = sdata.axistags[1]
-                sdata_axis_1_cal = AxisCalibrationData(sdata_axis_1_info)
+                sdata_axis_1_cal = AxisCalibrationData.new(sdata_axis_1_info)
                 if self.versionString < "5.5":
                     sdata_axis_1_cal.resolution=float(self.state["micronsPerPixel_YAxis"].value)
                 else:
@@ -1569,7 +1571,7 @@ class PVFrame(PVObject):
                 else:
                     sdata_axis_2_info = sdata.axistags["c"]
                 
-                sdata_axis_2_cal = AxisCalibrationData(sdata_axis_2_info)
+                sdata_axis_2_cal = AxisCalibrationData.new(sdata_axis_2_info)
                 sdata_axis_2_cal.addChannelCalibration(ChannelCalibrationData(index = self.files[k]["channel"],
                                                                           name=self.files[k]["channelName"]),
                                                         name = self.files[k]["channelName"],
@@ -1915,7 +1917,7 @@ class PVSequence (PVObject):
                                                  resolution=framePeriod, 
                                                  description=axisTypeName(axisTypeFromString("t")))
                     
-                    newAxisCal = AxisCalibrationData(newAxisInfo)
+                    newAxisCal = AxisCalibrationData.new(newAxisInfo)
                     newAxisCal.units = pq.s,
                     newAxisCal.origin = frameTimes[0]
                     newAxisCal.resolution = framePeriod
@@ -1942,7 +1944,7 @@ class PVSequence (PVObject):
                                                  resolution=zres,
                                                  description=axisTypeName(axisTypeFromString("z")))
                     
-                    newAxisCal = AxisCalibrationData(newAxisInfo)
+                    newAxisCal = AxisCalibrationData.new(newAxisInfo)
                     newAxisCal.units = pq.um
                     newAxisCal.origin = z_pos[0]
                     newAxisCal.resolution = zres
@@ -2007,7 +2009,7 @@ class PVSequence (PVObject):
                     # do we concatenateon the highest (outer) dimension regardless
                     newAxisDim = data[0][0].ndim # use highest dimension for concatenation axis
                     
-                if self.sequencetype == PVSequenceType.TSeries:
+                if self.sequencetype == PVSequenceType.TSeries: # Tseries, separate channels
                     if self.parent.versionString < "5.5":
                         frameTimes = list(map(float(f.state["absoluteTime"].value), self.frames))
                     else:
@@ -2030,7 +2032,7 @@ class PVSequence (PVObject):
                     
                     newAxisInfo = newAxisCal.calibrateAxis(newAxisInfo)
                     
-                else: # ZSeries
+                else: # ZSeries, separate channels
                     # get the Z axis resolution from the frames state
                     if self.parent.versionString < "5.5":
                         z_pos = list(map(lambda f: float(f.state["positionCurrent_ZAxis"].value), self.frames))
@@ -2047,7 +2049,7 @@ class PVSequence (PVObject):
                                                  resolution=zres,
                                                  description=axisTypeName(axisTypeFromString("z")))
                     
-                    newAxisCal = AxisCalibrationData(newAxisInfo)
+                    newAxisCal = AxisCalibrationData.new(newAxisInfo)
                     newAxisCal.units=pq.um
                     newAxisCal.origin=z_pos[0]
                     newAxisCal.resolution=zres
@@ -2571,7 +2573,7 @@ class PVScan(PVObject):
                                              typeFlags=vigra.AxisType.Time, 
                                              resolution=framePeriod)
                 
-                newAxisCal = AxisCalibrationData(newAxisInfo)
+                newAxisCal = AxisCalibrationData.new(newAxisInfo)
                 newAxisCal.units = pq.s
                 newAxisCal.origin = float(self.sequences[0].frames[0].attributes["absoluteTime"])
                 newAxisCal.resolution = framePeriod
@@ -3546,15 +3548,32 @@ class PrairieViewImporter(QtWidgets.QDialog, __UI_PrairieImporter, WorkspaceGuiM
             data_segments = [k for k in range(self._scandata_.scansFrames)]
                 
     @safewrapper
-    def loadPVScan(self, fileName):
+    def loadPVScan(self, fileName) -> bool:
         if len(fileName) and os.path.isfile(fileName):
             mime_type, file_type, encoding = pio.getMimeAndFileType(fileName)
             
             if "xml" in mime_type:
-                self._pvscan_ = PVScan(pio.loadXMLFile(fileName))
+                pvscanDoc = pio.loadXMLFile(fileName)
+                pvscanAttrs = xmlutils.attributesToDict(pvscanDoc.documentElement)
+                pvVersion = pvscanAttrs.get("version", None)
+                if not isinstance(pvVersion, str) or len(pvVersion.strip()) == 0:
+                    scipywarn(f"Invalid 'version' attribute ({pvVersion})")
+                    return False
                 
-            # elif "pickle" in mime_type:
-            #     self._pvscan_ = pio.loadPickleFile(fileName)
+                if pvVersion < "5.5":
+                    self._pvscan_ = PVScan(fileName)
+                else:
+                    pvEnvFile = pathlib.Path(pathlib.Path(fileName).stem + ".env")
+                    if not pvEnvFile.is_file():
+                        fn, _ = self.chooseFile("Select PrairieView Environment File",
+                                                    ".env")
+                        if len(fn.strip()) == 0:
+                            scipywarn(f"PVScan acquired with PrairieView version {pvVersion} require an 'environment' file (*.env)")
+                            return False
+                            
+                        pvEnvFile = pathlib.Path(fn)
+                        
+                    self._pvscan_ = PVScan(fileName, pvEnvFile)
                 
             else:
                 self.errorMessage("PrairieView Import - Prairiew View Scan file", "%s is not an XML file" % self.pvScanFileName)

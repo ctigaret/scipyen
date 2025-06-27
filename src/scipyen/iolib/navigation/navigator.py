@@ -1311,7 +1311,11 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         if clipped:
             bgColor = QtGui.QColor(fgColor)
             bgColor.setAlpha(0)
-            gradient = QtGui.QLinearGradient(textRect.topLeft(), textRect.topRight())
+            if __has_PyQt6__ or __has_PySide6__:
+                gradient = QtGui.QLinearGradient(QtCore.QPointF(textRect.topLeft()), 
+                                                 QtCore.QPointF(textRect.topRight()))
+            else:
+                gradient = QtGui.QLinearGradient(textRect.topLeft(), textRect.topRight())
             if leftToRight:
                 gradient.setColorAt(0.8, fgColor)
                 gradient.setColorAt(1.0, bgColor)

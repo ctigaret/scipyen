@@ -1786,8 +1786,11 @@ class AxisCalibrationData(CalibrationData):
         self.channels sequence just use the usual sequence indexing method, e.g.:
         
                 self.channels[𝑘]
-        to access the 𝑘ᵗʰ ChannelCalibrationData. This assumes that this 
-        AxisCalibrationData relates to a Channels axis, and:
+        
+        to access the 𝑘ᵗʰ ChannelCalibrationData. 
+    
+        This assumes that this instance of AxisCalibrationData relates to a 
+        Channels axis, and:
         
             -len(self.channels) ≤ 𝑘 < len(self.channels)
         
