@@ -1472,13 +1472,17 @@ class PVFrame(PVObject):
             else:
                 fdata_axis_2_info = fdata.axistags["c"]
                 
+            chCal = ChannelCalibrationData(index = self.files[k]["channel"],
+                                            name=self.files[k]["channelName"])
+                
             fdata_axis_2_info.description = self.files[k]["channelName"]
             
             fdata_axis_2_cal = AxisCalibrationData.new(fdata_axis_2_info)
-            fdata_axis_2_cal.addChannelCalibration(ChannelCalibrationData(index = self.files[k]["channel"],
-                                                                          name=self.files[k]["channelName"]),
-                                                   name=self.files[k]["channelName"],
-                                                   index = self.files[k]["channel"])
+            fdata_axis_2_cal.addChannelCalibration(chCal)
+            # fdata_axis_2_cal.addChannelCalibration(ChannelCalibrationData(index = self.files[k]["channel"],
+            #                                                               name=self.files[k]["channelName"]),
+            #                                        name=self.files[k]["channelName"],
+            #                                        index = self.files[k]["channel"])
             
             #fdata_axis_2_cal.setChannelName(0, self.files[k]["channelName"]) # also adds channel calibration to the channel axis calibration
                                         
@@ -1573,9 +1577,11 @@ class PVFrame(PVObject):
                 
                 sdata_axis_2_cal = AxisCalibrationData.new(sdata_axis_2_info)
                 sdata_axis_2_cal.addChannelCalibration(ChannelCalibrationData(index = self.files[k]["channel"],
-                                                                          name=self.files[k]["channelName"]),
-                                                        name = self.files[k]["channelName"],
-                                                        index = self.files[k]["channel"])
+                                                                          name=self.files[k]["channelName"]))
+                # sdata_axis_2_cal.addChannelCalibration(ChannelCalibrationData(index = self.files[k]["channel"],
+                #                                                           name=self.files[k]["channelName"]),
+                #                                         name = self.files[k]["channelName"],
+                #                                         index = self.files[k]["channel"])
 
                 sdata_axis_2_cal = sdata_axis_2_cal.calibrateAxis(sdata_axis_2_info)
                 
@@ -1605,13 +1611,18 @@ class PVFrame(PVObject):
                 
                 merged_channels_axinfo = mergedFrameData.axistags["c"]
                 
-                merged_channels_axcal = AxesCalibration(merged_channels_axinfo,
-                                                        axisname = axisTypeName(merged_channels_axinfo))
+                merged_channels_axcal = AxesCalibration.new(merged_channels_axinfo,
+                                                        name = axisTypeName(merged_channels_axinfo))
                 
+#                 merged_channels_axcal = AxesCalibration(merged_channels_axinfo,
+#                                                         axisname = axisTypeName(merged_channels_axinfo))
+#                 
                 for kch, channel in enumerate(channels):
                     merged_channels_axcal.addChannelCalibration(ChannelCalibrationData(name=channel_names[kch],
-                                                                                         index=channel),
-                                                                  name=channel_names[kch])
+                                                                                         index=channel))
+                    # merged_channels_axcal.addChannelCalibration(ChannelCalibrationData(name=channel_names[kch],
+                    #                                                                      index=channel),
+                    #                                               name=channel_names[kch])
                     
                 merged_channels_axinfo = merged_channels_axcal.calibrateAxis(merged_channels_axinfo)
                         
@@ -1621,12 +1632,11 @@ class PVFrame(PVObject):
                     merged_source_channel_axinfo = mergedSourceData.axistags["c"]
                     
                     merged_source_channel_axcal = AxesCalibration(merged_source_channel_axinfo,
-                                                                    axisname = axisTypeName(merged_source_channel_axinfo))
+                                                                  name = axisTypeName(merged_source_channel_axinfo))
                     
                     for kch, channel in enumerate(channels):
                         merged_source_channel_axcal.addChannelCalibration(ChannelCalibrationData(name=channel_names[kch],
-                                                                                                    index = channel),
-                                                                            name = channel_names[kch])
+                                                                                                    index = channel))
                         
                     merged_source_channel_axis_ino = merged_source_channel_axcal.calibrateAxis(merged_channels_axinfo)
                         
@@ -2929,39 +2939,34 @@ class PVScan(PVObject):
             
         return "\n".join(ret)
     
-# NOTE: 2020-11-30 23:45:00
-# place the mixin before other base classes so that it is initialized
-# then super(...).__init__ it
-# class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, ):
-#     sig_protocolRemoved = Signal(int, name="sig_protocolRemoved")
 class PrairieViewImporter(QtWidgets.QDialog, __UI_PrairieImporter, WorkspaceGuiMixin):
     sig_protocolRemoved = Signal(int, name="sig_protocolRemoved")
     
     def __init__(self, parent=None,
                  name: typing.Optional[str] = None,
-                 pvScanFileName: typing.Optional[str]=None, 
-                 optionsFileName: typing.Optional[str]=None, 
-                 ephysFileNames: typing.Optional[typing.Union[str, tuple, list]]=None,
-                 protocolFileName: typing.Optional[str]=None,
+                 pvScanFileName: typing.Optional[typing.Union[pathlib.Path, str]]=None, 
+                 optionsFileName: typing.Optional[typing.Union[pathlib.Path, str]]=None, 
+                 ephysFileNames: typing.Optional[typing.Union[pathlib.Path, str, tuple, list]]=None,
+                 protocolFileName: typing.Optional[typing.Union[pathlib.Path, str]]=None,
                  clearTriggerEvents: typing.Optional[bool]=False,
                  auto_export:bool = False,
                  **kwargs): # parent, flags - see documentation for QDialog constructor in Qt Assistant
         r"""
         Parameters:
         -----------
-        name:str (optional, default is None) - name of generated ScanData
-        pvScanFileName:str (optional, default is None) - name of PrairieView scan experiment (XML) file
-        optionsFileName:str (optional, default is None) - name of a pickle (*pkl) file containing ScanData options
-        ephysFileNames:str or sequence of str - name(s) of Axon file(s) , or
-                    pickle (*.pkl) files, containing associated electrophysiology
-                            data.
+        name: (optional, default is None) - name of generated ScanData
+        pvScanFileName: (optional, default is None) - name of PrairieView scan 
+            experiment (XML) file
+        optionsFileName: (optional, default is None) - name of a pickle (*pkl) 
+            file containing ScanData options
+        ephysFileNames: name, or names, of Axon file(s) , or pickle (*.pkl) files, 
+            containing associated electrophysiology data.
                     
-                    The Axon files can be text (*.atf) or binary (*.abf) files.
-                    
-                    Optional; default is None
+            The Axon files can be text (*.atf) or binary (*.abf) files.
+            
+            Optional; default is None
                             
-        protocolFileName:str (optional, default is None) - name of pickle (*.pkl) 
-                    file with TriggerProtocols 
+        protocolFileName: name of pickle (*.pkl) file with TriggerProtocols 
 
         clearTriggerEvents:bool (optional, default is False)
                             When True (default), remove all neo.Event objects
@@ -3000,56 +3005,72 @@ class PrairieViewImporter(QtWidgets.QDialog, __UI_PrairieImporter, WorkspaceGuiM
         
         self.dataName = "" # the value of lsdata "name" attribute
         
-        self.pvScanFileName = "" # the PV Scan XML document file - contains
+        self.pvScanFileName:pathlib.Path = pathlib.Path() # the PV Scan XML document file - contains
                                  # scan experiment information & location of
                                  # the files with the numerical data of lsdata
                                  
-        self.scanDataVarName = "" # the name that will be assigned to lsdata in the
+        self.scanDataVarName:str = "" # the name that will be assigned to lsdata in the
                                 # user's workspace
                                 
-        self.protocolFileName = "" # pickle file containing the trigger protocols
+        self.protocolFileName:pathlib.Path = pathlib.Path() # pickle file containing the trigger protocols
         
-        self.optionsFileName = "" # pickle file containing saved ESPCaT options
+        self.optionsFileName:pathlib.Path = pathlib.Path() # pickle file containing saved ESPCaT options
         
-        self.ephysFileNames = list() 
+        self.ephysFileNames:typing.List[pathlib.Path] = list() 
         
-        self.scanDataOptions = ScanDataOptions.default() # ScanDataOptions object - to be assigned to lsdata
+        self.scanDataOptions:ScanDataOptions = ScanDataOptions.default() # ScanDataOptions object - to be assigned to lsdata
         
-        self._ephys_ = None # a neo.Block with electrophysiology recordings associated
+        self._ephys_:typing.Optional[neo.Block] = None # a neo.Block with electrophysiology recordings associated
                             # with lsdata
                             
         
-        self.clearEvents = clearTriggerEvents if isinstance(clearTriggerEvents, bool) else False
+        self.clearEvents:bool = clearTriggerEvents if isinstance(clearTriggerEvents, bool) else False
                             
         self.triggerProtocols = list()  # list of TriggerProtocol objects associated
                                         # with lsdata
                                         
         self.cachedEvents = list()
         self.cachedProtocols = list()
-        self.cachedProtocolFileName = ""
+        self.cachedProtocolFileName:pathlib.Path = pathlib.Path()
                                         
         if isinstance(name, str) and len(name.strip()):
             self.dataName = name
             self.scanDataVarName = strutils.str2symbol(self.dataName)
         
-        if isinstance(pvScanFileName, str) and len(pvScanFileName.strip()):
-            if os.path.isfile(pvScanFileName) and any([mime in pio.mimetypes.guess_type(pvScanFileName)[0] for mime in ("xml", "pickle")]):
-                self.pvScanFileName = pvScanFileName
-        
-        if isinstance(optionsFileName, str) and len(optionsFileName.strip()):
-            if os.path.isfile(optionsFileName) and "pickle" in pio.mimetypes.guess_type(optionsFileName)[0]:
-                self.optionsFileName = optionsFileName
-        
-        if isinstance(ephysFileNames, str) and len(ephysFileNames.strip()):
-            if os.path.isfile(ephysFileNames) and any([mime in pio.mimetypes.guess_type(ephysFileNames)[0] for mime in ("pickle", "axon")]):
-                self.ephysFileNames = [ephysFileNames]
+        if isinstance(pvScanFileName, pathlib.Path):
+            self.pvScanFileName = pvScanFileName
             
-        elif isinstance(ephysFileNames, (tuple, list)) and all([isinstance(v, str) for v in ephysFileNames]):
-            self.ephysFileNames = [s for s in ephysFileNames if (len(s.strip()) and any([mime in pio.mimetypes.guess_type(s)[0]]))]
+        elif isinstance(pvScanFileName, str) and len(pvScanFileName.strip()):
+            if os.path.isfile(pvScanFileName) and any([mime in pio.mimetypes.guess_type(pvScanFileName)[0] for mime in ("xml", "pickle")]):
+                self.pvScanFileName = pathlib.Path(pvScanFileName)
         
-        if isinstance(protocolFileName, str) and len(protocolFileName.strip()):
+        if isinstance(optionsFileName, pathlib.Path):
+            self.optionsFileName = optionsFileName
+        
+        elif isinstance(optionsFileName, str) and len(optionsFileName.strip()):
+            if os.path.isfile(optionsFileName) and "pickle" in pio.mimetypes.guess_type(optionsFileName)[0]:
+                self.optionsFileName = pathlib.Path(optionsFileName)
+        
+        if isinstance(ephysFileNames, pathlib.Path):
+            self.ephysFileNames = [ephysFileNames]
+        
+        elif isinstance(ephysFileNames, str) and len(ephysFileNames.strip()):
+            if os.path.isfile(ephysFileNames) and any([mime in pio.mimetypes.guess_type(ephysFileNames)[0] for mime in ("pickle", "axon")]):
+                self.ephysFileNames = list(map(lambda f: pathlib.Path(f), [ephysFileNames]))
+            
+        elif isinstance(ephysFileNames, (tuple, list)):
+            if all(isinstance(v, pathlib.Path) for v in ephysFileNames):
+                self.ephysFileNames = ephysFileNames
+            elif all([isinstance(v, str) for v in ephysFileNames]):
+                self.ephysFileNames = list(map(lambda f: pathlib.Path(f), filter(lambda f: len(f.strip()) and any([mime in pio.mimetypes.guess_type(f)[0]]), ephysFileNames)))
+            # self.ephysFileNames = [s for s in ephysFileNames if (len(s.strip()) and any([mime in pio.mimetypes.guess_type(s)[0]]))]
+        
+        if isinstance(protocolFileName, pathlib.Path):
+            self.protocolFileName = protocolFileName
+        
+        elif isinstance(protocolFileName, str) and len(protocolFileName.strip()):
             if os.path.isfile(self.protocolFileName) and "pickle" in pio.mimetypes.guess_type(self.protocolFileName)[0]:
-                self.protocolFileName = protocolFileName
+                self.protocolFileName = pathlib.Path(protocolFileName)
                 
         self.auto_export = auto_export
         
@@ -3070,8 +3091,8 @@ class PrairieViewImporter(QtWidgets.QDialog, __UI_PrairieImporter, WorkspaceGuiM
         self.pvScanFileNameLineEdit.undoAvailable=True
         self.pvScanFileNameLineEdit.redoAvailable=True
         self.pvScanFileNameLineEdit.setClearButtonEnabled(True)
-        if len(self.pvScanFileName):
-            self.pvScanFileNameLineEdit.setText(self.pvScanFileName)
+        if self.pvScanFileName.is_file():
+            self.pvScanFileNameLineEdit.setText(self.pvScanFileName.as_posix())
         self.pvScanFileNameLineEdit.editingFinished.connect(self._slot_setPVScanFileName)
         self.pvScanFileNameLineEdit.textChanged.connect(self._slot_setPVScanFileName)
         
@@ -3082,8 +3103,8 @@ class PrairieViewImporter(QtWidgets.QDialog, __UI_PrairieImporter, WorkspaceGuiM
         self.optionsFileNameLineEdit.redoAvailable=True
         self.optionsFileNameLineEdit.setClearButtonEnabled(True)
         
-        if len(self.optionsFileName):
-            self.optionsFileNameLineEdit.setText(self.optionsFileName)
+        if self.optionsFileName.is_file():
+            self.optionsFileNameLineEdit.setText(self.optionsFileName.as_posix())
         self.optionsFileNameLineEdit.editingFinished.connect(self._slot_setOptionsFileName)
         self.optionsFileNameLineEdit.textChanged.connect(self._slot_setOptionsFileName)
         
@@ -3093,7 +3114,7 @@ class PrairieViewImporter(QtWidgets.QDialog, __UI_PrairieImporter, WorkspaceGuiM
         self.ephysFileNameLineEdit.undoAvailable=True
         self.ephysFileNameLineEdit.redoAvailable=True
         self.ephysFileNameLineEdit.setClearButtonEnabled(True)
-        self.ephysFileNameLineEdit.setText(os.pathsep.join(self.ephysFileNames))
+        self.ephysFileNameLineEdit.setText(os.pathsep.join(list(map(lambda f: f.as_posix(), self.ephysFileNames))))
         self.ephysFileNameLineEdit.editingFinished.connect(self._slot_setEphysFileNames)
         
         self.ephysFileChooserToolButton.clicked.connect(self._slot_chooseEphysFiles)
@@ -3103,8 +3124,8 @@ class PrairieViewImporter(QtWidgets.QDialog, __UI_PrairieImporter, WorkspaceGuiM
         self.triggerProtocolFileNameLineEdit.redoAvailable=True
         self.triggerProtocolFileNameLineEdit.setClearButtonEnabled(True)
         
-        if len(self.protocolFileName):
-            self.triggerProtocolFileNameLineEdit.setText(protocolFile)
+        if self.protocolFileName.is_file():
+            self.triggerProtocolFileNameLineEdit.setText(self.protocolFileName.as_posix())
         self.triggerProtocolFileNameLineEdit.editingFinished.connect(self._slot_setProtocolFileName)
         self.triggerProtocolFileNameLineEdit.textChanged.connect(self._slot_setProtocolFileName)
             
@@ -3121,18 +3142,10 @@ class PrairieViewImporter(QtWidgets.QDialog, __UI_PrairieImporter, WorkspaceGuiM
         # below self._scipyenWindow_ is inherited from WorkspaceGuiMixin (initialized)
         self.ephysPreview = sv.SignalViewer(win_title = "Trigger Events Detection")
         
-        #self.ephysPreview = sv.SignalViewer(parent = self._scipyenWindow_, 
-                                            #win_title = "Trigger Events Detection")
-        
-        #self.ephysPreview = sv.SignalViewer(parent = self, 
-                                            #win_title = "Trigger Events Detection")
-        
         # NOTE: 2021-03-21 11:35:59 just a "place holder" here; the actual dialog 
         # created in _slot_startTriggerEventDetectionGui()
         self.eventDetectionDialog = None # when a TriggerDetectDialog, this caches the detection options & events
         
-        #self.protocolEditorDialog = ProtocolEditorDialog(parent=self, title = "Edit Trigger Protocols")
-        #self.protocolEditorDialog = ProtocolEditorDialog(parent=self._scipyenWindow_, title = "Edit Trigger Protocols")
         self.protocolEditorDialog = ProtocolEditorDialog(title = "Edit Trigger Protocols")
         
         # the ProtocolEditorDialog works on a reference to the list of 
@@ -3142,8 +3155,6 @@ class PrairieViewImporter(QtWidgets.QDialog, __UI_PrairieImporter, WorkspaceGuiM
         self.protocolEditorDialog.sig_removeProtocol.connect(self._slot_removeProtocol)
         self.protocolEditorDialog.sig_requestProtocolAdd.connect(self._slot_protocolAddRequest)
         self.protocolEditorDialog.finished.connect(self._slot_protocolEditorFinished)
-        
-        # self.buttonBox.accepted.connect(self.slot_generateScanData)
         
     @Slot(int)
     def _slot_removeProtocol(self, index):
@@ -3277,13 +3288,21 @@ class PrairieViewImporter(QtWidgets.QDialog, __UI_PrairieImporter, WorkspaceGuiM
         signalblockers = [QtCore.QSignalBlocker(w) for w in (self.pvScanFileNameLineEdit, self.dataNameLineEdit)]
         fileFilter = ";;".join(["XML Files (*.xml)", "Pickle files (*.pkl)", "All files (*.*)"])
         
-        self.pvScanFileName, _ = self.chooseFile(caption="Open PrairieView file",
+        fn, _ = self.chooseFile(caption="Open PrairieView file",
                                    fileFilter=fileFilter)
+        if not isinstance(fn, str) or len(fn.strip()) == 0:
+            return 
         
-        if len(self.pvScanFileName.strip()):
+        self.pvScanFileName = pathlib.Path(fn)
+        if not self.pvScanFileName.is_file():
+            scipywarn(f"File {self.pvScanFileName} does not exist")
+            return
+        
+        # if len(self.pvScanFileName.strip()):
+        if self.pvScanFileName.is_file():
             self._scandata_ = None # because we need to rebuild the scanData
             if self.loadPVScan(self.pvScanFileName):
-                self.pvScanFileNameLineEdit.setText(self.pvScanFileName)
+                self.pvScanFileNameLineEdit.setText(self.pvScanFileName.as_posix())
             else:
                 self.pvScanFileNameLineEdit.clear()
                 self.pvScanFileName = ""
@@ -3365,10 +3384,11 @@ class PrairieViewImporter(QtWidgets.QDialog, __UI_PrairieImporter, WorkspaceGuiM
         
         fileFilter = ";;".join(["Axon files (*.abf)", "Pickle files (*.pkl)"])
         
-        self.ephysFileNames, _ = self.chooseFile(caption=caption, fileFilter=fileFilter, single=False)
+        fNames, _ = self.chooseFile(caption=caption, fileFilter=fileFilter, single=False)
+        self.ephysFileNames = list(map(lambda f: pathlib.Path(f), fNames))
         
         if len(self.ephysFileNames) == 1:
-            self.ephysFileNameLineEdit.setText(self.ephysFileNames[0])
+            self.ephysFileNameLineEdit.setText(self.ephysFileNames[0].as_posix)
             
         elif len(self.ephysFileNames) > 1:
             self.ephysFileNameLineEdit.setText("<multiple files>")
@@ -3394,8 +3414,8 @@ class PrairieViewImporter(QtWidgets.QDialog, __UI_PrairieImporter, WorkspaceGuiM
     def _slot_setProtocolFileName(self):
         if any([v in self.triggerProtocolFileNameLineEdit.text() for v in ("imported", "detected")]):
             return
-        self.protocolFileName = self.triggerProtocolFileNameLineEdit.text()
-        if len(self.protocolFileName.strip()):
+        self.protocolFileName = pathlib.Path(self.triggerProtocolFileNameLineEdit.text())
+        if self.protocolFileName.is_file():
             if self.loadProtocols(self.protocolFileName):
                 self.cachedProtocolFileName = self.protocolFileName
         
@@ -3409,15 +3429,18 @@ class PrairieViewImporter(QtWidgets.QDialog, __UI_PrairieImporter, WorkspaceGuiM
         targetdir = os.getcwd()
         caption = "Open Trigger Protocol file for %s" % self.scanDataVarName if (isinstance(self.scanDataVarName, str) and len(self.scanDataVarName.strip())) else "Open Trigger Protocol file"
             
-        self.protocolFileName, _ = self.chooseFile(caption=caption, fileFilter="Pickle Files (*.pkl)")
+        fName, _ = self.chooseFile(caption=caption, fileFilter="Pickle Files (*.pkl)")
+        if not isinstance(fName, str) or len(fName.strip()) == 0:
+            return 
+        self.protocolFileName = pathlib.Path(fname)
         
-        if len(self.protocolFileName.strip()):
+        if self.protocolFileName.is_file():
             if self.loadProtocols(self.protocolFileName):
-                self.triggerProtocolFileNameLineEdit.setText(self.protocolFileName)
+                self.triggerProtocolFileNameLineEdit.setText(self.protocolFileName.as_posix())
                 self.cachedProtocolFileName = self.protocolFileName
             
         else:
-            self.triggerProtocolFileNameLineEdit.setText(self.cachedProtocolFileName)
+            self.triggerProtocolFileNameLineEdit.setText(self.cachedProtocolFileName.as_posix())
             self.triggerProtocols.clear()
         
     @Slot()
@@ -3548,56 +3571,63 @@ class PrairieViewImporter(QtWidgets.QDialog, __UI_PrairieImporter, WorkspaceGuiM
             data_segments = [k for k in range(self._scandata_.scansFrames)]
                 
     @safewrapper
-    def loadPVScan(self, fileName) -> bool:
-        if len(fileName) and os.path.isfile(fileName):
-            mime_type, file_type, encoding = pio.getMimeAndFileType(fileName)
+    def loadPVScan(self, fileName:typing.Union[pathlib.Path, str]) -> bool:
+        if isinstance(fileName, str) and len(fileName.strip()):
+            fileName = pathlib.Path(fileName)
             
-            if "xml" in mime_type:
-                pvscanDoc = pio.loadXMLFile(fileName)
-                pvscanAttrs = xmlutils.attributesToDict(pvscanDoc.documentElement)
-                pvVersion = pvscanAttrs.get("version", None)
-                if not isinstance(pvVersion, str) or len(pvVersion.strip()) == 0:
-                    scipywarn(f"Invalid 'version' attribute ({pvVersion})")
-                    return False
-                
-                if pvVersion < "5.5":
-                    self._pvscan_ = PVScan(fileName)
-                else:
-                    pvEnvFile = pathlib.Path(pathlib.Path(fileName).stem + ".env")
-                    if not pvEnvFile.is_file():
-                        fn, _ = self.chooseFile("Select PrairieView Environment File",
-                                                    ".env")
-                        if len(fn.strip()) == 0:
-                            scipywarn(f"PVScan acquired with PrairieView version {pvVersion} require an 'environment' file (*.env)")
-                            return False
-                            
-                        pvEnvFile = pathlib.Path(fn)
-                        
-                    self._pvscan_ = PVScan(fileName, pvEnvFile)
-                
-            else:
-                self.errorMessage("PrairieView Import - Prairiew View Scan file", "%s is not an XML file" % self.pvScanFileName)
+        if not isinstance(fileName, pathlib.Path) or not fileName.is_file():
+            self.errorMessage("PrairieView Import", f"Expecting a str for an existing file name or a valid Path")
+            return False
+        
+        if not fileName.is_file():
+            self.errorMessage("PrairieView Import", f"File {fileName} not found")
+            return False
+        
+        mime_type, file_type, encoding = pio.getMimeAndFileType(fileName)
+            
+        if "xml" in mime_type:
+            pvscanDoc = pio.loadXMLFile(fileName)
+            pvscanAttrs = xmlutils.attributesToDict(pvscanDoc.documentElement)
+            pvVersion = pvscanAttrs.get("version", None)
+            if not isinstance(pvVersion, str) or len(pvVersion.strip()) == 0:
+                scipywarn(f"Invalid 'version' attribute ({pvVersion})")
                 return False
             
-            tempDataVarName = os.path.splitext(os.path.basename(fileName))[0]
-            if len(self.scanDataVarName.strip()) == 0:
-                self.scanDataVarName = strutils.str2symbol(tempDataVarName)
+            if pvVersion < "5.5":
+                self._pvscan_ = PVScan(fileName)
+            else:
+                pvFile = pathlib.Path(fileName).relative_to(pathlib.Path.cwd())
+                pvEnvFile = pathlib.Path(pvFile.parent / (pvFile.stem + ".env"))
+                if not pvEnvFile.is_file():
+                    fn, _ = self.chooseFile("Select PrairieView Environment File",
+                                                ".env")
+                    if len(fn.strip()) == 0:
+                        scipywarn(f"PVScan acquired with PrairieView version {pvVersion} require an 'environment' file (*.env)")
+                        return False
+                        
+                    pvEnvFile = pathlib.Path(fn)
+                    
+                self._pvscan_ = PVScan(fileName, pvEnvFile)
             
-            if len(self.dataName.strip()) == 0:
-                #self.dataName = self.scanDataVarName
-                self.dataNameLineEdit.setText(self.scanDataVarName)
-                
-            if fileName != self.pvScanFileName:
-                signalblockers = [QtCore.QSignalBlocker(w) for w in (self.pvScanFileNameLineEdit, self.dataNameLineEdit)]
-                self.pvScanFileName = fileName
-                self.pvScanFileNameLineEdit.setText(self.pvScanFileName)
-                
-            return True
-        
         else:
-            self.errorMessage("PrairieView Import", "File %s not found" % fileName)
+            self.errorMessage("PrairieView Import - Prairiew View Scan file", "%s is not an XML file" % self.pvScanFileName)
+            return False
         
-        return False
+        # tempDataVarName = os.path.splitext(os.path.basename(fileName))[0]
+        tempDataVarName = fileName.stem
+        if len(self.scanDataVarName.strip()) == 0:
+            self.scanDataVarName = strutils.str2symbol(tempDataVarName)
+        
+        if len(self.dataName.strip()) == 0:
+            #self.dataName = self.scanDataVarName
+            self.dataNameLineEdit.setText(self.scanDataVarName)
+            
+        if fileName != self.pvScanFileName:
+            signalblockers = [QtCore.QSignalBlocker(w) for w in (self.pvScanFileNameLineEdit, self.dataNameLineEdit)]
+            self.pvScanFileName = fileName
+            self.pvScanFileNameLineEdit.setText(self.pvScanFileName.as_posix())
+            
+        return True
     
     @safewrapper
     def loadEphys(self, fileNamesList): # TODO 2024-07-28 09:49:36 streamline

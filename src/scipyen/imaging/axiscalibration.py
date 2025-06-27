@@ -306,7 +306,63 @@ class CalibrationData:
                 ret &= super(self).__eq__(other)
                 
         return ret
+    
+    def __ne__(self, other):
+        return not self.__eq__(other)
+    
+    def isclose(self, other, 
+                rtol = RELATIVE_TOLERANCE, 
+                atol = ABSOLUTE_TOLERANCE,
+                equal_nan = EQUAL_NAN,
+                use_math=True,
+                ignore:typing.Optional[typing.Union[str, tuple, list]] = None):
+        
+        if ignore is not None:
+            if all(v not in ignore for v in ('units', 'origin','resolution','maximum')):
+                ignore = None
+        
+        if rtol is None:
+            rtol = self.relative_tolerance
+            
+        if atol is None:
+            atol = self.absolute_tolerance
+        
+        ret = other.__class__ == self.__class__
+        
+        if ret and (ignore is None or "units" not in ignore):
+            ret &= unitsConvertible(self.units, other.units)
+            
+        if ignore is not None and "units" in ignore:
+            if isinstance(ignore, str):
+                ignore = ignore.replace("units", "")
+                if len(ignore.strip()) == 0:
+                    ignore = None
+                    
+            elif isinstance(ignore, (tuple, list)):
+                ignore = list(s for s in ignore if s != "units")
+                if len(ignore)==0:
+                    ignore = None
+                    
+        if ret:
+            if ignore is None:
+                cal_p = list(getattr(self, p) for p in ("calibratedOrigin", "calibratedResolution", "calibratedMaximum") if hasattr(self, p))
                 
+                if self.units != other.units:
+                    oth_p = list(getattr(other, p).rescale(self.units) for p in ("calibratedOrigin", "calibratedResolution", "calibratedMaximum") if hasattr(self, p))
+                    # oth_p = list(v.rescale(getattr(other, p), self.units) for p in ("calibratedOrigin", "calibratedResolution", "calibratedMaximum") if hasattr(self, p))
+                    
+                else:
+                    oth_p = list(getattr(other, p) for p in ("calibratedOrigin", "calibratedResolution", "calibratedMaximum") if hasattr(self, p))
+                    
+            else:
+                cal_p = list(getattr(self, p) for p in ("calibratedOrigin", "calibratedResolution", "calibratedMaximum") if p not in ignore and hasattr(self, p))
+                oth_p = list(getattr(other, p) for p in ("calibratedOrigin", "calibratedResolution", "calibratedMaximum") if p not in ignore and hasattr(other, p))
+                         
+                    
+            ret &= len(cal_p) == len(oth_p) and all(isclose(p[0], p[1], rtol=rtol, atol=atol, equal_nan=equal_nan, use_math=use_math) for p in zip(cal_p, oth_p))
+            
+        return ret
+                 
 class CalibrationUnitsDescriptor:
     r"""Use this for the 'units' attribute of an AxisCalibrationData object.
     This enforces the rule that only NonChannel axes have this attribute with a
@@ -1661,6 +1717,13 @@ class AxisCalibrationData(CalibrationData):
             
         self.units = u
         
+    def addChannelCalibration(self, val:ChannelCalibrationData):
+        if not self.type & vigra.AxisType.Channels:
+            return
+        
+        self.channels.append(val)
+        
+        
     def calibrateAxis(self, axinfo:vigra.AxisInfo) -> vigra.AxisInfo:
         assert self.type == axinfo.typeFlags, f"Cannot apply a {self.type} axis calibration to a {axinfo.typeFlags} axis"
         
@@ -1732,7 +1795,6 @@ class AxisCalibrationData(CalibrationData):
         """
         return self.calibratedMeasure(value)
         
-    
     def coordinateInSamples(self, value:pq.Quantity) -> int | None:
         r"""Converts a calibrated distance from axis origin to number of samples.
             This performs the inverse of self.calibratedCoordinate.
@@ -2386,7 +2448,6 @@ class AxesCalibration(object):
         
         return key in self.axiskeys and key in self._axistags_
     
-    # @property
     def axiskeys(self):
         r"""A generator of axiskeys
         """
@@ -2396,7 +2457,7 @@ class AxesCalibration(object):
     def keys(self):
         r"""Alias to self.axiskeys
         """
-        yield from self.axiskeys
+        yield from self.axiskeys()
     
     @property
     def axistags(self) -> vigra.AxisTags:
@@ -2422,7 +2483,6 @@ class AxesCalibration(object):
     def items(self):
         yield from ((cal.key, cal) for cal in self)
     
-    #@property
     def typeFlags(self, key):
         r"""Read-only
         """
