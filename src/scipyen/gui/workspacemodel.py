@@ -134,6 +134,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # WARNING: this is also a reference to the "workspace" attribute of the 
         # ScipyenWindow instance
         self.shell = shell  
+        self.currentDir = os.getcwd()
 
         self.cached_vars = dict()
         self.modified_vars = dict()
@@ -1342,7 +1343,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # this SHOULD also notify the observers - Works OK when adding new symbols
         # does not work when an object bound to an existing symbol has been modified
         # (i.e., either the symbols is bound to a different object reference, or
-        # the contents of the object have changed)
+        # the contents of the object - e.g. a container - have changed)
         self.internalVariablesMonitor.update(current_vars)
         
         # NOTE 2023-05-25 18:13:46
@@ -1367,7 +1368,9 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # NOTE: 2023-05-28 01:31:53
         # the next two signal a change directory command issued at the console
         current_dir = os.getcwd()
-        self.workingDir.emit(current_dir)
+        if current_dir != self.currentDir:
+            self.currentDir = current_dir
+            self.workingDir.emit(current_dir)
         
         # NOTE: 2023-11-04 17:53:24
         # update internal caches

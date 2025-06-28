@@ -1748,6 +1748,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # self.pythonHelpWindow = QtWidgets.QMainWindow(self)
         # self.helpWidget = PythonHelpWidget(self.shell, self.pythonHelpWindow)
         # self.pythonHelpWindow.setCentralWidget(self.helpWidget)
+        
+        self.console.show()
 
     # BEGIN Properties
     
@@ -3419,6 +3421,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.shell.events.register("post_run_cell", self.workspaceModel.postRunCell)
 
         self.slot_changeDirectory(self.recentDirectories[0])
+        self.console.show()
 
     # END   PyQt slots
 
@@ -3974,7 +3977,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             # -------------------------
             self.console.setWindowTitle(u'Scipyen Console')
 
-        self.console.show()
+        # self.console.show()
         # NOTE: 2021-10-18 11:28:25
         # The following must be called when console has become visible!
         self.console.consoleWidget.set_pygment(self.console.consoleWidget._console_pygment)

@@ -358,21 +358,30 @@ class ListTrait(List, ScipyenTraitTypeMixin):
             if any(not isinstance(v, self.klass) for v in (new_value, old_value)):
                 silent=False
                 
-            # print(f"{self.__class__.__name__}.set: old_value = {old_value}, new_value = {new_value}")
-            if silent:
-                silent = bool(old_value == new_value)
-                # print(f"{self.__class__.__name__}.set: old_value == new_value => silent {silent}")
-            
-            
+            print(f"{self.__class__.__name__}.set: silent before new_hash: {silent}")
             # NOTE: 2021-08-19 16:17:23
             # check for change in contents
             if silent:
                 new_hash = gethash(new_value)
                 silent = (new_hash == self.hashed)
-                # print(f"{self.__class__.__name__}.set: new_hash == self.hashed => silent {silent}")
+                print(f"{self.__class__.__name__}.set: new_hash == self.hashed => silent {silent}")
                 
                 if not silent:
                     self.hashed = new_hash
+                    
+            print(f"{self.__class__.__name__}.set: old_value = {old_value}, new_value = {new_value}")
+            # NOTE: 2025-06-28 23:17:33
+            # OK so when operating on a list e.g. del(a[k]) the old_value is already set to the
+            # result of the operation, way before the observes ever gets a chance to verify
+            # changes - this si because 'a' is stored by reference in the HasTraits traits!
+            #
+            # Therefore I must find a way to memoize the data 0> check to change in content BEFORE
+            # this check below (which is pretty useless)
+            if silent:
+                silent = bool(old_value == new_value)
+                print(f"{self.__class__.__name__}.set: old_value == new_value is {old_value == new_value} => silent {silent}")
+            
+            
         except:
             # traceback.print_exc()
             # if there is an error in comparing, default to notify

@@ -46,7 +46,7 @@ Useful to have even when vigranumpy is not installed.
 # Adaptation for use with PyQt5/6
 # Copyright 209-2021 by Cezar M. Tigaret (cezar.tigaret@gmail.com, TigaretC@cardiff.ac.uk)
 #########################################################################
-import os, typing, inspect, math
+import os, typing, inspect, math, types, functools, traceback
 import numpy as np
 import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
@@ -76,6 +76,7 @@ else:
     
 
 from gui.guiutils import(InftyDoubleValidator, ComplexValidator, UnitsStringValidator)
+from core.prog import scipywarn
 
 def alignLabels(*args):
     m = 0
@@ -169,20 +170,25 @@ class OutputFile(FileDialog):
             return True
 
 class _OptionalValueInput(QtWidgets.QFrame):
+    valueChanged = Signal(str, name="valueChanged")
     def __init__(self, parent, label):
         QtWidgets.QFrame.__init__(self, parent)
         parent.addWidget(self)
         self.label = QtWidgets.QLabel(label)
         self.variable = QtWidgets.QLineEdit()
         self.variable.setValidator(self._QValidator(parent=self.variable))
-
+        self.variable.textChanged[str].connect(self._slot_valueChanged)
         self._layout = QtWidgets.QHBoxLayout()
         self._layout.setSpacing(5)
         self._layout.addWidget(self.label)
         self._layout.addWidget(self.variable, 1)
         
         self.setLayout(self._layout)
-                    
+    
+    @Slot(str)
+    def _slot_valueChanged(self, val:str):
+        self.valueChanged.emit(val)
+    
     def setFocus(self):
         self.variable.setFocus()
         
@@ -267,19 +273,23 @@ class FloatInput(OptionalFloatInput):
         return float(self.text())
 
 class OptionalStringInput(QtWidgets.QFrame):
+    valueChanged = Signal(str, name="valueChanged")
     def __init__(self, parent, label):
         QtWidgets.QFrame.__init__(self, parent)
         parent.addWidget(self)
         self.label = QtWidgets.QLabel(label)
         self.variable = QtWidgets.QLineEdit()
-
         self._layout = QtWidgets.QHBoxLayout()
         self._layout.setSpacing(5)
         self._layout.addWidget(self.label)
         self._layout.addWidget(self.variable, 1)
-        
+        self.variable.textChanged[str].connect(self._slot_textChanged)
         self.setLayout(self._layout)
-                    
+    
+    @Slot(str)
+    def _slot_textChanged(self, val:str):
+        self.valueChanged.emit(val)
+    
     def setFocus(self):
         self.variable.setFocus()
         
@@ -598,6 +608,8 @@ class QuickDialog(QtWidgets.QDialog):
                  addStretch=True, 
                  addSpacing=True):
         QtWidgets.QDialog.__init__(self, parent)
+        
+        self._cb_ = list()
 
         self.layout = QtWidgets.QVBoxLayout(self)
         if isinstance(addStretch, bool):
@@ -623,6 +635,38 @@ class QuickDialog(QtWidgets.QDialog):
         self.setWindowTitle(title)
         #self.setOrientation(QtCore.Qt.Vertical)
         self.resize(500,-1)
+        
+    @property
+    def callbacks(self) -> list:
+        return self._cb_
+    
+    def addCallback(self, f:typing.Union[types.FunctionType, types.MethodType, functools.partial]) -> None:
+        if not isinstance(f, (types.FunctionType, types.MethodType, functools.partial)):
+            raise TypeError(f"Expecting a types.FunctionType, types.MethodType, or a functools.partial; got {type(f).__name__} instead")
+        
+        self._cb_.append(f)
+        
+    def removeCallback(self, f:typing.Union[types.FunctionType, types.MethodType, functools.partial]) -> None:
+        if not isinstance(f, (types.FunctionType, types.MethodType, functools.partial)):
+            raise TypeError(f"Expecting a types.FunctionType, types.MethodType, or a functools.partial; got {type(f).__name__} instead")
+        
+        if f in self._cb_:
+            index = self._cb_.index(f)
+            del(self._cb_[index])
+            
+    def clearCallbacks(self):
+        self._cb_.clear()
+        
+    @Slot(str)
+    def _slot_valueChanged(self, val:str):
+        if len(self._cb_):
+            for f in self._cb_:
+                try:
+                    f(val)
+                except:
+                    scipywarn(f"In {self.__class__.__name__}._slot_valueChanged: Bad callback call for {f}")
+                    traceback.print_exc()
+            
         
     def insertButtons(self):
         self.buttons = QtWidgets.QFrame(self)

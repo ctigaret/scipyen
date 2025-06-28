@@ -614,10 +614,16 @@ class DataViewer(ScipyenViewer):
         
         if len(objects) == 1:
             dlg = quickdialog.QuickDialog(self, "Copy to workspace")
+            labelString = "Warning: The current variable name starts with an underscore ('_'), and therefore it will be hidden in the workspace viewer."
             namePrompt = quickdialog.StringInput(dlg, "Data name:")
+            namePrompt.valueChanged[str].connect(dlg._slot_valueChanged)
             namePrompt.variable.setClearButtonEnabled(True)
             namePrompt.variable.redoAvailable=True
             namePrompt.variable.undoAvailable=True
+            hiddenWarningLabel = QtWidgets.QLabel(labelString, self)
+            hiddenWarningLabel.setVisible(False)
+            dlg.addCallback(lambda s: hiddenWarningLabel.setVisible(s.startswith("_")))
+            dlg.addWidget(hiddenWarningLabel, 0, QtCore.Qt.AlignLeft)
             
             namePrompt.setText(names[0])
             

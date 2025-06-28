@@ -343,6 +343,7 @@ def main():
     #sip.setdestroyonexit(True)
 
     try:
+        print("Scipyen is initializing, please wait...\n")
         # BEGIN 
         # 1. create the app
         app = QtWidgets.QApplication(sys.argv)
@@ -362,9 +363,24 @@ def main():
         app.setOrganizationName(scipyen_config.organization_name)
         
         gc.enable()
-
+        
+#         icon = QtGui.QIcon.fromTheme("pythonbackend")
+#         pixmap = icon.pixmap(QtCore.QSize(256,256), state=QtGui.QIcon.On)
+#         image = pixmap.toImage().convertToFormat(QtGui.QImage.Format_RGB32)
+#         # splashPixmap = QtGui.QPixmap.fromImage(image)
+#         splashPixmap = QtGui.QPixmap(256,256)
+#         splashPixmap.fill(QtGui.QColor("white"))
+#         
+#         splash = QtWidgets.QSplashScreen(splashPixmap)
+#         splash.setAttribute(QtCore.Qt.WA_StyledBackground)
+#         # splash.setAttribute(QtCore.Qt.WA_TranslucentBackground + QtCore.Qt.WA_StyledBackground + QtCore.Qt.WA_FramlessWindowHint)
+#         splash.show()
+#         app.processEvents()
+#         splash.showMessage("Scipyen is initializing, please wait...")
+#         app.processEvents()
         # 2. initialize main window
         mainWindow = mainwindow.ScipyenWindow()
+        app.processEvents()
         
         # NOTE: 2021-08-17 10:06:24 FIXME / TODO
         # come up with a nice icon?
@@ -372,7 +388,9 @@ def main():
         #mainWindow.setWindowIcon(app.icon)
         
         # 3. show the main window
+        # splash.finish(mainWindow)
         mainWindow.show()
+        # app.processEvents()
         
         # 4. start the main GUI app (pyqt5) event loop
         app.exec()
