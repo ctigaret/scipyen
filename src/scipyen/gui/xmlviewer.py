@@ -447,7 +447,11 @@ class XMLViewer(ScipyenViewer):
         
     def _configureUI_(self):
         self.fileMenu = self.menuBar().addMenu("&File")
-        self.fileMenu.addAction("&Save As...", self.saveAsFile, "Ctrl+Shift+S")
+        if __has_PyQt6__ or __has_PySide6__:
+            action = self.fileMenu.addAction(QtGui.QIcon.fromTheme("document-save-as"), "&Save As...", self.saveAsFile)
+            action.setShortcut("Ctrl+Shift+S")
+        else:
+            self.fileMenu.addAction("&Save As...", self.saveAsFile, "Ctrl+Shift+S")
         
         # contruct a tree view
         self._docViewer_ = QtWidgets.QTreeView(self)

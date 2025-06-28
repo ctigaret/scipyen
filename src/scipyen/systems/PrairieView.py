@@ -2452,7 +2452,11 @@ class PVScan(PVObject):
                 # is saved in the same directory as the main PVScan XML file
                 # So, going out on a limb here.
                 configFile = self._path_.with_suffix(".env")
+                # config = loadPrairieViewXML(configFile)
                 config = pio.loadXML(configFile)
+                config_filepath = config.createElement("DocPath")
+                config_filepath.setAttribute("value", configFile.as_posix())
+                config.documentElement.appendChild(config_filepath)
                 self._systemConfiguration_ = PVSystemConfiguration(config.documentElement, self)
             else: 
                 # self._path_ has NOT been set; this is usually because the 
@@ -2462,29 +2466,34 @@ class PVScan(PVObject):
                 # 'augmented' with a child node 'DocPath' with the 'value'
                 # attribute set to the absolute path of the PVScan XML file.
                 docPathNodes = tuple(xmlutils.getChildren(doc.documentElement, tagName="DocPath"))
-                if len(docPathNodes):
-                    # was loaded using loadPrairieViewXML; 
-                    self._path_ = pathlib.Path(docPathNodes[0]).getAttributes("value")
-                    # so I assume the env file saved in the same directory by default
-                    configFile = self._path_.with_suffix(".env")
-                    if not configFile.is_file():
-                        # my assumption failed here
-                        raise OSError(f"Cannot find the configuration file {configFile}")
-                    config = pio.loadXML(configFile)
-                    self._systemConfiguration_ = PVSystemConfiguration(config.documentElement, parent=self)
+                if len(docPathNodes) == 0:
+                    raise ValueError("Document should have been loaded with 'loadPrairieViewXML'")
                 
+                # was loaded using loadPrairieViewXML; 
+                self._path_ = pathlib.Path(docPathNodes[0]).getAttributes("value")
+                # so I assume the env file saved in the same directory by default
+                configFile = self._path_.with_suffix(".env")
+                if configFile.is_file():
+                    config = loadPrairieViewXML(configFile)
                 else:
-                    if isinstance(config, str):
-                        config = pathlib.Path(config)
+                    # my assumption failed here;
+                    # allow for the possibility that a config file or Document
+                    # was supplied separately
+                    if not isinstance(config, xmlutils.xml.dom.minidom.Document):
+                        if isinstance(config, str):
+                            config = pathlib.Path(config)
+                            
+                        if isinstance(config, pathlib.Path) and config.is_file() and config.suffix.lower() == ".env":
+                            config = loadPrairieViewXML(config)
+                        else:                    
+                            raise TypeError(f"For separately loaded XML documents created with PrairieView version {self.versionString}, a 'config' parameter must be given,\n either a absolute path to an existing configuration file, or as a loaded XML document")
                         
-                    if isinstance(config, pathlib.Path) and config.is_file() and config.suffix.lower() == ".env":
-                        config = pio.loadXMLFile(config) # OK to use the generic XML loader in pio module
-                    elif isinstance(config, xmlutils.xml.dom.minidom.Document):
-                        self._systemConfiguration_ = PVSystemConfiguration(config.documentElement, parent=self)
-                    else:                    
-                        raise TypeError(f"For separately loaded XML documents created with PrairieView version {self.versionString}, a 'config' parameter must be given,\n either a absolute path to an existing configuration file, or as a loaded XML document")
+                    raise OSError(f"Cannot find the configuration file {configFile}")
+
+                systemConfiuration = PVSystemConfiguration(config.documentElement, parent=self)
+                assert systemConfiguration.versionstring == self.versionString, "Experiment and environment files were cerated with distinct versions of PrairieView"
+                self._systemConfiguration_ = systemConfiguration
                 
-            
         if isinstance(name, str):
             self._name_ = name
             
@@ -3811,8 +3820,8 @@ class PrairieViewImporter(QtWidgets.QDialog, __UI_PrairieImporter, WorkspaceGuiM
 def loadPrairieViewXML(filePath:typing.Union[str, pathlib.Path]) -> object:
     filePath = pathlib.Path(filePath).absolute()
     ret = pio.loadXML(filePath)
-    if ret.documentElement.tagName != "PVScan":
-        raise ValueError("Not a PVScan experiment file")
+    if ret.documentElement.tagName not in ("PVScan", "Environment"):
+        raise ValueError("Not a PVScan experiment or PVScan environment file")
     # augument with the full path to this file
     doc_filepath = ret.createElement("DocPath")
     doc_filepath.setAttribute("value", filePath.as_posix())

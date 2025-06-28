@@ -11,6 +11,7 @@ r"""
 from __future__ import print_function
 
 import os, warnings, types, traceback, itertools, inspect, dataclasses, numbers
+import pathlib
 import datetime
 import fractions, decimal
 import typing
@@ -300,6 +301,11 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         # print(f"{self.__class__.__name__}<{self.parent().windowTitle()}, {self.parent().parent().windowTitle()}> set data")
         self._visited_.clear()
         self.predicate = predicate
+        
+        # NOTE: 2025-06-28 13:55:20
+        # self._private_data_ is used to build the tree model; it can be the
+        # 'data' itself, OR a mapping representation of its members.
+        # 'has_dynamic_private' is False in the former case, and True in the latter
         self._private_data_, self.has_dynamic_private = self._parse_data_(data)
         
         if len(top_title.strip()) == 0:
@@ -331,7 +337,10 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                     item = items[0]
                     index = self.indexFromItem(item, self._last_active_item_column_)
                     target = self.itemFromIndex(index)
-                    self.scrollToItem(target, self._last_active_item_column_)
+                    if __has_PyQt6__ or __has_PySide6__:
+                        self.scrollToItem(target)#, self._last_active_item_column_)
+                    else:
+                        self.scrollToItem(target, self._last_active_item_column_)
                     target.setSelected(True)
                     self.scrollTo(index, QtWidgets.QAbstractItemView.PositionAtCenter)
                     
@@ -340,10 +349,32 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         return dict(map(lambda x: (x.name, getattr(data, x.name)), datafields))
     
     def _parse_data_(self, data) -> tuple:
+        r"""
+        Returns a tuple (a, b), where:
+        
+        a: dict is the iterable container (a mapping or otherwise) upon which the 
+            tree model is built.
+            'a' can be the data itself, or a mapping representation of its members
+            (i.e. a dictionary) generated using datatypes.inspect_members(…). This
+            is similar, but not identical, to accessing the __dict__ attribute 
+            of the data.
+        
+        b: flag indicating whether 'a' is the data itself or a mapping representation of its
+            attributes (for any non-iterable object/container)
+        
+            'b' is True when the data itself is a container suitable for representation
+            in a tree model
+        
+    """
         mro = inspect.getmro(type(data))
         if all(t not in self._supported_data_types_ for t in mro) and not inspect.isroutine(data) and data is not None:
+            # NOTE: 2025-06-28 13:57:28
+            # generate a mapping representation of data's members upon which
+            # the tree model is built
             return datatypes.inspect_members(data, self.predicate), True
         else:
+            # NOTE: 2025-06-28 13:58:14
+            # The data is suitable for direct representation by a tree model
             return data, False
         
     def memoize(self, obj, path):
@@ -827,6 +858,8 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
             elif isinstance(data, enum.Enum):
                 desc = f"{data} ({data.name})"
                 
+            elif isinstance(data, pathlib.Path):
+                desc = data.as_posix()
             else:
                 desc = type(data).__name__
                 
