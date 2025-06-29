@@ -1443,6 +1443,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # the global singleton instance of the QApplication running Scipyen
         self.app = QtWidgets.QApplication.instance()
         self.app.processEvents()
+        
+        splash = kwargs.get("splash", None)
 
         # gui_viewers defined in gui package (see gui/__init__.py)
         # self.viewers = dict(map(lambda x: (x, list()), gui_viewers))
@@ -1514,6 +1516,15 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self._changesInWatchedDir_ = False
         self._monitoredDirsCache_ = dict()
         
+        if isinstance(splash, QtWidgets.QSplashScreen):
+            self.app.processEvents()
+            splash.showMessage("Scipyen is initializing, please wait...",
+                               QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter,
+                               QtGui.QColor("yellow"))
+            self.app.processEvents()
+
+        checkOrigin()
+        
         # ### BEGIN long comment - wrap it for KDE's Kate
         # NOTE: 2023-05-27 22:00:37
         # self._init_QtConsole_ will asign to self.workspace a reference to the 
@@ -1574,11 +1585,18 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self._copy_varnames_separator_ = " "
         # END - to revisit
 
+        if isinstance(splash, QtWidgets.QSplashScreen):
+            self.app.processEvents()
+            splash.showMessage("Initializing the user interface...",
+                               QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter,
+                               QtGui.QColor("yellow"))
+            self.app.processEvents()
+
         # NOTE: 2021-08-17 12:38:41 see also NOTE: 2021-08-17 10:05:20 in scipyen.py
         # self._default_GUI_style = self.app.style()
         self._current_GUI_style_name = "Default"
         self._prev_gui_style_name = self._current_GUI_style_name
-
+        
         # NOTE: WARNING 2021-09-16 14:32:03
         # this must be called AFTER all class and instance attributes used in the
         # configurables mechanism have been defined, and BEFORE self._configureUI_()
@@ -1694,7 +1712,24 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         sigBlock = QtCore.QSignalBlocker(self.actionUse_system_default_font)
         self.actionUse_system_default_font.setChecked(self._useSystemDefaultFont)
         
+        if isinstance(splash, QtWidgets.QSplashScreen):
+            self.app.processEvents()
+            splash.showMessage("Initializing Scipyen Console...",
+                               QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter,
+                               QtGui.QColor("yellow"))
+            self.app.processEvents()
+
         self._init_QtConsole_() # also instantiates self.shell, etc
+
+        if isinstance(splash, QtWidgets.QSplashScreen):
+            self.app.processEvents()
+            splash.showMessage("Initializing the workspace...",
+                               QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter,
+                               QtGui.QColor("yellow"))
+            self.app.processEvents()
+
+
+
         # NOTE: 2025-06-24 21:49:54
         # update this NOW, see NOTE: 2025-06-24 21:49:03
         self._nonInteractiveVars_.update([i for i in self.workspace.items()])
@@ -1730,13 +1765,26 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.workspaceModel.itemChanged.connect(self.slot_variableItemNameChanged)
         self.workspaceModel.modelContentsChanged.connect(self.slot_updateWorkspaceView)
         
+        if isinstance(splash, QtWidgets.QSplashScreen):
+            self.app.processEvents()
+            splash.showMessage("Loading configuration...",
+                               QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter,
+                               QtGui.QColor("yellow"))
+            self.app.processEvents()
+
         # With all UI elements and their signal-slot connections in place we can
         # now apply stored settings, including the 'state' of the ScipyenWindow
         # object (which is an instance of QMainWindow)
         #
         self.loadSettings()
         
-        checkOrigin()
+
+        if isinstance(splash, QtWidgets.QSplashScreen):
+            self.app.processEvents()
+            splash.showMessage("Loading plugins...",
+                               QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter,
+                               QtGui.QColor("yellow"))
+            self.app.processEvents()
 
         # NOTE: 2024-05-29 13:04:00
         # Asynchronously launch the plugin loading mechanism
@@ -1757,6 +1805,13 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # The following must be called when console has become visible!
         self.console.consoleWidget.set_pygment(self.console.consoleWidget._console_pygment)
   
+        if isinstance(splash, QtWidgets.QSplashScreen):
+            self.app.processEvents()
+            splash.showMessage("Done!",
+                               QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter,
+                               QtGui.QColor("yellow"))
+            self.app.processEvents()
+
     # BEGIN Properties
     
     @property

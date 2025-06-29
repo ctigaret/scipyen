@@ -383,7 +383,7 @@ def main():
         
         
         # 2. initialize main window
-        mainWindow = mainwindow.ScipyenWindow()
+        mainWindow = mainwindow.ScipyenWindow(splash=splash)
         app.processEvents()
         
         # NOTE: 2021-08-17 10:06:24 FIXME / TODO
