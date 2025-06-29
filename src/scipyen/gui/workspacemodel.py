@@ -1344,6 +1344,9 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # does not work when an object bound to an existing symbol has been modified
         # (i.e., either the symbols is bound to a different object reference, or
         # the contents of the object - e.g. a container - have changed)
+        #
+        # see NOTE: 2025-06-28 23:17:33 in core.scipyen_traitlets
+        #
         self.internalVariablesMonitor.update(current_vars)
         
         # NOTE 2023-05-25 18:13:46
@@ -1844,7 +1847,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     @Slot(dict)
     def _slot_updateModelAsync_(self, namespace:dict):
         r"""Triggered by self.sig_startAsyncUpdate signal.
-        This signal is emitted by self.update() and self._updateModel_()
+        The signal 'self.sig_startAsyncUpdate' is emitted by self.update() and self._updateModel_()
         """
         # print(f"\n{self.__class__.__name__}._slot_updateModelAsync_ -> self.__changes__ = {self.__changes__}")
         if len(self.__changes__) == 0:

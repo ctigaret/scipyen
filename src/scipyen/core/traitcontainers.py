@@ -101,10 +101,10 @@ class DataBagTraitsObserver(HasTraits):
         """
         # if "WorkspaceModel" in type(self.parent.parent).__name__:
         #     print(f"\n{self.__class__.__name__}._notify_trait(name={name}, change_type={change_type})")
-        if new_value is old_value and change_type != "new":
-            # if "WorkspaceModel" in type(self.parent.parent).__name__:
-            #     print(f"\tnew value is old value -> nothing to do")
-            return
+        # if new_value is old_value and change_type != "new":
+        #     # if "WorkspaceModel" in type(self.parent.parent).__name__:
+        #     #     print(f"\tnew value is old value -> nothing to do")
+        #     return
         self.notify_change(
             Bunch(
                 name=name,

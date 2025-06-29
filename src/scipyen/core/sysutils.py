@@ -18,7 +18,10 @@ def getUnbuiltVersion(path:pathlib.Path):
     if proc.returncode == 0:
         return proc.stdout.decode().replace("\n", "")
 
-def checkGitRepo(path:pathlib.Path, label:str = "Scipyen") -> bool:
+def checkGitRepo(path:pathlib.Path, label:str = "Scipyen", verb:typing.Optional[str]=None) -> bool:
+    if not isinstance(verb,str) or len(verb.strip()) == 0:
+        verb = "Running"
+        
     gitTest = subprocess.run(["git", "-C", path.as_posix(), "status", "--short", "--branch"], capture_output=True)
 
     if gitTest.returncode == 0:
@@ -28,7 +31,7 @@ def checkGitRepo(path:pathlib.Path, label:str = "Scipyen") -> bool:
         local, remote = branches.split("...")
         local = print_styled(local, color="green")
         remote = print_styled(remote, color="red")
-        msg = f"{print_styled('WARNING:', color='yellow')} Running {local} branch of the local {label} git repository in {print_styled(path.as_posix(), color='blue')}, with status:"
+        msg = f"{print_styled('WARNING:', color='yellow')} {verb} {local} branch of the local {label} git repository in {print_styled(path.as_posix(), color='blue')}, with status:"
         result[0] = "## "+local+"..."+remote
         if len(result) > 1:
             for k in range(1,len(result)):

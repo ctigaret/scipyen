@@ -546,7 +546,7 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
         self.font = font
         
     @property
-    def consoleColors(self):
+    def consoleColors(self): # FIXME 2025-06-29 09:06:35 should return the pygment?
         return self._console_colors
     
     @markConfigurable("ConsoleColors", "qt")
@@ -556,6 +556,10 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
         style = self._console_pygment
         
         self.set_pygment(style, val)
+        
+    @property
+    def pygment(self) -> str:
+        return self._console_pygment
         
     # def _create_page_control(self): # doesn't work!
     #     r"""Overrides the method in qtconsole.ConsoleWidget
@@ -757,19 +761,6 @@ get_ipython().InteractiveTB.tb_highlight = 'bg:ansired'
             True)
             except:
                 traceback.print_exc()
-                #pass
-            
-            # not needed (for now)
-            #style = pstyles.get_style_by_name(scheme)
-            #try:
-                ##self.syntax_style=scheme
-                #self._control.style = style
-                #self._highlighter.set_style (scheme)
-                #self._custom_syntax_style = style
-                #self._syntax_style_changed()
-            #except:
-                #traceback.print_exc()
-                #pass
  
 class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
     r"""Inherits qtconsole.mainwindow.MainWindow with a few added perks.
@@ -3562,20 +3553,6 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
                 if action.text() == self.active_frontend.syntaxStyle:
                     action.setChecked(True)
                     self.syntax_style_menu.setDefaultAction(action)
-            # for style in available_syntax_styles:
-#             for style in PYGMENT_STYLES:
-#                 print(f"{self.__class__.__name__}._configureUI_ adding menu item for pygment {style}")
-#                 action = QAction("{}".format(style), self,
-#                                        triggered=lambda v:
-#                                            self.active_frontend._set_syntax_style(val=style))
-#                                            # self.active_frontend._slot_setSyntaxStyle(style))
-#         
-#                 action.setCheckable(True)
-#                 style_group.addAction(action)
-#                 self.syntax_style_menu.addAction(action)
-#                 if style == self.active_frontend.syntaxStyle:
-#                     action.setChecked(True)
-#                     self.syntax_style_menu.setDefaultAction(action)
 
         self.colors_menu = self.settings_menu.addMenu("Console Colors")
         colors_group = QActionGroup(self)
@@ -3605,17 +3582,12 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
                 action.setChecked(True)
                 self.sb_menu.setDefaultAction(action)
 
-        # self.choose_font_act = QAction("Console Font", self, shortcut=ctrl+"F",
-        #                                          triggered = self.chooseFont)
         self.choose_font_act = QAction("Console Font", self, triggered = self.chooseFont)
         self.choose_font_act.setIcon(QtGui.QIcon.fromTheme("font-face-symbolic"))
         
         self.settings_menu.addAction(self.choose_font_act)
         self.addAction(self.choose_font_act)
         
-        # self.set_console_scrollbackAction = QAction("Console scroll back",
-        #                                                       self, shortcut=ctrl+"L",
-        #                                                       triggered = self.set_scrollBack)
         self.set_console_scrollbackAction = QAction("Console scroll back",
                                                               self, triggered = self.set_scrollBack)
         

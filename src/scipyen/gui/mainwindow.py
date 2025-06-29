@@ -427,20 +427,21 @@ _valid_varname__regex_ = '^[A-Za-z_][A-Za-z0-9_]{1,30}$'
 #     u'\n\nTherefore ipython line magics such as %pylab or %mtplotlib, although still available, are not necessary anymore\n'
 
 __verstr__ = None
-p = pathlib.Path(__scipyendir__)
-if p.parent.name == "src":
-    # NOTE: 2025-05-21 21:50:37
-    # This figures out if scipyen is being run off a local git repository; if it
-    # does, then outputs a brief message about the git branch begn used and its 
-    # status (modified, or not, etc)
-    # Then sets out a dynamic version based on the git branch, etc
-    # NOTE: this code was previously in the scipyen.py launcher script
-    try:
-        repoDir = p.parent.parent
-        if sysutils.checkGitRepo(repoDir, "Scipyen"):
-            __verstr__ = sysutils.getUnbuiltVersion(p)
-    except:
-        traceback.print_exc()
+def checkOrigin():
+    p = pathlib.Path(__scipyendir__)
+    if p.parent.name == "src":
+        # NOTE: 2025-05-21 21:50:37
+        # This figures out if scipyen is being run off a local git repository; if it
+        # does, then outputs a brief message about the git branch begn used and its 
+        # status (modified, or not, etc)
+        # Then sets out a dynamic version based on the git branch, etc
+        # NOTE: this code was previously in the scipyen.py launcher script
+        try:
+            repoDir = p.parent.parent
+            if sysutils.checkGitRepo(repoDir, "Scipyen"):
+                __verstr__ = sysutils.getUnbuiltVersion(p)
+        except:
+            traceback.print_exc()
     
 _qt_python_verstr_ = f"PySide6 ({PySide6.__version__})" if __has_PySide6__ else f"{'PyQt6' if __has_PyQt6__ else 'PyQt5'} ({qtpy.PYQT_VERSION})"
 _scipyen_console_banner_ = f"Scipyen {__verstr__} internal console using {_qt_python_verstr_}\n" if isinstance(__verstr__, str) and len(__verstr__.strip()) else f"Scipyen internal console using {_qt_python_verstr_}\n"
@@ -1438,6 +1439,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # see traitlets.config.SingletonConfigurable
         self.__class__._instance = self  
         
+        # NOTE: 2023-01-08 16:14:26 - set this early !
+        # the global singleton instance of the QApplication running Scipyen
+        self.app = QtWidgets.QApplication.instance()
+        self.app.processEvents()
 
         # gui_viewers defined in gui package (see gui/__init__.py)
         # self.viewers = dict(map(lambda x: (x, list()), gui_viewers))
@@ -1452,10 +1457,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # self.currentViewers[mpl.figure.Figure] = None
 
         self.currentViewers = {mpl.figure.Figure: None}
-        
-        # NOTE: 2023-01-08 16:14:26 - set this early !
-        # the global singleton instance of the QApplication running Scipyen
-        self.app = QtWidgets.QApplication.instance()
         
         # self._pyinstaller_bundled_ = kwargs.pop("pyinstaller_bundled", False)
         self._pyinstaller_bundled_ = getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS")
@@ -1734,6 +1735,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # object (which is an instance of QMainWindow)
         #
         self.loadSettings()
+        
+        checkOrigin()
 
         # NOTE: 2024-05-29 13:04:00
         # Asynchronously launch the plugin loading mechanism
@@ -1750,7 +1753,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # self.pythonHelpWindow.setCentralWidget(self.helpWidget)
         
         self.console.show()
-
+        # NOTE: 2021-10-18 11:28:25
+        # The following must be called when console has become visible!
+        self.console.consoleWidget.set_pygment(self.console.consoleWidget._console_pygment)
+  
     # BEGIN Properties
     
     @property
@@ -3414,7 +3420,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     @Slot()
     @safewrapper
     def slot_initQtConsole(self):
-        self._init_QtConsole_()
+        needs_init = False
+        if not isinstance(self.console, consoles.ScipyenConsole):
+            needs_init = True
+            self._init_QtConsole_()
 
         self.shell.events.register("pre_execute", self.workspaceModel.preExecute)
         # self.shell.events.register("post_execute", self.workspaceModel.post_execute)
@@ -3422,6 +3431,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         self.slot_changeDirectory(self.recentDirectories[0])
         self.console.show()
+        if needs_init:
+            self.console.consoleWidget.set_pygment(self.console.consoleWidget._console_pygment)
+        
 
     # END   PyQt slots
 
@@ -3978,9 +3990,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             self.console.setWindowTitle(u'Scipyen Console')
 
         # self.console.show()
-        # NOTE: 2021-10-18 11:28:25
-        # The following must be called when console has become visible!
-        self.console.consoleWidget.set_pygment(self.console.consoleWidget._console_pygment)
+        # # NOTE: 2021-10-18 11:28:25
+        # # The following must be called when console has become visible!
+        # self.console.consoleWidget.set_pygment(self.console.consoleWidget._console_pygment)
         
         self._updateConsolesEditor("internal")
         

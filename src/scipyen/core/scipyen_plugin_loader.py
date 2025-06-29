@@ -360,7 +360,7 @@ def find_plugins(path:typing.Union[str, pathlib.Path],
         sys.path.append(topdir.as_posix())
     
     if checkgit:
-        sysutils.checkGitRepo(topdir, "Scipyen plugins")
+        sysutils.checkGitRepo(topdir, "Scipyen plugins", "Using plugins in the")
     # print(f"scipyen_plugin_loader.find_plugins: topdir = {topdir}")
     
     plugin_source_files[:] = list(map(lambda x: pathlib.Path(x).absolute(), list(filter(lambda x: os.path.splitext(x)[-1] in importlib.machinery.SOURCE_SUFFIXES and check_plugin_module(x), list(itertools.chain.from_iterable( (os.path.join(e[0], i) for i in e[2]) for e in os.walk(topdir)))))))

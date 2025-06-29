@@ -217,9 +217,6 @@ class DictTrait(Dict, ScipyenTraitTypeMixin):
             if any(not isinstance(v, self.klass) for v in (new_value, old_value)):
                 silent=False
                 
-            if silent:
-                silent = bool(old_value == new_value)
-            
             # NOTE: 2021-08-19 16:17:23
             # check for change in contents
             if silent:
@@ -227,6 +224,10 @@ class DictTrait(Dict, ScipyenTraitTypeMixin):
                 silent = (new_hash == self.hashed)
                 if not silent:
                     self.hashed = new_hash
+
+            if silent:
+                silent = bool(old_value == new_value)
+            
         except:
             # if there is an error in comparing, default to notify
             silent = False
@@ -254,7 +255,6 @@ class ListTrait(List, ScipyenTraitTypeMixin):
     klass = list
     _trait = None
     _valid_defaults = (list,tuple)
-    
     
     def __init__(self, trait=None, traits=None, default_value=Undefined, **kwargs):
         r"""
@@ -342,6 +342,8 @@ class ListTrait(List, ScipyenTraitTypeMixin):
         r"""Overrides List.set to check for special hash.
         This is supposed to also detect changes in the order of elements.
         """
+        # NOTE: 2025-06-29 09:33:07
+        # silent False means that a notificaiton must be sent
         new_value = self._validate(obj, value)
         silent = True
         change_type = "modified"
@@ -358,18 +360,19 @@ class ListTrait(List, ScipyenTraitTypeMixin):
             if any(not isinstance(v, self.klass) for v in (new_value, old_value)):
                 silent=False
                 
-            print(f"{self.__class__.__name__}.set: silent before new_hash: {silent}")
+            # print(f"{self.__class__.__name__}.set: silent before new_hash: {silent}")
             # NOTE: 2021-08-19 16:17:23
             # check for change in contents
             if silent:
                 new_hash = gethash(new_value)
                 silent = (new_hash == self.hashed)
-                print(f"{self.__class__.__name__}.set: new_hash == self.hashed => silent {silent}")
+                # print(f"{self.__class__.__name__}.set: new_hash == self.hashed => silent {silent}")
                 
                 if not silent:
                     self.hashed = new_hash
                     
-            print(f"{self.__class__.__name__}.set: old_value = {old_value}, new_value = {new_value}")
+            # print(f"{self.__class__.__name__}.set: old_value = {old_value}, new_value = {new_value}")
+            
             # NOTE: 2025-06-28 23:17:33
             # OK so when operating on a list e.g. del(a[k]) the old_value is already set to the
             # result of the operation, way before the observes ever gets a chance to verify
@@ -377,9 +380,10 @@ class ListTrait(List, ScipyenTraitTypeMixin):
             #
             # Therefore I must find a way to memoize the data 0> check to change in content BEFORE
             # this check below (which is pretty useless)
+            #
             if silent:
                 silent = bool(old_value == new_value)
-                print(f"{self.__class__.__name__}.set: old_value == new_value is {old_value == new_value} => silent {silent}")
+                # print(f"{self.__class__.__name__}.set: old_value == new_value is {old_value == new_value} => silent {silent}")
             
             
         except:
@@ -391,10 +395,10 @@ class ListTrait(List, ScipyenTraitTypeMixin):
             
         obj._trait_values[self.name] = new_value
         
-        # print(f"{self.__class__.__name__}.set: silent {silent}, hashed {self.hashed}")
+        # print(f"{self.__class__.__name__}.set: silent {silent}")
         
         if not silent:
-            # obj._notify_trait(self.name, old_value, new_value)
+            # print(f"{self.__class__.__name__}.set to notify change_type = {change_type}")
             obj._notify_trait(self.name, old_value, new_value,
                               change_type=change_type)
             
