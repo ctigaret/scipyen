@@ -285,12 +285,6 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         
         # if not QtWidgets.qApp.testAttribute(QtCore.Qt.AA_DontUseNativeMenuBar):
         if not QtWidgets.QApplication.instance().testAttribute(QtCore.Qt.AA_DontUseNativeMenuBar):
-            # if "startplasma" in sysutils.get_desktop() or "KDE" in sysutils.get_desktop("desktop"):
-            # if sysutils.is_kde_x11() and __has_qtdbus__:
-            # NOTE: 2024-11-08 09:44:58
-            # accomodate wayland sessions (eveb when run with QT_QPA_PLATFORM=xcb,
-            # the session reported by QApplication is wayland if the WM is using wayland)
-            # if sysutils.is_kde() and __has_qtdbus__:
             if desktoputils.is_kde() and __has_qtdbus__:
                 appMenuServiceNames = list(name for name in QtDBus.QDBusConnection.sessionBus().interface().registeredServiceNames().value() if "AppMenu" in name)
                 
@@ -418,8 +412,8 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             service_name = self._global_menu_service_
             service_path = "/com/canonical/AppMenu/Registrar"
             interface = "com.canonical.AppMenu.Registrar"
-            dbusinterface = QtDBus.QDBusInterface(service_name, service_path,
-                                                  interface)
+            dbusinterface = QtDBus.QDBusInterface(self._global_menu_service_, "/"+self._global_menu_service_.replace(".", "/"),
+                                                  self._global_menu_service_)
             dbusinterface.setTimeout(100)
             if __has_PyQt6__ or __has_PySide6__:
                 v = int(self.winId())

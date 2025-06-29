@@ -1433,13 +1433,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         parent: QtWidgets.QWidget or None (default).
         """
-        # WindowManager.__init__(self, parent)
-        # super().__init__(parent=parent)
-        
-        # if __has_PyQt6__:
-        #     QtWidgets.QMainWindow.__init__(self)
-        # else:
-        #     super().__init__(parent)
         super().__init__(parent)
 
         # NOTE: singleton design pattern
@@ -1604,37 +1597,44 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self._current_GUI_style_name = "Default"
         self._prev_gui_style_name = self._current_GUI_style_name
         
-        # NOTE: WARNING 2021-09-16 14:32:03
-        # this must be called AFTER all class and instance attributes used in the
-        # configurables mechanism have been defined, and BEFORE self._configureUI_()
-        # This is so that GUI widgets members of the ScipyenWindow instance have
-        # been themselves initialized
-        self.setupUi(self)
-        
-        # ### BEGIN global menu stuff
-        self._global_menu_service_ = None
-        if not QtWidgets.QApplication.instance().testAttribute(QtCore.Qt.AA_DontUseNativeMenuBar):
-            # if "startplasma" in sysutils.get_desktop() or "KDE" in sysutils.get_desktop("desktop"):
-            # if sysutils.is_kde_x11() and __has_qtdbus__:
-            # NOTE: 2024-11-08 09:44:58
-            # accomodate wayland sessions (eveb when run with QT_QPA_PLATFORM=xcb,
-            # the session reported by QApplication is wayland if the WM is using wayland)
-            # if sysutils.is_kde() and __has_qtdbus__:
-            if desktoputils.is_kde() and __has_qtdbus__:
-                appMenuServiceNames = list(name for name in QtDBus.QDBusConnection.sessionBus().interface().registeredServiceNames().value() if "AppMenu" in name)
-                
-                if len(appMenuServiceNames):
-                    self._global_menu_service_ = appMenuServiceNames[0]
-        
-        # ### END   global menu stuff
+        # NOTE: 2016-04-15 23:58:08
+        # place holders for the tree widget item holding the commands in the
+        # current session, in the command history tree widget
+        self.currentSessionTreeWidgetItem = None
 
-        # WindowManager.__init__(self, parent=self)
+        self.fileSystemModel = QtWidgets.QFileSystemModel(parent=self)
+
+        self.currentVarItem = None
+        self.currentVarItemName = None
+
+        # NOTE: 2021-08-17 12:45:10 TODO
+        # to be used with _run_loop_process_, which at the moment is not used
+        # anywhere - keep available as app-wide threadpool for various sub-apps
+        self.threadpool = QtCore.QThreadPool()
+
+        self._winFlagsCache_ = self.windowFlags()
+                
+        if isinstance(getattr(self, "configurable_traits", None), DataBag):
+            self.configurable_traits["RecentScripts"] = self._recentScripts
+
+        self._lockedToolBar:bool = True
+        self._guiIconSize_ = self._defaultIconSize_
+        self._workspaceIconSize_ = self._defaultIconSize_
+        self._fileSystemIconSize_ = self._defaultIconSize_
+        
+        self._configureUI_()
+
         if sys.platform.startswith("win32"):
-            WorkspaceGuiMixin.__init__(self, parent=None)  # , settings=settings)
-            self.scriptsManager = ScriptManager(parent=None)
+            myparent = None
         else:
-            WorkspaceGuiMixin.__init__(self, parent=self)  # , settings=settings)
-            self.scriptsManager = ScriptManager(parent=self)
+            myparent=self
+        #     WorkspaceGuiMixin.__init__(self, parent=None)  # , settings=settings)
+        #     self.scriptsManager = ScriptManager(parent=None)
+        # else:
+        #     WorkspaceGuiMixin.__init__(self, parent=self)  # , settings=settings)
+        #     self.scriptsManager = ScriptManager(parent=self)
+        WorkspaceGuiMixin.__init__(self, parent=myparent)  # , settings=settings)
+        self.scriptsManager = ScriptManager(parent=myparent)
             
         self.scriptsManager.signal_executeScript[str].connect(
             self._slot_runPythonScriptFromManager)
@@ -1655,46 +1655,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.scriptsManager.signal_scriptManagerClosed.connect(
             self._slot_scriptManagerClosed)
 
-        # NOTE: 2016-04-15 23:58:08
-        # place holders for the tree widget item holding the commands in the
-        # current session, in the command history tree widget
-        self.currentSessionTreeWidgetItem = None
-
-        self.fileSystemModel = QtWidgets.QFileSystemModel(parent=self)
-
-        self.currentVarItem = None
-        self.currentVarItemName = None
-        
-        self._winFlagsCache_ = self.windowFlags()
-                
-        # NOTE: 2021-08-17 12:45:10 TODO
-        # to be used with _run_loop_process_, which at the moment is not used
-        # anywhere - keep available as app-wide threadpool for various sub-apps
-        self.threadpool = QtCore.QThreadPool()
-
-        if isinstance(getattr(self, "configurable_traits", None), DataBag):
-            self.configurable_traits["RecentScripts"] = self._recentScripts
-
-        self._lockedToolBar:bool = True
-        self._guiIconSize_ = self._defaultIconSize_
-        self._workspaceIconSize_ = self._defaultIconSize_
-        self._fileSystemIconSize_ = self._defaultIconSize_
-        
         # NOTE: 2023-06-04 10:49:56
         # for debugging only; comment out for relese
         # self.shell.events.register("pre_run_cell", self.workspaceModel.preRunCell)
 
-        # NOTE: 2021-01-06 17:22:45
-        # A lot of things happen up to here which depend on an initialized bare-bones
-        # UI; hence setupUi is early (see NOTE: WARNING 2021-09-16 14:32:03).
-        #
-        # _configureUI_ must be called NOW, to initialize additional UI elements
-        # and signal-slot connections NOT defined in the *.ui file
-        #
-        # NOTE: 2024-05-29 13:01:37 
-        # this approach IS DIFFERENT from the "regular" child windows that 
-        # inherit from ScipyenViewer
-        self._configureUI_()
 
         # NOTE:2022-01-28 23:16:57
         # when collections are modified directly (instead of setting via
@@ -1741,7 +1705,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             splash.showMessage("Initializing Scipyen Console...",
                                QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter,
                                QtGui.QColor("yellow"))
-            self.app.processEvents()
+            # self.app.processEvents()
 
         self._init_QtConsole_() # also instantiates self.shell, etc
 
@@ -1750,7 +1714,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             splash.showMessage("Initializing the workspace...",
                                QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter,
                                QtGui.QColor("yellow"))
-            self.app.processEvents()
+            # self.app.processEvents()
 
 
 
@@ -1794,7 +1758,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             splash.showMessage("Loading configuration...",
                                QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter,
                                QtGui.QColor("yellow"))
-            self.app.processEvents()
+            # self.app.processEvents()
 
         # With all UI elements and their signal-slot connections in place we can
         # now apply stored settings, including the 'state' of the ScipyenWindow
@@ -1802,13 +1766,12 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         #
         self.loadSettings()
         
-
         if isinstance(splash, QtWidgets.QSplashScreen):
             self.app.processEvents()
             splash.showMessage("Loading plugins...",
                                QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter,
                                QtGui.QColor("yellow"))
-            self.app.processEvents()
+            # self.app.processEvents()
 
         # NOTE: 2024-05-29 13:04:00
         # Asynchronously launch the plugin loading mechanism
@@ -1828,13 +1791,49 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # NOTE: 2021-10-18 11:28:25
         # The following must be called when console has become visible!
         self.console.consoleWidget.set_pygment(self.console.consoleWidget._console_pygment)
-  
+        
+        if self._script_manager_autolaunch:
+            self._showScriptsManagerWindow()
+            
         if isinstance(splash, QtWidgets.QSplashScreen):
             self.app.processEvents()
             splash.showMessage("Done!",
                                QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter,
                                QtGui.QColor("yellow"))
-            self.app.processEvents()
+            # self.app.processEvents()
+        print(f"{self.__class__.__name__}.__init__: {self.menuBar().children()}")
+        self.show()
+        
+        # ### BEGIN global menu stuff -- see also self._deregister_menuBar_, self._restore_menuBar_, self.getAppMenu and self._slot_visibility_changed
+        self._app_menu_ = None
+        self._wm_id_ = int(self.winId())
+        self._global_menu_service_ = None
+        self._dbusinterface_ = None
+        if not QtWidgets.QApplication.instance().testAttribute(QtCore.Qt.AA_DontUseNativeMenuBar):
+            if desktoputils.is_kde() or desktoputils.is_gnome() and __has_qtdbus__:
+                appMenuServiceNames = list(name for name in QtDBus.QDBusConnection.sessionBus().interface().registeredServiceNames().value() if "AppMenu" in name)
+                
+                if len(appMenuServiceNames):
+                    self._global_menu_service_ = appMenuServiceNames[0]
+                    
+#                     self._dbusinterface_ = QtDBus.QDBusInterface(self._global_menu_service_, "/" + self._global_menu_service_.replace(".", "/"),
+#                                                   self._global_menu_service_)
+#                     self._dbusinterface_.setTimeout(1000)
+#                     if __has_PyQt6__ or __has_PySide6__:
+#                         v = int(self.winId())
+#                     else:
+#                         v = QtCore.QVariant(int(self.winId()))
+#                         
+#                         if not v.convert(QtCore.QVariant.UInt): # NOTE: 2023-01-08 23:10:14 MUST convert to UInt
+#                             return
+#                         
+#                     result = self._dbusinterface_.call("RegisterWindow", v, QtDBus.QDBusObjectPath(f"/{self.applicationName}/{self.__class__.__name__}/MenuBar")).arguments()
+#                     print(f"{self.__class__.__name__}._init__ DBus register window: result -> {result}")
+                            
+        self._app_menu_ = self.getAppMenu()
+        self.windowHandle().visibilityChanged.connect(self._slot_visibility_changed)
+        # ### END   global menu stuff -- see also self._deregister_menuBar_, self._restore_menuBar_, self.getAppMenu and self._slot_visibility_changed
+
 
     # BEGIN Properties
     
@@ -2304,11 +2303,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         
         self._set_icon_Size(val)
         
-        # toolbars = tuple(p[0] for p in inspect.getmembers_static(self, lambda x: isinstance(x, (QtWidgets.QToolBar, QtWidgets.QToolButton))))
-        # for t in toolbars:
-        #     getattr(self,t).setIconSize(QtCore.QSize(val, val))
-
-
     @property
     def consoleDocked(self):
         return self._console_docked_
@@ -2454,14 +2448,15 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         if isinstance(val, str):
             val = True if val.lower() == "true" else False
 
-        if val is True:
-            self._showScriptsManagerWindow()
-        else:
-            self.scriptsManager.close()
-
         self._script_manager_autolaunch = True
         sigblock = QtCore.QSignalBlocker(self.actionAuto_launch_Script_Manager)
         self.actionAuto_launch_Script_Manager.setChecked(val)
+
+        if not val is True:
+        #     self._showScriptsManagerWindow()
+        # else:
+            self.scriptsManager.close()
+
 
     @property
     def maxRecentDirectories(self):
@@ -3014,58 +3009,56 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 return
             super().activateWindow()
             
+    # ### BEGIN Global menu stuff - see also BEGIN  global menu stuff - END  global menu stuff block in __init__
+    #
     def getAppMenu(self):
         if self._global_menu_service_ == "com.canonical.AppMenu.Registrar":
-            service_name = self._global_menu_service_
-            service_path = "/com/canonical/AppMenu/Registrar"
-            interface = "com.canonical.AppMenu.Registrar"
-            dbusinterface = QtDBus.QDBusInterface(service_name, service_path,
-                                                  interface)
-            dbusinterface.setTimeout(100)
+            dbusinterface = QtDBus.QDBusInterface(self._global_menu_service_, "/" +  self._global_menu_service_.replace(".", "/"),
+                                                  self._global_menu_service_)
+            dbusinterface.setTimeout(1000)
             if __has_PyQt6__ or __has_PySide6__:
                 v = int(self.winId())
-                result = dbusinterface.call("GetMenuForWindow", v).arguments()
             else:
                 v = QtCore.QVariant(int(self.winId()))
                 
-                if v.convert(QtCore.QVariant.UInt): # NOTE: 2023-01-08 23:10:14 MUST convert to UInt
-                    # NOTE: 2023-01-08 22:58:38
-                    # When all OK, result should be a list with:
-                    # • str: address of the connection on DBus (e.g.: ':1.383')
-                    # • str: The path to the object which implements the com.canonical.dbusmenu interface.
-                    #           (e.g., /MenuBar/4') as a str (NOT QDBusObjectPath!) 
-                    #
-                    #       If you use QDBusViewer, the address points to /MenuBar/x 
-                    #       where x is an int >= 1, and it has the following interfaces:
-                    #       ∘ com.canonical.dbusmenu (AHA!)
-                    #       ∘ the next three are generic and present on all objects on DBus
-                    #           ▷ org.freedesktop.DBus.Properties
-                    #           ▷ org.freedesktop.DBus.Introspectable
-                    #           ▷ org.freedesktop.DBus.Peer
-                    #
-                    result = dbusinterface.call("GetMenuForWindow", v).arguments()
-                
-                    if len(result) == 1: # oops!
-                        # warnings.warn(result[0])
-                        return
-                
-                        # address, objpath = result
-                
-                    return result
+                if not v.convert(QtCore.QVariant.UInt): # NOTE: 2023-01-08 23:10:14 MUST convert to UInt
+                    return
+            # NOTE: 2023-01-08 22:58:38
+            # When all OK, result should be a list with:
+            # • str: address of the connection on DBus (e.g.: ':1.383')
+            # • str: The path to the object which implements the com.canonical.dbusmenu interface.
+            #           (e.g., /MenuBar/4') as a str (NOT QDBusObjectPath!) 
+            #
+            #       If you use QDBusViewer, the address points to /MenuBar/x 
+            #       where x is an int >= 1, and it has the following interfaces:
+            #       ∘ com.canonical.dbusmenu (AHA!)
+            #       ∘ the next three are generic and present on all objects on DBus
+            #           ▷ org.freedesktop.DBus.Properties
+            #           ▷ org.freedesktop.DBus.Introspectable
+            #           ▷ org.freedesktop.DBus.Peer
+            #
+            result = dbusinterface.call("GetMenuForWindow", v).arguments()
+        
+            if len(result) == 1: # oops!
+                # warnings.warn(result[0])
+                return
+        
+                # address, objpath = result
+        
+            return result
             
     def _deregister_menuBar_(self):
-        if self.menubar is not None and self._global_menu_service_ == "com.canonical.AppMenu.Registrar":
-            service_name = self._global_menu_service_
-            service_path = "/com/canonical/AppMenu/Registrar"
-            interface = "com.canonical.AppMenu.Registrar"
-            dbusinterface = QtDBus.QDBusInterface(service_name, service_path,
-                                                interface)
-            dbusinterface.setTimeout(100)
+        if self._app_menu_ is not None and self._global_menu_service_ == "com.canonical.AppMenu.Registrar" and isintance(self._dbusinterface_, QtDBus.QDBusInterface):
+            self._dbusinterface_.setTimeout(100)
             
-            old_v = QtCore.QVariant(self._wm_id_)
-            
-            if old_v.convert(QtCore.QVariant.UInt):
-                reply = dbusinterface.call("UnregisterWindow", old_v)
+            if __has_PyQt6__ or __has_PySide6__:
+                old_v = int(self._wm_id_)
+            else:
+                old_v = QtCore.QVariant(self._wm_id_)
+                if not old_v.convert(QtCore.QVariant.UInt):
+                    return
+                
+            reply = self._dbusinterface_.call("UnregisterWindow", old_v)
                 
     def _restore_menuBar_(self):
         r"""Hack to restore the window's menubar in the desktop's global menu.
@@ -3076,18 +3069,18 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         """
         currentAppMenu = self.getAppMenu()
         
-        if self.menubar is None:
+        if self._app_menu_ is None:
             # nothing to restore
             return
         
         if currentAppMenu is None:
-            if self._global_menu_service_ == "com.canonical.AppMenu.Registrar":
-                service_name = self._global_menu_service_
-                service_path = "/com/canonical/AppMenu/Registrar"
-                interface = "com.canonical.AppMenu.Registrar"
-                dbusinterface = QtDBus.QDBusInterface(service_name, service_path,
-                                                    interface)
-                dbusinterface.setTimeout(100)
+            if self._global_menu_service_ == "com.canonical.AppMenu.Registrar" and isintance(self._dbusinterface_, QtDBus.QDBusInterface):
+                # service_name = self._global_menu_service_
+                # service_path = "/com/canonical/AppMenu/Registrar"
+                # interface = "com.canonical.AppMenu.Registrar"
+                # dbusinterface = QtDBus.QDBusInterface(service_name, service_path,
+                #                                     interface)
+                self._dbusinterface_.setTimeout(100)
                 
                 old_v = QtCore.QVariant(self._wm_id_)
                 new_v = QtCore.QVariant(int(self.winId()))
@@ -3095,8 +3088,17 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 if old_v.convert(QtCore.QVariant.UInt) and new_v.convert(QtCore.QVariant.UInt):
                     # deregister old WM window ID, then register the new one
                     # to the same DBus object path (i.e. dbusmenu instance)
-                    dereg_reply = dbusinterface.call("UnregisterWindow", old_v)
-                    newreg_reply = dbusinterface.call("RegisterWindow", new_v, QtDBus.QDBusObjectPath(self.menubar[1]))
+                    dereg_reply = self._dbusinterface_.call("UnregisterWindow", old_v)
+                    newreg_reply = self._dbusinterface_.call("RegisterWindow", new_v, QtDBus.QDBusObjectPath(self.menubar[1]))
+
+    @Slot(QtGui.QWindow.Visibility)
+    def _slot_visibility_changed(self, val):
+        if hasattr(self, "_wm_id_") and self._wm_id_ != int(self.winId()):
+            if self._global_menu_service_ == "com.canonical.AppMenu.Registrar":
+                self._restore_menuBar_()
+
+    #
+    # ### END   Global menu stuff - see also BEGIN  global menu stuff - END  global menu stuff block in __init__
     
     def changeEvent(self, event):
         if event.type() == QtCore.QEvent.LanguageChange:
@@ -5866,14 +5868,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     def _configureUI_(self):
         ''' Collect file menu actions & submenus that are built in the UI file. This should be 
             done before loading the plugins.
-        
-        NOTE: 2024-05-29 13:02:34 
-        In contrast to the "regular" child windows in Scipyen (i.e., inheriting
-        from ScipyenViewer) this method DOES NOT call setupUi()
-        self.setuo.Ui(self) MUST be called prior to calling this method.
         '''
-        self.setDockNestingEnabled(True)
-
+        self.setupUi(self)
         # NOTE: 2021-04-15 10:12:33 TODO
         # allow user to choose app style interactively --
 
@@ -5881,18 +5877,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # NOTE: 2023-03-29 14:08:58 CT - selecting bb10 bright & dark styles crashes the GUI - not sure why
         self._available_Qt_style_names_ = [
             s for s in QtWidgets.QStyleFactory.keys() if not s.startswith("bb10")]
-#         if hasQDarkStyle:
-#             self._available_Qt_style_names_.append("QDarkStyle Dark")
-#             self._available_Qt_style_names_.append("QDarkStyle Light")
-#
-#         if hasQDarkTheme:
-#             self._available_Qt_style_names_.extend(f"Qt{v.capitalize()}" for v in qdarktheme.get_themes())
-            
-        # if sys.platform.startswith("win32") and hasQDarkStyle:
-        #     self._available_Qt_style_names_.append("Dark Style")
-        # elif hasQDarkTheme:
-        #     self._available_Qt_style_names_.extend(f"Qt{v.capitalize()}" for v in qdarktheme.get_themes())
 
+        # ### BEGIN Menus and actions
+        #
         self.actionSet_Icon_Size.triggered.connect(self._slot_configureIconSize) # slot inherited from WorkspaceGuiMixin
         self.actionGUI_Style.triggered.connect(self._slot_set_Application_style)
         self.actionSet_user_plugins_directory.triggered.connect(self._slot_set_Users_Plugins_directory)
@@ -5925,14 +5912,14 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.actionManageScripts = QAction(QtGui.QIcon.fromTheme("scriptnew"), "Script Manager", self)
         self.actionManageScripts.triggered.connect(self.slot_showScriptsManagerWindow)
         self.menuScripts.addAction(self.actionManageScripts)
-        # END scripts menu
+        # ### END scripts menu
 
-        # BEGIN Applications menu
+        # ### BEGIN Applications menu
         # self.menuApplications = QtWidgets.QMenu("Applications", self) # NOTE: 2024-09-26 12:02:54 def'ed in the ui file
         self.menuApplications.setTearOffEnabled(True)
         self.menuApplications.setToolTipsVisible(True)
         self.menubar.insertMenu(self.menuHelp.menuAction(), self.menuApplications)
-        # ### END Applications menu
+        # ### END   Applications menu
         
         # ### BEGIN Help menu
         self.whatsThisAction = QtWidgets.QWhatsThis.createAction(self)
@@ -5941,7 +5928,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.testPythonHelpAction = QAction(QtGui.QIcon.fromTheme("help-contextual"), "Python help", self)
         self.testPythonHelpAction.triggered.connect(self._slot_PythonHelp)
         self.menuHelp.addAction(self.testPythonHelpAction)
-        # ### END Help menu
+        # ### END   Help menu
         
         self.actionQuit.triggered.connect(self.slot_Quit)
         
@@ -6039,80 +6026,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         
         self.sig_refreshRecentFilesMenu.connect(self._slot_refreshRecentFilesMenu_)
 
-        # ### BEGIN workspace view
-        #
-        
-        self.workspaceView.setShowGrid(False)
-        
-        # ### BEGIN
-        # NOTE: 2025-06-24 22:03:52
-        # Next two lines henceforth called AFTER workspaceModel initialization, which is AFTER
-        # self._init_QtConsole_, which now is AFTER self._configureUI_()
-        # furthermore, workspaceView.selectionModel() REQUIRES the presence of a 
-        # item model for the workspaceView
-        # ### END
-        # self.workspaceView.setModel(self.workspaceModel)
-        # self.workspaceView.selectionModel().selectionChanged[QtCore.QItemSelection, QtCore.QItemSelection].connect(self.slot_selectionChanged)
-        # NOTE 2021-07-28 14:26:09
-        # avoid editing by db-click
-        self.workspaceView.setEditTriggers(QtWidgets.QAbstractItemView.EditKeyPressed)
-        self.workspaceView.activated[QtCore.QModelIndex].connect(self.slot_variableItemActivated)
-        # NOTE: 2021-07-28 14:41:38
-        # taken care of by selectionChanged?
-        self.workspaceView.pressed[QtCore.QModelIndex].connect(self.slot_variableItemPressed)
-        self.workspaceView.customContextMenuRequested[QtCore.QPoint].connect(self.slot_workspaceViewContextMenuRequest)
-
-        # NOTE: 2019-12-01 13:30:02
-        # is seems that for Qt > 5.12 setSortingEnabled must be set to False so
-        # that programmatic sorting by calling sortByColumn() actually works!
-        # when set to True then sorting only works by manually clicking on the
-        # column's header (which gets a sorting indicator widget and its colunm
-        # becomes sortable by click)
-        self.workspaceView.setSortingEnabled(False)
-        self.workspaceView.sortByColumn(0, QtCore.Qt.AscendingOrder)
-        self.workspaceView.setSortingEnabled(True)
-        self.workspaceView.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
-        self.workspaceView.horizontalHeader().setStretchLastSection(False)
-        # TODO 2024-07-21 23:30:05
-        # make this configurable (and locale-dependent?)
-        self.workspaceView.horizontalHeader().setDefaultAlignment(QtCore.Qt.AlignLeft)
-
-        # NOTE: 2025-06-24 22:09:00 see NOTE: 2025-06-24 22:03:52
-        # self.workspaceModel.itemChanged.connect(self.slot_variableItemNameChanged)
-        # self.workspaceModel.modelContentsChanged.connect(self.slot_updateWorkspaceView)
-        
-        self.copyVarnameToolBtn.clicked.connect(self.slot_copyWorkspaceSelection)
-        self.sendVarnameToConsoleToolBtn.clicked.connect(self.slot_pasteWorkspaceSelection)
-        self.renameVarnameToolBtn.clicked.connect(self.slot_renameWorkspaceVar)
-        self.displayVariableToolBtn.setMenu(self.menuSelected_Image_or_Volume)
-        self.saveVariableToolBtn.clicked.connect(self.slot_saveSelectedVariables)
-        self.removeSelectedVarsToolBtn.clicked.connect(self.slot_deleteSelectedWorkspaceObjects)
-        self.clearWorkspaceToolBtn.clicked.connect(self._slot_clearInternalWorkspace)
-        # self.actionDisplay_In_Console.triggered.connect(self.slot_consoleDisplaySelectedVariables)
-        
-        #
-        # ### END workspace view
-
-        # ### BEGIN command history view
-        #
-        # NOTE: Upon launch it will get populated with Scipyen's history, during
-        # the execution of self._init_QtConsole_()
-        # So its resizeColumnToContents(0) method needs to be called once, in there.
-        #
-        # A new item (row) will be added with every statement executed at the 
-        # console, REGARDLESS of whether the execution was succesful or not.
-        #
-        self.historyTreeWidget.setHeaderLabels(
-            ["Session / Line #:", "Session Date & Time / Statement:"])
-        self.historyTreeWidget.itemActivated[QtWidgets.QTreeWidgetItem, int].connect(self.slot_historyItemActivated)
-        self.historyTreeWidget.customContextMenuRequested[QtCore.QPoint].connect(self.slot_historyContextMenuRequest)
-        self.historyTreeWidget.itemClicked[QtWidgets.QTreeWidgetItem, int].connect(self.slot_historyItemSelected)
-        self.historyTreeWidget.resizeColumnToContents(0)
-        
-        #
-        # ### END command history view
-        
-        self.setWindowTitle("Scipyen")
 
         self.newViewersMenu = QtWidgets.QMenu("New", self)
         self.newViewersMenu.setIcon(QtGui.QIcon.fromTheme("window-new"))
@@ -6120,12 +6033,15 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.newViewersMenu.setToolTipsVisible(True)
         self.newViewersMenu.addAction(QtGui.QIcon.fromTheme("window"),"Figure", lambda: self.newViewer(mpl.figure.Figure))
         self.menuViewers.addMenu(self.newViewersMenu)
-
+        #
+        # ### END   Menus and actions
+        
+        # ### BEGIN Toolbar
+        #
+        
         # add new viewers menu as toolbar action, too
         self.newViewersAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("window-new"), "New Viewer")
         self.newViewersAction.setMenu(self.newViewersMenu)
-        # self.newViewersActionTB = [w for w in self.newViewersAction.associatedWidgets() if isinstance(w, QtWidgets.QToolButton)][0]
-        # self.newViewersActionTB.setPopupMode(QtWidgets.QToolButton.MenuButtonPopup)
         self.consolesAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("akonadiconsole"), "Consoles")
         # this one is defined in the ui file mainwindow.ui
         self.consolesAction.setMenu(self.menuConsoles)
@@ -6207,6 +6123,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         #
         # ### END   toolbar icon size
         
+        #
+        # ### END   Toolbar
 
         # BEGIN do not delete: action for presenting a list of viewer types to choose from
         # self.menuViewer.addSeparator()
@@ -6214,9 +6132,68 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # self.actionNewViewer.triggered.connect(self.slot_newViewer)
         # END do not delete: action for presenting a list of viewer types to choose from
 
-        # ### BEGIN Dock widgets management - it is good to know which one is on top
+
+        # ### BEGIN Dock widgets and their children
+        #
+        self.setDockNestingEnabled(True)
+
+
+        # ### BEGIN workspace view
+        #
+        
+        self.workspaceView.setShowGrid(False)
+        
+        # ### BEGIN
+        # NOTE: 2025-06-24 22:03:52
+        # Next two lines henceforth called AFTER workspaceModel initialization, which is AFTER
+        # self._init_QtConsole_, which now is AFTER self._configureUI_()
+        # furthermore, workspaceView.selectionModel() REQUIRES the presence of a 
+        # item model for the workspaceView
+        # ### END
+        # self.workspaceView.setModel(self.workspaceModel)
+        # self.workspaceView.selectionModel().selectionChanged[QtCore.QItemSelection, QtCore.QItemSelection].connect(self.slot_selectionChanged)
+        # NOTE 2021-07-28 14:26:09
+        # avoid editing by db-click
+        self.workspaceView.setEditTriggers(QtWidgets.QAbstractItemView.EditKeyPressed)
+        self.workspaceView.activated[QtCore.QModelIndex].connect(self.slot_variableItemActivated)
+        # NOTE: 2021-07-28 14:41:38
+        # taken care of by selectionChanged?
+        self.workspaceView.pressed[QtCore.QModelIndex].connect(self.slot_variableItemPressed)
+        self.workspaceView.customContextMenuRequested[QtCore.QPoint].connect(self.slot_workspaceViewContextMenuRequest)
+
+        # NOTE: 2019-12-01 13:30:02
+        # is seems that for Qt > 5.12 setSortingEnabled must be set to False so
+        # that programmatic sorting by calling sortByColumn() actually works!
+        # when set to True then sorting only works by manually clicking on the
+        # column's header (which gets a sorting indicator widget and its colunm
+        # becomes sortable by click)
+        self.workspaceView.setSortingEnabled(False)
+        self.workspaceView.sortByColumn(0, QtCore.Qt.AscendingOrder)
+        self.workspaceView.setSortingEnabled(True)
+        self.workspaceView.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
+        self.workspaceView.horizontalHeader().setStretchLastSection(False)
+        # TODO 2024-07-21 23:30:05
+        # make this configurable (and locale-dependent?)
+        self.workspaceView.horizontalHeader().setDefaultAlignment(QtCore.Qt.AlignLeft)
+
+        # NOTE: 2025-06-24 22:09:00 see NOTE: 2025-06-24 22:03:52
+        # self.workspaceModel.itemChanged.connect(self.slot_variableItemNameChanged)
+        # self.workspaceModel.modelContentsChanged.connect(self.slot_updateWorkspaceView)
+        
+        self.copyVarnameToolBtn.clicked.connect(self.slot_copyWorkspaceSelection)
+        self.sendVarnameToConsoleToolBtn.clicked.connect(self.slot_pasteWorkspaceSelection)
+        self.renameVarnameToolBtn.clicked.connect(self.slot_renameWorkspaceVar)
+        self.displayVariableToolBtn.setMenu(self.menuSelected_Image_or_Volume)
+        self.saveVariableToolBtn.clicked.connect(self.slot_saveSelectedVariables)
+        self.removeSelectedVarsToolBtn.clicked.connect(self.slot_deleteSelectedWorkspaceObjects)
+        self.clearWorkspaceToolBtn.clicked.connect(self._slot_clearInternalWorkspace)
+        # self.actionDisplay_In_Console.triggered.connect(self.slot_consoleDisplaySelectedVariables)
+        
         self.dockWidgetWorkspace.visibilityChanged[bool].connect(
             self.slot_dockWidgetVisibilityChanged)
+        #
+        # ### END workspace view
+
 
         # ### BEGIN file system view,  navigation widgets & actions
         # self.fileSystemTreeView.setUniformRowHeights(True) # set in the ui file
@@ -6314,10 +6291,29 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.varNameFilterFinderComboBox.lineEdit().addAction(self.removeVarNameFromFinderListAction,
                                                               QtWidgets.QLineEdit.TrailingPosition)
 
-        # ### END file system view,  navigation widgets & actions
+        # ### END   file system view,  navigation widgets & actions
         
         # ### BEGIN Command history
         #
+        # ### BEGIN command history view
+        #
+        # NOTE: Upon launch it will get populated with Scipyen's history, during
+        # the execution of self._init_QtConsole_()
+        # So its resizeColumnToContents(0) method needs to be called once, in there.
+        #
+        # A new item (row) will be added with every statement executed at the 
+        # console, REGARDLESS of whether the execution was succesful or not.
+        #
+        self.historyTreeWidget.setHeaderLabels(
+            ["Session / Line #:", "Session Date & Time / Statement:"])
+        self.historyTreeWidget.itemActivated[QtWidgets.QTreeWidgetItem, int].connect(self.slot_historyItemActivated)
+        self.historyTreeWidget.customContextMenuRequested[QtCore.QPoint].connect(self.slot_historyContextMenuRequest)
+        self.historyTreeWidget.itemClicked[QtWidgets.QTreeWidgetItem, int].connect(self.slot_historyItemSelected)
+        self.historyTreeWidget.resizeColumnToContents(0)
+        
+        #
+        # ### END command history view
+        
         
         self.historyCommandsExecuteToolButton.clicked.connect(self._execHistorySelection_)
         self.historyCommandsToConsoleToolButton.clicked.connect(self._historyToConsole_)
@@ -6354,18 +6350,17 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         # ### BEGIN console dock — NOT USED !
         #
-        self.consoleDockWidget = QtWidgets.QDockWidget(
-            "Console", self, objectName="consoleDockWidget")
+        self.consoleDockWidget = QtWidgets.QDockWidget("Console", self, objectName="consoleDockWidget")
         self.consoleDockWidget.setAllowedAreas(QtCore.Qt.AllDockWidgetAreas)
         self.consoleDockWidget.setFeatures(QtWidgets.QDockWidget.DockWidgetMovable | QtWidgets.QDockWidget.DockWidgetFloatable)
         # self.consoleDockWidget.setFeatures(QtWidgets.QDockWidget.AllDockWidgetFeatures)# NOTE 2024-05-02 12:21:54 deprecated even in Qt 5 !!!
         self.consoleDockWidget.setVisible(False)
         
         #
-        # ### END console dock — NOT USED !
+        # ### END   console dock — NOT USED !
         
         #
-        # ### END Dock widgets management
+        # ### END   Dock widgets  and their children
 
         # ### BEGIN miscellaneous
         #
@@ -6378,18 +6373,15 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # Quit the Qt app when Scipyen main window is closed
         self.app.destroyed.connect(self.slot_Quit)
 
+        self.sig_windowRemoved.connect(self.slot_windowRemoved)
+        
+        self.setWindowTitle("Scipyen")
         # 
         # ### END   miscellaneous
  
- # signal inherited from WindowManager
-        self.sig_windowRemoved.connect(self.slot_windowRemoved)
-
-       #
-        # ### END miscellaneous
-
         # NOTE: 2021-08-17 12:36:49 TODO custom icon ?
         # see also NOTE: 2021-08-17 10:06:24 in scipyen.py
-        icon = QtGui.QIcon.fromTheme("python")
+        icon = QtGui.QIcon.fromTheme("pythonbackend")
         # self.setWindowIcon(icon) # this doesn't work? -- next line does
         QtWidgets.QApplication.setWindowIcon(icon)
 

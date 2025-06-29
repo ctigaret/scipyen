@@ -360,6 +360,7 @@ def main():
         app.setOrganizationName(scipyen_config.organization_name)
         
         gc.enable()
+        splash=None
         
         icon = QtGui.QIcon.fromTheme("pythonbackend")
         pixmap = icon.pixmap(QtCore.QSize(256,256), state=QtGui.QIcon.On)
@@ -367,24 +368,26 @@ def main():
         # splashPixmap = QtGui.QPixmap.fromImage(image)
         # splashPixmap = QtGui.QPixmap(256,256)
         # splashPixmap.fill(QtGui.QColor("white"))
-        splash = QtWidgets.QSplashScreen(pixmap)
+        # splash = QtWidgets.QSplashScreen(pixmap)
         
         # splash.setAttribute(QtCore.Qt.WA_StyledBackground)
         # splash.setAttribute(QtCore.Qt.WA_TranslucentBackground + QtCore.Qt.WA_StyledBackground + QtCore.Qt.WA_FramlessWindowHint)
         # NOTE: 2025-01-22 08:56:42
         # this needs to be here in order to initialize navigator widgets
         import gui.mainwindow as mainwindow
-        app.processEvents()
-        splash.showMessage("Scipyen is initializing, please wait...",
-                           QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter,
-                           QtGui.QColor("yellow"))
-        splash.show()
-        app.processEvents()
+        if splash:
+            app.processEvents()
+            splash.showMessage("Scipyen is initializing, please wait...",
+                            QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter,
+                            QtGui.QColor("yellow"))
+            splash.show()
+            app.processEvents()
         
-        
-        # 2. initialize main window
-        mainWindow = mainwindow.ScipyenWindow(splash=splash)
-        app.processEvents()
+            mainWindow = mainwindow.ScipyenWindow(splash=splash)
+            app.processEvents()
+            splash.finish(mainWindow)
+        else:
+            mainWindow = mainwindow.ScipyenWindow()
         
         # NOTE: 2021-08-17 10:06:24 FIXME / TODO
         # come up with a nice icon?
@@ -392,8 +395,7 @@ def main():
         #mainWindow.setWindowIcon(app.icon)
         
         # 3. show the main window
-        splash.finish(mainWindow)
-        mainWindow.show()
+        # mainWindow.show()
         # app.processEvents()
         
         # 4. start the main GUI app (pyqt5) event loop

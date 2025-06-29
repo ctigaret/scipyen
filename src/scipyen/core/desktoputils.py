@@ -523,6 +523,12 @@ def is_kde_x11():
 
     return get_desktop("session").lower() == "x11" and get_desktop() == "KDE"
 
+def is_gnome_x11():
+    if platform.system() != "Linux":
+        return False
+
+    return get_desktop("session").lower() == "x11" and get_desktop() == "GNOME"
+
 
 def is_kde_wayland():
     if platform.system() != "Linux":
@@ -530,6 +536,11 @@ def is_kde_wayland():
 
     return get_desktop("session").lower() == "wayland" and get_desktop() == "KDE"
 
+def is_gnome_wayland():
+    if platform.system() != "Linux":
+        return False
+
+    return get_desktop("session").lower() == "wayland" and get_desktop() == "GNOME"
 
 def is_kde():
     if platform.system() != "Linux":
@@ -537,6 +548,14 @@ def is_kde():
 
     return (
         get_desktop("session").lower() in ("x11", "wayland") and get_desktop() == "KDE"
+    )
+
+def is_gnome():
+    if platform.system() != "Linux":
+        return False
+
+    return (
+        get_desktop("session").lower() in ("x11", "wayland") and get_desktop() == "GNOME"
     )
 
 
