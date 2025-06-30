@@ -1810,18 +1810,43 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # ### BEGIN global menu stuff -- see also self._deregister_menuBar_, self._restore_menuBar_, self.getAppMenu and self._slot_visibility_changed
         self._app_menu_ = None
         self._wm_id_ = int(self.winId())
-        self._global_menu_service_ = None
-        self._dbusinterface_ = None
+        self._globalMenuServiceName_ = None
+        self._dbusAppMenuInterface_ = None
+        self._dbusInterface_ = None
+        self._dbusSessionBus_ = None
+        self._dbusUniqueName_ = None
         if not QtWidgets.QApplication.instance().testAttribute(QtCore.Qt.AA_DontUseNativeMenuBar):
             if desktoputils.is_kde() or desktoputils.is_gnome() and __has_qtdbus__:
-                appMenuServiceNames = list(name for name in QtDBus.QDBusConnection.sessionBus().interface().registeredServiceNames().value() if "AppMenu" in name)
-                
+                self._dbusSessionBus_ = QtDBus.QDBusConnection.sessionBus() # also a QDBusConnection
+                self._dbusUniqueName_ = self._dbusSessionBus_.baseService() # a str, empty if NOT connected to dbus dameon
+                appMenuServiceNames = list(name for name in self._dbusSessionBus_.interface().registeredServiceNames().value() if "AppMenu" in name)
                 if len(appMenuServiceNames):
-                    self._global_menu_service_ = appMenuServiceNames[0]
+                    self._globalMenuServiceName_ = appMenuServiceNames[0]
+                    self._dbusAppMenuInterface_ = QtDBus.QDBusInterface(self._globalMenuServiceName_, "/" + self._globalMenuServiceName_.replace(".", "/") + self._globalMenuServiceName_.replace(".", "/"),
+                                                  self._globalMenuServiceName_, QtDBus.QDBusConnection.sessionBus(), self)
                     
-                    self._dbusinterface_ = QtDBus.QDBusInterface(self._global_menu_service_, "/" + self._global_menu_service_.replace(".", "/") + self._global_menu_service_.replace(".", "/"),
-                                                  self._global_menu_service_, QtDBus.QDBusConnection.sessionBus(), self)
-#                     self._dbusinterface_.setTimeout(1000)
+                # TODO 2025-06-30 23:47:57 finalize me !!!
+#                 if isinstance(self._dbusUniqueName_, str) and len(self._dbusUniqueName_.strip()):
+#                     
+#                     self._dbusInterface_ = QtDBus.QDBusInterface()
+                    
+                
+                    
+                    # NOTE: 2025-06-30 22:56:02
+                    # self._dbusSessionBus_.interface() -> QDBusConnectionInterface
+                    # self._dbusSessionBus_.name() -> str: 'qt_default_session_bus' 
+                    # self._dbusAppMenuInterface_.interface() -> 'com.canonical.AppMenu.Registrar'
+                    # self._dbusAppMenuInterface_.connection() -> QDBusconnection
+                    # self._dbusAppMenuInterface_.connection().baseService() -> str: "unique connection name"
+                    #    = the name of the session bus where the MenuBar is registered
+                    #   in Qt D-bus viewer this looks like:
+                    #   :1.134 and in its methods tree there is a MenuBar/2/ 4/ 5/ etc...
+                    #   --> Same as self._dbusSessionBus_.baseService()
+                    # self._dbusAppMenuInterface_.children()[0] -> QDBusServiceWatcher:
+                    #   serviceWatcher.watchedServices() -> ['com.canonical.AppMenu.Registrar'] -- A-HA...
+                    # dbusinterface.baseService() -> str: 'qt_default_session_bus' (ALWAYS this?)
+                    # dbusinterface.interface() is the QtDBus.QDBusConnection.sessionBus().interface()
+#                     self._dbusAppMenuInterface_.setTimeout(1000)
 #                     if __has_PyQt6__ or __has_PySide6__:
 #                         v = int(self.winId())
 #                     else:
@@ -1830,7 +1855,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 #                         if not v.convert(QtCore.QVariant.UInt): # NOTE: 2023-01-08 23:10:14 MUST convert to UInt
 #                             return
 #                         
-#                     result = self._dbusinterface_.call("RegisterWindow", v, QtDBus.QDBusObjectPath(f"/{self.applicationName}/{self.__class__.__name__}/MenuBar")).arguments()
+#                     result = self._dbusAppMenuInterface_.call("RegisterWindow", v, QtDBus.QDBusObjectPath(f"/{self.applicationName}/{self.__class__.__name__}/MenuBar")).arguments()
 #                     print(f"{self.__class__.__name__}._init__ DBus register window: result -> {result}")
                             
             self._app_menu_ = self.getAppMenu()
@@ -3024,9 +3049,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     # ### BEGIN Global menu stuff - see also BEGIN  global menu stuff - END  global menu stuff block in __init__
     #
     def getAppMenu(self):
-        if self.menuBar().isNativeMenuBar() and self._global_menu_service_ == "com.canonical.AppMenu.Registrar":
-            dbusinterface = QtDBus.QDBusInterface(self._global_menu_service_, "/" +  self._global_menu_service_.replace(".", "/"),
-                                                  self._global_menu_service_)
+        if self.menuBar().isNativeMenuBar() and self._globalMenuServiceName_ == "com.canonical.AppMenu.Registrar":
+            dbusinterface = QtDBus.QDBusInterface(self._globalMenuServiceName_, "/" +  self._globalMenuServiceName_.replace(".", "/"),
+                                                  self._globalMenuServiceName_)
             dbusinterface.setTimeout(1000)
             if __has_PyQt6__ or __has_PySide6__:
                 v = int(self.winId())
@@ -3064,8 +3089,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     def _deregister_menuBar_(self):
         if not self.menuBar().isNativeMenuBar() :
             return
-        if self._app_menu_ is not None and self._global_menu_service_ == "com.canonical.AppMenu.Registrar" and isintance(self._dbusinterface_, QtDBus.QDBusInterface):
-            self._dbusinterface_.setTimeout(100)
+        if self._app_menu_ is not None and self._globalMenuServiceName_ == "com.canonical.AppMenu.Registrar" and isintance(self._dbusAppMenuInterface_, QtDBus.QDBusInterface):
+            self._dbusAppMenuInterface_.setTimeout(100)
             
             if __has_PyQt6__ or __has_PySide6__:
                 old_v = int(self._wm_id_)
@@ -3074,7 +3099,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 if not old_v.convert(QtCore.QVariant.UInt):
                     return
                 
-            reply = self._dbusinterface_.call("UnregisterWindow", old_v)
+            reply = self._dbusAppMenuInterface_.call("UnregisterWindow", old_v)
                 
     def _restore_menuBar_(self):
         r"""Hack to restore the window's menubar in the desktop's global menu.
@@ -3093,13 +3118,13 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             return
         
         if currentAppMenu is None:
-            if self._global_menu_service_ == "com.canonical.AppMenu.Registrar" and isintance(self._dbusinterface_, QtDBus.QDBusInterface):
-                # service_name = self._global_menu_service_
+            if self._globalMenuServiceName_ == "com.canonical.AppMenu.Registrar" and isintance(self._dbusAppMenuInterface_, QtDBus.QDBusInterface):
+                # service_name = self._globalMenuServiceName_
                 # service_path = "/com/canonical/AppMenu/Registrar"
                 # interface = "com.canonical.AppMenu.Registrar"
                 # dbusinterface = QtDBus.QDBusInterface(service_name, service_path,
                 #                                     interface)
-                self._dbusinterface_.setTimeout(100)
+                self._dbusAppMenuInterface_.setTimeout(100)
                 
                 old_v = QtCore.QVariant(self._wm_id_)
                 new_v = QtCore.QVariant(int(self.winId()))
@@ -3107,13 +3132,13 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 if old_v.convert(QtCore.QVariant.UInt) and new_v.convert(QtCore.QVariant.UInt):
                     # deregister old WM window ID, then register the new one
                     # to the same DBus object path (i.e. dbusmenu instance)
-                    dereg_reply = self._dbusinterface_.call("UnregisterWindow", old_v)
-                    newreg_reply = self._dbusinterface_.call("RegisterWindow", new_v, QtDBus.QDBusObjectPath(self.menubar[1]))
+                    dereg_reply = self._dbusAppMenuInterface_.call("UnregisterWindow", old_v)
+                    newreg_reply = self._dbusAppMenuInterface_.call("RegisterWindow", new_v, QtDBus.QDBusObjectPath(self.menubar[1]))
 
     @Slot(QtGui.QWindow.Visibility)
     def _slot_visibility_changed(self, val):
         if self.menuBar().isNativeMenuBar() and hasattr(self, "_wm_id_") and self._wm_id_ != int(self.winId()):
-            if self._global_menu_service_ == "com.canonical.AppMenu.Registrar":
+            if self._globalMenuServiceName_ == "com.canonical.AppMenu.Registrar":
                 self._restore_menuBar_()
 
     #
