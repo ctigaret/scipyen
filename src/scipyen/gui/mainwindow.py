@@ -714,7 +714,7 @@ class ScriptManager(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__, Workspace
     def clear(self):
         self.scriptsTable.clearContents()
         self.scriptsTable.setRowCount(0)
-
+        
     @property
     def scriptsCount(self):
         return self.scriptsTable.rowCount()
@@ -1435,6 +1435,12 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         """
         super().__init__(parent)
 
+        if sys.platform.startswith("win32"):
+            myparent = None
+        else:
+            myparent=self
+        WorkspaceGuiMixin.__init__(self, parent=myparent)
+
         # NOTE: singleton design pattern
         # see traitlets.config.SingletonConfigurable
         self.__class__._instance = self  
@@ -1624,36 +1630,31 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         
         self._configureUI_()
 
-        if sys.platform.startswith("win32"):
-            myparent = None
-        else:
-            myparent=self
-        #     WorkspaceGuiMixin.__init__(self, parent=None)  # , settings=settings)
-        #     self.scriptsManager = ScriptManager(parent=None)
+        # if sys.platform.startswith("win32"):
+        #     myparent = None
         # else:
-        #     WorkspaceGuiMixin.__init__(self, parent=self)  # , settings=settings)
-        #     self.scriptsManager = ScriptManager(parent=self)
-        WorkspaceGuiMixin.__init__(self, parent=myparent)  # , settings=settings)
-        self.scriptsManager = ScriptManager(parent=myparent)
+        #     myparent=self
+        # 
+        # WorkspaceGuiMixin.__init__(self, parent=myparent)
+
+        self._scriptManager_ = ScriptManager(parent=myparent)
             
-        self.scriptsManager.signal_executeScript[str].connect(
+        self._scriptManager_.signal_executeScript[str].connect(
             self._slot_runPythonScriptFromManager)
-        self.scriptsManager.signal_importScript[str].connect(
+        self._scriptManager_.signal_importScript[str].connect(
             self._slot_importPythonScriptFromManager)
-        self.scriptsManager.signal_pasteScript[str].connect(
+        self._scriptManager_.signal_pasteScript[str].connect(
             self._slot_pastePythonScriptFromManager)
-        self.scriptsManager.signal_forgetScripts[object].connect(
+        self._scriptManager_.signal_forgetScripts[object].connect(
             self._slot_forgetScripts_)
-        self.scriptsManager.signal_editScript[str].connect(
+        self._scriptManager_.signal_editScript[str].connect(
             self.slot_systemEditScript)
-        self.scriptsManager.signal_openScriptFolder[str].connect(
+        self._scriptManager_.signal_openScriptFolder[str].connect(
             self.slot_systemOpenParentFolder)
-        self.scriptsManager.signal_pythonFileReceived[str, QtCore.QPoint].connect(
+        self._scriptManager_.signal_pythonFileReceived[str, QtCore.QPoint].connect(
             self.slot_handlePythonTextFile)
-        self.scriptsManager.signal_pythonFileAdded[str].connect(
-            self._slot_scriptFileAddedInManager)
-        self.scriptsManager.signal_scriptManagerClosed.connect(
-            self._slot_scriptManagerClosed)
+        self._scriptManager_.signal_pythonFileAdded[str].connect(self._slot_scriptFileAddedInManager)
+        self._scriptManager_.signal_scriptManagerClosed.connect(self._slot_scriptManagerClosed)
 
         # NOTE: 2023-06-04 10:49:56
         # for debugging only; comment out for relese
@@ -1801,8 +1802,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                                QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter,
                                QtGui.QColor("yellow"))
             # self.app.processEvents()
-        print(f"{self.__class__.__name__}.__init__: {self.menuBar().children()}")
-        self.show()
+            
+            
+        # print(f"{self.__class__.__name__}.__init__: {self.menuBar().children()}")
+        # self.show()
         
         # ### BEGIN global menu stuff -- see also self._deregister_menuBar_, self._restore_menuBar_, self.getAppMenu and self._slot_visibility_changed
         self._app_menu_ = None
@@ -1816,8 +1819,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 if len(appMenuServiceNames):
                     self._global_menu_service_ = appMenuServiceNames[0]
                     
-#                     self._dbusinterface_ = QtDBus.QDBusInterface(self._global_menu_service_, "/" + self._global_menu_service_.replace(".", "/"),
-#                                                   self._global_menu_service_)
+                    self._dbusinterface_ = QtDBus.QDBusInterface(self._global_menu_service_, "/" + self._global_menu_service_.replace(".", "/") + self._global_menu_service_.replace(".", "/"),
+                                                  self._global_menu_service_, QtDBus.QDBusConnection.sessionBus(), self)
 #                     self._dbusinterface_.setTimeout(1000)
 #                     if __has_PyQt6__ or __has_PySide6__:
 #                         v = int(self.winId())
@@ -1830,10 +1833,13 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 #                     result = self._dbusinterface_.call("RegisterWindow", v, QtDBus.QDBusObjectPath(f"/{self.applicationName}/{self.__class__.__name__}/MenuBar")).arguments()
 #                     print(f"{self.__class__.__name__}._init__ DBus register window: result -> {result}")
                             
-        self._app_menu_ = self.getAppMenu()
+            self._app_menu_ = self.getAppMenu()
         self.windowHandle().visibilityChanged.connect(self._slot_visibility_changed)
         # ### END   global menu stuff -- see also self._deregister_menuBar_, self._restore_menuBar_, self.getAppMenu and self._slot_visibility_changed
 
+        # NOTE: 2025-06-30 08:36:52
+        # uncomment this to show the menubar in the main window
+        # self.menuBar().setNativeMenuBar(False)
 
     # BEGIN Properties
     
@@ -2267,7 +2273,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             
         self.guiIconSize = newVal
         
-
     @property
     def guiIconSize(self) -> int:
         return self._guiIconSize_
@@ -2303,6 +2308,14 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         
         self._set_icon_Size(val)
         
+    @property
+    def scriptManager(self) -> ScriptManager | None:
+        return self._scriptManager_
+    
+    @property
+    def scriptsManager(self) -> ScriptManager | None:
+        return self.scriptManager
+
     @property
     def consoleDocked(self):
         return self._console_docked_
@@ -2438,8 +2451,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
     @property
     def scriptManagerAutoLaunch(self):
-        self._script_manager_autolaunch = self.scriptsManager.isVisible(
-        ) and not self.scriptsManager.isMinimized()
+        self._script_manager_autolaunch = self._scriptManager_.isVisible() and not self._scriptManager_.isMinimized()
         return self._script_manager_autolaunch
 
     @markConfigurable("ScriptManagerAutoLaunch", "qt")
@@ -2455,7 +2467,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         if not val is True:
         #     self._showScriptsManagerWindow()
         # else:
-            self.scriptsManager.close()
+            self._scriptManager_.close()
 
 
     @property
@@ -3012,7 +3024,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     # ### BEGIN Global menu stuff - see also BEGIN  global menu stuff - END  global menu stuff block in __init__
     #
     def getAppMenu(self):
-        if self._global_menu_service_ == "com.canonical.AppMenu.Registrar":
+        if self.menuBar().isNativeMenuBar() and self._global_menu_service_ == "com.canonical.AppMenu.Registrar":
             dbusinterface = QtDBus.QDBusInterface(self._global_menu_service_, "/" +  self._global_menu_service_.replace(".", "/"),
                                                   self._global_menu_service_)
             dbusinterface.setTimeout(1000)
@@ -3046,8 +3058,12 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 # address, objpath = result
         
             return result
+        else:
+            return self.menuBar()
             
     def _deregister_menuBar_(self):
+        if not self.menuBar().isNativeMenuBar() :
+            return
         if self._app_menu_ is not None and self._global_menu_service_ == "com.canonical.AppMenu.Registrar" and isintance(self._dbusinterface_, QtDBus.QDBusInterface):
             self._dbusinterface_.setTimeout(100)
             
@@ -3067,6 +3083,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         environment that provides such service, such as GNOME AND KDE on UN*X.
         
         """
+        if not self.menuBar().isNativeMenuBar() :
+            return self.menuBar()
+        
         currentAppMenu = self.getAppMenu()
         
         if self._app_menu_ is None:
@@ -3093,7 +3112,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
     @Slot(QtGui.QWindow.Visibility)
     def _slot_visibility_changed(self, val):
-        if hasattr(self, "_wm_id_") and self._wm_id_ != int(self.winId()):
+        if self.menuBar().isNativeMenuBar() and hasattr(self, "_wm_id_") and self._wm_id_ != int(self.winId()):
             if self._global_menu_service_ == "com.canonical.AppMenu.Registrar":
                 self._restore_menuBar_()
 
@@ -6605,13 +6624,13 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 action.setStatusTip(s)
                 action.triggered.connect(self._slot_runRecentPythonScript_)
 
-            if any([f not in self._recent_scripts_dict_.keys() for f in self.scriptsManager.scriptFileNames]) \
-                    or any([f not in self.scriptsManager.scriptFileNames for f in self._recent_scripts_dict_.keys()]):
-                self.scriptsManager.setData(self._recent_scripts_dict_)
+            if any([f not in self._recent_scripts_dict_.keys() for f in self._scriptManager_.scriptFileNames]) \
+                    or any([f not in self._scriptManager_.scriptFileNames for f in self._recent_scripts_dict_.keys()]):
+                self._scriptManager_.setData(self._recent_scripts_dict_)
 
         else:
-            if len(self.scriptsManager.scriptFileNames):
-                self.scriptsManager.clear()
+            if len(self._scriptManager_.scriptFileNames):
+                self._scriptManager_.clear()
 
     @safewrapper
     def dragEnterEvent(self, event):
@@ -7547,9 +7566,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self._showScriptsManagerWindow()
 
     def _showScriptsManagerWindow(self):
-        self.scriptsManager.setData(self._recent_scripts_dict_)
-        self.scriptsManager.setVisible(True)
-        self.scriptsManager.showNormal()
+        self._scriptManager_.setData(self._recent_scripts_dict_)
+        self._scriptManager_.setVisible(True)
+        self._scriptManager_.showNormal()
         # self._script_manager_autolaunch = True
 
     @Slot()

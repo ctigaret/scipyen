@@ -168,13 +168,6 @@ else:
     
 # # print(f"scipyen.py: qtpy.API is {qtpy.API}")
 
-if __has_PySide6__:
-    appName = "Scipyen-PySide6"
-elif __has_PyQt6__:
-    appName = "Scipyen-PyQt6"
-else:
-    appName = "Scipyen"
-    
 from core.prog import scipywarn
 
 # hasQDarkTheme = False
@@ -341,6 +334,13 @@ def main():
         #compl = subprocess.run(["xrdb", "-merge", os.path.join(__module_path__, "neuron_python",  "app-defaults", "nrniv")])
         #print("xrdb: ", compl.returncode)
     #sip.setdestroyonexit(True)
+    
+    if __has_PySide6__:
+        appName = "Scipyen-PySide6"
+    elif __has_PyQt6__:
+        appName = "Scipyen-PyQt6"
+    else:
+        appName = "Scipyen"
 
     try:
         print("Scipyen is initializing, please wait...\n")
@@ -362,9 +362,9 @@ def main():
         gc.enable()
         splash=None
         
-        icon = QtGui.QIcon.fromTheme("pythonbackend")
-        pixmap = icon.pixmap(QtCore.QSize(256,256), state=QtGui.QIcon.On)
-        image = pixmap.toImage().convertToFormat(QtGui.QImage.Format_RGB32)
+        # icon = QtGui.QIcon.fromTheme("pythonbackend")
+        # pixmap = icon.pixmap(QtCore.QSize(256,256), state=QtGui.QIcon.On)
+        # image = pixmap.toImage().convertToFormat(QtGui.QImage.Format_RGB32)
         # splashPixmap = QtGui.QPixmap.fromImage(image)
         # splashPixmap = QtGui.QPixmap(256,256)
         # splashPixmap.fill(QtGui.QColor("white"))
@@ -395,7 +395,7 @@ def main():
         #mainWindow.setWindowIcon(app.icon)
         
         # 3. show the main window
-        # mainWindow.show()
+        mainWindow.show()
         # app.processEvents()
         
         # 4. start the main GUI app (pyqt5) event loop
