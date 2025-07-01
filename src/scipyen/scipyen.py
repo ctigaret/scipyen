@@ -86,34 +86,16 @@ if sys.platform.startswith("linux"):
         
     # os.environ["QT_QPA_PLATFORM"]="xcb"
     
-# TODO 2024-09-11 23:56:17
+# TODO 2024-09-11 23:56:17 - NO! see NOTE: 2025-07-01 09:42:46
 # use qtpaths or qtpaths6 to figure out where the platform QT5/6 is installed
 # if at all
 # then add the corresponding plugins dir to QT_PLUGINS_PATH
 # so we won't have to build qt locally anymore, by the installer
-
-# NOTE: 2025-06-09 22:08:56
-# restrict support for pyqt5, pyqt6, and pyside6 ONLY
-# pyqt5 remains the default (for now)
 #
-# if len(sys.argv) > 1:
-#     if "pyqt6" in sys.argv:
-#         os.environ["QT_API"] = "pyqt6"
-#         os.environ["PYQTGRAPH_QT_LIB"] = "PyQt6"
-#         os.environ["FORCE_QT_API"] = "1"
-#         
-#     elif "pyside6" in sys.argv:
-#         os.environ["QT_API"] = "pyside6"
-#         os.environ["PYQTGRAPH_QT_LIB"] = "PySide6"
-#         os.environ["FORCE_QT_API"] = "1"
-#         
-#     else:
-#         os.environ["QT_API"] = "pyqt5"
-#         os.environ["PYQTGRAPH_QT_LIB"] = "PyQt5"
-#         os.environ["FORCE_QT_API"] = "1"
-#         
+# NOTE: 2025-07-01 09:42:46 -> the platform libraries likely to have different
+# hence different build from what is installed from PyPI, thus crashing the 
+# application
 
-#import cProfile
 __version__ = "0.0.1"
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
@@ -362,29 +344,29 @@ def main():
         gc.enable()
         splash=None
         
-        # icon = QtGui.QIcon.fromTheme("pythonbackend")
-        # pixmap = icon.pixmap(QtCore.QSize(256,256), state=QtGui.QIcon.On)
-        # image = pixmap.toImage().convertToFormat(QtGui.QImage.Format_RGB32)
-        # splashPixmap = QtGui.QPixmap.fromImage(image)
-        # splashPixmap = QtGui.QPixmap(256,256)
-        # splashPixmap.fill(QtGui.QColor("white"))
-        # splash = QtWidgets.QSplashScreen(pixmap)
+        icon = QtGui.QIcon.fromTheme("pythonbackend")
+        pixmap = icon.pixmap(QtCore.QSize(256,256), state=QtGui.QIcon.On)
+        # # image = pixmap.toImage().convertToFormat(QtGui.QImage.Format_RGB32)
+        # # splashPixmap = QtGui.QPixmap.fromImage(image)
+        # # splashPixmap = QtGui.QPixmap(256,256)
+        # # splashPixmap.fill(QtGui.QColor("white"))
         
+        # splash = QtWidgets.QSplashScreen(pixmap)
         # splash.setAttribute(QtCore.Qt.WA_StyledBackground)
         # splash.setAttribute(QtCore.Qt.WA_TranslucentBackground + QtCore.Qt.WA_StyledBackground + QtCore.Qt.WA_FramlessWindowHint)
         # NOTE: 2025-01-22 08:56:42
         # this needs to be here in order to initialize navigator widgets
         import gui.mainwindow as mainwindow
         if splash:
-            app.processEvents()
+            # app.processEvents()
+            splash.show()
             splash.showMessage("Scipyen is initializing, please wait...",
                             QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter,
                             QtGui.QColor("yellow"))
-            splash.show()
             app.processEvents()
         
-            mainWindow = mainwindow.ScipyenWindow(splash=splash)
-            app.processEvents()
+            mainWindow = mainwindow.ScipyenWindow()
+            # app.processEvents()
             splash.finish(mainWindow)
         else:
             mainWindow = mainwindow.ScipyenWindow()

@@ -152,14 +152,12 @@
      <property name="title">
       <string>Icon Sizes</string>
      </property>
+     <property name="icon">
+      <iconset theme="image-resize-symbolic"/>
+     </property>
      <addaction name="actionSet_Icon_Size"/>
      <addaction name="actionWorkspaceIconSize"/>
      <addaction name="actionFile_SystemIconSize"/>
-    </widget>
-    <widget class="QMenu" name="menuType_Here">
-     <property name="title">
-      <string>Type Here</string>
-     </property>
     </widget>
     <addaction name="actionAuto_launch_Script_Manager"/>
     <addaction name="menuCode_editor"/>
@@ -170,7 +168,7 @@
     <addaction name="actionGUI_Style"/>
     <addaction name="menuIcon_Sizes"/>
     <addaction name="menuFonts"/>
-    <addaction name="menuType_Here"/>
+    <addaction name="actionUse_Native_Menu_Bar"/>
    </widget>
    <widget class="QMenu" name="menuConsoles">
     <property name="title">
@@ -1669,6 +1667,17 @@ NOTE: you can click anywhere in the row to select</string>
    </property>
    <property name="text">
     <string>File System</string>
+   </property>
+  </action>
+  <action name="actionUse_Native_Menu_Bar">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset theme="application-menu-symbolic"/>
+   </property>
+   <property name="text">
+    <string>Use Native Menu Bar</string>
    </property>
   </action>
  </widget>

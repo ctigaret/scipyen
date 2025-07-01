@@ -1057,16 +1057,17 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                         )
 
     # class attribute
-    pluginActions = []
+    pluginActions:list = []
 
-    defaultShellCacheSize = 10000
+    defaultShellCacheSize:int = 10000
     
     _defaultUIFont:QtGui.QFont = QtWidgets.QApplication.font()
     
     _useDefaultQApplicationFont:bool = True
     
-    _defaultIconSize_ = 16
-
+    _defaultIconSize_:int = 16
+    
+    _defaultUseNativeMenuBar:bool = True
 
     _instance = None # NOTE: Singleton design pattern
     
@@ -1433,12 +1434,13 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         parent: QtWidgets.QWidget or None (default).
         """
-        super().__init__(parent)
 
-        if sys.platform.startswith("win32"):
+        if sys.platform.startswith("win32") or os.name == "nt" or platform.uname().system == "Windows":
             myparent = None
         else:
             myparent=self
+            
+        super().__init__(parent)
         WorkspaceGuiMixin.__init__(self, parent=myparent)
 
         # NOTE: singleton design pattern
@@ -1448,9 +1450,13 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # NOTE: 2023-01-08 16:14:26 - set this early !
         # the global singleton instance of the QApplication running Scipyen
         self.app = QtWidgets.QApplication.instance()
-        self.app.processEvents()
         
-        splash = kwargs.get("splash", None)
+        # NOTE: 2025-07-01 09:41:01
+        # DO NOT call this now -> it will mess up the native menu bar (i.e. it won't
+        # be visible) - not sure why...
+        # self.app.processEvents()
+        
+        # splash = kwargs.get("splash", None)
 
         # gui_viewers defined in gui package (see gui/__init__.py)
         # self.viewers = dict(map(lambda x: (x, list()), gui_viewers))
@@ -1510,6 +1516,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         
         self._useSystemDefaultFont:bool = self._useDefaultQApplicationFont
         
+        self._useNativeMenuBar:bool = self._defaultUseNativeMenuBar
+        
         # ### END configurables, but see NOTE:2022-01-28 23:16:57 below
 
         self.navPrevDir = collections.deque()
@@ -1522,12 +1530,12 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self._changesInWatchedDir_ = False
         self._monitoredDirsCache_ = dict()
         
-        if isinstance(splash, QtWidgets.QSplashScreen):
-            self.app.processEvents()
-            splash.showMessage("Scipyen is initializing, please wait...",
-                               QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter,
-                               QtGui.QColor("yellow"))
-            self.app.processEvents()
+        # if isinstance(splash, QtWidgets.QSplashScreen):
+        #     # self.app.processEvents()
+        #     splash.showMessage("Scipyen is initializing, please wait...",
+        #                        QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter,
+        #                        QtGui.QColor("yellow"))
+        #     # self.app.processEvents()
 
         checkOrigin()
         
@@ -1591,12 +1599,12 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self._copy_varnames_separator_ = " "
         # END - to revisit
 
-        if isinstance(splash, QtWidgets.QSplashScreen):
-            self.app.processEvents()
-            splash.showMessage("Initializing the user interface...",
-                               QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter,
-                               QtGui.QColor("yellow"))
-            self.app.processEvents()
+        # if isinstance(splash, QtWidgets.QSplashScreen):
+        #     # self.app.processEvents()
+        #     splash.showMessage("Initializing the user interface...",
+        #                        QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter,
+        #                        QtGui.QColor("yellow"))
+        #     # self.app.processEvents()
 
         # NOTE: 2021-08-17 12:38:41 see also NOTE: 2021-08-17 10:05:20 in scipyen.py
         # self._default_GUI_style = self.app.style()
@@ -1629,13 +1637,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self._fileSystemIconSize_ = self._defaultIconSize_
         
         self._configureUI_()
-
-        # if sys.platform.startswith("win32"):
-        #     myparent = None
-        # else:
-        #     myparent=self
-        # 
-        # WorkspaceGuiMixin.__init__(self, parent=myparent)
 
         self._scriptManager_ = ScriptManager(parent=myparent)
             
@@ -1701,21 +1702,21 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         sigBlock = QtCore.QSignalBlocker(self.actionUse_system_default_font)
         self.actionUse_system_default_font.setChecked(self._useSystemDefaultFont)
         
-        if isinstance(splash, QtWidgets.QSplashScreen):
-            self.app.processEvents()
-            splash.showMessage("Initializing Scipyen Console...",
-                               QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter,
-                               QtGui.QColor("yellow"))
-            # self.app.processEvents()
+        # if isinstance(splash, QtWidgets.QSplashScreen):
+        #     # self.app.processEvents()
+        #     splash.showMessage("Initializing Scipyen Console...",
+        #                        QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter,
+        #                        QtGui.QColor("yellow"))
+        #     # self.app.processEvents()
 
         self._init_QtConsole_() # also instantiates self.shell, etc
 
-        if isinstance(splash, QtWidgets.QSplashScreen):
-            self.app.processEvents()
-            splash.showMessage("Initializing the workspace...",
-                               QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter,
-                               QtGui.QColor("yellow"))
-            # self.app.processEvents()
+        # if isinstance(splash, QtWidgets.QSplashScreen):
+        #     # self.app.processEvents()
+        #     splash.showMessage("Initializing the workspace...",
+        #                        QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter,
+        #                        QtGui.QColor("yellow"))
+        #     # self.app.processEvents()
 
 
 
@@ -1754,12 +1755,12 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.workspaceModel.itemChanged.connect(self.slot_variableItemNameChanged)
         self.workspaceModel.modelContentsChanged.connect(self.slot_updateWorkspaceView)
         
-        if isinstance(splash, QtWidgets.QSplashScreen):
-            self.app.processEvents()
-            splash.showMessage("Loading configuration...",
-                               QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter,
-                               QtGui.QColor("yellow"))
-            # self.app.processEvents()
+        # if isinstance(splash, QtWidgets.QSplashScreen):
+        #     # self.app.processEvents()
+        #     splash.showMessage("Loading configuration...",
+        #                        QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter,
+        #                        QtGui.QColor("yellow"))
+        #     # self.app.processEvents()
 
         # With all UI elements and their signal-slot connections in place we can
         # now apply stored settings, including the 'state' of the ScipyenWindow
@@ -1767,12 +1768,12 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         #
         self.loadSettings()
         
-        if isinstance(splash, QtWidgets.QSplashScreen):
-            self.app.processEvents()
-            splash.showMessage("Loading plugins...",
-                               QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter,
-                               QtGui.QColor("yellow"))
-            # self.app.processEvents()
+        # if isinstance(splash, QtWidgets.QSplashScreen):
+        #     # self.app.processEvents()
+        #     splash.showMessage("Loading plugins...",
+        #                        QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter,
+        #                        QtGui.QColor("yellow"))
+        #     # self.app.processEvents()
 
         # NOTE: 2024-05-29 13:04:00
         # Asynchronously launch the plugin loading mechanism
@@ -1796,12 +1797,12 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         if self._script_manager_autolaunch:
             self._showScriptsManagerWindow()
             
-        if isinstance(splash, QtWidgets.QSplashScreen):
-            self.app.processEvents()
-            splash.showMessage("Done!",
-                               QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter,
-                               QtGui.QColor("yellow"))
-            # self.app.processEvents()
+        # if isinstance(splash, QtWidgets.QSplashScreen):
+        #     # self.app.processEvents()
+        #     splash.showMessage("Done!",
+        #                        QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter,
+        #                        QtGui.QColor("yellow"))
+        #     # self.app.processEvents()
             
             
         # print(f"{self.__class__.__name__}.__init__: {self.menuBar().children()}")
@@ -1866,7 +1867,23 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # uncomment this to show the menubar in the main window
         # self.menuBar().setNativeMenuBar(False)
 
-    # BEGIN Properties
+    # ### BEGIN Properties and slots connected to properties
+    
+    @property
+    def useNativeMenuBar(self) -> bool:
+        return self._useNativeMenuBar
+    
+    @markConfigurable("UseNativeMenuBar", "Qt")
+    @useNativeMenuBar.setter
+    def useNativeMenuBar(self, val:bool) -> None:
+        self._useNativeMenuBar = val == True
+        signalBlocker = QtCore.QSignalBlocker(self.actionUse_Native_Menu_Bar)
+        self.actionUse_Native_Menu_Bar.setChecked(self._useNativeMenuBar == True)
+        self.menuBar().setNativeMenuBar(self._useNativeMenuBar)
+        
+    @Slot(bool)
+    def _slot_useNativeMenuBar(self, val:bool) -> None:
+        self.useNativeMenuBar = val == True
     
     @property
     def desktopScreen(self) -> QtGui.QScreen:
@@ -3010,7 +3027,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         self._refreshRecentScriptsMenu_()
 
-    # END   Properties
+    # ### END   Properties and slots connected to properties
     
     @Slot(object)
     @safewrapper
@@ -6041,8 +6058,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.keyDeleteStuff.activated.connect(self.slot_keyDeleteStuff)
 
         # NOTE: File menu - some actions defined in mainwindow.ui
-        self.actionImport_PrairieView_data.triggered.connect(
-            self.slot_importPrairieView)
+        self.actionImport_PrairieView_data.triggered.connect(self.slot_importPrairieView)
         self.recentFilesMenu = QtWidgets.QMenu("Open recent...", self)
         self.recentFilesMenu.setIcon(QtGui.QIcon.fromTheme("document-open-recent"))
         # self.menuFile.insertMenu(self.actionOpen, self.recentFilesMenu)
@@ -6132,6 +6148,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         self.tbChDir.setPopupMode(QtWidgets.QToolButton.MenuButtonPopup)
         self.tbChDir.setMenu(self.recentDirectoriesMenu)
+        
+        self.actionUse_Native_Menu_Bar.setChecked(self._useNativeMenuBar)
+        self.actionUse_Native_Menu_Bar.toggled.connect(self._slot_useNativeMenuBar)
 
         self.lockToolBarAction = QAction(QtGui.QIcon.fromTheme("lock-symbolic"), "Lock Toolbar Positions", self)
         self.lockToolBarAction.setCheckable(True)
