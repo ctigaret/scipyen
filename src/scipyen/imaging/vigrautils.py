@@ -1153,13 +1153,6 @@ def concatenateImages(*images, **kwargs):
                     img.channelIndex == img.ndim
                     --> True
     
-                    
-    
-        
-    
-    
-
-
     What this function does:
     ========================
 
@@ -1224,8 +1217,6 @@ def concatenateImages(*images, **kwargs):
     catAxis = 0
     
     ignore = None
-    
-    #asPictArray = False # set up below
     
     if len(kwargs) > 0:
         catAxis     = kwargs.pop("axis",     0)
@@ -1360,8 +1351,8 @@ def concatenateImages(*images, **kwargs):
     # we allow for mismatches only for the concatenation axis, including ignoring
     # some or all of its calibration parameters (units, origin, resolution)
     try:
-        axcal       = AxesCalibration(images[0])
-        for img in images[1:]:
+        axcal  = AxesCalibration(images[0])
+        for k, img in enumerate(images[1:]):
             if img.axistags != axistags:
                 raise ValueError("Cannot concatenate images with different AxisInfo objects")
             
@@ -1371,7 +1362,7 @@ def concatenateImages(*images, **kwargs):
             for key in img_axcal.keys():
                 #print("key", key)
                 if axistags[key] == catAxis:
-                    if not axcal[key].isclose(img_axcal[key], ignore=ignore):
+                    if not axcal[key].isclose(img_axcal[key], ignore=ignore, equal_nan=True, use_math=False):
                         if ignore is None:
                             raise RuntimeError("Cannot concatenate along the axis %s which has non-matching calibration across images" % key)
                         
@@ -1379,10 +1370,11 @@ def concatenateImages(*images, **kwargs):
                             raise RuntimeError("Cannot concatenate along the axis %s which has non-matching calibration across images, ignoring %s" % (key, str(ignore)))
                     
                 else:
-                    if not axcal[key].isclose(img_axcal[key]):
+                    if not axcal[key].isclose(img_axcal[key], ignore=ignore, equal_nan=True, use_math=False):
                         print("In vigrautils.concatenateImages:")
-                        print(f"axcal[{key}] {axcal[key]}")
-                        print(f"img_axcal[{key}] {img_axcal[key]}")
+                        print(f"\tfor image [{k}]:")
+                        print(f"\t\taxcal[{key}] {axcal[key]}")
+                        print(f"\t\timg_axcal[{key}] {img_axcal[key]}")
                         raise RuntimeError("Cannot concatenate images with non-matching calibration for axis %s" % key)
                     
             if not all(first_shape[s] == img.shape[s] for s in range(min_dims) if s != catAxisNdx):

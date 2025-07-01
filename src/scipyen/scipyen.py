@@ -11,15 +11,21 @@
 
 #### BEGIN core python modules
 
-import sys, os, platform, pathlib, subprocess
+import sys, os, platform, pathlib, subprocess, traceback
 
-import atexit, re, inspect, gc, io, traceback
+import atexit, re, inspect, gc, io, time
 import faulthandler, warnings
 import xdg
 from xdg import IconTheme
 
+#### BEGIN Scipyen modules
+#
 from core.prog import scipywarn, print_styled
-from core import sysutils
+from core import sysutils, prog
+from core import scipyen_config
+#
+#### END Scipyen modules
+
 
 my_conda_env = os.environ.get("CONDA_DEFAULT_ENV", None)
 conda_env_prefix = os.environ.get("CONDA_PREFIX", None)
@@ -150,8 +156,6 @@ else:
     
 # # print(f"scipyen.py: qtpy.API is {qtpy.API}")
 
-from core.prog import scipywarn
-
 # hasQDarkTheme = False
 # try:
 #     import qdarktheme
@@ -195,8 +199,6 @@ if sys.platform.startswith("linux"):
     
 QtGui.QIcon.setThemeSearchPaths(themePaths)
 QtGui.QIcon.setFallbackSearchPaths(fbPaths)
-
-
     
 # NOTE: 2023-09-28 22:06:54
 # this should be necessary only on windows platform
@@ -263,10 +265,6 @@ elif sys.platform.startswith("darwin"):
         
 #### END 3rd party modules
 
-#### BEGIN Scipyen modules
-from core import scipyen_config
-#### END Scipyen modules
-
 # NOTE: 2021-01-10 13:19:20
 # the same Configuration object holds/merges both the user options and the 
 # package defaults (therefore there is no need for two Configuration objects)
@@ -325,10 +323,15 @@ def main():
         appName = "Scipyen"
 
     try:
+        start = time.perf_counter()
         print("Scipyen is initializing, please wait...\n")
         # BEGIN 
         # 1. create the app
         app = QtWidgets.QApplication(sys.argv)
+        # NOTE: 2025-07-01 14:45:39
+        # this MUST be imported AFTER, and NOT BEFORE creating the app ni the 
+        # line above
+        import gui.mainwindow as mainwindow
         translator = QtCore.QTranslator(app)
         if os.environ["QT_API"] == "pyside6":
             translator.load(QtCore.QLocale.system(), "qtbase", "_", QtCore.QLibraryInfo.path(QtCore.QLibraryInfo.TranslationsPath))
@@ -342,7 +345,6 @@ def main():
         app.setOrganizationName(scipyen_config.organization_name)
         
         gc.enable()
-        import gui.mainwindow as mainwindow
         
 #         # ### BEGIN Splash screen shenanigans
 #         splash=None
@@ -378,7 +380,7 @@ def main():
 #             mainWindow = mainwindow.ScipyenWindow()
 #         
 #         # ### END   Splash screen shenanigans
-        
+    
         mainWindow = mainwindow.ScipyenWindow()
         
         # NOTE: 2021-08-17 10:06:24 FIXME / TODO
@@ -389,9 +391,10 @@ def main():
         # 3. show the main window
         # mainWindow.show()
         
+        end = time.perf_counter()
+        print(f"Scipyen initialization: {end - start} s")
         # 4. start the main GUI app (pyqt5) event loop
         app.exec()
-        
     except Exception as e:
         #faulthandler.dump_traceback()
         traceback.print_exc()

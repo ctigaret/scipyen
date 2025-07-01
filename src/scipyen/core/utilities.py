@@ -458,13 +458,17 @@ def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None,
     
     if any(v.size > 1 for v in (x,y)):
         use_math = False
+        
+    # NOTE: 2025-07-01 15:30:50
+    # switch to using np.isclose if equal_nan is True
+    if equal_nan:
+        use_math = False
     
     f_isclose, rtol, atol = __check_isclose_args__(rtol, atol, use_math)
     
     if isinstance(y, pq.Quantity):
         y = y.magnitude
-    
-    # emulate equal_nan for math.isclose
+
     if use_math:
         if all(v is math.nan or v is np.nan for v in (x,y)):
             return True

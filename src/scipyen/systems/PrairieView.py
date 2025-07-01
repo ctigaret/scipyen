@@ -1388,7 +1388,7 @@ class PVFrame(PVObject):
             
             # fdata_axis_0_cal  = AxisCalibrationData(fdata_axis_0_info)
             fdata_axis_0_cal  = AxisCalibrationData.new(fdata_axis_0_info)
-            print(f"{self.__class__.__name__}.__call__: calibration -> {fdata_axis_0_cal.type}")
+            # print(f"{self.__class__.__name__}.__call__: calibration -> {fdata_axis_0_cal.type}")
             if self.versionString < "5.5":
                 fdata_axis_0_cal.resolution = float(self.state["micronsPerPixel_XAxis"].value)
             else:
@@ -1614,16 +1614,9 @@ class PVFrame(PVObject):
                 merged_channels_axcal = AxesCalibration.new(merged_channels_axinfo,
                                                         name = axisTypeName(merged_channels_axinfo))
                 
-#                 merged_channels_axcal = AxesCalibration(merged_channels_axinfo,
-#                                                         axisname = axisTypeName(merged_channels_axinfo))
-#                 
                 for kch, channel in enumerate(channels):
                     merged_channels_axcal.addChannelCalibration(ChannelCalibrationData(name=channel_names[kch],
                                                                                          index=channel))
-                    # merged_channels_axcal.addChannelCalibration(ChannelCalibrationData(name=channel_names[kch],
-                    #                                                                      index=channel),
-                    #                                               name=channel_names[kch])
-                    
                 merged_channels_axinfo = merged_channels_axcal.calibrateAxis(merged_channels_axinfo)
                         
                 if sourceData is not None:
@@ -2716,12 +2709,10 @@ class PVScan(PVObject):
             # frame data (because TSeries and ZSeries frames have no "source"
             # attribute)
             if self._mergeChannelsOnOutput_:
-                return self.sequences[0].mergeChannels() # (frameData, None)
-                # return (self.sequences[0].mergeChannels(), None) # (frameData, None)
+                return self.sequences[0].mergeChannels()
                 
             else:
-                return self.sequences[0]() #, None )# (frameData, None)
-                # return (self.sequences[0](), None )# (frameData, None)
+                return self.sequences[0]()
             
         elif self.sequences[0].sequencetype == PVSequenceType.Single.value:
             # again, nothing to do here -- this pertains to SingleImage 

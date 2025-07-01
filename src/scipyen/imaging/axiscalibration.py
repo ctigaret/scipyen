@@ -327,10 +327,18 @@ class CalibrationData:
         if atol is None:
             atol = self.absolute_tolerance
         
+        # print(f"\n{self.__class__.__name__}.isclose: other class is self class: {other.__class__ == self.__class__}")
         ret = other.__class__ == self.__class__
         
         if ret and (ignore is None or "units" not in ignore):
-            ret &= unitsConvertible(self.units, other.units)
+            try:
+                unitstest = unitsConvertible(self.units, other.units)
+                ret &= unitstest
+                if not unitstest:
+                    print(f"\n{self.__class__.__name__}.isclose: convertible units: {unitstest}")
+            except:
+                traceback.print_exc()
+                print(f"self.units: {self.units}, other.units: {other.units}")
             
         if ignore is not None and "units" in ignore:
             if isinstance(ignore, str):
@@ -343,6 +351,8 @@ class CalibrationData:
                 if len(ignore)==0:
                     ignore = None
                     
+        print(f"\n{self.__class__.__name__}.isclose: ignore is {ignore}")
+        
         if ret:
             if ignore is None:
                 cal_p = list(getattr(self, p) for p in ("calibratedOrigin", "calibratedResolution", "calibratedMaximum") if hasattr(self, p))
@@ -354,13 +364,23 @@ class CalibrationData:
                 else:
                     oth_p = list(getattr(other, p) for p in ("calibratedOrigin", "calibratedResolution", "calibratedMaximum") if hasattr(self, p))
                     
+                print(f"\n{self.__class__.__name__}.isclose:")
+                print(f"\ncal_p = {cal_p}")
+                print(f"\noth_p = {oth_p}")
             else:
                 cal_p = list(getattr(self, p) for p in ("calibratedOrigin", "calibratedResolution", "calibratedMaximum") if p not in ignore and hasattr(self, p))
                 oth_p = list(getattr(other, p) for p in ("calibratedOrigin", "calibratedResolution", "calibratedMaximum") if p not in ignore and hasattr(other, p))
                          
+                         
+                print(f"\n{self.__class__.__name__}.isclose:")
+                print(f"\ncal_p = {cal_p}")
+                print(f"\noth_p = {oth_p}")
                     
             ret &= len(cal_p) == len(oth_p) and all(isclose(p[0], p[1], rtol=rtol, atol=atol, equal_nan=equal_nan, use_math=use_math) for p in zip(cal_p, oth_p))
             
+            
+        if not ret:
+            print(f"\n{self.__class__.__name__}.isclose will return {ret}")
         return ret
                  
 class CalibrationUnitsDescriptor:
