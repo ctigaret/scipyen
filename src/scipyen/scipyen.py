@@ -343,6 +343,7 @@ def main():
         
         gc.enable()
         splash=None
+        import gui.splash as guisplash
         
         icon = QtGui.QIcon.fromTheme("pythonbackend")
         pixmap = icon.pixmap(QtCore.QSize(256,256), state=QtGui.QIcon.On)
@@ -351,21 +352,24 @@ def main():
         # # splashPixmap = QtGui.QPixmap(256,256)
         # # splashPixmap.fill(QtGui.QColor("white"))
         
-        # splash = QtWidgets.QSplashScreen(pixmap)
+        # splash = guisplash.ScipyenSplash(pixmap)
         # splash.setAttribute(QtCore.Qt.WA_StyledBackground)
         # splash.setAttribute(QtCore.Qt.WA_TranslucentBackground + QtCore.Qt.WA_StyledBackground + QtCore.Qt.WA_FramlessWindowHint)
         # NOTE: 2025-01-22 08:56:42
         # this needs to be here in order to initialize navigator widgets
         import gui.mainwindow as mainwindow
+        
+        
         if splash:
+            # mainwindow.ScipyenWindow.sig_splashMessage[str].connect(splash._slot_showMessage)
             # app.processEvents()
-            splash.show()
+            # splash.show()
             splash.showMessage("Scipyen is initializing, please wait...",
                             QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter,
                             QtGui.QColor("yellow"))
-            app.processEvents()
+            # app.processEvents()
         
-            mainWindow = mainwindow.ScipyenWindow()
+            mainWindow = mainwindow.ScipyenWindow(splash=splash)
             # app.processEvents()
             splash.finish(mainWindow)
         else:

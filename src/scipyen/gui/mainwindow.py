@@ -1040,6 +1040,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     startPluginLoad = Signal()
     sig_refreshRecentFilesMenu = Signal()
     sig_windowRemoved = Signal(tuple, name="sig_windowRemoved")
+    sig_splashMessage = Signal(str, name = "sig_splashMessage")
     
     sig_changedDirectory = Signal(str, name="sig_changedDirectory")
     sig_newItemsInMonitoredDir = Signal(tuple, name="sig_newItemsInMonitoredDir")
@@ -1434,7 +1435,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         parent: QtWidgets.QWidget or None (default).
         """
-
+        # import gui.splash as guisplash
+        from gui.splash import ScipyenSplash
         if sys.platform.startswith("win32") or os.name == "nt" or platform.uname().system == "Windows":
             myparent = None
         else:
@@ -1456,7 +1458,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # be visible) - not sure why...
         # self.app.processEvents()
         
-        # splash = kwargs.get("splash", None)
+        splash = kwargs.get("splash", None)
+        if isinstance(splash, ScipyenSplash):
+            self.sig_splashMessage[str].connect(splash._slot_showMessage)
 
         # gui_viewers defined in gui package (see gui/__init__.py)
         # self.viewers = dict(map(lambda x: (x, list()), gui_viewers))
@@ -1530,6 +1534,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self._changesInWatchedDir_ = False
         self._monitoredDirsCache_ = dict()
         
+        self.sig_splashMessage.emit("Scipyen is initializing, please wait...")
+        
         # if isinstance(splash, QtWidgets.QSplashScreen):
         #     # self.app.processEvents()
         #     splash.showMessage("Scipyen is initializing, please wait...",
@@ -1599,6 +1605,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self._copy_varnames_separator_ = " "
         # END - to revisit
 
+        self.sig_splashMessage.emit("Initializing the user interface...")
         # if isinstance(splash, QtWidgets.QSplashScreen):
         #     # self.app.processEvents()
         #     splash.showMessage("Initializing the user interface...",
@@ -1701,7 +1708,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         
         sigBlock = QtCore.QSignalBlocker(self.actionUse_system_default_font)
         self.actionUse_system_default_font.setChecked(self._useSystemDefaultFont)
-        
+        self.sig_splashMessage.emit("Initializing Scipyen Console...")
         # if isinstance(splash, QtWidgets.QSplashScreen):
         #     # self.app.processEvents()
         #     splash.showMessage("Initializing Scipyen Console...",
@@ -1711,6 +1718,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         self._init_QtConsole_() # also instantiates self.shell, etc
 
+        self.sig_splashMessage.emit("Initializing User Workspace...")
         # if isinstance(splash, QtWidgets.QSplashScreen):
         #     # self.app.processEvents()
         #     splash.showMessage("Initializing the workspace...",
@@ -1755,6 +1763,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.workspaceModel.itemChanged.connect(self.slot_variableItemNameChanged)
         self.workspaceModel.modelContentsChanged.connect(self.slot_updateWorkspaceView)
         
+        self.sig_splashMessage.emit("Loading Saved Settings...")
         # if isinstance(splash, QtWidgets.QSplashScreen):
         #     # self.app.processEvents()
         #     splash.showMessage("Loading configuration...",
@@ -1768,6 +1777,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         #
         self.loadSettings()
         
+        self.sig_splashMessage.emit("Loading User Plugins...")
         # if isinstance(splash, QtWidgets.QSplashScreen):
         #     # self.app.processEvents()
         #     splash.showMessage("Loading plugins...",
@@ -1797,6 +1807,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         if self._script_manager_autolaunch:
             self._showScriptsManagerWindow()
             
+        self.sig_splashMessage.emit("Done!")
         # if isinstance(splash, QtWidgets.QSplashScreen):
         #     # self.app.processEvents()
         #     splash.showMessage("Done!",
