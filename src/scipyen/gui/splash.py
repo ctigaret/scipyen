@@ -41,11 +41,10 @@ except:
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
-
-class ScipyenSplash(QtWidgets.QSplashScreen):
+class ScipyenSplashWidget(QtWidgets.QSplashScreen):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.show()
+        # self.show()
         
     @Slot(str)
     def _slot_showMessage(self, val:str, color:typing.Optional[typing.Union[str, QtGui.QColor]] = None) -> None:
@@ -62,3 +61,18 @@ class ScipyenSplash(QtWidgets.QSplashScreen):
             self.showMessage(val, QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter, color)
             
     
+class SplashThread(QtCore.QThread):
+    def __init__(self, splashWidget:ScipyenSplashWidget):#, parent:typing.Optional[QtCore.QObject] = None):
+        QtCore.QThread.__init__(self)#, parent)
+        self.splashWidget = splashWidget
+    def run(self):
+        self.splashWidget.show()
+        
+class ScipyenSplash(QtCore.QObject):
+    def __init__(self, pixmap: QtGui.QPixmap):#, parent:typing.Optional[QtCore.QObject] = None):
+        super().__init__()
+        self.splashWidget = ScipyenSplashWidget(pixmap)#, parent=None)
+        self.splashWidget.deleteLater()
+        self.splashThread = SplashThread(self.splashWidget)
+        self.splashWidget.moveToThread(self.splashThread)
+        self.splashThread.run()
