@@ -342,38 +342,44 @@ def main():
         app.setOrganizationName(scipyen_config.organization_name)
         
         gc.enable()
-        splash=None
-        import gui.splash as guisplash
-        
-        icon = QtGui.QIcon.fromTheme("pythonbackend")
-        pixmap = icon.pixmap(QtCore.QSize(256,256), state=QtGui.QIcon.On)
-        # # image = pixmap.toImage().convertToFormat(QtGui.QImage.Format_RGB32)
-        # # splashPixmap = QtGui.QPixmap.fromImage(image)
-        # # splashPixmap = QtGui.QPixmap(256,256)
-        # # splashPixmap.fill(QtGui.QColor("white"))
-        
-        # splash = guisplash.ScipyenSplash(pixmap)
-        # splash.setAttribute(QtCore.Qt.WA_StyledBackground)
-        # splash.setAttribute(QtCore.Qt.WA_TranslucentBackground + QtCore.Qt.WA_StyledBackground + QtCore.Qt.WA_FramlessWindowHint)
-        # NOTE: 2025-01-22 08:56:42
-        # this needs to be here in order to initialize navigator widgets
         import gui.mainwindow as mainwindow
         
+#         # ### BEGIN Splash screen shenanigans
+#         splash=None
+#         import gui.splash as guisplash
+#         
+#         icon = QtGui.QIcon.fromTheme("pythonbackend")
+#         pixmap = icon.pixmap(QtCore.QSize(256,256), state=QtGui.QIcon.On)
+#         # # image = pixmap.toImage().convertToFormat(QtGui.QImage.Format_RGB32)
+#         # # splashPixmap = QtGui.QPixmap.fromImage(image)
+#         # # splashPixmap = QtGui.QPixmap(256,256)
+#         # # splashPixmap.fill(QtGui.QColor("white"))
+#         
+#         # splash = guisplash.ScipyenSplash(pixmap)
+#         # splash.setAttribute(QtCore.Qt.WA_StyledBackground)
+#         # splash.setAttribute(QtCore.Qt.WA_TranslucentBackground + QtCore.Qt.WA_StyledBackground + QtCore.Qt.WA_FramlessWindowHint)
+#         # NOTE: 2025-01-22 08:56:42
+#         # this needs to be here in order to initialize navigator widgets
+#         
+#         
+#         if splash:
+#             # mainwindow.ScipyenWindow.sig_splashMessage[str].connect(splash._slot_showMessage)
+#             # app.processEvents()
+#             # splash.show()
+#             splash.showMessage("Scipyen is initializing, please wait...",
+#                             QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter,
+#                             QtGui.QColor("yellow"))
+#             # app.processEvents()
+#         
+#             mainWindow = mainwindow.ScipyenWindow(splash=splash)
+#             # app.processEvents()
+#             splash.finish(mainWindow)
+#         else:
+#             mainWindow = mainwindow.ScipyenWindow()
+#         
+#         # ### END   Splash screen shenanigans
         
-        if splash:
-            # mainwindow.ScipyenWindow.sig_splashMessage[str].connect(splash._slot_showMessage)
-            # app.processEvents()
-            # splash.show()
-            splash.showMessage("Scipyen is initializing, please wait...",
-                            QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter,
-                            QtGui.QColor("yellow"))
-            # app.processEvents()
-        
-            mainWindow = mainwindow.ScipyenWindow(splash=splash)
-            # app.processEvents()
-            splash.finish(mainWindow)
-        else:
-            mainWindow = mainwindow.ScipyenWindow()
+        mainWindow = mainwindow.ScipyenWindow()
         
         # NOTE: 2021-08-17 10:06:24 FIXME / TODO
         # come up with a nice icon?
@@ -381,8 +387,7 @@ def main():
         #mainWindow.setWindowIcon(app.icon)
         
         # 3. show the main window
-        mainWindow.show()
-        # app.processEvents()
+        # mainWindow.show()
         
         # 4. start the main GUI app (pyqt5) event loop
         app.exec()
