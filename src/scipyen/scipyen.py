@@ -350,36 +350,46 @@ def main():
         splash=None
         import gui.splash as guisplash
         
-        icon = QtGui.QIcon.fromTheme("pythonbackend")
-        pixmap = icon.pixmap(QtCore.QSize(256,256), state=QtGui.QIcon.On)
-        # # image = pixmap.toImage().convertToFormat(QtGui.QImage.Format_RGB32)
-        # # splashPixmap = QtGui.QPixmap.fromImage(image)
-        # # splashPixmap = QtGui.QPixmap(256,256)
-        # # splashPixmap.fill(QtGui.QColor("white"))
-        
-        splash = guisplash.ScipyenSplash(pixmap)
-        # splash.setAttribute(QtCore.Qt.WA_StyledBackground)
-        # splash.setAttribute(QtCore.Qt.WA_TranslucentBackground + QtCore.Qt.WA_StyledBackground + QtCore.Qt.WA_FramlessWindowHint)
-        
-        if splash:
-            # mainwindow.ScipyenWindow.sig_splashMessage[str].connect(splash._slot_showMessage)
-            # app.processEvents()
-            # splash.show()
-            splash.splashWidget.showMessage("Scipyen is initializing, please wait...",
-                            QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter,
-                            QtGui.QColor("yellow"))
-            # app.processEvents()
-        
-            mainWindow = mainwindow.ScipyenWindow(splash=splash.splashWidget)
-            # app.setActiveWindow(mainWindow)
-            # app.processEvents()
-            mainWindow.menuBar().setNativeMenuBar(mainWindow.useNativeMenuBar)
-            # splash.splashWidget.finish(mainWindow)
-            # if mainWindow.isVisible():
-            #     splash.close()
-        else:
+        if __has_PyQt6__ or __has_PySide6__:
+            # BUG 2025-07-02 01:05:08 FIXME/TODO
+            # splash shows as a black rectangle, so set aside for now, in PyQt6/PySide6
+            # until I fire out the problem
             mainWindow = mainwindow.ScipyenWindow()
+        else:
+            icon = QtGui.QIcon.fromTheme("pythonbackend")
+            pixmap = icon.pixmap(QtCore.QSize(256,256), state=QtGui.QIcon.On)
             
+            splash = guisplash.ScipyenSplash(pixmap)
+            # splash.setAttribute(QtCore.Qt.WA_StyledBackground)
+            # splash.setAttribute(QtCore.Qt.WA_TranslucentBackground + QtCore.Qt.WA_StyledBackground + QtCore.Qt.WA_FramlessWindowHint)
+            
+            if splash:
+                # app.processEvents()
+                # splash.show()
+                # NOTE: 2025-07-02 01:06:30
+                # this WILL show, but signals from the mainwindow won't take effect due to queued connection;
+                # on the other hand, if using direct connection or autoconnection (which resolves to direct connection
+                # on account of both being in the same, main, thread) the menubar won't register with the dbus
+                # through the Qt's default (built-in) mechanism.
+                # Perhaps designing its own dbus interface might help, but need to learn moe about dbus and
+                # then how to register with the AppMenu dbus service manually .. brrrr....
+                
+                
+                splash.splashWidget.showMessage("Scipyen is initializing, please wait...",
+                                QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter,
+                                QtGui.QColor("yellow"))
+                # app.processEvents()
+            
+                mainWindow = mainwindow.ScipyenWindow(splash=splash.splashWidget)
+                # app.setActiveWindow(mainWindow)
+                # app.processEvents()
+                mainWindow.menuBar().setNativeMenuBar(mainWindow.useNativeMenuBar)
+                # splash.splashWidget.finish(mainWindow)
+                # if mainWindow.isVisible():
+                #     splash.close()
+            else:
+                mainWindow = mainwindow.ScipyenWindow()
+                
         # mainWindow.show()
         
         # ### END   Splash screen shenanigans
@@ -395,7 +405,7 @@ def main():
         # mainWindow.show()
         
         end = time.perf_counter()
-        print(f"Scipyen initialization: {end - start} s")
+        print(f"Scipyen initialization took {end - start} s")
         # 4. start the main GUI app (pyqt5) event loop
         app.exec()
     except Exception as e:
