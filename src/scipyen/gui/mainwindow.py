@@ -1469,8 +1469,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # self.app.processEvents()
         
         splash = kwargs.get("splash", None)
-        # if isinstance(splash, ScipyenSplashWidget):
-        #     self.sig_splashMessage[str].connect(splash._slot_showMessage)
+        if isinstance(splash, ScipyenSplashWidget):
+            self.sig_splashMessage[str].connect(splash._slot_showMessage, QtCore.Qt.QueuedConnection)
 
         # gui_viewers defined in gui package (see gui/__init__.py)
         # self.viewers = dict(map(lambda x: (x, list()), gui_viewers))

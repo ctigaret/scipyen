@@ -44,6 +44,9 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 class ScipyenSplashWidget(QtWidgets.QSplashScreen):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.message:str = ""
+        self.alignmentFlag = QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter
+        self.color =  QtGui.QColor("black")
         # self.show()
         
     @Slot(str)
@@ -60,19 +63,31 @@ class ScipyenSplashWidget(QtWidgets.QSplashScreen):
                     
             self.showMessage(val, QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter, color)
             
+    def showMessage(self, message:str, alignmentFlag, color:QtGui.QColor = QtGui.QColor("black")):
+        self.message=message
+        self.alignmentFlag = alignmentFlag
+        self.color = color
+        self.repaint()
+            
+    def drawContents(self, painter:QtGui.QPainter):
+        painter.drawPixmap(0, 0, self.pixmap())
+        if isinstance(self.message, str) and len(self.message.strip()):
+            pen = QtGui.QPen(QtGui.QColor("black"))
+            pen.setCosmetic(True)
+            painter.setPen(pen)
+            painter.setRenderHint(QtGui.QPainter.TextAntialiasing, True)
+            painter.drawText(self.rect().adjusted(1,1,1,1), self.alignmentFlag, self.message)
+            pen.setColor(self.color)
+            painter.setPen(pen)
+            painter.drawText(self.rect(), self.alignmentFlag, self.message)
+            
     
-class SplashThread(QtCore.QThread):
-    def __init__(self, splashWidget:ScipyenSplashWidget):#, parent:typing.Optional[QtCore.QObject] = None):
-        QtCore.QThread.__init__(self)#, parent)
-        self.splashWidget = splashWidget
-    def run(self):
-        self.splashWidget.show()
-        
 class ScipyenSplash(QtCore.QObject):
     def __init__(self, pixmap: QtGui.QPixmap):#, parent:typing.Optional[QtCore.QObject] = None):
         super().__init__()
         self.splashWidget = ScipyenSplashWidget(pixmap)#, parent=None)
         self.splashWidget.deleteLater()
-        self.splashThread = SplashThread(self.splashWidget)
-        self.splashWidget.moveToThread(self.splashThread)
-        self.splashThread.run()
+        self.splashWidget.show()
+        # NOTE: 2025-07-02 00:37:28 REMEMBER: 
+        # cannot move widgets to a nother QThread
+        # all GUI code must be executed in the main thread 
