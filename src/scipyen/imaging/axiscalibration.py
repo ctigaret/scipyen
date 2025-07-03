@@ -351,7 +351,7 @@ class CalibrationData:
                 if len(ignore)==0:
                     ignore = None
                     
-        print(f"\n{self.__class__.__name__}.isclose: ignore is {ignore}")
+        # print(f"\n{self.__class__.__name__}.isclose: ignore is {ignore}")
         
         if ret:
             if ignore is None:
@@ -364,7 +364,7 @@ class CalibrationData:
                 else:
                     oth_p = list(getattr(other, p) for p in ("calibratedOrigin", "calibratedResolution", "calibratedMaximum") if hasattr(self, p))
                     
-                print(f"\n{self.__class__.__name__}.isclose:")
+                print(f"\n{self.__class__.__name__}.isclose with ignore: {ignore}")
                 print(f"\ncal_p = {cal_p}")
                 print(f"\noth_p = {oth_p}")
             else:
@@ -372,7 +372,7 @@ class CalibrationData:
                 oth_p = list(getattr(other, p) for p in ("calibratedOrigin", "calibratedResolution", "calibratedMaximum") if p not in ignore and hasattr(other, p))
                          
                          
-                print(f"\n{self.__class__.__name__}.isclose:")
+                print(f"\n{self.__class__.__name__}.isclose with ignore: {ignore}")
                 print(f"\ncal_p = {cal_p}")
                 print(f"\noth_p = {oth_p}")
                     

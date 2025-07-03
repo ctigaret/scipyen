@@ -1952,16 +1952,23 @@ class PVSequence (PVObject):
                     newAxisCal.origin = z_pos[0]
                     newAxisCal.resolution = zres
                     newAxisInfo = newAxisCal.calibrateAxis(newAxisInfo)
+                    
+                    # print(f"{self.__class__.__name__}.__call__: sequence {self.sequencetypename} with {len(self.frames)} frames")
+                    # print(f"\tnewAxisInfo -> {newAxisInfo} with newAxisCal -> {newAxisCal}")
                 
                 # NOTE: 2018-08-01 17:03:52
                 # see NOTE: 2018-08-01 17:04:06
                 channelAxisDim = data[0].axistags.channelIndex
+                # print(f"\tchannelAxisDim -> {channelAxisDim}")
                 
                 if channelAxisDim == data[0].ndim-1:
                     newAxisDim = channelAxisDim
                     
                 else:
                     newAxisDim = data[0].ndim
+                    
+                    
+                print(f"\tnewAxisDim -> {newAxisDim}")
                     
                 images = [imgp.insertAxis(img, newAxisInfo, newAxisDim) for img in data]
             
@@ -2058,15 +2065,20 @@ class PVSequence (PVObject):
                     newAxisCal.resolution=zres
                     newAxisInfo = newAxisCal.calibrateAxis(newAxisInfo)
                     
+                    print(f"{self.__class__.__name__}.__call__: sequence {self.sequencetypename} with {len(self.frames)} frames")
+                    print(f"\tnewAxisInfo -> {newAxisInfo} with newAxisCal -> {newAxisCal}")
+
                 # NOTE: 2018-08-01 17:03:52
                 # see NOTE: 2018-08-01 17:04:06
                 channelAxisDim = data[0][0].axistags.channelIndex
+                print(f"\tchannelAxisDim -> {channelAxisDim}")
                 
                 if channelAxisDim == data[0][0].ndim-1:
                     newAxisDim = channelAxisDim
                     
                 else:
                     newAxisDim = data[0][0].ndim
+                print(f"\tnewAxisDim -> {newAxisDim}")
                     
                 # NOTE: 2025-04-03 08:57:14
                 # return the tuple (frame data, None), where
@@ -2536,6 +2548,8 @@ class PVScan(PVObject):
         
         if filepath is None:
             filepath = self.filepath
+            
+        print(f"{self.__class__.__name__}.__call__: sequencetype: {self.sequences[0].sequencetypename} with {len(self.sequences)} sequences")
             
         if self.sequences[0].sequencetype == PVSequenceType.Linescan:
             if self.sequences[0].definition.mode in (PVLinescanMode.straightLine, \

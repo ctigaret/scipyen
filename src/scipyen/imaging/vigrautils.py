@@ -1222,6 +1222,8 @@ def concatenateImages(*images, **kwargs):
         catAxis     = kwargs.pop("axis",     0)
         ignore      = kwargs.pop("ignore", None)
         
+    print(f"vigrautils.concatenateImages(catAxis={catAxis}, ignore={ignore})")
+        
     # 1) check the "images" parameter:
     
     if len(images) == 1: # this is OK
