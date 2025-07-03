@@ -67,9 +67,14 @@ class ScipyenSplashWidget(QtWidgets.QSplashScreen):
         self.message=message
         self.alignmentFlag = alignmentFlag
         self.color = color
-        self.repaint()
+        self.update()
+        # if __has_PyQt6__ or _-__has_PySide6__:
+        #     self.repaint(self.rect())
+        # else:
+        #     self.repaint()
             
     def drawContents(self, painter:QtGui.QPainter):
+        print(f"{self.__class__.__name__}.drawContents")
         painter.drawPixmap(0, 0, self.pixmap())
         if isinstance(self.message, str) and len(self.message.strip()):
             pen = QtGui.QPen(QtGui.QColor("black"))
@@ -88,6 +93,7 @@ class ScipyenSplash(QtCore.QObject):
         self.splashWidget = ScipyenSplashWidget(pixmap)#, parent=None)
         self.splashWidget.deleteLater()
         self.splashWidget.show()
+        QtGui.QGuiApplication.processEvents()
         # NOTE: 2025-07-02 00:37:28 REMEMBER: 
         # cannot move widgets to a nother QThread
         # all GUI code must be executed in the main thread 

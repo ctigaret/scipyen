@@ -360,7 +360,7 @@ def main():
         pixmap = icon.pixmap(QtCore.QSize(256,256), state=QtGui.QIcon.On)
         
         splash = guisplash.ScipyenSplash(pixmap)
-        app.processEvents()
+        # app.processEvents()
         # splash.setAttribute(QtCore.Qt.WA_StyledBackground)
         # splash.setAttribute(QtCore.Qt.WA_TranslucentBackground + QtCore.Qt.WA_StyledBackground + QtCore.Qt.WA_FramlessWindowHint)
         
@@ -379,7 +379,7 @@ def main():
             splash.splashWidget.showMessage("Scipyen is initializing, please wait...",
                             QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter,
                             QtGui.QColor("yellow"))
-            # app.processEvents()
+            QtGui.QGuiApplication.processEvents() # app.processEvents()
         
             mainWindow = mainwindow.ScipyenWindow(splash=splash.splashWidget)
             # app.setActiveWindow(mainWindow)
