@@ -805,7 +805,8 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                     desc = f"{data}"
                 else:
                     desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
-                    widget = self._makeTableWidget_(data)
+                    if data.ndim < 3 or not any(v > 1 for v in data.shape[2:]):
+                        widget = self._makeTableWidget_(data)
                     
             elif isinstance(data, pq.dimensionality.Dimensionality):
                 desc = f"{data}"
@@ -815,7 +816,8 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                     desc = f"{data}"
                 else:
                     desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
-                    widget = self._makeTableWidget_(data)
+                    if data.ndim < 3 or not any(v > 1 for v in data.shape[2:]):
+                        widget = self._makeTableWidget_(data)
                     
             elif isinstance(data, (vigra.filters.Kernel1D, vigra.filters.Kernel2D)):
                 widget = self._makeTableWidget_(data)

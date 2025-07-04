@@ -54,7 +54,7 @@ from core.utilities import (summarize_object_properties,
                             )
 from core.strutils import (is_cached_output_varname, is_cached_input_varname)
 
-from core.prog import (safewrapper, timefunc, processtimefunc, timeblock)
+from core.prog import (safewrapper, timefunc, processtimefunc, timeblock, print_styled)
 from core.typeenum import TypeEnum
 # from jupyter_core.paths import jupyter_runtime_dir
 
@@ -1318,7 +1318,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # varnames that have been removed 
         del_vars = observed_varnames - current_user_varnames
         
-        # print(f"{self.__class__.__name__}._updateModel_ del_vars = {del_vars}")
+        print(f"{print_styled(f'\n{self.__class__.__name__}._updateModel_ del_vars = {del_vars}', 'yellow')}")
 
         # 3.2. now, remove these from the DataBag of observed variables (self.internalVariablesMonitor)
         #

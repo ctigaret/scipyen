@@ -9775,30 +9775,30 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             self._data_.name = self.baseScipyenDataWidget.dataName
             self._data_modifed_(True)
             
-        if not eq(self._data_.sourceID, self.baseScipyenDataWidget.sourceID):
-            # avoid pitfalls of pandas NAType
-            self._data_.sourceID = self.baseScipyenDataWidget.sourceID
-            self._data_modifed_(True)
-            
-        if not eq(self._data_.cell, self.baseScipyenDataWidget.cell):
-            self._data_.cell = self.baseScipyenDataWidget.cell
-            self._data_modifed_(True)
-            
-        if not eq (self._data_.field, self.baseScipyenDataWidget.field):
-            self._data_.field = self.baseScipyenDataWidget.field
-            self._data_modifed_(True)
-            
-        if not eq(self._data_.genotype, self.baseScipyenDataWidget.genotype):
-            self._data_.genotype = self.baseScipyenDataWidget.genotype
-            self._data_modifed_(True)
-            
-        if not eq(self._data_.sex, self.baseScipyenDataWidget.sex):
-            self._data_.sex = self.baseScipyenDataWidget.sex
-            self._data_modifed_(True)
-            
-        if not eq(self._data_.age, self.baseScipyenDataWidget.age):
-            self._data_.age = self.baseScipyenDataWidget.age
-            self._data_modifed_(True)
+#         if not eq(self._data_.source.sourceID, self.baseScipyenDataWidget.sourceID):
+#             # avoid pitfalls of pandas NAType
+#             self._data_.source.sourceID = self.baseScipyenDataWidget.sourceID
+#             self._data_modifed_(True)
+#             
+#         if not eq(self._data_.cell, self.baseScipyenDataWidget.cell):
+#             self._data_.cell = self.baseScipyenDataWidget.cell
+#             self._data_modifed_(True)
+#             
+#         if not eq (self._data_.field, self.baseScipyenDataWidget.field):
+#             self._data_.field = self.baseScipyenDataWidget.field
+#             self._data_modifed_(True)
+#             
+#         if not eq(self._data_.genotype, self.baseScipyenDataWidget.genotype):
+#             self._data_.genotype = self.baseScipyenDataWidget.genotype
+#             self._data_modifed_(True)
+#             
+#         if not eq(self._data_.sex, self.baseScipyenDataWidget.sex):
+#             self._data_.sex = self.baseScipyenDataWidget.sex
+#             self._data_modifed_(True)
+#             
+#         if not eq(self._data_.age, self.baseScipyenDataWidget.age):
+#             self._data_.age = self.baseScipyenDataWidget.age
+#             self._data_modifed_(True)
 
     @Slot()
     @safewrapper

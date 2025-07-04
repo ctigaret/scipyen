@@ -36,7 +36,7 @@ try:
 except:
     __has_qtdbus__ = False
                     
-# from core.prog import (safewrapper, safeguiwrapper, scipwarn, printStyled)
+# from core.prog import (safewrapper, safeguiwrapper, scipwarn, print_styled)
 # from core.sysutils import adapt_ui_path
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
