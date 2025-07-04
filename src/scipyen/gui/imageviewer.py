@@ -150,7 +150,7 @@ from gui.itemslistdialog import ItemsListDialog
 # needed for the new plugins framework
 __scipyen_plugin__ = None
 
-mpl.rcParams['backend']='Qt5Agg'
+# mpl.rcParams['backend']='Qt5Agg'
 
 #__viewer_info__ = {"alias": "iv", "class": "ImageViewer"}
 
@@ -3144,13 +3144,17 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             img = self.frameData
             # print(f"{self.__class__.__name__}._displayValueAtCoordinates: img axistags: {img.axistags}")
             
+            # NOTE: 2025-07-04 09:27:37
+            # indexes of the with ("X") axis and height ("Y") axis
             viewWidthAxisIndex  = img.axistags.index(wAxInfo.key)
             viewHeightAxisIndex = img.axistags.index(hAxInfo.key)
             
+            # NOTE: 2025-07-04 09:28:11
+            # image width and height
             viewW = img.shape[viewWidthAxisIndex]
             viewH = img.shape[viewHeightAxisIndex]
             
-            # ### BEGIN cursor information
+            # ### BEGIN data cursor information
             # NOTE: 2021-10-25 22:26:53
             # when given, wx and wy below are, horizontal & vertical cursor
             # windows, respectively
@@ -3173,8 +3177,10 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                 crstxt = "%s " % (crsId)
             else:
                 crstxt = ""
-            # ### END   cursor information
+            # ### END   data cursor information
                 
+            # NOTE: 2025-07-04 09:29:52
+            # ### BEGIN adjust x and y if they are beyond the boundaries of the image plane
             if x is not None and x >= w:
                 x = w-1
                 
@@ -3186,12 +3192,15 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                 
             if y is not None and y < 0:
                 y = 0
+            # ### END   adjust x and y if they are beyond the boundaries of the image plane
 
             #print("w: %f, x: %f, h: %f, y: %f" % (w, x, h, y))
             
             if all([v_ is not None for v_ in (x,y)]):
                 if img.ndim >= 2: # there may be a channel axis
                     if self._axes_calibration_:
+                        # NOTE: 2025-07-04 09:30:31
+                        # get calibrated coordinates (x -> cx and y -> cy)
                         cx = self._axes_calibration_[viewWidthAxisIndex].calibratedMeasure(x)
                         cy = self._axes_calibration_[viewHeightAxisIndex].calibratedMeasure(y)
                         scx = quantity2str(cx)

@@ -317,6 +317,10 @@ class CalibrationData:
                 use_math=True,
                 ignore:typing.Optional[typing.Union[str, tuple, list]] = None):
         
+        # print(f"\n{self.__class__.__name__}.isclose:")
+        # print(f"\tself: {self}\n")
+        # print(f"\tother: {other}\n")
+        
         if ignore is not None:
             if all(v not in ignore for v in ('units', 'origin','resolution','maximum')):
                 ignore = None
@@ -330,16 +334,23 @@ class CalibrationData:
         # print(f"\n{self.__class__.__name__}.isclose: other class is self class: {other.__class__ == self.__class__}")
         ret = other.__class__ == self.__class__
         if ret:
-            ret &= self.isChannels and other.isChannels
+            if hasattr(self, "isChannels"):
+                ret &= hasattr(other, "isChannels")
+                if ret:
+                    ret &= self.isChannels == other.isChannels
             
         if ret:
-            if self.isChannels:
+            if hasattr(self, "isChannels") and self.isChannels:
                 ret &= self.nChannels == other.nChannels
                 if ret:
-                    ret &= all(list(map(lambda c: self.channels[c].isclose(other.channels[c], rtol=rtol, atol=atol, equal_nan=equal_nan, use_math=use_math, ignore=ignore))))
+                    ret &= all(list(map(lambda c: self.channels[c].isclose(other.channels[c], rtol=rtol, atol=atol, equal_nan=equal_nan, use_math=use_math, ignore=ignore), range(self.nChannels))))
                     
+                # print(f"\n{self.__class__.__name__}.isclose: testing channels: -> {ret}")
+                    
+                
             else:
                 if ret and (ignore is None or "units" not in ignore):
+                    # print(f"\n{self.__class__.__name__}.isclose: testing units: {self.units} <-> {other.units}")
                     try:
                         if all(isinstance(u, pq.Quantity) for u in (self.units, other.units)):
                             ret &= unitsConvertible(self.units, other.units)
@@ -368,8 +379,6 @@ class CalibrationData:
                             
                 
                 # print(f"\n{self.__class__.__name__}.isclose: ignore is {ignore}")
-                # BUG 2025-07-04 00:59:31 FIXME NOW
-                # skip these for channel axis; try isclose for each channel instead
                 if ret:
                     if ignore is None:
                         cal_p = list(getattr(self, p) for p in ("calibratedOrigin", "calibratedResolution", "calibratedMaximum") if hasattr(self, p))
@@ -380,25 +389,25 @@ class CalibrationData:
                             
                         else:
                             oth_p = list(getattr(other, p) for p in ("calibratedOrigin", "calibratedResolution", "calibratedMaximum") if hasattr(self, p))
-                            
-                        print(f"\n{self.__class__.__name__}.isclose with ignore: {ignore}")
-                        print(f"\t in\n\t{self} and\n\t{other}:")
-                        print(f"\ncal_p = {cal_p}")
-                        print(f"\noth_p = {oth_p}")
+#                             
+#                         print(f"\n{self.__class__.__name__}.isclose with ignore: {ignore}")
+#                         print(f"\t in\n\t{self} and\n\t{other}:")
+#                         print(f"\ncal_p = {cal_p}")
+#                         print(f"\noth_p = {oth_p}")
                     else:
                         cal_p = list(getattr(self, p) for p in ("calibratedOrigin", "calibratedResolution", "calibratedMaximum") if p not in ignore and hasattr(self, p))
                         oth_p = list(getattr(other, p) for p in ("calibratedOrigin", "calibratedResolution", "calibratedMaximum") if p not in ignore and hasattr(other, p))
                                 
                                 
-                        print(f"\n{self.__class__.__name__}.isclose with ignore: {ignore}")
-                        print(f"\ncal_p = {cal_p}")
-                        print(f"\noth_p = {oth_p}")
+                        # print(f"\n{self.__class__.__name__}.isclose with ignore: {ignore}")
+                        # print(f"\ncal_p = {cal_p}")
+                        # print(f"\noth_p = {oth_p}")
                             
                     ret &= len(cal_p) == len(oth_p) and all(isclose(p[0], p[1], rtol=rtol, atol=atol, equal_nan=equal_nan, use_math=use_math) for p in zip(cal_p, oth_p))
                     
                     
-        if not ret:
-            print(f"\n{self.__class__.__name__}.isclose will return {ret}")
+        # if not ret:
+        #     print(f"\n{self.__class__.__name__}.isclose will return {ret}")
         return ret
                  
 class CalibrationUnitsDescriptor:
@@ -491,6 +500,10 @@ class CalibrationScalarDescriptor:
     'origin', 'maximum', 'resolution'
     This enforces the rule that these attributes get numeric values only for 
     NonChannel axes, but are set to dataclasses.MISSING for Channels axes.
+    WARNING:
+    Before setting a value to any of these attributes, the 'unit' attrribute of
+    the AxisCalibrationDatamust have been appropriately set!.
+    
     """
     def __init__(self, *, default:typing.Union[numbers.Number, pq.Quantity, MissingType, str]=0.0):
         if isinstance(default, str):

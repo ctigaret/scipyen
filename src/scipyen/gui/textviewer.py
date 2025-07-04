@@ -97,12 +97,21 @@ class TextViewer(ScipyenViewer):
             
     def _configureUI_(self):
         self.fileMenu = self.menuBar().addMenu("&File")
-        self.fileMenu.addAction(QtGui.QIcon.fromTheme("document-open"), "&Open...", self.openFile, "Ctrl+Shift+O")
-        self.fileMenu.addAction(QtGui.QIcon.fromTheme("document-save-as"), "&Save As...", self.saveAsFile, "Ctrl+Shift+S")
-        self.fileMenu.addAction(QtGui.QIcon.fromTheme("document-export"), "Export to workspace...", self._slot_exportDataToWorkspace, "Ctrl+Shift+E")
+        if __has_PyQt6__ or __has_PySide6__:
+            self.fileMenu.addAction(QtGui.QIcon.fromTheme("document-open"), "&Open...", self.openFile)
+            self.fileMenu.addAction(QtGui.QIcon.fromTheme("document-save-as"), "&Save As...", self.saveAsFile)
+            self.fileMenu.addAction(QtGui.QIcon.fromTheme("document-export"), "Export to workspace...", self._slot_exportDataToWorkspace)
+        else:
+            self.fileMenu.addAction(QtGui.QIcon.fromTheme("document-open"), "&Open...", self.openFile, "Ctrl+Shift+O")
+            self.fileMenu.addAction(QtGui.QIcon.fromTheme("document-save-as"), "&Save As...", self.saveAsFile, "Ctrl+Shift+S")
+            self.fileMenu.addAction(QtGui.QIcon.fromTheme("document-export"), "Export to workspace...", self._slot_exportDataToWorkspace, "Ctrl+Shift+E")
         self.editMenu = self.menuBar().addMenu("&Edit")
-        self.editMenu.addAction(QtGui.QIcon.fromTheme("edit-undo"), "&Undo", self.undo, "Ctrl+z")
-        self.editMenu.addAction(QtGui.QIcon.fromTheme("edit-redo"), "&Redo", self.undo, "Ctrl+Shift+z")
+        if __has_PyQt6__ or __has_PySide6__:
+            self.editMenu.addAction(QtGui.QIcon.fromTheme("edit-undo"), "&Undo", self.undo)
+            self.editMenu.addAction(QtGui.QIcon.fromTheme("edit-redo"), "&Redo", self.undo)
+        else:
+            self.editMenu.addAction(QtGui.QIcon.fromTheme("edit-undo"), "&Undo", self.undo, "Ctrl+z")
+            self.editMenu.addAction(QtGui.QIcon.fromTheme("edit-redo"), "&Redo", self.undo, "Ctrl+Shift+z")
         
         self._docViewer_ = QtWidgets.QTextEdit(self)
         self._docViewer_.setReadOnly(self._readOnly)
@@ -182,6 +191,7 @@ class TextViewer(ScipyenViewer):
         self._set_data_("")
         self._docViewer_.document().clear()
         
+    @Slot()
     def openFile(self):
         fileFilter = "All files (*.*);;Text files (*.txt);;HTML (*.html, *.htm);;XML (*.xml);;Markdown (*.md)"
         
@@ -223,6 +233,7 @@ class TextViewer(ScipyenViewer):
     def redo(self):
         self._docViewer_.redo()
     
+    @Slot()
     def saveAsFile(self):
         if self._docViewer_.document().isEmpty():
             #print("Nothing to save")

@@ -1114,6 +1114,7 @@ class PVFrame(PVObject):
         self.ExtraParameters = list(map(lambda n: DataBag(xmlutils.attributesToDict(n)), extraParamNodes))
 
         stateShardNodes = tuple(xmlutils.getChildren(node, tagName="PVStateShard"))
+        
         if len(stateShardNodes):
             self._stateshard_ = PVStateShard(stateShardNodes[0], self)
         
@@ -1389,8 +1390,9 @@ class PVFrame(PVObject):
             # fdata_axis_0_cal  = AxisCalibrationData(fdata_axis_0_info)
             fdata_axis_0_cal  = AxisCalibrationData.new(fdata_axis_0_info)
             # print(f"{self.__class__.__name__}.__call__: calibration -> {fdata_axis_0_cal.type}")
+            fdata_axis_0_cal.units = pq.um
             if self.versionString < "5.5":
-                fdata_axis_0_cal.resolution = float(self.state["micronsPerPixel_XAxis"].value)
+                fdata_axis_0_cal.resolution = float(self.state["micronsPerPixel_XAxis"].value)*pq.um
             else:
                 # ATTENTION: 2025-04-04 15:07:52
                 # axes resolutions are ALL in the state shard at PVScan level,  
@@ -1401,10 +1403,10 @@ class PVFrame(PVObject):
                         
                 # print(f"{self.__class__.__name__}.__call__: query scales for {fdata_axis_0_info} - state keys: {tuple(state.keys)}")
                 if isinstance(state, PVStateShard) and "micronsPerPixel" in state:
-                    fdata_axis_0_cal.resolution = float(state["micronsPerPixel"]["XAxis"].value)
-                    fdata_axis_0_cal.units = pq.um
+                    fdata_axis_0_cal.resolution = float(state["micronsPerPixel"]["XAxis"].value)*pq.um
                 else:
                     scipywarn(f"Cannot get the μm / pixel for axis {print_styled(f'{fdata_axis_0_info}', 'yellow')} in frame {print_styled(f'frame {self.index}', 'yellow')}")
+            
             
             # embed calibration string into axis_0_info's description
             fdata_axis_0_info = fdata_axis_0_cal.calibrateAxis(fdata_axis_0_info)
@@ -1421,7 +1423,7 @@ class PVFrame(PVObject):
             if self.parent is not None and self.parent.type == PVSequenceType.Linescan:
                 fdata_axis_1_info = vigra.AxisInfo(key="t", 
                                              typeFlags=vigra.AxisType.Time, 
-                                             resolution = self.state.attributes["scanlinePeriod"])
+                                             resolution = self.state.attributes["scanlinePeriod"])*pq.s
                 
                 fdata_axis_1_cal  = AxisCalibrationData.new(fdata_axis_1_info)
                 fdata_axis_1_cal.units = pq.s
@@ -1430,29 +1432,19 @@ class PVFrame(PVObject):
                 fdata_axis_1_info = fdata.axistags[1] # by default vigra behaviour is Space 
                 
                 fdata_axis_1_cal = AxisCalibrationData.new(fdata_axis_1_info)
+                fdata_axis_1_cal.units = pq.um
                 if self.versionString < "5.5":
-                    fdata_axis_1_cal.resolution = float(self.state["micronsPerPixel_YAxis"].value)
+                    fdata_axis_1_cal.resolution = float(self.state["micronsPerPixel_YAxis"].value)*pq.um
                 else:
                     # NOTE: see ATTENTION: 2025-04-04 15:07:52
                     state = self.parent.parent.state
-                    # if self.index == 0:
-                    #     state = self.parent.parent.state
-                    # else:
-                    #     state = self.state
-                    # if not isinstance(state, PVStateShard) or len(state) == 0 or "micronsPerPixel" not in state:
-                    #     parent = self.parent
-                    #     while len(self.state) == 0  and isinstance(parent, PVObject):
-                    #         state = parent.state
-                    #         if isinstance(state, PVStateShard) and "micronsPerPixel" in state:
-                    #             break
-                    #         parent = parent.parent
                     # print(f"{self.__class__.__name__}.__call__: query scales for {fdata_axis_1_info} - state keys: {tuple(state.keys)}")
                     # state = self.state if len(self.state) else self.parent.parent.state
                     if isinstance(state, PVStateShard) and "micronsPerPixel" in state:
-                        fdata_axis_1_cal.resolution = float(state["micronsPerPixel"]["YAxis"].value)
-                        fdata_axis_1_cal.units = pq.um
+                        fdata_axis_1_cal.resolution = float(state["micronsPerPixel"]["YAxis"].value)*pq.um
                     else:
                         scipywarn(f"Cannot get the μm / pixel for axis {print_styled(f'{fdata_axis_1_info}', 'yellow')} in frame {print_styled(f'frame {self.index}', 'yellow')}")
+
                 
             # embed calibration string into axis_1_info's description
             fdata_axis_1_info = fdata_axis_1_cal.calibrateAxis(fdata_axis_1_info)
@@ -1515,28 +1507,17 @@ class PVFrame(PVObject):
                     
                 sdata_axis_0_info = sdata.axistags[0]
                 sdata_axis_0_cal = AxisCalibrationData.new(sdata_axis_0_info)
+                sdata_axis_0_cal.units = pq.um
+                
                 if self.versionString < "5.5":
-                    sdata_axis_0_cal.resolution = float(self.state["micronsPerPixel_XAxis"].value)
+                    sdata_axis_0_cal.resolution = float(self.state["micronsPerPixel_XAxis"].value)*pq.um
                 else:
                     # NOTE: see ATTENTION: 2025-04-04 15:07:52
                     state = self.parent.parent.state
-#                     if self.index == 0:
-#                         state = self.parent.parent.state
-#                     else:
-#                         state = self.state
-#                     
-#                     if not isinstance(state, PVStateShard) or len(state) == 0:
-#                         parent = self.parent
-#                         while len(self.state) == 0  and isinstance(parent, PVObject):
-#                             state = parent.state
-#                             if isinstance(state, PVStateShard) and "micronsPerPixel" in state:
-#                                 break
-#                             parent = parent.parent
                             
                     # print(f"{self.__class__.__name__}.__call__: query scales for SOURCE {sdata_axis_0_info} - state keys: {tuple(state.keys)}")
                     if isinstance(state, PVStateShard) and "micronsPerPixel" in state:
-                        sdata_axis_0_cal.resolution = float(state["micronsPerPixel"]["XAxis"].value)
-                        sdata_axis_0_cal.units = pq.um
+                        sdata_axis_0_cal.resolution = float(state["micronsPerPixel"]["XAxis"].value)*pq.um
                     else:
                         scipywarn(f"Cannot get the μm / pixel for axis {print_styled(f'{sdata_axis_0_info}', 'yellow')} in frame {print_styled(f'frame {self.index}', 'yellow')}")
                         
@@ -1544,30 +1525,19 @@ class PVFrame(PVObject):
                 
                 sdata_axis_1_info = sdata.axistags[1]
                 sdata_axis_1_cal = AxisCalibrationData.new(sdata_axis_1_info)
+                sdata_axis_1_cal.units = pq.um
+                
                 if self.versionString < "5.5":
-                    sdata_axis_1_cal.resolution=float(self.state["micronsPerPixel_YAxis"].value)
+                    sdata_axis_1_cal.resolution=float(self.state["micronsPerPixel_YAxis"].value) * pq.um
                 else:
                     # NOTE: see ATTENTION: 2025-04-04 15:07:52
                     state = self.parent.parent.state
-#                     if self.index == 0:
-#                         state = self.parent.parent.state
-#                     else:
-#                         state = self.state
-#                         
-#                     if not isinstance(state, PVStateShard) or len(state) == 0:
-#                         parent = self.parent
-#                         while len(self.state) == 0  and isinstance(parent, PVObject):
-#                             state = parent.state
-#                             if isinstance(state, PVStateShard) and "micronsPerPixel" in state:
-#                                 break
-#                             parent = parent.parent
-                            
                     # print(f"{self.__class__.__name__}.__call__: query scales for SOURCE {sdata_axis_1_info} - state keys: {tuple(state.keys)}")
                     if isinstance(state, PVStateShard) and "micronsPerPixel" in state:
-                        sdata_axis_1_cal.resolution=float(state["micronsPerPixel"]["YAxis"].value)
-                        sdata_axis_1_cal.units = pq.um
+                        sdata_axis_1_cal.resolution=float(state["micronsPerPixel"]["YAxis"].value)* pq.um
                     else:
                         scipywarn(f"Cannot get the μm / pixel for axis {print_styled(f'{sdata_axis_1_info}', 'yellow')} in frame {print_styled(f'frame {self.index}', 'yellow')}")
+                        
                 sdata_axis_1_info = sdata_axis_1_cal.calibrateAxis(sdata_axis_1_info)
                 
                 if sdata.channelIndex == sdata.ndim:
@@ -1578,11 +1548,6 @@ class PVFrame(PVObject):
                 sdata_axis_2_cal = AxisCalibrationData.new(sdata_axis_2_info)
                 sdata_axis_2_cal.addChannelCalibration(ChannelCalibrationData(index = self.files[k]["channel"],
                                                                           name=self.files[k]["channelName"]))
-                # sdata_axis_2_cal.addChannelCalibration(ChannelCalibrationData(index = self.files[k]["channel"],
-                #                                                           name=self.files[k]["channelName"]),
-                #                                         name = self.files[k]["channelName"],
-                #                                         index = self.files[k]["channel"])
-
                 sdata_axis_2_cal = sdata_axis_2_cal.calibrateAxis(sdata_axis_2_info)
                 
                 newaxistags = vigra.AxisTags(sdata_axis_0_info, sdata_axis_1_info, sdata_axis_2_info)
@@ -1923,7 +1888,7 @@ class PVSequence (PVObject):
                     newAxisCal = AxisCalibrationData.new(newAxisInfo)
                     newAxisCal.units = pq.s,
                     newAxisCal.origin = frameTimes[0]
-                    newAxisCal.resolution = framePeriod
+                    newAxisCal.resolution = framePeriod * pq.s
                     newAxisInfo = newAxisCal.calibrateAxis(newAxisInfo)
                     
                 else: # Z series
@@ -1968,7 +1933,7 @@ class PVSequence (PVObject):
                     newAxisDim = data[0].ndim
                     
                     
-                print(f"\tnewAxisDim -> {newAxisDim}")
+                # print(f"\tnewAxisDim -> {newAxisDim}")
                     
                 images = [imgp.insertAxis(img, newAxisInfo, newAxisDim) for img in data]
             
@@ -2065,20 +2030,20 @@ class PVSequence (PVObject):
                     newAxisCal.resolution=zres
                     newAxisInfo = newAxisCal.calibrateAxis(newAxisInfo)
                     
-                    print(f"{self.__class__.__name__}.__call__: sequence {self.sequencetypename} with {len(self.frames)} frames")
-                    print(f"\tnewAxisInfo -> {newAxisInfo} with newAxisCal -> {newAxisCal}")
+                    # print(f"{self.__class__.__name__}.__call__: sequence {self.sequencetypename} with {len(self.frames)} frames")
+                    # print(f"\tnewAxisInfo -> {newAxisInfo} with newAxisCal -> {newAxisCal}")
 
                 # NOTE: 2018-08-01 17:03:52
                 # see NOTE: 2018-08-01 17:04:06
                 channelAxisDim = data[0][0].axistags.channelIndex
-                print(f"\tchannelAxisDim -> {channelAxisDim}")
+                # print(f"\tchannelAxisDim -> {channelAxisDim}")
                 
                 if channelAxisDim == data[0][0].ndim-1:
                     newAxisDim = channelAxisDim
                     
                 else:
                     newAxisDim = data[0][0].ndim
-                print(f"\tnewAxisDim -> {newAxisDim}")
+                # print(f"\tnewAxisDim -> {newAxisDim}")
                     
                 # NOTE: 2025-04-03 08:57:14
                 # return the tuple (frame data, None), where
@@ -2190,13 +2155,21 @@ class PVSequence (PVObject):
         
             elif self.type == PVSequenceType.ZSeries:
                 # get the Z axis resolution from the frames state
-                z_pos = [f.state.attributes["positionCurrent_ZAxis"] for f in self.frames]
-                z_steps = np.diff(z_pos)
-                #if len(z_steps) > 1:
-                    #if not all(z == z_steps[0] for z in z_steps):
-                        #raise ValueError("Irregular Z axis sampling not supported")
-                    
-                framePeriod = abs(z_steps[0]) * pq.um
+                if self.versionString >= "5.5":
+                    # NOTE: 2025-07-04 10:51:23
+                    # Frame-specific Z position appears to have been removed from the 
+                    # per-frame state shard
+                    # my guess s that is may have been updated in the parent PVSvcan during
+                    # acquisition.
+                    # Therefore I cannot infer the Z axis resollution from this data anymore
+                    # Intead, I must use PVScan's state["micronsPerPixel"]["ZAxis"]
+                    # z_pos = [f.state.attributes["positionCurrent"]["ZAxis"] for f in self.frames]
+                    framePeriod = float(self.parent.state["micronsPerPixel"]["ZAxis"].value) * pq.um
+                else:
+                    z_pos = [f.state.attributes["positionCurrent_ZAxis"] for f in self.frames]
+                    z_steps = np.diff(z_pos)
+                        
+                    framePeriod = abs(z_steps[0]) * pq.um
                 
             else:
                 framePeriod = 1 * pq.dimensionless
@@ -2549,7 +2522,7 @@ class PVScan(PVObject):
         if filepath is None:
             filepath = self.filepath
             
-        print(f"{self.__class__.__name__}.__call__: sequencetype: {self.sequences[0].sequencetypename} with {len(self.sequences)} sequences")
+        # print(f"{self.__class__.__name__}.__call__: sequencetype: {self.sequences[0].sequencetypename} with {len(self.sequences)} sequences")
             
         if self.sequences[0].sequencetype == PVSequenceType.Linescan:
             if self.sequences[0].definition.mode in (PVLinescanMode.straightLine, \
@@ -2769,7 +2742,7 @@ class PVScan(PVObject):
         for future in concurrent.futures.as_completed(futures):
             (scans, scene) = future.result()
         
-        meta = self.metadata()
+        meta = self.metadata
         
         file_origin = self.filepath
         rec_datetime = self._rec_datetime_
@@ -2779,7 +2752,7 @@ class PVScan(PVObject):
                         analysisOptions=analysisOptions,
                         file_origin=file_origin,
                         rec_datetime=rec_datetime,
-                        metadata=self.metadata())
+                        metadata=self.metadata)
 
     def scandata(self, *args, **kwargs):
         return self.scanData(*args, **kwargs)
