@@ -435,6 +435,12 @@ def isclose(x:typing.Union[Number, np.ndarray], y:typing.Union[Number, np.ndarra
     """
     raise NotImplementedError(f"{type(x).__name__} objects are not supported")
 
+@isclose.register(type(None))
+def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, 
+      use_math:bool=True, equal_nan:bool=False) -> bool:
+    if any(v is None for v in (x,y)):
+        return x is None and y is None
+
 @isclose.register(str)
 def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, 
       use_math:bool=True, equal_nan:bool=False) -> bool:

@@ -329,56 +329,74 @@ class CalibrationData:
         
         # print(f"\n{self.__class__.__name__}.isclose: other class is self class: {other.__class__ == self.__class__}")
         ret = other.__class__ == self.__class__
-        
-        if ret and (ignore is None or "units" not in ignore):
-            try:
-                unitstest = unitsConvertible(self.units, other.units)
-                ret &= unitstest
-                if not unitstest:
-                    print(f"\n{self.__class__.__name__}.isclose: convertible units: {unitstest}")
-            except:
-                traceback.print_exc()
-                print(f"self.units: {self.units}, other.units: {other.units}")
-            
-        if ignore is not None and "units" in ignore:
-            if isinstance(ignore, str):
-                ignore = ignore.replace("units", "")
-                if len(ignore.strip()) == 0:
-                    ignore = None
-                    
-            elif isinstance(ignore, (tuple, list)):
-                ignore = list(s for s in ignore if s != "units")
-                if len(ignore)==0:
-                    ignore = None
-                    
-        # print(f"\n{self.__class__.__name__}.isclose: ignore is {ignore}")
-        
         if ret:
-            if ignore is None:
-                cal_p = list(getattr(self, p) for p in ("calibratedOrigin", "calibratedResolution", "calibratedMaximum") if hasattr(self, p))
-                
-                if self.units != other.units:
-                    oth_p = list(getattr(other, p).rescale(self.units) for p in ("calibratedOrigin", "calibratedResolution", "calibratedMaximum") if hasattr(self, p))
-                    # oth_p = list(v.rescale(getattr(other, p), self.units) for p in ("calibratedOrigin", "calibratedResolution", "calibratedMaximum") if hasattr(self, p))
+            ret &= self.isChannels and other.isChannels
+            
+        if ret:
+            if self.isChannels:
+                ret &= self.nChannels == other.nChannels
+                if ret:
+                    ret &= all(list(map(lambda c: self.channels[c].isclose(other.channels[c], rtol=rtol, atol=atol, equal_nan=equal_nan, use_math=use_math, ignore=ignore))))
                     
-                else:
-                    oth_p = list(getattr(other, p) for p in ("calibratedOrigin", "calibratedResolution", "calibratedMaximum") if hasattr(self, p))
-                    
-                print(f"\n{self.__class__.__name__}.isclose with ignore: {ignore}")
-                print(f"\ncal_p = {cal_p}")
-                print(f"\noth_p = {oth_p}")
             else:
-                cal_p = list(getattr(self, p) for p in ("calibratedOrigin", "calibratedResolution", "calibratedMaximum") if p not in ignore and hasattr(self, p))
-                oth_p = list(getattr(other, p) for p in ("calibratedOrigin", "calibratedResolution", "calibratedMaximum") if p not in ignore and hasattr(other, p))
-                         
-                         
-                print(f"\n{self.__class__.__name__}.isclose with ignore: {ignore}")
-                print(f"\ncal_p = {cal_p}")
-                print(f"\noth_p = {oth_p}")
+                if ret and (ignore is None or "units" not in ignore):
+                    try:
+                        if all(isinstance(u, pq.Quantity) for u in (self.units, other.units)):
+                            ret &= unitsConvertible(self.units, other.units)
+                            
+                        elif any(u in (MISSING, None) for u in (self.units, other.units)):
+                            ret &= self.units == other.units
+                        else:
+                            ret &= False
+                        # ret &= unitstest
+                        # if not unitstest:
+                        #     print(f"\n{self.__class__.__name__}.isclose: convertible units: {unitstest}")
+                    except:
+                        traceback.print_exc()
+                        print(f"self.units: {self.units}, other.units: {other.units}")
                     
-            ret &= len(cal_p) == len(oth_p) and all(isclose(p[0], p[1], rtol=rtol, atol=atol, equal_nan=equal_nan, use_math=use_math) for p in zip(cal_p, oth_p))
-            
-            
+                if ignore is not None and "units" in ignore:
+                    if isinstance(ignore, str):
+                        ignore = ignore.replace("units", "")
+                        if len(ignore.strip()) == 0:
+                            ignore = None
+                            
+                    elif isinstance(ignore, (tuple, list)):
+                        ignore = list(s for s in ignore if s != "units")
+                        if len(ignore)==0:
+                            ignore = None
+                            
+                
+                # print(f"\n{self.__class__.__name__}.isclose: ignore is {ignore}")
+                # BUG 2025-07-04 00:59:31 FIXME NOW
+                # skip these for channel axis; try isclose for each channel instead
+                if ret:
+                    if ignore is None:
+                        cal_p = list(getattr(self, p) for p in ("calibratedOrigin", "calibratedResolution", "calibratedMaximum") if hasattr(self, p))
+                        
+                        if self.units != other.units:
+                            oth_p = list(getattr(other, p).rescale(self.units) for p in ("calibratedOrigin", "calibratedResolution", "calibratedMaximum") if hasattr(self, p))
+                            # oth_p = list(v.rescale(getattr(other, p), self.units) for p in ("calibratedOrigin", "calibratedResolution", "calibratedMaximum") if hasattr(self, p))
+                            
+                        else:
+                            oth_p = list(getattr(other, p) for p in ("calibratedOrigin", "calibratedResolution", "calibratedMaximum") if hasattr(self, p))
+                            
+                        print(f"\n{self.__class__.__name__}.isclose with ignore: {ignore}")
+                        print(f"\t in\n\t{self} and\n\t{other}:")
+                        print(f"\ncal_p = {cal_p}")
+                        print(f"\noth_p = {oth_p}")
+                    else:
+                        cal_p = list(getattr(self, p) for p in ("calibratedOrigin", "calibratedResolution", "calibratedMaximum") if p not in ignore and hasattr(self, p))
+                        oth_p = list(getattr(other, p) for p in ("calibratedOrigin", "calibratedResolution", "calibratedMaximum") if p not in ignore and hasattr(other, p))
+                                
+                                
+                        print(f"\n{self.__class__.__name__}.isclose with ignore: {ignore}")
+                        print(f"\ncal_p = {cal_p}")
+                        print(f"\noth_p = {oth_p}")
+                            
+                    ret &= len(cal_p) == len(oth_p) and all(isclose(p[0], p[1], rtol=rtol, atol=atol, equal_nan=equal_nan, use_math=use_math) for p in zip(cal_p, oth_p))
+                    
+                    
         if not ret:
             print(f"\n{self.__class__.__name__}.isclose will return {ret}")
         return ret
