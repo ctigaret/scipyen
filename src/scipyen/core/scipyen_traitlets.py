@@ -109,6 +109,68 @@ class ScipyenTraitTypeMixin:
                 obj._notify_trait(self.name, old_value, Undefined,
                                   change_type="removed")
                 
+class TypeTrait(Any, ScipyenTraitTypeMixin):
+    info_text = "Traitlet for type; types are considered immutable"
+    default_value = type
+    klass = type
+    _trait = None
+    _valid_defaults = (type,)
+    
+    def __init__(self, args=None, kw=None, **kwargs):
+        super(ScipyenTraitTypeMixin, self).__init__()
+        default_value = kwargs.pop("default_value", None)
+        self.allow_none = kwargs.pop("allow_none", False)
+        if isinstance(args, type):
+            self.default_value = args
+        else:
+            self.default_value = type
+        args = None
+        super().__init__(klass = self.klass, args=args, kw=kw, 
+                         default_value=default_value, **kwargs)
+        
+    def validate(self, obj, value):
+        if isinstance(value, type):
+            return value
+        
+        self.error(obj, value)
+        
+    def set(self, obj, value):
+        new_value = self.validate(obj, value)
+        silent=True
+        change_type="new"
+
+        if self.name and self.name in obj._trait_values and self.name in obj.traits():
+            old_value = obj._trait_values[self.name]
+        else:
+            old_value = self.default_value
+            silent = False
+            change_type = "new"
+            
+        if new_value is None and old_value is None:
+            return
+        
+        if new_value is None:
+            change_type = "modified" # don't EVER use "new" here 'cause will trigger duplications in some listeners
+            obj._trait_values[self.name] = new_value
+            obj._notify_trait(self.name, old_value, new_value, 
+                            change_type = change_type)
+            return
+        
+        if old_value is None:
+            change_type = "modified" # don't EVER use "new" here 'cause will trigger duplications in some listeners
+            obj._trait_values[self.name] = new_value
+            obj._notify_trait(self.name, old_value, new_value, 
+                            change_type = change_type)
+        
+        if silent:
+            silent &= new_value == old_value
+           
+        if not silent:
+            change_type = "new"
+            obj._trait_values[self.name] = new_value
+            obj._notify_trait(self.name, old_value, new_value,
+                              change_type = change_type)
+    
 class DictTrait(Dict, ScipyenTraitTypeMixin):
     info_text = "Traitlet for mapping types (dict) that is sensitive to content changes"
     default_value = dict() # default value of the Trait instance

@@ -111,9 +111,9 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     sig_startAsyncUpdate = Signal(dict, name="sig_startAsyncUpdate")
     
     #                         ns    dataname ns_name 
-    sig_varAdded = Signal(dict, str,     str,     name="sig_varAdded")
-    sig_varRemoved = Signal(dict, str,     str,     name="sig_varRemoved")
-    sig_varModified = Signal(dict, str,     str,     name="sig_varModified")
+    # sig_varAdded = Signal(dict, str,     str,     name="sig_varAdded")
+    # sig_varRemoved = Signal(dict, str,     str,     name="sig_varRemoved")
+    # sig_varModified = Signal(dict, str,     str,     name="sig_varModified")
 
     def __init__(self, shell, user_ns_hidden=dict(),
                  parent=None,
@@ -204,9 +204,9 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                                        WorkspaceVarChange.Modified: partial(self.__class__.updateRowForVariable2, self, self.shell.user_ns),
                                        WorkspaceVarChange.Removed:  partial(self.__class__.removeRowForVariable2, self, self.shell.user_ns)}
         
-        self.sig_varAdded.connect(self.addRowForVariable2)
-        self.sig_varModified.connect(self.updateRowForVariable2)
-        self.sig_varRemoved.connect(self.removeRowForVariable2)
+        # self.sig_varAdded.connect(self.addRowForVariable2)
+        # self.sig_varModified.connect(self.updateRowForVariable2)
+        # self.sig_varRemoved.connect(self.removeRowForVariable2)
 
         # self.internalVariableChanged.connect(self._slot_internalVariableChanged_)
         self.internalVariableChanged.connect(self._slot_cacheInternalVariableChange_)
@@ -886,7 +886,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # self.__change_dict__ = change
         # QtCore.QTimer.singleShot(0, self._observe_wrapper_)
         # connected to self._slot_internalVariableChanged_, def'ed below
-        # print(f"\n{self.__class__.__name__}.internalVariablesListenerCB({change})")
+        # print(f"{print_styled(f'\n{self.__class__.__name__}.internalVariablesListenerCB({change})', color='red')}")
         if change.type not in ("remove", "removed"):
             if change.name not in self.shell.user_ns:
                 change.type = "remove"
@@ -1284,8 +1284,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # ###
         # 3. now, deal with everything else
         #
-        if self.lastExecutionResult:
-            print(f"{print_styled(f'\n{self.__class__.__name__}._updateModel_ last execution result: {self.lastExecutionResult}', 'magenta')}")
+        # if self.lastExecutionResult:
+        #     print(f"{print_styled(f'\n{self.__class__.__name__}._updateModel_ last execution result: {self.lastExecutionResult}', 'magenta')}")
         # ### BEGIN 2023-05-23 22:39:22 do not delete
         #
         # 3.1. establish which variables have been removed ⇒ del_vars
@@ -1556,7 +1556,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # TODO 2020-07-30 22:18:35 merge & factor code for both internal and foreign
         # kernels (make use of the ns parameter)
         #
-        print(f"{print_styled(f'{self.__class__.__name__}.updateRowForVariable2 dataname = {dataname}, ns_name={ns_name}, sender: {self.sender()}', color='red')}")
+        # print(f"{print_styled(f'{self.__class__.__name__}.updateRowForVariable2 dataname = {dataname}, ns_name={ns_name}, sender: {self.sender()}', color='red')}")
         if dataname not in ns:
             return
         
@@ -1686,7 +1686,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     def addRowForVariable2(self, ns: dict, dataname: str, ns_name: str = "Internal"):
         r"""CAUTION Only use for data in the internal workspace, not in remote ones.
         """
-        # print(f"\n{self.__class__.__name__}.addRowForVariable2 for {dataname}")
+        # print(f"{print_styled(f'\n{self.__class__.__name__}.addRowForVariable2 for {dataname}', color='red')}")
         # if isinstance(ns_name, str):
         #     if len(ns_name.strip()) == 0:
         #         ns_name = "Internal"

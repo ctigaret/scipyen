@@ -1262,9 +1262,6 @@ class ScanDataFramesMapUpdater(AttributeAdapter):
         if not isinstance(obj, ScanData):
             return
         
-        if not hasattr(obj, "_data_children_"):
-            return
-        
         if self.fieldname not in tuple(c[0] for c in obj._data_children_):
             return
 
@@ -1604,6 +1601,9 @@ class ScanData(BaseScipyenData):
     # avatars from the old model, kept here because they're still useful
     # NOTE that I gave up the parsing of neo-style attribute specification
     # and use dataclass mechanism instead
+    #
+    # however, this one below is required for the _get_data_child_component_(…)
+    # instance method and for setting up the framesMap attribute
     _data_children_:typing.ClassVar = (
         ("scans",                           tuple(), (list, tuple),   vigra.VigraArray),
         ("scene",                           tuple(), (list, tuple),   vigra.VigraArray),
@@ -1611,51 +1611,48 @@ class ScanData(BaseScipyenData):
         )
     
     _derived_data_children_:typing.ClassVar = (
-        ("scansBlock",                      neo.Block(name="Scans")),
-        ("scansProfiles",                   neo.Block(name="Scan region scans profiles")),
-        ("sceneBlock",                      neo.Block(name="Scene")),
-        ("sceneProfiles",                   neo.Block(name="Scan region scene profiles")),
+        # ("scansBlock",                      neo.Block(name="Scans")),
+        # ("scansProfiles",                   neo.Block(name="Scan region scans profiles")),
+        # ("sceneBlock",                      neo.Block(name="Scene")),
+        # ("sceneProfiles",                   neo.Block(name="Scan region scene profiles")),
         )
     
     _result_data_:typing.ClassVar = (
-        ("electrophysiologyResult",         pd.DataFrame),
-        ("imagingResult",                   pd.DataFrame),
-        ("result",                          pd.DataFrame),
+        # ("electrophysiologyResult",         pd.DataFrame),
+        # ("imagingResult",                   pd.DataFrame),
+        # ("result",                          pd.DataFrame),
         )
     
-    # _data_attributes_:typing.ClassVar = (
-    #     ("framesMap",                       FrameIndexLookup),
-    #     )
-    
     _data_attributes_:typing.ClassVar = (
-        ("sceneAxesCalibration",            list,   AxesCalibration),
-        ("scansAxesCalibration",            list,   AxesCalibration),
-        ("sceneLayout",                     Bunch),
-        ("scansLayout",                     Bunch),
-        ("framesMap",                       FrameIndexLookup),
+        # ("sceneAxesCalibration",            list,   AxesCalibration),
+        # ("scansAxesCalibration",            list,   AxesCalibration),
+        # ("sceneLayout",                     Bunch),
+        # ("scansLayout",                     Bunch),
+        # ("framesMap",                       FrameIndexLookup),
+        # ("triggerProtocols",                list)
         )
     
     _graphics_attributes_:typing.ClassVar = (
-        ("scansCursors",                    dict, Cursor),
-        ("scansRois",                       dict, PlanarGraphics),
-        ("scanTrajectory",                  (PlanarGraphics, type(None))),
-        ("sceneCursors",                    dict, Cursor),
-        ("sceneRois",                       dict, PlanarGraphics),
+        # ("scansCursors",                    dict, Cursor),
+        # ("scansRois",                       dict, PlanarGraphics),
+        # ("scanTrajectory",                  (PlanarGraphics, type(None))),
+        # ("sceneCursors",                    dict, Cursor),
+        # ("sceneRois",                       dict, PlanarGraphics),
         )
     
     _metadata_attributes_:typing.ClassVar = (
-        ("analysisUnits",                   set, AnalysisUnit),
-        ("analysisUnit",                    AnalysisUnit),
-        ("metadata",                        dict),
+        # ("analysisUnits",                   set, AnalysisUnit),
+        # ("analysisUnit",                    AnalysisUnit),
+        # ("metadata",                        dict),
         )
     
     _option_attributes_:typing.ClassVar = (
-        ("analysisOptions",                 dict),
-        ("analysisMode",                    ScanDataAnalysisMode.frame),
-        ("type",                            ScanDataType.linescan),
+        # ("analysisOptions",                 dict),
+        # ("analysisMode",                    ScanDataAnalysisMode.frame),
+        # ("type",                            ScanDataType.linescan),
         )
     
-    _attributes_:typing.ClassVar = _data_children_ + _derived_data_children_ + _result_data_ + _data_attributes_ + _graphics_attributes_ +_metadata_attributes_ + _option_attributes_ 
+    # _attributes_:typing.ClassVar = _data_children_ + _derived_data_children_ + _result_data_ + _data_attributes_ + _graphics_attributes_ +_metadata_attributes_ + _option_attributes_ 
     # ### END class variables
     
     # ### BEGIN instance variables 
@@ -1675,56 +1672,29 @@ class ScanData(BaseScipyenData):
                                                                                 None,
                                                                                 neo.Block,
                                                                                 postset_hook=ScanDataFramesMapUpdater("electrophysiology"))
-  
+    # associated trigger protocols
+    triggerProtocols:list = dataclasses.field(default_factory=list)
+    
     # type of scanning
     type:ScanDataType = dataclasses.field(default=ScanDataType.linescan)
     # scans:list[vigra.VigraArray] = dataclasses.field(default_factory=list)
     
-    # BUG 2024-08-14 21:11:36 FIXME
-    # all attributes derived from the scans/scene image data, and set up by their
-    # corresponding descriptors via preset_hook, are overwritten by the 
-    # defaults below — this involves AxisCalibration and Layout;
-    # on the other hand, NOT specifing them here preserved the attributes as set
-    # by the scan and scene descriptors, but they won't be listed as a field of
-    # ScanData — I need a good fix for this.
-    #
-    # For now, omit them from declared fields and rely on the class attribute
-    # `_attributes_` (a ClassVar) defined above.
-    #
-    # TODO: 2024-08-14 21:34:56 Maybe they should be set up through a postset 
-    # hook like below? Then the question is how to execute more than one 
-    # postset defined in the descriptor?
-    #
-    # NOTE: 2024-08-14 21:28:36 In contrast, attributes set by scans/scene
-    # descriptors via the postset_hook appears immune to the side effect above;
-    # these include framesMap...
-    #
-    # axes calibrations for image data in the scans; initialized/set up by the scans descriptor
-    # scansAxesCalibration:list[AxesCalibration] = dataclasses.field(default_factory=list)
-    # to document; initialized/set up by the scans descriptor
-    # scansLayout:dict = dataclasses.field(default_factory = dict, init=False) 
     # signals containing quantitative data measured in the scans (depends on experiment type)
     scansBlock:typing.Optional[neo.Block] = dataclasses.field(default=neo.Block(name="Scans"))
+
     # signals containing pixel intensities along scans rois (linescans only) 
     scansProfiles:typing.Optional[neo.Block] = dataclasses.field(default=neo.Block(name="Scan region scans profiles"))
+
     scansCursors:dict = dataclasses.field(default_factory = dict)
+
     scansRois:dict = dataclasses.field(default_factory = dict)
     
-    # scanTrajectory:typing.Optional[PlanarGraphics] = None
-    # see NOTE: 2024-08-14 21:28:36 for why this is stll here and not commented-out
     scanTrajectory:typing.Optional[PlanarGraphics] = dataclasses.field(default=None)
     
-    # scene:list[vigra.VigraArray] = dataclasses.field(default_factory=list)
-    #
-    # see BUG 2024-08-14 21:11:36 for why these are commented-out
-    # sceneAxesCalibration:list[AxesCalibration] = dataclasses.field(default_factory=list)
-    # sceneLayout:dict = dataclasses.field(default_factory = dict, init=False)
     sceneBlock:typing.Optional[neo.Block] = dataclasses.field(default=neo.Block(name="Scene"))
     sceneProfiles:typing.Optional[neo.Block] = dataclasses.field(default=neo.Block(name="Scan region scene profiles"))
     sceneCursors:dict = dataclasses.field(default_factory = dict)
     sceneRois:dict = dataclasses.field(default_factory = dict)
-    
-    # electrophysiology:typing.Optional[neo.Block] = dataclasses.field(default=neo.Block(name="Electrophysiology"))
     
     # landmark data
     landmark:typing.Optional[PlanarGraphics] = dataclasses.field(default=None)
@@ -1734,6 +1704,7 @@ class ScanData(BaseScipyenData):
     analysisUnits:set[AnalysisUnit] = dataclasses.field(default_factory=set)
     analysisUnit:typing.Optional[AnalysisUnit] = None
     analysisMode:ScanDataAnalysisMode = ScanDataAnalysisMode.frame
+    
     # metadata:typing.Optional[dict] = dataclasses.field(default=None)
     metadata:ScanDataComponentDescriptor = ScanDataComponentDescriptor("metadata",None, DataBag,
                                                                        postset_hook=ScanDataMetadataAdapter("metadata"))
@@ -1744,6 +1715,9 @@ class ScanData(BaseScipyenData):
     # see NOTE: 2024-08-14 21:28:36 for why this is stll here and not commented-out
     framesMap:typing.Optional[FrameIndexLookup] = dataclasses.field(default=None)
     
+    # user annotations
+    annotations:dict = dataclasses.field(default_factory = dict)
+    
     # analysis results data
     electrophysiologyResult:typing.Optional[pd.DataFrame] = dataclasses.field(default=None)
     imagingResult:typing.Optional[pd.DataFrame] = dataclasses.field(default=None)
@@ -1753,7 +1727,6 @@ class ScanData(BaseScipyenData):
     modified:bool = dataclasses.field(default=False, compare=False)
     processed:bool = dataclasses.field(default=False, compare=False)
     availableUnitTypes:list = dataclasses.field(default_factory=lambda: [s for s in UnitTypes.values()], compare=False)
-    # availableGenotypes:list = dataclasses.field(default_factory=lambda: [s for s in GENOTYPES], init=False, compare=False)
     # ### END instance variables 
     
     def _get_data_child_component_(self, component:str):
@@ -1803,93 +1776,16 @@ class ScanData(BaseScipyenData):
                 return nFrames if isinstance(nFrames, int) else np.prod(nFrames)
             
     def __reduce__(self):
-        # kw = dict((d[0], getattr(self, d[0], None)) for d in self._attributes_ if d[0] not in ("scene", "scans", "electrophysiology"))# "metadata"))
-        
-        
-        # print(f"{self.__class__.__name__}.__reduce__:\n{list(kw.keys())}")
-        
-        # return (_new_ScanData, (self.scans, self.scene, self.electrophysiology, 
-        #                         kw))
-            
+        r"""Required for pickling"""
         kw = dict((f.name, getattr(self, f.name)) for f in dataclasses.fields(self) if f.name not in ("scene", "scans", "electrophysiology"))
-        # kw = dict((f.name, getattr(self, f.name)) for f in dataclasses.fields(self))
         
         return (_new_ScanData, (self.scans, self.scene, self.electrophysiology, 
                                 kw))
-        # return (_new_ScanData, (kw, ))
         
     @safewrapper
     def __post_init__(self, *args, **kwargs):
         r"""Constructs a ScanData object.
         
-        Named parameters:
-        =================
-        
-        For the name and value type of the expected parameters, see
-        ScanData._attributes_
-        
-        The description of the more important ones is given below.
-        
-        scans: a vigra.VigraArray or a list of vigra.VigraArray ojects, or None.
-        
-            When a the VigraArray, scans may contain more than one channel
-                (multi-band array).
-                
-            When a sequence of VigraArrays, each VigraArray in the list MUST be
-                single-band (corresponding to a single channel)
-                
-            Frames are automatically defined as array slices along the highest
-            non-channel axis (or dimension), but this axis can be specified/overridden
-            using "sceneFrameAxis" parameter (see below).
-            
-            Represents the "scene" where an imaging experiment took place (e.g.
-            where a scanline trajectory or a set or imaging ROIs were defined
-            for linescanning or multi-ROI imaging, respectively).
-            
-        scene: similar to "scans", this can be either one (possibly, multi-band) 
-            VigraArray, or a list of single-band VigraArray objects, or None.
-            
-            In either case, the data layout must be resolve to a number of "frames"
-            (possibly just one) along a non-channel axis.
-            
-            The frames can be:
-                
-            a) linescan frames (e.g. repetitions of a linescanning acquisition)
-            
-            b) raster scanning frames (for Z- or T-series)
-            
-        The frames in scans and scene are typically defined along the non-channel
-            axis of the highest order of the image VigraArray. This can be 
-            overridden using 'scansFrameAxis' and 'sceneFrameAxis'
-            parameter (see below).
-            
-            The data in "scans" is the main subject for further analysis.
-            
-        metadata: a dictionary or DataBag with various parameters that determine
-            what kind of imaging experiment is being stored in this object
-            
-            TODO elaborate documentation here.
-            
-            
-        electrophysiology: a neo.Block containing associated electrophysiology data. It should
-            contain as many segments as there are frames in "scans".
-            
-        sceneFrameAxis, scansFrameAxis: vigra.AxisInfo objects along which slices 
-            of scene and scans arrays are taken as "frames";
-            optional (default is None); when omitted, the frame axes will be 
-            guessed from the image axistags
-            
-        name: str: object name for book keeping
-        
-        analysisOptions: DataBag; optional default is None
-        
-        framesMap: FrameIndexLookup; optional default is None
-
-        triggers: either the string "auto", or None, or a list of TriggerProtocol 
-            objects
-            
-            When "auto", try to "parse" TriggerProtocol from ephys neo.Block data.
-                
         """
         self.availableUnitTypes.insert(0, "unknown")
         self._modified_ = False
@@ -1931,8 +1827,8 @@ class ScanData(BaseScipyenData):
             p.text("\n")
             p.text("With trigger protocols:")
             p.breakable()
-            if isinstance(self.triggers, (typing.Sequence, typing.Set)) and len(self.triggers):
-                p.pretty(self.triggers)
+            if isinstance(self.triggerProtocols, (typing.Sequence, typing.Set)) and len(self.triggerProtocols):
+                p.pretty(self.triggerProtocols)
             
             p.text("\n")
             p.text("With analysis units:")
@@ -1967,7 +1863,7 @@ class ScanData(BaseScipyenData):
             protocol_names = [p.name for p in self.triggerProtocols]
             result.append(f"Protocols: {(', '.join(protocol_names))}")
             
-        result.append(f"Analysis unit (based on entire data):\n{self.analysisUnit()};")
+        result.append(f"Analysis unit (based on entire data):\n{self.analysisUnit};")
         
         if len(self.analysisUnits):
             analysis_units = [a.__repr__() for a in self.analysisUnits]
@@ -6764,58 +6660,43 @@ class ScanData(BaseScipyenData):
     def protocol(self, index):
         r"""Alias to self.triggerProtocol(index)
         """
-        return self.triggerProtocol(index)
+        return self.triggerProtocolForFrame(index)
     
     @safewrapper
-    def triggerProtocol(self, nameOrSegmentIndex):
-        r"""Accesses a trigger protocol in this ScanData, specified by name or frame.
+    def triggerProtocolForFrame(self, frameIndex:int):
+        r"""Accesses a trigger protocol associated with a specific scanning frame.
+        The data frame is specified by an integer index. Indexing starts with 0
+        and negative indices are used for 'reversed' indexing (i.e. starting with
+        the highest index and going backwards).
+        
+        To lookup a TriggerProtocol by its name, use self.getNamedTriggerProtocols(…)
         
         Parameters:
         ==========
         
-        nameOrSegmentIndex: a str (protocol name) or an int (frame index) which must be found
-            in the segmentIndices attrbute of the exising protocols
+        frameIndex: must be found in the 'segmentIndices' attribute of the exising protocols
             
-            NOTE  when an int this is NOT the index of the protocol in 
-            triggerProtocols list!
+            CAUTION:  This is NOT the index of the protocol in self.triggerProtocols
         
         Returns:
         ========
         
-        When nameOrSegmentIndex is a str: a trigger protocol with the name specified by "nameOrSegmentIndex"
-        
-            Raises an Exception if no such protocol exists.
-            
-        When nameOrSegmentIndex is an int: a trigger protocol associated attached to the
-            scans frame with the given nameOrSegmentIndex.
+        A trigger protocol associated attached to the scans frame with the given frameIndex.
             
             Returns None if the specified frame index does not associate a protocol.
             
             Raises an Exception if frame index is outside the semi-open interval [0, self.scansFrames)
             or if the frame index associated more than one protocols.
             
-        Returns None if there are not trigger protocols defined.
+        Returns None if there are no trigger protocols defined.
         
         """
         
         if len(self.triggerProtocols) == 0:
             return None
         
-        if isinstance(nameOrSegmentIndex, str):
-            if nameOrSegmentIndex in [p.name for p in self._trigger_protocols_]:
-                
-                protocols = [p for p in self._trigger_protocols_ if p.name == nameOrSegmentIndex]
-                
-                if len(protocols) > 1:
-                    raise RuntimeError("There appears to be %d protocols named '%s' in %s" % (len(protocols), nameOrSegmentIndex, self.name))
-                
-                return protocols[0]
-            
-            else:
-                raise ValueError("data does not contain a protocol named %s" % nameOrSegmentIndex)
-            
-        elif isinstance(nameOrSegmentIndex, int):
-            if nameOrSegmentIndex < 0 or nameOrSegmentIndex >= self.scansFrames:
+        if isinstance(frameIndex, int):
+            if frameIndex < 0 or nameOrSegmentIndex >= self.scansFrames:
                 raise ValueError("Invalid frame nameOrSegmentIndex %d); expected to be a value on the semi-open interval [0, %d) in %s" % (nameOrSegmentIndex, self.scansFrames, self.name))
         
             protocols = [p for p in self.triggerProtocols if nameOrSegmentIndex in p.segmentIndices()]

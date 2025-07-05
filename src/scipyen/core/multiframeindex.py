@@ -108,12 +108,11 @@ class IndexProxy(object):
         sp_set_loc(self._obj_._map_, key, self._field_, value)
         
 class FrameIndexLookup(object):
-    
     r"""Wrapper around multi-frame indexing using sparse pandas DataFrames.
     
-    The correspondence between data master ("virtual") frame index and the 
-    index of the frames in the child data objects of the owner are stored in a
-    sparse array wrapped in a Pandas DataFrame.
+    Stores the correspondence between a virtual frame index in a data and the 
+    index of the frames in the child data objects of the data, as a sparse
+    array wrapped in a Pandas DataFrame.
     
     The owner's fields containing child data are stored as column names in 
     the underlying DataFrame (the 'map' attribute of the FrameLookupIndex 

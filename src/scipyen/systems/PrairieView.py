@@ -3771,14 +3771,13 @@ class PrairieViewImporter(QtWidgets.QDialog, __UI_PrairieImporter, WorkspaceGuiM
                 self._scandata_.analysisOptions = self.scanDataOptions
                 
             if isinstance(self.triggerProtocols, (tuple, list)) and all([isinstance(v, TriggerProtocol) for v in self.triggerProtocols]):
-                self._scandata_.triggers = self.triggerProtocols
+                self._scandata_.triggerProtocols = list(self.triggerProtocols)
                 
             if self.auto_export:
                 self._scipyenWindow_.assignToWorkspace(self.scanDataVarName, self.scanData)
             
     def updateProtocolEditor(self):
         self.protocolEditorDialog.triggerProtocols = self.triggerProtocols
-        
         
     @property
     def ephysdata(self):

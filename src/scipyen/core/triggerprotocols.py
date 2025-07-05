@@ -832,7 +832,7 @@ class TriggerProtocol:
                 raise TypeError("Cannot update frame indexing %s with %s" % (self.segments, value))
     
     def segmentIndices(self, value=None):
-        r"""Returns a list of segment indices.
+        r"""Returns a list of segment or data frame indices associated with this protocol.
         'value' is used only when segmentIndex is a python slice object, and it must be an int
         """
         

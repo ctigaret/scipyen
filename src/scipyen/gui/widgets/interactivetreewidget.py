@@ -179,17 +179,6 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                         self._scipyenWindow_ = f[0].f_globals["ScipyenWindow"].instance()
                     break
         
-#     @property
-#     def widgetHeight(self) -> int:
-#         return self._widget_height_
-#     
-#     @widgetHeight.setter
-#     def widgetHeight(self, val:int):
-#         if val < 10: 
-#             return
-#         self._widget_height_ = val
-#         self._setAssociatedWidgetHeight_()
-    
     def _makeTableWidget_(self, data):
         if self._use_TableEditor_:
             widget = TableEditorWidget(parent=self)

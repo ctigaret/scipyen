@@ -60,11 +60,6 @@ class BaseScipyenData(ScipyenDataclass):
     # as these are specific to ephys/imaging protocols.
     procedure:Procedure = dataclasses.field(default_factory=Procedure)
     
-    # __match_args__ = tuple(set(ScipyenDataclass.__match_args__ + ("file_origin",
-    #                                                               "file_datetime",
-    #                                                               "rec_datetime",
-    #                                                               "analysis_datetime")))
-    
     def __repr__(self):
         indent = lambda x: x.replace("\n", "\n\t")
         repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}"
