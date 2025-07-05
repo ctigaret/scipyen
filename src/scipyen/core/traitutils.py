@@ -14,7 +14,7 @@ cleaning up...
 
 import enum, os
 from enum import (EnumMeta, Enum, IntEnum, )
-import contextlib, traceback
+import contextlib, traceback, dataclasses
 
 from inspect import (getmro, isclass, isfunction, signature,)
 import quantities as pq
@@ -132,8 +132,6 @@ def traitlet_set(instance, obj, value):
     
     if instance.name and instance.name in obj._trait_values and instance.name in obj.traits():
         old_value = obj._trait_values[instance.name]
-        # if new_value is old_value:
-        #     silent = True
     else:
         change_type = "new"
         old_value = instance.default_value
@@ -147,14 +145,19 @@ def traitlet_set(instance, obj, value):
         if isinstance(value, type) and (hasattr(value, "setupUi") or issubclass(value,Shiboken.Object)):
             silent = True
             
+    if new_value is None and old_value is None:
+        return
     # NOTE: 2023-06-14 08:49:55
     # always notify here - this is relevant, because:
     # a) notifies when an existing trait is set to None
     # b) notifies when a new trait with underlying value of None is set 
     # therefore this will enable e.g., showing up symbols bound to None, in
     # any monitored mappings (such as the workspace)
-    if new_value is None: # and old_value is None:
-        change_type = "modified" # don't EVER use "new" here 'cause will trigger duplications in some listeners
+    if new_value is None or old_value is None:
+        if not instance.name or instance.name not in obj._trait_values or instance.name not in obj.traits():
+            change_type = "new"
+        else:
+            change_type = "modified"
         obj._trait_values[instance.name] = new_value
         obj._notify_trait(instance.name, old_value, new_value, 
                           change_type = change_type)
@@ -415,6 +418,9 @@ def dynamic_trait(x, *args, **kwargs):
     kw = kwargs
     
     myclass = x.__class__
+    
+    if dataclasses.is_dataclass(x):
+        return sct.DataclassTrait(allow_none=allow_none)
     
     if issubclass(myclass, DataBag):
         traits = dict((k, dynamic_trait(v, allow_none = allow_none, content_traits=False if v is x else True)) for k,v in x.items())

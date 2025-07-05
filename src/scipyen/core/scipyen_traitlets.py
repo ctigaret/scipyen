@@ -54,7 +54,7 @@ from .triggerevent import DataMark, TriggerEvent
 
 from .utilities import (gethash, safe_identity_test)
 
-from .prog import timeblock
+from .prog import (timeblock, print_styled)
 
 # NOTE: DataBagTrait <- Instance <- ClassBasedTraitType <- TraitType <- BaseDescriptor
 
@@ -90,7 +90,7 @@ TRAITSMAP = {           # use casting versions
     Enum:       (Any,), # IntEnum inherits from int and Enum
     #EnumMeta:   (UseEnum,),
     #Enum:       (UseEnum,), # IntEnum inherits from int and Enum
-    type:       (Any,),    # e.g., type(type(None))
+    # type:       (Any,),    # e.g., type(type(None))
     #type:       (Instance,),    # e.g., type(type(None)) # Instance requires arguments to instantiate default value
     property:   (Any,),
     #property:   (DottedObjectName,),
@@ -149,18 +149,15 @@ class TypeTrait(Any, ScipyenTraitTypeMixin):
         if new_value is None and old_value is None:
             return
         
-        if new_value is None:
-            change_type = "modified" # don't EVER use "new" here 'cause will trigger duplications in some listeners
+        if new_value is None or old_value is None:
+            if not self.name or self.name not in obj._trait_values or self.name not in obj.traits()::
+                change_type = "new"
+            else:
+                change_type = "modified"
             obj._trait_values[self.name] = new_value
             obj._notify_trait(self.name, old_value, new_value, 
                             change_type = change_type)
             return
-        
-        if old_value is None:
-            change_type = "modified" # don't EVER use "new" here 'cause will trigger duplications in some listeners
-            obj._trait_values[self.name] = new_value
-            obj._notify_trait(self.name, old_value, new_value, 
-                            change_type = change_type)
         
         if silent:
             silent &= new_value == old_value
@@ -170,7 +167,77 @@ class TypeTrait(Any, ScipyenTraitTypeMixin):
             obj._trait_values[self.name] = new_value
             obj._notify_trait(self.name, old_value, new_value,
                               change_type = change_type)
+            
+class DataclassTrait(Any, ScipyenTraitTypeMixin):
+    info_text = "Traitlet for Dataclasses"
+    default_value = None
+    klass = None
     
+    def __init__(self, args=None, kw=None, **kwargs):
+        super(ScipyenTraitTypeMixin, self).__init__()
+        # default_value = kwargs.pop("default_value", None)
+        self.allow_none = kwargs.pop("allow_none", True)
+        # if dataclasses.is_dataclass(args):
+        #     self.default_value = args
+        #     if isinstance(args, type):
+        #         self.klass = args
+        #     else:
+        #         self.klass = type(args)
+        # else:
+        #     self.default_value = None
+            
+        args = None
+        super().__init__(klass = self.klass, args=args, kw=kw, **kwargs)
+        
+    def validate(self, obj, value):
+        if dataclasses.is_dataclass(value) or value is None:
+            return value
+        
+        self.error(obj, value)
+        
+    def set(self, obj, value):
+        from core.utilities import safe_identity_test
+        new_value = self.validate(obj, value)
+        silent=True
+        change_type=""
+        
+        if self.name and self.name in obj._trait_values and self.name in obj.traits():
+            old_value = obj._trait_values[self.name]
+            print(f"{print_styled(f'{old_value}', color='magenta')}")
+        else:
+            old_value = self.default_value # may be None
+            silent = False
+            change_type = "new"
+            
+        if new_value is None and old_value is None:
+            return
+        
+        if not dataclasses.is_dataclass(new_value) or not dataclasses.is_dataclass(old_value):
+            if not self.name or self.name not in obj._trait_values or self.name not in obj.traits():
+                change_type = "new"
+            else:
+                change_type = "modified" 
+            obj._trait_values[self.name] = new_value
+            obj._notify_trait(self.name, old_value, new_value, 
+                            change_type = change_type)
+            return
+        
+        if silent:
+            silent = old_value.__class__ == new_value.__class__
+            
+        if silent:
+            fields = tuple(map(lambda f: (f.name, getattr(old_value, f.name), getattr(new_value, f.name)), dataclasses.fields(old_value)))
+            diff_fields = tuple(filter(lambda f: type(f[1]) != type(f[2]) or not safe_identity_test(f[1], f[2]), fields))
+            print(f"{print_styled(f'{tuple(map(lambda f: f[0], diff_fields))}', color='magenta')}")
+            silent = len(diff_fields) == 0
+            
+        if not silent:
+            change_type = "modified"
+            obj._trait_values[self.name] = new_value
+            obj._notify_trait(self.name, old_value, new_value, 
+                            change_type = change_type)
+        print(f"{print_styled(f'{self.__class__.__name__}.set -> {change_type}', color='green')}")
+        
 class DictTrait(Dict, ScipyenTraitTypeMixin):
     info_text = "Traitlet for mapping types (dict) that is sensitive to content changes"
     default_value = dict() # default value of the Trait instance
@@ -229,20 +296,6 @@ class DictTrait(Dict, ScipyenTraitTypeMixin):
         super().__init__(value_trait=value_trait, per_key_traits=per_key_traits,key_trait=key_trait,
                          default_value=default_value, **kwargs)
         
-#     def validate(self, obj, value):
-#         # return super().validate(obj, value)
-#         value = super().validate(obj, value)
-#         if value is None:
-#             return value
-#         value = self.validate_elements(obj, value)
-#         return value
-# 
-# #         if isinstance(value, self.klass):
-# #             return value
-# #         
-# #         elif isinstance(value, self._valid_defaults):
-# #             return self.klass(value)
-    
     def validate_elements(self, obj, value):
         value = super(DictTrait, self).validate_elements(obj, value)
         
@@ -305,7 +358,6 @@ class DictTrait(Dict, ScipyenTraitTypeMixin):
             obj._notify_trait(self.name, old_value, new_value, 
                               change_type=change_type)
   
-            
 class ListTrait(List, ScipyenTraitTypeMixin):
     r"""TraitType that ideally should notify:
     a) when a list contents has changed (i.e., gained/lost members)

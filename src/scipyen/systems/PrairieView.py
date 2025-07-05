@@ -2734,7 +2734,6 @@ class PVScan(PVObject):
         else:
             caller = self.__call__
             
-            
         # read scans and scene vigra arrays concurrently
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
             futures = [executor.submit(caller)]

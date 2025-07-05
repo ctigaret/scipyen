@@ -5364,6 +5364,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         CAUTION: this is also called when variables are re-created!
 
         """
+        print(f"{print_styled(f'{self.__class__.__name__}.slot_variableItemNameChanged(item: {item.data(QtCore.Qt.DisplayRole)} in column {item.column()})', color='red')}")
         signalBlockers = [QtCore.QSignalBlocker(self.workspaceView),
                           QtCore.QSignalBlocker(self.workspaceModel),
                           QtCore.QSignalBlocker(self.workspaceView.selectionModel())]

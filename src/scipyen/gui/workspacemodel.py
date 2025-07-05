@@ -1145,7 +1145,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         pass
 
     def postRunCell(self, result:Bunch):
-        # print(f"\n{self.__class__.__name__}.postRunCell result = {result}")
+        print(f"{print_styled(f'\n{self.__class__.__name__}.postRunCell result = {result}', color='red')}")
         if hasattr(result, "result"):
             # NOTE: 2023-06-06 12:56:44
             # this is bound to the symbol "_" in the internal namespace, by IPython
@@ -1828,7 +1828,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         r"""Triggered by self.sig_startAsyncUpdate signal.
         The signal 'self.sig_startAsyncUpdate' is emitted by self.update() and self._updateModel_()
         """
-        # print(f"\n{self.__class__.__name__}._slot_updateModelAsync_ -> self.__changes__ = {self.__changes__}")
+        print(f"{print_styled(f'\n{self.__class__.__name__}._slot_updateModelAsync_ -> self.__changes__ = {self.__changes__}', color='red')}")
         if len(self.__changes__) == 0:
             return
         
@@ -1841,6 +1841,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         #     for modification in modifications:
         #         print(f"{modification}")
         
+        
         for item in removals:
             self._varChanges_callbacks_[item[1]](item[0])
         
@@ -1849,9 +1850,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         
         for item in modifications:
             self._varChanges_callbacks_[item[1]](item[0])
-
+            
         self.__changes__.clear()
-        
         self.modelContentsChanged.emit()
 
     def updateFromExternal(self, prop_dicts):
