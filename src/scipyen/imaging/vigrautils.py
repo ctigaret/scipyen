@@ -1446,11 +1446,11 @@ def proposeLayout(img:vigra.VigraArray,
     r"""Proposes a layout for frame-by-frame display and analysis of a VigraArray.
     
     Based on user-specified hints, suggests which array axes may be used:
-        * to slice the array into meaningful 2D array views (data 'frames')
+        * to slice the array into 'meaningful' 2D array views (data 'frames')
         * for the definition of a frame's width and height
         
-    and proposes the number of frames in the array (array size along the 'frames'
-    axis).
+    and proposes the number of frames in the array (i.e., the array size along 
+    the 'frames' axis).
         
     Parameters:
     ===========
@@ -1482,21 +1482,19 @@ def proposeLayout(img:vigra.VigraArray,
      
     nFrames:int -> the number of frames along the proposed "frame" axis
     
-    All the others are vigra.AxisInfo objects, None, or tuple of vigra.AxisInfo
-     
-    horizontal:vigra.AxisInfo or int = the axis (or axis index) proposed
+    horizontalAxis:vigra.AxisInfo or int = the axis (or axis index) proposed
         for the frame 'width'.
     
         BY CONVENTION this is the first non-channel axis (usually, the 1st array
         dimension), which is also the innermost non-channel axis given by 
         img.innerNonChannelIndex property
         
-    vertical:vigra.AxisInfo or int = the axis (or axis index) proposed
+    verticalAxis:vigra.AxisInfo or int = the axis (or axis index) proposed
         for the frame 'height'.
     
-    BY CONVENTION this is the 2nd non-channel axis (usually, the 2nd dimension)
+        BY CONVENTION this is the 2nd non-channel axis (usually, the 2nd dimension)
         
-    channels:vigra.AxisInfo or None, or int: as above, for the 'channels' 
+    channelsAxis:vigra.AxisInfo or None, or int: as above, for the 'channels' 
         axis.
     
         The 'channels' axis is either the AxisInfo with type flags of 
@@ -1528,7 +1526,7 @@ def proposeLayout(img:vigra.VigraArray,
         always make good sense to do so (especially whenn there are more than
         four distinct data channels).
         
-    frames: vigra.AxisInfo, None, tuple of AxisInfo or tuple of int
+    framesAxis: vigra.AxisInfo, None, tuple of AxisInfo or tuple of int
     
         When given, this is the AxisInfo along which the array can be 'sliced'
         in 'frames' defined for the purpose of display and/or analysis.
@@ -1635,7 +1633,7 @@ def proposeLayout(img:vigra.VigraArray,
     # this helps with checking if it is a Channel axis or not
     if isinstance(userFrameAxis, (vigra.AxisInfo, str)):
         if userFrameAxis not in img.axistags:
-            # CAUTION equality testing for AxisInfo objects ONLY takes into
+            # CAUTION Equality testing for AxisInfo objects ONLY takes into
             # account the axis typeFlags and key
             raise ValueError("Axis %s not found in image" % userFrameAxis.key)
         
@@ -1906,8 +1904,6 @@ def proposeLayout(img:vigra.VigraArray,
         
     else:
         frames = img.axistags.index(frameAxisInfo.key) if indices else frameAxisInfo
-    
-        
     
     return Bunch({"nFrames":nFrames, 
                   "horizontalAxis":horizontal, 

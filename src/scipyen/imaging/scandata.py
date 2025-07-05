@@ -20,7 +20,7 @@ import pandas as pd
 
 
 from core import (prog, traitcontainers, strutils, neoutils, models,)
-from core.prog import (safewrapper, AttributeAdapter, NoData, BaseDescriptorValidator)
+from core.prog import (safewrapper, AttributeAdapter, NoData, BaseDescriptorValidator, print_styled)
 from core.basescipyen import BaseScipyenData
 from core.traitcontainers import DataBag
 from core import scipyen_quantities as cq
@@ -1011,61 +1011,11 @@ class AnalysisUnit(BaseScipyenData):
         
         return result
     
-#     def isSameAs(self, other):
-#         if not isinstance(other, AnalysisUnit):
-#             raise TypeError("Expecting an AnalysisUnit object; got %s instead" % type(other).__name__)
-#         
-#         sameName = self.name == other.name
-#         
-#         sameParent = self.parent == other.parent
-#         
-#         sameSource = self.inScene == other.inScene
-#         
-#         sameLandmark = self.landmark == other.landmark
-#         
-#         sameProtocols = all([p in other.protocols for p in self.protocols])
-#         
-#         sameType = self.unit_type == other.unit_type
-#         
-#         sameCell = self.cell == other.cell
-#         
-#         sameField = self.field == other.field
-#         
-#         sameDescriptors = self.descriptors == other.descriptors
-#         
-#         return sameParent and sameName and sameSource and sameLandmark and sameProtocols and sameType and sameCell and sameField and sameDescriptors
-#     
-#     def is_same_as(self, other):
-#         return self.isSameAs(other)
-    
-#     def copy(self):
-#         r"""Returns a copy of this object.
-#         
-#         The result's landmark is a references to the landmark and of this unit.
-#         The result's protocols are deep copies of those in this unit.
-#         
-#         """
-#         # NOTE: 2021-11-26 08:42:21
-#         # use copy constructor strategy for trigger protocols so that the new 
-#         # AnalysisUnit objact is detached from the original data protocols; yet
-#         # it retains the reference to the 'parent'
-#         
-#         kwargs = dict((attr[0], getattr(self, attr[0], None)) for attr in self._attributes_ )
-#         kwargs["protocols"] = [p.copy() for p in self.protocols]
-#         kwargs.update(self.annotations)
-#         
-#         result = AnalysisUnit(self.parent, **kwargs)
-#         
-#         return result
-        
 class ScanDataImageParser(AttributeAdapter):
     # def __init__(self, owner=None, fieldname=None):
     def __init__(self, fieldname:str):
         self.fieldname = fieldname
-        # self.obj = owner
-        
-    # def setOwner(self, obj:typing.Any) -> None:
-    #     self.obj = obj
+        # print(f"{print_styled(f'\n{self.__class__.__name__}.__init__(fieldname = {fieldname})')}")
         
     def __call__(self, obj, value):
         self.parseImageData(obj, value)
@@ -1115,29 +1065,32 @@ class ScanDataImageParser(AttributeAdapter):
         # if not hasattr(obj, self.fieldname):
         #     return
         
-        imageLayout = getattr(obj, f"{self.fieldname}Layout", None)
-        frameAxis = None if not isinstance(imageLayout, dict) else imageLayout.get(f"{self.fieldname}FrameAxis", None)
-        axesCalibration = getattr(obj, f"{self.fieldname}AxesCalibration", None)
+        layoutFName = f"{self.fieldname}Layout"
+        frAxisFName = f"{self.fieldname}FrameAxis"
+        axcalFName = f"{self.fieldname}AxesCalibration"
         
+        imageLayout = getattr(obj, f"{layoutFName}", None)
+        framesAxis = None if not isinstance(imageLayout, dict) else imageLayout.get(f"{frAxisFName}", None)
+        axesCalibration = getattr(obj, f"{axcalFName}", None)
+        
+        # NOTE: 2025-07-05 10:11:40
+        # below, 'layout' is a traitlets.Bunch
         data, layout, axesCalibration = self.imageDataLayout(value, 
-                                                            frameAxis = frameAxis,
+                                                            framesAxis = framesAxis,
                                                             axescal = axesCalibration)
         
-        layoutfName = f"{self.fieldname}Layout"
-        axcalfName = f"{self.fieldname}AxesCalibration"
+        setattr(obj, layoutFName, layout)
         
-        setattr(obj, layoutfName, layout)
-        
-        setattr(obj, axcalfName, axesCalibration)
+        setattr(obj, axcalFName, axesCalibration)
         
         # print(f"{self.__class__.__name__}.parseImageData for field {self.fieldname} of {type(obj).__name__} object:")
-        # print(f"\t{layoutfName} set to {getattr(obj, layoutfName, None)}")
-        # print(f"\t{axcalfName} set to {getattr(obj, axcalfName, None)}")
+        # print(f"\t{layoutFName} set to {getattr(obj, layoutFName, None)}")
+        # print(f"\t{axcalFName} set to {getattr(obj, axcalFName, None)}")
         
         return obj
     
-    def imageDataLayout(self,data, 
-                    frameAxis:typing.Optional[vigra.AxisInfo]=None, 
+    def imageDataLayout(self, data:typing.Union[vigra.VigraArray, typing.Sequence], 
+                    framesAxis:typing.Optional[vigra.AxisInfo]=None, 
                     horizontalAxis:typing.Optional[vigra.AxisInfo]=None, 
                     verticalAxis:typing.Optional[vigra.AxisInfo]=None, 
                     axescal:typing.Optional[AxesCalibration]=None):
@@ -1156,9 +1109,7 @@ class ScanDataImageParser(AttributeAdapter):
             shapes and axistag keys. If there is more than one vigra array
             in the sequence then all the arrays must have one channel only.
             
-        'layout': traitlets.Bunch or None. When a Bunch, it maps the following
-            key/value pairs:
-            
+        'layout': traitlets.Bunch with the following key ↦ value mapping:
             'nFrames':      int;
                             This is the total number of 2D data 
                             slices (or frames) that can be displayed in a 2D 
@@ -1198,15 +1149,26 @@ class ScanDataImageParser(AttributeAdapter):
         'axes_calibration': an imaging.axiscalibration.AxesCalibration object, 
                             or None.
                             
+        Change: 2025-07-05 11:15:55
+        layout is always a Bunch as above, but with members set to default values
+        of 0 nFrames and None for all axes.
+        
         """
+        layout = Bunch({"nFrames":  0, 
+                        "horizontalAxis": None, 
+                        "verticalAxis":   None, 
+                        "channelsAxis":   None,
+                        "framesAxis":     None})
         if data is None:
-            return (None, None, None)
+            # print(f"{print_styled(f'\n{self.__class__.__name__}.imageDataLayout(data = {data}) will return {(None, None, None)})')}")
+            return (data, layout, None)
         
         if not isinstance(data, (vigra.VigraArray, tuple, list)):
             raise TypeError(f"Expecting a VigraArray or a sequence (tuple, list) of VigraArrays; got {type(data).__name__} instead")
         
         if isinstance(data, vigra.VigraArray):
-            layout = proposeLayout(data, userFrameAxis = frameAxis, indices = True)
+            # calls imaging.vigrautils.proposeLayout
+            layout = proposeLayout(data, userFrameAxis = framesAxis, indices = True)
             
             if isinstance(axescal, AxesCalibration) and all(axescal.typeFlags(key) == x.typeFlags for (key, x) in zip(axescal.axiskeys, data.axistags)):
                 axes_cal = [axscal]
@@ -1218,24 +1180,24 @@ class ScanDataImageParser(AttributeAdapter):
         elif isinstance(data, (tuple, list)):
             if len(data):
                 if not all([isinstance(s, vigra.VigraArray) for s in data]):
-                    raise TypeError("When not empty, data is expected to contain VigraArray objects")
+                    raise TypeError("When a sequence, 'data' is expected to contain VigraArray objects, or to be an empty sequence")
 
                 if not all([s.shape == data[0].shape for s in data[1:]]):
-                    raise TypeError("Image arrays in a sequence must have identical shapes")
+                    raise TypeError("Image arrays in the 'data' sequence must have identical shapes")
 
                 if not all([s.axistags == data[0].axistags for s in data[1:]]):
-                    raise TypeError("Image arrays in a sequence must have identical axistags")
+                    raise TypeError("Image arrays in the 'data' sequence must have identical axistags")
                 
                 if len(data) > 1 and any(s.channels > 1 for s in data):
                     raise TypeError("When more than one image array is supplied, these must have a single channel")
 
                 if not all([s.channels == data[0].channels for s in data[1:]]):
-                    raise TypeError("Image arrays in a sequence must have the same number of channels")
+                    raise TypeError("Image arrays in the 'data' sequence must have the same number of channels")
 
-                # NOTE: 2022-01-06 10:38:28
+                # CAUTION 2022-01-06 10:38:28 CAUTION
                 # when several images are contained in 'data' we assume they
                 # all have the same axes layout
-                layout = proposeLayout(data[0], userFrameAxis = frameAxis, indices = True)
+                layout = proposeLayout(data[0], userFrameAxis = framesAxis, indices = True)
                 
                 if isinstance(axescal, (tuple, list)):
                     if len(axescal) != len(data):
@@ -1253,9 +1215,11 @@ class ScanDataImageParser(AttributeAdapter):
                 
                 return (data, layout, axes_cal)
 
-            return (list(), None, None)
-                
-        return (None, None, None)
+            # print(f"{print_styled(f'\n{self.__class__.__name__}.imageDataLayout(data = {data}) will return {(data, None, None)})')}")
+            return (list(), layout, None)
+        
+        # print(f"{print_styled(f'\n{self.__class__.__name__}.imageDataLayout(data = {type(data).__name__}) will return {(None, None, None)})')}")        
+        return (None, layout, None)
     
 ImageParser = ScanDataImageParser
 
@@ -1348,7 +1312,7 @@ class ScanDataFramesMapUpdater(AttributeAdapter):
                 # possibly duplicated code!
                 # imageDataLayout is also a method of ScanDataImageParser
                 # data, layout, axesCalibration = obj.imageDataLayout(field,
-                #                                                     frameAxis = userFrameAxis,
+                #                                                     framesAxis = userFrameAxis,
                 #                                                     axescal = axesCalibration)
                 newframes = layout.nFrames
                 
@@ -1456,9 +1420,25 @@ class ScanDataComponentDescriptor(BaseDescriptorValidator):
                  preset_hook:typing.Optional[typing.Union[AttributeAdapter, types.MethodType, types.FunctionType]] = None,
                  postset_hook:typing.Optional[typing.Union[AttributeAdapter, types.MethodType, types.FunctionType]] = None,
                  accept_none:bool=True):
+        r"""Descriptor for ScanData components.
+    The components are 'scene', 'scans', 'electrophysiology', and 'metadata'.
+    
+    Parameters:
+    ==========
+        name — name of the component descriptor
+        default — the default value; when this is None, then a value of None can
+            be attributed to the component descriptor
+        types — when specified, these are used to validate the value before it is
+            attributed to the component descriptor (this validation occurs IN ADDITION
+            TO checking whether value is None)
+        
+        
+    
+    """
         super().__init__(name, default, use_private=True, 
                          preset_hook=preset_hook, 
                          postset_hook=postset_hook)
+        # print(f"{print_styled(f'\n{self.__class__.__name__}.__init__(name = {name}, default={type(default).__name__}, types={types})')}")
         if isinstance(types, type):
             self.types = (types, )
             
@@ -1468,19 +1448,36 @@ class ScanDataComponentDescriptor(BaseDescriptorValidator):
         else:
             self.types = tuple()
             
+        self.default = default
+        
         if self.default is None:
             self.accept_none = True
         else:
-            self.accept_none = accept_none
+            self.accept_none = False
             
-    def validate(self, value):
-        if value is None:
-            if not self.accept_none:
-                raise ValueError(f"The descriptor for {self.public_name} does not accept None")
-        else:
-            if len(self.types):
-                assert isinstance(value, self.types), f"Expecting an instance of one of {self.types}; instead, got a {type(value).__name__}"
-        
+        # print(f"{print_styled(f'\n{self.__class__.__name__}.__init__: name: {name} accept_none = {self.accept_none}')}")
+            
+    def validate(self, value:typing.Any):
+        r""" Validates 'value' against the criteria set in the constructor.
+    An invalid 'value' will raise an exception.
+    A 'value' of None is valid only if a default of None was passed to the
+    constructor.
+    Furthermore, 'value' is considered valid if its type is present in the 
+    'types' parameter passed to the constructor, if 'types' is type or a sequence
+    of types.
+    
+    When the constructor's 'default' is None and 'types' is an empty sequence or 
+    None, then 'value' can be anything.
+    """
+        # print(f"{print_styled(f'\n{self.__class__.__name__}.validate for public name: {self.public_name}: accept_none = {self.accept_none}')}")
+            
+        if len(self.types):
+            if self.accept_none:
+                types = self.types + (type(None),)
+            assert isinstance(value, types), f"{print_styled(f'Expecting an instance of one of {types}; instead, got a {type(value).__name__}', color='red')}"
+
+        elif value is None and not self.accept_none:
+            raise ValueError(f"{print_styled(f'The descriptor for {self.public_name} does not accept None', color='red')}")
         
 @dataclass
 class ScanData(BaseScipyenData):
@@ -1490,7 +1487,7 @@ class ScanData(BaseScipyenData):
         
         
     """
-    #  An almost direct translation of my old matlab LSData data structure.
+    #  ### BEGIN An almost direct translation of my old matlab LSData data structure.
     
     #     NOTE: 2024-08-10 21:21:10
     #     Switching to dataclass-based design
@@ -1598,6 +1595,9 @@ class ScanData(BaseScipyenData):
     #         a scanRegion with states for 26 frames -- why? The original data had
     #         38 frames in this particular example -- see 18l12 CACNA1C152mHET/c01/sp01/ 
     #         Where the did the 26 come from?
+    #
+    #  ### END   An almost direct translation of my old matlab LSData data structure.
+    
     from gui import pictgui as pgui
     
     # ### BEGIN class variables
@@ -1623,18 +1623,18 @@ class ScanData(BaseScipyenData):
         ("result",                          pd.DataFrame),
         )
     
+    # _data_attributes_:typing.ClassVar = (
+    #     ("framesMap",                       FrameIndexLookup),
+    #     )
+    
     _data_attributes_:typing.ClassVar = (
+        ("sceneAxesCalibration",            list,   AxesCalibration),
+        ("scansAxesCalibration",            list,   AxesCalibration),
+        ("sceneLayout",                     Bunch),
+        ("scansLayout",                     Bunch),
         ("framesMap",                       FrameIndexLookup),
         )
     
-#     _data_attributes_:typing.ClassVar = (
-#         ("sceneAxesCalibration",            list,   AxesCalibration),
-#         ("scansAxesCalibration",            list,   AxesCalibration),
-#         ("sceneLayout",                     dict),
-#         ("scansLayout",                     dict),
-#         ("framesMap",                       FrameIndexLookup),
-#         )
-#     
     _graphics_attributes_:typing.ClassVar = (
         ("scansCursors",                    dict, Cursor),
         ("scansRois",                       dict, PlanarGraphics),
@@ -1672,7 +1672,7 @@ class ScanData(BaseScipyenData):
     
     # associated electrophysiology data
     electrophysiology:ScanDataComponentDescriptor = ScanDataComponentDescriptor("electrophysiology",
-                                                                                neo.Block(name="Electrophysiology"),
+                                                                                None,
                                                                                 neo.Block,
                                                                                 postset_hook=ScanDataFramesMapUpdater("electrophysiology"))
   
@@ -1784,7 +1784,7 @@ class ScanData(BaseScipyenData):
         # 'component_name' being one of ('scene' , 'scans')
         #
         #   in the VigraArray case I use the 'nFrames' member of the layout 
-        #   directly, if available, otherwise I calculate it using frameAxis 
+        #   directly, if available, otherwise I calculate it using framesAxis 
         #   (as is it done below) and use the opportunity update the '<component_name>Layout'.
         
         data = self._get_data_child_component_(component)
@@ -2041,26 +2041,34 @@ class ScanData(BaseScipyenData):
         1) adapt to a new scenario where all scene image data is a single  multi-channel VigraArray
 
         """
-        new_scene, scene_frame_axis, scene_axes_calibrations = self.imageDataLayout(scene, frameAxis=sceneFrameAxis)
+        new_scene, scene_frame_axis, scene_axes_calibrations = self.imageDataLayout(scene, framesAxis=sceneFrameAxis)
         
         #print(new_scene)
-        new_scans, scans_frame_axis, scans_axes_calibrations = self.imageDataLayout(scans, frameAxis=scansFrameAxis)
+        new_scans, scans_frame_axis, scans_axes_calibrations = self.imageDataLayout(scans, framesAxis=scansFrameAxis)
 
         if new_scene is not None:
             self.sceneCursors.clear()
             self.sceneRois.clear()
             self.scanTrajectory = None
             self.scene = new_scene
-            self.sceneFrameAxis = scene_frame_axis
+            self.sceneLayout.framesAxis = scene_frame_axis
             self.sceneAxesCalibration = scene_axes_calibrations
+        else:
+            # NOTE: 2025-07-05 09:40:55 these NEED to be defined
+            self.sceneLayout.framesAxis = None
+            self.sceneAxesCalibration = None
 
         if new_scans is not None:
             self.scansCursors.clear()
             self.scanCursors.clear()
             self.analysisUnits.clear()
             self.scans = new_scans
-            self.scansFrameAxis = scans_frame_axis
+            self.scansLauout.framesAxis = scans_frame_axis
             self.scansAxesCalibrations = scans_axes_calibrations
+        else:
+            # NOTE: see NOTE: 2025-07-05 09:40:55
+            self.scansLayout.framesAxis = None
+            self.scansAxesCalibrations = None
             
     def embedTriggerEvents(self, tp=None, to_imaging=True):
         r"""
@@ -2302,8 +2310,8 @@ class ScanData(BaseScipyenData):
             channelNames = self.sceneChannelNames
             src_channels = other.sceneChannels
             src_channelNames = other.sceneChannelNames
-            frameAxis = self.sceneFrameAxis
-            src_frameAxis = other.sceneFrameAxis
+            framesAxis = self.sceneFrameAxis
+            src_framesAxis = other.sceneFrameAxis
             frameAxisIndex = self.sceneFrameAxisIndex
             src_frameAxisIndex = other.sceneFrameAxisIndex
             
@@ -2316,8 +2324,8 @@ class ScanData(BaseScipyenData):
             channelNames = self.scansChannelNames
             src_channels = other.scansChannels
             src_channelNames = other.scansChannelNames
-            frameAxis = self.scansFrameAxis
-            src_frameAxis = other.scansFrameAxis
+            framesAxis = self.scansFrameAxis
+            src_framesAxis = other.scansFrameAxis
             frameAxisIndex = self.scansFrameAxisIndex
             src_frameAxisIndex = other.scansFrameAxisIndex
             
@@ -2332,7 +2340,7 @@ class ScanData(BaseScipyenData):
         if channelNames != src_channelNames:
             raise ValueError("Different channel names in %s" % which_data)
         
-        if frameAxis != src_frameAxis:
+        if framesAxis != src_framesAxis:
             raise ValueError("Different frame axis in %s" % which_data)
         
         if frameAxisIndex != src_frameAxisIndex:
@@ -2342,7 +2350,7 @@ class ScanData(BaseScipyenData):
         
         if scene:
             for k, img in enumerate(own):
-                result.append(concatenateImages(img, tgt[k], axis=frameAxis, ignore=["origin", "resolution"]))
+                result.append(concatenateImages(img, tgt[k], axis=framesAxis, ignore=["origin", "resolution"]))
             
             
         else:
@@ -2417,7 +2425,7 @@ class ScanData(BaseScipyenData):
                     else:
                         raise ValueError("invalid pad_value %s" % pad_value)
                         
-                result.append(concatenateImages(img0, img1, axis = frameAxis, ignore=["origin", "resolution"]))
+                result.append(concatenateImages(img0, img1, axis = framesAxis, ignore=["origin", "resolution"]))
                 
         return result
     
@@ -8565,6 +8573,18 @@ class ScanData(BaseScipyenData):
         return self.sceneLayout.framesAxis
     
     @property
+    def sceneHorizontalAxis(self):
+        return self.sceneLayout.horizontalAxis
+    
+    @property
+    def sceneVerticalAxis(self):
+        return self.sceneLayout.verticalAxis
+    
+    @property
+    def sceneChannelsAxis(self):
+        return self.sceneLayout.channelsAxis
+    
+    @property
     def sceneChannels(self) -> int:
         r"""Read-only. 
         The number of channels in the scene data or 0 if no scene data exists.
@@ -8656,6 +8676,18 @@ class ScanData(BaseScipyenData):
     @property
     def scansFrameAxis(self):
         return self.scansLayout.framesAxis
+    
+    @property
+    def scansHorizontalAxis(self):
+        return self.scansLayout.horizontalAxis
+    
+    @property
+    def scansVerticalAxis(self):
+        return self.scansLayout.verticalAxis
+    
+    @property
+    def scansChannelsAxis(self):
+        return self.scansLayout.channelsAxis
     
     @property
     def scansChannels(self):

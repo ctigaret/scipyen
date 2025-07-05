@@ -1578,14 +1578,16 @@ class AxisCalibrationData(CalibrationData):
         return tuple(map(lambda c: c.index, self.channels))
 
     @property
-    def channelNames(self):
+    def channelNames(self) -> tuple[str] | None:
         r"""A tuple of channel names, from their calibration data.
         These include the virtual channel (if it exists).
         
         This list is empty if the AxisCalibrationData corresponds to a 
         non-Channels axis.
         """
-        return tuple(map(lambda c: c.name, self.channels))
+        if self.isChannels:
+            return tuple(map(lambda c: c.name, self.channels))
+    
     @property
     def calibrationString(self) -> str:
         r"""
@@ -2518,6 +2520,10 @@ class AxesCalibration(object):
     
     @property
     def channels(self) -> list:
+        r"""List of image channel calibration data; possibly empty.
+        When there exists a non-virtual channel axis, this property is the list
+        of channel calibration data for that axis
+    """
         if "c" in self:
             return len(self["c"].channels)
         else:
@@ -2710,47 +2716,35 @@ class AxesCalibration(object):
 def hasNameString(s):
     return AxesCalibration.hasNameString(s)
     
-def axisChannelName(axisinfo, channel):
+def axisChannelName(axisinfo:vigra.AxisInfo, channel:int) -> str | None:
     r"""
     Parameters:
     ===========
     axisinfo: vigra.AxisInfo object
     
     channel: int >=0 (0-based index of the channel)
+    
+    Returns
+    =======
+    Channel name, or None for NonChannel axis
     """
-    return AxisCalibrationData(axisinfo).getChannelName(channel)
+    # return AxisCalibrationData(axisinfo).getChannelName(channel)
+    if axisinfo.isChannel:
+        return AxisCalibrationData(axisinfo).channelNames[channel]
 
-def axisName(axisinfo):
+def axisName(axisinfo:vigra.AxisInfo) -> str | None:
     r"""Returns the axis name stored in the axis description.
+    
+    To get the name of a channel (valid only for Channel axis) use axisChannelName
     
     Parameters:
     ===========
     axisinfo: vigra.AxisInfo
     
-    Returns:
-    =======
-    
-    A two-elements tuple: (names, indices), where:
-    
-        names = a list of str
-    
-        indices = a list of int. 
-        
-    When axisinfo.isChannel() is True the list of names contains the channel
-    names, and the list of indices contains the corresponding channel index.
-    
-    When axisinfo.isChannel() is False the list of names has only one element
-    which is the name of the axis, and the list of indices is empty.
-    
-    When axisinfo does not have a name XML-formatted string in its description,
-    both lists are empty.
-    
-    It is not guaranteed that the number of channel names equals the size
-    of the axis with this axisinfo. If this is required, then it should be 
-    checked outside this function.
     
     """
-    return AxesCalibration(axisinfo).axisName
+    return AxisCalibrationData(axisinfo).axisName
+    # return AxesCalibration(axisinfo).axisName
     
 def isCalibrated(axisinfo):
     r"""Syntactic shorthand for hasCalibrationString(axisinfo.description).

@@ -8,7 +8,7 @@
 
 
 r"""
-The workspace model - also used by the internal shell, to which ii provides the
+The workspace model - also used by the internal shell, to which it provides the
 event handlers preExecute() and post_execute().
 
 """
@@ -918,29 +918,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             
         # print(f"\n{self.__class__.__name__}._slot_cacheInternalVariableChange_ self.__changes__ = {self.__changes__} and {name} is in workspace: {name in self.shell.user_ns}")
 
-#     @Slot(dict)
-#     def _slot_internalVariableChanged_(self, change):
-#         r"""Connected (and triggered by) self.internalVariableChanged Qt signal.
-#         Launches an UI update for each workspace model in a loop, which is
-#         executed asynchronously inside a QRunnable.
-#         DEPRECATED
-#         """
-#         name = change.name
-#         print(f"\n{self.__class__.__name__}._slot_internalVariableChanged_({change.name}: {change.change_type})")
-# 
-#         displayed_var_names = set(self.getDisplayedVariableNames())
-#         user_shell_var_names = set(self.shell.user_ns.keys())
-# 
-#         change_type = change.get("change_type", change.type)
-#         
-#         worker = pgui.GuiWorker(self._updateFromMonitor_, name, 
-#                                 displayed_var_names, user_shell_var_names,
-#                                 change_type)
-#         
-#         worker.signals.signal_Result.connect(self._slot_updateModelFromMonitor_)
-#         
-#         self.threadpool.start(worker)
-
     def _updateFromMonitor_(self, name: str, 
                             displayed_var_names: set, user_shell_var_names: set,
                             change_type:str):
@@ -1002,8 +979,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self.cached_vars = dict([item for item in self.shell.user_ns.items(
         ) if self.isDisplayable(self.shell.user_ns, *item)])
 #         
-#         print(f"\nIn {self.__class__.__name__}.preExecute:")
-#         print(f"\t{len(self.cached_vars)} cached_vars")
+        # print(f"{print_styled(f'\nIn {self.__class__.__name__}.preExecute:', color='magenta')}")
+        # print(f"{print_styled(f'\t{len(self.cached_vars)} cached_vars', color='magenta')}")
 
         # NOTE: 2023-06-07 08:39:15
         # at this stage there may be variables not cached but still monitored
@@ -1013,7 +990,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             cached_set = set(self.cached_vars)
 
             observed_not_cached = observed_set - cached_set
-            # print(f"\t{len(observed_not_cached)} observed_not_cached")
+            # print(f"{print_styled('\t{len(observed_not_cached)} observed_not_cached', color='magenta')}")
             for var in observed_not_cached:
                 self.internalVariablesMonitor.pop(var, None)
 
@@ -1307,6 +1284,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # ###
         # 3. now, deal with everything else
         #
+        if self.lastExecutionResult:
+            print(f"{print_styled(f'\n{self.__class__.__name__}._updateModel_ last execution result: {self.lastExecutionResult}', 'magenta')}")
         # ### BEGIN 2023-05-23 22:39:22 do not delete
         #
         # 3.1. establish which variables have been removed ⇒ del_vars
@@ -1318,7 +1297,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # varnames that have been removed 
         del_vars = observed_varnames - current_user_varnames
         
-        print(f"{print_styled(f'\n{self.__class__.__name__}._updateModel_ del_vars = {del_vars}', 'yellow')}")
+        # print(f"{print_styled(f'\n{self.__class__.__name__}._updateModel_ del_vars = {del_vars}', 'magenta')}")
 
         # 3.2. now, remove these from the DataBag of observed variables (self.internalVariablesMonitor)
         #
@@ -1577,7 +1556,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # TODO 2020-07-30 22:18:35 merge & factor code for both internal and foreign
         # kernels (make use of the ns parameter)
         #
-        # print(f"{self.__class__.__name__}.updateRowForVariable2 dataname = {dataname}, ns_name={ns_name}")
+        print(f"{print_styled(f'{self.__class__.__name__}.updateRowForVariable2 dataname = {dataname}, ns_name={ns_name}, sender: {self.sender()}', color='red')}")
         if dataname not in ns:
             return
         
@@ -1589,11 +1568,11 @@ class WorkspaceModel(QtGui.QStandardItemModel):
 
         row = self.rowIndexForItemsWithProps(Workspace=ns_name)
 
-        # print("updateRowForVariable, row:", row)
+        # print("updateRowForVariable2, row:", row)
 
         items = self.findItems(dataname)
 
-        # print("updateRowForVariable, items", items)
+        # print("updateRowForVariable2, items", items)
 
         if len(items) > 0:
             row = self.indexFromItem(items[0]).row()  # same as below

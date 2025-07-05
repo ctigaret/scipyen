@@ -85,9 +85,9 @@ from core.workspacefunctions import (validate_varname, user_workspace)
 
 #from core.utilities import (get_nested_value, set_nested_value, counter_suffix, )
 
-from core.utilities import NestedFinder
+from core.utilities import (NestedFinder, unique)
 
-from core.prog import (safewrapper, safeguiwrapper, )
+from core.prog import (safewrapper, safeguiwrapper, print_styled)
 
 from core.traitcontainers import (DataBag, DataBagTraitsObserver,)
 
@@ -625,15 +625,8 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         
         """
         from pyqtgraph.widgets.DataTreeWidget import HAVE_METAARRAY
-        # from collections import OrderedDict
         from core.datatypes import (is_namedtuple, TypeEnum)
         
-#         print(f"{self.__class__.__name__}.parse data is a {type(data).__name__}")
-#         
-#         print(f"{self.__class__.__name__}.parse: predicate = {predicate}")
-
-        # data_type = type(data)
-
         # NOTE: 2022-12-30 11:37:05
         # allow pre-empting the type string (e.g. when passed a dict created
         # dynamically from an object of some type)
@@ -705,7 +698,6 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                     children = data.__members__
                 
             elif isinstance(data, NestedFinder.nesting_types + (set,)):
-                # print(f"{self.__class__.__name__}.parse -> data_type is a nesting type ")
                 # NOTE: 2025-05-21 16:15:26
                 # here 'widget' is None — this will force the caller (i.e. buildTree)
                 # to descend into the children of the data and build up a subtree
@@ -718,10 +710,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                     # therefore we resort to an indexing vector
                     ndx = [i[1] for i in sorted((str(k[0]), k[1]) for k in zip(data.keys(), range(len(data))))]
                     items = [i for i in data.items()]
-                    # children = OrderedDict([items[k] for k in ndx])
                     children = dict([items[k] for k in ndx])
-                    # print(f"desc for {type(data)}: {desc}")
-                    # print(f"{len(children)} for {type(data)}")
                         
                 elif issubclass(type(data), (list, tuple, deque, set)):
                     # NOTE: 2025-05-21 16:17:37
@@ -733,30 +722,23 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                         children = data._asdict()
                     else:
                         children = dict(enumerate(data))
-                        # children = OrderedDict(enumerate(data))
                         
-                else:
-                    print("fallthrough")
+                # else:
+                #     print("fallthrough")
                 
             elif HAVE_METAARRAY and (hasattr(data, 'implements') and data.implements('MetaArray')):
                 # NOTE: 2025-05-21 16:17:37
                 # 'widget' is None, here
-                # desc = type(data).__name__
                 children = dict([
                     ('data', data.view(np.ndarray)),
                     ('meta', data.infoCopy())
                 ])
-                # children = OrderedDict([
-                #     ('data', data.view(np.ndarray)),
-                #     ('meta', data.infoCopy())
-                # ])
             
             elif isinstance(data, types.SimpleNamespace):
                 lbl = f"{data.__class__.__name__} object"
                 desc = " ".join([lbl, "with", f"{len(data.__dict__)} members"])
                 # NOTE: 2025-05-21 16:17:37
                 # 'widget' is None, here
-                # desc = type(data).__name__
                 children = data.__dict__
             
             elif isinstance(data, pd.DataFrame):
@@ -832,7 +814,6 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                 widget.setReadOnly(True)
                 
             elif isinstance(data, scipy.optimize.Bounds):
-                # desc = type(data).__name__
                 children = {"lb": data.lb, "ub": data.ub, "keep_feasible": data.keep_feasible}
                 
             elif isinstance(data, (str, bytes, bytearray)):
@@ -850,12 +831,26 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                 desc = f"{data}"
                 
             elif dataclasses.is_dataclass(data):
-                # print(f"{self.__class__.__name__}.parse: data is a {type(data)}")
                 datafields = dataclasses.fields(data)
                 lbl = f"{data.__class__.__name__} object"
                 desc = " ".join([lbl, "with", f"{len(datafields)} fields"])
-                children = dict(map(lambda x: (x.name, getattr(data, x.name)), datafields))
-                # children = OrderedDict(map(lambda x: (x.name, getattr(data, x.name)), datafields))
+                
+                # NOTE: 2025-07-05 11:30:31
+                # Some dataclasses, especially those inheriting from ScipyenDataclass
+                # for example, ScanData,  may have dynamically generated properties, 
+                # which will NOT be captured by the dataclasses.fields() function.
+                # 
+                # membernames = list(map(lambda m: m[0], filter(lambda m: not datatypes.is_routine(m[1]), inspect.getmembers(data))))
+                try:
+                    fieldnames = list(map(lambda f: f.name, datafields))
+                    membernames = list(data.__dict__.keys())
+                    childnames = list(sorted(unique(membernames + fieldnames)))
+                    children = dict(map(lambda c: (c, getattr(data, c)), childnames))
+                except:
+                    traceback.print_exc()
+                    print(f"{print_styled(f'for {type(data).__name__} data', color='red')}")
+                    
+                # children = dict(map(lambda x: (x.name, getattr(data, x.name)), datafields))
                 
             elif isinstance(data, enum.Enum):
                 desc = f"{data} ({data.name})"

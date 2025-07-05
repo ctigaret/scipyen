@@ -2755,6 +2755,9 @@ class PVScan(PVObject):
                         metadata=self.metadata)
 
     def scandata(self, *args, **kwargs):
+        r"""Alias of (delegates to) self.scanData.
+        This method is kept so that it does not break older Scipyen API.
+    """
         return self.scanData(*args, **kwargs)
         
     def mergeChannels(self, filepath=None):
