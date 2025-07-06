@@ -1059,12 +1059,6 @@ class ScanDataImageParser(AttributeAdapter):
         if self.fieldname not in ("scans", "scene"):
             return
         
-        # if not hasattr(obj, "_data_children_"):
-        #     return
-        # 
-        # if not hasattr(obj, self.fieldname):
-        #     return
-        
         layoutFName = f"{self.fieldname}Layout"
         frAxisFName = f"{self.fieldname}FrameAxis"
         axcalFName = f"{self.fieldname}AxesCalibration"

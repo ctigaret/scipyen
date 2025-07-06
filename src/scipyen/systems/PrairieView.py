@@ -1466,6 +1466,8 @@ class PVFrame(PVObject):
                 
             chCal = ChannelCalibrationData(index = self.files[k]["channel"],
                                             name=self.files[k]["channelName"])
+            
+            # print(f"{print_styled(f'\n{self.__class__.__name__}.__call__: chCal -> {chCal}', color='green')}")
                 
             fdata_axis_2_info.description = self.files[k]["channelName"]
             
@@ -1984,6 +1986,11 @@ class PVSequence (PVObject):
                     # do we concatenateon the highest (outer) dimension regardless
                     newAxisDim = data[0][0].ndim # use highest dimension for concatenation axis
                     
+                    
+                # NOTE: 2025-07-06 18:10:28 Prepare the concatenation axis
+                # ### BEGIN Prepare the concatenation axis
+                #
+                    
                 if self.sequencetype == PVSequenceType.TSeries: # Tseries, separate channels
                     if self.parent.versionString < "5.5":
                         frameTimes = list(map(float(f.state["absoluteTime"].value), self.frames))
@@ -2032,17 +2039,21 @@ class PVSequence (PVObject):
                     
                     # print(f"{self.__class__.__name__}.__call__: sequence {self.sequencetypename} with {len(self.frames)} frames")
                     # print(f"\tnewAxisInfo -> {newAxisInfo} with newAxisCal -> {newAxisCal}")
+                    
 
                 # NOTE: 2018-08-01 17:03:52
                 # see NOTE: 2018-08-01 17:04:06
                 channelAxisDim = data[0][0].axistags.channelIndex
                 # print(f"\tchannelAxisDim -> {channelAxisDim}")
                 
+                
                 if channelAxisDim == data[0][0].ndim-1:
                     newAxisDim = channelAxisDim
                     
                 else:
                     newAxisDim = data[0][0].ndim
+                #
+                # ### END   Prepare the concatenation axis
                 # print(f"\tnewAxisDim -> {newAxisDim}")
                     
                 # NOTE: 2025-04-03 08:57:14

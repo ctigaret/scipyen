@@ -196,6 +196,7 @@ class DescriptorValidatorABC(ABC):
         """
         # NOTE: 2022-01-03 20:45:48
         # value should be validated BEFORE anything
+        # WARNING: self.validate MUST be implemented in subclasses
         self.validate(value)
 
         # NOTE: 2024-08-11 20:04:28
