@@ -886,7 +886,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # self.__change_dict__ = change
         # QtCore.QTimer.singleShot(0, self._observe_wrapper_)
         # connected to self._slot_internalVariableChanged_, def'ed below
-        # print(f"{print_styled(f'\n{self.__class__.__name__}.internalVariablesListenerCB({change})', color='red')}")
+        # print(f"{print_styled(f'\n{self.__class__.__name__}.internalVariablesListenerCB({change})', color='green')}")
         if change.type not in ("remove", "removed"):
             if change.name not in self.shell.user_ns:
                 change.type = "remove"
@@ -976,8 +976,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # self.cached_vars = dict([item for item in self.shell.user_ns.items(
         # ) if not item[0].startswith("_") and self.isDisplayable(item[0], item[1])])
         
-        self.cached_vars = dict([item for item in self.shell.user_ns.items(
-        ) if self.isDisplayable(self.shell.user_ns, *item)])
+        self.cached_vars = dict([item for item in self.shell.user_ns.items() if self.isDisplayable(self.shell.user_ns, *item)])
 #         
         # print(f"{print_styled(f'\nIn {self.__class__.__name__}.preExecute:', color='magenta')}")
         # print(f"{print_styled(f'\t{len(self.cached_vars)} cached_vars', color='magenta')}")
@@ -1145,7 +1144,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         pass
 
     def postRunCell(self, result:Bunch):
-        print(f"{print_styled(f'\n{self.__class__.__name__}.postRunCell result = {result}', color='red')}")
+        # print(f"{print_styled(f'\n{self.__class__.__name__}.postRunCell result = {result}', color='green')}")
         if hasattr(result, "result"):
             # NOTE: 2023-06-06 12:56:44
             # this is bound to the symbol "_" in the internal namespace, by IPython
@@ -1556,7 +1555,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # TODO 2020-07-30 22:18:35 merge & factor code for both internal and foreign
         # kernels (make use of the ns parameter)
         #
-        # print(f"{print_styled(f'{self.__class__.__name__}.updateRowForVariable2 dataname = {dataname}, ns_name={ns_name}, sender: {self.sender()}', color='red')}")
+        # print(f"{print_styled(f'{self.__class__.__name__}.updateRowForVariable2 dataname = {dataname}, ns_name={ns_name}, sender: {self.sender()}', color='green')}")
         if dataname not in ns:
             return
         
@@ -1566,22 +1565,33 @@ class WorkspaceModel(QtGui.QStandardItemModel):
 
         data = ns[dataname]
 
-        row = self.rowIndexForItemsWithProps(Workspace=ns_name)
+        # NOTE: 2025-07-06 14:05:36
+        # row indices for items in the given workspace - Do NOT DELETE - useful later when implementing this for foreign namespaces
+        internalWSRows = self.rowIndexForItemsWithProps(Workspace=ns_name)
 
-        # print("updateRowForVariable2, row:", row)
+        # print(f"{print_styled(f'\trow = {internalWSRows}', color='green')}")
+        # print("updateRowForVariable2, internalWSRows:", internalWSRows)
 
         items = self.findItems(dataname)
 
-        # print("updateRowForVariable2, items", items)
-
         if len(items) > 0:
-            row = self.indexFromItem(items[0]).row()  # same as below
-            # print("updateRowForVariable, row:", row)
-            # row = items[0].index().row()
-            # generate model view row contents for existing item
-            v_row = self.generateRowContents(dataname, data)
-            # print(f"{self.__class__.__name__}.updateRowForVariable2: len(v_row) = {len(v_row)}")
-            self.updateRow(row, v_row)
+            item_row = self.indexFromItem(items[0]).row()  # same as below
+            
+            # NOTE: 2025-07-06 14:10:10
+            ## for now, restrict to internal workspace
+            if item_row not in internalWSRows:
+                return
+            # print(f"{print_styled(f'\titem_row = {item_row}', color='green')}")
+            # generate new contents for model view row for the existing item
+            row_contents = self.generateRowContents(dataname, data)
+            
+            # NOTE: 2025-07-06 15:00:17
+            # workaround to avoid triggering mainWindow.slot_variableItemNameChanged
+            # due to model's itemChange signal, when the only  changes are at most
+            # in the contents of the variable bound to dataname, and not to dataname itself
+            
+            self.itemChanged.disconnect(self.parent().slot_variableItemNameChanged)
+            self.updateRow(item_row, row_contents)
             
             # BUG: 2023-09-16 09:55:11
             # this causes a rename to the variables, which shouldn't happen; the
@@ -1589,6 +1599,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             # in the workspace - clearly a flaw in how I designed all of this...
             if isinstance(data, QtWidgets.QWidget):
                 data.windowTitleChanged.connect(self._slot_itemGuiObjectTitleChanged)
+                
+            self.itemChanged.connect(self.parent().slot_variableItemNameChanged)
 
     def updateRowFromProps(self, row, obj_props, background=None):
         r"""
@@ -1631,27 +1643,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                 # code for displayed name change
                 self.setItem(rowindex, col, newrowdata[col])
 
-    # def removeRowForVariable(self, dataname, ns=None):
-    #     if isinstance(ns, str):
-    #         if len(ns.strip()) == 0:
-    #             ns = "Internal"
-    # 
-    #     else:
-    #         ns = "Internal"
-    # 
-    #     row = self.rowIndexForItemsWithProps(Name=dataname, Workspace=ns)
-    # 
-    #     # print("WorkspaceModel.removeRowForVariable data: %s ns: %s row: %s" % (dataname, ns, row))
-    #     if row == -1:
-    #         return
-    # 
-    #     if isinstance(row, list):
-    #         for r in row:
-    #             self.removeRow(r)
-    # 
-    #     else:
-    #         self.removeRow(row)
-
     @Slot(dict, str, str)
     def removeRowForVariable2(self, ns: dict, dataname: str, ns_name: str = "Internal"):
 
@@ -1686,7 +1677,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     def addRowForVariable2(self, ns: dict, dataname: str, ns_name: str = "Internal"):
         r"""CAUTION Only use for data in the internal workspace, not in remote ones.
         """
-        # print(f"{print_styled(f'\n{self.__class__.__name__}.addRowForVariable2 for {dataname}', color='red')}")
+        # print(f"{print_styled(f'\n{self.__class__.__name__}.addRowForVariable2 for {dataname}', color='green')}")
         # if isinstance(ns_name, str):
         #     if len(ns_name.strip()) == 0:
         #         ns_name = "Internal"
@@ -1828,7 +1819,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         r"""Triggered by self.sig_startAsyncUpdate signal.
         The signal 'self.sig_startAsyncUpdate' is emitted by self.update() and self._updateModel_()
         """
-        print(f"{print_styled(f'\n{self.__class__.__name__}._slot_updateModelAsync_ -> self.__changes__ = {self.__changes__}', color='red')}")
+        # print(f"{print_styled(f'\n{self.__class__.__name__}._slot_updateModelAsync_ -> self.__changes__ = {self.__changes__}', color='green')}")
         if len(self.__changes__) == 0:
             return
         
@@ -1841,7 +1832,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         #     for modification in modifications:
         #         print(f"{modification}")
         
-        
+        # NOTE: 2025-07-06 10:54:42
+        # invoke the callbacks in THIS order
         for item in removals:
             self._varChanges_callbacks_[item[1]](item[0])
         

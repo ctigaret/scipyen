@@ -1413,8 +1413,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             return cls._instance
     
     # @processtimefunc
-    # def __init__(self, app: QtWidgets.QApplication, 
-    #              parent: typing.Optional[QtWidgets.QWidget] = None, *args, **kwargs):
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None, *args, **kwargs):
         r"""Scipyen's main window initializer (constructor).
 
@@ -1719,7 +1717,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # WorkspaceModel needs the shell's user_ns hence it has to be instantiated
         # AFTER _init_QtConsole_()
         self.workspaceModel = WorkspaceModel(self.shell, parent=self,
-                                             # user_ns_hidden = self._nonInteractiveVars_,
                                              user_ns_hidden = self.workspace,
                                              mpl_figure_close_callback=self.handle_mpl_figure_close,
                                              mpl_figure_click_callback=self.handle_mpl_figure_click,
@@ -5364,7 +5361,12 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         CAUTION: this is also called when variables are re-created!
 
         """
-        print(f"{print_styled(f'{self.__class__.__name__}.slot_variableItemNameChanged(item: {item.data(QtCore.Qt.DisplayRole)} in column {item.column()})', color='red')}")
+        # NOTE: 2025-07-06 14:59:01
+        # workaround from this interfering with workspaceModel.updateRow() - signal temporarily disconnected inside workspaceModel.updateRowForVariable2
+        item_data = f"'{item.data(QtCore.Qt.DisplayRole)}'"
+        item_text = item.text()
+        item_column = item.column()
+        # print(f"{print_styled(f'{self.__class__.__name__}.slot_variableItemNameChanged(item: {item_data} with text: \'{item_text}\' in column {item_column})', color='green')}")
         signalBlockers = [QtCore.QSignalBlocker(self.workspaceView),
                           QtCore.QSignalBlocker(self.workspaceModel),
                           QtCore.QSignalBlocker(self.workspaceView.selectionModel())]
@@ -5375,15 +5377,17 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             return
 
         originalVarName = self.getCurrentVarName()
-        # originalVarName = self.workspaceModel.getCurrentVarName()
-        newVarName = item.text()
+        newVarName = item_text # item.text()
 
-        # print(f"slot_variableItemNameChanged old: {originalVarName} new: {newVarName}")
+        # print(f"{print_styled(f'\n\toriginalVarname: {originalVarName}\n\tnewVarName: {newVarName}', color='green')}")
         # this is the new text (i.e. AFTER name change)
         if originalVarName is None:
             return
 
         if len(originalVarName.strip()) == 0:
+            return
+        
+        if originalVarName == newVarName:
             return
 
         obj = self.workspace[originalVarName]
@@ -5401,13 +5405,11 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             obj_ = self.workspace[newVarName] # what for ?!?
 
         if len(newVarName.strip()) == 0:  # prevent accidental deletion
-            self.workspaceModel.itemChanged.disconnect(
-                self.slot_variableItemNameChanged)
+            self.workspaceModel.itemChanged.disconnect(self.slot_variableItemNameChanged)
             item.setText(originalVarName)
             self.currentVarItem = item
             self.currentVarItemName = originalVarName
-            self.workspaceModel.itemChanged.connect(
-                self.slot_variableItemNameChanged)
+            self.workspaceModel.itemChanged.connect(self.slot_variableItemNameChanged)
             return
 
         if newVarName != originalVarName:
@@ -7085,18 +7087,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             url = QtCore.QUrl(path.as_uri())
             self.navigator.setLocationUrl(url)
             self.navigator.urlChanged.emit(url)
-            # if isinstance(self.navigator, navigator.UrlNavigator):
-            #     path = pathlib.Path(self.fileSystemModel.filePath(ndx))
-            #     if not path.is_dir():
-            #         scipywarn(f"The path {print_styled(path, 'yellow')} does not exist. is it a mount point or a remote place?")
-            #         return
-            # 
-            #     # print(f"{self.__class__.__name__}.slot_fileSystemItemActivated: path = {path}")
-            #     url = QtCore.QUrl(path.as_uri())
-            #     self.navigator.setLocationUrl(url)
-            #     self.navigator.urlChanged.emit(url)
-            # else: #  NOTE: 2025-03-31 15:13:43 this branch is DEPRECATED - TODO REMOVE
-            #     self.slot_changeDirectory(self.fileSystemModel.filePath(ndx))
 
         else:
             self.loadFiles([self.fileSystemModel.filePath(ndx)], 
