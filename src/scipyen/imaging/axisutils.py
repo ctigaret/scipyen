@@ -784,53 +784,6 @@ def getNonChannelDimensions(img):
     else:
         return img.ndim-1 # VigraArray objects can have at most one channel axis!
         
-#def _getTypeFlag_(value):
-    #r"""Needed because there is faulty translation of AxisType data structure between python & C++
-    #TODO/FIXME Revisit this DEPRECATED
-    #"""
-    #if not isinstance(value, int):
-        #raise TypeError("Expecting an int")
-    
-    #if value == vigra.AxisType.Channels.numerator:
-        #return vigra.AxisType.Channels
-    
-    #elif value == vigra.AxisType.Space.numerator:
-        #return vigra.AxisType.Space
-    
-    #elif value == vigra.AxisType.Angle.numerator:
-        #return vigra.AxisType.Angle
-    
-    #elif value == vigra.AxisType.Time.numerator:
-        #return vigra.AxisType.Time
-    
-    #elif value == vigra.AxisType.Frequency.numerator:
-        #return vigra.AxisType.Frequency
-    
-    #elif value == vigra.AxisType.Frequency | vigra.AxisType.Space:
-        #return vigra.AxisType.Frequency | vigra.AxisType.Space
-    
-    #elif value == vigra.AxisType.Frequency | vigra.AxisType.Time:
-        #return vigra.AxisType.Frequency | vigra.AxisType.Time
-    
-    #elif value == vigra.AxisType.Frequency | vigra.AxisType.Angle:
-        #return vigra.AxisType.Frequency | vigra.AxisType.Angle
-    
-    #elif value == vigra.AxisType.Edge.numerator:
-        #return vigra.AxisType.Edge
-    
-    #elif value == vigra.AxisType.UnknownAxisType.numerator:
-        #return vigra.AxisType.UnknownAxisType
-    
-    #elif value == vigra.AxisType.NonChannel.numerator:
-        #return vigra.AxisType.NonChannel
-    
-    #elif value == vigra.AxisType.AllAxes.numerator:
-        #return vigra.AxisType.AllAxes
-    
-    #else:
-        #return vigra.AxisType.UnknownAxisType
-    
-
 def isValidAxisType(x:typing.Union[vigra.AxisType, int]):
     if isinstance(x, vigra.AxisType):
         return True
@@ -902,7 +855,25 @@ def isElementaryAxisType(x:typing.Union[vigra.AxisType, int, str]) -> bool:
     
     return False
         
-        
-        
+def getNameForAxisType(x:vigra.AxisType) -> str | None:
+    r"""Returns the name associated with the AxisType 'x', if this is an elementary type"""
+    if not isinstance(x, vigra.AxisType):
+        raise TypeError(f"Expecting a vigra.AxisType; got {type(x).__name__} instead")
+    
+    names, vals = zip(*list(vigra.AxisType.names.items()))
+    if x in vals:
+        ndx = vals.index[x]
+        return names[ndx]
+
+def getValueForAxisType(x:vigra.AxisType) -> int | None:
+    r"""Returns the int value associated with the AxisType 'x', if this is an elementary type"""
+    if not isinstance(x, vigra.AxisType):
+        raise TypeError(f"Expecting a vigra.AxisType; got {type(x).__name__} instead")
+    
+    ints, vals = zip(*list(vigra.AxisType.names.items()))
+    if x in vals:
+        ndx = vals.index[x]
+        return ints[ndx]
+    
     
     

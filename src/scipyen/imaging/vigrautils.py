@@ -14,7 +14,7 @@ from .axiscalibration import (AxesCalibration,
                               ChannelCalibrationData,
                               getCalibratedAxisSize)
 from imaging import axisutils
-from imaging.axisutils import (STANDARD_AXIS_TAGS_KEYS, axisTypeFromString, axisTypeName)
+from imaging.axisutils import (STANDARD_AXIS_TAGS_KEYS, axisTypeFromString, axisTypeStrings, axisTypeName, getNameForAxisType, getValueForAxisType)
 from traitlets import Bunch
 from core.prog import (print_styled, safewrapper)
 
@@ -2101,8 +2101,6 @@ def nFrames(x:vigra.VigraArray,
     else:
         raise RuntimeError(f"Cannot determine the number of frames")
     
-    
-
 def specifyAxisTags(image, newtags, newshape=None, in_place=False):
     r"""Assigns a new AxisTags object to a VigraArray.
     Optionally, reshapes the data array and removes or inserts new axes

@@ -1456,6 +1456,7 @@ class PVFrame(PVObject):
             # assigns this as 'c' even if is singleton)
             #
             
+            # NOTE: 2025-07-06 22:58:05 Create a channel axis calibration
             if fdata.channelIndex == fdata.ndim: # channel axis is virtual
                 # NOTE: 2018-08-01 16:43:58
                 # make sure there IS a channel axis
@@ -1464,15 +1465,17 @@ class PVFrame(PVObject):
             else:
                 fdata_axis_2_info = fdata.axistags["c"]
                 
-            chCal = ChannelCalibrationData(index = self.files[k]["channel"],
-                                            name=self.files[k]["channelName"])
+            chCal = ChannelCalibrationData(index = 0,
+                                           acquisition_index=self.files[k]["channel"],
+                                           name=self.files[k]["channelName"])
             
             # print(f"{print_styled(f'\n{self.__class__.__name__}.__call__: chCal -> {chCal}', color='green')}")
                 
             fdata_axis_2_info.description = self.files[k]["channelName"]
             
-            fdata_axis_2_cal = AxisCalibrationData.new(fdata_axis_2_info)
-            fdata_axis_2_cal.addChannelCalibration(chCal)
+            fdata_axis_2_cal = AxisCalibrationData.new(fdata_axis_2_info, channels = [chCal])
+            
+            # fdata_axis_2_cal.addChannelCalibration(chCal)
             # fdata_axis_2_cal.addChannelCalibration(ChannelCalibrationData(index = self.files[k]["channel"],
             #                                                               name=self.files[k]["channelName"]),
             #                                        name=self.files[k]["channelName"],
@@ -1547,9 +1550,12 @@ class PVFrame(PVObject):
                 else:
                     sdata_axis_2_info = sdata.axistags["c"]
                 
-                sdata_axis_2_cal = AxisCalibrationData.new(sdata_axis_2_info)
-                sdata_axis_2_cal.addChannelCalibration(ChannelCalibrationData(index = self.files[k]["channel"],
-                                                                          name=self.files[k]["channelName"]))
+                sChCal = ChannelCalibrationData(index = 0,
+                                                acquisition_index = self.files[k]["channel"],
+                                                name=self.files[k]["channelName"])
+                sdata_axis_2_cal = AxisCalibrationData.new(sdata_axis_2_info, channels = sChCal)
+                # sdata_axis_2_cal.addChannelCalibration()
+                
                 sdata_axis_2_cal = sdata_axis_2_cal.calibrateAxis(sdata_axis_2_info)
                 
                 newaxistags = vigra.AxisTags(sdata_axis_0_info, sdata_axis_1_info, sdata_axis_2_info)
@@ -1571,19 +1577,23 @@ class PVFrame(PVObject):
             # concatenation will lose the image metadata
             # therefore we need to collect it then pass it back onto the result
             if self._mergeChannelsOnOutput_:
-                channels = [int(self.files[k]["channel"]) for k in range(len(self.files))]
+                channel_indicess = list(range(len(self.files)))
+                channel_acqusition_indices = [int(self.files[k]["channel"]) for k in range(len(self.files))]
                 channel_names = [self.files[k]["channelName"] for k in range(len(self.files))]
                 
                 mergedFrameData = concatenateImages(*frameData, axis="c", allowConcatenationFor=("origin", "resolution"))
                 
                 merged_channels_axinfo = mergedFrameData.axistags["c"]
                 
-                merged_channels_axcal = AxesCalibration.new(merged_channels_axinfo,
-                                                        name = axisTypeName(merged_channels_axinfo))
+                merged_channel_calibrations = list(map(lambda c: ChannelCalibrationData(index = c[0], acquisition_index=c[1], name=c[2]), zip(channel_indices, channel_acqusition_indices, channel_names)))
                 
-                for kch, channel in enumerate(channels):
-                    merged_channels_axcal.addChannelCalibration(ChannelCalibrationData(name=channel_names[kch],
-                                                                                         index=channel))
+                merged_channels_axcal = AxesCalibration.new(merged_channels_axinfo,
+                                                            name = axisTypeName(merged_channels_axinfo),
+                                                            channels = merged_channel_calibrations)
+                
+                # for kch, channel in enumerate(channels):
+                #     merged_channels_axcal.addChannelCalibration(ChannelCalibrationData(name=channel_names[kch],
+                #                                                                          index=channel))
                 merged_channels_axinfo = merged_channels_axcal.calibrateAxis(merged_channels_axinfo)
                         
                 if sourceData is not None:
@@ -1592,11 +1602,12 @@ class PVFrame(PVObject):
                     merged_source_channel_axinfo = mergedSourceData.axistags["c"]
                     
                     merged_source_channel_axcal = AxesCalibration(merged_source_channel_axinfo,
-                                                                  name = axisTypeName(merged_source_channel_axinfo))
+                                                                  name = axisTypeName(merged_source_channel_axinfo),
+                                                                  channels = merged_channel_calibrations)
                     
-                    for kch, channel in enumerate(channels):
-                        merged_source_channel_axcal.addChannelCalibration(ChannelCalibrationData(name=channel_names[kch],
-                                                                                                    index = channel))
+                    # for kch, channel in enumerate(channels):
+                    #     merged_source_channel_axcal.addChannelCalibration(ChannelCalibrationData(name=channel_names[kch],
+                    #                                                                                 index = channel))
                         
                     merged_source_channel_axis_ino = merged_source_channel_axcal.calibrateAxis(merged_channels_axinfo)
                         
@@ -2715,7 +2726,7 @@ class PVScan(PVObject):
         elif self.sequences[0].sequencetype == PVSequenceType.Single.value:
             # again, nothing to do here -- this pertains to SingleImage 
             # acquisition in PrairieView and consists of one sequence with one frame
-            # TODO - FIXME can these ever have mmore thann one sequence? can each
+            # TODO - FIXME can these ever have mmore than one sequence? can each
             # of these sequences ever have more than one frame?
             
             if self._mergeChannelsOnOutput_:
@@ -2751,13 +2762,25 @@ class PVScan(PVObject):
             
         for future in concurrent.futures.as_completed(futures):
             (scans, scene) = future.result()
+
+        # print(f"{print_styled(f'\n{self.__class__.__name__}.scanData:', color='yellow')}")
+        # if isinstance(scene, (tuple, list)) and all(isinstance(v, vigra.VigraArray) for v in scene):
+        #     for k, v in enumerate(scene):
+        #         axCal = AxesCalibration(v)
+        #         print(f"{print_styled(f'\n\tscene axes calibration {k} = \n\t{axCal}', color='yellow')}")
+                
+        # if isinstance(scans, (tuple, list)  ) and all(isinstance(v, vigra.VigraArray) for v in scans):
+        #     for k, v in enumerate(scans):
+        #         axCal = AxesCalibration(v)
+        #         print(f"{print_styled(f'\n\tscans axes calibration {k} = \n\t{axCal}', color='yellow')}")
+                
         
         meta = self.metadata
         
         file_origin = self.filepath
         rec_datetime = self._rec_datetime_
             
-        return ScanData(scene=scene, scans=scans, name=self.name,
+        return ScanData(scans=scans, scene=scene, name=self.name,
                         electrophysiology=electrophysiology,
                         analysisOptions=analysisOptions,
                         file_origin=file_origin,

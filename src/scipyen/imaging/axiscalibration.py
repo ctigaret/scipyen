@@ -93,7 +93,7 @@ from core.utilities import (reverse_mapping_lookup, unique, counter_suffix,
 
 from core.traitcontainers import DataBag
 
-from core.prog import (ArgumentError, scipywarn)
+from core.prog import (ArgumentError, scipywarn, print_styled)
 
 from .axisutils import (axisTypeName, 
                         axisTypeSymbol, 
@@ -624,7 +624,6 @@ class CalibrationChannelsDescriptor:
         obj_axtype = getattr(obj, "type", None)
         if not obj_axtype & vigra.AxisType.AllAxes:
             setattr(obj, self._name_, list())
-            # scipywarn(f"The owner (a {type(obj).__name__}) has an invalid type attribute: {obj_axtype}")
             return
         # NOTE: 2025-04-15 23:05:35
         # set this attribute only for a Channels axis; otherwise set it to MISSING
@@ -879,6 +878,21 @@ class ChannelCalibrationData(CalibrationData):
     index:int = 0 
     r'''channel index'''
     
+    acquisition_index:int = 0
+    r"""channel acquisition index.
+    Some acquistion software may start channel numbering at 1; moreover, several
+    channels may be save as separate files, yet are assigned different channel 
+    numbers to indicate they belong to the same data set.
+    
+    Therefore, in the final vigra array, a channel with acquisition index of, say,
+    1, may actually correspond to the 0ᵗʰ channel in the channels axis. When
+    other channels are acquired but stored in separate single-channel image arrays, 
+    the 0ᵗʰ channel of those image arrays will corresponds to higher channel
+    acqusition indices, etc.
+    
+    So for reaons of sanity, let's store this variable as well.
+    """
+    
     origin:CalibrationScalarDescriptor = CalibrationScalarDescriptor(default = 0.0) # is this really needed?
     r"""channel's minimum value, in self.units, as float"""
     
@@ -1001,10 +1015,16 @@ class ChannelCalibrationData(CalibrationData):
     @classmethod
     def _(cls, e:ET.Element):
         fnames = tuple(map(lambda f: f.name, dataclasses.fields(cls)))
+        # print(f"{print_styled(f'\n{cls.__name__}.new[ET.Element]: fnames -> {fnames}', color='yellow')}")
         data = dict()
         for c in e:
             if c.tag in fnames:
+                # val = cls._from_xml_text_(c.tag, c.text)
+                # print(f"{print_styled(f'\n\tc.tag: {c.tag} -> {val}', color='yellow')}")
+                # data[c.tag] = val
+                
                 data[c.tag] = cls._from_xml_text_(c.tag, c.text)
+                
         # print(f"{cls.__name__}.new({data})")
         return cls.new(data)
         
@@ -1012,19 +1032,21 @@ class ChannelCalibrationData(CalibrationData):
 @dataclass(eq=False)
 class AxisCalibrationData(CalibrationData):
     r"""Calibration data for an array axis.
-        Provides a mechanism to attach a physical dimensionality to vigra.AxisInfo
-        objects which, in turn, are used to attach semantics to the axes of a
-        vigra.VigraArray (see vigra documentation for details).
         
-        A vigra.VigraArray object always associates a vigra.AxisInfo to the 
+        Applicable to vigra.VigraArray objects, where it provides a mechanism to 
+        attach a physical dimensionality to vigra.AxisInfo objects which, in turn,
+        are used to attach semantics to the axes of a vigra.VigraArray (see vigra 
+        documentation for details).
+        
+        A vigra.VigraArray object associates one vigra.AxisInfo with each of its 
         array axes.
         
         The AxisCalibrationData can be used to attach the physical dimensionality
         to an AxisInfo in a persistent manner, by seralizing it to an XML-formatted
-        string embedded in the AxisInfo.description attribute.
+        string embedded in the 'description' attribute of the AxisInfo object.
         
-        Conversely, the string contained in the AxisInfo.description attribute
-        can be used to recreate the AxisCalibrationData object.
+        Conversely, the string contained in AxisInfo.description can be used to
+        recreate the AxisCalibrationData object.
         
         Constructing an AxisCalibrationData object:
         ===========================================
@@ -1310,7 +1332,8 @@ class AxisCalibrationData(CalibrationData):
             o = self.origin if isinstance(self.origin, numbers.Number) else 0.0
             
             # NOTE: 2025-04-16 17:37:15
-            # the line below adapts to ChannelCalibrationData using NaN unless a scalar value is given
+            # the line below adapts to ChannelCalibrationData using NaN unless a
+            # scalar value is given
             m = self.maximum if isinstance(self.maximum, numbers.Number) else math.nan 
             
             if len(self.channels) == 0:
@@ -1524,6 +1547,7 @@ class AxisCalibrationData(CalibrationData):
                     
                 # print(f"{cls.__name__}.new({type(s).__name__}): cal[{param}] = {cal[param]}")
                         
+            # NOTE: 2025-07-06 22:30:44 Now, populate channel calibration data
             if ischannels:
                 child_nodes = tuple(getXMLChildren(cal_xml_element, tagName="channels"))
                 if len(child_nodes):
@@ -1576,6 +1600,16 @@ class AxisCalibrationData(CalibrationData):
         non-Channels axis.
         """
         return tuple(map(lambda c: c.index, self.channels))
+    
+    @property
+    def channelAqcuisitionIndices(self) -> tuple:
+        r"""A tuple of channel indices, from their calibration data.
+        These include the virtual channel (if it exists).
+        
+        This tuple is empty if the AxisCalibrationData corresponds to a 
+        non-Channels axis.
+        """
+        return tuple(map(lambda c: c.acquisition_index, self.channels))
 
     @property
     def channelNames(self) -> tuple[str] | None:
@@ -2549,7 +2583,8 @@ class AxesCalibration(object):
         if key not in self.keys() or key not in self._axistags_:
             raise KeyError("Axis with key %s is not calibrated by this object" % key)
         
-        return self[key]["type"]
+        # return self[key]["type"]
+        return self[key].type
     
     def addAxis(self, axisInfo, index = None):
         r"""Register a new axis with this AxesCalibration object.

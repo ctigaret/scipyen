@@ -1066,12 +1066,25 @@ class ScanDataImageParser(AttributeAdapter):
         imageLayout = getattr(obj, f"{layoutFName}", None)
         framesAxis = None if not isinstance(imageLayout, dict) else imageLayout.get(f"{frAxisFName}", None)
         axesCalibration = getattr(obj, f"{axcalFName}", None)
+        # print(f"{print_styled(f'\n{self.__class__.__name__}.parseImageData for field \'{self.fieldname}\' of {type(obj).__name__} object', color='yellow')}")
+        
+        if axesCalibration is None:
+            # try to see if value has axis calibration
+            if isinstance(value, vigra.VigraArray):
+                axesCalibration = [AxesCalibration(value)]
+            elif isinstance(value, (tuple, list)) and all(isinstance(v, vigra.VigraArray) for v in value):
+                # WARNING: assumes ALL arrays in the list have the same axes, dimensions etc
+                axesCalibration = list(map(lambda v: AxesCalibration(v), value))
+        
+        # print(f"\t{print_styled(f'axesCalibration = {axesCalibration}', color='yellow')}")
         
         # NOTE: 2025-07-05 10:11:40
         # below, 'layout' is a traitlets.Bunch
         data, layout, axesCalibration = self.imageDataLayout(value, 
                                                             framesAxis = framesAxis,
                                                             axescal = axesCalibration)
+        
+        # print(f"\t{print_styled(f'after imageDataLayout: axesCalibration = {axesCalibration}', color='green')}")
         
         setattr(obj, layoutFName, layout)
         
@@ -1087,7 +1100,7 @@ class ScanDataImageParser(AttributeAdapter):
                     framesAxis:typing.Optional[vigra.AxisInfo]=None, 
                     horizontalAxis:typing.Optional[vigra.AxisInfo]=None, 
                     verticalAxis:typing.Optional[vigra.AxisInfo]=None, 
-                    axescal:typing.Optional[AxesCalibration]=None):
+                    axescal:typing.Optional[typing.Sequence[AxesCalibration]]=None):
         r""" Proposes an axes layout and axes calibration for the data.
         
         See also imaging.vigrautils.proposeLayout()
@@ -1140,8 +1153,8 @@ class ScanDataImageParser(AttributeAdapter):
             For a detailed explanation of the concept of frames and frames axis
             see imaging.vigrautils.proposeLayout()
 
-        'axes_calibration': an imaging.axiscalibration.AxesCalibration object, 
-                            or None.
+        'axes_calibration': a sequence of imaging.axiscalibration.AxesCalibration
+                            objects, or None.
                             
         Change: 2025-07-05 11:15:55
         layout is always a Bunch as above, but with members set to default values
@@ -1154,7 +1167,7 @@ class ScanDataImageParser(AttributeAdapter):
                         "channelsAxis":   None,
                         "framesAxis":     None})
         if data is None:
-            # print(f"{print_styled(f'\n{self.__class__.__name__}.imageDataLayout(data = {data}) will return {(None, None, None)})')}")
+            # print(f"{print_styled(f'\n{self.__class__.__name__}.imageDataLayout(data = {data}) will return {(None, None, None)})', color='red')}")
             return (data, layout, None)
         
         if not isinstance(data, (vigra.VigraArray, tuple, list)):
@@ -1164,8 +1177,19 @@ class ScanDataImageParser(AttributeAdapter):
             # calls imaging.vigrautils.proposeLayout
             layout = proposeLayout(data, userFrameAxis = framesAxis, indices = True)
             
-            if isinstance(axescal, AxesCalibration) and all(axescal.typeFlags(key) == x.typeFlags for (key, x) in zip(axescal.axiskeys, data.axistags)):
-                axes_cal = [axscal]
+            if isinstance(axescal, AxesCalibration):
+                if all(axescal.typeFlags(key) == x.typeFlags for (key, x) in zip(list(axescal.axiskeys()), data.axistags)):
+                    axes_cal = [axescal]
+                else:
+                    raise ValueError(f"Mismatch between the supplied axescalibrations and the axistags of arrays in 'data'")
+                
+            elif isinstance(axescal, (tuple, list)):
+                if len(axescal) != 1:
+                    raise ValueError(f"Expecting one AxesCalibration object; got {len(axescal)} instead")
+                if all(axescal[0].typeFlags(key) == x.typeFlags for (key, x) in zip(list(axescal[0].axiskeys()), data.axistags)):
+                    axes_cal = axescal
+                else:
+                    raise ValueError(f"Mismatch between the axes types in the supplied axescalibrations and the axistags of arrays in 'data'")
             else:
                 axes_cal = [AxesCalibration(data)]
                 
@@ -1198,14 +1222,20 @@ class ScanDataImageParser(AttributeAdapter):
                         raise ValueError(f"Axes calibration expected to be a sequence with as many elements as 'data' ({len(data)}; got {len(axescal)} instead)")
                     
                     if not all(isinstance(ac, AxesCalibration) for ac in axescal):
-                        raise TypeError("Expecting a tuple of AxesCalibration objects")
+                        raise TypeError("Expecting a sequence of AxesCalibration objects")
                     
-                    if all(all(axcal.typeFlags(key) == x.typeFlags for (key, x) in zip(axcal.axiskeys, img.axistags)) for axcal,img in zip(axescal,data)):
+                    if all(all(axcal.typeFlags(key) == x.typeFlags for (key, x) in zip(list(axcal.axiskeys()), img.axistags)) for axcal, img in zip(axescal, data)):
                         axes_cal = [axcal for axcal in axescal]
                     else:
-                        axes_cal = [AxesCalibration(img) for img in data]
-                else:
-                    axes_cal = [AxesCalibration(img) for img in data]
+                        raise ValueError(f"Mismatch between the axes types in the supplied axescalibrations and the axistags of arrays in 'data'")
+                elif isinstance(axescal, AxesCalibration):
+                    if all(all(axescal.typeFlags(key) == x.typeFlags for (key, x) in zip(list(axescal.axiskeys()), img.axistags)) for img in data):
+                        axes_cal = list(map(lambda i: axescal, data))
+                    else:
+                        raise ValueError(f"Mismatch between the axes types in the supplied axescalibrations and the axistags of arrays in 'data'")
+                    
+                elif axescal is None:
+                    axes_cal = list(map(lambda i: AxesCalibration(i), data))
                 
                 return (data, layout, axes_cal)
 

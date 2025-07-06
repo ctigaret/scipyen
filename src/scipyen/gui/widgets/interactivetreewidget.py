@@ -615,6 +615,8 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         """
         from pyqtgraph.widgets.DataTreeWidget import HAVE_METAARRAY
         from core.datatypes import (is_namedtuple, TypeEnum)
+        from imaging.axiscalibration import (AxesCalibration, AxisCalibrationData, ChannelCalibrationData)
+        from imaging.axisutils import axisTypeStrings
         
         # NOTE: 2022-12-30 11:37:05
         # allow pre-empting the type string (e.g. when passed a dict created
@@ -729,6 +731,22 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                 # NOTE: 2025-05-21 16:17:37
                 # 'widget' is None, here
                 children = data.__dict__
+                
+            elif isinstance(data, AxesCalibration):
+                lbl = f"{data.__class__.__name__} object"
+                desc = " ".join([lbl, "with", f"{len(data.calibrations)} axes"])
+                children = dict(enumerate(data.calibrations))
+                
+            elif isinstance(data, AxisCalibrationData):
+                lbl = f"{data.__class__.__name__} object"
+                desc = " ".join([lbl, "with name (type):", f"'{data.name}' ('{axisTypeStrings(data.type, single=True)[0]})'"])
+                if data.isChannels:
+                    desc += f" and {len(data.channels)} channels"
+                    children = dict(enumerate(data.channels))
+                    
+            elif isinstance(data, ChannelCalibrationData):
+                lbl = f"{data.__class__.__name__} object"
+                desc = " ".join([lbl, "with name:", f"'{data.name}'", "index:", f"{data.index}", "acquisition index:", f"{data.acquisition_index}"])
             
             elif isinstance(data, pd.DataFrame):
                 desc = "length=%d, columns=%d" % (len(data), len(data.columns))
