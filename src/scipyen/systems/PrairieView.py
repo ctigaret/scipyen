@@ -642,10 +642,9 @@ class PVStateValue(PVObject):
         return "".join(ret)
     
     def as_dict(self) -> dict:
-        if len(self.items):
+        if len(list(self.items)):
             return dict(self.items)
-        else:
-            return dict{self.key:self.value}
+        return {self.key:self.value}
                         
     @property
     def parent(self):
@@ -782,7 +781,7 @@ class PVIndexedValue(PVObject):
         return self.attributes.get("description", None)
     
     def as_dict(self)->dict:
-        return dict(self.attributes)
+        return dict(filter(lambda i: i[0] != "index", self.attributes.items()))
     
 class PVSubIndexedValue(PVObject):
     def __init__(self, node, parent:PVSubIndexedValueList):
@@ -813,7 +812,7 @@ class PVSubIndexedValue(PVObject):
         return "".join(ret)
     
     def as_dict(self)->dict:
-        return dict(self.attributes)
+        return dict(filter(lambda i: i[0] != "subindex", self.attributes.items()))
     
     @property
     def parent(self):

@@ -796,8 +796,12 @@ class DataViewer(ScipyenViewer):
             increasing nesting depth.
         
         """
-        from core.datatypes import is_namedtuple
-        from core.datatypes import subarray_type_map
+        from core.datatypes import (is_namedtuple, TypeEnum, subarray_type_map)
+        from imaging.axiscalibration import (AxesCalibration, AxisCalibrationData, ChannelCalibrationData)
+        from imaging.axisutils import axisTypeStrings
+        from systems.PrairieView import (PVObject,PVScan, PVSequence, PVFrame, PVSystemConfiguration,
+                                        PVStateShard, PVStateValue, PVIndexedValue, PVSubIndexedValue, 
+                                        PVSubIndexedValueList, PVLinescanDefinition)
         
         try:
             self._subselections_.clear()
@@ -861,6 +865,21 @@ class DataViewer(ScipyenViewer):
                         expr[k-1] = f"['{expr[k-1]}']"
                     else:
                         expr[k-1] = f"[{expr[k-1]}]"
+                        
+                # elif issubclass(pdatatype, PVObject): # PrairieView objects
+                elif pdatatype in (PVStateShard, PVStateValue):
+                    expr[k-1] = f"['{expr[k-1]}']"
+                    
+                elif pdatatype == PVIndexedValue:
+                    # expr[k-1] = f"['{expr[k-1]}'].value"
+                    expr[k-1] = ".value"
+                
+                elif pdatatype == PVSubIndexedValueList:
+                    expr[k-1] = f"[{expr[k-1]}].value"
+                    
+                elif pdatatype == PVSubIndexedValue:
+                    expr[k-1] = ""
+                    
                 else:
                     expr[k-1] = f".{expr[k-1]}"
                     

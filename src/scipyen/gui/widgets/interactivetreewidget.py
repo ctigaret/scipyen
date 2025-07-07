@@ -617,7 +617,6 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         from core.datatypes import (is_namedtuple, TypeEnum)
         from imaging.axiscalibration import (AxesCalibration, AxisCalibrationData, ChannelCalibrationData)
         from imaging.axisutils import axisTypeStrings
-        # from systems.PrairieView import *
         from systems.PrairieView import (PVObject,PVScan, PVSequence, PVFrame, PVSystemConfiguration,
                                         PVStateShard, PVStateValue, PVIndexedValue, PVSubIndexedValue, 
                                         PVSubIndexedValueList, PVLinescanDefinition)
