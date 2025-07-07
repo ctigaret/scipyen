@@ -617,6 +617,10 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         from core.datatypes import (is_namedtuple, TypeEnum)
         from imaging.axiscalibration import (AxesCalibration, AxisCalibrationData, ChannelCalibrationData)
         from imaging.axisutils import axisTypeStrings
+        # from systems.PrairieView import *
+        from systems.PrairieView import (PVObject,PVScan, PVSequence, PVFrame, PVSystemConfiguration,
+                                        PVStateShard, PVStateValue, PVIndexedValue, PVSubIndexedValue, 
+                                        PVSubIndexedValueList, PVLinescanDefinition)
         
         # NOTE: 2022-12-30 11:37:05
         # allow pre-empting the type string (e.g. when passed a dict created
@@ -747,7 +751,26 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
             elif isinstance(data, ChannelCalibrationData):
                 lbl = f"{data.__class__.__name__} object"
                 desc = " ".join([lbl, "with name:", f"'{data.name}'", "index:", f"{data.index}", "acquisition index:", f"{data.acquisition_index}"])
-            
+                
+            elif isinstance(data, PVObject):
+                lbl = f"{data.__class__.__name__} object"
+                if isinstance(data, PVScan):
+                    desc = " ".join([lbl, f"{data.attributes}"])
+                    # children = {"State": data.state, "Sequences":data.sequences)
+                elif isinstance(data, PVSequence):
+                    desc = " ".join([lbl, f"Type: {data.attributes['sequencetypename']} with {len(data.frames)} frames"])
+                    # children = {"State": data.state, "Frames": data.frames}
+                elif isinstance(data, PVFrame):
+                    desc = " ".join([lbl, f"Channels: {data.channels}"])
+                    # children = dict("State": data.state)
+                elif isinstance(data, (PVSystemConfiguration, PVIndexedValue, PVSubIndexedValue)):
+                    if hasattr(data, "description") and isinstance(data.description, str) and len(data.description.strip()):
+                        desc = " ".join([lbl, data.description])
+                # elif isinstance(data, PVLinescanDefinition):
+                    # desc = " ".join([lbl, data.description])
+                    
+                children = data.as_dict()
+                
             elif isinstance(data, pd.DataFrame):
                 desc = "length=%d, columns=%d" % (len(data), len(data.columns))
                 widget = self._makeTableWidget_(data)

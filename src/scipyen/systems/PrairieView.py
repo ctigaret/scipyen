@@ -258,6 +258,8 @@ class PVObject(object):
         self._parent_ = None
         self._stateshard_ = None
         
+    def as_dict(self): pass # must implement in subclasses
+        
     @property
     def parent(self):
         return self._parent_
@@ -639,6 +641,12 @@ class PVStateValue(PVObject):
         ret += ["\n"]
         return "".join(ret)
     
+    def as_dict(self) -> dict:
+        if len(self.items):
+            return dict(self.items)
+        else:
+            return dict{self.key:self.value}
+                        
     @property
     def parent(self):
         return self._parent_
@@ -773,6 +781,9 @@ class PVIndexedValue(PVObject):
     def description(self):
         return self.attributes.get("description", None)
     
+    def as_dict(self)->dict:
+        return dict(self.attributes)
+    
 class PVSubIndexedValue(PVObject):
     def __init__(self, node, parent:PVSubIndexedValueList):
         if not isinstance(parent, PVSubIndexedValueList):
@@ -800,6 +811,9 @@ class PVSubIndexedValue(PVObject):
         ret += ["  %s = %s\n" % (i[0], i[1]) for i in self._attributes_.items()]
         ret += ["\n"]
         return "".join(ret)
+    
+    def as_dict(self)->dict:
+        return dict(self.attributes)
     
     @property
     def parent(self):
@@ -856,6 +870,9 @@ class PVSubIndexedValueList(PVObject):
             
         ret += ["\n"]
         return "".join(ret)
+    
+    def as_dict(self)->dict:
+        return dict(self.items)
 
     @property
     def attributes(self) -> DataBag:
@@ -995,6 +1012,9 @@ class PVStateShard(PVObject):
     def __len__(self):
         return len(tuple(self.keys))
     
+    def as_dict(self) -> dict:
+        return dict(self.items)
+    
     @property
     def attributes(self):
         return self._attributes_
@@ -1071,15 +1091,18 @@ class PVSequence(PVObject): pass #needed for PVFrame below
 # attribute, whuch somewhat simplifies things.
 #
 #NOTE: 2017-08-07 13:49:49
-# the behavior of vigraimpex towards file names that are paret of a sequence is quite handy
+# the behavior of vigraimpex towards file names that are parent of a sequence is quite handy
 # with ZSeries also, as it can be used to load the entire ZSeries data for one channel
 # into a single VigraArray
 class PVFrame(PVObject):
+    r"""Encapsulates a PrairieView Frame.
+        A ferame may contain several "File"s which are encapsulated by DataBag objects
+    """
     def __init__(self, node, index:int, parent:PVSequence):
         r"""PVFrame constructor:
         node: xmlutils.xml.dom.Node with type ELEMENT_NODE
         index: int index of the frame in the parent sequence; must be >= 0
-            Also this shuldbe uniue among all the frames in a sequence (CAUTION: this is NOT enforced)
+            Also this shuold be unique among all the frames in a sequence (CAUTION: this is NOT enforced)
         parent: a PVSequence object
         
         """
@@ -1119,6 +1142,9 @@ class PVFrame(PVObject):
             self._stateshard_ = PVStateShard(stateShardNodes[0], self)
         
         self._mergeChannelsOnOutput_ = False
+        
+    def as_dict(self)->dict:
+        return {"Files": self.files, "State": self.state}
         
     @property
     def version(self):
@@ -2027,10 +2053,17 @@ class PVSequence (PVObject):
                     
                 else: # ZSeries, separate channels
                     # get the Z axis resolution from the frames state
+                    zres = self.parent.state["micronsPerPixel"]["ZAxis"]
                     if self.parent.versionString < "5.5":
                         z_pos = list(map(lambda f: float(f.state["positionCurrent_ZAxis"].value), self.frames))
                     else:
+                        # NOTE: get the frame state, else parent's (i.e. PVSCan's state)
                         frameStates = map(lambda f: f.state if len(f.state) else self.parent.state, self.frames)
+                        # WARNING: some more recent build versions of PV do NOT include
+                        # a Z axis positionCurrent in the stateshard of the first frame - not sure why is that,
+                        # unless it has something to do with setting imaging laser intensity to some function
+                        # of the imaging Z axis coordinate; in such cases, I suspect the Z position of the first
+                        # fraem is to be found int e PVStateshard of the parent PVScan (NOT its sequence)
                         z_pos = list(map(lambda s: float(s["positionCurrent"]["ZAxis"][0].value), frameStates))
 
                     z_steps = np.diff(z_pos)
@@ -2337,7 +2370,8 @@ class PVSequence (PVObject):
         
         return ("".join(ret))
         
-                
+    def as_dict(self)->dict:
+        return {"State": self.state, "Frames": self.frames}
 
 class PVScan(PVObject):
     r"""Encapsulates a PrairieView scan data.
@@ -2844,6 +2878,9 @@ class PVScan(PVObject):
         metadata["type"] = self.__class__.__name__
         
         return metadata
+    
+    def as_dict(self)->dict:
+        return {"State": self.state, "Sequences":self.sequences}
     
     @property
     def state(self):
@@ -3841,3 +3878,6 @@ def loadPrairieViewXML(filePath:typing.Union[str, pathlib.Path]) -> object:
     ret.documentElement.appendChild(doc_filepath)
     return ret
 
+__all__ = ("PVObject","PVScan", "PVSequence", "PVFrame", "PVSystemConfiguration",
+           "PVStateShard", "PVStateValue", "PVIndexedValue", "PVSubIndexedValue",
+           "PVSubIndexedValueList", "PVLinescanDefinition")

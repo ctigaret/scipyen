@@ -6665,8 +6665,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             "Load file or change directory. SHIFT to also change to file's parent directory")
         if event.mimeData().hasUrls():
             urls = event.mimeData().urls()
-            self.slot_loadDroppedURLs(
-                urls, event.keyboardModifiers() == QtCore.Qt.ShiftModifier, event.pos())
+            if __has_PyQt6__ or __has_PySide6__:
+                self.slot_loadDroppedURLs(urls, event.modifiers() == QtCore.Qt.ShiftModifier, event.pos())
+            else:
+                self.slot_loadDroppedURLs(urls, event.keyboardModifiers() == QtCore.Qt.ShiftModifier, event.pos())
 
         event.accept()
 
