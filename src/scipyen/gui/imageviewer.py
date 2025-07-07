@@ -1042,6 +1042,19 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                  frame:(int, type(None)) = None, 
                  displayChannel = None, normalize: (bool, ) = False, gamma: (float, ) = 1.0, *args, **kwargs):
         # print(f"{self.__class__.__name__}.__init__: data: {type(data).__name__}")
+        # # NOTE: 2021-08-25 09:42:54
+        # # ScipyenFrameViewer initialization - also does the following:
+        # # 1) calls self._configureUI_() overridden here:
+        # #   1.1) sets up the UI defined in the .ui file (setupUi)
+        # #
+        # # 2) calls self.loadSettings() inherited from 
+        # # ScipyenViewer <- WorkspaceGuiMixin <- ScipyenConfigurable
+        # #
+        # # NOTE: 2022-01-17 16:27:30
+        # # pass None for data to prevent super().__init__ from calling setData
+        # # next call our own setData
+        # super().__init__(data=None, parent=parent, ID=ID, win_title=win_title, 
+        #                  doc_title=doc_title, frameIndex=frame, **kwargs)
         self._image_width_ = 0
         self._image_height_ = 0
         self._imageNormalize             = None
@@ -1153,7 +1166,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         # NOTE: 2022-01-17 16:27:30
         # pass None for data to prevent super().__init__ from calling setData
         # next call our own setData
-        super().__init__(data=None, parent=parent, ID=ID, win_title=win_title, 
+        ScipyenFrameViewer.__init__(self, data=None, parent=parent, ID=ID, win_title=win_title, 
                          doc_title=doc_title, frameIndex=frame, **kwargs)
         
         self.observed_vars = DataBag(allow_none=True, mutable_types=True)

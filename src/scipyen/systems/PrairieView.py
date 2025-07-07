@@ -1932,18 +1932,20 @@ class PVSequence (PVObject):
                 else: # Z series
                     # get the Z axis resolution from the frames state
                     if self.parent.versionString < "5.5":
-                        z_pos = list(map(lambda f: float(f.state["positionCurrent_ZAxis"].value), self.frames))
+                        zres = float(self.parent.state["micronsPerPixel_ZAxis"].value)*pq.um
+                        # z_pos = list(map(lambda f: float(f.state["positionCurrent_ZAxis"].value), self.frames))
                     else:
-                        frameStates = map(lambda f: f.state if len(f.state) else self.parent.state, self.frames)
-                        z_pos = list(map(lambda s: float(s["positionCurrent"]["ZAxis"].value), frameStates))
+                        zres = float(self.parent.state["micronsPerPixel"]["ZAxis"].value)*pq.um
+                        # frameStates = map(lambda f: f.state if len(f.state) else self.parent.state, self.frames)
+                        # z_pos = list(map(lambda s: float(s["positionCurrent"]["ZAxis"].value), frameStates))
                         
-                    z_steps = np.diff(z_pos)
-                    
-                    if len(z_steps) > 1:
-                        if not all(z == z_steps[0] for z in z_steps):
-                            raise ValueError("Irregular Z axis sampling is not supported")
-                        
-                    zres = z_steps[0]
+#                     z_steps = np.diff(z_pos)
+#                     
+#                     if len(z_steps) > 1:
+#                         if not all(z == z_steps[0] for z in z_steps):
+#                             raise ValueError("Irregular Z axis sampling is not supported")
+#                         
+#                     zres = z_steps[0]
                     
                     newAxisInfo = vigra.AxisInfo(key="z", 
                                                  typeFlags=vigra.AxisType.Space,

@@ -341,9 +341,12 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         
         # print(f"ScipyenViewer[{self.__class__.__name__}].__init__: self.scipyenWindow = {self.scipyenWindow}")
         
-        self._setIconSize(self._scipyenWindow_.iconSize())
-        self._setToolBarIconSize(self.scipyenWindow.toolBarIconSize)
-        self._setToolBarButtonStyle(self.scipyenWindow.toolBarButtonStyle)
+        if self._scipyenWindow_:
+            self._setIconSize(self._scipyenWindow_.iconSize())
+            self._setToolBarIconSize(self._scipyenWindow_.toolBarIconSize)
+            self._setToolBarButtonStyle(self._scipyenWindow_.toolBarButtonStyle)
+        # else:
+            
         
     #def mousePressEvent(self, evt):
         #if sys.platform.startswith("win32"):

@@ -1060,8 +1060,6 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
             self._appWindow_ = appWindow
             
         elif self._appWindow_ is None:
-            # if isinstance(parent, QtWidgets.QMainWindow):
-            #     self._appWindow_ = parent
             if isinstance(parent_obj, QtWidgets.QMainWindow):
                 self._appWindow_ = parent_obj
                 

@@ -1789,15 +1789,24 @@ class ScanData(BaseScipyenData):
             return len(data.segments)
         
         else:
+            layout = getattr(self, f"{component}Layout", None)
+                
             if isinstance(data, (tuple, list)): # scene or scans
                 if len(data) == 0:
                     return 0
-                layout = getattr(self, f"{component}Layout", None)
                 if not isinstance(layout, dict):
                     layout = self.ImageParser(owner=self, fieldname=component).parseImageData(data)
                     
                 nFrames = layout.get("nFrames", 0)
+                
                 return nFrames if isinstance(nFrames, int) else np.prod(nFrames)
+            
+            elif isinstance(data, vigra.VigraArray):
+                if not isinstance(layout, dict):
+                    layout = self.ImageParser(owner=self, fieldname=component).parseImageData(data)
+                return data.shape[layout.frameAxis]
+                
+            return 0 # no data 
             
     def __reduce__(self):
         r"""Required for pickling"""
