@@ -235,7 +235,7 @@ from core.utilities import (get_nested_value, set_nested_value, counter_suffix,
                             yyMdd,
                             NestedFinder)
 
-from core.prog import (safewrapper, safeguiwrapper, scipywarn)
+from core.prog import (safewrapper, safeguiwrapper, scipywarn, print_styled)
 #import core.datasignal as datasignal
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
 from core.datazone import DataZone
@@ -3501,11 +3501,12 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     #
     # On the other hand, the settings for LSCaT and its client viewers are ALL
     # SAVED when LSCaTWindow is closed (see self.slot_Quit() PyQt slot)
-    viewer_for_types = {ScanData:99}
+    
+    viewer_for_types = {ScanData:99} # TODO 2025-07-08 21:50:45 copy to a future ScanDataViewer
     
     view_action_name = "LSCaT Window"
     
-    default_scanline_spline_order = 3
+    default_scanline_spline_order = 3 # TODO 2025-07-08 21:50:45 migrate to a future ScanDataViewer
     
     # NOTE 2020-09-05 19:50:36
     # because defaultPureletFilterOptions is a class attribute, it will be
@@ -3582,7 +3583,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     defaultBinomialFilterOptions.scans.ind = DataBag()
     defaultBinomialFilterOptions.scans.ind.radius = 10
 
-    def __init__(self, *args, parent:(QtWidgets.QMainWindow, type(None)) = None, win_title="LSCaT", **kwargs):
+    def __init__(self, *args, parent:(QtWidgets.QMainWindow, type(None)) = None, win_title="LSCaT", **kwargs): # TODO 2025-07-08 21:50:45 migrate to a future ScanDataViewer
         self.threadpool = QtCore.QThreadPool()
         
         # guard variables for filtering
@@ -3592,7 +3593,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self._generic_work_idle_ = True
         
         #self._data_ = None # inherited from ScipyenViewer
-        self._current_frame_scan_region_ = list() # so that its contents will be updated
+        self._current_frame_scan_region_ = list() # so that its contents will be updated # TODO 2025-07-08 21:50:45 migrate to a future ScanDataViewer
         
         self._data_var_name_ = None # optionally gets a str value further below
         
@@ -3616,153 +3617,72 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         # BEGIN window lists
         # ###
         
-        self.sceneviewers   = list()    # list of ImageViewer
+        self.sceneviewers   = list()    # list of ImageViewer # TODO 2025-07-08 21:50:45 migrate to a future ScanDataViewer
         
-        self.scansviewers    = list()    # list of ImageViewer
+        self.scansviewers    = list()    # list of ImageViewer # TODO 2025-07-08 21:50:45 migrate to a future ScanDataViewer
         
-        self.ephysviewers   = list()    # list of SignalViewer - only ONE window
+        self.ephysviewers   = list()    # list of SignalViewer - only ONE window # TODO 2025-07-08 21:50:45 migrate to a future ScanDataViewer
         
-        self.scansblockviewers  = list()    # list of SignalViewer - only ONE window
+        self.profileviewers = list()    # list of SignalViewer - only ONE window # TODO 2025-07-08 21:50:45 migrate to a future ScanDataViewer
         
-        self.sceneblockviewers = list()# list of SignalViewer - only ONE window
+        self.scansblockviewers  = list()    # list of SignalViewer - only ONE window # NOTE: 2025-07-08 21:53:12 keep in LSCaT analysis
         
-        self.profileviewers = list()    # list of SignalViewer - only ONE window
+        self.sceneblockviewers = list()# list of SignalViewer - only ONE window # NOTE: 2025-07-08 21:53:12 keep in LSCaT analysis
         
         # ###
         # END window lists
         # ###
         
-        self._displayed_scene_channels_ = list()
+        self._displayed_scene_channels_ = list() # TODO 2025-07-08 21:50:45 migrate to a future ScanDataViewer
         
-        self._displayed_scan_channels_ = list()
+        self._displayed_scan_channels_ = list() # TODO 2025-07-08 21:50:45 migrate to a future ScanDataViewer
         
-        self._current_protocols_ = []
+        self._current_protocols_ = [] # TODO 2025-07-08 21:50:45 migrate to a future ScanDataViewer
         
-        self.currentSceneFrame = 0
+        self.currentSceneFrame = 0 # TODO 2025-07-08 21:50:45 migrate to a future ScanDataViewer
         
-        self.currentScanFrame = 0
+        self.currentScanFrame = 0 # TODO 2025-07-08 21:50:45 migrate to a future ScanDataViewer
         
-        self._current_frame_index_ = 0
+        self._current_frame_index_ = 0 # TODO 2025-07-08 21:50:45 migrate to a future ScanDataViewer
         
+        # TODO 2025-07-08 21:50:45 migrate to a future ScanDataViewer
         self._frame_selector_ = None # a list/tuple of frames, typically
                                      # can also be a range or, when the total
                                      # number of frames in the data is known,
                                      # a slice object
         
-        # ###
-        # BEGIN channels configuration
-        # ###
+        # ### BEGIN channels configuration # TODO 2025-07-08 21:50:45 migrate to a future ScanDataViewer
+        #
         
-        self._scene_roi_channel_= 0
-        self._scene_roi_channel_name_= ""
+        self._scene_roi_channel_= 0 # TODO 2025-07-08 21:50:45 migrate to a future ScanDataViewer
+        self._scene_roi_channel_name_= "" # TODO 2025-07-08 21:50:45 migrate to a future ScanDataViewer
         
         # to be synchronised with values from the EPSCaT tab
-        self._scan_ref_channel_ = 0
-        self._scan_ref_channel_name_ =""
+        self._scan_ref_channel_ = 0 # TODO 2025-07-08 21:50:45 migrate to a future ScanDataViewer
+        self._scan_ref_channel_name_ ="" # TODO 2025-07-08 21:50:45 migrate to a future ScanDataViewer
         
-        self._scan_cat_channel_ = 1
-        self._scan_cat_channel_name_ = ""
+        self._scan_cat_channel_ = 1 # TODO 2025-07-08 21:50:45 migrate to a future ScanDataViewer
+        self._scan_cat_channel_name_ = "" # TODO 2025-07-08 21:50:45 migrate to a future ScanDataViewer
         
+        #
+        # ### END channels configuration
         
-        # ###
-        # END channels configuration
-        # ###
-        
-        # ###
-        # BEGIN Filter options
-        # ###
+        # ### BEGIN Filter options # NOTE: 2025-07-08 21:53:12 keep in LSCaT analysis
+        #
         
         # NOTE: 2019-10-12 14:24:26
         # migrate filter logic from ScanData to here
         self._scene_filters_ = dict()
         self._scans_filters_ = dict()
         
-        # NOTE: 2017-11-17 10:24:39
-        # TODO set up configuration framework to make these persistent
-        # TODO implement undo/redo/reset to default functionality
-        # probably a pain to do it for every single value, address all params
-        # "en bloc"
+        # 
+        # ### END filter options
         
-        #self.scanline_spline_order = 3
+        self._report_dataframe_ = None # NOTE: 2025-07-08 21:53:12 keep in LSCaT analysis
         
-        #self.defaultPureletFilterOptions = DataBag()
+        scandata = None # TODO 2025-07-08 21:50:45 migrate to a future ScanDataViewer
         
-        #self.defaultPureletFilterOptions.scene = DataBag()
-        
-        #self.defaultPureletFilterOptions.scene.ref = DataBag()
-        #self.defaultPureletFilterOptions.scene.ref.alpha = 1
-        #self.defaultPureletFilterOptions.scene.ref.beta = 0
-        #self.defaultPureletFilterOptions.scene.ref.sigma = 0
-        #self.defaultPureletFilterOptions.scene.ref.j = 4
-        #self.defaultPureletFilterOptions.scene.ref.t = 3
-        
-        #self.defaultPureletFilterOptions.scene.ind = DataBag()
-        #self.defaultPureletFilterOptions.scene.ind.alpha = 1
-        #self.defaultPureletFilterOptions.scene.ind.beta = 0
-        #self.defaultPureletFilterOptions.scene.ind.sigma = 0
-        #self.defaultPureletFilterOptions.scene.ind.j = 4
-        #self.defaultPureletFilterOptions.scene.ind.t = 3
-        
-        #self.defaultPureletFilterOptions.scans = DataBag()
-        
-        #self.defaultPureletFilterOptions.scans.ref = DataBag()
-        #self.defaultPureletFilterOptions.scans.ref.alpha = 1
-        #self.defaultPureletFilterOptions.scans.ref.beta = 0
-        #self.defaultPureletFilterOptions.scans.ref.sigma = 0
-        #self.defaultPureletFilterOptions.scans.ref.j = 4
-        #self.defaultPureletFilterOptions.scans.ref.t = 3
-        
-        #self.defaultPureletFilterOptions.scans.ind = DataBag()
-        #self.defaultPureletFilterOptions.scans.ind.alpha = 1
-        #self.defaultPureletFilterOptions.scans.ind.beta = 0
-        #self.defaultPureletFilterOptions.scans.ind.sigma = 0
-        #self.defaultPureletFilterOptions.scans.ind.j = 4
-        #self.defaultPureletFilterOptions.scans.ind.t = 3
-        
-        #self.defaultGaussianFilterOptions = DataBag()
-        
-        #self.defaultGaussianFilterOptions.scene = DataBag()
-        
-        #self.defaultGaussianFilterOptions.scene.ref = DataBag()
-        #self.defaultGaussianFilterOptions.scene.ref.size = 0
-        #self.defaultGaussianFilterOptions.scene.ref.sigma = 5
-        
-        #self.defaultGaussianFilterOptions.scene.ind = DataBag()
-        #self.defaultGaussianFilterOptions.scene.ind.size = 0
-        #self.defaultGaussianFilterOptions.scene.ind.sigma = 5
-        
-        #self.defaultGaussianFilterOptions.scans = DataBag()
-        
-        #self.defaultGaussianFilterOptions.scans.ref = DataBag()
-        #self.defaultGaussianFilterOptions.scans.ref.size = 0
-        #self.defaultGaussianFilterOptions.scans.ref.sigma = 5
-        
-        #self.defaultGaussianFilterOptions.scans.ind = DataBag()
-        #self.defaultGaussianFilterOptions.scans.ind.size = 0
-        #self.defaultGaussianFilterOptions.scans.ind.sigma = 5
-        
-        #self.defaultBinomialFilterOptions = DataBag()
-        
-        #self.defaultBinomialFilterOptions.scene = DataBag()
-        #self.defaultBinomialFilterOptions.scene.ref = DataBag()
-        #self.defaultBinomialFilterOptions.scene.ref.radius = 10
-        #self.defaultBinomialFilterOptions.scene.ind = DataBag()
-        #self.defaultBinomialFilterOptions.scene.ind.radius = 10
-        
-        #self.defaultBinomialFilterOptions.scans = DataBag()
-        #self.defaultBinomialFilterOptions.scans.ref = DataBag()
-        #self.defaultBinomialFilterOptions.scans.ref.radius = 10
-        #self.defaultBinomialFilterOptions.scans.ind = DataBag()
-        #self.defaultBinomialFilterOptions.scans.ind.radius = 10
-        
-        # ###
-        # END filter options
-        # ###
-        
-        self._report_dataframe_ = None
-        
-        scandata = None
-        
+        # TODO 2025-07-08 21:50:45 migrate to a future ScanDataViewer
         if len(args):
             if isinstance(args[0], ScanData):
                 scandata = args[0]
@@ -3771,13 +3691,13 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 self._data_var_name_ = args[1]
                 
         # NOTE: 2022-01-16 13:08:12
-        # super()._init__(...) below also calls self._configureUI_()
+        # super()._init__(...) below also calls self._configureUI_() # TODO 2025-07-08 21:50:45 migrate to a future ScanDataViewer
         super().__init__(data=scandata, win_title=win_title, doc_title=self._data_var_name_, 
                          parent=parent, **kwargs) # also calls self._configureUI_()
         
-        self.loadSettings()
+        self.loadSettings() # TODO 2025-07-08 21:50:45 include in a future ScanDataViewer
         
-    def _connect_gui_slots_(self, signal_slots):
+    def _connect_gui_slots_(self, signal_slots): # TODO 2025-07-08 21:50:45 copy to a future ScanDataViewer
         for item in signal_slots:
             if len(item) == 3 and isinstance(item[2], QtCore.Qt.ConnectionType):
                 item[0].connect(item[1], type = item[2])
@@ -3785,171 +3705,9 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             else:
                 item[0].connect(item[1])
                 
-    def _disconnect_gui_slots_(self, signal_slots):
+    def _disconnect_gui_slots_(self, signal_slots): # TODO 2025-07-08 21:50:45 cppy to a future ScanDataViewer
         for item in signal_slots:
             item[0].disconnect(item[1])
-            
-    #def saveSettings(self):
-        #r"""Overrides ScipyenViewer.saveSettings
-        #"""
-        ##print("%s.saveSettings %s" % (self.__class__.__name__, self.winTitle))
-        ## NOTE: 2021-07-08 10:18:11
-        ## Saves the settings for the QMainWindow instances of LSCaTWindow AND of
-        ## its (child, or client) viewers
-        #self.saveWindowSettings()# overrides ScipyenViewer.saveWindowSettings
-        
-        ## NOTE: 2021-07-08 10:19:45
-        ## Saves the settings unrelated to the QMainWindow instances of LSCaTWindow
-        ## AND of its clien viewers
-        #self.saveViewerSettings()
-    
-    #def loadSettings(self):
-        ##print("%s.loadSetting" % self.winTitle)
-        ## NOTE: 2021-07-08 10:13:54
-        ## loadWindowSettings is inherited from ScipyenViewer and will ONLY load
-        ## LSCaTWindow settings for its main GUI window. 
-        ## the settings for individual viewers are NOT loaded here. Instead, they 
-        ## are loaded right after their initialization in the various 
-        ## self._init_viewers_() method of LSCaTWindow
-        #self.loadWindowSettings()
-        
-        ## NOTE: Similarly, settings for individual client viewers, unrelated to 
-        ## their QMainWindow instances are also loaded after their initialization.
-        #self.loadViewerSettings()
-        
-    def saveViewerSettings(self):
-        r"""Overrides ScipyenViewer.saveViewerSettings()
-        """
-        # TODO/FIXME: 2021-07-08 10:55:21
-        # settings for LnF of cursors & rois
-        # TODO/FIXME 2021-08-23 18:43:36
-        # use traitlets.config.Configurable and confuse
-        from matplotlib.colors import Colormap
-        
-        #self.qsettings.setValue("LSCaTAnalysis/Use_Opaque_Labels", self.actionOpaque_cursor_labels.isChecked())
-        
-        #self.qsettings.setValue("LSCaTAnalysis/Link_Scan_Vertical_Cursors_to_Scene_Point_Cursors", self.actionLink_vertical_scan_cursors_to_scene_point_cursors.isChecked())
-        
-        #self.qsettings.setValue("LSCaTAnalysis/Plot_long_fits", self.actionPlot_long_fits.isChecked())
-
-        #for k, w in enumerate(self.sceneviewers):
-            #if isinstance(w.colorMap, Colormap):
-                #self.qsettings.setValue("LSCaTAnalysis/SceneWindow_%d_ColorMap" % k, w.colorMap.name)
-                
-            #else:
-                #self.qsettings.setValue("LSCaTAnalysis/SceneWindow_%d_ColorMap" % k, None)
-                
-        #for k, w in enumerate(self.scansviewers):
-            #if isinstance(w.colorMap, Colormap):
-                #self.qsettings.setValue("LSCaTAnalysis/ScansWindow_%d_ColorMap" % k, w.colorMap.name)
-                
-            #else:
-                #self.qsettings.setValue("LSCaTAnalysis/ScansWindow_%d_ColorMap" % k, None)
-                
-        #if len(self.profileviewers):
-            #w = self.profileviewers[0]
-            #for dw in w.dockWidgets:
-                #self.qsettings.setValue("LSCaTAnalysis/ProfileWindow_%s" % dw[0], dw[1].isVisible())
-            
-        #if len(self.scansblockviewers):
-            #w = self.scansblockviewers[0]
-            #for dw in w.dockWidgets:
-                #self.qsettings.setValue("LSCaTAnalysis/ScansDataWindow_%s" % dw[0], dw[1].isVisible())
-            
-        #if len(self.ephysviewers):
-            #w = self.ephysviewers[0]
-            #for dw in w.dockWidgets:
-                #self.qsettings.setValue("LSCaTAnalysis/EphysWindow_%s" % dw[0], dw[1].isVisible())
-            
-        #if len(self.scansblockviewers):
-            #w = self.scansblockviewers[0]
-            #for dw in w.dockWidgets:
-                #self.qsettings.setValue("LSCaTAnalysis/SceneDataWindow_%s" % dw[0], dw[1].isVisible())
-                
-            
-    def saveWindowSettings(self):
-        r"""Overrides ScipyenViewer.saveWindowSettings()
-        Also saves window settings for child windows.
-        
-        NOTE: The window settings for each of these child windows are loaded
-        individually when they are initialized.
-        """
-        # NOTE: 2021-08-24 09:49:01
-        # window settings for each child window MUST be saved here because
-        # they all inherit from ScipyenViewer and WorkspaceGuiMixin and are NOT
-        # toplevel!
-        # because:
-        # a) they are not top level 
-        #print("%s.saveWindowSettings %s" % (self.__class__.__name__, self.winTitle))
-        #print("%s.saveWindowSettings %s save client windows settings" % (self.__class__.__name__, self.winTitle))
-        #for k, w in enumerate(self.sceneviewers):
-            #custom = dict()
-            #custom["ColorMap"] = w.colorMap.name
-            
-            #saveWindowSettings(self.qsettings, w, 
-                               #prefix="SceneWindow_%d" % k, **custom)
-                
-        #for k, w in enumerate(self.scansviewers):
-            #custom = dict()
-            #custom["ColorMap"] = w.colorMap.name
-            
-            #saveWindowSettings(self.qsettings, w, 
-                               #prefix="ScansWindow_%d" % k, **custom)
-                    
-        #if len(self.profileviewers):
-            #w = self.profileviewers[0]
-            #saveWindowSettings(self.qsettings, w, 
-                               #prefix="ProfileWindow")
-                
-        #if len(self.scansblockviewers):
-            #w = self.scansblockviewers[0]
-            #saveWindowSettings(self.qsettings, w, 
-                               #prefix="ScansDataWindow")
-                
-        #if self.reportWindow.isVisible():
-            #saveWindowSettings(self.qsettings, w, prefix="ReportWindow")
-            
-        #if len(self.ephysviewers):
-            #w = self.ephysviewers[0]
-            #saveWindowSettings(self.qsettings, w, prefix="EphysWindow")
-            
-        #if len(self.scansblockviewers):
-            #w = self.scansblockviewers[0]
-            #saveWindowSettings(self.qsettings, w, prefix="SceneDataWindow")
-                
-        #print("%s.saveWindowSettings %s Call super().saveWindowSettings" % (self.__class__.__name__, self.winTitle))
-        super().saveWindowSettings() # to save LSCaT window pos, geometry & state
-            
-    def loadViewerSettings(self):
-        r"""Loads settings unrelated to QMainWindowe instance.
-        Concerns only the LSCaTWindow and not its client image/signal viewers
-        """
-        pass
-        # TODO/FIXME 2021-08-23 18:43:36
-        # use traitlets.config.Configurable and confuse
-        #use_opaque_labels = self.qsettings.value("LSCaTAnalysis/Use_Opaque_Labels", False)
-        
-        #if isinstance(use_opaque_labels, str):
-            #self.actionOpaque_cursor_labels.setChecked(use_opaque_labels.lower().strip() == "true")
-                
-        #else:
-            #self.actionOpaque_cursor_labels.setChecked(use_opaque_labels)
-        
-        #link_scan_vc_to_scene_pc = self.qsettings.value("LSCaTAnalysis/Link_Scan_Vertical_Cursors_to_Scene_Point_Cursors", False)
-        
-        #if isinstance(link_scan_vc_to_scene_pc, str):
-            #self.actionLink_vertical_scan_cursors_to_scene_point_cursors.setChecked(link_scan_vc_to_scene_pc.lower().strip() == "true")
-
-        #else:
-            #self.actionLink_vertical_scan_cursors_to_scene_point_cursors.setChecked(link_scan_vc_to_scene_pc)
-            
-        #plot_long_fits = self.qsettings.value("LSCaTAnalysis/Plot_long_fits", False)
-        
-        #if isinstance(plot_long_fits, str):
-            #self.actionPlot_long_fits.setChecked(plot_long_fits.lower().strip() == "true")
-            
-        #else:
-            #self.actionPlot_long_fits.setChecked(plot_long_fits)
             
     def _configureUI_(self):
         self.setupUi(self)
@@ -3968,6 +3726,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self._filter_gui_slots_ = [
             ]
         
+        # TODO 2025-07-08 21:50:45 migrate to a future ScanDataViewer
         self._menu_actions_gui_slots_ = [
                 [self.whatsThisAction.triggered,                        self.slot_enterWhatsThisMode,           QtCore.Qt.QueuedConnection],
                 [self.actionOpen.triggered,                             self.slot_openScanDataPickleFile,       QtCore.Qt.QueuedConnection],
@@ -3999,37 +3758,32 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 [self.actionImport_Data_wide_Descriptors.triggered,     self.slot_import_data_wide_descriptors, QtCore.Qt.QueuedConnection]
             ]
         
-        # self._common_data_fields_gui_signal_slots_ = [
-        #         [self.scanDataNameLineEdit.editingFinished,             self.slot_setDataName,              QtCore.Qt.QueuedConnection],
-        #         [self.sourceIDLineEdit.editingFinished,                 self.slot_gui_changed_source_ID,    QtCore.Qt.QueuedConnection],
-        #         [self.cellLineEdit.editingFinished,                     self.slot_gui_changed_cell_name,    QtCore.Qt.QueuedConnection],
-        #         [self.fieldLineEdit.editingFinished,                    self.slot_gui_changed_field_name,   QtCore.Qt.QueuedConnection],
-        #         [self.genotypeComboBox.currentTextChanged[str],         self.slot_gui_changed_genotype,     QtCore.Qt.QueuedConnection],
-        #         [self.sexComboBox.currentIndexChanged[str],             self.slot_gui_changed_sex,       QtCore.Qt.QueuedConnection],
-        #         [self.ageLineEdit.editingFinished,                      self.slot_gui_age_changed,          QtCore.Qt.QueuedConnection]
-        #     ]
-        
+        # TODO 2025-07-08 21:50:45 migrate to a future ScanDataViewer
         self._base_scipyen_data_gui_signal_slots_ = [
             [self.baseScipyenDataWidget.sig_valueChanged, self.slot_baseScipyenDataChanged, QtCore.Qt.QueuedConnection],
             ]
         
-        # NOTE: 2022-01-16 11:45:41
+        # NOTE: 2022-01-16 11:45:41 # TODO 2025-07-08 21:50:45 migrate to a future ScanDataViewer
         # signal from client ScipyenFrameViewer frame navigator widgets carry
         # the viewer's data frame index (which may or may NOT be the same as 
         # the master frame index, depending on ScanData framesMap)
         # therefore self.slot_setFrameNumber should determine this;
         # however, below, the connection is for signals emitted by LSCaTWindow's
         # own navigation widgets.
+        
+        # TODO 2025-07-08 21:50:45 migrate to a future ScanDataViewer
         self._navigation_gui_signal_slots_ = [
                 [self.frameQSlider.valueChanged[int],    self.slot_setFrameNumber, QtCore.Qt.QueuedConnection],
                 [self.framesQSpinBox.valueChanged[int],  self.slot_setFrameNumber, QtCore.Qt.QueuedConnection]
             ]
         
+        # TODO 2025-07-08 21:50:45 migrate to a future ScanDataViewer
         self._scene_gui_signal_slots_ = [
                 [self.sceneDisplayChannelComboBox.currentIndexChanged[int], self.slot_sceneDisplayChannelChanged,   QtCore.Qt.QueuedConnection],
                 [self.showScanlineCheckBox.stateChanged[int],               self.slot_showScanlineProfiles,         QtCore.Qt.QueuedConnection]
             ]
         
+        # TODO 2025-07-08 21:50:45 migrate to a future ScanDataViewer
         self._frames_gui_signal_slots_ = [
                 [self.protocolSelectionComboBox.currentIndexChanged[int],   self.slot_displayFramesWithProtocol,    QtCore.Qt.QueuedConnection],
                 [self.scanDisplayChannelCombobox.currentIndexChanged[int],  self.slot_scanDisplayChannelChanged,    QtCore.Qt.QueuedConnection],
@@ -4037,12 +3791,14 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 [self.removeFramesBtn.clicked,                              self.slot_removeScanDataFrames,         QtCore.Qt.QueuedConnection]
             ]
         
+        # TODO 2025-07-08 21:50:45 migrate to a future ScanDataViewer or keep in LSCaT ? DECIDE !
         self._analysis_unit_gui_widgets_ = [
             self.selectCursorSpinBox, self.cursorXposDoubleSpinBox, self.cursorYposDoubleSpinBox,
             self.cursorXwindow, self.cursorYwindow, self.unitTypeComboBox, 
             self.analysisUnitNameLineEdit, self.defineAnalysisUnitCheckBox, self.descriptorsEditorBtn, 
             self.extractCurrentUnitButton]
             
+        # TODO 2025-07-08 21:50:45 migrate to a future ScanDataViewer or keep in LSCaT ? DECIDE !
         self._analysis_unit_gui_signal_slots_ = [
                 [self.selectCursorSpinBox.valueChanged[int],        self.slot_gui_spinbox_select_cursor_by_index],
                 [self.cursorXposDoubleSpinBox.valueChanged[float],  self.slot_gui_changed_cursor_x_pos],
@@ -4058,12 +3814,14 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 [self.extractUnitsButton.clicked,                   self.slot_exportAnalysisUnits,                      QtCore.Qt.QueuedConnection],
             ]
         
+        # TODO 2025-07-08 21:50:45 migrate to a future ScanDataViewer
         self._protocol_gui_signal_slots_ = [
                 [self.protocolTableWidget.itemChanged[QtWidgets.QTableWidgetItem],  self.slot_protocolTableEdited, QtCore.Qt.QueuedConnection],
                 [self.addProtocolAction.triggered,                                  self.slot_addProtocol, QtCore.Qt.QueuedConnection],
                 [self.removeProtocolAction.triggered,                               self.slot_removeProtocol, QtCore.Qt.QueuedConnection]
             ]
         
+        # NOTE 2025-07-08 21:50:45 keep in LSCaT
         self._epscat_channels_calibration_gui_signal_slots_ = [
                 [self.indicatorChannelComboBox.currentIndexChanged[int], self.slot_epscatIndicatorChannelChanged,   QtCore.Qt.QueuedConnection],
                 [self.referenceChannelComboBox.currentIndexChanged[int], self.slot_epscatReferenceChannelChanged,   QtCore.Qt.QueuedConnection],
@@ -4075,6 +3833,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 [self.indicatorFmaxDoubleSpinBox.valueChanged[float],    self.slot_indicatorFmaxChanged,            QtCore.Qt.QueuedConnection]
             ]
         
+        # NOTE 2025-07-08 21:50:45 keep in LSCaT
         self._epscat_detection_gui_signal_slots_ = [
                 [self.fs_DiscriminantDoubleSpinBox.valueChanged[float],             self.slot_fsDiscriminantChanged,                QtCore.Qt.QueuedConnection],
                 [self.minR2SpinBox.valueChanged[float],                             self.slot_minimumR2Changed,                     QtCore.Qt.QueuedConnection],
@@ -4088,6 +3847,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 [self.doFitCheckBox.stateChanged[int],                              self.slot_toggleEPSCaTFit,                      QtCore.Qt.QueuedConnection]
             ]
         
+        # NOTE 2025-07-08 21:50:45 keep in LSCaT
         self._epscat_intervals_gui_signal_slots_ = [
                 [self.epscatDarkCurrentBeginDoubleSpinBox.valueChanged[float],  self.slot_epscatDarkCurrentBeginChanged,    QtCore.Qt.QueuedConnection],
                 [self.epscatDarkCurrentEndDoubleSpinBox.valueChanged[float],    self.slot_epscatDarkCurrentEndChanged,      QtCore.Qt.QueuedConnection],
@@ -4099,18 +3859,21 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 [self.epscatIntegralEndDoubleSpinBox.valueChanged[float],       self.slot_epscatIntegralEndChanged,         QtCore.Qt.QueuedConnection]
             ]
         
+        # NOTE 2025-07-08 21:50:45 keep in LSCaT
         self._epscat_parameters_table_gui_signal_slots_ = [
                 [self.epscatComponentsTableWidget.itemChanged[QtWidgets.QTableWidgetItem],  self.slot_epscatParameterChanged,   QtCore.Qt.QueuedConnection],
                 [self.addEPSCaTAction.triggered,                                            self.slot_addEPSCaTComponent,       QtCore.Qt.QueuedConnection],
                 [self.removeEPSCaTAction.triggered,                                         self.slot_removeEPSCaTComponent,    QtCore.Qt.QueuedConnection]
             ]
         
+        # NOTE 2025-07-08 21:50:45 keep in LSCaT
         self._process_buttons_gui_signal_slots_ = [
                 [self.processDataBtn.clicked,   self.slot_processData],
                 [self.processSceneBtn.clicked,  self.slot_processScene],
                 [self.processScanBtn.clicked,   self.slot_processScans]
             ]
         
+        # NOTE 2025-07-08 21:50:45 keep in LSCaT
         self._analyse_buttons_gui_slots_ = [
                 [self.analyseDataBtn.clicked,               self.slot_analyseData],
                 [self.analyseRoiBtn.clicked,                self.slot_analyseCurrentLandmarkInCurrentFrame],
@@ -4153,6 +3916,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         # self.scanDataNameLineEdit.redoAvailable = True
         #self.scanDataNameLineEdit.setValidator(strutils.QNameValidator())
         
+        # TODO 2025-07-08 21:50:45 migrate to a future ScanDataViewer
         self.framesQSpinBox.setKeyboardTracking(False)
         self.framesQSpinBox.setMinimum(0)
         self.framesQSpinBox.setMaximum(0)
@@ -4160,31 +3924,33 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self._frames_spinner_ = self.framesQSpinBox
         
         
+        # TODO 2025-07-08 21:50:45 migrate to a future ScanDataViewer
         self.frameQSlider.setMinimum(0)
         self.frameQSlider.setMaximum(0)
         self.frameQSlider.valueChanged.connect(self.slot_setFrameNumber)
         self._frames_slider_ = self.frameQSlider
         
         
+        # NOTE 2025-07-08 21:50:45 keep in LSCaT
         self.tabWidget.setCurrentIndex(0) # TODO make persistent configuration
         # END common widgets
         
         # ###
         # BEGIN Data tab
         
-        # ### scene groupbox
+        # ### scene groupbox # TODO 2025-07-08 21:50:45 migrate to a future ScanDataViewer
         self.showScanlineCheckBox.setCheckState(QtCore.Qt.Checked)
         self.sceneDisplayChannelComboBox.addItem("All channels")
         self.sceneDisplayChannelComboBox.setCurrentIndex(0)
         
-        # ### frames groupbox
+        # ### frames groupbox # TODO 2025-07-08 21:50:45 migrate to a future ScanDataViewer
         self.protocolSelectionComboBox.addItem("All")
         self.protocolSelectionComboBox.setCurrentIndex(0)
         
         self.scanDisplayChannelCombobox.addItem("All channels")
         self.scanDisplayChannelCombobox.setCurrentIndex(0)
         
-        # ### analysis units groupbox
+        # ### analysis units groupbox # NOTE 2025-07-08 22:05:28 keep in LSCaT
         self.selectCursorSpinBox.setSpecialValueText("none")
         self.selectCursorSpinBox.setRange(-1,0)
         self.analysisUnitNameLineEdit.setClearButtonEnabled(True)
@@ -4192,24 +3958,6 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.analysisUnitNameLineEdit.undoAvailable = True
         #self.analysisUnitNameLineEdit.setValidator(strutils.QRNameValidator())
          
-        # NOTE: 2019-01-15 11:40:35
-        # implements source ID field in ScanData
-        # where by source one means cell culture, animal, patient
-        # self.sourceIDLineEdit.setClearButtonEnabled(True)
-        # self.sourceIDLineEdit.redoAvailable = True
-        # self.sourceIDLineEdit.undoAvailable = True
-        
-         
-        # self.cellLineEdit.setClearButtonEnabled(True)
-        # self.cellLineEdit.redoAvailable = True
-        # self.cellLineEdit.undoAvailable = True
-        #self.cellLineEdit.setValidator(strutils.QRNameValidator())
-        
-        # self.fieldLineEdit.setClearButtonEnabled(True)
-        # self.fieldLineEdit.redoAvailable = True
-        # self.fieldLineEdit.undoAvailable = True
-        #self.fieldLineEdit.setValidator(strutils.QRNameValidator())
-        
         unit_types = sorted([v for v in UnitTypes.values()])
         unit_types.insert(0, "unknown")
         
@@ -4222,23 +3970,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         genotypes = ["NA", "wt", "het", "hom"]
         
-        # self.genotypeComboBox.setEditable(True)
-        # self.genotypeComboBox.lineEdit().setClearButtonEnabled(True)
-        # self.genotypeComboBox.lineEdit().redoAvailable = True
-        # self.genotypeComboBox.lineEdit().undoAvailable = True
-        # self.genotypeComboBox.addItems(genotypes)
-        # self.genotypeComboBox.setCurrentIndex(0)
-        
         sex = ["NA", "F", "M"]
-        
-#         self.sexComboBox.setEditable(False)
-#         self.sexComboBox.addItems(sex)
-#         self.sexComboBox.setCurrentIndex(0)
-#         
-#         self.ageLineEdit.setText("NA")
-#         self.ageLineEdit.setClearButtonEnabled(True)
-#         self.ageLineEdit.redoAvailable = True
-#         self.ageLineEdit.undoAvailable = True
         
         epscatComponentSuccessSelect = ["any", "all", "index"]
         self.selectFailureTestComponentComboBox.addItems(epscatComponentSuccessSelect)
@@ -10727,7 +10459,13 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         obj = self._data_.scanRegion
         #print("_display_scan_region_ %s: %s" % (type(obj).__name__, obj))
         
-        if len(self._data_.scene) and len(self.sceneviewers) and isinstance(obj, pgui.PlanarGraphics):
+        if not isinstance(self._data_.scene, (tuple, list)) or not all(isinstance(v, vigra.VigraArray) for v in self._data_scene):
+            return
+        
+        if len(self.sceneViewers) == 0:
+            return
+        
+        if isinstance(obj, pgui.PlanarGraphics):
             #print("LSCaT._display_scan_region_ %s: %d frontends" % (type(obj).__name__, len(obj.frontends)))
 
             # see NOTE: 2018-09-25 22:19:58
@@ -10772,61 +10510,47 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         if self._data_ is None:
             return
         
-        if scene:
-            channels    = self._data_.sceneChannelNames
-            data        = self._data_.scene
-            windows     = self.sceneviewers
-            nFrames     = self._data_.sceneFrames
-            
-            if rois:
-                graphicsObjects    = self._data_.sceneRois
+        data = self._data_.scene if scene else self._data_.scans
+        if not isinstance(data, (tuple, list)) or not all(isinstance(v, vigra.VigraArray) for v in data):
+            return
                 
-            else:
-                graphicsObjects    = self._data_.sceneCursors
-            
-        else:
-            channels    = self._data_.scansChannelNames
-            data        = self._data_.scans
-            windows     = self.scansviewers
-            nFrames     = self._data_.scansFrames
-            
-            
-            if rois:
-                graphicsObjects    = self._data_.scansRois
-                
-            else:
-                graphicsObjects    = self._data_.scansCursors
-                
-                if isinstance(graphicsObjects, dict) and len(graphicsObjects):
-                    if isinstance(self._data_.scans, (tuple, list)) and len(self._data_.scans):
-                        cursor_span = self._data_.scans[0].shape[0]
-                        
-                    elif isinstance(self._data_.scans, vigra.VigraArray):
-                        cursor_span = self._data_scans.shape[0]
-                        
-                    for c in graphicsObjects.values():
-                        c.width = cursor_span
-                        
-                    # see NOTE: 2018-09-25 22:19:58
-                    sigBlock = QtCore.QSignalBlocker(self.selectCursorSpinBox)
-                    self.selectCursorSpinBox.setMaximum(len(self._data_.scansCursors)-1)
-                
-                
-        if len(data) > 0 and len(windows) > 0:
+        channels = self._data_.sceneChannelNames if scene else self._data_.scansChannelNames
+        
+        windows = self.sceneviewers if scene else self.scansviewers
+        
+        if len(windows) == 0:
+            return
+        
+        nFrames = self._data_.sceneFrames if scene else self._data_.scansFrames
+        
+        graphicsObjects = (self._data_.sceneRois if rois else self._data_.sceneCursors) if scene else (self._data_.scansRois if rois else self._data_.scansCursors)
+        
+        if not scene and not rois:
             if isinstance(graphicsObjects, dict) and len(graphicsObjects):
-                transparent_label = not self.actionOpaque_cursor_labels.isChecked()
+                if isinstance(self._data_.scans, (tuple, list)) and len(self._data_.scans):
+                    cursor_span = self._data_.scans[0].shape[0]
+                    
+                elif isinstance(self._data_.scans, vigra.VigraArray):
+                    cursor_span = self._data_scans.shape[0]
+                    
+                for c in graphicsObjects.values():
+                    c.width = cursor_span
+                    
                 # see NOTE: 2018-09-25 22:19:58
-                
-                signalBlockers = [QtCore.QSignalBlocker(w) for w in windows]
-                
-                for obj in graphicsObjects.values():
-                    #print("_display_graphics_objects_ obj", obj)
-                    if len(obj.frontends) == 0:
-                        for k, win in enumerate(windows):
-                            gobj = win.addPlanarGraphics(obj, labelShowsPosition=False)
-                            
-                            #if gobj is not None:# it may be None if there is no image displayed in the window
-                                #gobj.setTransparentLabel(transparent_label)
+                sigBlock = QtCore.QSignalBlocker(self.selectCursorSpinBox)
+                self.selectCursorSpinBox.setMaximum(len(self._data_.scansCursors)-1)
+        
+        if isinstance(graphicsObjects, dict) and len(graphicsObjects):
+            transparent_label = not self.actionOpaque_cursor_labels.isChecked()
+            # see NOTE: 2018-09-25 22:19:58
+            
+            signalBlockers = [QtCore.QSignalBlocker(w) for w in windows]
+            
+            for obj in graphicsObjects.values():
+                #print("_display_graphics_objects_ obj", obj)
+                if len(obj.frontends) == 0:
+                    for k, win in enumerate(windows):
+                        gobj = win.addPlanarGraphics(obj, labelShowsPosition=False)
                             
     @safewrapper
     def _update_filter_ui_fields_(self):
@@ -11609,6 +11333,9 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         if not isinstance(self._data_, ScanData):
             return
         
+        if not isinstance(self._data_.scans, (tuple, list)) or not all(isinstance(v, vigra.VigraArray) for v in self._data_.scans):
+            return
+        
         if not isinstance(channel, str):
             raise TypeError("Expecting a channel name; got %s instead" % type(channel).__name__)
         
@@ -11680,6 +11407,9 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         """
         if not isinstance(self._data_, ScanData):
+            return
+        
+        if not isinstance(self._data_.scene, (tuple, list)) or not all(isinstance(v, vigra.VigraArray) for v in self._data_.scene):
             return
         
         if not isinstance(channel, str):
@@ -11841,7 +11571,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                     self.binomialOrderScansIndSpinBox.value())
                 
     @safewrapper
-    def generateScanRegionProfiles(self):
+    def generateScanRegionProfiles(self): # TODO 2025-07-08 21:50:45 migrate to a future ScanDataViewer or better to imaging module
         r"""
         FIXME/TODO adapt to a new scenario where all scene image data is a single
         multi-channel VigraArray
@@ -11863,7 +11593,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.generateScanRegionProfilesFromScene() 
 
     @safewrapper
-    def generateScanRegionProfilesFromScene(self):
+    def generateScanRegionProfilesFromScene(self): # TODO 2025-07-08 21:50:45 migrate to a future ScanDataViewer or better to imaging module
         r"""Generates scanline profiles from the scene rois
         
         FIXME/TODO adapt to a new scenario where all scene image data is a single
@@ -11887,6 +11617,9 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             return
 
         data = self._data_.scene
+        if not isinstance(data, (tuple, list)) or not all(isinstance(v, vigra.VigraArray) for v in data):
+            return
+        
         target = self._data_.sceneProfiles
         sigprefix = "Scene"
     
@@ -11894,6 +11627,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         # which si also the ONLY non-temporal axis in the case of linescans
         
         # ATTENTION: this will OVERWRITE analogsignals in all segments of the profile block
+        
         
         if len(data) > 0:
             if len(self._data_.sceneRois) > 0:
@@ -11957,7 +11691,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                             target.segments[k].name = f"Sweep {k}"
                 
     @safewrapper
-    def generateScanRegionProfilesFromScans(self):
+    def generateScanRegionProfilesFromScans(self): # TODO 2025-07-08 21:50:45 migrate to a future ScanDataViewer or better to imaging module
         r"""Generates scanline profiles from the linescans X axis average.
         
         FIXME/TODO adapt to a new scenario where all scene image data is a single
@@ -11981,6 +11715,9 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             return
 
         data = self._data_.scans
+        if not isinstance(data, (tuple, list)) or not all(isinstance(v, vigra.VigraArray) for v in data):
+            return
+        
         target = self._data_.scansProfiles
         sigprefix = "Scans"
     
@@ -11988,7 +11725,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         # which si also the ONLY non-temporal axis in the case of linescans
         
         # ATTENTION: this will OVERWRITE analogsignals in all segments of the profile block
-        
+
         if len(data) > 0:
             if len(data) == 1: 
                 # single array, either single-band or multi-band
@@ -12020,6 +11757,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                                 raise RuntimeError("No reference channel is defined, or it has not been named, in %s" % self._data_var_name_)
                 
                 chNdx = self._data_.scansChannelNames.index(self._data_.analysisOptions["Channels"]["Reference"])
+                # print(f"{print_styled(f'{self.__class__.__name__}.generateScanRegionProfilesFromScans: chNdx -> {chNdx}', color='yellow')}")
                 
                 frames = data[chNdx].shape[self._data_.scansFrameAxis] if isinstance(self._data_.scansFrameAxis, int) else data[chNdx].shape[data[chNdx].axistags.index(self._data_.scansFrameAxis)]
                 

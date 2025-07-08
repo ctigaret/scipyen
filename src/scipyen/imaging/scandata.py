@@ -1316,16 +1316,19 @@ class ScanDataFramesMapUpdater(AttributeAdapter):
             # NOTE: 2022-01-04 16:06:11
             # FrameIndexLookup is now MANDATORY - see also NOTE: 2022-01-04 16:05:12
             framesMap = FrameIndexLookup(field_frames)
-            
-            setattr(obj, "framesMap", framesMap)
+            print(f"{print_styled(f'\n{self.__class__.__name__}<{self.fieldname}>.updateFramesMap(value={value})', color='yellow')}")
+            # setattr(obj, "framesMap", framesMap)
         
         else:
-            nframes = len(obj.framesMap)
+            print(f"{print_styled(f'\n{self.__class__.__name__}<{self.fieldname}>.updateFramesMap(value={value}) for framesMap {framesMap}', color='yellow')}")
+            # nframes = len(obj.framesMap)
+            nframes = len(framesMap)
+            print(f"{print_styled(f'\n\tnframes -> {nframes}', color='yellow')}")
                 
             if isinstance(field, neo.Block):
                 newframes = len(field.segments)
                 
-            elif isinstance(field, list) and all(isinstance(v, vigra.VigraArray) for v in field):
+            elif isinstance(field, (tuple, list)) and all(isinstance(v, vigra.VigraArray) for v in field):
                 userFrameAxis = getattr(obj, f"{self.fieldname}FrameAxis", None)
                 axesCalibration = getattr(obj, f"{self.fieldname}AxesCalibration", None)
                 layout = getattr(obj, f"{self.fieldname}Layout", None)
@@ -1339,16 +1342,21 @@ class ScanDataFramesMapUpdater(AttributeAdapter):
                 
             else:
                 newframes=0
+            print(f"{print_styled(f'\n\tnewframes -> {newframes}', color='yellow')}")
+                
             
             if newframes == nframes:
                 # assume 1-2-1 correspondence with the index in framesMap
-                obj.framesMap[self.fieldname] = range(newframes)
+                framesMap[self.fieldname] = range(newframes)
+                # obj.framesMap[self.fieldname] = range(newframes)
                 
             elif newframes < nframes:
                 value = list(range(newframes))
-                value.extend([obj.framesMap.missingFrameIndex for k in range(newframes, nframes)])
+                value.extend([framesMap.missingFrameIndex for k in range(newframes, nframes)])
+                # value.extend([obj.framesMap.missingFrameIndex for k in range(newframes, nframes)])
                         
-                obj.framesMap[self.fieldname] = value
+                framesMap[self.fieldname] = value
+                # obj.framesMap[self.fieldname] = value
                 
             else: # --> newframes > nframes
                 # concatenate a new frame index lookup
@@ -1356,7 +1364,8 @@ class ScanDataFramesMapUpdater(AttributeAdapter):
                 for c in obj._data_children_:
                     name = c[0]
                     if name != self.fieldname:
-                        if np.any(obj.framesMap[name].isna()):
+                        # if np.any(obj.framesMap[name].isna()):
+                        if np.any(framesMap[name].isna()):
                             val = None
                         else:
                             val = 0
@@ -1368,9 +1377,14 @@ class ScanDataFramesMapUpdater(AttributeAdapter):
                 fil = FrameIndexLookup(dd)
                 fil[self.fieldname] = range(nframes, newframes)
                 
-                newmap = pd.concat([obj.framesMap.map, fil.map], ignore_index=True)
+                newmap = pd.concat([framesMap.map, fil.map], ignore_index=True)
+                # newmap = pd.concat([obj.framesMap.map, fil.map], ignore_index=True)
                 
-                obj.framesMap.map = newmap
+                framesMap.map = newmap
+                # obj.framesMap.map = newmap
+                
+        setattr(obj, "framesMap", framesMap)
+            
                 
 FramesMapUpdater = ScanDataFramesMapUpdater
 
@@ -1737,6 +1751,8 @@ class ScanData(BaseScipyenData):
     # → initialized/set up by scans and scene desscriptors (postset hook)
     #
     # see NOTE: 2024-08-14 21:28:36 for why this is stll here and not commented-out
+    # BUG: 2025-07-08 23:04:53 FIXME/TODO URGENTLY
+    # this seems to overwrite whatever the ScanDataComponentDescriptor's postset_hook sets as framesMap
     framesMap:typing.Optional[FrameIndexLookup] = dataclasses.field(default=None)
     
     # user annotations
@@ -6689,6 +6705,10 @@ class ScanData(BaseScipyenData):
         for u in self.analysisUnits:
             ndx = u.protocols.index(protocol)
             del u.protocols[ndx]
+            
+    @property
+    def triggers(self):
+        return self.triggerProtocols
         
     def protocol(self, index):
         r"""Alias to self.triggerProtocol(index)

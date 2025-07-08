@@ -261,6 +261,7 @@ class DescriptorValidatorABC(ABC):
                 preset_func = obj_preset_hook
 
         if preset_func is not None:
+            print(f"{print_styled(f'\n{self.__class__.__name__}.__set__ will call preset_hook {preset_func}', color='yellow')}")
             # check callable definition to see how many arguments (positional parameters) the callable expects
             # the invoke the callable
             if isinstance(preset_func, types.MethodType):
@@ -307,6 +308,7 @@ class DescriptorValidatorABC(ABC):
                 postset_func = obj_postset_hook
 
         if postset_func is not None:
+            print(f"{print_styled(f'\n{self.__class__.__name__}.__set__ will call postset_hook {postset_func}', color='yellow')}")
             # print(f"postset {postset_func} for {self.public_name}")
             if isinstance(postset_func, types.MethodType):
                 args = inspect.getfullargspec(postset_func).args[1:]
@@ -713,15 +715,6 @@ class DescriptorGenericValidator(BaseDescriptorValidator):
                     raise AttributeError(
                         f"{self.__class__.__name__}: Unexpected value for {self.private_name}: {value}"
                     )
-
-            #  NOTE: 2024-08-01 15:14:12 what's this for ?!?
-            #             if is_hashable(value) and len(self.hashables):
-            #                 if value not in self.hashables:
-            #                     raise AttributeError(f"{self.__class__.__name__}: Unexpected value for {self.private_name}: {value}")
-            #
-            #             if not is_hashable(value) and len(self.non_hashables):
-            #                 if id(value) not in self.non_hashables:
-            #                     raise AttributeError(f"{self.__class__.__name__}: Unexpected value for {self.private_name}: {value}")
 
             if len(self.dcriteria):
                 # check to see if type of value is a key in criteria

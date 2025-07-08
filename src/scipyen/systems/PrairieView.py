@@ -2798,17 +2798,6 @@ class PVScan(PVObject):
         for future in concurrent.futures.as_completed(futures):
             (scans, scene) = future.result()
 
-        # print(f"{print_styled(f'\n{self.__class__.__name__}.scanData:', color='yellow')}")
-        # if isinstance(scene, (tuple, list)) and all(isinstance(v, vigra.VigraArray) for v in scene):
-        #     for k, v in enumerate(scene):
-        #         axCal = AxesCalibration(v)
-        #         print(f"{print_styled(f'\n\tscene axes calibration {k} = \n\t{axCal}', color='yellow')}")
-                
-        # if isinstance(scans, (tuple, list)  ) and all(isinstance(v, vigra.VigraArray) for v in scans):
-        #     for k, v in enumerate(scans):
-        #         axCal = AxesCalibration(v)
-        #         print(f"{print_styled(f'\n\tscans axes calibration {k} = \n\t{axCal}', color='yellow')}")
-                
         
         meta = self.metadata
         

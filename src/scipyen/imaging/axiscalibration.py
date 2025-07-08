@@ -1967,8 +1967,13 @@ class AxisCalibrationData(CalibrationData):
         else:
             scipywarn("Not a Channels axis")
             
-    def getChannelCalibration(self, o:int | str = 0):
+    def getChannelCalibration(self, o:int | str = 0) -> ChannelCalibrationData | None:
         return self.channelCalibration(o) # alias for backward compatibility
+    
+    def getChannelUnits(self, o:int|str = 0) -> pq.Quantity | None:
+        if self.isChannels:
+            chCal = self.getChannelCalibration(o)
+            return chCal.units
             
 class AxesCalibration(object):
     r"""Encapsulates calibration of a set of axes.
@@ -2765,7 +2770,7 @@ def axisChannelName(axisinfo:vigra.AxisInfo, channel:int) -> str | None:
     """
     # return AxisCalibrationData(axisinfo).getChannelName(channel)
     if axisinfo.isChannel:
-        return AxisCalibrationData(axisinfo).channelNames[channel]
+        return AxisCalibrationData.new(axisinfo).channelNames[channel]
 
 def axisName(axisinfo:vigra.AxisInfo) -> str | None:
     r"""Returns the axis name stored in the axis description.
@@ -3057,10 +3062,12 @@ def getAxisResolution(axisinfo:vigra.AxisInfo,
         return axcal.resolution
     
 def getAxisUnits(axisinfo:vigra.AxisInfo,
-                 channel:typing.Optional[typing.Union[int,str]] = None) -> pq.Quantity:
+                 channel:typing.Optional[typing.Union[int,str]] = None) -> pq.Quantity | None:
+    r"""For a channels axis, return the units of the specified channel or channel 0.
+For a Nonchannel axis returns the axis units"""
     if not isinstance(axisinfo, vigra.AxisInfo):
         raise TypeError("Expecting a vigra.AxisInfo object; got %s instead" % type(axisinfo).__name__)
-    axcal = AxisCalibrationData(axisinfo)
+    axcal = AxisCalibrationData.new(axisinfo)
     
     if axisinfo.typeFlags & vigra.AxisType.NonChannel == 0:
         if isinstance(channel, (int, str)):
@@ -3071,7 +3078,6 @@ def getAxisUnits(axisinfo:vigra.AxisInfo,
         
     else:
         return axcal.units
-    
     
 def getCalibratedAxisSize(image, axis):
     r"""Returns a calibrated length for "axis" in "image" VigraArray, as a python Quantity
