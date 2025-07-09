@@ -1299,6 +1299,7 @@ class ScanDataFramesMapUpdater(AttributeAdapter):
         
         field = getattr(obj, self.fieldname)
         
+        print(f"{print_styled(f'\n{self.__class__.__name__}<{self.fieldname}>.updateFramesMap(value={type(value).__name__}) for framesMap {framesMap}', color='yellow')}")
         if framesMap is None:
             field_frames = dict((c[0], 0) for c in obj._data_children_)
             for c in field_frames:
@@ -1316,11 +1317,9 @@ class ScanDataFramesMapUpdater(AttributeAdapter):
             # NOTE: 2022-01-04 16:06:11
             # FrameIndexLookup is now MANDATORY - see also NOTE: 2022-01-04 16:05:12
             framesMap = FrameIndexLookup(field_frames)
-            print(f"{print_styled(f'\n{self.__class__.__name__}<{self.fieldname}>.updateFramesMap(value={value})', color='yellow')}")
             # setattr(obj, "framesMap", framesMap)
         
         else:
-            print(f"{print_styled(f'\n{self.__class__.__name__}<{self.fieldname}>.updateFramesMap(value={value}) for framesMap {framesMap}', color='yellow')}")
             # nframes = len(obj.framesMap)
             nframes = len(framesMap)
             print(f"{print_styled(f'\n\tnframes -> {nframes}', color='yellow')}")
@@ -1342,8 +1341,8 @@ class ScanDataFramesMapUpdater(AttributeAdapter):
                 
             else:
                 newframes=0
-            print(f"{print_styled(f'\n\tnewframes -> {newframes}', color='yellow')}")
                 
+            print(f"{print_styled(f'\n\tnewframes -> {newframes}', color='yellow')}")
             
             if newframes == nframes:
                 # assume 1-2-1 correspondence with the index in framesMap
@@ -1383,8 +1382,12 @@ class ScanDataFramesMapUpdater(AttributeAdapter):
                 framesMap.map = newmap
                 # obj.framesMap.map = newmap
                 
+        objname = getattr(obj, "name", "")
+        print(f"{print_styled(f'\n\twill assign {framesMap} to \'framesMap\' of {type(obj).__name__} object' + f' {objname}', color='yellow')}")
+        print(f"{print_styled(f'\n\t framesMap has \n{framesMap.map}', color='yellow')}")
         setattr(obj, "framesMap", framesMap)
-            
+        
+        print(f"{print_styled(f'\n{type(obj).__name__} object' + f' {objname}' + f'has framesMap: {framesMap} with \n{framesMap.map}', color='yellow')}")
                 
 FramesMapUpdater = ScanDataFramesMapUpdater
 

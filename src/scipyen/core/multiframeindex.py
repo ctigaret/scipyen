@@ -523,6 +523,9 @@ class FrameIndexLookup(object):
         p.text(f"Frame Indices Map (frame index -> index of component frame or segment):\n")
         p.pretty(self._map_)
         
+    def __repr__(self):
+        return f"{self.__class__.__name__} with {len(self)} frames, data components: {tuple(self.keys())}"
+        
     def childFrames(self, field:typing.Optional[str]=None):
         if isinstance(field, str):
             if field in self._map_.columns:
