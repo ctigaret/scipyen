@@ -1589,19 +1589,19 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     
     # helper for export slots
     
-    def _export_scene_helper_(self, file_format):
-        if file_format == "workspace":
+    def _export_scene_helper_(self, to_workspace:bool=False):
+        if to_workspace:
             img = self.frameData
             if self.axesCalibration:
                 img = self.axesCalibration.calibrateImage(img)
             self.exportDataToWorkspace(img, f"frame_image_data_{self.currentFrame}")
             return
         
-        elif not isinstance(file_format, str) or file_format.strip().lower() not in ("svg", "tiff", "png", "hdf5", "pickle"):
-            scipywarn("Unsupported export file format %s" % file_format)
-            return
+        # elif not isinstance(file_format, str) or file_format.strip().lower() not in ("svg", "tiff", "png", "hdf5", "pickle"):
+        #     scipywarn("Unsupported export file format %s" % file_format)
+        #     return
         
-        fileFilter = "All files (*.*);;TIFF (*.tif);; Scalable Vector Graphics files (*.svg);;Portable Network Graphics (*.png);;Pickle (*.pkl);;HDF5 (*.h5)"
+        fileFilter = "TIFF (*.tif);; Scalable Vector Graphics files (*.svg);;Portable Network Graphics (*.png);;Pickle (*.pkl);;HDF5 (*.h5)"
         if self._scipyenWindow_ is not None:
             targetDir = self._scipyenWindow_.currentDir
             fn, fl = self.chooseFile("Export Image Frame As", fileFilter=fileFilter, single=True,
@@ -1610,14 +1610,12 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             fn, fl = self.chooseFile("Export Image Frame As", fileFilter=fileFilter, single=True,
                                     save=True)
             
-        # fileName = self._getSaveFileName_(file_format)
-        
-        if len(fileName) == 0:
+        if len(fn) == 0:
             return
         
         if "svg" in fl.strip().lower():
             generator = QtSvg.QSvgGenerator()
-            generator.setFileName(fileName)
+            generator.setFileName(fn)
             
             generator.setSize(QtCore.QSize(int(self.viewerWidget.scene.width()), 
                                            int(self.viewerWidget.scene.height())))
@@ -1637,7 +1635,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             self.viewerWidget.scene.render(painter)
             painter.end()
         
-        elif any(v in fl.strip().lower() for v in ("png", "tiff")):
+        elif any(v in fl.strip().lower() for v in ("png", "tif")):
             # qimg_format = QtGui.QImage.Format_ARGB32
             out = QtGui.QImage(int(self.viewerWidget.scene.width()), 
                                int(self.viewerWidget.scene.height()),
@@ -1648,9 +1646,9 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             painter = QtGui.QPainter(out)
             self.viewerWidget.scene.render(painter)
             painter.end()
-            out.save(fileName, file_format.strip().lower(), 100)
+            out.save(fn, file_format.strip().lower(), 100)
             
-        elif file_format.strip().lower() in ("hdf5", "pickle"):
+        elif any(v in fl.strip().lower() for v in ("hdf5", "pkl")):
             img = self.frameData
             if self.axesCalibration:
                 img = self.axesCalibration.calibrateImage(img)
@@ -1668,124 +1666,93 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         if self._data_ is None:
             return
         
-        self._export_scene_helper_("png")
+        self._export_scene_helper_()
         
     @Slot()
     @safewrapper
-    def slot_exportSceneAsSVG(self):
-        r"""Exports the image in the current frame as a scalable vector graphics file.
-        The result includes rendered ROIs and cursors."""
-        if self._data_ is None:
-            return
-        
-        self._export_scene_helper_("svg")
-        
-#     @Slot()
-#     @safewrapper
-#     def slot_exportSceneAsTIFF(self):
-#         r"""Exports the image in the current frame as a TIFF file.
-#         The result includes rendered ROIs and cursors."""
-#         if self._data_ is None:
-#             return
-#         
-#         self._export_scene_helper_("tiff")
-        
-    # @Slot()
-    # @safewrapper
-    # def slot_exportFrameAsHDF5(self):
-    #     r"""Exports the image in the current frame as a HDF file.
-    #     The image (array) axes will include calibration data"""
-    #     if self._data_ is None:
-    #         return
-    #     self._export_scene_helper_("hdf5")
-        
-    @Slot()
-    @safewrapper
-    def slot_exportFrameAsPickle(self):
-        r"""Exports the image in the current frame as a Python pickle file.
-        The image (array) axes will include calibration data"""
-        if self._data_ is None:
-            return
-        self._export_scene_helper_("pickle")
-        
-    @Slot()
-    @safewrapper
-    def slot_exportFrameToWorkspace(self):
+    def slot_exportSceneToWorkspace(self):
         r"""Exports the image of the current frame as a VigraArray in the workspace.
         Ithe array axes will include calibration data"""
         if self._data_ is None:
             return
-        self._export_scene_helper_("workspace")
+        self._export_scene_helper_(True)
         
-    def _getSaveFileName_(self, captionPrefix:str = "Save data", fileType:str = "TIFF"):
-        if sys.platform.startswith("win32"):
-            options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
-            kw = {"options":options}
-        else:
-            kw = {}
-            
-        if not isinstance(fileType, str) or len(fileType.strip()) == 0:
-            return
-        
-        caption = ""
-        flt = ""
-        if fileType.strip().lower() == "tiff":
-            caption = f"{captionPrefix} as TIFF"
-            flt = "TIFF Files (*.tif)"
-            
-        elif fileType.strip().lower() == "hdf5":
-            caption = f"{captionPrefix} as HDF5"
-            flt = "HDF5 Files (*.h5)"
-            
-        elif fileType.strip().lower() == "png":
-            caption = f"{captionPrefix} as PNG"
-            flt = "PNG Files (*.png)"
-
-        elif fileType.strip().lower() == "pickle":
-            caption = f"{captionPrefix} as Python Pickle"
-            flt = "Pickle Files (*.pkl)"
-            
-        elif fileType.strip().lower() == "svg":
-            caption = f"{captionPrefix} as Scalable Vector Graphics"
-            flt = "Scalable Vector Graphics Files (*.svg)"
-            
-        else:
-            scipywarn(f"Unsupported export file format: {fileType}")
-            return
-        
-        if self._scipyenWindow_ is not None:
-            targetDir = self._scipyenWindow_.currentDir
-            fn, fl = self.chooseFile(caption=caption, fileFilter = flt, single=True, save=True,
-                                     targetDir=targetDir)
-            
-        else:
-            fn, fl = self.chooseFile(caption=caption, fileFilter = flt, single=True, save=True)
-
-        return fn
-        # if self._scipyenWindow_ is not None:
-        #     targetDir = self._scipyenWindow_.currentDir
-        #     fileName, _ = QtWidgets.QFileDialog.getSaveFileName(self, 
-        #                                                         caption=caption, 
-        #                                                         filter=flt,
-        #                                                         directory=targetDir, **kw)
-        # else:
-        #     fileName, _ = QtWidgets.QFileDialog.getSaveFileName(self, 
-        #                                                         caption=caption, 
-        #                                                         filter=flt, **kw)
-        # return fileName
-        
+#     def _getSaveFileName_(self, captionPrefix:str = "Save data", fileType:str = "TIFF"):
+#         if sys.platform.startswith("win32"):
+#             options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
+#             kw = {"options":options}
+#         else:
+#             kw = {}
+#             
+#         if not isinstance(fileType, str) or len(fileType.strip()) == 0:
+#             return
+#         
+#         caption = ""
+#         flt = ""
+#         if fileType.strip().lower() == "tiff":
+#             caption = f"{captionPrefix} as TIFF"
+#             flt = "TIFF Files (*.tif)"
+#             
+#         elif fileType.strip().lower() == "hdf5":
+#             caption = f"{captionPrefix} as HDF5"
+#             flt = "HDF5 Files (*.h5)"
+#             
+#         elif fileType.strip().lower() == "png":
+#             caption = f"{captionPrefix} as PNG"
+#             flt = "PNG Files (*.png)"
+# 
+#         elif fileType.strip().lower() == "pickle":
+#             caption = f"{captionPrefix} as Python Pickle"
+#             flt = "Pickle Files (*.pkl)"
+#             
+#         elif fileType.strip().lower() == "svg":
+#             caption = f"{captionPrefix} as Scalable Vector Graphics"
+#             flt = "Scalable Vector Graphics Files (*.svg)"
+#             
+#         else:
+#             scipywarn(f"Unsupported export file format: {fileType}")
+#             return
+#         
+#         if self._scipyenWindow_ is not None:
+#             targetDir = self._scipyenWindow_.currentDir
+#             fn, fl = self.chooseFile(caption=caption, fileFilter = flt, single=True, save=True,
+#                                      targetDir=targetDir)
+#             
+#         else:
+#             fn, fl = self.chooseFile(caption=caption, fileFilter = flt, single=True, save=True)
+# 
+#         return fn
+#         # if self._scipyenWindow_ is not None:
+#         #     targetDir = self._scipyenWindow_.currentDir
+#         #     fileName, _ = QtWidgets.QFileDialog.getSaveFileName(self, 
+#         #                                                         caption=caption, 
+#         #                                                         filter=flt,
+#         #                                                         directory=targetDir, **kw)
+#         # else:
+#         #     fileName, _ = QtWidgets.QFileDialog.getSaveFileName(self, 
+#         #                                                         caption=caption, 
+#         #                                                         filter=flt, **kw)
+#         # return fileName
+#         
     @Slot()
     @safewrapper
-    def slot_saveTIFF(self):
+    def slot_saveToFile(self):
         if self._data_ is None:
             return
         
-        fileName = self._getSaveFileName_("TIFF")
-        
-        if len(fileName) == 0:
+        fileFilter = "TIFF (*.tif);; Scalable Vector Graphics files (*.svg);;Portable Network Graphics (*.png);;Pickle (*.pkl);;HDF5 (*.h5)"
+        if self._scipyenWindow_ is not None:
+            targetDir = self._scipyenWindow_.currentDir
+            fn, fl = self.chooseFile("Export Image Frame As", fileFilter=fileFilter, single=True,
+                                    save=True, targetDir=targetDir)
+        else:
+            fn, fl = self.chooseFile("Export Image Frame As", fileFilter=fileFilter, single=True,
+                                    save=True)
+            
+        if len(fn) == 0:
             return
         
-        pio.saveImageFile(self._data_, fileName)
+        pio.saveImageFile(self._data_, fn)
         
     @Slot()
     @safewrapper
@@ -2813,11 +2780,11 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         # self.actionExportAsTIFF.triggered.connect(self.slot_exportSceneAsTIFF)
         # self.actionExportAsHDF5.triggered.connect(self.slot_exportFrameAsHDF5)
         # self.actionExportAsPickle.triggered.connect(self.slot_exportFrameAsPickle)
-        self.actionExportSceneToWorkspace.triggered.connect(self.slot_exportFrameToWorkspace)
-        self.actionSaveTIFF.triggered.connect(self.slot_saveTIFF)
-        self.actionHDF5.triggered.connect(self.slot_saveHDF5)
-        self.actionPickle.triggered.connect(self.slot_savePickle)
-        self.actionTo_workspace.triggered.connect(self.slot_dataToWorkspace)
+        self.actionExportSceneToWorkspace.triggered.connect(self.slot_exportSceneToWorkspace)
+        self.actionSaveToFile.triggered.connect(self.slot_saveToFile)
+        # self.actionHDF5.triggered.connect(self.slot_saveHDF5)
+        # self.actionPickle.triggered.connect(self.slot_savePickle)
+        self.actionExportToWorkspace.triggered.connect(self.slot_dataToWorkspace)
         
         self.displayMenu = QtWidgets.QMenu("Display", self)
         self.menubar.addMenu(self.displayMenu)
