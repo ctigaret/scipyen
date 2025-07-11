@@ -167,21 +167,15 @@
      <property name="title">
       <string>&amp;Export frame</string>
      </property>
-     <addaction name="actionExportAsPNG"/>
-     <addaction name="actionExportAsSVG"/>
-     <addaction name="actionExportAsTIFF"/>
-     <addaction name="actionExportAsHDF5"/>
-     <addaction name="actionExportAsPickle"/>
-     <addaction name="actionExportToWorkspace"/>
+     <addaction name="actionExportSceneAsFile"/>
+     <addaction name="actionExportSceneToWorkspace"/>
     </widget>
     <widget class="QMenu" name="menuSave">
      <property name="title">
       <string>&amp;Save</string>
      </property>
-     <addaction name="actionSaveTIFF"/>
-     <addaction name="actionHDF5"/>
-     <addaction name="actionPickle"/>
-     <addaction name="actionTo_workspace"/>
+     <addaction name="actionSaveToFile"/>
+     <addaction name="actionExportToWorkspace"/>
     </widget>
     <addaction name="separator"/>
     <addaction name="actionView"/>
@@ -239,9 +233,12 @@
     <string>Remove Cursor...</string>
    </property>
   </action>
-  <action name="actionExportAsPNG">
+  <action name="actionExportSceneAsFile">
+   <property name="icon">
+    <iconset theme="document-save"/>
+   </property>
    <property name="text">
-    <string>&amp;PNG</string>
+    <string>To File</string>
    </property>
   </action>
   <action name="actionExportAsSVG">
@@ -254,9 +251,12 @@
     <string>&amp;TIFF</string>
    </property>
   </action>
-  <action name="actionSaveTIFF">
+  <action name="actionSaveToFile">
+   <property name="icon">
+    <iconset theme="document-save"/>
+   </property>
    <property name="text">
-    <string>&amp;TIFF</string>
+    <string>To File</string>
    </property>
   </action>
   <action name="actionView">
@@ -307,12 +307,18 @@
     <string>Pickle</string>
    </property>
   </action>
-  <action name="actionExportToWorkspace">
+  <action name="actionExportSceneToWorkspace">
+   <property name="icon">
+    <iconset theme="document-export"/>
+   </property>
    <property name="text">
     <string>To workspace</string>
    </property>
   </action>
-  <action name="actionTo_workspace">
+  <action name="actionExportToWorkspace">
+   <property name="icon">
+    <iconset theme="document-export"/>
+   </property>
    <property name="text">
     <string>To workspace</string>
    </property>

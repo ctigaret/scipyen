@@ -1164,16 +1164,16 @@ def group2neoDataObject(g:h5py.Group, target_class:type, cache:dict = {}):
     
     elif target_class in (neo.Epoch, DataZone):
         obj = target_class(times=times, durations=durations, labels=ax0["labels"], 
-                           units = ax0["units"], relative=ax0.get("relative", False),
-                           segment=segment)
+                           units = ax0["units"], relative=ax0.get("relative", False))
+        setattr(obj, "segment", segment)
     
         for k,v in rec_attrs.items():
             setattr(obj, k, v)
             
     elif target_class == Interval:
         obj = target_class(times=times, durations=durations, units = ax0["units"],
-                           labels=ax0["labels"], extent=ax0.get("extent", False),
-                           segment=segment, )
+                           labels=ax0["labels"], extent=ax0.get("extent", False))
+        setattr(obj, "segment", segment)
     
         for k,v in rec_attrs.items():
             setattr(obj, k, v)

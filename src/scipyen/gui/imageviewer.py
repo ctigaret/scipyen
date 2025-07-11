@@ -1601,12 +1601,21 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             scipywarn("Unsupported export file format %s" % file_format)
             return
         
-        fileName = self._getSaveFileName_(file_format)
+        fileFilter = "All files (*.*);;TIFF (*.tif);; Scalable Vector Graphics files (*.svg);;Portable Network Graphics (*.png);;Pickle (*.pkl);;HDF5 (*.h5)"
+        if self._scipyenWindow_ is not None:
+            targetDir = self._scipyenWindow_.currentDir
+            fn, fl = self.chooseFile("Export Image Frame As", fileFilter=fileFilter, single=True,
+                                    save=True, targetDir=targetDir)
+        else:
+            fn, fl = self.chooseFile("Export Image Frame As", fileFilter=fileFilter, single=True,
+                                    save=True)
+            
+        # fileName = self._getSaveFileName_(file_format)
         
         if len(fileName) == 0:
             return
         
-        if file_format.strip().lower() == "svg":
+        if "svg" in fl.strip().lower():
             generator = QtSvg.QSvgGenerator()
             generator.setFileName(fileName)
             
@@ -1628,7 +1637,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             self.viewerWidget.scene.render(painter)
             painter.end()
         
-        elif file_format.strip().lower() in ("png", "tiff"):
+        elif any(v in fl.strip().lower() for v in ("png", "tiff")):
             # qimg_format = QtGui.QImage.Format_ARGB32
             out = QtGui.QImage(int(self.viewerWidget.scene.width()), 
                                int(self.viewerWidget.scene.height()),
@@ -1653,7 +1662,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     
     @Slot()
     @safewrapper
-    def slot_exportSceneAsPNG(self):
+    def slot_exportSceneToFile(self):
         r"""Exports the image in the current frame as a portable network graphics file.
         The result includes rendered ROIs and cursors."""
         if self._data_ is None:
@@ -1671,24 +1680,24 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         self._export_scene_helper_("svg")
         
-    @Slot()
-    @safewrapper
-    def slot_exportSceneAsTIFF(self):
-        r"""Exports the image in the current frame as a TIFF file.
-        The result includes rendered ROIs and cursors."""
-        if self._data_ is None:
-            return
+#     @Slot()
+#     @safewrapper
+#     def slot_exportSceneAsTIFF(self):
+#         r"""Exports the image in the current frame as a TIFF file.
+#         The result includes rendered ROIs and cursors."""
+#         if self._data_ is None:
+#             return
+#         
+#         self._export_scene_helper_("tiff")
         
-        self._export_scene_helper_("tiff")
-        
-    @Slot()
-    @safewrapper
-    def slot_exportFrameAsHDF5(self):
-        r"""Exports the image in the current frame as a HDF file.
-        The image (array) axes will include calibration data"""
-        if self._data_ is None:
-            return
-        self._export_scene_helper_("hdf5")
+    # @Slot()
+    # @safewrapper
+    # def slot_exportFrameAsHDF5(self):
+    #     r"""Exports the image in the current frame as a HDF file.
+    #     The image (array) axes will include calibration data"""
+    #     if self._data_ is None:
+    #         return
+    #     self._export_scene_helper_("hdf5")
         
     @Slot()
     @safewrapper
@@ -1720,15 +1729,15 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         caption = ""
         flt = ""
-        if fileType.strip().lower() == "TIFF":
+        if fileType.strip().lower() == "tiff":
             caption = f"{captionPrefix} as TIFF"
             flt = "TIFF Files (*.tif)"
             
-        elif fileType.strip().lower() == "HDF5":
+        elif fileType.strip().lower() == "hdf5":
             caption = f"{captionPrefix} as HDF5"
             flt = "HDF5 Files (*.h5)"
             
-        elif fileType.strip().lower() == "PNG":
+        elif fileType.strip().lower() == "png":
             caption = f"{captionPrefix} as PNG"
             flt = "PNG Files (*.png)"
 
@@ -1743,18 +1752,27 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         else:
             scipywarn(f"Unsupported export file format: {fileType}")
             return
-
+        
         if self._scipyenWindow_ is not None:
             targetDir = self._scipyenWindow_.currentDir
-            fileName, _ = QtWidgets.QFileDialog.getSaveFileName(self, 
-                                                                caption=caption, 
-                                                                filter=flt,
-                                                                directory=targetDir, **kw)
+            fn, fl = self.chooseFile(caption=caption, fileFilter = flt, single=True, save=True,
+                                     targetDir=targetDir)
+            
         else:
-            fileName, _ = QtWidgets.QFileDialog.getSaveFileName(self, 
-                                                                caption=caption, 
-                                                                filter=flt, **kw)
-        return fileName
+            fn, fl = self.chooseFile(caption=caption, fileFilter = flt, single=True, save=True)
+
+        return fn
+        # if self._scipyenWindow_ is not None:
+        #     targetDir = self._scipyenWindow_.currentDir
+        #     fileName, _ = QtWidgets.QFileDialog.getSaveFileName(self, 
+        #                                                         caption=caption, 
+        #                                                         filter=flt,
+        #                                                         directory=targetDir, **kw)
+        # else:
+        #     fileName, _ = QtWidgets.QFileDialog.getSaveFileName(self, 
+        #                                                         caption=caption, 
+        #                                                         filter=flt, **kw)
+        # return fileName
         
     @Slot()
     @safewrapper
@@ -2790,12 +2808,12 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.actionView.triggered.connect(self.slot_loadImageFromWorkspace)
         self.actionRefresh.triggered.connect(self.slot_refreshDataDisplay)
         
-        self.actionExportAsPNG.triggered.connect(self.slot_exportSceneAsPNG)
-        self.actionExportAsSVG.triggered.connect(self.slot_exportSceneAsSVG)
-        self.actionExportAsTIFF.triggered.connect(self.slot_exportSceneAsTIFF)
-        self.actionExportAsHDF5.triggered.connect(self.slot_exportFrameAsHDF5)
-        self.actionExportAsPickle.triggered.connect(self.slot_exportFrameAsPickle)
-        self.actionExportToWorkspace.triggered.connect(self.slot_exportFrameToWorkspace)
+        self.actionExportSceneAsFile.triggered.connect(self.slot_exportSceneToFile)
+        # self.actionExportAsSVG.triggered.connect(self.slot_exportSceneAsSVG)
+        # self.actionExportAsTIFF.triggered.connect(self.slot_exportSceneAsTIFF)
+        # self.actionExportAsHDF5.triggered.connect(self.slot_exportFrameAsHDF5)
+        # self.actionExportAsPickle.triggered.connect(self.slot_exportFrameAsPickle)
+        self.actionExportSceneToWorkspace.triggered.connect(self.slot_exportFrameToWorkspace)
         self.actionSaveTIFF.triggered.connect(self.slot_saveTIFF)
         self.actionHDF5.triggered.connect(self.slot_saveHDF5)
         self.actionPickle.triggered.connect(self.slot_savePickle)
