@@ -624,6 +624,11 @@ class DataBag(Bunch):
         # bypass self.__getitem__()
         obs = object.__getattribute__(self, "__observer__")
         ret = len(obs.traits())
+        if not hasattr(self, "__hidden__") or not isinstance(object.__getattribute__(self, "__hidden__"), dict):
+            object.__setattr__(self, "__hidden__", dict())
+        # hidden = object.__getattribute__(self, "__hidden__", None)
+        # if not isinstance(hidden, dict):
+        #     object.__setattr__(self, "__hidden__", dict())
         object.__getattribute__(self, "__hidden__")["length"] = ret
         return ret
 

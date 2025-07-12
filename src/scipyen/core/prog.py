@@ -194,6 +194,7 @@ class DescriptorValidatorABC(ABC):
         public name to a function, bound method, or a callable instance.
 
         """
+        # print(f"{print_styled(f'\n{self.__class__.__name__}.__set__ for {self.private_name} ({self.public_name}) attribute of {type(obj).__name__}', color='yellow')}")
         # NOTE: 2022-01-03 20:45:48
         # value should be validated BEFORE anything
         # WARNING: self.validate MUST be implemented in subclasses
@@ -240,9 +241,7 @@ class DescriptorValidatorABC(ABC):
         # a) as the instance attribute 'preset_hook' of this descriptor
         # (initialized in the c'tor)
         if hasattr(self, "preset_hook"):
-            if isinstance(
-                self.preset_hook, (types.MethodType, types.FunctionType)
-            ) or inspect.ismethod(getattr(self.preset_hook, "__call__", None)):
+            if isinstance(self.preset_hook, (types.MethodType, types.FunctionType)) or inspect.ismethod(getattr(self.preset_hook, "__call__", None)):
                 # above checxk includes a generic way to check for a callable; AttributeAdapter is but one example
                 preset_func = self.preset_hook
 
@@ -255,19 +254,20 @@ class DescriptorValidatorABC(ABC):
         # NOTE: this is old code;
         elif hasattr(obj, "_preset_hooks_") and isinstance(obj._preset_hooks_, dict):
             obj_preset_hook = obj._preset_hooks_.get(self.public_name, None)
-            if isinstance(
-                obj_preset_hook, (types.MethodType, types.FunctionType)
-            ) or inspect.ismethod(getattr(obj_preset_hook, "__call__", None)):
+            if isinstance(obj_preset_hook, (types.MethodType, types.FunctionType)) or inspect.ismethod(getattr(obj_preset_hook, "__call__", None)):
                 preset_func = obj_preset_hook
 
         if preset_func is not None:
-            print(f"{print_styled(f'\n{self.__class__.__name__}.__set__ will call preset_hook {preset_func} for {self.private_name} attribute of {type(obj).__name__}', color='yellow')}")
+            # print(f"{print_styled(f'\n\twill call preset_hook {preset_func}', color='yellow')}")
+            
             # check callable definition to see how many arguments (positional parameters) the callable expects
             # the invoke the callable
             if isinstance(preset_func, types.MethodType):
                 args = inspect.getfullargspec(preset_func).args[1:]
+                
             elif isinstance(preset_func, types.FunctionType):
                 args = inspect.getfullargspec(preset_func).args
+                
             else:
                 args = inspect.getfullargspec(preset_func.__call__).args[1:]
 
@@ -277,9 +277,7 @@ class DescriptorValidatorABC(ABC):
             elif len(args) == 2:
                 preset_func(obj, value)
             else:
-                scipywarn(
-                    f"Ignoring the preset function {preset_func} for {self.public_name} attribute of {type(obj).__name__}, as it is expecting {len(args)} positional parameters"
-                )
+                scipywarn(f"Ignoring the preset function {preset_func} for {self.public_name} attribute of {type(obj).__name__}, as it is expecting {len(args)} positional parameters")
 
         setattr(obj, self.private_name, value)
 
@@ -295,25 +293,24 @@ class DescriptorValidatorABC(ABC):
         postset_func = None
 
         if hasattr(self, "postset_hook"):
-            if isinstance(
-                self.postset_hook, (types.MethodType, types.FunctionType)
-            ) or inspect.ismethod(getattr(self.postset_hook, "__call__", None)):
+            if isinstance(self.postset_hook, (types.MethodType, types.FunctionType)) or inspect.ismethod(getattr(self.postset_hook, "__call__", None)):
                 postset_func = self.postset_hook
 
         elif hasattr(obj, "_postset_hooks_") and isinstance(obj._postset_hooks_, dict):
             obj_postset_hook = obj._postset_hooks_.get(self.public_name, None)
-            if isinstance(
-                obj_postset_hook, (types.MethodType, types.FunctionType)
-            ) or inspect.ismethod(getattr(obj_postset_hook, "__call__", None)):
+            if isinstance(obj_postset_hook, (types.MethodType, types.FunctionType)) or inspect.ismethod(getattr(obj_postset_hook, "__call__", None)):
                 postset_func = obj_postset_hook
 
         if postset_func is not None:
-            print(f"{print_styled(f'\n{self.__class__.__name__}.__set__ will call postset_hook {postset_func}', color='yellow')}")
+            # print(f"{print_styled(f'\n\twill call postset_hook {postset_func}', color='yellow')}")
             # print(f"postset {postset_func} for {self.public_name}")
+
             if isinstance(postset_func, types.MethodType):
                 args = inspect.getfullargspec(postset_func).args[1:]
+                
             elif isinstance(postset_func, types.FunctionType):
                 args = inspect.getfullargspec(postset_func).args
+                
             else:
                 args = inspect.getfullargspec(postset_func.__call__).args[1:]
 
@@ -325,9 +322,7 @@ class DescriptorValidatorABC(ABC):
             elif len(args) == 2:
                 postset_func(obj, value)
             else:
-                scipywarn(
-                    f"Ignoring the postset function {postset_func} for {self.public_name} attribute of {type(obj).__name__}, as it is expecting {len(args)} positional parameters"
-                )
+                scipywarn(f"Ignoring the postset function {postset_func} for {self.public_name} attribute of {type(obj).__name__}, as it is expecting {len(args)} positional parameters")
 
     def __delete__(self, obj):
         if hasattr(obj, self.private_name):

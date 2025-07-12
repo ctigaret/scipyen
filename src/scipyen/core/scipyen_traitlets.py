@@ -822,8 +822,23 @@ class SeriesTrait(Instance, ScipyenTraitTypeMixin):
         if ret:
             ret = old_value.dtype == new_value.dtype
             
+        # print(f"ret -> {ret}, old_value.dtype -> {old_value.dtype}, new_value.dtype -> {new_value.dtype}")
         if ret:
-            ret = np.all(old_value == new_value)
+            # by now, both old and new have same dtype
+            if isinstance(old_value.dtype, pd.SparseDtype) and old_value.dtype.fill_value is pd.NA:
+                # print(f"ret -> {ret}, old_value.dtype.fill_value -> {old_value.dtype.fill_value}")
+                # by implication dtype.fill_value is also the same in old and new
+                navals_old = np.where(pd.isna(old_value))[0]
+                navals_new = np.where(pd.isna(new_value))[0]
+                ret = np.all(navals_old == navals_new)
+                
+                if ret:
+                    nonavals_old = np.where(~pd.isna(old_value))[0]
+                    nonavals_new = np.where(~pd.isna(new_value))[0]
+                    ret = np.all(np.array(old_value[nonavals_old]) == np.array(new_value[nonavals_new]))
+                        
+            else:
+                ret = np.all(old_value == new_value)
             
         return ret
         

@@ -1254,6 +1254,7 @@ class ScanDataFramesMapUpdater(AttributeAdapter):
     def __call__(self, obj, value):
         self.updateFramesMap(obj, value)
         
+    @safewrapper
     def updateFramesMap(self, obj, value):
         r"""Adapts the frames map to the electrophysiology's segments.
         
@@ -1299,8 +1300,10 @@ class ScanDataFramesMapUpdater(AttributeAdapter):
         
         field = getattr(obj, self.fieldname)
         
-        print(f"{print_styled(f'\n{self.__class__.__name__}<{self.fieldname}>.updateFramesMap(value={type(value).__name__}) for framesMap {framesMap}', color='yellow')}")
-        if framesMap is None:
+        # print(f"{print_styled(f'\n{self.__class__.__name__}<{self.fieldname}>.updateFramesMap(value={type(value).__name__}) for framesMap {framesMap}', color='yellow')}")
+        
+        if self.fieldname == "framesMap":
+            # update framesMap based on what is already there, discard value
             field_frames = dict((c[0], 0) for c in obj._data_children_)
             for c in field_frames:
                 if c in ("scene","scans"):
@@ -1313,81 +1316,104 @@ class ScanDataFramesMapUpdater(AttributeAdapter):
                     val = len(data.segments) if isinstance(data, neo.Block) else 0
             
                 field_frames[c] = val
-            
-            # NOTE: 2022-01-04 16:06:11
-            # FrameIndexLookup is now MANDATORY - see also NOTE: 2022-01-04 16:05:12
-            framesMap = FrameIndexLookup(field_frames)
-            # setattr(obj, "framesMap", framesMap)
-        
+                
+            if framesMap is None:
+                framesMap = FrameIndexLookup(field_frames)
+            # else:
+                
         else:
-            # nframes = len(obj.framesMap)
-            nframes = len(framesMap)
-            print(f"{print_styled(f'\n\tnframes -> {nframes}', color='yellow')}")
-                
-            if isinstance(field, neo.Block):
-                newframes = len(field.segments)
-                
-            elif isinstance(field, (tuple, list)) and all(isinstance(v, vigra.VigraArray) for v in field):
-                userFrameAxis = getattr(obj, f"{self.fieldname}FrameAxis", None)
-                axesCalibration = getattr(obj, f"{self.fieldname}AxesCalibration", None)
-                layout = getattr(obj, f"{self.fieldname}Layout", None)
-                # NOTE: 2024-08-11 21:27:06 FIXME/TODO
-                # possibly duplicated code!
-                # imageDataLayout is also a method of ScanDataImageParser
-                # data, layout, axesCalibration = obj.imageDataLayout(field,
-                #                                                     framesAxis = userFrameAxis,
-                #                                                     axescal = axesCalibration)
-                newframes = layout.nFrames
-                
-            else:
-                newframes=0
-                
-            print(f"{print_styled(f'\n\tnewframes -> {newframes}', color='yellow')}")
-            
-            if newframes == nframes:
-                # assume 1-2-1 correspondence with the index in framesMap
-                framesMap[self.fieldname] = range(newframes)
-                # obj.framesMap[self.fieldname] = range(newframes)
-                
-            elif newframes < nframes:
-                value = list(range(newframes))
-                value.extend([framesMap.missingFrameIndex for k in range(newframes, nframes)])
-                # value.extend([obj.framesMap.missingFrameIndex for k in range(newframes, nframes)])
-                        
-                framesMap[self.fieldname] = value
-                # obj.framesMap[self.fieldname] = value
-                
-            else: # --> newframes > nframes
-                # concatenate a new frame index lookup
-                dd = dict()
-                for c in obj._data_children_:
-                    name = c[0]
-                    if name != self.fieldname:
-                        # if np.any(obj.framesMap[name].isna()):
-                        if np.any(framesMap[name].isna()):
-                            val = None
-                        else:
-                            val = 0
-                        dd[name] = val
+            if framesMap is None:
+                # print(f"{print_styled(f'\n\tno framesMap yet', color='yellow')}")
+                field_frames = dict((c[0], 0) for c in obj._data_children_)
+                for c in field_frames:
+                    if c in ("scene","scans"):
+                        f = getattr(obj, f"{c}Layout", None)
+                        nFrames = f.get("nFrames", 0) if isinstance(f, dict) else 0
+                        val = nFrames if isinstance(nFrames, int) else np.prod(nFrames)
                         
                     else:
-                        dd[name] = newframes - nframes
-                        
-                fil = FrameIndexLookup(dd)
-                fil[self.fieldname] = range(nframes, newframes)
+                        data = getattr(obj, c, None)
+                        val = len(data.segments) if isinstance(data, neo.Block) else 0
                 
-                newmap = pd.concat([framesMap.map, fil.map], ignore_index=True)
-                # newmap = pd.concat([obj.framesMap.map, fil.map], ignore_index=True)
+                    field_frames[c] = val
                 
-                framesMap.map = newmap
-                # obj.framesMap.map = newmap
+                # NOTE: 2022-01-04 16:06:11
+                # FrameIndexLookup is now MANDATORY - see also NOTE: 2022-01-04 16:05:12
+                framesMap = FrameIndexLookup(field_frames)
+                # print(f"{print_styled(f'\n\tcreated framsMap with map: {framesMap.map}', color='yellow')}")
+                # setattr(obj, "framesMap", framesMap)
+            
+            else:
+                # nframes = len(obj.framesMap)
+                nframes = len(framesMap)
+                # print(f"{print_styled(f'\n\texisting framesMap with {nframes} frames', color='yellow')}")
+                    
+                if isinstance(field, neo.Block):
+                    newComponentFrames = len(field.segments)
+                    
+                elif isinstance(field, (tuple, list)) and all(isinstance(v, vigra.VigraArray) for v in field):
+                    userFrameAxis = getattr(obj, f"{self.fieldname}FrameAxis", None)
+                    axesCalibration = getattr(obj, f"{self.fieldname}AxesCalibration", None)
+                    layout = getattr(obj, f"{self.fieldname}Layout", None)
+                    # NOTE: 2024-08-11 21:27:06 FIXME/TODO
+                    # possibly duplicated code!
+                    # imageDataLayout is also a method of ScanDataImageParser
+                    # data, layout, axesCalibration = obj.imageDataLayout(field,
+                    #                                                     framesAxis = userFrameAxis,
+                    #                                                     axescal = axesCalibration)
+                    newComponentFrames = layout.nFrames
+                    
+                else:
+                    newComponentFrames=0
+                    
+                # print(f"{print_styled(f'\n\texisting framesMap to get {newComponentFrames} frames for {self.fieldname}', color='yellow')}")
                 
-        objname = getattr(obj, "name", "")
-        print(f"{print_styled(f'\n\twill assign {framesMap} to \'framesMap\' of {type(obj).__name__} object' + f' {objname}', color='yellow')}")
-        print(f"{print_styled(f'\n\t framesMap has \n{framesMap.map}', color='yellow')}")
+                if newComponentFrames == nframes:
+                    # assume 1-2-1 correspondence with the index in framesMap
+                    framesMap[self.fieldname] = range(newComponentFrames)
+                    # obj.framesMap[self.fieldname] = range(newComponentFrames)
+                    
+                elif newComponentFrames < nframes:
+                    value = list(range(newComponentFrames))
+                    value.extend([framesMap.missingFrameIndex for k in range(newComponentFrames, nframes)])
+                            
+                    framesMap[self.fieldname] = value
+                    # obj.framesMap[self.fieldname] = value
+                    
+                else: # --> newComponentFrames > nframes
+                    # concatenate a new frame index lookup
+                    # print(f"{print_styled(f'\n\tConcatenating:', color='yellow')}")
+                    dd = dict()
+                    for c in obj._data_children_:
+                        name = c[0]
+                        if name != self.fieldname:
+                            if np.any(framesMap[name].isna()):
+                                val = None
+                            else:
+                                val = 0
+                            dd[name] = val
+                            
+                        else:
+                            dd[name] = newComponentFrames - nframes
+                    
+                    # print(f"{print_styled(f'\n\tdd -> {dd}', color='yellow')}")
+                    fil = FrameIndexLookup(dd)
+                    # print(f"{print_styled(f'\n\tfil -> {fil}', color='yellow')}")
+                    fil[self.fieldname] = range(nframes, newComponentFrames)
+                    
+                    newmap = pd.concat([framesMap.map, fil.map], ignore_index=True)
+                    # print(f"{print_styled(f'\n\tnewmap -> {newmap.to_string()}', color='yellow')}")
+                    # newmap = pd.concat([obj.framesMap.map, fil.map], ignore_index=True)
+                    
+                    framesMap.map = newmap
+                    # obj.framesMap.map = newmap
+                    
+        # objname = getattr(obj, "name", "")
+        # print(f"{print_styled(f'\n\twill assign {framesMap} to \'framesMap\' of {type(obj).__name__} object' + f' {objname}', color='yellow')}")
+        # print(f"{print_styled(f'\n\tframesMap.map is \n{framesMap.map.to_string()}', color='yellow')}")
         setattr(obj, "framesMap", framesMap)
         
-        print(f"{print_styled(f'\n{type(obj).__name__} object' + f' {objname}' + f'has framesMap: {framesMap} with \n{framesMap.map}', color='yellow')}")
+        # print(f"{print_styled(f'\n\t{type(obj).__name__} object' + f' {objname}' + f' now has framesMap: {framesMap} with map:\n{framesMap.map.to_string()}', color='yellow')}")
                 
 FramesMapUpdater = ScanDataFramesMapUpdater
 
@@ -1452,6 +1478,19 @@ class ScanDataMetadataAdapter(AttributeAdapter):
             scipywarn(f"{value.type.name} scan data not yet supported")
             # raise NotImplementedError("%s data not yet supported" % value.type)
     
+class ScanDataFramesMapDescriptor(BaseDescriptorValidator):
+    def __init__(self, default:FrameIndexLookup = FrameIndexLookup({"scene":0, "scans":0, "electrophysiology":0}),
+                 preset_hook:typing.Optional[typing.Union[AttributeAdapter, types.MethodType, types.FunctionType]] = None,
+                 postset_hook:typing.Optional[typing.Union[AttributeAdapter, types.MethodType, types.FunctionType]] = None,
+                 accept_none:bool=True):
+        super().__init__("framesMap", default, use_private=True,
+                         postset_hook=postset_hook)
+        self.accept_none = accept_none
+        self.types = (FrameIndexLookup,)
+        
+        def validate(self, value):
+            if not isinstance(value, FrameIndexLookup) or (value is None and not self.accept_none):
+                raise TypeError(f"Invalid value type: {type(value).__name__}")
 
 class ScanDataComponentDescriptor(BaseDescriptorValidator):
     def __init__(self, name:str, default:typing.Any=None, types:typing.Optional[typing.Union[type,tuple]] = None,
@@ -1459,7 +1498,7 @@ class ScanDataComponentDescriptor(BaseDescriptorValidator):
                  postset_hook:typing.Optional[typing.Union[AttributeAdapter, types.MethodType, types.FunctionType]] = None,
                  accept_none:bool=True):
         r"""Descriptor for ScanData components.
-    The components are 'scene', 'scans', 'electrophysiology', 'metadata', and 'framesMap'.
+    The components are 'scene', 'scans', 'electrophysiology', and 'metadata'.
     
     Parameters:
     ==========
@@ -1481,7 +1520,7 @@ class ScanDataComponentDescriptor(BaseDescriptorValidator):
             self.types = (types, )
             
         elif isinstance(type, tuple) and all(isinstance(t, type) for t in types):
-            self.types=types
+            self.types = types
             
         else:
             self.types = tuple()
@@ -1512,6 +1551,8 @@ class ScanDataComponentDescriptor(BaseDescriptorValidator):
         if len(self.types):
             if self.accept_none:
                 types = self.types + (type(None),)
+            else:
+                types = self.types
             assert isinstance(value, types), f"{print_styled(f'Expecting an instance of one of {types}; instead, got a {type(value).__name__}', color='red')}"
 
         elif value is None and not self.accept_none:
@@ -1747,7 +1788,7 @@ class ScanData(BaseScipyenData):
     analysisMode:ScanDataAnalysisMode = ScanDataAnalysisMode.frame
     
     # metadata:typing.Optional[dict] = dataclasses.field(default=None)
-    metadata:ScanDataComponentDescriptor = ScanDataComponentDescriptor("metadata",None, DataBag,
+    metadata:ScanDataComponentDescriptor = ScanDataComponentDescriptor("metadata", None, DataBag,
                                                                        postset_hook=ScanDataMetadataAdapter("metadata"))
 
     # mapping of imaging frames to electrophysiology sweeps
@@ -1756,8 +1797,9 @@ class ScanData(BaseScipyenData):
     # see NOTE: 2024-08-14 21:28:36 for why this is stll here and not commented-out
     # BUG: 2025-07-08 23:04:53 FIXME/TODO URGENTLY
     # this seems to overwrite whatever the ScanDataComponentDescriptor's postset_hook sets as framesMap
-    # framesMap:typing.Optional[FrameIndexLookup] = dataclasses.field(default=None)
-    framesMap:typing.Optional[FrameIndexLookup] = dataclasses.field(default=None)
+    framesMap:ScanDataComponentDescriptor = ScanDataComponentDescriptor("framesMap", FrameIndexLookup({"scene":0, "scans":0, "electrophysiology":0}), 
+                                                                        FrameIndexLookup,
+                                                                        postset_hook = ScanDataFramesMapUpdater("framesMap"))
     
     # user annotations
     annotations:dict = dataclasses.field(default_factory = dict)
@@ -1835,15 +1877,15 @@ class ScanData(BaseScipyenData):
         return (_new_ScanData, (self.scans, self.scene, self.electrophysiology, 
                                 kw))
         
-    @safewrapper
-    def __post_init__(self, *args, **kwargs):
-        r"""Constructs a ScanData object.
-        
-        """
-        self.availableUnitTypes.insert(0, "unknown")
-        self._modified_ = False
-        
-        print(f"{self.__class__.__name__}.__post_init__: framesMap = {self.framesMap}")
+#     @safewrapper
+#     def __post_init__(self, *args, **kwargs):
+#         r"""Constructs a ScanData object.
+#         
+#         """
+#         self.availableUnitTypes.insert(0, "unknown")
+#         self._modified_ = False
+#         
+#         print(f"{self.__class__.__name__}.__post_init__: framesMap = {self.framesMap}")
         
     def _repr_pretty_(self, p, cycle):
         name = self.name if isinstance(self.name, str) else ""

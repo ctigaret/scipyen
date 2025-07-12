@@ -1252,11 +1252,16 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                     ret = val if role == QtCore.Qt.EditRole else f"{val}"
 
             elif isinstance(self._modelData_, pd.Index):
-                # CAUTION 2025-05-25 09:09:00 
-                # when _modelData_ is the column index of a DataFrame, ``row`` 
-                # needs to be a column index!
-                val = self._modelData_.iloc[row,col]
+                if isinstance(self._modelData_, pd.RangeIndex):
+                    val = self._modelData_[row]
+                else:
+                    # CAUTION 2025-05-25 09:09:00 
+                    # when _modelData_ is the column index of a DataFrame, ``row`` 
+                    # needs to be a column index!
+                    val = self._modelData_.iloc[row,col]
+                    
                 ret_type = type(val).__name__
+                
                 if isinstance(val, datetime.datetime):
                     ret = val if role == QtCore.Qt.EditRole else val.isoformat(" ")
                 else:
