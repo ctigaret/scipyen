@@ -1459,7 +1459,7 @@ class ScanDataComponentDescriptor(BaseDescriptorValidator):
                  postset_hook:typing.Optional[typing.Union[AttributeAdapter, types.MethodType, types.FunctionType]] = None,
                  accept_none:bool=True):
         r"""Descriptor for ScanData components.
-    The components are 'scene', 'scans', 'electrophysiology', and 'metadata'.
+    The components are 'scene', 'scans', 'electrophysiology', 'metadata', and 'framesMap'.
     
     Parameters:
     ==========
@@ -1756,6 +1756,7 @@ class ScanData(BaseScipyenData):
     # see NOTE: 2024-08-14 21:28:36 for why this is stll here and not commented-out
     # BUG: 2025-07-08 23:04:53 FIXME/TODO URGENTLY
     # this seems to overwrite whatever the ScanDataComponentDescriptor's postset_hook sets as framesMap
+    # framesMap:typing.Optional[FrameIndexLookup] = dataclasses.field(default=None)
     framesMap:typing.Optional[FrameIndexLookup] = dataclasses.field(default=None)
     
     # user annotations
@@ -1841,6 +1842,8 @@ class ScanData(BaseScipyenData):
         """
         self.availableUnitTypes.insert(0, "unknown")
         self._modified_ = False
+        
+        print(f"{self.__class__.__name__}.__post_init__: framesMap = {self.framesMap}")
         
     def _repr_pretty_(self, p, cycle):
         name = self.name if isinstance(self.name, str) else ""

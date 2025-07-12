@@ -261,7 +261,7 @@ class DescriptorValidatorABC(ABC):
                 preset_func = obj_preset_hook
 
         if preset_func is not None:
-            print(f"{print_styled(f'\n{self.__class__.__name__}.__set__ will call preset_hook {preset_func}', color='yellow')}")
+            print(f"{print_styled(f'\n{self.__class__.__name__}.__set__ will call preset_hook {preset_func} for {self.private_name} attribute of {type(obj).__name__}', color='yellow')}")
             # check callable definition to see how many arguments (positional parameters) the callable expects
             # the invoke the callable
             if isinstance(preset_func, types.MethodType):
