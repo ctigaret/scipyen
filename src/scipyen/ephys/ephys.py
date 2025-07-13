@@ -4637,24 +4637,16 @@ def cursors_chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal],
         raise TypeError(f"Invalid first cursor specified; expecting a SignalCursor or DataCursor; instead, got {type(cursor1).__name__}")
 
     t0 = cursor0.x if isinstance(cursor0, SignalCursor) else cursor0.coord
-    # t0 = cursor0[0] if isinstance(cursor0, tuple) else cursor0.x if isinstance(x, SignalCursor) else cursor0.coord
-    
-    y0 = cursor_average(signal, cursor0, channel=channel)
-    
-
     if isinstance(t0, float):
         t0 *= signal.times.units
-        
     t1 = cursor1.x if isinstance(cursor1, SignalCursor) else cursor1.coord
-    # t1 = cursor1[0] if isinstance(cursor1, tuple) else cursor1.x if isinstance(cursor1, SignalCursor) else cursor1.coord
-
     if isinstance(t1, float):
         t1 *= signal.times.units
         
-    y1 = cursor_average(signal, cursor1, channel=channel)
-    
+    print(f"\nephys.cursors_chord_slope: t-start = {signal.t_start}; t0 = {t0}; t1 = {t1}")
     if relative:
         t0, t1 = adjust_times_relative_to_signal(signal, t0, t1)
+        print(f"ephys.cursors_chord_slope: t-start = {signal.t_start}; adjusted -> t0 = {t0}; t1 = {t1}")
     else:
         if t0 < signal.t_start or t0 > signal.t_stop:
             scipywarn(f"t0 {t0} fals outside signal's domain with start {signal.t_start} and stop {signal.t_stop}")
@@ -4664,7 +4656,12 @@ def cursors_chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal],
             scipywarn(f"t1 {t1} fals outside signal's domain with start {signal.t_start} and stop {signal.t_stop}")
             return np.nan
     
+    y0 = cursor_average(signal, cursor0, channel=channel)
+
+    y1 = cursor_average(signal, cursor1, channel=channel)
+    
     return (y1-y0)/(t1-t0).simplified
+    
 
 def cursor_chord_slope(signal:typing.Union[neo.AnalogSignal, DataSignal], 
                        cursor:typing.Union[SignalCursor, DataCursor], 

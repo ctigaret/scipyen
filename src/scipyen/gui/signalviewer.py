@@ -8083,6 +8083,8 @@ anything else       anything else       ❌
         pfun = lambda x: np.inf if x is None else x
         
         for k, ax in enumerate(self.axes):
+            # NOTE: 2025-07-13 22:21:02 potentia BUG / FIXME
+            # what is axes have different item data boundaries?
             [[dataxmin, dataxmax], [dataymin, dataymax]] = guiutils.getPlotItemDataBoundaries(ax)
             
             for c in self.cursorsInAxis(k):
@@ -10783,14 +10785,104 @@ anything else       anything else       ❌
     def cursors(self):
         r"""A list with all defined SignalCursors.
         ATTENTION: the list is NOT ordered.
+        Aliased to self.signalCursors, self.dataCursors
+        WARNING: 
+        The cursors in the list are references to the data cursors in the signal
+        viewer. This means that they cannot necessarily be directly used to
+        measure signal features (such as cursors chord slope, etc) across all 
+        segments in a block unless the signals across all segments have the same 
+        t_start value.
+        In addition, if a cursors's property "staysInAxes" is True, then the 
+        coordinates of the cursor, and especially the X coordinate for vertical
+        and crosshair cursors, will be adjusted by the viewer to be at the same
+        coordinates relative to the signal's range or domain range.
+        
+        In short, do NOT use these cursors to measure signal features "off-line"
+        (i.e. at the console) for signals across the segments of a block, unless
+        the signals have the same value of t_start property.
+        
+        Instead one should use self.getRelativeCursorCoordinates method.
+        
+        
         """
         return list(self._data_cursors_.values())
     
+    def getRelativeCursorCoordinates(self, what:str="x", cursors:typing.Optional[typing.Union[SignalCursor, typing.Sequence[SignalCursor]]]=None):
+        r"""Returns relative cursor coordinate(s)
+        Coordinates are relative to the axis data boundaries (whichh are set to cursor's xBounds and yBounds)
+    """
+        if not isinstance(what, str):
+            raise TypeError("'what' must be a str")
+        if what not in ("x", "y", "xy"):
+            raise ValueError("'what' must be one of 'x', 'y', 'xy'")
+        # for k, ax in enumerate(self.axes):
+            # [[dataxmin, dataxmax], [dataymin, dataymax]] = guiutils.getPlotItemDataBoundaries(ax)
+        if what == 'x':
+            if isinstance(cursors, SignalCursor):
+                if cursors.cursorType in (SignalCursorTypes.vertical, SignalCursorTypes.crosshair):
+                    cursors = [cursors]
+                else:
+                    return
+            else:
+                if cursors is None:
+                    cursors = list(filter(lambda c: c.cursorType in (SignalCursorTypes.vertical, SignalCursorTypes.crosshair), self.cursors))
+        
+                elif isinstance(cursors, typing.Sequence) and all(isinstance(c, SignalCursor) for c in cursors):
+                    cursors = list(filter(lambda c: c.cursorType in (SignalCursorTypes.vertical, SignalCursorTypes.crosshair), cursors))
+                    
+                else:
+                    raise TypeError(f"'cursors' must be a SignalCursor, a sequence of SignalCursor objects, or None; instead, got {type(cursors).__name__}")
+                
+            values = tuple(map(lambda c: c.x - c.xBounds()[0] if c.staysInAxis else c.x, cursors))
+            
+        elif what == 'y':
+            if isinstance(cursors, SignalCursor):
+                if cursors.cursorType in (SignalCursorTypes.horizontal, SignalCursorTypes.crosshair):
+                    cursors = [cursors]
+                else:
+                    return
+            else:
+                if cursors is None:
+                    cursors = list(filter(lambda c: c.cursorType in (SignalCursorTypes.horizontal, SignalCursorTypes.crosshair), self.cursors))
+        
+                elif isinstance(cursors, typing.Sequence) and all(isinstance(c, SignalCursor) for c in cursors):
+                    cursors = list(filter(lambda c: c.cursorType in (SignalCursorTypes.horizontal, SignalCursorTypes.crosshair), cursors))
+                else:
+                    raise TypeError(f"'cursors' must be a SignalCursor, a sequence of SignalCursor objects, or None; instead, got {type(cursors).__name__}")
+                
+            values = tuple(map(lambda c: c.y - c.yBounds()[0] if c.staysInAxis else c.y, cursors))
+            
+        else:
+            if isinstance(cursors, SignalCursor):
+                if cursors.cursorType in (SignalCursorTypes.horizontal, SignalCursorTypes.crosshair):
+                    cursors = [cursors]
+                else:
+                    return
+            else:
+                if cursors is None:
+                    cursors = list(filter(lambda c: c.cursorType in (SignalCursorTypes.horizontal, SignalCursorTypes.crosshair), self.cursors))
+        
+                elif isinstance(cursors, typing.Sequence) and all(isinstance(c, SignalCursor) for c in cursors):
+                    cursors = list(filter(lambda c: c.cursorType in (SignalCursorTypes.horizontal, SignalCursorTypes.crosshair), cursors))
+                else:
+                    raise TypeError(f"'cursors' must be a SignalCursor, a sequence of SignalCursor objects, or None; instead, got {type(cursors).__name__}")
+                
+            getX = lambda c: (c.x - c.xBounds()[0] if c.staysInAxis else c.x) if c.cursorType in (SignalCursorTypes.vertical,   SignalCursorTypes.crosshair) else None
+            getY = lambda c: (c.y - c.yBounds()[0] if c.staysInAxis else c.y) if c.cursorType in (SignalCursorTypes.horizontal, SignalCursorTypes.crosshair) else None
+                
+            values = tuple(map(lambda c: (getX(c), getY(c)), cursors))
+            
+        return values
+    
     @property
     def signalCursors(self):
-        r"""Alias to cursors property
+        r"""Alias to cursors and dataCursors properties
         """
         return self.cursors
+    
+    @property
+    def dataCursors(self):
+        r"""Alias to cursors and signalCursors properties"""
     
     @property
     def selectedAxis(self):

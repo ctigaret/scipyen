@@ -1122,7 +1122,7 @@ class DataViewer(ScipyenViewer):
                             names.append(f"{name}_{k}")
                     else:
                         statement, eAccess, oType, tType = accessList[0]
-                        print(f"statement: {statement}, eAccess: {eAccess}, oType: {oType}, tType: {tType}")
+                        # print(f"statement: {statement}, eAccess: {eAccess}, oType: {oType}, tType: {tType}")
                         if len(eAccess):
                             # unpack accessor elements
                             call, rowNdx, colNdx, hiNdx = eAccess
