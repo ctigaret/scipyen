@@ -3693,7 +3693,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         # NOTE: 2022-01-16 13:08:12
         # super()._init__(...) below also calls self._configureUI_() # TODO 2025-07-08 21:50:45 migrate to a future ScanDataViewer
         super().__init__(data=scandata, win_title=win_title, doc_title=self._data_var_name_, 
-                         parent=parent, **kwargs) # also calls self._configureUI_()
+                         parent=parent, **kwargs) # also calls self._configureUI_() and self.setData()
         
         self.loadSettings() # TODO 2025-07-08 21:50:45 include in a future ScanDataViewer
         
@@ -3821,7 +3821,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 [self.removeProtocolAction.triggered,                               self.slot_removeProtocol, QtCore.Qt.QueuedConnection]
             ]
         
-        # NOTE 2025-07-08 21:50:45 keep in LSCaT
+        # NOTE 2025-07-08 21:50:45 keep in LSCaT - fluorescence dyes "calibration"
         self._epscat_channels_calibration_gui_signal_slots_ = [
                 [self.indicatorChannelComboBox.currentIndexChanged[int], self.slot_epscatIndicatorChannelChanged,   QtCore.Qt.QueuedConnection],
                 [self.referenceChannelComboBox.currentIndexChanged[int], self.slot_epscatReferenceChannelChanged,   QtCore.Qt.QueuedConnection],
@@ -10430,7 +10430,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         displayScanChannelGUINdx = self.scanDisplayChannelCombobox.currentIndex()
         self.scanDisplayChannelCombobox.clear()
-        self.scanDisplayChannelCombobox.addItems(["All channels"] + self._data_.scansChannelNames + ["Choose..."])
+        self.scanDisplayChannelCombobox.addItems(["All channels"] + list(self._data_.scansChannelNames) + ["Choose..."])
         self.scanDisplayChannelCombobox.setCurrentIndex(displayScanChannelGUINdx)
         
     @safewrapper
@@ -11173,21 +11173,27 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         #print("LSCaTWindow._update_ui_fields_ END")
         
     @safewrapper
-    def _parsedata_(self, newdata=None):#, varname=None):
+    def _parsedata_(self, newdata=None):
         r"""Parses metainformation and then actually assigns the data to the _data_ attribute
         """
+        # NOTE: 2025-07-13 08:54:27 This is called by self.setData()
+        
         if isinstance(newdata, ScanData):
             name = getattr(newdata, "name", None)
             if name is None or not (isinstance(name, str) and len(name.strip())):
+                # NOTE: 2025-07-13 08:55:29 
+                # self.workspaceSymbolForData() is inherited from WorkspaceGuiMixin via ScipyenViewer
+                #
                 name = self.workspaceSymbolForData(newdata)
                 newdata.name = name
                 
-            self.baseScipyenDataWidget.populate(newdata)
+            self.baseScipyenDataWidget.populate(newdata) # TODO 2025-07-13 08:56:37 revisit this in light of ScanData now being a Dataclass
 
             #newdata._upgrade_API_()
             #print("LSCaTWindow _parsedata_ %s" % newdata.name)
             
             # keep uptodate with analysisOptions (maye have changed across pickling)
+            # TODO 2025-07-13 08:57:18 keep to LSCaT, remove in ScanDataViewer
             default_options = scanDataOptions()
             
             try: # old pickles don't have analysisOptions descriptors!
@@ -11239,6 +11245,9 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                                 
                                 
         self.generateScanRegionProfiles()
+        
+        # TODO 2025-07-13 08:57:51
+        # populate channel display selectors
                                 
         
     @safewrapper
@@ -12087,17 +12096,12 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     def setData(self, newdata = None, doc_title=None, **kwargs):
         r"""When newdata is None this resets everything to their defaults"""
         
-#         uiParamsPrompt = kwargs.pop("uiParamsPrompt", False)
-#         
-#         if uiParamsPrompt:
-#             # TODO 2023-01-18 08:48:13
-#             pass
-#             # print(f"{self.__class__.__name__}.setData uiParamsPrompt")
-            
         # NOTE: 2021-07-08 13:40:23
         # called by ScyipenViewer superclass
         self._clear_contents_()
         
+        # TODO: 2025-07-13 08:58:35
+        # split analysis stuff from display stuff; migrate the latter to ScanDataViewer
         if isinstance(newdata, ScanData):
             self._parsedata_(newdata)#, name)
             self._data_modifed_(False)
