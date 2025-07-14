@@ -499,7 +499,11 @@ class ListTrait(List, ScipyenTraitTypeMixin):
             # NOTE: 2021-08-19 16:17:23
             # check for change in contents
             if silent:
-                silent = bool(old_value == new_value)
+                if isinstance(old_value, typing.Sequence) and any(isinstance(v, np.ndarray) for v in old_value) or \
+                    isinstance(new_value, typing.Sequence) and any(isinstance(v, np.ndarray) for v in new_value):
+                        silent = safe_identity_test(old_value, new_value)
+                else:
+                    silent = bool(old_value == new_value)
                 # print(f"{print_styled(f'{self.__class__.__name__}.set: old_value == new_value -> {silent}', color='yellow')}")
                 
             if silent:

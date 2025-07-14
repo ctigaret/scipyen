@@ -236,6 +236,7 @@ from core.strutils import (InflectEngine, get_int_sfx)
 from core.sysutils import adapt_ui_path
 
 from imaging.vigrautils import kernel2array
+from core import scipyen_quantities as scq
 
 from ephys import ephys as ephys
 # from ephys.ephys import cursors2epoch
@@ -3757,6 +3758,8 @@ anything else       anything else       ❌
         # print(f"{self.__class__.__name__}_addCursor_ cursor_type = {cursor_type}, x = {x} ,y = {y}, xwindow = {xwindow}, ywindow = {ywindow},xBounds = {xBounds},yBounds = {yBounds}, axis={axis}, label= {label}, follows_mouse = {follows_mouse}")
         relative = kwargs.pop("relative", True)
         label_position = kwargs.pop("label_position", 0.5)
+        xUnits = None
+        yUnits = None
         
         #### BEGIN Figure out cursors destination: axis or scene
         # NOTE: it seemingly makes no sense to add a cursors when there are no
@@ -3790,11 +3793,19 @@ anything else       anything else       ❌
         if xwindow is None:
             if isinstance(x, DataCursor):
                 xwindow = x.span
+                if isinstance(xwindow, pq.Quantity):
+                    xUnits = xwindow.units
+                    xwindow = float(xwindow.magnitude.flatten()[0])
+            elif isinstance(x, Interval):
+                xwindow = x.durations[0]
+                xUnits = xwindow.units
+                xwindow = float(xwindow.magnitude.flatten()[0])
             else:
                 xwindow = self.defaultCursorWindowSizeX
-            
+                
         elif isinstance(xwindow, pq.Quantity):
             xwindow = float(xwindow.magnitude.flatten()[0])
+            xUnits = xwindow.units
             
         elif not isinstance(xwindow, numbers.Number):
             raise TypeError("Unexpected type for xwindow: %s" % type(xwindow).__name__)
@@ -3802,11 +3813,20 @@ anything else       anything else       ❌
         if ywindow is None:
             if isinstance(y, DataCursor):
                 ywindow = y.span
+                if isinstance(ywindow, pq.Quantity):
+                    yUnits = ywindow.units
+                    ywindow = float(ywindow.magnitude.flatten()[0])
+                    
+            elif isinstance(y, Interval):
+                ywindow = y.durations[0]
+                yUnits = ywindow.units
+                ywindow = float(ywindow.magnitude.flatten()[0])
             else:
                 ywindow = self.defaultCursorWindowSizeY
             
         elif isinstance(ywindow, pq.Quantity):
             ywindow = float(ywindow.magnitude.flatten()[0])
+            yUnits = ywindow.units
             
         elif not isinstance(ywindow, numbers.Number):
             raise TypeError("Unexpected type for ywindow: %s" % type(ywindow).__name__)
@@ -3817,8 +3837,8 @@ anything else       anything else       ❌
         # • identify` cursor_dict
         # • adjust cursor windows as needed (set 0 for unused cursor lines)
         #
-        if any(isinstance(v, DataCursor) for v in (x,y)):
-            cursor_type = SignalCursorTypes.getType((isinstance(y, DataCursor), isinstance(x, DataCursor)))
+        if any(isinstance(v, (DataCursor, Interval)) for v in (x,y)):
+            cursor_type = SignalCursorTypes.getType((isinstance(y, (DataCursor, Interval)), isinstance(x, (DataCursor,Interval))))
             # print(f"{self.__class__.__name__}._addCursor_ (DataCursor): cursor_type = {cursor_type}")
         else:
             if isinstance(cursor_type, SignalCursorTypes):
@@ -3868,6 +3888,12 @@ anything else       anything else       ❌
                 x = view_range[0][0] + (view_range[0][1] - view_range[0][0])/2
             
             elif isinstance(x, pq.Quantity):
+                if not isinstance(xUnits, pq.Quantity):
+                    xUnits = x.units
+                else:
+                    if xUnits != x.units:
+                        assert scq.unitsConvertible(xUnits, x.units), f"x.units {x.units} and x window units {xUnits} are incompatible"
+                        xUnits = xUnits.rescale(x.units)
                 x = float(x.magnitude.flatten()[0])
                 
             elif not isinstance(x, (numbers.Number, DataCursor)):
@@ -3881,6 +3907,12 @@ anything else       anything else       ❌
                 y = view_range[1][0] + (view_range[1][1] - view_range[1][0])/2
             
             elif isinstance(y, pq.Quantity):
+                if not isinstance(yUnits, pq.Quantity):
+                    yUnits = y.units
+                else:
+                    if yUnits != y.units:
+                        assert scq.unitsConvertible(yUnits, y.units), f"y.units {y.units} and y window units {yUnits} are incompatible"
+                        yUnits = yUnits.rescale(y.units)
                 y = float(y.magnitude.flatten()[0])
             
             elif not isinstance(y, (numbers.Number, DataCursor)):
@@ -4009,6 +4041,8 @@ anything else       anything else       ❌
                                    yBounds = yBounds,
                                    precision = precision,
                                    label_position = label_position,
+                                   xUnits = xUnits,
+                                   yUnits = yUnits,
                                    **kwargs)
         
         cursorDict[crsId] = cursor
@@ -10807,16 +10841,52 @@ anything else       anything else       ❌
         """
         return list(self._data_cursors_.values())
     
-    def getRelativeCursorCoordinates(self, what:str="x", cursors:typing.Optional[typing.Union[SignalCursor, typing.Sequence[SignalCursor]]]=None):
+    def getRelativeCursorCoordinates(self, what:str="x", 
+                                     cursors:typing.Optional[typing.Union[SignalCursor, typing.Sequence[SignalCursor]]]=None,
+                                     windows:bool=False,
+                                     as_type:typing.Optional[type]=None):
         r"""Returns relative cursor coordinate(s)
-        Coordinates are relative to the axis data boundaries (whichh are set to cursor's xBounds and yBounds)
+    Coordinates are relative to the data boundaries (cursor's xBounds and yBounds)
+    which are set to the current axes.
+    
+    For for neo data, the xBounds depend on the on thetime domain of the signal.
+    When the displayed signal is contained in a neo.Segment (which may belong
+    to a neo.Block) then the time domain is specific to the currently displayed
+    viewer frame.
+        
+    Parameters:
+    ===========
+    what — specify what coordinate to obtain; valid vlues are "x", "y", and "xy"
+        
+    cursors — a SignalCursor, a sequence of SignalCursors, or None (in which case all available cursors will be obtained)
+        
+    windows — when True, then include the window around the coordinate in the returned values
+        
     """
         if not isinstance(what, str):
             raise TypeError("'what' must be a str")
+        
         if what not in ("x", "y", "xy"):
             raise ValueError("'what' must be one of 'x', 'y', 'xy'")
-        # for k, ax in enumerate(self.axes):
-            # [[dataxmin, dataxmax], [dataymin, dataymax]] = guiutils.getPlotItemDataBoundaries(ax)
+        
+        if as_type is Interval:
+            getValX  = lambda c: (float(c.x - c.xBounds()[0]) if c.staysInAxes else float(c.x))
+            getValY  = lambda c: (float(c.y - c.yBounds()[0]) if c.staysInAxes else float(c.y))
+            getXc    = lambda c: getValX(c) * (c.xUnits.units if isinstance(c.xUnits, pq.Quantity) else pq.dimensionless)
+            getYc    = lambda c: getValY(c) * (c.xUnits.units if isinstance(c.xUnits, pq.Quantity) else pq.dimensionless)
+            
+            getXcw = lambda c: (getXc(c), c.xwindow * (c.xUnits.units if isinstance(c.xUnits, pq.Quantity) else pq.dimensionless)) if windows else getXc(c)
+            getYcw = lambda c: (getYc(c), c.ywindow * (c.xUnits.units if isinstance(c.xUnits, pq.Quantity) else pq.dimensionless)) if windows else getYc(c)
+        else:
+            getXc  = lambda c: (float(c.x - c.xBounds()[0]) if c.staysInAxes else float(c.x))
+            getYc  = lambda c: (float(c.y - c.yBounds()[0]) if c.staysInAxes else float(c.y))
+        
+            getXcw = lambda c: (getXc(c), c.xwindow) if windows else getXc(c)
+            getYcw = lambda c: (getYc(c), c.ywindow) if windows else getYc(c)
+        
+        getX   = lambda c: getXcw(c) if c.cursorType in (SignalCursorTypes.vertical,   SignalCursorTypes.crosshair) else None
+        getY   = lambda c: getYcw(c) if c.cursorType in (SignalCursorTypes.horizontal, SignalCursorTypes.crosshair) else None
+    
         if what == 'x':
             if isinstance(cursors, SignalCursor):
                 if cursors.cursorType in (SignalCursorTypes.vertical, SignalCursorTypes.crosshair):
@@ -10833,7 +10903,7 @@ anything else       anything else       ❌
                 else:
                     raise TypeError(f"'cursors' must be a SignalCursor, a sequence of SignalCursor objects, or None; instead, got {type(cursors).__name__}")
                 
-            values = tuple(map(lambda c: c.x - c.xBounds()[0] if c.staysInAxis else c.x, cursors))
+            values = tuple(map(lambda c: (getX(c), c.ID), cursors))
             
         elif what == 'y':
             if isinstance(cursors, SignalCursor):
@@ -10850,7 +10920,7 @@ anything else       anything else       ❌
                 else:
                     raise TypeError(f"'cursors' must be a SignalCursor, a sequence of SignalCursor objects, or None; instead, got {type(cursors).__name__}")
                 
-            values = tuple(map(lambda c: c.y - c.yBounds()[0] if c.staysInAxis else c.y, cursors))
+            values = tuple(map(lambda c: (getY(c), c.ID), cursors))
             
         else:
             if isinstance(cursors, SignalCursor):
@@ -10867,10 +10937,16 @@ anything else       anything else       ❌
                 else:
                     raise TypeError(f"'cursors' must be a SignalCursor, a sequence of SignalCursor objects, or None; instead, got {type(cursors).__name__}")
                 
-            getX = lambda c: (c.x - c.xBounds()[0] if c.staysInAxis else c.x) if c.cursorType in (SignalCursorTypes.vertical,   SignalCursorTypes.crosshair) else None
-            getY = lambda c: (c.y - c.yBounds()[0] if c.staysInAxis else c.y) if c.cursorType in (SignalCursorTypes.horizontal, SignalCursorTypes.crosshair) else None
-                
-            values = tuple(map(lambda c: (getX(c), getY(c)), cursors))
+            values = tuple(map(lambda c: (getX(c), getY(c), c.ID), cursors))
+            
+        if as_type is Interval:
+            to_interval = lambda v: Interval(*v[0], extent=True, name = v[1]) if len(v == 2) else (Interval(*v[0], extent=True, name = f"{v[2]}_h"), Interval(*v[1], extent=True, name = f"{v[2]}_v"))
+            return tuple(map(lambda v: to_interval(v), values))
+        elif as_type is DataCursor:
+            to_datacursor = lambda v: DataCursor(*v[0], v[1]) if len(v == 2) else (DataCursor(*v[0], f"{v[2]}_h"), DataCursor(*v[1], f"{v[2]}_v"))
+            return tuple(map(lambda v: to_datacursor(v), values))
+        elif as_type is not None:
+            raise ValueError(f"'as_type' {as_type} is not supported")
             
         return values
     

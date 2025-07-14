@@ -57,11 +57,12 @@ import neo
 from core.prog import (safewrapper, with_doc)
 from core.scipyen_quantities import checkTimeUnits
 
-# FIXME 2025-04-26 14:13:52 
-# remove this class, as it does the aame thing as the new Interval with extent=True
 @dataclass
 class DataCursor:
-    r"""Convenience structure for notional 1D cursor with a coordinate and span
+    r"""Convenience structure for notional 1D cursor with a coordinate and span.
+Perform similar function as Interval with extent=True (i.e. the coordinate is at
+the center of the span, and the span extends symmetrically around the coordinate)
+EXCEPT that the coordinates may not necessarily associate a physical quantity.
 """
     coord:typing.Union[float, pq.Quantity]
     span:typing.Union[float, pq.Quantity]
@@ -236,7 +237,10 @@ class SignalCursor(QtCore.QObject):
                  movable_label:bool=True, 
                  label_position:float = 0.5,
                  show_value:bool=False, 
-                 precision:int=3, **kwargs):
+                 precision:int=3,
+                 x_units:typing.Optional[pq.Quantity] = None,
+                 y_units:typing.Optional[pq.Quantity] = None,
+                 **kwargs):
         r""" SignalCursor constructor.
             
             By default, this creates a crosshair cursor.
@@ -313,6 +317,8 @@ class SignalCursor(QtCore.QObject):
             show_value:bool=False
             
             precision:int=3
+    
+    x_units, y_units: (optional) scalar python Quantities
             
         Var-keyword parameters:
         =======================
@@ -412,6 +418,9 @@ class SignalCursor(QtCore.QObject):
                          cursor_type=cursor_type, cursorID=cursorID,
                          follower=follower, xBounds = xBounds, yBounds=yBounds,
                          **kwargs)
+        
+        self._x_units = x_units
+        self._y_units = y_units
         
     def _setup_lines_(self, h, v, **kwargs):
         name = kwargs.get("name", self._cursor_type_)
@@ -1514,18 +1523,25 @@ class SignalCursor(QtCore.QObject):
             return (self.x, self.xwindow, self.y, self.ywindow, self.ID)
         
     @property
-    def x(self):
-        r"""The X coordinate of the cursor in axes (PlotItem) data coordinates.
+    def xUnits(self) -> pq.Quantity | None:
+        return self._x_units
+    
+    @property
+    def yUnits(self) -> pq.Quantity | None:
+        return self._y_units
+        
+    @property
+    def x(self) -> numbers.Number | None:
+        r"""The X coordinate in axes data coordinates (dimensionless).
         For multi-axes cursors this will return the value in the "current" PlotItem
         (i.e., the plot where the cursor coordinates are mapped to a point in the
         plot item's view range)
         
-        NOTE: To obtain the "y" data coordinate in another PlotItem (axes system)
+        NOTE: To obtain the "x" data coordinate in another PlotItem (axes system)
         that is spanned by the cursor, call self.getX(plotitem)
         """
         if self._hl_ is None and self._vl_ is None and isinstance(self._vDataCursor_, DataCursor):
             return self._vDataCursor_.coord
-            # return self._x_
         
         if self._vl_ is not None:
             line = self._vl_
@@ -1556,7 +1572,7 @@ class SignalCursor(QtCore.QObject):
                 return line.getXPos() # up to the caller to do what it wants with this
     
     @x.setter
-    def x(self, val):
+    def x(self, val:numbers.Number):
         r"""Expects a value in a plotitem valid range
         """
         if isinstance(val, pq.Quantity):
@@ -1568,7 +1584,7 @@ class SignalCursor(QtCore.QObject):
         if self._vl_ is not None:
             self._update_vline_position_(val)
             
-    def getX(self, plotitem = None):
+    def getX(self, plotitem = None) -> numbers.Number | None:
         if isinstance(self._host_graphics_item_, pg.PlotItem):
             # so that we can also use this function with single axis cursors
             return self.x
@@ -1592,10 +1608,10 @@ class SignalCursor(QtCore.QObject):
             
             return plotitem.vb.mapSceneToView(QtCore.QPointF(x, 0.0)).x()
             
-    def setX(self, val, plotItem=None):
+    def setX(self, val:numbers.Number, plotItem=None):
         r"""Sets the X coordinate of a line.
         
-        The X coordinate is specified in axis coordinates
+        The X coordinate is specified in axis coordinates (dimensionless)
         
         For single-axes cursors, this simply sets the "x" property.
         
@@ -1622,8 +1638,8 @@ class SignalCursor(QtCore.QObject):
             self._update_vline_position_(val, plotItem)
             
     @property
-    def y(self):
-        r"""The Y coordinate of the cursor in axes (PlotItem) data coordinates.
+    def y(self) -> numbers.Number | None:
+        r"""The Y coordinate in axes (PlotItem) data coordinates (dimensionless).
         For multi-axes cursors this will return the value in the "current" PlotItem
         (i.e., the plot where the cursor coordinates are mapped to a point in the
         plot item's view range)
@@ -1663,7 +1679,7 @@ class SignalCursor(QtCore.QObject):
                 return line.getYPos() # up to the caller to do what it wants with this
                 
     @y.setter
-    def y(self, val):
+    def y(self, val:numbers.Number):
         if isinstance(val, pq.Quantity):
             val = val.magnitude.flatten()[0]
             
@@ -1673,7 +1689,7 @@ class SignalCursor(QtCore.QObject):
         if self._hl_ is not None:
             self._update_hline_position_(val)
             
-    def getY(self, plotitem=None):
+    def getY(self, plotitem=None) -> numbers.Number | None:
         if isinstance(self._host_graphics_item_, pg.PlotItem):
             # so that we can also use this function with single axis cursors
             return self.y
@@ -1697,7 +1713,7 @@ class SignalCursor(QtCore.QObject):
             
             return plotitem.vb.mapSceneToView(QtCore.QPointF(0.0, y)).y()
             
-    def setY(self, val, plotItem=None):
+    def setY(self, val:numbers.Number, plotItem=None):
         if isinstance(self.hostItem, pg.PlotItem):
             # so that we can also use this function with single axis cursors
             self.y = val
