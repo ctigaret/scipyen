@@ -422,6 +422,14 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
     CHANGELOG
     =========
+    NOTE: 2025-07-14 21:52:45 to developers
+    Since the plotItems are pg.PlotItem objects thatinherit from Qt QGraphicsItem,
+    we can store user-specific data to these as a mapping key:int ↦ object
+    In sSignalViewer I use this mechanism to store python quantities associated 
+    with the plotted data (e.g., time units and signal.units for analog signals, etc)
+    as follows:
+    key 0 ↦ domain (e.g. time) units of the plotted data or None
+    key 1 ↦ data units or None
     NOTE: 2019-02-11 13:52:30
     heavily based on pyqtgraph package
     
@@ -2125,35 +2133,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     symbolStyle["color"] = QtGui.QColor("black")
                     symbolStyle["brush"] = eventsBrush
                     
-                
                 self._plot_events_or_marks_(entities_list, entities_axis, 
                                             xLabel, yLabel, 
                                             minX, maxX, adapt_X_range, 
                                             height_interval, 
                                             symbolStyle,
                                             **labelStyle)
-                
-#             elif all(isinstance(v, (DataMark, TriggerEvent)) for v in entities_list):
-#                 xdimstr = scq.shortSymbol(entities_list[0].times.units.dimensionality)
-#                 if len(xdimstr):
-#                     xLabel = f"{get_domain_name(entities_list[0])} ({xdimstr})"
-#                 else:
-#                     xLabel = f"{get_domain_name(entities_list[0])}"
-#                     
-#                 yLabel = "Triggers" if all(isinstance(v, TriggerEvent) for v in entities_list) else "Data marks"
-#                 
-#                 symbolStyle["symbol"] = eventsSymbol
-#                 
-#                 if len(entities_list) > 1:
-#                     symbolStyle["pen"] = cycle(self.defaultLineColorsList)
-#                     symbolStyle["color"] = cycle(self.defaultLineColorsList)
-#                 
-#                 self._plot_events_or_marks_(entities_list, entities_axis, 
-#                                             xLabel, yLabel, 
-#                                             minX, maxX, adapt_X_range, 
-#                                             height_interval, 
-#                                             symbolStyle,
-#                                             **labelStyle)
                 
             elif all(isinstance(v, neo.SpikeTrain) for v in entities_list):
                 entities_axis.clear()
@@ -2168,6 +2153,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                                 symbol=spikeTrainSymbol,
                                                 pen=None, name=data_name,
                                                 symbolPen=QtGui.QPen(QtGui.QColor(next(eventsSymbolColors))),
+                                                xUnits = train.times.units,
                                                 reusePlotItems=False)
                         
                 xdimstr = scq.shortSymbol(entities_list[0].times.units.dimensionality)
@@ -3761,6 +3747,7 @@ anything else       anything else       ❌
         xUnits = None
         yUnits = None
         
+        
         #### BEGIN Figure out cursors destination: axis or scene
         # NOTE: it seemingly makes no sense to add a cursors when there are no
         # plot items (axes); nevertheless the cursor can and should be added
@@ -3789,13 +3776,14 @@ anything else       anything else       ❌
             
         #### END Figure out cursors destination: axis or scene
         
-        #### BEGIN sort out cursor windows
+        #### BEGIN sort out cursor windows (and units, 1st pass) -- TODO 2025-07-14 22:40:39 streamline this
         if xwindow is None:
             if isinstance(x, DataCursor):
                 xwindow = x.span
                 if isinstance(xwindow, pq.Quantity):
                     xUnits = xwindow.units
                     xwindow = float(xwindow.magnitude.flatten()[0])
+                    
             elif isinstance(x, Interval):
                 xwindow = x.durations[0]
                 xUnits = xwindow.units
@@ -3831,7 +3819,7 @@ anything else       anything else       ❌
         elif not isinstance(ywindow, numbers.Number):
             raise TypeError("Unexpected type for ywindow: %s" % type(ywindow).__name__)
         
-        #### END sort out cursor windows
+        #### END sort out cursor windows (and units, 1st pass) -- TODO 2025-07-14 22:40:39 streamline this
         
         #### BEGIN figure out cursor type ⇒
         # • identify` cursor_dict
@@ -3848,7 +3836,8 @@ anything else       anything else       ❌
             cursorDict = self._verticalSignalCursors_
             crsPrefix = "dv" if follows_mouse else "v"
             
-            ywindow = 0.0
+            ywindow = 0.0 * yUnits if isinstance(yUnits, pq.Quantity) else 0.0
+            
             pen = QtGui.QPen(QtGui.QColor(self.cursorColors["vertical"]), 1, QtCore.Qt.SolidLine)
             linkedPen = QtGui.QPen(QtGui.QColor(self.linkedCursorColors["vertical"]), 1, QtCore.Qt.SolidLine)
             pen.setCosmetic(True)
@@ -3857,7 +3846,7 @@ anything else       anything else       ❌
         elif cursor_type in ("horizontal", "h", SignalCursorTypes.horizontal):
             cursorDict = self._horizontalSignalCursors_
             crsPrefix = "dh" if follows_mouse else "h"
-            xwindow = 0.0
+            xwindow = 0.0 * xUnits if isinstance(xUnits, pq.Quantity) else 0.0
             pen = QtGui.QPen(QtGui.QColor(self.cursorColors["horizontal"]), 1, QtCore.Qt.SolidLine)
             linkedPen = QtGui.QPen(QtGui.QColor(self.linkedCursorColors["horizontal"]), 1, QtCore.Qt.SolidLine)
             pen.setCosmetic(True)
@@ -3876,28 +3865,36 @@ anything else       anything else       ❌
         #### END figure out cursor type; adjust cursor windows as needed (set 0 for unused cursor lines)
             
             
-        #### BEGIN check cursors coordinates
+        #### BEGIN check cursors coordinates (and units) - see also TODO 2025-07-14 22:40:39 streamline this
         if isinstance(axis, pg.PlotItem): # single-axis cursor - a.k.a cursor in axis
             if axis not in self.signalsLayout.items:
                 return
+            
+            # NOTE: 2025-07-14 22:29:19
+            # use embedded user data in the QGraphicsItem (Qt API), see also:
+            # NOTE: 2025-07-14 21:49:57 and NOTE: 2025-07-14 21:52:45
+            ax_xUnits = axis.data(0)
+            ax_yUnits = axis.data(1)
             
             data_range = guiutils.getPlotItemDataBoundaries(axis)
             view_range = axis.viewRange()
             
             if x is None:
                 x = view_range[0][0] + (view_range[0][1] - view_range[0][0])/2
-            
+                xUnits = ax_xUnits
+
             elif isinstance(x, pq.Quantity):
-                if not isinstance(xUnits, pq.Quantity):
+                if x.units != ax_xUnits:
+                    assert scq.unitsConvertible(xUnits, x.units), f"x.units {x.units} and axis X units {ax_xUnits} are incompatible"
+                    x.rescale(ax_xUnits)
                     xUnits = x.units
-                else:
-                    if xUnits != x.units:
-                        assert scq.unitsConvertible(xUnits, x.units), f"x.units {x.units} and x window units {xUnits} are incompatible"
-                        xUnits = xUnits.rescale(x.units)
+                    
                 x = float(x.magnitude.flatten()[0])
                 
             elif not isinstance(x, (numbers.Number, DataCursor)):
                 raise TypeError("Unexpected type for x coordinate: %s" % type(x).__name__)
+            else:
+                xUnits = ax_xUnits
             
             if xBounds is None:
                 xBounds = data_range[0]
@@ -3905,18 +3902,21 @@ anything else       anything else       ❌
                 
             if y is None:
                 y = view_range[1][0] + (view_range[1][1] - view_range[1][0])/2
+                yUnits = ax_yUnits
             
             elif isinstance(y, pq.Quantity):
-                if not isinstance(yUnits, pq.Quantity):
+                if yUnits != ax_yUnits:
+                    assert scq.unitsConvertible(y.units, ax_yUnits), f"y.units {y.units} and axis Y units {ax_yUnits} are incompatible"
+                    y = rescale(ax_yUnits)
                     yUnits = y.units
-                else:
-                    if yUnits != y.units:
-                        assert scq.unitsConvertible(yUnits, y.units), f"y.units {y.units} and y window units {yUnits} are incompatible"
-                        yUnits = yUnits.rescale(y.units)
+                        
                 y = float(y.magnitude.flatten()[0])
             
             elif not isinstance(y, (numbers.Number, DataCursor)):
                 raise TypeError("Unexpected type for y coordinate: %s" % type(y).__name__ )
+            else:
+                xUnits = ax_xUnits
+                yUnits = ax_yUnits
             
             if yBounds is None:
                 yBounds = data_range[1]
@@ -3980,7 +3980,7 @@ anything else       anything else       ❌
                     
             # print(f"{self.__class__.__name__}._addCursor_ multi-axis x = {x}")
             
-        #### END check cursors coordinates
+        #### END check cursors coordinates (and units) - see also TODO 2025-07-14 22:40:39 streamline this
         
         if not isinstance(cursor_type, (str, SignalCursorTypes)):
             raise TypeError("cursor_type expected to be a str or a SignalCursorTypes; got %s instead" % type(cursor_type).__name__)
@@ -4041,8 +4041,8 @@ anything else       anything else       ❌
                                    yBounds = yBounds,
                                    precision = precision,
                                    label_position = label_position,
-                                   xUnits = xUnits,
-                                   yUnits = yUnits,
+                                   x_units = xUnits,
+                                   y_units = yUnits,
                                    **kwargs)
         
         cursorDict[crsId] = cursor
@@ -4425,6 +4425,8 @@ anything else       anything else       ❌
     @Slot()
     @safewrapper
     def slot_addVerticalCursor(self, label = None, follows_mouse=False):
+        axis = self._selected_plot_item_
+        axisNdx = self._selected_plot_item_index_
         return self._addCursor_("vertical", axis=self._selected_plot_item_, 
                                   label=label, follows_mouse=follows_mouse,
                                   show_value=self.setCursorsShowValue.isChecked(),
@@ -9623,13 +9625,17 @@ anything else       anything else       ❌
             
     def _make_sig_plot_dict_(self, plotItem:pg.PlotItem, 
                              x:np.ndarray, y:np.ndarray, 
-                             xlabel:(str, type(None))=None,  ylabel:(str, type(None))=None, 
+                             xlabel: typing.Optional[str]=None,  
+                             ylabel:typing.Optional[str] = None,
+                             xUnits: typing.Optional[pq.Quantity] = None,
+                             yUnits: typing.Optional[pq.Quantity] = None,
                              title:(str, type(None))=None, name:(str, type(None))=None, 
                              symbolColor:(cycle, type(None))=None, 
                              *args, **kwargs):
         return {"plotItem":plotItem, 
                 "x": x, "y": y, 
                 "xlabel": xlabel, "ylabel": ylabel,
+                "xUnits": xUnits, "yUnits": yUnits,
                 "title": title, "name": name, 
                 "symbolColor": symbolColor,
                 "args": args, "kwargs": kwargs}
@@ -9648,6 +9654,8 @@ anything else       anything else       ❌
         y                   = data.pop("y")
         xlabel              = data.pop("xlabel", None)
         ylabel              = data.pop("ylabel", None)
+        xUnits              = data.pop("xUnits", None)
+        yUnits              = data.pop("yUnits", None)
         title               = data.pop("title", None)
         name                = data.pop("name", None)
         symbolColor         = data.pop("symbolColor", None)
@@ -9655,7 +9663,7 @@ anything else       anything else       ❌
         kwargs              = data.pop("args", dict())
 
         # print(f"_slot_plot_numeric_data_ y.shape {y.shape}")
-        self._plot_numeric_data_(plotItem,  x, y, xlabel, ylabel,
+        self._plot_numeric_data_(plotItem,  x, y, xlabel, ylabel, xUnits, yUnits,
                                 title, name, symbolColor, *args, **kwargs)
         
         self.setCursor(QtCore.Qt.ArrowCursor)
@@ -9707,11 +9715,14 @@ anything else       anything else       ❌
         xx_ = np.concatenate(xx).T
         yy_ = np.concatenate(yy).T
         
+        xUnits = event.times.units
+        
         if yy_.shape[1] > 10:
             self.setCursor(QtCore.Qt.WaitCursor)
             self.sig_plot.emit(self._make_sig_plot_dict_(entities_axis, xx_, yy_,
                                                         pen=None, name = data_name,
                                                         symbol = "event", 
+                                                        xUnits = xUnits,
                                                         symbolColor = symbolColor,
                                                         symbolBrush = symbolBrush,
                                                         symbolPen   = symbolPen)
@@ -9720,6 +9731,7 @@ anything else       anything else       ❌
             self._plot_numeric_data_(entities_axis, xx_, yy_,
                                     pen=None, name=data_name,
                                     symbol = "event", 
+                                    xUnits = xUnits,
                                     symbolColor = symbolColor,
                                     symbolBrush = symbolBrush,
                                     symbolPen   = symbolPen)
@@ -9795,8 +9807,8 @@ anything else       anything else       ❌
                                     sig.magnitude,
                                     xlabel = xlabel,
                                     ylabel = ylabel,
-                                    # name=plot_name,
-                                    # symbol=None,
+                                    xUnits = sig.times.units,
+                                    yUnits = sig.units,
                                     **kwargs))
         else:
             self._plot_numeric_data_(plotItem,
@@ -9804,16 +9816,13 @@ anything else       anything else       ❌
                                     sig.magnitude,
                                     xlabel = xlabel,
                                     ylabel = ylabel,
-                                    # name=plot_name,
-                                    # symbol=None,
+                                    xUnits = sig.times.units,
+                                    yUnits = sig.units,
                                     **kwargs)
             
         if plotItemName != plotItem.vb.name:
             self._register_plot_item_name_(plotItem, plotItemName)
 
-        # plotItem.axes["left"]["item"].setStyle(autoExpandTextSpace=False,
-        #                                         autoReduceTextSpace=False,
-        #                                         hideOverlappingLabels=True)
         plotItem.update()
         
     @Slot()
@@ -9900,7 +9909,10 @@ anything else       anything else       ❌
     def _plot_numeric_data_(self, plotItem: pg.PlotItem, x:np.ndarray, y:np.ndarray, 
                             xlabel:(str, type(None))=None, ylabel:(str, type(None))=None, 
                             title:(str, type(None))=None, # name:(str, type(None))=None, 
-                            reusePlotItems:bool = True, *args, **kwargs):
+                            reusePlotItems:bool = True, 
+                            xUnits:typing.Optional[pq.Quantity]=None,
+                            yUnits:typing.Optional[pq.Quantity]=None,
+                            *args, **kwargs):
                             # symbolColor:(cycle, type(None))=None, 
         r""" The workhorse that does the actual plotting of signals
         Common landing zone for many of the self._plot_* methods
@@ -9927,6 +9939,8 @@ anything else       anything else       ❌
             plots (e.g. inside a loop), when the arrays cannot be conatenated 
             in a single matrix due to shape constraints. NOTE: In this case you 
             should clear the plotitem (the axis) beforehand.
+     
+        xUnots, yUnits (optional) pq.Quantity or pq.UnitQuantity
             
         args, kwargs: additional parameters for PlotItem.plot() function (and
             indirectly PlotDataItem constructor and methods).
@@ -9942,7 +9956,7 @@ anything else       anything else       ❌
         a pyqtgraph.PlotItem where the data was plotted
         
         """
-        # print(f"{self.__class__.__name__}._plot_numeric_data_ kwargs: {kwargs}")
+        # print(f"{self.__class__.__name__}._plot_numeric_data_ xUnits: {xUnits}, yUnits: {yUnits}")
         
         # ATTENTION: y is a numpy arrays here; x is either None, or a numpy array
         
@@ -10164,6 +10178,12 @@ anything else       anything else       ❌
             if lbl.startswith("<B>") and lbl.endswith("</B>"):
                 lbl = lbl[3 : lbl.find("</B>")]
                 plotItem.setLabel("left", lbl)
+                
+        # NOTE: 2025-07-14 21:49:57
+        # as plotItem inherits from QGraphicsItem, we can use the user's data 
+        # available from Qt API to store X units under key 0, and yUnits under key 1
+        plotItem.setData(0, xUnits)
+        plotItem.setData(1, yUnits)
         
         plotItem.replot() # must be called NOW, and NOT earlier !
         
@@ -10939,11 +10959,13 @@ anything else       anything else       ❌
                 
             values = tuple(map(lambda c: (getX(c), getY(c), c.ID), cursors))
             
+        print(f"{self.__class__.__name__}.getRelativeCursorCoordinates -> values: {values}")
+            
         if as_type is Interval:
-            to_interval = lambda v: Interval(*v[0], extent=True, name = v[1]) if len(v == 2) else (Interval(*v[0], extent=True, name = f"{v[2]}_h"), Interval(*v[1], extent=True, name = f"{v[2]}_v"))
+            to_interval = lambda v: Interval(*v[0], extent=True, name = v[1]) if len(v) == 2 else (Interval(*v[0], extent=True, name = f"{v[2]}_h"), Interval(*v[1], extent=True, name = f"{v[2]}_v"))
             return tuple(map(lambda v: to_interval(v), values))
         elif as_type is DataCursor:
-            to_datacursor = lambda v: DataCursor(*v[0], v[1]) if len(v == 2) else (DataCursor(*v[0], f"{v[2]}_h"), DataCursor(*v[1], f"{v[2]}_v"))
+            to_datacursor = lambda v: DataCursor(*v[0], v[1]) if len(v) == 2 else (DataCursor(*v[0], f"{v[2]}_h"), DataCursor(*v[1], f"{v[2]}_v"))
             return tuple(map(lambda v: to_datacursor(v), values))
         elif as_type is not None:
             raise ValueError(f"'as_type' {as_type} is not supported")
