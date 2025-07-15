@@ -4666,7 +4666,7 @@ def cursors_chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal],
     # y0 = cursor_average(signal, cursor0, channel=channel)
     # 
     # y1 = cursor_average(signal, cursor1, channel=channel)
-    y
+    # y
     
     return (y1-y0)/(t1-t0).simplified
     

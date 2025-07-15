@@ -6827,11 +6827,16 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     def slot_filterSelectVarNames(self, val):
         r"""Select variables in workspace viewer, according to name filter.
         """
+        if __has_PyQt6__ or __has_PySide6__:
+            matchRegExFlag = QtCore.Qt.MatchRegularExpression
+        else:
+            matchRegExFlag = QtCore.Qt.MatchRegExp
+
         match = QtCore.Qt.MatchContains | \
             QtCore.Qt.MatchCaseSensitive | \
             QtCore.Qt.MatchWrap | \
             QtCore.Qt.MatchRecursive | \
-            QtCore.Qt.MatchRegExp
+            matchRegExFlag
 
         # BEGIN other matching options - dont work as well
         # match = QtCore.Qt.MatchContains | \

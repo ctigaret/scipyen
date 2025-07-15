@@ -10959,7 +10959,7 @@ anything else       anything else       ❌
                 
             values = tuple(map(lambda c: (getX(c), getY(c), c.ID), cursors))
             
-        print(f"{self.__class__.__name__}.getRelativeCursorCoordinates -> values: {values}")
+        # print(f"{self.__class__.__name__}.getRelativeCursorCoordinates -> values: {values}")
             
         if as_type is Interval:
             to_interval = lambda v: Interval(*v[0], extent=True, name = v[1]) if len(v) == 2 else (Interval(*v[0], extent=True, name = f"{v[2]}_h"), Interval(*v[1], extent=True, name = f"{v[2]}_v"))

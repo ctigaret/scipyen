@@ -701,9 +701,12 @@ coordinates are NOT restricted to time units.
         self.__domain_name__ = cq.nameFromUnit(self.units)
         
     def __repr__(self):
+        times = list(self.times)
+        durations = list(self.durations)
+        labels = list(self.labels) if self.labes.size>0 else [""]
         objs = ['%s@%s for %s' % (label, str(time), str(dur)) for label, time, dur in
-                zip(self.labels, self.times, self.durations)]
-        return f"<{self.__class___.__name__}:{', '.join(objs)}>"
+                zip(labels, times, durations)]
+        return f"<{self.__class__.__name__}:{', '.join(objs)}>"
 
     def _repr_pretty_(self, pp, cycle):
         super()._repr_pretty_(pp, cycle)
