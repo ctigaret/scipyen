@@ -10861,15 +10861,14 @@ anything else       anything else       ❌
         """
         return list(self._data_cursors_.values())
     
-    def getRelativeCursorCoordinates(self, what:str="x", 
+    def getRelativeCursorCoordinates(self, what:str = "x",
                                      cursors:typing.Optional[typing.Union[SignalCursor, typing.Sequence[SignalCursor]]]=None,
-                                     windows:bool=False,
-                                     as_type:typing.Optional[type]=None):
+                                     windows:bool = False) -> tuple | None:
         r"""Returns relative cursor coordinate(s)
     Coordinates are relative to the data boundaries (cursor's xBounds and yBounds)
     which are set to the current axes.
     
-    For for neo data, the xBounds depend on the on thetime domain of the signal.
+    For for neo data, the xBounds depend on the on the time domain of the signal.
     When the displayed signal is contained in a neo.Segment (which may belong
     to a neo.Block) then the time domain is specific to the currently displayed
     viewer frame.
@@ -10880,8 +10879,10 @@ anything else       anything else       ❌
         
     cursors — a SignalCursor, a sequence of SignalCursors, or None (in which case all available cursors will be obtained)
         
-    windows — when True, then include the window around the coordinate in the returned values
-        
+    windows: when True, also include cursor window sizes - useful to generate
+        DataCursor or Interval objects from the result, see:
+        self.getRelativeCursorCoordinatesAsDataCursors
+        self.getRelativeCursorCoordinatesAsIntervals
     """
         if not isinstance(what, str):
             raise TypeError("'what' must be a str")
@@ -10889,20 +10890,27 @@ anything else       anything else       ❌
         if what not in ("x", "y", "xy"):
             raise ValueError("'what' must be one of 'x', 'y', 'xy'")
         
-        if as_type is Interval:
-            getValX  = lambda c: (float(c.x - c.xBounds()[0]) if c.staysInAxes else float(c.x))
-            getValY  = lambda c: (float(c.y - c.yBounds()[0]) if c.staysInAxes else float(c.y))
-            getXc    = lambda c: getValX(c) * (c.xUnits.units if isinstance(c.xUnits, pq.Quantity) else pq.dimensionless)
-            getYc    = lambda c: getValY(c) * (c.xUnits.units if isinstance(c.xUnits, pq.Quantity) else pq.dimensionless)
-            
-            getXcw = lambda c: (getXc(c), c.xwindow * (c.xUnits.units if isinstance(c.xUnits, pq.Quantity) else pq.dimensionless)) if windows else getXc(c)
-            getYcw = lambda c: (getYc(c), c.ywindow * (c.xUnits.units if isinstance(c.xUnits, pq.Quantity) else pq.dimensionless)) if windows else getYc(c)
-        else:
-            getXc  = lambda c: (float(c.x - c.xBounds()[0]) if c.staysInAxes else float(c.x))
-            getYc  = lambda c: (float(c.y - c.yBounds()[0]) if c.staysInAxes else float(c.y))
+        getValX  = lambda c: (float(c.x - c.xBounds()[0]) if c.staysInAxes else float(c.x))
+        getValY  = lambda c: (float(c.y - c.yBounds()[0]) if c.staysInAxes else float(c.y))
+        getXc    = lambda c: getValX(c) * (c.xUnits.units if isinstance(c.xUnits, pq.Quantity) else pq.dimensionless)
+        getYc    = lambda c: getValY(c) * (c.xUnits.units if isinstance(c.xUnits, pq.Quantity) else pq.dimensionless)
         
-            getXcw = lambda c: (getXc(c), c.xwindow) if windows else getXc(c)
-            getYcw = lambda c: (getYc(c), c.ywindow) if windows else getYc(c)
+        getXcw = lambda c: (getXc(c), c.xwindow * (c.xUnits.units if isinstance(c.xUnits, pq.Quantity) else pq.dimensionless)) if windows else getXc(c)
+        getYcw = lambda c: (getYc(c), c.ywindow * (c.xUnits.units if isinstance(c.xUnits, pq.Quantity) else pq.dimensionless)) if windows else getYc(c)
+#         if as_type is Interval:
+#             getValX  = lambda c: (float(c.x - c.xBounds()[0]) if c.staysInAxes else float(c.x))
+#             getValY  = lambda c: (float(c.y - c.yBounds()[0]) if c.staysInAxes else float(c.y))
+#             getXc    = lambda c: getValX(c) * (c.xUnits.units if isinstance(c.xUnits, pq.Quantity) else pq.dimensionless)
+#             getYc    = lambda c: getValY(c) * (c.xUnits.units if isinstance(c.xUnits, pq.Quantity) else pq.dimensionless)
+#             
+#             getXcw = lambda c: (getXc(c), c.xwindow * (c.xUnits.units if isinstance(c.xUnits, pq.Quantity) else pq.dimensionless)) if windows else getXc(c)
+#             getYcw = lambda c: (getYc(c), c.ywindow * (c.xUnits.units if isinstance(c.xUnits, pq.Quantity) else pq.dimensionless)) if windows else getYc(c)
+#         else:
+#             getXc  = lambda c: (float(c.x - c.xBounds()[0]) if c.staysInAxes else float(c.x))
+#             getYc  = lambda c: (float(c.y - c.yBounds()[0]) if c.staysInAxes else float(c.y))
+#         
+#             getXcw = lambda c: (getXc(c), c.xwindow) if windows else getXc(c)
+#             getYcw = lambda c: (getYc(c), c.ywindow) if windows else getYc(c)
         
         getX   = lambda c: getXcw(c) if c.cursorType in (SignalCursorTypes.vertical,   SignalCursorTypes.crosshair) else None
         getY   = lambda c: getYcw(c) if c.cursorType in (SignalCursorTypes.horizontal, SignalCursorTypes.crosshair) else None
@@ -10961,16 +10969,21 @@ anything else       anything else       ❌
             
         # print(f"{self.__class__.__name__}.getRelativeCursorCoordinates -> values: {values}")
             
-        if as_type is Interval:
-            to_interval = lambda v: Interval(*v[0], extent=True, name = v[1]) if len(v) == 2 else (Interval(*v[0], extent=True, name = f"{v[2]}_h"), Interval(*v[1], extent=True, name = f"{v[2]}_v"))
-            return tuple(map(lambda v: to_interval(v), values))
-        elif as_type is DataCursor:
-            to_datacursor = lambda v: DataCursor(*v[0], v[1]) if len(v) == 2 else (DataCursor(*v[0], f"{v[2]}_h"), DataCursor(*v[1], f"{v[2]}_v"))
-            return tuple(map(lambda v: to_datacursor(v), values))
-        elif as_type is not None:
-            raise ValueError(f"'as_type' {as_type} is not supported")
-            
         return values
+    
+    def getRelativeCursorCoordinatesAsDataCursors(self,what:str="x", 
+                                     cursors:typing.Optional[typing.Union[SignalCursor, typing.Sequence[SignalCursor]]]=None) -> tuple | None:
+        values = self.getRelativeCursorCoordinates(what, cursors, True)
+        to_datacursor = lambda v: DataCursor(*v[0], v[1]) if len(v) == 2 else (DataCursor(*v[0], f"{v[2]}_h"), DataCursor(*v[1], f"{v[2]}_v"))
+        if len(values):
+            return tuple(map(lambda v: to_datacursor(v), values))
+        
+    def getRelativeCursorCoordinatesAsIntervals(self,what:str="x", 
+                                     cursors:typing.Optional[typing.Union[SignalCursor, typing.Sequence[SignalCursor]]]=None) -> tuple | None:
+        values = self.getRelativeCursorCoordinates(what, cursors, True)
+        to_interval = lambda v: Interval(*v[0], extent=True, name = v[1]) if len(v) == 2 else (Interval(*v[0], extent=True, name = f"{v[2]}_h"), Interval(*v[1], extent=True, name = f"{v[2]}_v"))
+        if len(values):
+            return tuple(map(lambda v: to_interval(v), values))
     
     @property
     def signalCursors(self):

@@ -8167,7 +8167,7 @@ def average_blocks_by_segments(*args, **kwargs):
 
 @safewrapper
 @with_doc(average_segments, use_header=True)
-def average_segments_in_block(data, **kwargs):
+def average_segments_in_block(data, **kwargs) -> neo.Block:
     r"""Returns a new neo.Block containing one segment which is the average¹ of
     the segments in the block.
 

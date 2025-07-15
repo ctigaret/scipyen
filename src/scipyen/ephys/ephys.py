@@ -3942,14 +3942,15 @@ def cursor_reduce(func:types.FunctionType,
     cursors, just call max(), min(), argmax() argmin() on a signal time slice 
     obtained using the two cursor's x values.
     """
+    from copy import deepcopy
     if isinstance(cursor, SignalCursor):
         # print(f"cursor_reduce: cursor.x = {cursor.x}, cursor.xwindow = {cursor.xwindow}")
         t0 = (float(cursor.x) - float(cursor.xwindow/2.)) * signal.times.units
         t1 = (float(cursor.x) + float(cursor.xwindow/2.)) * signal.times.units
         
     elif isinstance(cursor, DataCursor):
-        t0 = cursor.coord - cursor.span/2
-        t1 = cursor.coord + cursor.span/2
+        t0 = (float(cursor.coord) - float(cursor.span)/2) * signal.times.units
+        t1 = (float(cursor.coord) + float(cursor.span)/2) * signal.times.units
         
     elif isinstance(cursor, Interval):
         t0 = Interval.t0
@@ -3960,6 +3961,9 @@ def cursor_reduce(func:types.FunctionType,
         
     else:
         raise TypeError(f"Incorrrect cursors specification; expecting a SignalCursor, DataCursor, or a 2-tuple of scalars; got {cursor} instead")
+    
+    
+    print(f"cursor_reduce: t0 = {t0}, t1 = {t1}")
     
     if not isinstance(t0, pq.Quantity):
         t0 *= signal.times.units
@@ -4626,47 +4630,16 @@ def cursors_chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal],
         gui.signalviewer.SignalCursor of type "vertical", or a DataCursor
     
     """
+    from copy import deepcopy
     if not isinstance(cursor0, (SignalCursor, DataCursor, typing.Sequence)):
         raise TypeError(f"Invalid first cursor specified; expecting a SignalCursor or DataCursor; instead, got {type(cursor0).__name__}")
 
     if not isinstance(cursor1, (SignalCursor, DataCursor, typing.Sequence)):
         raise TypeError(f"Invalid first cursor specified; expecting a SignalCursor or DataCursor; instead, got {type(cursor1).__name__}")
 
-    t0, w0 = (cursor0.x, cursor0.xwindow) if isinstance(cursor0, SignalCursor) else (cursor0.coord, cursor0.span) if isinstance(cursor0, DataCursor) else cursor0[:2]
-    if isinstance(t0, float):
-        t0 *= signal.times.units
-    if isinstance(w0, float):
-        w0 *= signal.times.units
-        
-    t1, w1 = (cursor1.x, cursor1.xwindow) if isinstance(cursor1, SignalCursor) else (cursor1.coord, cursor1.span) if isinstance(cursor1, DataCursor) else cursor1[:2]
-    
-    if isinstance(t1, float):
-        t1 *= signal.times.units
-    if isinstance(w1, float):
-        w1 *= signal.times.units
-        
-    # print(f"\nephys.cursors_chord_slope: t-start = {signal.t_start}; t0 = {t0}; t1 = {t1}")
+    y0 = cursor_average(signal, cursor0, channel=channel)
 
-    if relative:
-        t0, t1 = adjust_times_relative_to_signal(signal, t0, t1)
-        # print(f"\tadjusted -> t0 = {t0}; t1 = {t1}")
-    else:
-        if t0 < signal.t_start or t0 > signal.t_stop:
-            scipywarn(f"t0 {t0} fals outside signal's domain with start {signal.t_start} and stop {signal.t_stop}")
-            return np.nan
-        
-        if t1 < signal.t_start or t1 > signal.t_stop:
-            scipywarn(f"t1 {t1} fals outside signal's domain with start {signal.t_start} and stop {signal.t_stop}")
-            return np.nan
-
-    y0 = cursor_average(signal, (t0, t0+w0/2), channel=channel)
-
-    y1 = cursor_average(signal, (t1, t1+w1/1), channel=channel)
-    # print(f"\ty0 = {y0}; y1 = {y1}")
-    # y0 = cursor_average(signal, cursor0, channel=channel)
-    # 
-    # y1 = cursor_average(signal, cursor1, channel=channel)
-    # y
+    y1 = cursor_average(signal, cursor1, channel=channel)
     
     return (y1-y0)/(t1-t0).simplified
     
