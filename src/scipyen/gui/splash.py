@@ -64,17 +64,19 @@ class ScipyenSplashWidget(QtWidgets.QSplashScreen):
             self.showMessage(val, QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter, color)
             
     def showMessage(self, message:str, alignmentFlag, color:QtGui.QColor = QtGui.QColor("black")):
+        # print(f"{self.__class__.__name__}.showMessage({message})")
         self.message=message
         self.alignmentFlag = alignmentFlag
         self.color = color
         self.update()
+        QtGui.QGuiApplication.processEvents()
         # if __has_PyQt6__ or _-__has_PySide6__:
         #     self.repaint(self.rect())
         # else:
         #     self.repaint()
             
     def drawContents(self, painter:QtGui.QPainter):
-        print(f"{self.__class__.__name__}.drawContents")
+        # print(f"{self.__class__.__name__}.drawContents")
         painter.drawPixmap(0, 0, self.pixmap())
         if isinstance(self.message, str) and len(self.message.strip()):
             pen = QtGui.QPen(QtGui.QColor("black"))

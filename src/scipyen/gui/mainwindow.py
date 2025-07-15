@@ -1605,7 +1605,12 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         self._copy_varnames_separator_ = " "
         # END - to revisit
-
+        
+        # BUG 2025-07-15 22:23:18
+        # calling this here (or anywhere below the __init__ call stack) prevents
+        # the global appmenu from registering properly with the dbus service
+        # (or messes it up so that the global menu doesn't show)
+        # QtGui.QGuiApplication.processEvents() 
         self.sig_splashMessage.emit("Initializing the user interface...")
 
         # NOTE: 2021-08-17 12:38:41 see also NOTE: 2021-08-17 10:05:20 in scipyen.py
