@@ -8164,69 +8164,62 @@ def average_blocks_by_segments(*args, **kwargs):
 
 @safewrapper
 @with_doc(average_segments, use_header=True)
-def average_segments_in_block(data, **kwargs) -> neo.Block:
+def average_segments_in_block(data:neo.Block, **kwargs) -> neo.Block:
     r"""Returns a new neo.Block containing one segment which is the average¹ of
-    the segments in the block.
+the segments in the block.
+
+Parameters:
+==========
+"data" a neo.Block.
+
+Var-keyword parameters:
+======================
+"segments" = integer, sequence of integers, range or slice that chooses
+        which segment(s) of the `data` block are taken into the average
+
+        optional: by default, all segments will be included in the average
+
+    e.g. from a block with 5 segments, one may choose to calculate the
+    average between segments 1, 3 and 5: segments = [1,3,5]
+
+"signals" = integer or string, or sequence of integers or strings
+    that indicate which channels need to be included in the averaged
+    segment. This argument is pased directly to ephys.average_segments
+    function.
+
+    NOTE: All segments in "Data" must contain the same number of channels,
+    and these channels must have the same names.
+
+"count", "every" → see average_segments(…)
+    Additional segment selectors - WARNING: these apply to the segments
+    already selected by the 'segments' parameter:
+    
+    "count" specifies how many successive segments should be taken into the average
+    "every" specifies how many segment to skip between successive averages
+
+This will average individual signals in all the segments in data.
+The time base will be that of the first segment in each averaged subset of segments.
 
 
-    Parameters:
-    ==========
-    "data" a neo.Block.
+NOTE:
+=====
 
-    Var-keyword parameters:
-    ======================
-    "segments" = integer, sequence of integers, range or slice that chooses
-            which segment(s) are taken into the average
+To operate on a list of segments, use directly the "average_segments(…)"
+function defined in this module.
 
-            optional: by default, all segments will be included in the average
+Returns:
+=======
 
-        e.g. from a block with 5 segments, one may choose to calculate the
-        average between segments 1, 3 and 5: segments = [1,3,5]
+A neo.Block with segments containing the average of the corresponding analog
+signals² in the segments in "data" (either all segments, or of those
+selected by "segments").
+    
+Irregularly sampled signals, events and epochs are EXCLUDED from the average
 
-    "signals" = integer or string, or sequence of integers or strings
-        that indicate which channels need to be included in the averaged
-        segment. This argument is pased directly to ephys.average_segments
-        function.
+¹ See average_segments for details
+² Optionally, only of those selected using the 'signals' parameter.
 
-        NOTE: All segments in "Data" must contain the same number of channels,
-        and these channels must have the same names.
-
-
-    This will average individual signals in all the segments in data.
-    The time base will be that of the first segment in data.
-
-
-    Arguments:
-    =========
-
-    To operate on a list of segments, use directly the "average_segments(…)"
-    function defined in this module.
-
-    Keyword Arguments **kwargs: key/value pairs:
-    ============================================
-    segments: selector of segments in the "data" Block (optional, default is None)
-        This can be:
-        • int: will only use one segment (therefore, no average)
-        • a range or a sequence of int → will use only the segments with the given indices
-
-    count, every → see average_segments(…)
-        Additional segment selectors - WARNING: these apply to the segments
-        already selected by the 'segments' parameter!
-
-
-    Returns:
-    =======
-
-    A neo.Block with one segment which represents the average of the corresponding
-    analog signals² in the segments in "data" (either all segments, or of those
-    selected by "segments").
-
-    NOTES:
-    =====
-    ¹ See average_segments for details
-    ² Optionally, only of those selected using the 'signals' parameter.
-
-    """
+"""
 
     if not isinstance(data, neo.Block):
         raise TypeError(

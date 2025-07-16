@@ -6250,7 +6250,7 @@ def getProtocol(x:typing.Union[neo.Block, pab.pyabf.ABF]):
         raise TypeError(f"Expecting a neo.Block or a pyabf.ABF object; instead, got {type(x).__name__}")
     
     if isinstance(x, neo.Block) and not pab.sourcedFromABF(x):
-        raise NotImplementedError("Only ABF protocols are supported for the moment")
+        raise NotImplementedError("The neo.Block has not been generated directly from ABF data")
     
     if isinstance(x, neo.Block) and getattr(x, "annotations", None) is None or getattr(x, "annotations", {}).get("abf_version", None) is None:
         scipywarn(f"{type(x).__name__} object does not appear to have been created from an ABF file; cannot parse a protocol")
