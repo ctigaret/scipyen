@@ -8033,14 +8033,11 @@ def average_segments(*args, **kwargs) -> typing.List[neo.Segment]:
                 if analog_index is None:
                     if len(args[k].analogsignals) < len(selected_signals):
                         raise ValueError(
-                            f"Segment {k} (named: {args[k].name}) has only {len(args[k].analogsignals)} when {len(selected_signals)} were expected"
+                            f"Segment {k} (named: {args[k].name}) has only {len(args[k].analogsignals)} analog signals when {len(selected_signals)} were expected"
                         )
 
                     if len(args[k].analogsignals) > len(selected_signals):
-                        warnings.warn(
-                            f"Segment {k} (named: {args[k].name}) has {len(args[k].analogsignals)} but only the first {len(selected_signals)} will be used ",
-                            category=RuntimeWarning,
-                        )
+                        scipywarn(f"Segment {k} (named: {args[k].name}) has {len(args[k].analogsignals)} analog signals but only the first {len(selected_signals)} will be used "),
 
                     ss = args[k].analogsignals
 

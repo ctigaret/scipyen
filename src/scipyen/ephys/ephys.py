@@ -3943,27 +3943,32 @@ def cursor_reduce(func:types.FunctionType,
     obtained using the two cursor's x values.
     """
     from copy import deepcopy
-    if isinstance(cursor, SignalCursor):
-        # print(f"cursor_reduce: cursor.x = {cursor.x}, cursor.xwindow = {cursor.xwindow}")
-        t0 = (float(cursor.x) - float(cursor.xwindow/2.)) * signal.times.units
-        t1 = (float(cursor.x) + float(cursor.xwindow/2.)) * signal.times.units
-        
-    elif isinstance(cursor, DataCursor):
-        t0 = (float(cursor.coord) - float(cursor.span)/2) * signal.times.units
-        t1 = (float(cursor.coord) + float(cursor.span)/2) * signal.times.units
-        
-    elif isinstance(cursor, Interval):
-        t0 = Interval.t0
-        t1 = Interval.t1
-        
-    elif isinstance(cursor, tuple) and len(cursor) == 2:
+    if isinstance(cursor, tuple) and len(cursor) == 2:
         t0, t1 = cursor
         
-    else:
-        raise TypeError(f"Incorrrect cursors specification; expecting a SignalCursor, DataCursor, or a 2-tuple of scalars; got {cursor} instead")
+    else:    
+        if isinstance(cursor, Interval):
+            t0 = Interval.t0[0].copy()
+            t1 = Interval.t1[0].copy()
+        else:
+            if isinstance(cursor, SignalCursor):
+                coord = float(cursor.x)
+                span = float(cursor.xwindow)
+                if isinstance(cursor.xUnits, pq.Quantity):
+                    coord *= cursor.xUnits
+                    span *= cursor.xUnits
+                
+            elif isinstance(cursor, DataCursor):
+                # need copies here, because of possible readjustment
+                coord = cursor.coord.copy() if isinstance(cursor.coord, np.ndarray) else float(cursor.coord)
+                span = cursor.span.copy() if isinstance(cursor.span, np.ndarray) else float(cursor.span)
+
+            else:
+                raise TypeError(f"Incorrrect cursors specification; expecting a SignalCursor, DataCursor, or a 2-tuple of scalars; got {cursor} instead")
+        
+            t0, t1 = (coord - span/2, coord + span/2)
     
-    
-    print(f"cursor_reduce: t0 = {t0}, t1 = {t1}")
+    # print(f"cursor_reduce: t0 = {t0}, t1 = {t1}")
     
     if not isinstance(t0, pq.Quantity):
         t0 *= signal.times.units
@@ -4167,7 +4172,7 @@ def cursor_argminmax(signal: typing.Union[neo.AnalogSignal, DataSignal],
 
 @safewrapper
 def cursor_average(signal: typing.Union[neo.AnalogSignal, DataSignal], 
-                   cursor: typing.Union[tuple, SignalCursor, DataCursor], 
+                   cursor: typing.Union[tuple, SignalCursor, DataCursor, Interval], 
                    channel: typing.Optional[int]=None,
                    relative: bool = True,
                    usenan: bool = False):
@@ -4607,8 +4612,8 @@ def chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal],
     
 @safewrapper
 def cursors_chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal], 
-                        cursor0: typing.Union[SignalCursor, tuple, DataCursor], 
-                        cursor1: typing.Union[SignalCursor, tuple, DataCursor], 
+                        cursor0: typing.Union[SignalCursor, tuple, DataCursor, Interval], 
+                        cursor1: typing.Union[SignalCursor, tuple, DataCursor, Interval], 
                         channel: typing.Optional[int] = None,
                         relative:bool = True):
     r"""Signal chord slope between two vertical cursors.
@@ -4636,6 +4641,41 @@ def cursors_chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal],
 
     if not isinstance(cursor1, (SignalCursor, DataCursor, typing.Sequence)):
         raise TypeError(f"Invalid first cursor specified; expecting a SignalCursor or DataCursor; instead, got {type(cursor1).__name__}")
+
+    if isinstance(cursor0, tuple):
+        t0 = float(cursor0[0])
+    elif isinstance(cursor0, Interval):
+        t0 = cursor0.t0[0].copy()
+    else:
+        if isinstance(cursor0, DataCursor):
+            coord = cursor0.coord.copy() if isinstance(cursor0.coord, np.ndarray) else float(cursor0.coord)
+            span = cursor0.span.copy() if isinstance(cursor0.span, np.ndarray) else float(cursor0.span)
+        elif isinstance(cursor0, SignalCursor):
+            coord = float(cursor0.x)
+            span = float(cursor0.xwindow)
+            if isinstance(cursor0.xUnits, pq.Quantity):
+                coord *= cursor0.xUnits
+                span *= cursor0.xUnits
+            
+        t0 = coord-span/2
+        
+    if isinstance(cursor1, tuple):
+        t1 = float(cursor1[0])
+    elif isinstance(cursor1, Interval):
+        t1 = cursor1.t0[0].copy()
+    else:
+        if isinstance(cursor1, DataCursor):
+            coord = cursor1.coord.copy() if isinstance(cursor1.coord, np.ndarray) else float(cursor1.coord)
+            span = cursor1.span.copy() if isinstance(cursor1.span, np.ndarray) else float(cursor1.span)
+            
+        elif isinstance(cursor1, SignalCursor):
+            coord = float(cursor1.x)
+            span = float(cursor1.xwindow)
+            if isinstance(cursor1.xUnits, pq.Quantity):
+                coord *= cursor1.xUnits
+                span *= cursor1.xUnits
+            
+        t1 = coord-span/2
 
     y0 = cursor_average(signal, cursor0, channel=channel)
 
