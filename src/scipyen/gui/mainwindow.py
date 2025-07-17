@@ -6551,27 +6551,27 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         '''
         self.recentFilesMenu.clear()
         
-            if len(self._recentFiles) > 0:
-                if self._maxRecentFiles > 10:
-                    clearAction = self.recentFilesMenu.addAction(QtGui.QIcon.fromTheme("edit-clear-history"),
-                        "Clear Recent Files List")
-                    clearAction.triggered.connect(self._clearRecentFiles_)
-                    self.recentFilesMenu.addSeparator()
-                    
-                try:
-                    for item in self._recentFiles.keys():
-                        itemName = pathlib.Path(item).name
-                        itemText = f"{itemName} [{item}]"
-                        action = self.recentFilesMenu.addAction(itemText)
-                        action.triggered.connect(self.slot_loadRecentFile)
-                except:
-                    traceback.print_exc()
+        if len(self._recentFiles) > 0:
+            if self._maxRecentFiles > 10:
+                clearAction = self.recentFilesMenu.addAction(QtGui.QIcon.fromTheme("edit-clear-history"),
+                    "Clear Recent Files List")
+                clearAction.triggered.connect(self._clearRecentFiles_)
+                self.recentFilesMenu.addSeparator()
+                
+            try:
+                for item in self._recentFiles.keys():
+                    itemName = pathlib.Path(item).name
+                    itemText = f"{itemName} [{item}]"
+                    action = self.recentFilesMenu.addAction(itemText)
+                    action.triggered.connect(self.slot_loadRecentFile)
+            except:
+                traceback.print_exc()
 
-                if self._maxRecentFiles <= 10:
-                    self.recentFilesMenu.addSeparator()
-                    clearAction = self.recentFilesMenu.addAction(QtGui.QIcon.fromTheme("edit-clear-history"),
-                        "Clear Recent Files List")
-                    clearAction.triggered.connect(self._clearRecentFiles_)
+            if self._maxRecentFiles <= 10:
+                self.recentFilesMenu.addSeparator()
+                clearAction = self.recentFilesMenu.addAction(QtGui.QIcon.fromTheme("edit-clear-history"),
+                    "Clear Recent Files List")
+                clearAction.triggered.connect(self._clearRecentFiles_)
 
 
     def _clearRecentFiles_(self):
