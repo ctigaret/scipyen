@@ -9353,7 +9353,7 @@ def plot_neo(
     )
     name = obj.name
     if name is None or len(name.strip()) == 0:
-        name = nameFromUnit(obj.units.dimensionality)
+        name = nameFromUnit(obj.units)
     ylabel = f"{name} ({obj.units.dimensionality.string})"
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)

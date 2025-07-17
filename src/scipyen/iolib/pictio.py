@@ -1481,8 +1481,12 @@ def writeCsv(data, fileName:typing.Optional[typing.Union[str, pathlib.Path]]=Non
                 raise TypeError("Unexpected data type for header; should have been a list or tuple with %d element or a np.ndarray with %d columns and %s dtype; instead I've got %s" %(data.shape[1], data.shape[1], "<U10", type(header).__name__))
             
         else:
-            headerlist = ["Time", strutils.str2symbol(data.name)] if isinstance(data, neo.IrregularlySampledSignal) else [strutils.str2symbol(data.domain_name), 
-                                                                                                                                            strutils.str2symbol(data.name)]
+            name = data.name if isinstance(data.name, str) and len(data.name.strip()) else ""
+            nChannels = data.shape[1] if data.ndim==2 else 1
+                
+            headerlist = ["Time",name] if isinstance(data, neo.IrregularlySampledSignal) else [strutils.str2symbol(data.domain_name), name]
+            if nChannels > 1:
+                headerlist += list(map(lambda k: f"channel {k}", range(nChannels)))
             
         csvfile = open(fileName, "w", newline="")
         writer = csv.writer(csvfile, delimiter="\t")
@@ -1491,8 +1495,13 @@ def writeCsv(data, fileName:typing.Optional[typing.Union[str, pathlib.Path]]=Non
             if headerlist is not None:
                 writer.writerow(headerlist)
                 
-            for t, l in zip(data.times, data):
-                writer.writerow(["%f %s" % (t, t.units.dimensionality), "%f %s" % (l, l.units.dimensionality)])
+            if nChannels == 1:
+                for t, l in zip(data.times, data):
+                    writer.writerow(["%f %s" % (t, t.units.dimensionality), "%f %s" % (l, l.units.dimensionality)])
+            else:
+                for t, l in zip(data.times, data):
+                    row = ["%f %s" % (t, t.units.dimensionality)] + list(map(lambda k: "%f %s" % (l[k], l[k].units.dimensionality), range(nChannels)))
+                    writer.writerow(row)
                     
             csvfile.close()
 

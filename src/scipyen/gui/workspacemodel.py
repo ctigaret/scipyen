@@ -822,7 +822,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         namespace[varname] = data
         self.postRunCell(Bunch(success=True))
         
-    def unbindObjectInNamespace(self, varname:str, 
+    def unbindFromNamespace(self, varname:typing.Union[str, typing.Sequence[str]], 
                                   namespace:typing.Optional[dict] = None) -> typing.Any:
         r"""Unbinds an object from its symbol is a specified namespace.
         WARNING: The object may be still alive, but unaccessible in the namespace
@@ -834,19 +834,29 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         if namespace != self.shell.user_ns:
             warnings.warn("Currently, only the internal workspace is supported")
             return
-        # print(f"{self.__class__.__name__}.unbindObjectInNamespace(varname = {varname})")
+        # print(f"{self.__class__.__name__}.unbindFromNamespace(varname = {varname})")
         # print(f"{varname} is observed: {varname in self.internalVariablesMonitor.keys()}")
-        if varname in namespace:
-            if varname not in self.user_ns_hidden:
-                # NOTE: 2023-06-07 08:34:57
-                # emulates a console execution
+        if isinstance(varname, str):
+            if varname in namespace:
+                if varname not in self.user_ns_hidden:
+                    # NOTE: 2023-06-07 08:34:57
+                    # emulates a console execution
+                    self.preExecute()
+                    obj = namespace.pop(varname)
+                    # self.__changes__[varname]=WorkspaceVarChange.Removed
+                    self.postRunCell(Bunch(success=True))
+                    return obj
+        elif isinstance(varname, typing.Sequence):
+            existing = list(filter(lambda v: isinstance(v, str) and len(v.strip()) and v in namespace, varname))
+            if len(existing):
+                ret = list()
                 self.preExecute()
-                obj = namespace.pop(varname)
-                # self.__changes__[varname]=WorkspaceVarChange.Removed
+                for v in existing:
+                    ret.append(namespace.pop(v))
                 self.postRunCell(Bunch(success=True))
-                return obj
+                return ret
             
-        # print(f"{self.__class__.__name__}.unbindObjectInNamespace(varname = {varname}) not found")
+        # print(f"{self.__class__.__name__}.unbindFromNamespace(varname = {varname}) not found")
             
     def rebindObjectInNamespace(self, old_name:str, new_name:str,
                                 namespace:typing.Optional[dict] = None):
@@ -966,7 +976,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     or modifies workspace variables, followed by calling postRunCell.
         
     For GUI components, the best way to deal with this is via calling 
-    'bindObjectInNamespace' and 'unbindObjectInNamespace' methods of the
+    'bindObjectInNamespace' and 'unbindFromNamespace' methods of the
     WorkspaceModel instance.
         """
         # ensure we observe only "user" variables in user_ns (i.e. excluding the "hidden"

@@ -326,12 +326,14 @@ class DictTrait(Dict, ScipyenTraitTypeMixin):
         
         if self.name and self.name in obj._trait_values and self.name in obj.traits():
             old_value = obj._trait_values[self.name]
-            self.hashed = gethash(old_value)
+            if not self.hashed:
+                self.hashed = gethash(old_value)
         else:
-            old_value = self.default_value
-            self.hashed = gethash(old_value)
-            silent=False
             change_type="new"
+            old_value = self.default_value
+            if not self.hashed:
+                self.hashed = gethash(old_value)
+            silent=False
         
         try:
             klass = getattr(self, "klass", None)
@@ -339,17 +341,27 @@ class DictTrait(Dict, ScipyenTraitTypeMixin):
             if any(not check_klass(v) for v in (new_value, old_value)):
                 if not self.name or self.name not in obj._trait_values or self.name not in obj.traits():
                     change_type = "new"
+                    self.hashed = new_hash
+                    obj._trait_values[self.name] = new_value
+                    obj._notify_trait(self.name, old_value, new_value, 
+                                    change_type = change_type)
+                    return
                 else:
                     change_type = "modified"
-                self.hashed = new_hash
-                obj._trait_values[self.name] = new_value
-                obj._notify_trait(self.name, old_value, new_value, 
-                                change_type = change_type)
-                    
-                return
-                
+            
             # NOTE: 2021-08-19 16:17:23
             # check for change in contents
+            # NOTE: 2025-07-17 11:53:04 do it more granular
+            if silent and all(issubclass(type(v), dict) for v in (old_value, new_value)):
+                if len(old_value) != len(new_value):
+                    silent = False
+                    change_type = "modified"
+                    
+                if silent:
+                    if list(old_value.keys()) != list(new_value.keys()):
+                        silent = False
+                        change_type = "modified"
+                
             if silent:
                 new_hash = gethash(new_value)
                 silent = (new_hash == self.hashed)
@@ -359,6 +371,7 @@ class DictTrait(Dict, ScipyenTraitTypeMixin):
             
         except:
             # if there is an error in comparing, default to not notify
+            traceback.print_exc()
             silent = True
 
         if silent is not True:

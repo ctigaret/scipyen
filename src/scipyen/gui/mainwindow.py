@@ -3171,7 +3171,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         fig_var_name = self.workspaceModel.getDisplayableVarnamesForVar(self.workspace, fig)
         if len(fig_var_name):
             for name in fig_var_name:
-                self.workspaceModel.unbindObjectInNamespace(name)
+                self.workspaceModel.unbindFromNamespace(name)
                 
     @safewrapper
     def newViewer(self, winClass, *args, **kwargs):
@@ -4334,7 +4334,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # With the current workspaceModel implementation since 2023-05-28 this
         # function appears redundant. However, it is not, as it allows code outside
         # the main Scipyen window to remove user data from the workspace.
-        self.workspaceModel.unbindObjectInNamespace(name) # single-shot
+        self.workspaceModel.unbindFromNamespace(name) # single-shot
 
     def removeFromWorkspace(self, value: typing.Any, by_name: bool = True):#, update: bool = True):
         r"""Removes an object from the workspace via Context menu Delete action.
@@ -4352,7 +4352,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             Typically (when 'by_name' is True, see below) this is the str symbol, 
             in the workspace, to which the object is bound
 
-        Named parametsrs:
+        Named parameters:
         ----------------
         by_name: bool, optional; default is True
             Used when value is a str, to indicate that it represents the symbol
@@ -4374,16 +4374,21 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             expensive updates of the workspace viewer after each variable.
 
         """
+        # NOTE: 2025-07-17 11:37:57 WARNING
+        # Do NOT DELETE this method definition - this is called by subclasses of scipyenviewer for removing
+        # themselves from workspace upon closing
+        # FIXME might want to redesign so that it is not being called anymore
+        # possibly redundant with self.removeWorkspaceSymbol
         if by_name:
             if isinstance(value, str):
-                r = self.workspace.unbindObjectInNamespace(value) # one-shot
+                r = self.workspace.unbindFromNamespace(value) # one-shot
         else:
             objects = [(name, obj)
                        for (name, obj) in self.workspace.items() if obj is value]
             
             if len(objects):
                 for o in objects:
-                    self.workspaceModel.unbindObjectInNamespace(o[0])
+                    self.workspaceModel.unbindFromNamespace(o[0])
 
         self.workspaceModel.currentItem = None
 
@@ -5606,7 +5611,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
             # NOTE: 2023-05-30 18:08:26
             # remove stuff and update workspace model/viewer asynchronously: 
-            # instead of calling workspaceModel.unbindObjectInNamespace, we:
+            # instead of calling workspaceModel.unbindFromNamespace, we:
             # 1) first, "remove" objects directly from the workspace (in reality
             # this unbinds the 'varName' symbol from the object it is bound to,
             # in the workspace; the objects still exist on the heapm but will hbe
@@ -5620,21 +5625,36 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             #
             # It is important to check of the symbol of the o
             #
-            for n in varNames:
-                obj = self.workspace[n]
-                if isinstance(obj, (QtWidgets.QMainWindow, mpl.figure.Figure)):
-                    if isinstance(obj, mpl.figure.Figure):
-                        # also removes obj.number from plt.get_fignums()
-                        if self.autoRemoveViewers and hasattr(obj, "manager") or hasattr(obj, "number"):
-                            plt.close(obj)
+            
+            windows = list(filter(lambda n: isinstance(self.workspace[n], QtWidgets.QMainWindow), varNames))
+            for w in windows:
+                w.close()
+                self.deRegisterWindow(w)
+                
+                
+            figures = list(filter(lambda n: isinstance(self.workspace[n], mpl.figure.Figure), varNames))
+            for f in figures:
+                if self.autoRemoveViewers and hasattr(f, "manager") or hasattr(f, "number"):
+                    plt.close(f)
+                self.deRegisterWindow(f)
+                
+            # for n in varNames:
+            #     obj = self.workspace[n]
+            #     if isinstance(obj, (QtWidgets.QMainWindow, mpl.figure.Figure)):
+            #         if isinstance(obj, mpl.figure.Figure):
+            #             # also removes obj.number from plt.get_fignums()
+            #             if self.autoRemoveViewers and hasattr(obj, "manager") or hasattr(obj, "number"):
+            #                 plt.close(obj)
+            # 
+            #         else:
+            #             obj.close()
+            # 
+            #         # does not remove its symbol for workspace - this has already been removed by delete action
+            #         self.deRegisterWindow(obj)
 
-                    else:
-                        obj.close()
-
-                    # does not remove its symbol for workspace - this has already been removed by delete action
-                    self.deRegisterWindow(obj)
-
-                self.removeWorkspaceSymbol(n)
+                # self.removeWorkspaceSymbol(n)
+                
+            self.workspaceModel.unbindFromNamespace(varNames)
 
             self.currentVarItem = None
             self.currentVarItemName = None
@@ -5666,7 +5686,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 # does not remove its symbol for workspace - this has already been removed by delete action
                 self.deRegisterWindow(obj)
         
-            self.workspaceModel.unbindObjectInNamespace(varName) # single shot
+            self.workspaceModel.unbindFromNamespace(varName) # single shot
 
 
     @Slot(bool)
