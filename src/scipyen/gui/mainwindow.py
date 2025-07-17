@@ -5628,15 +5628,17 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             
             windows = list(filter(lambda n: isinstance(self.workspace[n], QtWidgets.QMainWindow), varNames))
             for w in windows:
-                w.close()
-                self.deRegisterWindow(w)
+                obj = self.workspace[w]
+                obj.close()
+                self.deRegisterWindow(obj)
                 
                 
             figures = list(filter(lambda n: isinstance(self.workspace[n], mpl.figure.Figure), varNames))
             for f in figures:
+                obj = self.workspace[f]
                 if self.autoRemoveViewers and hasattr(f, "manager") or hasattr(f, "number"):
-                    plt.close(f)
-                self.deRegisterWindow(f)
+                    plt.close(obj)
+                self.deRegisterWindow(obj)
                 
             # for n in varNames:
             #     obj = self.workspace[n]

@@ -4269,6 +4269,10 @@ def _(obj, **kwargs):
     for kw in not_kwargs.keys():
         kwargs.pop(kw, None)
 
+    if "segments" not in kwargs and "segment" in kwargs:
+        raise SyntaxError("Invalid keyword parameter 'segment' - did you mean 'segments'?")
+    # if "signals" not in kwargs and "signal" in kwargs:
+    #     raise SyntaxError("Invalid keyword parameter 'signal' - did you mean 'signals'?")
     indexing = dict((s, kwargs.pop(s, None)) for s in obj._child_containers)
 
     ret = make_neo_object(obj)
@@ -8226,7 +8230,11 @@ Irregularly sampled signals, events and epochs are EXCLUDED from the average
             "Data must be a neo.Block instance; got %s instead" % (type(data).__name__)
         )
 
+    if "segments" not in kwargs and "segment" in kwargs:
+        raise SyntaxError("Invalid keyword parameter 'segment' - did you mean 'segments'?")
     segments = kwargs.pop("segments", None)
+    if "signals" not in kwargs and "signal" in kwargs:
+        raise SyntaxError("Invalid keyword parameter 'signal' - did you mean 'signals'?")
     signals = kwargs.pop("signals", None)
     count = kwargs.pop("count", None)
     every = kwargs.pop("every", None)
