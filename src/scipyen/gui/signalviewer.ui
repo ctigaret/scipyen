@@ -127,7 +127,7 @@
      <x>0</x>
      <y>0</y>
      <width>900</width>
-     <height>30</height>
+     <height>27</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -248,10 +248,19 @@
      <addaction name="actionVerticalCursorsFromEpochInCurrentAxis"/>
      <addaction name="actionMultiAxisVerticalCursorsFromEpoch"/>
     </widget>
+    <widget class="QMenu" name="menuExport_Cursor_Data">
+     <property name="title">
+      <string>Export Cursor Data</string>
+     </property>
+     <addaction name="actionExportVerticalCursorData"/>
+     <addaction name="actionExportHorizontalCursorData"/>
+     <addaction name="actionExportCrosshairCursorData"/>
+    </widget>
     <addaction name="addCursorsMenu"/>
     <addaction name="editCursorsMenu"/>
     <addaction name="removeCursorsMenu"/>
     <addaction name="menuVerticalCursorsFromEpoch"/>
+    <addaction name="menuExport_Cursor_Data"/>
     <addaction name="separator"/>
     <addaction name="setCursorsShowValue"/>
     <addaction name="setCursorsLabelPrecisionAction"/>
@@ -588,8 +597,7 @@
     <bool>true</bool>
    </property>
    <property name="icon">
-    <iconset theme="link">
-     <normaloff>.</normaloff>.</iconset>
+    <iconset theme="link"/>
    </property>
    <property name="text">
     <string>Link X axes</string>
@@ -600,8 +608,7 @@
   </action>
   <action name="actionUnlink_X_Axes">
    <property name="icon">
-    <iconset theme="remove-link">
-     <normaloff>.</normaloff>.</iconset>
+    <iconset theme="remove-link"/>
    </property>
    <property name="text">
     <string>Unlink X Axes</string>
@@ -615,8 +622,7 @@
     <bool>true</bool>
    </property>
    <property name="icon">
-    <iconset theme="settings-configure">
-     <normaloff>.</normaloff>.</iconset>
+    <iconset theme="settings-configure"/>
    </property>
    <property name="text">
     <string>Edit Cursor At Creation</string>
@@ -643,8 +649,7 @@
     <bool>true</bool>
    </property>
    <property name="icon">
-    <iconset theme="view-grid">
-     <normaloff>.</normaloff>.</iconset>
+    <iconset theme="view-grid"/>
    </property>
    <property name="text">
     <string>Show X Grid on All Axes</string>
@@ -661,8 +666,7 @@
     <bool>true</bool>
    </property>
    <property name="icon">
-    <iconset theme="view-grid">
-     <normaloff>.</normaloff>.</iconset>
+    <iconset theme="view-grid"/>
    </property>
    <property name="text">
     <string>Show Y Grid on All Axes</string>
@@ -717,11 +721,25 @@
   </action>
   <action name="actionLeft_Axis_Spacer">
    <property name="icon">
-    <iconset theme="adjustcol">
-     <normaloff>.</normaloff>.</iconset>
+    <iconset theme="adjustcol"/>
    </property>
    <property name="text">
     <string>Left Axis Spacer</string>
+   </property>
+  </action>
+  <action name="actionExportVerticalCursorData">
+   <property name="text">
+    <string>Vertical</string>
+   </property>
+  </action>
+  <action name="actionExportHorizontalCursorData">
+   <property name="text">
+    <string>Horizontal</string>
+   </property>
+  </action>
+  <action name="actionExportCrosshairCursorData">
+   <property name="text">
+    <string>Crosshair</string>
    </property>
   </action>
  </widget>

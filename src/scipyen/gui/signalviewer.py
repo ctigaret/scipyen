@@ -1034,6 +1034,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.epochInDataBetweenCursors.triggered.connect(self.slot_epochInDataBetweenCursors)
         #### END Epoch actions
         
+        # ### BEGIN export cursor data actions
+        self.actionExportVerticalCursorData.triggered.connect(self.slot_exportVerticalCursorData)
+        self.actionExportHorizontalCursorData.triggered.connect(self.slot_exportHorizontalCursorData)
+        self.actionExportCrosshairCursorData.triggered.connect(self.slot_exportCrosshairCursorData)
+        # ### END   export cursor data actions
+        
         self.actionLink_X_axes.toggled.connect(self._slot_setXAxesLinked)
         self.actionLink_X_axes.setEnabled(False)
         
@@ -4518,6 +4524,7 @@ anything else       anything else       ❌
             return
         
         itemsrect = self.viewerWidget.scene().itemsBoundingRect()
+        print(f"\n{self.__class__.__name__}._export_to_graphics_file_: itemsrect = {itemsrect}")
         w = int(np.ceil(itemsrect.width()))
         h = int(np.ceil(itemsrect.height()))
 
@@ -5077,12 +5084,30 @@ anything else       anything else       ❌
     def slot_editSelectedCursor(self):
         if isinstance(self.selectedDataCursor, SignalCursor):
             self.slot_editCursor(crsId=self.selectedDataCursor.ID, choose=False)
-#     
-#     def testGlobalsFcn(self, workspace):
-#         r"""workspace is a dict as returned by globals() 
-#         """
-#         exec("a=np.eye(3)", workspace)
+            
+    @Slot()
+    @safewrapper
+    def slot_exportVerticalCursorData(self):
+        cursors = list(filter(lambda c: c.cursorType == SignalCursorTypes.vertical, self.cursors))
+        ret = self.getRelativeCursorCoordinatesAsDataCursors("x", cursors)
+        if len(ret):
+            self.exportDataToWorkspace(ret, "verticalCursorData")
         
+    @Slot()
+    @safewrapper
+    def slot_exportHorizontalCursorData(self):
+        cursors = list(filter(lambda c: c.cursorType == SignalCursorTypes.horizontal, self.cursors))
+        ret = self.getRelativeCursorCoordinatesAsDataCursors("y", cursors)
+        if len(ret):
+            self.exportDataToWorkspace(ret, "horizontalCursorData")
+        
+    @Slot()
+    @safewrapper
+    def slot_exportCrosshairCursorData(self):
+        cursors = list(filter(lambda c: c.cursorType == SignalCursorTypes.crosshair, self.cursors))
+        ret = self.getRelativeCursorCoordinatesAsDataCursors("xy", cursors)
+        if len(ret):
+            self.exportDataToWorkspace(ret, "crosshairCursorData")
         
     @Slot()
     @safewrapper
