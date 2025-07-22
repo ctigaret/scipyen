@@ -9565,6 +9565,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 # plt.ylabel(ylabel)
                 # if isinstance(objname, str) and len(objname.strip()):
                 #     plt.title(objname)
+            elif isinstance(obj, vigra.VigraArray):
+                plt.plot(np.arange(obj.shape[0]), np.array(obj))
             else:
                 plt.plot(obj)
 

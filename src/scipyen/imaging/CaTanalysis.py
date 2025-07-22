@@ -13703,6 +13703,7 @@ def correctUnitType(data):
         
         
 def blankUncageArtifactInLineScans(data, time, width, bgstart, bgend, frame=0):
+    # FIXME 2025-07-22 21:27:47 might want to use NaNs instead!
     r"""
     Blanks uncaging artifact
     
@@ -13787,6 +13788,64 @@ class LSCaTMagics(Magics):
                 lscatWindow.view(lsdata)
             else:
                 lscatWindow.show()
+                
+def computeCaT(source:vigra.VigraArray, 
+               f0Coords:tuple[int],
+               xCoords:typing.Optional[tuple[int]]=None,
+               reference:typing.Optional[vigra.VigraArray]=None,
+               ratiometric:bool=False) -> np.ndarray:
+    r"""Calculates a CaT trace
+    
+    Uses linescanning jymograph data to calculate:
+    a) ΔF/F₀ (or ΔF/Reference, if reference is given, see below) for 
+    non-ratiometric Ca2+ indicators
+    b) ΔF₁/F₂, for ratiometric indicators
+    
+    
+    Parameters:
+    ===========
+    source: time-varying fluorescence data of the Ca²⁺ indicaor. This should be 
+a linescanning ("kymograph") with horizontal axis in the space domain, and 
+vertical axis in the time domain. It may be background-subtracted if necessary.
+    
+    f0Coords: start, stop integer coordinates for the baseline fluorescence ("F0")
+— effectively, the "rows" in the source image corresponding to a baseline 
+fluorescence recorded BEFORE the event for eliciting a Ca²⁺ transient. NOTE that in Python
+these two values represent the half-open interval [start...stop) as in regular
+Python slicing.
+        
+    xCoords: start, stop cooordinates for the ROI representing the structure where
+the CaT might have occurred. Optional, default is None (i.e. the entire source image
+is considered to be the structure of interest). 
+
+You definitely need to use this parameter for linescanning images were the line
+scan trajectory crosses several structures (spines, dendrites, etc).
+    
+However, when the source image is already "cropped" such that is contains only
+data from a sructure of interest, you need to pass 'None' here.
+    
+    reference: Optional VIGRA array with same shape and structure as the 'source'.
+Default is None.
+    When given as an array, is may contain ither:
+a) fluorescence linescanning data data from a reference indicator
+b) time-varying fluorescence from a ratiometric Ca2+ indicator
+    
+    ratiometric: default is False. NOTE: then reatiometric is True, the 'reference'
+MUST be given as an array
+    
+    Returns:
+    ========
+    a 1D vigra.VigraArray
+    
+"""
+    F = source[xCoords[0]:xCoords[1],:].mean(axis=0).flatten()
+    F0 = source[xCoords[0]:xCoords[1], f0Coords[0]:f0Coords[1]].mean()
+    if isinstance(reference, vigra.VigraArray):
+        assert reference.shape == source.shape, f"The shape of the Ca²⁺ transient image ({source.shape}) is different from that of the reference array ({reference.shape})"
+        refTrace  = reference[xCoords[0]:xCoords[1]].mean(axis=0).flatten()
+        return (F-F0)/refTrace
+    
+    return (F-F0)
         
 def launch():
     try:
