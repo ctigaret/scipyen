@@ -2634,6 +2634,7 @@ class _UrlNavigator_(QtCore.QObject):
         r"""UrlNavigator's context menu
         Allows 
         • copy/paste of path, 
+        • open its location in file manager
         • switching between edit mode and breadcrumb navigation mode, 
         • show path in full, or in places-reduced style (when in breadcrumb 
             navigation mode)
@@ -3431,10 +3432,17 @@ class UrlNavigator(QtWidgets.QWidget):
         # therefore either apply url here or open platform's default appliuation
         keyboardModifiers = QtWidgets.QApplication.keyboardModifiers()
         
-        if int(keyboardModifiers & QtCore.Qt.ShiftModifier):
+        if __has_PyQt6__ or __has_PySide6__:
+            isShift = keyboardModifiers & QtCore.Qt.ShiftModifier
+            isControl = keyboardModifiers & QtCore.Qt.ControlModifier
+        else:
+            isShift = int(keyboardModifiers & QtCore.Qt.ShiftModifier)
+            isControl = int(keyboardModifiers & QtCore.Qt.ControlModifier)
+            
+        if isShift:
             self._nav_p_.applyUncommittedUrl(ApplyUrlMethod.NewWindow) # -> open in application
             
-        elif int(keyboardModifiers & QtCore.Qt.ControlModifier):
+        elif isControl:
             self._nav_p_.switchToBreadcrumbMode()
             self._nav_p_.updateButtonVisibility()
             

@@ -242,10 +242,10 @@ def get_current_font_metrics():
         
     return fm
         
-def get_elided_text(s:str, w:int):
+def get_elided_text(s:str, w:int, elideMode = QtCore.Qt.ElideRight):
     fm = get_current_font_metrics()
     # fm = QtWidgets.QApplication.fontMetrics()
-    return fm.elidedText(s, QtCore.Qt.ElideRight, w)
+    return fm.elidedText(s, elideMode, w)
 
 def get_text_width(s:str, fm:typing.Optional[QtGui.QFontMetrics]=None, flags=QtCore.Qt.TextSingleLine, tabStops = 0, tabArray=None):
     if not isinstance(fm, QtGui.QFontMetrics):

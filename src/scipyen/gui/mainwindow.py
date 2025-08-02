@@ -6297,6 +6297,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         else:
             target = os.environ['HOME']
         self.navigator.setHomeUrl(QtCore.QUrl(pathlib.Path(target).as_uri()))
+        # self.navigator.newWindowRequested.connect()
 
         self.fileSystemFilter.lineEdit().setClearButtonEnabled(True)
 
@@ -7139,11 +7140,29 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         
     @Slot(QAction, QtCore.Qt.MouseButton)
     def slot_recentDirActivated(self, action:QAction, button:QtCore.Qt.MouseButton):
+        from gui import guiutils
         result = action.data() 
         path = pathlib.Path(self._recentDirectories[result]).absolute() #.resolve()   # the path to the subdirectory pointed to by the action
-        url = QtCore.QUrl(path.as_uri())
-        self.navigator.setLocationUrl(url)
-        self.navigator.urlChanged.emit(url)
+        if path.exists():
+            url = QtCore.QUrl(path.as_uri())
+            self.navigator.setLocationUrl(url)
+            self.navigator.urlChanged.emit(url)
+        else:
+            p = pathlib.Path(path)
+            while not p.exists():
+                if p == p.parent:
+                    break
+                p = p.parent
+            if p.exists():
+                url = QtCore.QUrl(p.as_uri())
+                self.navigator.setLocationUrl(url)
+                self.navigator.urlChanged.emit(url)
+            else:
+                txt = p.as_posix()
+                
+                elided = guiutils.get_elided_text(f"Inaccessible directory: {txt}", self.width(), QtCore.Qt.ElideMiddle)
+                self.statusBar().showMessage(elided)
+                self.errorMessage("Navigation", f"Inaccessible recent directory:\n{txt}")
 
     @Slot()
     @safewrapper
