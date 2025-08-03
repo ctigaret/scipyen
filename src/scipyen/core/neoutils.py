@@ -7566,9 +7566,25 @@ def average_irregular_signals(*args, fun=np.mean, name: typing.Optional[str] = N
 
 
 # @safewrapper
-def average_signals(*args, fun=np.mean, name: typing.Optional[str] = None):
+def average_signals(*args, fun=np.mean, reltimes:bool=False,
+                    name: typing.Optional[str] = None):
     r"""Returns an AnalogSignal containing the element-by-element average of several neo.AnalogSignals.
     All signals must be single-channel and have compatible shapes and sampling rates.
+    In addition, signals SHOULD have identical domains (times).
+    To allow averageing signals with the same sampling rate and duration but with
+    different start times ('t_start' attribute) then pass 'reltimes=True'.
+    
+    WARNING: when 'reltimes' is True, this will modify the signal's domain for each
+    signal in args.
+    
+    You shuld therefore pass COPIES of signals, rather than references to those
+    signals!
+    
+    For example given a neo.Block 'b', obtain signal copies as follows:
+    
+    signals = list(map(lambda s: s.analogsignals[0].copy(), b.segments))
+    
+    
     """
 
     if len(args) == 0:
@@ -7603,9 +7619,17 @@ def average_signals(*args, fun=np.mean, name: typing.Optional[str] = None):
 
     if any([s.shape[1] > 1 for s in args]):
         raise ValueError("Expecting single-channel signals only")
-
-    if any(not np.all(s.times == args[0].times) for s in args):
-        raise ValueError("Signal must have identical domains")
+    
+    if reltimes:
+        if not all(s.t_stop == args[0].t_stop for s in args):
+            raise ValueError("Signal must have identical domains")
+        
+        if not all(s.t_start == args[0].t_start for s in args):
+            for s in args:
+                s.t_start = 0 * args[0].times.units
+    else:
+        if any(not np.all(s.times == args[0].times) for s in args):
+            raise ValueError("Signal must have identical domains")
 
     data = fun(np.concatenate(args, axis=1), axis=1).magnitude
 
