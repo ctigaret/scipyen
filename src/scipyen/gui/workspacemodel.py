@@ -1578,6 +1578,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # NOTE: 2025-07-06 14:05:36
         # row indices for items in the given workspace - Do NOT DELETE - useful later when implementing this for foreign namespaces
         internalWSRows = self.rowIndexForItemsWithProps(Workspace=ns_name)
+        if isinstance(internalWSRows, int):
+            internalWSRows = [internalWSRows]
 
         # print(f"{print_styled(f'\trow = {internalWSRows}', color='green')}")
         # print("updateRowForVariable2, internalWSRows:", internalWSRows)
@@ -1929,7 +1931,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
 
         Returns:
         --------
-        a list of row indices (0-based) or one integer >=0 if ony one 
+        a list of row indices (0-based) or one integer >=0 if only one 
         item was found , or -1 if no item was found (Qt way)
 
         If kwargs are not specified, then returns range(self.rowCount())
@@ -1939,7 +1941,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
 
         if len(kwargs) == 0:
             # return all row indices here
-            # if used froma  deleting function, thso shoudl result in the removal
+            # if used from a deleting function, this should result in the removal
             # of all items in the model
             return range(self.rowCount())
 
@@ -1947,7 +1949,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             if self.rowCount() == 0:
                 return -1
 
-            # auxiliary vector for setting up logical indexin, see for loop below
+            # auxiliary vector for setting up logical indexing, see for loop below
             allrows = np.arange(self.rowCount())
 
             # set up logical indexing vector
@@ -1960,8 +1962,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             for key, value in kwargs.items():
                 # find the column's index  - this is the index of the column name
                 # in the summary header
-                key_column = standard_obj_summary_headers.index(
-                    key.replace("_", " "))
+                key_column = standard_obj_summary_headers.index(key.replace("_", " "))
                 # now, find the viewer item based on the value mapped to the kwarg
                 # key, given the index of the key column; the value must be a str
                 # NOTE: findItems is a method of QAbstractItemModel
