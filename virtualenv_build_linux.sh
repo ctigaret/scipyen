@@ -495,9 +495,10 @@ function dopyqt6 ()
     
     if [ ! -r ${VIRTUAL_ENV}/.pyqt6done ] || [[ $reinstall_pyqt6 -gt 0 ]]; then
         if [[ $build_pyqt6 -eq 1 ]] ; then
-            mkdir -p ${VIRTUAL_ENV}/src && cd ${VIRTUAL_ENV}/src
             
             findqmake6
+            
+            mkdir -p ${VIRTUAL_ENV}/src && cd ${VIRTUAL_ENV}/src
             
             if [ `pwd` != "$VIRTUAL_ENV"/src ]; then
                 echo -e "Not inside $VIRTUAL_ENV/src - goodbye\n"
@@ -714,6 +715,9 @@ function dovigra ()
         vigra_src=$VIRTUAL_ENV/src/vigra
         vigra_build=$VIRTUAL_ENV/src/vigra-build
         
+        echo -e "VIGRA source will be downloaded to ${vigra_src}"
+        echo -e "VIGRA source will be built in ${vigra_build}"
+
         if [ ! -r ${vigra_src} ] ; then
             echo -e "Cloning vigra git repository...\n"
             git clone https://github.com/ukoethe/vigra.git
@@ -728,7 +732,7 @@ function dovigra ()
                 echo -e "Refreshing vigra git repository...\n"
                 cd ${vigra_src}
                 git pull
-                cd ..
+                cd ${mydir}
             fi
         fi
           
@@ -737,12 +741,12 @@ function dovigra ()
         fi
         
         echo -e "Creating vigra build tree outside the source tree\n"
-        mkdir -p vigra-build && cd vigra-build
+        mkdir -p ${vigra_build} && cd ${vigra_build}
         
         $cmake_binary -DPython_INCLUDE_DIRS=$(python -c "import sysconfig; print(sysconfig.get_paths()['include'])") \
                       -DPython_LIBRARIES=$(python -c "import distutils.sysconfig as sysconfig; print(sysconfig.get_config_var('LIBDIR'))") \
                       -DPython_EXECUTABLE:FILEPATH=`which python` \
-                      -DCMAKE_INSTALL_PREFIX=$VIRTUAL_ENV -DCMAKE_SKIP_INSTALL_RPATH=1 -DCMAKE_SKIP_RPATH=1 -DWITH_BOOST_GRAPH=1 -DWITH_BOOST_THREAD=1 -DWITH_HDF5=1 -DWITH_OPENEXR=1 -DWITH_VIGRANUMPY=1 -DLIB_SUFFIX=64 ../vigra
+                      -DCMAKE_INSTALL_PREFIX=$VIRTUAL_ENV -DCMAKE_SKIP_INSTALL_RPATH=1 -DCMAKE_SKIP_RPATH=1 -DWITH_BOOST_GRAPH=1 -DWITH_BOOST_THREAD=1 -DWITH_HDF5=1 -DWITH_OPENEXR=1 -DWITH_VIGRANUMPY=1 -DLIB_SUFFIX=64 ${vigra_src}
         
         if [[ $njobs -gt 0 ]] ; then
             make --jobs=$njobs && make install
@@ -1251,7 +1255,7 @@ SECONDS=0
 get_pyver
 uv_exec=`which uv`
 
-
+mydir=`pwd`
 virtual_env_pfx="scipyenv"
 install_dir=${HOME}
 realscript=`realpath $0`
