@@ -6752,10 +6752,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             if len(valid_urls) == 0:
                 scipywarn(f"{self.__class__.__name__}.slot_loadDroppedURLs: Remote URLs not yet supported") #, NotImplemented)
                 
-            
             url_dirs = [u.path() for u in valid_urls if os.path.isdir(u.path()) or (os.path.isfile(u.path()) and chdirs) ]
             
             target_dir = None
+            
             if len(url_dirs):
                 target_dir = url_dirs[-1]
                 
