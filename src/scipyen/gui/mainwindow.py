@@ -450,8 +450,8 @@ def checkOrigin():
         except:
             traceback.print_exc()
     
-_qt_python_verstr_ = f"PySide6 ({PySide6.__version__})" if __has_PySide6__ else f"{'PyQt6' if __has_PyQt6__ else 'PyQt5'} ({qtpy.PYQT_VERSION})"
-_scipyen_console_banner_ = f"Scipyen {__verstr__} internal console using {_qt_python_verstr_}\n" if isinstance(__verstr__, str) and len(__verstr__.strip()) else f"Scipyen internal console using {_qt_python_verstr_}\n"
+_qt_python_verstr_ = f"PySide6 ({PySide6.__version__})" if __has_PySide6__ else f"{'PyQt6' if __has_PyQt6__ else 'PyQt5'} {qtpy.PYQT_VERSION}"
+_scipyen_console_banner_ = f"Scipyen {__verstr__} internal console ({_qt_python_verstr_})\n" if isinstance(__verstr__, str) and len(__verstr__.strip()) else f"Scipyen internal console ({_qt_python_verstr_})\n"
 
 # # # try:
 # # #     # from setuptools_scm import get_version
@@ -4466,12 +4466,23 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             # validate name against existing user (visible) variables
             newVarNameOK = validate_varname(name, self.workspace)
             
+            # if len(newVarNameOK) == 0:
+            #     return
+            
             if newVarNameOK != name:
-                qbox = QtWidgets.QMessageBox(QtWidgets.QMessageBox.Question,
-                                             "Assign object in workspace",
-                                            f"An object named '{name}' exists in the workspace.\nDo you wish to rename, overwrite or cancel?",
-                                             QtWidgets.QMessageBox.StandardButtons(QtWidgets.QMessageBox.Cancel),
-                                             parent = self)
+                if __has_PyQt6__ or __has_PySide6__:
+                    qbox = QtWidgets.QMessageBox(QtWidgets.QMessageBox.Question,
+                                                "Assign object in workspace",
+                                                f"An object named '{name}' exists in the workspace.\nDo you wish to rename, overwrite or cancel?",
+                                                # QtWidgets.QMessageBox.StandardButton(QtWidgets.QMessageBox.Cancel),
+                                                QtWidgets.QMessageBox.Cancel,
+                                                parent = self)
+                else:
+                    qbox = QtWidgets.QMessageBox(QtWidgets.QMessageBox.Question,
+                                                "Assign object in workspace",
+                                                f"An object named '{name}' exists in the workspace.\nDo you wish to rename, overwrite or cancel?",
+                                                QtWidgets.QMessageBox.StandardButtons(QtWidgets.QMessageBox.Cancel),
+                                                parent = self)
                 qbox.addButton("Rename", QtWidgets.QMessageBox.YesRole) # → returns 0
                 qbox.addButton("Overwrite", QtWidgets.QMessageBox.AcceptRole) # → returns 1
                 qbox.setDefaultButton(QtWidgets.QMessageBox.Cancel)
