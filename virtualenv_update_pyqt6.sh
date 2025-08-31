@@ -60,7 +60,8 @@ if [ `pwd` != "$VIRTUAL_ENV"/src ]; then
     echo -e "Not inside $VIRTUAL_ENV/src - goodbye\n"
     exit 1
 fi
-py_exec="$VIRTUAL_ENV/bin/${python_exec}"
+py_exec=`which python3`
+echo -e "python executable: "${py_exec}
 sip_wheel_exec="$VIRTUAL_ENV/bin/sip-wheel"
 if [[ `id -u` -eq 0 ]] ; then
     echo -e "\n****\nCannot run as administrator!\n****\n"
@@ -73,7 +74,7 @@ fi
 # archive (i.e., the sdist) of PyQt6 - its file name typically ends with
 # .tar.gz
 pyqt6_src_url=`${py_exec} $installscriptdir/locate_pyqt6_src.py`
-pyqt6_src=`basename $pyqt6_src_url`
+pyqt6_src=`basename ${pyqt6_src_url}`
 
 pyqt6_src_dir=${VIRTUAL_ENV}/src/${pyqt6_src%.tar.gz}
 
