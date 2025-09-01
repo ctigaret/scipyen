@@ -325,7 +325,7 @@ class PVLinescanDefinition(PVObject):
                                             (eval(n.attributes.getNamedItem("stopPixelX").value), \
                                             eval(n.attributes.getNamedItem("startPixelY").value))) for n in linenodes]
                     
-            self.line_length = linenodes[0].attributes.getNamedItem("lineLength").value
+            self.line_length = float(linenodes[0].attributes.getNamedItem("lineLength").value)
         else: # TODO code for other linescan modes
             self._coordinates_ = [] # for now!
             
