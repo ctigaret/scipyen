@@ -1069,6 +1069,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     
     _defaultIconSize_:int = 16
     
+    _defaultNewNavigatorLook_:bool = False
+    
     _defaultUseNativeMenuBar:bool = True
 
     _instance = None # NOTE: Singleton design pattern
@@ -1643,6 +1645,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self._guiIconSize_ = self._defaultIconSize_
         self._workspaceIconSize_ = self._defaultIconSize_
         self._fileSystemIconSize_ = self._defaultIconSize_
+        self._newNavigatorLook_ = self._defaultNewNavigatorLook_
         
         self._configureUI_()
 
@@ -1843,6 +1846,22 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # self.menuBar().setNativeMenuBar(False)
 
     # ### BEGIN Properties and slots connected to properties
+    
+    @property
+    def useNewNavigatorLook(self) -> bool:
+        return self._newNavigatorLook_
+    
+    @markConfigurable("UseNewNavigatorLook", "Qt")
+    @useNewNavigatorLook.setter
+    def useNewNavigatorLook(self, val:bool):
+        self._newNavigatorLook_ = val == True
+        self.navigator.newLook = self._newNavigatorLook_
+        signalBlocker = QtCore.QSignalBlocker(self.actionUse_New_Navigator_Look)
+        self.actionUse_New_Navigator_Look.setChecked(self.navigator.newLook)
+        
+    @Slot(bool)
+    def _slot_newNavigatorLook(self, val:bool) -> None:
+        self.useNewNavigatorLook = val == True
     
     @property
     def useNativeMenuBar(self) -> bool:
@@ -6168,6 +6187,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         
         self.actionUse_Native_Menu_Bar.setChecked(self._useNativeMenuBar)
         self.actionUse_Native_Menu_Bar.toggled.connect(self._slot_useNativeMenuBar)
+        
+        self.actionUse_New_Navigator_Look.setChecked(self._newNavigatorLook_)
+        self.actionUse_New_Navigator_Look.toggled.connect(self._slot_newNavigatorLook)
 
         self.lockToolBarAction = QAction(QtGui.QIcon.fromTheme("lock-symbolic"), "Lock Toolbar Positions", self)
         self.lockToolBarAction.setCheckable(True)
@@ -6309,6 +6331,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         else:
             target = os.environ['HOME']
         self.navigator.setHomeUrl(QtCore.QUrl(pathlib.Path(target).as_uri()))
+        self.navigator.newLook = self.useNewNavigatorLook
         # self.navigator.newWindowRequested.connect()
 
         self.fileSystemFilter.lineEdit().setClearButtonEnabled(True)

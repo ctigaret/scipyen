@@ -777,6 +777,10 @@ class UrlNavigatorMenu(QtWidgets.QMenu):
                             name="sig_urlDropped")
     mouseButtonClicked = Signal(QAction, QtCore.Qt.MouseButton, 
                                     name="mouseButtonClicked")
+    sig_mouseLeave = Signal(name="sig_mouseLeave")
+    sig_mouseEnter = Signal(name="sig_mouseEnter")
+    sig_closed = Signal(name="sig_closed")
+    
     def __init__(self, title:typing.Optional[str] = None, 
                  parent:typing.Optional[QtWidgets.QWidget] = None):
         if isinstance(title, QtWidgets.QWidget):
@@ -811,6 +815,19 @@ class UrlNavigatorMenu(QtWidgets.QMenu):
         action = self.actionAt(evt.position().toPoint())
         if action is not None:
             self.sig_urlDropped.emit(action, evt)
+        evt.accept()
+            
+    def leaveEvent(self, evt:QtCore.QEvent):
+        self.sig_mouseLeave.emit()
+        evt.accept()
+        
+    def enterEvent(self, evt:QtCore.QEvent):
+        self.sig_mouseEnter.emit()
+        evt.accept()
+        
+    def closeEvent(self, evt:QtGui.QCloseEvent):
+        self.sig_closed.emit()
+        evt.accept()
     
     def mouseMoveEvent(self, evt:QtGui.QMouseEvent):
         if not self._mouseMoved_:
@@ -908,6 +925,8 @@ class UrlNavigatorButtonBase(QtWidgets.QPushButton):
     @property
     def isHighlighted(self) ->bool:
         return self.isDisplayHintEnabled(DisplayHint.EnteredHint) or self.isDisplayHintEnabled(DisplayHint.DraggedHint) or self.isDisplayHintEnabled(DisplayHint.PopupActiveHint)
+        # if self.newLook:
+        #     return self.isDisplayHintEnabled(DisplayHint.EnteredHint) or self.isDisplayHintEnabled(DisplayHint.DraggedHint) or self.isDisplayHintEnabled(DisplayHint.PopupActiveHint)
         # return self.isDisplayHintEnabled(DisplayHint.EnteredHint) or self.isDisplayHintEnabled(DisplayHint.DraggedHint) # or self.isDisplayHintEnabled(DisplayHint.PopupActiveHint)
     
     def drawHoverBackground(self, painter:QtGui.QPainter):
@@ -916,19 +935,14 @@ class UrlNavigatorButtonBase(QtWidgets.QPushButton):
         
         # print(f"{self.__class__.__name__}.drawHoverBackground: self._newLook_ = {self._newLook_}")
         if self._newLook_:
-            if __has_PyQt6__ or __has_PySide6__:
-                backgroundColor = self.palette().color(QtGui.QPalette.Accent)
-            else:
-                backgroundColor = self.palette().color(QtGui.QPalette.AlternateBase)
+            backgroundColor = self.palette().color(QtGui.QPalette.AlternateBase)
+            # if __has_PyQt6__ or __has_PySide6__:
+            #     backgroundColor = self.palette().color(QtGui.QPalette.Accent)
+            # else:
+            #     backgroundColor = self.palette().color(QtGui.QPalette.AlternateBase)
         else:
             backgroundColor = self.palette().color(QtGui.QPalette.Highlight) if self.isHighlighted else QtCore.Qt.transparent
         
-        # if not self._active_ and isHighlighted:
-        if not self._active_ and self.isHighlighted:
-            backgroundColor.setAlpha(128)
-        
-        # if backgroundColor != QtCore.Qt.transparent:
-        # if isHighlighted:
         if self._newLook_:
             option = QtWidgets.QStyleOptionButton()
             option.initFrom(self)
@@ -940,6 +954,8 @@ class UrlNavigatorButtonBase(QtWidgets.QPushButton):
                 # primitive = QtWidgets.QStyle.PE_PanelLineEdit
                 # primitive = QtWidgets.QStyle.PE_PanelItemViewItem
         else:
+            if not self._active_ and self.isHighlighted:
+                backgroundColor.setAlpha(128)
             option = QtWidgets.QStyleOptionViewItem()
             option.initFrom(self)
             option.viewItemPosition = QtWidgets.QStyleOptionViewItem.OnlyOne
@@ -949,6 +965,7 @@ class UrlNavigatorButtonBase(QtWidgets.QPushButton):
                 option.state = QtWidgets.QStyle.State_Enabled | QtWidgets.QStyle.State_MouseOver
             else:
                 option.state = QtWidgets.QStyle.State_Enabled
+                
         painter.setBackground(backgroundColor)
         self.style().drawPrimitive(primitive, option, painter, self)
         
@@ -993,29 +1010,38 @@ class UrlNavigatorToggleButton(UrlNavigatorButtonBase):
     
     def enterEvent(self, evt:QtGui.QEnterEvent):
         super().enterEvent(evt)
-        if not self.isChecked():
-            self._pixmap_ = QtGui.QIcon.fromTheme("edit-entry-symbolic").pixmap(QtCore.QSize(self._iconSize_, self._iconSize_).expandedTo(self.iconSize()))
+        if self.isChecked():
+            self._pixmap_ = QtGui.QIcon.fromTheme("dialog-ok").pixmap(QtCore.QSize(16, 16).expandedTo(QtCore.QSize(16,16)))
+        else:
+            self._pixmap_ = QtGui.QIcon.fromTheme("edit-entry-symbolic").pixmap(QtCore.QSize(16, 16).expandedTo(QtCore.QSize(16,16)))
+            # self._pixmap_ = QtGui.QIcon.fromTheme("edit-entry-symbolic").pixmap(QtCore.QSize(self._iconSize_, self._iconSize_).expandedTo(self.iconSize()))
         self.updateCursor()
+        evt.accept()
     
     def leaveEvent(self, evt:QtCore.QEvent):
         super().leaveEvent(evt)
         self._pixmap_ = None
         self.setCursor(QtCore.Qt.ArrowCursor)
+        evt.accept()
     
     def paintEvent(self, evt:QtGui.QPaintEvent):
         painter = QtGui.QPainter(self)
         painter.setClipRect(evt.rect())
         buttonWidth = int(self.width())
         buttonHeight = int(self.height())
+        option = QtWidgets.QStyleOptionFrame()
+        option.initFrom(self)
+        option.state = QtWidgets.QStyle.State_None
         
         if self.isChecked():
             self.drawHoverBackground(painter)
             
-            if self._pixmap_ is None:
-                self._pixmap_ = QtGui.QIcon.fromTheme("dialog-ok").pixmap(QtCore.QSize(self._iconSize_, self._iconSize_).expandedTo(self.iconSize()))
+            if self.newLook:
+                option.palette.setColor(QtGui.QPalette.Base, self.palette().alternateBase().color())
+                self.style().drawPrimitive(QtWidgets.QStyle.PE_FrameLineEdit, option, painter, self)
                 
-            self.style().drawItemPixmap(painter, self.rect(), QtCore.Qt.AlignRight, self._pixmap_)
-            # self.style().drawItemPixmap(painter, self.rect(), QtCore.Qt.AlignCenter, self._pixmap_)
+            self._pixmap_ = QtGui.QIcon.fromTheme("dialog-ok").pixmap(QtCore.QSize(16, 16).expandedTo(QtCore.QSize(16,16)))
+            self.style().drawItemPixmap(painter, self.rect(), QtCore.Qt.AlignCenter, self._pixmap_)
             
         else:
             if self.isDisplayHintEnabled(DisplayHint.EnteredHint):
@@ -1028,7 +1054,8 @@ class UrlNavigatorToggleButton(UrlNavigatorButtonBase):
                 x = 0 if self.layoutDirection() == QtCore.Qt.LeftToRight else buttonWidth - caretWidth
                 
                 if isinstance(self._pixmap_, QtGui.QPixmap):
-                    self.style().drawItemPixmap(painter, self.rect(), QtCore.Qt.AlignRight, self._pixmap_)
+                    # self.style().drawItemPixmap(painter, self.rect(), QtCore.Qt.AlignRight, self._pixmap_)
+                    self.style().drawItemPixmap(painter, self.rect(), QtCore.Qt.AlignCenter, self._pixmap_)
             
                 painter.drawRect(x, verticalGap, caretWidth, buttonHeight - 2 * verticalGap)
     
@@ -1241,8 +1268,13 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         #
         menu.mouseButtonClicked.connect(self.slot_menuActionClicked) # mouse activation of menu entry
         menu.triggered.connect(self.slot_menuActionTriggered) # keybard activation of menu entry
-        menu.sig_urlDropped.connect(self.slot_urlsDropped) # drag'ndrop not yet implemented
+        menu.sig_urlDropped.connect(self.slot_urlsDropped) # TODO: drag'ndrop not yet implemented
+        
+        if isinstance(menu.parent(), self.__class__):
+            menu.sig_closed.connect(self.slot_navMenuClosed)
+        
         menu.setLayoutDirection(QtCore.Qt.LeftToRight)
+        
         
         # NOTE: 2025-01-21 09:01:43
         # allow a maximum og 30 entries per menu; if there are > 30 entries, place
@@ -1255,9 +1287,6 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
 
         nSubDirs = len(self._subDirs_)
 
-
-        # print(f"\tnSubDirs = {nSubDirs}")
-        # lastIndex = min(nSubDirs - 1, maxIndex)
         lastIndex = min(nSubDirs, maxIndex)
         
         subDirsNames = list(map(lambda x: x.name, self._subDirs_[startIndex : lastIndex]))
@@ -1282,6 +1311,10 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
             subDirsMenu = UrlNavigatorMenu("More", menu)
             self.initMenu(subDirsMenu, maxIndex, maxItems)
             menu.addMenu(subDirsMenu)
+            
+    @Slot()
+    def slot_navMenuClosed(self):
+        self.setDisplayHintEnabled(DisplayHint.PopupActiveHint, False)
         
     def paintEvent(self, evt:QtGui.QPaintEvent):
         painter = QtGui.QPainter(self)
@@ -1736,6 +1769,7 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         
         self._subDirsMenu_.popup(pos)
         self.update()
+        # self.setDisplayHintEnabled(DisplayHint.PopupActiveHint, False)
     
     @Slot(list)
     def slot_addEntriesToSubdirs(self, entries:list[pathlib.Path]):
@@ -3206,6 +3240,7 @@ class UrlNavigator(QtWidgets.QWidget):
         
         super().__init__(parent=parent)
         self._newLook_ = False
+        self._backgroundEnabled_ = False
         
         self._nav_p_ = _UrlNavigator_(url, self)#, placesModel)
 
@@ -3214,6 +3249,14 @@ class UrlNavigator(QtWidgets.QWidget):
         self.setMinimumWidth(100)
         self._nav_p_.updateContent()
     # ### END   __init__ UrlNavigator c'tor 
+    
+    @property
+    def backgroundEnabled(self) -> bool:
+        return self._backgroundEnabled_
+    
+    @backgroundEnabled.setter
+    def backgroundEnabled(self, enabled:bool):
+        self._backgroundEnabled_ = enabled
         
     @property
     def newLook(self)->bool:
@@ -3223,8 +3266,10 @@ class UrlNavigator(QtWidgets.QWidget):
     def newLook(self, val:bool):
         self._newLook_ = val
         
-        for btn in list(filter(lambda x: isinstance(x, UrlNavigatorButtonBase), self.children())):
+        for btn in list(filter(lambda x: issubclass(type(x), UrlNavigatorButtonBase), self.children())):
             btn.newLook = self._newLook_
+            
+        self.backgroundEnabled = self._newLook_
             
     def __del__(self):
         self._nav_p_._dropDownButton_.removeEventFilter(self)
@@ -3233,22 +3278,36 @@ class UrlNavigator(QtWidgets.QWidget):
         
         for button in self._nav_p_._navButtons_:
             button.removeEventFilter(self)
-        
-    # TODO 2025-01-19 10:28:19 for below,
-    # verify CoreUrlNavigator code
+            
+    def paintEvent(self, evt:QtGui.QPaintEvent):
+        painter = QtGui.QPainter(self)
+        option = QtWidgets.QStyleOptionFrame()
+        option.initFrom(self)
+        option.state = QtWidgets.QStyle.State_None
+        if self.hasFocus():
+            option.palette.setColor(QtGui.QPalette.Window, self.palette().color(QtGui.QPalette.Highlight))
+            
+        if self.backgroundEnabled:
+            if self._nav_p_._editable_:
+                option.palette.setColor(QtGui.QPalette.Base, self.palette().alternateBase().color())
+            self.style().drawPrimitive(QtWidgets.QStyle.PE_FrameLineEdit, option, painter, self)
+            
+        else:
+            if self._nav_p_._editable_:
+                if self.newLook:
+                    self.style().drawPrimitive(QtWidgets.QStyle.PE_FrameLineEdit, option, painter, self)
+                else:
+                    super().paintEvent(evt)
+            
     def locationUrl(self, historyIndex:int = -1) -> QtCore.QUrl: 
         return self._nav_p_._coreUrlNavigator_.locationUrl(historyIndex)
     
-    # TODO 2025-01-19 10:28:19 for below,
-    # verify CoreUrlNavigator code
     @safewrapper
     def saveLocationState(self, state:QtCore.QByteArray):
         # print(f"{self.__class__.__name__}.saveLocationState({state})")
         currentState = self._nav_p_._coreUrlNavigator_.locationState()
         self._nav_p_._coreUrlNavigator_.saveLocationState(currentState)
         
-    # TODO 2025-01-19 10:28:19 for below,
-    # verify CoreUrlNavigator code
     @safewrapper
     def locationState(self, historyIndex:int = -1) -> QtCore.QByteArray:
         return self._nav_p_._coreUrlNavigator_.locationState(historyIndex)

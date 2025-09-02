@@ -46,7 +46,7 @@
      <x>0</x>
      <y>0</y>
      <width>898</width>
-     <height>28</height>
+     <height>29</height>
     </rect>
    </property>
    <property name="sizePolicy">
@@ -169,6 +169,7 @@
     <addaction name="menuIcon_Sizes"/>
     <addaction name="menuFonts"/>
     <addaction name="actionUse_Native_Menu_Bar"/>
+    <addaction name="actionUse_New_Navigator_Look"/>
    </widget>
    <widget class="QMenu" name="menuConsoles">
     <property name="title">
@@ -1678,6 +1679,17 @@ NOTE: you can click anywhere in the row to select</string>
    </property>
    <property name="text">
     <string>Use Native Menu Bar</string>
+   </property>
+  </action>
+  <action name="actionUse_New_Navigator_Look">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset theme="color-fill"/>
+   </property>
+   <property name="text">
+    <string>Use New Navigator Look</string>
    </property>
   </action>
  </widget>
