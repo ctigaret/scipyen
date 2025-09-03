@@ -925,21 +925,11 @@ class UrlNavigatorButtonBase(QtWidgets.QPushButton):
     @property
     def isHighlighted(self) ->bool:
         return self.isDisplayHintEnabled(DisplayHint.EnteredHint) or self.isDisplayHintEnabled(DisplayHint.DraggedHint) or self.isDisplayHintEnabled(DisplayHint.PopupActiveHint)
-        # if self.newLook:
-        #     return self.isDisplayHintEnabled(DisplayHint.EnteredHint) or self.isDisplayHintEnabled(DisplayHint.DraggedHint) or self.isDisplayHintEnabled(DisplayHint.PopupActiveHint)
-        # return self.isDisplayHintEnabled(DisplayHint.EnteredHint) or self.isDisplayHintEnabled(DisplayHint.DraggedHint) # or self.isDisplayHintEnabled(DisplayHint.PopupActiveHint)
     
     def drawHoverBackground(self, painter:QtGui.QPainter):
-        # isHighlighted = self.isDisplayHintEnabled(DisplayHint.EnteredHint) or self.isDisplayHintEnabled(DisplayHint.DraggedHint) or self.isDisplayHintEnabled(DisplayHint.PopupActiveHint)
-        # backgroundColor = self.palette().color(QtGui.QPalette.Highlight) if isHighlighted else QtCore.Qt.transparent
-        
         # print(f"{self.__class__.__name__}.drawHoverBackground: self._newLook_ = {self._newLook_}")
         if self._newLook_:
             backgroundColor = self.palette().color(QtGui.QPalette.AlternateBase)
-            # if __has_PyQt6__ or __has_PySide6__:
-            #     backgroundColor = self.palette().color(QtGui.QPalette.Accent)
-            # else:
-            #     backgroundColor = self.palette().color(QtGui.QPalette.AlternateBase)
         else:
             backgroundColor = self.palette().color(QtGui.QPalette.Highlight) if self.isHighlighted else QtCore.Qt.transparent
         
@@ -951,8 +941,6 @@ class UrlNavigatorButtonBase(QtWidgets.QPushButton):
                 primitive = QtWidgets.QStyle.PE_PanelButtonCommand
             else:
                 primitive = QtWidgets.QStyle.PE_Widget
-                # primitive = QtWidgets.QStyle.PE_PanelLineEdit
-                # primitive = QtWidgets.QStyle.PE_PanelItemViewItem
         else:
             if not self._active_ and self.isHighlighted:
                 backgroundColor.setAlpha(128)
@@ -1033,15 +1021,20 @@ class UrlNavigatorToggleButton(UrlNavigatorButtonBase):
         option.initFrom(self)
         option.state = QtWidgets.QStyle.State_None
         
+        # if self.newLook:
+        #     option.palette.setColor(QtGui.QPalette.Base, self.palette().alternateBase().color())
+        # self.style().drawPrimitive(QtWidgets.QStyle.PE_FrameLineEdit, option, painter, self)
+            
         if self.isChecked():
-            self.drawHoverBackground(painter)
             
             if self.newLook:
+                self.drawHoverBackground(painter)
                 option.palette.setColor(QtGui.QPalette.Base, self.palette().alternateBase().color())
                 self.style().drawPrimitive(QtWidgets.QStyle.PE_FrameLineEdit, option, painter, self)
                 
             self._pixmap_ = QtGui.QIcon.fromTheme("dialog-ok").pixmap(QtCore.QSize(16, 16).expandedTo(QtCore.QSize(16,16)))
             self.style().drawItemPixmap(painter, self.rect(), QtCore.Qt.AlignCenter, self._pixmap_)
+            # self.style().drawItemPixmap(painter, self.rect(), QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight, self._pixmap_)
             
         else:
             if self.isDisplayHintEnabled(DisplayHint.EnteredHint):
@@ -1053,10 +1046,8 @@ class UrlNavigatorToggleButton(UrlNavigatorButtonBase):
                 caretWidth = 2
                 x = 0 if self.layoutDirection() == QtCore.Qt.LeftToRight else buttonWidth - caretWidth
                 
-                if isinstance(self._pixmap_, QtGui.QPixmap):
-                    # self.style().drawItemPixmap(painter, self.rect(), QtCore.Qt.AlignRight, self._pixmap_)
-                    self.style().drawItemPixmap(painter, self.rect(), QtCore.Qt.AlignCenter, self._pixmap_)
-            
+                self._pixmap_ = QtGui.QIcon.fromTheme("edit-entry-symbolic").pixmap(QtCore.QSize(16, 16).expandedTo(QtCore.QSize(16,16)))
+                self.style().drawItemPixmap(painter, self.rect(), QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight, self._pixmap_)
                 painter.drawRect(x, verticalGap, caretWidth, buttonHeight - 2 * verticalGap)
     
     @Slot()
@@ -2369,6 +2360,9 @@ class _UrlNavigator_(QtCore.QObject):
         self._pathBox_.setSizeAdjustPolicy(QtWidgets.QComboBox.AdjustToContentsOnFirstShow)
         # self._pathBox_.setSizeAdjustPolicy(QtWidgets.QComboBox.AdjustToMinimumContentsLengthWithIcon)
         self._pathBox_.installEventFilter(self._nav_)
+        self._pathBox_.lineEdit().undoAvailable = True
+        self._pathBox_.lineEdit().redoAvailable = True
+        self._pathBox_.lineEdit().setClearButtonEnabled(True)
         
         # ### BEGIN TODO 2025-01-09 21:05:56 implement completion
         # UrlCompletion <- Completion (KCompletion in KCompletion framework)
@@ -3022,7 +3016,7 @@ class _UrlNavigator_(QtCore.QObject):
                     button.urlsDroppedOnNavButton.connect(self._nav_._slot_dropUrls) # CMT: wraps to dropUrls
                     button.navigatorButtonActivated.connect(self.slotNavigatorButtonClicked)
                     button.finishedTextResolving.connect(self.updateButtonVisibility)
-
+                    button.newLook = self._nav_.newLook
                     self.appendWidget(button)
 
                 else:
@@ -3227,11 +3221,11 @@ class UrlNavigator(QtWidgets.QWidget):
     # ### END signals
     
     # ### BEGIN __init__ UrlNavigator c'tor 
+    def __init__(self, url:typing.Optional[QtCore.QUrl]=None, 
+                 parent:typing.Optional[QtWidgets.QWidget] = None):
     # def __init__(self, placesModel:typing.Optional[PlacesModel]=None,
     #              url:typing.Optional[QtCore.QUrl]=None, 
     #              parent:typing.Optional[QtWidgets.QWidget] = None):
-    def __init__(self, url:typing.Optional[QtCore.QUrl]=None, 
-                 parent:typing.Optional[QtWidgets.QWidget] = None):
         # if isinstance(placesModel, QtCore.QUrl):
         #     if isinstance(url, QtWidgets.QWidget):
         #         parent = url

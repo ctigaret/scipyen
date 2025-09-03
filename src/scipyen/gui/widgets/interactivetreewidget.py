@@ -550,40 +550,41 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
             # self.setFirstItemColumnSpanned(subnode, True) # obsolete !!!
             
         # recurse into children (a dict)
-        for key, child_data in children.items():
-            keyType = type(key)
-            if isinstance(key, type):
-                keyrepr = f"{key.__module__}.{key.__name__}"
-                keytip = f"member type: {key}"
-                
-            elif type(key).__name__ == "instance":
-                keyrepr = key.__class__.__name__
-                keytip = f"member type: {key}"
-                # keytip = str(key)
-                
-            elif isinstance(data, types.SimpleNamespace):
-                keyrepr = f"{key}"
-                keytip = f"member type: {type(child_data).__name__}"
-                
-            elif isinstance(data, scipy.optimize.Bounds):
-                keyrepr = f"{key}"
-                keytip = f"member type: {type(child_data).__name__}"
-                
-            elif dataclasses.is_dataclass(data) and not isinstance(data, type):
-                keyrepr = f"{key}"
-                keytip = f"field type: {type(child_data).__name__}"
-                
-            elif isinstance(data, (tuple, list, deque, typing.Sequence, dict, types.MappingProxyType)):
-                keyrepr = f"{key}"
-                keytip = f"index type: {type(key).__name__}" # this here is crucial; I want type of key not of what is mapped to it
-                
-            else:
-                keyrepr = str(key)
-                keytip = f"object type: {type(key).__name__}"
-                
-            #              data        parent, name, nameTip,
-            self.buildTree(child_data, node, name=keyrepr, keyType = keyType, nameTip = keytip, 
-                           predicate=predicate, path=path+(keyrepr,)) # so hideRoot is always False?
+        if isinstance(children, dict):
+            for key, child_data in children.items():
+                keyType = type(key)
+                if isinstance(key, type):
+                    keyrepr = f"{key.__module__}.{key.__name__}"
+                    keytip = f"member type: {key}"
+                    
+                elif type(key).__name__ == "instance":
+                    keyrepr = key.__class__.__name__
+                    keytip = f"member type: {key}"
+                    # keytip = str(key)
+                    
+                elif isinstance(data, types.SimpleNamespace):
+                    keyrepr = f"{key}"
+                    keytip = f"member type: {type(child_data).__name__}"
+                    
+                elif isinstance(data, scipy.optimize.Bounds):
+                    keyrepr = f"{key}"
+                    keytip = f"member type: {type(child_data).__name__}"
+                    
+                elif dataclasses.is_dataclass(data) and not isinstance(data, type):
+                    keyrepr = f"{key}"
+                    keytip = f"field type: {type(child_data).__name__}"
+                    
+                elif isinstance(data, (tuple, list, deque, typing.Sequence, dict, types.MappingProxyType)):
+                    keyrepr = f"{key}"
+                    keytip = f"index type: {type(key).__name__}" # this here is crucial; I want type of key not of what is mapped to it
+                    
+                else:
+                    keyrepr = str(key)
+                    keytip = f"object type: {type(key).__name__}"
+                    
+                #              data        parent, name, nameTip,
+                self.buildTree(child_data, node, name=keyrepr, keyType = keyType, nameTip = keytip, 
+                            predicate=predicate, path=path+(keyrepr,)) # so hideRoot is always False?
 
     def parse(self, data, path, predicate=None, typeStr=None) -> tuple:
         r"""
