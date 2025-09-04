@@ -355,16 +355,8 @@ class FrameIndexLookup(object):
         dd = dict()
         
         for field, value in field_frames.items():
-            # print(f"{self.__class__.__name__}.__init__: field -> {field}, value -> {value}")
-            # if not isinstance(value, int):
-            #     if isinstance(value, float) and not np.isnan(value):
-            #         raise TypeError(f"The only acceptable float 'field_frames' values are np.nan or math.nan; instead got {value}")
-            #     # elif value is not None:
-            #     #     raise TypeError(f"The only acceptable float'field_frames' values are np.nan or math.nan; instead got {value}")
-            #     else:
-            #         raise TypeError(f"'field_frames' expected to have int values, np.nan, math.nan, or None values; got {value} ({type(value)}) for field {field} instead")
             if value is None:
-                value = frame_missing
+                sval = frame_missing
             elif value > 0:
                 sval = range(maxFrames)
                 if value < maxFrames:

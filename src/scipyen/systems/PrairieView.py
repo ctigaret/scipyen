@@ -1446,11 +1446,21 @@ class PVFrame(PVObject):
             # so we only modify this default behaviour when PVSequence is of 
             # Linescan type
             if self.parent is not None and self.parent.type == PVSequenceType.Linescan:
-                fdata_axis_1_info = vigra.AxisInfo(key="t", 
-                                             typeFlags=vigra.AxisType.Time, 
-                                             resolution = self.state.attributes["scanlinePeriod"])*pq.s
+                if self.versionString < "5.5":
+                    fdata_axis_1_info = vigra.AxisInfo(key="t", 
+                                                typeFlags=vigra.AxisType.Time,
+                                                resolution = float(self.state.attributes["scanlinePeriod"])) 
+                    resolution = float(self.state.attributes["scanlinePeriod"])*pq.s
+                else:
+                    state = self.parent.parent.state
+                    fdata_axis_1_info = vigra.AxisInfo(key="t", 
+                                                typeFlags=vigra.AxisType.Time,
+                                                resolution = float(state["scanLinePeriod"].value)) 
+                    resolution = float(state["scanLinePeriod"].value)*pq.s
+                    
                 
                 fdata_axis_1_cal  = AxisCalibrationData.new(fdata_axis_1_info)
+                fdata_axis_1_cal.resolution = resolution
                 fdata_axis_1_cal.units = pq.s
                 
             else:
@@ -1524,8 +1534,10 @@ class PVFrame(PVObject):
             if "source" in self.files[k] and all(self.files[k]["source"]):
                 sourceFileName = self.files[k]["source"]
                 # print(f"\treading source {sourceFileName}")
-                if filepath is not None:
-                    sdata = pio.loadImageFile(os.path.join(filepath, sourceFileName))
+                # if filepath is not None:
+                if isinstance(filepath, pathlib.Path):
+                    sdata = pio.loadImageFile(filepath.parent / sourceFileName)
+                    # sdata = pio.loadImageFile(os.path.join(filepath, sourceFileName))
                     # sdata = pio.loadImageFile(os.path.join(filepath, self.files[k]["source"]))
                     
                 else:
@@ -1862,6 +1874,8 @@ class PVSequence (PVObject):
                 # which contain a raster scan data of the "scene" where the linescan
                 # was defined & acquired; 
                 # load these too
+                
+                # print(f"{self.__class__.__name__}.__call__: filepath = {filepath}")
             
                 # NOTE: 2017-10-27 21:47:29
                 # for linescans, the Y axis should be Time !!!
