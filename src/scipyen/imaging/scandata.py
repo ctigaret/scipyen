@@ -8587,7 +8587,7 @@ class ScanData(BaseScipyenData):
             return len(self.scene)
 
     @property
-    def sceneChannelNames(self):
+    def sceneChannelNames(self) -> tuple:
         r"""
         FIXME/TODO adapt to a new scenario where all scene image data is a single
         multi-channel VigraArray
@@ -8672,7 +8672,7 @@ class ScanData(BaseScipyenData):
         return self.scansLayout.channelsAxis
     
     @property
-    def scansChannels(self):
+    def scansChannels(self) -> int:
         r"""The number of channels; read-only
         
         FIXME/TODO adapt to a new scenario where all scene image data is a single
@@ -8707,7 +8707,7 @@ class ScanData(BaseScipyenData):
         return tuple(itertools.chain.from_iterable((AxesCalibration(self.scans[k])["c"].channelNames for k in range(len(self.scans)))))
         
     @scansChannelNames.setter
-    def scansChannelNames(self, value):
+    def scansChannelNames(self, value) -> tuple:
         r"""
         
         FIXME/TODO adapt to a new scenario where all scene image data is a single

@@ -1361,11 +1361,11 @@ class PVFrame(PVObject):
         
         sourceData = list() # will contnain vigra arrays for each source frame, to be concatenated
         
-        #channelNames = (f["channelName"] for f in self.files)
-        
         # print(f"{self.__class__.__name__}.__call__")
         for k in range(len(mdata["files"])):
             fileName = self.files[k]['filename']
+            channel_acquisition_index = self.files[k]['channel']
+            channel_name = self.files[k]['channelName']
             # print(f"\treading {fileName}")
             # NOTE: 2022-01-06 00:10:42
             # fdata: frame data
@@ -1501,23 +1501,15 @@ class PVFrame(PVObject):
                 fdata_axis_2_info = fdata.axistags["c"]
                 
             chCal = ChannelCalibrationData(index = 0,
-                                           acquisition_index=self.files[k]["channel"],
-                                           name=self.files[k]["channelName"])
+                                           acquisition_index = channel_acquisition_index,
+                                           name = channel_name)
             
-            # print(f"{print_styled(f'\n{self.__class__.__name__}.__call__: chCal -> {chCal}', color='green')}")
+            print(f"{print_styled(f'\n{self.__class__.__name__}.__call__: frame {k}: scans data chCal -> {chCal}', color='green')}")
                 
-            fdata_axis_2_info.description = self.files[k]["channelName"]
+            fdata_axis_2_info.description = channel_name
             
             fdata_axis_2_cal = AxisCalibrationData.new(fdata_axis_2_info, channels = [chCal])
             
-            # fdata_axis_2_cal.addChannelCalibration(chCal)
-            # fdata_axis_2_cal.addChannelCalibration(ChannelCalibrationData(index = self.files[k]["channel"],
-            #                                                               name=self.files[k]["channelName"]),
-            #                                        name=self.files[k]["channelName"],
-            #                                        index = self.files[k]["channel"])
-            
-            #fdata_axis_2_cal.setChannelName(0, self.files[k]["channelName"]) # also adds channel calibration to the channel axis calibration
-                                        
             # embed calibration string into axis_2_info's description
             fdata_axis_2_info = fdata_axis_2_cal.calibrateAxis(fdata_axis_2_info)
             
@@ -1534,15 +1526,11 @@ class PVFrame(PVObject):
             if "source" in self.files[k] and all(self.files[k]["source"]):
                 sourceFileName = self.files[k]["source"]
                 # print(f"\treading source {sourceFileName}")
-                # if filepath is not None:
                 if isinstance(filepath, pathlib.Path):
                     sdata = pio.loadImageFile(filepath.parent / sourceFileName)
-                    # sdata = pio.loadImageFile(os.path.join(filepath, sourceFileName))
-                    # sdata = pio.loadImageFile(os.path.join(filepath, self.files[k]["source"]))
                     
                 else:
                     sdata = pio.loadImageFile(sourceFileName)
-                    # sdata = pio.loadImageFile(self.files[k]["source"])
                     
                 if sdata.ndim == 2 and sdata.channelIndex == sdata.ndim:
                     sdata.insertChannelAxis() # make sure there is a channel axis
@@ -1586,12 +1574,17 @@ class PVFrame(PVObject):
                     sdata_axis_2_info = vigra.AxisInfo.c
                 else:
                     sdata_axis_2_info = sdata.axistags["c"]
+                    
+                
                 
                 sChCal = ChannelCalibrationData(index = 0,
-                                                acquisition_index = self.files[k]["channel"],
-                                                name=self.files[k]["channelName"])
+                                                acquisition_index = channel_acquisition_index,
+                                                name = channel_name)
+                print(f"{print_styled(f'\n{self.__class__.__name__}.__call__: frame {k} scene data sChCal -> {sChCal}', color='green')}")
+                
+                sdata_axis_2_info.description = channel_name
+                
                 sdata_axis_2_cal = AxisCalibrationData.new(sdata_axis_2_info, channels = sChCal)
-                # sdata_axis_2_cal.addChannelCalibration()
                 
                 sdata_axis_2_cal = sdata_axis_2_cal.calibrateAxis(sdata_axis_2_info)
                 
@@ -1615,14 +1608,14 @@ class PVFrame(PVObject):
             # therefore we need to collect it then pass it back onto the result
             if self._mergeChannelsOnOutput_:
                 channel_indicess = list(range(len(self.files)))
-                channel_acqusition_indices = [int(self.files[k]["channel"]) for k in range(len(self.files))]
+                channel_acquisition_indices = [int(self.files[k]["channel"]) for k in range(len(self.files))]
                 channel_names = [self.files[k]["channelName"] for k in range(len(self.files))]
                 
                 mergedFrameData = concatenateImages(*frameData, axis="c", allowConcatenationFor=("origin", "resolution"))
                 
                 merged_channels_axinfo = mergedFrameData.axistags["c"]
                 
-                merged_channel_calibrations = list(map(lambda c: ChannelCalibrationData(index = c[0], acquisition_index=c[1], name=c[2]), zip(channel_indices, channel_acqusition_indices, channel_names)))
+                merged_channel_calibrations = list(map(lambda c: ChannelCalibrationData(index = c[0], acquisition_index=c[1], name=c[2]), zip(channel_indices, channel_acquisition_indices, channel_names)))
                 
                 merged_channels_axcal = AxesCalibration.new(merged_channels_axinfo,
                                                             name = axisTypeName(merged_channels_axinfo),
@@ -1752,10 +1745,24 @@ class PVSequence (PVObject):
         return len(self.frames)
     
     def __call__(self, filepath=None):
-        r"""Load the images from the file(s) define in its frames attribute
+        r"""Load the images from the file(s) defined in its frames attribute.
+    
+        In line scanning mode, PrairieView also saves "sources" TIFF files alongside
+        the line scanning data. Scipyen uses these "source" files as the "scene": 
+        a reference frame where the line scanning data was acquired.
+    
+        For T- or Z-stacks, the scans and the scene refer to the same field of view
+        (albeit possibly with different spatial/temporal resolutions and acquisition
+        channels).
+    
+        The "scene" data is more useful for linescans, as is represents the 
+        reference frame where the linescan was acquired.
+    
+        When present, each frame has set of "source" files, one per acquisition
+        channel, which are used to construct the corresponding scene.
         
         If there is only one frame, then it will load that data and return it
-        as a (possibly, multi-channel or "multi-band" ) vigra array
+        as a (possibly, multi-channel or "multi-band" ) vigra array.
         
         Returns None if no frames are defined.
         
@@ -1767,6 +1774,10 @@ class PVSequence (PVObject):
         
         This value overrides any value from the parent PVScan (when the latter
         is not None).
+    
+        Returns:
+        =======
+        A sequence of 
         
         """
         #from os.path import join
@@ -1950,16 +1961,6 @@ class PVSequence (PVObject):
                         # z_pos = list(map(lambda f: float(f.state["positionCurrent_ZAxis"].value), self.frames))
                     else:
                         zres = float(self.parent.state["micronsPerPixel"]["ZAxis"].value)*pq.um
-                        # frameStates = map(lambda f: f.state if len(f.state) else self.parent.state, self.frames)
-                        # z_pos = list(map(lambda s: float(s["positionCurrent"]["ZAxis"].value), frameStates))
-                        
-#                     z_steps = np.diff(z_pos)
-#                     
-#                     if len(z_steps) > 1:
-#                         if not all(z == z_steps[0] for z in z_steps):
-#                             raise ValueError("Irregular Z axis sampling is not supported")
-#                         
-#                     zres = z_steps[0]
                     
                     newAxisInfo = vigra.AxisInfo(key="z", 
                                                  typeFlags=vigra.AxisType.Space,
@@ -1972,9 +1973,6 @@ class PVSequence (PVObject):
                     newAxisCal.resolution = zres
                     newAxisInfo = newAxisCal.calibrateAxis(newAxisInfo)
                     
-                    # print(f"{self.__class__.__name__}.__call__: sequence {self.sequencetypename} with {len(self.frames)} frames")
-                    # print(f"\tnewAxisInfo -> {newAxisInfo} with newAxisCal -> {newAxisCal}")
-                
                 # NOTE: 2018-08-01 17:03:52
                 # see NOTE: 2018-08-01 17:04:06
                 channelAxisDim = data[0].axistags.channelIndex
