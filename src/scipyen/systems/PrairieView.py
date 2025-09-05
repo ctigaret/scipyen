@@ -1586,7 +1586,12 @@ class PVFrame(PVObject):
                 
                 sdata_axis_2_cal = AxisCalibrationData.new(sdata_axis_2_info, channels = sChCal)
                 
+                print(f"\nsdata_axis_2_cal: {sdata_axis_2_cal}")   
+                
                 sdata_axis_2_cal = sdata_axis_2_cal.calibrateAxis(sdata_axis_2_info)
+                
+                print(f"\nsdata_axis_2_info.description: {sdata_axis_2_info.description}")   
+                
                 
                 newaxistags = vigra.AxisTags(sdata_axis_0_info, sdata_axis_1_info, sdata_axis_2_info)
                 source = vigra.VigraArray(sdata, axistags=newaxistags)
