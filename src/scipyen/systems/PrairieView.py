@@ -1348,39 +1348,52 @@ class PVFrame(PVObject):
         # whole data (hyper-)volume, but just the files pertaining to this frame
         # (hence we do not pass asVolume=True to loadImageFile function)
         
-        # STEP 1: read metadata
+        # ### BEGIN STEP 1: read metadata
+        #
         mdata = self.metadata()
+        #
+        # ### END   STEP 1: read metadata
         
-        # STEP 2: set up file names
+        # ### BEGIN STEP 2: set up file names
+        #
         if filepath is None:
             if self.parent is not None:
                 filepath = self.parent.filepath
+        #
+        # ### END   STEP 2: set up file names
         
-        # STEP 3: set up vigra arrays and their axes
+        # ### BEGIN STEP 3: set up vigra arrays and their axes, using the "files" 
+        # metadata field
+        #
+        #
+        # ### END   STEP 3: set up vigra arrays and their axes
         frameData = list() # will contain vigra arrays for each scans frame, to be concatenated
         
-        sourceData = list() # will contnain vigra arrays for each source frame, to be concatenated
+        sourceData = list() # will contain vigra arrays for each source frame, to be concatenated
         
-        # print(f"{self.__class__.__name__}.__call__")
         for k in range(len(mdata["files"])):
             fileName = self.files[k]['filename']
             channel_acquisition_index = self.files[k]['channel']
             channel_name = self.files[k]['channelName']
-            # print(f"\treading {fileName}")
             # NOTE: 2022-01-06 00:10:42
             # fdata: frame data
             # sdata: source data
             if isinstance(filepath, str):
                 filepath = pathlib.Path(filepath)
                 
+            # ### BEGIN load frame data
+            #
             if isinstance(filepath, pathlib.Path):
                 fdata = pio.loadImageFile(filepath.parent / fileName)
-                # fdata = pio.loadImageFile(os.path.join(filepath, fileName))
-                # fdata = pio.loadImageFile(os.path.join(filepath, self.files[k]["filename"]))
             
             else:
                 fdata = pio.loadImageFile(fileName)
-                # fdata = pio.loadImageFile(self.files[k]["filename"])
+            #
+            # ### END   load frame data
+            
+            # ### BEGIN set up frame data axes and calibrations
+            #
+            
                 
             if fdata.ndim == 2 and fdata.channelIndex == fdata.ndim:
                 fdata.insertChannelAxis() # make sure there is a channel axis
@@ -1405,42 +1418,41 @@ class PVFrame(PVObject):
             # AxisCalibrationData objects here are just used to embed calibration
             # strings in the `description` attribute for the corresponding
             # AxisInfo
-                
-            # NOTE: 2018-06-03 22:15:10
-            # axis_0_info is the AxisInfo object for the 1st (spatial) dimension (axis)
-            fdata_axis_0_info = fdata.axistags[0]
             
-            # NOTE: 2021-10-26 15:48:42
+            # ### BEGIN Axis 0 (i.e., 1st dimension)
+            #
+            fdata_axis_0_info = fdata.axistags[0]
             
             # fdata_axis_0_cal  = AxisCalibrationData(fdata_axis_0_info)
             fdata_axis_0_cal  = AxisCalibrationData.new(fdata_axis_0_info)
-            # print(f"{self.__class__.__name__}.__call__: calibration -> {fdata_axis_0_cal.type}")
             fdata_axis_0_cal.units = pq.um
             if self.versionString < "5.5":
                 fdata_axis_0_cal.resolution = float(self.state["micronsPerPixel_XAxis"].value)*pq.um
+                
             else:
-                # ATTENTION: 2025-04-04 15:07:52
-                # axes resolutions are ALL in the state shard at PVScan level,  
-                # NOT in the frame's stateshard, which contain frame-specific information
+                # ATTENTION: 2025-04-04 15:07:52 for PrairieView v >= 5.5, axes
+                # resolutions are ALL in the state shard at PVScan level, NOT in
+                # the frame's stateshard, which contains frame-specific information
                 # such as gain & laser power, ONLY WHEN APPROPRIATE (e.g. in a Z series)
                 # 
                 state = self.parent.parent.state
                         
-                # print(f"{self.__class__.__name__}.__call__: query scales for {fdata_axis_0_info} - state keys: {tuple(state.keys)}")
                 if isinstance(state, PVStateShard) and "micronsPerPixel" in state:
                     fdata_axis_0_cal.resolution = float(state["micronsPerPixel"]["XAxis"].value)*pq.um
                 else:
                     scipywarn(f"Cannot get the μm / pixel for axis {print_styled(f'{fdata_axis_0_info}', 'yellow')} in frame {print_styled(f'frame {self.index}', 'yellow')}")
             
-            
             # embed calibration string into axis_0_info's description
             fdata_axis_0_info = fdata_axis_0_cal.calibrateAxis(fdata_axis_0_info)
             
+            #
+            # ### END   Axis 0 (i.e., 1st dimension)
             
+            # ### BEGIN Axis 1 (i.e., 2nd dimension)
+            #
             # NOTE: 2018-06-03 22:15:54
-            # axis_1_info is the AxisInfo objects for the 2nd dimension (axis);
             # the type of this axis (spatial or temporal) depends on the type of 
-            # PVSequence: for a Linescan, the this axis is a temporal one
+            # PVSequence: for a Linescan, this axis is in the time domain.
             #
             # By default, vigra impex sets this axis to be a Space type ('y')
             # so we only modify this default behaviour when PVSequence is of 
@@ -1463,7 +1475,7 @@ class PVFrame(PVObject):
                 fdata_axis_1_cal.resolution = resolution
                 fdata_axis_1_cal.units = pq.s
                 
-            else:
+            else: # NOT a line scan — this implies axis 1 is in the space domain
                 fdata_axis_1_info = fdata.axistags[1] # by default vigra behaviour is Space 
                 
                 fdata_axis_1_cal = AxisCalibrationData.new(fdata_axis_1_info)
@@ -1473,8 +1485,6 @@ class PVFrame(PVObject):
                 else:
                     # NOTE: see ATTENTION: 2025-04-04 15:07:52
                     state = self.parent.parent.state
-                    # print(f"{self.__class__.__name__}.__call__: query scales for {fdata_axis_1_info} - state keys: {tuple(state.keys)}")
-                    # state = self.state if len(self.state) else self.parent.parent.state
                     if isinstance(state, PVStateShard) and "micronsPerPixel" in state:
                         fdata_axis_1_cal.resolution = float(state["micronsPerPixel"]["YAxis"].value)*pq.um
                     else:
@@ -1483,6 +1493,12 @@ class PVFrame(PVObject):
                 
             # embed calibration string into axis_1_info's description
             fdata_axis_1_info = fdata_axis_1_cal.calibrateAxis(fdata_axis_1_info)
+            
+            #
+            # ### END   Axis 1 (i.e., 2nd dimension)
+            
+            # ### BEGIN Axis 2 (i.e., 3rd dimension)
+            #
             
             # NOTE: 2018-06-03 22:16:26
             # axis_2_info is the AxisInfo object for 3rd dimension
@@ -1504,21 +1520,33 @@ class PVFrame(PVObject):
                                            acquisition_index = channel_acquisition_index,
                                            name = channel_name)
             
-            print(f"{print_styled(f'\n{self.__class__.__name__}.__call__: frame {k}: scans data chCal -> {chCal}', color='green')}")
+            print(f"\n{self.__class__.__name__}.__call__: frame {k}: scans data chCal -> \n{print_styled(f'\n{chCal}', color='yellow')}")
                 
             fdata_axis_2_info.description = channel_name
             
             fdata_axis_2_cal = AxisCalibrationData.new(fdata_axis_2_info, channels = [chCal])
+            print(f"\nfdata_axis_2_cal: \n{print_styled(fdata_axis_2_cal, 'yellow')}")   
             
-            # embed calibration string into axis_2_info's description
             fdata_axis_2_info = fdata_axis_2_cal.calibrateAxis(fdata_axis_2_info)
+            # embed calibration string into axis_2_info's description
+            print(f"\nfdata_axis_2_info.description: \n{print_styled(fdata_axis_2_info.description, 'yellow')}")   
             
-            # construct a new VigraArray using fdata and new axistags initialized
-            # from the calibrated AxisInfo objects
+            #
+            # ### END   Axis 2 (i.e., 3rd dimension)
+            
+            #
+            # ### END   set up frame data axes and calibrations
+            
+            # ### BEGIN append a new VigraArray constructed from fdata and the new axistags
+            # (initialized from the calibrated AxisInfo objects)
+            #
             newaxistags = vigra.AxisTags(fdata_axis_0_info, fdata_axis_1_info, fdata_axis_2_info)
             frame = vigra.VigraArray(fdata, axistags=newaxistags)
             
             frameData.append(frame)
+            #
+            # ### END   append a new VigraArray constructed from fdata and the new axistags
+            
         
             # NOTE: 2021-10-27 22:18:41
             # the source data is set up using the same blueprint as for frame data
@@ -1580,17 +1608,17 @@ class PVFrame(PVObject):
                 sChCal = ChannelCalibrationData(index = 0,
                                                 acquisition_index = channel_acquisition_index,
                                                 name = channel_name)
-                print(f"{print_styled(f'\n{self.__class__.__name__}.__call__: frame {k} scene data sChCal -> {sChCal}', color='green')}")
+                print(f"\n{self.__class__.__name__}.__call__: frame {k} scene data sChCal -> \n{print_styled(f'\n{sChCal}', color='yellow')}")
                 
                 sdata_axis_2_info.description = channel_name
                 
                 sdata_axis_2_cal = AxisCalibrationData.new(sdata_axis_2_info, channels = sChCal)
                 
-                print(f"\nsdata_axis_2_cal: {sdata_axis_2_cal}")   
+                print(f"\nsdata_axis_2_cal: \n{print_styled(sdata_axis_2_cal, 'yellow')}")   
                 
                 sdata_axis_2_cal = sdata_axis_2_cal.calibrateAxis(sdata_axis_2_info)
                 
-                print(f"\nsdata_axis_2_info.description: {sdata_axis_2_info.description}")   
+                print(f"\nsdata_axis_2_info.description: \n{print_styled(sdata_axis_2_info.description, 'yellow')}")   
                 
                 
                 newaxistags = vigra.AxisTags(sdata_axis_0_info, sdata_axis_1_info, sdata_axis_2_info)
@@ -1693,6 +1721,7 @@ class PVFrame(PVObject):
                     ret.append("  %s = %s\n" % (i[0], i[1]))
             
         return "".join(ret)
+    
         
 class PVScan(PVObject): pass # needed for PVSequence below; overwritten further down
 # NOTE: 2017-08-03 09:24:20
