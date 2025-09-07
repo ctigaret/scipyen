@@ -2022,7 +2022,6 @@ def full_class_name(data):
 
     return ".".join([data.__module__, data.__name__])
 
-# def unwind_type_sig(x, *t, visited:set = set()):
 def unwind_type_sig(x, visited:set = set()):
     """Unwinds type annotation to its component types.
 This includes special aliases defined in the ``types`` and ``typing`` standard 
@@ -2039,8 +2038,10 @@ library modules.
     
     Returns:
     ========
-    None - the function places te individual types inside the ```visited`` argument
-    which must be present in the caller's namespace (and is passed here by reference
+    visited - a set
+    
+    The function places the individual types inside the ```visited`` argument
+    which should be present in the caller's namespace (and is passed here by reference
     as are all containers in Python).
     
     Side effects:
@@ -2051,13 +2052,13 @@ library modules.
     
     if isinstance(x, type):
         visited.add(x)
-        return
+        return visited
     elif isinstance(x, (typing._GenericAlias, typing._SpecialGenericAlias, types.UnionType, types.GenericAlias)):
         visited.add(x)
         unwind_type_sig(x.__args__, visited = visited)
-        return
+        return visited
     elif not isinstance(x, (tuple, list)):
-        return
+        return visited
     
     ret = list()
     
@@ -2071,7 +2072,8 @@ library modules.
             if hasattr(v, "__args__"):
                 unwind_type_sig(v.__args__, visited=visited)
             visited.add(v)
-            
+    return visited
+
 def get_positional_named_annotations(f:typing.Union[types.FunctionType, types.MethodType]) -> list:
     compress_annot = lambda x: x[0] if len(x) else MISSING
     funcSignature = signature_as_dict(f)
@@ -2255,14 +2257,38 @@ def is_hashable(x):
     return ret
 
 
-def typing_unravel(x):
+def unravel_types(x):
+    ret = set()
     origin = typing.get_origin(x)
-    if issubclass(origin, (collections.abc.Sequence, list, tuple, collections.deque)):
-        # deal with typing.Sequence[...], List[...], Tuple[...]
-        pass
-    elif issubclass(origin, (dict, collection.abc.Mapping)):
-        pass
-    
+    if origin is None:
+        if isinstance(x, type):
+            ret.add(x)
+        elif isinstance(x, typing.Sequence):
+            if all(isinstance(v, type) for v in x):
+                ret |= set(x)
+            else:
+                ret.add(type(x))
+                
+        else:
+            ret.add(type(x))
+            
+    else:
+        args = unravel_types(typing.get_args(x))
+        ret |= args
+        
+    return ret
+            
+#     elif issubclass(origin, (collections.abc.Sequence, list, tuple, collections.deque)):
+#         # deal with typing.Sequence[...], List[...], Tuple[...]
+#         
+#         pass
+#     elif issubclass(origin, (dict, collection.abc.Mapping)):
+#         pass
+#     
+#     elif isinstance(x, typing.Sequence):
+#         ret.extend(list(map(lambda v: typing_unravel(v), x)))
+#     
+#     return tuple(ret)
 
 def is_type_or_subclass(x: typing.Any, y:typing.Union[type, typing._Final]):
     if not isinstance(y, (type, typing._Final)):

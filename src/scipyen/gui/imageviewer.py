@@ -1245,7 +1245,6 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             self._prevColorMap = self._colorMap
         
         self._colorMap = cmap
-        #self._colorMap = val
         if isinstance(getattr(self, "configurable_traits", None), DataBag):
             self.configurable_traits["ColorMap"] = cmap_name
         
@@ -1266,8 +1265,6 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         # NOTE when a frame axis index equals data.ndim this means there is no
         # frame axis there!
         
-        #print("in frameIndexBinding: self.frameAxis", self.frameAxis)
-        #print("in frameIndexBinding: self._number_of_frames_", self._number_of_frames_)
         if isinstance(self._number_of_frames_, int):
             return tuple((self.frameAxis if self.frameAxis < self._data_.ndim else None, k) for k in range(self._number_of_frames_))
         
@@ -2988,6 +2985,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.imageToolBar.setMovable(False)
         self.setAxesScalesAction = self.imageToolBar.addAction(QtGui.QIcon.fromTheme("measure-symbolic"), "Axes scales")
         self.setAxesScalesAction.triggered.connect(self.slot_editAxesScales)
+        self.chooseColorMapAction = self.imageToolBar.addAction(QtGui.QIcon.fromTheme("colormanagement-symbolic"), "Color map")
+        self.chooseColorMapAction.triggered.connect(self.slot_chooseColorMap)
         
         self.addToolBar(QtCore.Qt.TopToolBarArea, self.imageToolBar)
         
@@ -3004,6 +3003,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.zoomOriginalAction.triggered.connect(self.slot_zoomOriginal)
         self.zoomInAction.triggered.connect(self.slot_zoomIn)
         self.zoomAction.triggered.connect(self.slot_selectZoom)
+        
 
         self.addToolBar(QtCore.Qt.TopToolBarArea, self.zoomToolBar)
         

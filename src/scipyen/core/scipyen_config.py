@@ -228,7 +228,10 @@ def configsrc2bunch(src:typing.Union[confuse.ConfigSource, Bunch]):
     """
     return Bunch(((k, configsrc2bunch(v)) if isinstance(v, (confuse.ConfigSource, Bunch)) else (k,v) for k,v in src.items()))
 
-def markConfigurable(confname:str, conftype:str="", setter:bool=True, default:typing.Optional[typing.Any]=None, trait_notifier:typing.Optional[typing.Union[bool, DataBag]] = None, value_type=None):
+def markConfigurable(confname:str, conftype:str="", setter:bool=True, 
+                     default:typing.Optional[typing.Any]=None, 
+                     trait_notifier:typing.Optional[typing.Union[bool, DataBag]] = None, 
+                     value_type=None):
     r"""Decorator for instance methods & properties.
     
     Decorates instance properties and methods that access instance attributes 
@@ -1164,13 +1167,25 @@ class ScipyenConfigurable(object):
         self._tag = configTag
         
     def _get_parent_(self):
+        """Returns the parent 'appWindow' (if defined) or the Qt parent object.
+    This is so that scipyen viewers that are created a children of other Scipyen apps
+    can have their confugrables saved in a subgroup belonging to that 'parent' app.
+    
+    The 'appWindow' attribute, if it exists, should not be confused with the Qt 
+    'parent' object (typically, a widget or window)
+    """
         parent = None
-        parent_f = inspect.getattr_static(self, "parent", None)
-        if inspect.isfunction(parent_f) or inspect.ismethoddescriptor(parent_f):
-            parent = self.parent()
+        
+        if hasattr(self, "appWindow"):
+            parent = self.appWindow
             
-        elif isinstance(parent_f, property):
-            parent = parent_f.fget(self)
+        if parent is None:
+            parent_f = inspect.getattr_static(self, "parent", None)
+            if inspect.isfunction(parent_f) or inspect.ismethoddescriptor(parent_f):
+                parent = self.parent()
+                
+            elif isinstance(parent_f, property):
+                parent = parent_f.fget(self)
             
         return parent
 
@@ -1274,23 +1289,19 @@ class ScipyenConfigurable(object):
         r"""
         If isTop, returns the confuse config section for the class of this instance:
                 scipyen_config → this class name
-        Else:
+        otherwise, the behaviour is as defined below:
             If parent is not None:
-                If tag is not None (or an empty str)
+                If tag is a non-empty string
                     return the sub-subsection: scipyen_config → parent class name → this class name → tag
-                Else
+                Else:
                     return the sub-subsection: scipyen_config → parent class name → this class name
         
             Else:
                 return the same thing as if isTop were True ('cause there's no parent, let alone a tag)
                     
         """
-        # if self.__class__.__name__ == "EventAnalysis":
-        #     print(f"scipyen_config {id(scipyen_config)} {scipyen_config}")
-            
         if isTop: 
             return scipyen_config[self.__class__.__name__]#.get()
-            # return scipyen_config[self.__class__.__name__].get(None)
             
         if parent is not None:
             if isinstance(tag, str) and len(tag.strip()):
@@ -1453,10 +1464,10 @@ class ScipyenConfigurable(object):
         On the other hand, individual settings can be organized hierarchically
         by collecting them in a dict (or dict-like) object.
         """
-        # print(f"ScipyenConfigurable<{self.__class__.__name__}.saveSettings()")
+        # print(f"ScipyenConfigurable<{self.__class__.__name__}>.saveSettings()")
         # NOTE: 2021-05-04 21:53:04
         # This saveSettings has access to all the subclass attributes (with the
-        # subclass being  fully initialized by the time this is called).
+        # subclass being fully initialized by the time this is called).
         #print("ScipyenConfigurable <%s>.saveSettings" % self.__class__.__name__)
         cfg = self.clsconfigurables
         
@@ -1467,8 +1478,11 @@ class ScipyenConfigurable(object):
         
         if len(cfg):
             isTop = hasattr(self, "isTopLevel") and self.isTopLevel
-                
-            parent = self._get_parent_()
+            parent = None
+            if hasattr(self, "appWindow"):
+                parent = self.appWindow
+            if parent is None:
+                parent = self._get_parent_()
             tag = self.configTag if hasattr(self, "configTag") and isinstance(self.configTag, str) and len(self.configTag.strip()) else None
             user_conf = self._get_config_view_(isTop, parent, tag)
             
