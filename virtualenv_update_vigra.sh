@@ -24,7 +24,7 @@ scipyendir=`dirname "$realscript"`
 docdir=${scipyendir}/doc
 installscriptdir=${scipyendir}/setup_env
 scipyensrcdir=${scipyendir}/src/scipyen
-refresh_git_repos=0
+refresh_git_repos=1
 
 njobs=`nproc --all`
 
@@ -72,7 +72,7 @@ if [ ! -r ${vigra_src} ] ; then
     fi
     
 else
-    # refresh the gir repo...
+    # refresh the git repo...
     if [[ $refresh_git_repos -gt 0 ]] ; then
         echo -e "Refreshing vigra git repository...\n"
         cd ${vigra_src}

@@ -625,7 +625,7 @@ function dopyside6 ()
             cd ${VIRTUAL_ENV}
             mkdir -p src && cd src
             # create build directory
-            mkdir pyside6-build && cd pyside6-build
+            mkdir -p pyside6-build && cd pyside6-build
             # pre-create build sub directory as expected by setup.py in pyside-setup
             # BUT: make sure install/lib and install/lib64 point to the same directory
             # i.e., make lib64 a symbolic link to lib
