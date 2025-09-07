@@ -1393,7 +1393,6 @@ class PVFrame(PVObject):
             
             # ### BEGIN set up frame data axes and calibrations
             #
-            
                 
             if fdata.ndim == 2 and fdata.channelIndex == fdata.ndim:
                 fdata.insertChannelAxis() # make sure there is a channel axis
@@ -1423,7 +1422,6 @@ class PVFrame(PVObject):
             #
             fdata_axis_0_info = fdata.axistags[0]
             
-            # fdata_axis_0_cal  = AxisCalibrationData(fdata_axis_0_info)
             fdata_axis_0_cal  = AxisCalibrationData.new(fdata_axis_0_info)
             fdata_axis_0_cal.units = pq.um
             if self.versionString < "5.5":
@@ -1520,16 +1518,13 @@ class PVFrame(PVObject):
                                            acquisition_index = channel_acquisition_index,
                                            name = channel_name)
             
-            print(f"\n{self.__class__.__name__}.__call__: frame {k}: scans data chCal -> \n{print_styled(f'\n{chCal}', color='yellow')}")
+            # print(f"\n{self.__class__.__name__}.__call__: frame {k}: scans data chCal -> \n{print_styled(f'\n{chCal}', color='yellow')}")
                 
             fdata_axis_2_info.description = channel_name
-            
             fdata_axis_2_cal = AxisCalibrationData.new(fdata_axis_2_info, channels = [chCal])
-            print(f"\nfdata_axis_2_cal: \n{print_styled(fdata_axis_2_cal, 'yellow')}")   
-            
+            # print(f"\nfdata_axis_2_cal: \n{print_styled(fdata_axis_2_cal, 'yellow')}")
             fdata_axis_2_info = fdata_axis_2_cal.calibrateAxis(fdata_axis_2_info)
-            # embed calibration string into axis_2_info's description
-            print(f"\nfdata_axis_2_info.description: \n{print_styled(fdata_axis_2_info.description, 'yellow')}")   
+            # print(f"\nfdata_axis_2_info.description: \n{print_styled(fdata_axis_2_info.description, 'yellow')}")
             
             #
             # ### END   Axis 2 (i.e., 3rd dimension)
@@ -1537,7 +1532,7 @@ class PVFrame(PVObject):
             #
             # ### END   set up frame data axes and calibrations
             
-            # ### BEGIN append a new VigraArray constructed from fdata and the new axistags
+            # ### BEGIN append a new frame scan data: VigraArray constructed from fdata and the new axistags
             # (initialized from the calibrated AxisInfo objects)
             #
             newaxistags = vigra.AxisTags(fdata_axis_0_info, fdata_axis_1_info, fdata_axis_2_info)
@@ -1602,24 +1597,17 @@ class PVFrame(PVObject):
                     sdata_axis_2_info = vigra.AxisInfo.c
                 else:
                     sdata_axis_2_info = sdata.axistags["c"]
-                    
-                
                 
                 sChCal = ChannelCalibrationData(index = 0,
                                                 acquisition_index = channel_acquisition_index,
                                                 name = channel_name)
-                print(f"\n{self.__class__.__name__}.__call__: frame {k} scene data sChCal -> \n{print_styled(f'\n{sChCal}', color='yellow')}")
+                # print(f"\n{self.__class__.__name__}.__call__: frame {k} scene data sChCal -> \n{print_styled(f'\n{sChCal}', color='yellow')}")
                 
                 sdata_axis_2_info.description = channel_name
-                
-                sdata_axis_2_cal = AxisCalibrationData.new(sdata_axis_2_info, channels = sChCal)
-                
-                print(f"\nsdata_axis_2_cal: \n{print_styled(sdata_axis_2_cal, 'yellow')}")   
-                
+                sdata_axis_2_cal = AxisCalibrationData.new(sdata_axis_2_info, channels = [sChCal])
+                # print(f"\nsdata_axis_2_cal: \n{print_styled(sdata_axis_2_cal, 'yellow')}")
                 sdata_axis_2_cal = sdata_axis_2_cal.calibrateAxis(sdata_axis_2_info)
-                
-                print(f"\nsdata_axis_2_info.description: \n{print_styled(sdata_axis_2_info.description, 'yellow')}")   
-                
+                # print(f"\nsdata_axis_2_info.description: \n{print_styled(sdata_axis_2_info.description, 'yellow')}")
                 
                 newaxistags = vigra.AxisTags(sdata_axis_0_info, sdata_axis_1_info, sdata_axis_2_info)
                 source = vigra.VigraArray(sdata, axistags=newaxistags)

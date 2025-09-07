@@ -23,7 +23,7 @@ TODO:
 # NOTE: 2017-07-03 21:28:18 
 # this is a WORKING routine:
 #
-# BEGIN PSEUDOCODE
+# ### BEGIN PSEUDOCODE
 #   1)  find out stimulus delay from start of linescans (because linescanning does NOT
 #       start at t0_ephys = 0!)
 #       open abf file, view it in signalviewer
@@ -121,7 +121,7 @@ TODO:
 #
 #       view it in SignalViewer
 #
-# END   PSEUDOCODE
+# ### END   PSEUDOCODE
 
 
 #### BEGIN core python modules
@@ -10459,10 +10459,10 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         obj = self._data_.scanRegion
         #print("_display_scan_region_ %s: %s" % (type(obj).__name__, obj))
         
-        if not isinstance(self._data_.scene, (tuple, list)) or not all(isinstance(v, vigra.VigraArray) for v in self._data_scene):
+        if not isinstance(self._data_.scene, (tuple, list)) or not all(isinstance(v, vigra.VigraArray) for v in self._data_.scene):
             return
         
-        if len(self.sceneViewers) == 0:
+        if len(self.sceneviewers) == 0:
             return
         
         if isinstance(obj, pgui.PlanarGraphics):

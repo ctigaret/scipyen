@@ -2255,13 +2255,28 @@ def is_hashable(x):
     return ret
 
 
-def is_type_or_subclass(x, y):
-    if isinstance(x, type):
-        return issubclass(x, y)
+def typing_unravel(x):
+    origin = typing.get_origin(x)
+    if issubclass(origin, (collections.abc.Sequence, list, tuple, collections.deque)):
+        # deal with typing.Sequence[...], List[...], Tuple[...]
+        pass
+    elif issubclass(origin, (dict, collection.abc.Mapping)):
+        pass
+    
 
-    return isinstance(x, y)
+def is_type_or_subclass(x: typing.Any, y:typing.Union[type, typing._Final]):
+    if not isinstance(y, (type, typing._Final)):
+        raise TypeError(f"Second argument must be a type; instead, got {type(y).__name__}")
+    
+    if isinstance(y, type):
+        if isinstance(x, type):
+            return issubclass(x, y)
 
-
+        return isinstance(x, y)
+    
+    else:
+        return False
+    
 def __check_array_attribute__(rt, param):
     import vigra
     from core.scipyen_quantities import unitsConvertible

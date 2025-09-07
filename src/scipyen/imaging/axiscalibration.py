@@ -1383,7 +1383,7 @@ class AxisCalibrationData(CalibrationData):
           origin: typing.Optional[typing.Union[numbers.Number, pq.Quantity, CalSpec]] = None,
           maximum: typing.Optional[typing.Union[numbers.Number, pq.Quantity]] = None,
           resolution: typing.Optional[typing.Union[numbers.Number, pq.Quantity]] = None,
-          channels: typing.Optional[typing.Sequence[CalSpec | ChannelCalibrationData]] = None):
+          channels: typing.Optional[typing.Union[CalSpec, ChannelCalibrationData, typing.Sequence[CalSpec | ChannelCalibrationData]]] = None):
         r"""Factory for constructing an AxisCalibrationData using vigra.AxisInfo"""
         # NOTE: 2025-04-13 13:42:52
         # in vigra.AxisInfo, a 'resolution' field 0.0 means axis resolution, in
@@ -1429,7 +1429,16 @@ class AxisCalibrationData(CalibrationData):
                 
             if ischannels:
                 if isinstance(channels, typing.Sequence):
-                    ret.channels = channels # use the CalibrationChannelsDescriptor
+                    if all(isinstance(c, (CalSpec, ChannelCalibrationData)) for c in channels):
+                        ret.channels = channels # use the CalibrationChannelsDescriptor
+                    else:
+                        raise TypeError("Incompatible types in channels specification")
+                elif isinstance(channels (CalSpec, ChannelCalibrationData)):
+                    ret.channel = [channels]
+                    
+                elif channels is not None:
+                    raise TypeError(f"Wrong 'channels' specification. expecting a CalSpec, ChannelCalibrationData, or a sequence of these; instead, got {type(channels).__name__}")
+                    
                 else:
                     if len(ret.channels) == 0:
                         ret.channels.append(ChannelCalibrationData(name = "channel_0", index=0)) # a default, for one channel!
