@@ -2278,18 +2278,6 @@ def unravel_types(x):
         
     return ret
             
-#     elif issubclass(origin, (collections.abc.Sequence, list, tuple, collections.deque)):
-#         # deal with typing.Sequence[...], List[...], Tuple[...]
-#         
-#         pass
-#     elif issubclass(origin, (dict, collection.abc.Mapping)):
-#         pass
-#     
-#     elif isinstance(x, typing.Sequence):
-#         ret.extend(list(map(lambda v: typing_unravel(v), x)))
-#     
-#     return tuple(ret)
-
 def is_type_or_subclass(x: typing.Any, y:typing.Union[type, typing._Final]):
     if not isinstance(y, (type, typing._Final)):
         raise TypeError(f"Second argument must be a type; instead, got {type(y).__name__}")
