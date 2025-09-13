@@ -530,7 +530,10 @@ def familyConstants(family:str):
     
     return CONSTANTS[family]
 
-def unitFamilies():
+def unitFamilies() -> list:
+    """Lists the names of the Unit families defined in Scipyen.
+    Note that these are actually imported from the Quantities package.
+"""
     return list(UNITS_DICT.keys())
 
 def isCompound(x:pq.Quantity | pq.UnitQuantity):
@@ -761,6 +764,30 @@ def getUnitFamily(unit:typing.Union[pq.Quantity, pq.UnitQuantity], /,
         
     
 def familyUnits(family:str, kind:typing.Optional[str]=None) -> set:
+    """Returns the set of units belonging to a Units Family.
+    Parameters:
+    ==========
+    family: Units family name. See unitFamilies() function in this module for
+        a list of Unit families defined in Scipyen.
+    
+    kind: Optional; allowed values are the strings "irreducible" or "derived", 
+        or None (default)
+    
+        Specifies which units should be returned (irreducible, i.e., fundamental,
+        or derived, i.e., those that can be further reduced to an algebraic expression
+        of irreducible units).
+    
+        The default (None) means that ALL units in the fmaily are returned.
+    
+    Returns:
+    ========
+    A set of unit quantities, as specified by the 'kind' parameter
+    
+    NOTE: See also, in this module:
+    getUnitFamily() -> retrieve the Units family for a known quantity
+    unitFamilies()  -> list the Unit family names defined in Scipyen (via python Quantities package)
+    
+"""
     if family not in UNITS_DICT:
         raise ValueError(f"{family} is not a valid UnitQuantity family; valid units families are {list(UNITS_DICT.keys())}\n\n\t(see {__name__}.UNITS_DICT)")
     

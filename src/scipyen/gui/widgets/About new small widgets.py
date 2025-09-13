@@ -22,7 +22,7 @@ Might not be necesary to subclass stock QtWidgets below.
 Editables:
     int -> IntWidget(QSpinBox)
         singleStep:int=1
-        minimum:int, maximum:int by cconstructor
+        minimum:int, maximum:int by constructor
         prefix:str, suffix:str by constructor
         stepType:QAbstractSpinBox.StepType = QAbstractSpinBox.defaultStepType
         

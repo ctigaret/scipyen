@@ -397,8 +397,17 @@ class FrameIndexLookup(object):
                         
                     elif all(isinstance(v_, tuple) and len(v_) == 2 and (isinstance(v_[0], int) and (v_[1] is frame_missing or v_[1] is None or isinstance(v_[1], int))) for v_ in v):
                         for v_ in v:
-                            if isinstance(maxFrames, int) and v_[0] not in range(-maxFrames, maxFrames): # allow negative indices
-                                raise ValueError(f"master index {v_[0]} out of range {(-maxFrames, maxFrames-1)}")
+                            if isinstance(maxFrames, int):
+                                if maxFrames > 0:
+                                    if v_[0] not in range(-maxFrames, maxFrames): # allow negative indices
+                                        raise ValueError(f"master index {v_[0]} out of range {(-maxFrames, maxFrames-1)}")
+                                elif maxFrames == 0:
+                                    if v_[0] != 0:
+                                        raise ValueError(f"Bad master index ({v_[0]}) for {maxFrames} frames")
+                                
+                                else:
+                                    raise RuntimeError(f"Bad maxFrames: {maxFrames}")
+                                    
                             
                             if isinstance(field_frames[k], int):
                                 if isinstance(v_[1], int) and v_[1] not in range(-field_frames[k], field_frames[k]):

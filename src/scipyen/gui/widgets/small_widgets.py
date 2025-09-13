@@ -249,7 +249,12 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
     _default_internal_maximum   =  math.inf
         
     
-    def __init__(self, parent:typing.Optional[QtWidgets.QWidget]=None, units:typing.Optional[pq.Quantity]=None, unitsFamily:typing.Optional[str]=None, singleStep:typing.Optional[float]=None, decimals:typing.Optional[int]=None):#, minimum:typing.Optional[typing.Union[pq.Quantity, float]]=None, maximum:typing.Optional[typing.Union[pq.Quantity, float]]=None):
+    def __init__(self, parent:typing.Optional[QtWidgets.QWidget]=None,
+                 units:typing.Optional[pq.Quantity]=None, 
+                 unitsFamily:typing.Optional[str]=None, 
+                 singleStep:typing.Optional[float]=None, 
+                 stepType:typing.Optional[QtWidgets.QAbstractSpinBox.StepType] = None,
+                 decimals:typing.Optional[int]=None):#, minimum:typing.Optional[typing.Union[pq.Quantity, float]]=None, maximum:typing.Optional[typing.Union[pq.Quantity, float]]=None):
         r"""
         Named parameters:
         =================
@@ -271,13 +276,33 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         
         if isinstance(units, pq.Quantity):
             self._units_ = units.units
+            if not isinstance(units, pq.UnitQuantity):
+                super().setValue(units.magnitude)
         else:
             self._units_ = self._default_units_
         
         if unitsFamily in scq.UNITS_DICT:
             self._unitFamily_ = unitsFamily
+        elif isinstance(self._units_, pq.Quantity):
+            self._unitFamily_ = scq.getUnitFamily(self._units_)
         else:
             self._unitFamily_ = None
+            
+        print(f"{self.__class__.__name__}.__init__: units = {self._units_}, unit family = {self._unitFamily_}")
+        
+        if self._units_.dimensionality == pq.dimensionless.dimensionality:
+            super().setSuffix("")
+            super().setPrefix("")
+        else:
+            symbol = self._units_.dimensionality.unicode
+            if self._unitFamily_ == "Currency":
+                super().setSuffix("")
+                super().setPrefix(f"{symbol} ")
+            else:
+                super().setSuffix(f" {symbol}")
+                super().setPrefix("")
+            
+        print(f"{self.__class__.__name__}.__init__: suffix -> {self.suffix()}, prefix -> {self.prefix()}")
         
         self._default_singleStep = super().singleStep()
         if isinstance(singleStep,float):
@@ -288,25 +313,38 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         else:
             raise TypeError(f"singleStep expected to be a float or None; instead, got {singleStep}")
             
+        super().setSingleStep(self._singleStep)
+        
+        print(f"{self.__class__.__name__}.__init__: single step -> {self.singleStep()}")
+        
+        if isinstance(stepType, QtWidgets.QAbstractSpinBox.StepType):
+            super().setStepType(stepType)
+        
+        print(f"{self.__class__.__name__}.__init__: step type -> {self.stepType()}")
+        
         self._default_decimals = -int(math.log10(abs(self._singleStep))) if (self._singleStep < 1 and self._singleStep > -1) else 1
         if isinstance(decimals, int) and decimals >= 0:
             self._decimals = decimals
-            
+        
         elif decimals is None:
             self._decimals = self._default_decimals
             
         else:
             raise TypeError(f"decimals expected to be an int >= 0 or None; instead, got {decimals}")
         
+        super().setDecimals(self._decimals)
+        print(f"{self.__class__.__name__}.__init__:  decimals -> {self.decimals()}")
+            
         self._internal_minimum = self._default_internal_minimum
         self._internal_maximum = self._default_internal_maximum
         
-        self.setSingleStep(self._singleStep)
-        self.setDecimals(self._decimals)
-        self.setRange(self._internal_minimum, self._internal_maximum)
+        super().setRange(self._internal_minimum, self._internal_maximum)
         
+        print(f"{self.__class__.__name__}.__init__:  range -> {self.minimum(), self.maximum()}")
+            
         self.setContextMenuPolicy(QtCore.Qt.DefaultContextMenu)
         super().valueChanged.connect(self._slot_valueChanged)
+        print(f"{self.__class__.__name__}.__init__ DONE")
         
     @property
     def units(self):
@@ -314,15 +352,26 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
     
     @units.setter
     def units(self, value:typing.Optional[pq.Quantity] = None):
+        print(f"{self.__class__.__name__}.units.setter: value = {value}")
         if not isinstance(value, pq.Quantity):
             value = pq.dimensionless
             
         self._units_ = value.units
         
+        self._unitFamily_ = scq.getUnitFamily(self._units_)
+        
         if self._units_.dimensionality == pq.dimensionless.dimensionality:
             super().setSuffix("")
+            super().setPrefix("")
         else:
-            super().setSuffix(f" {self._units_.dimensionality.unicode}")
+            symbol = self._units_.dimensionality.unicode
+            if self._unitFamily_ == "Currency":
+                super().setSuffix("")
+                super().setPrefix(f"{symbol} ")
+            else:
+                super().setSuffix(f" {symbol}")
+                super().setPrefixSuffix("")
+            
             
     @Slot(float)
     def _slot_valueChanged(self, val):
@@ -569,12 +618,16 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
     def unitFamily(self):
         return self._unitFamily_
     
-    def unitFamily(self, value:typing.Optional[str]=None):
-        if value in scq.UNITS_DICT:
-            self._unitFamily_ = value
-        else:
-            self._unitFamily_ = None
-        
+    # @unitFamily.setter
+    # def unitFamily(self, value:typing.Optional[str]=None):
+    #     print(f"{self.__class__.__name__}.unitFamily.setter: value = {value}")
+    #     if value in scq.UNITS_DICT:
+    #         self._unitFamily_ = value
+    #     else:
+    #         if isinstance(self.units, pq.Quantity):
+    #             self._unitFamily_ = scq.getUnitFamily(self.units)
+    #         else:
+    #             self._unitFamily_ = None
         
     @Slot()
     def _slot_setUnits(self):
