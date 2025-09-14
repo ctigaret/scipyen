@@ -61,9 +61,11 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
     """
     unitChanged = Signal(object, name="unitChanged")
     
+    _default_units_ = pq.dimensionless
+    
     def __init__(self, parent:typing.Optional[QtWidgets.QWidget]=None, 
-                 unit:typing.Optional[pq.Quantity]=None):#, 
-                 # unitFamily:typing.Optional[str]=None):
+                 unit:typing.Optional[pq.Quantity]=None, 
+                 unitsFamily:typing.Optional[str]=None):
         r"""
         Named parameters:
         =================
@@ -79,23 +81,15 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
         _irreds = [k for k in scq.UNITS_DICT if len(scq.UNITS_DICT[k]["irreducible"])]
         _derived = [k for k in scq.UNITS_DICT if len(scq.UNITS_DICT[k]["irreducible"])==0]
         self._family_names, self._families = zip(*list(scq.UNITS_DICT.items()))
-        # self._unitFamilies = list(_irreds + _derived)
-#         if unitFamily in scq.UNITS_DICT:
-#             self._unitFamilies = [unitFamily]
-#             
-#         else:
-#             _irreds = [k for k in scq.UNITS_DICT if len(scq.UNITS_DICT[k]["irreducible"])]
-#             _derived = [k for k in scq.UNITS_DICT if len(scq.UNITS_DICT[k]["irreducible"])==0]
-#             self._unitFamilies = list(_irreds + _derived)
         
-        self._currentUnit = unit.units if isinstance(unit, pq.Quantity) else pq.dimensionless
+        self._units_ = unit.units if isinstance(unit, pq.Quantity) else pq.dimensionless
         
-        self._getUnitFamilyAndUnitFamilyUnits(self._currentUnit)
+        self._getUnitFamilyAndUnitFamilyUnits(self._units_)
         
         self._configureUI_() # will also assign the initial value of self._currentUnitsFamily 
         
         if isinstance(unit, pq.Quantity):
-            self.currentUnit = unit
+            self.units = unit
 
     def _configureUI_(self):
         self.setupUi(self)
@@ -111,7 +105,7 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
         self._unitIndexInFamily = self.unitComboBox.currentIndex()
         self.unitComboBox.currentIndexChanged.connect(self._slot_unitComboNewIndex)
         
-        self._currentUnit = self._currentUnitFamilyUnits[self._unitIndexInFamily]
+        self._units_ = self._currentUnitFamilyUnits[self._unitIndexInFamily]
         
     def _getUnitFamilyAndUnitFamilyUnits(self, unit:pq.Quantity):
         # print(f"{self.__class__.__name__}._getUnitFamilyAndUnitFamilyUnits (unit = {unit})")
@@ -119,15 +113,23 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
                                                    as_string=True, 
                                                    indicate_if_directly_found=True)
         
+        # print(f"{self.__class__.__name__}._getUnitFamilyAndUnitFamilyUnits: unit = {unit}")
+        # print(f"\n\tfamily -> {family_name}")
+        # print(f"\n\tdirectly_found -> {directly_found}")
+        
         self._currentUnitsFamily = scq.UNITS_DICT[family_name]
+        # print(f"\n\t_currentUnitsFamily -> {self._currentUnitsFamily}")
         self._currentUnitFamilyUnits = sorted(list(scq.familyUnits(family_name)), key = lambda x: x.name)
+        # print(f"\n\t_currentUnitFamilyUnits -> {self._currentUnitFamilyUnits}")
         
         if not directly_found:
             self._currentUnitFamilyUnits.insert(0, unit.units)
         
         self._familyIndex = list(scq.UNITS_DICT).index(family_name)
+        print(f"\n\t_familyIndex -> {self._familyIndex}")
         
         self._unitIndexInFamily = self._currentUnitFamilyUnits.index(unit.units)
+        # print(f"\n\t_unitIndexInFamily -> {self._unitIndexInFamily}")
         
     def _setupFamilyCombo(self):
         r"""Called by _configureUI_ but also when manually setting the units family
@@ -150,26 +152,23 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
         self.unitComboBox.clear()
         u_names = list(map(lambda x: x.name, self._currentUnitFamilyUnits))
         self.unitComboBox.addItems(u_names)
-        if self._currentUnit.name in u_names:
-            self.unitComboBox.setCurrentIndex(u_names.index(self._currentUnit.name))
+        if self._units_.name in u_names:
+            self.unitComboBox.setCurrentIndex(u_names.index(self._units_.name))
         else:
             self.unitComboBox.setCurrentIndex(0)
-            # self._currentUnit = self._currentUnitFamilyUnits[self.unitComboBox.currentIndex()]
+            # self._units_ = self._currentUnitFamilyUnits[self.unitComboBox.currentIndex()]
         
     @Slot(int)
     def _slot_refresh_unitComboBox(self, value):
         self._currentUnitsFamily = self._family_names[self.unitFamilyComboBox.currentIndex()]
         self._setupUnitCombo()
-        self._currentUnit = self._currentUnitFamilyUnits[self.unitComboBox.currentIndex()]
-        self.unitChanged.emit(self._currentUnit)
+        self._units_ = self._currentUnitFamilyUnits[self.unitComboBox.currentIndex()]
+        self.unitChanged.emit(self._units_)
         
     @Slot(int)
     def _slot_unitComboNewIndex(self, value):
-        self._currentUnit = self._currentUnitFamilyUnits[self.unitComboBox.currentIndex()]
-        
-        # print(f"self.__class__.__name__._slot_unitComboNewIndex {currentUnit}, type: {type(currentUnit).__name__}, dimensionality: {currentUnit.dimensionality}")
-        
-        self.unitChanged.emit(self._currentUnit)
+        self._units_ = self._currentUnitFamilyUnits[self.unitComboBox.currentIndex()]
+        self.unitChanged.emit(self._units_)
         
     @property
     def unitFamily(self):
@@ -184,19 +183,25 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
             self._setupUnitCombo()
         
     @property
-    def currentUnit(self):
-        return self._currentUnit
+    def units(self):
+        return self._units_
     
-    @currentUnit.setter
-    def currentUnit(self, value:typing.Optional[typing.Union[pq.UnitQuantity, pq.Quantity]]=None):
+    @units.setter
+    def units(self, value:typing.Optional[typing.Union[pq.UnitQuantity, pq.Quantity]]=None):
+        print(f"{self.__class__.__name__}.units.setter: value = {value}")
         if value is None:
             value = pq.dimensionless
             
         self._getUnitFamilyAndUnitFamilyUnits(value)
-        self._currentUnit = self._currentUnitFamilyUnits[self._unitIndexInFamily]
+        self._units_ = self._currentUnitFamilyUnits[self._unitIndexInFamily]
+        print(f"\n{self.__class__.__name__}.units.setter:  _units_ -> {self._units_}")
         
         signalBlockers = [QtCore.QSignalBlocker(w) for w in (self.unitFamilyComboBox, self.unitComboBox)]
         currentUnitComboboxIndex = self.unitFamilyComboBox.currentIndex()
+        print(f"\n{self.__class__.__name__}.units.setter: ")
+        print(f"\t_familyIndex -> {self._familyIndex}")
+        print(f"\tcurrentUnitComboboxIndex -> {currentUnitComboboxIndex}")
+        
         if currentUnitComboboxIndex != self._familyIndex:
             self.unitFamilyComboBox.setCurrentIndex(self._familyIndex)
             self._setupUnitCombo()
@@ -205,13 +210,13 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
         
     def value(self):
         r"""For compatibilty with qd.QuickDialog"""
-        return self.currentUnit
+        return self.units
     
     def setValue(self, value:typing.Optional[pq.Quantity]=None):
         r"""For compatibilty with qd.QuickDialog"""
         if value is None:
             value = pq.dimensionless
-        self.currentUnit = value
+        self.units = value
         
     def validate(self):
         r"""For compatibilty with qd.QuickDialog"""
@@ -633,12 +638,12 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
     def _slot_setUnits(self):
         dlg = qd.QuickDialog(parent = self, title="Set units")
         quantityWidget = QuantityChooserWidget(parent = dlg)
-        quantityWidget.currentUnits = self._units_
+        quantityWidget.units = self._units_
         if self._unitFamily_ in scq.UNITS_DICT:
             quantityWidget.restrictToUnitFamily(self._unitFamily_)
         dlg.addWidget(quantityWidget)
         if dlg.exec():
-            self.units = quantityWidget.currentUnit
+            self.units = quantityWidget.units
             
     @Slot()
     def _slot_setSingleStep(self):

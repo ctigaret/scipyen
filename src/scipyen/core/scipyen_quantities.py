@@ -606,6 +606,9 @@ def getUnitFamily(unit:typing.Union[pq.Quantity, pq.UnitQuantity], /,
                 'as_string' parameter is True
     
             ∘ or a list e.g. [["Length"], ["Time"]] — when 'as_string' is False
+
+        NOTE: For pq.dimensionless this return an empty string or empty list
+
     
     as_string: bool, optional; default is True
         Specifies the format of the result (see above)
@@ -632,10 +635,16 @@ def getUnitFamily(unit:typing.Union[pq.Quantity, pq.UnitQuantity], /,
     
     if isinstance(unit, pq.UnitQuantity):
         # udim_pw = list(unit.simplified.dimensionality.items())
-        udim_pw = list(getUQSimp(unit).dimensionality.items())
+        if unit == pq.dimensionless:
+            udim_pw = [pq.dimensionless]
+        else:
+            udim_pw = list(getUQSimp(unit).dimensionality.items())
         
     elif isinstance(unit, pq.Quantity):
-        udim_pw = list(unit.dimensionality.items())
+        if unit.units == p.dimensionless:
+            udim_pw = [pq.dimensionless]
+        else:
+            udim_pw = list(unit.dimensionality.items())
 
     else:
         raise TypeError(f"Expecting a Quantity or UnitQuantity; got {type(unit).__name__} instead")
@@ -649,61 +658,73 @@ def getUnitFamily(unit:typing.Union[pq.Quantity, pq.UnitQuantity], /,
             return
         
     families = list()
-    ndims = len(udim_pw)
+    if len(udim_pw) == 1 and np.all(udim_pw[0] == pq.dimensionless):
+        ndims = 0
+    else:
+        ndims = len(udim_pw)
     
     # 1) first, lookup the unit directly in the UNITS_DICT mapping;
     # if found, and show_components is False (the default), then return the family;
     # otherwise, carry on
-    for family, contents in UNITS_DICT.items():
-        uset = contents["irreducible"] | contents["derived"]
-        # CAUTION: This works only with UnitQuantity objects, which are hashable;
-        # Quantity objects are NOT hashable
-        if isinstance(unit, typing.Hashable):
-            if unit in uset and not show_components:
-                if as_string:
-                    return (family, True) if indicate_if_directly_found else family
-                else:
-                    return ([[family]], True) if indicate_if_directly_found else [[family]]
-            
-        else: # not hashable (i.e. a pq.Quantity) -> lookup via dimensionality
-            udims = list(map(lambda x: x.dimensionality, uset))
-            usimpdims = list(filter(lambda x: x is not None, map(lambda x: __try_simp_dim__(x), uset)))
-            unit_simpDim = __try_simp_dim__(unit)
-            if not show_components:
-                # the logic here is as follows:
-                # 1. if the dimensionality is found among the dimensionalities of
-                #  the derived units in the family, then return the family directly.,
-                #  and indicate (if asked) that the unit parameter was found in that
-                #  family. Otherwise:
-                # 2. check if the dimensionality of 'unit' parameter if among
-                #  the dimensionality of the simplified derived units in the family
-                # 3. if (2) produced no result, then check if the dimensionality
-                #  of the simplified form of the 'unit' parameter is among the
-                #  dimensionalities of the simplified forms of the units in this
-                #  family;
-                # 
-                # If either (2) and (3) produce a result, and if asked, then
-                # indicate that the 'unit' was not found DIRECTLY
-                if unit.dimensionality in udims:
-                    # derived unit are stored directly in the mapping
+    if unit.units == pq.dimensionless:
+        family = "Dimensionless"
+        if as_string:
+            return (family, True) if indicate_if_directly_found else family
+        else:
+            return ([[family]], True) if indicate_if_directly_found else [[family]]
+    else:
+        for family, contents in UNITS_DICT.items():
+            uset = contents["irreducible"] | contents["derived"]
+            # CAUTION: This works only with UnitQuantity objects, which are hashable;
+            # Quantity objects are NOT hashable
+            if isinstance(unit, typing.Hashable):
+                if unit in uset and not show_components:
                     if as_string:
                         return (family, True) if indicate_if_directly_found else family
                     else:
                         return ([[family]], True) if indicate_if_directly_found else [[family]]
-                elif unit.dimensionality in usimpdims:
-                    if as_string:
-                        return (family, False) if indicate_if_directly_found else family
-                    else:
-                        return ([[family]], False) if indicate_if_directly_found else [[family]]
-                elif unit_simpDim in usimpdims:
-                    if as_string:
-                        return (family, False) if indicate_if_directly_found else family
-                    else:
-                        return ([[family]], False) if indicate_if_directly_found else [[family]]
+                
+            else: # not hashable (i.e. a pq.Quantity) -> lookup via dimensionality
+                udims = list(map(lambda x: x.dimensionality, uset))
+                usimpdims = list(filter(lambda x: x is not None, map(lambda x: __try_simp_dim__(x), uset)))
+                unit_simpDim = __try_simp_dim__(unit)
+                if not show_components:
+                    # the logic here is as follows:
+                    # 1. if the dimensionality is found among the dimensionalities of
+                    #  the derived units in the family, then return the family directly.,
+                    #  and indicate (if asked) that the unit parameter was found in that
+                    #  family. Otherwise:
+                    # 2. check if the dimensionality of 'unit' parameter if among
+                    #  the dimensionality of the simplified derived units in the family
+                    # 3. if (2) produced no result, then check if the dimensionality
+                    #  of the simplified form of the 'unit' parameter is among the
+                    #  dimensionalities of the simplified forms of the units in this
+                    #  family;
+                    # 
+                    # If either (2) and (3) produce a result, and if asked, then
+                    # indicate that the 'unit' was not found DIRECTLY
+                    if unit.dimensionality in udims:
+                        # derived unit are stored directly in the mapping
+                        if as_string:
+                            return (family, True) if indicate_if_directly_found else family
+                        else:
+                            return ([[family]], True) if indicate_if_directly_found else [[family]]
+                        
+                    elif unit.dimensionality in usimpdims:
+                        if as_string:
+                            return (family, False) if indicate_if_directly_found else family
+                        else:
+                            return ([[family]], False) if indicate_if_directly_found else [[family]]
+                        
+                    elif unit_simpDim in usimpdims:
+                        if as_string:
+                            return (family, False) if indicate_if_directly_found else family
+                        else:
+                            return ([[family]], False) if indicate_if_directly_found else [[family]]
     
     # 2) if (1) did not return, then unit is either:
     # 2.a) a compound Unit that was not found in the UNITS_DICT mapping,
-    # 2.b) or show_components parameters is False; 
+    # 2.b) or show_components parameters is True; 
     #
     # Therefore, here we look up its components; in this case, return the familes
     # of the component units and any algebraic relationship between them

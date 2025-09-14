@@ -19,12 +19,12 @@
   <property name="windowTitle">
    <string>Form</string>
   </property>
-  <layout class="QGridLayout" name="gridLayout">
+  <layout class="QGridLayout" name="gridLayout_2">
    <item row="0" column="0">
     <widget class="QWidget" name="widget" native="true">
-     <layout class="QFormLayout" name="formLayout">
+     <layout class="QGridLayout" name="gridLayout">
       <item row="0" column="0">
-       <widget class="QLabel" name="typeLabel">
+       <widget class="QLabel" name="familyNameLabel">
         <property name="toolTip">
          <string>Type of physical unit (Unit &quot;Family&quot;)</string>
         </property>
@@ -35,7 +35,7 @@
          <string>Type of physical unit (Unit &quot;Family&quot;)</string>
         </property>
         <property name="text">
-         <string>Type:</string>
+         <string>Family:</string>
         </property>
         <property name="buddy">
          <cstring>unitFamilyComboBox</cstring>
