@@ -82,28 +82,29 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
         _derived = [k for k in scq.UNITS_DICT if len(scq.UNITS_DICT[k]["irreducible"])==0]
         self._family_names, self._families = zip(*list(scq.UNITS_DICT.items()))
         
-        self._units_ = unit.units if isinstance(unit, pq.Quantity) else pq.dimensionless
+        myunits = unit.units if isinstance(unit, pq.Quantity) else self._default_units_
         
-        self._getUnitFamilyAndUnitFamilyUnits(self._units_)
+        self._getUnitFamilyAndUnitFamilyUnits(myunits)
+        
+        self._restrictedToFamily_ = None
+        
+        self._units_ = myunits
         
         self._configureUI_() # will also assign the initial value of self._currentUnitsFamily 
         
-        if isinstance(unit, pq.Quantity):
-            self.units = unit
-
     def _configureUI_(self):
         self.setupUi(self)
         
         self._setupFamilyCombo()
         
-        self.unitFamilyComboBox.currentIndexChanged.connect(self._slot_refresh_unitComboBox)
+        self.unitFamilyComboBox.currentIndexChanged.connect(self._slot_unitsFamilyChanged)
         
         self._setupUnitCombo() 
         
         self.unitComboBox.setCurrentIndex(0)
         
         self._unitIndexInFamily = self.unitComboBox.currentIndex()
-        self.unitComboBox.currentIndexChanged.connect(self._slot_unitComboNewIndex)
+        self.unitComboBox.currentIndexChanged.connect(self._slot_unitsComboIndexChanged)
         
         self._units_ = self._currentUnitFamilyUnits[self._unitIndexInFamily]
         
@@ -113,35 +114,40 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
                                                    as_string=True, 
                                                    indicate_if_directly_found=True)
         
-        # print(f"{self.__class__.__name__}._getUnitFamilyAndUnitFamilyUnits: unit = {unit}")
-        # print(f"\n\tfamily -> {family_name}")
-        # print(f"\n\tdirectly_found -> {directly_found}")
         
-        self._currentUnitsFamily = scq.UNITS_DICT[family_name]
-        # print(f"\n\t_currentUnitsFamily -> {self._currentUnitsFamily}")
+        self._currentUnitsFamilyName = family_name
+        self._currentUnitsFamily = scq.UNITS_DICT[self._currentUnitsFamilyName]
         self._currentUnitFamilyUnits = sorted(list(scq.familyUnits(family_name)), key = lambda x: x.name)
-        # print(f"\n\t_currentUnitFamilyUnits -> {self._currentUnitFamilyUnits}")
         
         if not directly_found:
             self._currentUnitFamilyUnits.insert(0, unit.units)
         
         self._familyIndex = list(scq.UNITS_DICT).index(family_name)
-        print(f"\n\t_familyIndex -> {self._familyIndex}")
         
         self._unitIndexInFamily = self._currentUnitFamilyUnits.index(unit.units)
-        # print(f"\n\t_unitIndexInFamily -> {self._unitIndexInFamily}")
+        
+        # print(f"{self.__class__.__name__}._getUnitFamilyAndUnitFamilyUnits: unit = {unit}")
+        # print(f"\tfamily -> {family_name}")
+        # print(f"\tdirectly_found -> {directly_found}")
+        # print(f"\t_currentUnitsFamily -> {self._currentUnitsFamily}")
+        # print(f"\t_currentUnitsFamilyName -> {self._currentUnitsFamilyName}")
+        # print(f"\t_currentUnitFamilyUnits -> {self._currentUnitFamilyUnits}")
+        # print(f"\t_familyIndex -> {self._familyIndex}")
+        # print(f"\t_unitIndexInFamily -> {self._unitIndexInFamily}")
         
     def _setupFamilyCombo(self):
         r"""Called by _configureUI_ but also when manually setting the units family
         """
         signalBlocker = QtCore.QSignalBlocker(self.unitFamilyComboBox)
+        # signalBlockers = [QtCore.QSignalBlocker(w) for w in (self.unitFamilyComboBox, self.unitComboBox)]
         self.unitFamilyComboBox.clear()
         self.unitFamilyComboBox.addItems(self._family_names)
-        if self._currentUnitsFamily in self._families:
+        if self._currentUnitsFamilyName in self._family_names:
             self.unitFamilyComboBox.setCurrentIndex(self._families.index(self._currentUnitsFamily))
         else:
             self.unitFamilyComboBox.setCurrentIndex(0)
             self._currentUnitsFamily = self._families[self.unitFamilyComboBox.currentIndex()]
+            self._currentUnitsFamilyName = self._family_names[self.unitFamilyComboBox.currentIndex()]
             self._currentUnitFamilyUnits = sorted(list(scq.familyUnits(self._family_names[self.unitFamilyComboBox.currentIndex()])), key = lambda x: x.name)
         
     def _setupUnitCombo(self):
@@ -151,34 +157,39 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
         signalBlocker = QtCore.QSignalBlocker(self.unitComboBox)
         self.unitComboBox.clear()
         u_names = list(map(lambda x: x.name, self._currentUnitFamilyUnits))
-        self.unitComboBox.addItems(u_names)
+        u_names_display = list(map(lambda x: f"{x.name} ({x.dimensionality.unicode})" if (x != pq.dimensionless and x.name != x.dimensionality.unicode) else x.name, self._currentUnitFamilyUnits))
+        self.unitComboBox.addItems(u_names_display)
         if self._units_.name in u_names:
             self.unitComboBox.setCurrentIndex(u_names.index(self._units_.name))
         else:
             self.unitComboBox.setCurrentIndex(0)
-            # self._units_ = self._currentUnitFamilyUnits[self.unitComboBox.currentIndex()]
         
     @Slot(int)
-    def _slot_refresh_unitComboBox(self, value):
-        self._currentUnitsFamily = self._family_names[self.unitFamilyComboBox.currentIndex()]
+    def _slot_unitsFamilyChanged(self, value):
+        # print(f"{self.__class__.__name__}._slot_unitsFamilyChanged: value = {value}")
+        self._currentUnitsFamilyName = self._family_names[self.unitFamilyComboBox.currentIndex()]
+        self._currentUnitsFamily = scq.UNITS_DICT[self._currentUnitsFamilyName]
+        # print(f"\nself._currentUnitsFamily -> {self._currentUnitsFamily}")
+        self._currentUnitFamilyUnits = sorted(list(scq.familyUnits(self._currentUnitsFamilyName)), key = lambda x: x.name)
         self._setupUnitCombo()
         self._units_ = self._currentUnitFamilyUnits[self.unitComboBox.currentIndex()]
         self.unitChanged.emit(self._units_)
         
     @Slot(int)
-    def _slot_unitComboNewIndex(self, value):
+    def _slot_unitsComboIndexChanged(self, value):
         self._units_ = self._currentUnitFamilyUnits[self.unitComboBox.currentIndex()]
         self.unitChanged.emit(self._units_)
         
     @property
     def unitFamily(self):
-        return self._currentUnitsFamily
+        return self._currentUnitsFamilyName
     
     @unitFamily.setter
     def unitFamily(self, value:typing.Optional[str]=None):
         if value in scq.UNITS_DICT:
             self._unitFamilies = [value]
-            self._currentUnitsFamily = value
+            self._currentUnitsFamilyName = value
+            self._currentUnitsFamily = scq.UNITS_DICT[value]
             self._setupFamilyCombo()
             self._setupUnitCombo()
         
@@ -188,19 +199,19 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
     
     @units.setter
     def units(self, value:typing.Optional[typing.Union[pq.UnitQuantity, pq.Quantity]]=None):
-        print(f"{self.__class__.__name__}.units.setter: value = {value}")
+        # print(f"{self.__class__.__name__}.units.setter: value = {value}")
         if value is None:
             value = pq.dimensionless
             
         self._getUnitFamilyAndUnitFamilyUnits(value)
         self._units_ = self._currentUnitFamilyUnits[self._unitIndexInFamily]
-        print(f"\n{self.__class__.__name__}.units.setter:  _units_ -> {self._units_}")
+        # print(f"\n{self.__class__.__name__}.units.setter:  _units_ -> {self._units_}")
         
         signalBlockers = [QtCore.QSignalBlocker(w) for w in (self.unitFamilyComboBox, self.unitComboBox)]
         currentUnitComboboxIndex = self.unitFamilyComboBox.currentIndex()
-        print(f"\n{self.__class__.__name__}.units.setter: ")
-        print(f"\t_familyIndex -> {self._familyIndex}")
-        print(f"\tcurrentUnitComboboxIndex -> {currentUnitComboboxIndex}")
+        # print(f"\n{self.__class__.__name__}.units.setter: ")
+        # print(f"\t_familyIndex -> {self._familyIndex}")
+        # print(f"\tcurrentUnitComboboxIndex -> {currentUnitComboboxIndex}")
         
         if currentUnitComboboxIndex != self._familyIndex:
             self.unitFamilyComboBox.setCurrentIndex(self._familyIndex)
@@ -222,10 +233,24 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
         r"""For compatibilty with qd.QuickDialog"""
         return True
     
-    def restrictToUnitFamily(self, value:typing.Optional[str]=None):
-        if value in scq.UNITS_DICT:
-            self._unitFamilies = [value]
+    def restrictToCurrentUnitFamily(self, value:bool=False):
+        self.unitFamilyComboBox.setEnabled(value)
+            
+    @property
+    def familyRestriction(self) -> str:
+        return self._restrictedToFamily_
+    
+    @familyRestriction.setter
+    def familyRestriction(self, value:typing.Optional[str] = None):
+        if isinstance(value, str):
+            if value not in self._family_names:
+                scipywarn(f"Family of units named {value} not found")
+                return
+            self._restrictedToFamily_ = value
             self.unitFamily = value
+            self.unitFamilyComboBox.setEnabled(False)
+        else:
+            self.unitFamilyComboBox.setEnabled(True)
         
 
 class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
@@ -279,77 +304,90 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         
         # self._default_units_ = pq.dimensionless
         
+        self._restrictedToFamily_:typing.Optional[str] = None
+        
+        self._rescaleOnUnitChange_:bool = False
+        
+        self._units_:pq.Quantity = self._default_units_
+        self._magnitude_ = 0.0
+        self._suffix_ = ""
+        self._prefix_ = ""
+        
         if isinstance(units, pq.Quantity):
             self._units_ = units.units
             if not isinstance(units, pq.UnitQuantity):
-                super().setValue(units.magnitude)
+                self._magnitude_ = units.magnitude
         else:
             self._units_ = self._default_units_
         
+        self._unitFamily_:str = "Dimensionless"
+        
         if unitsFamily in scq.UNITS_DICT:
             self._unitFamily_ = unitsFamily
+            
         elif isinstance(self._units_, pq.Quantity):
             self._unitFamily_ = scq.getUnitFamily(self._units_)
         else:
             self._unitFamily_ = None
             
-        print(f"{self.__class__.__name__}.__init__: units = {self._units_}, unit family = {self._unitFamily_}")
+        # print(f"{self.__class__.__name__}.__init__: units = {self._units_}, unit family = {self._unitFamily_}")
         
         if self._units_.dimensionality == pq.dimensionless.dimensionality:
-            super().setSuffix("")
-            super().setPrefix("")
+            self._suffix_ = ""
+            self._prefix_ = ""
         else:
             symbol = self._units_.dimensionality.unicode
             if self._unitFamily_ == "Currency":
-                super().setSuffix("")
-                super().setPrefix(f"{symbol} ")
+                self._suffix_ = ""
+                self._prefix_ = f"{symbol} "
             else:
-                super().setSuffix(f" {symbol}")
-                super().setPrefix("")
-            
-        print(f"{self.__class__.__name__}.__init__: suffix -> {self.suffix()}, prefix -> {self.prefix()}")
+                self._suffix_ = f" {symbol}"
+                self._prefix_ = ""
+                
+        # print(f"{self.__class__.__name__}.__init__: suffix -> {self.suffix()}, prefix -> {self.prefix()}")
         
         self._default_singleStep = super().singleStep()
         if isinstance(singleStep,float):
-            self._singleStep = singleStep
+            self._singleStep_ = singleStep
             
         elif singleStep is None:
-            self._singleStep = self._default_singleStep
+            self._singleStep_ = self._default_singleStep
         else:
             raise TypeError(f"singleStep expected to be a float or None; instead, got {singleStep}")
             
-        super().setSingleStep(self._singleStep)
+        self._default_decimals = -int(math.log10(abs(self._singleStep_))) if (self._singleStep_ < 1 and self._singleStep_ > -1) else 1
+        self._decimals_ = self._default_decimals
         
-        print(f"{self.__class__.__name__}.__init__: single step -> {self.singleStep()}")
-        
-        if isinstance(stepType, QtWidgets.QAbstractSpinBox.StepType):
-            super().setStepType(stepType)
-        
-        print(f"{self.__class__.__name__}.__init__: step type -> {self.stepType()}")
-        
-        self._default_decimals = -int(math.log10(abs(self._singleStep))) if (self._singleStep < 1 and self._singleStep > -1) else 1
         if isinstance(decimals, int) and decimals >= 0:
-            self._decimals = decimals
+            self._decimals_ = decimals
         
         elif decimals is None:
-            self._decimals = self._default_decimals
+            self._decimals_ = self._default_decimals
             
         else:
             raise TypeError(f"decimals expected to be an int >= 0 or None; instead, got {decimals}")
         
-        super().setDecimals(self._decimals)
-        print(f"{self.__class__.__name__}.__init__:  decimals -> {self.decimals()}")
+        # print(f"{self.__class__.__name__}.__init__:  decimals -> {self.decimals()}")
             
         self._internal_minimum = self._default_internal_minimum
         self._internal_maximum = self._default_internal_maximum
         
-        super().setRange(self._internal_minimum, self._internal_maximum)
-        
-        print(f"{self.__class__.__name__}.__init__:  range -> {self.minimum(), self.maximum()}")
-            
         self.setContextMenuPolicy(QtCore.Qt.DefaultContextMenu)
+        # print(f"{self.__class__.__name__}.__init__ DONE")
+        
+        # NOTE: 2025-09-14 23:33:43
+        # this calls validate() hence self.-decimals_ must have been defined already
+        super().setValue(self._magnitude_)
+        super().setSingleStep(self._singleStep_)
+        super().setDecimals(self._decimals_)
+        super().setRange(self._internal_minimum, self._internal_maximum)
+        if isinstance(stepType, QtWidgets.QAbstractSpinBox.StepType):
+            super().setStepType(stepType)
+        super().setSuffix(self._suffix_)
+        super().setPrefix(self._prefix_)
         super().valueChanged.connect(self._slot_valueChanged)
-        print(f"{self.__class__.__name__}.__init__ DONE")
+            
+        
         
     @property
     def units(self):
@@ -357,25 +395,55 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
     
     @units.setter
     def units(self, value:typing.Optional[pq.Quantity] = None):
-        print(f"{self.__class__.__name__}.units.setter: value = {value}")
+        # print(f"{self.__class__.__name__}.units.setter: value = {value}")
         if not isinstance(value, pq.Quantity):
             value = pq.dimensionless
             
-        self._units_ = value.units
-        
+        if self._rescaleOnUnitChange_ and scq.unitsConvertible(value, self._units_) and float(value.magnitude) not in (math.nan, np.nan, -math.inf, math.inf, -np.inf, np.inf):
+            newval = self.value().rescale(value)
+            newfval = float(newval.magnitude)
+            ratio = newfval/self._magnitude_
+            self._singleStep_ *= ratio
+            self._magnitude_ = float(newval.magnitude)
+            self._units_ = newval.units
+            super().setValue(self._magnitude_)
+            self.setSingleStep(self._singleStep_)
+        else:
+            self._units_ = value.units
+            
         self._unitFamily_ = scq.getUnitFamily(self._units_)
         
-        if self._units_.dimensionality == pq.dimensionless.dimensionality:
-            super().setSuffix("")
-            super().setPrefix("")
-        else:
+        self._suffix_ = ""
+        self._prefix_ = ""
+        
+        if self._units_.dimensionality != pq.dimensionless.dimensionality:
             symbol = self._units_.dimensionality.unicode
             if self._unitFamily_ == "Currency":
-                super().setSuffix("")
-                super().setPrefix(f"{symbol} ")
+                self._suffix_ = ""
+                self._prefix_ = f"{symbol} "
             else:
-                super().setSuffix(f" {symbol}")
-                super().setPrefixSuffix("")
+                self._suffix_ = f" {symbol}"
+                self._prefix_ = ""
+        
+        if np.isnan(self._magnitude_):
+            text = "NaN"
+            super().setSpecialValueText(text)
+            
+        elif np.isinf(self._magnitude_):
+            text = "-Inf" if self._magnitude_ in (-np.inf, -math.inf) else "Inf"
+            super().setSpecialValueText(text)
+        else:
+            text = f"{self._magnitude_:.{self.decimals()}}"
+            
+        super().setSuffix(self._suffix_)
+        super().setPrefix(self._prefix_)
+        
+        if len(self._prefix_):
+            text = f"{self._prefix_}{text}"
+        if len(self._suffix_):
+            text = f"{text}{self._suffix_}"
+            
+        self.lineEdit().setText(text)
             
             
     @Slot(float)
@@ -385,13 +453,22 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
     def contextMenuEvent(self, evt):
         cm = QtWidgets.QMenu("Options", self)
         setUnitsAction = cm.addAction("Set units")
-        setUnitsAction.triggered.connect(self._slot_setUnits)
+        setUnitsAction.triggered.connect(self._slot_setUnitsGUI)
         setSingleStepAction = cm.addAction("Set single step")
-        setSingleStepAction.triggered.connect(self._slot_setSingleStep)
+        setSingleStepAction.triggered.connect(self._slot_setSingleStepGUI)
         setDecimalsAction = cm.addAction("Set decimals")
-        setDecimalsAction.triggered.connect(self._slot_setDecimals)
+        setDecimalsAction.triggered.connect(self._slot_setDecimalsGUI)
         resetAction = cm.addAction("Reset")
         resetAction.triggered.connect(self._slot_reset)
+        cm.addSeparator()
+        rescaleValueAction = cm.addAction("Rescale on unit change")
+        rescaleValueAction.setCheckable(True)
+        rescaleValueAction.setChecked(self._rescaleOnUnitChange_)
+        rescaleValueAction.toggled.connect(self._slot_rescaleValueChanged)
+        restrictAction = cm.addAction("Fix units family")
+        restrictAction.setCheckable(True)
+        restrictAction.setChecked(isinstance(self._restrictedToFamily_, str) and self._restrictedToFamily_ in scq.UNITS_DICT)
+        restrictAction.toggled.connect(self._slot_familyRestrictionChanged)
         cm.popup(self.mapToGlobal(evt.pos()))
         
     def setMinimum(self, value:typing.Optional[typing.Union[float, pq.Quantity]]=None):
@@ -516,27 +593,33 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
     def value(self):
         r""" Reimplements QDoubleSpinBox.value() to return a quantity
         """
-        # NOTE: use NA as a volatile; once we've moved away from it we're done
-        # by the way, one can only move away from NA by entering a numeric value 
-        # in the spin box field
-        val = super().value()
-        if val == super().minimum() and self.specialValueText() == "NA":
-            return pd.NA * self.units
+        if self.specialValueText() == "NA":
+            return pd.NA
+        elif self.specialValueText() == "NaN":
+            return np.nan * self.units
+        else:
+            return self._magnitude_ * self.units
         
-        super().setMinimum(self._internal_minimum)
-        super().setSpecialValueText("")
-        
-        return val * self.units
-    
     def getDecimals(self) -> int:
-        return super().decimals()
+        """
+    """
+        return self._decimals_
+    
+    def decimals(self) -> int:
+        return self._decimals_
+    
+    def setDecimals(self, val:int):
+        if val < 0:
+            val = 0
+        self._decimals_ = val
+        super().setDecimals(self._decimals_)
     
     def validate(self, text, pos):
         validator = InftyDoubleValidator(parent=self)
         validator.suffix = self.suffix()
         validator.setDecimals(self.getDecimals()) 
         # NOTE: 2023-12-19 14:37:35
-        # self.decimals is an int property, for a function !!!
+        # self.decimals() is a function !!!
         # validator.setDecimals(self.decimals) # self.decimals inherited from QDoubleSpinBox
         valid = validator.validate(text, pos)
         validstr = validatorString(valid[0])
@@ -544,109 +627,179 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         return valid
     
     def valueFromText(self, text:str):
-        suffix = self.suffix()
+        suffix = self._suffix_
+        prefix = self._prefix_
         if suffix in text:
             s = text.strip(suffix)
         else:
             s = text
             
-        ret = super().valueFromText(s)
-        return ret * self.units
+        if prefix in s:
+            s = s.strip(prefix)
+            
+        if s == "NA":
+            return pd.NA
+        elif s.lower() == "nan":
+            return math.nan * self.units
+        else:
+            # ret = super().valueFromText(s)
+            ret = float(s)
+            return ret * self.units
 
-        # unit = scq.unitQuantityFromNameOrSymbol(self.suffix)
-        # return ret*unit
-    
     def textFromValue(self, value:typing.Union[float, pq.Quantity, np.ndarray]):
-        units = value.units if isinstance(value, pq.Quantity) else pq.dimensionless
-        sfx = "" if units == pq.dimensionality else f" {units.dimensionality.unicode}"
-        
         if isinstance(value, (pq.Quantity, np.ndarray)):
             if value.size > 1:
-                ret = "NA"
+                return "NA"
                 
+            units = value.units if isinstance(value, pq.Quantity) else pq.dimensionless
+            prefix = ""
+            suffix = ""
+            family = scq.getUnitFamily(units)
+            if family == "Currency":
+                prefix = f"{units.dimensionality.unicode}"
+            else:
+                suffix = f"{units.dimensionality.unicode}"
+                
+            fval = float(value.magnitude)
+            
+            if np.isnan(fval):
+                ret = "NaN"
+            elif np.isinf(fval):
+                ret = "-Inf" if fval in (-np.inf, -mathl.inf) else "Inf"
+            else:
+                ret = f"{fval:.{self.decimals()}}"
+                # ret = super().textFromValue(float(value.magnitude))
+            
+            if len(prefix):
+                ret = f"{prefix} {ret}"
+            if len(suffix):
+                ret = f"{ret} {suffix}"
+                
+            return ret
+            
         elif isinstance(value, float):
-            ret = super().textFromValue(value)
+            if np.isnan(value):
+                ret = "NaN"
+            elif np.isinf(value):
+                ret = "-Inf" if value == -np.inf else "Inf"
+            else:
+                ret = f"{value:.{self.decimals()}}"
+                # ret = super().textFromValue(value)
+            
+            return ret
 
         else:
-            ret = "NA"
+            return "NA"
             
-        # self.units = units
-        # self.setSuffix(sfx)
-        
-        return ret
-        
-    def setValue(self, value:typing.Union[pq.Quantity, float, type(pd.NA)]):
+    def setValue(self, value:typing.Union[pq.Quantity, float, int, type(pd.NA)]):
         r"""Also allows changing the units if not convertible to current ones.
-        Otherwise the value will be rescales to current units.
-        """
+        Otherwise the value will be rescaled to current units.
+    WARNING: This is different from the case when new units are chosen while
+    self.rescaleOnUnitChange is True.
+    """
         # print(f"{self.__class__.__name__}.setValue({value})")
         if isinstance(value, pq.Quantity):
             if value.size > 1:
                 return # Only scalar quantities are allowed
                 # raise TypeError("Only scalar quantities are allowed")
             
+            fval = float(value.magnitude)
+            
             if scq.unitsConvertible(self.units, value.units):
-                fval = float(value.magnitude)
                 if fval > -math.inf and fval < math.inf:
-                    val = float(value.rescale(self.units).magnitude)
-                else:
-                    val = float(value.magnitude)
+                    fval = float(value.rescale(self.units).magnitude)
             else:
                 self.units = value.units
-                val = float(value.magnitude)
-        else:
-            val = value
+                
+            self._magnitude_ = fval
+            
+        elif isinstance(value, float):
+            self._magnitude_ = value
         
-        if isinstance(val, int):
-            val = float(val)
+        elif isinstance(value, int):
+            self._magnitude_ = float(value)
             
-        # FIXME/TODO: 2022-11-07 13:51:37
-        # at the moment, this will fail silently; find a way to notify user/caller
-        if isinstance(val, float):
-            super().setValue(val)
-            super().setSpecialValueText("")
-            # if val < self._internal_minimum:
-            #     self.setMinimum(val)
-            #     super().setMinimum(self._internal_minimum)
-            # else:
-            #     QtWidgets.QMessageBox.critical(self, "Value is too small", text)
+        elif value in (pd.NA, math.nan, np.nan):
+            self._magnitude_ = value
             
-        elif val is pd.NA:
+        else:
+            raise ValueError(f"Incompatible value: {value}")
+            
+        if isinstance(self._magnitude_, float):
+            super().setValue(self._magnitude_)
+            text = f"{self._magnitude_:.{self.decimals()}}"
+            specialText = "-inf" if self._magnitude_ == -math.inf else "inf" if self._magnitude_ == math.inf else ""
+            if len(specialText):
+                super().setSpecialValueText(specialText)
+                text = specialText
+                
+            if len(self._prefix_):
+                text = f"{self._prefix_} {text}"
+                
+            if len(self._suffix_):
+                text = f"{text} {self._suffix_}"
+                
+            self.lineEdit().setText(text)
+            
+        elif self._magnitude_ in (pd.NA, math.nan, np.nan):
             super().setMinimum(-math.inf)
-            super().setSpecialValueText("NA")
+            specialText = "NA" if self._magnitude_ is pd.NA else "NaN"
+            super().setSpecialValueText(specialText)
             super().setValue(-math.inf)
+            
+            text = specialText
+            
+            if len(self._prefix_):
+                text = f"{self._prefix_} {text}"
+                
+            if len(self._suffix_):
+                text = f"{text} {self._suffix_}"
+            
+            self.lineEdit().setText(text)
                 
         else:
-            raise TypeError(f"Expecting a scalar quantity or a float; instead, got {type(value).__name__}")
+            raise TypeError(f"Expecting a scalar quantity, a float or pd.NA; instead, got {type(value).__name__}")
+        
+    @property
+    def rescaleOnUnitChange(self)->bool:
+        return self._rescaleOnUnitChange_
+    
+    @rescaleOnUnitChange.setter
+    def rescaleOnUnitChange(self, val:bool):
+        self._rescaleOnUnitChange_ = val
         
     @property
     def unitFamily(self):
         return self._unitFamily_
     
-    # @unitFamily.setter
-    # def unitFamily(self, value:typing.Optional[str]=None):
-    #     print(f"{self.__class__.__name__}.unitFamily.setter: value = {value}")
-    #     if value in scq.UNITS_DICT:
-    #         self._unitFamily_ = value
-    #     else:
-    #         if isinstance(self.units, pq.Quantity):
-    #             self._unitFamily_ = scq.getUnitFamily(self.units)
-    #         else:
-    #             self._unitFamily_ = None
-        
+    @property
+    def familyRestriction(self) -> str:
+        return self._restrictedToFamily_
+    
+    @familyRestriction.setter
+    def familyRestriction(self, value:typing.Optional[str] = None):
+        if isinstance(value, str):
+            if value in scq.UNITS_DICT:
+                self._restrictedToFamily_ = value
+        else:
+            self._restrictedToFamily_ = None
+    
     @Slot()
-    def _slot_setUnits(self):
+    def _slot_setUnitsGUI(self):
         dlg = qd.QuickDialog(parent = self, title="Set units")
         quantityWidget = QuantityChooserWidget(parent = dlg)
         quantityWidget.units = self._units_
-        if self._unitFamily_ in scq.UNITS_DICT:
-            quantityWidget.restrictToUnitFamily(self._unitFamily_)
+        if isinstance(self._restrictedToFamily_, str) and self._restrictedToFamily_ in scq.UNITS_DICT:
+            quantityWidget.familyRestriction = self._restrictedToFamily_
+        else:
+            quantityWidget.familyRestriction = None
+            
         dlg.addWidget(quantityWidget)
         if dlg.exec():
             self.units = quantityWidget.units
             
     @Slot()
-    def _slot_setSingleStep(self):
+    def _slot_setSingleStepGUI(self):
         dlg = qd.QuickDialog(parent=self, title="Set single step")
         floatInput = qd.FloatInput(dlg, "Step (float)")
         floatInput.setValue(f"{super().singleStep()}")
@@ -654,18 +807,30 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         if dlg.exec():
             value = floatInput.value()
             self.setSingleStep(value)
-            newDecimals = -int(math.log10(abs(value))) if (value < 1 and value > -1) else 1
+            newDecimals = -int(math.log10(abs(value)))+1 if (value < 1 and value > -1) else 1
             # NOTE: 2022-11-07 12:19:00
             # adapt to new decimals
             #
             if self.decimals() != newDecimals:
                 self.setDecimals(newDecimals)
+                
+    @Slot(bool)
+    def _slot_familyRestrictionChanged(self, value:bool):
+        if value:
+            family = scq.getUnitFamily(self.units)
+            self._restrictedToFamily_ = family
+        else:
+            self._restrictedToFamily_ = None
+            
+    @Slot(bool)
+    def _slot_rescaleValueChanged(self, value:bool):
+        self._rescaleOnUnitChange_ = value
             
     @Slot()
-    def _slot_setDecimals(self):
+    def _slot_setDecimalsGUI(self):
         dlg = qd.QuickDialog(parent=self, title="Set decimals")
         intInput = qd.IntegerInput(dlg, "Decimals (int) >= 0")
-        intInput.setValue(f"{self._decimals}")
+        intInput.setValue(f"{self._decimals_}")
         dlg.addWidget(intInput)
         if dlg.exec():
             value = intInput.value()

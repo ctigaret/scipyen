@@ -641,7 +641,7 @@ def getUnitFamily(unit:typing.Union[pq.Quantity, pq.UnitQuantity], /,
             udim_pw = list(getUQSimp(unit).dimensionality.items())
         
     elif isinstance(unit, pq.Quantity):
-        if unit.units == p.dimensionless:
+        if unit.units == pq.dimensionless:
             udim_pw = [pq.dimensionless]
         else:
             udim_pw = list(unit.dimensionality.items())
