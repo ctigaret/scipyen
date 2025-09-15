@@ -284,7 +284,11 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
                  unitsFamily:typing.Optional[str]=None, 
                  singleStep:typing.Optional[float]=None, 
                  stepType:typing.Optional[QtWidgets.QAbstractSpinBox.StepType] = None,
-                 decimals:typing.Optional[int]=None):#, minimum:typing.Optional[typing.Union[pq.Quantity, float]]=None, maximum:typing.Optional[typing.Union[pq.Quantity, float]]=None):
+                 decimals:typing.Optional[int]=None,
+                 fixFamily:typing.Optional[typing.Union[str, bool]]=None,
+                 rescaleWithUnitsChange:bool=False, 
+                 minimum:typing.Optional[typing.Union[pq.Quantity, float]]=None, 
+                 maximum:typing.Optional[typing.Union[pq.Quantity, float]]=None):
         r"""
         Named parameters:
         =================
@@ -306,29 +310,39 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         
         self._restrictedToFamily_:typing.Optional[str] = None
         
+        # if isinstance(fixFamily, str):
+            
+        
         self._rescaleOnUnitChange_:bool = False
         
         self._units_:pq.Quantity = self._default_units_
-        self._magnitude_ = 0.0
+        self._magnitude_:float = 0.0
         self._suffix_ = ""
         self._prefix_ = ""
         
         if isinstance(units, pq.Quantity):
+#             if isinstance(unitsFamily, str):
+#                 if unitsFamily not in scq.UNITS_DICT:
+#                     raise ValueError(f"Unknown 'unitsFamily' {unitsFamily}")
+#                     
+#                 if scq.getUnitFamily(self._units_) != unitsFamily:
+#                     raise ValueError(f"'unitsFamily' {unitsFamily} is incompatible with the specified units {self._units_}")
+            
             self._units_ = units.units
             if not isinstance(units, pq.UnitQuantity):
                 self._magnitude_ = units.magnitude
         else:
             self._units_ = self._default_units_
         
-        self._unitFamily_:str = "Dimensionless"
-        
-        if unitsFamily in scq.UNITS_DICT:
-            self._unitFamily_ = unitsFamily
+#         self._unitFamily_:str = scq.getUnitFamily(self._units_)
+#         
+#         if unitsFamily in scq.UNITS_DICT:
+#             self._unitFamily_ = unitsFamily
             
-        elif isinstance(self._units_, pq.Quantity):
-            self._unitFamily_ = scq.getUnitFamily(self._units_)
-        else:
-            self._unitFamily_ = None
+        self._unitFamily_ = scq.getUnitFamily(self._units_)
+        # elif isinstance(self._units_, pq.Quantity):
+        # else:
+        #     self._unitFamily_ = None
             
         # print(f"{self.__class__.__name__}.__init__: units = {self._units_}, unit family = {self._unitFamily_}")
         
