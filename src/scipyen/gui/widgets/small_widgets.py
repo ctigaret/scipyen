@@ -294,7 +294,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         =================
         parent: parent widget; optional, default is None
         units: initial units; optional, default is pq.dimensionless
-        unitFamily: restrict to units in given family; optoonal, default is None
+        unitFamily: restrict to units in given family; optional, default is None
     
         """
         # minimum, maximum: min & max values of the spin box - to be set manually
@@ -858,7 +858,36 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         self.setDecimals(self._default_decimals)
         self.units = self._default_units_
             
-    
+    def _calculateAdaptiveDecimalStep(self, steps:int) -> float:
+        """Subject to future teaks, this is almost exactly what 
+    QAbstractSpinBox.calculateAdaptiveDecimalStep() does.
+    The difference is that we use self._magnitude_ instead of self.value()
+    """
+        value = self._magnitude_
+        decimals = self.decimals()
+        minStep = math.pow(10, -decimals)
+        absVal = abs(value)
+        
+        if absVal < minStep:
+            return minStep
+        
+        valNeg = value < 0
+        stepsNeg = steps < 0
+        
+        if valNeg != stepsNeg:
+            absVal /= 1.01
+            
+        shift = math.pow(10, 1 - math.floor(math.log(10, absVal)))
+        absRound = round(absVal * shift, decimals) / shift
+        logVal = math.floor(math.log(10, absRound)) - 1
+        return max(minStep, math.pow(10, logVal))
+        
+    # NOTE: 2025-09-15 18:22:34 TODO Finalize this
+    # def stepBy(self, steps:int):
+    #     old = self._magnitude_
+    #     tmp = self.lineEdit().displayText()
+    #     cursorPos = self.lineEdit().cursorPosition()
+    #     nostep = False
         
         
         
