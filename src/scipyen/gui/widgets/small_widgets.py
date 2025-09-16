@@ -400,6 +400,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         super().setSuffix(self._suffix_)
         super().setPrefix(self._prefix_)
         super().valueChanged.connect(self._slot_valueChanged)
+        self.lineEdit().textChanged.connect(self._slot_valueTextChanged)
             
         
         
@@ -459,6 +460,11 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             
         self.lineEdit().setText(text)
             
+    @Slot(str)
+    def _slot_valueTextChanged(self, s:str):
+        val = self.valueFromText(s)
+        self._magnitude_ = float(val)
+        self.sig_valueChanged.emit(self.value())
             
     @Slot(float)
     def _slot_valueChanged(self, val):
