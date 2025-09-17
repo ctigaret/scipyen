@@ -465,10 +465,15 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         cm = QtWidgets.QMenu("Options", self)
         setUnitsAction = cm.addAction("Set units")
         setUnitsAction.triggered.connect(self._slot_setUnitsGUI)
-        setSingleStepAction = cm.addAction("Set single step")
-        setSingleStepAction.triggered.connect(self._slot_setSingleStepGUI)
         setDecimalsAction = cm.addAction("Set decimals")
         setDecimalsAction.triggered.connect(self._slot_setDecimalsGUI)
+        setSingleStepAction = cm.addAction("Set single step")
+        setSingleStepAction.triggered.connect(self._slot_setSingleStepGUI)
+        adaptiveStepAction = cm.addAction("Adaptive step")
+        adaptiveStepAction.setCheckable(True)
+        adaptiveStepAction.setChecked(self.stepType() == QtWidgets.QAbstractSpinBox.AdaptiveDecimalStepType)
+        adaptiveStepAction.toggled.connect(self._slot_setAdaptiveStep)
+        cm.addSeparator()
         resetAction = cm.addAction("Reset")
         resetAction.triggered.connect(self._slot_reset)
         cm.addSeparator()
@@ -841,6 +846,13 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             self._restrictedToFamily_ = family
         else:
             self._restrictedToFamily_ = None
+            
+    @Slot(bool)
+    def _slot_setAdaptiveStep(self, value:bool):
+        stepType = QtWidgets.QAbstractSpinBox.AdaptiveDecimalStepType if value else QtWidgets.QAbstractSpinBox.DefaultStepType
+        
+        if stepType != self.stepType():
+            self.setStepType(stepType)
             
     @Slot(bool)
     def _slot_rescaleValueChanged(self, value:bool):

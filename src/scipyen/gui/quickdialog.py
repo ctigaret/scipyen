@@ -326,6 +326,48 @@ class CheckBox(QtWidgets.QCheckBox):
 
     def selection(self):
         return self.isChecked()
+    
+class SpinBox(QtWidgets.QFrame):
+    """Adds a spin box"""
+    def __init__(self, parent, label, vertical = 0):
+        QtWidgets.QFrame.__init__(self, parent)
+        parent.addWidget(self)
+        self.label = QtWidgets.QLabel(text=label, parent=self)
+        self.spinBox = QtWidgets.QSpinBox()
+        if vertical:
+            self.layout = QtWidgets.QVBoxLayout(self)
+        else:
+            self.layout = QtWidgets.QHBoxLayout(self)
+            
+        self.layout.addWidget(self.label)
+        self.layout.addWidget(self.spinBox)
+        self.layout.addStretch(5)
+        
+    def setValue(self, value:int):
+        self.spinBox.setValue(value)
+        
+    def value(self) -> int:
+        return self.spinBox.value()
+    
+    def minimum(self) -> int:
+        return self.spinBox.minimum()
+    
+    def setMinimum(self, value:int):
+        self.spinBox.setMinimum(value)
+        
+    def maximum(self) -> int:
+        return self.spinBox.maximum()
+    
+    def setMaximum(self, value:int):
+        self.spinBox.setMaximum(value)
+        
+class VSpinBox(SpinBox):
+    def __init__(self, parent, label):
+        SpinBox.__init__(self, parent, label, 1)
+        
+class HSpinBox(SpinBox):
+    def __init__(self, parent, label):
+        SpinBox.__init__(self, parent, label, 0)
 
 class Choice(QtWidgets.QFrame):
     """Radio buttons"""
@@ -562,7 +604,7 @@ class VariableNameStringInput(StringInput):
     
 class QuickWidget(QtWidgets.QWidget):
     r"""Quick creation of a custom widget
-    TODO: 2022-10-28 11:27:24
+    TODO: 2022-10-28 11:27:24 Finalize me
     """
     def __init__(self, parent:typing.Optional[QtWidgets.QWidget]=None, layoutType:type=QtWidgets.QVBoxLayout):
         QtWidgets.QWidget.__init__(self, parent)
