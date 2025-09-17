@@ -321,28 +321,13 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         self._prefix_ = ""
         
         if isinstance(units, pq.Quantity):
-#             if isinstance(unitsFamily, str):
-#                 if unitsFamily not in scq.UNITS_DICT:
-#                     raise ValueError(f"Unknown 'unitsFamily' {unitsFamily}")
-#                     
-#                 if scq.getUnitFamily(self._units_) != unitsFamily:
-#                     raise ValueError(f"'unitsFamily' {unitsFamily} is incompatible with the specified units {self._units_}")
-            
             self._units_ = units.units
             if not isinstance(units, pq.UnitQuantity):
-                self._magnitude_ = units.magnitude
+                self._magnitude_ = float(units.magnitude)
         else:
             self._units_ = self._default_units_
         
-#         self._unitFamily_:str = scq.getUnitFamily(self._units_)
-#         
-#         if unitsFamily in scq.UNITS_DICT:
-#             self._unitFamily_ = unitsFamily
-            
         self._unitFamily_ = scq.getUnitFamily(self._units_)
-        # elif isinstance(self._units_, pq.Quantity):
-        # else:
-        #     self._unitFamily_ = None
             
         # print(f"{self.__class__.__name__}.__init__: units = {self._units_}, unit family = {self._unitFamily_}")
         
@@ -380,7 +365,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             
         else:
             raise TypeError(f"decimals expected to be an int >= 0 or None; instead, got {decimals}")
-        
+
         # print(f"{self.__class__.__name__}.__init__:  decimals -> {self.decimals()}")
             
         self._internal_minimum = self._default_internal_minimum
@@ -394,6 +379,11 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         super().setValue(self._magnitude_)
         super().setSingleStep(self._singleStep_)
         super().setDecimals(self._decimals_)
+        if isinstance(stepType, QtWidgets.QAbstractSpinBox.StepType):
+            super().setStepType(stepType)
+        else:
+            super().setStepType(QtWidgets.QAbstractSpinBox.DefaultStepType)
+        
         super().setRange(self._internal_minimum, self._internal_maximum)
         if isinstance(stepType, QtWidgets.QAbstractSpinBox.StepType):
             super().setStepType(stepType)
@@ -463,8 +453,9 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
     @Slot(str)
     def _slot_valueTextChanged(self, s:str):
         val = self.valueFromText(s)
-        self._magnitude_ = float(val)
-        self.sig_valueChanged.emit(self.value())
+        if isinstance(val, (pq.Quantity, float)):
+            self._magnitude_ = float(val)
+            self.sig_valueChanged.emit(self.value())
             
     @Slot(float)
     def _slot_valueChanged(self, val):
@@ -657,14 +648,14 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         if prefix in s:
             s = s.strip(prefix)
             
+        s = s.replace(",", "")
+            
         if s == "NA":
             return pd.NA
         elif s.lower() == "nan":
             return math.nan * self.units
         else:
-            # ret = super().valueFromText(s)
-            ret = float(s)
-            return ret * self.units
+            return float(s) * self.units if len(s) else None
 
     def textFromValue(self, value:typing.Union[float, pq.Quantity, np.ndarray]):
         if isinstance(value, (pq.Quantity, np.ndarray)):
@@ -823,16 +814,25 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         dlg = qd.QuickDialog(parent=self, title="Set single step")
         floatInput = qd.FloatInput(dlg, "Step (float)")
         floatInput.setValue(f"{super().singleStep()}")
+        adaptiveCheckBox = qd.CheckBox(dlg, "Adaptive")
+        adaptiveCheckBox.setChecked(self.stepType() == QtWidgets.QAbstractSpinBox.AdaptiveDecimalStepType)
         dlg.addWidget(floatInput)
+        dlg.addWidget(adaptiveCheckBox)
         if dlg.exec():
             value = floatInput.value()
-            self.setSingleStep(value)
-            newDecimals = -int(math.log10(abs(value)))+1 if (value < 1 and value > -1) else 1
-            # NOTE: 2022-11-07 12:19:00
-            # adapt to new decimals
-            #
-            if self.decimals() != newDecimals:
-                self.setDecimals(newDecimals)
+            stepType = QtWidgets.QAbstractSpinBox.AdaptiveDecimalStepType if adaptiveCheckBox.isChecked() else QtWidgets.QAbstractSpinBox.DefaultStepType
+            if value != self.singleStep():
+                self.setSingleStep(value)
+                
+            if stepType != self.stepType():
+                self.setStepType(stepType)
+            
+            # newDecimals = -int(math.log10(abs(value)))+1 if (value < 1 and value > -1) else 1
+            # # NOTE: 2022-11-07 12:19:00
+            # # adapt to new decimals
+            # #
+            # if self.decimals() != newDecimals:
+            #     self.setDecimals(newDecimals)
                 
     @Slot(bool)
     def _slot_familyRestrictionChanged(self, value:bool):
@@ -888,14 +888,15 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         logVal = math.floor(math.log(10, absRound)) - 1
         return max(minStep, math.pow(10, logVal))
         
-    # NOTE: 2025-09-15 18:22:34 TODO Finalize this
-    # def stepBy(self, steps:int):
-    #     old = self._magnitude_
-    #     tmp = self.lineEdit().displayText()
-    #     cursorPos = self.lineEdit().cursorPosition()
-    #     nostep = False
+    # # NOTE: 2025-09-15 18:22:34 TODO Finalize this
+    def stepBy(self, steps:int):
+        super().stepBy(steps)
+        txt = self.lineEdit().displayText()
+        val = self.valueFromText(txt)
+        self._magnitude_ = float(val)
+        self.sig_valueChanged.emit(self.value())
         
-        
+    
         
             
     

@@ -328,6 +328,7 @@ class CheckBox(QtWidgets.QCheckBox):
         return self.isChecked()
 
 class Choice(QtWidgets.QFrame):
+    """Radio buttons"""
     def __init__(self, parent, label, vertical = 0):
         QtWidgets.QFrame.__init__(self, parent)
         parent.addWidget(self)
