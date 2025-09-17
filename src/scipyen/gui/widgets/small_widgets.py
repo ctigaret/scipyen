@@ -253,7 +253,7 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
             self.unitFamilyComboBox.setEnabled(True)
         
 
-class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
+class QuantitySpinBox(QtWidgets.QDoubleSpinBox): # TODO: 2025-09-17 23:04:47 allow single step as a quantity TODO
     r"""Subclass of QDoubleSpinBox aware of Python quantities.
     Single step, number of decimals and units suffix are all configurable.
         
@@ -391,8 +391,6 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         super().setPrefix(self._prefix_)
         super().valueChanged.connect(self._slot_valueChanged)
         self.lineEdit().textChanged.connect(self._slot_valueTextChanged)
-            
-        
         
     @property
     def units(self):
@@ -817,14 +815,14 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
     @Slot()
     def _slot_setSingleStepGUI(self):
         dlg = qd.QuickDialog(parent=self, title="Set single step")
-        floatInput = qd.FloatInput(dlg, "Step (float)")
-        floatInput.setValue(f"{super().singleStep()}")
+        stepInput = qd.HSpinBox(dlg, "Step (float)", widget_type="d")
+        stepInput.setValue(self.singleStep())
         adaptiveCheckBox = qd.CheckBox(dlg, "Adaptive")
         adaptiveCheckBox.setChecked(self.stepType() == QtWidgets.QAbstractSpinBox.AdaptiveDecimalStepType)
-        dlg.addWidget(floatInput)
+        dlg.addWidget(stepInput)
         dlg.addWidget(adaptiveCheckBox)
         if dlg.exec():
-            value = floatInput.value()
+            value = stepInput.value()
             stepType = QtWidgets.QAbstractSpinBox.AdaptiveDecimalStepType if adaptiveCheckBox.isChecked() else QtWidgets.QAbstractSpinBox.DefaultStepType
             if value != self.singleStep():
                 self.setSingleStep(value)
@@ -832,12 +830,30 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             if stepType != self.stepType():
                 self.setStepType(stepType)
             
-            # newDecimals = -int(math.log10(abs(value)))+1 if (value < 1 and value > -1) else 1
-            # # NOTE: 2022-11-07 12:19:00
-            # # adapt to new decimals
-            # #
-            # if self.decimals() != newDecimals:
-            #     self.setDecimals(newDecimals)
+#     @Slot()
+#     def _slot_setSingleStepGUI_old(self):
+#         dlg = qd.QuickDialog(parent=self, title="Set single step")
+#         floatInput = qd.FloatInput(dlg, "Step (float)")
+#         floatInput.setValue(f"{super().singleStep()}")
+#         adaptiveCheckBox = qd.CheckBox(dlg, "Adaptive")
+#         adaptiveCheckBox.setChecked(self.stepType() == QtWidgets.QAbstractSpinBox.AdaptiveDecimalStepType)
+#         dlg.addWidget(floatInput)
+#         dlg.addWidget(adaptiveCheckBox)
+#         if dlg.exec():
+#             value = floatInput.value()
+#             stepType = QtWidgets.QAbstractSpinBox.AdaptiveDecimalStepType if adaptiveCheckBox.isChecked() else QtWidgets.QAbstractSpinBox.DefaultStepType
+#             if value != self.singleStep():
+#                 self.setSingleStep(value)
+#                 
+#             if stepType != self.stepType():
+#                 self.setStepType(stepType)
+#             
+#             # newDecimals = -int(math.log10(abs(value)))+1 if (value < 1 and value > -1) else 1
+#             # # NOTE: 2022-11-07 12:19:00
+#             # # adapt to new decimals
+#             # #
+#             # if self.decimals() != newDecimals:
+#             #     self.setDecimals(newDecimals)
                 
     @Slot(bool)
     def _slot_familyRestrictionChanged(self, value:bool):
@@ -858,14 +874,27 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
     def _slot_rescaleValueChanged(self, value:bool):
         self._rescaleOnUnitChange_ = value
             
+    # @Slot()
+    # def _slot_setDecimalsGUI_old(self):
+    #     dlg = qd.QuickDialog(parent=self, title="Set decimals")
+    #     intInput = qd.IntegerInput(dlg, "Decimals (int) >= 0")
+    #     intInput.setValue(f"{self._decimals_}")
+    #     dlg.addWidget(intInput)
+    #     if dlg.exec():
+    #         value = intInput.value()
+    #         if value < 0:
+    #             value  = 0
+    #         self.setDecimals(value)
+            
     @Slot()
     def _slot_setDecimalsGUI(self):
         dlg = qd.QuickDialog(parent=self, title="Set decimals")
-        intInput = qd.IntegerInput(dlg, "Decimals (int) >= 0")
-        intInput.setValue(f"{self._decimals_}")
-        dlg.addWidget(intInput)
+        decimalsInput = qd.HSpinBox(dlg, "Decimals (int) >= 0")
+        decimalsInput.setValue(self._decimals_)
+        decimalsInput.setMinimum(0)
+        dlg.addWidget(decimalsInput)
         if dlg.exec():
-            value = intInput.value()
+            value = decimalsInput.value()
             if value < 0:
                 value  = 0
             self.setDecimals(value)

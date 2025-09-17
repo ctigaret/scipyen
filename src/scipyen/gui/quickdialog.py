@@ -77,6 +77,7 @@ else:
 
 from gui.guiutils import(InftyDoubleValidator, ComplexValidator, UnitsStringValidator)
 from core.prog import scipywarn
+import quantities as pq
 
 def alignLabels(*args):
     m = 0
@@ -329,11 +330,15 @@ class CheckBox(QtWidgets.QCheckBox):
     
 class SpinBox(QtWidgets.QFrame):
     """Adds a spin box"""
-    def __init__(self, parent, label, vertical = 0):
+    def __init__(self, parent, label, vertical = 0, widget_type:str="i"):
+        from gui.widgets.small_widgets import QuantitySpinBox
         QtWidgets.QFrame.__init__(self, parent)
         parent.addWidget(self)
+        if widget_type not in ("i", "d", "q"):
+            widget_type = "i"
+        self._type_ = widget_type
         self.label = QtWidgets.QLabel(text=label, parent=self)
-        self.spinBox = QtWidgets.QSpinBox()
+        self.spinBox = QtWidgets.QSpinBox(parent=self) if self._type_ == "i" else QtWidgets.QDoubleSpinBox(parent=self) if self._type_ == "d" else QuantitySpinBox(parent=self)
         if vertical:
             self.layout = QtWidgets.QVBoxLayout(self)
         else:
@@ -343,31 +348,110 @@ class SpinBox(QtWidgets.QFrame):
         self.layout.addWidget(self.spinBox)
         self.layout.addStretch(5)
         
-    def setValue(self, value:int):
-        self.spinBox.setValue(value)
+    def setValue(self, value:int|float|pq.Quantity):
+        if isinstance(value, pq.Quantity) and size(value) > 1:
+            raise TypeError("Cannot set value to a non-scalar quantity")
+        if self._type_ == "i":
+            self.spinBox.setValue(round(value))
+        # elif self._type_ == "q" and isinstance(value, pq.Quantity):
+        #     self.spinBox.setValue(value)
+        else:
+            self.spinBox.setValue(value)
         
-    def value(self) -> int:
+    def value(self) -> int|float|pq.Quantity:
         return self.spinBox.value()
     
-    def minimum(self) -> int:
+    def minimum(self) -> int|float|pq.Quantity:
         return self.spinBox.minimum()
     
-    def setMinimum(self, value:int):
-        self.spinBox.setMinimum(value)
+    def setMinimum(self, value:int|float|pq.Quantity):
+        if isinstance(value, pq.Quantity) and size(value) > 1:
+            raise TypeError("Cannot set value to a non-scalar quantity")
+        if self._type_ == "i":
+            self.spinBox.setMinimum(round(value))
+        else:
+            self.spinBox.setMinimum(value)
         
-    def maximum(self) -> int:
+    def maximum(self) -> int|float|pq.Quantity:
         return self.spinBox.maximum()
     
-    def setMaximum(self, value:int):
-        self.spinBox.setMaximum(value)
+    def setMaximum(self, value:int|float|pq.Quantity):
+        if isinstance(value, pq.Quantity) and size(value) > 1:
+            raise TypeError("Cannot set value to a non-scalar quantity")
+        if self._type_ == "i":
+            self.spinBox.setMaxImum(round(value))
+        else:
+            self.spinBox.setMaximum(value)
+        
+    def singleStep(self) -> int|float|pq.Quantity:
+        return self.spinBox.singleStep()
+    
+    def setSingleStep(self, val:int|float|pq.Quantity):
+        if isinstance(value, pq.Quantity) and size(value) > 1:
+            raise TypeError("Cannot set value to a non-scalar quantity")
+        if self._type_ == "i":
+            self.spinBox.setSingleStep(round(val))
+        else:
+            self.spinBox.setSingleStep(val)
+        
+    def decimals(self) -> int:
+        if self._type_ == "i":
+            return 0
+        return self.spinBox.decimals()
+    
+    def setDecimals(self, val:int):
+        if self._type_ != "i":
+            if val < 0: 
+                val = 0
+            self.spinBox.setDecimals(val)
+            
+    def stepType(self) -> QtWidgets.QAbstractSpinBox.StepType:
+        return self.spinBox.stepType()
+    
+    def setStepType(self, val: QtWidgets.QAbstractSpinBox.StepType):
+        self.spinBox.setStepType(val)
+        
+    def prefix(self) -> str:
+        return self.spinBox.prefix()
+    
+    def setPrefix(self, val:str):
+        if self._type_ == "q":
+            return
+        self.spinBox.setPrefix(val)
+        
+    def suffix(self) -> str:
+        return self.spinBox.suffix()
+    
+    def setSuffix(self, val:str):
+        if self._type_ == "q":
+            return
+        self.spinBox.setSuffix(val)
+        
+    def displayIntegerBase(self) -> int:
+        return self.spinBox.displayIntegerBase()
+        
+    def setDisplayIntegerBase(self, val:int):
+        self.spinBox.setDisplayIntegerBase(val)
+        
+    def setRange(self, minimum:int|float, maximum:int|float):
+        if self._type_ == "i":
+            self.spinBox.setRange(round(minimum), round(maximum))
+        else:
+            self.spinBox.setRange(float(minimum), float(maximum))
+            
+    def specialValueText(self) -> str:
+        return self.spinBox.specialValueText()
+    
+    def setSpecialValueText(self, val:str):
+        self.spinBox.setSpecialValueText(val)
         
 class VSpinBox(SpinBox):
-    def __init__(self, parent, label):
-        SpinBox.__init__(self, parent, label, 1)
+    def __init__(self, parent, label, widget_type:str = "i"):
+        SpinBox.__init__(self, parent, label, 1, widget_type)
         
 class HSpinBox(SpinBox):
-    def __init__(self, parent, label):
-        SpinBox.__init__(self, parent, label, 0)
+    def __init__(self, parent, label, widget_type:str = "i"):
+        SpinBox.__init__(self, parent, label, 0, widget_type)
 
 class Choice(QtWidgets.QFrame):
     """Radio buttons"""
