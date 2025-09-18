@@ -253,7 +253,7 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
             self.unitFamilyComboBox.setEnabled(True)
         
 
-class QuantitySpinBox(QtWidgets.QDoubleSpinBox): # TODO: 2025-09-17 23:04:47 allow single step as a quantity TODO
+class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
     r"""Subclass of QDoubleSpinBox aware of Python quantities.
     Single step, number of decimals and units suffix are all configurable.
         
@@ -791,10 +791,14 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox): # TODO: 2025-09-17 23:04:47 all
         return self._restrictedToFamily_
     
     @familyRestriction.setter
-    def familyRestriction(self, value:typing.Optional[str] = None):
+    def familyRestriction(self, value:typing.Optional[typing.Union[str, bool]] = None):
         if isinstance(value, str):
             if value in scq.UNITS_DICT:
                 self._restrictedToFamily_ = value
+                
+            elif isinstance(value, bool):
+                if value:
+                    self._restrictedToFamily_ = scq.getUnitFamily(self.units)
         else:
             self._restrictedToFamily_ = None
     
@@ -815,7 +819,12 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox): # TODO: 2025-09-17 23:04:47 all
     @Slot()
     def _slot_setSingleStepGUI(self):
         dlg = qd.QuickDialog(parent=self, title="Set single step")
-        stepInput = qd.HSpinBox(dlg, "Step (float)", widget_type="d")
+        # stepInput = qd.HSpinBox(dlg, "Step (float)", widget_type="d")
+        stepInput = qd.HSpinBox(dlg, "Step (float|Scalar quantity)", widget_type="q")
+        stepInput.familyRestriction = scq.getUnitFamily(self.units)
+        stepInput.rescaleOnUnitChange = True
+        stepInput.units = self.units
+        stepInput.setDecimals(3)
         stepInput.setValue(self.singleStep())
         adaptiveCheckBox = qd.CheckBox(dlg, "Adaptive")
         adaptiveCheckBox.setChecked(self.stepType() == QtWidgets.QAbstractSpinBox.AdaptiveDecimalStepType)
@@ -937,7 +946,24 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox): # TODO: 2025-09-17 23:04:47 all
         self._magnitude_ = float(val)
         self.sig_valueChanged.emit(self.value())
         
-    
+    def singleStep(self) -> pq.Quantity:
+        return self._singleStep_ * self.units
         
+    def setSingleStep(self, value:float|pq.Quantity):
+        if isinstance(value, pq.Quantity):
+            if value.size != 1:
+                raise TypeError("Scalar quantity expected")
             
+            if not scq.unitsConvertible(value, self.units):
+                raise ValueError(f"Cannot set single step with units (){value.units}) that are not scalable to the current units ({self.units})")
     
+            v = float(value.rescale(self.units).magnitude)
+            
+        elif isinstance(value, float):
+            v = value
+        else:
+            raise TypeError(f"Expecting a scalar quantity or float; instead, got a {type(value).__name__}")
+        
+        self._singleStep_ = v
+        
+        super().setSingleStep(self._singleStep_)

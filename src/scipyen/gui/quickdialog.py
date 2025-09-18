@@ -349,7 +349,7 @@ class SpinBox(QtWidgets.QFrame):
         self.layout.addStretch(5)
         
     def setValue(self, value:int|float|pq.Quantity):
-        if isinstance(value, pq.Quantity) and size(value) > 1:
+        if isinstance(value, pq.Quantity) and value.size != 1:
             raise TypeError("Cannot set value to a non-scalar quantity")
         if self._type_ == "i":
             self.spinBox.setValue(round(value))
@@ -365,7 +365,7 @@ class SpinBox(QtWidgets.QFrame):
         return self.spinBox.minimum()
     
     def setMinimum(self, value:int|float|pq.Quantity):
-        if isinstance(value, pq.Quantity) and size(value) > 1:
+        if isinstance(value, pq.Quantity) and value.size != 1:
             raise TypeError("Cannot set value to a non-scalar quantity")
         if self._type_ == "i":
             self.spinBox.setMinimum(round(value))
@@ -376,7 +376,7 @@ class SpinBox(QtWidgets.QFrame):
         return self.spinBox.maximum()
     
     def setMaximum(self, value:int|float|pq.Quantity):
-        if isinstance(value, pq.Quantity) and size(value) > 1:
+        if isinstance(value, pq.Quantity) and value.size != 1:
             raise TypeError("Cannot set value to a non-scalar quantity")
         if self._type_ == "i":
             self.spinBox.setMaxImum(round(value))
@@ -387,7 +387,7 @@ class SpinBox(QtWidgets.QFrame):
         return self.spinBox.singleStep()
     
     def setSingleStep(self, val:int|float|pq.Quantity):
-        if isinstance(value, pq.Quantity) and size(value) > 1:
+        if isinstance(value, pq.Quantity) and value.size != 1:
             raise TypeError("Cannot set value to a non-scalar quantity")
         if self._type_ == "i":
             self.spinBox.setSingleStep(round(val))
