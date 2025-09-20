@@ -288,7 +288,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
                  unitsFamily:typing.Optional[str]=None, 
                  fixUnitFamily:typing.Optional[typing.Union[str, bool]]=None,
                  rescaleWithUnitsChange:bool=False,
-                 forceDimensionless:bool=False,
+                 keepDimensionless:bool=False,
                  ):
         r"""
         Named parameters:
@@ -309,16 +309,16 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         
         # self._default_units_ = pq.dimensionless
         
-        self._forceDimensionless_ = forceDimensionless
+        self._keepDimensionless_ = keepDimensionless
         self._restrictedToFamily_:typing.Optional[str] = None
         self._rescaleOnUnitChange_:bool = False
+        self._forceDimensionless_:bool = False
         
         self._units_:pq.Quantity = self._default_units_
         self._magnitude_:float = 0.0
         self._prefix_ = ""
         self._suffix_ = ""
         
-        # if not self._forceDimensionless_:
         if isinstance(units, pq.Quantity):
             self._units_ = units.units
             if not isinstance(units, pq.UnitQuantity):
@@ -341,7 +341,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             self._suffix_ = ""
             self._prefix_ = ""
         else:
-            if not self._forceDimensionless_:
+            if not (self._keepDimensionless_ or self._forceDimensionless_):
                 symbol = self._units_.dimensionality.unicode
                 if self._unitFamily_ == "Currency":
                     self._suffix_ = ""
@@ -351,6 +351,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
                     self._prefix_ = ""
                 
         self._default_singleStep = super().singleStep()
+        
         if isinstance(singleStep,float):
             self._singleStep_ = singleStep
             
@@ -399,18 +400,19 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         
     @property
     def units(self):
-        return self._units_
+        if not (self._keepDimensionless_ or self._forceDimensionless_):
+            return self._units_
     
     @units.setter
     def units(self, value:typing.Optional[pq.Quantity] = None):
         # print(f"{self.__class__.__name__}.units.setter: value = {value}")
-        if self._forceDimensionless_:
+        if self._keepDimensionless_ or self._forceDimensionless_:
             return 
         
         if not isinstance(value, pq.Quantity):
             value = pq.dimensionless
             
-        if self._rescaleOnUnitChange_ and scq.unitsConvertible(value, self._units_) and float(value.magnitude) not in (math.nan, np.nan, -math.inf, math.inf, -np.inf, np.inf):
+        if self._rescaleOnUnitChange_ and scq.unitsConvertible(value, self._units_) and float(self.value()) not in (math.nan, np.nan, -math.inf, math.inf, -np.inf, np.inf):
             newval = self.value().rescale(value)
             newfval = float(newval.magnitude)
             ratio = newfval/self._magnitude_
@@ -466,10 +468,14 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
     @Slot(float)
     def _slot_valueChanged(self, val):
         self.sig_valueChanged.emit(self.value())
+        
+    @Slot(bool)
+    def _slot_keepDimensionless(self, val:bool):
+        self.keepDimensionless = val
             
     def contextMenuEvent(self, evt):
         cm = QtWidgets.QMenu("Options", self)
-        if not self._forceDimensionless_:
+        if not (self._keepDimensionless_ or self._forceDimensionless_):
             setUnitsAction = cm.addAction("Set units")
             setUnitsAction.triggered.connect(self._slot_setUnitsGUI)
         setDecimalsAction = cm.addAction("Set decimals")
@@ -480,10 +486,9 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         adaptiveStepAction.setCheckable(True)
         adaptiveStepAction.setChecked(self.stepType() == QtWidgets.QAbstractSpinBox.AdaptiveDecimalStepType)
         adaptiveStepAction.toggled.connect(self._slot_setAdaptiveStep)
-        cm.addSeparator()
-        resetAction = cm.addAction("Reset")
-        resetAction.triggered.connect(self._slot_reset)
-        if not self._forceDimensionless_:
+        setRangeAction = cm.addation("Set range (min, max)")
+        setRangeAction.triggered.connect(self._slot_setRangeGUI)
+        if not (self._keepDimensionless_ or self._forceDimensionless_):
             cm.addSeparator()
             rescaleValueAction = cm.addAction("Rescale on unit change")
             rescaleValueAction.setCheckable(True)
@@ -494,6 +499,14 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             restrictAction.setChecked(isinstance(self._restrictedToFamily_, str) and self._restrictedToFamily_ in scq.UNITS_DICT)
             restrictAction.toggled.connect(self._slot_familyRestrictionChanged)
             
+        cm.addSeparator()
+        if not self.forceDimensionless:
+            toggleDimensionlessAction = cm.addAction("Ignore dimensionality")
+            toggleDimensionlessAction.setCheckable(True)
+            toggleDimensionlessAction.setChecked(self._keepDimensionless_)
+            toggleDimensionlessAction.toggled.connect(self._slot_keepDimensionless)
+        resetAction = cm.addAction("Reset")
+        resetAction.triggered.connect(self._slot_reset)
         cm.popup(self.mapToGlobal(evt.pos()))
         
     def setMinimum(self, value:typing.Optional[typing.Union[float, pq.Quantity]]=None):
@@ -505,7 +518,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         When None, the minimum value will be set to -math.inf
         """
         if value is None:
-            super().setMinimum(self._internal_minimum)
+            super().setMinimum(self._default_internal_minimum)
             
         elif isinstance(value, float):
             super().setMinimum(value)
@@ -517,6 +530,8 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             units = value.units
             super().setMinimum(val)
             self.units = units
+            
+        self._internal_minimum = super().minimum()
         
     def setMaximum(self, value:typing.Optional[typing.Union[float, pq.Quantity]]=None):
         r"""Overloads QDoubleSpinBox.setMaximum, to accept:
@@ -527,7 +542,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         When None, the maximum value will be set to math.inf
         """
         if value is None:
-            super().setMaximum(self._internal_maximum)
+            super().setMaximum(self._default_internal_maximum)
             
         elif isinstance(value, float):
             super().setMaximum(value)
@@ -540,6 +555,8 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             super().setMaximum(val)
             self.units = units
             
+        self._internal_maximum = super().maximum()
+            
     def setRange(self, minimum:typing.Optional[typing.Union[float, pq.Quantity]]=None, maximum:typing.Optional[typing.Union[float, pq.Quantity]]=None):
         r"""Overloads QDoubleSpinBox.setRange to accept:
         • floats
@@ -551,11 +568,6 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         When either is None, the 'minimum' and 'maximum' will be set to
         -math.inf and math.inf, respectively.
         """
-        # if self._forceDimensionless_:
-        #     min_ = float(minimum)
-        #     max_ = float(maximum)
-        #     super().setRange(min_, max_)
-        #     return 
         
         if all(isinstance(v, pq.Quantity) for v in (minimum, maximum)):
             # NOTE: 2022-11-07 09:55:43
@@ -613,13 +625,13 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         
     def minimum(self):
         ret = super().minimum() 
-        if self._forceDimensionless_:
+        if self._keepDimensionless_ or self._forceDimensionless_:
             return ret
         return ret  * self.units
     
     def maximum(self):
         ret = super().maximum() 
-        if self._forceDimensionless_:
+        if self._keepDimensionless_ or self._forceDimensionless_:
             return ret
         return ret * self.units
     
@@ -634,7 +646,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             return np.nan * self.units
         else:
             ret = self._magnitude_
-            if self._forceDimensionless_:
+            if self._keepDimensionless_ or self._forceDimensionless_:
                 return ret
             return ret * self.units
         
@@ -742,7 +754,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             
             fval = float(value.magnitude)
             
-            if not self._forceDimensionless_:
+            if not (self._keepDimensionless_ or self._forceDimensionless_):
                 if scq.unitsConvertible(self.units, value.units):
                     if fval > -math.inf and fval < math.inf:
                         fval = float(value.rescale(self.units).magnitude)
@@ -751,14 +763,14 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
                 
             self._magnitude_ = fval
             
+        elif value in (pd.NA, math.nan, np.nan):
+            self._magnitude_ = value
+            
         elif isinstance(value, float):
             self._magnitude_ = value
         
         elif isinstance(value, int):
             self._magnitude_ = float(value)
-            
-        elif value in (pd.NA, math.nan, np.nan):
-            self._magnitude_ = value
             
         else:
             raise ValueError(f"Incompatible value: {value}")
@@ -800,28 +812,28 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         
     @property
     def rescaleOnUnitChange(self)->bool:
-        if self._forceDimensionless_:
+        if self._keepDimensionless_ or self._forceDimensionless_:
             return False
         return self._rescaleOnUnitChange_
     
     @rescaleOnUnitChange.setter
     def rescaleOnUnitChange(self, val:bool):
-        if not self._forceDimensionless_:
+        if not (self._keepDimensionless_ or self._forceDimensionless_):
             self._rescaleOnUnitChange_ = val
         
     @property
     def unitFamily(self):
-        if not self._forceDimensionless_:
+        if not (self._keepDimensionless_ or self._forceDimensionless_):
             return self._unitFamily_
     
     @property
     def familyRestriction(self) -> str:
-        if not self._forceDimensionless_:
+        if not (self._keepDimensionless_ or self._forceDimensionless_):
             return self._restrictedToFamily_
     
     @familyRestriction.setter
     def familyRestriction(self, value:typing.Optional[typing.Union[str, bool]] = None):
-        if self._forceDimensionless_:
+        if self._keepDimensionless_ or self._forceDimensionless_:
             return 
         
         if isinstance(value, str):
@@ -836,6 +848,8 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
     
     @Slot()
     def _slot_setUnitsGUI(self):
+        if self._keepDimensionless_ or self._forceDimensionless_:
+            return
         dlg = qd.QuickDialog(parent = self, title="Set units")
         quantityWidget = QuantityChooserWidget(parent = dlg)
         quantityWidget.units = self._units_
@@ -850,7 +864,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             
     @Slot()
     def _slot_setSingleStepGUI(self):
-        if self._forceDimensionless_:
+        if self._keepDimensionless_ or self._forceDimensionless_:
             return 
         dlg = qd.QuickDialog(parent=self, title="Set single step")
         # stepInput = qd.HSpinBox(dlg, "Step (float)", widget_type="d")
@@ -875,7 +889,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             
     @Slot(bool)
     def _slot_familyRestrictionChanged(self, value:bool):
-        if self._forceDimensionless_:
+        if self._keepDimensionless_ or self._forceDimensionless_:
             return
         
         if value:
@@ -893,7 +907,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             
     @Slot(bool)
     def _slot_rescaleValueChanged(self, value:bool):
-        if self._forceDimensionless_:
+        if self._keepDimensionless_ or self._forceDimensionless_:
             return
         self._rescaleOnUnitChange_ = value
             
@@ -909,6 +923,25 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             if value < 0:
                 value  = 0
             self.setDecimals(value)
+            
+    @Slot()
+    def _slot_setRangeGUI(self):
+        dlg = qd.QuickDialog(parent=self, title="Set range (min, max)")
+        unitsLabel = ""
+        if not (self._keepDimensionless_ or self._forceDimensionless_):
+            unitsLabel = self._prefix_ if len(self._prefix_) else self._suffix_ if len(self._suffix_) else ""
+        label = f" ({unitsLabel})" if len(unitsLabel) else ""
+        minimumInput = qd.HSpinBox(dlg, f"Minimum{label}", widget_type="f")
+        minimumInput.setValue(super().minimum())
+        maximumInput = qd.HSpinBox(dlg, f"Maximum{label}", widget_type="f")
+        maximumInput.setValue(super().maximum())
+        dlg.addWidget(minimumInput)
+        dlg.addWidget(maximumInput)
+        if dlg.exec():
+            minimum = minimumInput.value()
+            maximum = maximumInput.value()
+            self.setMinimum(minimum)
+            self.setMaximum(maximum)
             
     @Slot()
     def _slot_reset(self):
@@ -949,7 +982,10 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         self.sig_valueChanged.emit(self.value())
         
     def singleStep(self) -> pq.Quantity:
-        return self._singleStep_ * self.units
+        ret = self._singleStep_
+        if self._keepDimensionless_ or self._forceDimensionless_:
+            return ret
+        return ret * self.units
         
     def setSingleStep(self, value:float|pq.Quantity):
         if isinstance(value, pq.Quantity):
@@ -971,14 +1007,28 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         super().setSingleStep(self._singleStep_)
         
     @property
+    def keepDimensionless(self) -> bool:
+        return self._keepDimensionless_
+    
+    @keepDimensionless.setter
+    def keepDimensionless(self, val:bool):
+        self._keepDimensionless_ = val
+        if self._keepDimensionless_ or self._forceDimensionless_:
+            super().setSuffix("")
+            super().setPrefix("")
+        else:
+            super().setSuffix(self._suffix_)
+            super().setPrefix(self._prefix_)
+            
+        self.update()
+        
+    @property
     def forceDimensionless(self) -> bool:
         return self._forceDimensionless_
     
     @forceDimensionless.setter
     def forceDimensionless(self, val:bool):
-        self._forceDimensionless_ = True
-        self._prefix_ = ""
-        self._suffix_ = ""
+        self._forceDimensionless_ = val
         self.update()
 
 class ComplexSpinBox(QtWidgets.QFrame):
@@ -1004,7 +1054,8 @@ class ComplexSpinBox(QtWidgets.QFrame):
                  useQuantities:bool=False,
                  unitsFamily:typing.Optional[str]=None, 
                  fixUnitFamily:typing.Optional[typing.Union[str, bool]]=None,
-                 rescaleWithUnitsChange:bool=False, 
+                 rescaleWithUnitsChange:bool=False,
+                 keepDimensionless:bool=False, 
                  ):
         QtWidgets.QFrame.__init__(self, parent)
         if isinstance(parent, QtWidgets.QWidget):
@@ -1015,8 +1066,12 @@ class ComplexSpinBox(QtWidgets.QFrame):
         self.prefixLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignHCenter)
         self.prefixLabel.setTextInteractionFlags(QtCore.Qt.NoTextInteraction)
         
-        self.realSpinBox = QtWidgets.QDoubleSpinBox(self)
-        self.imagSpinBox = QtWidgets.QDoubleSpinBox(self)
+        # self.realSpinBox = QtWidgets.QSpinBox(self)
+        self.realSpinBox = QuantitySpinBox(self, decimals=3)#, keepDimensionless = True)
+        self.realSpinBox.forceDimensionless = True
+        # self.imagSpinBox = QtWidgets.QDoubleSpinBox(self)
+        self.imagSpinBox = QuantitySpinBox(self, decimals=3)#, keepDimensionless = True)
+        self.imagSpinBox.forceDimensionless = True
         self.plusLabel = QtWidgets.QLabel(self)
         self.plusLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignHCenter)
         self.plusLabel.setText("+")
@@ -1039,6 +1094,8 @@ class ComplexSpinBox(QtWidgets.QFrame):
         
         self._restrictedToFamily_:typing.Optional[str] = None
         self._rescaleOnUnitChange_:bool = False
+        self._keepDimensionless_ = keepDimensionless
+        self._forceDimensionless_:bool = False
         
         self._units_:pq.Quantity = self._default_units_
         self._magnitude_:complex = complex(0.0, 0.0)
@@ -1076,6 +1133,7 @@ class ComplexSpinBox(QtWidgets.QFrame):
                 self._prefix_ = ""
                 
         self._default_singleStep_real = self.realSpinBox.singleStep()
+        
         if isinstance(singleStepReal,float):
             self._singleStepReal_ = singleStepReal
             
@@ -1151,7 +1209,7 @@ class ComplexSpinBox(QtWidgets.QFrame):
         
         self.setContextMenuPolicy(QtCore.Qt.DefaultContextMenu)
         
-    def _setupSpinBox_(self, spinBox, minimun, maximum, decimals, singleStep, stepType, value):
+    def _setupSpinBox_(self, spinBox, minimum, maximum, decimals, singleStep, stepType, value):
         spinBox.setMinimum(minimum)
         spinBox.setMaximum(maximum)
         spingBox.setDecimals(decimals)
@@ -1160,9 +1218,203 @@ class ComplexSpinBox(QtWidgets.QFrame):
         spinBox.setValue(value)
         
     def value(self) -> complex | pq.Quantity:
+        ret = self._magnitude_
+        if self._keepDimensionless_ or self._forceDimensionless_:
+            return ret
         
+        return ret * self._units_
+    
+    def setValue(self, value:typing.Union[complex, float, int, pq.Quantity]):
+        if isinstance(value, pq.Quantity):
+            if value.size > 1:
+                # return # Only scalar quantities are allowed
+                raise TypeError("Only scalar quantities are allowed")
+            
+            if value.dtype == np.dtype("complex"):
+                cval = complex(value.magnitude)
+            else:
+                cval = complex(float(value.magnitude), 0.0)
+                
+            if not (self._keepDimensionless_ or self._forceDimensionless_):
+                if scq.unitsConvertible(self.units, value.units):
+                    if any( (v > -math.inf and v < math.inf) for v in (cval.real, cval.imag)):
+                        cval = complex((cval*value.units).rescale(self.units).magnitude)
+                else:
+                    self.units = value.units
+                    
+            self._magnitude_ = cval
+            
+                    
+        elif value in (pd.NA, math.nan, np.nan):
+            self._magnitude_ = complex(value, value)
+            
+        elif isinstance(value, float):
+            self._magnitude_ = complex(value, 0.0)
         
+        elif isinstance(value, int):
+            self._magnitude_ = complex(float(value), 0.0)
+        
+        else:
+            raise ValueError(f"Incompatible value: {value}")
+        
+        self.realSpinBox.setValue(self._magnitude_.real)
+        self.imagSpinBox.setValue(self._magnitude_.imag)
+            
+    
+    def contextMenuEvent(self, evt):
+        cm = QtWidgets.QMenu("Options", self)
+        setUnitsAction = cm.addAction("Set units")
+        setUnitsAction.triggered.connect(self._slot_setUnitsGUI)
+        rescaleValueAction = cm.addAction("Rescale on unit change")
+        rescaleValueAction.setCheckable(True)
+        rescaleValueAction.setChecked(self._rescaleOnUnitChange_)
+        rescaleValueAction.toggled.connect(self._slot_rescaleValueChanged)
+        restrictAction = cm.addAction("Fix units family")
+        restrictAction.setCheckable(True)
+        restrictAction.setChecked(isinstance(self._restrictedToFamily_, str) and self._restrictedToFamily_ in scq.UNITS_DICT)
+        restrictAction.toggled.connect(self._slot_familyRestrictionChanged)
+        # realOptionsMenu = cm.addMenu("Real part")
+        # setDecimalsActionReal = realOptionsMenu.addAction("Set decimals (real part)")
+        # setDecimalsActionReal.triggered.connect(self._slot_setDecimalsGUI_Real)
+        # setSingleStepActionReal = realOptionsMenu.addAction("Set single step (real part)")
+        # setSingleStepActionReal.triggered.connect(self._slot_setSingleStepGUI_Real)
+        # adaptiveStepActionReal = cm.addAction("Adaptive step (real part)")
+        # adaptiveStepActionReal.setCheckable(True)
+        # adaptiveStepActionReal.setChecked(self.stepType() == QtWidgets.QAbstractSpinBox.AdaptiveDecimalStepType)
+        # adaptiveStepAction.toggled.connect(self._slot_setAdaptiveStep_Real)
+        # cm.addSeparator()
+        # cm.addSeparator()
+        # toggleDimensionlessAction = cm.addAction("Ignore dimensionality")
+        # toggleDimensionlessAction.setCheckable(True)
+        # toggleDimensionlessAction.setChecked(self._keepDimensionless_)
+        # toggleDimensionlessAction.toggled.connect(self._slot_keepDimensionless)
+        resetAction = cm.addAction("Reset")
+        resetAction.triggered.connect(self._slot_reset)
+        cm.popup(self.mapToGlobal(evt.pos()))
+        
+
+    @Slot()
+    def _slot_setUnitsGUI(self):
+        dlg = qd.QuickDialog(parent = self, title="Set units")
+        quantityWidget = QuantityChooserWidget(parent = dlg)
+        quantityWidget.units = self._units_
+        if isinstance(self._restrictedToFamily_, str) and self._restrictedToFamily_ in scq.UNITS_DICT:
+            quantityWidget.familyRestriction = self._restrictedToFamily_
+        else:
+            quantityWidget.familyRestriction = None
+            
+        dlg.addWidget(quantityWidget)
+        if dlg.exec():
+            self.units = quantityWidget.units
+            
+    @Slot(bool)
+    def _slot_rescaleValueChanged(self, value:bool):
+        if self._keepDimensionless_ or self._forceDimensionless_:
+            return
+        self._rescaleOnUnitChange_ = value
+            
+    @Slot(bool)
+    def _slot_familyRestrictionChanged(self, value:bool):
+        if self._keepDimensionless_ or self._forceDimensionless_:
+            return
+        
+        if value:
+            family = scq.getUnitFamily(self.units)
+            self._restrictedToFamily_ = family
+        else:
+            self._restrictedToFamily_ = None
+            
     @Slot(float)
     def _slot_valueChanged(self, val):
         self.sig_valueChanged.emit(self.value())
             
+    @property
+    def units(self):
+        if not (self._keepDimensionless_ or self._forceDimensionless_):
+            return self._units_
+    
+    @units.setter
+    def units(self, value:typing.Optional[pq.Quantity] = None):
+        # print(f"{self.__class__.__name__}.units.setter: value = {value}")
+        if self._keepDimensionless_ or self._forceDimensionless_:
+            return 
+        
+        if not isinstance(value, pq.Quantity):
+            value = pq.dimensionless
+            
+        myVal = self.value()
+        
+        if isinstance(myVal, pq.Quantity) and myVal.dtype == np.dtype("complex"):
+            myReal = float(myVal.magnitude.real) 
+            myImag = float(myVal.magnitude.imag)
+        else:
+            myReal = float(myVal.magmitude)
+            myImag = 0.0
+            
+        if self._rescaleOnUnitChange_ and scq.unitsConvertible(value, self._units_) and any(v not in (math.nan, np.nan, -math.inf, math.inf, -np.inf, np.inf) for v in (myReal, myImag)):
+            scaledval = self.value().rescale(value)
+            newval = complex(scaledval.magnitude) if scaledval.dtype == np.dtype("complex") else float(scaledval.magnitude)
+            ratio = newval/self._magnitude_
+            realStep = self.realSpinBox.singleStep() * ratio
+            imagStep = self.imagSpinBox.singleStep() * ratio
+            self._magnitude_ = complex(scaled.magnitude) if scaledval.dtype == np.dtype("complex") else float(scaledval.magnitude)
+            self._units_ = newval.units
+            self.realSpinBox.setValue(self._magnitude_.real)
+            self.realSpinBox.setSingleStep(realStep)
+            self.imagSpinBox.setValue(self._magnitude_.imag)
+            self.imagSpinBox.setsingleStep(imagStep)
+        else:
+            self._units_ = value.units
+            
+        self._unitFamily_ = scq.getUnitFamily(self._units_)
+        
+        self._suffix_ = ""
+        self._prefix_ = ""
+        
+        if self._units_.dimensionality != pq.dimensionless.dimensionality:
+            symbol = self._units_.dimensionality.unicode
+            if self._unitFamily_ == "Currency":
+                self._suffix_ = ""
+                self._prefix_ = f"{symbol} "
+            else:
+                self._suffix_ = f" {symbol}"
+                self._prefix_ = ""
+        
+        # if np.isnan(self._magnitude_):
+        #     text = "NaN"
+        #     super().setSpecialValueText(text)
+            
+        # elif np.isinf(self._magnitude_):
+        #     text = "-Inf" if self._magnitude_ in (-np.inf, -math.inf) else "Inf"
+        #     super().setSpecialValueText(text)
+        # else:
+        #     text = f"{self._magnitude_:.{self.decimals()}}"
+            
+        self.prefixLabel.setText(self._prefix_)
+        self.suffixLabel.setText(self._suffix_)
+        
+    @property
+    def keepDimensionless(self) -> bool:
+        return self._keepDimensionless_
+    
+    @keepDimensionless.setter
+    def keepDimensionless(self, val:bool):
+        self._keepDimensionless_ = val
+        if self._keepDimensionless_ or self._forceDimensionless_:
+            super().setSuffix("")
+            super().setPrefix("")
+        else:
+            super().setSuffix(self._suffix_)
+            super().setPrefix(self._prefix_)
+            
+        self.update()
+        
+    @property
+    def forceDimensionless(self) -> bool:
+        return self._forceDimensionless_
+    
+    @forceDimensionless.setter
+    def forceDimensionless(self, val:bool):
+        self._forceDimensionless_ = val
+        self.update()
+

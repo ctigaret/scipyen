@@ -351,11 +351,11 @@ class SpinBox(QtWidgets.QFrame):
         from gui.widgets.small_widgets import QuantitySpinBox
         QtWidgets.QFrame.__init__(self, parent)
         parent.addWidget(self)
-        if widget_type not in ("i", "d", "q"):
+        if widget_type not in ("i", "d", "f", "q"):
             widget_type = "i"
         self._type_ = widget_type
         self.label = QtWidgets.QLabel(text=label, parent=self)
-        self.spinBox = QtWidgets.QSpinBox(parent=self) if self._type_ == "i" else QtWidgets.QDoubleSpinBox(parent=self) if self._type_ == "d" else QuantitySpinBox(parent=self)
+        self.spinBox = QtWidgets.QSpinBox(parent=self) if self._type_ == "i" else QtWidgets.QDoubleSpinBox(parent=self) if self._type_ in ("d", "f") else QuantitySpinBox(parent=self)
         if vertical:
             self.layout = QtWidgets.QVBoxLayout(self)
         else:
