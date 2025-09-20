@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-r"""
+r""" ATTENTION: Do not import
 """
 import sys, os, typing
 from qtpy import QtCore, QtGui, QtWidgets, QtSvg
@@ -15,29 +15,28 @@ from core.sysutils import adapt_ui_path
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
-# CAUTION Won't compile
 
 Might not be necesary to subclass stock QtWidgets below.
 
 Editables:
-    int -> IntWidget(QSpinBox)
+    ✓ int -> QSpinBox gui.quickdialog.(V/H)SpinBox
         singleStep:int=1
         minimum:int, maximum:int by constructor
         prefix:str, suffix:str by constructor
         stepType:QAbstractSpinBox.StepType = QAbstractSpinBox.defaultStepType
         
-    float -> FloatWidget (QDoubleSpinBox):
+    ✓ float -> QDoubleSpinBox, gui.quickdialog.(V/H)SpinBox
         decimals by constructor
 
     complex -> two FloatWidgets (real, imag)
 
-    Quantity -> QuantityChooserWidget Quantitywidget
+    ✓ pq.Quantity -> QuantitySpinBox, gui.quickdialog.(V/H)SpinBox
         
-    str: QLineEdit
+    ✓ str: QLineEdit, gui.quickdialog.StringInput
 
-    bool: QCheckBox
+    ✓ bool: QCheckBox, gui.quickdialog.CheckBox
 
-    tribool: QCheckBox (tristate=True)
+    ✓ tribool: QCheckBox (tristate=True)
 
 Non-editables:
     Enum -> EnumWidget (QComboBox):

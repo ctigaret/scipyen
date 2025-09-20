@@ -90,7 +90,10 @@ def alignLabels(*args):
         dialogElement.label.setFixedWidth(m+10)
 
 class FileDialog(QtWidgets.QFrame):
-    def __init__(self, parent, label, filter):
+    r"""A file dialog. 
+NOTE: It is better to use Qt file dialogs directly
+"""
+    def __init__(self, parent:QtWidgets.QWidget, label:str, filter:str):
         QtWidgets.QFrame.__init__(self, parent)
         parent.addWidget(self)
         self.filter = filter
@@ -114,7 +117,7 @@ class FileDialog(QtWidgets.QFrame):
         self.filename.setFocus()
 
 class InputFile(FileDialog):
-    def __init__(self, parent, label, filter):
+    def __init__(self, parent:QtWidgets.QWidget, label:str, filter:str):
         FileDialog.__init__(self, parent, label, filter)
         #self.connect(self.filebrowser, SIGNAL("clicked()"), self.browse)
         self.filebrowser.clicked.connect(self.browse)
@@ -143,7 +146,7 @@ class InputFile(FileDialog):
             return False
 
 class OutputFile(FileDialog):
-    def __init__(self, parent, label, filter):
+    def __init__(self, parent:QtWidgets.QWidget, label:str, filter:str):
         FileDialog.__init__(self, parent, label, filter)
         #self.connect(self.filebrowser, SIGNAL("clicked()"), self.browse)
         self.filebrowser.clicked.connect(self.browse)
@@ -171,8 +174,11 @@ class OutputFile(FileDialog):
             return True
 
 class _OptionalValueInput(QtWidgets.QFrame):
+    r"""Widget for entering a value (number or string).
+WARNING: Data is internally represented as a string.
+"""
     valueChanged = Signal(str, name="valueChanged")
-    def __init__(self, parent, label):
+    def __init__(self, parent:QtWidgets.QWidget, label:str):
         QtWidgets.QFrame.__init__(self, parent)
         parent.addWidget(self)
         self.label = QtWidgets.QLabel(label)
@@ -193,7 +199,7 @@ class _OptionalValueInput(QtWidgets.QFrame):
     def setFocus(self):
         self.variable.setFocus()
         
-    def setValue(self, text):
+    def setValue(self, text:str):
         self.variable.setText(str(self._text2Value(text)))
     
     def value(self):
@@ -274,8 +280,9 @@ class FloatInput(OptionalFloatInput):
         return float(self.text())
 
 class OptionalStringInput(QtWidgets.QFrame):
+    r"""Widget for plain text input"""
     valueChanged = Signal(str, name="valueChanged")
-    def __init__(self, parent, label):
+    def __init__(self, parent:QtWidgets.QWidget, label:str):
         QtWidgets.QFrame.__init__(self, parent)
         parent.addWidget(self)
         self.label = QtWidgets.QLabel(label)
@@ -294,10 +301,10 @@ class OptionalStringInput(QtWidgets.QFrame):
     def setFocus(self):
         self.variable.setFocus()
         
-    def setValue(self, text):
+    def setValue(self, text:str):
         self.variable.setText(text)
             
-    def setText(self, text):
+    def setText(self, text:str):
         self.variable.setText(text)
     
     def text(self):
@@ -307,7 +314,7 @@ class OptionalStringInput(QtWidgets.QFrame):
         return unicode(self.variable.text())
 
 class StringInput(OptionalStringInput):
-    def __init__(self, parent, label):
+    def __init__(self, parent:QtWidgets.QWidget, label:str):
         OptionalStringInput.__init__(self, parent, label)
             
     def validate(self):
@@ -321,16 +328,26 @@ InputVariable = StringInput
 OptionalInputVariable = OptionalStringInput
 
 class CheckBox(QtWidgets.QCheckBox):
-    def __init__(self, parent, label):
+    r"""Inherits directly from QCheckBox.
+Supports tri-state: use the inherited checkState() method returning a
+QtCore.Qt.CheckState value
+"""
+    def __init__(self, parent:QtWidgets.QWidget, label:str, tristate:bool=False):
         QtWidgets.QCheckBox.__init__(self, label, parent)
+        self.setTristate(tristate)
         parent.addWidget(self)
 
     def selection(self):
         return self.isChecked()
     
+class ComplexSpinBox(QtWidgets.QFrame):
+    r"""Compound widget for editing complex numbers"""
+    def __init__(self, parent:QtWidgets.QWidget, label:str):
+        pass
+    
 class SpinBox(QtWidgets.QFrame):
-    """Adds a spin box"""
-    def __init__(self, parent, label, vertical = 0, widget_type:str="i"):
+    r"""Spin box wrapper"""
+    def __init__(self, parent:QtWidgets.QWidget, label:str, vertical:int|bool = 0, widget_type:str="i"):
         from gui.widgets.small_widgets import QuantitySpinBox
         QtWidgets.QFrame.__init__(self, parent)
         parent.addWidget(self)
@@ -446,16 +463,16 @@ class SpinBox(QtWidgets.QFrame):
         self.spinBox.setSpecialValueText(val)
         
 class VSpinBox(SpinBox):
-    def __init__(self, parent, label, widget_type:str = "i"):
+    def __init__(self, parent:QtWidgets.QWidget, label:str, widget_type:str = "i"):
         SpinBox.__init__(self, parent, label, 1, widget_type)
         
 class HSpinBox(SpinBox):
-    def __init__(self, parent, label, widget_type:str = "i"):
+    def __init__(self, parent:QtWidgets.QWidget, label:str, widget_type:str = "i"):
         SpinBox.__init__(self, parent, label, 0, widget_type)
 
 class Choice(QtWidgets.QFrame):
-    """Radio buttons"""
-    def __init__(self, parent, label, vertical = 0):
+    r"""Radio buttons"""
+    def __init__(self, parent:QtWidgets.QWidget, label:str, vertical:int|bool = 0):
         QtWidgets.QFrame.__init__(self, parent)
         parent.addWidget(self)
         
@@ -472,16 +489,16 @@ class Choice(QtWidgets.QFrame):
         self.buttons = []
         self.results = []
     
-    def addButton(self, label, result):
+    def addButton(self, label:str, result:typing.Any):
         self.buttons.append(QtWidgets.QRadioButton(label))
         self.buttonBox.layout.addWidget(self.buttons[-1])
         self.results.append(result)
         self.buttons[0].setChecked(True)
         
-    def addSpacing(self, spacing):
+    def addSpacing(self, spacing:int):
         self.buttonBox.addSpace(spacing)
         
-    def selectButton(self, index):
+    def selectButton(self, index:int):
         if index >= 0 and index < len(self.buttons):
             self.buttons[index].setChecked(True)
         
@@ -492,15 +509,15 @@ class Choice(QtWidgets.QFrame):
         return None # should never happen
 
 class HChoice(Choice):
-    def __init__(self, parent, label):
+    def __init__(self, parent:QtWidgets.QWidget, label:str):
         Choice.__init__(self, parent, label, 0)
         
 class VChoice(Choice):
-    def __init__(self, parent, label):
+    def __init__(self, parent:QtWidgets.QWidget, label:str):
         Choice.__init__(self, parent, label, 1)
         
 class DialogGroup(QtWidgets.QFrame):
-    def __init__(self, parent, vertical = 0, validate=True):
+    def __init__(self, parent:QtWidgets.QWidget, vertical:bool|int = 0, validate:bool=True):
         QtWidgets.QFrame.__init__(self, parent)
         self.bypassValidation = not validate
         parent.addWidget(self)
@@ -512,19 +529,19 @@ class DialogGroup(QtWidgets.QFrame):
             self.defaultAlignment = QtCore.Qt.AlignTop
         self.widgets = []
                
-    def addWidget(self, widget, stretch = 0, alignment = None):
+    def addWidget(self, widget:QtWidgets.QWidget, stretch:int = 0, alignment:typing.Optional[QtCore.Qt.AlignmentFlag] = None):
         if alignment is None:
             alignment = self.defaultAlignment
         self.layout.addWidget(widget, stretch, alignment)
         self.widgets.append(widget)
         
-    def addSpacing(self, spacing):
+    def addSpacing(self, spacing:int):
         self.layout.addSpacing(spacing)
 
-    def addStretch(self, stretch):
+    def addStretch(self, stretch:int):
         self.layout.addStretch(stretch)
         
-    def addLabel(self, labelString):
+    def addLabel(self, labelString:str):
         label = QtWidgets.QLabel(labelString, self)
         self.addWidget(label, 0, QtCore.Qt.AlignLeft)
         
@@ -544,21 +561,19 @@ class DialogGroup(QtWidgets.QFrame):
         return True
 
 class HDialogGroup(DialogGroup):
-    def __init__(self, parent, validate=True):
+    def __init__(self, parent:QtWidgets.QWidget, validate:bool=True):
         DialogGroup.__init__(self, parent, 0, validate=validate)
         
 class VDialogGroup(DialogGroup):
-    def __init__(self, parent, validate=True):
+    def __init__(self, parent:QtWidgets.QWidget, validate:bool=True):
         DialogGroup.__init__(self, parent, 1, validate=validate)
         
-
-       
 class QuickDialogComboBox(QtWidgets.QFrame):
     r"""A combobox to use with a QuickDialog.
     
     The combobox is nothing fancy -- only accepts a list of text items
     """
-    def __init__(self, parent, label):
+    def __init__(self, parent:QtWidgets.QWidget, label:str):
         QtWidgets.QFrame.__init__(self, parent)
         parent.addWidget(self)
         
@@ -575,7 +590,8 @@ class QuickDialogComboBox(QtWidgets.QFrame):
     def setFocus(self):
         self.variable.setFocus()
         
-    def setItems(self, textList):
+    def setItems(self, textList:typing.Sequence[str]):
+        r"""Set the entry list; if empty, all existing entries will be removed"""
         if not isinstance(textList, (tuple, list)):
             raise TypeError("Expecting a sequence; got %s instead" % type(textList).__name__ )
         
@@ -590,11 +606,11 @@ class QuickDialogComboBox(QtWidgets.QFrame):
     def setCurrentIndex(self, value:int):
         self.setValue(value)
             
-    def setValue(self, index):
+    def setValue(self, index:int):
         if isinstance(index, int) and index >= -1 and index < self.variable.model().rowCount():
             self.variable.setCurrentIndex(index)
             
-    def setText(self, text):
+    def setText(self, text:str):
         if isinstance(text, str):
             self.variable.setCurrentText(text)
             
@@ -604,10 +620,10 @@ class QuickDialogComboBox(QtWidgets.QFrame):
     def text(self):
         return self.variable.currentText()
     
-    def connectTextChanged(self, slot):
+    def connectTextChanged(self, slot:object):
         self.currentTextChanged[str].connect(slot)
         
-    def connectIndexChanged(self, slot):
+    def connectIndexChanged(self, slot:object):
         r"""Connects the combobox currentIndexChanged signal.
         NOTE: this is an overlaoded signal, with to versions 
         (respectively, with a str and int argument).
@@ -650,10 +666,10 @@ class VariableNameStringInput(StringInput):
     Cezar M. Tigaret
     """
     class VarNameValidator(QtGui.QValidator):
-        def __init__(self, parent=None):
+        def __init__(self, parent:typing.Optional[QtCore.QObject]=None):
             super().__init__(parent)
             
-        def validate(self, s, pos):
+        def validate(self, s:str, pos:int):
             if not s.isidentifier() or keyword.iskeyword(s):
                 ret = (QtGui.QValidator.Invalid, s, pos)
                 #if s[0:pos].isidentifier() and not keyword.iskeyword(s[0:pos]):
@@ -667,11 +683,11 @@ class VariableNameStringInput(StringInput):
             return ret 
         
         
-        def fixup(self, s):
+        def fixup(self, s:str):
             return validate_varname(s)
             
             
-    def __init__(self, parent, label, ws):
+    def __init__(self, parent:QtWidgets.QWidget, label:str, ws:object):
         super().__init__(parent, label)
         self.variable.setClearButtonEnabled(True)
         self.variable.undoAvailable = True
@@ -809,21 +825,21 @@ class QuickDialog(QtWidgets.QDialog):
         self.buttons.layout.addWidget(self.buttons.Cancel)
         self.layout.addWidget(self.buttons)
         
-    def addWidget(self, widget, stretch = 0, alignment = None):
+    def addWidget(self, widget:QtWidgets.QWidget, stretch:int = 0, alignment:typing.Optional[QtCore.Qt.AlignmentFlag] = None):
         if alignment is None:
             alignment = QtCore.Qt.AlignTop
         self.layout.insertWidget(len(self.widgets), widget, stretch, alignment)
         self.widgets.append(widget)
         
-    def addSpacing(self, spacing):
+    def addSpacing(self, spacing:int):
         self.layout.insertSpacing(len(self.widgets), spacing)
         self.widgets.append(None)
 
-    def addStretch(self, stretch):
+    def addStretch(self, stretch:int):
         self.layout.insertStretch(len(self.widgets), stretch)
         self.widgets.append(None)
 
-    def addLabel(self, labelString):
+    def addLabel(self, labelString:str):
         label = QtWidgets.QLabel(labelString, self)
         self.addWidget(label, 0, QtCore.Qt.AlignLeft)
         

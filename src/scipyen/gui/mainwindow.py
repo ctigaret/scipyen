@@ -48,6 +48,7 @@ from pprint import pprint
 from copy import copy, deepcopy
 import collections
 from collections import deque, ChainMap
+import cmath
 
 # END core python modules
 
@@ -6409,7 +6410,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # console, REGARDLESS of whether the execution was succesful or not.
         #
         self.historyTreeWidget.setHeaderLabels(
-            ["Session / Line #:", "Session Date & Time / Statement:"])
+            ["Session & Line:", "Session Date & Time or Expression:"])
         self.historyTreeWidget.itemActivated[QtWidgets.QTreeWidgetItem, int].connect(self.slot_historyItemActivated)
         self.historyTreeWidget.customContextMenuRequested[QtCore.QPoint].connect(self.slot_historyContextMenuRequest)
         self.historyTreeWidget.itemClicked[QtWidgets.QTreeWidgetItem, int].connect(self.slot_historyItemSelected)
