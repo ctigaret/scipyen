@@ -1244,6 +1244,10 @@ class ComplexSpinBox(QtWidgets.QFrame):
         
         return ret * self._units_
     
+    def validate(self):
+        r"""For compatibilty with qd.QuickDialog"""
+        return True
+
     def setValue(self, value:typing.Union[complex, float, int, pq.Quantity]):
         if isinstance(value, pq.Quantity):
             if value.size > 1:
