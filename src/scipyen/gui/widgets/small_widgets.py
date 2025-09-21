@@ -1088,11 +1088,11 @@ class ComplexSpinBox(QtWidgets.QFrame):
         self.imagSpinBox.sig_valueChanged.connect(self._slot_valueChanged)
         self.plusLabel = QtWidgets.QLabel(self)
         self.plusLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignHCenter)
-        self.plusLabel.setText("+")
+        self.plusLabel.setText(" + ")
         self.plusLabel.setTextInteractionFlags(QtCore.Qt.NoTextInteraction)
         self.jLabel = QtWidgets.QLabel(self)
         self.jLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignHCenter)
-        self.jLabel.setText(" ×j")
+        self.jLabel.setText(" × j")
         self.jLabel.setTextInteractionFlags(QtCore.Qt.NoTextInteraction)
         self.suffixLabel = QtWidgets.QLabel(self)
         self.suffixLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignHCenter)
@@ -1305,6 +1305,87 @@ class ComplexSpinBox(QtWidgets.QFrame):
             self.imagSpinBox.setDecimals(value)
             
         
+    def singleStep(self) -> tuple:
+        ret = (self.realSpinBox.singleStep(), self.imagSpinBox.singleStep())
+        if self._keepDimensionless_ or self._forceDimensionless_:
+            return ret
+        return tuple(map(lambda v: v * self.units, ret))
+        
+    def setSingleStep(self, value:typing.Union[typing.Sequence[float|int|pq.Quantity], float, int, pq.Quantity]):
+        if isinstance(value, pq.Quantity):
+            if value.size == 1:
+                realStep = imagStep = float(value.magnitude)
+            elif value.size == 2:
+                realStep, imagStep = tuple(map(lambda v: float(v.magnitude), value))
+            else:
+                raise TypeError(f"Invalid number of elements in value argument: {value.size}; expecting 1 or 2")
+            
+            if not scq.unitsConvertible(value, self.units):
+                raise ValueError(f"Cannot set single step with units ({value.units}) that are not scalable to the current units ({self.units})")
+            realStep = float((realStep*value.units).rescale(self.units).magnitude)
+            imagStep = float((imagStep*value.units).rescale(self.units).magnitude)
+            
+            
+        elif isinstance(value, (float, int)):
+            realStep = imagStep = float(value)
+            
+        elif isinstance(value, typing.Sequence):
+            if len(value) == 1:
+                value = value[0]
+                if isinstance(value, (float, int)):
+                    realStep = imagStep = float(value)
+                    
+                elif isinstance(value, pq.Quantity):
+                    if not scq.unitsConvertible(value, self.units):
+                        raise ValueError(f"Cannot set single step with units ({value.units}) that are not scalable to the current units ({self.units})")
+                    realStep = imagStep = float(value.rescale(self.units).magnitude)
+                else:
+                    raise TypeError(f"Wrong value type: {type(value).__name__}")
+                    
+            elif len(value) >= 2:
+                realStep, imagStep = value[0:2]
+                
+                if isinstance(realStep, (float, int)):
+                    realStep = float(realStep)
+                
+                elif isinstance(realStep, pq.Quantity):
+                    if not scq.unitsConvertible(realStep, self.units):
+                        raise ValueError(f"Cannot set single step with units ({realStep.units}) that are not scalable to the current units ({self.units})")
+                    realStep = float(realStep.rescale(self.units).magnitude)
+                    
+                else:
+                    TypeError(f"Wrong real value type: {type(realStep).__name__}")
+                    
+                if isinstance(imagStep, (float, int)):
+                    imagStep = float(imagStep)
+                
+                elif isinstance(imagStep, pq.Quantity):
+                    if not scq.unitsConvertible(imagStep, self.units):
+                        raise ValueError(f"Cannot set single step with units ({imagStep.units}) that are not scalable to the current units ({self.units})")
+                    imagStep = float(imagStep.rescale(self.units).magnitude)
+                    
+                else:
+                    TypeError(f"Wrong real value type: {type(imagStep).__name__}")
+                    
+            else:
+                raise TypeError("Expecting at least one value in the sequence")
+        else:
+            raise TypeError(f"Expecting a scalar quantity, float, int or a sequence of at least twpo of these data types; instead, got a {type(value).__name__}")
+        
+        self.realSpinBox.setSingleStep(realStep)
+        self.imagSpinBox.setSingleStep(imagStep)
+        
+    def stepType(self) -> tuple:
+        return (self.realSpinBox.stepType(), self.imagSpinBox.stepType())
+    
+    def setStepType(self, value:typing.Sequence[QtWidgets.QAbstractSpinBox.StepType]):
+        if isinstance(value, typing.Sequence) and len(value) == 2 and all(isinstance(v, QtWidgets.QAbstractSpinBox.StepType) for v in value):
+            self.realSpinBox.setStepType(value[0])
+            self.imagSpinBox.setStepType(value[1])
+            
+        else:
+            raise ValueError(f"Incorrect step type specification ({value}); expecting a sequence of two QtWidgets.QAbstractSpinBox.StepType enum values")
+
     def contextMenuEvent(self, evt):
         cm = QtWidgets.QMenu("Options", self)
         if not (self._keepDimensionless_ or self._forceDimensionless_):
@@ -1377,21 +1458,37 @@ class ComplexSpinBox(QtWidgets.QFrame):
         realVal = self._singleStepReal_
         imagVal = self._singleStepImag_
         dlg  = qd.QuickDialog(parent=self, title="Set single step")
-        realInput = qd.HSpinBox(dlg, "Real part:", widget_type="f")
+        realGrp = qd.DialogGroup(dlg)
+        realInput = qd.HSpinBox(realGrp, "Real part:", widget_type="f")
         realInput.setValue(realVal)
+        adaptiveRealCheckBox = qd.CheckBox(realGrp, "Adaptive")
+        adaptiveRealCheckBox.setChecked(self.stepType()[0] == QtWidgets.QAbstractSpinBox.AdaptiveDecimalStepType)
+        realGrp.addWidget(realInput, QtCore.Qt.AlignVCenter)
+        realGrp.addWidget(adaptiveRealCheckBox, QtCore.Qt.AlignVCenter)
         # realInput.setMinimum(0)
-        imagInput = qd.HSpinBox(dlg, "Imaginary part:", widget_type="f")
+        imagGrp = qd.DialogGroup(dlg)
+        imagInput = qd.HSpinBox(imagGrp, "Imaginary part:", widget_type="f")
         imagInput.setValue(imagVal)
+        adaptiveImagCheckBox = qd.CheckBox(imagGrp, "Adaptive")
+        adaptiveImagCheckBox.setChecked(self.stepType()[1] == QtWidgets.QAbstractSpinBox.AdaptiveDecimalStepType)
+        imagGrp.addWidget(imagInput, QtCore.Qt.AlignVCenter)
+        imagGrp.addWidget(adaptiveImagCheckBox, QtCore.Qt.AlignVCenter)
         # imagInput.setMinimum(0)
-        dlg.addWidget(realInput)
-        dlg.addWidget(imagInput)
+        
+        # dlg.addWidget(realInput)
+        # dlg.addWidget(imagInput)
+        dlg.addWidget(realGrp)
+        dlg.addWidget(imagGrp)
         dlg.adjustSize()
         if dlg.exec():
             realVal = realInput.value()
             imagVal = imagInput.value()
-        self.realSpinBox.setSingleStep(realVal)
-        self.imagSpinBox.setSingleStep(imagVal)
-        
+            adaptiveReal = QtWidgets.QAbstractSpinBox.AdaptiveDecimalStepType if adaptiveRealCheckBox.isChecked() else QtWidgets.QAbstractSpinBox.DefaultStepType
+            adaptiveImag = QtWidgets.QAbstractSpinBox.AdaptiveDecimalStepType if adaptiveImagCheckBox.isChecked() else QtWidgets.QAbstractSpinBox.DefaultStepType
+            self.realSpinBox.setSingleStep(realVal)
+            self.realSpinBox.setStepType(adaptiveReal)
+            self.imagSpinBox.setSingleStep(imagVal)
+            self.imagSpinBox.setStepType(adaptiveImag)
 
     @Slot()
     def _slot_setUnitsGUI(self):

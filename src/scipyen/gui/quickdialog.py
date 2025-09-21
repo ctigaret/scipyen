@@ -328,9 +328,9 @@ InputVariable = StringInput
 OptionalInputVariable = OptionalStringInput
 
 class CheckBox(QtWidgets.QCheckBox):
-    r"""Inherits directly from QCheckBox.
-Supports tri-state: use the inherited checkState() method returning a
-QtCore.Qt.CheckState value
+    r"""(Tri-)Boolean value input.
+Inherits directly from QCheckBox. Supports tri-state: use the inherited 
+checkState() method returning a QtCore.Qt.CheckState value
 """
     def __init__(self, parent:QtWidgets.QWidget, label:str, tristate:bool=False):
         QtWidgets.QCheckBox.__init__(self, label, parent)
@@ -340,22 +340,31 @@ QtCore.Qt.CheckState value
     def selection(self):
         return self.isChecked()
     
+    def value(self) -> QtCore.Qt.CheckState:
+        return self.checkState()
+    
+    def validate(self, *args):
+        return True
+    
 class ComplexSpinBox(QtWidgets.QFrame):
     r"""Compound widget for editing complex numbers"""
     def __init__(self, parent:QtWidgets.QWidget, label:str):
         pass
     
 class SpinBox(QtWidgets.QFrame):
-    r"""Spin box wrapper"""
+    r"""Alternative to IntegerInput and FloatInput, with support for python Quantities.
+
+"""
     def __init__(self, parent:QtWidgets.QWidget, label:str, vertical:int|bool = 0, widget_type:str="i"):
-        from gui.widgets.small_widgets import QuantitySpinBox
+        from gui.widgets.small_widgets import (QuantitySpinBox, ComplexSpinBox)
         QtWidgets.QFrame.__init__(self, parent)
         parent.addWidget(self)
-        if widget_type not in ("i", "d", "f", "q"):
+        if widget_type not in ("i", "d", "f", "q", "c"):
             widget_type = "i"
         self._type_ = widget_type
         self.label = QtWidgets.QLabel(text=label, parent=self)
-        self.spinBox = QtWidgets.QSpinBox(parent=self) if self._type_ == "i" else QtWidgets.QDoubleSpinBox(parent=self) if self._type_ in ("d", "f") else QuantitySpinBox(parent=self)
+        # self.spinBox = QtWidgets.QSpinBox(parent=self) if self._type_ == "i" else QtWidgets.QDoubleSpinBox(parent=self) if self._type_ in ("d", "f") else QuantitySpinBox(parent=self)
+        self.spinBox = QtWidgets.QSpinBox(parent=self) if self._type_ == "i" else ComplexSpinBox(parent=self) if self._type_ == "c" else QtWidgets.QDoubleSpinBox(parent=self) if self._type_ in ("d", "f") else QuantitySpinBox(parent=self)
         if vertical:
             self.layout = QtWidgets.QVBoxLayout(self)
         else:
