@@ -539,6 +539,13 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         #         widget.setReadOnly(True)
         
         # Add widget to new subnode
+        # TODO 2025-09-21 22:33:30 
+        # this seems like a good place to create/insert a delegate widget for data editing as appropriate
+        # FIXME: this needs defining a model (currently this uses QAbstractItemModel)
+        # TODO: the way to go seems to take out the parse() and buildTree() code and place it
+        # into a custom TreeModel (to be created); other code to move there:
+        # memoize(), getWidgetSelection(), _parse_data_(), _parse_dataclass(), _makeTableWidget_()
+        # and maybe _slot_tableEditorWidgetSelectionChanged(), setSupportedDataTypes()
         if widget is not None:
             self.widgets.append(widget)
             subnode = QtWidgets.QTreeWidgetItem(["", "", ""])
