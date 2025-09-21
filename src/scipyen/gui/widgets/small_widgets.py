@@ -864,6 +864,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             quantityWidget.familyRestriction = None
             
         dlg.addWidget(quantityWidget)
+        dlg.adjustSize()
         if dlg.exec():
             self.units = quantityWidget.units
             
@@ -883,6 +884,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         adaptiveCheckBox.setChecked(self.stepType() == QtWidgets.QAbstractSpinBox.AdaptiveDecimalStepType)
         dlg.addWidget(stepInput)
         dlg.addWidget(adaptiveCheckBox)
+        dlg.adjustSize()
         if dlg.exec():
             value = stepInput.value()
             stepType = QtWidgets.QAbstractSpinBox.AdaptiveDecimalStepType if adaptiveCheckBox.isChecked() else QtWidgets.QAbstractSpinBox.DefaultStepType
@@ -923,6 +925,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         decimalsInput.setValue(self._decimals_)
         decimalsInput.setMinimum(0)
         dlg.addWidget(decimalsInput)
+        dlg.adjustSize()
         if dlg.exec():
             value = decimalsInput.value()
             if value < 0:
@@ -932,16 +935,20 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
     @Slot()
     def _slot_setRangeGUI(self):
         dlg = qd.QuickDialog(parent=self, title="Set range (min, max)")
+        group = qd.DialogGroup(dlg)
         unitsLabel = ""
         if not (self._keepDimensionless_ or self._forceDimensionless_):
             unitsLabel = self._prefix_ if len(self._prefix_) else self._suffix_ if len(self._suffix_) else ""
         label = f" ({unitsLabel})" if len(unitsLabel) else ""
-        minimumInput = qd.HSpinBox(dlg, f"Minimum{label}:", widget_type="f")
+        minimumInput = qd.HSpinBox(group, f"Minimum{label}:", widget_type="f")
         minimumInput.setValue(super().minimum())
-        maximumInput = qd.HSpinBox(dlg, f"Maximum{label}:", widget_type="f")
+        maximumInput = qd.HSpinBox(group, f"Maximum{label}:", widget_type="f")
         maximumInput.setValue(super().maximum())
-        dlg.addWidget(minimumInput)
-        dlg.addWidget(maximumInput)
+        group.addWidget(minimumInput)
+        group.addWidget(maximumInput)
+        dlg.addWidget(group)
+        dlg.adjustSize()
+        
         if dlg.exec():
             minimum = minimumInput.value()
             maximum = maximumInput.value()
@@ -1208,14 +1215,14 @@ class ComplexSpinBox(QtWidgets.QFrame):
                             self._internal_maximum_real, self._decimals_real,
                             self._singleStepReal_, self._stepType_real, self._magnitude_.real)
         
-        self.realSpinBox.valueChanged.connect(self._slot_valueChanged)
+        self.realSpinBox.sig_valueChanged.connect(self._slot_valueChanged)
         
         self._setupSpinBox_(self.imagSpinBox, self._internal_minimum_imag,
                             self._internal_maximum_imag, self._decimals_imag,
                             self._singleStepImag_, self._stepType_imag,
                             self._magnitude_.imag)
         
-        self.imagSpinBox.valueChanged.connect(self._slot_valueChanged)
+        self.imagSpinBox.sig_valueChanged.connect(self._slot_valueChanged)
         
         self.prefixLabel.setText(self._prefix_)
         self.suffixLabel.setText(self._suffix_)
@@ -1256,7 +1263,6 @@ class ComplexSpinBox(QtWidgets.QFrame):
                     self.units = value.units
                     
             self._magnitude_ = cval
-            
                     
         elif value in (pd.NA, math.nan, np.nan):
             self._magnitude_ = complex(value, value)
@@ -1273,7 +1279,28 @@ class ComplexSpinBox(QtWidgets.QFrame):
         self.realSpinBox.setValue(self._magnitude_.real)
         self.imagSpinBox.setValue(self._magnitude_.imag)
             
+    def decimals(self) -> tuple:
+        return (self.realSpinBox.getDecimals(), self.imagSpinBox.getDecimals())
     
+    def setDecimals(self, value:typing.Union[int, typing.Sequence[int]]):
+        if isinstance(value, typing.Sequence) and all(isinstance(v, int) for v in value):
+            if any (v<0 for v in value):
+                raise ValueError("Decimals must be >= 0")
+            
+            if len(value) < 2:
+                self.realSpinBox.setDecimals(value[0])
+                self.imagSpinBox.setDecimals(value[0])
+            else:
+                self.realSpinBox.setDecimals(value[0])
+                self.imagSpinBox.setDecimals(value[1])
+                
+        elif isinstance(value, int):
+            if value < 0:
+                raise ValueError("Decimals must be >= 0")
+            self.realSpinBox.setDecimals(value)
+            self.imagSpinBox.setDecimals(value)
+            
+        
     def contextMenuEvent(self, evt):
         cm = QtWidgets.QMenu("Options", self)
         if not (self._keepDimensionless_ or self._forceDimensionless_):
@@ -1330,6 +1357,7 @@ class ComplexSpinBox(QtWidgets.QFrame):
         imagInput.setValue(imagVal)
         dlg.addWidget(realInput)
         dlg.addWidget(imagInput)
+        dlg.adjustSize()
         if dlg.exec():
             realVal = realInput.value()
             if realVal < 0:
@@ -1342,8 +1370,8 @@ class ComplexSpinBox(QtWidgets.QFrame):
         
     @Slot()
     def _slot_setSingleStepGUI(self):
-        realSteps = self._singleStepReal_
-        imagSteps = self._singleStepImag_
+        realVal = self._singleStepReal_
+        imagVal = self._singleStepImag_
         dlg  = qd.QuickDialog(parent=self, title="Set single step")
         realInput = qd.HSpinBox(dlg, "Real part:", widget_type="f")
         realInput.setValue(realVal)
@@ -1353,11 +1381,12 @@ class ComplexSpinBox(QtWidgets.QFrame):
         # imagInput.setMinimum(0)
         dlg.addWidget(realInput)
         dlg.addWidget(imagInput)
+        dlg.adjustSize()
         if dlg.exec():
             realVal = realInput.value()
             imagVal = imagInput.value()
-        self.realSpinBox.setDecimals(realVal)
-        self.imagSpinBox.setDecimals(imagVal)
+        self.realSpinBox.setSingleStep(realVal)
+        self.imagSpinBox.setSingleStep(imagVal)
         
 
     @Slot()
@@ -1371,6 +1400,7 @@ class ComplexSpinBox(QtWidgets.QFrame):
             quantityWidget.familyRestriction = None
             
         dlg.addWidget(quantityWidget)
+        dlg.adjustSize()
         if dlg.exec():
             self.units = quantityWidget.units
             
@@ -1393,8 +1423,8 @@ class ComplexSpinBox(QtWidgets.QFrame):
         else:
             self._restrictedToFamily_ = None
             
-    @Slot(float)
-    def _slot_valueChanged(self, val):
+    @Slot(object)
+    def _slot_valueChanged(self, val_:object):
         self.sig_valueChanged.emit(self.value())
         
     @Slot()

@@ -293,7 +293,8 @@ def checkboxDialogPrompt(parent, title, slist):
     
     checkboxes = [quickdialog.CheckBox(group, value) for value in slist]
     
-    dlg.resize(dlg.minimumSize())
+    # dlg.resize(dlg.minimumSize())
+    dlg.adjustSize()
     
     if dlg.exec() == 1:
         return [w.isChecked() for w in checkboxes]

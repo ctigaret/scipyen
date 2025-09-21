@@ -233,7 +233,8 @@ def getInput(prompts:dict, mapping:bool=False):
             
     dlg.addWidget(group, stretch=1)
         
-    dlg.resize(-1, -1)
+    # dlg.resize(-1, -1)
+    dlg.adjustSize()
         
     dlgret = dlg.exec()
     

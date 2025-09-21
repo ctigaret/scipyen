@@ -280,6 +280,7 @@ class PenComboBox(QtWidgets.QComboBox):
             dlg  = QuickDialog(self, "Custom Dash Pattern")
             namePrompt = OptionalStringInput(dlg, "Name:")
             dashPrompt = OptionalStringInput(dlg, "Dash style:")
+            dlg.adjustSize()
             if dlg.exec_():
                 name = namePrompt.text()
                 dash = dashPrompt.text()

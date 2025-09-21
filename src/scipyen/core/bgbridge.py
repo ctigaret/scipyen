@@ -700,7 +700,7 @@ class BrainAtlasManager(QtCore.QObject):
         
         dlg = ItemsListDialog(parent = dlgParent, itemsList = names,
                                 title = dlgTitle)
-        
+        dlg.adjustSize()
         a = dlg.exec_()
         
         if a == QtWidgets.QDialog.Accepted:

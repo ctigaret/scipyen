@@ -370,6 +370,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             selectionDialog = ItemsListDialog(self, objNames,
                                                 title = dlgTitle,
                                                 selectmode = QtWidgets.QAbstractItemView.MultiSelection)
+            selectionDialog.adjustSize()
             
             ans = selectionDialog.exec_()
             
@@ -413,7 +414,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         
         if not isinstance(crsId, str) or len(crsId.strip()) == 0:
             selectionDialog = ItemsListDialog(self, sorted([c.name for c in self.graphicsCursors]), "Select cursor")
-            
+            selectionDialog.adjustSize()
             a = selectionDialog.exec_()
             
             if a == QtWidgets.QDialog.Accepted:
@@ -557,6 +558,8 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
                 w.variable.redoAvailable=True
                 w.variable.undoAvailable=True
 
+        d.adjustSize()
+        
         if d.exec() == QtWidgets.QDialog.Accepted:
             old_name = cursor.name
             
@@ -617,25 +620,6 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
                 except:
                     traceback_print_exc()
                 
-            #elif txt.find(":") > 0:
-                #try:
-                    #newFrames = [int(f_) for f_ in txt.split(":")]
-                    #if len(newFrames) > 3:
-                        #newFrames = []
-                        
-                    #else:
-                        #newFrames = range(*newFrames)
-                        
-                #except Exception as e:
-                    #traceback_print_exc()
-                    
-            #else:
-                #try:
-                    #newFrames = [int(f_) for f_ in txt.split(",")]
-                    
-                #except Exception as e:
-                    #traceback.print_exc()
-                    
             linkToFrames = linkToFramesCheckBox.selection()
             
             if linkToFrames:

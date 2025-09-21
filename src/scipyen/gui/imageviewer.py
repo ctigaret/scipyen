@@ -2190,6 +2190,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             y_len_prompt.variable.undoAvailable = True
             y_len_prompt.setValue(def_y_len)
             
+            dlg.adjustSize()
+            
             if dlg.exec() == QtWidgets.QDialog.Accepted:
                 self._display_horizontal_scalebar_ = show_x.selection()
                 self._display_vertical_scalebar_ = show_y.selection()
@@ -3020,6 +3022,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             dlg = AxesCalibrationDialog2(self._axes_calibration_)
             
         # dlg.setModal(False)
+        dlg.adjustSize()
             
         if dlg.exec() > 0:
             # print(f"{self.__class__.__name__}.slot_editAxesScales: dlg.calibration = {dlg.calibration}")
@@ -3080,7 +3083,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
 
     def _editImageBrightness(self):
         dlg = ImageBrightnessDialog(self)
-        # dlg = pgui.ImageBrightnessDialog(self)
+        dlg.adjustSize()
         dlg.show()
         
     def _editImageGamma(self):

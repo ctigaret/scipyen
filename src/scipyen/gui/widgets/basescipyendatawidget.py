@@ -340,7 +340,7 @@ class BaseScipyenDataWidget(Ui_BaseScipyenDataWidget, QWidget):
         dfmt = qde.displayFormat()
         dlg = qd.QuickDialog(parent=self, title = "Set analysis date and time")
         dlg.addWidget(qde)
-        
+        dlg.adjustSize()
         ret = dlg.exec()
         
         if ret == QtWidgets.QDialog.Accepted:

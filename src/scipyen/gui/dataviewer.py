@@ -603,6 +603,7 @@ class DataViewer(ScipyenViewer):
             dlg.addWidget(hiddenWarningLabel, 0, QtCore.Qt.AlignLeft)
             
             namePrompt.setText(names[0])
+            dlg.adjustSize()
             
             if dlg.exec() == QtWidgets.QDialog.Accepted:
                 newVarName = namePrompt.text()
@@ -1176,26 +1177,6 @@ class DataViewer(ScipyenViewer):
         
         return objects, names
         
-        # NOTE: 2025-05-28 13:57:47 
-        # moved to slot_exportToWorkspace
-#         if len(objects) == 1:
-#             dlg = quickdialog.QuickDialog(self, "Copy to workspace")
-#             namePrompt = quickdialog.StringInput(dlg, "Data name:")
-#             namePrompt.variable.setClearButtonEnabled(True)
-#             namePrompt.variable.redoAvailable=True
-#             namePrompt.variable.undoAvailable=True
-#             
-#             namePrompt.setText(names[0])
-#             
-#             if dlg.exec() == QtWidgets.QDialog.Accepted:
-#                 newVarName = namePrompt.text()
-#                 
-#                 self._scipyenWindow_.assignToWorkspace(newVarName, objects[0], check_name=False)
-#                 
-#         else:
-#             for name, obj in zip(names, objects):
-#                 self._scipyenWindow_.assignToWorkspace(name, obj, check_name=False)
-
     def _collapse_expand_Recursive(self, item, expand=False, current=True):
         if expand:
             fn = self.treeWidget.expandItem

@@ -104,7 +104,8 @@ class GenericMappingDialog(qd.QuickDialog, WorkspaceGuiMixin):
         self.buttons.layout.addWidget(removeEntryPushButton)
         removeEntryPushButton.clicked.connect(self._slot_removeEntry)
         
-        self.resize(-1,-1)
+        # self.resize(-1,-1)
+        self.adjustSize()
         
     @Slot()
     def _slot_entryValueChanged(self):
@@ -162,6 +163,8 @@ class GenericMappingDialog(qd.QuickDialog, WorkspaceGuiMixin):
         etype.setCurrentIndex(0)
         dlg.addWidget(ename)
         dlg.addWidget(etype)
+        dlg.adjustSize()
+        
         if dlg.exec():
             factory = None
             val_factory = None
@@ -206,6 +209,7 @@ class GenericMappingDialog(qd.QuickDialog, WorkspaceGuiMixin):
         entriesCombo = qd.QuickDialogComboBox(parent=dlg,label="Entry name:")
         entriesCombo.setItems([k for k in self._mapping_])
         dlg.addWidget(entriesCombo)
+        dlg.adjustSize()
         
         if dlg.exec():
             entry = entriesCombo.text()

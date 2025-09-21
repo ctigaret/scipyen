@@ -3296,6 +3296,7 @@ class PrairieViewImporter(QtWidgets.QDialog, __UI_PrairieImporter, WorkspaceGuiM
             # call open() instead of anything else to keep the GUI loop running
             # and NOT block interaction with other windows, especially with the
             # SignalViewer that plots the ephys data
+            self.eventDetectionDialog.adjustSize()
             self.eventDetectionDialog.open() 
             
     @Slot()

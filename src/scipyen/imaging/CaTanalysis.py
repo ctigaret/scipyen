@@ -4920,6 +4920,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             newVarName = validate_varname(bname, self._scipyenWindow_.workspace)
             
             namePrompt.setText(newVarName)
+            dlg.adjustSize()
             
             if dlg.exec() == QtWidgets.QDialog.Accepted:
                 newVarName = validate_varname(namePrompt.text(), self._scipyenWindow_.workspace)
@@ -5354,6 +5355,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         indexPrompt.variable.setToolTip(infotxt)
         
         #dlg.setModal(False) # allow GUI interaction FIXME does not work because we call exec()
+        dlg.adjustSize()
         
         if dlg.exec():
             txt = indexPrompt.text()
@@ -6332,6 +6334,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         frames_index_prompt.variable.undoAvailable = True
         
         frames_index_prompt.setText(" ")
+        dlg.adjustSize()
         
         if dlg.exec() == QtWidgets.QDialog.Accepted:
             txt = frames_index_prompt.text()
@@ -7193,6 +7196,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             exportCsvPrompt = qd.CheckBox(dlg, "Write to CSV file")
             
             exportCsvPrompt.setChecked(False)
+            dlg.adjustSize()
             
             if dlg.exec() == QtWidgets.QDialog.Accepted:
                 newVarName = strutils.str2symbol(namePrompt.text()) # allow user to overwrite variables if so wished
@@ -7422,6 +7426,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             namePrompt = qd.StringInput(dlg, "New name:")
             namePrompt.setText(var_name)
             namePrompt.setToolTip("Enter new name to prevent overwriting in the workspace")
+            dlg.adjustSize()
             
             if dlg.exec() == QtWidgets.QDialog.Accepted:
                 var_name = namePrompt.text()
@@ -7831,6 +7836,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         else:
             spwidth_field.setText("%g" % spine_width)
             
+        dlg.adjustSize()
+        
         if dlg.exec() == QtWidgets.QDialog.Accepted:
             # NOTE: 2019-01-10 10:50:44 
             # dialog was accepted
@@ -9133,6 +9140,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         namePrompt.variable.undoAvailable=True
         
         namePrompt.setText(newVarName)
+        dlg.adjustSize()
         
         if dlg.exec() == QtWidgets.QDialog.Accepted:
             newVarName = validate_varname(namePrompt.text(), self._scipyenWindow_.workspace)
@@ -10288,6 +10296,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         photo = ()
         imaging = ()
 
+        dlg.adjustSize()
+        
         if dlg.exec() == QtWidgets.QDialog.Accepted:
             presynaptic_trigger = presynDetect.selection()
             

@@ -567,6 +567,7 @@ class TriggerDetectDialog(qd.QuickDialog):
         
         self._set_ephys_data_(ephysdata)
         self.setSizeGripEnabled(True)
+        # self.adjustSize()
             
     def _set_ephys_data_(self, value):
         if check_ephys_data_collection(value, mix=False):
@@ -837,7 +838,7 @@ def guiDetectTriggers(data:Block):
     if isinstance(data, Block) and len(data.segments):
         eventDetectionDialog = TriggerDetectDialog(ephysdata = data,
                                                    clearEvents = True)
-        
+        eventDetectionDialog.adjustSize()
         result = eventDetectionDialog.exec()
         
         if result == QtWidgets.QDialog.Accepted:

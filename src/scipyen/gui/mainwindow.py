@@ -1329,7 +1329,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                                 widget = qd.OutputVariable(d, ret_names[k])
                                 widget.setText(suggested_ret_names[k])
                                 d.returnWidgets.append(widget)
-
+                            d.adjustSize()
+                            
                             if d.exec_() == 0:
                                 return  # don't call anything, just return nothing
 
@@ -2177,7 +2178,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             
         cb.setCurrentIndex(selected)
         
-        dlg.resize(-1,-1)
+        # dlg.resize(-1,-1)
+        dlg.adjustSize()
         
         if dlg.exec() > 0:
             # newVal = icon_sizes[cb.value()]
@@ -2236,7 +2238,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             
         cb.setCurrentIndex(selected)
         
-        dlg.resize(-1,-1)
+        # dlg.resize(-1,-1)
+        dlg.adjustSize()
         
         if dlg.exec() > 0:
             # newVal = icon_sizes[cb.value()]
@@ -2299,7 +2302,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             
         cb.setCurrentIndex(selected)
         
-        dlg.resize(-1,-1)
+        # dlg.resize(-1,-1)
+        dlg.adjustSize()
         
         if dlg.exec() > 0:
             # newVal = icon_sizes[cb.value()]
@@ -3613,10 +3617,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             d, "Editor name (e.g., 'kate' or 'kwrite')")
         editorNameInput.setValue(self.scipyenEditor)
         d.editorNameInput = editorNameInput
+        d.adjustSize()
         if d.exec() == QtWidgets.QDialog.Accepted:
             self.scipyenEditor = d.editorNameInput.text()
-            
-            
 
     @Slot(bool)
     def _slot_setOverrideSystemEditor(self, val):
@@ -4541,7 +4544,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         viewer_type_names = list(v.__name__ for v in self.viewers)
         dlg = ItemsListDialog(parent=self, itemsList=viewer_type_names,
                               title="Viewer type", modal=True)
-
+        dlg.adjustSize()
         if dlg.exec() == 1:
             seltxt = dlg.selectedItemsText
             if len(seltxt) == 0:
@@ -5498,7 +5501,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         pw.variable.setClearButtonEnabled(True)
         pw.setText(varName)
         dlg.addWidget(pw)
-
+        dlg.adjustSize()
+        
         if dlg.exec() == 0:
             return
 
@@ -9577,11 +9581,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             
             listedWindows = [self.workspace[n] for n in varnames if type(self.workspace[n]) == winType]
             
-            # print(f"{self.__class__.__name__}.viewObject listedWindows = {listedWindows}")
-            # print(f"{self.__class__.__name__}.viewObject win : {win}; title: {win.windowTitle()}")
-            # print(f"{self.__class__.__name__}.viewObject win is listed {win in listedWindows}")
-            
-            # if len(listedWindows) == 0 or win not in listedWindows:
             if win not in listedWindows:
                 # create a binding in the workspace
                 win_title = winType.__name__
@@ -9600,7 +9599,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             if askForParams:
                 dlg = qd.QuickDialog(self, "Plot")
                 chkb = qd.CheckBox(dlg, "Clear previous plot")
-                dlg.resize(QtCore.QSize(-1, -1))
+                # dlg.resize(QtCore.QSize(-1, -1))
+                dlg.adjustSize()
                 ret = dlg.exec_()
                 if ret == 1:
                     if chkb.selection():
@@ -9608,18 +9608,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
             if isinstance(obj, neo.core.basesignal.BaseSignal):
                 neoutils.plot_neo(obj, win)
-                # plt.plot(obj.times, obj)
-                # times_units_str = obj.times.units.dimensionality.string
-                # xlabel = "" if times_units_str == "dimensionless" else f"{cq.nameFromUnit(obj.times.units)} ({obj.times.units.dimensionality.string})"
-                # name = obj.name
-                # if name is None or len(name.strip()) == 0:
-                #     name = cq.nameFromUnit(obj.units.dimensionality)
-                #     # name = cq.nameFromUnit(obj.units.dimensionality.string)
-                # ylabel = f"{name} ({obj.units.dimensionality.string})"
-                # plt.xlabel(xlabel)
-                # plt.ylabel(ylabel)
-                # if isinstance(objname, str) and len(objname.strip()):
-                #     plt.title(objname)
+
             elif isinstance(obj, vigra.VigraArray):
                 plt.plot(np.arange(obj.shape[0]), np.array(obj))
             else:

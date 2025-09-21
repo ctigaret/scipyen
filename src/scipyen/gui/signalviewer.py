@@ -3361,7 +3361,7 @@ anything else       anything else       ❌
                                        title="Select Analog Signals to Plot",
                                        modal = True,
                                        selectmode = QtWidgets.QAbstractItemView.ExtendedSelection)
-            
+            dlg.adjustSize()
             if dlg.exec() == 1:
                 sel_items = dlg.selectedItemsText
                 
@@ -3432,6 +3432,7 @@ anything else       anything else       ❌
         if isinstance(self._yData_, (neo.Block, neo.Segment)) or (isinstance(self._yData_, (tuple, list)) and all([isinstance(v, (neo.Block, neo.Segment)) for v in self._yData_])):
             from gui.triggerdetectgui import TriggerDetectDialog
             tdlg = TriggerDetectDialog(ephysdata=self._yData_, ephysViewer=self, parent=self)
+            tdlg.adjustSize()
             tdlg.open()
         
     @Slot(str)
@@ -3491,6 +3492,7 @@ anything else       anything else       ❌
                                        title="Select Irregular Signals to Plot", 
                                        modal=True,
                                        selectmode=QtWidgets.QAbstractItemView.ExtendedSelection)
+            dlg.adjustSize()
             
             if dlg.exec() == 1:
                 sel_items = dlg.selectedItemsText
@@ -4181,6 +4183,8 @@ anything else       anything else       ❌
         
         self._slot_updateCursorEditorDlg_(crsId, d)
             
+        d.adjustSize()
+        
         if d.exec() == QtWidgets.QDialog.Accepted:
             if choose: # choose cursor as per dialog; otherwise cursor is set above
                 crsId = cursorComboBox.text() 
@@ -4206,6 +4210,7 @@ anything else       anything else       ❌
                         pw.variable.setClearButtonEnabled(True)
                         pw.setText(newName)
                         namedlg.addWidget(pw)
+                        namedlg.adjustSize()
                         
                         if namedlg.exec() == 0:
                             return
@@ -4360,6 +4365,8 @@ anything else       anything else       ❌
                     
                     namePrompt.setText(newVarName)
                     
+                    dlg.adjustSize()
+                    
                     if dlg.exec() == QtWidgets.QDialog.Accepted:
                         newVarName = validate_varname(namePrompt.text(), self._scipyenWindow_.workspace)
                         
@@ -4382,6 +4389,7 @@ anything else       anything else       ❌
         d.windowsPrompt.setValue("cursor_windows")
         d.labelsPrompt = qd.StringInput(d, "Labels:")
         d.labelsPrompt.setValue("cursor_labels")
+        d.adjustSize()
         
         if d.exec() == QtWidgets.QDialog.Accepted:
             coords_var = d.coordinatesPrompt.text()
@@ -4760,6 +4768,7 @@ anything else       anything else       ❌
             cursorComboBox.setValue(0)
             
             d.cursorComboBox = cursorComboBox
+            d.adjustSize()
             
             if d.exec() == QtWidgets.QDialog.Accepted:
                 crsID = d.cursorComboBox.text()
@@ -4911,6 +4920,7 @@ anything else       anything else       ❌
             seldlg = ItemsListDialog(self, itemsList = epoch_names,
                                      title="Select epoch",
                                      selectmode = QtWidgets.QAbstractItemView.SingleSelection)
+            seldlg.adjustSize()
             ans = seldlg.exec_()
             if ans != QtWidgets.QDialog.Accepted:
                 return
@@ -5138,6 +5148,7 @@ anything else       anything else       ❌
                 cseldlg = ItemsListDialog(self, itemsList = [c.name for c in vertAndCrossCursors.values()],
                                             title="Select cursors",
                                             selectmode = QtWidgets.QAbstractItemView.ExtendedSelection)
+            cseldlg.adjustSize()
             ans = cseldlg.exec_()
             
             if ans != QtWidgets.QDialog.Accepted:
@@ -5171,6 +5182,8 @@ anything else       anything else       ❌
         d.promptWidgets[0].variable.setClearButtonEnabled(True)
         d.promptWidgets[0].variable.redoAvailable = True
         d.promptWidgets[0].variable.undoAvailable = True
+        
+        d.adjustSize()
         
         if d.exec() == QtWidgets.QDialog.Accepted:
             txt = d.promptWidgets[0].text()
@@ -5210,6 +5223,8 @@ anything else       anything else       ❌
                 cseldlg = ItemsListDialog(self, itemsList = [c.name for c in vertAndCrossCursors.values()],
                                                 title="Select cursors",
                                                 selectmode = QtWidgets.QAbstractItemView.ExtendedSelection)
+            cseldlg.adjustSize()
+            
             ans = cseldlg.exec_()
             
             if ans != QtWidgets.QDialog.Accepted:
@@ -5257,6 +5272,8 @@ anything else       anything else       ❌
             
             d.overwriteEpochCheckBox = qd.CheckBox(d, "Overwrite existing epochs")
             d.overwriteEpochCheckBox.setChecked(False);
+            
+            d.adjustSize()
             
             if d.exec() == QtWidgets.QDialog.Accepted:
                 txt = d.epochNamePrompt.text()
@@ -5314,6 +5331,8 @@ anything else       anything else       ❌
             d.overwriteEpochCheckBox = qd.CheckBox(d, "Overwrite existing epochs")
             d.overwriteEpochCheckBox.setChecked(True);
             
+            d.adjustSize()
+            
             if d.exec() == QtWidgets.QDialog.Accepted:
                 txt = d.namePrompt.text()
                 if isinstance(txt, str) and len(txt.strip()):
@@ -5348,8 +5367,6 @@ anything else       anything else       ❌
         
         if isinstance(self._yData_, (neo.Block, neo.Segment)):
             d = qd.QuickDialog(self, "Make Epoch From Interval Between Cursors:")
-            #d = vigra.pyqt.qd.QuickDialog(self, "Make Epoch From Interval Between Cursors:")
-            # d.promptWidgets = list()
             
             d.namePrompt=qd.StringInput(d, "Name:")
             d.namePrompt.setText("Epoch")
@@ -5368,9 +5385,10 @@ anything else       anything else       ❌
             d.sweepRelativeCheckBox = qd.CheckBox(d, "Relative to each segment start")
             d.sweepRelativeCheckBox.setChecked(True)
             
-            
             d.overwriteEpochCheckBox = qd.CheckBox(d, "Overwrite existing epochs")
             d.overwriteEpochCheckBox.setChecked(False);
+            
+            d.adjustSize()
             
             if d.exec() == QtWidgets.QDialog.Accepted:
                 name = d.namePrompt.text()
@@ -5472,6 +5490,7 @@ anything else       anything else       ❌
             d.cursorComboBox.setItems([c.ID for c in vertAndCrossCursors.values()])
             d.cursorComboBox.conextIndexChanged(partial(self._slot_update_cursor_to_epoch_dlg, d=d))
             
+        d.adjustSize()
         
         if d.exec() == QtWidgets.QDialog.Accepted:
             txt = d.namePrompt.text()
@@ -5520,6 +5539,8 @@ anything else       anything else       ❌
         d.promptWidgets.append(namePrompt)
         d.promptWidgets.append(c1Combo)
         d.promptWidgets.append(c2Combo)
+        
+        d.adjustSize()
         
         if d.exec() == QtWidgets.QDialog.Accepted:
             name = namePrompt.text()
@@ -5833,6 +5854,8 @@ anything else       anything else       ❌
 #             #d.promptWidgets.append(vigra.pyqt.qd.StringInput(d, "Name:"))
 #             d.promptWidgets[0].setText("Epoch from "+crs.ID)
 #             
+#             d.adjustSize()
+#
 #             if d.exec() == QtWidgets.QDialog.Accepted:
 #                 txt = d.promptWidgets[0].text()
 #                 if txt is not None and len(txt)>0:
@@ -7451,6 +7474,7 @@ anything else       anything else       ❌
         frameAxis_prompt.variable.undoAvailable = True
         d.promptWidgets.append(frameAxis_prompt)
         
+        d.adjustSize()
         # TODO 2023-08-27 15:10:03 finalize me !!!
             
     @property
@@ -7963,6 +7987,7 @@ anything else       anything else       ❌
         wdg.setValue(self.cursorLabelPrecision)
         dlg.addLabel("Precision")
         dlg.addWidget(wdg)
+        dlg.adjustSize()
         if dlg.exec() > 0:
             val = wdg.value()
             
@@ -9860,7 +9885,8 @@ anything else       anything else       ❌
         spinner.valueChanged.connect(self._slot_setLeftLabelSpace)
         spinner.setValue(val0)
         dlg.addWidget(spinner)
-        dlg.resize(-1,-1)
+        # dlg.resize(-1,-1)
+        dlg.adjustSize()
         if dlg.exec() > 0:
             self.leftLabelSpace = spinner.value()
         else:

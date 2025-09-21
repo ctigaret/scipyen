@@ -915,7 +915,8 @@ def quickColorDialog(parent:typing.Optional[QtWidgets.QWidget]=None,
         
     dlg.addWidget(group)
     
-    dlg.resize(-1, -1)
+    # dlg.resize(-1, -1)
+    dlg.adjustSize()
         
     dlgret = dlg.exec()
     
