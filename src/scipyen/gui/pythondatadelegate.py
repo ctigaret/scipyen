@@ -47,3 +47,6 @@ class PythonDataDelegate(QtWidgets.QStyleItemDelegate):
     def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None):
         super().__init__(parent=parent)
         
+    def createEditor(self, parent:QtWidgets.QWidget, option:int, index:QtCore.QModelIndex) -> QtWidgets.QWidget | None:
+        pass
+        

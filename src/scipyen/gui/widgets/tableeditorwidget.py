@@ -867,9 +867,6 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             if not isinstance(data, (pd.Series, pd.DataFrame, pd.Index, np.ndarray, type(None))):
                 raise TypeError("%s data is not yet supported" % type(data).__name__)
             
-            #if isinstance(data, np.ndarray) and data.ndim > 2:
-                #raise TypeError("cannot support numpy array data with more than two dimensions")
-            
             self.beginResetModel()
             
             #self._modelData_ = data
@@ -878,17 +875,11 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 self._modelData_ = data
                 self._modelRows_ = data.shape[0]
                 self._modelColumns_ = data.shape[1]
-                #self._modelData_ = data.values
-                #self._modelDataRowHeaders = data.index
-                #self._modelDataColumnHeaders = data.columns
                 
             elif isinstance(data, pd.Series):
                 self._modelData_ = data
                 self._modelRows_ = data.shape[0]
                 self._modelColumns_ = 1
-                #self._modelData_ = data.values
-                #self._modelDataRowHeaders = data.index
-                #self._modelDataColumnHeaders = data.name
                 
             elif isinstance(data, pd.Index):
                 self._modelData_ = data
@@ -901,14 +892,12 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                     self._modelRows_ = data.shape[0]
                     
                     if data.ndim > 1:
-                        self._modelColumns_ = data.shape[1] + 1 # include domain as the first column - FIXME: use row headers for time domain?
+                        self._modelColumns_ = data.shape[1] + 1 # include domain as the first column - FIXME: use row headers for time domain unless the domain is editable TODO 2025-09-22 21:38:20
                     
                 else:
                     self._modelRows_ = 1
                     self._modelColumns_ = 1
                 
-                #self._modelRows_ = data.shape[0]
-                #self._modelColumns_ = data.shape[1] + 1 
                 self._modelData_ = data
                 
             elif isinstance(data, np.ndarray):
@@ -917,7 +906,6 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                         self._modelData_ = np.squeeze(data).reshape((data.shape[0], np.prod(data.shape[1:])))
                     else:
                         raise ValueError("Arrays with more than two dimensions and with non-singleton dimensions higher than 2 are not supported")
-                    # self._modelData_ = np.squeeze(data).reshape((data.shape[0], np.prod(data.shape[1:])))
                 else:
                     self._modelData_ = data
                     
@@ -936,17 +924,14 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 self._modelRows_ = 0
                 self._modelColumns_ = 0
                 
-            #self._displayedColumns = 0
             self._displayedRows_ = 0
             
             self.endResetModel()
             
-            #print("TabularDataModel setModelData %s" % type(self._modelData_).__name__)
             if self._modelData_ is None:
                 self.headerDataChanged.emit(QtCore.Qt.Vertical, 0, 0)
                 
             else:
-                #self.headerDataChanged.emit(QtCore.Qt.Vertical, 0, self._modelData_.shape[0])
                 self.headerDataChanged.emit(QtCore.Qt.Vertical, 0, self._modelRows_)
             
         except Exception as e:
