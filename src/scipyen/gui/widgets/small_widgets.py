@@ -998,7 +998,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         if self._keepDimensionless_ or self._forceDimensionless_:
             return ret
         return ret * self.units
-        
+    
     def setSingleStep(self, value:float|pq.Quantity):
         if isinstance(value, pq.Quantity):
             if value.size != 1:
