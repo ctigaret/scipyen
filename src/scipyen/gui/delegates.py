@@ -6,7 +6,7 @@
 
 r"""
 """
-import os, sys, typing
+import os, sys, typing, math
 import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
 from qtpy.QtCore import (Signal, Slot, Property,)
@@ -58,30 +58,74 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         
     def createEditor(self, parent:QtWidgets.QWidget, option:int, index:QtCore.QModelIndex) -> QtWidgets.QWidget | None:
         data = index.data(QtCore.Qt.EditRole)
+        disp = index.data(QtCore.Qt.DisplayRole)
         
-        if isinstance(data, int):
+        # print(f"{self.__class__.__name__}.createEditor:\n\t data type: {type(data).__name__}")
+        
+        # TODO: 2025-09-25 23:42:02
+        # for datetime.datetime use QDateTimeEdit (with QDate and QTime)
+        # for datetime.date use QDateEdit (with QDate)
+        # for datetime.time use QTimeEdit (with QTime)
+        
+        if isinstance(data, int) or "int" in type(data).__name__: # to include numpy array int dtypes
             widget = QtWidgets.QSpinBox(parent)
             widget.setMinimum(-1000)
             widget.setMaximum(1000)
-        elif isinstance(data, float):
-            widget = QtWidgets.QDoubleSpinBox(parent)
+            widget.setValue(data)
+            
+        elif isinstance(data, float) or "float" in type(data).__name__: # to include numpy array float dtypes
+            if "." in disp:
+                # print(f"first dot: {s0.index('.')}")
+                decimals = len(disp[disp.index("."):])
+            else:
+                decimals = 0
+                
+            widget = QtWidgets.QDoubleSpinBox(parent, enforceImmutableUnits=True) # disallow units change for individual data points !
             widget.setMinimum(-1e3)
             widget.setMaximum(1e3)
             widget.setSingleStep(1)
-            widget.setStepType(QtWidgets.QAbstractSpinBox.AdaptiveDecimalStepType)
+            widget.setDecimals(decimals)
+            # widget.setStepType(QtWidgets.QAbstractSpinBox.AdaptiveDecimalStepType)
+            widget.setValue(data)
         elif isinstance(data, pq.Quantity):
-            if not isinstance(data, pq.UnitQuantity):
-                widget = smw.QuantitySpinBox(parent)
-                widget.setMinimum(-1e3 * data.units)
-                widget.setMaximum(1e3 * data.units)
-                widget.setSingleStep(1.0  * data.units)
-                widget.setStepType(QtWidgets.QAbstractSpinBox.AdaptiveDecimalStepType)
-            else:
+            if isinstance(data, pq.UnitQuantity): # unlikely, but here we go...
                 widget = smw.QuantityChooserWidget(parent)
+            else:
+                if data.ndim > 0: # no editing of Quantity ARRAYS; only scalar Quantities can be edited; unlikely to encounter this, but here we go...
+                    return
+                # figure out how many decimals are shown — needed to set up the "decimals" property of the spin box
+                # (NOTE: the actual number of decimals displayed in the spin box depends on the column width, 
+                #        but at least we avoid scientific notation which can hide the visual of the value)
+                # below, 's0' is the string representation of the Quantity's magnitude (as a float)
+                units_str = data.units.dimensionality.unicode
+                if units_str in disp:
+                    s0 = disp.strip(units_str).strip()
+                else:
+                    s0 = disp.split(" ")[0].strip()
+                    
+                if "." in s0:
+                    # print(f"first dot: {s0.index('.')}")
+                    decimals = len(s0[s0.index(".")-1:]) # count the dot as well
+                else:
+                    decimals = 0
+                    
+                # print(f"decimals: {decimals}")
+                
+                widget = smw.QuantitySpinBox(parent)
+                widget.setMinimum(-math.inf * data.units)
+                widget.setMaximum(math.inf * data.units)
+                widget.setDecimals(decimals)
+                widget.setSingleStep(1.0  * data.units)
+                widget.disableUnitChange = True
+                # widget.setStepType(QtWidgets.QAbstractSpinBox.AdaptiveDecimalStepType)
+            widget.setValue(data)
+                
         elif isinstance(data, str):
             widget = QtWidgets.QLineEdit(parent)
+            widget.setText(data)
         else: # TODO: 2025-09-23 16:16:56 FIXME use a pushbutton to open a complex viewer/editor
-            widget = QtWidgets.QLineEdit(parent)
+            # widget = QtWidgets.QLineEdit(parent)
+            return
         widget.setFrame(False)
         widget.setAutoFillBackground(True)
         return widget

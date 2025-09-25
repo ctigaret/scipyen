@@ -893,7 +893,15 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                     
                     if data.ndim > 1:
                         self._modelColumns_ = data.shape[1] + 1 # include domain as the first column - FIXME: use row headers for time domain unless the domain is editable TODO 2025-09-22 21:38:20
-                    
+                        # NOTE: 2025-09-25 22:32:27 OK so the domain IS directly editable only for irregularly-sampled signals
+                        # AnalogSignal and DataSignal objects by definition do NOT have a directly editable domain, although one can alter any of the attributes below:
+                        # a) t_start
+                        # b) sampling_rate
+                        # c) sampling_period
+                        # d) WARNING — for DataSignal only: domain units
+                        
+                    # NOTE: 2025-09-25 23:31:58 for neo data objects, changing the units on individual data points should NOT be allowed
+                    # TODO: figrue out how to use Quantity chooser on the header (if at all possible) to change the units for all the Quantity array
                 else:
                     self._modelRows_ = 1
                     self._modelColumns_ = 1
@@ -1252,7 +1260,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 else:
                     ret = val if role == QtCore.Qt.EditRole else f"{val}"
                     
-            elif isinstance(self._modelData_, (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal, IrregularlySampledDataSignal)):
+            # elif isinstance(self._modelData_, (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal, IrregularlySampledDataSignal)):
+            elif isinstance(self._modelData_, neo.core.dataobject.DataObject):
                 # NOTE: 2025-03-31 23:47:43 WRONG:
                 # use the times as the row index!
                 if col == 0:

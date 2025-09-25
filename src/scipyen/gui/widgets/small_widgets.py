@@ -289,6 +289,8 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
                  fixUnitFamily:typing.Optional[typing.Union[str, bool]]=None,
                  rescaleWithUnitsChange:bool=False,
                  keepDimensionless:bool=False,
+                 disableUnitChange:bool=False,#
+                 enforceImmutableUnits:bool=False
                  ):
         r"""
         Named parameters:
@@ -309,7 +311,11 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         
         # self._default_units_ = pq.dimensionless
         
-        self._keepDimensionless_ = keepDimensionless
+        self._keepDimensionless_:bool = keepDimensionless
+        self._disableUnitChange_:bool = disableUnitChange
+        self._enforceImmutableUnits_:bool = enforceImmutableUnits
+        if self._enforceImmutableUnits_:
+            self._disableUnitChange_ = True
         self._restrictedToFamily_:typing.Optional[str] = None
         self._rescaleOnUnitChange_:bool = False
         self._forceDimensionless_:bool = False
@@ -475,7 +481,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             
     def contextMenuEvent(self, evt):
         cm = QtWidgets.QMenu("Options", self)
-        if not (self._keepDimensionless_ or self._forceDimensionless_):
+        if not (self._keepDimensionless_ or self._forceDimensionless_ or self._disableUnitChange_):
             setUnitsAction = cm.addAction("Set units")
             setUnitsAction.triggered.connect(self._slot_setUnitsGUI)
         setDecimalsAction = cm.addAction("Set decimals")
@@ -488,7 +494,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         adaptiveStepAction.toggled.connect(self._slot_setAdaptiveStep)
         setRangeAction = cm.addAction("Set range (min, max)")
         setRangeAction.triggered.connect(self._slot_setRangeGUI)
-        if not (self._keepDimensionless_ or self._forceDimensionless_):
+        if not (self._keepDimensionless_ or self._forceDimensionless_ or self._disableUnitChange_):
             cm.addSeparator()
             rescaleValueAction = cm.addAction("Rescale on unit change")
             rescaleValueAction.setCheckable(True)
@@ -500,11 +506,17 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             restrictAction.toggled.connect(self._slot_familyRestrictionChanged)
             
         cm.addSeparator()
-        if not self.forceDimensionless:
+        if not (self.forceDimensionless or self._disableUnitChange_):
             toggleDimensionlessAction = cm.addAction("Ignore dimensionality")
             toggleDimensionlessAction.setCheckable(True)
             toggleDimensionlessAction.setChecked(self._keepDimensionless_)
             toggleDimensionlessAction.toggled.connect(self._slot_keepDimensionless)
+        if not self._enforceImmutableUnits_:
+            toggleUnitChange = cm.addAction("Immutable units")
+            toggleUnitChange.setCheckable(True)
+            toggleUnitChange.setChecked(self._disableUnitChange_)
+            toggleUnitChange.toggled.connect(self._slot_toggleImmutableUnits)
+        
         resetAction = cm.addAction("Reset")
         resetAction.triggered.connect(self._slot_reset)
         cm.popup(self.mapToGlobal(evt.pos()))
@@ -634,8 +646,6 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         if self._keepDimensionless_ or self._forceDimensionless_:
             return ret
         return ret * self.units
-    
-    # def decimals(self)d
     
     def value(self) -> pq.Quantity:
         r""" Reimplements QDoubleSpinBox.value() to return a quantity
@@ -816,6 +826,14 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             raise TypeError(f"Expecting a scalar quantity, a float or pd.NA; instead, got {type(value).__name__}")
         
     @property
+    def disableUnitChange(self) -> bool:
+        return self._disableUnitChange_
+    
+    @disableUnitChange.setter
+    def disableUnitChange(self, val:bool):
+        self._disableUnitChange_ = val
+    
+    @property
     def rescaleOnUnitChange(self)->bool:
         if self._keepDimensionless_ or self._forceDimensionless_:
             return False
@@ -893,6 +911,10 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
                 
             if stepType != self.stepType():
                 self.setStepType(stepType)
+                
+    @Slot(bool)
+    def _slot_toggleImmutableUnits(self, val:bool):
+        self.disableUnitChange = val
             
     @Slot(bool)
     def _slot_familyRestrictionChanged(self, value:bool):
