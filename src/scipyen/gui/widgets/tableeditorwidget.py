@@ -1080,7 +1080,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                         return QtCore.QVariant()
                         
             elif isinstance(self._modelData_, pd.Series):
-                if orientation == QtCore.Qt.Horizontal:
+                if orientation == QtCore.Qt.Horizontal: # horizontal (column) headers
                     if role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.AccessibleTextRole):
                         return QtCore.QVariant(str(self._modelData_.name))
                         
@@ -1105,7 +1105,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                     else:
                         return QtCore.QVariant()
                     
-                else:
+                else: # vertical (row) headers
                     if isinstance(self._modelData_.index, pd.MultiIndex): # MultiIndex is subclass of Index so catch it first
                         if role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.AccessibleTextRole):
                             return QtCore.QVariant(str(self._modelData_.index[section]))
@@ -1164,13 +1164,15 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                         # return QtCore.QVariant("%s (channel %d, %s)" % (self._modelData_.name, section, self._modelData_.dimensionality))
                         if section == 0:
                             if isinstance(self._modelData_, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)):
+                                domain = getattr(self._modelData_, "times", None)
                                 domain_name = getattr(self._modelData_,"domain_name", None)
-                                domain = getattr(self._modelData_, "domain", None)
+                                if domain_name is None and domain is not None:
+                                    domain_name = ""
                                 # NOTE: 2024-01-23 23:45:53
                                 # better do this:
-                                if isinstance(self._modelData_, neo.IrregularlySampledSignal):
-                                    domain_name = "Time"
+                                if isinstance(self._modelData_, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)):
                                     domain = self._modelData_.times
+                                    domain_name = "Time"
                                 if isinstance(domain_name, str) and isinstance(domain, pq.Quantity):
                                     dname = f"{domain_name} ({domain.dimensionality})" if len(domain_name.strip()) else "Sample index"
                                     return QtCore.QVariant(dname)
@@ -1179,10 +1181,13 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                                     return QtCore.QVariant("Sample")
                                                        
                             else:
-                                return QtCore.QVariant("Time (%s)" % self._modelData_.times.dimensionality)
+                                # return QtCore.QVariant("Time (%s)" % self._modelData_.times.dimensionality)
+                                return QtCore.QVariant("%s (channel %d, %s)" % (self._modelData_.name, section, self._modelData_.dimensionality))
+                                # return QtCore.QVariant("Time (%s)" % self._modelData_.times.dimensionality)
                             
                         else:
-                            return QtCore.QVariant("%s (channel %d, %s)" % (self._modelData_.name, section-1, self._modelData_.dimensionality))
+                            # return QtCore.QVariant("%s (channel %d, %s)" % (self._modelData_.name, section-1, self._modelData_.dimensionality))
+                            return QtCore.QVariant("%s (channel %d, %s)" % (self._modelData_.name, section, self._modelData_.dimensionality))
                         
                     elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
                         return QtCore.QVariant("%s" % self._modelData_[:,section].dtype)
@@ -1190,15 +1195,19 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                     else:
                         return QtCore.QVariant()
                         
-                else: # vertical (rows) header
-                    if role in (QtCore.Qt.DisplayRole, QtCore.Qt.AccessibleTextRole):
-                        return QtCore.QVariant("%s" % section)
-                    
-                    elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
-                        return QtCore.QVariant("%s" % self._modelData_[section,:].dtype)
-                            
+                else: # vertical (rows) headers
+                    if isinstance(self._modelData_, (neo.AnalogSignal, DataSignal)):
+                        return QtCore.QVariant(self._modelData_.times[section])
                     else:
-                        return QtCore.QVariant()
+                        if role in (QtCore.Qt.DisplayRole, QtCore.Qt.AccessibleTextRole):
+                            return QtCore.QVariant("%s" % section)
+                        
+                        elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
+                                
+                            return QtCore.QVariant("%s" % self._modelData_[section,:].dtype)
+                                
+                        else:
+                            return QtCore.QVariant()
                 
                     
             elif isinstance(self._modelData_, np.ndarray):
@@ -1262,14 +1271,16 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                     
             # elif isinstance(self._modelData_, (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal, IrregularlySampledDataSignal)):
             elif isinstance(self._modelData_, neo.core.dataobject.DataObject):
-                # NOTE: 2025-03-31 23:47:43 WRONG:
-                # use the times as the row index!
-                if col == 0:
-                    val = self._modelData_.times[row]
+                # NOTE: 2025-03-31 23:47:43 WRONG: FIXME/TODO
+                # use the times as the row index for regularly sampled signals!
+                if isinstance(self._modelData_, (neo.AnalogSignal, DataSignal)):
+                    val = self._modelData_[row, col]
+                    ret_type = type(val).__name__
                 else:
-                    val = self._modelData_[row, col-1]
-
-                ret_type = type(val).__name__
+                    if col == 0:
+                        val = self._modelData_.times[row]
+                    else:
+                        val = self._modelData_[row, col-1]
                 
                 if isinstance(val, datetime.datetime):
                     ret = val if role == QtCore.Qt.EditRole else ret.isoformat(" ")
@@ -1398,6 +1409,12 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                     
                 #result = np.fromstring(value, dtype=data_type)
                 #self._modelData_.iloc[row] = result
+                
+            elif isinstance(self._modelData_, neo.dataobject.DataObject):
+                if isinstance(self._modelData_, (neo.AnalogSignal, DataSignal)):
+                    # BUG 2025-09-26 23:08:58 TODO/FIXME
+                    # disallow editing of the domain -> use it as row headers, Not as data column
+                    pass
                 
             elif isinstance(self._modelData_, np.ndarray):
                 current_value = self._modelData_[row, col]

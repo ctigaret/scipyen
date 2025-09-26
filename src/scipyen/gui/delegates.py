@@ -71,22 +71,22 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             widget = QtWidgets.QSpinBox(parent)
             widget.setMinimum(-1000)
             widget.setMaximum(1000)
-            widget.setValue(data)
+            # widget.setValue(data)
             
         elif isinstance(data, float) or "float" in type(data).__name__: # to include numpy array float dtypes
-            if "." in disp:
-                # print(f"first dot: {s0.index('.')}")
-                decimals = len(disp[disp.index("."):])
-            else:
-                decimals = 0
+            # if "." in disp:
+            #     # print(f"first dot: {s0.index('.')}")
+            #     decimals = len(disp[disp.index("."):])
+            # else:
+            #     decimals = 0
                 
             widget = QtWidgets.QDoubleSpinBox(parent)
             widget.setMinimum(-1e3)
             widget.setMaximum(1e3)
             widget.setSingleStep(1)
-            widget.setDecimals(decimals)
+            # widget.setDecimals(decimals)
             # widget.setStepType(QtWidgets.QAbstractSpinBox.AdaptiveDecimalStepType)
-            widget.setValue(data)
+            # widget.setValue(data)
             
         elif isinstance(data, pq.Quantity):
             if isinstance(data, pq.UnitQuantity): # unlikely, but here we go...
@@ -115,19 +115,78 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                 widget = smw.QuantitySpinBox(parent, enforceImmutableUnits=True) # disallow units change for individual data points in a Quantity
                 widget.setMinimum(-math.inf * data.units)
                 widget.setMaximum(math.inf * data.units)
-                widget.setDecimals(decimals)
+                # widget.setDecimals(decimals)
                 widget.setSingleStep(1.0  * data.units)
                 widget.disableUnitChange = True
                 # widget.setStepType(QtWidgets.QAbstractSpinBox.AdaptiveDecimalStepType)
-            widget.setValue(data)
+            # widget.setValue(data)
                 
-        elif isinstance(data, str):
+        elif isinstance(data, str) or "str" in type(a).__name__: # for numpy.str_ type
             widget = QtWidgets.QLineEdit(parent)
-            widget.setText(data)
+            # widget.setText(data)
+            
         else: # TODO: 2025-09-23 16:16:56 FIXME use a pushbutton to open a complex viewer/editor
             # widget = QtWidgets.QLineEdit(parent)
             return
         widget.setFrame(False)
         widget.setAutoFillBackground(True)
         return widget
-        
+    
+    def setEditorData(self, editor:QtWidgets.QWidget, index:QtCore.QModelIndex):
+        data = index.data(QtCore.Qt.EditRole)
+        disp = index.data(QtCore.Qt.DisplayRole)
+
+        if isinstance(data, int) or "int" in type(data).__name__:
+            assert isinstance(editor, QtWidgets.QSpinBox), f"Incompatible editor widget type ({type(editor).__name__}) for integer data"
+            editor.setValue(data)
+            
+        elif isinstance(data, float) or "float" in type(data).__name__:
+            assert isinstance(editor, QtWidgets.QDoubleSpinBox), f"Incompatible editor widget type ({type(editor).__name__}) for floating point data"
+            if "." in disp:
+                # print(f"first dot: {s0.index('.')}")
+                decimals = len(disp[disp.index("."):])
+            else:
+                decimals = 0
+            editor.setDecimals(decimals)
+            # editor.setStepType(QtWidgets.QAbstractSpinBox.AdaptiveDecimalStepType)
+            editor.setValue(data)
+            
+        elif isinstance(data, pq.Quantity):
+            if isinstance(data, pq.UnitQuantity):
+                assert isinstance(editor, smw.QuantityChooserWidget), f"Incompatible editor widget type ({type(editor).__name__}) for UnitQuantity data"
+            else:
+                assert isinstance(editor, smw.QuantitySpinBox), f"Incompatible editor widget type ({type(editor).__name__}) for Quantity data"
+                if data.ndim > 0: # no editing of Quantity ARRAYS; only scalar Quantities can be edited; unlikely to encounter this, but here we go...
+                    return
+                # figure out how many decimals are shown — needed to set up the "decimals" property of the spin box
+                # (NOTE: the actual number of decimals displayed in the spin box depends on the column width, 
+                #        but at least we avoid scientific notation which can hide the visual of the value)
+                # below, 's0' is the string representation of the Quantity's magnitude (as a float)
+                units_str = data.units.dimensionality.unicode
+                if units_str in disp:
+                    s0 = disp.strip(units_str).strip()
+                else:
+                    s0 = disp.split(" ")[0].strip()
+                    
+                if "." in s0:
+                    # print(f"first dot: {s0.index('.')}")
+                    decimals = len(s0[s0.index(".")-1:]) # count the dot as well
+                else:
+                    decimals = 0
+                    
+                editor.setDecimals(decimals)
+                # editor.setSingleStep(1.0  * data.units)
+            editor.setValue(data)
+                
+        elif isinstance(data, str) or "str" in type(a).__name__:
+            assert isinstance(editor, QtWidgets.QLineEdit), f"Incompatible editor editor type ({type(editor).__name__}) for string data"
+            editor.setText(data)
+            
+            
+    def setModelData(self, editor:QtWidgets.QWidget, model:QtCore.QAbstractItemModel, index:QtCore.QModelIndex):
+        if isinstance(editor, (QtWidgets.QSpinBox, QtWidgets.QDoubleSpinBox, smw.QuantitySpinBox)):
+            data = editor.value()
+        elif isinstance(editor, QtWidgets.QLineEdit):
+            data = editor.text()
+            
+        model.setData(index, data, QtCore.Qt.EditRole)
