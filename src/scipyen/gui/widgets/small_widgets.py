@@ -296,7 +296,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         Named parameters:
         =================
         parent: parent widget; optional, default is None
-        units: initial units; optional, default is pq.dimensionless
+        units: initial units, or initial value; optional, default is pq.dimensionless
         unitFamily: restrict to units in given family; optional, default is None
     
         """
@@ -386,8 +386,6 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         self.setContextMenuPolicy(QtCore.Qt.DefaultContextMenu)
         # print(f"{self.__class__.__name__}.__init__ DONE")
         
-        # NOTE: 2025-09-14 23:33:43
-        # this calls validate() hence self.-decimals_ must have been defined already
         super().setValue(self._magnitude_)
         super().setSingleStep(self._singleStep_)
         super().setDecimals(self._decimals_)
@@ -401,6 +399,10 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             super().setStepType(stepType)
         super().setSuffix(self._suffix_)
         super().setPrefix(self._prefix_)
+        
+        if isinstance(units, pq.Quantity) and not isinstance(units, pq.UnitQuantity):
+            self.setValue(units)
+        
         super().valueChanged.connect(self._slot_valueChanged)
         self.lineEdit().textChanged.connect(self._slot_valueTextChanged)
         
@@ -481,7 +483,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             
     def contextMenuEvent(self, evt):
         cm = QtWidgets.QMenu("Options", self)
-        if not (self._keepDimensionless_ or self._forceDimensionless_ or self._disableUnitChange_):
+        if not (self._keepDimensionless_ or self._forceDimensionless_ or self._disableUnitChange_ or self._enforceImmutableUnits_):
             setUnitsAction = cm.addAction("Set units")
             setUnitsAction.triggered.connect(self._slot_setUnitsGUI)
         setDecimalsAction = cm.addAction("Set decimals")

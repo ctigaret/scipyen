@@ -80,7 +80,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             else:
                 decimals = 0
                 
-            widget = QtWidgets.QDoubleSpinBox(parent, enforceImmutableUnits=True) # disallow units change for individual data points !
+            widget = QtWidgets.QDoubleSpinBox(parent)
             widget.setMinimum(-1e3)
             widget.setMaximum(1e3)
             widget.setSingleStep(1)
@@ -89,7 +89,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             widget.setValue(data)
         elif isinstance(data, pq.Quantity):
             if isinstance(data, pq.UnitQuantity): # unlikely, but here we go...
-                widget = smw.QuantityChooserWidget(parent)
+                widget = smw.QuantityChooserWidget(parent, enforceImmutableUnits=True) # disallow units change for individual data points in a Quantity
             else:
                 if data.ndim > 0: # no editing of Quantity ARRAYS; only scalar Quantities can be edited; unlikely to encounter this, but here we go...
                     return

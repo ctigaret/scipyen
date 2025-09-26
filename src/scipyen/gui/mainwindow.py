@@ -4566,6 +4566,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     @safewrapper
     def slot_historyContextMenuRequest(self, point):
         cm = QtWidgets.QMenu("Selected history", self)
+        executeHistorySelection = cm.addAction("Execute")
+        executeHistorySelection.setToolTip("Execute selected lines")
+        executeHistorySelection.triggered.connect(self._execHistorySelection_)
         copyHistorySelection = cm.addAction("Copy")
         copyHistorySelection.setToolTip("Copy selected history to clipboard")
         copyHistorySelection.triggered.connect(self._copyHistorySelection_)
