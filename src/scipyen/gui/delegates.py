@@ -87,9 +87,10 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             widget.setDecimals(decimals)
             # widget.setStepType(QtWidgets.QAbstractSpinBox.AdaptiveDecimalStepType)
             widget.setValue(data)
+            
         elif isinstance(data, pq.Quantity):
             if isinstance(data, pq.UnitQuantity): # unlikely, but here we go...
-                widget = smw.QuantityChooserWidget(parent, enforceImmutableUnits=True) # disallow units change for individual data points in a Quantity
+                widget = smw.QuantityChooserWidget(parent)
             else:
                 if data.ndim > 0: # no editing of Quantity ARRAYS; only scalar Quantities can be edited; unlikely to encounter this, but here we go...
                     return
@@ -111,7 +112,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                     
                 # print(f"decimals: {decimals}")
                 
-                widget = smw.QuantitySpinBox(parent)
+                widget = smw.QuantitySpinBox(parent, enforceImmutableUnits=True) # disallow units change for individual data points in a Quantity
                 widget.setMinimum(-math.inf * data.units)
                 widget.setMaximum(math.inf * data.units)
                 widget.setDecimals(decimals)

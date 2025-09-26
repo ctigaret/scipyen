@@ -289,8 +289,8 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
                  fixUnitFamily:typing.Optional[typing.Union[str, bool]]=None,
                  rescaleWithUnitsChange:bool=False,
                  keepDimensionless:bool=False,
-                 disableUnitChange:bool=False,#
-                 enforceImmutableUnits:bool=False
+                 disableUnitChange:bool=False,
+                 enforceImmutableUnits:bool=False,
                  ):
         r"""
         Named parameters:
@@ -482,6 +482,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         self.keepDimensionless = val
             
     def contextMenuEvent(self, evt):
+        # print(f"{self.__class__.__name__}.contextMenuEvent: _enforceImmutableUnits_ = {self._enforceImmutableUnits_}")
         cm = QtWidgets.QMenu("Options", self)
         if not (self._keepDimensionless_ or self._forceDimensionless_ or self._disableUnitChange_ or self._enforceImmutableUnits_):
             setUnitsAction = cm.addAction("Set units")
@@ -508,11 +509,12 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             restrictAction.toggled.connect(self._slot_familyRestrictionChanged)
             
         cm.addSeparator()
-        if not (self.forceDimensionless or self._disableUnitChange_):
+        if not (self._forceDimensionless_ or self._disableUnitChange_):
             toggleDimensionlessAction = cm.addAction("Ignore dimensionality")
             toggleDimensionlessAction.setCheckable(True)
             toggleDimensionlessAction.setChecked(self._keepDimensionless_)
             toggleDimensionlessAction.toggled.connect(self._slot_keepDimensionless)
+            
         if not self._enforceImmutableUnits_:
             toggleUnitChange = cm.addAction("Immutable units")
             toggleUnitChange.setCheckable(True)

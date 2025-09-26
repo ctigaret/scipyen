@@ -1715,7 +1715,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         sigBlock = QtCore.QSignalBlocker(self.actionUse_system_default_font)
         self.actionUse_system_default_font.setChecked(self._useSystemDefaultFont)
         self.sig_splashMessage.emit("Initializing Scipyen Console...")
-
+        
         self._init_QtConsole_() # also instantiates self.shell, etc
 
         self.sig_splashMessage.emit("Initializing User Workspace...")
@@ -1753,6 +1753,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.workspaceView.selectionModel().selectionChanged[QtCore.QItemSelection, QtCore.QItemSelection].connect(self.slot_selectionChanged)
         self.workspaceModel.itemChanged.connect(self.slot_variableItemNameChanged)
         self.workspaceModel.modelContentsChanged.connect(self.slot_updateWorkspaceView)
+        
+        self._shell_automagics:bool = True
         
         self.sig_splashMessage.emit("Loading Saved Settings...")
 
@@ -1848,6 +1850,24 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # self.menuBar().setNativeMenuBar(False)
 
     # ### BEGIN Properties and slots connected to properties
+    
+    @property
+    def shellAutomagic(self) -> bool:
+        return self._shell_automagics
+    
+    @markConfigurable("ShellAutomagic")
+    @shellAutomagic.setter
+    def shellAutomagic(self, val:bool):
+        self._shell_automagics = val == True
+        if self.console:
+            self.console.shellAutomagic = self._shell_automagics
+            
+        signalBlock = QtCore.QSignalBlocker(self.actionUseShellAutomagic)
+        self.actionUseShellAutomagic.setChecked(self.console.shellAutomagic)
+        
+    @Slot(bool)
+    def _slot_UseShellAutomagic(self, val:bool):
+        self.shellAutomagic = val == True
     
     @property
     def useNewNavigatorLook(self) -> bool:
@@ -4169,7 +4189,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             # the same ExitAutocall object; see IPython.core.autocall module for
             # details
             #
-            # The point of all this is that we quit the Scipyen application when
+            # The point of all this is that we can quit the Scipyen application when
             # either "exit" or "quit" are entered in the internal Scipyen Console
             #
             self.workspace["_exit_kernel_"] = self.workspace["exit"]
@@ -4185,7 +4205,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
             # TODO/FIXME 2019-08-04 11:06:16
             # this does not override ipython's exit:
-            # this will have to be called as %exit line magic (i.e. automagic doesn't work)
+            # this will have to be called as %exit line magic (i.e. automagic doesn't seem to work in this case)
             # see also NOTE 2020-07-09 11:36:34
             self.ipkernel.shell.register_magics(ScipyenMagics)
 
@@ -4222,6 +4242,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # self.console.consoleWidget.set_pygment(self.console.consoleWidget._console_pygment)
         
         self._updateConsolesEditor("internal")
+        
+        self.actionUseShellAutomagic.setChecked(self.console.shellAutomagic)
         
     @Slot()
     @safewrapper
@@ -4600,7 +4622,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 
         return ret
         
-        
     def _getCodesForCurrentSession_(self, /, 
                                 asString:bool=True, lineNumbers:bool=False,
                                 withHeader:bool=False,
@@ -4633,7 +4654,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     def _getHistoryBlockAsCode_(self, magic:typing.Optional[str]=None, /, lineNumbers:bool = False,
                                 skipEmptySessions:bool=False,
                                 withHeader:bool=False,
-                                suggestTitle:bool=False) -> str:
+                                suggestTitle:bool=False,
+                                newLineAtEnd:bool=True) -> str:
         r"""Generates a string by concatenating commands from the history.
     Commands are selected in the Command History tree widget.
         
@@ -4693,8 +4715,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         if len(selectedItems) == 0:
             ret = self._getFullHistoryAsCode_(magic, lineNumbers = lineNumbers,
                                               withHeader = withHeader,
-                                              skipEmptySessions = 
-                                              skipEmptySessions)
+                                              skipEmptySessions = skipEmptySessions,#
+                                              newLineAtEnd = newLineAtEnd)
             
             if suggestTitle:
                 ret = (ret, "Full Command History")
@@ -4714,9 +4736,12 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                                                                  skipEmpty = skipEmptySessions))
                     
                     if magic is None:
-                        ret = "\n".join(selectionList) + "\n"
+                        ret = "\n".join(selectionList)
                     else:
-                        ret = " ".join(selectionList) + "\n"
+                        ret = " ".join(selectionList)
+                        
+                    if newLineAtEnd:
+                        ret += "\n"
                         
                     if suggestTitle:
                         ret = (ret, "Current session")
@@ -4731,28 +4756,18 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                                                                         withHeader = withHeader,
                                                                         skipEmpty = skipEmptySessions))
                     if magic is None:
-                        ret = "\n".join(selectionList) + "\n"
+                        ret = "\n".join(selectionList)
                     else:
-                        ret = " ".join(selectionList) + "\n"
+                        ret = " ".join(selectionList)
+                        
+                    if newLineAtEnd:
+                        ret += "\n"
                         
                     if suggestTitle:
                         ret = (ret, f"Session {selectedItems[0].text(0)}")
                         
                     return ret
                     
-                # NOTE: 2025-04-30 14:48:10 not executed, never reached
-#                 # when a "Node" is selected, get the entire list of selected children
-#                 getChildData = lambda c: f"{c.text(0)}: {c.text(1)}" if lineNumbers else f"{c.text(1)}"
-#                 
-#                 selectionList += list(map(lambda k: getChildData(selectedItems[0].child(k)), 
-#                                           range(selectedItems[0].childCount())))
-                # if lineNumbers:
-                #     selectionList += [selectedItems[0].child(k).text(1)
-                #                     for k in range(selectedItems[0].childCount())]
-                # else:
-                #     selectionList += [selectedItems[0].child(k).text(1)
-                #                     for k in range(selectedItems[0].childCount())]
-
             elif selectedItems[0].columnCount() > 1:  # a command node was selected
                 #  check-out its parent session number
                 if isinstance(selectedItems[0].parent(), QtWidgets.QTreeWidgetItem)\
@@ -4771,7 +4786,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                     
                 text = f"{selectedItems[0].text(0)}: {selectedItems[0].text(1)}" if lineNumbers else selectedItems[0].text(1)
                 selectionList.append(text)
-                # selectionList.append(selectedItems[0].text(1))
+                
+                if newLineAtEnd:
+                    selectionList.append("\n")
 
             else:  # not sure we'll ever reach this
                 return
@@ -4819,16 +4836,20 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 selectionList.append(lineText)
 
         if magic is None:
-            cmd = "\n".join(selectionList) + "\n"
+            cmd = "\n".join(selectionList)
 
         else:
-            cmd = " ".join(selectionList) + "\n"
+            cmd = " ".join(selectionList)
+            
+        if newLineAtEnd:
+            cmd += "\n"
 
         if suggestTitle:
             if len(pastSessions) == 1:
                 return (cmd, f"Session {pastSessions[0]}")
             else:
                 return (cmd, "Command History")
+            
         return cmd
 
     def _copyHistorySelection_(self):
@@ -4842,7 +4863,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     def _getFullHistoryAsCode_(self,magic=None, /,  
                             lineNumbers:bool = False, 
                             withHeader:bool = False,
-                            skipEmptySessions:bool=False):
+                            skipEmptySessions:bool=False,
+                            newLineAtEnd:bool=True):
         r"""Outputs ALL command history resident in IPython's database.
     """
         hhs = self.historyAccessor.search('*')
@@ -4876,9 +4898,12 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         codes = itertools.chain.from_iterable(codes)
         
         if magic is None: # what is magic?
-            cmd = "\n".join(codes) + "\n"
+            cmd = "\n".join(codes)
         else:
             cmd = " ".join(codes) + " "
+            
+        if newLineAtEnd:
+            cmd += "\n"
         
         return cmd
 
@@ -4959,20 +4984,56 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     @Slot()
     def _historyToConsole_(self):
         cmd, title = self._getHistoryBlockAsCode_(suggestTitle=True, skipEmptySessions=True,
-                                                  withHeader=False)
+                                                  withHeader=False, newLineAtEnd=False)
         if isinstance(cmd, str) and len(cmd.strip()):
             self.console.widget.writeText(cmd)
         
     @Slot()
     def _execHistorySelection_(self):
         cmd, title = self._getHistoryBlockAsCode_(suggestTitle=True, skipEmptySessions=True,
-                                                  withHeader=False)
+                                                  withHeader=False, newLineAtEnd=False)
         if isinstance(cmd, str) and len(cmd.strip()):
             self.statusBar().showMessage("Working...")
             currentMouseCursor = self.cursor()
             self.setCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
             try:
+                # NOTE: 2025-09-26 21:44:21 
+                # pasting a line or cell magic without the preceding '%' or '%%'
+                # will NOT be interpreted as magic by consoleWidget.execute(…)
+                # therefore I need to see if the first word in a line is a IPython magic name;
+                # if it is, then prepend '%' or '%%' as appropriate
+                #
+                # the downside of this approach is that an identifier which HAPPENS 
+                # to be the same as that of an IPython magic will always be interpreted
+                # as a magic even at the command line (unless automagic is OFF)
+                
+                # A way to avoid this confusion is to turn automagic OFF in 
+                # the console; however, this will only work for the commands 
+                # added to history AFTER the turn off, and not before.
+                #
+                # The best way is to avoid using magic names as identifiers for
+                # python objects
+                
+                # NOTE that I only do this when the code is executed directly; 
+                # pasting it to the console first gives the opportunity to correct
+                # by manually prepending '%' or '%%' as appropriate
+                
+                if self.shell.magics_manager.auto_magic:
+                    cmd_lines = cmd.split("\n")
+                    for k, cmd_line in enumerate(cmd_lines):
+                        words = cmd_line.split(" ")
+                        if words[0] in self.shell.magics_manager.magics["line"].keys():
+                            words[0] = "%"+words[0]
+                        elif words[0] in self.shell.magics_manager.magics["cell"].keys():
+                            words[0] = "%%"+words[0]
+                            
+                        new_cmd_line = " ".join(words)
+                        
+                        cmd_lines[k] = new_cmd_line
+                    cmd = "\n".join(cmd_lines)
+                    
                 self.console.consoleWidget.execute(cmd, hidden=False, interactive=False)
+                
                 self.executionCount = self.ipkernel.shell.execution_count
                 self._updateHistoryView_(
                     self.executionCount-1, self.ipkernel.shell.history_manager.input_hist_raw[-1])
@@ -6198,6 +6259,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         
         self.actionUse_New_Navigator_Look.setChecked(self._newNavigatorLook_)
         self.actionUse_New_Navigator_Look.toggled.connect(self._slot_newNavigatorLook)
+        
+        self.actionUseShellAutomagic.toggled.connect(self._slot_UseShellAutomagic)
 
         self.lockToolBarAction = QAction(QtGui.QIcon.fromTheme("lock-symbolic"), "Lock Toolbar Positions", self)
         self.lockToolBarAction.setCheckable(True)

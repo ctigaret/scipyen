@@ -3594,6 +3594,16 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         self.settings_menu.addAction(self.set_console_scrollbackAction)
         self.addAction(self.set_console_scrollbackAction)
         
+        self.set_useAutomagicAction = QAction("Use Automagic", self)
+        self.set_useAutomagicAction.setCheckable(True)
+        self.set_useAutomagicAction.toggled.connect(self._slot_useAutomagic)
+        self.settings_menu.addAction(self.set_useAutomagicAction)
+        self.addAction(self.set_useAutomagicAction)
+        
+    @Slot(bool)
+    def _slot_useAutomagic(self, val:bool):
+        self.shellAutomagic = val==True
+        
     @Slot()
     def _slot_listMagics(self):
         self.ipkernel.shell.run_cell("%lsmagic")
@@ -3692,6 +3702,19 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     def stdout(self):
         r"""The standard output stream of the kernel running in this console"""
         return self.ipkernel.stdout
+    
+    @property
+    def shellAutomagic(self) -> bool:
+        return self.shell.magics_manager.auto_magic
+    
+    @shellAutomagic.setter
+    def shellAutomagic(self, val:bool):
+        self.shell.magics_manager.auto_magic = val == True
+        signalBlockers = [QtCore.QSignalBlocker(self.set_useAutomagicAction)]
+        self.set_useAutomagicAction.setChecked(self.shell.magics_manager.auto_magic)
+        if self.scipyenWindow:
+            if self.scipyenWindow.shellAutomagic != self.shell.magics_manager.auto_magic:
+                self.scipyenWindow.shellAutomagic = self.shell.magics_manager.auto_magic
     
     @property
     def shell(self):
