@@ -65,11 +65,14 @@ echo -e "VIGRA source will be built in ${vigra_build}"
 
 if [ ! -r ${vigra_src} ] ; then
     echo -e "Cloning vigra git repository...\n"
+#     cd ${VIRTUAL_ENV}
+    mkdir -p ${VIRTUAL_ENV}/src && cd ${VIRTUAL_ENV}/src
     git clone https://github.com/ukoethe/vigra.git
     if [[ $? -ne 0 ]] ; then
         echo -e "Cannot clone vigra git repository. Goodbye!\n"
         exit 1
     fi
+    cd ${mydir}
     
 else
     # refresh the git repo...
