@@ -294,7 +294,7 @@ class TableEditor(ScipyenViewer):
         self.toolBar = QtWidgets.QToolBar("Main", self)
         self.toolBar.setObjectName("TableEditor_Main_Toolbar")
         
-        refreshAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("view-refresh"), "Refresh")
+        refreshAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("view-refresh"), "Reload data")
         refreshAction.triggered.connect(self.slot_refreshDataDisplay)
         
         plotDataAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("labplot-xy-curve-segments"), "Plot Selected Data")

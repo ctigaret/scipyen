@@ -127,7 +127,7 @@
      <x>0</x>
      <y>0</y>
      <width>900</width>
-     <height>27</height>
+     <height>29</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -355,6 +355,7 @@
    <attribute name="toolBarBreak">
     <bool>false</bool>
    </attribute>
+   <addaction name="actionRefresh"/>
    <addaction name="actionLink_X_axes"/>
    <addaction name="actionShow_X_grid"/>
    <addaction name="actionShow_Y_grid"/>
@@ -426,8 +427,14 @@
    </property>
   </action>
   <action name="actionRefresh">
+   <property name="icon">
+    <iconset theme="view-refresh"/>
+   </property>
    <property name="text">
     <string>Refresh</string>
+   </property>
+   <property name="toolTip">
+    <string>Reload data</string>
    </property>
   </action>
   <action name="actionData_to_workspace">

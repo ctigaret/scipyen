@@ -4591,14 +4591,16 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         executeHistorySelection = cm.addAction("Execute")
         executeHistorySelection.setToolTip("Execute selected lines")
         executeHistorySelection.triggered.connect(self._execHistorySelection_)
+        historyToConsoleAction = cm.addAction("Send to console")
+        historyToConsoleAction.setToolTip("Send code to Scipyen's console")
+        historyToConsoleAction.triggered.connect(self._historyToConsole_)
         copyHistorySelection = cm.addAction("Copy")
         copyHistorySelection.setToolTip("Copy selected history to clipboard")
         copyHistorySelection.triggered.connect(self._copyHistorySelection_)
-        cm.popup(self.historyTreeWidget.mapToGlobal(
-            point), copyHistorySelection)
         saveHistorySelection = cm.addAction("Save...")
         saveHistorySelection.setToolTip("Save selected history to file")
         saveHistorySelection.triggered.connect(self._saveHistorySelection_)
+        cm.popup(self.historyTreeWidget.mapToGlobal(point), copyHistorySelection)
         
     def _getHistoryTreeWidgetSessionCode_(self, item: QtWidgets.QTreeWidgetItem, /, 
                                 asString:bool=True,

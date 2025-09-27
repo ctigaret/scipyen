@@ -171,5 +171,5 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             data = editor.value()
         elif isinstance(editor, QtWidgets.QLineEdit):
             data = editor.text()
-            
+        # print(f"{self.__class__.__name__}.setModelData -> data = {data}")
         model.setData(index, data, QtCore.Qt.EditRole)
