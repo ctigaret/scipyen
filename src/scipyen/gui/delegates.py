@@ -57,8 +57,24 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         self._model_ = None
         
     def createEditor(self, parent:QtWidgets.QWidget, option:int, index:QtCore.QModelIndex) -> QtWidgets.QWidget | None:
+        # NOTE: 2025-09-27 10:29:14 ATTENTION
+        # editor data, although it can also be set here, it should be set through
+        # self.setEditorData(), overridden below
         data = index.data(QtCore.Qt.EditRole)
         disp = index.data(QtCore.Qt.DisplayRole)
+        
+        # NOTE: 2025-09-27 11:06:52
+        # some models may be able to prevent editing indexes with certain rows
+        # and/or columns; AFAIK, this functionality is not provided by stock Qt 
+        # item# models and must be implemented in my custom QAbstractItemModel
+        # subclasses (e.g. TabularDataModel in tableeditorwidget.py). My implementation
+        # uses two pythonic properties of the item model: 'immutableColumns' and
+        # 'immutableRows', which I use below
+        model = index.model()
+        
+        if hasattr(model, "immutableColumns") and hasattr(model, "immutableRows"):
+            if index.column() in model.immutableColumns and index.row() in model.immutableRows:
+                return
         
         # print(f"{self.__class__.__name__}.createEditor:\n\t data type: {type(data).__name__}")
         
@@ -71,22 +87,12 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             widget = QtWidgets.QSpinBox(parent)
             widget.setMinimum(-1000)
             widget.setMaximum(1000)
-            # widget.setValue(data)
             
         elif isinstance(data, float) or "float" in type(data).__name__: # to include numpy array float dtypes
-            # if "." in disp:
-            #     # print(f"first dot: {s0.index('.')}")
-            #     decimals = len(disp[disp.index("."):])
-            # else:
-            #     decimals = 0
-                
             widget = QtWidgets.QDoubleSpinBox(parent)
             widget.setMinimum(-1e3)
             widget.setMaximum(1e3)
             widget.setSingleStep(1)
-            # widget.setDecimals(decimals)
-            # widget.setStepType(QtWidgets.QAbstractSpinBox.AdaptiveDecimalStepType)
-            # widget.setValue(data)
             
         elif isinstance(data, pq.Quantity):
             if isinstance(data, pq.UnitQuantity): # unlikely, but here we go...
@@ -94,39 +100,16 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             else:
                 if data.ndim > 0: # no editing of Quantity ARRAYS; only scalar Quantities can be edited; unlikely to encounter this, but here we go...
                     return
-                # figure out how many decimals are shown — needed to set up the "decimals" property of the spin box
-                # (NOTE: the actual number of decimals displayed in the spin box depends on the column width, 
-                #        but at least we avoid scientific notation which can hide the visual of the value)
-                # below, 's0' is the string representation of the Quantity's magnitude (as a float)
-                units_str = data.units.dimensionality.unicode
-                if units_str in disp:
-                    s0 = disp.strip(units_str).strip()
-                else:
-                    s0 = disp.split(" ")[0].strip()
-                    
-                if "." in s0:
-                    # print(f"first dot: {s0.index('.')}")
-                    decimals = len(s0[s0.index(".")-1:]) # count the dot as well
-                else:
-                    decimals = 0
-                    
-                # print(f"decimals: {decimals}")
-                
                 widget = smw.QuantitySpinBox(parent, enforceImmutableUnits=True) # disallow units change for individual data points in a Quantity
                 widget.setMinimum(-math.inf * data.units)
                 widget.setMaximum(math.inf * data.units)
-                # widget.setDecimals(decimals)
                 widget.setSingleStep(1.0  * data.units)
                 widget.disableUnitChange = True
-                # widget.setStepType(QtWidgets.QAbstractSpinBox.AdaptiveDecimalStepType)
-            # widget.setValue(data)
                 
         elif isinstance(data, str) or "str" in type(a).__name__: # for numpy.str_ type
             widget = QtWidgets.QLineEdit(parent)
-            # widget.setText(data)
             
         else: # TODO: 2025-09-23 16:16:56 FIXME use a pushbutton to open a complex viewer/editor
-            # widget = QtWidgets.QLineEdit(parent)
             return
         widget.setFrame(False)
         widget.setAutoFillBackground(True)
@@ -142,13 +125,13 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             
         elif isinstance(data, float) or "float" in type(data).__name__:
             assert isinstance(editor, QtWidgets.QDoubleSpinBox), f"Incompatible editor widget type ({type(editor).__name__}) for floating point data"
+            # NOTE: 2025-09-27 10:31:43
+            # figure out how many decimals we've got here, see also NOTE: 2025-09-27 10:31:23
             if "." in disp:
-                # print(f"first dot: {s0.index('.')}")
                 decimals = len(disp[disp.index("."):])
             else:
                 decimals = 0
             editor.setDecimals(decimals)
-            # editor.setStepType(QtWidgets.QAbstractSpinBox.AdaptiveDecimalStepType)
             editor.setValue(data)
             
         elif isinstance(data, pq.Quantity):
@@ -158,6 +141,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                 assert isinstance(editor, smw.QuantitySpinBox), f"Incompatible editor widget type ({type(editor).__name__}) for Quantity data"
                 if data.ndim > 0: # no editing of Quantity ARRAYS; only scalar Quantities can be edited; unlikely to encounter this, but here we go...
                     return
+                # NOTE: 2025-09-27 10:31:23
                 # figure out how many decimals are shown — needed to set up the "decimals" property of the spin box
                 # (NOTE: the actual number of decimals displayed in the spin box depends on the column width, 
                 #        but at least we avoid scientific notation which can hide the visual of the value)
@@ -169,7 +153,6 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                     s0 = disp.split(" ")[0].strip()
                     
                 if "." in s0:
-                    # print(f"first dot: {s0.index('.')}")
                     decimals = len(s0[s0.index(".")-1:]) # count the dot as well
                 else:
                     decimals = 0
