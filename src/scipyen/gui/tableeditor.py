@@ -414,6 +414,9 @@ class TableEditor(ScipyenViewer):
 #         self.plotData(modelIndexes, custom=True)
     # ### END   don't delete yet
         
+    # @property
+    # def data(self) -> typing.Any:
+    #     return self._data_
         
     @safewrapper
     def plotData(self, *args, **kwargs):

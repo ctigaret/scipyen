@@ -834,6 +834,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         #return QtCore.Qt.ItemIsEditable | QtCore.Qt.ItemIsSelectable
     
     def setData(self, modelIndex, value, role=QtCore.Qt.EditRole):
+        r"""Set a new data at the specified model index in this model"""
         if self._modelData_ is None:
             return False
         
@@ -846,6 +847,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         if isinstance(self._modelData_, neo.core.dataobject.DataObject):
             if col >= self._modelData_.shape[1] + 1:
                 return False
+            
         elif col >= self._modelData_.shape[1]:
             return False
             
@@ -1333,70 +1335,12 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             else:
                 pyvalue = value
                 
-            # print(f"{self.__class__.__name__}._setDataValue_ for {type(self._modelData_).__name__}, row {row}, column {col}: pyvalue = {pyvalue}")
-                
             if isinstance(self._modelData_, pd.DataFrame):
                 self._modelData_.at[data_row, data_col] = pyvalue
-#                 data_row = self._modelData_.index[row]
-#                 data_col = self._modelData_.columns[col]
-#                 
-#                 current_value = self._modelData_.loc[data_row, data_col]
-#                 
-#                 if hasattr(current_value, "dtype"):
-#                     data_type = current_value.dtype.type
-#                     
-#                 else:
-#                     data_type = type(current_value)
-#                 
-#                 if data_type != object:
-#                     if isinstance(pyvalue, str):
-#                         if len(pyvalue.strip()) > 0:
-#                             data_value = pyvalue
-#                             
-#                         else:
-#                             data_value = None
-#                         
-#                     #else:
-#                 data_value = data_type(data_value)
-#                     
-#                 self._modelData_.at[data_row, data_col] = data_value
-#                 
-                #self._modelData_.set_value(data_row, data_col, data_value)
-                
-                #result = np.fromstring(value, dtype=data_type)
-                #self._modelData_.loc[data_row, data_col] = result
-                #self._modelData_.iloc[row, col] = result
                 
             elif isinstance(self._modelData_, pd.Series):
                 self._modelData_.at[data_row] = pyvalue
-#                 data_row = self._modelData_.index[row]
-#                 current_value = self._modelData_.loc[row]
-#                 if hasattr(current_value, "dtype"):
-#                     data_type = self._modelData_.loc[row].dtype.type
-#                     
-#                 else:
-#                     data_type = type(current_value)
-#                 #data_type = self._modelData_.iloc[row].dtype
-#                 
-#                 if isinstance(value, QtCore.QVariant) or hasattr(value, "value"):
-#                     pyvalue = value.value()
-#                     
-#                 else:
-#                     pyvalue = value
-#                 
-#                 if data_type != object:
-#                     if isinstance(pyvalue, str):
-#                         if len(pyvalue.strip()) > 0:
-#                             data_value = pyvalue
-#                             
-#                         else:
-#                             data_value = None
-#                         
-#                     #else:
-#                 data_value = data_type(data_value)
-#                         
-#                 self._modelData_.at[data_row] = data_value
-                        
+                
             elif isinstance(self._modelData_, neo.dataobject.DataObject):
                 if col == 0:
                     if isinstance(self._modelData_, (neo.AnalogSignal, DataSignal)) :
@@ -1438,27 +1382,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                     else:
                             raise TypeError(f"Expecting a float or a Quantity in {self._modelData_.units}; got {type(pyvalue).__name__} instead")
                             
-                
             elif isinstance(self._modelData_, np.ndarray):
                 self._modelData_[row, col] = pyvalue
-#                 current_value = self._modelData_[row, col]
-#                 if hasattr(current_value, "dtype"):
-#                     data_type = current_value.dtype.type
-#                 else:
-#                     data_type = type(current_value)
-#                     
-#                 if data_type != object:
-#                     if isinstance(pyvalue, str):
-#                         if len(pyvalue.strip()) > 0:
-#                             data_value = pyvalue
-#                             
-#                         else:
-#                             data_value = None
-#                         
-#                     #else:
-#                 data_value = data_type(data_value)
-#                         
-#                 self._modelData_[row, col] = data_value
                         
             else:
                 return False

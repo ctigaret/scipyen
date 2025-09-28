@@ -158,6 +158,8 @@ class TextViewer(ScipyenViewer):
         else:
             raise TypeError("Expecting a QTextDdocument or a str; got %s instead" % type(data).__name__)
         
+        self._data_ = data
+        
         if kwargs.get("show", True):
             self.activateWindow()
             
@@ -172,7 +174,7 @@ class TextViewer(ScipyenViewer):
             return self._docViewer_.document().toHtml()
         
     def setText(self, data):
-        self.setData(data) # inherited
+        super().setData(data) # inherited
     
     @property
     def isMarkdown(self):

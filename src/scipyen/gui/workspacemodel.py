@@ -201,7 +201,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self.mpl_figure_enter_callback = mpl_figure_enter_callback
 
         self._varChanges_callbacks_ = {WorkspaceVarChange.New:      partial(self.__class__.addRowForVariable2, self, self.shell.user_ns),
-                                       WorkspaceVarChange.Modified: partial(self.__class__.updateRowForVariable2, self, self.shell.user_ns),
+                                       # WorkspaceVarChange.Modified: partial(self.__class__.updateRowForVariable2, self, self.shell.user_ns),
+                                       WorkspaceVarChange.Modified: partial(self.__class__.variableModified, self, self.shell.user_ns),
                                        WorkspaceVarChange.Removed:  partial(self.__class__.removeRowForVariable2, self, self.shell.user_ns)}
         
         # self.sig_varAdded.connect(self.addRowForVariable2)
@@ -928,31 +929,31 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             
         # print(f"\n{self.__class__.__name__}._slot_cacheInternalVariableChange_ self.__changes__ = {self.__changes__} and {name} is in workspace: {name in self.shell.user_ns}")
 
-    def _updateFromMonitor_(self, name: str, 
-                            displayed_var_names: set, user_shell_var_names: set,
-                            change_type:str):
-
-        if change_type in ("remove", "removed"):
-            alteration = WorkspaceVarChange.Removed
-        elif change_type == "new": # name in user_shell_var_names:
-            alteration = WorkspaceVarChange.New
-        elif change_type == "modified":
-            alteration = WorkspaceVarChange.Modified
-        else:   # for legacy (traitlets.TraitType-style) notifications
-                # lacking a 'change_type' attribute
-            if name in user_shell_var_names:
-                if name not in displayed_var_names:
-                    alteration = WorkspaceVarChange.New
-                else:
-                    alteration = WorkspaceVarChange.Modified
-            else:
-                if name in displayed_var_names:
-                    alteration = WorkspaceVarChange.Removed
-        
-                else:
-                    alteration = None
-                
-        return (name, alteration)
+#     def _updateFromMonitor_(self, name: str, 
+#                             displayed_var_names: set, user_shell_var_names: set,
+#                             change_type:str):
+# 
+#         if change_type in ("remove", "removed"):
+#             alteration = WorkspaceVarChange.Removed
+#         elif change_type == "new": # name in user_shell_var_names:
+#             alteration = WorkspaceVarChange.New
+#         elif change_type == "modified":
+#             alteration = WorkspaceVarChange.Modified
+#         else:   # for legacy (traitlets.TraitType-style) notifications
+#                 # lacking a 'change_type' attribute
+#             if name in user_shell_var_names:
+#                 if name not in displayed_var_names:
+#                     alteration = WorkspaceVarChange.New
+#                 else:
+#                     alteration = WorkspaceVarChange.Modified
+#             else:
+#                 if name in displayed_var_names:
+#                     alteration = WorkspaceVarChange.Removed
+#         
+#                 else:
+#                     alteration = None
+#                 
+#         return (name, alteration)
 
     @Slot(tuple)
     def _slot_updateModelFromMonitor_(self, value):
@@ -1559,6 +1560,22 @@ class WorkspaceModel(QtGui.QStandardItemModel):
 
         return v if v in self.shell.user_ns else None  # <- this is the workspace
 
+    @Slot(dict, str, str)
+    def variableModified(self, ns:dict, dataname:str, ns_name:str="Internal"):
+        print(f"{self.__class__.__name__}.variableModified(dataname={dataname}, ns_name={ns_name})")
+        self.updateRowForVariable2(ns, dataname, ns_name)
+        self.refreshDataViewers(ns, dataname, ns_name)
+        
+        
+    def refreshDataViewers(self, ns:dict, dataname:str, ns_name:str = "Internal"):
+        from gui.scipyenviewer import ScipyenViewer
+        if dataname in ns:
+            data = ns[dataname]
+            showsData = lambda x: id(data) in [id(v) for v in x.data] if isinstance(x.data,typing.Sequence) else id(data) == id(x.data)
+            viewers = list(filter(showsData, filter(lambda x: isinstance(x, ScipyenViewer), ns.values())))
+            for viewer in viewer:
+                viewer.slot_refreshDataDisplay()
+                
     @Slot(dict, str, str)
     def updateRowForVariable2(self, ns: dict, dataname: str, ns_name:str = "Internal"):
         # CAUTION This is only for internal workspace, but

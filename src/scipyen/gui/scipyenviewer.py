@@ -650,14 +650,18 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         
         if get_focus:
             self.activateWindow()
-            
-            #self.show()
         
     @abstractmethod
     def _set_data_(self, data: object, *args, **kwargs):
         r"""Must implement in the subclass
         """
         pass
+    
+    @property
+    def data(self):
+        r"""Should implement/override in the subclass if self._data_ has specific structure
+        """
+        return self._data_
     
     @property
     def ID(self):
