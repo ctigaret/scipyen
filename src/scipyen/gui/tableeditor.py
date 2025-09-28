@@ -102,13 +102,17 @@ __scipyen_plugin__ = None
 class TableEditor(ScipyenViewer):
     r"""Viewer/Editor for tabular data
     """
-    # TODO: 2022-11-25 15:11:59
-    # inherit from WorkspaceGuiMixin for messages and data I/O
-    # TODO: 2019-09-09 22:40:36
-    # implement plotting -- via the plots module
-    sig_activated               = Signal(int)
-    closeMe                     = Signal(int)
-    signal_window_will_close    = Signal()
+    
+    # NOTE: 2025-09-28 21:04:50
+    # notifies that the model data has been changed - meant to be connected to
+    # the _slot_dataModifiedInViewer in Scipyen's workspace model
+    # Parameters: varname, namespace_name, where:
+    #   varname: binding symbol of model data in the named namespace - 
+    #   namespace_name: the namespace name as registered with Scipyen's workspace model
+    sig_dataChanged = Signal(str, str, name="sig_dataChanged") 
+    # sig_activated               = Signal(int)
+    # closeMe                     = Signal(int)
+    # signal_window_will_close    = Signal()
     
     # TODO 2019-11-01 22:57:01
     # finish implementing all these
@@ -208,6 +212,10 @@ class TableEditor(ScipyenViewer):
 #
     # ### END   toolbar menu TODO 2025-06-25 23:11:32 FINALIZE ME - DO NOT DELETE
         
+        if type(self._scipyenWindow_).__name__ == "ScipyenWindow":
+            self.sig_dataChanged.connect(self._scipyenWindow_.workspaceModel._slot_dataModifiedInViewer)
+        
+        
     def _save_viewer_settings_(self):
         if type(self._scipyenWindow_).__name__ == "ScipyenWindow":
             self.qsettings.setValue("/".join([self.__class__.__name__, "UseMatplotlib"]), "%s" % self._use_matplotlib_)
@@ -232,6 +240,16 @@ class TableEditor(ScipyenViewer):
     @safewrapper
     def _slot_use_mpl_toggled_(self, value):
         self._use_matplotlib_ = value
+        
+    @Slot()
+    def _slot_modelDataModified(self):
+        print(f"{self.__class__.__name__}._slot_modelDataModified")
+        sourceData = getattr(self._dataModel_, "sourceData", None)
+        if sourceData is not None and self.scipyenWindow is not None:
+            varName = self.scipyenWindow.workspaceModel.getBinding(sourceData)
+            print(f"\tvarName -> {varName}")
+            if varName:
+                self.sig_dataChanged.emit(varName, "internal")
             
     def _configureUI_(self):
         r"""Initializes and configures the GUI elements.
@@ -271,6 +289,7 @@ class TableEditor(ScipyenViewer):
         # TODO implement pyqtgraph plotting as alternative
         
         self.tableWidget = TableEditorWidget(parent=self)
+        self.tableWidget.sig_dataChanged.connect(self._slot_modelDataModified)
         self._dataModel_ = self.tableWidget._dataModel_
         
         self.setCentralWidget(self.tableWidget)
@@ -558,14 +577,18 @@ class TableEditor(ScipyenViewer):
                         
     def getSelectedData(self) -> tuple:
         r"""Retrieves the selected data in the table.
+        
         Returns a two lists:
         • 'data': a list of tuples of the form (x, y) where x and y are column vectors
         • 'column_headers': a list of str objects, one for each tuple in 'data'
         
+        The 'x', 'y' coordinates are to be used to access individual data items 
+        in the underlying data object tabulated here.
+        
         See documentation of plotData for what is returned, based on the selection.
         
         """
-        
+        # WARNING: requires the TabularDataModel used as item model here
         # NOTE: 2025-03-31 23:21:51
         # model data can only be a pandas DataFrame, Series, or numpy 2D array
         # vigra filter kernels are converted to numpy arrays in the editor widget
@@ -574,7 +597,7 @@ class TableEditor(ScipyenViewer):
         if len(modelIndexes)==0: # bail out if there is no selection
             return list(), list()
         
-        sourceData = self._dataModel_.sourceData
+        sourceData = getattr(self._dataModel_, "sourceData", None)
         
         if sourceData is None:
             return list(), list()
@@ -605,7 +628,10 @@ class TableEditor(ScipyenViewer):
                         else:
                             column_headers = list(map(lambda x: f"{obj_name} channel {x-1}", data_cols))
                     else: # times column selected
-                        column_headers = [self._dataModel_.__getHeaderData__(0, QtCore.Qt.Horizontal).value()]
+                        if hasattr(self._dataModel_, "__getHeaderData__"):
+                            column_headers = [self._dataModel_.__getHeaderData__(0, QtCore.Qt.Horizontal).value()]
+                        else:
+                            column_headers = ["Domain"]
                 else:
                     if len(array_annotations):
                         column_headers = list(map(lambda x: f"{obj_name} channel {sourceData.array_annotations_at_index(x-1)['channel_names']}", u_sel_cols))

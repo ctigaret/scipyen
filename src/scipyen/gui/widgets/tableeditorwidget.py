@@ -99,6 +99,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
     view_action_name = "Table"
     
     sig_selectionChanged = Signal(name="sig_selectionChanged")
+    sig_dataChanged = Signal(name="sig_dataChanged")
     
     def __init__(self, parent:typing.Optional[QtWidgets.QMainWindow]=None) -> None:
         super().__init__(parent=parent)
@@ -136,6 +137,8 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         self._selectedRowIndex_ = None
         self._selectedColumnIndex_ = None
         
+        if hasattr(self._dataModel_, "sig_modelDataChanged") and isinstance(type(self._dataModel_).sig_modelDataChanged, Signal):
+            self._dataModel_.sig_modelDataChanged.connect(self.sig_dataChanged) # connect signal to signal directly
         
     def setData(self, data:(pd.DataFrame, pd.Series, neo.core.baseneo.BaseNeo,
                        neo.AnalogSignal, neo.IrregularlySampledSignal,
@@ -256,6 +259,8 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
     def model(self, md):
         self._dataModel_ = md
         self.tableView.setModel(self._dataModel_)
+        if hasattr(self._dataModel_, "sig_modelDataChanged") and isinstance(type(self._dataModel_).sig_modelDataChanged, Signal):
+            self._dataModel_.sig_modelDataChanged.connect(self.sig_dataChanged) # connect signal to signal directly
         
     @property
     def readOnly(self):
@@ -723,7 +728,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
     WARNING use with caution
     """
-    editCompleted = Signal([pd.DataFrame], [pd.Series], [np.ndarray], name="editCompleted")
+    sig_editCompleted = Signal([pd.DataFrame], [pd.Series], [np.ndarray], name="sig_editCompleted")
+    sig_modelDataChanged = Signal(name="sig_modelDataChanged")
     
     signal_rowsPopulated = Signal(int, name="signal_rowsPopulated")
     signal_columnsPopulated = Signal(int, name="signal_columnsPopulated")
@@ -834,7 +840,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         #return QtCore.Qt.ItemIsEditable | QtCore.Qt.ItemIsSelectable
     
     def setData(self, modelIndex, value, role=QtCore.Qt.EditRole):
-        r"""Set a new data at the specified model index in this model"""
+        r"""Set a new data with the specified role, at the specified model index in this model"""
         if self._modelData_ is None:
             return False
         
@@ -855,7 +861,23 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             return False
         
         if self._setDataValue_(value, row, col):
+            # NOTE: This signal (inherited from Qt?) notifies the itemview (here, 
+            # the tableView in the TableEditorWidget class) that the data for a
+            # model index has changed. the view does what it pleases with it
+            # (normally, updates the displayed data)
+            #
+            # This is really part of the internal model/view mechanism to trigger
+            # a selective update in the view, for the data that has actually changed
+            # thus avoiding unnecessary repaints in views that display large models
+            #
             self.dataChanged.emit(modelIndex, modelIndex)
+            
+            # I should a similar mechanism to notify other viewers that share the same
+            # underlying data — via Scipyen's workspacemodel — thus bypassing
+            # the shortcomings of the DataBag trait notifier (which does NOT pick up
+            # 'atomic' data changes in arrays, etc)
+            # CAUTION/WARNING this only works for my own custom item models!
+            self.sig_modelDataChanged.emit()
             return True
         
         return False
@@ -1325,6 +1347,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             return QtCore.QVariant()
         
     def _setDataValue_(self, value, row, col):
+        r"""Sets the EditRole data for the row & column in the tabular model"""
         if self._modelData_ is None:
             return False
         

@@ -193,23 +193,18 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self.setColumnCount(len(self._wspace_headers_))
         self.setHorizontalHeaderLabels(self._wspace_headers_)  # defined in core.utilities
         
-        # self.setColumnCount(len(standard_obj_summary_headers))
-        # self.setHorizontalHeaderLabels(standard_obj_summary_headers)  # defined in core.utilities
-
         self.mpl_figure_close_callback = mpl_figure_close_callback
         self.mpl_figure_click_callback = mpl_figure_click_callback
         self.mpl_figure_enter_callback = mpl_figure_enter_callback
 
+        # NOTE: 2025-09-28 20:40:09
+        # callbacks executed when a specific change (New, Modified, Removed) is
+        # notified by the traits notifier
         self._varChanges_callbacks_ = {WorkspaceVarChange.New:      partial(self.__class__.addRowForVariable2, self, self.shell.user_ns),
                                        # WorkspaceVarChange.Modified: partial(self.__class__.updateRowForVariable2, self, self.shell.user_ns),
                                        WorkspaceVarChange.Modified: partial(self.__class__.variableModified, self, self.shell.user_ns),
                                        WorkspaceVarChange.Removed:  partial(self.__class__.removeRowForVariable2, self, self.shell.user_ns)}
         
-        # self.sig_varAdded.connect(self.addRowForVariable2)
-        # self.sig_varModified.connect(self.updateRowForVariable2)
-        # self.sig_varRemoved.connect(self.removeRowForVariable2)
-
-        # self.internalVariableChanged.connect(self._slot_internalVariableChanged_)
         self.internalVariableChanged.connect(self._slot_cacheInternalVariableChange_)
         self.sig_startAsyncUpdate.connect(self._slot_updateModelAsync_)
         
@@ -891,7 +886,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         return
     
     def internalVariablesListenerCB(self, change:dict):
-        r"""Callback for notifications from the workspace monitor.
+        r"""Callback for notifications from the workspace monitor (a trait notifier).
         Emits self.internalVariableChanged signal
         """
         # self.__change_dict__ = change
@@ -902,6 +897,16 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             if change.name not in self.shell.user_ns:
                 change.type = "remove"
         self.internalVariableChanged.emit(change)
+        
+    @Slot(str, str)
+    def _slot_dataModifiedInViewer(self, varName:str, ns_name:str="internal"):
+        from gui.scipyenviewer import ScipyenViewer
+         # FIXME: 2025-09-28 21:12:26 allow the use of foreign namespaces too TODO
+        ns = self.shell.user_ns
+        viewer = self.sender()
+        print(f"{self.__class__.__name__}._slot_dataModifiedInViewer(varNaame={varName}, ns_name={ns_name}) -> sender: {type(viewer).__name__}")
+        exclude = [viewer] if isinstance(viewer, ScipyenViewer) else list()
+        self.refreshDataViewers(ns, varName, ns_name, exclude=exclude)
         
     @Slot(dict)
     def _slot_cacheInternalVariableChange_(self, change):
@@ -1506,7 +1511,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         If the object is not currrently in the workspace will return None.
         Only works for displayed (and displayable) variables.
         """
-        
+        # FIXME: 2025-09-28 20:48:49 TODO - do this for external (foreign) namespaces also 
         names_objs = list((n,o) for n,o in self.shell.user_ns.items() if o is obj)
         
         if len(names_objs) == 0:
@@ -1552,13 +1557,13 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         return ndx
 
     def getVarName(self, index: QtCore.QModelIndex):
-        r"""Returns the symbol of a variable in the model, for a given model index.
+        r"""Returns the symbol of a variable in this model, for a given model index.
 
         Returns none it if the symbol does not exist in the user workspace
         """
         v = self.item(index.row(), 0).text()
 
-        return v if v in self.shell.user_ns else None  # <- this is the workspace
+        return v if v in self.shell.user_ns else None  # <- FIXME: 2025-09-28 20:47:43 this is the internal workspace; TODO fix this for external namespaces also
 
     @Slot(dict, str, str)
     def variableModified(self, ns:dict, dataname:str, ns_name:str="Internal"):
@@ -1567,13 +1572,15 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self.refreshDataViewers(ns, dataname, ns_name)
         
         
-    def refreshDataViewers(self, ns:dict, dataname:str, ns_name:str = "Internal"):
+    def refreshDataViewers(self, ns:dict, dataname:str, ns_name:str = "Internal", exclude:typing.Optional[typing.Sequence[QtWidgets.QWidget]] = None):
         from gui.scipyenviewer import ScipyenViewer
         if dataname in ns:
             data = ns[dataname]
             showsData = lambda x: id(data) in [id(v) for v in x.data] if isinstance(x.data,typing.Sequence) else id(data) == id(x.data)
             viewers = list(filter(showsData, filter(lambda x: isinstance(x, ScipyenViewer), ns.values())))
-            for viewer in viewer:
+            if isinstance(exclude, typing.Sequence) and all(isinstance(e, ScipyenViewer) for e in exclude):
+                viewers = list(filter(lambda x: x not in exclude, viewers))
+            for viewer in viewers:
                 viewer.slot_refreshDataDisplay()
                 
     @Slot(dict, str, str)
@@ -2169,7 +2176,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             
 
     def getDisplayedVariableNames(self, asStrings=True, ws="Internal"):
-        '''Returns names of variables in the internal workspace, registered with the model.
+        '''Returns names of variables in the specified workspace, registered with the model.
 
         Parameter: asStrings (boolean, optional, default True) variable names 
                     are returned as (a Python list of) strings, otherwise 
@@ -2197,3 +2204,21 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             workspaces.add(wsname)
 
         return workspaces
+
+    def getBinding(self, obj:typing.Any, ns_name="internal") -> str|None:
+        r"""Retrieve the symbol that an object is bound to, in the specified namespace.
+        Returns None is the object is not found in the namespace
+    """
+        if ns_name.lower() == "internal":
+            items = list(filter(lambda x: id(obj) == id(x[1]), self.shell.user_ns.items()))
+            print(f"{self.__class__.__name__}.getBinding -> {len(items)} items")
+            if len(items):
+                varNames = self.getDisplayedVariableNames(asStrings=True, ws = ns_name)
+                items = list(filter(lambda x: x[0] in varNames, items)) # only select those objects that are listed (displayed) in the model
+                print(f"among varNames -> {len(items)} items")
+                if len(items) > 1:
+                    scipywarn("More than one symbols appear to be bound to the object; will return the first one")
+                return items[0][0] if len(items) else None
+        else:
+            scipywarn("This method only supports the internal namespace, for now...")
+        

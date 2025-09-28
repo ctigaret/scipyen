@@ -59,7 +59,7 @@ else:
 class TriggerProtocolsTableModel(QtCore.QAbstractTableModel):
     model_columns = ["Name", "Presynaptic", "Postsynaptic", "Photostimulation", "Imaging delay", "Frames"]
     
-    editCompleted = Signal(str, name="editCompleted")
+    sig_editCompleted = Signal(str, name="sig_editCompleted")
     
     def __init__(self, protocols=None, parent=None):
         super().__init__(parent)
@@ -272,7 +272,7 @@ class TriggerProtocolsTableModel(QtCore.QAbstractTableModel):
         else:
             return False
         
-        self.editCompleted.emit(value)
+        self.sig_editCompleted.emit(value)
         
         return True
     

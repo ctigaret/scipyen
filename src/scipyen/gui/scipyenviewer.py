@@ -164,6 +164,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     sig_activated           = Signal(int, name="sig_activated")
     sig_closeMe             = Signal()
     
+    
     # tuple of 2-tuples (python type, priority)
     # if you don;t want this to be registered as a viewer, then make this attribute empty
     viewer_for_types = {object:0}
