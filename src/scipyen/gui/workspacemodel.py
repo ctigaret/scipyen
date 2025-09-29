@@ -904,7 +904,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
          # FIXME: 2025-09-28 21:12:26 allow the use of foreign namespaces too TODO
         ns = self.shell.user_ns
         viewer = self.sender()
-        print(f"{self.__class__.__name__}._slot_dataModifiedInViewer(varNaame={varName}, ns_name={ns_name}) -> sender: {type(viewer).__name__}")
+        # print(f"{self.__class__.__name__}._slot_dataModifiedInViewer(varNaame={varName}, ns_name={ns_name}) -> sender: {type(viewer).__name__}")
         exclude = [viewer] if isinstance(viewer, ScipyenViewer) else list()
         self.refreshDataViewers(ns, varName, ns_name, exclude=exclude)
         
@@ -2175,16 +2175,17 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         return []
             
 
-    def getDisplayedVariableNames(self, asStrings=True, ws="Internal"):
+    # def getDisplayedVariableNames(self, ws="Internal"):
+    def getDisplayedVariableNames(self, asStrings=True, ws="Internal") -> typing.List[str|QtGui.QStandardItem]:
         '''Returns names of variables in the specified workspace, registered with the model.
 
         Parameter: asStrings (boolean, optional, default True) variable names 
-                    are returned as (a Python list of) strings, otherwise 
-                    they are returned as Python list of QStandardItems
+                    are returned as (a Python list of) strings.
+                    When False, returned a Python list of QStandardItems
         '''
         wscol = standard_obj_summary_headers.index("Workspace")
-        ret = [self.item(row).text() if asStrings else self.item(row) for row in range(
-            self.rowCount()) if self.item(row, wscol).text() == ws]
+        ret = [self.item(row,0).text() if asStrings else self.item(row,0) for row in range(
+            self.rowCount()) if self.item(row, wscol).text().lower() == ws.lower()]
 
         return ret
 
@@ -2211,11 +2212,12 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     """
         if ns_name.lower() == "internal":
             items = list(filter(lambda x: id(obj) == id(x[1]), self.shell.user_ns.items()))
-            print(f"{self.__class__.__name__}.getBinding -> {len(items)} items")
+            # print(f"{self.__class__.__name__}.getBinding -> {len(items)} items")
             if len(items):
                 varNames = self.getDisplayedVariableNames(asStrings=True, ws = ns_name)
+                # print(f"\tvarNames -> {varNames}")
                 items = list(filter(lambda x: x[0] in varNames, items)) # only select those objects that are listed (displayed) in the model
-                print(f"among varNames -> {len(items)} items")
+                # print(f"among varNames -> {len(items)} items")
                 if len(items) > 1:
                     scipywarn("More than one symbols appear to be bound to the object; will return the first one")
                 return items[0][0] if len(items) else None

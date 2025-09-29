@@ -243,11 +243,11 @@ class TableEditor(ScipyenViewer):
         
     @Slot()
     def _slot_modelDataModified(self):
-        print(f"{self.__class__.__name__}._slot_modelDataModified")
+        # print(f"{self.__class__.__name__}._slot_modelDataModified")
         sourceData = getattr(self._dataModel_, "sourceData", None)
         if sourceData is not None and self.scipyenWindow is not None:
             varName = self.scipyenWindow.workspaceModel.getBinding(sourceData)
-            print(f"\tvarName -> {varName}")
+            # print(f"\tvarName -> {varName}")
             if varName:
                 self.sig_dataChanged.emit(varName, "internal")
             
