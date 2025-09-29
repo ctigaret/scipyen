@@ -2175,7 +2175,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         return []
             
 
-    # def getDisplayedVariableNames(self, ws="Internal"):
     def getDisplayedVariableNames(self, asStrings=True, ws="Internal") -> typing.List[str|QtGui.QStandardItem]:
         '''Returns names of variables in the specified workspace, registered with the model.
 
