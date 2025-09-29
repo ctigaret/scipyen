@@ -1567,7 +1567,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
 
     @Slot(dict, str, str)
     def variableModified(self, ns:dict, dataname:str, ns_name:str="Internal"):
-        print(f"{self.__class__.__name__}.variableModified(dataname={dataname}, ns_name={ns_name})")
+        # print(f"{self.__class__.__name__}.variableModified(dataname={dataname}, ns_name={ns_name})")
         self.updateRowForVariable2(ns, dataname, ns_name)
         self.refreshDataViewers(ns, dataname, ns_name)
         
