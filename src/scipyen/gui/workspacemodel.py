@@ -104,6 +104,11 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     This may be used by code external to ScipyenWindow (e.g. CaTanalysis etc)
 
     '''
+    # NOTE: 2025-09-30 22:22:50
+    # Although it inherits from QStandardItemModel, little of that APi is used 
+    # here — this is heavily customized, perhaps too much
+    # TODO 2025-09-30 22:24:00 simplify/streamline and see what can be used from QStandardItemModel
+    # 
     modelContentsChanged = Signal(name="modelContentsChanged")
     workingDir = Signal(str, name="workingDir")
     internalVariableChanged = Signal(dict, name="internalVariableChanged")
