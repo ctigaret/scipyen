@@ -1629,6 +1629,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.currentSessionTreeWidgetItem = None
 
         self.fileSystemModel = QtWidgets.QFileSystemModel(parent=self)
+        self.fileSystemModel.setNameFilterDisables(False)
 
         self.currentVarItem = None
         self.currentVarItemName = None
@@ -1648,6 +1649,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self._workspaceIconSize_ = self._defaultIconSize_
         self._fileSystemIconSize_ = self._defaultIconSize_
         self._newNavigatorLook_ = self._defaultNewNavigatorLook_
+        self._fileNamesFiltersHides_:bool = False
         
         self._configureUI_()
 
@@ -1868,6 +1870,23 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     @Slot(bool)
     def _slot_UseShellAutomagic(self, val:bool):
         self.shellAutomagic = val == True
+        
+    @property
+    def hideFilesWhenFiltering(self) -> bool:
+        return self._fileNamesFiltersHides_
+    
+    @markConfigurable("HideFilteredFileNames", "Qt")
+    @hideFilesWhenFiltering.setter
+    def hideFilesWhenFiltering(self, val:bool):
+        self._fileNamesFiltersHides_ = val==True
+        self.fileSystemModel.setNameFilterDisables(not self._fileNamesFiltersHides_)
+        sigBlock = [QtCore.QSignalBlocker(w) for w in (self.actionHide_Filtered_out_File_Names, self.hideFilteredOutnamesToolButton)]
+        self.actionHide_Filtered_out_File_Names.setChecked(self._fileNamesFiltersHides_)
+        self.hideFilteredOutnamesToolButton.setChecked(self._fileNamesFiltersHides_)
+        
+    @Slot(bool)
+    def _slot_hideFilteredFileNames(self, val:bool):
+        self.hideFilesWhenFiltering = val==True
     
     @property
     def useNewNavigatorLook(self) -> bool:
@@ -2653,7 +2672,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         self.filesFilterFrame.setVisible(self._showFilesFilter)
         
-        signalBlockers = [QtCore.QSignalBlocker(w) for w in (self.viewFilesFilterToolBtn, self.hideFilesFilterToolBtn)]
+        # signalBlockers = [QtCore.QSignalBlocker(w) for w in (self.viewFilesFilterToolBtn, self.hideFilesFilterToolBtn)]
+        signalBlocker = QtCore.QSignalBlocker(self.viewFilesFilterToolBtn)
         
         self.viewFilesFilterToolBtn.setChecked(self._showFilesFilter)
         
@@ -4855,9 +4875,12 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         return cmd
 
     def _copyHistorySelection_(self):
-        cmd = self._getHistoryBlockAsCode_()
+        cmd = self._getHistoryBlockAsCode_(suggestTitle=False, 
+                                           newLineAtEnd=False)
         if isinstance(cmd, str) and len(cmd.strip()):
-            self.app.clipboard().setText(cmd+"\n")
+            if not cmd.endswith("\n"):
+                cmd += "\n"
+            self.app.clipboard().setText(cmd)
 
         else:
             self.app.clipboard().clear()  # don't leave gremlins
@@ -6220,6 +6243,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.applicationsAction.setMenu(self.menuApplications)
         self.refreshViewAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("view-refresh"), "Refresh Active View")
         self.refreshViewAction.triggered.connect(self.slot_refreshView)
+        self.actionHide_Filtered_out_File_Names.setChecked(self._fileNamesFiltersHides_)
+        self.actionHide_Filtered_out_File_Names.toggled.connect(self._slot_hideFilteredFileNames)
+        self.hideFilteredOutnamesToolButton.setChecked(self._fileNamesFiltersHides_)
+        self.hideFilteredOutnamesToolButton.toggled.connect(self._slot_hideFilteredFileNames)
         # NOTE: 2024-06-01 18:08:54
         # 'whats this' action should be the last action added to the toolbar
         self.helpTbAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("help-contents"), "Help")
@@ -6446,7 +6473,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         
         # self.viewFilesFilterToolBtn.released.connect(self.slot_showFilesFilter)
         self.viewFilesFilterToolBtn.toggled.connect(self.slot_showFilesFilter)
-        self.hideFilesFilterToolBtn.released.connect(self.slot_hideFilesFilter)
+        # self.hideFilesFilterToolBtn.released.connect(self.slot_hideFilesFilter)
 
         # filter/select variable names combo
         self.varNameFilterFinderComboBox.currentTextChanged[str].connect(
@@ -7546,11 +7573,11 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.showFileSystemFilter = val is True
         # self.filesFilterFrame.setVisible(True)
 
-    @Slot()
-    @safewrapper
-    def slot_hideFilesFilter(self):
-        self.showFileSystemFilter=False
-        # self.filesFilterFrame.setVisible(False)
+    # @Slot()
+    # @safewrapper
+    # def slot_hideFilesFilter(self):
+    #     self.showFileSystemFilter=False
+    #     # self.filesFilterFrame.setVisible(False)
 
     @Slot(str)
     @safewrapper

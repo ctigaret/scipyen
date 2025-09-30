@@ -4767,14 +4767,17 @@ def concatenate_blocks(*args, **kwargs):
 
     reverse = not ascending
 
-    # NOTE: 2023-12-19 09:42:53
+    
     # ### BEGIN parse args
+    
+    # print(f"args: {type(args).__name__}: {len(args)} elements")
 
     if len(args) == 0:
         return None
 
     if len(args) == 1:
         # if isinstance(args[0], (str, type)):
+        # print(f"args[0]: {type(args[0]).__name__}")
         if isinstance(args[0], str):
             try:
                 blocks = get_workspace_neo_blocks(
@@ -4862,8 +4865,8 @@ def concatenate_blocks(*args, **kwargs):
             except:
                 traceback.print_exc()
                 return
-        else:
-            blocks = [b for b in args]
+        # # # # else:
+        # # # #     blocks = [b for b in args]
 
         # NOTE: 2021-11-24 09:55:15
         # this branch deals with a sequence of Blocks:

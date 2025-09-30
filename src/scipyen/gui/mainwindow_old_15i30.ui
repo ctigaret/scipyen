@@ -1231,6 +1231,31 @@ NOTE: you can click anywhere in the row to select</string>
             </property>
            </widget>
           </item>
+          <item>
+           <widget class="QToolButton" name="hideFilesFilterToolBtn">
+            <property name="enabled">
+             <bool>true</bool>
+            </property>
+            <property name="toolTip">
+             <string>Hide file filter</string>
+            </property>
+            <property name="statusTip">
+             <string>Hide file filter</string>
+            </property>
+            <property name="whatsThis">
+             <string>Hide file filter</string>
+            </property>
+            <property name="text">
+             <string>Hide</string>
+            </property>
+            <property name="icon">
+             <iconset theme="window-close"/>
+            </property>
+            <property name="autoRaise">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
          </layout>
         </widget>
        </item>
