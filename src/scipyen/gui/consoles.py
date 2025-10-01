@@ -3290,6 +3290,8 @@ class ScipyenConsoleWidget(ConsoleWidget):
         src = evt.source()
         mimeData = evt.mimeData()
         dropAction = evt.dropAction()
+        keyboardModifiers = QtWidgets.QApplication.keyboardModifiers()
+        
         # print(f"{self.__class__.__name__}.dropEvent: evt: dropAction = {dropAction}, mimeData = {mimeData.text()}")
         
         # NOTE: 2019-08-10 00:23:42
@@ -3337,15 +3339,18 @@ class ScipyenConsoleWidget(ConsoleWidget):
                 # set mainWindow to load the URL asynchronously
                 # this also allows us to decide if we should also cd to the
                 # directory of the (local) URL, by pressing SHIFT while dropping
-                self.loadUrls.emit(urls, evt.keyboardModifiers() == QtCore.Qt.ShiftModifier, evt.pos())
+                # self.loadUrls.emit(urls, evt.keyboardModifiers() == QtCore.Qt.ShiftModifier, evt.pos())
+                self.loadUrls.emit(urls, keyboardModifiers & QtCore.Qt.ShiftModifier, evt.pos())
                 
             elif evt.mimeData().hasText() and len(evt.mimeData().text()):
                 # NOTE: 2019-08-10 00:33:00
                 # just write at the console whatever text has been dropped
                 if evt.proposedAction() in (QtCore.Qt.CopyAction, QtCore.Qt.MoveAction):
                     text = evt.mimeData().text()
-                    echoing = not bool(evt.keyboardModifiers() & QtCore.Qt.ShiftModifier)
-                    store = bool(evt.keyboardModifiers() & QtCore.Qt.ControlModifier)
+                    # echoing = not bool(evt.keyboardModifiers() & QtCore.Qt.ShiftModifier)
+                    # store = bool(evt.keyboardModifiers() & QtCore.Qt.ControlModifier)
+                    echoing = not bool(keyboardModifiers & QtCore.Qt.ShiftModifier)
+                    store = bool(keyboardModifiers & QtCore.Qt.ControlModifier)
                     
                     # NOTE: 2019-08-13 11:08:14
                     # TODO: allow for running the code without writing it in console

@@ -68,7 +68,7 @@ from core import pyabfbridge as pab
 
 from core import (xmlutils, strutils, datasignal)#, neoepoch, neoevent)
 
-from core.prog import (ContextExecutor, safewrapper,)
+from core.prog import (ContextExecutor, safewrapper, scipywarn, print_styled)
 
 from core.monkey import (check_neo_patch, 
                        identify_neo_patch,  import_relocated_module)
@@ -1091,6 +1091,7 @@ def loadAxonFile(fileName:typing.Union[str, pathlib.Path],
         return data
     
     except Exception as e:
+        scipywarn(f"Skipping file {print_styled(fileName, 'yellow')} due to error below:")
         traceback.print_exc()
         
 @safewrapper

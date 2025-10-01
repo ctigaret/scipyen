@@ -675,23 +675,8 @@ class Episode(ScipyenDataclass):
     # description:str = ""
     procedure:typing.Optional[Procedure] = field(default = None)
     
-    # __match_args__ = tuple(set(ScipyenDataclass.__match_args__ + ("begin", "end", 
-    #                                                               "beginFrame", "endFrame",
-    #                                                               "procedure")))
-    
     def __eq__(self, other) -> bool:
         return super().__eq__(other)
-    
-# #         if not isinstance(other, self.__class__):
-# #             return False
-# #         
-# #         ret = True
-# #         ret &= self.name == other.name
-# #         if ret:
-# #             # don't compare description as this is not definitory
-# #             ret &= all(getattr(self, f.name) == getattr(other, f.name) for f in list(filter(lambda x: x.name != "description", dataclasses.fields(self.__class__))))
-# #             
-#         return ret
     
     def __repr__(self):
         indent = lambda x: x.replace("\n", "\n\t")

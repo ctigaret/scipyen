@@ -115,7 +115,7 @@ standard_obj_summary_headers = ["Name","Workspace",
                                 "Object Type","Data Type (DType)", 
                                 "Minimum", "Maximum", "Size", "Dimensions",
                                 "Shape", "Axes", "Array Order", "Memory Size",
-                                "Address", "Icon"]
+                                "ID", "Icon"]
 
 GeneralIndexType = typing.Union[str, int, typing.Union[typing.Sequence[str], typing.Sequence[int]], np.ndarray, range, slice, type(MISSING)]
 r"""Generic index type, used with normalized_indexed and similar functions"""
@@ -3256,7 +3256,7 @@ def summarize_object_properties(objname:str, obj:typing.Any, namespace="Internal
     Returns a dict (key ↦ value mapping) with the following keys:
         "Data Type (DType)", "Workspace", "Minimum", "Maximum", "Size",
         "Dimensions", "Shape", "Axes", "Array Order", "Memory Size",
-        "Address", "Icon"
+        "ID", "Icon"
     
     and the values are nested key ↦ str where the keys define the "role" of the
         str value in the workspace view:
@@ -3618,7 +3618,7 @@ def summarize_object_properties(objname:str, obj:typing.Any, namespace="Internal
         result["Axes"]          = {"display": axes,         "tooltip" : "%s%s" % (axestip, axes)}
         result["Array Order"]   = {"display": arrayorder,   "tooltip" : "%s%s" % (ordertip, arrayorder)}
         result["Memory Size"]   = {"display": memsz,        "tooltip" : "%s%s" % (memsztip, memsz)}
-        result["Address"]       = {"display": hexaddress,   "tooltip" : f"Memory address in hex (decimal):\n{hexaddress} ({address})"}
+        result["ID"]       = {"display": hexaddress,   "tooltip" : f"Memory address in hex (decimal):\n{hexaddress} ({address})"}
         result["Icon"]          = icon
         
         # NOTE: 2021-06-12 12:22:38
