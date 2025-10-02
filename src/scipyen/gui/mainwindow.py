@@ -2672,10 +2672,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         self.filesFilterFrame.setVisible(self._showFilesFilter)
         
-        # signalBlockers = [QtCore.QSignalBlocker(w) for w in (self.viewFilesFilterToolBtn, self.hideFilesFilterToolBtn)]
-        signalBlocker = QtCore.QSignalBlocker(self.viewFilesFilterToolBtn)
+        # signalBlockers = [QtCore.QSignalBlocker(w) for w in (self.toggleFilesFilterToolBtn, self.hideFilesFilterToolBtn)]
+        signalBlocker = QtCore.QSignalBlocker(self.toggleFilesFilterToolBtn)
         
-        self.viewFilesFilterToolBtn.setChecked(self._showFilesFilter)
+        self.toggleFilesFilterToolBtn.setChecked(self._showFilesFilter)
         
     @property
     def uiFontFamily(self) -> str:
@@ -5619,6 +5619,11 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     @safewrapper
     def slot_saveSelectedVariables(self):
         indexList = self.workspaceView.selectedIndexes()
+        if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier):
+            saver = pio.saveHDF5
+        else:
+            saver = pio.savePickleFile
+    
 
         if len(indexList) == 0:
             return
@@ -5637,7 +5642,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
             for n in varNames:
                 if not isinstance(self.workspace[n], (QtWidgets.QWidget)):
-                    pio.saveHDF5(self.workspace[n], n)
+                    saver(self.workspace[n], n)
+                    # pio.saveHDF5(self.workspace[n], n)
                     # pio.savePickleFile(self.workspace[n], n)
 
             # QtWidgets.QApplication.restoreOverrideCursor()
@@ -6471,9 +6477,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.systemOpenFolderBtn.released.connect(self.slot_systemOpenCurrentFolder)
         self.systemOpenParentFolderBtn.released.connect(self.slot_systemOpenParentFolder2)
         
-        # self.viewFilesFilterToolBtn.released.connect(self.slot_showFilesFilter)
-        self.viewFilesFilterToolBtn.toggled.connect(self.slot_showFilesFilter)
-        # self.hideFilesFilterToolBtn.released.connect(self.slot_hideFilesFilter)
+        self.toggleFilesFilterToolBtn.toggled.connect(self.slot_showFilesFilter)
+        self.hideFilesFilterToolBtn.released.connect(self.slot_hideFilesFilter)
 
         # filter/select variable names combo
         self.varNameFilterFinderComboBox.currentTextChanged[str].connect(
@@ -7571,13 +7576,11 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     @safewrapper
     def slot_showFilesFilter(self, val):
         self.showFileSystemFilter = val is True
-        # self.filesFilterFrame.setVisible(True)
 
-    # @Slot()
-    # @safewrapper
-    # def slot_hideFilesFilter(self):
-    #     self.showFileSystemFilter=False
-    #     # self.filesFilterFrame.setVisible(False)
+    @Slot()
+    @safewrapper
+    def slot_hideFilesFilter(self):
+        self.showFileSystemFilter=False
 
     @Slot(str)
     @safewrapper

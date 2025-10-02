@@ -46,7 +46,7 @@
      <x>0</x>
      <y>0</y>
      <width>898</width>
-     <height>28</height>
+     <height>29</height>
     </rect>
    </property>
    <property name="sizePolicy">
@@ -340,13 +340,13 @@
        <item>
         <widget class="QToolButton" name="saveVariableToolBtn">
          <property name="toolTip">
-          <string>Save objects to disk</string>
+          <string>Save objects to disk (pickle); press &amp; hold Shift to save as HDF5</string>
          </property>
          <property name="statusTip">
           <string>Save objects to disk</string>
          </property>
          <property name="whatsThis">
-          <string>Save objects to disk</string>
+          <string>Save objects to disk (pickle); press &amp; hold Shift to save as HDF5</string>
          </property>
          <property name="text">
           <string>Save</string>
@@ -1003,15 +1003,15 @@ NOTE: you can click anywhere in the row to select</string>
         </spacer>
        </item>
        <item>
-        <widget class="QToolButton" name="viewFilesFilterToolBtn">
+        <widget class="QToolButton" name="toggleFilesFilterToolBtn">
          <property name="toolTip">
-          <string>Show filter bar</string>
+          <string>Toggle filter bar</string>
          </property>
          <property name="statusTip">
-          <string>Show filter bar</string>
+          <string>Toggle filter bar</string>
          </property>
          <property name="whatsThis">
-          <string>Show filter bar</string>
+          <string>Toggle filter bar - to filter files by name</string>
          </property>
          <property name="text">
           <string>Filter...</string>
@@ -1210,6 +1210,9 @@ NOTE: you can click anywhere in the row to select</string>
             <property name="insertPolicy">
              <enum>QComboBox::InsertAtTop</enum>
             </property>
+            <property name="placeholderText">
+             <string>Enter file name filter</string>
+            </property>
            </widget>
           </item>
           <item>
@@ -1225,6 +1228,31 @@ NOTE: you can click anywhere in the row to select</string>
             </property>
             <property name="checkable">
              <bool>true</bool>
+            </property>
+            <property name="autoRaise">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QToolButton" name="hideFilesFilterToolBtn">
+            <property name="enabled">
+             <bool>true</bool>
+            </property>
+            <property name="toolTip">
+             <string>Hide file filter</string>
+            </property>
+            <property name="statusTip">
+             <string>Hide file filter</string>
+            </property>
+            <property name="whatsThis">
+             <string>Hide file filter</string>
+            </property>
+            <property name="text">
+             <string>Hide</string>
+            </property>
+            <property name="icon">
+             <iconset theme="window-close"/>
             </property>
             <property name="autoRaise">
              <bool>true</bool>
