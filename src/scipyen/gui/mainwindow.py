@@ -2652,9 +2652,16 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             self._lastFileSystemFilter = val
         else:
             self._lastFileSystemFilter = str()
+            
+        if len(self._lastFileSystemFilter) > 0 and len(self._lastFileSystemFilter.strip()) == 0:
+            self._lastFileSystemFilter = str()
 
         self.fileSystemFilter.setCurrentText(self._lastFileSystemFilter)
-        self.fileSystemModel.setNameFilters(self._lastFileSystemFilter.split())
+        
+        if len(self._lastFileSystemFilter) > 0:
+            self.fileSystemModel.setNameFilters(self._lastFileSystemFilter.split())
+        else:
+            self.fileSystemModel.setNameFilters(list())
 
     @property
     def showFileSystemFilter(self):
@@ -6399,6 +6406,27 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         
         self.dockWidgetWorkspace.visibilityChanged[bool].connect(
             self.slot_dockWidgetVisibilityChanged)
+
+        # filter/select variable names combo
+        self.varNameFilterFinderComboBox.lineEdit().setPlaceholderText("Enter expression e.g. 'data*' ...")
+        self.varNameFilterFinderComboBox.currentTextChanged[str].connect(
+            self.slot_filterSelectVarNames)
+
+        self.varNameFilterFinderComboBox.lineEdit().returnPressed.connect(
+            self.slot_addVarNameToFinderHistory)
+        self.varNameFilterFinderComboBox.lineEdit().setClearButtonEnabled(True)
+        self.varNameFilterFinderComboBox.lineEdit().undoAvailable = True
+        self.varNameFilterFinderComboBox.lineEdit().redoAvailable = True
+
+        self.removeVarNameFromFinderListAction = QAction(QtGui.QIcon.fromTheme("edit-delete"),
+                                                                   "Remove item from list",
+                                                                   self.varNameFilterFinderComboBox.lineEdit())
+
+        self.removeVarNameFromFinderListAction.triggered.connect(
+            self.slot_removeVarNameFromFinderHistory)
+
+        self.varNameFilterFinderComboBox.lineEdit().addAction(self.removeVarNameFromFinderListAction,
+                                                              QtWidgets.QLineEdit.TrailingPosition)
         #
         # ### END workspace view
 
@@ -6441,6 +6469,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # self.navigator.newWindowRequested.connect()
 
         self.fileSystemFilter.lineEdit().setClearButtonEnabled(True)
+        self.fileSystemFilter.lineEdit().setPlaceholderText("Enter file name filter...")
 
         self.removeFileFilterFromListAction = QAction(QtGui.QIcon.fromTheme("edit-delete"),
                                                                 "Remove this filter from history",
@@ -6480,25 +6509,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.toggleFilesFilterToolBtn.toggled.connect(self.slot_showFilesFilter)
         self.hideFilesFilterToolBtn.released.connect(self.slot_hideFilesFilter)
 
-        # filter/select variable names combo
-        self.varNameFilterFinderComboBox.currentTextChanged[str].connect(
-            self.slot_filterSelectVarNames)
-
-        self.varNameFilterFinderComboBox.lineEdit().returnPressed.connect(
-            self.slot_addVarNameToFinderHistory)
-        self.varNameFilterFinderComboBox.lineEdit().setClearButtonEnabled(True)
-        self.varNameFilterFinderComboBox.lineEdit().undoAvailable = True
-        self.varNameFilterFinderComboBox.lineEdit().redoAvailable = True
-
-        self.removeVarNameFromFinderListAction = QAction(QtGui.QIcon.fromTheme("edit-delete"),
-                                                                   "Remove item from list",
-                                                                   self.varNameFilterFinderComboBox.lineEdit())
-
-        self.removeVarNameFromFinderListAction.triggered.connect(
-            self.slot_removeVarNameFromFinderHistory)
-
-        self.varNameFilterFinderComboBox.lineEdit().addAction(self.removeVarNameFromFinderListAction,
-                                                              QtWidgets.QLineEdit.TrailingPosition)
 
         # ### END   file system view,  navigation widgets & actions
         
@@ -6533,11 +6543,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # filter/select commands from history combo
         #
         
-        self.commandFinderComboBox.currentTextChanged[str].connect(
-            self.slot_findCommand)
-
-        self.commandFinderComboBox.lineEdit().returnPressed.connect(
-            self.slot_addCommandFindToHistory)
+        # self.commandFinderComboBox.currentTextChanged[str].connect(self.slot_findCommand) # heep this - will revisit
+        self.commandFinderComboBox.currentIndexChanged[int].connect(self.slot_findCommandIndexChanged)
+        self.commandFinderComboBox.lineEdit().setPlaceholderText("Find expression ...")
+        self.commandFinderComboBox.lineEdit().returnPressed.connect(self.slot_addCommandFindToHistory)
         self.commandFinderComboBox.lineEdit().setClearButtonEnabled(True)
         self.commandFinderComboBox.lineEdit().undoAvailable = True
         self.commandFinderComboBox.lineEdit().redoAvailable = True
@@ -7039,9 +7048,17 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     # TODO: if the above task is successfully completed, then also find
     # out how to filter or select by session number
 
+
+    @Slot(int)
+    def slot_findCommandIndexChanged(self, val:int):
+        cmdTxt = self.commandFinderComboBox.itemText(val)
+        if len(cmdTxt.strip()) > 0:
+            self.lastCommandFind = cmdTxt
+            self.slot_findCommand(cmdTxt)
+            
     @Slot(str)
     @safewrapper
-    def slot_findCommand(self, val):
+    def slot_findCommand(self, val:str):
         r"""Finds command in the history tree based on glob search.
 
         TODO option to search in a selected session only
@@ -7058,7 +7075,11 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         else:
             p = None
 
+        if p is None:
+            return
         # selected_children = list()
+        
+        mostRecentItem = None
 
         original_selection_mode = self.historyTreeWidget.selectionMode()
 
@@ -7066,45 +7087,46 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             QtWidgets.QAbstractItemView.MultiSelection)
 
         try:
+            self.historyTreeWidget.reset()
             for k in range(self.historyTreeWidget.topLevelItemCount()):
                 topLevelItem = self.historyTreeWidget.topLevelItem(k)
 
                 childCount = topLevelItem.childCount()
 
-                for c in range(childCount):
-                    child = self.historyTreeWidget.topLevelItem(k).child(c)
-                    child.setSelected(False)
+                # for c in range(childCount):
+                #     child = self.historyTreeWidget.topLevelItem(k).child(c)
+                #     child.setSelected(False)
 
-                if p is not None:
-                    items_text_list = list(zip(
-                        *[(topLevelItem.child(k).text(0), topLevelItem.child(k).text(1)) for k in range(childCount)]))
+                items_text_list = list(zip(
+                    *[(topLevelItem.child(k).text(0), topLevelItem.child(k).text(1)) for k in range(childCount)]))
 
-                    if len(items_text_list) == 2:
-                        found_text = [s for s in filter(
-                            p.match, items_text_list[1])]
+                if len(items_text_list) == 2:
+                    found_text = [s for s in filter(p.match, items_text_list[1])]
 
-                        within_session_indices = [
-                            int(items_text_list[0][items_text_list[1].index(s)]) for s in found_text]
+                    within_session_indices = [int(items_text_list[0][items_text_list[1].index(s)]) for s in found_text]
 
-                        selected_children = [topLevelItem.child(
-                            k-1) for k in within_session_indices if topLevelItem.child(k-1) is not None]
+                    selected_children = [topLevelItem.child(k-1) for k in within_session_indices if topLevelItem.child(k-1) is not None]
 
-                        if len(selected_children):
-                            topLevelItem.setExpanded(True)
-
-                        else:
-                            topLevelItem.setExpanded(False)
+                    if len(selected_children):
+                        topLevelItem.setExpanded(True)
+                        mostRecentItem = topLevelItem
 
                         for item in selected_children:
                             item.setSelected(True)
-
+                            
                     else:
                         topLevelItem.setExpanded(False)
 
                 else:
                     topLevelItem.setExpanded(False)
 
+            # else:
+            #     topLevelItem.setExpanded(False)
+
             self.historyTreeWidget.setSelectionMode(original_selection_mode)
+            
+            if mostRecentItem:
+                self.historyTreeWidget.scrollToItem(mostRecentItem)
 
         except:
             self.historyTreeWidget.setSelectionMode(original_selection_mode)
@@ -7113,9 +7135,11 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     @safewrapper
     def slot_addCommandFindToHistory(self):
         cmdTxt = self.commandFinderComboBox.lineEdit().text()
-        if len(cmdTxt) > 0 and cmdTxt not in self._commandHistoryFinderList:
-            self._commandHistoryFinderList.appendleft(cmdTxt)
+        if len(cmdTxt.strip()) > 0:
+            if cmdTxt not in self._commandHistoryFinderList:
+                self._commandHistoryFinderList.appendleft(cmdTxt)
             self.lastCommandFind = cmdTxt
+            self.slot_findCommand(cmdTxt)
 
     @Slot()
     @safewrapper
