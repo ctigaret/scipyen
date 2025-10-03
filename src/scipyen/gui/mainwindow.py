@@ -2941,7 +2941,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 #         self._nMaxWatchedDirectories_= value
 
     @property
-    def variableSearches(self):
+    def variableSearches(self) -> collections.deque:
         return self._recentVariablesList
 
     @markConfigurable("VariableSearch", "Qt")
@@ -6408,12 +6408,12 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             self.slot_dockWidgetVisibilityChanged)
 
         # filter/select variable names combo
-        self.varNameFilterFinderComboBox.lineEdit().setPlaceholderText("Enter expression e.g. 'data*' ...")
+        self.varNameFilterFinderComboBox.lineEdit().setPlaceholderText("Select variable by expression e.g. 'data*' ...")
         self.varNameFilterFinderComboBox.currentTextChanged[str].connect(
             self.slot_filterSelectVarNames)
 
-        self.varNameFilterFinderComboBox.lineEdit().returnPressed.connect(
-            self.slot_addVarNameToFinderHistory)
+        self.varNameFilterFinderComboBox.lineEdit().returnPressed.connect(self.slot_addVarNameToFinderHistory)
+        self.varNameFilterFinderComboBox.currentIndexChanged[int].connect(self.slot_filterSelectVarNamesIndexChanged)
         self.varNameFilterFinderComboBox.lineEdit().setClearButtonEnabled(True)
         self.varNameFilterFinderComboBox.lineEdit().undoAvailable = True
         self.varNameFilterFinderComboBox.lineEdit().redoAvailable = True
@@ -6523,8 +6523,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # A new item (row) will be added with every statement executed at the 
         # console, REGARDLESS of whether the execution was succesful or not.
         #
-        self.historyTreeWidget.setHeaderLabels(
-            ["Session & Line:", "Session Date & Time or Expression:"])
+        self.historyTreeWidget.setHeaderLabels(["Session & Line:", "Session Date & Time or Expression:"])
         self.historyTreeWidget.itemActivated[QtWidgets.QTreeWidgetItem, int].connect(self.slot_historyItemActivated)
         self.historyTreeWidget.customContextMenuRequested[QtCore.QPoint].connect(self.slot_historyContextMenuRequest)
         self.historyTreeWidget.itemClicked[QtWidgets.QTreeWidgetItem, int].connect(self.slot_historyItemSelected)
@@ -6982,9 +6981,18 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     @safewrapper
     def slot_addVarNameToFinderHistory(self):
         varTxt = self.varNameFilterFinderComboBox.lineEdit().text()
-        if len(varTxt) > 0 and varTxt not in self._recentVariablesList:
-            self._recentVariablesList.appendleft(varTxt)
+        if len(varTxt.strip()) > 0 :
+            if varTxt not in self._recentVariablesList:
+                self._recentVariablesList.appendleft(varTxt)
             self._lastVariableFind = varTxt
+            self.slot_filterSelectVarNames(varTxt)
+            
+    @Slot(int)
+    def slot_filterSelectVarNamesIndexChanged(self, val:int):
+        varTxt = self.varNameFilterFinderComboBox.itemText(val)
+        if len(varTxt.strip()) > 0 :
+            self._lastVariableFind = varTxt
+            self.slot_filterSelectVarNames(varTxt)
 
     # NOTE: 2017-08-03 08:44:34
     # TODO/FIXME decide on the match; basically works with match2
@@ -7029,6 +7037,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             for i in itemList:
                 self.workspaceView.selectionModel().select(
                     i.index(), QtCore.QItemSelectionModel.Select)
+                
+            self.workspaceView.scrollTo(self.workspaceView.model().indexFromItem(itemList[-1]))
 
     @Slot()
     @safewrapper
