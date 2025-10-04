@@ -931,7 +931,7 @@ if sys.platform.startswith("linux"):
         for line in desktop_file_contents:
             desktop_file.write(f"{line}\n")
             
-        shutil.copyfile(desktop_file_name, pathlib.Path())
+        shutil.copyfile(desktop_file_name, pathlib.Path(distpath)/product/"org.scipyen.desktop")
 
 stop_time = time.perf_counter()
 dt = stop_time - start_time
