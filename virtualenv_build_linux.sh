@@ -1259,8 +1259,13 @@ chmod +x ${scriptfile}
 echo -e "Scipyen startup script created in ${target_dir} \n"
 }
 
-function zMain(){}  # bogus function for locating this part of the script in
-                    # Kate editor's symbol viewer
+function zMain()
+{
+    # bogus function for locating this part of the script in
+    # Kate editor's symbol viewer
+    echo ""
+}
+
 #### BEGIN Main script action happens here ###
 #
 
