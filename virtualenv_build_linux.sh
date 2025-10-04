@@ -1564,7 +1564,8 @@ echo -e "python executable: ${python_executable}"
 
 
 # makes a virtual environment and activates it
-if ! [ -v VIRTUAL_ENV ] ; then
+# if ! [ -v ${VIRTUAL_ENV} ] ; then
+if [[ -z ${VIRTUAL_ENV} ]] ; then
 # NOTE: 2023-06-25 20:57:31 
 # these two MUST be run
 makevirtenv
@@ -1580,7 +1581,7 @@ if [[ $? -ne 0 ]] ; then
 fi
 
 # verify that the newly created virtual environment is active
-if [[ -z "$VIRTUAL_ENV" ]] ; then
+if [[ -z ${VIRTUAL_ENV} ]] ; then
     echo -e "Not in an active environment! Goodbye!\n"
     exit 1
 fi
