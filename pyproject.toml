@@ -4,8 +4,6 @@
 
 [project]
 name = "scipyen"
-# version = "0.0.1"
-# dependencies = ["pygments"]
 readme = "README.md"
 authors = [{name="Cezar M. Tigaret", email="cezar.tigaret@gmail.com"}]
 description = "Scientific python environment for neuroscience"

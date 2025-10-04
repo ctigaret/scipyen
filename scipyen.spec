@@ -231,6 +231,8 @@ if hasTaxoniq:
 myfile = sys.argv[-1] # the spec file ; this is THE LAST argument in the argument list to pyinstaller
 myfile = pathlib.Path(myfile).absolute()
 scipyen_dir = os.fspath(myfile.parent)
+version_file = pathlib.Path(scipyen_dir)/"VERSION"
+VERSION = version_file.read_text(encoding="utf-8")
 
 # print(f"scipyen_dir = {scipyen_dir}")
 
@@ -623,7 +625,7 @@ build_sfx = f"{year}{month}{day}_{hr}_{mn}_{sc}"
 pyver_sfx = "_".join(["python", f"{sys.version_info.major}", f"{sys.version_info.minor}", f"{sys.version_info.micro}"])
 # debug_sfx = "debug" if compile_options.debug else ""
 
-product = "_".join(["scipyen", gitsfx, platform, host_name, pyver_sfx, build_sfx])
+product = "_".join(["scipyen", VERSION, gitsfx, platform, host_name, pyver_sfx, build_sfx])
 if compile_options.debug:
     product += "_debug"
 # product = f"scipyen{gitsfx}_{platform}_{host_name}{debug_sfx}"
