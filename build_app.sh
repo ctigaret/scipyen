@@ -43,6 +43,17 @@ fi
 destination=${HOME}/scipyen_app 
 
 debug=0
+if [ ! -r ${VIRTUAL_ENV}/.python_qt ]; then
+qtapi="PyQt5"
+else
+qtapi=`cat ${VIRTUAL_ENV}/.python_qt`
+fi
+
+echo -e "Seeting up the build for QT API: "${qtapi}
+
+export QT_API=${qtapi,,}
+export PYQTGRAPH_QT_LIB=${qtapi}
+export FORCE_QT_API="1"
 
 for i in "$@" ; do
 #     echo $i
@@ -75,8 +86,11 @@ if [ -d ${destination} ] ; then
     mkdir -p $destination
 fi
 
+realscript=`realpath $0`
+scipyendir=`dirname "$realscript"`
 workdir=${destination}/build
 distdir=${destination}/dist
+splashimgfile=${scipyendir}/payload/splash.png
 
 # echo $0: $"debug: "$debug
 

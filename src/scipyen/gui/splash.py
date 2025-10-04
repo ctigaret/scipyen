@@ -24,12 +24,11 @@ if os.environ["QT_API"] == "pyside6":
 else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
-        from qtpy.uic import loadUiType
-        QAction = QtWidgets.QAction
-        QActionGroup = QtWidgets.QActionGroup
-        QShortcut = QtWidgets.QShortcut
-        
-        __has_qtdbus__ = False
+    from qtpy.uic import loadUiType
+    QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
+    
 try:
     from qtpy import QtDBus
     __has_qtdbus__ = True

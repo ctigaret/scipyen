@@ -479,12 +479,24 @@ function dopyqt5 ()
                     exit 1
                 else
                     echo "PyQt5 built and installed "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.pyqt5build_done
+                    echo "PyQt5" > ${VIRTUAL_ENV}/.python_qt
                     echo -e "\n\n=====================\n# Pyqt5 installed!\n=====================\n\n"
                 fi
             fi
         
         else 
-            pip install pyqt5
+            if [ -z ${uv_exec} ] ; then
+                pip install pyqt5
+            else
+                ${uv_exec} pip install pyqt5
+            fi
+            if [[ $? -ne 0 ]] ; then
+                echo -e "Cannot install PyQt5 from PyPi; check console output. Goodbye!\n"
+                exit 1
+            else
+                echo "PyQt5 pip package installed "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.pyqt6done
+                echo "PyQt5" > ${VIRTUAL_ENV}/.python_qt
+            fi
         fi
     fi
 }
@@ -602,6 +614,7 @@ function dopyqt6 ()
                     exit 1
                 else
                     echo "PyQt6 built and installed "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.pyqt6done
+                    echo "PyQt6" > ${VIRTUAL_ENV}/.python_qt
                     echo -e "\n\n=====================\n# Pyqt6 installed!\n=====================\n\n"
                 fi
             fi
@@ -610,6 +623,13 @@ function dopyqt6 ()
                 pip install pyqt6
             else
                 ${uv_exec} pip install pyqt6
+            fi
+            if [[ $? -ne 0 ]] ; then
+                echo -e "Cannot install PyQt6 from PyPi; check console output. Goodbye!\n"
+                exit 1
+            else
+                echo "PyQt6 pip package installed "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.pyqt6done
+                echo "PyQt6" > ${VIRTUAL_ENV}/.python_qt
             fi
         fi
     fi
@@ -669,14 +689,14 @@ function dopyside6 ()
             fi
             
             if [[ $? -ne 0 ]] ; then
-                echo -e "\nCould not build PySide6. Goodbye!\n"
+                echo -e "Could not build PySide6. Goodbye!\n"
                 exit 1
             fi
             build_dir=${base_build_dir}/`basename ${VIRTUAL_ENV}`
             python create_wheels.py --no-examples --build-dir=${build_dir}
             
             if [[ $? -ne 0 ]] ; then
-                echo -e "\nCould not create PySide6 wheels. Goodbye!\n"
+                echo "Could not create PySide6 wheels. Goodbye!\n"
                 exit 1
             fi
             
@@ -687,10 +707,12 @@ function dopyside6 ()
             fi
             
             if [[ $? -ne 0 ]] ; then
-                echo -e "\nCould not install PySide6 wheels. Goodbye!\n"
+                echo -e "Could not install PySide6 wheels. Goodbye!\n"
                 exit 1
             else
-                echo -e "\nPySide6 wheel have been successfully built and installed"
+                echo "PySide6 built and installed "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.pyside6done
+                echo "PySide6" > ${VIRTUAL_ENV}/.python_qt
+                echo "PySide6 wheel have been successfully built and installed"
             fi
             
         else
@@ -698,6 +720,13 @@ function dopyside6 ()
                 pip install PySide6
             else
                 ${uv_exec} pip install PySide6
+            fi
+            if [[ $? -ne 0 ]] ; then
+                echo -e "\nCould not install PySide6 from PyPi. Goodbye!\n"
+                exit 1
+            else
+                echo -e "\nPySide6 pip package installed "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.pyside6done
+                echo "PySide6" > ${VIRTUAL_ENV}/.python_qt
             fi
         fi
     fi

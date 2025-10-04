@@ -744,6 +744,21 @@ datas.extend(plugin_toc)
 # NOTE: 2023-07-14 15:22:26
 # hookspath contains code for pyinstaller hooks called ONLY when the Analyser
 # detects an import in Scipyen code; these won't work for NEURON stuff....
+excludeQt = ["PySide2"]
+qtapi = os.environ["QT_API"]
+
+print(f"Building for QT API: {qtapi}")
+
+if qtapi.lower() == "pyqt5":
+    excludeQt += ["PySide6", "PyQt6"]
+elif qtapi.lower() == "pyqt6":
+    excludeQt += ["PySide6", "PyQt5"]
+elif qtapi.lower() == "pyside6":
+    excludeQt += ["PyQt5", "PyQt6"]
+else:
+    raise ValueError(f"Unsupported QT API {qtapi}")
+
+excludes = ["OpenGL", "torch", "nuitka"] + excludeQt
 
 a = Analysis(
     [os.path.join(scipyen_dir, 'src','scipyen','scipyen.py')],
@@ -768,7 +783,7 @@ a = Analysis(
     runtime_hooks=[os.path.join(scipyen_dir, 'src','scipyen','__pyinstaller', 'rthooks','pyi_rth_typeguard.py'),
                    # os.path.join(scipyen_dir, 'src','scipyen','__pyinstaller', 'rthooks','pyi_rth_gui.py'), # these just added manually to hiddenimports, above
                    ],
-    excludes=["OpenGL", "torch", "nuitka", "PySide6"],
+    excludes=excludes,
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,

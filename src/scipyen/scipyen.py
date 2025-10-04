@@ -154,6 +154,11 @@ else:
     QShortcut = QtWidgets.QShortcut
     __has_sip__ = True
     
+try:
+    from qtpy import QtDBus
+    __has_qtdbus__ = True
+except:
+    __has_qtdbus__ = False
 # # print(f"scipyen.py: qtpy.API is {qtpy.API}")
 
 # hasQDarkTheme = False
@@ -318,9 +323,9 @@ def main():
     if __has_PySide6__:
         appName = "Scipyen-PySide6"
     elif __has_PyQt6__:
-        appName = "Scipyen-PyQt6"
-    else:
         appName = "Scipyen"
+    else:
+        appName = "Scipyen-PyQt5"
 
     try:
         start = time.perf_counter()
