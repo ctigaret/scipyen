@@ -18,7 +18,7 @@ To create a distributable scipyen application, you need to:
 1) clone the scipyen git repo locally (e.g. to $HOME/scipyen) - 
 NOTE: this is assumed to be the case from here onwards, on GNU/linux and MacOS
 
-ATTENTION: python binary compatiility(ies) ATTENTION
+ATTENTION: python binary compatibility(ies) ATTENTION
 
 For the bundled app to be portable across machines with the same OS
 make sure that the host platform (where the bundle is to be run) has the SAME
