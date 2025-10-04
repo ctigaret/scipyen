@@ -231,7 +231,7 @@ if hasTaxoniq:
 myfile = sys.argv[-1] # the spec file ; this is THE LAST argument in the argument list to pyinstaller
 myfile = pathlib.Path(myfile).absolute()
 scipyen_dir = os.fspath(myfile.parent)
-version_file = pathlib.Path(scipyen_dir)/"VERSION"
+version_file = pathlib.Path(scipyen_dir)/"src"/"scipyen"/"VERSION"
 VERSION = version_file.read_text(encoding="utf-8")
 
 # print(f"scipyen_dir = {scipyen_dir}")
