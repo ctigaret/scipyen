@@ -801,8 +801,10 @@ if [ ! -r ${VIRTUAL_ENV}/.desktop_done ] || [[ $reinstall_desktop -gt 0 ]] ; the
 # fi
 tmpfiledir=$(mktemp -d)
 tmpfile=${tmpfiledir}/${desktopfile}
-script=${target_dir}/${scriptfile}
-echo -e "Script to execute: ${script}"
+# script=${target_dir}/${scriptfile}
+# script=${scriptfile}
+# echo -e "Script to execute: ${script}"
+echo -e "Script to execute: ${scriptfile}"
 cat<<END > ${tmpfile}
 [Desktop Entry]
 Type=Application
@@ -814,7 +816,7 @@ GenericName[en_GB]=Scientific Python Environment for Neurophysiology
 GenericName=Scientific Python Environment for Neurophysiology
 Icon=pythonbackend
 Categories=Science;Utilities;Science & Maths;Education;Development
-Exec=${script}
+Exec=${scriptfile}
 MimeType=
 Path=
 StartupNotify=true
