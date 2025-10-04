@@ -414,6 +414,27 @@ def getQt5PluginsDir():
 def getQt5Plugins(path):
     return Tree(root=path, prefix="PyQt5/Qt5/plugins", typecode="BINARY")
 
+def getQt6PluginsDir():
+    # not sure I can use this ...
+    # NOTE: on windows this is qtpaths; on SuSE this is qtpaths6
+    if sys.platform.startswith("win32"):
+        qtpaths_exec = "qtpaths"
+    else:
+        qtpaths_exec = "qtpaths6"
+    pout = subprocess.run([qtpaths_exec, "--plugin-dir"],
+                          encoding="utf-8", capture_output=True)
+    
+    if pout.returncode != 0:
+        raise RuntimeError(f"The subprocess for qtpaths6 returned {pout.returncode}")
+    
+    plugins_dir = pout.stdout.strip("\n")
+    
+    return plugins_dir
+
+def getQt6Plugins(path):
+    # not sure I can use this ...
+    return Tree(root=path, prefix="PyQt6/Qt6/plugins", typecode="BINARY")
+
 def check_plugin_module(file_name) -> bool:
     with open(file_name, "rt", encoding="utf-8") as module_file:
         for line in module_file:
@@ -719,9 +740,7 @@ datas.extend(zmq_datas)
 binaries.extend(zmq_binaries)
 hiddenimports.extend(zmq_hiddenimports)
 
-qt5plugins_dir = getQt5PluginsDir()
 
-qt5plugins_toc = getQt5Plugins(qt5plugins_dir)
 
 # print(f"qt5plugins_toc = {qt5plugins_toc}")
 
@@ -807,6 +826,13 @@ a = Analysis(
     cipher=block_cipher,
     noarchive=False,
 )
+    
+if qtapi.lower() == "pyqt5":
+    # add qt5 plugins to the binaries !
+    qt5plugins_dir = getQt5PluginsDir()
+    qt5plugins_toc = getQt5Plugins(qt5plugins_dir)
+    a.binaries += qt5plugins_toc 
+    
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
 options = [
@@ -856,7 +882,7 @@ else:
     
 coll = COLLECT(
     exe,
-    a.binaries + qt5plugins_toc, # add qt5 plugins to the binaries !
+    a.binaries,
     a.zipfiles,
     a.datas,
     strip=False,
@@ -873,37 +899,39 @@ coll = COLLECT(
 # ------------------------------------
 #
 
-# if sys.platform.startswith("linux"):
-#     # add a system-wide installation script
-#     desktoptempdir = tempfile.mkdtemp()
-#     desktop_file_name = os.path.join(desktoptempdir, f"org.scipyen.{gitsfx}.desktop")
-#     desktop_icon_file = "pythonbackend.svg"
-#     exec_file = os.path.join(bundlepath, "scipyen")
-#     desktop_file_contents = ["[Desktop Entry]",
-#     "Type=Application",
-#     "Name[en_GB]=Scipyen",
-#     "Name=Scipyen",
-#     "Comment[en_GB]=Scientific Python Environment for Neurophysiology",
-#     "Comment=Scientific Python Environment for Neurophysiology",
-#     "GenericName[en_GB]=Scientific Python Environment for Neurophysiology",
-#     "GenericName=Scientific Python Environment for Neurophysiology",
-#     f"Icon={desktop_icon_file}",
-#     "Categories=Science;Utilities;",
-#     "Exec=%k/scipyen",
-#     "MimeType=",
-#     "Path=",
-#     "StartupNotify=true",
-#     "Terminal=true",
-#     "TerminalOptions=\s --noclose",
-#     "X-DBUS-ServiceName=",
-#     "X-DBUS-StartupType=",
-#     "X-KDE-SubstituteUID=false",
-#     "X-KDE-Username=",
-#     ]
-#     with open(desktop_file_name, "wt") as desktop_file:
-#         for line in desktop_file_contents:
-#             desktop_file.write(f"{line}\n")
-
+if sys.platform.startswith("linux"):
+    # add a system-wide installation script
+    desktoptempdir = tempfile.mkdtemp()
+    desktop_file_name = os.path.join(desktoptempdir, f"org.scipyen.desktop")
+    desktop_icon_file = "pythonbackend.svg"
+    exec_file = os.path.join(bundlepath, "scipyen")
+    desktop_file_contents = [
+        "[Desktop Entry]",
+        "Type=Application",
+        "Name[en_GB]=Scipyen",
+        "Name=Scipyen",
+        "Comment[en_GB]=Scientific Python Environment for Neurophysiology - PyInstaller frozen application",
+        "Comment=Scientific Python Environment for Neurophysiology - PyInstaller frozen application",
+        "GenericName[en_GB]=Scipyen",
+        "GenericName=Scipyen",
+        f"Icon={desktop_icon_file}",
+        "Categories=Science;Education",
+        "Exec=scipyen.app",
+        "MimeType=",
+        "Path=",
+        "StartupNotify=true",
+        "Terminal=true",
+        "TerminalOptions=\s --noclose",
+        "X-DBUS-ServiceName=",
+        "X-DBUS-StartupType=",
+        "X-KDE-SubstituteUID=false",
+        "X-KDE-Username=",
+    ]
+    with open(desktop_file_name, "wt") as desktop_file:
+        for line in desktop_file_contents:
+            desktop_file.write(f"{line}\n")
+            
+        shutil.copyfile(desktop_file_name, pathlib.Path())
 
 stop_time = time.perf_counter()
 dt = stop_time - start_time

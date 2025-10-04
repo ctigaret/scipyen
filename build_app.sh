@@ -108,28 +108,28 @@ echo -e "Compilation of frozen Scipyen application failed"
 exit 1
 fi
 
-echo -e "Creating a desktop file for Scipyen_app\n"
-desktopfile=${distdir}/org.Scipyen.desktop
-cat<<END > ${desktopfile}
-[Desktop Entry]
-Type=Application
-Name[en_GB]=Scipyen
-Name=Scipyen
-Comment[en_GB]=Scientific Python Environment for Neurophysiology - PyInstaller frozen application
-Comment=Scientific Python Environment for Neurophysiology - PyInstaller frozen application
-GenericName[en_GB]=Scipyen
-GenericName=Scipyen
-Icon=pythonbackend
-Categories=Science;Utilities;
-Exec=scipyen.app
-MimeType=
-Path=
-StartupNotify=true
-Terminal=true
-TerminalOptions=\s
-X-DBUS-ServiceName=
-X-DBUS-StartupType=
-X-KDE-SubstituteUID=false
-X-KDE-Username=
-END
+# echo -e "Creating a desktop file for Scipyen_app\n"
+# desktopfile=${distdir}/org.Scipyen.desktop
+# cat<<END > ${desktopfile}
+# [Desktop Entry]
+# Type=Application
+# Name[en_GB]=Scipyen
+# Name=Scipyen
+# Comment[en_GB]=Scientific Python Environment for Neurophysiology - PyInstaller frozen application
+# Comment=Scientific Python Environment for Neurophysiology - PyInstaller frozen application
+# GenericName[en_GB]=Scipyen
+# GenericName=Scipyen
+# Icon=pythonbackend
+# Categories=Science;Utilities;
+# Exec=scipyen.app
+# MimeType=
+# Path=
+# StartupNotify=true
+# Terminal=true
+# TerminalOptions=\s
+# X-DBUS-ServiceName=
+# X-DBUS-StartupType=
+# X-KDE-SubstituteUID=false
+# X-KDE-Username=
+# END
 
