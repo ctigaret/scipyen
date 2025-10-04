@@ -838,9 +838,27 @@ if [[ $? -ne 0 ]] ; then
 echo -e "Installation of Scipyen Desktop file failed\n"
 exit 1
 fi
+dfile=`echo "${desktopfile%*.*}"`
 echo "Scipyen Desktop file has been installed "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.desktop_done
-echo -e "Scipyen Desktop file ${dektopfile} has been installed \n"
+echo -e "Scipyen Desktop file '${dfile}' has been installed \n"
 fi
+}
+
+function install_console_styles()
+{
+    if [ ! -r ${VIRTUAL_ENV}/.styles_done ] | [[ $reinstall_console_styles -gt 0 ]]; then
+        # NOTE: install console color schemes
+        cd $scipyendir/src/scipyen/gui/scipyen_console_styles
+        if [ -x ${uv_exec} ] ; then
+            pip install .
+        else
+            ${uv_exec} pip install .
+        fi
+        cd $scipyendir
+        
+        echo -e "Custom console styles installed on "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.styles_done
+        echo -e "\n\n=====================\n# Custom console styles installed!\n=====================\n\n"
+    fi
 }
 
 function doneuron ()
@@ -1298,6 +1316,7 @@ build_pyside6=0
 install_fenicsx=0
 njobs=`nproc --all`
 reinstall_desktop=0
+reinstall_console_styles=0
 refresh_git_repos=0
 make_dist=0
 
@@ -1476,6 +1495,9 @@ for i in "$@" ; do
             desktopentry)
             reinstall_desktop=1
             ;;
+            console_styles)
+            reinstall_console_styles=1
+            ;;
             *)
             ;;
         esac
@@ -1640,14 +1662,16 @@ if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
     
     make_desktop_entry
     
-    # NOTE: install console color schemes
-    cd $scipyendir/src/scipyen/gui/scipyen_console_styles
-    if [ -x ${uv_exec} ] ; then
-        pip install .
-    else
-        ${uv_exec} pip install .
-    fi
-    cd $scipyendir
+    install_console_styles
+    
+#     # NOTE: install console color schemes
+#     cd $scipyendir/src/scipyen/gui/scipyen_console_styles
+#     if [ -x ${uv_exec} ] ; then
+#         pip install .
+#     else
+#         ${uv_exec} pip install .
+#     fi
+#     cd $scipyendir
     
 fi
 
