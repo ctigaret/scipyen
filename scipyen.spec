@@ -921,7 +921,7 @@ if sys.platform.startswith("linux"):
         "Path=",
         "StartupNotify=true",
         "Terminal=true",
-        "TerminalOptions=\s --noclose",
+        "TerminalOptions=\\s--noclose",
         "X-DBUS-ServiceName=",
         "X-DBUS-StartupType=",
         "X-KDE-SubstituteUID=false",
