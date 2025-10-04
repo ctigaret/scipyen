@@ -749,7 +749,7 @@ datas.extend(plugin_toc)
 excludeQt = ["PySide2"]
 qtapi = os.environ["QT_API"]
 
-print(f"Building for QT API: {qtapi}")
+print(f"Building Scipyen version {VERSION} with QT API: {qtapi}")
 
 if qtapi.lower() == "pyqt5":
     excludeQt += ["PySide6", "PyQt6"]
