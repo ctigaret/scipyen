@@ -11,6 +11,15 @@
 #
 #
 # Changelog:
+# 2025-10-04 09:18:30
+# • Python virtual environment built for local build of PyQt6 by DEFAULT.
+#   Building for PyQt5 is still possible, by passing --with_pyqt5 or --build_pyqt5 
+#   options to this script.
+# 
+# • Updating the local builds for VIGRA and PyQt5/6 or PySide6 are now handled
+#   by dedicated scripts. Therefore the corresponding --reinstall options have
+#   been removed.
+#
 # 2025-03-13 10:45:35:
 # • No more installation as root
 # • uses Python 3.13
@@ -53,6 +62,10 @@ function show_help ()
     echo -e "\nInstructions:"
     echo -e "============\n"
     echo -e "Run 'sh $0' without options for a fully automated installation, using built-in defaults.\n"
+    echo -e "By default, this script will build PyQt6 locally, for use in Scipyen GUI."
+    echo -e "To choose PyQt5 or PySide6 see the options below"
+    echo -e "Using locally built PyQt6 is RECOMMENDED."
+    echo -e ""
     echo -e "Options:"
     echo -e "========\n"
     echo -e "--install_dir=DIR\tSpecify where the virtual environment will be created (default is ${HOME})\n"
@@ -61,26 +74,17 @@ function show_help ()
     echo -e "--build_neuron\t\tBuild neuron python locally\n"
     echo -e "--with_coreneuron\twhen '--build_neuron' is passed, build local neuron with coreneuron; by default coreneuron is not used.\n"
     echo -e "--with_pyqt5\t\tInstall PyQt5 from PyPI\n"
-    echo -e "--build_pyqt5\t\tBuild a PyQt5 wheel locally and install it (recommended)\n"
-    echo -e "--with_pyside6\t\tInstall PySide6 ans Shiboken from PyPI (recommended)\n"
+    echo -e "--build_pyqt5\t\tBuild a PyQt5 wheel locally and install it\n"
+    echo -e "--with_pyside6\t\tInstall PySide6 and Shiboken from PyPI\n"
     echo -e "--build_pyside6\t\tBuild a PySide6 and Shiboken wheels locally and install them \n"
     echo -e "--refresh_repos\t When '--refresh_repos' is passed, local repository clones will be refreshed before rebuilding\n"
     echo -e "\tNOTE: This applies to vigra and to local neuron build only\n"
     echo -e "--jobs=N\t\tNumber of parallel tasks during building PyQt5 and neuron; default is 4; set to 0 to disable parallel build\n"
-    echo -e "--reinstall=NAME\t\t\tRe-install/re-building NAME, where NAME is one of:\n"
-    echo -e "\tpips, pyqt5, build_pyqt5, pyside6, build_pyside6, vigra, neuron, or desktopentry;\n"
-    echo -e "\t(this option can be passed more than once)\n"
-    echo -e "--install=NAME\t\t Alias to --reinstall option above; use it to "
-    echo -e "\tinstall optional libraries AFTER building Scipyen's virtual environment\n "
     echo -e "--about\t\t\tDisplay Install.md at the console (requires the program 'glow')\n"
     echo -e "--dist\t\t\tCreates a binary Scipyen diwstribution using PyInstaller. Requires that a virtual environment has already been built using this script.\n"
     echo -e "-h | -? | --help \tShow this help message and quit\n"
     echo -e "\nFor details, execute $0 --about\n"
     echo -e "\n"
-    echo -e "When run with the virtual Python environment already activated,\n"
-    echo -e "the script will use the current virtual environment to perform \n"
-    echo -e "(re)installations. WARNING: Make sure you activate the appropriate\n"
-    echo -e "Python environment for this !\n"
    
 }
 
@@ -371,7 +375,6 @@ function dopyqt5 ()
         exit 1
     fi
     
-#     if [ ! -r ${VIRTUAL_ENV}/.pyqt5done ] || [[ $reinstall_pyqt5 -gt 0 ]] || [[ $build_pyqt5 -gt 0 ]] ; then
     if [ ! -r ${VIRTUAL_ENV}/.pyqt5build_done ] || [[ $reinstall_pyqt5 -gt 0 ]] ; then
         if [[ $build_pyqt5 -gt 0 ]] ; then
             mkdir -p ${VIRTUAL_ENV}/src && cd ${VIRTUAL_ENV}/src
@@ -778,13 +781,13 @@ if [[ $with_pyside6 -eq 1 ]] ; then
         desktopfile=Scipyen-pyside6-pypi.desktop
         scriptfile=${target_dir}/scipyen-pyside6-pypi
     fi
-elif [[ $with_pyqt6 -eq 1 ]] ; then
-    if [[ $build_pyqt6 -eq 1 ]] ; then
-        desktopfile=Scipyen-pyqt6-build.desktop
-        scriptfile=${target_dir}/scipyen-pyqt6-build
+elif [[ $with_pyqt5 -eq 1 ]] ; then
+    if [[ $build_pyqt5 -eq 1 ]] ; then
+        desktopfile=Scipyen-pyqt5-build.desktop
+        scriptfile=${target_dir}/scipyen-pyqt5-build
     else 
-        desktopfile=Scipyen-pyqt6-pypi.desktop
-        scriptfile=${target_dir}/scipyen-pyqt6-pypi
+        desktopfile=Scipyen-pyqt5-pypi.desktop
+        scriptfile=${target_dir}/scipyen-pyqt5-pypi
     fi
 else
     desktopfile=Scipyen.desktop
@@ -837,7 +840,7 @@ echo -e "Installation of Scipyen Desktop file failed\n"
 exit 1
 fi
 echo "Scipyen Desktop file has been installed "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.desktop_done
-echo -e "Scipyen Desktop file has been installed \n"
+echo -e "Scipyen Desktop file ${dektopfile} has been installed \n"
 fi
 }
 
@@ -1016,6 +1019,12 @@ if [[ $with_pyside6 -eq 1 ]] ; then
     else 
         rcfile=${HOME}/.scipyen_pyside6_pypi_rc
     fi
+elif [[ $with_pyqt5 -eq 1 ]] ; then
+    if [[ $build_pyqt5 -eq 1 ]] ; then
+        rcfile=${HOME}/.scipyen_pyqt5_build_rc
+    else 
+        rcfile=${HOME}/.scipyen_pyqt5_pypi_rc
+    fi
 else
     rcfile=${HOME}/.scipyenrc
 fi
@@ -1173,12 +1182,12 @@ if [[ $with_pyside6 -eq 1 ]] ; then
 #         launchcmd="${scipyensrcdir}/scipyen.py pyside6"
     fi
 
-elif [[ $with_pyqt6 -eq 1 ]] ; then
-    if [[ $build_pyqt6 -eq 1 ]] ; then
-        scriptfile=${target_dir}/scipyen-pyqt6-build
+elif [[ $with_pyqt5 -eq 1 ]] ; then
+    if [[ $build_pyqt5 -eq 1 ]] ; then
+        scriptfile=${target_dir}/scipyen-pyqt5-build
 #         launchcmd="${scipyensrcdir}/scipyen.py pyqt6"
     else
-        scriptfile=${target_dir}/scipyen-pyqt6-pypi
+        scriptfile=${target_dir}/scipyen-pyqt5-pypi
 #         launchcmd="${scipyensrcdir}/scipyen.py pyqt6"
     fi
 
@@ -1232,6 +1241,13 @@ export PYQTGRAPH_QT_LIB="PyQt6"
 export FORCE_QT_API="1"
 
 END
+elif [[ ( $with_pyqt5 -eq 1 ) || ( $build_pyqt5 -eq 1 ) ]] ; then
+cat <<END >> ${scriptfile} 
+export QT_API="pyqt5"
+export PYQTGRAPH_QT_LIB="PyQt5"
+export FORCE_QT_API="1"
+
+END
 
 fi
 cat <<END >> ${scriptfile} 
@@ -1243,6 +1259,8 @@ chmod +x ${scriptfile}
 echo -e "Scipyen startup script created in ${target_dir} \n"
 }
 
+function zMain(){}  # bogus function for locating this part of the script in
+                    # Kate editor's symbol viewer
 #### BEGIN Main script action happens here ###
 #
 
@@ -1267,21 +1285,14 @@ using_python=""
 install_neuron=0
 use_pypi_neuron=1
 use_core_neuron=0
-with_pyqt5=1
-build_pyqt5=1
-reinstall_pyqt5=0
-with_pyqt6=0
-reinstall_pyqt6=0
-build_pyqt6=0
+with_pyqt6=1
+build_pyqt6=1
+with_pyqt5=0
+build_pyqt5=0
 with_pyside6=0
 build_pyside6=0
-reinstall_pyside6=0
 install_fenicsx=0
 njobs=`nproc --all`
-reinstall_vigra=0
-reinstall_neuron=0
-reinstall_fenicsx=0
-reinstall_pips=0
 reinstall_desktop=0
 refresh_git_repos=0
 make_dist=0
@@ -1308,48 +1319,21 @@ for i in "$@" ; do
         use_pypi_neuron=0
         shift
         ;;
-        --with_pyqt5)
-        with_pyqt5=1
-        build_pyqt5=0 
-        with_pyqt6=0
-        build_pyqt6=0
-        with_pyside6=0
-        build_pyside6=0
-        shift
-        ;;
-        --with_pyqt6)
-        with_pyqt6=1
-        build_pyqt6=0 
-        with_pyqt5=0
-        build_pyqt5=0 
-        with_pyside6=0
-        build_pyside6=0
-        shift
-        ;;
+#         --with_pyqt6)
+#         with_pyqt6=1
+#         build_pyqt6=0 
+#         with_pyqt5=0
+#         build_pyqt5=0 
+#         with_pyside6=0
+#         build_pyside6=0
+#         shift
+#         ;;
         --with_pyside6)
         with_pyqt6=0
         build_pyqt6=0 
         with_pyqt5=0
         build_pyqt5=0 
         with_pyside6=1
-        build_pyside6=0
-        shift
-        ;;
-        --build_pyqt5)
-        with_pyqt5=1
-        build_pyqt5=1
-        with_pyqt6=0
-        build_pyqt6=0
-        with_pyside6=0
-        build_pyside6=0
-        shift
-        ;;
-        --build_pyqt6)
-        with_pyqt6=1
-        build_pyqt6=1
-        with_pyqt5=0
-        build_pyqt5=0 
-        with_pyside6=0
         build_pyside6=0
         shift
         ;;
@@ -1362,6 +1346,33 @@ for i in "$@" ; do
         build_pyside6=1
         shift
         ;;
+        --with_pyqt5)
+        with_pyqt5=1
+        build_pyqt5=0 
+        with_pyqt6=0
+        build_pyqt6=0
+        with_pyside6=0
+        build_pyside6=0
+        shift
+        ;;
+        --build_pyqt5)
+        with_pyqt5=1
+        build_pyqt5=1
+        with_pyqt6=0
+        build_pyqt6=0
+        with_pyside6=0
+        build_pyside6=0
+        shift
+        ;;
+#         --build_pyqt6)
+#         with_pyqt6=1
+#         build_pyqt6=1
+#         with_pyqt5=0
+#         build_pyqt5=0 
+#         with_pyside6=0
+#         build_pyside6=0
+#         shift
+#         ;;
         --with_coreneuron)
         use_core_neuron=1
         shift
@@ -1390,59 +1401,59 @@ for i in "$@" ; do
         reinstall="${i#*=}"
         shift
         case $reinstall in
-            pyqt5)
-            reinstall_pyqt5=1
-            build_pyqt5=0
-            reinstall_pyqt6=0
-            build_pyqt6=0
-            reinstall_pyside6=0
-            build_pyside6=0
-            ;;
-            build_pyqt5)
-            reinstall_pyqt5=1
-            build_pyqt5=1
-            reinstall_pyqt6=0
-            build_pyqt6=0
-            reinstall_pyside6=0
-            build_pyside6=0
-            ;;
-            pyqt6)
-            reinstall_pyqt6=1
-            build_pyqt6=0
-            ;;
-            build_pyqt6)
-            reinstall_pyqt5=0
-            build_pyqt5=0
-            reinstall_pyqt6=1
-            build_pyqt6=1
-            reinstall_pyside6=0
-            build_pyside6=0
-            ;;
-            pyside6)
-            reinstall_pyqt5=0
-            build_pyqt5=0
-            reinstall_pyqt6=0
-            build_pyqt6=0
-            reinstall_pyside6=1
-            build_pyside6=0
-            ;;
-            build_pyside6)
-            reinstall_pyqt5=0
-            build_pyqt5=0
-            reinstall_pyqt6=0
-            build_pyqt6=0
-            reinstall_pyside6=1
-            build_pyside6=1
-            ;;
-            vigra)
-            reinstall_vigra=1
-            ;;
-            VIGRA)
-            reinstall_vigra=1
-            ;;
-            Vigra)
-            reinstall_vigra=1
-            ;;
+#             pyqt5)
+#             reinstall_pyqt5=1
+#             build_pyqt5=0
+#             reinstall_pyqt6=0
+#             build_pyqt6=0
+#             reinstall_pyside6=0
+#             build_pyside6=0
+#             ;;
+#             build_pyqt5)
+#             reinstall_pyqt5=1
+#             build_pyqt5=1
+#             reinstall_pyqt6=0
+#             build_pyqt6=0
+#             reinstall_pyside6=0
+#             build_pyside6=0
+#             ;;
+#             pyqt6)
+#             reinstall_pyqt6=1
+#             build_pyqt6=0
+#             ;;
+#             build_pyqt6)
+#             reinstall_pyqt5=0
+#             build_pyqt5=0
+#             reinstall_pyqt6=1
+#             build_pyqt6=1
+#             reinstall_pyside6=0
+#             build_pyside6=0
+#             ;;
+#             pyside6)
+#             reinstall_pyqt5=0
+#             build_pyqt5=0
+#             reinstall_pyqt6=0
+#             build_pyqt6=0
+#             reinstall_pyside6=1
+#             build_pyside6=0
+#             ;;
+#             build_pyside6)
+#             reinstall_pyqt5=0
+#             build_pyqt5=0
+#             reinstall_pyqt6=0
+#             build_pyqt6=0
+#             reinstall_pyside6=1
+#             build_pyside6=1
+#             ;;
+#             vigra)
+#             reinstall_vigra=1
+#             ;;
+#             VIGRA)
+#             reinstall_vigra=1
+#             ;;
+#             Vigra)
+#             reinstall_vigra=1
+#             ;;
             neuron)
             reinstall_neuron=1
             ;;    
@@ -1513,20 +1524,27 @@ fi
 
 echo -e "Will install in ${install_dir}" 
 
-# if  [[ ( $with_pyside6 -eq 1 ) || ( $build_pyside6 -eq 1 ) ]] ; then
+# NOTE: 2025-10-04 09:25:06 create environment with local PyQt6 build by default
 if  [[ $with_pyside6 -eq 1 ]] ; then
     if [[  $build_pyside6 -eq 1 ]] ; then
         virtual_env_pfx=${virtual_env_pfx}_pyside6_build
     else
         virtual_env_pfx=${virtual_env_pfx}_pyside6_pypi
     fi
-elif [[ $with_pyqt6 -eq 1 ]] ; then
-    if [[ $build_pyqt6 -eq 1 ]] ; then
-        virtual_env_pfx=${virtual_env_pfx}_pyqt6_build
+elif [[ $with_pyqt5 -eq 1 ]] ; then
+    if [[ $build_pyqt5 -eq 1 ]] ; then
+        virtual_env_pfx=${virtual_env_pfx}_pyqt5_build
     else
-        virtual_env_pfx=${virtual_env_pfx}_pyqt6_pypi
+        virtual_env_pfx=${virtual_env_pfx}_pyqt5_pypi
     fi
 fi
+# elif [[ $with_pyqt6 -eq 1 ]] ; then
+#     if [[ $build_pyqt6 -eq 1 ]] ; then
+#         virtual_env_pfx=${virtual_env_pfx}_pyqt6_build
+#     else
+#         virtual_env_pfx=${virtual_env_pfx}_pyqt6_pypi
+#     fi
+# fi
 
 if ! [ -v VIRTUAL_ENV ] ; then
     virtual_env=${install_dir}/${virtual_env_pfx}
@@ -1592,10 +1610,10 @@ if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
     
     if  [[ ( $with_pyside6 -eq 1 ) || ( $build_pyside6 -eq 1 ) ]]  ; then
         dopyside6
-    elif [[ ( $with_pyqt6 -eq 1 ) || ( $build_pyqt6 -eq 1 ) ]] ; then
-        dopyqt6
-    else
+    elif [[ ( $with_pyqt5 -eq 1 ) || ( $build_pyqt5 -eq 1 ) ]] ; then
         dopyqt5 
+    else
+        dopyqt6
     fi
     
     installpipreqs_part2
@@ -1628,6 +1646,8 @@ if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
     
 fi
 
+dfile=`echo "${desktopfile%*.*}"`
+
 t=$SECONDS
 
 days=$(( t/86400 ))
@@ -1640,7 +1660,7 @@ seconds=$(( t ))
 
 echo "Execution time was $days days, $hours hours, $minutes minutes and $seconds seconds"
 echo "Before using Scipyen, either restart the terminal, or call 'source ${rcfile}'"
-echo "Scipyen can be launched by calling ${scriptfile}"
+echo "Scipyen can be launched by calling ${scriptfile} or via the ${dfile} application in your Applications launcher or in your Desktop folder"
 
 #
 #### END   Main script action happens here ###

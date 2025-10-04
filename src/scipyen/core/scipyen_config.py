@@ -107,6 +107,7 @@ from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
 from qtpy.QtCore import (Signal, Slot, Property,)
 __has_PySide6__ = False
 __has_PyQt6__ = False
+__has_PyQt5__ = False
 __has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
@@ -120,6 +121,8 @@ if os.environ["QT_API"] == "pyside6":
 else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
+    elif os.environ["QT_API"] == "pyqt5":
+        __has_PyQt5__ = True
         
     from qtpy import sip
     from qtpy.uic import loadUiType
@@ -131,9 +134,12 @@ else:
 if __has_PySide6__:
     application_name = "Scipyen-PySide6"
     organization_name = "Scipyen-PySide6"
-elif __has_PyQt6__:
-    application_name = "Scipyen-PyQt6"
-    organization_name = "Scipyen-PyQt6"
+# elif __has_PyQt6__:
+#     application_name = "Scipyen-PyQt6"
+#     organization_name = "Scipyen-PyQt6"
+elif __has_PyQt5__:
+    application_name = "Scipyen-PyQt5"
+    organization_name = "Scipyen-PyQt5"
 else:
     application_name = "Scipyen"
     organization_name = "Scipyen"
