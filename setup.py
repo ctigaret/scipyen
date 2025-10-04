@@ -1,7 +1,7 @@
 from setuptools import setup #, find_packages
 from pathlib import Path
 
-VERSION = Path('src/scipyen/VERSION').read_text(encoding="utf-8")
+VERSION = Path('src/scipyen/VERSION').read_text(encoding="utf-8").strip("\n").strip()
 
 setup(
     name='Scipyen',
