@@ -800,9 +800,6 @@ if [ ! -r ${VIRTUAL_ENV}/.desktop_done ] || [[ $reinstall_desktop -gt 0 ]] ; the
 # else
 # fi
 tmpfiledir=$(mktemp -d)
-# tmpfile=${tmpfiledir}/cezartigaret-Scipyen.desktop
-# tmpfile=${tmpfiledir}/Scipyen.desktop
-# script=${target_dir}/scipyen
 tmpfile=${tmpfiledir}/${desktopfile}
 script=${target_dir}/${scriptfile}
 echo -e "Script to execute: ${script}"
@@ -816,7 +813,7 @@ Comment=Scientific Python Environment for Neurophysiology
 GenericName[en_GB]=Scientific Python Environment for Neurophysiology
 GenericName=Scientific Python Environment for Neurophysiology
 Icon=pythonbackend
-Categories=Science;Utilities;
+Categories=Science;Utilities;Science & Maths;Education;Development
 Exec=${script}
 MimeType=
 Path=
