@@ -13,7 +13,7 @@ from core.prog import print_styled
 def adapt_ui_path(module_path, uifile):
     return os.path.join(module_path, uifile)
 
-def getUnbuiltVersion(path:pathlib.Path):
+def getUnbuiltVersion(path:pathlib.Path) -> str:
     proc = subprocess.run([sys.executable, "-m", "setuptools_scm"], capture_output=True, cwd=path.as_posix())
     if proc.returncode == 0:
         return proc.stdout.decode().replace("\n", "")

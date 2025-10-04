@@ -131,6 +131,22 @@ def print_styled(s:str, color:str='yellow', bright:bool=True):
     pre = f"{c}{colorama.Style.BRIGHT}" if bright else c
     return f"{pre}{s}{colorama.Style.RESET_ALL}"
 
+def getUnbuiltVersion(path:pathlib.Path) -> str:
+    proc = subprocess.run([sys.executable, "-m", "setuptools_scm"], capture_output=True, cwd=path.as_posix())
+    if proc.returncode == 0:
+        return proc.stdout.decode().replace("\n", "")
+
+def checkGitRepo(path:pathlib.Path) -> bool:
+    gitTest = subprocess.run(["git", "-C", path.as_posix(), "status", "--short", "--branch"], capture_output=True)
+    return gitTest.returncode == 0
+
+def getVersion(src:pathlib.Path):
+    repoDir = src.parent
+    if checkGitRepo(repoDir):
+        ret = getUnbuiltVersion(repoDir)
+    else:
+        ret = Path(src/'scipyen/VERSION').read_text(encoding="utf-8").strip("\n").strip()
+    return ret
 
 
 start_time = time.perf_counter()
@@ -231,8 +247,8 @@ if hasTaxoniq:
 myfile = sys.argv[-1] # the spec file ; this is THE LAST argument in the argument list to pyinstaller
 myfile = pathlib.Path(myfile).absolute()
 scipyen_dir = os.fspath(myfile.parent)
-version_file = pathlib.Path(scipyen_dir)/"src"/"scipyen"/"VERSION"
-VERSION = version_file.read_text(encoding="utf-8").strip("\n").strip()
+# version_file = pathlib.Path(scipyen_dir)/"src"/"scipyen"/"VERSION"
+VERSION = getVersion(pathlib.Path(scipyen_dir)/"src")
 
 # print(f"scipyen_dir = {scipyen_dir}")
 

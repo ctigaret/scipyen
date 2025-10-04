@@ -434,23 +434,35 @@ _valid_varname__regex_ = '^[A-Za-z_][A-Za-z0-9_]{1,30}$'
 #     u'\n\nAnd from the Pict package:\npictio --> pio\nsignalviewer --> sv\ndatatypes \nxmlutils' +\
 #     u'\n\nTherefore ipython line magics such as %pylab or %mtplotlib, although still available, are not necessary anymore\n'
 
-__verstr__ = None
 def checkOrigin():
+    verstr = None
+    version_file = pathlib.Path(__scipyendir__)/"VERSION"
     p = pathlib.Path(__scipyendir__)
     if p.parent.name == "src":
         # NOTE: 2025-05-21 21:50:37
         # This figures out if scipyen is being run off a local git repository; if it
-        # does, then outputs a brief message about the git branch begn used and its 
+        # does, then outputs a brief message about the git branch being used and its 
         # status (modified, or not, etc)
         # Then sets out a dynamic version based on the git branch, etc
         # NOTE: this code was previously in the scipyen.py launcher script
         try:
             repoDir = p.parent.parent
             if sysutils.checkGitRepo(repoDir, "Scipyen"):
-                __verstr__ = sysutils.getUnbuiltVersion(p)
+                verstr = sysutils.getUnbuiltVersion(p)
+                
         except:
             traceback.print_exc()
+            
+    if verstr is None:
+        try:
+            verstr = version_file.read_text(encoding="utf-8").strip("\n").strip()
+        except:
+            traceback.print_exc()
+            
+    return verstr
     
+__verstr__ = checkOrigin()
+
 _qt_version_ = f"{QtCore.qVersion()}"
 _qt_python_verstr_ = f"PySide6 {PySide6.__version__}" if __has_PySide6__ else f"{'PyQt6' if __has_PyQt6__ else 'PyQt5'} {qtpy.PYQT_VERSION}"
 _scipyen_console_banner_ = f"Scipyen {__verstr__} internal console ({_qt_python_verstr_}, Qt {_qt_version_})\n" if isinstance(__verstr__, str) and len(__verstr__.strip()) else f"Scipyen internal console ({_qt_python_verstr_}, Qt {_qt_version_})\n"
@@ -1457,6 +1469,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             
         super().__init__(parent)
         WorkspaceGuiMixin.__init__(self, parent=myparent)
+        
+        self.__version__ = __verstr__
 
         # NOTE: singleton design pattern
         # see traitlets.config.SingletonConfigurable
@@ -1549,7 +1563,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         
         self.sig_splashMessage.emit("Scipyen is initializing, please wait...")
         
-        checkOrigin()
+        # self.__version__ = checkOrigin()
         
         # ### BEGIN long comment - wrap it for KDE's Kate
         # NOTE: 2023-05-27 22:00:37
@@ -2809,6 +2823,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     def historyFontWeight(self, val:int):
         self._commandHistoryFont.setWeight(get_font_weight(val))
         self._updateHistoryViewFont()
+        
+    @property
+    def version(self):
+        return self.__version__
         
     @property
     def useSystemFont(self) -> bool:
@@ -9046,8 +9064,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     @safewrapper
     def _slot_about(self) -> None:
         txt = ["Scipyen (Scientific Python Environment for Neuroscience)",
-               "Open-source environment for the analysis of electrophysiology ",
-               "and microscopy imaging data using Python programming language",
+               f"Version:  {self.__version__}",
                "",
                "Authors:",
                "",
