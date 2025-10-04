@@ -194,7 +194,7 @@ ns: the namepace where modules have been imported
                                      "pywt":        ("PyWavelets", "https://pywavelets.readthedocs.io/en/latest/index.html", "Wavelet Transforms in Python"),
                                      },
                     "User Interface & Plotting Frameworks": {"matplotlib": ("Matplotlib", "https://matplotlib.org", "MatplotLib: Visualization with Python"),
-                                                             "seaborn": ("seaborn", "https://seaborn.pydata.org", "Statistical data visualization"),
+                                                             "seaborn": ("Seaborn", "https://seaborn.pydata.org", "Statistical data visualization"),
                                                              "pyqtgraph": ("PyQtGraph", "https://www.pyqtgraph.org", "Scientific Graphics and GUI Library for Python."),
                                                              "qtpy": ("QtPy", "https://github.com/spyder-ide/qtpy", "Abstraction layer for PyQt5/PySide2/PyQt6/PySide6"),
                                                              },
@@ -233,7 +233,7 @@ ns: the namepace where modules have been imported
             '<meta> name="generator" content="Kate Editor"</meta>',
             '</head>',
             '<body>',
-            '<h2>Software Components of Scipyen¹</h2>',
+            '<h2>Software Components of Scipyen</h2>',
             '(Click on the links below, for credits & licenses)']
     
     txt.append('<h3>Environment</h3>')
@@ -266,11 +266,11 @@ ns: the namepace where modules have been imported
         line = _get_info_(name, minfo)
         if isinstance(line, str) and len(line.strip()):
             txt.append(line)
-    txt.append('<li> <a href="https://develop.kde.org/frameworks/breeze-icons/">Breeze Icons</a> © <a href="https://kde.org">KDE</a> and licenced under the <a href="https://www.gnu.org/licenses/lgpl-3.0.en.html">GNU LGPL version 3 or later</a></li>')
+    txt.append('<li> <a href="https://develop.kde.org/frameworks/breeze-icons/">Breeze Icons</a> © <a href="https://kde.org">KDE</a> and licensed under the <a href="https://www.gnu.org/licenses/lgpl-3.0.en.html">GNU LGPL version 3 or later</a></li>')
     txt.append("</ul>")
 
 
-    txt.append("<p>¹Used or available for use at the console — this is not an exhaustive list, and excludes libraries installed after Scipyen's installation.</p>")
+    # txt.append("<p>¹Used or available for use at the console — this is not an exhaustive list, and excludes libraries installed after Scipyen's installation.</p>")
     txt.append("</body>")
     txt.append("</html>")
     
