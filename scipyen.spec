@@ -904,7 +904,8 @@ if sys.platform.startswith("linux"):
     desktoptempdir = tempfile.mkdtemp()
     desktop_file_name = os.path.join(desktoptempdir, f"org.scipyen.desktop")
     desktop_icon_file = "pythonbackend.svg"
-    exec_file = os.path.join(bundlepath, "scipyen")
+    # exec_file = os.path.join(bundlepath, "scipyen.app")
+    # exec_file = final_exe_file_name
     desktop_file_contents = [
         "[Desktop Entry]",
         "Type=Application",
@@ -916,7 +917,7 @@ if sys.platform.startswith("linux"):
         "GenericName=Scipyen",
         f"Icon={desktop_icon_file}",
         "Categories=Science;Education",
-        "Exec=scipyen.app",
+        f"Exec={final_exe_file_name}",
         "MimeType=",
         "Path=",
         "StartupNotify=true",
@@ -931,7 +932,7 @@ if sys.platform.startswith("linux"):
         for line in desktop_file_contents:
             desktop_file.write(f"{line}\n")
             
-        shutil.copyfile(desktop_file_name, pathlib.Path(distpath)/product/"org.scipyen.desktop")
+    shutil.copyfile(pathlib.Path(desktop_file_name), pathlib.Path(bundlepath) / "org.scipyen.desktop")
 
 stop_time = time.perf_counter()
 dt = stop_time - start_time
