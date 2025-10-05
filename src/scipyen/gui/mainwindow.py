@@ -434,9 +434,10 @@ _valid_varname__regex_ = '^[A-Za-z_][A-Za-z0-9_]{1,30}$'
 #     u'\n\nAnd from the Pict package:\npictio --> pio\nsignalviewer --> sv\ndatatypes \nxmlutils' +\
 #     u'\n\nTherefore ipython line magics such as %pylab or %mtplotlib, although still available, are not necessary anymore\n'
 
+__is_pyinstaller_bundled__ = getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS")
+
 def checkOrigin():
     verstr = None
-    version_file = pathlib.Path(__scipyendir__)/"VERSION"
     p = pathlib.Path(__scipyendir__)
     if p.parent.name == "src":
         # NOTE: 2025-05-21 21:50:37
@@ -455,7 +456,12 @@ def checkOrigin():
             
     if verstr is None:
         try:
-            verstr = version_file.read_text(encoding="utf-8").strip("\n").strip()
+            if __is_pyinstaller_bundled__:
+                version_file = pathlib.Path(sys._MEIPASS).parent / "VERSION"
+            else:
+                version_file = pathlib.Path(__scipyendir__)/"VERSION"
+            if version_file.exists():
+                verstr = version_file.read_text(encoding="utf-8").strip("\n").strip()
         except:
             traceback.print_exc()
             

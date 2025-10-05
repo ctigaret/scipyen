@@ -934,6 +934,11 @@ if sys.platform.startswith("linux"):
             
     shutil.copyfile(pathlib.Path(desktop_file_name), pathlib.Path(bundlepath) / "org.scipyen.desktop")
 
+with tempfile.NamedTemporaryFile(delete_on_close=False) as fp:
+    fp.write(VERSION.encode())
+    fp.close()
+    shutil.copyfile(pathlib.Path(fp.name), pathlib.Path(bundlepath) / "VERSION")
+
 stop_time = time.perf_counter()
 dt = stop_time - start_time
 dd = int(dt//86400)
