@@ -438,6 +438,7 @@ __is_pyinstaller_bundled__ = getattr(sys, "frozen", False) and hasattr(sys, "_ME
 
 def checkOrigin():
     verstr = None
+    buildstr = None
     p = pathlib.Path(__scipyendir__)
     if p.parent.name == "src":
         # NOTE: 2025-05-21 21:50:37
@@ -458,13 +459,21 @@ def checkOrigin():
         try:
             if __is_pyinstaller_bundled__:
                 version_file = pathlib.Path(sys._MEIPASS).parent / "VERSION"
+                build_file = pathlib.Path(sys._MEIPASS).parent / "BUILD"
+                if build_file.exists():
+                    buildstr = build_file.read_text(encoding="utf-8").strip("\n").strip()
             else:
                 version_file = pathlib.Path(__scipyendir__)/"VERSION"
+                
             if version_file.exists():
                 verstr = version_file.read_text(encoding="utf-8").strip("\n").strip()
         except:
             traceback.print_exc()
-            
+    
+    if verstr is not None:
+        if buildstr is not None:
+            verstr += (f"(Build: {buildstr} )")
+
     return verstr
     
 __verstr__ = checkOrigin()

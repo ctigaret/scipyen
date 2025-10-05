@@ -653,42 +653,21 @@ hiddenimports.extend(pygments_styles_hiddenimports)
 
 now = datetime.datetime.now()
 year = f"{now.year}"[-2:]
-month = f"{string.ascii_lowercase[now.month-1]}"
+month = now.month
+month_letter = f"{string.ascii_lowercase[now.month-1]}"
 day = f"{now.day}"
 hr = f"{now.hour}"
 mn = f"{now.minute}"
 sc = f"{now.second}"
-build_sfx = f"{year}{month}{day}_{hr}_{mn}_{sc}"
+build_sfx = f"{year}{month_letter}{day}_{hr}_{mn}_{sc}"
+build_str = f"{year}/{month}/{day}, {hr}:{mn}:{sc}"
 pyver_sfx = "_".join(["python", f"{sys.version_info.major}", f"{sys.version_info.minor}", f"{sys.version_info.micro}"])
 # debug_sfx = "debug" if compile_options.debug else ""
 
 product = "_".join(["scipyen", VERSION, gitsfx, platform, host_name, pyver_sfx, build_sfx])
 if compile_options.debug:
     product += "_debug"
-# product = f"scipyen{gitsfx}_{platform}_{host_name}{debug_sfx}"
-# product = f"scipyen{gitsfx}_{platform}_{hr}_{mn}_{sc}_{year}{month}{day}"
-
 bundlepath = os.path.join(distpath, product)
-
-# 
-#     dist_install_script = ["#!/bin/bash",
-#                         "mydir=`dirname $0`",
-#                         "whereami=`realpath ${mydir}`",
-#                         # "chown -R root:root ${whereami}",
-#                         "sudo ln -s -b ${whereami}/scipyen /usr/local/bin/",
-#                         "sudo ln -s -b ${whereami}/Scipyen_app" + f"{gitsfx}.desktop /usr/share/applications/"]
-# 
-#     install_script_tempdir = tempfile.mkdtemp()
-#     dist_install_script_name = os.path.join(install_script_tempdir, "dist_install.sh")
-# 
-#     with open(dist_install_script_name, "wt") as dist_install:
-#         for line in dist_install_script:
-#             dist_install.write(f"{line}\n")
-#             
-#     datas.append((f"{os.path.join(scipyen_dir, 'src/scipyen/gui/resources/images', desktop_icon_file)}", '.'))
-#     # datas.append(("/home/cezar/scipyen/src/scipyen/gui/resources/images/pythonbackend.svg", '.'))
-#     datas.append((desktop_file_name, '.'))
-#     datas.append((dist_install_script_name, '.'))
 
 # NOTE: 2023-06-28 11:06:50 This WORKS!!! 
 # see NOTE: 2023-06-28 11:07:31 and NOTE: 2023-06-28 11:08:08
@@ -939,6 +918,11 @@ with tempfile.NamedTemporaryFile(delete_on_close=False) as fp:
     fp.write(VERSION.encode())
     fp.close()
     shutil.copyfile(pathlib.Path(fp.name), pathlib.Path(bundlepath) / "VERSION")
+    
+with tempfile.NamedTemporaryFile(delete_on_close=False) as fp:
+    fp.write(build_str.encode())
+    fp.close()
+    shutil.copyfile(pathlib.Path(fp.name), pathlib.Path(bundlepath) / "BUILD")
     
 install_script_contents = [
     "#! /bin/bash\n",
