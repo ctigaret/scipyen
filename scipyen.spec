@@ -939,6 +939,31 @@ with tempfile.NamedTemporaryFile(delete_on_close=False) as fp:
     fp.write(VERSION.encode())
     fp.close()
     shutil.copyfile(pathlib.Path(fp.name), pathlib.Path(bundlepath) / "VERSION")
+    
+install_script_contents = [
+    "#! /bin/bash",
+    "if [[ `id -u` -ne 0 ]] ; then",
+    "echo -e \"This script must be run as administrator\"",
+    "exit 1",
+    "fi",
+    "target_dir=/usr/local",
+    "mydir=`pwd`",
+    "realscript=`realpath $0`",
+    "bundle=`dirname ${realscript}`",
+    "package=`basename ${bundle}`",
+    "destination=${target_dir}/scipyen_app",
+    "if [ -d ${destination}/${package} ]; then",
+    "xdg-desktop-menu uninstall ${destination}/${package}/org.scipyen.desktop",
+    "rm -fr ${destination}/${package}",
+    "fi",
+    "mkdir -p ${destination} && cp -r -t ${destination} ${bundle} && ln -s -f -t ${target_dir}/bin/ ${destination}/${package}/scipyen.app && xdg-desktop-menu install --novendor ${destination}/${package}/org.scipyen.desktop"
+    ]
+
+with tempfile.NamedTemporaryFile(delete_on_close=False) as fp:
+    for line in install_script_contents:
+        fp.write(line.encode())
+    fp.close()
+    shutil.copyfile(pathlib.path(fp.name), pathlib.Path(bundlepath) / "scipyen_install.sh")
 
 stop_time = time.perf_counter()
 dt = stop_time - start_time
