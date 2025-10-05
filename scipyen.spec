@@ -433,7 +433,10 @@ def getQt6PluginsDir():
 
 def getQt6Plugins(path):
     # not sure I can use this ...
-    return Tree(root=path, prefix="PyQt6/Qt6/plugins", typecode="BINARY")
+    if qtapi.lower() == "pyqt6":
+        return Tree(root=path, prefix="PyQt6/Qt6/plugins", typecode="BINARY")
+    else:
+        return Tree(root=path, prefix="PySide6/Qt6/plugins", typecode="BINARY")
 
 def check_plugin_module(file_name) -> bool:
     with open(file_name, "rt", encoding="utf-8") as module_file:
@@ -813,6 +816,10 @@ if qtapi.lower() == "pyqt5":
     qt5plugins_dir = getQt5PluginsDir()
     qt5plugins_toc = getQt5Plugins(qt5plugins_dir)
     a.binaries += qt5plugins_toc 
+elif qtapi.lower() in ("pyqt6", "pyside6"):
+    qt6plugins_dir = getQt6PluginsDir()
+    qt6plugins_toc = getQt6Plugins(qt6plugins_dir)
+    a.binaries += qt6plugins_toc 
     
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 

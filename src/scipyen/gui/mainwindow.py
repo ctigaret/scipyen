@@ -9075,7 +9075,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             build_file = pathlib.Path(sys._MEIPASS).parent / "BUILD"
             if build_file.exists():
                 buildstr = build_file.read_text(encoding="utf-8").strip("\n").strip()
-                vrs += f" (PyInstaller Bundle Build: {buildstr})"
+                vrs += f"\nPyInstaller Bundle:\n{buildstr}"
             else:
                 vrs += " (PyInstaller Bundle)"
                 
