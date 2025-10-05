@@ -18,33 +18,36 @@ To create a distributable scipyen application, you need to:
 1) clone the scipyen git repo locally (e.g. to $HOME/scipyen) - 
 NOTE: this is assumed to be the case from here onwards, on GNU/linux and MacOS
 
-ATTENTION: python binary compatibility(ies) ATTENTION
+ATTENTION: Linux platforms - python binary compatibility(ies) ATTENTION
 
-For the bundled app to be portable across machines with the same OS
-make sure that the host platform (where the bundle is to be run) has the SAME
-python libraries as the machine where the bundle was built - especially the 
-python interpreter shared libraries.
+A bundle built on a machine might not run on a second machine even if both machines
+run the same OS (and APPEAR to have the same software installation, etc); the 
+the reverse may be possible: a bundle built on the 'second' machine might run OK
+on the 'first' machine.
 
-NOTE: Some distributions provide x86-64 optimized libraries (glibc-hwcaps); if 
-the PyInstaller bundle uses these then the binary will NOT work on platform without
-the optimized libraries installed.
-
-This may result in a bundle built on a machine not being usable on another machine
-(although the reverse may be possible: a bundle built on the 'other' might run OK
-on the 'first' machine).
+It seems this issue is caused by the system python libraries used while building the
+virtual python environment for Scipyen (i.e. locally building Python bindings for
+Qt libaries, and locally building the VIGRA libaries): there may be subtle differences
+betwen seemingly identical machines (e.g. the use of x64-64 optimized libraries 
+on one machine and not on the other, etc).
 
 While I'm trying to get my head around this — and make the bundles fully portable
-— I recommend the following approach to enable ALL user accounts on the machine 
+— I recommend the following approach to enable ALL user accounts on a given machine 
 to run Scipyen without building their own virtual python environments in their own
-account on the SAME machine as yours:
+account (thus saving time & disk space):
 
 1.1) build a scipyen environment in your own (regular) user account, then
 1.2) build a PyInstaller bundle and installing it (AS ADMINSTRATOR) on the 
 same machine where the bundle was created.
 
-1.3) NOTE: you MAY try to copy ehte bundle to another machine (thus avoiding 
-spending time on building a Scipyen environment & PyInstaller bundle there
-HOWEVER, WARNING: IT MAY NOT WORK, due to the issue described above.
+1.3) NOTE: you MAY try to copy the bundle to another machine (thus avoiding 
+spending time on building a Scipyen environment & PyInstaller bundle there, but
+(WARNING) IT MAY NOT WORK, due to the issue described above. If the bundle does 
+not work, it will have to be built locally on the specific machine, using a locally
+built Scipyen environment.
+
+The steps 1.1 & 1.2 almost surely will have to be used if the machines run different
+Linux distributions.
 
 2) use on of the installation scripts in the top directory of the cloned
     repository to create the local virtual environment required to run Scipyen:
