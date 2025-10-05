@@ -28,22 +28,23 @@ python interpreter shared libraries.
 NOTE: Some distributions provide x86-64 optimized libraries (glibc-hwcaps); if 
 the PyInstaller bundle uses these then the binary will NOT work on platform without
 the optimized libraries installed.
-I recommend installing these in all target platforms BEFORE building the virtual 
-environment for Scipyen and creating the PyInstaller bundle
 
-For example, in openSUSE tubmleweed one can install two different 
-libpython3.13.so.1.0 files from the same repository (main):
+This may result in a bundle built on a machine not being usable on another machine
+(although the reverse may be possible: a bundle built on the 'other' might run OK
+on the 'first' machine).
 
-Package                                         ↦   library file (size)
----------------------------------------------------------------------------
-libpython3_13-1_0 version 3.13.2-2.5            ↦   libpython3.13.so.1.0 (4.9 Mb)
-libpython3_13-1_0-x86-64-v3 version 3.13.2-2.5  ↦   libpython3.13.so.1.0 (5.0 Mb)
+While I'm trying to get my head around this — and make the bundles fully portable
+— I recommend the following approach to enable ALL user accounts on the machine 
+to run Scipyen without building their own virtual python environments in their own
+account on the SAME machine as yours:
 
-If the PyInstaller bundle is built on a machine using libpython3_13-1_0-x86-64-v3
-it will simply NOT work on machine that is using libpython3_13-1_0 !!!
+1.1) build a scipyen environment in your own (regular) user account, then
+1.2) build a PyInstaller bundle and installing it (AS ADMINSTRATOR) on the 
+same machine where the bundle was created.
 
-The reverse is OK: the executable built on a machine using libpython3_13-1_0
-WILL work on a machine that uses libpython3_13-1_0-x86-64-v3.
+1.3) NOTE: you MAY try to copy ehte bundle to another machine (thus avoiding 
+spending time on building a Scipyen environment & PyInstaller bundle there
+HOWEVER, WARNING: IT MAY NOT WORK, due to the issue described above.
 
 2) use on of the installation scripts in the top directory of the cloned
     repository to create the local virtual environment required to run Scipyen:
