@@ -933,7 +933,8 @@ if sys.platform.startswith("linux"):
             desktop_file.write(f"{line}\n")
             
     shutil.copyfile(pathlib.Path(desktop_file_name), pathlib.Path(bundlepath) / "org.scipyen.desktop")
-
+    shutil.rmtree(desktoptempdir)
+    
 with tempfile.NamedTemporaryFile(delete_on_close=False) as fp:
     fp.write(VERSION.encode())
     fp.close()
