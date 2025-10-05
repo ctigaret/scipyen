@@ -9069,8 +9069,11 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     @Slot()
     @safewrapper
     def _slot_about(self) -> None:
+        vrs = f"{self.__version__}"
+        if self._pyinstaller_bundled_:
+            vrs += " (PyInstaller bundle)"
         txt = ["Scipyen (Scientific Python Environment for Neuroscience)",
-               f"Version:  {self.__version__}",
+               f"Version:  {vrs}",
                "",
                "Authors:",
                "",
