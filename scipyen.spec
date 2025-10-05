@@ -25,6 +25,12 @@ make sure that the host platform (where the bundle is to be run) has the SAME
 python libraries as the machine where the bundle was built - especially the 
 python interpreter shared libraries.
 
+NOTE: Some distributions provide x86-64 optimized libraries (glibc-hwcaps); if 
+the PyInstaller bundle uses these then the binary will NOT work on platform without
+the optimized libraries installed.
+I recommend installing these in all target platforms BEFORE building the virtual 
+environment for Scipyen and creating the PyInstaller bundle
+
 For example, in openSUSE tubmleweed one can install two different 
 libpython3.13.so.1.0 files from the same repository (main):
 
