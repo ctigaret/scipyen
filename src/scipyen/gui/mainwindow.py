@@ -436,9 +436,8 @@ _valid_varname__regex_ = '^[A-Za-z_][A-Za-z0-9_]{1,30}$'
 
 __is_pyinstaller_bundled__ = getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS")
 
-def checkOrigin():
+def checkVersion():
     verstr = None
-    buildstr = None
     p = pathlib.Path(__scipyendir__)
     if p.parent.name == "src":
         # NOTE: 2025-05-21 21:50:37
@@ -459,10 +458,7 @@ def checkOrigin():
         try:
             if __is_pyinstaller_bundled__:
                 version_file = pathlib.Path(sys._MEIPASS).parent / "VERSION"
-                build_file = pathlib.Path(sys._MEIPASS).parent / "BUILD"
-                if build_file.exists():
-                    buildstr = build_file.read_text(encoding="utf-8").strip("\n").strip()
-            else:
+           else:
                 version_file = pathlib.Path(__scipyendir__)/"VERSION"
                 
             if version_file.exists():
@@ -470,13 +466,9 @@ def checkOrigin():
         except:
             traceback.print_exc()
     
-    if verstr is not None:
-        if buildstr is not None:
-            verstr += (f"(Build: {buildstr} )")
-
     return verstr
     
-__verstr__ = checkOrigin()
+__verstr__ = checkVersion()
 
 _qt_version_ = f"{QtCore.qVersion()}"
 _qt_python_verstr_ = f"PySide6 {PySide6.__version__}" if __has_PySide6__ else f"{'PyQt6' if __has_PyQt6__ else 'PyQt5'} {qtpy.PYQT_VERSION}"
@@ -1578,7 +1570,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         
         self.sig_splashMessage.emit("Scipyen is initializing, please wait...")
         
-        # self.__version__ = checkOrigin()
+        # self.__version__ = checkVersion()
         
         # ### BEGIN long comment - wrap it for KDE's Kate
         # NOTE: 2023-05-27 22:00:37
@@ -9080,7 +9072,13 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     def _slot_about(self) -> None:
         vrs = f"{self.__version__}"
         if self._pyinstaller_bundled_:
-            vrs += " (PyInstaller bundle)"
+            build_file = pathlib.Path(sys._MEIPASS).parent / "BUILD"
+            if build_file.exists():
+                buildstr = build_file.read_text(encoding="utf-8").strip("\n").strip()
+                vrs += f" (PyInstaller Bundle Build: {buildstr})"
+            else:
+                vrs += " (PyInstaller Bundle)"
+                
         txt = ["Scipyen (Scientific Python Environment for Neuroscience)",
                f"Version:  {vrs}",
                "",
