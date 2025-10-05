@@ -458,7 +458,7 @@ def checkVersion():
         try:
             if __is_pyinstaller_bundled__:
                 version_file = pathlib.Path(sys._MEIPASS).parent / "VERSION"
-           else:
+            else:
                 version_file = pathlib.Path(__scipyendir__)/"VERSION"
                 
             if version_file.exists():
