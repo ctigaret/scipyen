@@ -665,7 +665,7 @@ hr = f"{now.hour}"
 mn = f"{now.minute}"
 sc = f"{now.second}"
 build_sfx = f"{year}{month_letter}{day}_{hr}_{mn}_{sc}"
-build_str = f"{host_name} ({platstr}) {year}/{month}/{day}, {hr}:{mn}:{sc}"
+build_str = f"{host_name} ({platstr}) {year}/{month}/{day} {hr}:{mn}:{sc}"
 pyver_sfx = "_".join(["python", f"{sys.version_info.major}", f"{sys.version_info.minor}", f"{sys.version_info.micro}"])
 # debug_sfx = "debug" if compile_options.debug else ""
 
