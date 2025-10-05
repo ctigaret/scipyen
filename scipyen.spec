@@ -1005,16 +1005,4 @@ dt = dt % 60
 
 print(f"\n\nDuration: {dd} days, {hh} hours, {mm} minutes and {dt} seconds")
 
-# NOTE: 2024-05-31 09:36:11 FIXME/TODO
-# ------------------------------------
-# see NOTE: 2024-05-31 09:31:43 FIXME/TODO
-# ------------------------------------
-# if isinstance(tempdir, str) and os.path.isdir(tempdir):
-#     shutil.rmtree(tempdir)
-#     
-# if isinstance(desktoptempdir, str) and os.path.isdir(desktoptempdir):
-#     shutil.rmtree(desktoptempdir)
-#     
-# # app_location =
-# if sys.platform.startswith("linux"):
-#     print(f"To install system-wide, run {os.path.join(product, '_internal', 'dist_install.sh')}.")
+print(f"\n\nTo install system-wide, run 'sh ./install_scipyen_app.sh' inside the newly created sub-directory of 'dist', as adminstrator.")
