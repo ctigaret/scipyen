@@ -34,7 +34,7 @@ libpython3_13-1_0 version 3.13.2-2.5            ↦   libpython3.13.so.1.0 (4.9 
 libpython3_13-1_0-x86-64-v3 version 3.13.2-2.5  ↦   libpython3.13.so.1.0 (5.0 Mb)
 
 If the PyInstaller bundle is built on a machine using libpython3_13-1_0-x86-64-v3
-if will simply NOT work on machine that is using libpython3_13-1_0 !!!
+it will simply NOT work on machine that is using libpython3_13-1_0 !!!
 
 The reverse is OK: the executable built on a machine using libpython3_13-1_0
 WILL work on a machine that uses libpython3_13-1_0-x86-64-v3.
