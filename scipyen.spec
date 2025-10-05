@@ -941,56 +941,56 @@ with tempfile.NamedTemporaryFile(delete_on_close=False) as fp:
     shutil.copyfile(pathlib.Path(fp.name), pathlib.Path(bundlepath) / "VERSION")
     
 install_script_contents = [
-    "#! /bin/bash",
-    "if [[ `id -u` -ne 0 ]] ; then",
-    "echo -e \"This script must be run as administrator\"",
-    "exit 1",
-    "fi",
-    "target_dir=/usr/local",
-    "mydir=`pwd`",
-    "realscript=`realpath $0`",
-    "bundle=`dirname ${realscript}`",
-    "package=`basename ${bundle}`",
-    "destination=${target_dir}/scipyen_app",
-    "if [ -d ${destination}/${package} ]; then",
-    "xdg-desktop-menu uninstall ${destination}/${package}/org.scipyen.desktop",
-    "rm -fr ${destination}/${package}",
-    "fi",
-    "mkdir -p ${destination} && cp -r -t ${destination} ${bundle} && ln -s -f -t ${target_dir}/bin/ ${destination}/${package}/scipyen.app && xdg-desktop-menu install --novendor ${destination}/${package}/org.scipyen.desktop"
+    "#! /bin/bash\n",
+    "if [[ `id -u` -ne 0 ]] ; then\n",
+    "echo -e \"This script must be run as administrator\"\n",
+    "exit 1\n",
+    "fi\n",
+    "target_dir=/usr/local\n",
+    "mydir=`pwd`\n",
+    "realscript=`realpath $0`\n",
+    "bundle=`dirname ${realscript}`\n",
+    "package=`basename ${bundle}`\n",
+    "destination=${target_dir}/scipyen_app\n",
+    "if [ -d ${destination}/${package} ]; then\n",
+    "xdg-desktop-menu uninstall ${destination}/${package}/org.scipyen.desktop\n",
+    "rm -fr ${destination}/${package}\n",
+    "fi\n",
+    "mkdir -p ${destination} && cp -r -t ${destination} ${bundle} && ln -s -f -t ${target_dir}/bin/ ${destination}/${package}/scipyen.app && xdg-desktop-menu install --novendor ${destination}/${package}/org.scipyen.desktop\n"
     ]
 
 uninstall_script_contents = [
-    "#! /bin/bash",
-    "if [[ `id -u` -ne 0 ]] ; then",
-    "echo -e \"This script must be run as administrator\"",
-    "exit 1",
-    "fi",
-    "target_dir=/usr/local",
-    "mydir=`pwd`",
-    "realscript=`realpath $0`",
-    "bundle=`dirname ${realscript}`",
-    "package=`basename ${bundle}`",
-    "destination=${target_dir}/scipyen_app",
-    "if [ -d ${destination}/${package} ]; then",
-    "if [ -L ${target_dir}/bin/scipyen.app ] ; then ",
-    "rm -f ${target_dir}/bin/scipyen.app",
-    "fi",
-    "xdg-desktop-menu uninstall ${destination}/${package}/org.scipyen.desktop",
-    "rm -fr ${destination}/${package}",
-    "fi",
+    "#! /bin/bash\n",
+    "if [[ `id -u` -ne 0 ]] ; then\n",
+    "echo -e \"This script must be run as administrator\"\n",
+    "exit 1\n",
+    "fi\n",
+    "target_dir=/usr/local\n",
+    "mydir=`pwd`\n",
+    "realscript=`realpath $0`\n",
+    "bundle=`dirname ${realscript}`\n",
+    "package=`basename ${bundle}`\n",
+    "destination=${target_dir}/scipyen_app\n",
+    "if [ -d ${destination}/${package} ]; then\n",
+    "if [ -L ${target_dir}/bin/scipyen.app ] ; then\n",
+    "rm -f ${target_dir}/bin/scipyen.app\n",
+    "fi\n",
+    "xdg-desktop-menu uninstall ${destination}/${package}/org.scipyen.desktop\n",
+    "rm -fr ${destination}/${package}\n",
+    "fi\n",
     ]
 
 with tempfile.NamedTemporaryFile(delete_on_close=False) as fp:
     for line in install_script_contents:
         fp.write(line.encode())
     fp.close()
-    shutil.copyfile(pathlib.path(fp.name), pathlib.Path(bundlepath) / "install_scipyen_app.sh")
+    shutil.copyfile(pathlib.Path(fp.name), pathlib.Path(bundlepath) / "install_scipyen_app.sh")
 
 with tempfile.NamedTemporaryFile(delete_on_close=False) as fp:
     for line in uninstall_script_contents:
         fp.write(line.encode())
     fp.close()
-    shutil.copyfile(pathlib.path(fp.name), pathlib.Path(bundlepath) / "uninstall_scipyen_app.sh")
+    shutil.copyfile(pathlib.Path(fp.name), pathlib.Path(bundlepath) / "uninstall_scipyen_app.sh")
 
 stop_time = time.perf_counter()
 dt = stop_time - start_time
