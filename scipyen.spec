@@ -1005,4 +1005,4 @@ dt = dt % 60
 
 print(f"\n\nDuration: {dd} days, {hh} hours, {mm} minutes and {dt} seconds")
 
-print(f"\n\nTo install system-wide, run 'sh ./install_scipyen_app.sh' inside the newly created sub-directory of 'dist', as adminstrator.")
+print(f"\n\nTo install system-wide:\n\nrun 'sh ./install_scipyen_app.sh' inside the newly created sub-directory of 'dist' (see below), as adminstrator\n\n.")
