@@ -624,6 +624,7 @@ if os.path.isdir(os.path.join(mydir, ".git")):
                         
 host_name=""
 platform = sys.platform
+platstr = platform
 if platform.startswith("win32"):
     datas.append((os.path.join(scipyen_dir, "setup_env", "make_app_link.ps1"), "."))
     datas.append((os.path.join(scipyen_dir, "setup_env", "pythonbackend.ico"), "."))
@@ -633,7 +634,8 @@ if platform.startswith("win32"):
 else:
     uname = subprocess.run(["uname", "-ms"], encoding="utf-8", capture_output=True)
     if uname.returncode==0:
-        platform = uname.stdout.strip("\n").replace(" ", "_")
+        platstr = uname.stdout.strip("\n")
+        platform = platform.replace(" ", "_")
     pout = subprocess.run(["hostname"], encoding="utf-8", capture_output=True)
     if pout.returncode == 0:
         host_name = pout.stdout.strip("\n")
@@ -660,7 +662,7 @@ hr = f"{now.hour}"
 mn = f"{now.minute}"
 sc = f"{now.second}"
 build_sfx = f"{year}{month_letter}{day}_{hr}_{mn}_{sc}"
-build_str = f"{year}/{month}/{day}, {hr}:{mn}:{sc}"
+build_str = f"{host_name} ({platstr}) {year}/{month}/{day}, {hr}:{mn}:{sc}"
 pyver_sfx = "_".join(["python", f"{sys.version_info.major}", f"{sys.version_info.minor}", f"{sys.version_info.micro}"])
 # debug_sfx = "debug" if compile_options.debug else ""
 
