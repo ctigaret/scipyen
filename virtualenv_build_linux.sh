@@ -196,39 +196,49 @@ function makevirtenv ()
         if [ -a $virtual_env/pyvenv.cfg ] ; then 
             # and has pyvenv.cfg => check if pyvenv.cfg is what is expected to be
             aa=`cat $virtual_env/pyvenv.cfg | grep "virtualenv"`
-            if [ -n "$aa" ] ; then 
-                # and pyvenv.cfg defines a vitualenv variable -> OK so far
-                # => check for bin subdirerctory
-                if [ ! -d $virtual_env/bin ] ; then
-                    # bin subdirectory missing -> BAD!!!
-                    echo -e "$virtual_env/ does not look like a virtual environment directory. Goodbye!\n"
-                    exit 1
-                fi
-                if [ ! -r $virtual_env/bin ] ; then
-                    # bin subdirectory not readable -> BAD!!!
-                    echo -e "$virtual_env/ does not look like a virtual environment directory. Goodbye!\n"
-                    exit 1
-                fi
-                
-                echo -e "Virtual environment found; activating it...\n"
-                
-                # so far so good; try and activate the virtual environment
-                source $virtual_env/bin/activate
-                
-                if [[ -z ${VIRTUAL_ENV} ]]; then
-                    # failed to activate => bail out
-                    echo -r "Cannot activate a virtual environment from  $virtual_env . Goodbye!\n"
-                    exit 1
-                fi
-                
-                python_executable=`which python3`
-                
-                echo -e "Virtual environment activated and will use ${python_executable}\n"
-                
-            else
-                echo -e "$virtual_env/ does not look like a virtual environment directory. Goodbye!\n"
+            # NOTE: 2025-10-06 11:16:02
+            # when the virtual env was created with 'uv' there will be NO 'virtualenv' field in pyvenv.cfg!
+            # so let's try and get the uv version & implementation
+            uv_ver=`cat $virtual_env/pyvenv.cfg | grep "uv"`
+            implementation=`cat $virtual_env/pyvenv.cfg | grep "implementation"`
+
+            if [ -z "$aa" ] | ( [ -z "$uv_ver" ] & [ -z "$implementation" ] ) ; then
+                echo -e "$virtual_env/does not look like a virtual environment directory: invalid 'pyvenv.cfg' file. Goodbye!\n "
                 exit 1
-            fi 
+            fi
+
+            # and pyvenv.cfg defines a vitualenv variable -> OK so far
+            # => check for bin subdirerctory
+            if [ ! -d $virtual_env/bin ] ; then
+                # bin subdirectory missing -> BAD!!!
+                echo -e "$virtual_env/ does not look like a virtual environment directory (no 'bin' subdirectory). Goodbye!\n"
+                exit 1
+            fi
+
+            if [ ! -r $virtual_env/bin ] ; then
+                # bin subdirectory not readable -> BAD!!!
+                echo -e "$virtual_env/ does not look like a virtual environment directory ('bin' subdirectory unreadable). Goodbye!\n"
+                exit 1
+            fi
+
+            echo -e "Virtual environment found; activating it...\n"
+
+            # so far so good; try and activate the virtual environment
+            source $virtual_env/bin/activate
+
+            if [[ -z ${VIRTUAL_ENV} ]]; then
+                # failed to activate => bail out
+                echo -r "Sourcing $virtual_env/bin/activate did not activate a virtual environment. Goodbye!\n"
+                exit 1
+            fi
+
+            python_executable=`which python3`
+
+            echo -e "Virtual environment activated and will use ${python_executable}\n"
+
+        else
+            echo -e "$virtual_env does not have a readable 'pyvenv.cfg' file. Goodbye!\n"
+            exit 1
         fi
     else
         # putative virtual environment directory not found => need to generate one
@@ -1141,7 +1151,6 @@ if [ -z "${source_set}" ]; then
 # source .scipyenrc in there
 echo "Copying ${HOME}/.bashrc to ${HOME}/.bashrc.$dt"
 cp ${HOME}/.bashrc ${HOME}/.bashrc.$dt
-# echo "source ${HOME}/.scipyenrc" >> ${HOME}/.bashrc
 echo "source ${rcfile}/" >> ${HOME}/.bashrc
 echo ".bashrc has been modified in ${HOME}"
 echo "Sourcing ${HOME}/.bashrc"
@@ -1149,30 +1158,6 @@ source ${HOME}/.bashrc
 fi
 shopt -u lastpipe
 fi
-# if [ ! -r ${HOME}/.bashrc ]; then
-# cat<<END > ${HOME}/.bashrc
-# source ${HOME}/.scipyenrc
-# END
-# echo ".bashrc has been created in ${HOME}"
-# echo "Sourcing ${HOME}/.bashrc"
-# source ${HOME}/.bashrc
-# else
-# shopt -s lastpipe
-# # check if .scipyenrc is sourced from .bashrc
-# cat ${HOME}/.bashrc | grep "source ${HOME}/.scipyenrc" | read source_set
-# # echo "source_set="$source_set
-# if [ -z "${source_set}" ]; then
-# # .scipyenrc not sourced from .bashrc => backup .bashrc, then append a line to
-# # source .scipyenrc in there
-# echo "Copying ${HOME}/.bashrc to ${HOME}/.bashrc.$dt"
-# cp ${HOME}/.bashrc ${HOME}/.bashrc.$dt
-# echo "source ${HOME}/.scipyenrc" >> ${HOME}/.bashrc
-# echo ".bashrc has been modified in ${HOME}"
-# echo "Sourcing ${HOME}/.bashrc"
-# source ${HOME}/.bashrc
-# fi
-# shopt -u lastpipe
-# fi
 }
 
 function get_pyver ()
@@ -1617,7 +1602,9 @@ python_executable=${python_exec}
 echo -e "virtual_env is ${virtual_env}"
 echo -e "python executable: ${python_executable}"
 
-
+if [[ -z ${using_python} ]]; then
+using_python=${python_exec}
+fi
 # makes a virtual environment and activates it
 # if ! [ -v ${VIRTUAL_ENV} ] ; then
 if [[ -z ${VIRTUAL_ENV} ]] ; then
@@ -1696,6 +1683,8 @@ if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
     make_desktop_entry
     
     install_console_styles
+
+    update_bashrc
     
 #     # NOTE: install console color schemes
 #     cd $scipyendir/src/scipyen/gui/scipyen_console_styles
