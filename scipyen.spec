@@ -913,7 +913,8 @@ if sys.platform.startswith("linux"):
         "Comment=Scientific Python Environment for Neurophysiology - PyInstaller frozen application",
         "GenericName[en_GB]=Scipyen",
         "GenericName=Scipyen",
-        f"Icon={desktop_icon_file}",
+        "Icon=_internal/Logo.png",
+        # f"Icon={desktop_icon_file}",
         "Categories=Science;Education",
         f"Exec={final_exe_file_name}",
         "MimeType=",
@@ -959,7 +960,10 @@ install_script_contents = [
     "xdg-desktop-menu uninstall ${destination}/${package}/org.scipyen.desktop\n",
     "rm -fr ${destination}/${package}\n",
     "fi\n",
-    "mkdir -p ${destination} && cp -r -t ${destination} ${bundle} && ln -s -f -t ${target_dir}/bin/ ${destination}/${package}/scipyen.app && xdg-desktop-menu install --novendor ${destination}/${package}/org.scipyen.desktop\n"
+    "mkdir -p ${destination} && cp -r -t ${destination} ${bundle} && ln -s -f -t ${target_dir}/bin/ ${destination}/${package}/scipyen.app && xdg-desktop-menu install --novendor ${destination}/${package}/org.scipyen.desktop\n",
+#     "if [[ $? -eq 0 ]] ; then",
+#     
+#     "fi"
     ]
 
 uninstall_script_contents = [
