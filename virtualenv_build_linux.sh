@@ -889,7 +889,7 @@ fi
 
 function install_console_styles()
 {
-    if [ ! -r ${VIRTUAL_ENV}/.styles_done ] | [[ $reinstall_console_styles -gt 0 ]]; then
+    if [ ! -r ${VIRTUAL_ENV}/.styles_done ] || [[ $reinstall_console_styles -gt 0 ]]; then
         # NOTE: install console color schemes
         cd $scipyendir/src/scipyen/gui/scipyen_console_styles
         if [ -x ${uv_exec} ] ; then
