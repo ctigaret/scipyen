@@ -62,8 +62,11 @@ function show_help ()
     echo -e "\nInstructions:"
     echo -e "============\n"
     echo -e "Run 'sh $0' without options for a fully automated installation, using built-in defaults.\n"
-    echo -e "By default, this script will build PyQt6 locally, for use in Scipyen GUI."
-    echo -e "To choose PyQt5 or PySide6 see the options below"
+    echo -e "For Scipyen's GUI, this script will install PyQt6 wheels from PyPI."
+    echo -e "By default, this script will install PyQt6 from PyPI, for use in Scipyen GUI."
+    echo -e "Pass the option --build_pyqt6 to build PyQt6 locally in the enviornment."
+    echo -e "To choose PyQt5 or PySide6 downloaded fom PyPI pass --with_pyqt5 or --with_pyside6, respectively."
+    echo -e "To build PyQt5 or PySide6 locally, pass --build_pyqt5 or --build_pyside6, respectively."
     echo -e "Using locally built PyQt6 is RECOMMENDED."
     echo -e ""
     echo -e "Options:"
@@ -73,6 +76,7 @@ function show_help ()
     echo -e "--with_neuron\t\tInstall binary neuron python distribution from PyPI\n"
     echo -e "--build_neuron\t\tBuild neuron python locally\n"
     echo -e "--with_coreneuron\twhen '--build_neuron' is passed, build local neuron with coreneuron; by default coreneuron is not used.\n"
+    echo -e "--build_pyqt6\t\tBuild PyQt6 locally instead of getting it from PyPI\n"
     echo -e "--with_pyqt5\t\tInstall PyQt5 from PyPI\n"
     echo -e "--build_pyqt5\t\tBuild a PyQt5 wheel locally and install it\n"
     echo -e "--with_pyside6\t\tInstall PySide6 and Shiboken from PyPI\n"
@@ -1337,7 +1341,7 @@ install_neuron=0
 use_pypi_neuron=1
 use_core_neuron=0
 with_pyqt6=1
-build_pyqt6=1
+build_pyqt6=0
 with_pyqt5=0
 build_pyqt5=0
 with_pyside6=0
@@ -1371,15 +1375,15 @@ for i in "$@" ; do
         use_pypi_neuron=0
         shift
         ;;
-#         --with_pyqt6)
-#         with_pyqt6=1
-#         build_pyqt6=0 
-#         with_pyqt5=0
-#         build_pyqt5=0 
-#         with_pyside6=0
-#         build_pyside6=0
-#         shift
-#         ;;
+        --build_pyqt6)
+        with_pyqt6=1
+        build_pyqt6=1
+        with_pyqt5=0
+        build_pyqt5=0
+        with_pyside6=0
+        build_pyside6=0
+        shift
+        ;;
         --with_pyside6)
         with_pyqt6=0
         build_pyqt6=0 
