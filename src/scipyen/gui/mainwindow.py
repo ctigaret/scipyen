@@ -2387,7 +2387,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         
     def _set_toolButtonStyle(self, val:QtCore.Qt.ToolButtonStyle|int|str):
         r"""Sets a tool button style globally, NOT per toolbar"""
-        print(f"{self.__class__.__name__}._set_toolButtonStyle({val}:{type(val)})")
+        # print(f"{self.__class__.__name__}._set_toolButtonStyle({val}:{type(val)})")
         if isinstance(val, QtCore.Qt.ToolButtonStyle):
             val = val.value
         if isinstance(val, str):
