@@ -46,7 +46,7 @@
      <x>0</x>
      <y>0</y>
      <width>898</width>
-     <height>29</height>
+     <height>28</height>
     </rect>
    </property>
    <property name="sizePolicy">
@@ -166,6 +166,7 @@
     <addaction name="actionConfigure_external_HDF_viewer"/>
     <addaction name="separator"/>
     <addaction name="actionGUI_Style"/>
+    <addaction name="actionTool_Button_Style"/>
     <addaction name="menuIcon_Sizes"/>
     <addaction name="menuFonts"/>
     <addaction name="actionUse_Native_Menu_Bar"/>
@@ -1796,6 +1797,14 @@ NOTE: you can click anywhere in the row to select</string>
    </property>
    <property name="toolTip">
     <string>Hide non-matching file names when file names filter is used in the File System view</string>
+   </property>
+  </action>
+  <action name="actionTool_Button_Style">
+   <property name="icon">
+    <iconset theme="edit-paste-style"/>
+   </property>
+   <property name="text">
+    <string>Tool Button Style...</string>
    </property>
   </action>
  </widget>

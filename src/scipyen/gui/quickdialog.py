@@ -516,7 +516,7 @@ class Choice(QtWidgets.QFrame):
             if self.buttons[k].isChecked():
                 return self.results[k]
         return None # should never happen
-
+    
 class HChoice(Choice):
     def __init__(self, parent:QtWidgets.QWidget, label:str):
         Choice.__init__(self, parent, label, 0)

@@ -1671,6 +1671,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self._fileSystemIconSize_ = self._defaultIconSize_
         self._newNavigatorLook_ = self._defaultNewNavigatorLook_
         self._fileNamesFiltersHides_:bool = False
+        self._toolButtonStyle_:int = QtCore.Qt.ToolButtonFollowStyle.value
         
         self._configureUI_()
 
@@ -2187,7 +2188,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     def toolBarButtonStyle(self) -> QtCore.Qt.ToolButtonStyle:
         return self.toolBar.toolButtonStyle()
     
-    @markConfigurable("ToolbarButtonStyle")
+    @markConfigurable("ToolButtonStyle", "Qt")
     @toolBarButtonStyle.setter
     def toolBarButtonStyle(self, val:QtCore.Qt.ToolButtonStyle):
         self._tbButtonStyle = val
@@ -2373,6 +2374,60 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             newVal = currentIS
             
         self.guiIconSize = newVal
+        
+    @property
+    def toolButtonStyle(self) -> int:
+        return self._toolButtonStyle_
+    
+    @markConfigurable("ToolButtonStyle", "Qt")
+    @toolButtonStyle.setter
+    def toolButtonStyle(self, val:int):
+        self._toolButtonStyle_ = val
+        self._set_toolButtonStyle(self._toolButtonStyle_)
+        
+    def _set_toolButtonStyle(self, val:QtCore.Qt.ToolButtonStyle|int|str):
+        r"""Sets a tool button style globally, NOT per toolbar"""
+        print(f"{self.__class__.__name__}._set_toolButtonStyle({val}:{type(val)})")
+        if isinstance(val, QtCore.Qt.ToolButtonStyle):
+            val = val.value
+        if isinstance(val, str):
+            stylesDict = dict((i.name, i) for i in QtCore.Qt.ToolButtonStyle)
+            if val not in stylesDict:
+                scipywarn(f"invalid argument: {val} ({type(val)})")
+                return
+            val = stylesDict[val]
+        elif isinstance(val, int):
+            stylesDict = dict((i.value, i) for i in QtCore.Qt.ToolButtonStyle)
+            if val not in stylesDict:
+                scipywarn(f"invalid argument: {val} ({type(val)})")
+                return
+            val = stylesDict[val]
+        elif not isinstance(val, QtCore.Qt.ToolButtonStyle):
+            scipywarn(f"invalid argument: {val} ({type(val)})")
+            return
+        
+        ww = list(filter(lambda w: isinstance(w, (QtWidgets.QMainWindow, QtWidgets.QDockWidget)), self.app.allWidgets()))
+        for w in ww:
+            if isinstance(w, QtWidgets.QMainWindow):
+                w.setToolButtonStyle(val)
+                
+        self.toolBarButtonStyle = val
+        
+    @Slot()
+    def _slot_configureToolButtonStyle(self):
+        dlg = qd.QuickDialog(self, "Set tool button style across Scipyen")
+        styleChoice = qd.Choice(dlg, "Select style", vertical=True)
+        dlg.adjustSize()
+        styleDict = dict()
+        for item in QtCore.Qt.ToolButtonStyle:
+            styleChoice.addButton(item.name, item.value)
+            styleDict[item.value] = item.name
+        styleChoice.selectButton(self._toolButtonStyle_)
+        if dlg.exec():
+            self._toolButtonStyle_ = styleChoice.selection()
+            self._set_toolButtonStyle(self._toolButtonStyle_)
+        
+        
         
     @property
     def guiIconSize(self) -> int:
@@ -6345,6 +6400,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.textUnderIconsToolBarToolButtonStyleAction = QAction("Text Under Icons", self.toolBarToolButtonStyleActionGroup)
         self.toolBarToolButtonStyleActionGroup.setEnabled(True)
         self.toolBarToolButtonStyleActionGroup.triggered[QAction].connect(self._slot_setToolBarToolButtonStyle)
+        
+        self.actionTool_Button_Style.triggered.connect(self._slot_configureToolButtonStyle)
         #
         # ### END   toolbar button style
         
