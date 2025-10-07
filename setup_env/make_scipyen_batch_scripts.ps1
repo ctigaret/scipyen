@@ -57,8 +57,9 @@ $activateArgs2
 $launchScriptContent = @"
 @echo off
 echo Activating python virtual environment (mamba) in $myCondaEnv
+$activateArgs2
 $setQTAPI
-$activateArgs2 && $launchArgs
+$launchArgs
 "@
 # $setATAPI && <#$#>activateArgs1 && $activateArgs2 && $launchArgs
 

@@ -355,7 +355,7 @@ def main():
         splash=None
         import gui.splash as guisplash
         
-        if __has_PyQt6__ or __has_PySide6__:
+        if __has_PyQt6__ or __has_PySide6__ or sys.platform.startswith("win32"):
             # BUG 2025-07-02 01:05:08 FIXME/TODO
             # splash shows as a black rectangle, so set aside for now, in PyQt6/PySide6
             # until I fire out the problem
