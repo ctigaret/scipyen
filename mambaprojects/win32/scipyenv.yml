@@ -24,10 +24,10 @@ dependencies:
   - ipyparallel
   # - conda-forge::dbus-python # linux, osx
   - conda-forge::pywin32
-  - conda-forge::pyqt6
-  - conda-forge::pyqt6-sip
-  - conda-forge::pyqt6-charts
-  - conda-forge::pyqt6-webengine
+  # - conda-forge::pyqt6
+  # - conda-forge::pyqt6-sip
+  # - conda-forge::pyqt6-charts
+  # - conda-forge::pyqt6-webengine
   - conda-forge::jupyter_cms
   - conda-forge::jupyter_qtconsole_colorschemes
   - conda-forge::biopython
@@ -65,10 +65,12 @@ dependencies:
   - octave_kernel
   # - python-magic
   - pyinstaller
-  - openmath
-  - openexpressions
-  - scscp
+  # - openmath
+  # - openexpressions
+  # - scscp
   - pip:
+      - openmath
+      - openexpressions
       - cattrs==24.1.2
       - gnuplot-kernel==0.4.1
       - hdf5view==0.2.3
@@ -81,4 +83,8 @@ dependencies:
       - ncbi-taxonomist
       - entrez-utils
       - taxoniq
+      - pyqt6
+      - pyqt6-sip
+      - pyqt6-charts
+      - pyqt6-webengine
 

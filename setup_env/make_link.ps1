@@ -41,10 +41,10 @@ $repodir=$p
 
 $myScipyenLaunchScript=Join-Path -Path $repodir -ChildPath "src\scipyen\scipyen.py"
 $myCondaEnv=$Env:CONDA_PREFIX
-$myAnaconda=$Env:CONDA_PREFIX_1
-$myActivate=Join-Path -Path $myAnaconda -ChildPath "Scripts\activate.bat"
+# $myAnaconda=$Env:CONDA_PREFIX_1
+# $myActivate=Join-Path -Path $myAnaconda -ChildPath "Scripts\activate.bat"
 $targetPath="cmd.exe"
-$args = "/K $myActivate $myAnaconda && conda activate $myCondaEnv && python -Xfrozen_modules=off $myScipyenLaunchScript"
+$args = "/K conda activate $myCondaEnv && python -Xfrozen_modules=off $myScipyenLaunchScript"
 $linkPath=Join-Path -Path $desktop -ChildPath "Scipyen (git).lnk"
 $iconPath=Join-Path -Path $srcdir -ChildPath "pythonbackend.ico"
 # Create desktop shortcut

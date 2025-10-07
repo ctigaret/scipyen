@@ -22,8 +22,9 @@ call mamba env create --prefix %env_path% --file mambaprojects\win32\scipyenv.ym
 :activate_env
 echo:
 echo Activating mamba environment %env_path%
+call conda deactivate
 call mamba activate %env_path% || goto eof
-:install_pips
+rem  :install_pips - dealt with via the scipyenv.yml file
 echo:
 rem  echo Installing additional PyPI packages
 rem  call pip install -r %pip_reqs% || goto eof
