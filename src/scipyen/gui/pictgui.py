@@ -499,7 +499,8 @@ class WorkerThread(QtCore.QThread):
     def run(self):
         try:
             result = self.fn(*self.args, **self.kwargs)
-            self.signals.signal_Result.emit(result)
+            if result:
+                self.signals.signal_Result.emit(result)
         except:
             traceback.print_exc()
             exctype, value = sys.exc_info()[:2]

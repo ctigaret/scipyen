@@ -1011,8 +1011,8 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
     """
         self._scipyenWindow_ = None
         
-        self._fileLoadWorker_ = None
-        self._fileLoadController_ = None
+        # self._fileLoadWorker_ = None
+        # self._fileLoadController_ = None
         
         # NOTE: 2023-05-27 13:46:40
         # mutable control data for the worker loops, to communicate with the

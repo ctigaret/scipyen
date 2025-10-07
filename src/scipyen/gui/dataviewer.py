@@ -91,6 +91,7 @@ from gui.widgets.tablewidget import SimpleTableWidget
 from gui.widgets.tableeditorwidget import (TableEditorWidget, TabularDataModel)
 from gui.scipyenviewer import ScipyenViewer #, ScipyenFrameViewer
 from gui import quickdialog
+from gui.pictgui import WorkerThread
 
 # from . import resources_rc
 # from . import icons_rc
@@ -190,7 +191,7 @@ class DataViewer(ScipyenViewer):
             When parent is the Scipyen main window this will be a "top level" viewer
     
         ID: int: the ID of the viewer's window (mainly useful for managing several
-                top level isntances of the data viewer
+                top level instances of the data viewer
     
         win_title: when specified, overrides the default window title
     
@@ -213,12 +214,21 @@ class DataViewer(ScipyenViewer):
     
         """
         # hideRoot: When false (default) the root of the tree hierarchy is displayed.
+        self._showMethods_:bool=kwargs.get("showMethods", False)
+        self._showPrivateMembers_:bool = kwargs.get("showPrivate", False)
         self._useTableEditor_ = useTableEditor
         
+        
         if inspect.isfunction(predicate):
-            self.predicate = predicate
+            if not self._showMethods_:
+                self.predicate = lambda x: predicate(x) and not inspect.ismethod(x)
+            else:
+                self.predicate = predicate
         else:
-            self.predicate=None
+            if not self._showMethods_:
+                self.predicate = lambda x: not inspect.ismethod(x)
+            else:
+                self.predicate = None
             
         # self.hideRoot = hideRoot
         
@@ -291,6 +301,7 @@ class DataViewer(ScipyenViewer):
         r"""
         Displays new data
         """
+        
         if inspect.isfunction(predicate):
             self.predicate=predicate
             
@@ -313,10 +324,13 @@ class DataViewer(ScipyenViewer):
                 
             self.goNext.setEnabled(len(self._obj_cache_) > 1 and self._cache_index_ < len(self._obj_cache_)-1)
             
-            self._populate_tree_widget_()
+            # self._populate_tree_widget_()
+            worker = WorkerThread(self, self._populate_tree_widget_)
+            worker.signals.signal_Finished.connect(self._slot_treeWidgetPopulated)
+            worker.run()
             
-            for k in range(self.treeWidget.topLevelItemCount()):
-                self._collapse_expand_Recursive(self.treeWidget.topLevelItem(k), current=False)
+            # for k in range(self.treeWidget.topLevelItemCount()):
+            #     self._collapse_expand_Recursive(self.treeWidget.topLevelItem(k), current=False)
                 
         if kwargs.get("show", True):
             self.activateWindow()
@@ -331,17 +345,29 @@ class DataViewer(ScipyenViewer):
             # print(f"{self.__class__.__name__}._populate_tree_widget_: obj: {type(obj)}, name: {name}")
             self.treeWidget.setData(obj, 
                                     predicate = self.predicate, 
+                                    showPrivate = self._showPrivateMembers_,
                                     top_title = name, 
                                     dataTypeStr=type(obj).__name__)#, 
             self.docTitle = name
             
-            for k in range(self.treeWidget.topLevelItemCount()):
-                self._collapse_expand_Recursive(self.treeWidget.topLevelItem(k), current=False)
+            # for k in range(self.treeWidget.topLevelItemCount()):
+            #     self._collapse_expand_Recursive(self.treeWidget.topLevelItem(k), current=False)
+                
+    @Slot()
+    def _slot_treeWidgetPopulated(self):
+        # self.docTitle = name
+        
+        for k in range(self.treeWidget.topLevelItemCount()):
+            self._collapse_expand_Recursive(self.treeWidget.topLevelItem(k), current=False)
+        
 
     @Slot()
     @safewrapper
     def slot_refreshDataDisplay(self):
-        self._populate_tree_widget_()
+        worker = WorkerThread(self, self._populate_tree_widget_)
+        worker.signals.signal_Finished.connect(self._slot_treeWidgetPopulated)
+        worker.run()
+        # self._populate_tree_widget_()
             
     @Slot(QtWidgets.QTreeWidgetItem, int)
     @safewrapper

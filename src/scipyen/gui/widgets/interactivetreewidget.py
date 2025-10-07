@@ -93,6 +93,7 @@ from core.traitcontainers import (DataBag, DataBagTraitsObserver,)
 
 from gui.widgets.tablewidget import SimpleTableWidget
 from gui.widgets.tableeditorwidget import (TableEditorWidget, TabularDataModel,)
+from gui.pictgui import WorkerThread
 
 NOTMEMOIZED = (tuple, type(None), type(MISSING), type(pd.NA), type, np.ndarray)
 PODS = (bool, int, float, bytes, bytearray, str)
@@ -158,6 +159,8 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         self._widgetsWithSelection_ = set()
         
         self._scipyenWindow_ = None
+        self.predicate = None
+        self.showPrivate = False
         
         
         #  NOTE: 2025-06-26 21:29:48
@@ -228,6 +231,29 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         self._last_active_item_column_ = column
         
     @Slot()
+    def _slot_treeBuilt(self):
+        self.expandToDepth(3)
+        self.resizeColumnToContents(0)
+        
+        self.topLevelItem(0).setText(0, self.top_title)
+        
+        # print(f"{self.__class__.__name__}<{self.parent().windowTitle()}, {self.parent().parent().windowTitle()}> last item {self._last_active_item_} column {self._last_active_item_column_}")
+        if isinstance(self._last_active_item_, str) and len(self._last_active_item_.strip()) and \
+            self._last_active_item_column_ < self.columnCount():
+                items = self.findItems(self._last_active_item_, QtCore.Qt.MatchExactly, 0)
+                if len(items) > 0:
+                    # print(f"{self.__class__.__name__}<{self.parent().windowTitle()}, {self.parent().parent().windowTitle()}> last items {[i.data(0, QtCore.Qt.DisplayRole) for i in items]}")
+                    item = items[0]
+                    index = self.indexFromItem(item, self._last_active_item_column_)
+                    target = self.itemFromIndex(index)
+                    if __has_PyQt6__ or __has_PySide6__:
+                        self.scrollToItem(target)#, self._last_active_item_column_)
+                    else:
+                        self.scrollToItem(target, self._last_active_item_column_)
+                    target.setSelected(True)
+                    self.scrollTo(index, QtWidgets.QAbstractItemView.PositionAtCenter)
+        
+    @Slot()
     def _slot_tableEditorWidgetSelectionChanged(self):
         widget = self.sender()
         indexes = widget.tableView.selectedIndexes()
@@ -251,51 +277,21 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         if isinstance(types, tuple) and len(types):
             self._supported_data_types_ = types
             
-#     def _setAssociatedWidgetHeight_(self):
-#         from gui.guiutils import treeWidgetItems
-#         # itemWidgets = list(filter(lambda w: w is not None, list(map(lambda i: self.itemWidget(i,0), 
-#         #                           treeWidgetItems(self)))))
-#         
-#         # NOTE: 2025-06-26 21:25:55
-#         # Sequence of (QtWidgets.QTreeWidgetItem, QtWidgets.QWidget) tuples
-#         itemWidgets = list(filter(lambda w: w[1] is not None and not isinstance(w[1], QtWidgets.QLabel), list(map(lambda i: (i, self.itemWidget(i,0)), 
-#                                   treeWidgetItems(self)))))
-#         
-#         if len(itemWidgets) == 0:
-#             return
-#         
-#         # self._widgetIndexes_.clear()
-#         
-#         self._widgetIndexes_ = list(map(lambda i: (self.indexFromItem(i[0]).parent(), i[1]), itemWidgets))
-#         
-#         for w in itemWidgets:
-#             # if not isinstance(w, QtWidgets.QLabel):
-#                 # w.setMaximumHeight(self._widget_height_)
-#                 # w.resize(w.width(), self._widget_height_)
-#             if not isinstance(w[1], QtWidgets.QLabel):
-#                 w[1].setMaximumHeight(self._widget_height_)
-#                 w[1].resize(w[1].width(), self._widget_height_)
-#                 
-#     def sizeHintForIndex(self, index:QtCore.QModelIndex) -> QtCore.QSize:
-#         indexes = list(map(lambda i: i[0], self._widgetIndexes_))
-#         if len(self._widgetIndexes_) and index in indexes:
-#             ndx = indexes.index(index)
-#             return self._widgetIndexes_[ndx][1].size()
-# 
-#         return super().sizeHintForIndex(index)
-            
-    
-    def setData(self, data, predicate=None, top_title:str = "", dataTypeStr = None, hideRoot=False):
+    def setData(self, data, predicate=None, showPrivate:bool=False,
+                top_title:str = "", dataTypeStr = None, hideRoot=False):
         r"""data should be a dictionary."""
         # print(f"{self.__class__.__name__}<{self.parent().windowTitle()}, {self.parent().parent().windowTitle()}> set data")
         self._visited_.clear()
         self.predicate = predicate
+        self.showPrivate = showPrivate
         
         # NOTE: 2025-06-28 13:55:20
         # self._private_data_ is used to build the tree model; it can be the
         # 'data' itself, OR a mapping representation of its members.
         # 'has_dynamic_private' is False in the former case, and True in the latter
         self._private_data_, self.has_dynamic_private = self._parse_data_(data)
+        if not self.showPrivate:
+            self._private_data_ = dict(list(filter(lambda x: not x[0].startswith("_"), self._private_data_.items())))
         
         if len(top_title.strip()) == 0:
             self.top_title = "/"
@@ -307,31 +303,38 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         self.clear()
         self.widgets = []
         self.nodes = {}
+        
         #              data,                parent,                   …
         self.buildTree(self._private_data_, self.invisibleRootItem(), 
                        keyType = str,
                        typeStr = dataTypeStr, 
                        predicate=predicate, hideRoot=hideRoot)
-        self.expandToDepth(3)
-        self.resizeColumnToContents(0)
         
-        self.topLevelItem(0).setText(0, self.top_title)
+        worker = WorkerThread(self, self.buildTree, self._private_data_, self.invisibleRootItem(),
+                              keyType = str, typeStr = dataTypeStr, predicate=predicate, hideRoot=hideRoot)
+        worker.signals.signal_Finished.connect(self._slot_treeBuilt)
+        worker.run()
         
-        # print(f"{self.__class__.__name__}<{self.parent().windowTitle()}, {self.parent().parent().windowTitle()}> last item {self._last_active_item_} column {self._last_active_item_column_}")
-        if isinstance(self._last_active_item_, str) and len(self._last_active_item_.strip()) and \
-            self._last_active_item_column_ < self.columnCount():
-                items = self.findItems(self._last_active_item_, QtCore.Qt.MatchExactly, 0)
-                if len(items) > 0:
-                    # print(f"{self.__class__.__name__}<{self.parent().windowTitle()}, {self.parent().parent().windowTitle()}> last items {[i.data(0, QtCore.Qt.DisplayRole) for i in items]}")
-                    item = items[0]
-                    index = self.indexFromItem(item, self._last_active_item_column_)
-                    target = self.itemFromIndex(index)
-                    if __has_PyQt6__ or __has_PySide6__:
-                        self.scrollToItem(target)#, self._last_active_item_column_)
-                    else:
-                        self.scrollToItem(target, self._last_active_item_column_)
-                    target.setSelected(True)
-                    self.scrollTo(index, QtWidgets.QAbstractItemView.PositionAtCenter)
+#         self.expandToDepth(3)
+#         self.resizeColumnToContents(0)
+#         
+#         self.topLevelItem(0).setText(0, self.top_title)
+#         
+#         # print(f"{self.__class__.__name__}<{self.parent().windowTitle()}, {self.parent().parent().windowTitle()}> last item {self._last_active_item_} column {self._last_active_item_column_}")
+#         if isinstance(self._last_active_item_, str) and len(self._last_active_item_.strip()) and \
+#             self._last_active_item_column_ < self.columnCount():
+#                 items = self.findItems(self._last_active_item_, QtCore.Qt.MatchExactly, 0)
+#                 if len(items) > 0:
+#                     # print(f"{self.__class__.__name__}<{self.parent().windowTitle()}, {self.parent().parent().windowTitle()}> last items {[i.data(0, QtCore.Qt.DisplayRole) for i in items]}")
+#                     item = items[0]
+#                     index = self.indexFromItem(item, self._last_active_item_column_)
+#                     target = self.itemFromIndex(index)
+#                     if __has_PyQt6__ or __has_PySide6__:
+#                         self.scrollToItem(target)#, self._last_active_item_column_)
+#                     else:
+#                         self.scrollToItem(target, self._last_active_item_column_)
+#                     target.setSelected(True)
+#                     self.scrollTo(index, QtWidgets.QAbstractItemView.PositionAtCenter)
                     
     def _parse_dataclass(self, data) -> tuple:
         datafields = dataclasses.fields(data)
@@ -809,8 +812,8 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                 children = {"times": data.times, "labels": data.labels}
                 if isinstance(data, (DataMark, TriggerEvent)):
                     children.update({"type": data.type, "relative": data.relative})
-                chidren.update({"annotations": data.annotations,
-                              "description": data.description})
+                children.update({"annotations": data.annotations,
+                                 "description": data.description})
                 
             elif isinstance(data, neo.core.dataobject.DataObject):
                 desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
@@ -855,14 +858,15 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                 
             elif isinstance(data, (str, bytes, bytearray)):
                 if len(data)> 100:
-                    _data = data[:97] + "..."
+                    _data = data[:97] if isinstance(data, str) else data.decode()[:97]
+                    _data += "..."
                     desc = f"{type(data)} with {len(data)} elements"
                     txt = data if isinstance(data, str) else data.decode()
                     widget = QtWidgets.QPlainTextEdit(txt)
                     widget.setMaximumHeight(200)
                     widget.setReadOnly(True)
                 else:
-                    desc = data
+                    desc = data if isinstance(data, str) else data.decode()
                     
             elif isinstance(data, (bool, int, float, complex, fractions.Fraction, decimal.Decimal, numbers.Number)):
                 desc = f"{data}"
