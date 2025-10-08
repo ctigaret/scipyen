@@ -107,10 +107,19 @@ class MenuProxy(QtWidgets.QProxyStyle):
             top = opt.rect.y() + (opt.rect.height() - iconExtent) / 2
             # iconRect = QtCore.QRect(opt.rect.x() + margin, top, iconExtent, iconExtent)
             iconRect = QtCore.QRect(int(opt.rect.x() + margin), int(top), int(iconExtent), int(iconExtent))
-            pm = opt.icon.pixmap(widget.window().windowHandle(), 
-                QtCore.QSize(iconExtent, iconExtent), 
-                QtGui.QIcon.Normal if opt.state & self.State_Enabled else QtGui.QIcon.Disabled)
-            self.drawItemPixmap(qp, iconRect, QtCore.Qt.AlignCenter, pm)
+            # Qt5/Qt6-safe: paint the icon directly instead of using pixmap()
+            Icon = QtGui.QIcon
+            iconExtent = self.pixelMetric(self.PM_SmallIconSize)
+            margin = self.pixelMetric(self.PM_LayoutLeftMargin)
+            top = opt.rect.y() + (opt.rect.height() - iconExtent) / 2
+            iconRect = QtCore.QRect(int(opt.rect.x() + margin), int(top), int(iconExtent), int(iconExtent))
+            # Resolve Mode/State for Qt5 (attributes on QIcon) and Qt6 (enums under Mode/State)
+            normal   = getattr(getattr(Icon, 'Mode', Icon), 'Normal')
+            disabled = getattr(getattr(Icon, 'Mode', Icon), 'Disabled')
+            mode = normal if (opt.state & self.State_Enabled) else disabled
+            state = getattr(getattr(Icon, 'State', Icon), 'Off')
+            # Paint the icon into the target rect; avoids removed QWindow overload entirely
+            opt.icon.paint(qp, iconRect, QtCore.Qt.AlignCenter, mode, state)
             return
         super().drawControl(ctl, opt, qp, widget)
 
