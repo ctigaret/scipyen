@@ -54,6 +54,8 @@ else:
 # from pyqtgraph import (DataTreeWidget, TableWidget, )
 
 import neo
+if neo.__version__ >= '0.13.0':
+    from neo.core.objectlist import ObjectList as NeoObjectList
 import quantities as pq
 import numpy as np
 import scipy
@@ -290,7 +292,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         # 'data' itself, OR a mapping representation of its members.
         # 'has_dynamic_private' is False in the former case, and True in the latter
         self._private_data_, self.has_dynamic_private = self._parse_data_(data)
-        if not self.showPrivate:
+        if self.has_dynamic_private and not self.showPrivate:
             self._private_data_ = dict(list(filter(lambda x: not x[0].startswith("_"), self._private_data_.items())))
         
         if len(top_title.strip()) == 0:
@@ -305,10 +307,10 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         self.nodes = {}
         
         #              data,                parent,                   …
-        self.buildTree(self._private_data_, self.invisibleRootItem(), 
-                       keyType = str,
-                       typeStr = dataTypeStr, 
-                       predicate=predicate, hideRoot=hideRoot)
+        # self.buildTree(self._private_data_, self.invisibleRootItem(), 
+        #                keyType = str,
+        #                typeStr = dataTypeStr, 
+        #                predicate=predicate, hideRoot=hideRoot)
         
         worker = WorkerThread(self, self.buildTree, self._private_data_, self.invisibleRootItem(),
                               keyType = str, typeStr = dataTypeStr, predicate=predicate, hideRoot=hideRoot)

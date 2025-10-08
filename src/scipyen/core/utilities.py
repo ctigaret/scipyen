@@ -1581,8 +1581,8 @@ class NestedFinder(object):
     FIXME: This is buggy when searching by type !!!
     
     """
-    supported_collection_types = (np.ndarray, dict, list, tuple, deque, pd.Series, pd.DataFrame, pd.Index, set) # this implicitly includes namedtuple
-    supported_hierarchical_types = (dict, list, tuple, deque, set, types.MappingProxyType)
+    supported_collection_types = (np.ndarray, dict, list, tuple, deque, pd.Series, pd.DataFrame, pd.Index, set, NeoObjectList) # this implicitly includes namedtuple
+    supported_hierarchical_types = (dict, list, tuple, deque, set, types.MappingProxyType, NeoObjectList)
     nesting_types = supported_hierarchical_types
     
     def __init__(self, src:typing.Optional[typing.Union[dict, list, tuple, deque]]=None, 

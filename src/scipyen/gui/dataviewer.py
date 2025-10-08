@@ -48,6 +48,8 @@ else:
 from pyqtgraph import (DataTreeWidget, TableWidget, )
 
 import neo
+if neo.__version__ >= '0.13.0':
+    from neo.core.objectlist import ObjectList as NeoObjectList
 import quantities as pq
 import numpy as np
 import pandas as pd
@@ -714,8 +716,12 @@ class DataViewer(ScipyenViewer):
                     return True
             return False
         else:
-            return (obj, name) in self._obj_cache_
-        
+            # print(f"{self.__class__.__name__}._check_cache_: obj is a {type(obj).__name__}, name: {name} ({type(name).__name__}))")
+            for (o,n) in self._obj_cache_:
+                if all(isinstance(o_, np.ndarray) for o_ in (o, obj)) and np.all(obj == o) and name ==n:
+                    return True
+                return False
+
     def _get_cache_index_(self, obj:typing.Any, name:str) -> int | None:
         if isinstance(obj, np.ndarray):
             for k, (o,n) in enumerate(self._obj_cache_):
