@@ -1554,6 +1554,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         
         self._useSystemDefaultFont:bool = self._useDefaultQApplicationFont
         
+        self._useLastHistoryCommandSearch_:bool = False
+        
         self._useNativeMenuBar:bool = self._defaultUseNativeMenuBar
         
         # ### END configurables, but see NOTE:2022-01-28 23:16:57 below
@@ -3052,6 +3054,36 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             self._lastVariableFind = val
         else:
             self._lastVariableFind = str()
+            
+    @property
+    def useLastHistoryCommandSearch(self) -> bool:
+        return self._useLastHistoryCommandSearch_
+    
+    @markConfigurable("UseLastHistoryCommandSearch", "Qt")
+    @useLastHistoryCommandSearch.setter
+    def useLastHistoryCommandSearch(self, val:bool):
+        self._useLastHistoryCommandSearch_ = val == True
+        signalBlocker = QtCore.QSignalBlocker(self.useLastHistoryCommandSearchAction)
+        self.useLastHistoryCommandSearchAction.setChecked(self._useLastHistoryCommandSearch_)
+        
+    @Slot(bool)
+    def _slot_toggleUseLastHistoryCommandSearch(self, val:bool):
+        oldVal = self._useLastHistoryCommandSearch_
+        self.useLastHistoryCommandSearch = val == True
+        
+        if oldVal == val:
+            return
+        
+        if oldVal:
+            self.commandHistoryFinderComboBox.setCurrentText("")
+            original_selection_mode = self.historyTreeWidget.selectionMode()
+            self.historyTreeWidget.reset()
+            topLevelItem = self.historyTreeWidget.topLevelItem(self.historyTreeWidget.topLevelItemCount()-1)
+            self.historyTreeWidget.setSelectionMode(original_selection_mode)
+            self.historyTreeWidget.scrollToItem(topLevelItem)
+        else:
+            self.commandHistoryFinderComboBox.setCurrentIndex(0)
+        
 
     @property
     def commandSearches(self):
@@ -3068,11 +3100,20 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             self._commandHistoryFinderList = collections.deque()
 
         if len(self._commandHistoryFinderList):
-            self.commandFinderComboBox.clear()
+            self.commandHistoryFinderComboBox.clear()
             for item in self._commandHistoryFinderList:
-                self.commandFinderComboBox.addItem(item)
+                self.commandHistoryFinderComboBox.addItem(item)
+                
+            if self.useLastHistoryCommandSearch:
+                self.commandHistoryFinderComboBox.setCurrentIndex(0)
+            else:
+                self.commandHistoryFinderComboBox.setCurrentText("")
+                original_selection_mode = self.historyTreeWidget.selectionMode()
+                self.historyTreeWidget.reset()
+                topLevelItem = self.historyTreeWidget.topLevelItem(self.historyTreeWidget.topLevelItemCount()-1)
+                self.historyTreeWidget.setSelectionMode(original_selection_mode)
+                self.historyTreeWidget.scrollToItem(topLevelItem)
 
-        self.commandFinderComboBox.setCurrentText("")
 
     @property
     def lastCommandSearch(self):
@@ -6624,22 +6665,32 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # filter/select commands from history combo
         #
         
-        # self.commandFinderComboBox.currentTextChanged[str].connect(self.slot_findCommand) # heep this - will revisit
-        self.commandFinderComboBox.currentIndexChanged[int].connect(self.slot_findCommandIndexChanged)
-        self.commandFinderComboBox.lineEdit().setPlaceholderText("Find expression ...")
-        self.commandFinderComboBox.lineEdit().returnPressed.connect(self.slot_addCommandFindToHistory)
-        self.commandFinderComboBox.lineEdit().setClearButtonEnabled(True)
-        self.commandFinderComboBox.lineEdit().undoAvailable = True
-        self.commandFinderComboBox.lineEdit().redoAvailable = True
+        # self.commandHistoryFinderComboBox.currentTextChanged[str].connect(self.slot_findCommand) # heep this - will revisit
+        self.commandHistoryFinderComboBox.currentIndexChanged[int].connect(self.slot_commandHistoryFinderIndexChanged)
+        self.commandHistoryFinderComboBox.lineEdit().setPlaceholderText("Find expression ...")
+        self.commandHistoryFinderComboBox.lineEdit().returnPressed.connect(self.slot_addCommandFindToHistory)
+        self.commandHistoryFinderComboBox.lineEdit().setClearButtonEnabled(True)
+        self.commandHistoryFinderComboBox.lineEdit().undoAvailable = True
+        self.commandHistoryFinderComboBox.lineEdit().redoAvailable = True
 
         self.removeItemFromCommandFinderListAction = QAction(QtGui.QIcon.fromTheme("edit-delete"),
                                                                        "Remove item from list",
-                                                                       self.commandFinderComboBox.lineEdit())
+                                                                       self.commandHistoryFinderComboBox.lineEdit())
 
         self.removeItemFromCommandFinderListAction.triggered.connect(
             self.slot_removeItemFromCommandFinderHistory)
+        
+        self.useLastHistoryCommandSearchAction = QAction(QtGui.QIcon.fromTheme("document-open-recent"),
+                                                         "Show Last Command Search at Startup",
+                                                         self)
+        self.menuSettings.addAction(self.useLastHistoryCommandSearchAction)
+        
+        self.useLastHistoryCommandSearchAction.setCheckable(True)
+        self.useLastHistoryCommandSearchAction.setChecked(False)
+        self.useLastHistoryCommandSearchAction.toggled.connect(self._slot_toggleUseLastHistoryCommandSearch)
 
-        self.commandFinderComboBox.lineEdit().addAction(self.removeItemFromCommandFinderListAction,
+        
+        self.commandHistoryFinderComboBox.lineEdit().addAction(self.removeItemFromCommandFinderListAction,
                                                         QtWidgets.QLineEdit.TrailingPosition)
         #
         # ### END command history filters
@@ -7142,8 +7193,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
 
     @Slot(int)
-    def slot_findCommandIndexChanged(self, val:int):
-        cmdTxt = self.commandFinderComboBox.itemText(val)
+    def slot_commandHistoryFinderIndexChanged(self, val:int):
+        cmdTxt = self.commandHistoryFinderComboBox.itemText(val)
         if len(cmdTxt.strip()) > 0:
             self.lastCommandFind = cmdTxt
             self.slot_findCommand(cmdTxt)
@@ -7226,7 +7277,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     @Slot()
     @safewrapper
     def slot_addCommandFindToHistory(self):
-        cmdTxt = self.commandFinderComboBox.lineEdit().text()
+        cmdTxt = self.commandHistoryFinderComboBox.lineEdit().text()
         if len(cmdTxt.strip()) > 0:
             if cmdTxt not in self._commandHistoryFinderList:
                 self._commandHistoryFinderList.appendleft(cmdTxt)
@@ -7236,13 +7287,13 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     @Slot()
     @safewrapper
     def slot_removeItemFromCommandFinderHistory(self):
-        currentNdx = self.commandFinderComboBox.currentIndex()
-        cmdTxt = self.commandFinderComboBox.itemText(currentNdx)
+        currentNdx = self.commandHistoryFinderComboBox.currentIndex()
+        cmdTxt = self.commandHistoryFinderComboBox.itemText(currentNdx)
         if cmdTxt in self._commandHistoryFinderList:
             self._commandHistoryFinderList.remove(cmdTxt)
 
-        self.commandFinderComboBox.removeItem(currentNdx)
-        self.commandFinderComboBox.lineEdit().setClearButtonEnabled(True)
+        self.commandHistoryFinderComboBox.removeItem(currentNdx)
+        self.commandHistoryFinderComboBox.lineEdit().setClearButtonEnabled(True)
 
     # @Slot()
     # @safewrapper

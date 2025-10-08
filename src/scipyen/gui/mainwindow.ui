@@ -46,7 +46,7 @@
      <x>0</x>
      <y>0</y>
      <width>898</width>
-     <height>28</height>
+     <height>29</height>
     </rect>
    </property>
    <property name="sizePolicy">
@@ -749,7 +749,7 @@ NOTE: you can click anywhere in the row to select</string>
       </widget>
      </item>
      <item row="2" column="0">
-      <widget class="QComboBox" name="commandFinderComboBox">
+      <widget class="QComboBox" name="commandHistoryFinderComboBox">
        <property name="sizePolicy">
         <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
          <horstretch>0</horstretch>
