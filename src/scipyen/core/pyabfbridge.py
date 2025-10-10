@@ -4935,25 +4935,27 @@ class ABFProtocol(ElectrophysiologyProtocol):
         r"""Calls self.getDAC(…)"""
         return self.getDAC(index, physical)
     
-    def getDigitalChannelUsage(self, digChannel:int) -> tuple:
-        r"""Looks up the sweeps and epochs where a digital channel emits a TTL pulse or train
-        See ABFOutputConfiguration.getEpochsForDigitalChannel documentation for 
-        details.
-        
-        Returns a tuple of (sweep index ↔ epochs list) pairs
-        
-        """
-        if not isinstance(digChannel, int):
-            raise TypeError(f"'digChannel' expected an int; instead got {type(digChannel).__name__} ")
-        if digChannel < 0 or digChannel >= self.nDIGChannels:
-            raise ValueError(f"Invalid 'digChannel' ({digChannel}); expecting a value in {range(self.nDIGChannels)}")
-        
-        if isinstance(dac, (int, str)):
-            dac = self.getDAC(dac, physical=physical)
-        elif not isinstance(dac, ABFOutputConfiguration):
-            raise TypeError(f"'dac' expected an ABFOutputConfiguration, a str (DAC name) or int (DAC index); instead, got {type(dac).__name__}")
-        
-        return tuple(filter(lambda x: len(x[1]), ((k, dac.getEpochsForDigitalChannel(digChannel, k, indexes = epochIndexes, train=train)) for k in range(self.nSweeps))))
+#     def getDigitalChannelUsage(self, digChannel:int, dac:typing.Optional[typing.Union[int,str]] = None) -> tuple:
+#         r"""Looks up the sweeps and epochs where a digital channel emits a TTL pulse or train
+#         See ABFOutputConfiguration.getEpochsForDigitalChannel documentation for 
+#         details.
+#         
+#         Returns a tuple of (sweep index ↔ epochs list) pairs
+#         
+#         """
+#         if not isinstance(digChannel, int):
+#             raise TypeError(f"'digChannel' expected an int; instead got {type(digChannel).__name__} ")
+#         if digChannel < 0 or digChannel >= self.nDIGChannels:
+#             raise ValueError(f"Invalid 'digChannel' ({digChannel}); expecting a value in {range(self.nDIGChannels)}")
+#         
+#         if isinstance(dac, (int, str)):
+#             dac = self.getDAC(dac, physical=physical)
+#         elif dac is None:
+#             dac = self.activeDACOutput
+#         elif not isinstance(dac, ABFOutputConfiguration):
+#             raise TypeError(f"'dac' expected an ABFOutputConfiguration, a str (DAC name) or int (DAC index); instead, got {type(dac).__name__}")
+#         
+#         return tuple(filter(lambda x: len(x[1]), ((k, dac.getEpochsForDigitalChannel(digChannel, k, indexes = epochIndexes, train=train)) for k in range(self.nSweeps))))
         
     
 class ABFInputConfiguration:
