@@ -112,7 +112,7 @@ NOTE: The resulted string MUST be embedded somewhere between <body> </body> HTML
 #         return
     
 def module_infos(title:str, header:str, columns:int = 4) -> str:
-    env_pkginfos, env_nonpkginfos, scipyen_pkginfos, scipyen_nonpkginfos, plugins = listmodules()
+    env_pkg_names, env_non_pkg_names, scipyen_pkg_names, scipyen_non_pkg_names, plugin_names = listmodules()
     out = list()
     out += ['<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"',
             '    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">',
@@ -125,20 +125,20 @@ def module_infos(title:str, header:str, columns:int = 4) -> str:
     out.append("<body>")
     out.append(f"<h3>{header}</h3>")
     out.append("<h4>Python package modules:</h4>")
-    out.append(make_HTML_table(list(sorted(map(lambda i: i.name, env_pkginfos))), columns))
+    out.append(make_HTML_table(env_pkg_names, columns))
     out.append("<p>")
     out.append("<h4>Python non-package modules:</h4>")
-    out.append(make_HTML_table(list(sorted(map(lambda i: i.name, env_nonpkginfos))), columns))
+    out.append(make_HTML_table(env_non_pkg_names, columns))
     out.append("<p>")
     out.append("<h4>Scipyen's package modules:</h4>")
-    out.append(make_HTML_table(list(sorted(map(lambda i: i.name, scipyen_pkginfos))), columns))
+    out.append(make_HTML_table(scipyen_pkg_names, columns))
     out.append("<p>")
     out.append("<h4>Scipyen's non-package modules:</h4>")
-    out.append(make_HTML_table(list(sorted(map(lambda i: i.name, scipyen_nonpkginfos))), columns))
+    out.append(make_HTML_table(scipyen_non_pkg_names, columns))
     out.append("<p>")
-    if len(plugins):
+    if len(plugin_names):
         out.append("<h4>Scipyen's plugin modules:</h4>")
-        out.append(make_HTML_table(list(sorted(tuple(plugins.keys()))), columns))
+        out.append(make_HTML_table(plugin_names, columns))
         out.append("<p>")
     out.append("</body>")
     out.append("</html>")
@@ -148,26 +148,72 @@ def listmodules() -> tuple:
     from core.workspacefunctions import getMainScipyenWindow
     from core.prog import walk_packages
    # infos = list(filter(lambda s: "." not in s, map(lambda i: i.name, walk_packages())))
-    infos = list(filter(lambda i: "." not in i.name, walk_packages()))
+    infos = list(filter(lambda i: "." not in i.name, walk_packages())) # list of available module infos
     
     userPluginsInfos = list()
     plugins = dict()
     mainWindow = getMainScipyenWindow()
-    scipyeninfos = list(filter(lambda i: _scipyendir_ in i.module_finder.path, infos))
-    envinfos = list(filter(lambda i: _scipyendir_ not in i.module_finder.path, infos))
-    if isinstance(mainWindow, QtWidgets.QMainWindow) and type(mainWindow).__name__ == "ScipyenWindow":
-        userPluginsInfos = list(filter(lambda i: mainWindow.userPluginsDirectory in i.module_finder.path, infos))
-        plugins = mainWindow.plugins
-        scipyeninfos = list(filter(lambda i: i.name not in plugins, scipyeninfos))
-        
+    scipyeninfos = list(filter(lambda i: _scipyendir_ in i.module_finder.path, infos)) # list of module infos for scipyen's modules
     scipyen_pkginfos = list(filter(lambda i: i.ispkg, scipyeninfos))
-    scipyen_nonpkginfos = list(filter(lambda i: not i.ispkg, scipyeninfos))
+    scipyen_pkg_names = list(sorted(map(lambda i: i.name, scipyen_pkginfos)))
     
+    scipyen_nonpkginfos = list(filter(lambda i: not i.ispkg, scipyeninfos))
+    scipyen_non_pkg_names = list(sorted(map(lambda i: i.name, scipyen_nonpkginfos)))
+    
+    envinfos = list(filter(lambda i: _scipyendir_ not in i.module_finder.path, infos)) # list of module infos for modules from outside of scipyen tree
     env_pkginfos = list(filter(lambda i: i.ispkg, envinfos))
+    env_pkg_names = list(sorted(map(lambda i: i.name, env_pkginfos)))
     env_nonpkginfos = list(filter(lambda i: not i.ispkg, envinfos))
+    env_non_pkg_names = list(sorted(map(lambda i: i.name, env_nonpkginfos)))
+    
+    if isinstance(mainWindow, QtWidgets.QMainWindow) and type(mainWindow).__name__ == "ScipyenWindow":
+        userPluginsInfos = list(filter(lambda i: mainWindow.userPluginsDirectory in i.module_finder.path, infos)) # list of module infos for user plugins modules
+        plugins = mainWindow.plugins # ordered dict of plugins imported in mainwindow
+        
+        # NOTE: 2025-10-10 22:43:04 list of module infos for scipyen's modules after dropping out plugin modules
+        scipyeninfos = list(filter(lambda i: i.name not in plugins, scipyeninfos)) 
+        scipyen_module_names = list(sorted(map(lambda i: i.name, scipyeninfos)))
+        envinfos = list(filter(lambda i: i.name not in plugins, envinfos)) 
+        env_module_names     = list(sorted(map(lambda i: i.name, envinfos)))
+        
+        # NOTE: 2025-10-10 22:41:45 list of (name, module) pairs imported in user's workspace
+        # CAUTION: this will be different at each call if the user has
+        # manually imported modules during a session
+        modules_imported_in_shell = list(filter(lambda item: inspect.ismodule(item[1]) and item[1].__name__ not in plugins, mainWindow.workspace.items())) 
+        
+        # split in package and non-package modules
+        packages_in_shell     = list(filter(lambda item: hasattr(item[1], "spec") and item[1].spec.loader.is_package(item[1].spec.name), modules_imported_in_shell))
+        # packages_in_shell     = list(filter(lambda item: item[1].spec.loader.is_package(item[1].spec.name) if item[1].__name__ not in ("builtins", "sys") else False, modules_imported_in_shell))
+        shell_package_names, shell_packages = zip(*packages_in_shell) if len(packages_in_shell) else ([], [])
+        
+        non_packages_in_shell = list(filter(lambda item: item[0] not in shell_package_names, modules_imported_in_shell))
+        # non_packages_in_shell = list(filter(lambda item: not item[1].spec.loader.is_package(item[1].spec.name) if hasattr(item[1], "spec") else True, modules_imported_in_shell))
+        # non_packages_in_shell = list(filter(lambda item: not item[1].spec.loader.is_package(item[1].spec.name) if item[1].__name__ not in ("builtins", "sys") else True, modules_imported_in_shell))
+        shell_non_package_names, shell_non_packages = zip(*non_packages_in_shell) if len(non_packages_in_shell) else ([],[])
         
         
-    return env_pkginfos, env_nonpkginfos, scipyen_pkginfos, scipyen_nonpkginfos, plugins
+        # as in NOTE: 2025-10-10 22:41:45 above, but the name part in each pair augmented with the alias (if imported as alias) and split in package and non-package modules
+        scipyen_modules_in_ns  = list(map(lambda item: f"{item[1].__name__} ({item[0]})" if item[0] != item[1].__name__ else item[1].__name__, filter(lambda item: item[0] in scipyen_module_names or (hasattr(item[1], "__file__") and isinstance(item[1].__file__, str) and _scipyendir_ in item[1].__file__), non_packages_in_shell)))
+        scipyen_modules_not_in_ns = list(filter(lambda n: n not in shell_non_package_names, scipyen_module_names))
+        
+        scipyen_packages_in_ns = list(map(lambda item: f"{item[1].__name__} ({item[0]})" if item[0] != item[1].__name__ else item[1].__name__, filter(lambda item: item[0] in scipyen_module_names or (hasattr(item[1], "__file__") and isinstance(item[1].__file__, str) and _scipyendir_ in item[1].__file__), packages_in_shell)))
+        scipyen_packages_not_in_ns = list(filter(lambda n: n not in shell_package_names, scipyen_module_names))
+        
+        scipyen_pkg_names = list(sorted(scipyen_packages_in_ns + scipyen_packages_not_in_ns))
+        scipyen_non_pkg_names = list(sorted(scipyen_modules_in_ns + scipyen_modules_not_in_ns))
+        
+        env_modules_in_ns  = list(map(lambda item: f"{item[1].__name__} ({item[0]})" if item[0] != item[1].__name__ else item[1].__name__, filter(lambda item: item[0] not in scipyen_module_names and (not hasattr(item[1], "__file__") or (isinstance(item[1].__file__, str) and _scipyendir_ not in item[1].__file__)), non_packages_in_shell)))
+        env_modules_not_in_ns  = list(filter(lambda n: n not in shell_non_package_names, env_module_names))
+        
+        env_non_pkg_names =  list(sorted(env_modules_in_ns + env_modules_not_in_ns))
+        
+        env_packages_in_ns = list(map(lambda item: f"{item[1].__name__} ({item[0]})" if item[0] != item[1].__name__ else item[1].__name__, filter(lambda item: item[0] not in scipyen_module_names and (not hasattr(item[1], "__file__") or (isinstance(item[1].__file__, str) and _scipyendir_ not in item[1].__file__)), packages_in_shell)))
+        env_packages_not_in_ns  = list(filter(lambda n: n not in shell_package_names, env_module_names))
+        
+        env_pkg_names =  list(sorted(env_packages_in_ns + env_packages_not_in_ns))
+        
+        
+    return env_pkg_names, env_non_pkg_names, scipyen_pkg_names, scipyen_non_pkg_names, list(sorted(plugins.keys()))
     
 def info_components(ns:dict) -> str:
     r"""Prepares the contents of the Software Components dialog.
@@ -305,7 +351,7 @@ def dummy_pager(self, data, start, screen_lines, out = None):
     
 
 def run_help_command(cmd:str, shell:typing.Optional[object]=None) -> str | None:
-    import pydoc, importlib, types, traceback
+    import pydoc, importlib, types, traceback, contextlib
     if not isinstance(cmd, str) or len(cmd.strip()) == 0:
         return
 
@@ -318,49 +364,17 @@ def run_help_command(cmd:str, shell:typing.Optional[object]=None) -> str | None:
         try:
             helper.help(cmd)
             ret = bf.getvalue()
+            bf.flush()
         except:
             traceback.print_exc()
 
-# # #     if isinstance(ret, str) and "No Python documentation found" in ret and isinstance(shell, InteractiveShell):
-# # #         ipyret = None
-# # #         
-# # #         unwrap = lambda c: c if c in ("?", "??") else c[1:] if (c.startswith("?") and len(c) > 1) else c[:-1] if (c.endswith("?") and len(c) > 1) else c
-# # #         unwrapped = unwrap(cmd)
-# # #         print(f"found {unwrap(cmd)}: {unwrap(cmd) in shell.user_ns}") 
-# # #         bf = io.StringIO()
-# # #         ipycmd = unwrapped if (unwrapped.startswith("?") or unwrapped.endswith("?")) else f"?{unwrapped}"
-# # #         # shell.get_ipython().run_cell(ipycmd)
-# # #         original_pager = shell.hooks["show_in_pager"]
-# # #         new_pager = partial(dummy_pager, out = bf)
-# # #         # original_pager = shell.hooks["show_in_pager"]
-# # #         shell.set_hook("show_in_pager", new_pager)
-# # #         shell.run_cell(ipycmd)
-# # #         shell.set_hook("show_in_pager", original_pager)
-# # #         ipyret = bf.getvalue()
-# # #         bf.close()
-# # #         # with io.StringIO() as bf:
-# # #         #     original_pager = shell.hooks["show_in_pager"]
-# # #         #     new_pager = partial(dummy_pager, out = bf)
-# # #         #     # original_pager = shell.hooks["show_in_pager"]
-# # #         #     shell.set_hook("show_in_pager", new_pager)
-# # #         #     shell.run_cell(ipycmd)
-# # #         #     shell.set_hook("show_in_pager", original_pager)
-# # #         #     ipyret = bf.getvalue()
-# # #         # kstdout.flush()
-# # #         # with io.StringIO() as bf:
-# # #         #     shell.kernel.stdout = bf
-# # #         #     shell.run_cell(ipycmd)
-# # #         #     bf.flush()
-# # #         #     ipyret = bf.getvalue()
-# # #         #     shell.kernel.stdout = kstdout
-# # #             
-# # #         print(f"ipyret: {ipyret}")
-# # #             
-# # #         if isinstance(ipyret, str):
-# # #             ret = ipyret
             
-            
-            
+    # if isinstance(ret, str) and any(v in ret for v in ("No Python documentation found", "not found")):
+    #     if shell:
+    #         with io.StringIO() as bf, contextlib.redirect_stdout(bf):
+    #             shell.run_line_magic("pinfo", cmd)
+    #             ret = bf.getvalue()
+                
     if isinstance(ret, str) and any(v in ret for v in ("No Python documentation found", "not found")):
         ret += "\nCheck the spelling; you may need to enter a valid dotted path e.g. 'package.module.object.member'"
         

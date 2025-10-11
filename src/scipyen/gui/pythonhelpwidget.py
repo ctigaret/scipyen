@@ -111,7 +111,7 @@ class _PythonHelpThread_(QtCore.QThread):
             # if any(s in cmdParts for s in ("modules", "module")):
             if "modules" in cmdParts:
                 doc.setHtml(helputils.module_infos("Package modules", 
-                                                  "Here is a list of discovered modules. In the field above type 'module' and one of the names below for details",
+                                                   "Here is a list of discovered modules, given as name or name (alias) where appropriate.<br>In the field above type one of the names below (or alias) for details",
                                                   self.columns))
                 self.ready.emit(doc)
                 return
@@ -348,3 +348,16 @@ class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin
                 self.helpDisplay.setPlainText(doc)
             else:
                 self.helpDisplay.clear()
+
+class PythonHelpWindow(QtWidgets.QMainWindow, WorkspaceGuiMixin):
+    def __init__(self, shell, parent=None):
+        super().__init__(parent=parent)
+        WorkspaceGuiMixin.__init__(self, parent=parent)
+        self.setWindowTitle("Scipyen — Python help")
+        self.helpWidget = PythonHelpWidget(shell, self)
+        self.setCentralWidget(self.helpWidget)
+        
+        self.loadSettings()
+
+    def closeEvent(self, evt):
+        self.saveSettings()

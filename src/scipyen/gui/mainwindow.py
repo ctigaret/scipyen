@@ -1798,7 +1798,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         self._updateConsolesEditor()
 
-        self.helpWidget = None
+        # self.helpWidget = None
         self.pythonHelpWindow = None
 
         self.console.show()
@@ -5226,17 +5226,15 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     @Slot()
     def _slot_PythonHelp(self):
         # # from guiutils import testme
-        from gui.pythonhelpwidget import PythonHelpWidget
+        from gui.pythonhelpwidget import PythonHelpWindow
         if not isinstance(self.pythonHelpWindow, QtWidgets.QMainWindow):
-            self.pythonHelpWindow = QtWidgets.QMainWindow(self)
-            self.pythonHelpWindow.setWindowTitle("Scipyen — Python help")
-            if not isinstance(self.helpWidget, QtWidgets.QWidget):
-                self.helpWidget = PythonHelpWidget(self.shell, self.pythonHelpWindow)
-            self.pythonHelpWindow.setCentralWidget(self.helpWidget)
+            self.pythonHelpWindow = PythonHelpWindow(self.shell, self)
+            # self.pythonHelpWindow = QtWidgets.QMainWindow(self)
+            # self.pythonHelpWindow.setWindowTitle("Scipyen — Python help")
+            # if not isinstance(self.helpWidget, QtWidgets.QWidget):
+            #     self.helpWidget = PythonHelpWidget(self.shell, self.pythonHelpWindow)
+            # self.pythonHelpWindow.setCentralWidget(self.helpWidget)
         self.pythonHelpWindow.show()
-        # if not isinstance(self.helpWidget, PythonHelpWidget):
-        #     self.helpWidget = PythonHelpWidget(self.shell)
-        # self.helpWidget.show()
 
     @Slot(QtCore.QModelIndex)
     @safewrapper
