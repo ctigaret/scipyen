@@ -110,9 +110,12 @@ class _PythonHelpThread_(QtCore.QThread):
             cmdParts = self.helpCommand.split(" ")
             # if any(s in cmdParts for s in ("modules", "module")):
             if "modules" in cmdParts:
-                doc.setHtml(helputils.module_infos("Package modules", 
-                                                   "Here is a list of discovered modules, given as name or name (alias) where appropriate.<br>In the field above type one of the names below (or alias) for details",
+                doc.setHtml(helputils.module_infos("Modules", 
+                                                   "Here is a list of discovered modules, given as name or name (alias) where appropriate.<p>",
                                                   self.columns))
+                # doc.setHtml(helputils.module_infos("Package modules", 
+                #                                    "Here is a list of discovered modules, given as name or name (alias) where appropriate.<br>In the field above type one of the names below (or alias) for details",
+                #                                   self.columns))
                 self.ready.emit(doc)
                 return
             else:

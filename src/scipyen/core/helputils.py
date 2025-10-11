@@ -14,7 +14,7 @@ Meant to be used by gui.pythonhelpwidget
 # DO NOT import any of scipyen's modules here, so that this can be run in a 
 # separate python process
 
-import sys, os, typing, inspect, types, importlib, io, dataclasses, inspect
+import sys, os, typing, inspect, types, importlib, io, dataclasses, inspect, re
 from functools import (singledispatch, partial)
 from contextlib import redirect_stdout
 
@@ -46,6 +46,9 @@ else:
 
 
 from IPython.core.interactiveshell import InteractiveShell
+from IPython.core import magic, oinspect, page, prefilter, ultratb
+from IPython.utils.text import DollarFormatter, LSString, SList, format_screen
+from IPython.utils.wildcard import list_namespace, typestr2type
 
 # NOTE: 2025-05-31 17:15:38
 # do NOT place this file deeper than one level below scipyen directory
@@ -63,7 +66,7 @@ NOTE: The resulted string MUST be embedded somewhere between <body> </body> HTML
     elif isinstance(msg, list) and all(isinstance(s, str) for s in msg):
         items = msg
     else:
-        scipywarn(f"Expecting a str ot a list of str; instead got {type(msg).__name__}")
+        scipywarn(f"Expecting a str or a list of str; instead got {type(msg).__name__}")
         return "<table></table>"
     # print(f"{len(items)} items, with {max(tuple(len(i) for i in items))}")
     out = list()
@@ -123,23 +126,23 @@ def module_infos(title:str, header:str, columns:int = 4) -> str:
             "</head>"]
     
     out.append("<body>")
-    out.append(f"<h3>{header}</h3>")
-    out.append("<h4>Python package modules:</h4>")
-    out.append(make_HTML_table(env_pkg_names, columns))
-    out.append("<p>")
-    out.append("<h4>Python non-package modules:</h4>")
-    out.append(make_HTML_table(env_non_pkg_names, columns))
-    out.append("<p>")
-    out.append("<h4>Scipyen's package modules:</h4>")
+    out.append(f"<h1>{header}</h1>")
+    out.append("<h2>Scipyen's package modules:</h2>")
     out.append(make_HTML_table(scipyen_pkg_names, columns))
     out.append("<p>")
-    out.append("<h4>Scipyen's non-package modules:</h4>")
+    out.append("<h2>Scipyen's non-package modules:</h2>")
     out.append(make_HTML_table(scipyen_non_pkg_names, columns))
     out.append("<p>")
+    out.append("<h2>Python package modules:</h2>")
+    out.append(make_HTML_table(env_pkg_names, columns))
+    out.append("<p>")
     if len(plugin_names):
-        out.append("<h4>Scipyen's plugin modules:</h4>")
+        out.append("<h2>Scipyen's plugin modules:</h2>")
         out.append(make_HTML_table(plugin_names, columns))
         out.append("<p>")
+    out.append("<h2>Python non-package modules:</h2>")
+    out.append(make_HTML_table(env_non_pkg_names, columns))
+    out.append("<p>")
     out.append("</body>")
     out.append("</html>")
     return "\n".join(out)
@@ -342,15 +345,213 @@ def format_common_help_reply(msg:str):
             
     return "<br>\n".join(parts)
 
-def dummy_pager(self, data, start, screen_lines, out = None):
-    if isinstance(data, dict):
-        data = data['text/plain']
-        
-    print(f"data: {data}", file=out)
-    # return data
+# def dummy_pager(self, data, start, screen_lines, out = None):
+#     if isinstance(data, dict):
+#         data = data['text/plain']
+#         
+#     print(f"data: {data}", file=out)
+#     # return data
     
+def helpdisp(shell, bf:io.StringIO, obj, oname="", formatter=None, info:typing.Optional[oinspect.OInfo] = None,
+        detail_level=0, enable_html=True, omit_sections=()):#,
+        # start: int = 0, screen_lines: int = 0, ):
+    r"""Stand-in for oinspect.Inspector.pinfo"""
+    from core.prog import scipywarn
+    assert info is not None
+    info_b = shell.inspector._get_info(
+        obj, oname, formatter, info, detail_level, omit_sections=omit_sections
+    )
+    # print(f"core.helputils.helpdisp: info_b = {info_b}")
+    if enable_html:
+        strng = info_b["text/html"]
+    else:
+        strng = info_b['text/plain']
+    
+    for line in strng.splitlines():
+        bf.write(line)
+        
+# def parse_options(arg_str, opt_str, *long_opts, **kw):
+#     caller = sys._getframe(1).f_code.co_name
+#     arg_str = '%s %s' % (self.options_table.get(caller,''),arg_str)
+# 
+#     mode = kw.get('mode','string')
+#     if mode not in ['string','list']:
+#         raise ValueError('incorrect mode given: %s' % mode)
+#     # Get options
+#     list_all = kw.get('list_all',0)
+#     posix = kw.get('posix', os.name == 'posix')
+#     strict = kw.get('strict', True)
+# 
+#     preserve_non_opts = kw.get("preserve_non_opts", False)
+#     remainder_arg_str = arg_str
+# 
+#     # Check if we have more than one argument to warrant extra processing:
+#     odict = {}  # Dictionary with options
+#     args = arg_str.split()
+#     if len(args) >= 1:
+#         # If the list of inputs only has 0 or 1 thing in it, there's no
+#         # need to look for options
+#         argv = arg_split(arg_str, posix, strict)
+#         # Do regular option processing
+#         try:
+#             opts, args = getopt(argv, opt_str, long_opts)
+#         except GetoptError as e:
+#             raise UsageError(
+#                 '%s (allowed: "%s"%s)'
+#                 % (e.msg, opt_str, " ".join(("",) + long_opts) if long_opts else "")
+#             ) from e
+#         for o, a in opts:
+#             if mode == "string" and preserve_non_opts:
+#                 # remove option-parts from the original args-string and preserve remaining-part.
+#                 # This relies on the arg_split(...) and getopt(...)'s impl spec, that the parsed options are
+#                 # returned in the original order.
+#                 remainder_arg_str = remainder_arg_str.replace(o, "", 1).replace(
+#                     a, "", 1
+#                 )
+#             if o.startswith("--"):
+#                 o = o[2:]
+#             else:
+#                 o = o[1:]
+#             try:
+#                 odict[o].append(a)
+#             except AttributeError:
+#                 odict[o] = [odict[o],a]
+#             except KeyError:
+#                 if list_all:
+#                     odict[o] = [a]
+#                 else:
+#                     odict[o] = a
+# 
+#     # Prepare opts,args for return
+#     opts = Struct(odict)
+#     if mode == 'string':
+#         if preserve_non_opts:
+#             args = remainder_arg_str.lstrip()
+#         else:
+#             args = " ".join(args)
+# 
+#     return opts,args
+    
+        
+def shellpsearch(shell, bf:io.StringIO, parameter_s='', 
+                 list_types:bool=True, ignore_case:typing.Optional[bool]=None,
+                 show_all:bool=True):
+        def_search = ['user_local', 'user_global', 'builtin']
 
-def run_help_command(cmd:str, shell:typing.Optional[object]=None) -> str | None:
+        # Process options/args
+        # opts,args = parse_options(parameter_s,'cias:e:l',list_all=True)
+        # opt = opts.get
+        # psearch = shell.inspector.psearch
+        
+        # # select list object types
+        # list_types = False
+        # if 'l' in opts:
+        #     list_types = True
+        # 
+        # # select case options
+        # if 'i' in opts:
+        #     ignore_case = True
+        # elif 'c' in opts:
+        #     ignore_case = False
+        # else:
+        if not isinstance(ignore_case, bool):
+            ignore_case = not shell.wildcards_case_sensitive
+
+        # Build list of namespaces to search from user options
+        # def_search.extend(opt('s',[]))
+        ns_exclude = ns_exclude=opt('e',[])
+        ns_search = [nm for nm in def_search if nm not in ns_exclude]
+
+        # Call the actual search
+        try:
+            hpsearch(shell, bf, parameter_s, ns_search,
+                    show_all,ignore_case=ignore_case, list_types=list_types)
+        except:
+            shell.showtraceback()
+    
+        
+def hpsearch(shell, bf:io.StringIO, 
+             pattern, ns_search=[],
+             ignore_case=False,show_all=False, *, list_types=False):
+    type_pattern = 'all'
+    filter = ''
+
+    # list all object types
+    if list_types:
+        helpdisp(shell, bf, '\n'.join(sorted(typestr2type)))
+        return
+
+        cmds = pattern.split()
+        len_cmds  =  len(cmds)
+        if len_cmds == 1:
+            # Only filter pattern given
+            filter = cmds[0]
+        elif len_cmds == 2:
+            # Both filter and type specified
+            filter,type_pattern = cmds
+        else:
+            raise ValueError('invalid argument string for psearch: <%s>' %
+                             pattern)
+
+        # filter search namespaces
+        for name in ns_search:
+            if name not in shell.ns_table:
+                raise ValueError('invalid namespace <%s>. Valid names: %s' %
+                                 (name, shell.ns_table.keys()))
+
+        # print('type_pattern:',type_pattern)  # dbg
+        search_result, namespaces_seen = set(), set()
+        for ns_name in ns_search:
+            ns = shell.ns_table[ns_name]
+            # Normally, locals and globals are the same, so we just check one.
+            if id(ns) in namespaces_seen:
+                continue
+            namespaces_seen.add(id(ns))
+            tmp_res = list_namespace(ns, type_pattern, filter,
+                                    ignore_case=ignore_case, show_all=show_all)
+            search_result.update(tmp_res)
+
+        helpdisp(shell, bf, '\n'.join(sorted(search_result)))
+    
+    
+    
+def hinspect(shell:InteractiveShell, bf:io.StringIO, oname=str, namespaces=None, **kw):
+    r"""Stand-in for shell._inspect, called by pinfo magic.
+    Named as `hinspect` to avoid clash with the standard library module `inspect`.
+
+?symbol or symbol? in console triggers the following call chain:
+
+    NamespaceMagics.pinfo (parameter_s = "", namespaces = None) 
+        with `parameter_s` = the symbol and 'namespaces set to None (default)
+    ↓
+        • pinfo,qmark1,oname,qmark2 = re.match(r'(pinfo )?(\?*)(.*?)(\??$)',parameter_s).groups()
+        
+    shell._inspect("pinfo", oname)
+    ↓
+    page.page(data, start, screen_lines, pager_cmd) with: 
+        data: a Bundle/dict generated in shell._inspect(); 
+        start: 0
+        screen_lines: 0
+        pager_cmd: None
+    ⇊
+    eiher 
+        • shell.hooks.show_in_pager
+        • page.pager_page(data)
+"""
+    from core.prog import scipywarn
+    info = shell._object_find(oname, namespaces)
+    if info.found or hasattr(info.parent, oinspect.HOOK_NAME):
+        # pmethod = getattr(shell.inspector, meth)
+        # TODO: only apply format_screen to the plain/text repr of the mime
+        # bundle.
+        # formatter = format_screen if info.ismagic else docformat
+        helpdisp(shell, bf, info.obj, oname, format_screen, info)
+    else:
+        # scipywarn('Object `%s` not found.' % oname)
+        return 'not found'  # so callers can take other action
+
+def run_help_command(cmd:str, shell:typing.Optional[object]=None, namespaces=None) -> str | None:
+    # print(f"core.helputils.run_help_command({cmd})")
     import pydoc, importlib, types, traceback, contextlib
     if not isinstance(cmd, str) or len(cmd.strip()) == 0:
         return
@@ -364,17 +565,28 @@ def run_help_command(cmd:str, shell:typing.Optional[object]=None) -> str | None:
         try:
             helper.help(cmd)
             ret = bf.getvalue()
-            bf.flush()
+            if isinstance(ret, str) and any(v in ret for v in ("No Python documentation found", "not found")) and shell:
+                try:
+                    bf.flush()
+                    detail_level = 0
+                    pinfo,qmark1,oname,qmark2 = re.match(r'(pinfo )?(\?*)(.*?)(\??$)',cmd).groups()
+                    if pinfo or qmark1 or qmark2:
+                        detail_level = 1
+                    if "*" in oname:
+                        self.psearch(oname)
+                    else:
+                        val = hinspect(shell, bf, oname, detail_level=detail_level,
+                                            namespaces=namespaces)
+                        ret = bf.getvalue()
+                        
+                except:
+                    traceback.print_exc()
+            # bf.flush()
         except:
             traceback.print_exc()
 
             
-    # if isinstance(ret, str) and any(v in ret for v in ("No Python documentation found", "not found")):
-    #     if shell:
-    #         with io.StringIO() as bf, contextlib.redirect_stdout(bf):
-    #             shell.run_line_magic("pinfo", cmd)
-    #             ret = bf.getvalue()
-                
+
     if isinstance(ret, str) and any(v in ret for v in ("No Python documentation found", "not found")):
         ret += "\nCheck the spelling; you may need to enter a valid dotted path e.g. 'package.module.object.member'"
         
