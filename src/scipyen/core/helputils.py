@@ -562,6 +562,16 @@ def hinspect(shell:InteractiveShell, bf:io.StringIO, oname=str, namespaces=None,
 """
     from core.prog import scipywarn
     info = shell._object_find(oname, namespaces)
+    if not info.found:
+        # this happens when the first part in oname is not found by the shell
+        # a reason might be because oname contains a fully qualified object name
+        # (e.g. a module) which was imported directly e.g. from X import Y (hence
+        # shell 'knows' nothing about 'X' but known about 'Y')
+        #
+        # so let me try this here
+        parts = shell._find_parts(oname)
+        if parts[0]:
+            newparts = parts[1][1:]
     detail_level = kw.get("detail_level", 0)
     info_dict = shell.inspector.info(info.obj, oname, info, detail_level)
     
