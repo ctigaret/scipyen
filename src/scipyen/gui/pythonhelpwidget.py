@@ -128,30 +128,10 @@ class _PythonHelpThread_(QtCore.QThread):
                 # print(f"{self.__class__.__name__}.run: fullcmd = {fullcmd}")
                 try:
                     reply = helputils.run_help_command(" ".join(cmdParts), self.shell)
-                    reformat = True
+                    reformat = False
                 except:
                     traceback.print_exc()
-                # try:
-                #     self.helpProcess = subprocess.run(fullcmd, capture_output=True, check=True)
-                #     reply = self.helpProcess.stdout.decode()
-                #     reformat = True
-                # except subprocess.CalledProcessError as e:
-                #     reply = e.output.decode()
-                #     errors = e.stderr.decode()
-                #     retcode = e.returncode
-                #     if "No Python documentation found" in reply:
-                #         try:
-                #             reply = helputils.run_help_command(" ".join(cmdParts), self.shell)
-                #             reformat = True
-                #         except:
-                #             traceback.print_exc()
-                #     else:
-                #         scipywarn(f"Subprocess returned {retcode}")
-                #         if len(errors.strip()):
-                #             scipywarn(f"Errors:\n{errors}")
-                # except:
-                #     traceback.print_exc() 
-                
+
                 if isinstance(reply, str) and len(reply.strip()):
                     if self.helpCommand in ("keywords", "symbols", "topics"):
                         out = list()
@@ -192,9 +172,6 @@ class _PythonHelpThread_(QtCore.QThread):
                         out.append("</body>")
                         out.append("</html>")
                         doc.setHtml("\n".join(out))
-                        # print(reply.split("\n"))
-                        # doc.setMarkdown(reply)
-                        # doc.setHtml(reply)
                 
             self.ready.emit(doc)
             self.helpCommand = None

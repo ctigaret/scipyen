@@ -381,7 +381,8 @@ def helpdisp(shell, bf:io.StringIO, obj, oname="", formatter=None, info:typing.O
     # )
     
     strng = info_b["text/html"]
-    strng = strng.replace("<br>", "").replace("\n", "<br>").replace("<p>", "<br>")
+    # strng = strng.replace("<br>", "").replace("<p>", "<br>").replace("<br><br>", "<br>").replace("</h1><br>", "</h1>")
+    strng = strng.replace("<br>", "").replace("\n", "<br>\n").replace("<p>", "<br>").replace("<br><br>", "<br>").replace("</h1><br>", "</h1>")
 
     # if enable_html:
     #     strng = info_b["text/html"]
@@ -565,15 +566,22 @@ def hinspect(shell:InteractiveShell, bf:io.StringIO, oname=str, namespaces=None,
     if not info.found:
         # this happens when the first part in oname is not found by the shell
         # a reason might be because oname contains a fully qualified object name
-        # (e.g. a module) which was imported directly e.g. from X import Y (hence
-        # shell 'knows' nothing about 'X' but known about 'Y')
+        # (e.g. 'X.Y.Z.…' such as a module which was imported directly e.g. from X import Y (hence
+        # shell 'knows' nothing about 'X' but may know about 'Y' and what follows next)
         #
         # so let me try this here
-        parts = shell._find_parts(oname)
+        subname = oname
+        parts = shell._find_parts(subname)
         if parts[0]:
-            newparts = parts[1][1:]
+            for part in parts[1]:
+                subname = subname.replace(f"{part}.", "")
+                # print(f"subname = {subname}")
+                info = shell._object_find(subname, namespaces)
+                if info.found:
+                    break
+            
+    # print(f"core.helputils.hinspect: info = {info}")
     detail_level = kw.get("detail_level", 0)
-    info_dict = shell.inspector.info(info.obj, oname, info, detail_level)
     
     # if shell.sphinxify_docstring:
     #     if sphinxify is None:
@@ -587,6 +595,7 @@ def hinspect(shell:InteractiveShell, bf:io.StringIO, oname=str, namespaces=None,
     #         docformat = None
 
     if info.found or hasattr(info.parent, oinspect.HOOK_NAME):
+        info_dict = shell.inspector.info(info.obj, oname, info, detail_level)
         # pmethod = getattr(shell.inspector, meth)
         # TODO: only apply format_screen to the plain/text repr of the mime
         # bundle.
