@@ -49,7 +49,7 @@ from core.utilities import safewrapper
 # from core import workspacefunctions as wfunc
 # from .workspacegui import (WorkspaceGuiMixin, _X11WMBridge_, 
 #                            saveWindowSettings, loadWindowSettings)
-from .workspacegui import (WorkspaceGuiMixin, saveWindowSettings, loadWindowSettings)
+from gui.workspacegui import (WorkspaceGuiMixin, saveWindowSettings, loadWindowSettings)
 from gui.widgets.spinboxslider import SpinBoxSlider
 from gui.workspacemodel import WorkspaceModel
 from core import sysutils, desktoputils

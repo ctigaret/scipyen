@@ -17,6 +17,7 @@ Meant to be used by gui.pythonhelpwidget
 import sys, os, typing, inspect, types, importlib, io, dataclasses, inspect, re
 from functools import (singledispatch, partial)
 from contextlib import redirect_stdout
+from tempfile import TemporaryDirectory
 
 import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
@@ -49,6 +50,23 @@ from IPython.core.interactiveshell import InteractiveShell
 from IPython.core import magic, oinspect, page, prefilter, ultratb
 from IPython.utils.text import DollarFormatter, LSString, SList, format_screen
 from IPython.utils.wildcard import list_namespace, typestr2type
+
+try:
+    import docrepr.sphinxify as sphx
+
+    def sphinxify(oinfo):
+        wrapped_docstring = sphx.wrap_main_docstring(oinfo)
+
+        def sphinxify_docstring(docstring):
+            with TemporaryDirectory() as dirname:
+                return {
+                    "text/html": sphx.sphinxify(wrapped_docstring, dirname),
+                    "text/plain": docstring,
+                }
+
+        return sphinxify_docstring
+except ImportError:
+    sphinxify = None
 
 # NOTE: 2025-05-31 17:15:38
 # do NOT place this file deeper than one level below scipyen directory
@@ -353,19 +371,23 @@ def format_common_help_reply(msg:str):
 #     # return data
     
 def helpdisp(shell, bf:io.StringIO, obj, oname="", formatter=None, info:typing.Optional[oinspect.OInfo] = None,
-        detail_level=0, enable_html=True, omit_sections=()):#,
+        detail_level=0):#, enable_html=True, omit_sections=()):#,
         # start: int = 0, screen_lines: int = 0, ):
     r"""Stand-in for oinspect.Inspector.pinfo"""
     from core.prog import scipywarn
     assert info is not None
     info_b = shell.inspector._get_info(
-        obj, oname, formatter, info, detail_level, omit_sections=omit_sections
-    )
-    # print(f"core.helputils.helpdisp: info_b = {info_b}")
-    if enable_html:
-        strng = info_b["text/html"]
-    else:
-        strng = info_b['text/plain']
+        obj, oname, formatter, info, detail_level)#, omit_sections=omit_sections
+    # )
+    
+    strng = info_b["text/html"]
+    strng = strng.replace("<br>", "").replace("\n", "<br>").replace("<p>", "<br>")
+
+    # if enable_html:
+    #     strng = info_b["text/html"]
+    #     strng = strng..replace("<br>", "").replace("\n", "<br>")
+    # else:
+    #     strng = info_b['text/plain']
     
     for line in strng.splitlines():
         bf.write(line)
@@ -513,7 +535,7 @@ def hpsearch(shell, bf:io.StringIO,
 
         helpdisp(shell, bf, '\n'.join(sorted(search_result)))
     
-    
+# def get_info()
     
 def hinspect(shell:InteractiveShell, bf:io.StringIO, oname=str, namespaces=None, **kw):
     r"""Stand-in for shell._inspect, called by pinfo magic.
@@ -540,12 +562,26 @@ def hinspect(shell:InteractiveShell, bf:io.StringIO, oname=str, namespaces=None,
 """
     from core.prog import scipywarn
     info = shell._object_find(oname, namespaces)
+    detail_level = kw.get("detail_level", 0)
+    info_dict = shell.inspector.info(info.obj, oname, info, detail_level)
+    
+    # if shell.sphinxify_docstring:
+    #     if sphinxify is None:
+    #         raise ImportError("Module ``docrepr`` required but missing")
+    #     docformat = sphinxify(shell.object_inspect(oname))
+    # else:
+    #     object_info = shell.inspector.info(info.obj, oname, info, 1)
+    #     if "docstring" in object_info:
+    #         docformat = format_screen
+    #     else:
+    #         docformat = None
+
     if info.found or hasattr(info.parent, oinspect.HOOK_NAME):
         # pmethod = getattr(shell.inspector, meth)
         # TODO: only apply format_screen to the plain/text repr of the mime
         # bundle.
         # formatter = format_screen if info.ismagic else docformat
-        helpdisp(shell, bf, info.obj, oname, format_screen, info)
+        helpdisp(shell, bf, info.obj, oname, format_screen, info, detail_level)
     else:
         # scipywarn('Object `%s` not found.' % oname)
         return 'not found'  # so callers can take other action
@@ -555,9 +591,6 @@ def run_help_command(cmd:str, shell:typing.Optional[object]=None, namespaces=Non
     import pydoc, importlib, types, traceback, contextlib
     if not isinstance(cmd, str) or len(cmd.strip()) == 0:
         return
-
-    # return pydoc.render_doc(eval(cmd), title = cmd, forceload = 1, renderer = pydoc.html)
-
     ret = None
     
     with io.StringIO() as bf:
@@ -565,27 +598,33 @@ def run_help_command(cmd:str, shell:typing.Optional[object]=None, namespaces=Non
         try:
             helper.help(cmd)
             ret = bf.getvalue()
-            if isinstance(ret, str) and any(v in ret for v in ("No Python documentation found", "not found")) and shell:
+            # bf.flush()
+        except:
+            traceback.print_exc()
+
+    # print(f"run_help_command: first try ret = {ret}")
+    # if isinstance(ret, str) and any(v in ret for v in ("No Python documentation found", "not found")) and shell:
+    if isinstance(ret, str):
+        if ret.startswith("No Python documentation found") and shell:
+            with io.StringIO() as bf:
                 try:
-                    bf.flush()
                     detail_level = 0
                     pinfo,qmark1,oname,qmark2 = re.match(r'(pinfo )?(\?*)(.*?)(\??$)',cmd).groups()
                     if pinfo or qmark1 or qmark2:
                         detail_level = 1
                     if "*" in oname:
-                        self.psearch(oname)
+                        shellpsearch(shell, bf, oname)
                     else:
                         val = hinspect(shell, bf, oname, detail_level=detail_level,
                                             namespaces=namespaces)
                         ret = bf.getvalue()
-                        
+
                 except:
                     traceback.print_exc()
-            # bf.flush()
-        except:
-            traceback.print_exc()
+                # print(f"run_help_command: second try ret = {ret}")
+        else:
+            return ret
 
-            
 
     if isinstance(ret, str) and any(v in ret for v in ("No Python documentation found", "not found")):
         ret += "\nCheck the spelling; you may need to enter a valid dotted path e.g. 'package.module.object.member'"

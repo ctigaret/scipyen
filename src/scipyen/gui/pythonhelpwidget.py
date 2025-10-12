@@ -111,43 +111,46 @@ class _PythonHelpThread_(QtCore.QThread):
             # if any(s in cmdParts for s in ("modules", "module")):
             if "modules" in cmdParts:
                 doc.setHtml(helputils.module_infos("Modules", 
-                                                   "Here is a list of discovered modules, given as name or name (alias) where appropriate.<p>",
+                                                   "Module names and their aliases.<p>",
                                                   self.columns))
-                # doc.setHtml(helputils.module_infos("Package modules", 
-                #                                    "Here is a list of discovered modules, given as name or name (alias) where appropriate.<br>In the field above type one of the names below (or alias) for details",
-                #                                   self.columns))
                 self.ready.emit(doc)
                 return
             else:
                 # NOTE: 2025-06-02 17:02:10
                 # do NOT delete the next line - it works (kind of)
-                fullcmd = [sys.executable, "-Xfrozen_modules=off", "-m", "pydoc"] + cmdParts
+                # fullcmd = [sys.executabdle, "-Xfrozen_modules=off", "-m", "pydoc"] + cmdParts
                 # NOTE: 2025-06-02 17:01:56
                 # testing, don;t delete
                 # fullcmd = [sys.executable, "-Xfrozen_modules=off", "-m", helputils.__name__] + cmdParts
                 self.message.emit("Please wait...")
                 reply = None
                 errors = None
+                # print(f"{self.__class__.__name__}.run: fullcmd = {fullcmd}")
                 try:
-                    self.helpProcess = subprocess.run(fullcmd, capture_output=True, check=True)
-                    reply = self.helpProcess.stdout.decode()
+                    reply = helputils.run_help_command(" ".join(cmdParts), self.shell)
                     reformat = True
-                except subprocess.CalledProcessError as e:
-                    reply = e.output.decode()
-                    errors = e.stderr.decode()
-                    retcode = e.returncode
-                    if "No Python documentation found" in reply:
-                        try:
-                            reply = helputils.run_help_command(" ".join(cmdParts), self.shell)
-                            reformat = True
-                        except:
-                            traceback.print_exc()
-                    else:
-                        scipywarn(f"Subprocess returned {retcode}")
-                        if len(errors.strip()):
-                            scipywarn(f"Errors:\n{errors}")
                 except:
-                    traceback.print_exc() 
+                    traceback.print_exc()
+                # try:
+                #     self.helpProcess = subprocess.run(fullcmd, capture_output=True, check=True)
+                #     reply = self.helpProcess.stdout.decode()
+                #     reformat = True
+                # except subprocess.CalledProcessError as e:
+                #     reply = e.output.decode()
+                #     errors = e.stderr.decode()
+                #     retcode = e.returncode
+                #     if "No Python documentation found" in reply:
+                #         try:
+                #             reply = helputils.run_help_command(" ".join(cmdParts), self.shell)
+                #             reformat = True
+                #         except:
+                #             traceback.print_exc()
+                #     else:
+                #         scipywarn(f"Subprocess returned {retcode}")
+                #         if len(errors.strip()):
+                #             scipywarn(f"Errors:\n{errors}")
+                # except:
+                #     traceback.print_exc() 
                 
                 if isinstance(reply, str) and len(reply.strip()):
                     if self.helpCommand in ("keywords", "symbols", "topics"):
