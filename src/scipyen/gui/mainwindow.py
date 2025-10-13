@@ -9209,7 +9209,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     @safewrapper
     def _slot_aboutComponents(self) -> None:
         from core import helputils
-        txt = helputils.info_components(self.workspace)
+        txt = helputils.info_scipyen_components(self.workspace)
         d = AboutDialog(txt, self, "Software Components")
         
     @Slot()

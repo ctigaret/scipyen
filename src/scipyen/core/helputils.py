@@ -15,6 +15,7 @@ Meant to be used by gui.pythonhelpwidget
 # separate python process
 
 import sys, os, typing, inspect, types, importlib, io, dataclasses, inspect, re
+import traceback
 from functools import (singledispatch, partial)
 from contextlib import redirect_stdout
 from tempfile import TemporaryDirectory
@@ -50,6 +51,11 @@ from IPython.core.interactiveshell import InteractiveShell
 from IPython.core import magic, oinspect, page, prefilter, ultratb
 from IPython.utils.text import DollarFormatter, LSString, SList, format_screen
 from IPython.utils.wildcard import list_namespace, typestr2type
+from IPython.core.usage import interactive_usage as shell_usage
+
+from pygments import highlight
+from pygments.lexers import PythonLexer
+from pygments.formatters import HtmlFormatter
 
 try:
     import docrepr.sphinxify as sphx
@@ -72,6 +78,30 @@ except ImportError:
 # do NOT place this file deeper than one level below scipyen directory
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 _scipyendir_ = os.path.dirname(__module_path__)
+
+PYTHON_HELP_SECTIONS = ["NAME", 
+                        "CLASSES",
+                        "DATA", 
+                        "DESCRIPTION", 
+                        "FILE",
+                        "FUNCTIONS",
+                        "PACKAGE CONTENTS",
+                        "SUBMODULES",
+    ]
+
+def isDarkGui() -> bool:
+    windowColor = QtWidgets.QApplication.palette().color(QtGui.QPalette.Window)
+    _,_,v,_ = windowColor.getHsv()
+    return v <= 128
+
+def mypylight(code):
+    # return highlight(code, PythonLexer(), HtmlFormatter(noclasses=True, nobackground=True))
+    if isDarkGui():
+        style = "KeplerDark"
+    else:
+        style="default"
+    return highlight(code, PythonLexer(), HtmlFormatter(noclasses=True, nobackground=True, style=style))
+    # return highlight(code, PythonLexer(), HtmlFormatter(nobackground=True, style="native"))
 
 def make_HTML_table(msg:str|list[str], cols:typing.Optional[int] = None) -> str:
     r"""Formats a message to be displayed in a HTML table with ``cols`` columns.
@@ -236,7 +266,7 @@ def listmodules() -> tuple:
         
     return env_pkg_names, env_non_pkg_names, scipyen_pkg_names, scipyen_non_pkg_names, list(sorted(plugins.keys()))
     
-def info_components(ns:dict) -> str:
+def info_scipyen_components(ns:dict) -> str:
     r"""Prepares the contents of the Software Components dialog.
 Parameters:
 ==========
@@ -267,7 +297,7 @@ ns: the namepace where modules have been imported
                                                              },
                     }
     
-    def _get_info_(name:str, minfo:tuple):
+    def _get_modules_info(name:str, minfo:tuple):
         if name in modnames:
             modndx = modnames.index(name)
             modinfo = modinfos[modndx]
@@ -322,7 +352,7 @@ ns: the namepace where modules have been imported
     txt.append('<h3>Data Analysis</h3>')
     txt.append("<ul>")
     for name, minfo in address_map["Data Analysis"].items():
-        line = _get_info_(name, minfo)
+        line = _get_modules_info(name, minfo)
         if isinstance(line, str) and len(line.strip()):
             txt.append(line)
     txt.append("</ul>")
@@ -330,7 +360,7 @@ ns: the namepace where modules have been imported
     txt.append('<h3>User Interface & Plotting Frameworks</h3>')
     txt.append("<ul>")
     for name, minfo in address_map["User Interface & Plotting Frameworks"].items():
-        line = _get_info_(name, minfo)
+        line = _get_modules_info(name, minfo)
         if isinstance(line, str) and len(line.strip()):
             txt.append(line)
     txt.append('<li> <a href="https://develop.kde.org/frameworks/breeze-icons/">Breeze Icons</a> © <a href="https://kde.org">KDE</a> and licensed under the <a href="https://www.gnu.org/licenses/lgpl-3.0.en.html">GNU LGPL version 3 or later</a></li>')
@@ -363,101 +393,54 @@ def format_common_help_reply(msg:str):
             
     return "<br>\n".join(parts)
 
-# def dummy_pager(self, data, start, screen_lines, out = None):
-#     if isinstance(data, dict):
-#         data = data['text/plain']
-#         
-#     print(f"data: {data}", file=out)
-#     # return data
-    
 def helpdisp(shell, bf:io.StringIO, obj, oname="", formatter=None, info:typing.Optional[oinspect.OInfo] = None,
-        detail_level=0):#, enable_html=True, omit_sections=()):#,
+        detail_level=0, enable_html=True):#, omit_sections=()):#,
         # start: int = 0, screen_lines: int = 0, ):
     r"""Stand-in for oinspect.Inspector.pinfo"""
     from core.prog import scipywarn
     assert info is not None
+    
+    original_pylight = oinspect.pylight
+    oinspect.pylight = mypylight
+    info_dict = shell.inspector.info(info.obj, oname, info, detail_level)
     info_b = shell.inspector._get_info(
         obj, oname, formatter, info, detail_level)#, omit_sections=omit_sections
-    # )
     
-    strng = info_b["text/html"]
-    # strng = strng.replace("<br>", "").replace("<p>", "<br>").replace("<br><br>", "<br>").replace("</h1><br>", "</h1>")
-    strng = strng.replace("<br>", "").replace("\n", "<br>\n").replace("<p>", "<br>").replace("<br><br>", "<br>").replace("</h1><br>", "</h1>")
+    # TODO: 2025-10-13 02:07:14 BUG/FIXME
+    # supplement with a list of method signatures when detail_level is 0
+    # source = info_dict.get("source", None)
+    # if not inspect.ismodule(obj) and (not isinstance(source, str) or len(source) == 0):
+    #     methods = inspect.getmembers_static(obj, inspect.isfunction)
+    #     if len(methods):
+    #         methods_html = list()
+    #         methods_txt = list()
+    #         methods_txt.append("METHODS")
+    #         for m in methods:
+    #             m_name = m[0]
+    #             m_sig = f"{m[1].__module__}.{m[1].__qualname__}{str(inspect.signature(m[1]))}"
+    #             # methods_html.append(f"<h3>{m_name}:</h3><br>{m_sig}")
+    #             methods_html.append(f"{m_sig}")
+    #             methods_txt.append(f"{m_name}: {m_sig}")
+    #         info_b["text/html"] += f"<h1>Methods<h1>{oinspect.pylight('\n'.join(methods_html)).replace('\n', '<br>')}"
+    #         info_b["text/plain"] += "\n".join(methods_txt)
+        
+    oinspect.pylight = original_pylight
+    
+    if enable_html:
+        strng = info_b["text/html"]
+        strng = strng.replace("<br>", "").replace("\n", "<br>\n").replace("<p>", "<br>").replace("<br><br>", "<br>").replace("</h1><br>", "</h1>")
+    else:
+        strng = info_b['text/plain']
 
-    # if enable_html:
-    #     strng = info_b["text/html"]
-    #     strng = strng..replace("<br>", "").replace("\n", "<br>")
-    # else:
-    #     strng = info_b['text/plain']
+    bf_page(bf, strng)
     
+def bf_page(bf:io.StringIO, strng:str):
     for line in strng.splitlines():
         bf.write(line)
-        
-# def parse_options(arg_str, opt_str, *long_opts, **kw):
-#     caller = sys._getframe(1).f_code.co_name
-#     arg_str = '%s %s' % (self.options_table.get(caller,''),arg_str)
-# 
-#     mode = kw.get('mode','string')
-#     if mode not in ['string','list']:
-#         raise ValueError('incorrect mode given: %s' % mode)
-#     # Get options
-#     list_all = kw.get('list_all',0)
-#     posix = kw.get('posix', os.name == 'posix')
-#     strict = kw.get('strict', True)
-# 
-#     preserve_non_opts = kw.get("preserve_non_opts", False)
-#     remainder_arg_str = arg_str
-# 
-#     # Check if we have more than one argument to warrant extra processing:
-#     odict = {}  # Dictionary with options
-#     args = arg_str.split()
-#     if len(args) >= 1:
-#         # If the list of inputs only has 0 or 1 thing in it, there's no
-#         # need to look for options
-#         argv = arg_split(arg_str, posix, strict)
-#         # Do regular option processing
-#         try:
-#             opts, args = getopt(argv, opt_str, long_opts)
-#         except GetoptError as e:
-#             raise UsageError(
-#                 '%s (allowed: "%s"%s)'
-#                 % (e.msg, opt_str, " ".join(("",) + long_opts) if long_opts else "")
-#             ) from e
-#         for o, a in opts:
-#             if mode == "string" and preserve_non_opts:
-#                 # remove option-parts from the original args-string and preserve remaining-part.
-#                 # This relies on the arg_split(...) and getopt(...)'s impl spec, that the parsed options are
-#                 # returned in the original order.
-#                 remainder_arg_str = remainder_arg_str.replace(o, "", 1).replace(
-#                     a, "", 1
-#                 )
-#             if o.startswith("--"):
-#                 o = o[2:]
-#             else:
-#                 o = o[1:]
-#             try:
-#                 odict[o].append(a)
-#             except AttributeError:
-#                 odict[o] = [odict[o],a]
-#             except KeyError:
-#                 if list_all:
-#                     odict[o] = [a]
-#                 else:
-#                     odict[o] = a
-# 
-#     # Prepare opts,args for return
-#     opts = Struct(odict)
-#     if mode == 'string':
-#         if preserve_non_opts:
-#             args = remainder_arg_str.lstrip()
-#         else:
-#             args = " ".join(args)
-# 
-#     return opts,args
-    
+   
         
 def shellpsearch(shell, bf:io.StringIO, parameter_s='', 
-                 list_types:bool=True, ignore_case:typing.Optional[bool]=None,
+                 list_types:bool=False, ignore_case:typing.Optional[bool]=None,
                  show_all:bool=True):
         def_search = ['user_local', 'user_global', 'builtin']
 
@@ -482,26 +465,25 @@ def shellpsearch(shell, bf:io.StringIO, parameter_s='',
 
         # Build list of namespaces to search from user options
         # def_search.extend(opt('s',[]))
-        ns_exclude = ns_exclude=opt('e',[])
-        ns_search = [nm for nm in def_search if nm not in ns_exclude]
-
+        # ns_exclude = ns_exclude=opt('e',[])
+        # ns_search = [nm for nm in def_search if nm not in ns_exclude]
+        ns_search = def_search
         # Call the actual search
         try:
             hpsearch(shell, bf, parameter_s, ns_search,
-                    show_all,ignore_case=ignore_case, list_types=list_types)
+                    show_all=show_all, ignore_case=ignore_case, list_types=list_types)
         except:
             shell.showtraceback()
     
         
-def hpsearch(shell, bf:io.StringIO, 
-             pattern, ns_search=[],
-             ignore_case=False,show_all=False, *, list_types=False):
+def hpsearch(shell, bf:io.StringIO, pattern, ns_search=[],
+             ignore_case=False, show_all=False, list_types=False):
     type_pattern = 'all'
     filter = ''
 
     # list all object types
     if list_types:
-        helpdisp(shell, bf, '\n'.join(sorted(typestr2type)))
+        bf_page(bf, '\n'.join(sorted(typestr2type)))
         return
 
         cmds = pattern.split()
@@ -534,9 +516,63 @@ def hpsearch(shell, bf:io.StringIO,
                                     ignore_case=ignore_case, show_all=show_all)
             search_result.update(tmp_res)
 
-        helpdisp(shell, bf, '\n'.join(sorted(search_result)))
+        bf_page(shell, bf, '\n'.join(sorted(search_result)))
     
-# def get_info()
+def get_object_info(shell, oname=str, namespaces=None) -> oinspect.OInfo:
+    info = shell._object_find(oname, namespaces)
+    if not info.found:
+        # this happens when the first part in oname is not found by the shell
+        # a reason might be because oname contains a fully qualified object name
+        # (e.g. 'X.Y.Z.…' such as a module which was imported directly e.g. from X import Y (hence
+        # shell 'knows' nothing about 'X' but may know about 'Y' and what follows next)
+        #
+        # so let me try this here
+        subname = oname
+        parts = shell._find_parts(subname)
+        sinfo = None
+        if parts[0]:
+            for part in parts[1]:
+                subname = subname.replace(f"{part}.", "")
+                # print(f"subname = {subname}")
+                sinfo = shell._object_find(subname, namespaces)
+                if sinfo.found:
+                    break
+                
+        if isinstance(sinfo, oinspect.OInfo) and sinfo.found:
+            return sinfo
+        # else:
+        #     return oinspect.object_info(name=oname, found=False)
+            
+    return info
+    
+def hpinfo(shell, cmd, namespaces = None, detail_level:int=0,
+                                    enable_html:bool=True):
+    ret = None
+    reformat = False
+    
+    with io.StringIO() as bf:
+        try:
+            pinfo,qmark1,oname,qmark2 = re.match(r'(pinfo )?(\?*)(.*?)(\??$)',cmd).groups()
+            if pinfo or qmark1 or qmark2:
+                detail_level = 1
+            if "*" in oname:
+                shellpsearch(shell, bf, oname)
+                reformat=True
+            else:
+                hinspect(shell, bf, oname, namespaces=namespaces,
+                                detail_level = detail_level,
+                                enable_html = enable_html,
+                                )
+                reformat=False
+                
+            ret = bf.getvalue()
+
+        except:
+            traceback.print_exc()
+    
+    return ret, reformat
+     
+    
     
 def hinspect(shell:InteractiveShell, bf:io.StringIO, oname=str, namespaces=None, **kw):
     r"""Stand-in for shell._inspect, called by pinfo magic.
@@ -562,91 +598,117 @@ def hinspect(shell:InteractiveShell, bf:io.StringIO, oname=str, namespaces=None,
         • page.pager_page(data)
 """
     from core.prog import scipywarn
-    info = shell._object_find(oname, namespaces)
-    if not info.found:
-        # this happens when the first part in oname is not found by the shell
-        # a reason might be because oname contains a fully qualified object name
-        # (e.g. 'X.Y.Z.…' such as a module which was imported directly e.g. from X import Y (hence
-        # shell 'knows' nothing about 'X' but may know about 'Y' and what follows next)
-        #
-        # so let me try this here
-        subname = oname
-        parts = shell._find_parts(subname)
-        if parts[0]:
-            for part in parts[1]:
-                subname = subname.replace(f"{part}.", "")
-                # print(f"subname = {subname}")
-                info = shell._object_find(subname, namespaces)
-                if info.found:
-                    break
-            
-    # print(f"core.helputils.hinspect: info = {info}")
     detail_level = kw.get("detail_level", 0)
+    enable_html = kw.get("enable_html", True)
+    info = get_object_info(shell, oname, namespaces)
+    # print(f"core.helputils.hinspect: info = {info}")
     
-    # if shell.sphinxify_docstring:
-    #     if sphinxify is None:
-    #         raise ImportError("Module ``docrepr`` required but missing")
-    #     docformat = sphinxify(shell.object_inspect(oname))
-    # else:
-    #     object_info = shell.inspector.info(info.obj, oname, info, 1)
-    #     if "docstring" in object_info:
-    #         docformat = format_screen
-    #     else:
-    #         docformat = None
-
     if info.found or hasattr(info.parent, oinspect.HOOK_NAME):
         info_dict = shell.inspector.info(info.obj, oname, info, detail_level)
+        if shell.sphinxify_docstring:
+            if sphinxify is None:
+                raise ImportError("Module ``docrepr`` required but missing")
+            docformat = sphinxify(shell.object_inspect(oname))
+        else:
+            if "docstring" in info_dict:
+                docformat = format_screen
+            else:
+                docformat = None
+
         # pmethod = getattr(shell.inspector, meth)
         # TODO: only apply format_screen to the plain/text repr of the mime
         # bundle.
-        # formatter = format_screen if info.ismagic else docformat
-        helpdisp(shell, bf, info.obj, oname, format_screen, info, detail_level)
+        formatter = format_screen if info.ismagic else docformat
+        helpdisp(shell, bf, info.obj, oname, formatter, info, detail_level, enable_html)
     else:
+        bf.write("No Python documentation found")
         # scipywarn('Object `%s` not found.' % oname)
-        return 'not found'  # so callers can take other action
+        # return 'not found'  # so callers can take other action
 
-def run_help_command(cmd:str, shell:typing.Optional[object]=None, namespaces=None) -> str | None:
-    # print(f"core.helputils.run_help_command({cmd})")
-    import pydoc, importlib, types, traceback, contextlib
-    if not isinstance(cmd, str) or len(cmd.strip()) == 0:
-        return
+def run_python_help(cmd:str) -> str | None:
+    import pydoc, traceback
     ret = None
-    
     with io.StringIO() as bf:
         helper = pydoc.Helper(output = bf)
         try:
             helper.help(cmd)
             ret = bf.getvalue()
+            reformat=True
             # bf.flush()
         except:
             traceback.print_exc()
-
-    # print(f"run_help_command: first try ret = {ret}")
-    # if isinstance(ret, str) and any(v in ret for v in ("No Python documentation found", "not found")) and shell:
-    if isinstance(ret, str):
-        if ret.startswith("No Python documentation found") and shell:
-            with io.StringIO() as bf:
-                try:
-                    detail_level = 0
-                    pinfo,qmark1,oname,qmark2 = re.match(r'(pinfo )?(\?*)(.*?)(\??$)',cmd).groups()
-                    if pinfo or qmark1 or qmark2:
-                        detail_level = 1
-                    if "*" in oname:
-                        shellpsearch(shell, bf, oname)
-                    else:
-                        val = hinspect(shell, bf, oname, detail_level=detail_level,
-                                            namespaces=namespaces)
-                        ret = bf.getvalue()
-
-                except:
-                    traceback.print_exc()
-                # print(f"run_help_command: second try ret = {ret}")
-        else:
-            return ret
-
-
-    if isinstance(ret, str) and any(v in ret for v in ("No Python documentation found", "not found")):
+    if not isinstance(ret, str) or len(ret.strip()) == 0:
+        ret = f"No Python documentation found for {cmd}"
         ret += "\nCheck the spelling; you may need to enter a valid dotted path e.g. 'package.module.object.member'"
-        
     return ret
-                
+
+def format_python_help_output(data:str):
+    lines = data.splitlines()
+    formatted_lines = list()
+    for line in lines:
+        if line.startswith("Help on"):
+            formatted_lines.append(f"<h1>{line}</h1>")
+        elif any(line.startswith(v) for v in PYTHON_HELP_SECTIONS):
+            formatted_lines.append(f"<h2>{line}</h2>")
+        else:
+            formatted_lines.append(f"{line}<br>")
+    return "\n".join(formatted_lines)
+
+def run_help_command(shell, cmd:str, namespaces=None, **kw) -> str | None:
+    """
+kw: 
+enable_html: bool, default, is True
+detail_level: int, 0 or 1
+"""
+    # print(f"core.helputils.run_help_command({cmd})")
+    import pydoc, traceback
+    if not isinstance(cmd, str) or len(cmd.strip()) == 0:
+        return
+    
+    detail_level = kw.get("detail_level", 0)
+    enable_html = kw.get("enable_html", True)
+    
+    ret = None
+    reformat:bool = False
+    
+    if cmd.startswith("help"):
+        cmd = cmd.strip("help").strip("(").strip(")").strip("\"")
+        if len(cmd) == 0:
+            cmd = "help"
+        ret = run_python_help(cmd)
+        reformat = True
+        
+    else:
+        if cmd in ("?", "??"):
+            # bf_page(bf, shell_usage)
+            ret = shell_usage
+            reformat=True
+            
+        else:
+            if cmd.startswith("?") or cmd.endswith("?"):
+                def_cmd = shell.input_transformer_manager.transform_cell(cmd)
+                # this is of the form:
+                # get_ipython().run_line_magic(<method>, <target>)
+                method_name, target = def_cmd.strip("get_ipython().run_line_magic(").strip(")\n").replace("'", "").split(", ")
+                if method_name == "pinfo2":
+                    method_name = "pinfo"
+                elif method_name == "pinfo":
+                    method_name = ""
+                    
+                cmd = " ".join([method_name, target])
+            
+            ret, reformat = hpinfo(shell, cmd, namespaces, detail_level = detail_level,
+                                    enable_html = enable_html,
+                                    )
+
+               
+        if isinstance(ret, str):
+            if ret.startswith("No Python documentation found"):
+                ret = run_python_help(cmd)
+                reformat = True
+        else:
+            ret = f"No Python documentation found for {cmd}"
+            ret += "\nCheck the spelling; you may need to enter a valid dotted path e.g. 'package.module.object.member'"
+            reformat = True
+        
+    return ret, reformat

@@ -125,10 +125,10 @@ class _PythonHelpThread_(QtCore.QThread):
                 self.message.emit("Please wait...")
                 reply = None
                 errors = None
+                reformat = False
                 # print(f"{self.__class__.__name__}.run: fullcmd = {fullcmd}")
                 try:
-                    reply = helputils.run_help_command(" ".join(cmdParts), self.shell)
-                    reformat = False
+                    reply, reformat = helputils.run_help_command(self.shell, " ".join(cmdParts), )
                 except:
                     traceback.print_exc()
 
@@ -165,7 +165,10 @@ class _PythonHelpThread_(QtCore.QThread):
                                 "</head>"]
                         out.append("<body>")
                         if reformat:
-                            body = reply.replace("\n", "<br>\n")
+                            if reply.startswith("Help on"):
+                                body = helputils.format_python_help_output(reply)
+                            else:
+                                body = reply.replace("\n", "<br>")
                         else:
                             body = reply
                         out.append(body)
@@ -209,10 +212,14 @@ class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin
                 parts = list(map(lambda s: s.replace("\n", " "), msg.split("\n\n")))
                 parts = parts[:-1]
                 parts.append("\n".join(["Scipyen-specific NOTES:",
-                                        "---------------------- ",
-                                        "Queries for Python objects must be entered by their fully-qualified names, and not by alias: e.g., search for 'gui.scipyenviewer' and not for 'scipyenviewer', or whatever alias there may be, such as 'sv', etc.",
-                                        "This window is not a substitute to the Python 'help' command or IPython's help system ('?<object>') at the console, but it does 'free' up the console during such queries.",
-                                        "(Expect many bugs 😦)"]))
+                                        "------------------------ ",
+                                        "Enter a Python or IPython helpy query",
+                                        "NOTE: This does not substitute the Python 'help' command or IPython's help system ('?<object>') at the console, but it does help to 'free' up the console during such queries."]))
+                # parts.append("\n".join(["Scipyen-specific NOTES:",
+                #                         "---------------------- ",
+                #                         "Queries for Python objects must be entered by their fully-qualified names, and not by alias: e.g., search for 'gui.scipyenviewer' and not for 'scipyenviewer', or whatever alias there may be, such as 'sv', etc.",
+                #                         "This window is not a substitute to the Python 'help' command or IPython's help system ('?<object>') at the console, but it does 'free' up the console during such queries.",
+                #                         "(Expect many bugs 😦)"]))
                 self.intro_msg = "\n\n".join(parts)
                 
         except:
