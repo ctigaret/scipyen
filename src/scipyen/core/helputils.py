@@ -91,6 +91,8 @@ PYTHON_HELP_SECTIONS = ["NAME",
                         "SUBMODULES",
     ]
 
+PythonHelpDict = typing.TypedDict("PythonHelpDict", dict(map(lambda x: (x.lower(), typing.Optional[typing.Union[str, typing.List[str]]]), PYTHON_HELP_SECTIONS)))
+
 def isDarkGui() -> bool:
     windowColor = QtWidgets.QApplication.palette().color(QtGui.QPalette.Window)
     _,_,v,_ = windowColor.getHsv()
@@ -401,33 +403,15 @@ def helpdisp(shell, bf:io.StringIO, obj, oname="", formatter=None, info:typing.O
     from core.prog import scipywarn
     assert info is not None
     
-    original_pylight = oinspect.pylight
-    oinspect.pylight = mypylight
+    # original_pylight = oinspect.pylight
+    # oinspect.pylight = mypylight
     # info_dict = shell.inspector.info(info.obj, oname, info, detail_level)
     # info_b = shell.inspector._get_info(
     #     obj, oname, formatter, info, detail_level)#, omit_sections=omit_sections
     info_dict = hinfo(shell, info.obj, oname, info, detail_level)
     info_b = hget_info(shell, obj, oname, formatter, info, detail_level, omit_sections=omit_sections)
     
-    # TODO: 2025-10-13 02:07:14 BUG/FIXME
-    # supplement with a list of method signatures when detail_level is 0
-    # source = info_dict.get("source", None)
-    # if not inspect.ismodule(obj) and (not isinstance(source, str) or len(source) == 0):
-    #     methods = inspect.getmembers_static(obj, inspect.isfunction)
-    #     if len(methods):
-    #         methods_html = list()
-    #         methods_txt = list()
-    #         methods_txt.append("METHODS")
-    #         for m in methods:
-    #             m_name = m[0]
-    #             m_sig = f"{m[1].__module__}.{m[1].__qualname__}{str(inspect.signature(m[1]))}"
-    #             # methods_html.append(f"<h3>{m_name}:</h3><br>{m_sig}")
-    #             methods_html.append(f"{m_sig}")
-    #             methods_txt.append(f"{m_name}: {m_sig}")
-    #         info_b["text/html"] += f"<h1>Methods<h1>{oinspect.pylight('\n'.join(methods_html)).replace('\n', '<br>')}"
-    #         info_b["text/plain"] += "\n".join(methods_txt)
-        
-    oinspect.pylight = original_pylight
+    # oinspect.pylight = original_pylight
     
     if enable_html:
         strng = info_b["text/html"]
@@ -539,9 +523,19 @@ def object_inspect(shell, oname=str, detail_level:int=0):
     
 def get_object_info(shell, oname=str, namespaces=None) -> oinspect.OInfo:
     r"""Emulates shell._object_find()"""
+    if namespaces is None:
+        namespaces = [ ('Interactive', shell.user_ns),
+                        ('Interactive (global)', shell.user_global_ns),
+                        ('Python builtin', shell.ns_table["builtin"]),
+                        ]
     info = shell._object_find(oname, namespaces)
     if not info.found:
-        # this happens when the first part in oname is not found by the shell
+        # this might happen when either:
+        # 1) the object exists in the namespaces, but has been imported under an alias
+        oname1 = _find_by_alias(shell, oname, namespaces)
+        if isinstance(oname1, str) and len(oname1.strip()):
+            return shell._object_find(oname1, namespaces)
+        # 2) the first part in oname is not found by the shell
         # a reason might be because oname contains a fully qualified object name
         # (e.g. 'X.Y.Z.…' such as a module which was imported directly e.g. from X import Y (hence
         # shell 'knows' nothing about 'X' but may know about 'Y' and what follows next)
@@ -609,13 +603,14 @@ def hmake_info_unformatted(shell, obj, info, formatter, detail_level, omit_secti
         }
 
     if info["isalias"]:
-        append_field(shell,bundle, "Repr", "string_form")
+        append_field(shell, bundle, "Repr", "string_form")
 
     elif info['ismagic']:
         if detail_level > 0:
             append_field(shell, bundle, "Source", "source", code_formatter)
         else:
             append_field(shell, bundle, "Docstring", "docstring", formatter)
+            
         append_field(shell, bundle, "File", "file")
 
     elif info['isclass'] or oinspect.is_simple_callable(obj):
@@ -663,8 +658,9 @@ def hmake_info_unformatted(shell, obj, info, formatter, detail_level, omit_secti
             append_field(shell, bundle, "Docstring", "docstring", formatter)
             for field in _extra_info_fields:
                 if info[field]:
-                    fmt = code_formatter if field in ("methods", "descriptors", "functions") else formatter
-                    append_field(shell, bundle, field.capitalize(), field, fmt)
+                    append_field(shell, bundle, field.capitalize(), field, code_formatter)
+                    # fmt = code_formatter if field in ("methods", "descriptors", "functions", "classes", "data") else formatter
+                    # append_field(shell, bundle, field.capitalize(), field, fmt)
 
     return bundle
 
@@ -679,31 +675,42 @@ def hinfo(shell, obj, oname:str="", info:typing.Optional[oinspect.OInfo]=None,
         try:
             sig = inspect.signature(o)
         except:
-            sig = type(o).__name__
+            sig = f" <{type(o).__name__}>"
         return sig
     
     def _get_name(o):
         return getattr(o, "__qualname__", getattr(o, "__name__", f"{o}"))
 
-    def _is_docstring(o:typing.Any, member):
+    def _is_docstring(o:typing.Any, memberv):
         try:
             val = inspect.getmember(member[0])
             return data == o.__doc__ or (isinstance(val, str) and val == info_dict["doctring"])
         except:
             return False
+        
+    _test_docstring = partial(_is_docstring, obj)
             
     # NOTE: 2025-10-13 18:55:39
     # throughout below we exttratc only the public API
     
+    _is_data = lambda x: not(inspect.isclass(x) or inspect.isroutine(x) or inspect.ismethod(x) or inspect.isfunction(x) or inspect.ismodule(x) or _test_docstring(x))
     
-    datas = list(sorted(map(lambda f: f"{_get_name(f[1])}{_get_sig_or_type(f[1])}", 
-                            filter(lambda f: not _get_name(f[1]).startswith("_"), inspect.getmembers_static(obj, not inspect.isclass and not inspect.isroutine and not inspect.ismodule)))))
+    _is_function = lambda x: inspect.isfunction(x) or inspect.isroutine(x) or inspect.ismethod(x)
+    
+    _is_method = lambda x: inspect.isfunction(x) or inspect.isroutine(x) or inspect.ismethod(x) or inspect.isgenerator(x)
+    
+    _is_descriptor = lambda x: inspect.isdatadescriptor(x) or inspect.ismemberdescriptor(x) or inspect.isgetsetdescriptor(x)
+    
+    # datas = list(sorted(map(lambda f: f"{_get_name(f[1])}{_get_sig_or_type(f[1])}", 
+    #                         filter(lambda f: not f[0].startswith("_"), inspect.getmembers_static(obj, _is_data)))))
+    datas = list(sorted(map(lambda f: f"{f[0]}:{type(f[1]).__name__} = {f[1]}", 
+                            filter(lambda f: not f[0].startswith("_"), inspect.getmembers_static(obj, _is_data)))))
     
     info_dict["data"] = "\n".join(datas) if len(datas) else None
     
     if inspect.ismodule(obj):
         functions = list(sorted(map(lambda f: f"{_get_name(f[1])}{_get_sig_or_type(f[1])}", 
-                             filter(lambda f: not _get_name(f[1]).startswith("_"), inspect.getmembers_static(obj, inspect.isfunction or inspect.isroutine or inspect.ismethod)))))
+                             filter(lambda f: not _get_name(f[1]).startswith("_"), inspect.getmembers_static(obj, _is_function)))))
         info_dict["functions"] = "\n".join(functions) if len(functions) else None
         
         # NOTE: one can define a class as a member of another class (usually that's 
@@ -714,9 +721,9 @@ def hinfo(shell, obj, oname:str="", info:typing.Optional[oinspect.OInfo]=None,
         
     else:
         methods = list(sorted(map(lambda f: f"{_get_name(f[1])}{_get_sig_or_type(f[1])}", 
-                             filter(lambda f: not _get_name(f[1]).startswith("_"), inspect.getmembers_static(obj, inspect.isfunction or inspect.isroutine or inspect.ismethod or inspect.isgenerator)))))
+                             filter(lambda f: not _get_name(f[1]).startswith("_"), inspect.getmembers_static(obj, _is_method)))))
         descriptors = list(sorted(map(lambda f: f"{_get_name(f[1])}{_get_sig_or_type(f[1])}", 
-                             filter(lambda f: not _get_name(f[1]).startswith("_"), inspect.getmembers_static(obj, inspect.isdatadescriptor or inspect.ismemberdescriptor or inspect.isgetsetdescriptor)))))
+                             filter(lambda f: not _get_name(f[1]).startswith("_"), inspect.getmembers_static(obj, _is_descriptor)))))
         info_dict["methods"] = "\n".join(methods) if len(methods) else None
         info_dict["descriptors"] = "\n".join(descriptors) if len(descriptors) else None
         
@@ -825,9 +832,15 @@ def hinspect(shell:InteractiveShell, bf:io.StringIO, oname=str, namespaces=None,
     enable_html = kw.get("enable_html", True)
     info = get_object_info(shell, oname, namespaces)
     # print(f"core.helputils.hinspect: info = {info}")
+    if namespaces is None:
+        namespaces = [ ('Interactive', shell.user_ns),
+                        ('Interactive (global)', shell.user_global_ns),
+                        ('Python builtin', shell.ns_table["builtin"]),
+                        ]
     
     if info.found or hasattr(info.parent, oinspect.HOOK_NAME):
-        info_dict = shell.inspector.info(info.obj, oname, info, detail_level)
+        # info_dict = shell.inspector.info(info.obj, oname, info, detail_level)
+        info_dict = hinfo(shell, info.obj, oname, info, detail_level)
         if shell.sphinxify_docstring:
             if sphinxify is None:
                 raise ImportError("Module ``docrepr`` required but missing")
@@ -847,8 +860,26 @@ def hinspect(shell:InteractiveShell, bf:io.StringIO, oname=str, namespaces=None,
         bf.write("No Python documentation found")
         # scipywarn('Object `%s` not found.' % oname)
         # return 'not found'  # so callers can take other action
+        
+def _find_by_alias(shell, oname:str, namespaces=None):
+    r"""Find an object by its alias - typically applies to imported modules
+WARNING: Potentially problematic...
+ """
+    if namespaces is None:
+        namespaces = [ ('Interactive', shell.user_ns),
+                        ('Interactive (global)', shell.user_global_ns),
+                        ('Python builtin', shell.ns_table["builtin"]),
+                        ]
+        
+    for nsname,ns in namespaces:
+        obj_list = list(filter(lambda x: inspect.ismodule(x[1]) and oname in x[1].__name__, ns.items()))
+        if len(obj_list):
+            return obj_list[0][0]
+        
+    return
+    
 
-def run_python_help(cmd:str) -> str | None:
+def run_python_help(shell, cmd:str, enable_html=True, ) -> str | None:
     import pydoc, traceback
     ret = None
     with io.StringIO() as bf:
@@ -860,22 +891,92 @@ def run_python_help(cmd:str) -> str | None:
             # bf.flush()
         except:
             traceback.print_exc()
+            
     if not isinstance(ret, str) or len(ret.strip()) == 0:
         ret = f"No Python documentation found for {cmd}"
         ret += "\nCheck the spelling; you may need to enter a valid dotted path e.g. 'package.module.object.member'"
+    else:
+        ret_bundle = shell.inspector.format_mime(format_python_help_output(shell, make_python_help_dict(ret)))
+        if enable_html:
+            strng = ret_bundle["text/html"]
+            strng = strng.replace("<br>", "").replace("\n", "<br>\n").replace("<p>", "<br>").replace("<br><br>", "<br>").replace("</h1><br>", "</h1>")
+        else:
+            strng = ret_bundle['text/plain']
+            
+        with io.StringIO() as bf:
+            bf_page(bf, strng)
+            ret = bf.getvalue()
+        
     return ret
 
-def format_python_help_output(data:str):
-    lines = data.splitlines()
-    formatted_lines = list()
-    for line in lines:
-        if line.startswith("Help on"):
-            formatted_lines.append(f"<h1>{line}</h1>")
-        elif any(line.startswith(v) for v in PYTHON_HELP_SECTIONS):
-            formatted_lines.append(f"<h2>{line}</h2>")
+def make_python_help_dict(s:str):
+    lines = s.splitlines()
+    sections = list(map(lambda x: x.lower(), PYTHON_HELP_SECTIONS))
+    helpdict = PythonHelpDict(**{field:None for field in sections})
+    section = None
+    for k, line in enumerate(lines):
+        if k==0 and line.startswith("Help on"):
+            helpdict[line] = None
         else:
-            formatted_lines.append(f"{line}<br>")
-    return "\n".join(formatted_lines)
+            if line.lower() in helpdict:
+                section = line.lower()
+            else:
+                if section:
+                    if section not in helpdict or not isinstance(helpdict[section], list):
+                        helpdict[section] = list()
+                    # helpdict[section].append(f"{line}<br>")
+                    helpdict[section].append(line)
+                    
+    for section in helpdict:
+        slist = helpdict[section]
+        if isinstance(slist, list):
+            helpdict[section] = "\n".join(slist)
+            
+    return helpdict
+
+def format_python_help_output(shell, data:PythonHelpDict, formatter=None):
+    r"""Attempt for format standard Python help output similarly to IPython's help output.
+ """
+    bundle: UnformattedBundle = {
+        "text/plain": [],
+        "text/html": [],
+    }
+    
+    if formatter is None:
+        formatter = format_screen
+
+    _format = lambda t: shell.inspector.format(t)
+    
+    def code_formatter(text) -> Bundle:
+        return {
+            'text/plain': _format(text),
+            'text/html': mypylight(text)
+        }
+    
+    def append_field(shell, bundle:UnformattedBundle, title:str, key:str, hd:PythonHelpDict, formatter):
+        field = hd[key]
+        if field is not None:
+            formatted_field = shell.inspector._mime_format(field, formatter)
+            bundle["text/plain"].append((title, formatted_field["text/plain"]))
+            bundle["text/html"].append((title, formatted_field["text/html"]))
+        else:
+            bundle["text/plain"].append((title, ""))
+            bundle["text/html"].append((title, ""))
+    
+    titlekey = list(filter(lambda k: k.startswith("Help on"), data.keys()))
+    if len(titlekey):
+        titlekey = titlekey[0]
+        append_field(shell, bundle, titlekey, titlekey, data, formatter)
+    else:
+        titlekey = ""
+        
+    for key in data:
+        if key != titlekey:
+            fmt = code_formatter if key in ("data", "classes", "functions") else formatter
+            append_field(shell, bundle, key.capitalize(), key, data, fmt)
+        
+    return bundle
+    
 
 def run_help_command(shell, cmd:str, namespaces=None, **kw) -> str | None:
     """
@@ -902,7 +1003,7 @@ detail_level: int, 0 or 1
         cmd = cmd.strip("help").strip("(").strip(")").strip("\"")
         if len(cmd) == 0:
             cmd = "help"
-        ret = run_python_help(cmd)
+        ret = run_python_help(shell, cmd)
         reformat = True
         
     else:
