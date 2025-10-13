@@ -46,7 +46,7 @@
      <x>0</x>
      <y>0</y>
      <width>898</width>
-     <height>29</height>
+     <height>28</height>
     </rect>
    </property>
    <property name="sizePolicy">
@@ -86,6 +86,7 @@
     <property name="icon">
      <iconset theme="help-contents"/>
     </property>
+    <addaction name="actionPython_help"/>
     <addaction name="actionHelp_On_Console"/>
     <addaction name="actionAbout"/>
     <addaction name="actionAbout_Qt"/>
@@ -1654,7 +1655,7 @@ NOTE: you can click anywhere in the row to select</string>
     <iconset theme="tools-symbolic"/>
    </property>
    <property name="text">
-    <string>Components</string>
+    <string>About Components</string>
    </property>
   </action>
   <action name="actionLicense">
@@ -1805,6 +1806,23 @@ NOTE: you can click anywhere in the row to select</string>
    </property>
    <property name="text">
     <string>Tool Button Style...</string>
+   </property>
+  </action>
+  <action name="actionPython_help">
+   <property name="icon">
+    <iconset theme="help-contextual"/>
+   </property>
+   <property name="text">
+    <string>Help</string>
+   </property>
+   <property name="statusTip">
+    <string>Python language help</string>
+   </property>
+   <property name="whatsThis">
+    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Brings up a window to access the help systems of Python and IPython independently of (and in parallel to) the Scipyen's console.&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+   </property>
+   <property name="shortcut">
+    <string>F1</string>
    </property>
   </action>
  </widget>

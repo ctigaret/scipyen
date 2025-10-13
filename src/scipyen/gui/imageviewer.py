@@ -961,6 +961,9 @@ class AxesCalibrationDialog2(QDialog, Ui_AxesCalibrationDialog2):
         self.slot_updateAxesMetaData()
         
 class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
+    r"""Scipyen's image viewer.
+    Use with VIGRA arrays, numpy arrays, QImage & QPixmap objects.
+ """
     closeMe                 = Signal(int)
     
     signal_graphicsObjectAdded      = Signal(object, name="signal_graphicsObjectAdded")
@@ -1041,6 +1044,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                  win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None, 
                  frame:(int, type(None)) = None, 
                  displayChannel = None, normalize: (bool, ) = False, gamma: (float, ) = 1.0, *args, **kwargs):
+        r"""ImageViewer constructor
+     """
         # print(f"{self.__class__.__name__}.__init__: data: {type(data).__name__}")
         # # NOTE: 2021-08-25 09:42:54
         # # ScipyenFrameViewer initialization - also does the following:

@@ -6245,12 +6245,15 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # ### END   Applications menu
         
         # ### BEGIN Help menu
+        # self.testPythonHelpAction = QAction(QtGui.QIcon.fromTheme("help-contextual"), "Python help", self)
+        # self.testPythonHelpAction.triggered.connect(self._slot_PythonHelp)
+        # self.menuHelp.addAction(self.testPythonHelpAction)
+        self.actionPython_help.triggered.connect(self._slot_PythonHelp)
+        
         self.whatsThisAction = QtWidgets.QWhatsThis.createAction(self)
         self.whatsThisAction.setIcon(QtGui.QIcon.fromTheme("help-whatsthis"))
+        self.menuHelp.addSeparator()
         self.menuHelp.addAction(self.whatsThisAction)
-        self.testPythonHelpAction = QAction(QtGui.QIcon.fromTheme("help-contextual"), "Python help", self)
-        self.testPythonHelpAction.triggered.connect(self._slot_PythonHelp)
-        self.menuHelp.addAction(self.testPythonHelpAction)
         # ### END   Help menu
         
         self.actionQuit.triggered.connect(self.slot_Quit)

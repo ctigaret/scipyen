@@ -49,9 +49,11 @@ else:
 
 from IPython.core.interactiveshell import InteractiveShell
 from IPython.core import magic, oinspect, page, prefilter, ultratb
-from IPython.utils.text import DollarFormatter, LSString, SList, format_screen
+from IPython.core.oinspect import (UnformattedBundle, Bundle, InfoDict)
+from IPython.utils.text import (DollarFormatter, LSString, SList, 
+                                format_screen, indent, dedent)
 from IPython.utils.wildcard import list_namespace, typestr2type
-from IPython.core.usage import interactive_usage as shell_usage
+from IPython.core.usage import (interactive_usage, quick_reference)
 
 from pygments import highlight
 from pygments.lexers import PythonLexer
@@ -435,49 +437,58 @@ def helpdisp(shell, bf:io.StringIO, obj, oname="", formatter=None, info:typing.O
     bf_page(bf, strng)
     
 def bf_page(bf:io.StringIO, strng:str):
+    # print(f"bf_page split lines: {strng.splitlines()}")
     for line in strng.splitlines():
         bf.write(line)
    
-        
-def shellpsearch(shell, bf:io.StringIO, parameter_s='', 
-                 list_types:bool=False, ignore_case:typing.Optional[bool]=None,
-                 show_all:bool=True):
-        def_search = ['user_local', 'user_global', 'builtin']
-
-        # Process options/args
-        # opts,args = parse_options(parameter_s,'cias:e:l',list_all=True)
-        # opt = opts.get
-        # psearch = shell.inspector.psearch
-        
-        # # select list object types
-        # list_types = False
-        # if 'l' in opts:
-        #     list_types = True
-        # 
-        # # select case options
-        # if 'i' in opts:
-        #     ignore_case = True
-        # elif 'c' in opts:
-        #     ignore_case = False
-        # else:
-        if not isinstance(ignore_case, bool):
-            ignore_case = not shell.wildcards_case_sensitive
-
-        # Build list of namespaces to search from user options
-        # def_search.extend(opt('s',[]))
-        # ns_exclude = ns_exclude=opt('e',[])
-        # ns_search = [nm for nm in def_search if nm not in ns_exclude]
-        ns_search = def_search
-        # Call the actual search
-        try:
-            hpsearch(shell, bf, parameter_s, ns_search,
-                    show_all=show_all, ignore_case=ignore_case, list_types=list_types)
-        except:
-            shell.showtraceback()
+def redirect_psearch(shell, bf, cmd:str):
+    r"""Emulates NamespaceMagics.psearch"""
+    # print(f"redirect_psearch({cmd})")
+    # NOTE: 2025-10-13 12:00:25 
+    # contextlib.redirect_stdout doesn't work here
+    # so let's disembowel this a bit and use what we need
+    #
+    psearchfn = shell.find_line_magic("psearch") # the psearch magic function that shell would use
+    magicobj = psearchfn.__self__ # the magics object that owns `psearchfn`
+    def_search = ['user_local', 'user_global', 'builtin']
     
+    opts, args = magicobj.parse_options(cmd, 'cias:e:l',list_all=True)
+    opt = opts.get
+    # shell = self.shell # NOTE: 2025-10-13 11:59:24 `shell` already provided
+    # psearch = shell.inspector.psearch # NOTE: 2025-10-13 11:59:50 use our own `hpsearch`
+    # select list object types
+    list_types = False
+    if 'l' in opts:
+        list_types = True
+
+    # select case options
+    if 'i' in opts:
+        ignore_case = True
+    elif 'c' in opts:
+        ignore_case = False
+    else:
+        ignore_case = not shell.wildcards_case_sensitive
+
+    # Build list of namespaces to search from user options
+    def_search.extend(opt('s',[]))
+    ns_exclude = ns_exclude=opt('e',[])
+    ns_search = [nm for nm in def_search if nm not in ns_exclude]
+
+    # Call the actual search
+    try:
+        hpsearch(shell, bf, args, shell.ns_table, ns_search,
+                ignore_case=ignore_case, show_all=opt('a'), list_types=list_types)
+            
+    except:
+        traceback.print_exc()
+        # shell.showtraceback()
+
+    # return ret, True
         
-def hpsearch(shell, bf:io.StringIO, pattern, ns_search=[],
-             ignore_case=False, show_all=False, list_types=False):
+def hpsearch(shell, bf:io.StringIO, pattern, ns_table, ns_search=[],
+             ignore_case=False, show_all=False, *, list_types=False):
+    r"""Emulates shell.inspector.psearch"""
+    # print(f"hpsearch({pattern}, ns_table = {type(ns_table).__name__}, ns_search = {ns_search}, ignore_case={ignore_case}, show_all = {show_all}, list_types = {list_types})")
     type_pattern = 'all'
     filter = ''
 
@@ -486,37 +497,38 @@ def hpsearch(shell, bf:io.StringIO, pattern, ns_search=[],
         bf_page(bf, '\n'.join(sorted(typestr2type)))
         return
 
-        cmds = pattern.split()
-        len_cmds  =  len(cmds)
-        if len_cmds == 1:
-            # Only filter pattern given
-            filter = cmds[0]
-        elif len_cmds == 2:
-            # Both filter and type specified
-            filter,type_pattern = cmds
-        else:
-            raise ValueError('invalid argument string for psearch: <%s>' %
-                             pattern)
+    cmds = pattern.split()
+    
+    len_cmds  =  len(cmds)
+    if len_cmds == 1:
+        # Only filter pattern given
+        filter = cmds[0]
+    elif len_cmds == 2:
+        # Both filter and type specified
+        filter,type_pattern = cmds
+    else:
+        raise ValueError('invalid argument string for psearch: <%s>' %
+                            pattern)
 
-        # filter search namespaces
-        for name in ns_search:
-            if name not in shell.ns_table:
-                raise ValueError('invalid namespace <%s>. Valid names: %s' %
-                                 (name, shell.ns_table.keys()))
+    # filter search namespaces
+    for name in ns_search:
+        if name not in ns_table:
+            raise ValueError('invalid namespace <%s>. Valid names: %s' %
+                                (name, shell.ns_table.keys()))
 
-        # print('type_pattern:',type_pattern)  # dbg
-        search_result, namespaces_seen = set(), set()
-        for ns_name in ns_search:
-            ns = shell.ns_table[ns_name]
-            # Normally, locals and globals are the same, so we just check one.
-            if id(ns) in namespaces_seen:
-                continue
-            namespaces_seen.add(id(ns))
-            tmp_res = list_namespace(ns, type_pattern, filter,
-                                    ignore_case=ignore_case, show_all=show_all)
-            search_result.update(tmp_res)
+    # print('type_pattern:',type_pattern)  # dbg
+    search_result, namespaces_seen = set(), set()
+    for ns_name in ns_search:
+        ns = ns_table[ns_name]
+        # Normally, locals and globals are the same, so we just check one.
+        if id(ns) in namespaces_seen:
+            continue
+        namespaces_seen.add(id(ns))
+        tmp_res = list_namespace(ns, type_pattern, filter,
+                                ignore_case=ignore_case, show_all=show_all)
+        search_result.update(tmp_res)
 
-        bf_page(shell, bf, '\n'.join(sorted(search_result)))
+    bf_page(bf, '<p>\n'.join(list(sorted(search_result))))
     
 def get_object_info(shell, oname=str, namespaces=None) -> oinspect.OInfo:
     info = shell._object_find(oname, namespaces)
@@ -544,6 +556,121 @@ def get_object_info(shell, oname=str, namespaces=None) -> oinspect.OInfo:
         #     return oinspect.object_info(name=oname, found=False)
             
     return info
+
+def hinfo(shell, obj, oname="", info=None, detail_level=0) -> InfoDict:
+    r"Emulates shell.inspector.info()"
+    # TODO 2025-10-13 13:25:09
+
+    out = shell.inspector.info(obj, oname, info, detail_level)
+
+    return out
+    
+
+def happend_info_field(bundle: UnformattedBundle,
+        title: str,
+        key: str,
+        info,
+        omit_sections: typing.List[str],
+        formatter,
+        ):
+    # TODO 2025-10-13 13:25:09
+    if title in omit_sections or key in omit_sections:
+        return
+    field = info[key]
+    if field is not None:
+        formatted_field = self._mime_format(field, formatter)
+        bundle["text/plain"].append((title, formatted_field["text/plain"]))
+        bundle["text/html"].append((title, formatted_field["text/html"]))
+
+
+def hmake_info_unformatted(obj, info, formatter, detail_level, omit_sections) -> UnformattedBundle:
+    r"""Emulates shell.inspector._make_info_unformatted"""
+    # TODO 2025-10-13 13:25:09
+    bundle: UnformattedBundle = {
+        "text/plain": [],
+        "text/html": [],
+    }
+    def append_field(
+        bundle: UnformattedBundle, title: str, key: str, formatter=None
+    ):
+        happend_info_field(
+            bundle,
+            title=title,
+            key=key,
+            info=info,
+            omit_sections=omit_sections,
+            formatter=formatter,
+        )
+
+    def code_formatter(text) -> Bundle:
+        return {
+            'text/plain': self.format(text),
+            'text/html': pylight(text)
+        }
+
+    if info["isalias"]:
+        append_field(bundle, "Repr", "string_form")
+
+    elif info['ismagic']:
+        if detail_level > 0:
+            append_field(bundle, "Source", "source", code_formatter)
+        else:
+            append_field(bundle, "Docstring", "docstring", formatter)
+        append_field(bundle, "File", "file")
+
+    elif info['isclass'] or is_simple_callable(obj):
+        # Functions, methods, classes
+        append_field(bundle, "Signature", "definition", code_formatter)
+        append_field(bundle, "Init signature", "init_definition", code_formatter)
+        append_field(bundle, "Docstring", "docstring", formatter)
+        if detail_level > 0 and info["source"]:
+            append_field(bundle, "Source", "source", code_formatter)
+        else:
+            append_field(bundle, "Init docstring", "init_docstring", formatter)
+
+        append_field(bundle, "File", "file")
+        append_field(bundle, "Type", "type_name")
+        append_field(bundle, "Subclasses", "subclasses")
+
+    else:
+        # General Python objects
+        append_field(bundle, "Signature", "definition", code_formatter)
+        append_field(bundle, "Call signature", "call_def", code_formatter)
+        append_field(bundle, "Type", "type_name")
+        append_field(bundle, "String form", "string_form")
+
+        # Namespace
+        if info["namespace"] != "Interactive":
+            append_field(bundle, "Namespace", "namespace")
+
+        append_field(bundle, "Length", "length")
+        append_field(bundle, "File", "file")
+
+        # Source or docstring, depending on detail level and whether
+        # source found.
+        if detail_level > 0 and info["source"]:
+            append_field(bundle, "Source", "source", code_formatter)
+        else:
+            append_field(bundle, "Docstring", "docstring", formatter)
+            if not inspect.ismodule(obj):
+                append_field(bundle, "Methods", "methods")
+
+        append_field(bundle, "Class docstring", "class_docstring", formatter)
+        append_field(bundle, "Init docstring", "init_docstring", formatter)
+        append_field(bundle, "Call docstring", "call_docstring", formatter)
+        
+    return bundle
+
+
+def hget_info(shell, obj, oame:str="", formatter=None, info:typing.Optional[oinspect.OInfo]=None,
+              detail_level:int = 0, omit_sections:typing.Union[typing.List[str], typing.Tuple[str]] = ()) -> tuple[dict]:
+    r"""Emulates shell.inspector._get_info"""
+    # TODO 2025-10-13 13:25:09
+    
+    info_dict = shell.inspector.info(obj, oname=oname, info=info, detail_level=detail_level)
+    omit_sections = list(omit_sections)
+    
+    
     
 def hpinfo(shell, cmd, namespaces = None, detail_level:int=0,
                                     enable_html:bool=True):
@@ -556,7 +683,7 @@ def hpinfo(shell, cmd, namespaces = None, detail_level:int=0,
             if pinfo or qmark1 or qmark2:
                 detail_level = 1
             if "*" in oname:
-                shellpsearch(shell, bf, oname)
+                redirect_psearch(shell, bf, oname)
                 reformat=True
             else:
                 hinspect(shell, bf, oname, namespaces=namespaces,
@@ -660,7 +787,11 @@ kw:
 enable_html: bool, default, is True
 detail_level: int, 0 or 1
 """
+    # NOTE: 2025-10-13 11:21:18
+    # code shamelessly adapted/copied from IPython
+    
     # print(f"core.helputils.run_help_command({cmd})")
+    from IPython.core.magic import Magics, magics_class, line_magic, magic_escapes 
     import pydoc, traceback
     if not isinstance(cmd, str) or len(cmd.strip()) == 0:
         return
@@ -680,10 +811,47 @@ detail_level: int, 0 or 1
         
     else:
         if cmd in ("?", "??"):
-            # bf_page(bf, shell_usage)
-            ret = shell_usage
+            # bf_page(bf, interactive_usage)
+            ret = interactive_usage
             reformat=True
             
+        elif cmd == "quickref":
+            mman = shell.magics_manager
+            docs = mman.lsmagic_docs(True, missing='No documentation')
+            format_string = '%s%s:\n%s\n'
+            magicdocs = "".join(
+                [format_string % (magic_escapes['line'], fname,
+                              indent(dedent(fndoc)))
+                for fname, fndoc in sorted(docs['line'].items())]
+                +
+                [format_string % (magic_escapes['cell'], fname,
+                              indent(dedent(fndoc)))
+                for fname, fndoc in sorted(docs['cell'].items())]
+                )
+            ret = quick_reference + magicdocs
+            reformat=True
+            
+        elif cmd.startswith("lsmagic"): # NOTE: 2025-10-13 11:27:34 also allow `lsmagics`
+            from IPython.core.magics.basic import MagicsDisplay
+            mmd = MagicsDisplay(shell.magics_manager, ignore=[])
+            ret = mmd._lsmagic()
+            reformat=True
+            
+        elif cmd.startswith("psearch"):
+            s = cmd.strip("psearch").strip()
+            if len(s):
+                with io.StringIO() as bf:
+                    redirect_psearch(shell, bf, s)
+                    ret = bf.getvalue()
+                    if len(ret.strip()) == 0:
+                        ret = f"Nothing found matching the pattern {s}<p>"
+                    # print(f"run_help_command {cmd} -> ret = {ret}")
+                    reformat = True
+                    
+            else:
+                ret, reformat = hpinfo(shell, "psearch", namespaces, detail_level = detail_level,
+                                    enable_html = enable_html)
+                
         else:
             if cmd.startswith("?") or cmd.endswith("?"):
                 def_cmd = shell.input_transformer_manager.transform_cell(cmd)
@@ -698,8 +866,7 @@ detail_level: int, 0 or 1
                 cmd = " ".join([method_name, target])
             
             ret, reformat = hpinfo(shell, cmd, namespaces, detail_level = detail_level,
-                                    enable_html = enable_html,
-                                    )
+                                    enable_html = enable_html)
 
                
         if isinstance(ret, str):
@@ -712,3 +879,4 @@ detail_level: int, 0 or 1
             reformat = True
         
     return ret, reformat
+

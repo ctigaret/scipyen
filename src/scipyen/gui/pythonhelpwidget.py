@@ -200,6 +200,15 @@ class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin
             
         WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs)
         
+        self._placeHolder_ = "\n".join(["Scipyen-specific NOTES:",
+                                        "------------------------ ",
+                                        "Enter a query to access the help system of Python (e.g., `help(thing)`) or IPython (e.g. one of `thing`, `?thing`, `thing?`, `??thing`, `thing??`, `?`, or `??`)",
+                                        "",
+                                        "Supports help-related IPython tools: `?`, `??`, and the line magics `quickref` and `psearch`",
+                                        "",
+                                        "Enter the magic name without the `%` prefix, followed by arguments, to execute it (e.g. `psearch <pattern…>`), or the magic name WITH the `%` prefix to read its documentation (e.g. `%psearch`)",
+                                        ""
+                                        "NOTE: This does not substitute the Python 'help' command or IPython's help system ('?<object>') at the console, but it does help to 'free' up the console during such queries."])
         self._helpThread_ = _PythonHelpThread_(self, shell)
         self._helpThread_.message[str].connect(self._slot_displayMessage)
         self._helpThread_.ready[QtGui.QTextDocument].connect(self._slot_displayReply)
@@ -211,10 +220,7 @@ class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin
                 msg = bf.getvalue()
                 parts = list(map(lambda s: s.replace("\n", " "), msg.split("\n\n")))
                 parts = parts[:-1]
-                parts.append("\n".join(["Scipyen-specific NOTES:",
-                                        "------------------------ ",
-                                        "Enter a Python or IPython helpy query",
-                                        "NOTE: This does not substitute the Python 'help' command or IPython's help system ('?<object>') at the console, but it does help to 'free' up the console during such queries."]))
+                parts.append(self._placeHolder_)
                 # parts.append("\n".join(["Scipyen-specific NOTES:",
                 #                         "---------------------- ",
                 #                         "Queries for Python objects must be entered by their fully-qualified names, and not by alias: e.g., search for 'gui.scipyenviewer' and not for 'scipyenviewer', or whatever alias there may be, such as 'sv', etc.",
