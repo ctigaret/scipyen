@@ -58,7 +58,7 @@ from IPython.core.usage import (interactive_usage, quick_reference)
 from pygments import highlight
 from pygments.lexers import PythonLexer
 from pygments.formatters import HtmlFormatter
-
+_extra_info_fields = ["methods", "descriptors", "functions", "classes", "data"]
 try:
     import docrepr.sphinxify as sphx
 
@@ -396,17 +396,18 @@ def format_common_help_reply(msg:str):
     return "<br>\n".join(parts)
 
 def helpdisp(shell, bf:io.StringIO, obj, oname="", formatter=None, info:typing.Optional[oinspect.OInfo] = None,
-        detail_level=0, enable_html=True):#, omit_sections=()):#,
-        # start: int = 0, screen_lines: int = 0, ):
+        detail_level=0, enable_html=True, omit_sections=()):
     r"""Stand-in for oinspect.Inspector.pinfo"""
     from core.prog import scipywarn
     assert info is not None
     
     original_pylight = oinspect.pylight
     oinspect.pylight = mypylight
-    info_dict = shell.inspector.info(info.obj, oname, info, detail_level)
-    info_b = shell.inspector._get_info(
-        obj, oname, formatter, info, detail_level)#, omit_sections=omit_sections
+    # info_dict = shell.inspector.info(info.obj, oname, info, detail_level)
+    # info_b = shell.inspector._get_info(
+    #     obj, oname, formatter, info, detail_level)#, omit_sections=omit_sections
+    info_dict = hinfo(shell, info.obj, oname, info, detail_level)
+    info_b = hget_info(shell, obj, oname, formatter, info, detail_level, omit_sections=omit_sections)
     
     # TODO: 2025-10-13 02:07:14 BUG/FIXME
     # supplement with a list of method signatures when detail_level is 0
@@ -530,7 +531,14 @@ def hpsearch(shell, bf:io.StringIO, pattern, ns_table, ns_search=[],
 
     bf_page(bf, '<p>\n'.join(list(sorted(search_result))))
     
+def object_inspect(shell, oname=str, detail_level:int=0):
+    r"""Emulates shell.object_inspect"""
+    info = get_object_info(oname)
+    if info.found:
+        pass # TODO
+    
 def get_object_info(shell, oname=str, namespaces=None) -> oinspect.OInfo:
+    r"""Emulates shell._object_find()"""
     info = shell._object_find(oname, namespaces)
     if not info.found:
         # this happens when the first part in oname is not found by the shell
@@ -552,21 +560,10 @@ def get_object_info(shell, oname=str, namespaces=None) -> oinspect.OInfo:
                 
         if isinstance(sinfo, oinspect.OInfo) and sinfo.found:
             return sinfo
-        # else:
-        #     return oinspect.object_info(name=oname, found=False)
-            
+
     return info
 
-def hinfo(shell, obj, oname="", info=None, detail_level=0) -> InfoDict:
-    r"Emulates shell.inspector.info()"
-    # TODO 2025-10-13 13:25:09
-
-    out = shell.inspector.info(obj, oname, info, detail_level)
-
-    return out
-    
-
-def happend_info_field(bundle: UnformattedBundle,
+def happend_info_field(shell, bundle: UnformattedBundle,
         title: str,
         key: str,
         info,
@@ -578,22 +575,23 @@ def happend_info_field(bundle: UnformattedBundle,
         return
     field = info[key]
     if field is not None:
-        formatted_field = self._mime_format(field, formatter)
+        formatted_field = shell.inspector._mime_format(field, formatter)
         bundle["text/plain"].append((title, formatted_field["text/plain"]))
         bundle["text/html"].append((title, formatted_field["text/html"]))
 
 
-def hmake_info_unformatted(obj, info, formatter, detail_level, omit_sections) -> UnformattedBundle:
+def hmake_info_unformatted(shell, obj, info, formatter, detail_level, omit_sections) -> UnformattedBundle:
     r"""Emulates shell.inspector._make_info_unformatted"""
     # TODO 2025-10-13 13:25:09
     bundle: UnformattedBundle = {
         "text/plain": [],
         "text/html": [],
     }
-    def append_field(
+    def append_field(shell, 
         bundle: UnformattedBundle, title: str, key: str, formatter=None
     ):
         happend_info_field(
+            shell,
             bundle,
             title=title,
             key=key,
@@ -601,79 +599,177 @@ def hmake_info_unformatted(obj, info, formatter, detail_level, omit_sections) ->
             omit_sections=omit_sections,
             formatter=formatter,
         )
+        
+    _format = lambda t: shell.inspector.format(t)
 
     def code_formatter(text) -> Bundle:
         return {
-            'text/plain': self.format(text),
-            'text/html': pylight(text)
+            'text/plain': _format(text),
+            'text/html': mypylight(text)
         }
 
     if info["isalias"]:
-        append_field(bundle, "Repr", "string_form")
+        append_field(shell,bundle, "Repr", "string_form")
 
     elif info['ismagic']:
         if detail_level > 0:
-            append_field(bundle, "Source", "source", code_formatter)
+            append_field(shell, bundle, "Source", "source", code_formatter)
         else:
-            append_field(bundle, "Docstring", "docstring", formatter)
-        append_field(bundle, "File", "file")
+            append_field(shell, bundle, "Docstring", "docstring", formatter)
+        append_field(shell, bundle, "File", "file")
 
-    elif info['isclass'] or is_simple_callable(obj):
+    elif info['isclass'] or oinspect.is_simple_callable(obj):
         # Functions, methods, classes
-        append_field(bundle, "Signature", "definition", code_formatter)
-        append_field(bundle, "Init signature", "init_definition", code_formatter)
-        append_field(bundle, "Docstring", "docstring", formatter)
+        append_field(shell, bundle, "Signature", "definition", code_formatter)
+        append_field(shell, bundle, "Init signature", "init_definition", code_formatter)
+        append_field(shell, bundle, "Docstring", "docstring", formatter)
+        
         if detail_level > 0 and info["source"]:
-            append_field(bundle, "Source", "source", code_formatter)
+            append_field(shell, bundle, "Source", "source", code_formatter)
         else:
-            append_field(bundle, "Init docstring", "init_docstring", formatter)
+            append_field(shell, bundle, "Init docstring", "init_docstring", formatter)
+            for field in _extra_info_fields:
+                if info[field]:
+                    fmt = code_formatter if field in ("methods", "descriptors", "functions") else formatter
+                    append_field(shell, bundle, field.capitalize(), field, fmt)
 
-        append_field(bundle, "File", "file")
-        append_field(bundle, "Type", "type_name")
-        append_field(bundle, "Subclasses", "subclasses")
+        append_field(shell, bundle, "File", "file")
+        append_field(shell, bundle, "Type", "type_name")
+        append_field(shell, bundle, "Subclasses", "subclasses")
 
     else:
         # General Python objects
-        append_field(bundle, "Signature", "definition", code_formatter)
-        append_field(bundle, "Call signature", "call_def", code_formatter)
-        append_field(bundle, "Type", "type_name")
-        append_field(bundle, "String form", "string_form")
+        append_field(shell, bundle, "Signature", "definition", code_formatter)
+        append_field(shell, bundle, "Call signature", "call_def", code_formatter)
+        append_field(shell, bundle, "Type", "type_name")
+        append_field(shell, bundle, "String form", "string_form")
 
         # Namespace
         if info["namespace"] != "Interactive":
-            append_field(bundle, "Namespace", "namespace")
+            append_field(shell, bundle, "Namespace", "namespace")
 
-        append_field(bundle, "Length", "length")
-        append_field(bundle, "File", "file")
+        append_field(shell, bundle, "Class docstring", "class_docstring", formatter)
+        append_field(shell, bundle, "Init docstring", "init_docstring", formatter)
+        append_field(shell, bundle, "Call docstring", "call_docstring", formatter)
+        
+        append_field(shell, bundle, "Length", "length")
+        append_field(shell, bundle, "File", "file")
 
         # Source or docstring, depending on detail level and whether
         # source found.
         if detail_level > 0 and info["source"]:
-            append_field(bundle, "Source", "source", code_formatter)
+            append_field(shell, bundle, "Source", "source", code_formatter)
         else:
-            append_field(bundle, "Docstring", "docstring", formatter)
-            if not inspect.ismodule(obj):
-                append_field(bundle, "Methods", "methods")
+            append_field(shell, bundle, "Docstring", "docstring", formatter)
+            for field in _extra_info_fields:
+                if info[field]:
+                    fmt = code_formatter if field in ("methods", "descriptors", "functions") else formatter
+                    append_field(shell, bundle, field.capitalize(), field, fmt)
 
-        append_field(bundle, "Class docstring", "class_docstring", formatter)
-        append_field(bundle, "Init docstring", "init_docstring", formatter)
-        append_field(bundle, "Call docstring", "call_docstring", formatter)
-        
     return bundle
 
+def hinfo(shell, obj, oname:str="", info:typing.Optional[oinspect.OInfo]=None,
+          detail_level:int = 0) -> oinspect.InfoDict:
+    r"""Augments shell.inspect.info()
+ """
+    info_dict = shell.inspector.info(obj, oname=oname, info=info, detail_level=detail_level)
+    info_dict.update(**{field: None for field in _extra_info_fields if field not in info_dict})
+    
+    def _get_sig_or_type(o):
+        try:
+            sig = inspect.signature(o)
+        except:
+            sig = type(o).__name__
+        return sig
+    
+    def _get_name(o):
+        return getattr(o, "__qualname__", getattr(o, "__name__", f"{o}"))
 
-def hget_info(shell, obj, oame:str="", formatter=None, info:typing.Optional[oinspect.OInfo]=None,
+    def _is_docstring(o:typing.Any, member):
+        try:
+            val = inspect.getmember(member[0])
+            return data == o.__doc__ or (isinstance(val, str) and val == info_dict["doctring"])
+        except:
+            return False
+            
+    # NOTE: 2025-10-13 18:55:39
+    # throughout below we exttratc only the public API
+    
+    
+    datas = list(sorted(map(lambda f: f"{_get_name(f[1])}{_get_sig_or_type(f[1])}", 
+                            filter(lambda f: not _get_name(f[1]).startswith("_"), inspect.getmembers_static(obj, not inspect.isclass and not inspect.isroutine and not inspect.ismodule)))))
+    
+    info_dict["data"] = "\n".join(datas) if len(datas) else None
+    
+    if inspect.ismodule(obj):
+        functions = list(sorted(map(lambda f: f"{_get_name(f[1])}{_get_sig_or_type(f[1])}", 
+                             filter(lambda f: not _get_name(f[1]).startswith("_"), inspect.getmembers_static(obj, inspect.isfunction or inspect.isroutine or inspect.ismethod)))))
+        info_dict["functions"] = "\n".join(functions) if len(functions) else None
+        
+        # NOTE: one can define a class as a member of another class (usually that's 
+        # private but we drop these)
+        classes = list(sorted(map(lambda f: f"{_get_name(f[1])}{_get_sig_or_type(f[1])}", 
+                                filter(lambda f: not _get_name(f[1]).startswith("_"), inspect.getmembers_static(obj, inspect.isclass)))))
+        info_dict["classes"] = "\n".join(classes) if len(classes) else None
+        
+    else:
+        methods = list(sorted(map(lambda f: f"{_get_name(f[1])}{_get_sig_or_type(f[1])}", 
+                             filter(lambda f: not _get_name(f[1]).startswith("_"), inspect.getmembers_static(obj, inspect.isfunction or inspect.isroutine or inspect.ismethod or inspect.isgenerator)))))
+        descriptors = list(sorted(map(lambda f: f"{_get_name(f[1])}{_get_sig_or_type(f[1])}", 
+                             filter(lambda f: not _get_name(f[1]).startswith("_"), inspect.getmembers_static(obj, inspect.isdatadescriptor or inspect.ismemberdescriptor or inspect.isgetsetdescriptor)))))
+        info_dict["methods"] = "\n".join(methods) if len(methods) else None
+        info_dict["descriptors"] = "\n".join(descriptors) if len(descriptors) else None
+        
+    return info_dict
+
+def hget_info(shell, obj, oname:str="", formatter=None, info:typing.Optional[oinspect.OInfo]=None,
               detail_level:int = 0, omit_sections:typing.Union[typing.List[str], typing.Tuple[str]] = ()) -> tuple[dict]:
     r"""Emulates shell.inspector._get_info"""
     # TODO 2025-10-13 13:25:09
     
-    info_dict = shell.inspector.info(obj, oname=oname, info=info, detail_level=detail_level)
+    # info_dict = shell.inspector.info(obj, oname=oname, info=info, detail_level=detail_level)
+    info_dict = hinfo(shell, obj, oname=oname, info=info, detail_level=detail_level)
     omit_sections = list(omit_sections)
     
+    bundle = hmake_info_unformatted(shell, obj, info_dict, formatter,
+                                    detail_level = detail_level, 
+                                    omit_sections = omit_sections) 
+    
+    if shell.inspector.mime_hooks:
+        hook_data = oinspector.InspectorHookData(
+            obj=obj,
+            info=info,
+            info_dict=info_dict,
+            detail_level=detail_level,
+            omit_sections=omit_sections,
+        )
+        for key, hook in self.mime_hooks.items():  # type:ignore
+            required_parameters = [
+                parameter
+                for parameter in inspect.signature(hook).parameters.values()
+                if parameter.default != inspect.Parameter.default
+            ]
+            if len(required_parameters) == 1:
+                res = hook(hook_data)
+            else:
+                warnings.warn(
+                    "MIME hook format changed in IPython 8.22; hooks should now accept"
+                    " a single parameter (InspectorHookData); support for hooks requiring"
+                    " two-parameters (obj and info) will be removed in a future version",
+                    DeprecationWarning,
+                    stacklevel=2,
+                )
+                res = hook(obj, info)
+            if res is not None:
+                bundle[key] = res
+                
+    return shell.inspector.format_mime(bundle)
+
     
     
 def hpinfo(shell, cmd, namespaces = None, detail_level:int=0,
                                     enable_html:bool=True):
+    r"""Emulates a IPython pinfo call"""
     ret = None
     reformat = False
     
