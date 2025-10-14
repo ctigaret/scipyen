@@ -13,6 +13,7 @@ dependencies:
   - pip
   - sphinx
   - docrepr
+  - pymarkdown
   - markdown
   - pydoc-markdown
   - restructuredtext_lint

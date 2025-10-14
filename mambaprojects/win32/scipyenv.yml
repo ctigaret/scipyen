@@ -17,6 +17,7 @@ dependencies:
   - confuse
   - docrepr
   - markdown
+  - pymarkdown
   - pydoc-markdown
   - restructuredtext_lint
   - marko
