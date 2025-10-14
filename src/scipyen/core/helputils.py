@@ -57,7 +57,7 @@ from IPython.utils.wildcard import list_namespace, typestr2type
 from IPython.core.usage import (interactive_usage, quick_reference)
 
 import markdown # for converstion of md to html
-from pymarkdown.api import PyMarkdownApi # MD linter
+# from pymarkdown.api import PyMarkdownApi # MD linter
 from pygments import highlight
 from pygments.lexers import (PythonLexer, get_lexer_by_name, guess_lexer)
 from pygments.formatters import HtmlFormatter
@@ -118,14 +118,14 @@ def mdhighlight(text):
     else:
         style="default"
         
-    linter = PyMarkdownApi()
-    
-    scan_result = linter.scan_string(text)
-    
-    if sum(map(lambda a: len(getattr(scan_result, a)), ["scan_failures", "pragma_errors", "critical_errors"])):
-        fix_result = linter.fix_string(text)
-        if fix_result.was_fixed:
-            text = fix_result.fixed_file
+#     linter = PyMarkdownApi()
+#     
+#     scan_result = linter.scan_string(text)
+#     
+#     if sum(map(lambda a: len(getattr(scan_result, a)), ["scan_failures", "pragma_errors", "critical_errors"])):
+#         fix_result = linter.fix_string(text)
+#         if fix_result.was_fixed:
+#             text = fix_result.fixed_file
         
     md = markdown.Markdown(extensions=['markdown.extensions.extra','markdown.extensions.toc','markdown.extensions.nl2br'], 
                             safe_mode=True)
