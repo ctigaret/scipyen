@@ -228,10 +228,13 @@ class DataclassTrait(Any, ScipyenTraitTypeMixin):
             silent = old_value.__class__ == new_value.__class__
             
         if silent:
-            fields = tuple(map(lambda f: (f.name, getattr(old_value, f.name), getattr(new_value, f.name)), dataclasses.fields(old_value)))
-            diff_fields = tuple(filter(lambda f: type(f[1]) != type(f[2]) or not safe_identity_test(f[1], f[2]), fields))
-            # print(f"{print_styled(f'{tuple(map(lambda f: f[0], diff_fields))}', color='magenta')}")
-            silent = len(diff_fields) == 0
+            try:
+                fields = tuple(map(lambda f: (f.name, getattr(old_value, f.name), getattr(new_value, f.name)), dataclasses.fields(old_value)))
+                diff_fields = tuple(filter(lambda f: type(f[1]) != type(f[2]) or not safe_identity_test(f[1], f[2]), fields))
+                # print(f"{print_styled(f'{tuple(map(lambda f: f[0], diff_fields))}', color='magenta')}")
+                silent = len(diff_fields) == 0
+            except:
+                silent = False
             
         if not silent:
             change_type = "modified"

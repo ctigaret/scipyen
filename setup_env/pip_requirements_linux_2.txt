@@ -135,6 +135,9 @@ libNeuroML
 # linguistics
 lxml
 marisa-trie # installed by taxoniq but useful if taxoniq is omitted; may not be available on win32 platform
+markdown
+pydoc-markdown
+marko
 matlab_kernel
 matplotlib
 matplotlib-inline
@@ -202,6 +205,7 @@ recommonmark
 regex
 requests-toolbelt
 researchpy
+restructuredtext_lint
 scikit-image
 scikit-learn
 scikit-guess

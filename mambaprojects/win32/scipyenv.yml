@@ -15,6 +15,11 @@ dependencies:
   - isodate
   - cmasher
   - confuse
+  - docrepr
+  - markdown
+  - pydoc-markdown
+  - restructuredtext_lint
+  - marko
   - pyxdg
   - jupyter
   - qtconsole

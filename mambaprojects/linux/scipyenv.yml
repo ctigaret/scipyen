@@ -13,6 +13,10 @@ dependencies:
   - pip
   - sphinx
   - docrepr
+  - markdown
+  - pydoc-markdown
+  - restructuredtext_lint
+  - marko
   - isodate
   - cmasher
   - confuse

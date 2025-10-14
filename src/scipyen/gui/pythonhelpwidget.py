@@ -133,48 +133,26 @@ class _PythonHelpThread_(QtCore.QThread):
                     traceback.print_exc()
 
                 if isinstance(reply, str) and len(reply.strip()):
-                    if self.helpCommand in ("keywords", "symbols", "topics"):
-                        out = list()
-                        out += ['<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"',
-                                '    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">']
-                        out.append('<html>')
-                        parts = reply.split("help.")
-                        parts[0] += "help."
-                        out += ["<head>", 
-                                f"<title>{parts[0]}</title>", 
-                                '<meta> name="generator" content="Kate Editor"</meta>', 
-                                "</head>"]
-                        out.append("<body>")
-                        out.append(f"<h3>{parts[0]}</h3>")
-                        if "symbols" in self.helpCommand:
-                            cols = len(pydoc.Helper.symbols)//3 + len(pydoc.Helper.symbols) % 3
+                    out = list()
+                    out += ['<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"',
+                            '    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">']
+                    out.append('<html>')
+                    out += ["<head>", 
+                            f"<title>{self.helpCommand}</title>", 
+                            '<meta> name="generator" content="Kate Editor"</meta>', 
+                            "</head>"]
+                    out.append("<body>")
+                    if reformat:
+                        if reply.startswith("Help on"):
+                            body = helputils.format_python_help_output(reply)
                         else:
-                            cols = self.columns
-                        out.append(helputils.make_HTML_table(parts[1], cols))
-                        out.append("</body>")
-                        out.append("</html>")
-                        doc.setHtml("\n".join(out))
+                            body = reply.replace("\n", "<br>")
                     else:
-                        out = list()
-                        out += ['<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"',
-                                '    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">']
-                        out.append('<html>')
-                        out += ["<head>", 
-                                f"<title>{self.helpCommand}</title>", 
-                                '<meta> name="generator" content="Kate Editor"</meta>', 
-                                "</head>"]
-                        out.append("<body>")
-                        if reformat:
-                            if reply.startswith("Help on"):
-                                body = helputils.format_python_help_output(reply)
-                            else:
-                                body = reply.replace("\n", "<br>")
-                        else:
-                            body = reply
-                        out.append(body)
-                        out.append("</body>")
-                        out.append("</html>")
-                        doc.setHtml("\n".join(out))
+                        body = reply
+                    out.append(body)
+                    out.append("</body>")
+                    out.append("</html>")
+                    doc.setHtml("\n".join(out))
                 
             self.ready.emit(doc)
             self.helpCommand = None
@@ -202,7 +180,7 @@ class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin
         
         self._placeHolder_ = "\n".join(["Scipyen-specific NOTES:",
                                         "------------------------ ",
-                                        "Enter a query to access the help system of Python (e.g., `help(thing)`) or IPython (e.g. one of `thing`, `?thing`, `thing?`, `??thing`, `thing??`, `?`, or `??`)",
+                                        "Enter a query to access the help system of IPython (e.g. one of `thing`, `?thing`, `thing?`, `??thing`, `thing??`, `?`, or `??`) or Python (e.g., `help(thing)`)",
                                         "",
                                         "Supports help-related IPython tools: `?`, `??`, and the line magics `quickref` and `psearch`",
                                         "",

@@ -16,6 +16,7 @@ Meant to be used by gui.pythonhelpwidget
 
 import sys, os, typing, inspect, types, importlib, io, dataclasses, inspect, re
 import traceback
+import itertools
 from functools import (singledispatch, partial)
 from contextlib import redirect_stdout
 from tempfile import TemporaryDirectory
@@ -55,9 +56,15 @@ from IPython.utils.text import (DollarFormatter, LSString, SList,
 from IPython.utils.wildcard import list_namespace, typestr2type
 from IPython.core.usage import (interactive_usage, quick_reference)
 
+import markdown # for converstion of md to html
+from pymarkdown.api import PyMarkdownApi # MD linter
 from pygments import highlight
-from pygments.lexers import PythonLexer
+from pygments.lexers import (PythonLexer, get_lexer_by_name, guess_lexer)
 from pygments.formatters import HtmlFormatter
+
+import html
+
+
 _extra_info_fields = ["methods", "descriptors", "functions", "classes", "data"]
 try:
     import docrepr.sphinxify as sphx
@@ -98,16 +105,88 @@ def isDarkGui() -> bool:
     _,_,v,_ = windowColor.getHsv()
     return v <= 128
 
+def reSThighlight(text):
+    if isDarkGui():
+        style = "KeplerDark"
+    else:
+        style="default"
+    
+
+def mdhighlight(text):
+    if isDarkGui():
+        style = "KeplerDark"
+    else:
+        style="default"
+        
+    linter = PyMarkdownApi()
+    
+    scan_result = linter.scan_string(text)
+    
+    if sum(map(lambda a: len(getattr(scan_result, a)), ["scan_failures", "pragma_errors", "critical_errors"])):
+        fix_result = linter.fix_string(text)
+        if fix_result.was_fixed:
+            text = fix_result.fixed_file
+        
+    md = markdown.Markdown(extensions=['markdown.extensions.extra','markdown.extensions.toc','markdown.extensions.nl2br'], 
+                            safe_mode=True)
+    
+    formatted = md.convert(text)
+    
+    recmd = r"\<pre\>\<code\>[\s\S]*?\<\/code\>\<\/pre\>"
+    
+    formatter = HtmlFormatter(nobackground=True, noclasses=True, style=style)
+    
+    for code_section in re.findall(recmd, formatted):
+        new_code_section = code_section.replace('<pre><code>', '')
+        new_code_section = new_code_section.replace('</code></pre>', '')
+        new_code_section = html.unescape(new_code_section)
+        lexer = get_lexer_by_name("python", stripall=True)
+        # formatter = HtmlFormatter(linenos=True, cssclass="github-dark", style='default')
+        new_code_section_highlight = highlight(new_code_section, lexer, formatter)
+        formatted = formatted.replace(code_section, new_code_section_highlight)
+        
+    return formatted
+
 def mypylight(code):
     # return highlight(code, PythonLexer(), HtmlFormatter(noclasses=True, nobackground=True))
     if isDarkGui():
         style = "KeplerDark"
     else:
         style="default"
+        
     return highlight(code, PythonLexer(), HtmlFormatter(noclasses=True, nobackground=True, style=style))
     # return highlight(code, PythonLexer(), HtmlFormatter(nobackground=True, style="native"))
 
-def make_HTML_table(msg:str|list[str], cols:typing.Optional[int] = None) -> str:
+def make_multicolumn_html(strings:typing.List[str], columns:int=4, fn:typing.Callable = lambda s: s) -> str:
+    r"""Emulates pydoc.HTMLDoc.multicolumn with configurable number of columns"""
+    from gui import guiutils
+    if not isinstance(columns, int) or columns <= 0:
+        columns = 4
+        
+    maxwidth = max(map(lambda s: guiutils.get_text_width(s), strings))+5
+    
+    fullwidth = maxwidth * (columns + 1)
+    
+    head = list()
+    head.append("<colgroup>")
+    for c in range(columns):
+        head.append(f"<col span='1' style='width: {maxwidth}px';")
+    head.append("</colgroup")
+    
+    thead = "\n".join(head)
+
+    result = ''
+    rows = (len(strings) + (columns-1)) // columns
+    for col in range(columns):
+        result = result + '<td class="multicolumn">'
+        for i in range(rows*col, rows*col+rows):
+            if i < len(strings):
+                result = result + fn(strings[i]) + '<br>\n'
+        result = result + '</td>'
+    return f"<table style='width:{fullwidth}px'>{thead}<tr>{result}</tr></table>"
+
+    
+def make_HTML_table(msg:str|list[str], cols:int=4) -> str:
     r"""Formats a message to be displayed in a HTML table with ``cols`` columns.
 Useful when the message contains a list of names, keywords, etc.
 NOTE: The resulted string MUST be embedded somewhere between <body> </body> HTML tags. 
@@ -123,8 +202,6 @@ NOTE: The resulted string MUST be embedded somewhere between <body> </body> HTML
     # print(f"{len(items)} items, with {max(tuple(len(i) for i in items))}")
     out = list()
     out.append("<table style='width:100%'>")
-    # if cols is None:
-        
     k = 0
     while k < len(items):
         c = 0
@@ -135,7 +212,7 @@ NOTE: The resulted string MUST be embedded somewhere between <body> </body> HTML
                 # out.append("<tr style='width:100%'>")
                 out.append("<tr>")
             # out += ["<td style='width:100%'>", items[k], "</td>"]
-            out += ["<td>", items[k], "</td>"]
+            out += ["<td class='multicolumn'>", items[k], "</td>"]
             k += 1
             if c == cols-1:
                 out.append("</tr>")
@@ -145,27 +222,6 @@ NOTE: The resulted string MUST be embedded somewhere between <body> </body> HTML
     
     return "\n".join(out)
 
-# def help_query_scipyen(items:list[str]): 
-#     # TODO 2025-06-01 12:41:50 finalize me
-#     env_pkginfos, env_nonpkginfos, scipyen_pkginfos, scipyen_nonpkginfos, plugins = listmodules()
-#     # env_pkgnames = list(map(lambda i: i.name, env_pkginfos))
-#     # env_nonpkgnames = list(map(lambda i: i.name, env_nonpkginfos))
-#     scipyen_pkgnames = list(map(lambda i: i.name, scipyen_pkginfos))
-#     scipyen_nonpkgnames =list(map(lambda i: i.name, scipyen_nonpkginfos))
-#     
-#     for item in items:
-#         if isinstance(item, str) and len(item.strip()):
-#             if item in scipyen_pkgnames:
-#                 index = scipyen_pkgnames.index[item]
-#                 info = scipyen_pkginfos[index]
-#                 
-# def help_data_workspace(items:list[str]):
-#     # TODO 2025-06-01 12:41:50 finalize me
-#     from core.prog import scipywarn
-#     if len(items) == 0 or not all(isinstance(i, str) for i in items):
-#         scipywarn(f"Invalid items for help_data_workspace: {items}")
-#         return
-    
 def module_infos(title:str, header:str, columns:int = 4) -> str:
     env_pkg_names, env_non_pkg_names, scipyen_pkg_names, scipyen_non_pkg_names, plugin_names = listmodules()
     out = list()
@@ -202,7 +258,6 @@ def module_infos(title:str, header:str, columns:int = 4) -> str:
 def listmodules() -> tuple:
     from core.workspacefunctions import getMainScipyenWindow
     from core.prog import walk_packages
-   # infos = list(filter(lambda s: "." not in s, map(lambda i: i.name, walk_packages())))
     infos = list(filter(lambda i: "." not in i.name, walk_packages())) # list of available module infos
     
     userPluginsInfos = list()
@@ -896,7 +951,8 @@ def run_python_help(shell, cmd:str, enable_html=True, ) -> str | None:
         ret = f"No Python documentation found for {cmd}"
         ret += "\nCheck the spelling; you may need to enter a valid dotted path e.g. 'package.module.object.member'"
     else:
-        ret_bundle = shell.inspector.format_mime(format_python_help_output(shell, make_python_help_dict(ret)))
+        special = cmd if cmd in ("keywords", "symbols", "topics") else None
+        ret_bundle = shell.inspector.format_mime(format_python_help_output(shell, make_python_help_dict(ret, special)))
         if enable_html:
             strng = ret_bundle["text/html"]
             strng = strng.replace("<br>", "").replace("\n", "<br>\n").replace("<p>", "<br>").replace("<br><br>", "<br>").replace("</h1><br>", "</h1>")
@@ -909,14 +965,37 @@ def run_python_help(shell, cmd:str, enable_html=True, ) -> str | None:
         
     return ret
 
-def make_python_help_dict(s:str):
-    lines = s.splitlines()
+def make_python_help_dict(s:str, special:typing.Optional[str] = None):
+    # from pydoc import HTMLDoc
+    # htmlPydoc = HTMLDoc()
+    
+    lines = list(filter(lambda l: len(l.strip()) > 0, s.splitlines()))
+    # NOTE 2025-10-14 11:55:56 
+    # treat special cases (e.g. "help('topics')", "help('symbols')", etc)
+    # as well as those that start with a topic (e.g. "help('EXECUTION')")
+    if special:
+        if special.lower() in ("topics", "symbols", "keywords"):
+            body = make_multicolumn_html(list(itertools.chain.from_iterable(map(lambda s: s.split(), lines[1:]))))
+            
+            return {special.capitalize(): body}
+            
+        else:
+            return {special.capitalize(): s}
+        
+    elif not lines[0].startswith("Help on"):
+        return {lines[0]: "\n".join(lines[1:])}
+    
     sections = list(map(lambda x: x.lower(), PYTHON_HELP_SECTIONS))
     helpdict = PythonHelpDict(**{field:None for field in sections})
     section = None
+    
     for k, line in enumerate(lines):
-        if k==0 and line.startswith("Help on"):
+        if k==0:# and line.startswith("Help on"):
             helpdict[line] = None
+            # NOTE: 2025-10-14 11:57:53
+            # now, this is moot, see NOTE 2025-10-14 11:55:56 
+            # if not line.startswith("Help on"): 
+            #     section = line
         else:
             if line.lower() in helpdict:
                 section = line.lower()
@@ -953,6 +1032,12 @@ def format_python_help_output(shell, data:PythonHelpDict, formatter=None):
             'text/html': mypylight(text)
         }
     
+    def pyhelp_formatter(text) -> Bundle:
+        return {
+            'text/plain': _format(text),
+            'text/html': mdhighlight(text)
+            }
+    
     def append_field(shell, bundle:UnformattedBundle, title:str, key:str, hd:PythonHelpDict, formatter):
         field = hd[key]
         if field is not None:
@@ -963,17 +1048,19 @@ def format_python_help_output(shell, data:PythonHelpDict, formatter=None):
             bundle["text/plain"].append((title, ""))
             bundle["text/html"].append((title, ""))
     
-    titlekey = list(filter(lambda k: k.startswith("Help on"), data.keys()))
+    titlekey = list(filter(lambda k: k.upper() not in PYTHON_HELP_SECTIONS, data.keys()))
+
     if len(titlekey):
         titlekey = titlekey[0]
-        append_field(shell, bundle, titlekey, titlekey, data, formatter)
+        append_field(shell, bundle, titlekey, titlekey, data, pyhelp_formatter)
     else:
         titlekey = ""
         
     for key in data:
         if key != titlekey:
-            fmt = code_formatter if key in ("data", "classes", "functions") else formatter
-            append_field(shell, bundle, key.capitalize(), key, data, fmt)
+            if data[key]:
+                fmt = code_formatter if key in ("data", "classes", "functions") else formatter
+                append_field(shell, bundle, key.capitalize(), key, data, fmt)
         
     return bundle
     
@@ -1068,7 +1155,7 @@ detail_level: int, 0 or 1
                
         if isinstance(ret, str):
             if ret.startswith("No Python documentation found"):
-                ret = run_python_help(cmd)
+                ret = run_python_help(shell, cmd)
                 reformat = True
         else:
             ret = f"No Python documentation found for {cmd}"
