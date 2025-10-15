@@ -129,7 +129,7 @@ https://dnmtechs.com/converting-restructuredtext-to-html-using-python-3/
 
     html_content = docutils.core.publish_string(
         source=rst_content,
-        writer_name='html5',
+        writer_name='html',
         settings_overrides=settings_overrides,
     )
     return html_content
@@ -158,15 +158,18 @@ https://www.bomberbot.com/python/converting-restructuredtext-to-html-with-python
     
     # print('<pre class=' in ret_html)
 
+    # formatter = HtmlFormatter(noclasses=True, nobackground=True, style=style) # <--
+    
     def replace_code_block(match):
         code = match.group(1)
         # lang = match.group(2)
         # print(f"lang = {lang}")
-        # lexer = get_lexer_by_name(lang, stripall=True)
-        formatter = HtmlFormatter(noclasses=True, nobackground=True, style=style)
-        # formatter = HtmlFormatter(linenos=True, cssclass="source", noclasses=True, nobackground=True, style=style)
-        # formatter = HtmlFormatter(linenos=True, cssclass="source")
-        return highlight(code, PythonLexer(stripall=True), formatter)
+        # lexer = get_lexer_by_name(lang, stripall=True) # <--
+        # formatter = HtmlFormatter(linenos=True, cssclass="source", noclasses=True, nobackground=True, style=style) # <--
+        # formatter = HtmlFormatter(linenos=True, cssclass="source") # <--
+        # return highlight(code, PythonLexer(stripall=True), formatter) # <--
+        return mypylight(code)
+
 
     # import re # already imported at the top
     # pattern = r'<pre class="literal-block">\n(.+?)\n</pre>'
@@ -187,6 +190,27 @@ def reSThighlight(text):
     else:
         style="default"
     
+    formatter = HtmlFormatter(nobackground=True, noclasses=True, style=style)
+    
+    pattern1 = r'<pre class="code python doctest">(.+?)</pre>'
+    # pattern2 = r"\<pre\>\<code\>[\s\S]*?\<\/code\>\<\/pre\>"
+    
+    rst_html = convert_rst_to_html(text)
+    
+    # formatter = HtmlFormatter(linenos=True, cssclass="github-dark", style='default') # <--
+    
+    for code_section in re.findall(recmd, rst_html):
+        new_code_section = code_section.replace('<pre><code>', '')
+        new_code_section = new_code_section.replace('</code></pre>', '')
+        new_code_section = html.unescape(new_code_section)
+        new_code_section_highlight = mypylight(new_code_section) #, lexer, formatter)
+        # lexer = get_lexer_by_name("python", stripall=True) # <--
+        # formatter = HtmlFormatter(linenos=True, cssclass="github-dark", style='default') # <--
+        # new_code_section_highlight = highlight(new_code_section, lexer, formatter) # <--
+        rst_html = rst_html.replace(code_section, new_code_section_highlight)
+    
+    
+    return rst_html
 
 def mdhighlight(text):
     if isDarkGui():
@@ -238,15 +262,16 @@ def mdhighlight(text):
     
     recmd = r"\<pre\>\<code\>[\s\S]*?\<\/code\>\<\/pre\>"
     
-    formatter = HtmlFormatter(nobackground=True, noclasses=True, style=style)
+    # formatter = HtmlFormatter(nobackground=True, noclasses=True, style=style) # <--
     
     for code_section in re.findall(recmd, formatted):
         new_code_section = code_section.replace('<pre><code>', '')
         new_code_section = new_code_section.replace('</code></pre>', '')
         new_code_section = html.unescape(new_code_section)
-        lexer = get_lexer_by_name("python", stripall=True)
-        # formatter = HtmlFormatter(linenos=True, cssclass="github-dark", style='default')
-        new_code_section_highlight = highlight(new_code_section, lexer, formatter)
+        new_code_section_highlight = mypylight(new_code_section)
+        # lexer = get_lexer_by_name("python", stripall=True) # <--
+        # formatter = HtmlFormatter(linenos=True, cssclass="github-dark", style='default') # <--
+        # new_code_section_highlight = highlight(new_code_section, lexer, formatter) # <--
         formatted = formatted.replace(code_section, new_code_section_highlight)
         
     return formatted
@@ -259,8 +284,9 @@ def mypylight(text):
     else:
         style="default"
         
-    return highlight(text, PythonLexer(), HtmlFormatter(noclasses=True, nobackground=True, style=style))
-    # return highlight(code, PythonLexer(), HtmlFormatter(nobackground=True, style="native"))
+    lexer = get_lexer_by_name("python", stripall=True)
+    return highlight(text, lexer, HtmlFormatter(noclasses=True, nobackground=True, style=style))
+    # return highlight(text, PythonLexer(), HtmlFormatter(noclasses=True, nobackground=True, style=style))
 
 def make_multicolumn_html(strings:typing.List[str], columns:int=4, fn:typing.Callable = lambda s: s) -> str:
     r"""Emulates pydoc.HTMLDoc.multicolumn with configurable number of columns"""
@@ -1160,7 +1186,12 @@ def format_python_help_output(shell, data:PythonHelpDict, formatter=None):
 
     if len(titlekey):
         titlekey = titlekey[0]
-        append_field(shell, bundle, titlekey, titlekey, data, pyhelp_formatter)
+        try:
+            append_field(shell, bundle, titlekey, titlekey, data, pyhelp_formatter)
+        except:
+            traceback.print_exc()
+            append_field(shell, bundle, titlekey, titlekey, data, format_screen)
+                
     else:
         titlekey = ""
         
