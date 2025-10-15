@@ -61,6 +61,9 @@ import markdown # for converstion of md to html
 from pygments import highlight
 from pygments.lexers import (PythonLexer, get_lexer_by_name, guess_lexer)
 from pygments.formatters import HtmlFormatter
+import docutils.core, docutils.utils
+from docutils.core import publish_parts
+
 
 import html
 
@@ -105,6 +108,79 @@ def isDarkGui() -> bool:
     _,_,v,_ = windowColor.getHsv()
     return v <= 128
 
+def convert_rst_to_html(rst_content):
+    r"""RST 2 HTML conversion using docutils.
+Changes:
+• Throwing pygments in the mix.
+
+
+Original author: Dimity Margaret 
+https://dnmtechs.com/converting-restructuredtext-to-html-using-python-3/
+"""
+    # settings = docutils.frontend.OptionParser().get_default_values()
+    shut_up_level = docutils.utils.Reporter.SEVERE_LEVEL + 1
+    settings_overrides={'output_encoding': 'unicode',
+                        'output_encoding_error_handler': 'replace',
+                        'input_encoding_error_handler': 'ignore',
+                        'report_level': shut_up_level,
+                        'syntax_highlight': 'long',
+                        'table_style': 'borderless',
+                        'math_output': 'mathjax',}
+
+    html_content = docutils.core.publish_string(
+        source=rst_content,
+        writer_name='html5',
+        settings_overrides=settings_overrides,
+    )
+    return html_content
+
+def rst_to_html_with_highlighting(rst_text):
+    r"""Another RST 2 HTML converter.
+This one  "ByWilliam	July 8, 2025
+https://www.bomberbot.com/python/converting-restructuredtext-to-html-with-python-for-documentation/
+ """
+    if isDarkGui():
+        style = "KeplerDark"
+    else:
+        style="default"
+    shut_up_level = docutils.utils.Reporter.SEVERE_LEVEL + 1
+    settings_overrides={'output_encoding': 'unicode',
+                        'output_encoding_error_handler': 'replace',
+                        'input_encoding_error_handler': 'ignore',
+                        'report_level': shut_up_level,
+                        # 'report_level': docutils.utils.Reporter.INFO_LEVEL,
+                        'syntax_highlight': 'long',
+                        'table_style': 'borderless',
+                        'math_output': 'mathjax',}
+    # parts = publish_parts(rst_text, writer_name='html')
+    parts = publish_parts(rst_text, writer_name='html5', settings_overrides=settings_overrides,)
+    ret_html = parts['html_body']
+    
+    # print('<pre class=' in ret_html)
+
+    def replace_code_block(match):
+        code = match.group(1)
+        # lang = match.group(2)
+        # print(f"lang = {lang}")
+        # lexer = get_lexer_by_name(lang, stripall=True)
+        formatter = HtmlFormatter(noclasses=True, nobackground=True, style=style)
+        # formatter = HtmlFormatter(linenos=True, cssclass="source", noclasses=True, nobackground=True, style=style)
+        # formatter = HtmlFormatter(linenos=True, cssclass="source")
+        return highlight(code, PythonLexer(stripall=True), formatter)
+
+    # import re # already imported at the top
+    # pattern = r'<pre class="literal-block">\n(.+?)\n</pre>'
+    pattern1 = r'<pre class="code python doctest">(.+?)</pre>'
+    # pattern = r'<pre>\n(.+?)\n</pre>'
+    # rematch = re.match(pattern1, ret_html, flags=re.DOTALL)
+    # if rematch:
+    #     print(f"group1:{rematch.group(1)}, group2: {rematch.group(2)}")
+    ret_html = re.sub(pattern1, replace_code_block, ret_html, flags=re.DOTALL)
+    ret_html = html.unescape(ret_html)
+
+    return ret_html
+
+
 def reSThighlight(text):
     if isDarkGui():
         style = "KeplerDark"
@@ -118,6 +194,34 @@ def mdhighlight(text):
     else:
         style="default"
         
+    # NOTE: 2025-10-14 22:34:50
+    # there are issues with pip-installed pymarkdown:
+# ### BEGIN
+# from pymarkdown.api import PyMarkdown
+# In /home/cezar/scipyenv/lib64/python3.13/site-packages/pymarkdown/core.py, line 159: 
+# SyntaxWarning: invalid escape sequence '\w'
+#   return not not re.match('^\w+\s*=', line)
+# In /home/cezar/scipyenv/lib64/python3.13/site-packages/pymarkdown/core.py, line 159: 
+# SyntaxWarning: invalid escape sequence '\w'
+#   return not not re.match('^\w+\s*=', line)
+# ---------------------------------------------------------------------------
+# ModuleNotFoundError                       Traceback (most recent call last)
+# Cell In[2], line 1
+# ----> 1 from pymarkdown.api import PyMarkdown
+# 
+# File ~/scipyenv/lib64/python3.13/site-packages/pymarkdown/__init__.py:1
+# ----> 1 from .core import process
+# 
+# File ~/scipyenv/lib64/python3.13/site-packages/pymarkdown/core.py:4
+#       2 import re
+#       3 from contextlib import contextmanager
+# ----> 4 from StringIO import StringIO
+#       5 import itertools
+#       6 import sys
+# 
+# ModuleNotFoundError: No module named 'StringIO'
+# ### END
+
 #     linter = PyMarkdownApi()
 #     
 #     scan_result = linter.scan_string(text)
@@ -147,14 +251,15 @@ def mdhighlight(text):
         
     return formatted
 
-def mypylight(code):
+def mypylight(text):
+    r"""Highlights Python code in a text"""
     # return highlight(code, PythonLexer(), HtmlFormatter(noclasses=True, nobackground=True))
     if isDarkGui():
         style = "KeplerDark"
     else:
         style="default"
         
-    return highlight(code, PythonLexer(), HtmlFormatter(noclasses=True, nobackground=True, style=style))
+    return highlight(text, PythonLexer(), HtmlFormatter(noclasses=True, nobackground=True, style=style))
     # return highlight(code, PythonLexer(), HtmlFormatter(nobackground=True, style="native"))
 
 def make_multicolumn_html(strings:typing.List[str], columns:int=4, fn:typing.Callable = lambda s: s) -> str:
@@ -933,7 +1038,6 @@ WARNING: Potentially problematic...
         
     return
     
-
 def run_python_help(shell, cmd:str, enable_html=True, ) -> str | None:
     import pydoc, traceback
     ret = None
@@ -955,7 +1059,7 @@ def run_python_help(shell, cmd:str, enable_html=True, ) -> str | None:
         ret_bundle = shell.inspector.format_mime(format_python_help_output(shell, make_python_help_dict(ret, special)))
         if enable_html:
             strng = ret_bundle["text/html"]
-            strng = strng.replace("<br>", "").replace("\n", "<br>\n").replace("<p>", "<br>").replace("<br><br>", "<br>").replace("</h1><br>", "</h1>")
+            strng = strng.replace("<br>", "").replace("\n", "<br>")#.replace("<p>", "<br>").replace("<br><br>", "<br>").replace("</h1><br>", "</h1>")
         else:
             strng = ret_bundle['text/plain']
             
@@ -969,7 +1073,8 @@ def make_python_help_dict(s:str, special:typing.Optional[str] = None):
     # from pydoc import HTMLDoc
     # htmlPydoc = HTMLDoc()
     
-    lines = list(filter(lambda l: len(l.strip()) > 0, s.splitlines()))
+    # lines = list(filter(lambda l: len(l.strip()) > 0, s.splitlines()))
+    lines = s.splitlines()
     # NOTE 2025-10-14 11:55:56 
     # treat special cases (e.g. "help('topics')", "help('symbols')", etc)
     # as well as those that start with a topic (e.g. "help('EXECUTION')")
@@ -983,7 +1088,10 @@ def make_python_help_dict(s:str, special:typing.Optional[str] = None):
             return {special.capitalize(): s}
         
     elif not lines[0].startswith("Help on"):
-        return {lines[0]: "\n".join(lines[1:])}
+        if len(lines[0].strip()):
+            return {lines[0]: "\n".join(lines)}
+        else:
+            return {lines[0]: "\n".join(lines[1:])}
     
     sections = list(map(lambda x: x.lower(), PYTHON_HELP_SECTIONS))
     helpdict = PythonHelpDict(**{field:None for field in sections})
@@ -1035,7 +1143,7 @@ def format_python_help_output(shell, data:PythonHelpDict, formatter=None):
     def pyhelp_formatter(text) -> Bundle:
         return {
             'text/plain': _format(text),
-            'text/html': mdhighlight(text)
+            'text/html': rst_to_html_with_highlighting(text)
             }
     
     def append_field(shell, bundle:UnformattedBundle, title:str, key:str, hd:PythonHelpDict, formatter):
