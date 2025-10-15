@@ -17,6 +17,8 @@ Meant to be used by gui.pythonhelpwidget
 import sys, os, typing, inspect, types, importlib, io, dataclasses, inspect, re
 import traceback
 import itertools
+import pydoc
+import html
 from functools import (singledispatch, partial)
 from contextlib import redirect_stdout
 from tempfile import TemporaryDirectory
@@ -63,9 +65,6 @@ from pygments.lexers import (PythonLexer, get_lexer_by_name, guess_lexer)
 from pygments.formatters import HtmlFormatter
 import docutils.core, docutils.utils
 from docutils.core import publish_parts
-
-
-import html
 
 
 _extra_info_fields = ["methods", "descriptors", "functions", "classes", "data"]
@@ -133,6 +132,19 @@ https://dnmtechs.com/converting-restructuredtext-to-html-using-python-3/
         settings_overrides=settings_overrides,
     )
     return html_content
+
+def writedoc(bf, thing, forceload=0):
+    r"""Write HTML documentation to a file in the current directory.
+Shamelessly copiued from the standard library module pydoc.
+"""
+    object, name = pydoc.resolve(thing, forceload)
+    page = pydoc.HTMLDoc().page(describe(object), html.document(object, name))
+    bf.write(page)
+    # with open(name + '.html', 'w', encoding='utf-8') as file:
+    #     file.write(page)
+    # print('wrote', name + '.html')
+
+
 
 def rst_to_html_with_highlighting(rst_text):
     r"""Another RST 2 HTML converter.
@@ -294,9 +306,15 @@ def make_multicolumn_html(strings:typing.List[str], columns:int=4, fn:typing.Cal
     if not isinstance(columns, int) or columns <= 0:
         columns = 4
         
-    maxwidth = max(map(lambda s: guiutils.get_text_width(s), strings))+5
+    slen, sw = zip(*map(lambda s: (len(s), guiutils.get_text_width(s)), strings))
+    
+    maxwidth = max(sw)+5
+    
+    maxlen = max(slen)+(5)
     
     fullwidth = maxwidth * (columns + 1)
+    
+    add_space = lambda s: s + "".join(["&nbsp;"] * (maxlen - len(s)))
     
     head = list()
     head.append("<colgroup>")
@@ -305,14 +323,29 @@ def make_multicolumn_html(strings:typing.List[str], columns:int=4, fn:typing.Cal
     head.append("</colgroup")
     
     thead = "\n".join(head)
-
-    result = ''
+    
     rows = (len(strings) + (columns-1)) // columns
+    
+    # result = f"<table style='width:{fullwidth}px'>{thead}"
+#     for row in range(rows):
+#         result = result + "<tr>"
+#         
+#         for col in range(columns):
+#             k = row*columns + col
+#             if k < len(strings):
+#                 result = result  + '<td class="multicolumn">' + fn(strings[k]) + "</td>"
+#             
+#         result = result + "</tr>"
+#     
+#     result  = result + "</table>"
+#     return result
+        
+    result = ""
     for col in range(columns):
         result = result + '<td class="multicolumn">'
         for i in range(rows*col, rows*col+rows):
             if i < len(strings):
-                result = result + fn(strings[i]) + '<br>\n'
+                result = result + add_space(fn(strings[i])) + '<br>\n'
         result = result + '</td>'
     return f"<table style='width:{fullwidth}px'>{thead}<tr>{result}</tr></table>"
 
@@ -1065,7 +1098,6 @@ WARNING: Potentially problematic...
     return
     
 def run_python_help(shell, cmd:str, enable_html=True, ) -> str | None:
-    import pydoc, traceback
     ret = None
     with io.StringIO() as bf:
         helper = pydoc.Helper(output = bf)
@@ -1095,7 +1127,7 @@ def run_python_help(shell, cmd:str, enable_html=True, ) -> str | None:
         
     return ret
 
-def make_python_help_dict(s:str, special:typing.Optional[str] = None):
+def make_python_help_dict(s:str, special:typing.Optional[str] = None) -> dict:
     # from pydoc import HTMLDoc
     # htmlPydoc = HTMLDoc()
     
@@ -1106,7 +1138,8 @@ def make_python_help_dict(s:str, special:typing.Optional[str] = None):
     # as well as those that start with a topic (e.g. "help('EXECUTION')")
     if special:
         if special.lower() in ("topics", "symbols", "keywords"):
-            body = make_multicolumn_html(list(itertools.chain.from_iterable(map(lambda s: s.split(), lines[1:]))))
+            title = f"<h1>{lines[1]}</h1>"
+            body = title + make_multicolumn_html(list(sorted(itertools.chain.from_iterable(map(lambda s: s.split(), lines[2:])))))
             
             return {special.capitalize(): body}
             
@@ -1115,19 +1148,25 @@ def make_python_help_dict(s:str, special:typing.Optional[str] = None):
         
     elif not lines[0].startswith("Help on"):
         if len(lines[0].strip()):
+            special = lines[0]
             return {lines[0]: "\n".join(lines)}
         else:
             return {lines[0]: "\n".join(lines[1:])}
     
     sections = list(map(lambda x: x.lower(), PYTHON_HELP_SECTIONS))
     helpdict = PythonHelpDict(**{field:None for field in sections})
-    section = None
+    
+    section = special if special else None
     
     for k, line in enumerate(lines):
         if k==0:# and line.startswith("Help on"):
             helpdict[line] = None
+            # if section:
+            #     helpdict[section] = None
+            # else:
+            #     helpdict[line] = None
             # NOTE: 2025-10-14 11:57:53
-            # now, this is moot, see NOTE 2025-10-14 11:55:56 
+            # now, this is moot, see NOTE 2025-10-14 11:55:56
             # if not line.startswith("Help on"): 
             #     section = line
         else:
@@ -1186,11 +1225,12 @@ def format_python_help_output(shell, data:PythonHelpDict, formatter=None):
 
     if len(titlekey):
         titlekey = titlekey[0]
+        title = titlekey #if titlekey not in data else ""
         try:
-            append_field(shell, bundle, titlekey, titlekey, data, pyhelp_formatter)
+            append_field(shell, bundle, title, titlekey, data, pyhelp_formatter)
         except:
-            traceback.print_exc()
-            append_field(shell, bundle, titlekey, titlekey, data, format_screen)
+            # traceback.print_exc()
+            append_field(shell, bundle, title, titlekey, data, format_screen)
                 
     else:
         titlekey = ""

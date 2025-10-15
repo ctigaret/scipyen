@@ -169,24 +169,23 @@ class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin
                 
             return cls._instance
         
+    _placeHolder_ = "\n".join(["Scipyen-specific NOTES:",
+                                "------------------------ ",
+                                "Enter a query to access the help system of IPython (e.g. one of `thing`, `?thing`, `thing?`, `??thing`, `thing??`, `?`, or `??`) or Python (e.g., `help(thing)`)",
+                                "",
+                                "Supports help-related IPython tools: `?`, `??`, and the line magics `quickref` and `psearch`",
+                                "",
+                                "Enter the magic name without the `%` prefix, followed by arguments, to execute it (e.g. `psearch <pattern…>`), or the magic name WITH the `%` prefix to read its documentation (e.g. `%psearch`)",
+                                ""
+                                "NOTE: This does not substitute the Python 'help' command or IPython's help system ('?<object>') at the console, but it does help to 'free' up the console during such queries."])
+    
     def __init__(self, shell:InteractiveShell, parent:typing.Optional[QtWidgets.QMainWindow] = None,
                  **kwargs):
         if __has_PySide6__:# or __has_PyQt6__:
             super().__init__(parent)
         else:
             super(QtWidgets.QWidget, self).__init__(parent)
-            
-        WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs)
         
-        self._placeHolder_ = "\n".join(["Scipyen-specific NOTES:",
-                                        "------------------------ ",
-                                        "Enter a query to access the help system of IPython (e.g. one of `thing`, `?thing`, `thing?`, `??thing`, `thing??`, `?`, or `??`) or Python (e.g., `help(thing)`)",
-                                        "",
-                                        "Supports help-related IPython tools: `?`, `??`, and the line magics `quickref` and `psearch`",
-                                        "",
-                                        "Enter the magic name without the `%` prefix, followed by arguments, to execute it (e.g. `psearch <pattern…>`), or the magic name WITH the `%` prefix to read its documentation (e.g. `%psearch`)",
-                                        ""
-                                        "NOTE: This does not substitute the Python 'help' command or IPython's help system ('?<object>') at the console, but it does help to 'free' up the console during such queries."])
         self._helpThread_ = _PythonHelpThread_(self, shell)
         self._helpThread_.message[str].connect(self._slot_displayMessage)
         self._helpThread_.ready[QtGui.QTextDocument].connect(self._slot_displayReply)
@@ -198,17 +197,20 @@ class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin
                 msg = bf.getvalue()
                 parts = list(map(lambda s: s.replace("\n", " "), msg.split("\n\n")))
                 parts = parts[:-1]
-                parts.append(self._placeHolder_)
+                parts += (self._placeHolder_.splitlines())
                 # parts.append("\n".join(["Scipyen-specific NOTES:",
                 #                         "---------------------- ",
                 #                         "Queries for Python objects must be entered by their fully-qualified names, and not by alias: e.g., search for 'gui.scipyenviewer' and not for 'scipyenviewer', or whatever alias there may be, such as 'sv', etc.",
                 #                         "This window is not a substitute to the Python 'help' command or IPython's help system ('?<object>') at the console, but it does 'free' up the console during such queries.",
                 #                         "(Expect many bugs 😦)"]))
                 self.intro_msg = "\n\n".join(parts)
-                
+            
         except:
+            traceback.print_exc()
             self.intro_msg = 'Enter a help topic in the field above (e.g., "topics", "pywt.Wavelet", etc)'
         
+        WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs)
+                
         self._configureUI_()
         self.__class__._instance = self
         
