@@ -3310,7 +3310,9 @@ class ABFProtocol(ElectrophysiologyProtocol):
                     digChannel:typing.Optional[typing.Union[int, typing.Sequence[int]]] = None,
                     byDIGIndex:bool=False,
                     relativeToRunStart:typing.Optional[bool]=True,
-                    useHoldingTime:bool=True) -> typing.Sequence:
+                    useHoldingTime:bool=False,
+                    **kwargs
+                    ) -> typing.Sequence:
         r"""Trigger events emitted by the epochs in this DAC.
         The method considers that there is one TriggerEvent for each DIG 
         channel that emits a TTL while this DAC is "live"¹, across all the 
@@ -3343,11 +3345,10 @@ class ABFProtocol(ElectrophysiologyProtocol):
             should have time stamps that are relative to the start of the Run.
             When True, then the time stamps will be adjusted to include the 
             inter-sweep interval.
-            When False, the time stamps are adjusted to reflect the cummulative
-            duration of the previous sweeps, exlcluding the inter-sweep interval.
-            When None, then the time stamps are relative to the sweep start.
         
-            Optional; default is True
+            When False, the time stamps are adjusted to reflect the cummulative
+            duration of the previous sweeps, excluding the inter-sweep interval.
+            When None, then the time stamps are relative to the sweep start.
         
             This is useful for the analysis of repetitive peri-trigger features 
             in a multi-sweep recording, where each sweep record starts at increasing 
@@ -3360,6 +3361,11 @@ class ABFProtocol(ElectrophysiologyProtocol):
         
             Optional, default is True (i.e. shift the time stamps by the first
             holding period, in each sweep).
+        
+            WARNING: default is False for data recorded with Clampex v >= 11.1
+            as the holding time is NOT output in the record (CAUTION: do check
+            that the reported trigger times are aligned with the events of interest
+            and pass either False or True, accordingly!)
         
         NOTE:
         ¹ A DAC is "live" when its Epoch configurations are used to emit DIG or
@@ -3383,6 +3389,10 @@ class ABFProtocol(ElectrophysiologyProtocol):
         if sweep not in range(self.nSweeps):
             raise ValueError(f"Invalid sweep index {sweep} for {self.nSweeps} sweeps")
         
+        triggerType = kwargs.get("triggerType", TriggerEventType.presynaptic)
+        name = kwargs.get("name", None)
+        label_prefix = kwargs.get("label_prefix", None)
+        
         actualOutput = dac is None
             
         dac, _ = self.check_DAC_Epoch(dac, None)
@@ -3394,7 +3404,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         if len(digDACs) == 0 or dac.physicalIndex not in digDACs:
             return list()
         
-        hoDACActive = self.activeDACChannel not in (0,1)
+        hoDACActive = self.activeDACChannel not in (0,1) # high-order DAC active
         
         isAlternateDigital = False
         
@@ -3445,7 +3455,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
             if digChannel not in usedDigs:
                 # none opf the specified digChannels is in use => return 
                 # empty trigger event or None
-                return TriggerEvent(event_type = eventType, name=name, labels = label) # if enableEmptyEvent else None
+                return TriggerEvent(event_type = triggerType, name=name, labels = label_prefix) # if enableEmptyEvent else None
             
             digChannel = (digChannel,)
             
@@ -3470,7 +3480,11 @@ class ABFProtocol(ElectrophysiologyProtocol):
                 continue
             # collect as mapping DIG index ↦ trigger event for all non-empty trigger events
             # in the epoch
-            epoch_triggers = dict(filter(lambda x: len(x[1]), map(lambda x: (x, self.getEpochDigitalTriggers(epoch, sweep, myDac, digChannel=x)), digChannel)))
+            epoch_triggers = dict(filter(lambda x: len(x[1]), map(lambda x: (x, self.getEpochDigitalTriggers(epoch, sweep, myDac, digChannel=x, eventType = triggerType, name=name)), digChannel)))
+            
+            if isinstance(label_prefix, str) and len(label_prefix.strip()):
+                for triggerEvent in epoch_triggers.values():
+                    triggerEvent.setLabels(list(map(lambda k: f"{label_prefix}{k}", range(triggerEvent.size))))
             
             # if DIG index in triggers, then "concatenate"; else, just enter in triggers
             

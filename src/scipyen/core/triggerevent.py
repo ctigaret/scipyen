@@ -646,6 +646,14 @@ class DataMark(neo.Event):
         return obj
 
     def setLabel(self, value):
+        r"""Label individual marks (or time stamps) according to the 'value' parameter
+        When 'value' is a:
+        • str => all marks get the same label
+        • iterable of str => marks get the label at the corresponding index in 
+            the iterable
+            WARNING: requires that the iterable yield as many elements as there 
+            are marks in the DataMark instance
+    """
         if isinstance(value, str):
             setattr(self, "labels", np.array([value] * self.times.size))
             
@@ -1164,7 +1172,7 @@ class TriggerEvent(DataMark):
         For Examples 2:4 the workaround is to construct a new TriggerEvent using
         the returned object (TriggerEvent) as the only parameter to the constructor.
         
-    
+    Inherits DataMark.
     """
     _single_parent_objects = ('Segment',)
     _single_parent_attrs = ('segment',)
@@ -1318,6 +1326,17 @@ class TriggerEvent(DataMark):
         r"""Constructs a TriggerEvent.
         
         By default its __mark_type__ is TriggerEventType.presynaptic
+    
+        Parameters:
+        ===========
+    
+        time:   iterable of times (Quantity scalars, Quantity array, floats, numpy array-like), or None
+        labels: iterable  of strings (labels for each time point in the event)
+        units:  Quantity or UnitQuantity (typically, this would be in time units, e.g. pq.s, or pq.ms)
+                where pq is the alias to python Quantities package
+        name:   string, name of the trigger event
+        event_type: see TriggerEventType; default is TriggerEventType.presynaptic
+        
         """
         super().__init__(times=times, labels=labels, units=units, name=name,
                          description=description, file_origin=file_origin, 
