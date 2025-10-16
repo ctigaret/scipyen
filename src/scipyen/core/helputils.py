@@ -63,6 +63,7 @@ import markdown # for converstion of md to html
 from pygments import highlight
 from pygments.lexers import (PythonLexer, get_lexer_by_name, guess_lexer)
 from pygments.formatters import HtmlFormatter
+import docutils
 import docutils.core, docutils.utils
 from docutils.core import publish_parts
 
@@ -155,6 +156,7 @@ https://www.bomberbot.com/python/converting-restructuredtext-to-html-with-python
         style = "KeplerDark"
     else:
         style="default"
+    settings = docutils.frontend.get_default_settings()
     shut_up_level = docutils.utils.Reporter.SEVERE_LEVEL + 1
     settings_overrides={'output_encoding': 'unicode',
                         'output_encoding_error_handler': 'replace',
@@ -165,7 +167,7 @@ https://www.bomberbot.com/python/converting-restructuredtext-to-html-with-python
                         'table_style': 'borderless',
                         'math_output': 'mathjax',}
     # parts = publish_parts(rst_text, writer_name='html')
-    parts = publish_parts(rst_text, writer_name='html5', settings_overrides=settings_overrides,)
+    parts = publish_parts(rst_text, writer_name='html5', settings=setting,  settings_overrides=settings_overrides,)
     ret_html = parts['html_body']
     
     # print('<pre class=' in ret_html)
