@@ -298,7 +298,7 @@ class DataMark(neo.Event):
     def __new__(cls, places=None, times=None, labels=None, units=None, name=None, 
                 description=None, file_origin=None, mark_type=None, event_type=None, 
                 relative=None, array_annotations=None, **annotations):
-        
+        from core.datatypes import is_string
         if places is None:
             if times is None:
                 places = np.array([])
@@ -654,6 +654,7 @@ class DataMark(neo.Event):
             WARNING: requires that the iterable yield as many elements as there 
             are marks in the DataMark instance
     """
+        from core.datatypes import is_string
         if isinstance(value, str):
             setattr(self, "labels", np.array([value] * self.times.size))
             
@@ -1226,6 +1227,7 @@ class TriggerEvent(DataMark):
     def __new__(cls, times=None, labels=None, units=None, name=None, description=None,
                 file_origin=None, event_type=None, relative=None,
                 array_annotations=None, **annotations):
+        from core.datatypes import is_string
         # BUG: 2023-10-03 17:57:30 FIXME
         # when labels are passed as a string the counter is not taken into account
         if times is None:
