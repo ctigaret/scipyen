@@ -375,6 +375,11 @@ class SignalCursor(QtCore.QObject):
             
         else:
             self._linkedPen_ = None
+            
+        self._pen_.setStyle(QtCore.Qt.DashLine)
+        self._hoverPen_.setStyle(QtCore.Qt.DashLine)
+            
+        # self._selectedPen_ = QtGui.QPen(self._pen_)
         
         # NOTE: 2023-01-14 14:01:17
         # valid ranges where the cursor lines can go
@@ -863,6 +868,12 @@ class SignalCursor(QtCore.QObject):
                 
             else:
                 self._is_selected_ = val
+                
+        for l in (self._hl_, self._vl_):
+            if isinstance(l, pg.InfiniteLine):
+                l.pen.setStyle(QtCore.Qt.SolidLine if self._is_selected_ else QtCore.Qt.DashLine)
+                l.update()
+        
             
     def setBounds(self, host:typing.Optional[pg.GraphicsItem]=None,
                   xBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None, 
@@ -1048,7 +1059,6 @@ class SignalCursor(QtCore.QObject):
         self._host_graphics_item_ = None
             
         if isinstance(self._signal_proxy_, pg.SignalProxy):
-            #self._signal_proxy_.disconnect()
             self._signal_proxy_ = None
             
     def attach(self, host, xBounds=None, yBounds=None, pos=None):
@@ -1896,14 +1906,30 @@ class SignalCursor(QtCore.QObject):
         for l in (self._hl_, self._vl_):
             if isinstance(l, pg.InfiniteLine):
                 if self._follows_mouse_:
-                    l.sigDragged.disconnect(self.slot_positionChanged)
-                    l.sigPositionChanged.disconnect(self.slot_positionChanged)
-                    l.sigPositionChangeFinished.disconnect(self.slot_positionChanged)
+                    if l.receivers(l.sigDragged) > 0:
+                        l.sigDragged.disconnect()
+                    if l.receivers(l.sigPositionChanged) > 0:
+                        l.sigPositionChanged.disconnect()
+                    if l.receivers(l.sigPositionChangeFinished):
+                        l.sigPositionChangeFinished.disconnect()
+                        
+                    if isinstance(self._host_graphics_item_, pg.PlotItem):
+                        sig = self._host_graphics_item_.scene().sigMouseMoved
+                    
+                    else:
+                        sig = self._host_graphics_item_.sigMouseMoved
+                        
+                    self._signal_proxy_ = pg.SignalProxy(sig, rateLimit=60, slot=self._slot_mouse_moved_)
+                    
+                    # l.sigDragged.disconnect(self.slot_positionChanged)
+                    # l.sigPositionChanged.disconnect(self.slot_positionChanged)
+                    # l.sigPositionChangeFinished.disconnect(self.slot_positionChanged)
                 else:                    
                     l.sigDragged.connect(self.slot_positionChanged)
                     l.sigPositionChanged.connect(self.slot_positionChanged)
                     l.sigPositionChangeFinished.connect(self.slot_positionChanged)
                     self.hostScene.sigMouseMoved.connect(self._slot_mouse_event_)
+                    self._signal_proxy_ = None
         
         # self._cursorId_ = cursorID
         

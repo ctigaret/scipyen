@@ -1020,6 +1020,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.actionMultiAxisVerticalCursorsFromEpoch.triggered.connect(self._slot_makeMultiAxisVerticalCursorsFromEpoch)
         self.actionMultiAxisVerticalCursorsFromEpoch.setEnabled(False)# BUG/FIXME 2023-06-19 12:21:54
         
+        self.actionVertical_Cursor.triggered.connect(self.slot_TBAddVerticalCursor)
+        self.actionCrosshair_Cursor.triggered.connect(self.slot_TBAddCrosshairCursor)
+        self.actionHorizontal_Cursor.triggered.connect(self.slot_TBAddHorizontalCursor)
+        self.actionRemove_Cursor.triggered.connect(self.slot_TBRemoveCursor)
+        
         # NOTE: 2024-09-18 10:43:04
         # useful for LTP analysis, etc
         self.actionVertical_cursor_series.triggered.connect(self.slot_addVerticalCursors)
@@ -4445,6 +4450,54 @@ anything else       anything else       ❌
                                   label=label, follows_mouse=follows_mouse,
                                   show_value=self.setCursorsShowValue.isChecked(),
                                   editFirst = self.editCursorUponCreation)
+    
+    @Slot()
+    def slot_TBAddVerticalCursor(self):
+        follows_mouse = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ControlModifier)
+        isMultiAxis = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier)
+        
+        if isMultiAxis:
+            self._construct_multi_axis_crosshair_(dynamic=follows_mouse, editFirst=self.editCursorUponCreation)
+        else:
+            axis = self._selected_plot_item_
+            axisNdx = self._selected_plot_item_index_
+            self._addCursor_("vertical", axis=self._selected_plot_item_, 
+                                  label=None, follows_mouse=follows_mouse,
+                                  show_value=self.setCursorsShowValue.isChecked(),
+                                  editFirst = self.editCursorUponCreation)
+    
+    def slot_TBAddCrosshairCursor(self):
+        follows_mouse = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ControlModifier)
+        isMultiAxis = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier)
+        
+        if isMultiAxis:
+            self._construct_multi_axis_vertical_(dynamic=follows_mouse, editFirst=self.editCursorUponCreation)
+        else:
+            axis = self._selected_plot_item_
+            axisNdx = self._selected_plot_item_index_
+            self._addCursor_("crosshair", axis=self._selected_plot_item_, 
+                                  label=None, follows_mouse=follows_mouse,
+                                  show_value=self.setCursorsShowValue.isChecked(),
+                                  editFirst = self.editCursorUponCreation)
+    
+    @Slot()
+    def slot_TBAddHorizontalCursor(self):
+        follows_mouse = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ControlModifier)
+        
+        axis = self._selected_plot_item_
+        axisNdx = self._selected_plot_item_index_
+        self._addCursor_("horizontal", axis=self._selected_plot_item_, 
+                                label=None, follows_mouse=follows_mouse,
+                                show_value=self.setCursorsShowValue.isChecked(),
+                                editFirst = self.editCursorUponCreation)
+    
+    @Slot()
+    def slot_TBRemoveCursor(self):
+        if QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ControlModifier:
+            self.slot_removeCursors()
+            
+        else:
+            self.removeActiveCursor()
     
     @Slot()
     @safewrapper
