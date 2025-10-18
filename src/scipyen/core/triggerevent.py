@@ -24,7 +24,7 @@ from neo.core.dataobject import (DataObject, ArrayDict,)
 from core.typeenum import TypeEnum
 from core.constants import (RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE, EQUAL_NAN,)
 from core.prog import scipywarn
-from core.scipyen_quantities import checkTimeUnits, unitsCconvertible
+from core.scipyen_quantities import checkTimeUnits, unitsConvertible
 #from core.utilities import unique
 
 def _new_DataMark(cls, places = None, labels=None, units=None, name=None, 
@@ -1201,6 +1201,8 @@ class TriggerEvent(DataMark):
                 event_type = tt[0]
             else:
                 return
+        elif not isinstance(event_type, TriggerEventType):
+            return "event"
         
         if event_type & TriggerEventType.presynaptic:
             return "pre"
@@ -1255,7 +1257,7 @@ class TriggerEvent(DataMark):
         # print(f"{cls}.__new__ labels = {labels} ({type(labels).__name__})")
                 
         if labels is None:
-            l = self.defaultLabel(event_type)
+            l = cls.defaultLabel(event_type)
             ll = [f"trigger{k}" for k in range(times.size)]
             labels = np.array(ll, dtype='U')
             
@@ -1467,7 +1469,7 @@ class TriggerEvent(DataMark):
             
     def to_dataCursors(self, window:typing.Union[float, pq.Quantity]):
         if isinstance(window, float):
-            window  = windo * self.times.units
+            window  = window * self.times.units
         elif isinstance(window, pq.Quantity):
             if window.units != self.times.units:
                 if unitsCconvertible(window, self.times):
@@ -1475,7 +1477,7 @@ class TriggerEvent(DataMark):
                 else:
                     raise TypeError(f"'window' has incompatible units ({window.units}); expecting {self.time.units}")
                 
-        return list(map(lambda k: cursor.DataCursor(self.times[k], span=window, name=self.labels[k]), range(self.size)))
+        return list(map(lambda k: self.cursors.DataCursor(self.times[k], span=window, name=str(self.labels[k])), range(self.size)))
         
         
         
