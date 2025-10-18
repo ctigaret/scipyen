@@ -24,7 +24,7 @@ from neo.core.dataobject import (DataObject, ArrayDict,)
 from core.typeenum import TypeEnum
 from core.constants import (RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE, EQUAL_NAN,)
 from core.prog import scipywarn
-from core.scipyen_quantities import checkTimeUnits
+from core.scipyen_quantities import checkTimeUnits, unitsCconvertible
 #from core.utilities import unique
 
 def _new_DataMark(cls, places = None, labels=None, units=None, name=None, 
@@ -151,7 +151,6 @@ class TriggerEventType(TypeEnum):
     imaging             = imaging_frame | imaging_line  # 24
     acquisition         = imaging | sweep               # 56
     
-# class DataMark(DataObject):
 class DataMark(neo.Event):
     r"""Similar to neo.Event but suitable to all domains, not just time
     """
@@ -165,7 +164,6 @@ class DataMark(neo.Event):
     
     _parent_attrs = ("segment", )
 
-    #@staticmethod
     @classmethod
     def parseValues(cls, value, units:typing.Optional[pq.Quantity]=None) -> pq.Quantity:
         r""" Parses values to an array of quantities suitable for a TriggerEvent
@@ -1175,6 +1173,9 @@ class TriggerEvent(DataMark):
         
     Inherits DataMark.
     """
+    
+    from gui import cursors
+    
     _single_parent_objects = ('Segment',)
     _single_parent_attrs = ('segment',)
     _quantity_attr = 'times'
@@ -1187,7 +1188,7 @@ class TriggerEvent(DataMark):
     #equal_nan = True
     
     @staticmethod
-    def defaultLabel(event_type:typing.Union[int,str,TriggerEventType, MarkType]):
+    def defaultLabel(event_type:typing.Optional[typing.Union[int,str,TriggerEventType, MarkType]]=None):
         if isinstance(event_type, str):
             if event_type in TriggerEventType.names():
                 event_type = TriggerEventType.namevalue(event_type)
@@ -1202,10 +1203,10 @@ class TriggerEvent(DataMark):
                 return
         
         if event_type & TriggerEventType.presynaptic:
-            return "epsp"
+            return "pre"
         
         elif event_type & TriggerEventType.postsynaptic:
-            return "ap"
+            return "post"
         
         elif event_type & TriggerEventType.photostimulation:
             return "photo"
@@ -1254,6 +1255,7 @@ class TriggerEvent(DataMark):
         # print(f"{cls}.__new__ labels = {labels} ({type(labels).__name__})")
                 
         if labels is None:
+            l = self.defaultLabel(event_type)
             ll = [f"trigger{k}" for k in range(times.size)]
             labels = np.array(ll, dtype='U')
             
@@ -1425,8 +1427,9 @@ class TriggerEvent(DataMark):
         If `durations` is given, epoch labels are set to the corresponding
         labels of the events that indicate the epoch start.
 
-        If `durations` is not given, then the event labels A and B bounding
-        the epoch are used to set the labels of the epochs in the form 'A-B'.
+        If `durations` is not given, then the epoch labels are set using the
+        labels of the events bounding the epoch (e.g., if a epoch is bounded by
+        events 'A' and 'B', the epoch label will be 'A-B').
         """
         from core.datazone import DataZone
 
@@ -1462,7 +1465,20 @@ class TriggerEvent(DataMark):
         else:
             return DataZone(times=times, durations=durations, labels=labels, relative=relative)
             
-    
+    def to_dataCursors(self, window:typing.Union[float, pq.Quantity]):
+        if isinstance(window, float):
+            window  = windo * self.times.units
+        elif isinstance(window, pq.Quantity):
+            if window.units != self.times.units:
+                if unitsCconvertible(window, self.times):
+                    window = window.rescale(self.times.units)
+                else:
+                    raise TypeError(f"'window' has incompatible units ({window.units}); expecting {self.time.units}")
+                
+        return list(map(lambda k: cursor.DataCursor(self.times[k], span=window, name=self.labels[k]), range(self.size)))
+        
+        
+        
     def to_epoch(self, pairwise=False, durations=None):
         return self.to_zone(pairwise=pairwise, durations=durations, to_epoch=True)
 

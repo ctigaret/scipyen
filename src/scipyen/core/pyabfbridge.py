@@ -3367,6 +3367,16 @@ class ABFProtocol(ElectrophysiologyProtocol):
             that the reported trigger times are aligned with the events of interest
             and pass either False or True, accordingly!)
         
+        Var-keyword parameters:
+        -----------------------
+        triggerType: triggerevent.TriggerEventType, default is 
+            triggerevent.TriggerEventType.presynaptic
+        
+        name: str, optional, default is None
+        
+        label_prefix: str, the prefix ued to label the time stamps in the 
+            TriggerEvent; optional, default is None
+        
         NOTE:
         ¹ A DAC is "live" when its Epoch configurations are used to emit DIG or
             analog command waveforms. When Alternative Waveforms or Alternative
