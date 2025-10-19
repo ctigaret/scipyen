@@ -1514,11 +1514,59 @@ class ABFProtocol(ElectrophysiologyProtocol):
     
     @property
     def activeDACChannel(self) -> int:
-        r"""Index of the "active" DAC channel as reported in the ABF file protocol.
+        r"""Logical index of the "active" DAC channel as reported in the ABF file protocol.
         """
-        
+        # NOTE: this below doesn't report things correctly
+        #
         return self._activeDACChannel_
-    
+        
+        # I think the heuristic should be as follows:
+        #
+        # if there is ONLY ONE DAC emitting analog waveforms, then THAT is the active channel
+        # when only one DAC channel emits waveforms, then this is the active DAC channel.
+        # FIXME 2025-10-19 21:17:45 TODO
+#         waveformDACs = list(filter(lambda d: d.analogWaveformEnabled, self.DACs))
+#         if len(waveformDACs) == 1:
+#             # if alt waveforms is ON then this channel will emit ONLY on even sweeps
+#             # (0,2,4,…)
+#             # otherwise, it will emit on ALL sweeps
+#             return waveformDACs[0].logicalIndex
+#         
+#         elif len(waveformDACs) > 1:
+#             if self.alternateWaveformsEnabled:
+#     
+
+    def getActiveDACChannel(self, sweep:int = 0) -> int | list[int] | None:
+        r"""Retrieves the logical index of the DAC channel that is active during a specific sweep. 
+        When alternateWaveformsEnabled is True, there may be no active DAC channel
+        in the sweep
+        See also activeDACChannel or activeDACChannelIndex
+    """
+        waveformDACs = list(filter(lambda d: d.analogWaveformEnabled, self.DACs))
+        if len(waveformDACs) == 0:
+            return  # no DAC emits waveforms - one needs to infer the command waveform from the analog inputs
+                    # possibly problematic...
+                    
+        if len(waveformDACs) == 1:
+            if self.alternateWaveformsEnabled:
+                if sweep % 2 == 0: # even sweep (0,2,4,…)
+                    return waveformDACs[0].logicalIndex
+                else:
+                    return # does not emit on odd sweeps (1,3,5,…)
+            else:
+                return waveformDACs[0].logicalIndex # used in ALL sweeps
+            
+        else: #elif len(waveformDACs) >= 2:
+            dacNdx = list(map(lambda d: d.logicalIndex, waveformDACs))
+            if self.alternateWaveformsEnabled: # only the first two emit commands (whether it is 0 & 1 or 1 & 2, or 1 & 3, etc, according to Clampex 11.4.3)
+                if sweep % 2 == 0: # even sweep (0,2,4,…)
+                    return waveformDACs[0].logicalIndex
+                else: # odd sweep (1,3,5…)
+                    return waveformDACs[1].logicalIndex
+            else:
+                # both are active during ALL sweeps, so all bets are off - need to determine from corresponding analog inputs?
+                return list(map(lambda d: d.logicalIndex, waveformDACs))
+                
     @property
     def nADCChannels(self) -> int:
         return self._nADCChannels_
@@ -3352,8 +3400,16 @@ class ABFProtocol(ElectrophysiologyProtocol):
         sweep: sweep index, in the half-open interval [0, nSweeps)
         
         dac: DAC channel, DAC physical index or DAC name; optional, default is 
-            None, in which case the DAC that is "live"¹ during the specified
-            sweep is used. 
+            None.
+    
+            Whe dac is None, the method returns the triggers ACTUALLY generated 
+            during the specified sweep.
+        
+            When DAC is specified, this method returns the trigger AS DEFINED 
+            in the Clampex waveform dialog's Channel tab corresponding to the 
+            specified DAC. NOTE that these may not be output during a given sweep
+            (depending on the value of alternateDACOutputStateEnabled property and
+            how the DIG channels are activated during that sweep)
     
             See also self.getDigitalWaveform and self.getCommandWaveform
         
@@ -7951,22 +8007,22 @@ def _(data:neo.Block):
         traceback.print_exc()
         raise RuntimeError(f"The {type(data).__name__} data {data.name} does not seem to have been generated from readind an ABF file")
 
-@singledispatch
-def getActiveDACChannel(obj) -> int:
-    r"""Returns the index of the active DAC channel.
-
-    WARNING: Only works with a neo.Block generated from an Axon ABF file.
-    
-    The function first tries to create a pyabf.ABF object using the Axon (ABF)
-    file as indicated in the 'file_origin' attribute of 'data'. 
-
-    When this fails, (usually because the original ABF file cannot be found) the 
-    function will inspect the 'annotations' attribute of 'data' as a fallback.
-    If the data was read from an ABF file using Scipyen's pictio module, then the
-    'annotations' attribute should already contain the relevant information.
-    
-    """
-    raise NotImplementedError(f"Not implemented for {type(obj).__name__} objects")
+# @singledispatch
+# def getActiveDACChannel(obj) -> int:
+#     r"""Returns the index of the active DAC channel.
+# 
+#     WARNING: Only works with a neo.Block generated from an Axon ABF file.
+#     
+#     The function first tries to create a pyabf.ABF object using the Axon (ABF)
+#     file as indicated in the 'file_origin' attribute of 'data'. 
+# 
+#     When this fails, (usually because the original ABF file cannot be found) the 
+#     function will inspect the 'annotations' attribute of 'data' as a fallback.
+#     If the data was read from an ABF file using Scipyen's pictio module, then the
+#     'annotations' attribute should already contain the relevant information.
+#     
+#     """
+#     raise NotImplementedError(f"Not implemented for {type(obj).__name__} objects")
             
 # @getActiveDACChannel.register(pyabf.ABF)
 # def _(abf:pyabf.ABF) -> int:
