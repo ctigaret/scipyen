@@ -957,7 +957,7 @@ def loadAxon(fileName:typing.Union[str, pathlib.Path],
     return loadAxonFile(fileName, create_group_across_segment, signal_group_mode)
 
 def loadAxonFile(fileName:typing.Union[str, pathlib.Path], 
-                 create_group_across_segment:typing.Union[bool, dict]=False, 
+                 create_group_across_segment:typing.Union[bool, dict]=True, 
                  signal_group_mode:typing.Optional[str]="split-all") -> object:
     r"""Loads a binary Axon file (*.abf).
     
@@ -971,7 +971,7 @@ def loadAxonFile(fileName:typing.Union[str, pathlib.Path],
         
         Propagated to neo 0.9.0 neo.io.axonio.AxonIO
         
-        If True :
+        If True (default) :
         * Create a neo.Group to group AnalogSignal segments
         * Create a neo.Group to group SpikeTrain across segments
         * Create a neo.Group to group Event across segments
@@ -980,7 +980,7 @@ def loadAxonFile(fileName:typing.Union[str, pathlib.Path],
         With a dict the behavior can be controlled more finely
         create_group_across_segment = { 'AnalogSignal': True, 'SpikeTrain': False, ...}
 
-        When False (default): no grouping occurs.
+        When False: no grouping occurs.
         
         
     signal_group_mode: str (optional, default is "split-all")

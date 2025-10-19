@@ -1893,7 +1893,6 @@ def parse_trigger_protocols(src, return_source:typing.Optional[bool]=False):
     
     return protocols
 
-# @with_doc(auto_define_trigger_events, use_header=True)
 def auto_detect_trigger_protocols(data: typing.Union[neo.Block, neo.Segment, typing.Sequence[neo.Block], typing.Union[neo.Segment]], 
                                   presynaptic:tuple=(), 
                                   postsynaptic:tuple=(), 
@@ -1904,11 +1903,10 @@ def auto_detect_trigger_protocols(data: typing.Union[neo.Block, neo.Segment, typ
                                   reltimes:bool=True) -> typing.Optional[typing.List[TriggerProtocol]]:
     
     r"""Determines the set of trigger protocols in a neo.Block by searching for 
-    trigger waveforms in the analogsignals contained in 'data'.
+    trigger waveforms in the analog signals contained in 'data'.
     
     Time stamps of the detected trigger protocols will then be used to construct
-    TriggerEvent objects according to which of the keyword parameters below
-    have been specified.
+    TriggerEvent objects according to the keyword parameters below.
     
     Positional parameters:
     =====================

@@ -243,7 +243,7 @@ from core.utilities import (
 )
 
 from core.strutils import InflectEngine, pluralize
-# from core import pyabfbridge as pab
+# from core import pyabfbridge as pab # commented-out, to avoid circular imports!
 
 #### END pict.core modules
 
@@ -371,11 +371,14 @@ def segment_stop(data: neo.Segment):
 
 def block_duration(x: neo.Block):
     r"""Returns the duration of a neo.Block.
-    This is the relative time between the start of the first and last sweep in
-    the trial, plus the duration of the last trial.
-
-    NOTE: This is calculated based on the data stored inthe neo.Block,
+    This is the time interval between the start time of the first and the last 
+    sweep in the trial, plus the duration of the last sweep.
+    
+    NOTE 1: This is calculated based on the data stored in the neo.Block,
     irrespective of the protocol.
+    
+    NOTE 2: Remember: a "trial" is represented as a neo.Block object; each trial
+    "sweep" is represented as a neo.Segment object.
     """
     return (
         segment_start(x.segments[-1])
@@ -6154,6 +6157,37 @@ def remove_spiketrain(
 
     return segment
 
+def detect_trigger_events(data: neo.Block) -> bool:
+    r"""Adds trigger events to each Segment in the 'data' Block. 
+    Trigger events (core.triggerevent.TriggerEvent objects) are created as follows:
+    
+    • if the neo.Block represents a recorded trial that associates an acquisition 
+        protocol which can be accessed, the information embedded in the protocol
+        is used to create trigger events in each sweep (i.e. neo.Segment) of the 
+        'data'
+    
+    • else, the function will try to use the heuristic defined in the module 
+        `core.triggerprotocols`, which requires that, in addition to the relevant
+        analogsignals such as recorded current or voltage, the 'data' neo.Block 
+        also contains analogsignals representing the record of the used trigger 
+        signals (i.e., TTL-like waveforms)
+    
+    The function returns True if trigger event creation was successful, and False
+    otherwise.
+"""
+    # NOTE: 2025-10-19 11:10:37
+    # avoid circular imports by importing these here and NOT at module level. 
+    import ephys.ephys as ephys
+    import core.pyabfbridge as pab
+    
+    if not isinstance(data, neo.Block):
+        raise TypeError(f"Expecting a neo.Block; instead got a {type(data).__name__} object")
+    
+    protocol = ephys.getProtocol(data)
+    if protocol is None:
+        return False
+    
+    
 
 def remove_events(event, segment, byLabel=True):
     r"""Removes a specific event from the neo.Segment "segment"

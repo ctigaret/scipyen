@@ -874,10 +874,12 @@ class ABFEpoch:
 class ABFProtocol(ElectrophysiologyProtocol):
     r"""Instance of an ABF protocol (for Clampex v ≥ 10).
     Particularities:
-        • When "Alternative Waveforms" is enabled, only TWO DACs will emit analog
-        waveforms, on alternative sweeps ()
+        • When "Alternative Waveforms" is enabled, only TWO DACs (DAC 0 and DAC 1)
+        will emit analog waveforms on alternative sweeps 
     """
-    # BUG: 2024-10-27 09:47:18 - probably related to Clampex
+    # BUG: 2024-10-27 09:47:18 - probably related to Clampex 11.0, to check if it
+    # still occurs in Clampex 11.4.3
+    #
     # When Alternate Digital Outputs is enabled in the protocol, setting a digital 
     # pattern in a second DAC channel with index > 2, and setting the Digital Outputs
     # flag ON on that DAC channel seems to mess up the allocation of the DIG bits 
@@ -1681,6 +1683,11 @@ class ABFProtocol(ElectrophysiologyProtocol):
     
     @property
     def alternateDigitalOutputStateEnabled(self) -> bool:
+        r"""True if the protocol emits alternative DIG output patterns on odd/even sweeps.
+        NOTE: This option produces alternative digital patterns only when the 
+        epochs emitting TTLs on DIG channels are configured in relation with 
+        DAC 0 or DAC 1.
+     """
         return self._hasAltDigOutState_
     
     @property
@@ -1690,18 +1697,34 @@ class ABFProtocol(ElectrophysiologyProtocol):
         
     @property
     def alternateDACOutputStateEnabled(self) -> bool:
-        r"""This property is True if protocol emits alternate command waveforms.
+        r"""True if the protocol emits alternate DAC waveforms on odd/even sweeps.
     
-        The command waveforms are analog signals sent to the recorded source via
-        the amplifier. They are "synthesized" by the acquisition software as 
-        digital signals which are then converted to analog form by the DAQ device
-        and sent to the amplifier via DAC outputs.
+        The DAC waveforms are analog signals meant to be sent to the recorded 
+        source (cell, membrane patch) via the amplifier's output channel, therefore
+        acting as 'command' waveforms (e.g. membrane seal test, voltage ramps, or
+        current injections). 
+    
+        Such command waveforms are "synthesized" by the acquisition software as 
+        digital signals which are then converted to analog signals by the digital
+        acquisition (DAQ) device and sent to the recording amplifier via a 
+        "digital-to-analog converter" (DAC) channel (usually labeled "Analog 
+        Output Channel" on the DAQ device), connected to the amplifier's 
+        "Command input".
+        
+        It follows that a single DAC channel can send commands to only one
+        amplifier command input.
         
         When the protocol is configured to emit alternate command waveforms,
-        these waveforms are sent via the DAC here they are defined, on alternate
+        these waveforms are defined as being attached to distinct DAC output 
+        channels sent via the DAC where they are defined, on alternate
         sweeps: waveform from the active DAC is emitted during even-indexed sweeps
         (0,2,4,… ) whereas the waveform from the "alternative" DAC is emitted 
-        during odd-indexed sweeps( 1,3,5, …)
+        during odd-indexed sweeps( 1,3,5, …).
+        
+        NOTE: In Clampex only the first two DACs (DAC 0 and DAC 1) support alternate
+        DAC waveforms. Waveforms configured in Epochs on higer order DAC (i.e., 
+        DAC with index > 1) are emitted with every sweep.
+        order DACs
         
         """
         return self._hasAltDacOutState_
@@ -3315,13 +3338,14 @@ class ABFProtocol(ElectrophysiologyProtocol):
                     ) -> typing.Sequence:
         r"""Trigger events emitted by the epochs in this DAC.
         The method considers that there is one TriggerEvent for each DIG 
-        channel that emits a TTL while this DAC is "live"¹, across all the 
-        DAC's Epochs. This is because each DIG channel normally controls 
-        exactly ONE device (hence distinct DIG channels control distinct
-        devices).
-    
-        However, if there is more than one Epoch emitting TTL on the SAME DIG
-        channel then these events will be "merged".
+        channel, that emits a TTL while this DAC is "live"¹.
+     
+        By design, distinct DIG channels control distinct devices.
+        
+        Because each DIG channel normally controls exactly ONE device, and this 
+        device is the same in all epochs that emit TTL signals on this DIG channel,
+        the time stamps of the TTLs sent via this DIG in all Epochs where this 
+        is enabled will be "merged" into the same trigger event.
         
         Parameters:
         -----------
@@ -3338,17 +3362,21 @@ class ABFProtocol(ElectrophysiologyProtocol):
             for each DIG channel used to send TTLs
         
         byDIGIndex: flag indicating whether the TriggerEvent objects should be
-            packed in a mapping according to the index iof the DIG channel that
+            packed in a mapping according to the index of the DIG channel that
             emits them. Default is False
         
-        relativeToRunStart: ternary flag indicating whether the TriggerEvent objects
-            should have time stamps that are relative to the start of the Run.
-            When True, then the time stamps will be adjusted to include the 
-            inter-sweep interval.
+        relativeToRunStart: ternary flag indicating how the time stamps in the 
+            TriggerEvent objects should be readjusted with respectu to the start 
+            of the Run:
         
-            When False, the time stamps are adjusted to reflect the cummulative
+            • True (the default) => the time stamps will be adjusted to include 
+            the inter-sweep interval.
+        
+            • False => the time stamps are adjusted to reflect the cummulative
             duration of the previous sweeps, excluding the inter-sweep interval.
-            When None, then the time stamps are relative to the sweep start.
+
+            • None => then the time stamps are relative to the sweep start (i.e.
+            no adjustment is made)
         
             This is useful for the analysis of repetitive peri-trigger features 
             in a multi-sweep recording, where each sweep record starts at increasing 
@@ -3485,6 +3513,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
             shift += self.holdingTime
             
         triggers = dict() # mapping DIG_index ↦ TriggerEvent
+        
         for epoch in myDac.epochs:
             if epoch.type not in (ABFEpochType.Step, ABFEpochType.Pulse):
                 continue
