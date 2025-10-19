@@ -882,8 +882,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self._cursorsDockWidget_enabled_ = True
         self._annotationsDockWidget_enabled_ = True
         self._mainToolBarVisible_ = True
+        self._cursorsToolBarVisible_ = True
+        self._triggersToolBarVisible_ = True
         self._navigatorVisible_ = True
         self._selectorsVisible_ = True
+        self._toolbarsLocked_ = True
         
         #### END generic plot options
         
@@ -1055,8 +1058,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.actionShow_Y_grid.setEnabled(False)
         
         self.actionViewMain_Toolbar.toggled.connect(self.slot_toggleMainToolbar)
+        self.actionViewCursors_Toolbar.toggled.connect(self.slot_toggleCursorsToolbar)
+        self.actionViewTriggers_Toolbar.toggled.connect(self.slot_toggleTriggersToolbar)
         self.actionViewFrame_Navigator.toggled.connect(self.slot_toggleNavigator)
         self.actionViewSignal_Selectors.toggled.connect(self.slot_toggleSelectors)
+        self.actionLockToolbars.toggled.connect(self.slot_toggleLockedToolbars)
         
         self.actionLeft_Axis_Spacer.triggered.connect(self._slot_configureLeftLabelSpace)
         
@@ -1184,6 +1190,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # self.actionShow_Legends.setEnabled(False)
         
         self.mainToolBar.visibilityChanged.connect(self._slot_mainToolbarVisibilityChanged)
+        self.cursorsToolBar.visibilityChanged.connect(self._slot_cursorsToolbarVisibilityChanged)
+        self.triggersToolBar.visibilityChanged.connect(self._slot_triggersToolbarVisibilityChanged)
         
         self.leftLabelSpace = self.defaultLeftAxisLabelSpace
         
@@ -1440,48 +1448,85 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self.unlinkAllXAxes()
                 
     @property
-    def mainToolBarVisible(self):
+    def lockedToolbars(self) -> bool:
+        return self._toolbarsLocked_
+    
+    @markConfigurable("LockedToolbars", "Qt")
+    @lockedToolbars.setter
+    def lockedToolbars(self, value:bool):
+        self._toolbarsLocked_ = value
+        for w in list(filter(lambda w: isinstance(w, QtWidgets.QToolBar), self.children())):
+            w.setMovable(not self._toolbarsLocked_)
+        signalBlocker = QtCore.QSignalBlocker(self.actionLockToolbars)
+        self.actionLockToolbars.setChecked(self._toolbarsLocked_)
+    
+    @property
+    def cursorsToolBarVisible(self) -> bool:
+        return self._cursorsToolBarVisible_
+    
+    @markConfigurable("CursorsToolBarVisible", "Qt")
+    @cursorsToolBarVisible.setter
+    def cursorsToolBarVisible(self, value:bool):
+        self._cursorsToolBarVisible_ = value
+        signalBlockers = [QtCore.QSignalBlocker(w) for w in (self.actionViewCursors_Toolbar, self.cursorsToolBar)]
+        self.cursorsToolBar.setVisible(self._cursorsToolBarVisible_)
+        self.actionViewCursors_Toolbar.setChecked(self._cursorsToolBarVisible_)
+        
+    @property
+    def triggersToolBarVisible(self) -> bool:
+        return self._triggersToolBarVisible_
+    
+    @markConfigurable("TriggersToolBarVisible", "Qt")
+    @triggersToolBarVisible.setter
+    def triggersToolBarVisible(self, value:bool):
+        self._triggersToolBarVisible_ = value
+        signalBlockers = [QtCore.QSignalBlocker(w) for w in (self.actionViewTriggers_Toolbar, self.triggersToolBar)]
+        self.triggersToolBar.setVisible(self._triggersToolBarVisible_)
+        self.actionViewTriggers_Toolbar.setChecked(self._triggersToolBarVisible_)
+        
+    @property
+    def mainToolBarVisible(self) -> bool:
         return self._mainToolBarVisible_
     
     @markConfigurable("MainToolbarVisible", "qt")
     @mainToolBarVisible.setter
-    def mainToolBarVisible(self, value):
+    def mainToolBarVisible(self, value:bool):
         self._mainToolBarVisible_ = value == True
         signalBlockers = [QtCore.QSignalBlocker(w) for w in (self.actionViewMain_Toolbar, self.mainToolBar)]
         self.mainToolBar.setVisible(self._mainToolBarVisible_)
         self.actionViewMain_Toolbar.setChecked(self._mainToolBarVisible_)
         
     @property
-    def navigatorVisible(self):
+    def navigatorVisible(self) -> bool:
         return self._navigatorVisible_
     
     @markConfigurable("NavigatorVisible", "qt")
     @navigatorVisible.setter
-    def navigatorVisible(self, value):
+    def navigatorVisible(self, value:bool):
         self._navigatorVisible_ = value == True
         signalBlockers = [QtCore.QSignalBlocker(w) for w in (self.actionViewFrame_Navigator, self._frames_spinBoxSlider_)]
         self._frames_spinBoxSlider_.setVisible(self._navigatorVisible_)
         self.actionViewFrame_Navigator.setChecked(self._navigatorVisible_)
         
     @property
-    def selectorsVisible(self):
+    def selectorsVisible(self) -> bool:
         return self._selectorsVisible_
     
     @markConfigurable("SelectorsVisible", "qt")
     @selectorsVisible.setter
-    def selectorsVisible(self, value):
+    def selectorsVisible(self, value:bool):
         self._selectorsVisible_ = value == True
         signalBlockers = [QtCore.QSignalBlocker(w) for w in (self.actionViewSignal_Selectors, self.selectorsWidget)]
         self.selectorsWidget.setVisible(self._selectorsVisible_)
         self.actionViewSignal_Selectors.setChecked(self._selectorsVisible_)
         
     @property
-    def cursorsShowValue(self):
+    def cursorsShowValue(self) -> bool:
         return self._cursorsShowValue_
     
     @markConfigurable("CursorsShowValue")
     @cursorsShowValue.setter
-    def cursorsShowValue(self, val):
+    def cursorsShowValue(self, val:bool):
         self._cursorsShowValue_ = val == True
         signal_blocker = QtCore.QSignalBlocker(self.setCursorsShowValue)
         self.setCursorsShowValue.setChecked(self._cursorsShowValue_)
@@ -3434,8 +3479,8 @@ anything else       anything else       ❌
     @Slot()
     @safewrapper
     def slot_detectTriggers(self):
+        from gui.triggerdetectgui import TriggerDetectDialog
         if isinstance(self._yData_, (neo.Block, neo.Segment)) or (isinstance(self._yData_, (tuple, list)) and all([isinstance(v, (neo.Block, neo.Segment)) for v in self._yData_])):
-            from gui.triggerdetectgui import TriggerDetectDialog
             tdlg = TriggerDetectDialog(ephysdata=self._yData_, ephysViewer=self, parent=self)
             tdlg.adjustSize()
             tdlg.open()
@@ -3453,6 +3498,18 @@ anything else       anything else       ❌
         self._mainToolBarVisible_ = val == True
         signalBlocker = QtCore.QSignalBlocker(self.actionViewMain_Toolbar)
         self.actionViewMain_Toolbar.setChecked(self._mainToolBarVisible_)
+        
+    @Slot(bool)
+    def _slot_cursorsToolbarVisibilityChanged(self, val):
+        self._cursorsToolBarVisible_ = val == True
+        signalBlocker = QtCore.QSignalBlocker(self.actionViewCursors_Toolbar)
+        self.actionViewCursors_Toolbar.setChecked(self._cursorsToolBarVisible_)
+        
+    @Slot(bool)
+    def _slot_triggersToolbarVisibilityChanged(self, val):
+        self._triggersToolBarVisible_ = val == True
+        signalBlocker = QtCore.QSignalBlocker(self.actionViewTriggers_Toolbar)
+        self.actionViewTriggers_Toolbar.setChecked(self._triggersToolBarVisible_)
         
     # NOTE: 2024-03-03 23:02:33
     # QWidget does NOT have visibilityChanged signal
@@ -4748,7 +4805,6 @@ anything else       anything else       ❌
     @Slot(bool)
     def slot_toggleNavigator(self, value):
         self.navigatorVisible = value
-        # self.showNavigator() if self.actionViewMain_Toolbar.isChecked() else self.hideNavigator()
         
     def hideNavigator(self):
         self.navigatorVisible = False
@@ -4759,7 +4815,6 @@ anything else       anything else       ❌
     @Slot(bool)
     def slot_toggleSelectors(self, value):
         self.selectorsVisible = value
-        # self.showSelectors() if self.actionViewMain_Toolbar.isChecked() else self.hideSelectors()
         
     def hideSelectors(self):
         self.selectorsVisible = False
@@ -4768,7 +4823,27 @@ anything else       anything else       ❌
         self.selectorsVisible = True
         
     @Slot(bool)
-    def slot_toggleMainToolbar(self, value):
+    def slot_toggleCursorsToolbar(self, value:bool):
+        self.cursorsToolBarVisible = value
+        
+    def hideCursorsToolbar(self):
+        self.cursorsToolBarVisible = False
+        
+    def showCursorsToolbar(self):
+        self.cursorsToolBarVisible = True
+        
+    @Slot(bool)
+    def slot_toggleTriggersToolbar(self, value:bool):
+        self.triggersToolBarVisible = value
+        
+    def hideTriggersToolbar(self):
+        self.triggersToolBarVisible = False
+        
+    def showTriggersToolbar(self):
+        self.triggersToolBarVisible = True
+        
+    @Slot(bool)
+    def slot_toggleMainToolbar(self, value:bool):
         self.mainToolBarVisible = value
         # self.showMainToolbar() if self.actionViewMain_Toolbar.isChecked() else self.hideMainToolbar()
         
@@ -4777,6 +4852,10 @@ anything else       anything else       ❌
         
     def showMainToolbar(self):
         self.mainToolBarVisible = True
+        
+    @Slot(bool)
+    def slot_toggleLockedToolbars(self, value:bool):
+        self.lockedToolbars = value
         
     @safewrapper
     def removeActiveCursor(self):
@@ -7166,7 +7245,7 @@ anything else       anything else       ❌
                 
                 self._xData_ = x
                 self._yData_ = y
-
+                
                 self.actionDetect_Triggers.setEnabled(check_ephys_data_collection(self._yData_))
                             
                 self._new_data_ = True
