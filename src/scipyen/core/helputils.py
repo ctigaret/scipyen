@@ -781,7 +781,7 @@ def get_object_info(shell, oname=str, namespaces=None) -> oinspect.OInfo:
             subname = oname
             for part in reversed(parts[1]):
                 subname = subname.replace(f".{part}", "")
-                print(f"subname = {subname}")
+                # print(f"subname = {subname}")
                 sinfo = shell._object_find(subname, namespaces)
                 if sinfo.found:
                     info = sinfo
@@ -855,14 +855,16 @@ def hmake_info_unformatted(shell, obj, info, formatter, detail_level, omit_secti
             append_field(shell, bundle, "Source", "source", code_formatter)
         else:
             append_field(shell, bundle, "Init docstring", "init_docstring", formatter)
-            for field in _extra_info_fields:
-                if info[field]:
-                    fmt = code_formatter if field in ("methods", "descriptors", "functions") else formatter
-                    append_field(shell, bundle, field.capitalize(), field, fmt)
+            if not oinspect.is_simple_callable(obj):
+                for field in _extra_info_fields:
+                    if info[field]:
+                        fmt = code_formatter if field in ("methods", "descriptors", "functions") else formatter
+                        append_field(shell, bundle, field.capitalize(), field, fmt)
 
         append_field(shell, bundle, "File", "file")
         append_field(shell, bundle, "Type", "type_name")
-        append_field(shell, bundle, "Subclasses", "subclasses")
+        if not oinspect.is_simple_callable(obj):
+            append_field(shell, bundle, "Subclasses", "subclasses")
 
     else:
         # General Python objects
@@ -1117,7 +1119,6 @@ def run_python_help(shell, cmd:str, enable_html=True, ) -> str | None:
         try:
             helper.help(cmd)
             ret = bf.getvalue()
-            reformat=True
             # bf.flush()
         except:
             traceback.print_exc()
@@ -1165,6 +1166,8 @@ def make_python_help_dict(s:str, special:typing.Optional[str] = None) -> dict:
             return {lines[0]: "\n".join(lines)}
         else:
             return {lines[0]: "\n".join(lines[1:])}
+    # else:
+    #     return {lines[0]: "\n".join(lines[1:])}
     
     sections = list(map(lambda x: x.lower(), PYTHON_HELP_SECTIONS))
     helpdict = PythonHelpDict(**{field:None for field in sections})
@@ -1174,6 +1177,9 @@ def make_python_help_dict(s:str, special:typing.Optional[str] = None) -> dict:
     for k, line in enumerate(lines):
         if k==0:# and line.startswith("Help on"):
             helpdict[line] = None
+            if "function" in line:
+                helpdict[line] = list()
+                section = line
             # if section:
             #     helpdict[section] = None
             # else:
