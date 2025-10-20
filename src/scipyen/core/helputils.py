@@ -771,11 +771,22 @@ def get_object_info(shell, oname=str, namespaces=None) -> oinspect.OInfo:
                 # print(f"subname = {subname}")
                 sinfo = shell._object_find(subname, namespaces)
                 if sinfo.found:
-                    break
+                    info = sinfo
+                    return info
                 
-        if isinstance(sinfo, oinspect.OInfo) and sinfo.found:
-            return sinfo
-
+            # if isinstance(info, oinspect.OInfo) and info.found:
+            #     return info
+        
+            # do a reverse search
+            subname = oname
+            for part in reversed(parts[1]):
+                subname = subname.replace(f".{part}", "")
+                print(f"subname = {subname}")
+                sinfo = shell._object_find(subname, namespaces)
+                if sinfo.found:
+                    info = sinfo
+                    return info
+                
     return info
 
 def happend_info_field(shell, bundle: UnformattedBundle,
