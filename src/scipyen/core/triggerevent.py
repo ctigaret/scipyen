@@ -75,35 +75,60 @@ def _new_TriggerEvent(cls, times = None, labels=None, units=None, name=None,
     
 class MarkType(TypeEnum):
     r"""Some useful data mark types
+    
+    name            value                       description
+    ----------------------------------------------------------------------------
+    unspecified     0
+    up              1                           "upward" deflection (step, edge)
+    down            2                           "downward" deflection (step, edge)
+    pulse           up | down = 3 = down | up   sequence of two steps in opposite 
+                                                directions
+    bipulse         4                           sequence of two pulses in opposite 
+                                                directions (biphasic pulse)
+    pbip            bipulse | up    = 5         biphasic, first pulse positive
+    nbip            bipulse | down  = 6         biphasic, first pulse negative
+    slope           7                           upward -> positive; 
+                                                downward -> negative
+    angle           slope = 7 
+    pslope          slope | up       = 8        "positive" angle (CCW on unit circle)
+    nslope          slope | down     = 9        "negative" angle (CW on unit circle)
+    triangle        16                          sequence of two slopes in opposite 
+                                                directions; can be asymmetric
+    peak            triangle | up     = 17      triangle, first slope up
+    trough          triangle | down   = 18      triangle, first slope down
+    train           32                          train of events
+    chirp           64                          cosine wave
+    wave            chirp
+    uchirp          wave | up         = 65      wave of increasing frequency
+                                                (up-chirp)
+    dchirp          wave | down       = 66      wave of decreasing frequency 
+                                                (down-chirp)
+    user            128
+    place           up | down | pulse | bipulse | pbip | nbip | slope | pslope | 
+                    nslope | triangle | peak | trough | wave | uchirp | dchirp | 
+                    user
     """
-    # TODO 2024-11-12 18:58:21
-    # refine this !
+    unspecified = 0
     up          = 1 # "upward" deflection (step, edge)
     down        = 2 # "downward" deflection (step, edge)
     pulse       = up | down         # = 3 = down | up: sequence of two steps in opposite direction
-    # ppulse      = pulse | up        # = 4: "positive" pulse, first step upward
-    # npulse      = pulse | down      # = 5: "negative" pulse, first step downward
-    # bipulse     = pulse | pulse     # = 6: sequence of two pulses in opposite direction (biphasic)
-    bipulse     = 4                   # = 4: sequence of two pulses in opposite direction (biphasic)
-    pbip        = bipulse | up      # = 7: biphasic, first pulse positive
-    nbip        = bipulse | down    # = 8: biphasic, first pulse negative
-    slope       = 8                 # upward -> positive; downward -> negative
-    angle       = slope
-    pslope      = slope | up        # = 9: "positive" angle (CCW on unit circle)
-    # pangle      = pslope
-    nslope      = slope | down      # = 10: "negative" angle (CW on unit circle)
-    # nangle      = nslope      
-    triangle    = 16                # = 32: sequence of two slopes in opposite directions; can be asymmetric
+    bipulse     = 4                 # = 4: sequence of two pulses in opposite direction (biphasic)
+    pbip        = bipulse | up      # = 5: biphasic, first pulse positive
+    nbip        = bipulse | down    # = 6: biphasic, first pulse negative
+    slope       = 7                 # upward -> positive; downward -> negative
+    angle       = slope             # = 7 
+    pslope      = slope | up        # = 8: "positive" angle (CCW on unit circle)
+    nslope      = slope | down      # = 9: "negative" angle (CW on unit circle)
+    triangle    = 16                # sequence of two slopes in opposite directions; can be asymmetric
     peak        = triangle | up     # = 17: triangle, first slope up
     trough      = triangle | down   # = 18: triangle, first slope down
-    train       = 32               # train of events:
-    wave        = 64 # cosine wave
-    uchirp      = wave | up         # = 257: wave of increasing frequency: up-chirp
-    dchirp      = wave | down       # = 258: wave of decreasing frequency: down-chirp
-    
+    train       = 32                # train of events:
+    chirp       = 64                # cosine wave
+    wave        = chirp
+    uchirp      = wave | up         # = 65: wave of increasing frequency: up-chirp
+    dchirp      = wave | down       # = 66: wave of decreasing frequency: down-chirp
     user        = 128
     place       = up | down | pulse | bipulse | pbip | nbip | slope | pslope | nslope | triangle | peak | trough | wave | uchirp | dchirp | user
-    
     
 
 class TriggerEventType(TypeEnum):
@@ -116,6 +141,7 @@ class TriggerEventType(TypeEnum):
     
     Primitive types:
     -----------------
+    unspecified         =  0
     presynaptic         =  1 # synaptic stimulus (e.g. delivered via TTL to stim box)
     postsynaptic        =  2 # typically a squre pulse of current injection e.g. at the soma, to elicit APs
     photostimulation    =  4 # typically an uncaging event (generally a TTL which opens a soft or hard shutter for a stimulation laser, or a laser diode)
@@ -137,6 +163,7 @@ class TriggerEventType(TypeEnum):
     (*) this is just an alias
     
     """
+    unspecified         =  0
     presynaptic         =  1 # synaptic stimulus (e.g. delivered via TTL to stim box)
     postsynaptic        =  2 # typically a squre pulse of current injection e.g. at the soma, to elicit APs
     synaptic            = presynaptic | postsynaptic # 3
@@ -153,6 +180,8 @@ class TriggerEventType(TypeEnum):
     
 class DataMark(neo.Event):
     r"""Similar to neo.Event but suitable to all domains, not just time
+    NOTE: 2025-10-21 22:18:38 CHANGE:
+    By default the mark type is MarkType.unspecified (which, for TriggerEvent is TriggerEventType,.unspecified)
     """
     _single_parent_objects = ('Segment',)
     _single_parent_attrs = ('segment',)
@@ -297,37 +326,11 @@ class DataMark(neo.Event):
                 description=None, file_origin=None, mark_type=None, event_type=None, 
                 relative=None, array_annotations=None, **annotations):
         from core.datatypes import is_string
-        if places is None:
-            if times is None:
-                places = np.array([])
-                
-            elif isinstance(times, (list, tuple)):
-                places = np.array(times)
-                
-            elif isinstance(places, np.ndarray):
-                places = np.array(times)
-                
-            elif isinstance(times, (neo.Event, DataMark)):
-                # for copy c'tor
-                evt = times
-                units = evt.units
-                places = evt.times.flatten() * units
-                labels = evt.labels
-                name = evt.name
-                description = evt.description
-                file_origin = evt.file_origin
-                annotations = evt.annotations
-                
-        elif isinstance(places, (list, tuple)):
-            places = np.array(places)
-            
-        elif isinstance(places, np.ndarray):
-            places = np.array(places)
-            
-        elif isinstance(places, (neo.Event, DataMark)):
+        if isinstance(places, (neo.Event, DataMark)):
             evt = times
             units = evt.units
-            places = evt.times.flatten() * units
+            places = evt.times.flatten()
+            times = places
             labels = evt.labels
             name = evt.name
             relative = getattr(evt, "relative", False)
@@ -335,90 +338,111 @@ class DataMark(neo.Event):
             file_origin = evt.file_origin
             annotations = evt.annotations
             
-        if not isinstance(units, pq.Quantity):
-            if isinstance(places, pq.Quantity):
-                units = places.units
-            else:
-                if cls is TriggerEvent:
-                    units = pq.s
+        elif isinstance(times, (neo.Event, DataMark)):
+            # for copy c'tor
+            evt = times
+            units = evt.units
+            places = evt.times.flatten()
+            times = places
+            labels = evt.labels
+            name = evt.name
+            description = evt.description
+            file_origin = evt.file_origin
+            annotations = evt.annotations
+            
+        else:
+            if places is None:
+                if times is None:
+                    places = np.array([])
+                    
+                elif isinstance(times, (list, tuple)):
+                    places = np.array(times)
+                    
+                elif isinstance(places, np.ndarray):
+                    places = np.array(times)
+                    
+            elif isinstance(places, (list, tuple)):
+                places = np.array(places)
+                
+            elif isinstance(places, np.ndarray):
+                places = np.array(places)
+                
+            if not isinstance(units, pq.Quantity):
+                if isinstance(places, pq.Quantity):
+                    units = places.units
                 else:
-                    units = pq.arbitrary_unit
-                    
-        if not isinstance(places, pq.Quantity):
-            places = places * units
-            
-        times = places
-            
-        if labels is None:
-            labels = np.array([], dtype='S')
-            
-        else:
-            if isinstance(labels, str):
-                labels = np.array([labels] * times.size)
+                    if cls is TriggerEvent:
+                        units = pq.s
+                    else:
+                        units = pq.arbitrary_unit
+                        
+            if not isinstance(places, pq.Quantity):
+                places = places * units
                 
-            elif isinstance(labels, (tuple, list)):
-                if not all([isinstance(l, str) for l in labels]):
-                    raise TypeError("When ''labels' is a sequence, all elements must be str")
+            times = places
                 
-                if len(labels) < times.size:
-                    labels += [labels[-1]] * (times.size - len(labels))
-                    
-                elif len(labels) > times.size:
-                    labels = labels[:times.size]
-                    
-                labels = np.array(labels)
+            if labels is None:
+                labels = np.array([], dtype='S')
                 
-            elif isinstance(labels, np.ndarray):
-                if not is_string(labels):
-                    raise TypeError("When 'labels' is a numpy array, it must contain strings")
-                
-                if labels.size < times.size:
-                    labels = np.append(labels, [labels[-1]] * (times.size - labels-size))
-                elif labels.size > times.size:
-                    labels = labels[:times.size]
-                    
             else:
-                raise TypeError("'labels' must be either a str, a sequence of str or a numpy array of strings; got %s instead" % type(labels).__name__)
+                if isinstance(labels, str):
+                    labels = np.array([labels] * times.size)
                     
-        if units is None:
-            # No keyword units, so get from `times`
-            try:
-                units = times.units
-                dim = units.dimensionality
-            except AttributeError:
-                raise ValueError('you must specify units')
-        else:
-            if hasattr(units, 'dimensionality'):
-                dim = units.dimensionality
-            else:
-                dim = pq.quantity.validate_dimensionality(units)
-                
-        if mark_type is None:
-            if isinstance(event_type, (int, TriggerEventType)):
-                mark_type = event_type
-                
-                
-        if not isinstance(relative, bool):
-            relative = False
-                
-        # NOTE: 2021-11-11 09:39:49
-        # ONLY for TriggerEvent
-        # check to make sure the units are time
-        # this approach is much faster than comparing the
-        # reference dimensionality
-        if cls.__name__ == "TriggerEvent":
-            if (len(dim) != 1 or list(dim.values())[0] != 1 or not isinstance(list(dim.keys())[0],
-                                                                            pq.UnitTime)):
-                ValueError("Unit {} has dimensions {}, not [time]".format(units, dim.simplified))
+                elif isinstance(labels, (tuple, list)):
+                    if not all([isinstance(l, str) for l in labels]):
+                        raise TypeError("When ''labels' is a sequence, all elements must be str")
+                    
+                    if len(labels) < times.size:
+                        labels += [labels[-1]] * (times.size - len(labels))
+                        
+                    elif len(labels) > times.size:
+                        labels = labels[:times.size]
+                        
+                    labels = np.array(labels)
+                    
+                elif isinstance(labels, np.ndarray):
+                    if not is_string(labels):
+                        raise TypeError("When 'labels' is a numpy array, it must contain strings")
+                    
+                    if labels.size < times.size:
+                        labels = np.append(labels, [labels[-1]] * (times.size - labels-size))
+                        
+                    elif labels.size > times.size:
+                        labels = labels[:times.size]
+                        
+                else:
+                    raise TypeError("'labels' must be either a str, a sequence of str or a numpy array of strings; got %s instead" % type(labels).__name__)
+                        
+            if units is None:
+                # No keyword units, so get from `times`
+                if not hasattr(places, "units"):
+                    units = pq.dimensionless
+                else:
+                    units = places.units
 
-        ##if not isinstance(annotations, dict):
-            ##annotations = dict()
+            if mark_type is None:
+                if isinstance(event_type, (int, TriggerEventType)):
+                    mark_type = event_type
+                    
+            if not isinstance(relative, bool):
+                relative = False
+                
+            # NOTE: 2021-11-11 09:39:49
+            # ONLY for TriggerEvent
+            # check to make sure the units are time
+            # this approach is much faster than comparing the
+            # reference dimensionality
+            if cls.__name__ == "TriggerEvent":
+                if not checkTimeUnits(units):
+                    raise TypeError(f"Expecting time unitsl got {units} instead")
             
-        obj = pq.Quantity(places, units=dim).view(cls)
+        obj = pq.Quantity(places.magnitude, units=units).view(cls)
         obj._labels = labels
         obj._relative = relative
         obj.segment = None
         # obj.name = name
+        
+        print(f"{cls.__name__}.__new__(labels = {labels})")
         return obj
 
     
@@ -427,13 +451,15 @@ class DataMark(neo.Event):
                  relative = None, array_annotations=None, **annotations):
         r"""Constructs a DataMark.
         
-        For DataMark objects, event_type is by default MarkType.place
+        For DataMark objects, event_type is by default MarkType.unspecified
         
         For TriggerEvent objects, the default values of 'event_type' is 
-        TriggerEventType.presynaptic.
+        TriggerEventType.unspecified.
         """
         DataObject.__init__(self, name=name, file_origin=file_origin, description=description,
                             array_annotations=array_annotations, **annotations)
+        
+        print(f"{self.__class__.__name__}.__init__(labels = {labels})")
 
         if not isinstance(annotations, dict):
             annotations = dict()
@@ -445,25 +471,30 @@ class DataMark(neo.Event):
         
         if self.__class__.__name__ == "TriggerEvent":
             if mark_type is None:
-                self.__mark_type__ = TriggerEventType.presynaptic
+                self.__mark_type__ = TriggerEventType.unspecified
+                # self.__mark_type__ = TriggerEventType.presynaptic
                 
             elif isinstance(mark_type, str):
                 if mark_type in TriggerEventType.__members__:
                     self.__mark_type__ = TriggerEventType[mark_type]
                     
                 else:
-                    warngins.warning("Unknown event type %s; mark_type will be set to %s " % (mark_type, TriggerEventType.presynaptic))
-                    self.__mark_type__ = TriggerEventType.presynaptic
+                    warngins.warning("Unknown event type %s; mark_type will be set to %s " % (mark_type, TriggerEventType.unspecified))
+                    self.__mark_type__ = TriggerEventType.unspecified
+                    # warngins.warning("Unknown event type %s; mark_type will be set to %s " % (mark_type, TriggerEventType.presynaptic))
+                    # self.__mark_type__ = TriggerEventType.presynaptic
             
             elif isinstance(mark_type, TriggerEventType):
                 self.__mark_type__ = mark_type
                 
             else:
                 warngins.warn("'mark_type' parameter expected to be a TriggerEventType enum value, a TriggerEventType name, or None; got %s instead" % type(mark_type).__name__)
-                self.__mark_type__ = TriggerEventType.presynaptic
+                self.__mark_type__ = TriggerEventType.unspecified
+                # self.__mark_type__ = TriggerEventType.presynaptic
                 
         else:
-            self.__mark_type__ = MarkType.place
+            # self.__mark_type__ = MarkType.place
+            self.__mark_type__ = MarkType.unspecified
             
         self.setLabel(labels)
         
@@ -498,7 +529,8 @@ class DataMark(neo.Event):
         
     def __array_finalize__(self, obj):
         super(DataMark, self).__array_finalize__(obj)
-        self.__mark_type__ = getattr(obj, "__mark_type__", MarkType.place)
+        # self.__mark_type__ = getattr(obj, "__mark_type__", MarkType.place)
+        self.__mark_type__ = getattr(obj, "__mark_type__", MarkType.unspecified)
         
         self._labels = getattr(obj, 'labels', None)
         self._relative = getattr(obj, "relative", False)
@@ -584,7 +616,7 @@ class DataMark(neo.Event):
         Returns:
         ========
         
-        A new TriggerEvent with the same type as self
+        A new DataMark with the same type as self
         
         NOTE the new time stamps are stored in sorted order, by value!
         
@@ -653,6 +685,9 @@ class DataMark(neo.Event):
             are marks in the DataMark instance
     """
         from core.datatypes import is_string
+        
+        print(f"{self.__class__.__name__}.setLabel({value})")
+        
         if isinstance(value, str):
             setattr(self, "labels", np.array([value] * self.times.size))
             
@@ -780,7 +815,8 @@ class DataMark(neo.Event):
             setattr(self, attr, getattr(other, attr, None))
             
         if isinstance(self, TriggerEvent):
-            setattr(self, "__event_type__", getattr(other, "__event_type__", TriggerEventType.presynaptic))
+            # setattr(self, "__event_type__", getattr(other, "__event_type__", TriggerEventType.presynaptic))
+            setattr(self, "__event_type__", getattr(other, "__event_type__", TriggerEventType.unspecified))
         
     @staticmethod
     def defaultLabel(event_type):
@@ -1181,7 +1217,8 @@ class TriggerEvent(DataMark):
     _quantity_attr = 'times'
     _necessary_attrs = (('times', pq.Quantity, 1), 
                         ('labels', np.ndarray, 1, np.dtype('S')), 
-                        ("__event_type__", TriggerEventType, TriggerEventType.presynaptic))
+                        ("__event_type__", TriggerEventType, TriggerEventType.unspecified))
+                        # ("__event_type__", TriggerEventType, TriggerEventType.presynaptic))
 
     #relative_tolerance = 1e-4
     #absolute_tolerance = 1e-4
@@ -1201,6 +1238,7 @@ class TriggerEvent(DataMark):
                 event_type = tt[0]
             else:
                 return
+            
         elif not isinstance(event_type, TriggerEventType):
             return "event"
         
@@ -1233,13 +1271,7 @@ class TriggerEvent(DataMark):
         from core.datatypes import is_string
         # BUG: 2023-10-03 17:57:30 FIXME
         # when labels are passed as a string the counter is not taken into account
-        if times is None:
-            times = np.array([]) * pq.s
-        
-        elif isinstance(times, (list, tuple)):
-            times = np.array(times)
-            
-        elif isinstance(times, (neo.Event, TriggerEvent)):
+        if isinstance(times, (neo.Event, TriggerEvent)):
             # for copy c'tor
             evt = times
             times = evt.times.flatten()
@@ -1253,76 +1285,90 @@ class TriggerEvent(DataMark):
             
             if isinstance(evt, TriggerEvent):
                 event_type = evt.event_type
-                
-        # print(f"{cls}.__new__ labels = {labels} ({type(labels).__name__})")
-                
-        if labels is None:
-            l = cls.defaultLabel(event_type)
-            ll = [f"trigger{k}" for k in range(times.size)]
-            labels = np.array(ll, dtype='U')
-            
         else:
-            if isinstance(labels, str):
-                ll = [f"{labels}{k}" for k in range(times.size)]
-                # print(f"ll = {ll}")
-                # labels = np.array(ll, dtype="U")
-                labels = np.array(ll)
-                
-            elif isinstance(labels, (tuple, list)):
-                if not all([isinstance(l, str) for l in labels]):
-                    raise TypeError("When ''labels' is a sequence, all elements must be str")
-                
-                if len(labels) < times.size:
-                    labels += [f"{labels[-1]}{k}" for k in range(len(labels), times.size)]
-                    
-                elif len(labels) > times.size:
-                    labels = labels[:times.size]
-                    
-                labels = np.array(labels)
-                
-            elif isinstance(labels, np.ndarray):
-                if not is_string(labels):
-                    raise TypeError("When 'labels' is a numpy array, it must contain strings")
-                
-                if labels.size < times.size:
-                    ll = np.append(labels, [f"{labels[-1]}{k}" for k in range(labels.size, times.size, )])
-                    labels = ll
-                    
-                elif labels.size > times.size:
-                    labels = labels[:times.size]
-                    
-            else:
-                raise TypeError("'labels' must be either a str, a sequence of str or a numpy array of strings; got %s instead" % type(labels).__name__)
-                    
-        # print(f"\t{cls}.__new__ actual labels = {labels} ({type(labels).__name__}, dype={labels.dtype})")
-        
-        if units is None:
-            # No keyword units, so get from `times`
-            try:
-                units = times.units
-                dim = units.dimensionality
-            except AttributeError:
-                raise ValueError('you must specify units')
-        else:
-            if hasattr(units, 'dimensionality'):
-                dim = units.dimensionality
-            else:
-                dim = pq.quantity.validate_dimensionality(units)
-        # check to make sure the units are time
-        # this approach is much faster than comparing the
-        # reference dimensionality
-        if (len(dim) != 1 or list(dim.values())[0] != 1 or not isinstance(list(dim.keys())[0],
-                                                                          pq.UnitTime)):
-            ValueError("Unit {} has dimensions {}, not [time]".format(units, dim.simplified))
+            if times is None:
+                times = np.array([])
             
-        if not isinstance(relative, bool):
-            relative = False
+            elif isinstance(times, (list, tuple)):
+                if all(isinstance(v, pq.Quantity) for v in times):
+                    if not checkTimeUnits(times[0]):
+                        raise TypeError(f"Expecing time unitsl got {times[0].units} instead")
+                    
+                    if not all(v.units == times[0].units for v in times[1:]):
+                        times_ = list()
+                        times_.append(times[0])
+                        for v in times[1:]:
+                            if not unitsConvertible(v, times[0]):
+                                raise TypeError(f"'times' parametre has inconsistent units")
+                            times_.append(v.rescale(times[0]))
+                            
+                        times = times_
+                        
+                    times = np.array(times) * times[0].units
+                else:
+                    times = np.array(times)
+                
+            if labels is None:
+                l = cls.defaultLabel(event_type)
+                ll = [f"trigger{k}" for k in range(times.size)]
+                labels = np.array(ll, dtype='U')
+                
+            else:
+                if isinstance(labels, str):
+                    ll = [f"{labels}{k}" for k in range(times.size)]
+                    # print(f"ll = {ll}")
+                    # labels = np.array(ll, dtype="U")
+                    labels = np.array(ll)
+                    
+                elif isinstance(labels, (tuple, list)):
+                    if not all([isinstance(l, str) for l in labels]):
+                        raise TypeError("When ''labels' is a sequence, all elements must be str")
+                    
+                    if len(labels) < times.size:
+                        labels += [f"{labels[-1]}{k}" for k in range(len(labels), times.size)]
+                        
+                    elif len(labels) > times.size:
+                        labels = labels[:times.size]
+                        
+                    labels = np.array(labels)
+                    
+                elif isinstance(labels, np.ndarray):
+                    if not is_string(labels):
+                        raise TypeError("When 'labels' is a numpy array, it must contain strings")
+                    
+                    if labels.size < times.size:
+                        ll = np.append(labels, [f"{labels[-1]}{k}" for k in range(labels.size, times.size, )])
+                        labels = ll
+                        
+                    elif labels.size > times.size:
+                        labels = labels[:times.size]
+                        
+                else:
+                    raise TypeError("'labels' must be either a str, a sequence of str or a numpy array of strings; got %s instead" % type(labels).__name__)
             
+            if units is None:
+                # No keyword units, so get from `times`
+                if not hasattr(times, "units"):
+                    units = pq.s
+                else:
+                    units = times.units
+            else:
+                if not checkTimeUnits(units):
+                    raise ValueError(f"Incompatible units specified: {units}")
+                
+            if not isinstance(times, pq.Quantity):
+                times = times * units
+                
+            if not isinstance(relative, bool):
+                relative = False
 
-        obj = pq.Quantity(times, units=dim).view(cls)
+        obj = pq.Quantity(times.magnitude, units=units).view(cls)
         obj._labels = labels
         obj._relative = relative
         obj.segment = None
+        
+        print(f"{cls.__name__}.__new__: labels -> {obj._labels}")
+        
         return obj
 
     
@@ -1331,7 +1377,8 @@ class TriggerEvent(DataMark):
                 array_annotations=None, **annotations):
         r"""Constructs a TriggerEvent.
         
-        By default its __mark_type__ is TriggerEventType.presynaptic
+        NOTE: 2025-10-21 22:16:29 CHANGE:
+        By default its __mark_type__ is TriggerEventType.unspecified
     
         Parameters:
         ===========
@@ -1341,10 +1388,10 @@ class TriggerEvent(DataMark):
         units:  Quantity or UnitQuantity (typically, this would be in time units, e.g. pq.s, or pq.ms)
                 where pq is the alias to python Quantities package
         name:   string, name of the trigger event
-        event_type: see TriggerEventType; default is TriggerEventType.presynaptic
+        event_type: see TriggerEventType; default is TriggerEventType.unspecified
         
         """
-        super().__init__(times=times, labels=labels, units=units, name=name,
+        super().__init__(places=None, times=times, labels=labels, units=units, name=name,
                          description=description, file_origin=file_origin, 
                          mark_type=event_type, relative=relative,
                          array_annotations=array_annotations,
@@ -1353,7 +1400,8 @@ class TriggerEvent(DataMark):
     def __array_finalize__(self, obj):
         super(TriggerEvent, self).__array_finalize__(obj)
         
-        self.__mark_type__ = getattr(obj, "__mark_type__", TriggerEventType.presynaptic)
+        # self.__mark_type__ = getattr(obj, "__mark_type__", TriggerEventType.presynaptic)
+        self.__mark_type__ = getattr(obj, "__mark_type__", TriggerEventType.unspecified)
         
         self._labels = getattr(obj, '_labels', None)
         self._relative = getattr(obj, "relative", False)

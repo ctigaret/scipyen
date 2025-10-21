@@ -3454,7 +3454,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         Var-keyword parameters:
         -----------------------
         triggerType: triggerevent.TriggerEventType, default is 
-            triggerevent.TriggerEventType.presynaptic
+            triggerevent.TriggerEventType.unspecified
         
         name: str, optional, default is None
         
@@ -3483,7 +3483,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         if sweep not in range(self.nSweeps):
             raise ValueError(f"Invalid sweep index {sweep} for {self.nSweeps} sweeps")
         
-        triggerType = kwargs.get("triggerType", TriggerEventType.presynaptic)
+        triggerType = kwargs.get("triggerType", TriggerEventType.unspecified)
         name = kwargs.get("name", None)
         label_prefix = kwargs.get("label_prefix", None)
         
