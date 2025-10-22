@@ -3383,7 +3383,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
                     relativeToRunStart:typing.Optional[bool]=True,
                     useHoldingTime:bool=False,
                     **kwargs
-                    ) -> typing.Sequence:
+                    ) -> typing.Sequence[TriggerEvent] | TriggerEvent:
         r"""Trigger events emitted by the epochs in this DAC.
         The method considers that there is one TriggerEvent for each DIG 
         channel, that emits a TTL while this DAC is "live"¹.

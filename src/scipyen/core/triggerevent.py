@@ -442,7 +442,7 @@ class DataMark(neo.Event):
         obj.segment = None
         # obj.name = name
         
-        print(f"{cls.__name__}.__new__(labels = {labels})")
+        # print(f"{cls.__name__}.__new__(labels = {labels})")
         return obj
 
     
@@ -459,7 +459,7 @@ class DataMark(neo.Event):
         DataObject.__init__(self, name=name, file_origin=file_origin, description=description,
                             array_annotations=array_annotations, **annotations)
         
-        print(f"{self.__class__.__name__}.__init__(labels = {labels})")
+        # print(f"{self.__class__.__name__}.__init__(labels = {labels})")
 
         if not isinstance(annotations, dict):
             annotations = dict()
@@ -496,7 +496,8 @@ class DataMark(neo.Event):
             # self.__mark_type__ = MarkType.place
             self.__mark_type__ = MarkType.unspecified
             
-        self.setLabel(labels)
+        if hasattr(self, "_labels") and self._labels is None:
+            self.setLabel(labels)
         
         if isinstance(name, str) and len(name.strip()):
             self._name_ = name
@@ -686,7 +687,7 @@ class DataMark(neo.Event):
     """
         from core.datatypes import is_string
         
-        print(f"{self.__class__.__name__}.setLabel({value})")
+        # print(f"{self.__class__.__name__}.setLabel({value})")
         
         if isinstance(value, str):
             setattr(self, "labels", np.array([value] * self.times.size))
@@ -1367,7 +1368,7 @@ class TriggerEvent(DataMark):
         obj._relative = relative
         obj.segment = None
         
-        print(f"{cls.__name__}.__new__: labels -> {obj._labels}")
+        # print(f"{cls.__name__}.__new__: labels -> {obj._labels}")
         
         return obj
 
