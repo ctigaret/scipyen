@@ -8712,7 +8712,10 @@ anything else       anything else       ❌
             
             if any(a!=b for a,b in zip(current_viewXrange, (new_vx0, new_vx1))):
                 # print(f"{self.__class__.__name__}._align_X_range: Axis {kax} ({ax.vb.name}) view range from {current_viewXrange} to: {new_vx0, new_vx1}")
-                ax.vb.setXRange(new_vx0, new_vx1, padding = 0., update=True)
+                try:
+                    ax.vb.setXRange(new_vx0, new_vx1, padding = 0., update=True)
+                except:
+                    traceback.print_exc()
                 if isinstance(xLink, pg.ViewBox):
                     ax.vb.blockLink(False)
                     xLink.blockLink(False)
