@@ -561,7 +561,23 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     # defaultLeftAxisLabelWrapMode = "WrapAtWordBoundaryOrAnywhere"
     defaultLeftAxisLabelWrapMode = "WrapAtWordBoundary"
 
-    def __init__(self, x: (neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None, y: (neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None, parent: (QtWidgets.QMainWindow, type(None)) = None, ID:(int, type(None)) = None, win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None, frameIndex:(int, tuple, list, range, slice, type(None)) = None, frameAxis:(int, type(None)) = None, signalIndex:(str, int, tuple, list, range, slice, type(None)) = None, signalChannelAxis:(int, type(None)) = None, signalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, irregularSignalIndex:(str, int, tuple, list, range, slice, type(None)) = None, irregularSignalChannelAxis:(int, type(None)) = None, irregularSignalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, separateSignalChannels:bool = False, singleFrame:bool=False, interval:(tuple, list) = None, channelIndex:object = None, currentFrame:(int, type(None)) = None, plotStyle: str = "plot", nAxes:typing.Optional[int] = None,*args, **kwargs):
+    def __init__(self, x: typing.Optional[typing.Union[neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list]] = None, 
+                       y: typing.Optional[typing.Union[neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list]] = None, 
+                       parent: typing.Optional[QtWidgets.QMainWindow] = None, 
+                       ID: typing.Optional[int] = None, win_title: typing.Optional[str] = None, 
+                       doc_title: typing.Optional[str] = None, 
+                       frameIndex: typing.Optional[typing.Union[int, tuple, list, range, slice]] = None, 
+                       frameAxis: typing.Optional[int] = None, 
+                       signalIndex: typing.Optional[typing.Union[str, int, tuple, list, range, slice]] = None, 
+                       signalChannelAxis: typing.Optional[int] = None, 
+                       signalChannelIndex: typing.Optional[typing.Union[int, tuple, list, range, slice]] = None, 
+                       irregularSignalIndex:typing.Optional[typing.Union[str, int, tuple, list, range, slice]] = None, 
+                       irregularSignalChannelAxis: typing.Optional[int] = None, 
+                       irregularSignalChannelIndex: typing.Optional[typing.Union[int, tuple, list, range, slice]] = None, 
+                       separateSignalChannels:bool = False, singleFrame:bool=False, interval: typing.Optional[typing.Sequence] = None, 
+                       channelIndex:typing.Optional[typing.Any] = None, 
+                       currentFrame: typing.Optional[int] = None, plotStyle: str = "plot", nAxes:typing.Optional[int] = None, 
+                       *args, **kwargs):
         r"""SignalViewer constructor.
         TODO: Write docstring!
         """
@@ -3483,7 +3499,8 @@ anything else       anything else       ❌
         if isinstance(self._yData_, (neo.Block, neo.Segment)) or (isinstance(self._yData_, (tuple, list)) and all([isinstance(v, (neo.Block, neo.Segment)) for v in self._yData_])):
             tdlg = TriggerDetectDialog(ephysdata=self._yData_, ephysViewer=self, parent=self)
             tdlg.adjustSize()
-            tdlg.open()
+            # tdlg.open()
+            tdlg.exec()
         
     @Slot(str)
     @safewrapper

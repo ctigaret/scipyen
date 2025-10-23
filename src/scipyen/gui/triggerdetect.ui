@@ -91,7 +91,7 @@
            </widget>
           </item>
           <item>
-           <widget class="QDoubleSpinBox" name="presynStartDoubleSpinBox">
+           <widget class="QuantitySpinBox" name="presynStartDoubleSpinBox">
             <property name="suffix">
              <string> s</string>
             </property>
@@ -112,7 +112,7 @@
            </widget>
           </item>
           <item>
-           <widget class="QDoubleSpinBox" name="presynStopDoubleSpinBox">
+           <widget class="QuantitySpinBox" name="presynStopDoubleSpinBox">
             <property name="suffix">
              <string> s</string>
             </property>
@@ -213,7 +213,7 @@
            </widget>
           </item>
           <item>
-           <widget class="QDoubleSpinBox" name="postsynStartDoubleSpinBox">
+           <widget class="QuantitySpinBox" name="postsynStartDoubleSpinBox">
             <property name="suffix">
              <string> s</string>
             </property>
@@ -234,7 +234,7 @@
            </widget>
           </item>
           <item>
-           <widget class="QDoubleSpinBox" name="postsynStopDoubleSpinBox">
+           <widget class="QuantitySpinBox" name="postsynStopDoubleSpinBox">
             <property name="suffix">
              <string> s</string>
             </property>
@@ -335,7 +335,7 @@
            </widget>
           </item>
           <item>
-           <widget class="QDoubleSpinBox" name="photoStartDoubleSpinBox">
+           <widget class="QuantitySpinBox" name="photoStartDoubleSpinBox">
             <property name="suffix">
              <string> s</string>
             </property>
@@ -356,7 +356,7 @@
            </widget>
           </item>
           <item>
-           <widget class="QDoubleSpinBox" name="photoStopDoubleSpinBox">
+           <widget class="QuantitySpinBox" name="photoStopDoubleSpinBox">
             <property name="suffix">
              <string> s</string>
             </property>
@@ -457,7 +457,7 @@
            </widget>
           </item>
           <item>
-           <widget class="QDoubleSpinBox" name="imagingStartDoubleSpinBox">
+           <widget class="QuantitySpinBox" name="imagingStartDoubleSpinBox">
             <property name="suffix">
              <string> s</string>
             </property>
@@ -478,7 +478,7 @@
            </widget>
           </item>
           <item>
-           <widget class="QDoubleSpinBox" name="imagingStopDoubleSpinBox">
+           <widget class="QuantitySpinBox" name="imagingStopDoubleSpinBox">
             <property name="suffix">
              <string> s</string>
             </property>
@@ -553,6 +553,13 @@
    </item>
   </layout>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>QuantitySpinBox</class>
+   <extends>QDoubleSpinBox</extends>
+   <header location="global">gui.widgets.small_widgets</header>
+  </customwidget>
+ </customwidgets>
  <tabstops>
   <tabstop>presynGroupBox</tabstop>
   <tabstop>presynChannelSpinBox</tabstop>

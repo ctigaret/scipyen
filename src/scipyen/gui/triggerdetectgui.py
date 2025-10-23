@@ -142,6 +142,25 @@ class TriggerDetectWidget(QWidget, Ui_TriggerDetectWidget):
         
         self.reltimesCheckBox.setChecked(self._reltimes_)
         
+        startRangeWidgets = [self.presynStartDoubleSpinBox,
+                             self.postsynStartDoubleSpinBox,
+                             self.photoStartDoubleSpinBox,
+                             self.imagingStartDoubleSpinBox,
+                             ]
+        stopRangeWidgets = [self.presynStopDoubleSpinBox,
+                            self.postsynStopDoubleSpinBox,
+                            self.photoStopDoubleSpinBox,
+                            self.imagingStopDoubleSpinBox]
+        
+        widgets = startRangeWidgets + stopRangeWidgets
+        
+        for w in widgets:
+            w.units = pq.s
+            w.rescaleOnUnitChange = True
+            w.restrictToCurrentUnitFamily = True
+            w.setDecimals(3)
+            w.setSingleStep(0.001)
+            
         self._update_channel_ranges_()
         self._update_time_ranges_()
         
@@ -336,8 +355,8 @@ class TriggerDetectWidget(QWidget, Ui_TriggerDetectWidget):
         if self.presynGroupBox.isChecked():
             return (self.presynChannelSpinBox.value(),
                     self.presynNameLineEdit.text(),
-                    (self.presynStartDoubleSpinBox.value() * pq.s,
-                     self.presynStopDoubleSpinBox.value() * pq.s,),
+                    (self.presynStartDoubleSpinBox.value(),# * pq.s,
+                     self.presynStopDoubleSpinBox.value()),# * pq.s,),
                     )
         
         return ()
@@ -350,8 +369,8 @@ class TriggerDetectWidget(QWidget, Ui_TriggerDetectWidget):
     def presynapticOptions(self):
         if self.presynGroupBox.isChecked():
             return DataBag({"Channel": self.presynChannelSpinBox.value(),
-                            "DetectionBegin": self.presynStartDoubleSpinBox.value() * pq.s,
-                            "DetectionEnd": self.presynStopDoubleSpinBox.value() * pq.s,
+                            "DetectionBegin": self.presynStartDoubleSpinBox.value(),# * pq.s,
+                            "DetectionEnd": self.presynStopDoubleSpinBox.value(),# * pq.s,
                             "Name": self.presynNameLineEdit.text()}, allow_none=True)
             
     @property
@@ -359,8 +378,8 @@ class TriggerDetectWidget(QWidget, Ui_TriggerDetectWidget):
         if self.postsynGroupBox.isChecked():
             return (self.postsynChannelSpinBox.value(),
                     self.postsynNameLineEdit.text(),
-                    (self.postsynStartDoubleSpinBox.value() * pq.s,
-                     self.postsynStopDoubleSpinBox.value() * pq.s,),
+                    (self.postsynStartDoubleSpinBox.value(),# * pq.s,
+                     self.postsynStopDoubleSpinBox.value()),# * pq.s,),
                     )
                     
         return ()
@@ -373,8 +392,8 @@ class TriggerDetectWidget(QWidget, Ui_TriggerDetectWidget):
     def postsynapticOptions(self):
         if self.postsynGroupBox.isChecked():
             return DataBag({"Channel": self.postsynChannelSpinBox.value(),
-                           "DetectionBegin": self.postsynStartDoubleSpinBox.value() * pq.s,
-                           "DetectionEnd": self.postsynStopDoubleSpinBox.value() * pq.s,
+                           "DetectionBegin": self.postsynStartDoubleSpinBox.value(),# * pq.s,
+                           "DetectionEnd": self.postsynStopDoubleSpinBox.value(),# * pq.s,
                            "Name": self.postsynNameLineEdit.text()})
         
     @property
@@ -382,8 +401,8 @@ class TriggerDetectWidget(QWidget, Ui_TriggerDetectWidget):
         if self.photoGroupBox.isChecked():
             return (self.photoChannelSpinBox.value(),
                     self.photoNameLineEdit.text(),
-                    (self.photoStartDoubleSpinBox.value() * pq.s,
-                     self.photoStopDoubleSpinBox.value() * pq.s,),
+                    (self.photoStartDoubleSpinBox.value(),# * pq.s,
+                     self.photoStopDoubleSpinBox.value()), # * pq.s,),
                     )
                     
         return ()
@@ -396,8 +415,8 @@ class TriggerDetectWidget(QWidget, Ui_TriggerDetectWidget):
     def photostimulationOptions(self):
         if self.photoGroupBox.isChecked():
             return DataBag({"Channel": self.photoChannelSpinBox.value(),
-                            "DetectionBegin": self.photoStartDoubleSpinBox.value() * pq.s,
-                            "DetectionEnd": self.photoStopDoubleSpinBox.value() * pq.s,
+                            "DetectionBegin": self.photoStartDoubleSpinBox.value(),# * pq.s,
+                            "DetectionEnd": self.photoStopDoubleSpinBox.value(),# * pq.s,
                             "Name": self.photoNameLineEdit.text()})
         
     @property
@@ -405,8 +424,8 @@ class TriggerDetectWidget(QWidget, Ui_TriggerDetectWidget):
         if self.imagingGroupBox.isChecked():
             return (self.imagingChannelSpinBox.value(),
                     self.imagingNameLineEdit.text(),
-                    (self.imagingStartDoubleSpinBox.value() * pq.s,
-                     self.imagingStopDoubleSpinBox.value() * pq.s,),
+                    (self.imagingStartDoubleSpinBox.value(),# * pq.s,
+                     self.imagingStopDoubleSpinBox.value()),# * pq.s,),
                     )
                     
         return ()
@@ -419,8 +438,8 @@ class TriggerDetectWidget(QWidget, Ui_TriggerDetectWidget):
     def imagingFrameOptions(self):
         if self.imagingGroupBox.isChecked():
             return DataBag({"Channel": self.imagingChannelSpinBox.value(),
-                            "DetectionBegin": self.imagingStartDoubleSpinBox.value() * pq.s,
-                            "DetectionEnd": self.imagingStopDoubleSpinBox.value() * pq.s,
+                            "DetectionBegin": self.imagingStartDoubleSpinBox.value(),# * pq.s,
+                            "DetectionEnd": self.imagingStopDoubleSpinBox.value(), # * pq.s,
                             "Name": self.imagingNameLineEdit.text()})
                 
         
@@ -472,20 +491,27 @@ class TriggerDetectWidget(QWidget, Ui_TriggerDetectWidget):
         self._reltimes_ = val != QtCore.Qt.CheckState.Unchecked
     
     def _update_time_ranges_(self):
-        widgets = (self.presynStartDoubleSpinBox,
-                    self.presynStopDoubleSpinBox,
-                    self.postsynStartDoubleSpinBox,
-                    self.postsynStopDoubleSpinBox,
-                    self.photoStartDoubleSpinBox,
-                    self.photoStopDoubleSpinBox,
-                    self.imagingStartDoubleSpinBox,
-                    self.imagingStopDoubleSpinBox)
+        startRangeWidgets = [self.presynStartDoubleSpinBox,
+                             self.postsynStartDoubleSpinBox,
+                             self.photoStartDoubleSpinBox,
+                             self.imagingStartDoubleSpinBox,
+                             ]
+        stopRangeWidgets = [self.presynStopDoubleSpinBox,
+                            self.postsynStopDoubleSpinBox,
+                            self.photoStopDoubleSpinBox,
+                            self.imagingStopDoubleSpinBox]
+        
+        widgets = startRangeWidgets + stopRangeWidgets
         
         signalBlockers = [QtCore.QSignalBlocker(w) for w in widgets]
         
         for w in widgets:
             w.setMinimum(self._sig_start_)
             w.setMaximum(self._sig_stop_)
+            if w in startRangeWidgets:
+                w.setValue(self._sig_start_)
+            else:
+                w.setValue(self._sig_stop_)
         
     def _update_channel_ranges_(self):
         widgets = (self.presynChannelSpinBox,
@@ -506,12 +532,11 @@ class TriggerDetectDialog(qd.QuickDialog):
     sig_detectTriggers = Signal(name="sig_detectTriggers")
     sig_undoDetectTriggers = Signal(name="sig_undoDetectTriggers")
     
-    def __init__(self, ephysdata=None, title="Detect Trigger Events", clearEvents=False, parent=None, ephysViewer=None, **kwargs):
-        super().__init__(parent=parent, title=title) # calls ancestor's setupUi()
+    def __init__(self, ephysdata:typing.Optional[typing.Any]=None, 
+                 title: str="Detect Trigger Events", clearEvents:bool=False, 
+                 ephysViewer:typing.Optional[SignalViewer]=None, parent:typing.Optional[QtWidgets.QWidget]=None, 
+                 **kwargs):
             
-        self.eventDetectionWidget = TriggerDetectWidget(parent = self) 
-        self.addWidget(self.eventDetectionWidget)
-        
         self._clear_events_flag_ = clearEvents
         
         # NOTE: 2021-04-11 17:02:58
@@ -521,13 +546,23 @@ class TriggerDetectDialog(qd.QuickDialog):
         
         self.triggerProtocols = list()
         
-        if not isinstance(ephysViewer, SignalViewer):
-            self._ephysViewer_ = SignalViewer(win_title = "Trigger Events Detection")
-            self._owns_viewer_ = True
-            
-        else:
+        # NOTE: 2025-10-23 22:54:26 I find these below utterly confusing - why are they False ?!?
+        # print(f"{self.__class__.__name__}.__init__: ephysViewer is a SignalViewer: {isinstance(ephysViewer, SignalViewer)}")
+        # print(f"{self.__class__.__name__}.__init__: ephysViewer type is SignalViewer: {type(ephysViewer) == SignalViewer}")
+        
+        super().__init__(parent=parent, title=title) # needs to be called BEFORE adding any QtWidget objects
+        
+        if isinstance(ephysViewer, SignalViewer) or type(ephysViewer).__name__ == "SignalViewer":
             self._ephysViewer_ = ephysViewer
             self._owns_viewer_ = False
+        
+        else:
+            self._ephysViewer_ = SignalViewer(win_title = "Trigger Events Detection", parent=self)
+            self._owns_viewer_ = True
+            
+        
+        self.eventDetectionWidget = TriggerDetectWidget(parent = self) 
+        self.addWidget(self.eventDetectionWidget)
         
         self._ephysViewer_.frameChanged[int].connect(self._slot_ephysFrameChanged)
         
@@ -566,6 +601,7 @@ class TriggerDetectDialog(qd.QuickDialog):
         self._ephys_= None
         
         self._set_ephys_data_(ephysdata)
+        
         self.setSizeGripEnabled(True)
         # self.adjustSize()
             
@@ -827,11 +863,14 @@ class TriggerDetectDialog(qd.QuickDialog):
             self.eventDetectionWidget.nChannels = nChannels
             #self.eventDetectionWidget.nChannels = len(segment.analogsignals)
             if self.eventDetectionWidget.relTimes:
-                self.eventDetectionWidget.signalStart = 0.00
-                self.eventDetectionWidget.signalStop = float(min([sig.t_stop - sig.t_start for sig in segment.analogsignals]).magnitude)
+                self.eventDetectionWidget.signalStart = 0.0 * pq.s
+                # self.eventDetectionWidget.signalStop = float(min([sig.t_stop - sig.t_start for sig in segment.analogsignals]).magnitude)
+                self.eventDetectionWidget.signalStop = min([sig.t_stop - sig.t_start for sig in segment.analogsignals])
             else:
-                self.eventDetectionWidget.signalStart = float(min([sig.t_start for sig in segment.analogsignals]).magnitude)
-                self.eventDetectionWidget.signalStop = float(max([sig.t_stop for sig in segment.analogsignals]).magnitude)
+                self.eventDetectionWidget.signalStart = min([sig.t_start for sig in segment.analogsignals])
+                self.eventDetectionWidget.signalStop = max([sig.t_stop for sig in segment.analogsignals])
+                # self.eventDetectionWidget.signalStart = float(min([sig.t_start for sig in segment.analogsignals]).magnitude)
+                # self.eventDetectionWidget.signalStop = float(max([sig.t_stop for sig in segment.analogsignals]).magnitude)
         
         
 def guiDetectTriggers(data:Block):
