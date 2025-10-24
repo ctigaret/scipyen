@@ -1194,6 +1194,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         self.actionDetect_Triggers.triggered.connect(self.slot_detectTriggers)
         self.actionDetect_Triggers.setEnabled(False)
+        self.actionRemoveTriggers.triggered.connect(self.slot_removeTriggers)
+        self.actionRemoveTriggers.setEnabled(False)
+        # self.actionRemoveAllEvents.triggered.connect(self.slot_removeAllEvents)
+        # self.actionRemoveAllEvents.setEnabled(False)
         
         self.actionRefresh.triggered.connect(self.slot_refreshDataDisplay)
         
@@ -2758,8 +2762,10 @@ anything else       anything else       ❌
         
         self._yData_ = newData
         
-        self.actionDetect_Triggers.setEnabled(check_ephys_data_collection(self._yData_))
-        
+        isEphysDataCollection = check_ephys_data_collection(self._yData_)
+        self.actionDetect_Triggers.setEnabled(isEphysDataCollection)
+        self.actionRemoveTriggers.setEnabled(isEphysDataCollection)
+
         self._frames_spinBoxSlider_.range = range(self._number_of_frames_)
         
         self.currentFrame = self._number_of_frames_ - 1
@@ -2828,7 +2834,9 @@ anything else       anything else       ❌
             self.observed_vars["yData"] = None
         self.observed_vars["yData"] = self._yData_
         
-        self.actionDetect_Triggers.setEnabled(check_ephys_data_collection(self._yData_))
+        isEphysDataCollection = check_ephys_data_collection(self._yData_)
+        self.actionDetect_Triggers.setEnabled(isEphysDataCollection)
+        self.actionRemoveTriggers.setEnabled(isEphysDataCollection)
 
         self._frames_spinBoxSlider_.range = range(self._number_of_frames_)
         
@@ -3501,6 +3509,56 @@ anything else       anything else       ❌
             tdlg.adjustSize()
             # tdlg.open()
             tdlg.exec()
+            
+    @Slot()
+    def slot_removeTriggers(self):
+        if not isinstance(self.yData, neo.Block) or len(self.yData.segments) == 0:
+            return
+        
+        trigTypeNames = list(TriggerEventType.names())
+        
+        dlg = qd.QuickDialog(self, "Remove Events & Triggers")
+        evtCombo = qd.QuickDialogComboBox(dlg, "Choose Event Type")
+        comboItems = ["All Trigger Events"]
+        comboItems.extend(trigTypeNames)
+        comboItems.append("Select TriggerEvent Type(s)...")
+        comboItems.append("All Events")
+        evtCombo.setItems(comboItems)
+        allSegments = qd.CheckBox(dlg, "In All Segments")
+        allSegments.setChecked=False
+        dlg.adjustSize()
+        
+        if dlg.exec():
+            if allSegments.isChecked():
+                segments = self.yData.segments
+            else:
+                segments = [self.yData.segments[self.currentFrame]]
+                
+            value = evtCombo.value()
+            
+            if value == 0:
+                fn = lambda s: neoutils.remove_events(s, TriggerEvent) # only remove TriggerEvent objects (of all types)
+            elif value == len(comboItems)-1:
+                fn = lambda s: neoutils.remove_events(s) # remove all neo.Events
+            elif value in range(1, len(comboItems)-2):
+                fn = lambda s: neoutils.remove_events(s, TriggerEventType[comboItems[value]])
+            else:
+                sdlg = ItemsListDialog(parent=self, itemsList = trigTypeNames,
+                                       title = "Select Trigger Event Types",#
+                                       modal = True,
+                                       selectmode = QtWidgets.QAbstractItemView.ExtendedSelection)
+                sdlg.adjustSize()
+                
+                if sdlg.exec():
+                    sel_types = list(map(lambda t: TriggerEventType[t], sdlg.selectedItemsText))
+                    fn = lambda s: neoutils.remove_events(s, sel_types)
+                else:
+                    return
+                
+            for s in segments:
+                fn(s)
+                
+            self.refresh()
         
     @Slot(str)
     @safewrapper
@@ -7263,8 +7321,10 @@ anything else       anything else       ❌
                 self._xData_ = x
                 self._yData_ = y
                 
-                self.actionDetect_Triggers.setEnabled(check_ephys_data_collection(self._yData_))
-                            
+                isEphysDataCollection = check_ephys_data_collection(self._yData_)
+                self.actionDetect_Triggers.setEnabled(isEphysDataCollection)
+                self.actionRemoveTriggers.setEnabled(isEphysDataCollection)
+
                 self._new_data_ = True
                 
                 self.observed_vars["xData"] = self._xData_

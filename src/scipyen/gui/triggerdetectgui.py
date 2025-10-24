@@ -566,7 +566,9 @@ class TriggerDetectDialog(qd.QuickDialog):
         
         self._ephysViewer_.frameChanged[int].connect(self._slot_ephysFrameChanged)
         
-        self.clearEventsCheckBox = qd.CheckBox(self, "Clear existing")
+        self.optionsGroup = qd.HDialogGroup(self)
+        self.clearEventsCheckBox = qd.CheckBox(self.optionsGroup, "Clear existing")
+        self.inAllSegmentsCheckBox = qd.CheckBox(self.optionsGroup, "In all segments")
         
         self.clearEventsCheckBox.setIcon(QtGui.QIcon.fromTheme("edit-clear-history"))
         self.clearEventsCheckBox.setChecked(self._clear_events_flag_)
@@ -601,6 +603,7 @@ class TriggerDetectDialog(qd.QuickDialog):
         self._ephys_= None
         
         self._set_ephys_data_(ephysdata)
+        self.inAllSegmentsCheckBox.setEnabled(isinstance(self._ephys_, neo.Block) and len(self._ephys_.segments))
         
         self.setSizeGripEnabled(True)
         # self.adjustSize()

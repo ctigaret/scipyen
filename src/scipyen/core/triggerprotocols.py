@@ -1220,7 +1220,7 @@ def get_trigger_events(*src:typing.Union[neo.Block, neo.Segment, typing.Sequence
 def detect_trigger_events(x, event_type, 
                           use_lo_hi=True, 
                           label=None, 
-                          name=None):
+                          name=None) -> TriggerEvent | None:
     r"""Creates a datatypes.TriggerEvent object (array) of specified type.
     
     Parameters:
@@ -1290,6 +1290,9 @@ def detect_trigger_events(x, event_type,
         
     else:
         times = hi_lo
+        
+    if np.any(np.isnan(times)):
+        return
         
     if times.size > 1:
         if isinstance(label, str) and len(label.strip()):

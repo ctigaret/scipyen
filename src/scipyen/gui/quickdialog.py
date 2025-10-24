@@ -580,7 +580,7 @@ class VDialogGroup(DialogGroup):
 class QuickDialogComboBox(QtWidgets.QFrame):
     r"""A combobox to use with a QuickDialog.
     
-    The combobox is nothing fancy -- only accepts a list of text items
+    The combobox is nothing fancy: it only accepts a list of text items
     """
     def __init__(self, parent:QtWidgets.QWidget, label:str):
         QtWidgets.QFrame.__init__(self, parent)

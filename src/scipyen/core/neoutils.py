@@ -5717,8 +5717,9 @@ def clear_events(
     ] = None,
     match: str = "==",
 ):
-    # triggersOnly:bool=False, triggerType=None):
     r"""Shorthand for clearing neo.Event objects embedded in src.
+    
+    WARNING: 2025-10-24 22:35:13 BUG/FIXME DO NOT USE
 
     This includes TriggerEvent objects!
 
@@ -5767,7 +5768,7 @@ def clear_events(
         matches exactly the specification in 'triggers'. This behaviour can be finely
         tuned using the 'match' parameter, below.
 
-    match: str, (optional, default is 'strict') - the rule for mathcing the type
+    match: str, (optional, default is 'strict') - the rule for matching the type
         of the returned TriggerEvent objects to the type(s) in 'triggers'
 
         Used when 'triggers' is a TriggerEventType object, a TriggerEventType
@@ -5827,7 +5828,8 @@ def clear_events(
         For the meaning of 'primitive' and 'composite' TriggerEventType objects,
         ans their inclusion relationships,  see the documentation for
         triggerevent.TriggerEventType
-    See also: get_events
+    
+    See also: get_events, remove_events
 
 
     """
@@ -6189,32 +6191,44 @@ def detect_trigger_events(data: neo.Block) -> bool:
     
     
 
-def remove_events(event, segment, byLabel=True):
+def remove_events(segment, event:typing.Optional[typing.Union[neo.Event, str, int, TriggerEventType]]=None, byLabel=True) -> None:
     r"""Removes a specific event from the neo.Segment "segment"
 
     Parameters:
     ==========
-    event: a neo.Event, an int, a str or a datatypes.TriggerEventType.
+    segment: a neo.Segment object
 
-        When a neo.Event (or TriggerEvent), the functions remove the reference
-        to that event, if found, or any event that is identical to the specified
-        one, if found.
-        NOTE: two event objects can have identical time stamps, labels,
+    event: a neo.Event instance, an int, a str, a triggerevent.TriggerEventType,
+        or the class 'neo.Event' or triggerevent.TriggerEvent.
+
+        Optional, default is None, in which case ALL instances of neo.Event will
+        be removed.
+        
+        When 'event' is a neo.Event or TriggerEvent instance, the function will 
+        try to remove the reference to that event, if found, or to any event that
+        is identical to the specified one, if found (i.e., with identical time 
+        stamps, event type, event labels, and name).
+
+        NOTE: Two event objects can have identical time stamps, labels,
         names, units, and in the case of TriggerEvent, event type, even if they
         are distinct Python objects (e.g., one is a deep copy of the other).
 
-        When an int, the function removes the event at index "event" in the
+        When 'event' is the type neo.Event, all events will eb removed (same as
+        passing 'event=None')
+
+        When 'event' is the type triggerevent.TriggerEvent, all instances of 
+        TriggerEvent will be removed.
+
+        When 'event' is an int, the function removes the event at index "event" in the
             segment's events list (if the index is valid)
 
-        When a str, the function removes _ALL_ the events for having either the
+        When 'event' is a str, the function removes _ALL_ the events for having either the
             label (if byLabel is True) or name (is byLabel is False) equal to
             the "event" parameter, if such events are found in the segment.
 
-        When a TriggerEventType, _ALL_ TriggerEvent objects of this type will be
-        removed, if found - NOTE: This is similar to calling clear_events with
-        specific triggerType parameter.
-
-        See also: clear_events
+        When 'event' is a TriggerEventType, or a sequence of TriggerEventType,
+        _ALL_ TriggerEvent objects with the specified event type(s) will be
+        removed, if found.
 
     Keyword parameters:
     ==================
@@ -6234,8 +6248,19 @@ def remove_events(event, segment, byLabel=True):
 
     if len(segment.events) == 0:
         return
-
-    if isinstance(event, neo.Event):
+    
+    if event is None:
+        segment.events.clear()
+    
+    elif isinstance(event, type):
+        if event == neo.Event:
+            segment.events.clear()
+        elif event == TriggerEvent:
+            keep_events = list(filter(lambda e: not isinstance(e, TriggerEvent), segment.events))
+            segment.events.clear()
+            segment.events.extend(keep_events)
+            
+    elif isinstance(event, neo.Event):
         if event in segment.events:  # find event reference stored in events list
             evindex = segment.events.index(event)
             del segment.events[evindex]
@@ -6290,11 +6315,26 @@ def remove_events(event, segment, byLabel=True):
             keep_events = [segment.events[k] for k in all_events_ndx if k not in evndx]
 
             segment.events[:] = keep_events
+            
+    elif isinstance(event, typing.Sequence) and all(isinstance(e, TriggerEventType) for e in event):
+        evs = [
+            (k, e)
+            for (k, e) in segment.events
+            if isinstance(e, TriggerEvent) and any(e.type & e_ for e_ in event)
+        ]
+        
+        if len(evs):
+            (evndx, events) = zip(*evs)
+            all_events_ndx = range(len(segment.events))
+
+            keep_events = [segment.events[k] for k in all_events_ndx if k not in evndx]
+
+            segment.events[:] = keep_events
+            
 
     else:
         raise TypeError(
-            "event expected to be a neo.Event, an int, a str or a datatypes.TriggerEventType; got %s instead"
-            % type(event).__name__
+            f"Unexpected type for 'event': {type(event).__name__}"
         )
 
 

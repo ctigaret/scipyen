@@ -153,7 +153,14 @@
     <property name="title">
      <string>Analysis</string>
     </property>
-    <addaction name="actionDetect_Triggers"/>
+    <widget class="QMenu" name="menuTriggers">
+     <property name="title">
+      <string>Events and Triggers</string>
+     </property>
+     <addaction name="actionDetect_Triggers"/>
+     <addaction name="actionRemoveTriggers"/>
+    </widget>
+    <addaction name="menuTriggers"/>
    </widget>
    <widget class="QMenu" name="menuSettings">
     <property name="title">
@@ -384,6 +391,15 @@
    <property name="windowTitle">
     <string>Triggers</string>
    </property>
+   <property name="toolTip">
+    <string>Events and Triggers</string>
+   </property>
+   <property name="statusTip">
+    <string>Add or remove Triggers and Events</string>
+   </property>
+   <property name="whatsThis">
+    <string>Add or remove Triggers and Events</string>
+   </property>
    <attribute name="toolBarArea">
     <enum>TopToolBarArea</enum>
    </attribute>
@@ -391,6 +407,7 @@
     <bool>false</bool>
    </attribute>
    <addaction name="actionDetect_Triggers"/>
+   <addaction name="actionRemoveTriggers"/>
   </widget>
   <action name="actionClose">
    <property name="text">
@@ -832,6 +849,22 @@
    </property>
    <property name="text">
     <string>Lock Toolbars</string>
+   </property>
+  </action>
+  <action name="actionRemoveTriggers">
+   <property name="icon">
+    <iconset theme="remove"/>
+   </property>
+   <property name="text">
+    <string>Remove Events and Triggers</string>
+   </property>
+  </action>
+  <action name="actionRemoveAllEvents">
+   <property name="icon">
+    <iconset theme="delete"/>
+   </property>
+   <property name="text">
+    <string>Remove All Events</string>
    </property>
   </action>
  </widget>
