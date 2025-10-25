@@ -349,12 +349,14 @@ class TriggerDetectWidget(QWidget, Ui_TriggerDetectWidget):
         self.reltimesCheckBox.setChecked(self._reltimes_)
     
     @property
-    def presyn(self):
-        r"""Tuple: ( signal index, label, (t_start, t_stop) )
+    def presyn(self) -> tuple:
+        r"""Tuple: ( signal index, label, (t_start, t_stop) ) as required for
+        triggerprotocols.auto_define_trigger_events
         """
         if self.presynGroupBox.isChecked():
             return (self.presynChannelSpinBox.value(),
                     self.presynNameLineEdit.text(),
+                    self.presynHiLogicCheckBox.isChecked(),
                     (self.presynStartDoubleSpinBox.value(),# * pq.s,
                      self.presynStopDoubleSpinBox.value()),# * pq.s,),
                     )
@@ -371,13 +373,15 @@ class TriggerDetectWidget(QWidget, Ui_TriggerDetectWidget):
             return DataBag({"Channel": self.presynChannelSpinBox.value(),
                             "DetectionBegin": self.presynStartDoubleSpinBox.value(),# * pq.s,
                             "DetectionEnd": self.presynStopDoubleSpinBox.value(),# * pq.s,
-                            "Name": self.presynNameLineEdit.text()}, allow_none=True)
+                            "Name": self.presynNameLineEdit.text(),
+                            "Hi": self.presynHiLogicCheckBox.isChecked()}, allow_none=True)
             
     @property
     def postsyn(self):
         if self.postsynGroupBox.isChecked():
             return (self.postsynChannelSpinBox.value(),
                     self.postsynNameLineEdit.text(),
+                    self.postsynHiLogicCheckBox.isChecked(),
                     (self.postsynStartDoubleSpinBox.value(),# * pq.s,
                      self.postsynStopDoubleSpinBox.value()),# * pq.s,),
                     )
@@ -392,15 +396,17 @@ class TriggerDetectWidget(QWidget, Ui_TriggerDetectWidget):
     def postsynapticOptions(self):
         if self.postsynGroupBox.isChecked():
             return DataBag({"Channel": self.postsynChannelSpinBox.value(),
-                           "DetectionBegin": self.postsynStartDoubleSpinBox.value(),# * pq.s,
-                           "DetectionEnd": self.postsynStopDoubleSpinBox.value(),# * pq.s,
-                           "Name": self.postsynNameLineEdit.text()})
+                            "DetectionBegin": self.postsynStartDoubleSpinBox.value(),# * pq.s,
+                            "DetectionEnd": self.postsynStopDoubleSpinBox.value(),# * pq.s,
+                            "Name": self.postsynNameLineEdit.text(),
+                            "Hi": self.postsynHiLogicCheckBox.isChecked()}, allow_none=True)
         
     @property
     def photo(self):
         if self.photoGroupBox.isChecked():
             return (self.photoChannelSpinBox.value(),
                     self.photoNameLineEdit.text(),
+                    self.photoStimHiLogicCheckBox.isChecked(),
                     (self.photoStartDoubleSpinBox.value(),# * pq.s,
                      self.photoStopDoubleSpinBox.value()), # * pq.s,),
                     )
@@ -417,13 +423,15 @@ class TriggerDetectWidget(QWidget, Ui_TriggerDetectWidget):
             return DataBag({"Channel": self.photoChannelSpinBox.value(),
                             "DetectionBegin": self.photoStartDoubleSpinBox.value(),# * pq.s,
                             "DetectionEnd": self.photoStopDoubleSpinBox.value(),# * pq.s,
-                            "Name": self.photoNameLineEdit.text()})
+                            "Name": self.photoNameLineEdit.text(),
+                            "Hi": self.photoStimHiLogicCheckBox.isChecked()}, allow_none=True)
         
     @property
     def imaging(self):
         if self.imagingGroupBox.isChecked():
             return (self.imagingChannelSpinBox.value(),
                     self.imagingNameLineEdit.text(),
+                    self.imagingHiLogicCheckBox.isChecked(),
                     (self.imagingStartDoubleSpinBox.value(),# * pq.s,
                      self.imagingStopDoubleSpinBox.value()),# * pq.s,),
                     )
@@ -440,9 +448,9 @@ class TriggerDetectWidget(QWidget, Ui_TriggerDetectWidget):
             return DataBag({"Channel": self.imagingChannelSpinBox.value(),
                             "DetectionBegin": self.imagingStartDoubleSpinBox.value(),# * pq.s,
                             "DetectionEnd": self.imagingStopDoubleSpinBox.value(), # * pq.s,
-                            "Name": self.imagingNameLineEdit.text()})
+                            "Name": self.imagingNameLineEdit.text(),
+                            "Hi": self.imagingHiLogicCheckBox.isChecked()}, allow_none=True)
                 
-        
     @Slot(int)
     @Slot(float)
     @Slot(str)
@@ -566,9 +574,11 @@ class TriggerDetectDialog(qd.QuickDialog):
         
         self._ephysViewer_.frameChanged[int].connect(self._slot_ephysFrameChanged)
         
-        self.optionsGroup = qd.HDialogGroup(self)
-        self.clearEventsCheckBox = qd.CheckBox(self.optionsGroup, "Clear existing")
-        self.inAllSegmentsCheckBox = qd.CheckBox(self.optionsGroup, "In all segments")
+        # self.optionsGroup = qd.HDialogGroup(self)
+        self.clearEventsCheckBox = qd.CheckBox(self, "Clear existing")
+        self.inAllSegmentsCheckBox = qd.CheckBox(self, "All segments")
+        # self.optionsGroup.addWidget(self.clearEventsCheckBox)
+        # self.optionsGroup.addWidget(self.inAllSegmentsCheckBox)
         
         self.clearEventsCheckBox.setIcon(QtGui.QIcon.fromTheme("edit-clear-history"))
         self.clearEventsCheckBox.setChecked(self._clear_events_flag_)
@@ -586,9 +596,10 @@ class TriggerDetectDialog(qd.QuickDialog):
         # extend/reuse the Quickdialog's own button box => widgets nicely aligned
         # on the same row instead of occupying an additional row
         self.buttons.layout.insertWidget(0, self.clearEventsCheckBox)
-        self.buttons.layout.insertWidget(1, self.detectTriggersPushButton)
-        self.buttons.layout.insertWidget(2, self.undoTriggersPushButton)
-        self.buttons.layout.insertStretch(3)
+        self.buttons.layout.insertWidget(1, self.inAllSegmentsCheckBox)
+        self.buttons.layout.insertWidget(2, self.detectTriggersPushButton)
+        self.buttons.layout.insertWidget(3, self.undoTriggersPushButton)
+        self.buttons.layout.insertStretch(4)
         
         # NOTE: 2021-01-06 11:14:37 also place fancy icons on quickdialog's standard buttons
         self.buttons.OK.setIcon(QtGui.QIcon.fromTheme("dialog-ok-apply"))
@@ -603,7 +614,7 @@ class TriggerDetectDialog(qd.QuickDialog):
         self._ephys_= None
         
         self._set_ephys_data_(ephysdata)
-        self.inAllSegmentsCheckBox.setEnabled(isinstance(self._ephys_, neo.Block) and len(self._ephys_.segments))
+        self.inAllSegmentsCheckBox.setEnabled((isinstance(self._ephys_, Block) and len(self._ephys_.segments)) or (isinstance(self._ephys_, typing.Sequence) and all(isinstance(s, Segment) for s in self._ephys)))
         
         self.setSizeGripEnabled(True)
         # self.adjustSize()
@@ -793,6 +804,9 @@ class TriggerDetectDialog(qd.QuickDialog):
         return self.eventDetectionWidget.imaging
     
     def detect_triggers(self):
+        # NOTE: 2025-10-25 08:16:23
+        # detaching trigger event detection from trigger protocol construction:
+        # don't use protocols here, anymore; just detect trigger events
         if self._ephys_ is None:
             self.detected=False
             return
@@ -804,6 +818,36 @@ class TriggerDetectDialog(qd.QuickDialog):
             # only clear existing trigger events
             clear_flag = "triggers" if self._clear_events_flag_ else False
             
+            # NOTE: 2025-10-25 08:25:43 this below moified from 
+            # triggerprotocols.auto_detect_trigger_protocols(…)
+            
+            tpars = {"presynaptic":         self.presyn,
+                     "postsynaptic":        self.postsyn,
+                     "photostimulation":    self.photo,
+                     "imaging_frame":       self.imaging}
+            
+            for p_name, p_tuple in tpars.items():
+                # if len(tpars[p_name]) >= 2: # skip empty trigger spec
+                if len(p_tuple) >= 2: # skip empty trigger spec
+                    use_lo_hi = True if len(p_tuple) == 2 else p_tuple[2]
+                    
+                    if len(p_tuple) == 4:
+                        if not isinstance(p_tuple[3], tuple) or len(p_tuple[3]) != 2 or (not all(isinstance(v_, pq.Quantity) and unitsConvertible(v_, pq.s) and v_.size==1 for v_ in p_tuple[3])):
+                            raise ValueError(f"When specified, the third element in a {p_name} trigger specification must have exactly two scalar time quantities")
+                        time_slice = p_tuple[3]
+                    else:
+                        time_slice = None
+                        
+                    pfun = partial(auto_define_trigger_events, event_type = p_name, 
+                                analog_index = p_tuple[0], label = p_tuple[1], 
+                                use_lo_hi=use_lo_hi, clear=clear)
+                    
+                    if time_slice:
+                        pfun(data, time_slice = p_tuple[2])
+                        
+                    else:
+                        pfun(data)
+                        
             tp = auto_detect_trigger_protocols(self._ephys_,
                                         presynaptic = self.presyn,
                                         postsynaptic = self.postsyn,

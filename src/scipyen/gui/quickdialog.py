@@ -571,11 +571,11 @@ class DialogGroup(QtWidgets.QFrame):
 
 class HDialogGroup(DialogGroup):
     def __init__(self, parent:QtWidgets.QWidget, validate:bool=True):
-        DialogGroup.__init__(self, parent, 0, validate=validate)
+        DialogGroup.__init__(self, parent, vertical=False, validate=validate)
         
 class VDialogGroup(DialogGroup):
     def __init__(self, parent:QtWidgets.QWidget, validate:bool=True):
-        DialogGroup.__init__(self, parent, 1, validate=validate)
+        DialogGroup.__init__(self, parent, vertical=True, validate=validate)
         
 class QuickDialogComboBox(QtWidgets.QFrame):
     r"""A combobox to use with a QuickDialog.

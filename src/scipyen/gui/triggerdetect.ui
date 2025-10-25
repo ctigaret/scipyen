@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>597</width>
-    <height>212</height>
+    <width>613</width>
+    <height>264</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -45,22 +45,7 @@
        <property name="checked">
         <bool>false</bool>
        </property>
-       <layout class="QVBoxLayout" name="verticalLayout_2">
-        <property name="spacing">
-         <number>0</number>
-        </property>
-        <property name="leftMargin">
-         <number>0</number>
-        </property>
-        <property name="topMargin">
-         <number>0</number>
-        </property>
-        <property name="rightMargin">
-         <number>0</number>
-        </property>
-        <property name="bottomMargin">
-         <number>0</number>
-        </property>
+       <layout class="QVBoxLayout" name="verticalLayout">
         <item>
          <layout class="QHBoxLayout" name="horizontalLayout_4">
           <item>
@@ -144,6 +129,25 @@
           </item>
          </layout>
         </item>
+        <item>
+         <widget class="QCheckBox" name="presynHiLogicCheckBox">
+          <property name="toolTip">
+           <string>Use high logic</string>
+          </property>
+          <property name="statusTip">
+           <string>Direction of TTL-like waveforms</string>
+          </property>
+          <property name="whatsThis">
+           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;When checked, TTL-like waveforms are expected to follow an &amp;quot;up&amp;quot; logic, &lt;/p&gt;&lt;p&gt;(i.e., they are low-to-high, or upwards deflections).&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          </property>
+          <property name="text">
+           <string>High Logic</string>
+          </property>
+          <property name="checked">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
        </layout>
       </widget>
      </item>
@@ -167,22 +171,7 @@
        <property name="checked">
         <bool>false</bool>
        </property>
-       <layout class="QVBoxLayout" name="verticalLayout_3">
-        <property name="spacing">
-         <number>0</number>
-        </property>
-        <property name="leftMargin">
-         <number>0</number>
-        </property>
-        <property name="topMargin">
-         <number>0</number>
-        </property>
-        <property name="rightMargin">
-         <number>0</number>
-        </property>
-        <property name="bottomMargin">
-         <number>0</number>
-        </property>
+       <layout class="QVBoxLayout" name="verticalLayout_2">
         <item>
          <layout class="QHBoxLayout" name="horizontalLayout_8">
           <item>
@@ -266,6 +255,25 @@
           </item>
          </layout>
         </item>
+        <item>
+         <widget class="QCheckBox" name="postsynHiLogicCheckBox">
+          <property name="toolTip">
+           <string>Use high logic</string>
+          </property>
+          <property name="statusTip">
+           <string>Direction of TTL-like waveforms</string>
+          </property>
+          <property name="whatsThis">
+           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;When checked, TTL-like waveforms are expected to follow an &amp;quot;up&amp;quot; logic, &lt;/p&gt;&lt;p&gt;(i.e., they are low-to-high, or upwards deflections).&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          </property>
+          <property name="text">
+           <string>High Logic</string>
+          </property>
+          <property name="checked">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
        </layout>
       </widget>
      </item>
@@ -289,22 +297,7 @@
        <property name="checked">
         <bool>false</bool>
        </property>
-       <layout class="QVBoxLayout" name="verticalLayout_4">
-        <property name="spacing">
-         <number>0</number>
-        </property>
-        <property name="leftMargin">
-         <number>0</number>
-        </property>
-        <property name="topMargin">
-         <number>0</number>
-        </property>
-        <property name="rightMargin">
-         <number>0</number>
-        </property>
-        <property name="bottomMargin">
-         <number>0</number>
-        </property>
+       <layout class="QVBoxLayout" name="verticalLayout_3">
         <item>
          <layout class="QHBoxLayout" name="horizontalLayout_12">
           <item>
@@ -388,6 +381,25 @@
           </item>
          </layout>
         </item>
+        <item>
+         <widget class="QCheckBox" name="photoStimHiLogicCheckBox">
+          <property name="toolTip">
+           <string>Use high logic</string>
+          </property>
+          <property name="statusTip">
+           <string>Direction of TTL-like waveforms</string>
+          </property>
+          <property name="whatsThis">
+           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;When checked, TTL-like waveforms are expected to follow an &amp;quot;up&amp;quot; logic, &lt;/p&gt;&lt;p&gt;(i.e., they are low-to-high, or upwards deflections).&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          </property>
+          <property name="text">
+           <string>High Logic</string>
+          </property>
+          <property name="checked">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
        </layout>
       </widget>
      </item>
@@ -411,22 +423,7 @@
        <property name="checked">
         <bool>false</bool>
        </property>
-       <layout class="QVBoxLayout" name="verticalLayout_5">
-        <property name="spacing">
-         <number>0</number>
-        </property>
-        <property name="leftMargin">
-         <number>0</number>
-        </property>
-        <property name="topMargin">
-         <number>0</number>
-        </property>
-        <property name="rightMargin">
-         <number>0</number>
-        </property>
-        <property name="bottomMargin">
-         <number>0</number>
-        </property>
+       <layout class="QVBoxLayout" name="verticalLayout_4">
         <item>
          <layout class="QHBoxLayout" name="horizontalLayout_16">
           <item>
@@ -509,6 +506,25 @@
            </widget>
           </item>
          </layout>
+        </item>
+        <item>
+         <widget class="QCheckBox" name="imagingHiLogicCheckBox">
+          <property name="toolTip">
+           <string>Use high logic</string>
+          </property>
+          <property name="statusTip">
+           <string>Direction of TTL-like waveforms</string>
+          </property>
+          <property name="whatsThis">
+           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;When checked, TTL-like waveforms are expected to follow an &amp;quot;up&amp;quot; logic, &lt;/p&gt;&lt;p&gt;(i.e., they are low-to-high, or upwards deflections).&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          </property>
+          <property name="text">
+           <string>High Logic</string>
+          </property>
+          <property name="checked">
+           <bool>true</bool>
+          </property>
+         </widget>
         </item>
        </layout>
       </widget>

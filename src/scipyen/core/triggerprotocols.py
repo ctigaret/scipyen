@@ -1902,7 +1902,7 @@ def auto_detect_trigger_protocols(data: typing.Union[neo.Block, neo.Segment, typ
                                   photostimulation:tuple=(), 
                                   imaging:tuple=(), 
                                   clear:typing.Union[bool, str, int, tuple, list, ]=False, 
-                                  up=True, protocols=True,
+                                  up:typing.Optional[bool]=None, protocols=True,
                                   reltimes:bool=True) -> typing.Optional[typing.List[TriggerProtocol]]:
     
     r"""Determines the set of trigger protocols in a neo.Block by searching for 
@@ -1924,9 +1924,12 @@ def auto_detect_trigger_protocols(data: typing.Union[neo.Block, neo.Segment, typ
         Detection parameters, respectively, for the pre-, postsynaptic, 
         photostimulation and imaging trigger event types. 
     
-        Each is a tuple with 0 (default), two, or three elements:
+        Each is a tuple with 0 (default), two, three or four elements, in the
+        following order:
         
-            (signal_index, label, (t_start, t_stop))
+            (signal_index:int, label:str, up:bool, (t_start, t_stop))
+        
+            where t_start and t_stop are scalar quantities
         
         This tuple specifies the following:
         
@@ -1939,11 +1942,13 @@ def auto_detect_trigger_protocols(data: typing.Union[neo.Block, neo.Segment, typ
         
         • label: str, a common label for the detected trigger events
         
-        • (t_start, t_stop): quantities with time units, specifying the time 
+        • up: bool, indicates whether the TTL-like waveforms follow HIGH logic
+        
+        • (t_start, t_stop): scalar quantities with time units, specifying the time 
             interval, within the signal, where the TTL waveforms will be 
             searched.
 
-        In particular, the imaging trigger event also determines the delay
+        ATTENTION: The imaging trigger event also determines the delay
         between the acquisition of image and electrophysiology data, in experiments
         where imaging is synchronized with electrophysiology.
         
@@ -1962,10 +1967,12 @@ def auto_detect_trigger_protocols(data: typing.Union[neo.Block, neo.Segment, typ
             A trigger-like waveform is a rectangular pulse, or a train
             of rectangular pulses with polarity (upward or downward) specified 
             by the 'up' parameter, which emulate a TTL signal.
-            
-            Currently, the functions supports only the "up" logic i.e., 
-            upward-going TTL-like waveforms.
         
+            ATTENTION: the "up" parameter is now part of the tuple specification
+            for each trigger event type. However, then "up" is also passed as a
+            distinct parameter, it will apply to the detection of ALL event type
+            (overriding the 3rd element of the trigger specification tuple)
+            
         label: str = a label to be assigned to the detected event
         
         (t_start, t_stop): pair of python Quantity objects defining a time slice
@@ -2044,10 +2051,17 @@ def auto_detect_trigger_protocols(data: typing.Union[neo.Block, neo.Segment, typ
         caling this function for each segment individually will assign the 
         'segment' index to 0 in the detected trigger protocol. Make sure you
         correct for that, accordingly.
+    
         
+    NOTE: CHANGELOG
+    2025-10-25 09:04:30 The "up" parameter (see below) is now expected to be part
+    of the "parameters" tuples; the previous, stand-alone "up" parameter can be
+    used to override the settings (and force the use of a common logic) for the
+    detection of all event types.
+        
+    2021-01-06 11:28:23 NEW: introduced "up" parameter - to use the ability to 
+    detect negative pulses ("down" logic); 
     """
-    # NOTE: 2021-01-06 11:28:23 NEW: introduced "up" parameter - to use the
-    # ability to detect negative pulses ("down" logic); 
             
     # NOTE: 2021-01-06 13:54:58
     # any admissible value of 'clear' except for "same" is used here; then, the
@@ -2069,9 +2083,9 @@ def auto_detect_trigger_protocols(data: typing.Union[neo.Block, neo.Segment, typ
         # also, clear_events raises error if clear is a non compliant sequence
         clear = False
         
-    if not all(isinstance(v, tuple) and len(v) in (0,2,3) for v in (presynaptic, postsynaptic, 
+    if not all(isinstance(v, tuple) and len(v) in (0,2,3,4) for v in (presynaptic, postsynaptic, 
                                               photostimulation, imaging)):
-        raise TypeError(f"All trigger specifications must be tuples with 0, 2 or 3 elements")
+        raise TypeError(f"All trigger specifications must be tuples with 0, 2, 3 or 4 elements")
         
     # collect trigger parameter tuples in a mapping, to iterate
     tpars = {"presynaptic": presynaptic,
@@ -2084,31 +2098,35 @@ def auto_detect_trigger_protocols(data: typing.Union[neo.Block, neo.Segment, typ
     # we detect events in the whole signal or we limit detetion to a defined 
     # time-slice of the signal
     
-    # iterate through trigger parameter tuples - example given here for one loop
-    # to be explicit:
-    #### if len(presynaptic) >= 2:
-    ####    pfun = partial(auto_define_trigger_events, event_type = "presynaptic", 
-    ####               analog_index = presynaptic[0], label = presynaptic[1], 
-    ####               use_lo_hi=up, clear=clear)
-        
-    ####    if len(presynaptic) == 3:
-    ####        pfun(data, time_slice = presynaptic[2])
-    ####    else:
-    ####        pfun(data)
-    
     for p_name, p_tuple in tpars.items():
-        if len(tpars[p_name]) >= 2: # skip empty trigger spec
+        if len(tpars[p_tuple]) >= 2: # skip empty trigger spec
+            use_lo_hi = True if len(p_tuple) == 2 else p_tuple[2]
+            
+            if len(p_tuple) == 4:
+                if not isinstance(p_tuple[3], tuple) or len(p_tuple[3]) != 2 or (not all(isinstance(v_, pq.Quantity) and unitsConvertible(v_, pq.s) for v_ in p_tuple[2])):
+                    raise ValueError(f"When specified, the third element in a {p_name} trigger specification must have exactly two time quantities")
+                time_slice = p_tuple[3]
+            else:
+                time_slice = None
+                
             pfun = partial(auto_define_trigger_events, event_type = p_name, 
                         analog_index = p_tuple[0], label = p_tuple[1], 
-                        use_lo_hi=up, clear=clear)
+                        use_lo_hi=use_lo_hi, clear=clear)
             
-            if len(p_tuple) == 3:
-                if not isinstance(p_tuple[2], tuple) or len(p_tuple[2]) != 2 or (not all(isinstance(v_, pq.Quantity) and unitsConvertible(v_, pq.s) for v_ in p_tuple[2])):
-                    raise ValueError(f"When specified, the third element in a {p_name} trigger specification must have exactly two time quantities")
+#             if len(p_tuple) == 3:
+#                 if not isinstance(p_tuple[2], tuple) or len(p_tuple[2]) != 2 or (not all(isinstance(v_, pq.Quantity) and unitsConvertible(v_, pq.s) for v_ in p_tuple[2])):
+#                     raise ValueError(f"When specified, the third element in a {p_name} trigger specification must have exactly two time quantities")
+#                 pfun(data, time_slice = p_tuple[2])
+#                 
+#             else:
+#                 pfun(data)
+                
+            if time_slice:
                 pfun(data, time_slice = p_tuple[2])
                 
             else:
                 pfun(data)
+                        
                 
     if protocols:
         tp = parse_trigger_protocols(data)
