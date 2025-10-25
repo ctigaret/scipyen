@@ -5105,8 +5105,7 @@ def concatenate_blocks(*args, **kwargs):
 
 
 @safewrapper
-def get_events(
-    *src: typing.Union[neo.Block, neo.Segment, typing.Sequence],
+def get_events(*src: typing.Union[neo.Block, neo.Segment, typing.Sequence],
     as_dict: bool = False,
     flat: bool = False,
     triggers: typing.Optional[

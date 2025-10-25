@@ -3507,8 +3507,9 @@ anything else       anything else       ❌
         if isinstance(self._yData_, (neo.Block, neo.Segment)) or (isinstance(self._yData_, (tuple, list)) and all([isinstance(v, (neo.Block, neo.Segment)) for v in self._yData_])):
             tdlg = TriggerDetectDialog(ephysdata=self._yData_, ephysViewer=self, parent=self)
             tdlg.adjustSize()
+            tdlg.setModal(False)
             # tdlg.open()
-            tdlg.exec()
+            tdlg.show()
             
     @Slot()
     def slot_removeTriggers(self):
@@ -3558,7 +3559,8 @@ anything else       anything else       ❌
             for s in segments:
                 fn(s)
                 
-            self.refresh()
+            # self.refresh()
+            self.displayFrame()
         
     @Slot(str)
     @safewrapper

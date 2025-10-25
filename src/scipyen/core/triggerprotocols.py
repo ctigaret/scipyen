@@ -1061,6 +1061,17 @@ def auto_define_trigger_events(src:typing.Union[neo.Block, neo.Segment, typing.S
         The number of events detected (and embedded in 'src') can be retrieved
         using get_trigger_events(src)
     """
+    
+    # parse various options for what to clear
+    if clearSimilarEvents:
+        clear = "same"
+    elif clearTriggerEvents:
+        clear = "triggers"
+    elif clearAllEvents:
+        clear = "all"
+    elif isinstance(clear, bool):
+        clear = "all"
+    
     if isinstance(src, neo.Block):
         data = src.segments
         
@@ -1450,8 +1461,8 @@ def embed_trigger_event(event, segment, clear=False):
     In the segment's events list, the event is stored by reference.
     
     WARNING: one could easily append events with identical time stamps!
-        While this is NOT recommended and it can be easily prevented by setting
-        the "clear" parameer to "same", in which case the new trigger events
+        This is NOT recommended and it can be easily prevented by setting the
+        "clear" parameter to "same", in which case the new trigger events
         will replace the old ones
         
         To add time stamps to a TriggerEvent, create a new TriggerEvent object
@@ -2113,14 +2124,6 @@ def auto_detect_trigger_protocols(data: typing.Union[neo.Block, neo.Segment, typ
                         analog_index = p_tuple[0], label = p_tuple[1], 
                         use_lo_hi=use_lo_hi, clear=clear)
             
-#             if len(p_tuple) == 3:
-#                 if not isinstance(p_tuple[2], tuple) or len(p_tuple[2]) != 2 or (not all(isinstance(v_, pq.Quantity) and unitsConvertible(v_, pq.s) for v_ in p_tuple[2])):
-#                     raise ValueError(f"When specified, the third element in a {p_name} trigger specification must have exactly two time quantities")
-#                 pfun(data, time_slice = p_tuple[2])
-#                 
-#             else:
-#                 pfun(data)
-                
             if time_slice:
                 pfun(data, time_slice = p_tuple[2])
                 

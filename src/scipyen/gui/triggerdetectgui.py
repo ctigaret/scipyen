@@ -50,6 +50,8 @@ from core.triggerevent import (TriggerEvent, TriggerEventType,)
 
 from core.triggerprotocols import (TriggerProtocol,
                                    auto_detect_trigger_protocols,
+                                   auto_define_trigger_events,
+                                   detect_trigger_events,
                                    embed_trigger_protocol, 
                                    embed_trigger_event,
                                    get_trigger_events,
@@ -57,7 +59,7 @@ from core.triggerprotocols import (TriggerProtocol,
                                    remove_trigger_protocol,
                                    parse_trigger_protocols,)
 
-from core.neoutils import (concatenate_blocks, get_events,
+from core.neoutils import (concatenate_blocks, get_events, remove_events,
                            check_ephys_data_collection, check_ephys_data)
 
 from core.strutils import numbers2str
@@ -371,10 +373,12 @@ class TriggerDetectWidget(QWidget, Ui_TriggerDetectWidget):
     def presynapticOptions(self):
         if self.presynGroupBox.isChecked():
             return DataBag({"Channel": self.presynChannelSpinBox.value(),
+                            "Name": self.presynNameLineEdit.text(),
+                            "Hi": self.presynHiLogicCheckBox.isChecked(),
                             "DetectionBegin": self.presynStartDoubleSpinBox.value(),# * pq.s,
                             "DetectionEnd": self.presynStopDoubleSpinBox.value(),# * pq.s,
-                            "Name": self.presynNameLineEdit.text(),
-                            "Hi": self.presynHiLogicCheckBox.isChecked()}, allow_none=True)
+                            }, 
+        allow_none=True)
             
     @property
     def postsyn(self):
@@ -396,10 +400,12 @@ class TriggerDetectWidget(QWidget, Ui_TriggerDetectWidget):
     def postsynapticOptions(self):
         if self.postsynGroupBox.isChecked():
             return DataBag({"Channel": self.postsynChannelSpinBox.value(),
+                            "Name": self.postsynNameLineEdit.text(),
+                            "Hi": self.postsynHiLogicCheckBox.isChecked(),
                             "DetectionBegin": self.postsynStartDoubleSpinBox.value(),# * pq.s,
                             "DetectionEnd": self.postsynStopDoubleSpinBox.value(),# * pq.s,
-                            "Name": self.postsynNameLineEdit.text(),
-                            "Hi": self.postsynHiLogicCheckBox.isChecked()}, allow_none=True)
+                            }, 
+        allow_none=True)
         
     @property
     def photo(self):
@@ -421,10 +427,12 @@ class TriggerDetectWidget(QWidget, Ui_TriggerDetectWidget):
     def photostimulationOptions(self):
         if self.photoGroupBox.isChecked():
             return DataBag({"Channel": self.photoChannelSpinBox.value(),
+                            "Name": self.photoNameLineEdit.text(),
+                            "Hi": self.photoStimHiLogicCheckBox.isChecked(),
                             "DetectionBegin": self.photoStartDoubleSpinBox.value(),# * pq.s,
                             "DetectionEnd": self.photoStopDoubleSpinBox.value(),# * pq.s,
-                            "Name": self.photoNameLineEdit.text(),
-                            "Hi": self.photoStimHiLogicCheckBox.isChecked()}, allow_none=True)
+                            }, 
+        allow_none=True)
         
     @property
     def imaging(self):
@@ -446,10 +454,12 @@ class TriggerDetectWidget(QWidget, Ui_TriggerDetectWidget):
     def imagingFrameOptions(self):
         if self.imagingGroupBox.isChecked():
             return DataBag({"Channel": self.imagingChannelSpinBox.value(),
+                            "Name": self.imagingNameLineEdit.text(),
+                            "Hi": self.imagingHiLogicCheckBox.isChecked(),
                             "DetectionBegin": self.imagingStartDoubleSpinBox.value(),# * pq.s,
                             "DetectionEnd": self.imagingStopDoubleSpinBox.value(), # * pq.s,
-                            "Name": self.imagingNameLineEdit.text(),
-                            "Hi": self.imagingHiLogicCheckBox.isChecked()}, allow_none=True)
+                            }, 
+        allow_none=True)
                 
     @Slot(int)
     @Slot(float)
@@ -606,15 +616,17 @@ class TriggerDetectDialog(qd.QuickDialog):
         self.buttons.Cancel.setIcon(QtGui.QIcon.fromTheme("dialog-cancel"))
         
         self.statusBar = QtWidgets.QStatusBar(parent=self)
-        self.addWidget(self.statusBar)
+        # self.addWidget(self.statusBar)
+        self.layout.addWidget(self.statusBar)
         
-        self.setWindowModality(QtCore.Qt.WindowModal)
+        # self.setWindowModality(QtCore.Qt.WindowModal)
+        self.setWindowModality(QtCore.Qt.NonModal)
         
         # parse ephysdata parameter
         self._ephys_= None
         
         self._set_ephys_data_(ephysdata)
-        self.inAllSegmentsCheckBox.setEnabled((isinstance(self._ephys_, Block) and len(self._ephys_.segments)) or (isinstance(self._ephys_, typing.Sequence) and all(isinstance(s, Segment) for s in self._ephys)))
+        self.inAllSegmentsCheckBox.setEnabled((isinstance(self._ephys_, Block) and len(self._ephys_.segments)) or (isinstance(self._ephys_, typing.Sequence) and (all(isinstance(s, Segment) for s in self._ephys_) or all(isinstance(s, Block) for s in self._ephys_)) ))
         
         self.setSizeGripEnabled(True)
         # self.adjustSize()
@@ -664,22 +676,14 @@ class TriggerDetectDialog(qd.QuickDialog):
         # NOTE: 2021-04-16 11:30:35
         # unbind the SignalViewer reference from this symbol, otherwise the garbage
         # collector will try to double-delete C++ objects (in pyqtgraph)
-        #self._ephysViewer_ = None
+        if self._owns_viewer_:
+            self._ephysViewer_ = None
         
         super().closeEvent(evt)
         
     @Slot()
     def accept(self):
-        #print("accept owns viewer", self._owns_viewer_)
         super().accept()
-        # NOTE: 2021-04-16 11:24:35 this calls done(QDialog.Accepted), which 
-        # does all the things commented below
-        #if self._ephysViewer_.isVisible():
-            #if self._owns_viewer_:
-                #self._ephysViewer_.close()
-            #else:
-                #self._ephysViewer_.refresh()
-                
         
     @Slot()
     def reject(self):
@@ -745,30 +749,36 @@ class TriggerDetectDialog(qd.QuickDialog):
         self._restore_events_()
         if self.isVisible():
             if self._ephysViewer_.isVisible() and self._ephysViewer_.y:
-                self._ephysViewer_.refresh()
+                # self._ephysViewer_.refresh()
+                self._ephysViewer_.displayFrame()
             else:
                 self._ephysViewer_.plot(self._ehys_)
                 
         self.detected = False
         
     def _restore_events_(self):
-        if len(self._cached_events_):
-            if isinstance(self._ephys_, Block):
-                for k, s in enumerate(self._ephys_.segments):
-                    s.events[:] = self._cached_events_[k][:]
-                    
-            elif isinstance(self._ephys_, Segment):
-                self._ephys_.events[:] = self._cached_events_[0][:]
+        print(f"{self.__class__.__name__}._restore_events_: cached events: {self._cached_events_}")
+        # if len(self._cached_events_):
+        if isinstance(self._ephys_, Block):
+            for k, s in enumerate(self._ephys_.segments):
+                remove_events(s)
+                s.events[:] = self._cached_events_[k][:]
                 
-            elif isinstance(self._ephys_, (tuple, list)):
-                if all([isinstance(v, Block) for v in self._ephys_]):
-                    for k, b in enumerate(self._ephys_):
-                        for ks, s in enumerate(b.segments):
-                            s.events[:] = self._cached_events_[k][ks][:]
-                            
-                elif all([isinstance(v, Segment) for v in self._ephys_]):
-                    for k, s in enumerate(self._ephys_):
-                        s.events[:] = self._cached_events_[k][:]
+        elif isinstance(self._ephys_, Segment):
+            remove_events(self._ephys_)
+            self._ephys_.events[:] = self._cached_events_[0][:]
+            
+        elif isinstance(self._ephys_, (tuple, list)):
+            if all([isinstance(v, Block) for v in self._ephys_]):
+                for k, b in enumerate(self._ephys_):
+                    for ks, s in enumerate(b.segments):
+                        remove_events(s)
+                        s.events[:] = self._cached_events_[k][ks][:]
+                        
+            elif all([isinstance(v, Segment) for v in self._ephys_]):
+                for k, s in enumerate(self._ephys_):
+                    remove_events(s)
+                    s.events[:] = self._cached_events_[k][:]
                         
     @property
     def detected(self):
@@ -777,7 +787,7 @@ class TriggerDetectDialog(qd.QuickDialog):
     @detected.setter
     def detected(self, val):
         self._triggers_detected_ = val
-        self.detectTriggersPushButton.setEnabled(not self._triggers_detected_)
+        # self.detectTriggersPushButton.setEnabled(not self._triggers_detected_)
         
     @property
     def ephysdata(self):
@@ -804,15 +814,29 @@ class TriggerDetectDialog(qd.QuickDialog):
         return self.eventDetectionWidget.imaging
     
     def detect_triggers(self):
+        from functools import partial
         # NOTE: 2025-10-25 08:16:23
         # detaching trigger event detection from trigger protocol construction:
         # don't use protocols here, anymore; just detect trigger events
-        if self._ephys_ is None:
+        if self._ephys_ is None or self._ephysViewer_ is None:
             self.detected=False
             return
         
-        if any((self.presyn, self.postsyn, self.photo, self.imaging)):
-            self._cached_events_ = get_events(self._ephys_) # cache all events, not just the trigger ones
+        # tpars = {"presynaptic":         self.presyn,
+        #          "postsynaptic":        self.postsyn,
+        #          "photostimulation":    self.photo,
+        #          "imaging_frame":       self.imaging}
+        
+        tpars = dict(filter(lambda v: len(v[1])>0, zip(("presynaptic", "postsynaptic", "photostimulation", "imaging_frame"), 
+                                                       (self.presyn, self.postsyn, self.photo, self.imaging))))
+        
+        
+        self._cached_events_ = get_events(self._ephys_) # cache all events, not just the trigger ones
+        print(f"{self.__class__.__name__}.detect_triggers: cached events: {self._cached_events_}")
+        
+        # if any(map(lambda o: len(o)>0, (self.presyn, self.postsyn, self.photo, self.imaging))):
+        if len(tpars):
+            segments = self._get_segments_()
             
             # NOTE: 2021-03-21 14:29:27
             # only clear existing trigger events
@@ -821,61 +845,113 @@ class TriggerDetectDialog(qd.QuickDialog):
             # NOTE: 2025-10-25 08:25:43 this below moified from 
             # triggerprotocols.auto_detect_trigger_protocols(…)
             
-            tpars = {"presynaptic":         self.presyn,
-                     "postsynaptic":        self.postsyn,
-                     "photostimulation":    self.photo,
-                     "imaging_frame":       self.imaging}
-            
-            for p_name, p_tuple in tpars.items():
-                # if len(tpars[p_name]) >= 2: # skip empty trigger spec
-                if len(p_tuple) >= 2: # skip empty trigger spec
-                    use_lo_hi = True if len(p_tuple) == 2 else p_tuple[2]
+            for seg in segments:
+                nSignals = len(seg.analogsignals)
+                detected_events = list()
+                for p_name, p_tuple in tpars.items():
+                    if len(p_tuple) == 0:
+                        continue
+                    # print(f"{self.__class__.__name__}.detect_triggers: p_name = {p_name}, p_tuple = {p_tuple}")
+                    signalIndex = p_tuple[0]
                     
-                    if len(p_tuple) == 4:
-                        if not isinstance(p_tuple[3], tuple) or len(p_tuple[3]) != 2 or (not all(isinstance(v_, pq.Quantity) and unitsConvertible(v_, pq.s) and v_.size==1 for v_ in p_tuple[3])):
-                            raise ValueError(f"When specified, the third element in a {p_name} trigger specification must have exactly two scalar time quantities")
-                        time_slice = p_tuple[3]
-                    else:
-                        time_slice = None
+                    if signalIndex not in range(nSignals):
+                        raise ValueError(f"Wrong signal index specified {signalIndex} for {nSignals} signals in segment {k}")
+                    
+                    if len(p_tuple) >= 2: # skip empty trigger spec
+                        use_lo_hi = True if len(p_tuple) == 2 else p_tuple[2]
                         
-                    pfun = partial(auto_define_trigger_events, event_type = p_name, 
-                                analog_index = p_tuple[0], label = p_tuple[1], 
-                                use_lo_hi=use_lo_hi, clear=clear)
+                        if len(p_tuple) == 4:
+                            if not isinstance(p_tuple[3], tuple) or len(p_tuple[3]) != 2 or (not all(isinstance(v_, pq.Quantity) and unitsConvertible(v_, pq.s) and v_.size==1 for v_ in p_tuple[3])):
+                                raise ValueError(f"When specified, the third element in a {p_name} trigger specification must have exactly two scalar time quantities")
+                            time_slice = p_tuple[3]
+                        else:
+                            time_slice = None
+                            
+                    sig = seg.analogsignals[signalIndex]
                     
                     if time_slice:
-                        pfun(data, time_slice = p_tuple[2])
+                        if self.eventDetectionWidget.relTimes:
+                            t0, t1 = tuple(map(lambda v: v + seg.analogsignals[signalIndex].t_start, time_slice))
+                        else:
+                            t0, t1 = time_slice
+                            
+                        sig = sig.time_slice(t0, t1)
                         
-                    else:
-                        pfun(data)
+                    te = detect_trigger_events(sig, TriggerEventType[p_name], use_lo_hi = p_tuple[2], label=p_tuple[1], name=p_tuple[1])
+                    if isinstance(te, TriggerEvent):
+                        detected_events.append(te)
                         
-            tp = auto_detect_trigger_protocols(self._ephys_,
-                                        presynaptic = self.presyn,
-                                        postsynaptic = self.postsyn,
-                                        photostimulation = self.photo,
-                                        imaging = self.imaging,
-                                        clear = clear_flag,
-                                        protocols=True, reltimes=True)
+                if len(detected_events):
+                    if clear_flag == "triggers":
+                        remove_events(seg, triggersOnly=True)
+                    for te in detected_events:
+                        embed_trigger_event(te, seg)
+                        
+                        
+#             tp = auto_detect_trigger_protocols(self._ephys_,
+#                                         presynaptic = self.presyn,
+#                                         postsynaptic = self.postsyn,
+#                                         photostimulation = self.photo,
+#                                         imaging = self.imaging,
+#                                         clear = clear_flag,
+#                                         protocols=True, reltimes=True)
+#             
+#             self.triggerProtocols[:] = tp[:]
             
-            self.triggerProtocols[:] = tp[:]
             
-            
-            if len(self.triggerProtocols) == 0:
-                self._restore_events_()
-                self.detected = False
-                
-            else:
-                self.detected = True
-                
             nEvents = len(get_trigger_events(self.ephysdata, flat=True))
+            self.detected = nEvents > 0
             
-            cFrame = self._ephysViewer_.currentFrame
+#             if len(self.triggerProtocols) == 0:
+#                 self._restore_events_()
+#                 self.detected = False
+#                 
+#             else:
+#                 self.detected = True
+            # nEvents = len(get_trigger_events(self.ephysdata, flat=True))
+                
+            
+            # cFrame = self._ephysViewer_.currentFrame
             
             self._ephysViewer_.plot(self._ephys_)
             # self._ephysViewer_.currentFrame = cFrame
+            msg = f"{nEvents} triger events detected"
+            if not self.inAllSegmentsCheckBox.isChecked():
+                msg += f" in frame {self._ephysViewer_.currentFrame}"
+            self.statusBar.showMessage(msg)
+            # self.statusBar.showMessage("%d trigger events detected" % nEvents)
             
-            self.statusBar.showMessage("%d trigger events detected" % nEvents)
+    # def _get_segments_(self) -> typing.Tuple[list, int]:
+    def _get_segments_(self) -> typing.Sequence[Segment]:
+        if isinstance(self._ephys_, Block):
+            if self.inAllSegmentsCheckBox.isChecked():
+                segments = list(self._ephys_.segments)
+            else:
+                segments = [self._ephys_.segments[self._ephysViewer_.currentFrame]]
+            
+        elif isinstance(self._ephys_, typing.Sequence):
+            if all(isinstance(s, Segment) for s in self._ephys_):
+                if self.inAllSegmentsCheckBox.isChecked():
+                    segments = self._ephys_
+                else:
+                    segments = [self._ephys_[self._ephysViewer_.currentFrame]]
+                
+            elif all(isinstance(v, Block) for v in self._ephys_):
+                segments = list(chain(*(b.segments for b in self._ephys_)))
+                if not self.inAllSegmentsCheckBox.isChecked():
+                    segments = [segments[self._ephysViewer_.currentFrame]]
+            else:
+                scipywarn(f"Expecting a homogeneous sequence of Blocks or Segments; instead, got a sequence of {set(map(lambda v: type(v).__name__), self._ephys_)}")
+                segments = list()
+            
+        elif isinstance(self._ephys_, Segment):
+            segments = [self._ephys_]
+            
+        else:
+            segments = list()
+            
+        return segments #, len(segments)
         
-       
     def _update_trigger_detect_ranges_(self, frameindex):
         if self._ephys_ is None:
             return
@@ -891,7 +967,7 @@ class TriggerDetectDialog(qd.QuickDialog):
         elif isinstance(self._ephys_, Segment):
             segment = self._ephys_
             
-        elif isinstance(self._ephys_, (tuple, list)):
+        elif isinstance(self._ephys_, typing.Sequence):
             if all([isinstance(v, Block) for v in self._ephys_]):
                 segments = list(chain(*(b.segments for b in self._ephys_)))
                 segment = segments[frameindex]
@@ -906,18 +982,16 @@ class TriggerDetectDialog(qd.QuickDialog):
             return
         
         if segment:
-            nChannels = max([len(seg.analogsignals) + len(seg.irregularlysampledsignals) for seg in self._ephys_.segments])
+            # NOTE: 2025-10-25 13:49:16 only use regularly sampled signals
+            nChannels = max([len(seg.analogsignals) for seg in self._ephys_.segments])
+            # nChannels = max([len(seg.analogsignals) + len(seg.irregularlysampledsignals) for seg in self._ephys_.segments])
             self.eventDetectionWidget.nChannels = nChannels
-            #self.eventDetectionWidget.nChannels = len(segment.analogsignals)
             if self.eventDetectionWidget.relTimes:
                 self.eventDetectionWidget.signalStart = 0.0 * pq.s
-                # self.eventDetectionWidget.signalStop = float(min([sig.t_stop - sig.t_start for sig in segment.analogsignals]).magnitude)
                 self.eventDetectionWidget.signalStop = min([sig.t_stop - sig.t_start for sig in segment.analogsignals])
             else:
                 self.eventDetectionWidget.signalStart = min([sig.t_start for sig in segment.analogsignals])
                 self.eventDetectionWidget.signalStop = max([sig.t_stop for sig in segment.analogsignals])
-                # self.eventDetectionWidget.signalStart = float(min([sig.t_start for sig in segment.analogsignals]).magnitude)
-                # self.eventDetectionWidget.signalStop = float(max([sig.t_stop for sig in segment.analogsignals]).magnitude)
         
         
 def guiDetectTriggers(data:Block):
