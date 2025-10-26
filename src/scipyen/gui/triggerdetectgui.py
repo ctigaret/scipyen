@@ -7,6 +7,7 @@
 import os, typing
 from numbers import (Number, Real,)
 from itertools import chain
+from collections import deque
 #from itertools import (accumulate, chain,)
 
 import qtpy
@@ -62,6 +63,8 @@ from core.triggerprotocols import (TriggerProtocol,
 from core.neoutils import (concatenate_blocks, get_events, remove_events,
                            check_ephys_data_collection, check_ephys_data)
 
+from ephys.ephys import ElectrophysiologyProtocol
+
 from core.strutils import numbers2str
 
 from gui import quickdialog as qd
@@ -73,6 +76,20 @@ if os.environ["QT_API"] in ("pyqt5", "pyside2"):
     Ui_TriggerDetectWidget, QWidget = loadUiType(os.path.join(__module_path__, "triggerdetect.ui"), from_imports=True, import_from="gui")
 else:
     Ui_TriggerDetectWidget, QWidget = loadUiType(os.path.join(__module_path__, "triggerdetect.ui"))
+    
+class _DIGTriggerAssignmentWidget_(QtWidgets.QWidget):
+    r"""Helper class for curating digital trigger events in a recording protocol
+    NOTE: 2025-10-26 23:23:58 TODO
+ """
+    def __init__(self, data:typing.Optional[dict] = None, parent:typing.Optional[QtWidgets.QWidget] = None):
+        super().__init__(parent=parent)
+        
+        usedDIGs = list(set(itertools.chain.from_iterable(list(map(lambda i: i.keys(), data.values())))))
+        
+        # {dig_index: [(event, ), (sweep indices)]}
+        byDIG = dict(map(lambda d: (d, list(zip(*list(itertools.chain.from_iterable(map(lambda v: map(lambda v: (v[1], v[0]), filter(lambda i: i[0] == d, v[1].items())), data.items())))))), usedDIGs))
+    
+        
 
 class TriggerDetectWidget(QWidget, Ui_TriggerDetectWidget):
     r"""
@@ -562,6 +579,10 @@ class TriggerDetectDialog(qd.QuickDialog):
         # events had been detected!
         self._triggers_detected_ = False # True does NOT imply trigger events had been detected!
         
+        self._undoStack_ = deque()
+        self._ephysProtocol_ = None
+        self._protocolTriggers_ = None
+        
         self.triggerProtocols = list()
         
         # NOTE: 2025-10-23 22:54:26 I find these below utterly confusing - why are they False ?!?
@@ -578,10 +599,14 @@ class TriggerDetectDialog(qd.QuickDialog):
             self._ephysViewer_ = SignalViewer(win_title = "Trigger Events Detection", parent=self)
             self._owns_viewer_ = True
             
+        # self.eventDetectionWidget = TriggerDetectWidget(parent = self) 
+        # self.addWidget(self.eventDetectionWidget)
         
-        self.eventDetectionWidget = TriggerDetectWidget(parent = self) 
-        self.addWidget(self.eventDetectionWidget)
+        self.detectionTabWidget = QtWidgets.QTabWidget(parent = self)
+        self.eventDetectionWidget = TriggerDetectWidget() 
+        self.detectionTabWidget.addTab(self.eventDetectionWidget, "Detect from stimulus channel")
         
+        self.addWidget(self.detectionTabWidget)
         self._ephysViewer_.frameChanged[int].connect(self._slot_ephysFrameChanged)
         
         # self.optionsGroup = qd.HDialogGroup(self)
@@ -600,6 +625,7 @@ class TriggerDetectDialog(qd.QuickDialog):
         
         self.undoTriggersPushButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("edit-undo"),
                                                             "Undo", parent=self.buttons)
+        self.undoTriggersPushButton.setEnabled(False)
         self.undoTriggersPushButton.clicked.connect(self.slot_undo)
         
         # NOTE: 2021-01-06 10:57:10
@@ -630,12 +656,20 @@ class TriggerDetectDialog(qd.QuickDialog):
         
         self.setSizeGripEnabled(True)
         # self.adjustSize()
+        
+    def _updateDetectionWidget_(self):
+        if isinstance(self._ephysProtocol_, ElectrophysiologyProtocol) and isinstance(self._ephys_, Block):
+            self._protocolTriggers_ = dict(map(lambda k: (k, self._ephysProtocol_.getDigitalTriggers(sweep=k, byDIGIndex=True)), range(len(self._ephys_.segments))))
+            
+            if len(self._protocolTriggers_):
+                
             
     def _set_ephys_data_(self, value):
         if check_ephys_data_collection(value, mix=False):
             # no mixing of types when ephysdata is a sequence ...
             self._ephys_ = value
-            self._cached_events_ = get_events(self._ephys_)
+            # self._cached_events_ = get_events(self._ephys_)
+            self._ephysProtocol_ = ephys.getProtocol(self._ephys_)
             
             flat_events = get_events(self._ephys_, flat=True)
             
@@ -649,10 +683,8 @@ class TriggerDetectDialog(qd.QuickDialog):
             
             self._update_trigger_detect_ranges_(0)
             
-        else:
-            self._cached_events_ = list()
-        
-
+            self._updateDetectionWidget_()
+            
     def open(self):
         if self._ephys_:
             self._ephysViewer_.plot(self.ephysdata)
@@ -703,7 +735,11 @@ class TriggerDetectDialog(qd.QuickDialog):
         In turn it closes the dialog (equivalent of QWidget.close()).
         """
         if value == QtWidgets.QDialog.Accepted and not self.detected:
-            self.detect_triggers()
+            if len(self._undoStack_) == 0:
+                self.detect_triggers(False)
+        else:
+            if len(self._undoStack_):
+                self._restore_events_(True)
             
         #print("done owns viewer", self._owns_viewer_)
         if self._ephysViewer_.isVisible():
@@ -711,7 +747,8 @@ class TriggerDetectDialog(qd.QuickDialog):
                 self._ephysViewer_.close()
             
             else:
-                self._ephysViewer_.refresh()
+                # self._ephysViewer_.refresh()
+                self._ephysViewer_.displayFrame()
                 
         # NOTE: 2021-04-16 11:30:35
         # unbind the SignalViewer reference from this symbol, otherwise the garbage
@@ -738,7 +775,8 @@ class TriggerDetectDialog(qd.QuickDialog):
         
         if self.isVisible():
             if self._ephysViewer_.isVisible() and  self._ephysViewer_.y:
-                self._ephysViewer_.refresh()
+                # self._ephysViewer_.refresh()
+                self._ephysViewer_.displayFrame()
             else:
                 self._ephysViewer_.plot(self.ephysdata)
                 
@@ -756,30 +794,43 @@ class TriggerDetectDialog(qd.QuickDialog):
                 
         self.detected = False
         
-    def _restore_events_(self):
-        print(f"{self.__class__.__name__}._restore_events_: cached events: {self._cached_events_}")
+    def _restore_events_(self, initial:bool=False):
+        # print(f"{self.__class__.__name__}._restore_events_: cached events: {self._cached_events_}")
         # if len(self._cached_events_):
-        if isinstance(self._ephys_, Block):
-            for k, s in enumerate(self._ephys_.segments):
-                remove_events(s)
-                s.events[:] = self._cached_events_[k][:]
-                
-        elif isinstance(self._ephys_, Segment):
-            remove_events(self._ephys_)
-            self._ephys_.events[:] = self._cached_events_[0][:]
-            
-        elif isinstance(self._ephys_, (tuple, list)):
-            if all([isinstance(v, Block) for v in self._ephys_]):
-                for k, b in enumerate(self._ephys_):
-                    for ks, s in enumerate(b.segments):
-                        remove_events(s)
-                        s.events[:] = self._cached_events_[k][ks][:]
-                        
-            elif all([isinstance(v, Segment) for v in self._ephys_]):
-                for k, s in enumerate(self._ephys_):
+        if len(self._undoStack_) == 0:
+            return
+        
+        self._cached_events_ = self._undoStack_[0] if initial else self._undoStack_[-1] # defer popping until events restoration was successful
+
+        try:
+            if isinstance(self._ephys_, Block):
+                for k, s in enumerate(self._ephys_.segments):
                     remove_events(s)
                     s.events[:] = self._cached_events_[k][:]
+                    
+            elif isinstance(self._ephys_, Segment):
+                remove_events(self._ephys_)
+                self._ephys_.events[:] = self._cached_events_[0][:]
+                
+            elif isinstance(self._ephys_, (tuple, list)):
+                if all([isinstance(v, Block) for v in self._ephys_]):
+                    for k, b in enumerate(self._ephys_):
+                        for ks, s in enumerate(b.segments):
+                            remove_events(s)
+                            s.events[:] = self._cached_events_[k][ks][:]
+
+                elif all([isinstance(v, Segment) for v in self._ephys_]):
+                    for k, s in enumerate(self._ephys_):
+                        remove_events(s)
+                        s.events[:] = self._cached_events_[k][:]
                         
+            if not initial:
+                self._undoStack_.pop() # might still clear the stack
+        except:
+            traceback.print_exc()
+                        
+        self.undoTriggersPushButton.setEnabled(len(self._undoStack_) > 0 )
+        
     @property
     def detected(self):
         return self._triggers_detected_
@@ -813,7 +864,7 @@ class TriggerDetectDialog(qd.QuickDialog):
     def imaging(self):
         return self.eventDetectionWidget.imaging
     
-    def detect_triggers(self):
+    def detect_triggers(self, undoEnabled:bool=True):
         from functools import partial
         # NOTE: 2025-10-25 08:16:23
         # detaching trigger event detection from trigger protocol construction:
@@ -831,8 +882,11 @@ class TriggerDetectDialog(qd.QuickDialog):
                                                        (self.presyn, self.postsyn, self.photo, self.imaging))))
         
         
-        self._cached_events_ = get_events(self._ephys_) # cache all events, not just the trigger ones
-        print(f"{self.__class__.__name__}.detect_triggers: cached events: {self._cached_events_}")
+        if undoEnabled:
+            self._cached_events_ = get_events(self._ephys_) # cache all events, not just the trigger ones
+            self._undoStack_.append(self._cached_events_)
+        
+        # print(f"{self.__class__.__name__}.detect_triggers: cached events: {self._cached_events_}")
         
         # if any(map(lambda o: len(o)>0, (self.presyn, self.postsyn, self.photo, self.imaging))):
         if len(tpars):
@@ -919,6 +973,7 @@ class TriggerDetectDialog(qd.QuickDialog):
             if not self.inAllSegmentsCheckBox.isChecked():
                 msg += f" in frame {self._ephysViewer_.currentFrame}"
             self.statusBar.showMessage(msg)
+            self.undoTriggersPushButton.setEnabled(len(self._undoStack_)>0)
             # self.statusBar.showMessage("%d trigger events detected" % nEvents)
             
     # def _get_segments_(self) -> typing.Tuple[list, int]:
