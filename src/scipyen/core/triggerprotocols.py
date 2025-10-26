@@ -63,6 +63,7 @@ from core.datasignal import (DataSignal, IrregularlySampledDataSignal, )
 from core.prog import (safewrapper, with_doc)
 from core.triggerevent import (TriggerEvent, TriggerEventType,)
 from core.traitcontainers import DataBag
+import core.pyabfbridge as pab
 # from core.signalprocessing import detect_boxcar
 
 #### BEGIN module-level default options
