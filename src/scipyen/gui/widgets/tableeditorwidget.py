@@ -716,7 +716,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         cm.popup(self.tableView.mapToGlobal(pos), copySelectedAction)
 
 class TabularDataModel(QtCore.QAbstractTableModel):
-    r"""
+    r"""Table item model for tabular data (numpy arrays, pandas data structures)
     Change log:
     NOTE  2018-11-25 01:24:39
     1. Read-only row/column headers

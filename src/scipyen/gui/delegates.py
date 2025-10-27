@@ -111,6 +111,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             
         else: # TODO: 2025-09-23 16:16:56 FIXME use a pushbutton to open a complex viewer/editor
             return
+        
         widget.setFrame(False)
         widget.setAutoFillBackground(True)
         return widget

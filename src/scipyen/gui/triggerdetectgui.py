@@ -69,6 +69,7 @@ from core.strutils import numbers2str
 
 from gui import quickdialog as qd
 from gui.signalviewer import SignalViewer
+from gui.delegates import PythonItemDelegate
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
@@ -77,7 +78,130 @@ if os.environ["QT_API"] in ("pyqt5", "pyside2"):
 else:
     Ui_TriggerDetectWidget, QWidget = loadUiType(os.path.join(__module_path__, "triggerdetect.ui"))
     
-class _DIGTriggerAssignmentWidget_(QtWidgets.QWidget):
+class _TriggersTableModel_(QtCore.QAbstractTableModel):
+    model_columns = ["DIG Channel", "Type", "Name", "Labels", "Sweep(s)"]
+    sig_editCompleted = Signal(str, name="sig_editCompleted")
+    def __init__(self, triggers:typing.Sequence, parent=None):
+        super().__init__(parent)
+        
+        self._data_ = triggers
+        
+    def rowCount(self, parent):
+        return len(self._data_)
+    
+    def columnCount(self, parent):
+        return len(model_columns)
+    
+    def data(self, index, role=QtCore.Qt.DisplayRole):
+        if self._data_ is None:
+            return QtCore.QVariant()
+            
+        if not index.isValid():
+            return QtCore.QVariant()
+
+        if len(self._data_) == 0 or not all ((isinstance(p, TriggerProtocol) for p in self._data_)):
+            return QtCore.QVariant()
+        
+        if role not in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleTextRole):
+            return QtCore.QVariant()
+        
+        # rows: one for each defined protocol
+        row = index.row()
+        
+        if row >= len(self._data_) or row < 0:
+            return QtCore.QVariant()
+        
+        # columns:                                  editor proxy widget
+        # 0: int = DIG channel index                None
+        # 1: str: trigger event type name           combo box
+        # 2: str: trigger event name                line edit
+        # 3: str: trigger event label               line edit
+        # 4: tuple[int]: sweeps where it occurs     line edit
+        col = index.column()
+    
+        if col < 0 or col >= len(self.model_columns):
+            return QtCore.QVariant()
+        
+        trigger_data = self._data_[row]
+        
+        # value = QtCore.QVariant()
+        # tip = QtCore.QVariant()
+            
+        if col == 0: # digital channel
+            val = trigger_data[0]
+            tip = QtCore.QVariant(f"DIG Channel {val}")
+            
+        elif col == 1: # trigger event type name
+            val = trigger_data[1][0][0].type.name
+            tip = QtCore.QVariant(f"Type: {val}")
+            
+        elif col == 2: # name
+            val = trigger_data[1][0][0].name
+            tip = QtCore.QVariant(f"Name: {val}")
+            
+        elif col == 3: # labels
+            val = ", ".join(list(map(lambda x: str(x), trigger_data[1][0][0].labels)))
+            tip = QtCore.QVariant(f"Labels: {val}")
+            
+        elif col == 4: # sweeps where it occurs
+            val = ", ".join(list(map(lambda x: str(x), trigger_data[1][1])))
+            tip = QtCore.QVariant(f"Sweeps: {val}")
+            
+        else:
+            val = None
+            tip = QtCore.QVariant()
+            
+        if role in (QtCore.Qt.DisplayRole, QtCore.Qt.UserRole):
+            return QtCore.QVariant() if val is None else QtCore.QVariant(val)
+        
+        elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
+            return tip
+        
+        elif role in (QtCore.Qt.UserRole, ):
+            return QtCore.QVariant(val)
+            
+        elif role == QtCore.Qt.EditRole:
+            return val
+        
+    def setData(self, modelIndex, value, role = QtCore.Qt.EditRole) -> bool:
+        row = modelIndex.row()
+        col = modelIndex.column()
+        
+        if col == 0: # no editing of DIG channel index
+            return False
+        
+        if row >= len(self._data_):
+            return False
+        
+        if col >= len(self.model_columns):
+            return False
+        
+        if role != QtCore.Qt.EditRole:
+            return False
+        
+    def _setDataValue_(self, value, row, col) -> bool:
+        try:
+            if isinstance(value, QtCore.QVariant) or hasattr(value, "value"):
+                pyvalue = value.value()
+                
+            else:
+                pyvalue = value
+            
+            te_data = self._data_[row]
+            
+            if col == 1: # trigger event type
+                te_data[1][0][0].event_type = TriggerEventType(pyvalue)
+                
+        except:
+            traceback.print_exc()
+            return False
+        
+        
+        
+    
+    
+    
+class _DIGTriggersTable_(QtWidgets.QTableView):
     r"""Helper class for curating digital trigger events in a recording protocol
     NOTE: 2025-10-26 23:23:58 TODO
  """
@@ -86,9 +210,11 @@ class _DIGTriggerAssignmentWidget_(QtWidgets.QWidget):
         
         usedDIGs = list(set(itertools.chain.from_iterable(list(map(lambda i: i.keys(), data.values())))))
         
+        self.setItemDelegate(PythonItemDelegate(parent=self))
         # {dig_index: [(event, ), (sweep indices)]}
-        byDIG = dict(map(lambda d: (d, list(zip(*list(itertools.chain.from_iterable(map(lambda v: map(lambda v: (v[1], v[0]), filter(lambda i: i[0] == d, v[1].items())), data.items())))))), usedDIGs))
-    
+        self._triggers_by_origin = list(map(lambda d: (d, list(zip(*list(itertools.chain.from_iterable(map(lambda v: map(lambda v: (v[1], v[0]), filter(lambda i: i[0] == d, v[1].items())), data.items())))))), usedDIGs))
+        
+        self.setModel(_TriggersTableModel_(self._triggers_by_origin))
         
 
 class TriggerDetectWidget(QWidget, Ui_TriggerDetectWidget):
@@ -662,7 +788,7 @@ class TriggerDetectDialog(qd.QuickDialog):
             self._protocolTriggers_ = dict(map(lambda k: (k, self._ephysProtocol_.getDigitalTriggers(sweep=k, byDIGIndex=True)), range(len(self._ephys_.segments))))
             
             if len(self._protocolTriggers_):
-                
+                pass
             
     def _set_ephys_data_(self, value):
         if check_ephys_data_collection(value, mix=False):

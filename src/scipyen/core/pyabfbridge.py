@@ -3382,8 +3382,9 @@ class ABFProtocol(ElectrophysiologyProtocol):
                     byDIGIndex:bool=False,
                     relativeToRunStart:typing.Optional[bool]=True,
                     useHoldingTime:bool=False,
+                    # enableEmptyEvent:bool = False,
                     **kwargs
-                    ) -> typing.Sequence[TriggerEvent] | TriggerEvent:
+                    ) -> typing.Sequence[TriggerEvent] | TriggerEvent | None:
         r"""Trigger events emitted by the epochs in this DAC.
         The method considers that there is one TriggerEvent for each DIG 
         channel, that emits a TTL while this DAC is "live"¹.
@@ -3394,6 +3395,23 @@ class ABFProtocol(ElectrophysiologyProtocol):
         device is the same in all epochs that emit TTL signals on this DIG channel,
         the time stamps of the TTLs sent via this DIG in all Epochs where this 
         is enabled will be "merged" into the same trigger event.
+        
+        In short: one DIG channel => one TriggerEvent in the sweep(s) where it
+        was configured to defined to send TTLs, in Clampex.
+        
+        NOTE: This implies the acquisition was made in "episodic mode"; in such 
+        case, a DIG channel that has a value of 1 or '*' in Clampex protocol
+        editor (Waveforms tab) will ALWAYS emit the SAME trigger event in every
+        sweep. 
+    
+        In the case of alternative digital outputs, TWO distinct DIG channels 
+        will emit distinct trigger events on alternative sweeps¹; these events are 
+        CONCEPTUALLY distinct even if they have identical time stamps, etc (for
+        example, they can be both presynaptic events, but ocurring on distinct 
+        synaptic pathways).
+        
+        ¹ Clampex uses this only for the first two DAC channels where DIG channels
+        are activated.
         
         Parameters:
         -----------
@@ -3547,9 +3565,10 @@ class ABFProtocol(ElectrophysiologyProtocol):
 
         if isinstance(digChannel, int):
             if digChannel not in usedDigs:
-                # none opf the specified digChannels is in use => return 
+                # none of the specified digChannels is in use => return either an
                 # empty trigger event or None
-                return TriggerEvent(event_type = triggerType, name=name, labels = label_prefix) # if enableEmptyEvent else None
+                # return TriggerEvent(event_type = triggerType, name=name, labels = label_prefix) if enableEmptyEvent else None
+                return
             
             digChannel = (digChannel,)
             

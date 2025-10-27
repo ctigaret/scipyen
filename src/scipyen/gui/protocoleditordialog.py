@@ -77,7 +77,7 @@ class TriggerProtocolsTableModel(QtCore.QAbstractTableModel):
         return len(self._data_)
     
     def columnCount(self, parent):
-        return 6
+        return len(self.model_columns)
     
     def data(self, index, role=QtCore.Qt.DisplayRole):
         if self._data_ is None:
