@@ -211,11 +211,12 @@ class _DIGTriggersTable_(QtWidgets.QTableView):
         
         usedDIGs = list(set(itertools.chain.from_iterable(list(map(lambda i: i.keys(), data.values())))))
         
-        self.setItemDelegate(PythonItemDelegate(parent=self))
+        self.setModel(_TriggersTableModel_(self._triggers_by_origin))
+        
+        self.setItemDelegate(PythonItemDelegate(parent=self,
+                                                columnChoices = {1: {"choices": list(TriggerEventType.names()), "editable": False}}))
         # {dig_index: [(event, ), (sweep indices)]}
         self._triggers_by_origin = list(map(lambda d: (d, list(zip(*list(itertools.chain.from_iterable(map(lambda v: map(lambda v: (v[1], v[0]), filter(lambda i: i[0] == d, v[1].items())), data.items())))))), usedDIGs))
-        
-        self.setModel(_TriggersTableModel_(self._triggers_by_origin))
         
 
 class TriggerDetectWidget(QWidget, Ui_TriggerDetectWidget):

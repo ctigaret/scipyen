@@ -50,6 +50,7 @@ import quantities as pq
 from core import scipyen_quantities as scq
 from gui.widgets import small_widgets as smw
 from gui import quickdialog as qd
+from core import typeenum
 
 class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
     r"""Provides delegate widgets for editing individual items in tabular data models.
@@ -64,14 +65,20 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
     pq.Quantity (scalar)            small_widgets.QuantityChooserWidget
     str                             QLineEdit
 
-    However, for any of the above, the delegate can be configured to use a QComboBox
-    by passing "columnChoices" parameter (a dict) to the constructor. See also
-    setColumnChoices and setChoicesForColumn methods.
+    In addition, the delegate can be configured to use a QComboBox by passing
+    a "columnChoices" parameter (dict) to the constructor, which allows the use
+    of a combo box for selecting one of many categories (represented by strings)
 
-    See constructor documentation for details
+    For details, see the documentation for the initializer and or the methods 
+    setColumnChoices and setChoicesForColumn.
 
 
 """
+    
+    # TODO/FIXME: 2025-10-28 12:57:09
+    # decide how to handle the case where the combo box is editable (and its 
+    # currentText() is not among the combo box items)
+    
     def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None,
                  columnChoices: typing.Optional[dict[int, dict[typing.Sequence, bool]]] = None):
         r"""Instantiates a PythonItemDelegate.
@@ -84,12 +91,18 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         table columns:
 
         column index:int ↦ data:dict with key:str ↦ sequence or bool as below:
-                            — "choices": typing.Sequence
+                            — "choices": typing.Sequence[str]
                             — "editable": bool; when True, the combo box is editable
+                              WARNING: this is not currently supported, and by default
+                                this is False
+
+        NOTE: The choices are always strings, and the data assocated with the EditRole
+        of a model index MUST be a string that is present among the choices
+        
 
         Example (setting choices for columns 0 and 3):
 
-        {0: {   "choices": [1,2,3], 
+        {0: {   "choices": ["1","2","3"], 
                 "editable": False},
          3: {   "choices": ["test", "me", "now"], 
                 "editable": True}}
@@ -123,7 +136,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             return False
         
         checkSubKeys = lambda v: all(k in ("editable", "choices") for k in v.keys())
-        checkChoices = lambda v: isinstance(v["choices"], typing.Sequence) and len(v["choices"]) > 0
+        checkChoices = lambda v: isinstance(v["choices"], typing.Sequence) and len(v["choices"]) > 0 and all(isinstance(o, str) for o in v["choices"])
         checkEditable= lambda v: isinstance(v["editable"], bool)
         
         if not all(isinstance(v, dict) and checkSubKeys(v) and checkChoices(v) and checkEditable(v) for v in values):
@@ -178,10 +191,10 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                 return
             if isinstance(choiceData, dict):
                 # may be a choices subdictionary
-                if all(k in ("choices", "editable") for k in choiceData.keys()) and isinstance(choiceData["choices"], typing.Sequence) and len(choiceData["choices"]) > 0 and isinstance(choiceData["editable"], bool):
+                if all(k in ("choices", "editable") for k in choiceData.keys()) and isinstance(choiceData["choices"], typing.Sequence) and len(choiceData["choices"]) > 0 and all(isinstance(o, str) for o in choiceData["choices"]) and isinstance(choiceData["editable"], bool):
                     self._columnChoices_[col] = choiceData
                     
-                elif len(choiceData) == 0: # wipe out the choices for a specific column
+                elif len(choiceData) == 0: # empty dict -> wipe out the choices for a specific column
                     if col in self._columnChoices_:
                         self._columnChoices_.pop(col)
                         
@@ -194,6 +207,10 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                         scipywarn(f"{self.__class__.__name__}.setChoicesForColumn: no choices defined for column {col}")
                         
                 else:
+                    if not all(isinstance(o, str) for o in choiceData):
+                        scipywarn(f"{self.__class__.__name__}.setChoicesForColumn: choices must be strings")
+                        return
+                    
                     if col in self._columnChoices_: # if choices for col exist, set them to a new value
                         self._columnChoices_[col]["choices"] = choiceData
                         # optionally also set their editable flag
@@ -212,18 +229,25 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             else:
                 scipywarn(f"{self.__class__.__name__}.setChoicesForColumn: invalid choiceData: {choiceData}")
                 
-#     def _choiceAsStr(self, v:typing.Any):
-#         if isinstance(v, str):
-#             return v
-#         
-#         if isinstance(v, numbers.Number):
-#             return str(v)
-        
-        
     def createEditor(self, parent:QtWidgets.QWidget, option:int, index:QtCore.QModelIndex) -> QtWidgets.QWidget | None:
         # NOTE: 2025-09-27 10:29:14 ATTENTION
         # editor data, although it can also be set here, it should be set through
         # self.setEditorData(), overridden below
+        #
+        # NOTE: 2025-10-28 12:44:09 FIXME
+        # somewhere to provide interconversion between types and string 
+        # to be shown in the combo box, e.g.:
+        # convert to string:                    convert from string
+        # int -> str()
+        # str -> as is
+        # Enum -> 'name' property
+        # unit quantity -> str()
+        
+        # WARNING: combo boxes can only deal with strings!
+        
+        # one should restrict everything to string, in the custom item model, as
+        # as this cannot cover every possibility
+        
         data = index.data(QtCore.Qt.EditRole)
         disp = index.data(QtCore.Qt.DisplayRole)
         
@@ -236,49 +260,65 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         # 'immutableRows', which I use below
         model = index.model()
         
+        # print(f"{self.__class__.__name__}.createEditor:\n\t data type: {type(data).__name__}")
         if hasattr(model, "immutableColumns") and hasattr(model, "immutableRows"):
             if index.column() in model.immutableColumns and index.row() in model.immutableRows:
                 return
             
         if index.column() in self._columnChoices_: # TODO: 2025-10-28 09:28:20 finalize me
+            if not isinstance(data, str):
+                scipywarn(f"{self.__class__.__name__}.createEditor: data type ({type(data).__name__}) is not supported for combo box")
+                return 
+            
+            choices = self._columnChoices_[index.column()]["choices"]
+            
+            if data not in choices:
+                scipywarn(f"{self.__class__.__name__}.createEditor: data {data} does not belong to choices ({choices})")
+                return
+            
+            ndx = choices.index(data)
+            
             widget = QtWidgets.QComboBox()
-            choices = list(map(lambda v: str(v), self._columnChoices_[index.column()]["choices"]))
-        
-        # print(f"{self.__class__.__name__}.createEditor:\n\t data type: {type(data).__name__}")
-        
-        # TODO: 2025-09-25 23:42:02
-        # for datetime.datetime use QDateTimeEdit (with QDate and QTime)
-        # for datetime.date use QDateEdit (with QDate)
-        # for datetime.time use QTimeEdit (with QTime)
-        
-        if isinstance(data, int) or "int" in type(data).__name__: # to include numpy array int dtypes
-            widget = QtWidgets.QSpinBox(parent)
-            widget.setMinimum(-1000)
-            widget.setMaximum(1000)
+            widget.insertItems(0, choices)
+            widget.setEditable(False) # prevent editing for now; must revisit this FIXME/TODO
+            # widget.setEditable(self._columnChoices_[index.column()]["editable"])
+            widget.setCurrentIndex(ndx)
             
-        elif isinstance(data, float) or "float" in type(data).__name__: # to include numpy array float dtypes
-            widget = QtWidgets.QDoubleSpinBox(parent)
-            widget.setMinimum(-1e3)
-            widget.setMaximum(1e3)
-            widget.setSingleStep(1)
+        else:
             
-        elif isinstance(data, pq.Quantity):
-            if isinstance(data, pq.UnitQuantity): # unlikely, but here we go...
-                widget = smw.QuantityChooserWidget(parent)
-            else:
-                if data.ndim > 0: # no editing of Quantity ARRAYS; only scalar Quantities can be edited; unlikely to encounter this, but here we go...
-                    return
-                widget = smw.QuantitySpinBox(parent, enforceImmutableUnits=True) # disallow units change for individual data points in a Quantity
-                widget.setMinimum(-math.inf * data.units)
-                widget.setMaximum(math.inf * data.units)
-                widget.setSingleStep(1.0  * data.units)
-                widget.disableUnitChange = True
+            # TODO: 2025-09-25 23:42:02
+            # for datetime.datetime use QDateTimeEdit (with QDate and QTime)
+            # for datetime.date use QDateEdit (with QDate)
+            # for datetime.time use QTimeEdit (with QTime)
+            
+            if isinstance(data, int) or "int" in type(data).__name__: # to include numpy array int dtypes
+                widget = QtWidgets.QSpinBox(parent)
+                widget.setMinimum(-1000)
+                widget.setMaximum(1000)
                 
-        elif isinstance(data, str) or "str" in type(a).__name__: # for numpy.str_ type
-            widget = QtWidgets.QLineEdit(parent)
-            
-        else: # TODO: 2025-09-23 16:16:56 FIXME use a pushbutton to open a complex viewer/editor
-            return
+            elif isinstance(data, float) or "float" in type(data).__name__: # to include numpy array float dtypes
+                widget = QtWidgets.QDoubleSpinBox(parent)
+                widget.setMinimum(-1e3)
+                widget.setMaximum(1e3)
+                widget.setSingleStep(1)
+                
+            elif isinstance(data, pq.Quantity):
+                if isinstance(data, pq.UnitQuantity): # unlikely, but here we go...
+                    widget = smw.QuantityChooserWidget(parent)
+                else:
+                    if data.ndim > 0: # no editing of Quantity ARRAYS; only scalar Quantities can be edited; unlikely to encounter this, but here we go...
+                        return
+                    widget = smw.QuantitySpinBox(parent, enforceImmutableUnits=True) # disallow units change for individual data points in a Quantity
+                    widget.setMinimum(-math.inf * data.units)
+                    widget.setMaximum(math.inf * data.units)
+                    widget.setSingleStep(1.0  * data.units)
+                    widget.disableUnitChange = True
+                    
+            elif isinstance(data, str) or "str" in type(a).__name__: # for numpy.str_ type
+                widget = QtWidgets.QLineEdit(parent)
+                
+            else: # TODO: 2025-09-23 16:16:56 FIXME use a pushbutton to open a complex viewer/editor
+                return
         
         widget.setFrame(False)
         widget.setAutoFillBackground(True)
@@ -287,52 +327,68 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
     def setEditorData(self, editor:QtWidgets.QWidget, index:QtCore.QModelIndex):
         data = index.data(QtCore.Qt.EditRole)
         disp = index.data(QtCore.Qt.DisplayRole)
+        
+        if index.column() in self._columnChoices_ and isinstance(editor, QtWidgets.QComboBox):
+            if not isinstance(data, str):
+                scipywarn(f"{self.__class__.__name__}.createEditor: data type ({type(data).__name__}) is not supported for combo box")
+                return 
+            
+            choices = self._columnChoices_[index.column()]["choices"]
+            
+            if data not in choices:
+                scipywarn(f"{self.__class__.__name__}.createEditor: data {data} does not belong to choices ({choices})")
+                return
+            
+            ndx = choices.index(data)
+            editor.setCurrentIndex(ndx)
 
-        if isinstance(data, int) or "int" in type(data).__name__:
-            assert isinstance(editor, QtWidgets.QSpinBox), f"Incompatible editor widget type ({type(editor).__name__}) for integer data"
-            editor.setValue(data)
-            
-        elif isinstance(data, float) or "float" in type(data).__name__:
-            assert isinstance(editor, QtWidgets.QDoubleSpinBox), f"Incompatible editor widget type ({type(editor).__name__}) for floating point data"
-            # NOTE: 2025-09-27 10:31:43
-            # figure out how many decimals we've got here, see also NOTE: 2025-09-27 10:31:23
-            if "." in disp:
-                decimals = len(disp[disp.index("."):])
-            else:
-                decimals = 0
-            editor.setDecimals(decimals)
-            editor.setValue(data)
-            
-        elif isinstance(data, pq.Quantity):
-            if isinstance(data, pq.UnitQuantity):
-                assert isinstance(editor, smw.QuantityChooserWidget), f"Incompatible editor widget type ({type(editor).__name__}) for UnitQuantity data"
-            else:
-                assert isinstance(editor, smw.QuantitySpinBox), f"Incompatible editor widget type ({type(editor).__name__}) for Quantity data"
-                if data.ndim > 0: # no editing of Quantity ARRAYS; only scalar Quantities can be edited; unlikely to encounter this, but here we go...
-                    return
-                # NOTE: 2025-09-27 10:31:23
-                # figure out how many decimals are shown — needed to set up the "decimals" property of the spin box
-                # (NOTE: the actual number of decimals displayed in the spin box depends on the column width, 
-                #        but at least we avoid scientific notation which can hide the visual of the value)
-                # below, 's0' is the string representation of the Quantity's magnitude (as a float)
-                units_str = data.units.dimensionality.unicode
-                if units_str in disp:
-                    s0 = disp.strip(units_str).strip()
-                else:
-                    s0 = disp.split(" ")[0].strip()
-                    
-                if "." in s0:
-                    decimals = len(s0[s0.index(".")-1:]) # count the dot as well
+        else:        
+
+            if isinstance(data, int) or "int" in type(data).__name__:
+                assert isinstance(editor, QtWidgets.QSpinBox), f"Incompatible editor widget type ({type(editor).__name__}) for integer data"
+                editor.setValue(data)
+                
+            elif isinstance(data, float) or "float" in type(data).__name__:
+                assert isinstance(editor, QtWidgets.QDoubleSpinBox), f"Incompatible editor widget type ({type(editor).__name__}) for floating point data"
+                # NOTE: 2025-09-27 10:31:43
+                # figure out how many decimals we've got here, see also NOTE: 2025-09-27 10:31:23
+                if "." in disp:
+                    decimals = len(disp[disp.index("."):])
                 else:
                     decimals = 0
-                    
                 editor.setDecimals(decimals)
-                # editor.setSingleStep(1.0  * data.units)
-            editor.setValue(data)
+                editor.setValue(data)
                 
-        elif isinstance(data, str) or "str" in type(a).__name__:
-            assert isinstance(editor, QtWidgets.QLineEdit), f"Incompatible editor editor type ({type(editor).__name__}) for string data"
-            editor.setText(data)
+            elif isinstance(data, pq.Quantity):
+                if isinstance(data, pq.UnitQuantity):
+                    assert isinstance(editor, smw.QuantityChooserWidget), f"Incompatible editor widget type ({type(editor).__name__}) for UnitQuantity data"
+                else:
+                    assert isinstance(editor, smw.QuantitySpinBox), f"Incompatible editor widget type ({type(editor).__name__}) for Quantity data"
+                    if data.ndim > 0: # no editing of Quantity ARRAYS; only scalar Quantities can be edited; unlikely to encounter this, but here we go...
+                        return
+                    # NOTE: 2025-09-27 10:31:23
+                    # figure out how many decimals are shown — needed to set up the "decimals" property of the spin box
+                    # (NOTE: the actual number of decimals displayed in the spin box depends on the column width, 
+                    #        but at least we avoid scientific notation which can hide the visual of the value)
+                    # below, 's0' is the string representation of the Quantity's magnitude (as a float)
+                    units_str = data.units.dimensionality.unicode
+                    if units_str in disp:
+                        s0 = disp.strip(units_str).strip()
+                    else:
+                        s0 = disp.split(" ")[0].strip()
+                        
+                    if "." in s0:
+                        decimals = len(s0[s0.index(".")-1:]) # count the dot as well
+                    else:
+                        decimals = 0
+                        
+                    editor.setDecimals(decimals)
+                    # editor.setSingleStep(1.0  * data.units)
+                editor.setValue(data)
+                    
+            elif isinstance(data, str) or "str" in type(a).__name__:
+                assert isinstance(editor, QtWidgets.QLineEdit), f"Incompatible editor editor type ({type(editor).__name__}) for string data"
+                editor.setText(data)
             
             
     def setModelData(self, editor:QtWidgets.QWidget, model:QtCore.QAbstractItemModel, index:QtCore.QModelIndex):
@@ -340,5 +396,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             data = editor.value()
         elif isinstance(editor, QtWidgets.QLineEdit):
             data = editor.text()
+        elif isisntance(editor, QtWidgets.QComboBox):
+            data = editor.currentText()
         # print(f"{self.__class__.__name__}.setModelData -> data = {data}")
         model.setData(index, data, QtCore.Qt.EditRole)
