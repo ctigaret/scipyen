@@ -126,13 +126,13 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         checkChoices = lambda v: isinstance(v["choices"], typing.Sequence) and len(v["choices"]) > 0
         checkEditable= lambda v: isinstance(v["editable"], bool)
         
-        if not all(isinstance(v, dict) and checkSubKeys(v) and checkChoices(v) and checkEditable(v)) for v in values):
+        if not all(isinstance(v, dict) and checkSubKeys(v) and checkChoices(v) and checkEditable(v) for v in values):
             return False
             
         return True
             
     @property
-    def columnChoices(self) -> dict
+    def columnChoices(self) -> dict:
         r"""Returns a reference to the column choices.
     One may edit the contents directly
     """
@@ -178,7 +178,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                 return
             if isinstance(choiceData, dict):
                 # may be a choices subdictionary
-                if all(k in ("choices", "editable") for k in choiceData.keys()) and isinstance(choiceData["choices"], typing.Sequence) anc len(choiceData["choices"]) > 0 and isinstance(choiceData["editable"], bool):
+                if all(k in ("choices", "editable") for k in choiceData.keys()) and isinstance(choiceData["choices"], typing.Sequence) and len(choiceData["choices"]) > 0 and isinstance(choiceData["editable"], bool):
                     self._columnChoices_[col] = choiceData
                     
                 elif len(choiceData) == 0: # wipe out the choices for a specific column
