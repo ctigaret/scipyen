@@ -130,7 +130,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         # if len(d) == 0:
         #     return False
         
-        keys, vals = list(*zip(d.items()))
+        keys, values = list(zip(*d.items()))
         
         if not all(isinstance(k, int) and k >= 0 for k in keys):
             return False

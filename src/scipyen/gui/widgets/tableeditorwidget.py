@@ -757,6 +757,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         self.setModelData(data)
         
     #### BEGIN paged display
+    #
     #def canFetchMore(self, parentIndex):
         #return True
         ##return self._displayedRows_ < self._modelRows_
@@ -786,11 +787,14 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             ##self.endInsertColumns()
             
             ##self.signal_columnsPopulated.emit(columnsToFetch)
-    
+            
+    #
     #### END paged display
                 
     #### BEGIN item data handling
+    #
     #### BEGIN read-only access
+    #
     def data(self, modelIndex, role=QtCore.Qt.DisplayRole):
         try:
             if self._modelData_ is None:
@@ -808,7 +812,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             if col >= self._modelColumns_ or row < 0:
                 return QtCore.QVariant()
             
-            return self.__getModelData__(row, col, role)
+            return self._getModelData_(row, col, role)
             
         except Exception as e:
             traceback.print_exc()
@@ -818,7 +822,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         if self._modelData_ is None:
             return QtCore.QVariant()
         
-        return self.__getHeaderData__(section, orientation, role)
+        return self._getHeaderData_(section, orientation, role)
         
     def rowCount(self, parentIndex=QtCore.QModelIndex()):
         #print("TabularDataModel rowCount")
@@ -990,9 +994,11 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             traceback.print_exc()
         
     @safewrapper
-    def __getHeaderData__(self, section, orientation, role = QtCore.Qt.DisplayRole):
+    def _getHeaderData_(self, section, orientation, role = QtCore.Qt.DisplayRole):
         try:
-            if role not in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleTextRole):
+            if role not in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, 
+                            QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleTextRole,
+                            QtCore.Qt.AccessibleDescriptionRole):
                 return QtCore.QVariant()
                 
             if isinstance(self._modelData_, pd.DataFrame):
@@ -1258,7 +1264,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         except (IndexError, ):
             return QtCore.QVariant()
         
-    def __getModelData__(self, row, col, role = QtCore.Qt.DisplayRole):
+    def _getModelData_(self, row, col, role = QtCore.Qt.DisplayRole):
         try:
             if role not in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleTextRole):
                 return QtCore.QVariant()

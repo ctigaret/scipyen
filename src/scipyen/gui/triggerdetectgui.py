@@ -6,9 +6,9 @@
 
 import os, typing
 from numbers import (Number, Real,)
-from itertools import chain
+import itertools
+import traceback
 from collections import deque
-#from itertools import (accumulate, chain,)
 
 import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
@@ -63,7 +63,7 @@ from core.triggerprotocols import (TriggerProtocol,
 from core.neoutils import (concatenate_blocks, get_events, remove_events,
                            check_ephys_data_collection, check_ephys_data)
 
-from ephys.ephys import ElectrophysiologyProtocol
+from ephys.ephys import (ElectrophysiologyProtocol, getProtocol)
 
 from core.strutils import numbers2str
 
@@ -84,23 +84,43 @@ class _TriggersTableModel_(QtCore.QAbstractTableModel):
     def __init__(self, triggers:typing.Sequence, parent=None):
         super().__init__(parent)
         
-        self._data_ = triggers
+        self._model_data_ = triggers
         self.immutableColumns = [0]
         
     def rowCount(self, parent):
-        return len(self._data_)
+        return len(self._model_data_)
     
     def columnCount(self, parent):
-        return len(model_columns)
+        return len(self.model_columns)
+    
+    def headerData(self, section, orientation, role=QtCore.Qt.DisplayRole):
+        # if not isinstance(self._model_data_, typing.Sequence) or len(self._model_data_) == 0:
+        #     return QtCore.QVariant()
+        
+        return self._getHeaderData_(section, orientation, role)
+    
+    def _getHeaderData_(self, section, orientation, role = QtCore.Qt.DisplayRole):
+        try:
+            # if role not in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, 
+            #                 QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleTextRole,
+            #                 QtCore.Qt.AccessibleDescriptionRole):
+            #     return QtCore.QVariant()
+            if orientation == QtCore.Qt.Horizontal:
+                return QtCore.QVariant(self.model_columns[section])
+            else:
+                return QtCore.QVariant(f"{section}")
+        except:
+            traceback.print_exc()
+            return QtCore.QVariant()
     
     def data(self, index, role=QtCore.Qt.DisplayRole):
-        if self._data_ is None:
+        if self._model_data_ is None:
             return QtCore.QVariant()
             
         if not index.isValid():
             return QtCore.QVariant()
 
-        if len(self._data_) == 0 or not all ((isinstance(p, TriggerProtocol) for p in self._data_)):
+        if len(self._model_data_) == 0 or not all ((isinstance(p, TriggerProtocol) for p in self._model_data_)):
             return QtCore.QVariant()
         
         if role not in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleTextRole):
@@ -109,7 +129,7 @@ class _TriggersTableModel_(QtCore.QAbstractTableModel):
         # rows: one for each defined protocol
         row = index.row()
         
-        if row >= len(self._data_) or row < 0:
+        if row >= len(self._model_data_) or row < 0:
             return QtCore.QVariant()
         
         # columns:                                  editor proxy widget
@@ -123,7 +143,7 @@ class _TriggersTableModel_(QtCore.QAbstractTableModel):
         if col < 0 or col >= len(self.model_columns):
             return QtCore.QVariant()
         
-        trigger_data = self._data_[row]
+        trigger_data = self._model_data_[row]
         
         # value = QtCore.QVariant()
         # tip = QtCore.QVariant()
@@ -171,7 +191,7 @@ class _TriggersTableModel_(QtCore.QAbstractTableModel):
         if col == 0: # no editing of DIG channel index
             return False
         
-        if row >= len(self._data_):
+        if row >= len(self._model_data_):
             return False
         
         if col >= len(self.model_columns):
@@ -188,7 +208,7 @@ class _TriggersTableModel_(QtCore.QAbstractTableModel):
             else:
                 pyvalue = value
             
-            te_data = self._data_[row]
+            te_data = self._model_data_[row]
             
             if col == 1: # trigger event type
                 te_data[1][0][0].event_type = TriggerEventType(pyvalue)
@@ -197,27 +217,38 @@ class _TriggersTableModel_(QtCore.QAbstractTableModel):
             traceback.print_exc()
             return False
         
-        
-        
-    
-    
+    def setModelData(self, data:list):
+        try:
+            self.beginResetModel()
+            self._model_data_ = data
+            self.endResetModel()
+        except:
+            traceback.print_exc()
+            
+    def sourceData(self) -> list:
+        return self._model_data_
     
 class _DIGTriggersTable_(QtWidgets.QTableView):
     r"""Helper class for curating digital trigger events in a recording protocol
     NOTE: 2025-10-26 23:23:58 TODO
  """
-    def __init__(self, data:typing.Optional[dict] = None, parent:typing.Optional[QtWidgets.QWidget] = None):
+    def __init__(self, data:typing.Optional[list] = None, parent:typing.Optional[QtWidgets.QWidget] = None):
         super().__init__(parent=parent)
+        # {dig_index: [(event, ), (sweep indices)]}
+        if isinstance(data, list):
+            self._data_ = data
+        else:
+            self._data_ = list()
+            
+        self.setModel(_TriggersTableModel_(self._data_))
         
-        usedDIGs = list(set(itertools.chain.from_iterable(list(map(lambda i: i.keys(), data.values())))))
-        
-        self.setModel(_TriggersTableModel_(self._triggers_by_origin))
+        colChoices = {1: {"choices": list(TriggerEventType.names()), "editable": False}}
         
         self.setItemDelegate(PythonItemDelegate(parent=self,
-                                                columnChoices = {1: {"choices": list(TriggerEventType.names()), "editable": False}}))
-        # {dig_index: [(event, ), (sweep indices)]}
-        self._triggers_by_origin = list(map(lambda d: (d, list(zip(*list(itertools.chain.from_iterable(map(lambda v: map(lambda v: (v[1], v[0]), filter(lambda i: i[0] == d, v[1].items())), data.items())))))), usedDIGs))
-        
+                                                columnChoices = colChoices))
+    def setData(self, value:list):
+        self._data_ = value
+        self.model().setModelData(self._data_)
 
 class TriggerDetectWidget(QWidget, Ui_TriggerDetectWidget):
     r"""
@@ -724,7 +755,7 @@ class TriggerDetectDialog(qd.QuickDialog):
             self._owns_viewer_ = False
         
         else:
-            self._ephysViewer_ = SignalViewer(win_title = "Trigger Events Detection", parent=self)
+            self._ephysViewer_ = SignalViewer(win_title = "Detect Trigger Events", parent=self)
             self._owns_viewer_ = True
             
         # self.eventDetectionWidget = TriggerDetectWidget(parent = self) 
@@ -732,9 +763,12 @@ class TriggerDetectDialog(qd.QuickDialog):
         
         self.detectionTabWidget = QtWidgets.QTabWidget(parent = self)
         self.eventDetectionWidget = TriggerDetectWidget() 
-        self.detectionTabWidget.addTab(self.eventDetectionWidget, "Detect from stimulus channel")
+        self.protocolTriggersWidget = _DIGTriggersTable_()
+        self.detectionTabWidget.addTab(self.eventDetectionWidget, "Stimulus Channels")
+        self.detectionTabWidget.addTab(self.protocolTriggersWidget, "Recording Protocol")
         
         self.addWidget(self.detectionTabWidget)
+        self.protocolTriggersWidget.setEnabled(False)
         self._ephysViewer_.frameChanged[int].connect(self._slot_ephysFrameChanged)
         
         # self.optionsGroup = qd.HDialogGroup(self)
@@ -790,14 +824,15 @@ class TriggerDetectDialog(qd.QuickDialog):
             self._protocolTriggers_ = dict(map(lambda k: (k, self._ephysProtocol_.getDigitalTriggers(sweep=k, byDIGIndex=True)), range(len(self._ephys_.segments))))
             
             if len(self._protocolTriggers_):
-                pass
+                usedDIGs = list(set(itertools.chain.from_iterable(list(map(lambda i: i.keys(), self._protocolTriggers_.values())))))
+                trigger_data = list(map(lambda d: (d, list(zip(*list(itertools.chain.from_iterable(map(lambda v: map(lambda v: (v[1], v[0]), filter(lambda i: i[0] == d, v[1].items())), self._protocolTriggers_.items())))))), usedDIGs))
             
     def _set_ephys_data_(self, value):
         if check_ephys_data_collection(value, mix=False):
             # no mixing of types when ephysdata is a sequence ...
             self._ephys_ = value
             # self._cached_events_ = get_events(self._ephys_)
-            self._ephysProtocol_ = ephys.getProtocol(self._ephys_)
+            self._ephysProtocol_ = getProtocol(self._ephys_)
             
             flat_events = get_events(self._ephys_, flat=True)
             
@@ -1120,7 +1155,7 @@ class TriggerDetectDialog(qd.QuickDialog):
                     segments = [self._ephys_[self._ephysViewer_.currentFrame]]
                 
             elif all(isinstance(v, Block) for v in self._ephys_):
-                segments = list(chain(*(b.segments for b in self._ephys_)))
+                segments = list(itertools.chain(*(b.segments for b in self._ephys_)))
                 if not self.inAllSegmentsCheckBox.isChecked():
                     segments = [segments[self._ephysViewer_.currentFrame]]
             else:
@@ -1152,7 +1187,7 @@ class TriggerDetectDialog(qd.QuickDialog):
             
         elif isinstance(self._ephys_, typing.Sequence):
             if all([isinstance(v, Block) for v in self._ephys_]):
-                segments = list(chain(*(b.segments for b in self._ephys_)))
+                segments = list(itertools.chain(*(b.segments for b in self._ephys_)))
                 segment = segments[frameindex]
                 
             elif all([isinstance(v, Segment) for v in self._ephys_]):
