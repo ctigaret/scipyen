@@ -85,6 +85,7 @@ class _TriggersTableModel_(QtCore.QAbstractTableModel):
         super().__init__(parent)
         
         self._data_ = triggers
+        self.immutableColumns = [0]
         
     def rowCount(self, parent):
         return len(self._data_)

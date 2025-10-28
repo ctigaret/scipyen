@@ -52,9 +52,173 @@ from gui.widgets import small_widgets as smw
 from gui import quickdialog as qd
 
 class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
-    def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None):
+    r"""Provides delegate widgets for editing individual items in tabular data models.
+
+    By default, this provides the following editor widgets (all from QtWidgets,
+    unless specified):
+    
+    Data type                       Widget
+    -----------------------------------------
+    int                             QSpinBox
+    float                           QDoubleSpinBox
+    pq.Quantity (scalar)            small_widgets.QuantityChooserWidget
+    str                             QLineEdit
+
+    However, for any of the above, the delegate can be configured to use a QComboBox
+    by passing "columnChoices" parameter (a dict) to the constructor. See also
+    setColumnChoices and setChoicesForColumn methods.
+
+    See constructor documentation for details
+
+
+"""
+    def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None,
+                 columnChoices: typing.Optional[dict[int, dict[typing.Sequence, bool]]] = None):
+        r"""Instantiates a PythonItemDelegate.
+
+    Parameters:
+    ===========
+    parent: parent QWidget; optional, default is None
+
+    columnChoices: dict; sets up the delegate editor to be a QComboBox for specific
+        table columns:
+
+        column index:int ↦ data:dict with key:str ↦ sequence or bool as below:
+                            — "choices": typing.Sequence
+                            — "editable": bool; when True, the combo box is editable
+
+        Example (setting choices for columns 0 and 3):
+
+        {0: {   "choices": [1,2,3], 
+                "editable": False},
+         3: {   "choices": ["test", "me", "now"], 
+                "editable": True}}
+
+        NOTE: the "choices" field in the column sub-dictionary cannot be empty!
+
+    
+    """
         super().__init__(parent=parent)
         self._model_ = None
+        
+        if self._checkColumnChoiceDict_(columnChoices):
+            self._columnChoices_ = columnChoices
+            
+        else:
+            self._columnChoices_ = dict() # always keep it as a dict, even when empty
+        
+    def _checkColumnChoiceDict_(self, d:dict) -> bool:
+        if not isinstance(d, dict):
+            return False
+        
+        # NOTE: 2025-10-28 08:48:37 allow wiping out the choices by passing an 
+        # empty dict
+        #
+        # if len(d) == 0:
+        #     return False
+        
+        keys, vals = list(*zip(d.items()))
+        
+        if not all(isinstance(k, int) and k >= 0 for k in keys):
+            return False
+        
+        checkSubKeys = lambda v: all(k in ("editable", "choices") for k in v.keys())
+        checkChoices = lambda v: isinstance(v["choices"], typing.Sequence) and len(v["choices"]) > 0
+        checkEditable= lambda v: isinstance(v["editable"], bool)
+        
+        if not all(isinstance(v, dict) and checkSubKeys(v) and checkChoices(v) and checkEditable(v)) for v in values):
+            return False
+            
+        return True
+            
+    @property
+    def columnChoices(self) -> dict
+        r"""Returns a reference to the column choices.
+    One may edit the contents directly
+    """
+            
+    def setColumnChoices(self, choicesDict:typing.Optional[dict[int, dict[typing.Sequence, bool]]]=None):
+        if choicesDict is None:
+            self._columnChoices_ = dict() # wipes out current column choices
+            
+        elif self._checkColumnChoiceDict_(choicesDict): # may wipe out the choices if parameter is empty
+            self._columnChoices_ = choicesDict
+        else:
+            scipywarn(f"{self.__class__.__name__}.setColumnChoices: inappropriate value")
+            
+    def setChoicesForColumn(self, /, 
+                            col:typing.Optional[int] = None,
+                            choiceData:typing.Optional[typing.Union[dict, typing.Sequence, bool]]=None, 
+                            editable:typing.Optional[bool] = None
+                            ):
+        r"""Alter the choices for a specific column.
+        Keyword-only parameters:
+        col: int or None; column index; can be None when choiceData is a dict with
+            the appropriate structure
+    
+        choiceData: dict specifying the choice data for a single column, e.g.:
+            {1:  { "choices": ["1","2","3"], "editable": True }}
+        
+        Here, you can:
+        • insert or edit the choices for a column
+        """
+        
+        if self._checkColumnChoiceDict_(choiceData):
+            if len(choiceData) == 1:
+                if isinstance(self._columnChoices_, dict):
+                    self._columnChoices_.update(choiceData) 
+                else:
+                    self._columnChoices_ = choiceData
+            else:
+                scipywarn(f"{self.__class__.__name__}.setChoicesForColumn: incorrect choices specification: {choiceData}")
+        else:
+            # must specify a column index, here (col:int)
+            if not isinstance(col, int) or col < 0:
+                scipywarn(f"{self.__class__.__name__}.setChoicesForColumn: incorrect column specification: col = {col}")
+                return
+            if isinstance(choiceData, dict):
+                # may be a choices subdictionary
+                if all(k in ("choices", "editable") for k in choiceData.keys()) and isinstance(choiceData["choices"], typing.Sequence) anc len(choiceData["choices"]) > 0 and isinstance(choiceData["editable"], bool):
+                    self._columnChoices_[col] = choiceData
+                    
+                elif len(choiceData) == 0: # wipe out the choices for a specific column
+                    if col in self._columnChoices_:
+                        self._columnChoices_.pop(col)
+                        
+            elif isinstance(choiceData, typing.Sequence): # create or remove choices for a column
+                if len(choiceData) == 0: # also wipes out the choices for specified column
+                    if col in self._columnChoices_:
+                        self._columnChoices_.pop(col)
+                        
+                    else:
+                        scipywarn(f"{self.__class__.__name__}.setChoicesForColumn: no choices defined for column {col}")
+                        
+                else:
+                    if col in self._columnChoices_: # if choices for col exist, set them to a new value
+                        self._columnChoices_[col]["choices"] = choiceData
+                        # optionally also set their editable flag
+                        if isinstance(editable, bool):
+                            self._columnChoices_[col]["editable"] = editable
+                            
+                    else: # otherwise, create a new column choices subdictionary, not editable by default
+                        if not isinstance(editable, bool):
+                            editable = False
+                        self._columnChoices_[col] = {"choices": choiceData, "editable": editable}
+                        
+            elif isinstance(choiceData, bool): # set the editable flag only if there are choices for this column
+                if col in self._columnChoices_:
+                    self._columnChoices_[col]["editable"] = choiceData
+                    
+            else:
+                scipywarn(f"{self.__class__.__name__}.setChoicesForColumn: invalid choiceData: {choiceData}")
+                
+#     def _choiceAsStr(self, v:typing.Any):
+#         if isinstance(v, str):
+#             return v
+#         
+#         if isinstance(v, numbers.Number):
+#             return str(v)
+        
         
     def createEditor(self, parent:QtWidgets.QWidget, option:int, index:QtCore.QModelIndex) -> QtWidgets.QWidget | None:
         # NOTE: 2025-09-27 10:29:14 ATTENTION
@@ -75,6 +239,10 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         if hasattr(model, "immutableColumns") and hasattr(model, "immutableRows"):
             if index.column() in model.immutableColumns and index.row() in model.immutableRows:
                 return
+            
+        if index.column() in self._columnChoices_: # TODO: 2025-10-28 09:28:20 finalize me
+            widget = QtWidgets.QComboBox()
+            choices = list(map(lambda v: str(v), self._columnChoices_[index.column()]["choices"]))
         
         # print(f"{self.__class__.__name__}.createEditor:\n\t data type: {type(data).__name__}")
         
