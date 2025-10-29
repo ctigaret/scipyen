@@ -87,10 +87,12 @@ class _TriggersTableModel_(QtCore.QAbstractTableModel):
         self._model_data_ = triggers
         self.immutableColumns = [0]
         
-    def rowCount(self, parent):
+        # print(f"{self.__class__.__name__}.__init__: self._model_data_ = {self._model_data_}")
+        
+    def rowCount(self, parent=QtCore.QModelIndex()):
         return len(self._model_data_)
     
-    def columnCount(self, parent):
+    def columnCount(self, parent=QtCore.QModelIndex()):
         return len(self.model_columns)
     
     def headerData(self, section, orientation, role=QtCore.Qt.DisplayRole):
@@ -120,10 +122,10 @@ class _TriggersTableModel_(QtCore.QAbstractTableModel):
         if not index.isValid():
             return QtCore.QVariant()
 
-        if len(self._model_data_) == 0 or not all ((isinstance(p, TriggerProtocol) for p in self._model_data_)):
+        if len(self._model_data_) == 0 or not all ((isinstance(p, typing.Sequence) for p in self._model_data_)):
             return QtCore.QVariant()
         
-        if role not in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleTextRole):
+        if role not in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleTextRole, QtCore.Qt.AccessibleDescriptionRole):
             return QtCore.QVariant()
         
         # rows: one for each defined protocol
@@ -153,19 +155,22 @@ class _TriggersTableModel_(QtCore.QAbstractTableModel):
             tip = QtCore.QVariant(f"DIG Channel {val}")
             
         elif col == 1: # trigger event type name
-            val = trigger_data[1][0][0].type.name
+            val = trigger_data[1][0].type.name
+            # val = trigger_data[1][0][0].type.name
             tip = QtCore.QVariant(f"Type: {val}")
             
         elif col == 2: # name
-            val = trigger_data[1][0][0].name
+            val = trigger_data[1][0].name
+            # val = trigger_data[1][0][0].name
             tip = QtCore.QVariant(f"Name: {val}")
             
         elif col == 3: # labels
-            val = ", ".join(list(map(lambda x: str(x), trigger_data[1][0][0].labels)))
+            val = ", ".join(list(map(lambda x: str(x), trigger_data[1][0].labels)))
+            # val = ", ".join(list(map(lambda x: str(x), trigger_data[1][0][0].labels)))
             tip = QtCore.QVariant(f"Labels: {val}")
             
         elif col == 4: # sweeps where it occurs
-            val = ", ".join(list(map(lambda x: str(x), trigger_data[1][1])))
+            val = ", ".join(list(map(lambda x: str(x), trigger_data[2])))
             tip = QtCore.QVariant(f"Sweeps: {val}")
             
         else:
@@ -200,6 +205,10 @@ class _TriggersTableModel_(QtCore.QAbstractTableModel):
         if role != QtCore.Qt.EditRole:
             return False
         
+        # TODO: 2025-10-29 00:03:51
+        # do actually set the data
+        return self._setDataValue_(value, row, col)
+        
     def _setDataValue_(self, value, row, col) -> bool:
         try:
             if isinstance(value, QtCore.QVariant) or hasattr(value, "value"):
@@ -209,9 +218,17 @@ class _TriggersTableModel_(QtCore.QAbstractTableModel):
                 pyvalue = value
             
             te_data = self._model_data_[row]
-            
+            event = te_data[1][0]
             if col == 1: # trigger event type
-                te_data[1][0][0].event_type = TriggerEventType(pyvalue)
+                event.event_type = TriggerEventType(pyvalue)
+                # te_data[1][0][0].event_type = TriggerEventType(pyvalue)
+            elif col == 2: # event name
+                event.name = pyvalue
+                
+            elif col == 3: # labels
+                event.setLabels(pyvalue)
+                
+            
                 
         except:
             traceback.print_exc()
@@ -222,8 +239,12 @@ class _TriggersTableModel_(QtCore.QAbstractTableModel):
             self.beginResetModel()
             self._model_data_ = data
             self.endResetModel()
+            self.headerDataChanged.emit(QtCore.Qt.Vertical, 0, len(data))
+
         except:
             traceback.print_exc()
+            
+        # print(f"{self.__class__.__name__}.setModelData({data}) ->  self._model_data_ = {self._model_data_}")
             
     def sourceData(self) -> list:
         return self._model_data_
@@ -234,13 +255,16 @@ class _DIGTriggersTable_(QtWidgets.QTableView):
  """
     def __init__(self, data:typing.Optional[list] = None, parent:typing.Optional[QtWidgets.QWidget] = None):
         super().__init__(parent=parent)
+        self.setSortingEnabled(False)
         # {dig_index: [(event, ), (sweep indices)]}
         if isinstance(data, list):
             self._data_ = data
         else:
             self._data_ = list()
             
-        self.setModel(_TriggersTableModel_(self._data_))
+        self._dataModel_ = _TriggersTableModel_(self._data_)
+            
+        self.setModel(self._dataModel_)
         
         colChoices = {1: {"choices": list(TriggerEventType.names()), "editable": False}}
         
@@ -248,8 +272,70 @@ class _DIGTriggersTable_(QtWidgets.QTableView):
                                                 columnChoices = colChoices))
     def setData(self, value:list):
         self._data_ = value
-        self.model().setModelData(self._data_)
-
+        self._dataModel_.setModelData(self._data_)
+        # self.update()
+        
+    def getRowNames(self, ndx:typing.Optional[typing.Union[int, typing.Sequence[int]]] = None,
+                    quoted:bool=False, sep:str = "\t", asList:bool=False):
+        if ndx is None:
+            ndx = range(self.model().rowCount())
+        
+        elif isinstance(ndx, int):
+            ndx = [ndx]
+        
+        elif isinstance(ndx, (list, tuple)):
+            if len(ndx) == 0:
+                ndx = range(self.model().rowCount())
+            elif not all(isinstance(v, int) for v in ndx):
+                raise TypeError(f"Invalid row indices specified. Expecting int, sequence of int or None; instead, got {ndx}")
+        else:
+            raise TypeError(f"Invalid row indices specified. Expecting int, sequence of int or None; instead, got {ndx}")
+        
+        values = [self.model().headerData(k, QtCore.Qt.Vertical).value() for k in ndx]
+        # link = ", "
+        if len(values) == 1:
+            ret = f"'{values[0]}'" if quoted else values[0]
+            
+            if asList:
+                ret = [ret]
+            
+        else:
+            ret = [f"'{v}'" for v in values] if quoted else values
+            if not asList:
+                ret = sep.join(ret)
+                
+        return ret
+        
+    def getColumnNames(self, ndx:typing.Optional[typing.Union[int, typing.Sequence[int]]] = None,
+                    quoted:bool=False, sep:str = ", ", asList:bool=False):
+        if ndx is None:
+            ndx = range(self.model().columnCount())
+        
+        elif isinstance(ndx, int):
+            ndx = [ndx]
+        
+        elif isinstance(ndx, (list, tuple)):
+            if len(ndx) == 0:
+                ndx = range(self.model().columnCount())
+                
+            elif not all(isinstance(v, int) for v in ndx):
+                raise TypeError(f"Invalid row indices specified. Expecting int, sequence of int or None; instead, got {ndx}")
+        else:
+            raise TypeError(f"Invalid row indices specified. Expecting int, sequence of int or None; instead, got {ndx}")
+        
+        values = [self.model().headerData(k, QtCore.Qt.Horizontal).value() for k in ndx]
+        # link = ", "
+        if len(values) == 1:
+            ret = f"'{values[0]}'" if quoted else values[0]
+            if asList:
+                ret = [ret]
+        else:
+            ret = [f"'{v}'" for v in values] if quoted else values
+            if not asList:
+                ret = sep.join(ret)
+                
+        return ret
+        
 class TriggerDetectWidget(QWidget, Ui_TriggerDetectWidget):
     r"""
     """
@@ -820,12 +906,19 @@ class TriggerDetectDialog(qd.QuickDialog):
         # self.adjustSize()
         
     def _updateDetectionWidget_(self):
+        self.protocolTriggersWidget.setEnabled(False)
+        self.detectionTabWidget.setTabEnabled(1, False)
+        
         if isinstance(self._ephysProtocol_, ElectrophysiologyProtocol) and isinstance(self._ephys_, Block):
             self._protocolTriggers_ = dict(map(lambda k: (k, self._ephysProtocol_.getDigitalTriggers(sweep=k, byDIGIndex=True)), range(len(self._ephys_.segments))))
             
             if len(self._protocolTriggers_):
                 usedDIGs = list(set(itertools.chain.from_iterable(list(map(lambda i: i.keys(), self._protocolTriggers_.values())))))
-                trigger_data = list(map(lambda d: (d, list(zip(*list(itertools.chain.from_iterable(map(lambda v: map(lambda v: (v[1], v[0]), filter(lambda i: i[0] == d, v[1].items())), self._protocolTriggers_.items())))))), usedDIGs))
+                trigger_data = list(map(lambda d: (d, *list(zip(*list(itertools.chain.from_iterable(map(lambda v: map(lambda v: (v[1], v[0]), filter(lambda i: i[0] == d, v[1].items())), self._protocolTriggers_.items())))))), usedDIGs))
+                
+                self.protocolTriggersWidget.setData(trigger_data)
+                self.protocolTriggersWidget.setEnabled(len(self.protocolTriggersWidget._data_) > 0)
+                self.detectionTabWidget.setTabEnabled(1, len(self.protocolTriggersWidget._data_) > 0)
             
     def _set_ephys_data_(self, value):
         if check_ephys_data_collection(value, mix=False):
