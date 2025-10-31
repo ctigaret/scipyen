@@ -80,7 +80,9 @@ else:
     
 class _TriggersTableModel_(QtCore.QAbstractTableModel):
     model_columns = ["DIG Channel", "Type", "Name", "Labels", "Sweep(s)"]
+    
     sig_editCompleted = Signal(str, name="sig_editCompleted")
+    
     def __init__(self, triggers:typing.Sequence, parent=None):
         super().__init__(parent)
         
@@ -95,7 +97,7 @@ class _TriggersTableModel_(QtCore.QAbstractTableModel):
     def columnCount(self, parent=QtCore.QModelIndex()):
         return len(self.model_columns)
     
-    def headerData(self, section, orientation, role=QtCore.Qt.DisplayRole):
+    def headerData(self, section, orientation, role=QtCore.Qt.DisplayRole) -> QtCore.QVariant:
         # if not isinstance(self._model_data_, typing.Sequence) or len(self._model_data_) == 0:
         #     return QtCore.QVariant()
         
@@ -107,9 +109,10 @@ class _TriggersTableModel_(QtCore.QAbstractTableModel):
             #                 QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleTextRole,
             #                 QtCore.Qt.AccessibleDescriptionRole):
             #     return QtCore.QVariant()
-            if orientation == QtCore.Qt.Horizontal:
+            
+            if orientation == QtCore.Qt.Horizontal: # column header
                 return QtCore.QVariant(self.model_columns[section])
-            else:
+            else:   # row header
                 return QtCore.QVariant(f"{section}")
         except:
             traceback.print_exc()
@@ -255,16 +258,28 @@ class _DIGTriggersTable_(QtWidgets.QTableView):
  """
     def __init__(self, data:typing.Optional[list] = None, parent:typing.Optional[QtWidgets.QWidget] = None):
         super().__init__(parent=parent)
-        self.setSortingEnabled(False)
         # {dig_index: [(event, ), (sweep indices)]}
         if isinstance(data, list):
             self._data_ = data
         else:
             self._data_ = list()
             
-        self._dataModel_ = _TriggersTableModel_(self._data_)
+        self.horizontalHeaderVisible = True
+        self.verticalHeaderVisible = True
             
+        self.setSortingEnabled(False)
+        self._dataModel_ = _TriggersTableModel_(self._data_)
+        self._dataModel_.setObjectName("_dataModel_")
         self.setModel(self._dataModel_)
+        
+        self.horizontalHeader().setSectionsMovable(False)
+        self.horizontalHeader().setResizeContentsPrecision(0) 
+        self.setAlternatingRowColors(True)
+        
+        self.verticalHeader().setSectionsMovable(False)
+        self.verticalHeader().setResizeContentsPrecision(0) 
+        
+        self._defaultEditTriggers_ = self.editTriggers()
         
         colChoices = {1: {"choices": list(TriggerEventType.names()), "editable": False}}
         
@@ -848,8 +863,11 @@ class TriggerDetectDialog(qd.QuickDialog):
         # self.addWidget(self.eventDetectionWidget)
         
         self.detectionTabWidget = QtWidgets.QTabWidget(parent = self)
+        self.detectionTabWidget.setObjectName("detectionTabWidget")
         self.eventDetectionWidget = TriggerDetectWidget() 
+        self.eventDetectionWidget.setObjectName("eventDetectionWidget")
         self.protocolTriggersWidget = _DIGTriggersTable_()
+        self.protocolTriggersWidget.setObjectName("protocolTriggersWidget")
         self.detectionTabWidget.addTab(self.eventDetectionWidget, "Stimulus Channels")
         self.detectionTabWidget.addTab(self.protocolTriggersWidget, "Recording Protocol")
         

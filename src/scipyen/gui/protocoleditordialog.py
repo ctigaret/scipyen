@@ -154,7 +154,7 @@ class TriggerProtocolsTableModel(QtCore.QAbstractTableModel):
             return tip
             #return QtCore.QVariant(tip)
         
-    def headerData(self, section, orientation, role=QtCore.Qt.DisplayRole):
+    def headerData(self, section, orientation, role=QtCore.Qt.DisplayRole) -> QtCore.QVariant:
         if len(self._data_) == 0:
             return QtCore.QVariant()
         
