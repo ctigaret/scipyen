@@ -79,53 +79,51 @@ else:
     Ui_TriggerDetectWidget, QWidget = loadUiType(os.path.join(__module_path__, "triggerdetect.ui"))
     
 class _TriggersTableModel_(QtCore.QAbstractTableModel):
-    model_columns = ["DIG Channel", "Type", "Name", "Labels", "Sweep(s)"]
+    model_columns = ["DIG Channel", "Type", "Name", "Labels", "Sweep(s)", "Used"]
     
     sig_editCompleted = Signal(str, name="sig_editCompleted")
     
-    def __init__(self, triggers:typing.Sequence, parent=None):
+    def __init__(self, triggers:typing.Optional[typing.Sequence], parent=None):
         super().__init__(parent)
         
-        self._model_data_ = triggers
+        for k, col in enumerate(self.model_columns):
+            self.setHeaderData(k, QtCore.Qt.Horizontal, QtCore.QVariant(col))
+            
+        # self.headerDataChanged.emit()
         self.immutableColumns = [0]
+        self.beginResetModel()
+        self._data_ = list(triggers) if isinstance(triggers, typing.Sequence) else list()
+        self.endResetModel()
         
-        # print(f"{self.__class__.__name__}.__init__: self._model_data_ = {self._model_data_}")
-        
-    def rowCount(self, parent=QtCore.QModelIndex()):
-        return len(self._model_data_)
+    def rowCount(self, parent:QtCore.QModelIndex = QtCore.QModelIndex()):
+        return len(self._data_)
     
-    def columnCount(self, parent=QtCore.QModelIndex()):
+    def columnCount(self, parent:QtCore.QModelIndex = QtCore.QModelIndex()):
         return len(self.model_columns)
     
-    def headerData(self, section, orientation, role=QtCore.Qt.DisplayRole) -> QtCore.QVariant:
-        # if not isinstance(self._model_data_, typing.Sequence) or len(self._model_data_) == 0:
-        #     return QtCore.QVariant()
+    def headerData(self, section:int, orientation:QtCore.Qt.Orientation, 
+                   role:QtCore.Qt.ItemDataRole = QtCore.Qt.DisplayRole) -> QtCore.QVariant:
         
-        return self._getHeaderData_(section, orientation, role)
-    
-    def _getHeaderData_(self, section, orientation, role = QtCore.Qt.DisplayRole):
-        try:
-            # if role not in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, 
-            #                 QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleTextRole,
-            #                 QtCore.Qt.AccessibleDescriptionRole):
-            #     return QtCore.QVariant()
-            
-            if orientation == QtCore.Qt.Horizontal: # column header
-                return QtCore.QVariant(self.model_columns[section])
-            else:   # row header
-                return QtCore.QVariant(f"{section}")
-        except:
-            traceback.print_exc()
+        if len(self._data_) == 0:
             return QtCore.QVariant()
-    
-    def data(self, index, role=QtCore.Qt.DisplayRole):
-        if self._model_data_ is None:
+        
+        if role not in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleTextRole):
+            return QtCore.QVariant()
+        
+        if orientation == QtCore.Qt.Horizontal: # column header
+            return QtCore.QVariant(self.model_columns[section])
+        
+        else: # vertical (rows) header
+            return QtCore.QVariant("%d" % section)
+        
+    def data(self, index:QtCore.QModelIndex, role:QtCore.Qt.ItemDataRole = QtCore.Qt.DisplayRole):
+        if self._data_ is None:
             return QtCore.QVariant()
             
         if not index.isValid():
             return QtCore.QVariant()
 
-        if len(self._model_data_) == 0 or not all ((isinstance(p, typing.Sequence) for p in self._model_data_)):
+        if len(self._data_) == 0 or not all ((isinstance(p, typing.Sequence) for p in self._data_)):
             return QtCore.QVariant()
         
         if role not in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleTextRole, QtCore.Qt.AccessibleDescriptionRole):
@@ -134,7 +132,7 @@ class _TriggersTableModel_(QtCore.QAbstractTableModel):
         # rows: one for each defined protocol
         row = index.row()
         
-        if row >= len(self._model_data_) or row < 0:
+        if row >= len(self._data_) or row < 0:
             return QtCore.QVariant()
         
         # columns:                                  editor proxy widget
@@ -143,39 +141,43 @@ class _TriggersTableModel_(QtCore.QAbstractTableModel):
         # 2: str: trigger event name                line edit
         # 3: str: trigger event label               line edit
         # 4: tuple[int]: sweeps where it occurs     line edit
+        # 5: bool: use this trigger event           checkbox
+        
         col = index.column()
     
         if col < 0 or col >= len(self.model_columns):
             return QtCore.QVariant()
         
-        trigger_data = self._model_data_[row]
+        trigger_data = self._data_[row]
         
-        # value = QtCore.QVariant()
-        # tip = QtCore.QVariant()
-            
+        dig = trigger_data[0]
+        event = trigger_data[1][0]
+        used = trigger_data[2][0]
+        sweeps = trigger_data[3]
+        
         if col == 0: # digital channel
-            val = trigger_data[0]
+            val = dig
             tip = QtCore.QVariant(f"DIG Channel {val}")
             
         elif col == 1: # trigger event type name
-            val = trigger_data[1][0].type.name
-            # val = trigger_data[1][0][0].type.name
+            val = event.type.name
             tip = QtCore.QVariant(f"Type: {val}")
             
         elif col == 2: # name
-            val = trigger_data[1][0].name
-            # val = trigger_data[1][0][0].name
+            val = event.name
             tip = QtCore.QVariant(f"Name: {val}")
             
         elif col == 3: # labels
-            val = ", ".join(list(map(lambda x: str(x), trigger_data[1][0].labels)))
-            # val = ", ".join(list(map(lambda x: str(x), trigger_data[1][0][0].labels)))
+            val = ", ".join(list(map(lambda x: str(x), event.labels)))
             tip = QtCore.QVariant(f"Labels: {val}")
             
         elif col == 4: # sweeps where it occurs
-            val = ", ".join(list(map(lambda x: str(x), trigger_data[2])))
-            tip = QtCore.QVariant(f"Sweeps: {val}")
+            val = ", ".join(list(map(lambda x: str(x), sweeps)))
+            tip = QtCore.QVariant(f"Sweeps where emitted: {val}")
             
+        elif col == 5: # use this trigger event
+            val = used
+            tip = QtCore.QVariant("Used" if val else "Not used")
         else:
             val = None
             tip = QtCore.QVariant()
@@ -199,7 +201,7 @@ class _TriggersTableModel_(QtCore.QAbstractTableModel):
         if col == 0: # no editing of DIG channel index
             return False
         
-        if row >= len(self._model_data_):
+        if row >= len(self._data_):
             return False
         
         if col >= len(self.model_columns):
@@ -208,11 +210,6 @@ class _TriggersTableModel_(QtCore.QAbstractTableModel):
         if role != QtCore.Qt.EditRole:
             return False
         
-        # TODO: 2025-10-29 00:03:51
-        # do actually set the data
-        return self._setDataValue_(value, row, col)
-        
-    def _setDataValue_(self, value, row, col) -> bool:
         try:
             if isinstance(value, QtCore.QVariant) or hasattr(value, "value"):
                 pyvalue = value.value()
@@ -220,41 +217,60 @@ class _TriggersTableModel_(QtCore.QAbstractTableModel):
             else:
                 pyvalue = value
             
-            te_data = self._model_data_[row]
+            te_data = list(self._data_[row])
+            
+            # print(f"{self.__class__.__name__}.setData: te_data: {te_data}")
+            
             event = te_data[1][0]
+            
             if col == 1: # trigger event type
-                event.event_type = TriggerEventType(pyvalue)
-                # te_data[1][0][0].event_type = TriggerEventType(pyvalue)
+                event.event_type = TriggerEventType[pyvalue]
+
             elif col == 2: # event name
                 event.name = pyvalue
                 
             elif col == 3: # labels
                 event.setLabels(pyvalue)
                 
+            elif col == 5: # in use
+                te_data[2] = (pyvalue,)
+                
+            self._data_[row] = tuple(te_data)
             
+            # print(f"{self.__class__.__name__}.setData: _data_ = {self._data_}")
                 
         except:
             traceback.print_exc()
             return False
         
+    def flags(self, index:QtCore.QModelIndex):
+        return QtCore.Qt.ItemIsEditable | super().flags(index)
+    
+    @property
+    def modelData(self) -> list:
+        return self._data_
+    
+    @modelData.setter
+    def modelData(self, value:typing.Optional[typing.Sequence]):
+        self.beginResetModel()
+        self._data_ = list(value) if isinstance(value, typing.Sequence) else list()
+        self.endResetModel()
+    
     def setModelData(self, data:list):
         try:
             self.beginResetModel()
-            self._model_data_ = data
+            self._data_ = data
             self.endResetModel()
             self.headerDataChanged.emit(QtCore.Qt.Vertical, 0, len(data))
 
         except:
             traceback.print_exc()
             
-        # print(f"{self.__class__.__name__}.setModelData({data}) ->  self._model_data_ = {self._model_data_}")
-            
     def sourceData(self) -> list:
-        return self._model_data_
+        return self._data_
     
 class _DIGTriggersTable_(QtWidgets.QTableView):
     r"""Helper class for curating digital trigger events in a recording protocol
-    NOTE: 2025-10-26 23:23:58 TODO
  """
     def __init__(self, data:typing.Optional[list] = None, parent:typing.Optional[QtWidgets.QWidget] = None):
         super().__init__(parent=parent)
@@ -932,7 +948,7 @@ class TriggerDetectDialog(qd.QuickDialog):
             
             if len(self._protocolTriggers_):
                 usedDIGs = list(set(itertools.chain.from_iterable(list(map(lambda i: i.keys(), self._protocolTriggers_.values())))))
-                trigger_data = list(map(lambda d: (d, *list(zip(*list(itertools.chain.from_iterable(map(lambda v: map(lambda v: (v[1], v[0]), filter(lambda i: i[0] == d, v[1].items())), self._protocolTriggers_.items())))))), usedDIGs))
+                trigger_data = list(map(lambda d: (d, *list(zip(*list(itertools.chain.from_iterable(map(lambda v: map(lambda v: (v[1][0], True, v[0]), filter(lambda i: i[0] == d, v[1].items())), self._protocolTriggers_.items())))))), usedDIGs))
                 
                 self.protocolTriggersWidget.setData(trigger_data)
                 self.protocolTriggersWidget.setEnabled(len(self.protocolTriggersWidget._data_) > 0)

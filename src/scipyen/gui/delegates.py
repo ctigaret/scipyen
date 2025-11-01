@@ -278,7 +278,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             
             ndx = choices.index(data)
             
-            widget = QtWidgets.QComboBox()
+            widget = QtWidgets.QComboBox(parent)
             widget.insertItems(0, choices)
             widget.setEditable(False) # prevent editing for now; must revisit this FIXME/TODO
             # widget.setEditable(self._columnChoices_[index.column()]["editable"])
@@ -291,7 +291,10 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             # for datetime.date use QDateEdit (with QDate)
             # for datetime.time use QTimeEdit (with QTime)
             
-            if isinstance(data, int) or "int" in type(data).__name__: # to include numpy array int dtypes
+            if isinstance(data, bool) or "bool" in type(data).__name__:
+                widget = QtWidgets.QCheckBox(parent)
+                
+            elif isinstance(data, int) or "int" in type(data).__name__: # to include numpy array int dtypes
                 widget = QtWidgets.QSpinBox(parent)
                 widget.setMinimum(-1000)
                 widget.setMaximum(1000)
@@ -320,7 +323,8 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             else: # TODO: 2025-09-23 16:16:56 FIXME use a pushbutton to open a complex viewer/editor
                 return
         
-        widget.setFrame(False)
+        if hasattr(widget, "setFrame"):
+            widget.setFrame(False)
         widget.setAutoFillBackground(True)
         return widget
     
@@ -342,9 +346,12 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             ndx = choices.index(data)
             editor.setCurrentIndex(ndx)
 
-        else:        
-
-            if isinstance(data, int) or "int" in type(data).__name__:
+        else:
+            if isinstance(data, bool) or "bool" in type(data).__name__:
+                assert isinstance(editor, QtWidgets.QCheckBox), f"Incompatible editor widget type ({type(editor).__name__}) for boolean data"
+                editor.setChecked(data==True)
+                
+            elif isinstance(data, int) or "int" in type(data).__name__:
                 assert isinstance(editor, QtWidgets.QSpinBox), f"Incompatible editor widget type ({type(editor).__name__}) for integer data"
                 editor.setValue(data)
                 
@@ -396,7 +403,10 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             data = editor.value()
         elif isinstance(editor, QtWidgets.QLineEdit):
             data = editor.text()
-        elif isisntance(editor, QtWidgets.QComboBox):
+        elif isinstance(editor, QtWidgets.QComboBox):
             data = editor.currentText()
+        elif isinstance(editor, QtWidgets.QCheckBox):
+            data = editor.isChecked()
+            
         # print(f"{self.__class__.__name__}.setModelData -> data = {data}")
         model.setData(index, data, QtCore.Qt.EditRole)
