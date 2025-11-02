@@ -1101,13 +1101,15 @@ def importDataFrame(fileName:typing.Union[str, pathlib.Path]):
     if any([s in fileType for s in ("excel", "spreadsheet")]):
         return pd.read_excel(fileName)
         
-    elif any([s in fileType for s in ("csv", "tab-separated-values")]):
+    elif any([s in fileType for s in ("csv", "tab-separated-values", "comma-separated-values")]):
         # figure out separator: tab or comma?
         # NOTE: 2020-10-01 23:29:35 csv can also be tab-separated !!!
         with open(fileName, "rt") as csvfile:
             dialect = csv.Sniffer().sniff(csvfile.read(2048))
             
-        if dialect.delimiter in ("\t", " "): # tab-separated
+        # print(f"pio.importDataFrame: delimiter = {dialect.delimiter}")
+            
+        if dialect.delimiter in ("\t", " "): # tab- or space-separated
             return pd.read_table(fileName) # supports both str and pathlib.Path!
             
         elif dialect.delimiter == ",": # comma-separated
