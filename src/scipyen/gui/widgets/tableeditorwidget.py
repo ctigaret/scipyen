@@ -183,6 +183,14 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         self.nextSliceToolButton.setEnabled(False)
         self._dataModel_.setModelData(self._data_)
         
+        for row in range(self._dataModel_.rowCount()):
+            for col in range(self._dataModel_.columnCount()):
+                index = self._dataModel_.index(row, col)
+                indexdata = self._dataModel_.data(index).value()
+                if isinstance(indexdata, bool):
+                    self.tableView.openPersistentEditor(index)
+                
+        
     @Slot()
     def _slot_prevSlice(self):
         if isinstance(self._data_, np.ndarray) and self._data_.ndim > 2:
@@ -494,66 +502,67 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
     #     withHeaders = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.AltModifier)
         
         
-    @Slot(QtWidgets.QTableWidgetItem)
-    @safewrapper
-    def slot_tableEdited(self, item):
-        # TODO code for xarray.DataArray
-        # TODO code for multi-indexed pandas data frames
-        # TODO code for as_type(...) for pandas data -- e.g. categorical
-        col = item.column()
-        row = item.row()
-        value = item.text()
-        
-        if isinstance(self._data_, pd.DataFrame):
-            colHeaderText = self.tableView.horizontalHeaderItem(col).text()
-            
-            if colHeaderText not in self._data_.columns:
-                raise RuntimeError("%s not found in data columns!" % colHeaderText)
-            
-            columnDType = self._data_[colHeaderText].dtype
-            
-            if np.can_cast(eval(value), columnDType):
-                if columnDType == np.dtype("bool"):
-                    if value.lower().strip() in ("true, t, 1"):
-                        value = "True"
-                        
-                    elif value.lower().strip() in ("false, f, 0"):
-                        value = False
-                        
-                # CAUTION here
-                data_value = np.array(eval(value), dtype=columnDType)
-                
-                self._data_.loc[self._data_.index[row], colHeaderText] = data_value
-                
-            else:
-                raise RuntimeError("cannot cast %s to %s" % (value, columnDType))
-            
-            
-        elif isinstance(self._data_, pd.Series):
-            dataDType = self._data_.dtype
-            
-            if np.can_cast(eval(value), dataDType):
-                data_value = np.array(eval(value), dtype=dataDType)
-            
-                self._data_.loc[self._data_.index[row]] = data_value
-            
-        elif isinstance(self._data_, np.ndarray):
-            dataDType = self._data_.dtype
-            
-            if np.can_cast(eval(value), dataDType):
-                data_value = np.array(eval(value), dtype=dataDType)
-                
-                if self._data_.ndim == 3:
-                    self._data_[row,col,self.frameNo] = data_value
-                    
-                elif self._data_.ndim == 2:
-                    self._data_[row,col] = data_value
-                    
-                elif self._data_.ndim == 1:
-                    self._data_[row] = data_value
-           
-            else:
-                raise RuntimeError("cannot cast %s to %s" % (value, dataDType))
+#     @Slot(QtWidgets.QTableWidgetItem)
+#     @safewrapper
+#     def slot_tableEdited(self, item):
+#         # TODO: 2025-11-02 20:47:58 - edit in light of using styled item delegate for editing
+#         # TODO code for xarray.DataArray
+#         # TODO code for multi-indexed pandas data frames
+#         # TODO code for as_type(...) for pandas data -- e.g. categorical
+#         col = item.column()
+#         row = item.row()
+#         value = item.text()
+#         
+#         if isinstance(self._data_, pd.DataFrame):
+#             colHeaderText = self.tableView.horizontalHeaderItem(col).text()
+#             
+#             if colHeaderText not in self._data_.columns:
+#                 raise RuntimeError("%s not found in data columns!" % colHeaderText)
+#             
+#             columnDType = self._data_[colHeaderText].dtype
+#             
+#             if np.can_cast(eval(value), columnDType):
+#                 if columnDType == np.dtype("bool"):
+#                     if value.lower().strip() in ("true, t, 1"):
+#                         value = "True"
+#                         
+#                     elif value.lower().strip() in ("false, f, 0"):
+#                         value = False
+#                         
+#                 # CAUTION here
+#                 data_value = np.array(eval(value), dtype=columnDType)
+#                 
+#                 self._data_.loc[self._data_.index[row], colHeaderText] = data_value
+#                 
+#             else:
+#                 raise RuntimeError("cannot cast %s to %s" % (value, columnDType))
+#             
+#             
+#         elif isinstance(self._data_, pd.Series):
+#             dataDType = self._data_.dtype
+#             
+#             if np.can_cast(eval(value), dataDType):
+#                 data_value = np.array(eval(value), dtype=dataDType)
+#             
+#                 self._data_.loc[self._data_.index[row]] = data_value
+#             
+#         elif isinstance(self._data_, np.ndarray):
+#             dataDType = self._data_.dtype
+#             
+#             if np.can_cast(eval(value), dataDType):
+#                 data_value = np.array(eval(value), dtype=dataDType)
+#                 
+#                 if self._data_.ndim == 3:
+#                     self._data_[row,col,self.frameNo] = data_value
+#                     
+#                 elif self._data_.ndim == 2:
+#                     self._data_[row,col] = data_value
+#                     
+#                 elif self._data_.ndim == 1:
+#                     self._data_[row] = data_value
+#            
+#             else:
+#                 raise RuntimeError("cannot cast %s to %s" % (value, dataDType))
             
     @Slot()
     @safewrapper
@@ -746,8 +755,9 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         self._modelData_ = None
         self._modelRows_ = 0
         self._modelColumns_ = 0
-        self._immutableColumns_:typing.Sequence[int] = list()  # of column indexes
-        self._immutableRows_:typing.Sequence[int] = list()     # of row indexes
+        self._immutability_:dict = {"columns": list(), "rows": list(), "joint":False}
+        # self._immutableColumns_:typing.Sequence[int] = list()  # of column indexes
+        # self._immutableRows_:typing.Sequence[int] = list()     # of row indexes
         
         # NOTE: 2018-11-10 10:58:09
         # how many columns & rows are actually displayed
@@ -793,9 +803,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 
     #### BEGIN item data handling
     #
-    #### BEGIN read-only access
-    #
-    def data(self, modelIndex, role=QtCore.Qt.DisplayRole):
+    def data(self, modelIndex, role=QtCore.Qt.DisplayRole) -> QtCore.QVariant:
         try:
             if self._modelData_ is None:
                 return QtCore.QVariant()
@@ -832,7 +840,6 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         #print("TabularDataModel columnCount")
         return self._modelColumns_
         
-    #### END  read-only access
     
     #### BEGIN editable items
     def flags(self, modelIndex):
@@ -861,7 +868,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         elif col >= self._modelData_.shape[1]:
             return False
             
-        if role != QtCore.Qt.EditRole:
+        if role not in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole):
             return False
         
         if self._setDataValue_(value, row, col):
@@ -1264,7 +1271,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         except (IndexError, ):
             return QtCore.QVariant()
         
-    def _getModelData_(self, row, col, role = QtCore.Qt.DisplayRole):
+    def _getModelData_(self, row, col, role = QtCore.Qt.DisplayRole) -> QtCore.QVariant:
         try:
             if role not in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleTextRole):
                 return QtCore.QVariant()
@@ -1435,17 +1442,55 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         return self._modelData_
     
     @property
-    def immutableColumns(self)->typing.Sequence[int]:
-        return self._immutableColumns_
+    def immutability(self) -> dict:
+        return self._immutability_
+    
+    @immutability.setter
+    def immutability(self, value:dict):
+        # d = {"columns":list(), "rows": list(), "joint":False}
+        if not isinstance(value, dict):
+            self._immutability_ = {"columns":list(), "rows": list(), "joint":False}
+        else:
+            if "columns" in value and isinstance(value["columns"], typing.Sequence):
+                if len(value["columns"]) == 0 or not all(isinstance(v, int) for v in value["columns"]):
+                    self._immutability_["columns"] = list()
+                    
+                else:
+                    self._immutability_["columns"] = list(value["columns"])
+                    
+            if "rows" in value and isinstance(value["rows"], typing.Sequence):
+                if len(value["rows"]) == 0 or not all(isinstance(v, int) for v in value["rows"]):
+                    self._immutability_["rows"] = list()
+                    
+                else:
+                    self._immutability_["rows"] = list(value["rows"])
+                    
+            if "joint" in value:
+                if isinstance(value["joint"], bool):
+                    self._immutability_["value"] = value["joint"]
+                else:
+                    self._immutability_["value"] = False
+    
+    @property
+    def jointImmutability(self) -> bool:
+        return self._immutability_["joint"]
+    
+    @jointImmutability.setter
+    def jointImmutability(self, value:bool):
+        self._immutability_["joint"] = value == True
+    
+    @property
+    def immutableColumns(self) -> typing.Sequence[int]:
+        return self._immutability_["columns"]
     
     @immutableColumns.setter
     def immutableColumns(self, value:typing.Sequence[int]):
-        self._immutableColumns_ = value
+        self._immutability_["columns"] = value
         
     @property
     def immutableRows(self) -> typing.Sequence[int]:
-        return self._immutableRows_
+        return self._immutability_["rows"]
     
     @immutableRows.setter
-    def immutableRow(self, value:typing.Sequence[int]):
-        self._immutableRows_ = value
+    def immutableRows(self, value:typing.Sequence[int]):
+        self._immutability_["rows"] = value

@@ -553,6 +553,35 @@
       </widget>
      </item>
      <item>
+      <widget class="QCheckBox" name="allSegmentsCheckBox">
+       <property name="text">
+        <string>All segments</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="detectPushButton">
+       <property name="toolTip">
+        <string>Detect events from trigger signals</string>
+       </property>
+       <property name="statusTip">
+        <string>Detect events from trigger signals</string>
+       </property>
+       <property name="whatsThis">
+        <string>Detect events from trigger signals</string>
+       </property>
+       <property name="text">
+        <string>Detect</string>
+       </property>
+       <property name="icon">
+        <iconset theme="edit-find"/>
+       </property>
+       <property name="flat">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
       <spacer name="horizontalSpacer">
        <property name="orientation">
         <enum>Qt::Horizontal</enum>

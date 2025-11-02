@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>ImportDIGTriggerWidget</class>
+ <widget class="QWidget" name="ImportDIGTriggerWidget">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>613</width>
+    <height>264</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>ImportDIGTriggerWidget</string>
+  </property>
+  <property name="toolTip">
+   <string>ImportDIGTriggerWidget</string>
+  </property>
+  <property name="statusTip">
+   <string>ImportDIGTriggerWidget</string>
+  </property>
+  <property name="whatsThis">
+   <string>ImportDIGTriggerWidget</string>
+  </property>
+  <layout class="QGridLayout" name="gridLayout">
+   <item row="0" column="0">
+    <widget class="QTableView" name="tableView">
+     <property name="toolTip">
+      <string>DIG Triggers defined in the acqusition protocol</string>
+     </property>
+     <property name="statusTip">
+      <string>DIG Triggers defined in the acqusition protocol</string>
+     </property>
+     <property name="whatsThis">
+      <string>DIG Triggers defined in the acqusition protocol</string>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="0">
+    <layout class="QHBoxLayout" name="horizontalLayout">
+     <item>
+      <widget class="QPushButton" name="importPushButton">
+       <property name="toolTip">
+        <string>Import from recording protocol</string>
+       </property>
+       <property name="statusTip">
+        <string>Import from recording protocol</string>
+       </property>
+       <property name="whatsThis">
+        <string>Import from recording protocol</string>
+       </property>
+       <property name="text">
+        <string>Import</string>
+       </property>
+       <property name="icon">
+        <iconset theme="document-import"/>
+       </property>
+       <property name="flat">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <spacer name="horizontalSpacer">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+    </layout>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

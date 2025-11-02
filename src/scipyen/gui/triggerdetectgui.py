@@ -63,6 +63,8 @@ from core.triggerprotocols import (TriggerProtocol,
 from core.neoutils import (concatenate_blocks, get_events, remove_events,
                            check_ephys_data_collection, check_ephys_data)
 
+from core.prog import scipywarn
+
 from ephys.ephys import (ElectrophysiologyProtocol, getProtocol)
 
 from core.strutils import numbers2str
@@ -74,23 +76,26 @@ from gui.delegates import PythonItemDelegate
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
 if os.environ["QT_API"] in ("pyqt5", "pyside2"):
-    Ui_TriggerDetectWidget, QWidget = loadUiType(os.path.join(__module_path__, "triggerdetect.ui"), from_imports=True, import_from="gui")
+    Ui_TriggerDetectWidget, QWidget = loadUiType(os.path.join(__module_path__, "widgets", "triggerdetect.ui"), from_imports=True, import_from="gui")
+    Ui_ImportDIGTriggerWidget, _ = loadUiType(os.path.join(__module_path__, "widgets", "importDIGtrigger.ui"), from_imports=True, import_from="gui")
 else:
-    Ui_TriggerDetectWidget, QWidget = loadUiType(os.path.join(__module_path__, "triggerdetect.ui"))
+    Ui_TriggerDetectWidget, QWidget = loadUiType(os.path.join(__module_path__, "widgets", "triggerdetect.ui"))
+    Ui_ImportDIGTriggerWidget, _ = loadUiType(os.path.join(__module_path__, "widgets", "importDIGtrigger.ui"))
     
-class _TriggersTableModel_(QtCore.QAbstractTableModel):
+class DIGTriggersTableModel(QtCore.QAbstractTableModel):
     model_columns = ["DIG Channel", "Type", "Name", "Labels", "Sweep(s)", "Used"]
     
     sig_editCompleted = Signal(str, name="sig_editCompleted")
     
-    def __init__(self, triggers:typing.Optional[typing.Sequence], parent=None):
+    def __init__(self, triggers:typing.Optional[typing.Sequence]=None, parent=None):
         super().__init__(parent)
         
         for k, col in enumerate(self.model_columns):
             self.setHeaderData(k, QtCore.Qt.Horizontal, QtCore.QVariant(col))
             
         # self.headerDataChanged.emit()
-        self.immutableColumns = [0]
+        self.immutability = {"columns": [0, 4], "joint": False}
+        
         self.beginResetModel()
         self._data_ = list(triggers) if isinstance(triggers, typing.Sequence) else list()
         self.endResetModel()
@@ -269,60 +274,64 @@ class _TriggersTableModel_(QtCore.QAbstractTableModel):
     def sourceData(self) -> list:
         return self._data_
     
-class _DIGTriggersTable_(QtWidgets.QTableView):
+# class _DIGTriggersTable_(QtWidgets.QTableView):
+class DIGTriggersWidget(QtWidgets.QWidget, Ui_ImportDIGTriggerWidget):
     r"""Helper class for curating digital trigger events in a recording protocol
  """
     def __init__(self, data:typing.Optional[list] = None, parent:typing.Optional[QtWidgets.QWidget] = None):
         super().__init__(parent=parent)
         # {dig_index: [(event, ), (sweep indices)]}
-        if isinstance(data, list):
-            self._data_ = data
-        else:
-            self._data_ = list()
-            
-        self.horizontalHeaderVisible = True
-        self.verticalHeaderVisible = True
-            
-        self.setSortingEnabled(False)
-        self._dataModel_ = _TriggersTableModel_(self._data_)
+        self._dataModel_ = DIGTriggersTableModel(parent=self)
         self._dataModel_.setObjectName("_dataModel_")
-        self.setModel(self._dataModel_)
+        self._configureUI_()
         
-        self.horizontalHeader().setSectionsMovable(False)
-        self.horizontalHeader().setResizeContentsPrecision(0) 
-        self.setAlternatingRowColors(True)
+        self.setData(data)
         
-        self.verticalHeader().setSectionsMovable(False)
-        self.verticalHeader().setResizeContentsPrecision(0) 
+    def _configureUI_(self):
+        self.setupUi(self)
+        self.tableView.setModel(self._dataModel_)
+        self.tableView.horizontalHeaderVisible = True
+        self.tableView.verticalHeaderVisible = True
+            
+        self.tableView.setSortingEnabled(False)
+        self.tableView.horizontalHeader().setSectionsMovable(False)
+        self.tableView.horizontalHeader().setResizeContentsPrecision(0) 
+        self.tableView.setAlternatingRowColors(True)
         
-        self._defaultEditTriggers_ = self.editTriggers()
+        self.tableView.verticalHeader().setSectionsMovable(False)
+        self.tableView.verticalHeader().setResizeContentsPrecision(0) 
+        
+        self._defaultEditTriggers_ = self.tableView.editTriggers()
         
         colChoices = {1: {"choices": list(TriggerEventType.names()), "editable": False}}
-        
-        self.setItemDelegate(PythonItemDelegate(parent=self,
+        self.tableView.setItemDelegate(PythonItemDelegate(parent=self,
                                                 columnChoices = colChoices))
-    def setData(self, value:list):
-        self._data_ = value
+        
+    def setData(self, value:typing.Sequence):
+        self._data_ = list(value) if isinstance(value, typing.Sequence) else list()
         self._dataModel_.setModelData(self._data_)
-        # self.update()
+        for col in (1,5):
+            for row in range(self._dataModel_.rowCount()):
+                self.tableView.openPersistentEditor(self._dataModel_.index(row, col))
+        self.tableView.resizeColumnsToContents()
         
     def getRowNames(self, ndx:typing.Optional[typing.Union[int, typing.Sequence[int]]] = None,
                     quoted:bool=False, sep:str = "\t", asList:bool=False):
         if ndx is None:
-            ndx = range(self.model().rowCount())
+            ndx = range(self.tableView.model().rowCount())
         
         elif isinstance(ndx, int):
             ndx = [ndx]
         
         elif isinstance(ndx, (list, tuple)):
             if len(ndx) == 0:
-                ndx = range(self.model().rowCount())
+                ndx = range(self.tableView.model().rowCount())
             elif not all(isinstance(v, int) for v in ndx):
                 raise TypeError(f"Invalid row indices specified. Expecting int, sequence of int or None; instead, got {ndx}")
         else:
             raise TypeError(f"Invalid row indices specified. Expecting int, sequence of int or None; instead, got {ndx}")
         
-        values = [self.model().headerData(k, QtCore.Qt.Vertical).value() for k in ndx]
+        values = [self.tableView.model().headerData(k, QtCore.Qt.Vertical).value() for k in ndx]
         # link = ", "
         if len(values) == 1:
             ret = f"'{values[0]}'" if quoted else values[0]
@@ -340,21 +349,21 @@ class _DIGTriggersTable_(QtWidgets.QTableView):
     def getColumnNames(self, ndx:typing.Optional[typing.Union[int, typing.Sequence[int]]] = None,
                     quoted:bool=False, sep:str = ", ", asList:bool=False):
         if ndx is None:
-            ndx = range(self.model().columnCount())
+            ndx = range(self.tableView.model().columnCount())
         
         elif isinstance(ndx, int):
             ndx = [ndx]
         
         elif isinstance(ndx, (list, tuple)):
             if len(ndx) == 0:
-                ndx = range(self.model().columnCount())
+                ndx = range(self.tableView.model().columnCount())
                 
             elif not all(isinstance(v, int) for v in ndx):
                 raise TypeError(f"Invalid row indices specified. Expecting int, sequence of int or None; instead, got {ndx}")
         else:
             raise TypeError(f"Invalid row indices specified. Expecting int, sequence of int or None; instead, got {ndx}")
         
-        values = [self.model().headerData(k, QtCore.Qt.Horizontal).value() for k in ndx]
+        values = [self.tableView.model().headerData(k, QtCore.Qt.Horizontal).value() for k in ndx]
         # link = ", "
         if len(values) == 1:
             ret = f"'{values[0]}'" if quoted else values[0]
@@ -854,7 +863,8 @@ class TriggerDetectDialog(qd.QuickDialog):
         # thsi only informs that the detection had been performed, NOT if any
         # events had been detected!
         self._triggers_detected_ = False # True does NOT imply trigger events had been detected!
-        
+        self._triggers_imported_ = False
+        self._use_trigger_signals_flag_ = True
         self._undoStack_ = deque()
         self._ephysProtocol_ = None
         self._protocolTriggers_ = None
@@ -882,42 +892,64 @@ class TriggerDetectDialog(qd.QuickDialog):
         self.detectionTabWidget.setObjectName("detectionTabWidget")
         self.eventDetectionWidget = TriggerDetectWidget() 
         self.eventDetectionWidget.setObjectName("eventDetectionWidget")
-        self.protocolTriggersWidget = _DIGTriggersTable_()
+        self.protocolTriggersWidget = DIGTriggersWidget()
         self.protocolTriggersWidget.setObjectName("protocolTriggersWidget")
-        self.detectionTabWidget.addTab(self.eventDetectionWidget, "Stimulus Channels")
+        self.detectionTabWidget.addTab(self.eventDetectionWidget, "Trigger Signal Channels")
         self.detectionTabWidget.addTab(self.protocolTriggersWidget, "Recording Protocol")
         
         self.addWidget(self.detectionTabWidget)
         self.protocolTriggersWidget.setEnabled(False)
         self._ephysViewer_.frameChanged[int].connect(self._slot_ephysFrameChanged)
         
-        # self.optionsGroup = qd.HDialogGroup(self)
         self.clearEventsCheckBox = qd.CheckBox(self, "Clear existing")
-        self.inAllSegmentsCheckBox = qd.CheckBox(self, "All segments")
-        # self.optionsGroup.addWidget(self.clearEventsCheckBox)
-        # self.optionsGroup.addWidget(self.inAllSegmentsCheckBox)
+        # self.inAllSegmentsCheckBox = qd.CheckBox(self, "All segments")
+        self.inAllSegmentsCheckBox = self.eventDetectionWidget.allSegmentsCheckBox
         
         self.clearEventsCheckBox.setIcon(QtGui.QIcon.fromTheme("edit-clear-history"))
         self.clearEventsCheckBox.setChecked(self._clear_events_flag_)
         self.clearEventsCheckBox.stateChanged.connect(self._slot_clearEventsChanged)
         
-        self.detectTriggersPushButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("edit-find"),
-                                                              "Detect", parent=self.buttons)
+        # self.detectTriggersPushButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("edit-find"),
+        #                                                       "Detect", parent=self.buttons)
+        self.detectTriggersPushButton = self.eventDetectionWidget.detectPushButton
+        
+        # self.detectTriggersPushButton.setToolTip("Detect events from trigger signals")
+        # self.detectTriggersPushButton.setStatusTip("Detect events from trigger signals")
+        # self.detectTriggersPushButton.setWhatsThis("Detect events from trigger signals")
+        
         self.detectTriggersPushButton.clicked.connect(self.slot_detect)
+        
+        self.importDIGTriggersPushButton = self.protocolTriggersWidget.importPushButton
+        
+        # self.importDIGTriggersPushButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("document-import"),
+        #                                                       "Import", parent=self.buttons)
+        
+        # self.importDIGTriggersPushButton.setToolTip("Import from recording protocol")
+        # self.importDIGTriggersPushButton.setStatusTip("Import from recording protocol")
+        # self.importDIGTriggersPushButton.setWhatsThis("Import from recording protocol")
+        
+        self.importDIGTriggersPushButton.clicked.connect(self.slot_import_from_protocol)
         
         self.undoTriggersPushButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("edit-undo"),
                                                             "Undo", parent=self.buttons)
         self.undoTriggersPushButton.setEnabled(False)
         self.undoTriggersPushButton.clicked.connect(self.slot_undo)
         
+        self.useTriggerSignalsCheckBox = QtWidgets.QCheckBox("Use protocol", parent=self.buttons)
+        
+        self.useTriggerSignalsCheckBox.setChecked(not self._use_trigger_signals_flag_)
+        
+        self.useTriggerSignalsCheckBox.stateChanged.connect(self._slot_useTriggerSignalsChanged)
         # NOTE: 2021-01-06 10:57:10
         # extend/reuse the Quickdialog's own button box => widgets nicely aligned
         # on the same row instead of occupying an additional row
         self.buttons.layout.insertWidget(0, self.clearEventsCheckBox)
-        self.buttons.layout.insertWidget(1, self.inAllSegmentsCheckBox)
-        self.buttons.layout.insertWidget(2, self.detectTriggersPushButton)
-        self.buttons.layout.insertWidget(3, self.undoTriggersPushButton)
-        self.buttons.layout.insertStretch(4)
+        # self.buttons.layout.insertWidget(1, self.inAllSegmentsCheckBox)
+        # self.buttons.layout.insertWidget(2, self.detectTriggersPushButton)
+        # self.buttons.layout.insertWidget(1, self.importDIGTriggersPushButton)
+        self.buttons.layout.insertWidget(1, self.useTriggerSignalsCheckBox)
+        self.buttons.layout.insertWidget(2, self.undoTriggersPushButton)
+        self.buttons.layout.insertStretch(3)
         
         # NOTE: 2021-01-06 11:14:37 also place fancy icons on quickdialog's standard buttons
         self.buttons.OK.setIcon(QtGui.QIcon.fromTheme("dialog-ok-apply"))
@@ -1024,9 +1056,15 @@ class TriggerDetectDialog(qd.QuickDialog):
         r"""PyQt slot called by self.accept() and self.reject() (see QDialog).
         In turn it closes the dialog (equivalent of QWidget.close()).
         """
-        if value == QtWidgets.QDialog.Accepted and not self.detected:
-            if len(self._undoStack_) == 0:
-                self.detect_triggers(False)
+        if value == QtWidgets.QDialog.Accepted:
+            if self._use_trigger_signals_flag_:
+                if not self.detected:
+                    if len(self._undoStack_) == 0:
+                        self.detect_triggers(False)
+            else:
+                if not self.imported:
+                    if len(self._undoStack_) == 0:
+                        self.import_triggers(False)
         else:
             if len(self._undoStack_):
                 self._restore_events_(True)
@@ -1048,6 +1086,10 @@ class TriggerDetectDialog(qd.QuickDialog):
         super().done(value)
         
     @Slot()
+    def _slot_useTriggerSignalsChanged(self):
+        self._use_trigger_signals_flag_ = not self.useTriggerSignalsCheckBox.isChecked()
+        
+    @Slot()
     def _slot_clearEventsChanged(self):
         self._clear_events_flag_ = self.clearEventsCheckBox.selection()
         
@@ -1055,6 +1097,10 @@ class TriggerDetectDialog(qd.QuickDialog):
     def _slot_ephysFrameChanged(self, value):
         if not self.eventDetectionWidget.relTimes:
             self._update_trigger_detect_ranges_(value)
+            
+    @Slot()
+    def slot_import_from_protocol(self):
+        self.import_triggers()
         
     @Slot()
     def slot_detect(self):
@@ -1122,6 +1168,14 @@ class TriggerDetectDialog(qd.QuickDialog):
         self.undoTriggersPushButton.setEnabled(len(self._undoStack_) > 0 )
         
     @property
+    def imported(self) -> bool:
+        return self._triggers_imported_
+    
+    @imported.setter
+    def imported(self, value:bool):
+        self._triggers_imported_ = value == True
+        
+    @property
     def detected(self):
         return self._triggers_detected_
     
@@ -1153,6 +1207,43 @@ class TriggerDetectDialog(qd.QuickDialog):
     @property
     def imaging(self):
         return self.eventDetectionWidget.imaging
+    
+    def import_triggers(self, undoEnabled:bool=True):
+        trigger_model_data = self.protocolTriggersWidget._dataModel_
+        # print(f"{self.__class__.__name__}.import_triggers: trigger model data = {trigger_model_data.modelData}")
+        imported_trigger_events = list(map(lambda row: (row[1][0], row[3]), filter(lambda row: row[2][0], trigger_model_data.modelData)))
+        # print(f"{self.__class__.__name__}.import_triggers: used trigger events = {imported_trigger_events}")
+        
+        if undoEnabled:
+            self._cached_events_ = get_events(self._ephys_) # cache all events, not just the trigger ones
+            self._undoStack_.append(self._cached_events_)
+        
+        if len(imported_trigger_events):
+            segments = self._get_segments_()
+            clear_flag = "triggers" if self._clear_events_flag_ else False
+            
+            for (trigger_events, sweeps) in imported_trigger_events:
+                tevent = trigger_events
+                for sweep in sweeps:
+                    try:
+                        seg = segments[sweep]
+                        if clear_flag == "triggers":
+                            remove_events(seg, triggersOnly=True)
+                        embed_trigger_event(tevent, seg)
+                    except:
+                        traceback.print_exc()
+                        scipywarn(f"Event sweep {sweep} not present in data")
+                        continue
+                    
+                    
+            nEvents = len(get_trigger_events(self.ephysdata, flat=True))
+            self.imported = nEvents > 0
+            self._ephysViewer_.plot(self._ephys_)
+            msg = f"{nEvents} triger events imported from protocol"
+            # if not self.inAllSegmentsCheckBox.isChecked():
+            #     msg += f" in frame {self._ephysViewer_.currentFrame}"
+            self.statusBar.showMessage(msg)
+            self.undoTriggersPushButton.setEnabled(len(self._undoStack_)>0)
     
     def detect_triggers(self, undoEnabled:bool=True):
         from functools import partial
@@ -1232,47 +1323,26 @@ class TriggerDetectDialog(qd.QuickDialog):
                         embed_trigger_event(te, seg)
                         
                         
-#             tp = auto_detect_trigger_protocols(self._ephys_,
-#                                         presynaptic = self.presyn,
-#                                         postsynaptic = self.postsyn,
-#                                         photostimulation = self.photo,
-#                                         imaging = self.imaging,
-#                                         clear = clear_flag,
-#                                         protocols=True, reltimes=True)
-#             
-#             self.triggerProtocols[:] = tp[:]
-            
-            
             nEvents = len(get_trigger_events(self.ephysdata, flat=True))
             self.detected = nEvents > 0
             
-#             if len(self.triggerProtocols) == 0:
-#                 self._restore_events_()
-#                 self.detected = False
-#                 
-#             else:
-#                 self.detected = True
-            # nEvents = len(get_trigger_events(self.ephysdata, flat=True))
-                
-            
-            # cFrame = self._ephysViewer_.currentFrame
-            
             self._ephysViewer_.plot(self._ephys_)
-            # self._ephysViewer_.currentFrame = cFrame
             msg = f"{nEvents} triger events detected"
             if not self.inAllSegmentsCheckBox.isChecked():
                 msg += f" in frame {self._ephysViewer_.currentFrame}"
             self.statusBar.showMessage(msg)
             self.undoTriggersPushButton.setEnabled(len(self._undoStack_)>0)
-            # self.statusBar.showMessage("%d trigger events detected" % nEvents)
             
     # def _get_segments_(self) -> typing.Tuple[list, int]:
     def _get_segments_(self) -> typing.Sequence[Segment]:
         if isinstance(self._ephys_, Block):
-            if self.inAllSegmentsCheckBox.isChecked():
-                segments = list(self._ephys_.segments)
+            if self._use_trigger_signals_flag_:
+                if self.inAllSegmentsCheckBox.isChecked():
+                    segments = list(self._ephys_.segments)
+                else:
+                    segments = [self._ephys_.segments[self._ephysViewer_.currentFrame]]
             else:
-                segments = [self._ephys_.segments[self._ephysViewer_.currentFrame]]
+                segments = list(self._ephys_.segments)
             
         elif isinstance(self._ephys_, typing.Sequence):
             if all(isinstance(s, Segment) for s in self._ephys_):
@@ -1285,6 +1355,7 @@ class TriggerDetectDialog(qd.QuickDialog):
                 segments = list(itertools.chain(*(b.segments for b in self._ephys_)))
                 if not self.inAllSegmentsCheckBox.isChecked():
                     segments = [segments[self._ephysViewer_.currentFrame]]
+
             else:
                 scipywarn(f"Expecting a homogeneous sequence of Blocks or Segments; instead, got a sequence of {set(map(lambda v: type(v).__name__), self._ephys_)}")
                 segments = list()

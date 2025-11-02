@@ -62,10 +62,12 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
     -----------------------------------------
     int                             QSpinBox
     float                           QDoubleSpinBox
+    str                             QLineEdit or QComboBox¹
+    bool                            QCheckBox
     pq.Quantity (scalar)            small_widgets.QuantityChooserWidget
-    str                             QLineEdit
+    Enum value                      QLineEdit or QComboBox¹
 
-    In addition, the delegate can be configured to use a QComboBox by passing
+    ¹In addition, the delegate can be configured to use a QComboBox by passing
     a "columnChoices" parameter (dict) to the constructor, which allows the use
     of a combo box for selecting one of many categories (represented by strings)
 
@@ -80,7 +82,9 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
     # currentText() is not among the combo box items)
     
     def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None,
-                 columnChoices: typing.Optional[dict[int, dict[typing.Sequence, bool]]] = None):
+                 columnChoices: typing.Optional[dict[int, dict[typing.Sequence, bool]]] = None,
+                 immutableColumns: typing.Optional[typing.Sequence[int]] = None,
+                 immutableRows: typing.Optional[typing.Sequence[int]] = None):
         r"""Instantiates a PythonItemDelegate.
 
     Parameters:
@@ -109,6 +113,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
         NOTE: the "choices" field in the column sub-dictionary cannot be empty!
 
+    immutableColumns, immutableRows: columns/rows of model indexes that are uneditable
     
     """
         super().__init__(parent=parent)
@@ -119,6 +124,16 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             
         else:
             self._columnChoices_ = dict() # always keep it as a dict, even when empty
+            
+        if isinstance(immutableColumns, typing.Sequence) and len(immutableColumns) > 0 and all(isinstance(v, int) for v in immutableColumns):
+            self._immutableColumns_ = immutableColumns 
+        else:
+            self._immutableColumns_ = list()
+        
+        if isinstance(immutableRows, typing.Sequence) and len(immutableRows) > 0 and all(isinstance(v, int) for v in immutableRows):
+            self._immutableRows_ = immutableRows 
+        else:
+            self._immutableRows_ = list()
         
     def _checkColumnChoiceDict_(self, d:dict) -> bool:
         if not isinstance(d, dict):
@@ -261,8 +276,15 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         model = index.model()
         
         # print(f"{self.__class__.__name__}.createEditor:\n\t data type: {type(data).__name__}")
-        if hasattr(model, "immutableColumns") and hasattr(model, "immutableRows"):
-            if index.column() in model.immutableColumns and index.row() in model.immutableRows:
+        if isinstance(getattr(model, "immutability", None), dict):
+            immutableColumns = model.immutability.get("columns", list())
+            immutableRows = model.immutability.get("rows", list())
+            jointImmutability = model.immutability.get("joint", False)
+            
+            if jointImmutability and (index.column() in immutableColumns and index.row() in immutableRows):
+                return
+                
+            elif index.column() in immutableColumns or index.row() in immutableRows:
                 return
             
         if index.column() in self._columnChoices_: # TODO: 2025-10-28 09:28:20 finalize me
@@ -333,6 +355,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         disp = index.data(QtCore.Qt.DisplayRole)
         
         if index.column() in self._columnChoices_ and isinstance(editor, QtWidgets.QComboBox):
+            # case where we use a QComboBox
             if not isinstance(data, str):
                 scipywarn(f"{self.__class__.__name__}.createEditor: data type ({type(data).__name__}) is not supported for combo box")
                 return 
