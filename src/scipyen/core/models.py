@@ -366,6 +366,7 @@ def Clements_Bekkers_97(x:np.ndarray | float,
     if isinstance(x, pq.Quantity):
         x = x.magnitude
         
+        
     x = x.flatten()
     
     # α, β, x0, τ1, τ2 = parameters
@@ -402,7 +403,7 @@ def Clements_Bekkers_97(x:np.ndarray | float,
 
 def Clements_Bekkers_97_model(x:np.ndarray | float, parameters:typing.Sequence[float],
                               unit_amplitude:bool=False) -> np.ndarray | float:
-    return Clements_Bekkers_97(x, *p, unit_amplitude = unit_amplitude)
+    return Clements_Bekkers_97(x, *parameters, unit_amplitude = unit_amplitude)
 
 def get_CB_scale_for_unit_amplitude(β:float, τ_rise:float, τ_decay:float, x0:float = 0.):
     efunc       = lambda x, τ: np.exp(-x/τ)

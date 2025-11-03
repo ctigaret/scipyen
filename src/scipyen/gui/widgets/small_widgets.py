@@ -378,7 +378,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         else:
             raise TypeError(f"decimals expected to be an int >= 0 or None; instead, got {decimals}")
 
-        # print(f"{self.__class__.__name__}.__init__:  decimals -> {self.decimals()}")
+        # print(f"{self.__class__.__name__}.__init__:  decimals -> {self.decimals}")
             
         self._internal_minimum = self._default_internal_minimum
         self._internal_maximum = self._default_internal_maximum
@@ -454,7 +454,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             text = "-Inf" if self._magnitude_ in (-np.inf, -math.inf) else "Inf"
             super().setSpecialValueText(text)
         else:
-            text = f"{self._magnitude_:.{self.decimals()}}"
+            text = f"{self._magnitude_:.{self.decimals}}"
             
         super().setSuffix(self._suffix_)
         super().setPrefix(self._prefix_)
@@ -669,8 +669,13 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
     """
         return self._decimals_
     
+    @property
     def decimals(self) -> int:
         return self._decimals_
+    
+    @decimals.setter 
+    def decimals(self, val:int):
+        self.setDecimals(val)
     
     def setDecimals(self, val:int):
         if val < 0:
@@ -682,9 +687,6 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         validator = InftyDoubleValidator(parent=self)
         validator.suffix = self.suffix()
         validator.setDecimals(self.getDecimals()) 
-        # NOTE: 2023-12-19 14:37:35
-        # self.decimals() is a function !!!
-        # validator.setDecimals(self.decimals) # self.decimals inherited from QDoubleSpinBox
         valid = validator.validate(text, pos)
         validstr = validatorString(valid[0])
         # print(f"{self.__class__.__name__}[{self.objectName()}].validate text: {text}, pos: {pos} ⇒ {validstr}")
@@ -736,7 +738,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             elif np.isinf(fval):
                 ret = "-Inf" if fval in (-np.inf, -mathl.inf) else "Inf"
             else:
-                ret = f"{fval:.{self.decimals()}}"
+                ret = f"{fval:.{self.decimals}}"
                 # ret = super().textFromValue(float(value.magnitude))
             
             if len(prefix):
@@ -752,7 +754,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             elif np.isinf(value):
                 ret = "-Inf" if value == -np.inf else "Inf"
             else:
-                ret = f"{value:.{self.decimals()}}"
+                ret = f"{value:.{self.decimals}}"
                 # ret = super().textFromValue(value)
             
             return ret
@@ -796,7 +798,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             
         if isinstance(self._magnitude_, float):
             super().setValue(self._magnitude_)
-            text = f"{self._magnitude_:.{self.decimals()}}"
+            text = f"{self._magnitude_:.{self.decimals}}"
             specialText = "-inf" if self._magnitude_ == -math.inf else "inf" if self._magnitude_ == math.inf else ""
             if len(specialText):
                 super().setSpecialValueText(specialText)
@@ -993,7 +995,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
     The difference is that we use self._magnitude_ instead of self.value()
     """
         value = self._magnitude_
-        decimals = self.decimals()
+        decimals = self.decimals
         minStep = math.pow(10, -decimals)
         absVal = abs(value)
         
@@ -1309,8 +1311,13 @@ class ComplexSpinBox(QtWidgets.QFrame):
         self.realSpinBox.setValue(self._magnitude_.real)
         self.imagSpinBox.setValue(self._magnitude_.imag)
             
+    @property
     def decimals(self) -> tuple:
         return (self.realSpinBox.getDecimals(), self.imagSpinBox.getDecimals())
+    
+    @decimals.setter
+    def decimals(self, value:tuple[int]):
+        self.setDecimals(value)
     
     def setDecimals(self, value:typing.Union[int, typing.Sequence[int]]):
         if isinstance(value, typing.Sequence) and all(isinstance(v, int) for v in value):
@@ -1620,7 +1627,7 @@ class ComplexSpinBox(QtWidgets.QFrame):
         #     text = "-Inf" if self._magnitude_ in (-np.inf, -math.inf) else "Inf"
         #     super().setSpecialValueText(text)
         # else:
-        #     text = f"{self._magnitude_:.{self.decimals()}}"
+        #     text = f"{self._magnitude_:.{self.decimals}}"
             
         self.prefixLabel.setText(self._prefix_)
         self.suffixLabel.setText(self._suffix_)

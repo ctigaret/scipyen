@@ -9481,7 +9481,8 @@ def PSCwaveform(model_parameters, units=pq.pA, t_start=0*pq.s, duration=0.02*pq.
     Parameters:
     ===========
     model_parameters: a sequence of floating point numbers with the parameters
-        for the Clements & Bekkers 97 mEPSC model (see core.models.Clements_Bekkers_97(...))
+        for the Clements & Bekkers 97 mEPSC model (see functions Clements_Bekkers_97(…)
+        and Clements_Bekkers_97_model(…) in core.models module)
     
     Named parameters:
     =================
@@ -9517,7 +9518,7 @@ def PSCwaveform(model_parameters, units=pq.pA, t_start=0*pq.s, duration=0.02*pq.
     if all(isinstance(p, pq.Quantity) for p in model_parameters):
         model_parameters = tuple(float(p.magnitude) for p in model_parameters)
     
-    y = models.Clements_Bekkers_97(x.magnitude, model_parameters)
+    y = models.Clements_Bekkers_97_model(x.magnitude, model_parameters)
     
     dstring = f"Clements_Bekkers_97 α={model_parameters[0]}, β={model_parameters[1]}, x₀={model_parameters[2]}, τ₁={model_parameters[3]}, τ₂={model_parameters[4]}"
     
@@ -9563,10 +9564,10 @@ def detect_Events_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], wavefo
     
         ALTERNATIVELY, the waveform can be specified by a sequence of six scalars, 
         where the first five are the Clements & Bekkers 1997 model parameters:
-        α, β, x₀, τ₁ and τ₂ (see models.Clements_Bekkers_97 for details)
-        and the 6ᵗʰ element is the duration of the model waveform (which will
-        be generated ad-hoc); this last element is assumed to be in the units of
-        the domain of x.
+        α, β, x₀, τ₁ and τ₂ (see functions models.Clements_Bekkers_97(…) and 
+        models.Clements_Bekkers_97_model(…)  for details)  and the 6ᵗʰ element is 
+        the duration of the model waveform (which will be generated ad-hoc); this 
+        last element is assumed to be in the units of the domain of x.
     
         By default, waveform is (0., -1., 0.01, 0.001, 0.01, 0.05) which means,
         for a membrane current signal `x` in pA:
@@ -9589,7 +9590,7 @@ def detect_Events_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], wavefo
         sr          = 1e4   # [Hz]
         
         t = np.linspace(0, duration, num = sr * duration)
-        model = models.Clements_Bekkers_97(x, parameters)
+        model = models.Clements_Bekkers_97_model(x, parameters)
         
         As a convenience, you can use PSCwaveform(...) function in this module to
         generate a synthetic  waveform as a neo.AnalogSignal.
@@ -9712,7 +9713,7 @@ def detect_Events_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], wavefo
             ret.append(ret_)
             
     if len(ret):
-        result = neo.core.spiketrainlist.SpikeTrainList(items = ret, segment=x.segment)
+        result = neo.core.spiketrainlist.SpikeTrainList(items = ret)#, segment=x.segment)
         for st in result:
             st.segment = x.segment
             
@@ -10144,10 +10145,10 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.
     
         ALTERNATIVELY, the waveform can be specified by a sequence of six scalars, 
         where the first five are the Clements & Bekkers 1997 model parameters:
-        α, β, x₀, τ₁ and τ₂ (see models.Clements_Bekkers_97 for details)
-        and the 6ᵗʰ element is the duration of the model waveform (which will
-        be generated ad-hoc); this last element is assumed to be in the units of
-        the domain of x.
+        α, β, x₀, τ₁ and τ₂ (see functions models.Clements_Bekkers_97(…) and
+        models.Clements_Bekkers_97_model(…) for details)  and the 6ᵗʰ element is 
+        the duration of the model waveform (which will be generated ad-hoc); this 
+        last element is assumed to be in the units of the domain of x.
     
         By default, waveform is (0., -1., 0.01, 0.001, 0.01, 0.05) which means,
         for a membrane current signal `x` in pA:
@@ -10170,7 +10171,7 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.
         sr          = 1e4   # [Hz]
         
         t = np.linspace(0, duration, num = sr * duration)
-        model = models.Clements_Bekkers_97(x, parameters)
+        model = models.Clements_Bekkers_97_model(x, parameters)
         
         As a convenience, you can use PSCwaveform(...) function in this module 
         to generate a synthetic  waveform as a neo.AnalogSignal.

@@ -602,7 +602,7 @@ def fit_Event_model(data, p0, **kwargs):
             t: independent variable
             y: the data (dependent variable)
         """
-        yf = models.Clements_Bekkers_97(t, x)
+        yf = models.Clements_Bekkers_97_model(t, x)
         
         ret = y-yf
         
@@ -732,7 +732,7 @@ def fit_Event_model(data, p0, **kwargs):
     res_x = list(res.x.flatten())
     
     # create fitted curve
-    fC = models.Clements_Bekkers_97(xdata, res_x)
+    fC = models.Clements_Bekkers_97_model(xdata, res_x)
     
     sst = np.sum( (ydata - ydata.mean()) ** 2.)
     
@@ -745,9 +745,10 @@ def fit_Event_model(data, p0, **kwargs):
     result["Fit"] = res
     result["Coefficients"] = res_x
     result["Rsq"] = rsq
+    # result["Accept"] = True
     
     # reconstruct final fitted curve (REMEMBER: we have taken out the NaNs!)
-    initialSupport = np.full((data.shape[0],), np.NaN)
+    initialSupport = np.full((data.shape[0],), np.nan)
     
     fittedCurve = initialSupport.copy()
     

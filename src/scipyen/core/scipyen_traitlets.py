@@ -1378,7 +1378,7 @@ class NeoDataObjectTrait(NeoBaseNeoTrait):
                 result = np.all(old_value.array_annotations == new_value.array_annotations)
                 
         except:
-            traceback.print_exc()
+            # traceback.print_exc()
             result = False
             
         return result

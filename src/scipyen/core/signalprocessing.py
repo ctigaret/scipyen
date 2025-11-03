@@ -815,6 +815,8 @@ def state_levels(x: np.ndarray, **kwargs):
             These are passed as arguments to generate_bin_width() function (in this module)
 
             Their default values are, respectively: 15 bit, 10 V, and 1 (for Axon Digidata 1550)
+    
+            WARNING: generate_bin_width() may generatge unreasonably large numbers of bins!
 
     levels: float or sequence of floats
 
@@ -958,7 +960,7 @@ def state_levels(x: np.ndarray, **kwargs):
 def remove_dc(
     x,
     value: typing.Optional[typing.Union[pq.Quantity, np.ndarray]] = None,
-    channel: typing.Optional[int] = None,
+    channel: typing.Optional[int] = None, **kwargs
 ):
     r"""Returns a copy of x with DC offset removed.
 
@@ -1003,6 +1005,11 @@ def remove_dc(
             sequence of unique valid indices) in the half open interval
 
             [ -x.size[1], x.size[1] )
+    
+    Var-positional parameters (**kwargs, see estimate_dc and state_levels:
+        bins:typing.Optional[int] = None, bw:typing.Optional[float]=None,
+        adcres:typing.Optional[float]=None, adcrange:typing.Optional[float]=None,
+        adcscale:typing.Optional[float]=None
 
     Returns:
     ========
@@ -1010,6 +1017,12 @@ def remove_dc(
     A copy of the signal `x` with the DC ("baseline") removed.
 
     """
+    bins = kwargs.get("bins", None)
+    bw = kwargs.get("bw", None)
+    adcres = kwargs.get("adcres", None)
+    adcrange = kwargs.get("adcrange", None)
+    adcscale = kwargs.get("adcscale", None)
+    
     if not isinstance(x, np.ndarray):
         raise TypeError(f"Expecting a numpy array; got {type(x).__name__} instead")
     if x.ndim > 2:
@@ -1022,16 +1035,6 @@ def remove_dc(
 
     else:
         xx = x
-
-    #     def __guess_dc_(x_):
-    #         levels, counts, edges, ranges = state_levels(x_)
-    #
-    #         levelSizes = [np.sum(counts[level_range]) for level_range in ranges]
-    #
-    #         ndx = np.argmax(levelSizes)
-    #         val = levels[ndx]
-    #
-    #         return val
 
     yy = np.full_like(xx, np.nan)
 
@@ -1134,7 +1137,7 @@ def remove_dc(
                     val = value[0]
 
                 elif value is None:
-                    val = estimate_dc(xx[:, k])
+                    val = estimate_dc(xx[:, k], bins=bins, bw=bw, adcres=adcres, adcrange=adcrange, adcscale=adcscale)
 
                 yy[:, k] = xx[:, k] - val
 
@@ -1148,7 +1151,7 @@ def remove_dc(
                 val = value[0]
 
             else:
-                val = __guess_dc_(xx[:, channel])
+                val = estimate_dc(xx[:, channel], bins=bins, bw=bw, adcres=adcres, adcrange=adcrange, adcscale=adcscale)
 
             yy[:, channel] = xx[:, channel] - val
 
@@ -1163,7 +1166,7 @@ def remove_dc(
                     val = value[0] if len(value) == 1 else value[k]
 
                 else:
-                    val = __guess_dc_(xx[:, c])
+                    val = estimate_dc(xx[:, c], bins=bins, bw=bw, adcres=adcres, adcrange=adcrange, adcscale=adcscale)
 
                 yy[:, c] = xx[:, c] - val
 
@@ -1175,7 +1178,7 @@ def remove_dc(
             val = value[0]
 
         else:
-            val = __guess_dc_(xx)
+            val = estimate_dc(xx, bins=bins, bw=bw, adcres=adcres, adcrange=adcrange, adcscale=adcscale)
 
         yy = xx - val
 
@@ -1531,8 +1534,13 @@ def sosfilter(sig: typing.Union[pq.Quantity, np.ndarray], kernel: np.ndarray):
     return ret
 
 
-def estimate_dc(x_):
-    levels, counts, edges, ranges = state_levels(x_)
+def estimate_dc(x_, bins:typing.Optional[int] = None, bw:typing.Optional[float]=None,
+                    adcres:typing.Optional[float]=None, adcrange:typing.Optional[float]=None,
+                    adcscale:typing.Optional[float]=None):
+    r"""Estimate the DC component of a signal"""
+    levels, counts, edges, ranges = state_levels(x_, bins = bins, bw = bw,
+                                                 adcres = adcres, adcrange=adcrange,
+                                                 adcscale=adcscale)
 
     levelSizes = [np.sum(counts[level_range]) for level_range in ranges]
 
