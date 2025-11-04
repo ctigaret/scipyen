@@ -9915,7 +9915,8 @@ def slide_detect(x:np.ndarray, h:np.ndarray, padding:bool=True, data_cache = Non
         
     # return θ , α, β, ε, σ, xx
     
-def extract_event_waveforms(x:typing.Union[neo.AnalogSignal, DataSignal], duration, θ, threshold, peakfunc):
+def extract_event_waveforms(x:typing.Union[neo.AnalogSignal, DataSignal], 
+                            duration:pq.Quantity, θ:pq.Quantity, threshold, peakfunc) -> neo.SpikeTrain | None:
     r"""
     Extracts detected mPSC waveforms.
     
@@ -9930,12 +9931,16 @@ def extract_event_waveforms(x:typing.Union[neo.AnalogSignal, DataSignal], durati
     
     Parameters:
     ==========-
-    x: single-channel signal
-    duration: duration of the mPSC template 
+    x: single-channel signal (neo.AnalogSignal or DataSignal)
+    
+    duration: duration of the mPSC template (Quantity in units of the signal domain)
+    
     θ: single-channel signal with detection criterion (can be cross-correlation
         of the result of sliding deteciton algorithm)
+    
     threshold: scalar detection threshold; samples in the θ that are >= threshold 
         are considered to correspond to samples in the detected mPSCs
+    
     peakfunc: function to extract the sample index of the extremum in the 
         mPSC waveform (i.e., either argmax, for upward event waveform, or argmin
         for downward event waveform)
@@ -10120,7 +10125,12 @@ def extract_event_waveforms(x:typing.Union[neo.AnalogSignal, DataSignal], durati
     
     return ret
 
-def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.Union[np.ndarray, tuple, list]=(0., -1., 0.01, 0.001, 0.01, 0.02), useCBsliding:bool=False, threshold:typing.Optional[float]=None, outputDetection:bool=False, raw_signal=None):
+def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal], 
+                  waveform:typing.Union[np.ndarray, tuple, list]=(0., -1., 0.01, 0.001, 0.01, 0.02), 
+                  useCBsliding:bool=False,
+                  threshold:typing.Optional[float]=None,
+                  outputDetection:bool=False, 
+                  raw_signal=None):
     r"""Detect spontaneous events in a signal.
 
     Uses cross-correlation with a waveform, or the sliding detection algorithm
@@ -10132,7 +10142,8 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.
     x: neo.AnalogSignal containing the recorded membrane current that 
         will be scanned for events. Typically this is single-channel, meaning it
         is a 2D array with a singleton 2nd axis (e.g., x.shape = (n,1) where `n`
-        is the number of samples in `x`)
+        is the number of samples in `x`); this function supports multi-channel
+        signals (i.e., with x.shape[1] > 1)
     
     waveform: neo.AnalogSignal or 1D numpy array (vector, i.e., 
         waveform.shape = (m,) where `m` is the number of samples in `waveform`).
@@ -10198,33 +10209,53 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.
     
     raw_signal: analog signal with the same shape and domain as the signal where
         the detection took place, default is None
-        When given, the waveforms will be extracted from THIS signal using the 
-        time stamps in the spike train.
+    
+        When given, this should be the un-filtered version of the signbal where 
+        events are detected; the event waveforms will be extracted from THIS 
+        signal using the time stamps in the spike train.
+    
         This is useful when detection was performed on a pre-processed (e.g., 
-        smoothed) signal but the "raw" waveforms are required.
+        smoothed or otherise filtered) signal, while the intention is to retrieve 
+        the "raw" (unfiltered) waveforms.
     
     Returns:
     ========
-    A dict with keys:
-    "mini_starts": a quantity array with the start times of the detected waveforms
     
-    "mini_peaks": a quantity array with the times of the "mini's" peak (or trough)
+    result, thetas, 
+
+    where:
     
-    "minis": a list of AnalogSignal objects with the detected "mini" waveforms.
+    result: neo.SpikeTrainList or None
+    thetas: None, or list of normalized detection (i.e., cross-correlation) signals
+        (either neo.AnalogSignal or DataSignal, depending on type of 'x'), one for
+        each channel in the signal 'x'
     
-    "waveform": the actual waveform used as model or "template". 
+    NOTE: a 'channel' here is a signal slice in the 2nd axis
     
-        This is either:
-    
-        • the realization of the synthetic mPSC (when the `waveform` parameter 
-            is the sequence of model parameters)
-    
-        • the `waveform` parameters itself, when it is a template (synthetic or
-            otherwise)
-        
-    ATTENTION: When detection has failed, returns None
     
     """
+# NOTE: 
+#  BEGIN OBSOLETE documentation
+#     A dict with keys:
+#     "mini_starts": a quantity array with the start times of the detected waveforms
+#     
+#     "mini_peaks": a quantity array with the times of the "mini's" peak (or trough)
+#     
+#     "minis": a list of AnalogSignal objects with the detected "mini" waveforms.
+#     
+#     "waveform": the actual waveform used as model or "template". 
+#     
+#         This is either:
+#     
+#         • the realization of the synthetic mPSC (when the `waveform` parameter 
+#             is the sequence of model parameters)
+#     
+#         • the `waveform` parameters itself, when it is a template (synthetic or
+#             otherwise)
+#         
+#     ATTENTION: When detection has failed, returns None
+#  END  OBSOLETE documentation
+    
     # print(f"membrane.detect_Events: waveform is a {type(waveform).__name__}")
     if not isinstance(x, (neo.AnalogSignal, DataSignal)):
         raise TypeError(f"Expecting a neo.AnalogSignal or DataSignal; got a {type(x).__name__} instead")
@@ -10247,6 +10278,7 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.
     
     if isinstance(waveform, neo.core.basesignal.BaseSignal):
         mini_duration = waveform.duration
+        
     else:
         # NOTE: 2022-10-25 18:16:26
         # you need to make sure the waveform (if a plain numpy array) has the
@@ -10263,7 +10295,7 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.
             
     else:
         # 1) normalize the model waveform - only for the cross-correlation method
-        # if not useCBsliding:
+        # i.e. when not useCBsliding:
         mdl = sigp.normalise_waveform(waveform)
         
         mdl = np.atleast_2d(waveform)
@@ -10272,15 +10304,13 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.
             mdl = mdl.T
             
         N = mdl.shape[0]
-        M = x.shape[0]
+        M = x.shape[0] # number of samples per signal domain
 
-        # a list of cross-correrlation signals, one per signal channel (i.e. each
+        # a list of cross-correlation vectors, one per signal channel (i.e. each
         # data on 2nd axis)
         xc = [scipy.signal.correlate(x[:,k], mdl, mode="valid") for k in range(x.shape[1])]
         
         ret = list()
-        
-        # waves = list()
         
         # for each cross-correlation:
         # • detrend it
@@ -10291,6 +10321,11 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.
         thetas = list()
         
         for k, c in enumerate(xc):
+            # NOTE: 2025-11-04 14:22:44
+            # 'c' is a cross-correlation vector (1D array)
+            # 'dxc' is the detrended version of 'c'
+            # 'threshold' is 10 × dxc RMS / dxc.max()
+            # 'dxc_n' is the scaled version of the 'dxc' (ie. scaled to 10/dxc.max())
             dxc = scipy.signal.detrend(c, type="constant",axis=0)
             if threshold is None:
                 thr = sigp.rms(dxc) * 10 / dxc.max()
@@ -10300,6 +10335,10 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.
             dxc_n = np.copy(dxc) # because next is mod-ing in place
             dxc_n = sigp.scale_waveform(dxc_n, 10, np.max(dxc[~np.isnan(dxc)]))
 
+            # θ and θ_norm are an "analog" signals wrapping, respectively, the dxc
+            # and the dxc_n vectors;
+            # only θ_norm is returned, as element of 'thetas'
+            
             θ = type(x)(dxc, units = pq.dimensionless, t_start = x.t_start,
                         sampling_rate = x.sampling_rate,
                         name = f"{x.name}_θ",
@@ -10312,11 +10351,21 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.
             
             thetas.append(θ_norm)
             
+            # extract event waveforms, either from:
+            # • x (which is either a filtered signal or a raw, unfilterd signal)
+            # • raw_signal, if given (when going after raw waveforms, having
+            #   performed the detectino of a filtered signal)
+            #
+            # In either case, the 'extract_event_waveforms' function returns a 
+            # possibly empty) SpikeTrain
+            #
             if isinstance(raw_signal, type(x)) and raw_signal.shape == x.shape and \
                 raw_signal.sampling_rate == x.sampling_rate and raw_signal.times.units == x.times.units and \
                     raw_signal.t_start == x.t_start and raw_signal.units == x.units:
+                # extract event waveforms from the unfilteterd signal 'raw_signal'
                 ret_ = extract_event_waveforms(raw_signal[:,k], mini_duration, dxc_n, thr, peakfunc)
             else:
+                # extract event waveforms from the (possibily filtered) signal 'x'
                 ret_ = extract_event_waveforms(x[:,k], mini_duration, dxc_n, thr, peakfunc)
             
             if isinstance(ret_, neo.SpikeTrain):
@@ -10333,6 +10382,7 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.
                 return
         
         result = neo.core.spiketrainlist.SpikeTrainList(items = ret, segment=x.segment)
+        
         for st in result:
             st.segment = x.segment
         
@@ -10340,8 +10390,6 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.
             return result, thetas
         else:
             return result
-
-    
 
 def prep_for_nsfa(data):
     r"""Helper for the nsfa function
