@@ -68,6 +68,10 @@ CALLABLE_TYPES = (
     types.MethodDescriptorType,
     types.ClassMethodDescriptorType,
 )
+TYPING_TYPES = (typing._GenericAlias, 
+                typing._SpecialGenericAlias, 
+                typing._UnionGenericAlias,
+                types.UnionType, types.GenericAlias)
 
 class Versiontuple3: pass  # to be picked up in Kate editor's symbolviewer plugin
 VersionTuple3 = namedtuple("VersionTuple3", ["major", "minor", "micro"])
@@ -1504,7 +1508,7 @@ def deprecation(msg):
     warnings.warn(msg, DeprecationWarning, stacklevel=2)
 
 
-def get_func_param_types(func: typing.Callable):
+def get_func_param_types(func: typing.Callable, report_components:bool=False):
     r"""Quick'n dirty parser of function parameter types
 
         Returns a dict: param_name ↦ tuple(type_or_types, kind), where:
@@ -1524,8 +1528,26 @@ def get_func_param_types(func: typing.Callable):
     Parameter.KEYWORD_ONLY              'b' and 'c' in bar(*args, b, c=0, …)
     Parameter.VAR_KEYWORD               'kwargs' in baz(a, b, **kwargs)
 
+    Parameters:
+    ===========
+    func: an annotated function
+    report_components: when True, also report the types qualifiers of parameters
+        parameters of 'func' that are of Sequence or Mapping type
+    
+        Default is False
+
+    NOTE:
+    type.UnionType  is reported as a set of component types
+    
+    When report_components is True:
+    
+    typing.Sequence is reported as the tuple (Sequence, set of specified element types)
+    typing.Mapping  is reported as a dict (mapping) of key type ↦ value type
+        either of which may be annotated as Union of types, with the constraint
+        that key types must be Hashable — this is NOT checked here
 
     """
+    
     if isinstance(func, functools.partial):
         fn = func.func
         pargtypes = tuple(type(a) for a in func.args)
@@ -1547,18 +1569,52 @@ def get_func_param_types(func: typing.Callable):
         if isinstance(ptype, type):
             t = ptype
 
-        elif isinstance(ptype, (tuple, list)) and all(
+        elif isinstance(ptype, (typing.Sequence)) and all(
             isinstance(t, type) for t in ptype
         ):
             t = tuple(ptype)
+            
+        elif isinstance(ptype, TYPING_TYPES):
+            # print(f"ptype {ptype} in TYPING_TYPES")
+            if isinstance(ptype, types.UnionType):
+                t = set(typing.get_args(ptype))
+            else:
+                ptype_origin = typing.get_origin(ptype)
+                if isinstance(ptype_origin, TYPING_TYPES) and hasattr(ptype_origin, "__args__"):
+                    t = typing.get_args(ptype_origin)
+                elif ptype_origin.__module__ == "collections.abc":
+                    if ptype_origin == collections.abc.Mapping:
+                        t = dict((typing.get_args(ptype), ))
+                    elif ptype_origin == collections.abc.Sequence:
+                        if report_components:
+                            ptype_args = tuple(map(lambda t_: unwind_type_sig(t_, False), typing.get_args(ptype)))
+                            t = (ptype_origin, ) + ptype_args
+                            # get_t = lambda t: tuple(t)[0] if len(t) == 1 else t
+                            # ptype_args = tuple(map(lambda t_: get_t(unwind_type_sig(t_, False)), typing.get_args(ptype)))
+                            # t = ptype_args
+                        else:
+                            t = ptype_origin
+            
+        elif isinstance(type(ptype), TYPING_TYPES):
+            # print(f"ptype's type ({type(ptype)}) in TYPING_TYPES")
+            t = typing.get_origin(type(ptype))
+            if isinstance(t, TYPING_TYPES) and hasattr(t, "__args__"):
+                t = typing.get_args(t)
+            
+            
 
-        elif type(ptype).__name__ in dir(typing):
-            t = typing.get_origin(ptype)
-            if t.__name__ in dir(typing):
-                t = typing.get_args(ptype)
+        # elif type(ptype).__name__ in dir(typing) or type(ptype).__name__ in dir(types):
+        #     # NOTE: UnionType is actually in the types module
+        #     t = typing.get_origin(ptype)
+        #     if t.__name__ in dir(typing) or t.__name__ in dir(types):
+        #         t = typing.get_args(ptype)
 
         else:
-            warnings.warn(f"Cannot parse the type of {name} parameter")
+            scipywarn(f"Cannot parse the type of {name} parameter")
+            continue
+        
+        # if name=="x":
+        #     print(f"resolved = {t}")
 
         if (isinstance(t, (tuple, list)) and all(t_ not in pargtypes for t_ in t)) or (
             t not in pargtypes
@@ -2022,8 +2078,13 @@ def full_class_name(data):
 
     return ".".join([data.__module__, data.__name__])
 
-def unwind_type_sig(x, visited:set = set()):
-    """Unwinds type annotation to its component types.
+def unwind_type_sig(x, include_x:bool=False):
+    r"""Unwinds a type annotation to its component types."""
+    visited = set()
+    return unwind_type(x, include_x, visited)
+
+def unwind_type(x, include_x:bool=False, visited:set = set()):
+    r"""Unwinds a type to its component types.
 This includes special aliases defined in the ``types`` and ``typing`` standard 
 library modules.
     
@@ -2053,10 +2114,14 @@ library modules.
     if isinstance(x, type):
         visited.add(x)
         return visited
-    elif isinstance(x, (typing._GenericAlias, typing._SpecialGenericAlias, types.UnionType, types.GenericAlias)):
-        visited.add(x)
-        unwind_type_sig(x.__args__, visited = visited)
+    
+    elif isinstance(x, TYPING_TYPES):
+        if hasattr(x, "__args__"):
+            unwind_type(x.__args__, visited=visited)
+        if include_x:
+            visited.add(x)
         return visited
+    
     elif not isinstance(x, (tuple, list)):
         return visited
     
@@ -2064,14 +2129,19 @@ library modules.
     
     for v in x:
         visited.add(v)
+        
         if isinstance(v, type):
             visited.add(v)
+            
         elif isinstance(v, (tuple, list)):
-            unwind_type_sig(v, visited=visited)
-        elif isinstance(v, (typing._GenericAlias, typing._SpecialGenericAlias, types.UnionType, types.GenericAlias)):
+            unwind_type(v, include_x=include_x, visited=visited)
+            
+        elif isinstance(v, TYPING_TYPES):
             if hasattr(v, "__args__"):
-                unwind_type_sig(v.__args__, visited=visited)
-            visited.add(v)
+                unwind_type(v.__args__, visited=visited)
+            if include_x:
+                visited.add(v)
+            
     return visited
 
 def get_positional_named_annotations(f:typing.Union[types.FunctionType, types.MethodType]) -> list:

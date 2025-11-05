@@ -109,7 +109,7 @@ from core.basescipyen import BaseScipyenData
 from core.triggerevent import (TriggerEvent, TriggerEventType)
 from core.triggerprotocols import (TriggerProtocol, auto_define_trigger_events, auto_detect_trigger_protocols)
 
-from core.prog import (safewrapper, with_doc, scipywarn, print_styled)
+from core.prog import (safewrapper, with_doc, scipywarn, print_styled, get_func_param_types)
 #from core.patchneo import *
 
 #### END Scipyen core modules
@@ -9469,7 +9469,8 @@ def is_AP_spiketrain(x):
     
     return ret
 
-def PSCwaveform(model_parameters, units=pq.pA, t_start=0*pq.s, duration=0.02*pq.s, sampling_rate=1e4*pq.Hz):
+def PSCwaveform(model_parameters, units=pq.pA, t_start=0*pq.s, duration=0.02*pq.s, 
+                sampling_rate=1e4*pq.Hz, model_func:typing.Optional[typing.Callable] = None):
     r"""Helper function to generate a synthetic post-synaptic current waveform.
 
     The waveform realizes the Clements & Bekkers 1997 model as a neo.AnalogSignal.
@@ -9503,6 +9504,9 @@ def PSCwaveform(model_parameters, units=pq.pA, t_start=0*pq.s, duration=0.02*pq.
         to be in quantities.Hz
     
         Default is 1e4 Hz.
+    
+    model_func: a function to procuce a waveform given model_parameters
+        Optional default is None, in which case PSCwaveform uses Clements_Bekkers_97_model(…)
     
     Returns:
     ========
@@ -10131,10 +10135,19 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal],
                   threshold:typing.Optional[float]=None,
                   outputDetection:bool=False, 
                   raw_signal=None):
-    r"""Detect spontaneous events in a signal.
-
-    Uses cross-correlation with a waveform, or the sliding detection algorithm
-    by Clements & Bekkers, 1997, (Biophys J.).
+    r"""Detect the onset times of events in a signal.
+    
+    Here, an "event" is a waveform, embedded in the signal, corresponding to a
+    particular biological event, e.g., a synaptic response such as an 
+    (I/E)PS(P/C), an action potential, or any other biologically meaningful
+    waveform.
+    
+    The detection is carried out by scanning the signal for a waveform given as 
+    a "template", or by a function that generates such a waveform on the fly.
+    
+    The actual signal scanning is implemented as the cross-correlation of the 
+    signal with the template waveform, or by using the "sliding detection"
+    algorithm in Clements & Bekkers, 1997, (Biophys J.).
     
     Parameters:
     ==========
@@ -10153,6 +10166,23 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal],
     
         ATTENTION: Make sure this model waveform has the SAME SAMPLING RATE as 
         the signal!!!
+    
+        ALTERNATIVELY, the waveform can be specified by the mapping
+        "function" ↦ function, "params"  ↦ sequence of scalars, where:
+    
+        "function" is a model function (e.g., models.Clements_Bekkers_97(…) or
+        models.Clements_Bekkers_97_model(…))
+    
+        "params" is a sequence of N+1 scalars, with first N scalars being the 
+        parameters expected by "function" and the last one being the duration of
+        the template waveformk (Quantity scalar in units of the domain of 'x')
+    
+    
+        where the first five are the Clements & Bekkers 1997 model parameters:
+        α, β, x₀, τ₁ and τ₂ (see functions models.Clements_Bekkers_97(…) and
+        models.Clements_Bekkers_97_model(…) for details)  and the 6ᵗʰ element is 
+        the duration of the model waveform (which will be generated ad-hoc); this 
+        last element is assumed to be in the units of the domain of x.
     
         ALTERNATIVELY, the waveform can be specified by a sequence of six scalars, 
         where the first five are the Clements & Bekkers 1997 model parameters:
@@ -10263,6 +10293,23 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal],
     if isinstance(waveform, (np.ndarray,neo.core.basesignal.BaseSignal)):
         if not  datatypes.is_vector(waveform):
             raise TypeError("waveform expected to be a vector")
+        
+    elif isinstance(waveform, dict):
+        model_func = waveform.get("function", None)
+        if not inspect.isfunction(model_func):
+            raise TypeError("Invalid waveform mapping; expecting a mapping containing a field 'function' mapped to a function")
+        model_params = waveform.get("params", None)
+        if not isinstance(model_params, typing.Sequence):
+            raise TypeError("Invalid waveform mapping; expecting a mapping containing a field 'params' mapped to a sequence of scalars")
+            
+        
+        model_func_params = get_func_param_types(model_func)
+        if ["x"] not in model_func_params:
+            raise ValueError(f"Wrong function passed for model function; first parameter")
+        
+        
+        
+            
     
     elif isinstance(waveform, (tuple, list)):
         if len(waveform) == 6:
