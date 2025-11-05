@@ -94,20 +94,33 @@ def biexponential_decay(x:typing.Union[np.ndarray, float],
     r"""Decay modelled as a bi-exponential"""
     return β0 * np.exp(-x / τ0) + β1 * np.exp(-x / τ1)
 
-def biexponential_decay_model(x:typing.Union[np.ndarray, float], 
-                              p:typing.Sequence) -> np.ndarray | float:
-    return biexponential_decay(x, *p)
+# def biexponential_decay_model(x:typing.Union[np.ndarray, float], 
+#                               p:typing.Sequence) -> np.ndarray | float:
+#     return biexponential_decay(x, *p)
 
-def biased_biexponential_decay(x:np.ndarray | float, 
-                               α:float, β0:float, β1:float, τ0:float, τ1:float) -> np.ndarray | float:
+def biased_biexponential_decay(x:np.ndarray | float, α:float|typing.Sequence[float],/, 
+                               β0:typing.Optional[float]=None, β1:typing.Optional[float]=None, 
+                               τ0:typing.Optional[float]=None, τ1:typing.Optional[float]=None) -> np.ndarray | float:
+    if isinstance(α, typing.Sequence) and len(α) == 5 and all(isinstance(v, float) for v in α):
+        α, β0, β1, τ0, τ1 = α
+        
+    if not all(isinstance(v, float) for v in (α, β0, β1, τ0, τ1)):
+        raise TypeError("Expecting a comma-separated list of 5 parameters or a sequence of 5 parameters (α, β0, β1, τ0, τ1)")
+
     return α + β0 * np.exp(-x / τ0) + β1 * np.exp(-x / τ1)
 
-def biased_biexponential_decay_model(x:typing.Union[np.ndarray, float], 
-                                     p:typing.Sequence[float]) -> np.ndarray | float:
-    return biased_biexponential_decay(x, *p)
+# def biased_biexponential_decay_model(x:typing.Union[np.ndarray, float], 
+#                                      p:typing.Sequence[float]) -> np.ndarray | float:
+#     return biased_biexponential_decay(x, *p)
     
 def generic_biexponential_decay(x: np.ndarray | float, 
                                 α:float, β0:float, β1:float, x0:float, τ0:float, τ1:float) -> np.ndarray | float:
+    if isinstance(α, typing.Sequence) and len(α) == 6 and all(isinstance(v, float) for v in α):
+        α, β0, β1, x0, τ0, τ1 = α
+        
+    if not all(isinstance(v, float) for v in (α, β0, β1, x0, τ0, τ1)):
+        raise TypeError("Expecting a comma-separated list of 6 parameters or a sequence of 6 parameters (α, β0, β1, τ0, τ1)")
+
     return α + β0 * np.exp(-(x-x0) / τ0) + β1 * np.exp(-(x-x0) / τ1)
 
 def generic_biexponential_decay_model(x:np.ndarray | float,
@@ -152,6 +165,12 @@ def generic_exponential_prod_decay(x: np.ndarray | float,
 The other parameters are as for generic_single_exponential_decay.
     
 """
+    if isinstance(α, typing.Sequence) and all(isinstance(v, float) for v in α):
+        α, β, x0 = α
+        
+    if not all(isinstance(v, float) for v in (α, β0, β1, x0, τ0, τ1)):
+        raise TypeError("Expecting a comma-separated list of 6 parameters or a sequence of 6 parameters (α, β0, β1, τ0, τ1)")
+
     if len(τ) == 0:
         raise ValueError(f"τ must be supplied")
     elif len(τ) == 1:
@@ -317,7 +336,9 @@ def nsfa_model(x:np.ndarray | float, parameters:typing.Sequence[float]) -> np.nd
     return nfsa(x, *p)
 
 def Clements_Bekkers_97(x:np.ndarray | float,
-                        α:float, β:float, x0:float, τ1:float, τ2:float,
+                        α:typing.Union[float, typing.Sequence[float]], /, 
+                        β:typing.Optional[float] = None, x0:typing.Optional[float] = None, 
+                        τ1:typing.Optional[float] = None, τ2:typing.Optional[float] = None,
                         **kwargs) -> np.ndarray | float:
     r"""
     Clements & Bekkers 1997 mEPSC waveform (alphafunction-like).
@@ -347,7 +368,7 @@ def Clements_Bekkers_97(x:np.ndarray | float,
     α, β, x₀, τ₁ and τ₂: float scalars, where:
         α is considered in pA,
         β is dimensionless,
-        x₀, τ₁ and τ₂ are considered in s
+        x₀, τ₁ and τ₂ are considered to be given in s
 
         and τ₁ > 0 τ₂ > 0
     
@@ -369,6 +390,15 @@ def Clements_Bekkers_97(x:np.ndarray | float,
         
     x = x.flatten()
     
+    # NOTE: 2025-11-05 21:31:27
+    # allow passing all parameters packed in a sequence, so as to do away with 
+    # the *_model version of this function
+    if isinstance(α, typing.Sequence) and len(α) == 5 and all(isinstance(v, float) for v in α):
+        α,  β, x0, τ1, τ2 = α
+        
+    if not all(isinstance(v, float) for v in (α,  β, x0, τ1, τ2)):
+        raise TypeError("Expecting a sequence of 'α,  β, x₀, τ₁ τ₂' scalar floats or a comma-separated list of scalar floats for 'α,  β, x₀, τ₁ τ₂'")
+        
     # α, β, x0, τ1, τ2 = parameters
     
     xx = x-x0
@@ -380,7 +410,7 @@ def Clements_Bekkers_97(x:np.ndarray | float,
     y = np.full_like(xx, 0.)
     
     
-    if any(v == 0 for v in (τ2, τ2)):
+    if any(v == 0 for v in (τ1, τ2)):
         y += α
         y[xx>=0] = np.nan
     else:
@@ -397,15 +427,14 @@ def Clements_Bekkers_97(x:np.ndarray | float,
             
         y[xx>=0] = β * rise * decay
         y += α
-        # y[xx>=0] = α + β * (1 - np.exp(-xx[xx>=0]/τ₁)) * np.exp(-xx[xx>=0]/τ₂)
     
     return y
 
-def Clements_Bekkers_97_model(x:np.ndarray | float, parameters:typing.Sequence[float],
-                              unit_amplitude:bool=False) -> np.ndarray | float:
-    return Clements_Bekkers_97(x, *parameters, unit_amplitude = unit_amplitude)
+# def Clements_Bekkers_97_model(x:np.ndarray | float, parameters:typing.Sequence[float],
+#                               unit_amplitude:bool=False) -> np.ndarray | float:
+#     return Clements_Bekkers_97(x, *parameters, unit_amplitude = unit_amplitude)
 
-def get_CB_scale_for_unit_amplitude(β:float, τ_rise:float, τ_decay:float, x0:float = 0.):
+def get_CB_scale_for_unit_amplitude(β:float,τ_rise:float, τ_decay:float, x0:float = 0.):
     efunc       = lambda x, τ: np.exp(-x/τ)
     risefunc    = lambda x, τ: 1-efunc(x,τ)
     decayfunc   = efunc
@@ -417,9 +446,11 @@ def get_CB_scale_for_unit_amplitude(β:float, τ_rise:float, τ_decay:float, x0:
     
     return peak/yₘ
     
-def CBsum(x:np.ndarray | float, α:float, 
-          β0:float, x0_0:float, τ0_0:float, τ0_1:float, 
-          β1:float, x0_1:float, τ1_0:float, τ1_1:float) -> np.ndarray | float:
+def CBsum(x:np.ndarray | float, α:float | typing.Sequence[float], /, 
+          β0:typing.Optional[float]=None, x0_0:typing.Optional[float]=None,
+          τ0_0:typing.Optional[float]=None, τ0_1:typing.Optional[float]=None, 
+          β1:typing.Optional[float]=None, x0_1:typing.Optional[float]=None, 
+          τ1_0:typing.Optional[float]=None, τ1_1:typing.Optional[float]=None) -> np.ndarray | float:
     r"""Realizes a sum of two Clements_Bekkers_97 functions, on x.
     
     Let 𝒙 a 1D domain vector:
@@ -444,18 +475,27 @@ def CBsum(x:np.ndarray | float, α:float,
         α, β₀, x₀₀, τ₀₀, τ₁₀, β₁, x₀₁, τ₀₁, τ₁₁
 
     """
+    # NOTE: 2025-11-05 21:31:42
+    # allow passing all parameters packed in a sequence, so as to do away with 
+    # the *_model version of this function
+    if isinstance(α, typing.Sequence) and len(α) == 9 and all(isinstance(v, float) for v in α):
+        α, β0, x0_0, t0_0, t0_1, β1, x0_1, t1_0, t1_1 = α
+        
+    if not all(isinstance(v, float) for v in (α, β0, x0_0, τ0_0, τ0_1, β1, x0_1, τ1_0, τ1_1 )):
+        raise TypeError("Expecting a sequence of 'α, β0, x0_0, τ0_0, τ0_1, β1, x0_1, τ1_0, τ1_1' scalar floats or a coma-separated list of scalar floats for 'α, β0, x0_0, τ0_0, τ0_1, β1, x0_1, τ1_0, τ1_1'")
+        
     y0 = Clements_Bekkers_97(x, α, β0, x0_0, τ0_0, τ0_1)
     
     y1 = Clements_Bekkers_97(x, 0., β1, x0_1, τ1_0, τ1_1)
     
     return y0 + y1
     
-def CBsum_model(x:np.ndarray | float, parameters:typing.Sequence[float]) -> np.ndarray | float:
-    return CBsum(c, *parameters)
-    
-def exp_rise_multi_decay_model(x:np.ndarray|float, parameters:typing.Sequence[float], 
-                               returnDecays = False) -> np.ndarray | float:
-    return exp_rise_multi_decay(x, *parameters, returnDecays = returnDecays)
+# def CBsum_model(x:np.ndarray | float, parameters:typing.Sequence[float]) -> np.ndarray | float:
+#     return CBsum(c, *parameters)
+#     
+# def exp_rise_multi_decay_model(x:np.ndarray|float, parameters:typing.Sequence[float], 
+#                                returnDecays = False) -> np.ndarray | float:
+#     return exp_rise_multi_decay(x, *parameters, returnDecays = returnDecays)
     
 def exp_rise_multi_decay(x:np.ndarray|float, *parameters:float,
                          **kwargs) -> np.ndarray|float:
@@ -535,6 +575,9 @@ def exp_rise_multi_decay(x:np.ndarray|float, *parameters:float,
     
     # NOTE: call np.squeeze on the argument BEFORE passing it to this function !!!
     returnDecays = kwargs.pop("returnDecays", False)
+    if len(parameters) == 1 and isinstance(parameters[0], typing.Sequence) and all(isinstance(v, float) for v in parameters[0]):
+        parameters = parameters[0]
+        
     nDecays = check_rise_decay_params(parameters)
     
     if isinstance(x, numbers.Real):

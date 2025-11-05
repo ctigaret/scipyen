@@ -9482,8 +9482,8 @@ def PSCwaveform(model_parameters, units=pq.pA, t_start=0*pq.s, duration=0.02*pq.
     Parameters:
     ===========
     model_parameters: a sequence of floating point numbers with the parameters
-        for the Clements & Bekkers 97 mEPSC model (see functions Clements_Bekkers_97(…)
-        and Clements_Bekkers_97_model(…) in core.models module)
+        for the Clements & Bekkers 97 mEPSC model (see function Clements_Bekkers_97(…)
+        core.models module)
     
     Named parameters:
     =================
@@ -9505,8 +9505,8 @@ def PSCwaveform(model_parameters, units=pq.pA, t_start=0*pq.s, duration=0.02*pq.
     
         Default is 1e4 Hz.
     
-    model_func: a function to procuce a waveform given model_parameters
-        Optional default is None, in which case PSCwaveform uses Clements_Bekkers_97_model(…)
+    model_func: a function to produce a waveform given model_parameters
+        Optional default is None, in which case PSCwaveform uses Clements_Bekkers_97(…)
     
     Returns:
     ========
@@ -9522,7 +9522,7 @@ def PSCwaveform(model_parameters, units=pq.pA, t_start=0*pq.s, duration=0.02*pq.
     if all(isinstance(p, pq.Quantity) for p in model_parameters):
         model_parameters = tuple(float(p.magnitude) for p in model_parameters)
     
-    y = models.Clements_Bekkers_97_model(x.magnitude, model_parameters)
+    y = models.Clements_Bekkers_97(x.magnitude, model_parameters)
     
     dstring = f"Clements_Bekkers_97 α={model_parameters[0]}, β={model_parameters[1]}, x₀={model_parameters[2]}, τ₁={model_parameters[3]}, τ₂={model_parameters[4]}"
     
@@ -9568,10 +9568,10 @@ def detect_Events_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], wavefo
     
         ALTERNATIVELY, the waveform can be specified by a sequence of six scalars, 
         where the first five are the Clements & Bekkers 1997 model parameters:
-        α, β, x₀, τ₁ and τ₂ (see functions models.Clements_Bekkers_97(…) and 
-        models.Clements_Bekkers_97_model(…)  for details)  and the 6ᵗʰ element is 
-        the duration of the model waveform (which will be generated ad-hoc); this 
-        last element is assumed to be in the units of the domain of x.
+        α, β, x₀, τ₁ and τ₂ (see functions models.Clements_Bekkers_97(…) for details)
+        and the 6ᵗʰ element is the duration of the model waveform (which will be 
+        generated ad-hoc); this last element is assumed to be in the units of the 
+        domain of x.
     
         By default, waveform is (0., -1., 0.01, 0.001, 0.01, 0.05) which means,
         for a membrane current signal `x` in pA:
@@ -9594,7 +9594,7 @@ def detect_Events_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], wavefo
         sr          = 1e4   # [Hz]
         
         t = np.linspace(0, duration, num = sr * duration)
-        model = models.Clements_Bekkers_97_model(x, parameters)
+        model = models.Clements_Bekkers_97(x, parameters)
         
         As a convenience, you can use PSCwaveform(...) function in this module to
         generate a synthetic  waveform as a neo.AnalogSignal.
@@ -10158,49 +10158,43 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal],
         is the number of samples in `x`); this function supports multi-channel
         signals (i.e., with x.shape[1] > 1)
     
-    waveform: neo.AnalogSignal or 1D numpy array (vector, i.e., 
-        waveform.shape = (m,) where `m` is the number of samples in `waveform`).
+    waveform:   
+        • When this is a neo.AnalogSignal, DataSignal or 1D numpy array (vector, 
+        i.e., waveform.shape = (m,) where `m` is the number of samples in `waveform`):
     
-        Contains an event model (ie. a "synthetic" waveform) or a "template" 
-        waveform extracted from a signal.
+        Represents an event model (ie. a "synthetic" waveform) or a "template" 
+        waveform extracted from a signal — e.g., a mEPSC.
     
         ATTENTION: Make sure this model waveform has the SAME SAMPLING RATE as 
         the signal!!!
     
-        ALTERNATIVELY, the waveform can be specified by the mapping
-        "function" ↦ function, "params"  ↦ sequence of scalars, where:
+        • A mapping "function" ↦ function, "params"  ↦ sequence of scalars, where:
     
-        "function" is a model function (e.g., models.Clements_Bekkers_97(…) or
-        models.Clements_Bekkers_97_model(…))
+        "function" is a model function (e.g., models.Clements_Bekkers_97(…))
     
         "params" is a sequence of N+1 scalars, with first N scalars being the 
         parameters expected by "function" and the last one being the duration of
-        the template waveformk (Quantity scalar in units of the domain of 'x')
+        the template waveform (Quantity scalar in units of the domain of 'x')
+        — see the next paragraph for details
     
+        • A sequence of six scalar (float or pq.Quantity)
     
-        where the first five are the Clements & Bekkers 1997 model parameters:
-        α, β, x₀, τ₁ and τ₂ (see functions models.Clements_Bekkers_97(…) and
-        models.Clements_Bekkers_97_model(…) for details)  and the 6ᵗʰ element is 
-        the duration of the model waveform (which will be generated ad-hoc); this 
-        last element is assumed to be in the units of the domain of x.
+            ∘ the first five are the Clements & Bekkers 1997 model parameters:
+        α, β, x₀, τ₁ and τ₂ (see functions models.Clements_Bekkers_97(…) for details) 
+            ∘ the 6ᵗʰ element is the duration of the model waveform (which will 
+        be generated ad-hoc); this last element is assumed to be in the units of 
+        the domain of x.
     
-        ALTERNATIVELY, the waveform can be specified by a sequence of six scalars, 
-        where the first five are the Clements & Bekkers 1997 model parameters:
-        α, β, x₀, τ₁ and τ₂ (see functions models.Clements_Bekkers_97(…) and
-        models.Clements_Bekkers_97_model(…) for details)  and the 6ᵗʰ element is 
-        the duration of the model waveform (which will be generated ad-hoc); this 
-        last element is assumed to be in the units of the domain of x.
+            By default, waveform is (0., -1., 0.01, 0.001, 0.01, 0.05) which means,
+            for a membrane current signal `x` in pA:
     
-        By default, waveform is (0., -1., 0.01, 0.001, 0.01, 0.05) which means,
-        for a membrane current signal `x` in pA:
-    
-        α  =  0.0 pA (ie. no offset)
-        β  = -1.0 (i.e. downward deflection)
-        x₀ =  0.01 (i.e. 10 ms from the start of the waveform)
-        τ₁ =  0.001 (i.e., rising time constant of 1 ms)
-        τ₂ =  0.01  (i.e., decay time constant of 10 ms)
+            α  =  0.0 pA (ie. no offset)
+            β  = -1.0 (i.e. downward deflection)
+            x₀ =  0.01 (i.e. 10 ms from the start of the waveform)
+            τ₁ =  0.001 (i.e., rising time constant of 1 ms)
+            τ₂ =  0.01  (i.e., decay time constant of 10 ms)
         
-        and 50 ms duration of the model waveform
+            and 50 ms duration of the model waveform
     
         NOTE: When specified in this way the waveform will be generated ad-hoc
         using the sampling rate of the signal `x`.
@@ -10212,7 +10206,7 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal],
         sr          = 1e4   # [Hz]
         
         t = np.linspace(0, duration, num = sr * duration)
-        model = models.Clements_Bekkers_97_model(x, parameters)
+        model = models.Clements_Bekkers_97(x, parameters)
         
         As a convenience, you can use PSCwaveform(...) function in this module 
         to generate a synthetic  waveform as a neo.AnalogSignal.
@@ -10295,19 +10289,18 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal],
             raise TypeError("waveform expected to be a vector")
         
     elif isinstance(waveform, dict):
+        # allow passing *_model vesrion of model function (i.e. one expecting a sequence or parameters)
         model_func = waveform.get("function", None)
         if not inspect.isfunction(model_func):
             raise TypeError("Invalid waveform mapping; expecting a mapping containing a field 'function' mapped to a function")
-        model_params = waveform.get("params", None)
-        if not isinstance(model_params, typing.Sequence):
-            raise TypeError("Invalid waveform mapping; expecting a mapping containing a field 'params' mapped to a sequence of scalars")
-            
+            if not isinstance(model_params, typing.Sequence):
+                raise TypeError("Invalid waveform mapping; expecting a mapping containing a field 'params' mapped to a sequence of scalars")
         
-        model_func_params = get_func_param_types(model_func)
-        if ["x"] not in model_func_params:
-            raise ValueError(f"Wrong function passed for model function; first parameter")
-        
-        
+#         model_params = waveform.get("params", None)
+#             
+#         
+#         model_func_params = get_func_param_types(model_func)
+#         param_names = tuple(model_func_params.keys())
         
             
     
