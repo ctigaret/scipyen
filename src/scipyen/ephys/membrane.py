@@ -9922,7 +9922,7 @@ def slide_detect(x:np.ndarray, h:np.ndarray, padding:bool=True, data_cache = Non
 def extract_event_waveforms(x:typing.Union[neo.AnalogSignal, DataSignal], 
                             duration:pq.Quantity, θ:pq.Quantity, threshold, peakfunc) -> neo.SpikeTrain | None:
     r"""
-    Extracts detected mPSC waveforms.
+    Extracts detected waveforms (e.g. mEPSCs) in a signal.
     
     Waveforms are detected by comparing the θ signal (containing a detection
     signal) to the scalar `threshold`, to determine the start & end time stamps
@@ -10117,6 +10117,9 @@ def extract_event_waveforms(x:typing.Union[neo.AnalogSignal, DataSignal],
                  source="Event_detection",
                  signal_units = x.units, 
                  signal_origin = x.name,
+                 signal_domain_units = x.times.units,
+                 signal_sampling_rate = x.sampling_rate,
+                 signal_class = type(x),
                  datetime=datetime.datetime.now(),
                  Aligned = False,
                  )
@@ -10125,6 +10128,7 @@ def extract_event_waveforms(x:typing.Union[neo.AnalogSignal, DataSignal],
     ret.array_annotate(peak_time = mini_peaks)
     ret.array_annotate(wave_name = [w.name for w in minis])
     ret.array_annotate(accept = ret.annotations["Accept"])
+    ret.array_annotate(sampling_rate = [x.sampling_rate for w in minis])
     # ret.array_annotate(accept = np.concatenate([w.annotations["Accept"] for w in minis]))
     
     return ret
@@ -10290,12 +10294,29 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal],
         
     elif isinstance(waveform, dict):
         # allow passing *_model vesrion of model function (i.e. one expecting a sequence or parameters)
-        model_func = waveform.get("function", None)
+        wave_func = waveform.get("function", None)
         if not inspect.isfunction(model_func):
             raise TypeError("Invalid waveform mapping; expecting a mapping containing a field 'function' mapped to a function")
-            if not isinstance(model_params, typing.Sequence):
-                raise TypeError("Invalid waveform mapping; expecting a mapping containing a field 'params' mapped to a sequence of scalars")
         
+        wave_params = waveform.get("params", None)
+        if not isinstance(model_params, typing.Sequence):
+            raise TypeError("Invalid waveform mapping; expecting a mapping containing a field 'params' mapped to a sequence of scalars")
+        
+        wave_duration = waveform.get("duration",  None)
+        if not isinstance(wave_duration, pq.Quanity) or wavw_duration.size != 1 or not scq.checkTimeUnits(wave_duration):
+            raise TypeError("Invalid waveform mapping; expecting a mapping containing a field 'duration' mapped to scalar Quantity in time units")
+
+        x_ = np.linspace(0, wave_duration.magnitude, num=int(x.sampling_rate * wave_duration))
+        
+        if all(isinstance(p, pq.Quantity) for p in wave_params):
+            wave_params = tuple(map(lambda p: float(p), wave_params))
+            
+        y_ = wave_func(x_, wave_params)
+        
+        waveform = type(x)(y_, units = x.units, t_start = x.t_start,
+                           sampling_rate = x.sampling_rate,
+                           name=wave_func.__name__)
+
 #         model_params = waveform.get("params", None)
 #             
 #         
@@ -10413,7 +10434,6 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal],
                               channel_id = x.array_annotations.get("channel_ids", [0])[0])
                 ret_.segment = x.segment
                 ret.append(ret_)
-                # waves.append(waves_)
                 
         if len(ret) == 0:
             if outputDetection:
