@@ -10119,7 +10119,6 @@ def extract_event_waveforms(x:typing.Union[neo.AnalogSignal, DataSignal],
                  signal_origin = x.name,
                  signal_domain_units = x.times.units,
                  signal_sampling_rate = x.sampling_rate,
-                 signal_class = type(x),
                  datetime=datetime.datetime.now(),
                  Aligned = False,
                  )
@@ -10317,14 +10316,6 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal],
                            sampling_rate = x.sampling_rate,
                            name=wave_func.__name__)
 
-#         model_params = waveform.get("params", None)
-#             
-#         
-#         model_func_params = get_func_param_types(model_func)
-#         param_names = tuple(model_func_params.keys())
-        
-            
-    
     elif isinstance(waveform, (tuple, list)):
         if len(waveform) == 6:
             waveduration = waveform[5] * x.times.units

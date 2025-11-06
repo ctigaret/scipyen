@@ -2551,9 +2551,7 @@ def _(src: typing.Union[NeoObjectList, list, tuple, deque],
         raise IndexError("Invalid indexing: %s" % index)
 
 # @safewrapper
-def get_index_of_named_signal(
-    src, names, stype=neo.AnalogSignal, silent=False
-) -> typing.Sequence:
+def get_index_of_named_signal(src, names, stype=neo.AnalogSignal, silent=False) -> typing.Sequence:
     r"""
 Returns a list of indices of signals named as specified by 'names', and contained in src.
 
@@ -6913,21 +6911,24 @@ def inverse_lookup(
 def extract_spike_train_waveforms(x: neo.SpikeTrain, waveunits: pq.Quantity, **kwargs):
     r"""Extracts the waveforms from a spike train, as a list of AnalogSignals.
     The waveforms represent the events with time stamps stored in the spike train.
-    There seems to be no real convention as to what event time stamp is stored:
-    • the waveform start
-    • the actual event onset (at some time interval AFTER the waveform start)
+    There seems to be no real convention as to what event-related time stamp is 
+    stored:
+    • the waveform start (onset)
+    • the actual event onset (at some time interval AFTER or BEFORE the waveform 
+    starts)
 
     Scipyen uses the following convention:
-    • if the "left_sweep" attribute of the spike train is a POSITIVE scalar quantity:
-        the spike train stores the start times of the waveforms, and the event
-        ONSETS are the sum of the start times and the "left_sweep" attribute
+    • if the "left_sweep" attribute of the spike train is a POSITIVE scalar quantity
+        the actual wave onset is spike time stamp + left_sweep, i.e. the waveform
+        starts AFTER the spiek train time stamp.
 
     • if the "left_sweep" is a NEGATIVE scalar quantity, then the time stamps of
         the train are actual event ONSET times, and the waveforms start at
-        spike time - abs(left_sweep)
+        spike time - abs(left_sweep) (i.e., BEFORE the spike train time 
+        stamp)
 
-    • if the "left_sweep" is zero or None, then the waveform start times are
-        considered as being the same as the time stamps stored in the train.
+    • if the "left_sweep" is zero or None, then the waveform onsets are taken to
+        be identical to time stamps stored in the train.
 
     Parameters:
     ==========
@@ -6987,9 +6988,7 @@ def extract_spike_train_waveforms(x: neo.SpikeTrain, waveunits: pq.Quantity, **k
 
         if isinstance(x.left_sweep, pq.Quantity):
             if x.left_sweep.size > 1:
-                left_sweep = x.left_sweep[
-                    0
-                ]  # just in case; see NOTE: 2022-12-14 09:41:06
+                left_sweep = x.left_sweep[0]  # just in case; see NOTE: 2022-12-14 09:41:06
 
             else:
                 left_sweep = x.left_sweep

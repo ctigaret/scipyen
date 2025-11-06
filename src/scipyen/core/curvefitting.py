@@ -741,18 +741,19 @@ def fit_Event_model(data, p0, **kwargs):
     # R² for the entire fit
     rsq = 1 - sse/sst # only one R²
     
-    result = collections.OrderedDict()
-    result["Fit"] = res
-    result["Coefficients"] = res_x
-    result["Rsq"] = rsq
-    # result["Accept"] = True
-    
     # reconstruct final fitted curve (REMEMBER: we have taken out the NaNs!)
     initialSupport = np.full((data.shape[0],), np.nan)
     
     fittedCurve = initialSupport.copy()
     
     fittedCurve[realDataNdx] = fC
+    
+    result = dict()
+    result["Fit"] = res
+    result["Coefficients"] = res_x
+    result["Rsq"] = rsq
+    # result["amplitude"] = sigp.waveform_amplitude(fittedCurve)
+    # result["Accept"] = True # leave this here — I may use it at some point if I decide to implement further checks
     
     return fittedCurve, result
 
@@ -784,6 +785,11 @@ def fit_Event_wave(data, wave):
     sst = np.sum((data.magnitude.flatten() - data.magnitude.flatten().mean()) ** 2.)
     
     sse = np.sum((wave.magnitude.flatten() - data.magnitude.flatten()) ** 2.)
+    
+    result = dict()
+    result["Fit"] = tuple()
+    result["Coefficients"] = list()
+    result["Rsq"] = 1 - sse/sst
     
     return 1 - sse/sst
     

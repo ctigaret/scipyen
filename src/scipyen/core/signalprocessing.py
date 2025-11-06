@@ -590,10 +590,7 @@ def waveform_amplitude(x: np.ndarray, method: str = "direct", axis=None):
 
     """
     if not isinstance(x, np.ndarray):
-        raise TypeError(
-            "Expecting a np.ndarray object or a derived type; got %s instead"
-            % type(x).__name__
-        )
+        raise TypeError(f"Expecting a np.ndarray object or a derived type; got {type(x).__name__} instead")
 
     # NOTE: 2022-10-23 16:49:59
     # might want to do this, below
@@ -604,14 +601,10 @@ def waveform_amplitude(x: np.ndarray, method: str = "direct", axis=None):
     #         x = np.squeeze(x)
 
     if not isinstance(method, str):
-        return TypeError(
-            "method expected to be a str; got %s instead" % type(method).__name__
-        )
+        return TypeError(f"method expected to be a str; got {type(method).__name__} instead" )
 
     if method.lower() not in ("direct", "levels"):
-        return ValueError(
-            "method expected to be 'direct' or 'levels'; got %s instead" % method
-        )
+        return ValueError(f"method expected to be 'direct' or 'levels'; got {method} instead")
 
     if x.size == 0:
         if isinstance(x, pq.Quantity):
@@ -624,7 +617,7 @@ def waveform_amplitude(x: np.ndarray, method: str = "direct", axis=None):
 
     else:
         # FIXME/TODO 2022-10-23 16:56:59
-        # CAUTION is we preserve the shape of the array, sl will be we'll get
+        # CAUTION sl might be wrong if we preserve the shape of the array
         sl = state_levels(x, axis=axis)
 
         return np.abs(np.diff(sl[0]))
