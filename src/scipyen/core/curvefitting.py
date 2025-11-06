@@ -602,7 +602,7 @@ def fit_Event_model(data, p0, **kwargs):
             t: independent variable
             y: the data (dependent variable)
         """
-        yf = models.Clements_Bekkers_97_model(t, x)
+        yf = models.Clements_Bekkers_97(t, x)
         
         ret = y-yf
         
@@ -732,7 +732,7 @@ def fit_Event_model(data, p0, **kwargs):
     res_x = list(res.x.flatten())
     
     # create fitted curve
-    fC = models.Clements_Bekkers_97_model(xdata, res_x)
+    fC = models.Clements_Bekkers_97(xdata, res_x)
     
     sst = np.sum( (ydata - ydata.mean()) ** 2.)
     
@@ -1094,7 +1094,7 @@ def fit_model(data, func, p0, *args, **kwargs):
     
         func(x, p, /, *args, **kwargs)
     
-        NOTE: This function can be one of the ``*_model`` functions defined in 
+        NOTE: This function can be one of the model functions defined in 
         Scipyen's ``core.models`` module.
     
     p0: sequence of initial values for the coefficients in the model realized by

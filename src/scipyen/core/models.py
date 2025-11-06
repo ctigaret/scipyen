@@ -71,6 +71,19 @@ import numpy as np
 import quantities as pq
 import numbers
 from core import scipyen_quantities as scq
+from core.prog import scipywarn
+
+def check_unpack_model_params_seq(params:typing.Sequence | np.ndarray, n:int):
+    if isinstance(params, typing.Sequence) and len(params) == n and all (isinstance(v, float) for v in params):
+        return tuple(params)
+    
+    elif isinstance(params, np.ndarray) and params.size == n:
+        return tuple(map(lambda v: float(v), params))
+    
+    else:
+        raise TypeError(f"Expecting a sequence or a numpy array with {n} elements")
+    
+    
 
 def check_rise_decay_params(x:typing.Sequence[float]):
     r"""Returns the number of decay components for a exp-rise-multi-decay transient.
@@ -82,27 +95,46 @@ def check_rise_decay_params(x:typing.Sequence[float]):
     return (len(x)-3) // 2
 
 def biexponential(x:typing.Union[np.ndarray, float], 
-                  β0:float, β1:float, λ0:float, λ1:float) -> np.ndarray | float:
+                  β0:float|typing.Sequence[float]|np.ndarray, /,
+                  β1:typing.Optional[float] = None, 
+                  λ0:typing.Optional[float] = None, 
+                  λ1:typing.Optional[float] = None) -> np.ndarray | float:
+    
+    if isinstance(β0, (typing.Sequence, np.ndarray)):
+        β0, β1, λ0, λ1 = check_unpack_model_params_seq(β0, 4)
+        
+    if not all(isinstance(v, float) for v in (β0, β1, λ0, λ1)):
+        raise TypeError("Expecting four comma-separated floats or a sequence of four floats")
+    
     return β0 * np.exp(λ0 * x) + β1 * np.exp(λ1 * x)
 
-def biexponential_model(x:typing.Union[np.ndarray, float], 
-                        p:typing.Sequence[float]) -> np.ndarray | float:
-    return biexponential(x, *p)
+# def biexponential_model(x:typing.Union[np.ndarray, float], 
+#                         p:typing.Sequence[float]) -> np.ndarray | float:
+#     return biexponential(x, *p)
 
 def biexponential_decay(x:typing.Union[np.ndarray, float], 
-                        β0:float, β1:float, τ0:float, τ1:float) -> np.ndarray | float:
+                        β0:float|typing.Sequence[float]|np.ndarray, /,
+                        β1:typing.Optional[float] = None, 
+                        τ0:typing.Optional[float] = None, 
+                        τ1:typing.Optional[float] = None) -> np.ndarray | float:
     r"""Decay modelled as a bi-exponential"""
+    if isinstance(β0, (typing.Sequence, np.ndarray)):
+        β0, β1, τ0, τ1 = check_unpack_model_params_seq(β0, 4)
+        
+    if not all(isinstance(v, float) for v in (β0, β1, τ0, τ1)):
+        raise TypeError("Expecting four comma-separated float scalars or a sequence of four float scalars")
+    
     return β0 * np.exp(-x / τ0) + β1 * np.exp(-x / τ1)
 
 # def biexponential_decay_model(x:typing.Union[np.ndarray, float], 
 #                               p:typing.Sequence) -> np.ndarray | float:
 #     return biexponential_decay(x, *p)
 
-def biased_biexponential_decay(x:np.ndarray | float, α:float|typing.Sequence[float],/, 
+def biased_biexponential_decay(x:np.ndarray | float, α:typing.Union[float,typing.Sequence[float], np.ndarray],/, 
                                β0:typing.Optional[float]=None, β1:typing.Optional[float]=None, 
                                τ0:typing.Optional[float]=None, τ1:typing.Optional[float]=None) -> np.ndarray | float:
-    if isinstance(α, typing.Sequence) and len(α) == 5 and all(isinstance(v, float) for v in α):
-        α, β0, β1, τ0, τ1 = α
+    if isinstance(α, (typing.Sequence, np.ndarray)):
+        α, β0, β1, τ0, τ1 = check_unpack_model_params_seq(α, 5)
         
     if not all(isinstance(v, float) for v in (α, β0, β1, τ0, τ1)):
         raise TypeError("Expecting a comma-separated list of 5 parameters or a sequence of 5 parameters (α, β0, β1, τ0, τ1)")
@@ -114,21 +146,28 @@ def biased_biexponential_decay(x:np.ndarray | float, α:float|typing.Sequence[fl
 #     return biased_biexponential_decay(x, *p)
     
 def generic_biexponential_decay(x: np.ndarray | float, 
-                                α:float, β0:float, β1:float, x0:float, τ0:float, τ1:float) -> np.ndarray | float:
-    if isinstance(α, typing.Sequence) and len(α) == 6 and all(isinstance(v, float) for v in α):
-        α, β0, β1, x0, τ0, τ1 = α
+                                α:typing.Union[float, typing.Sequence[float], np.ndarray], /, 
+                                β0:typing.Optional[float], 
+                                β1:typing.Optional[float], 
+                                x0:typing.Optional[float], 
+                                τ0:typing.Optional[float], 
+                                τ1:typing.Optional[float]) -> np.ndarray | float:
+    if isinstance(α, (typing.Sequence, np.ndarray)):
+        α, β0, β1, x0, τ0, τ1 = check_unpack_model_params_seq(α, 6)
         
     if not all(isinstance(v, float) for v in (α, β0, β1, x0, τ0, τ1)):
         raise TypeError("Expecting a comma-separated list of 6 parameters or a sequence of 6 parameters (α, β0, β1, τ0, τ1)")
 
     return α + β0 * np.exp(-(x-x0) / τ0) + β1 * np.exp(-(x-x0) / τ1)
 
-def generic_biexponential_decay_model(x:np.ndarray | float,
-                                      p:typing.Sequence[float]) -> np.ndarray | float:
-    return generic_biexponential_decay(x, *p)
+# def generic_biexponential_decay_model(x:np.ndarray | float,
+#                                       p:typing.Sequence[float]) -> np.ndarray | float:
+#     return generic_biexponential_decay(x, *p)
 
 def generic_exponential_prod_decay(x: np.ndarray | float, 
-                                   α:float, β:float, x0:float, *τ) -> np.ndarray | float:
+                                   α:typing.Sequence[float] | float | np.ndarray, /,
+                                   β:typing.Optional[float] = None, 
+                                   x0:typing.Optional[float] = None, *τ) -> np.ndarray | float:
     r"""Realizes
                 ₙ₋₁
     y = α + β × Π  exp(-(x-x₀)/τₖ) = α + β × exp(-(x-x₀)/τᵪ)    , where:
@@ -164,12 +203,16 @@ def generic_exponential_prod_decay(x: np.ndarray | float,
     
 The other parameters are as for generic_single_exponential_decay.
     
+NOTE: For calling purposes, α can be supplied as a sequence of (α, β, x0), and any
+    arguments folowing it will be included in τ
+    
 """
-    if isinstance(α, typing.Sequence) and all(isinstance(v, float) for v in α):
-        α, β, x0 = α
+    if isinstance(α, (typing.Sequence, np.ndarray)):
+        τ = (β, x0) + τ
+        α, β, x0 = check_unpack_model_params_seq(α, 3)
         
-    if not all(isinstance(v, float) for v in (α, β0, β1, x0, τ0, τ1)):
-        raise TypeError("Expecting a comma-separated list of 6 parameters or a sequence of 6 parameters (α, β0, β1, τ0, τ1)")
+    if not all(isinstance(v, float) for v in (α, β0, β1, x0)) and not all(isinstance(v, float) for v in τ):
+        raise TypeError("Expecting a comma-separated list of parameters or a sequence of three parameters (α, β0, β1) followed by individual τ values")
 
     if len(τ) == 0:
         raise ValueError(f"τ must be supplied")
@@ -181,12 +224,15 @@ The other parameters are as for generic_single_exponential_decay.
         
     return α + β * np.exp(-(x-x0) / τc)
 
-def generic_exponential_prod_decay_model(x:np.ndarray | float, 
-                                         parameters: typing.Sequence[float]) -> np.ndarray | float:
-    return generic_exponential_prod_decay(x, *parameters)
+# def generic_exponential_prod_decay_model(x:np.ndarray | float, 
+#                                          parameters: typing.Sequence[float]) -> np.ndarray | float:
+#     return generic_exponential_prod_decay(x, *parameters)
 
-def generic_single_exponential_decay(x:np.ndarray | float,
-                                     α:float, β:float, x0:float, τ:float) -> np.ndarray | float:
+def generic_single_exponential_decay(x:np.ndarray | float, 
+                                     α:typing.Sequence[float] | np.ndarray | float, /,
+                                     β:typing.Optional[float] = None, 
+                                     x0:typing.Optional[float] = None, 
+                                     τ:typing.Optional[float] = None) -> np.ndarray | float:
     r"""Realizes y = α + β × exp(-(x-x₀)/τ)
     
 Parameters:
@@ -212,11 +258,20 @@ coefficients are given as floats in the following order:
 #     This works as well in jupyter qtconsole, but not in plain python REPL
     # y0, α, x0, τ = parameters
     
+    if isinstance(α, (typing.Sequence, np.ndarray)):
+        α, β, x0, τ = check_unpack_model_params_seq(α, 4)
+        
+    if not all(isinstance(v, float) for v in (α, β, x0, τ )):
+        raise TypeError("Expecting a sequence of floats or a comma-separated list of floats")
+    
     λ = 1/τ
     return α + β * np.exp(-(x-x0)*λ)
 
 def generic_single_exponential_rise(x:np.ndarray | float, 
-                                    α:float, β:float, x0:float, τ:float) -> np.ndarray | float:
+                                    α:typing.Sequence[float]|np.ndarray, 
+                                    β:typing.Optional[float] = None, 
+                                    x0:typing.Optional[float] = None, 
+                                    τ:typing.Optional[float] = None) -> np.ndarray | float:
     r"""Realizes α + β × [1 - exp(-(x-x₀)/τ)]
 
 Parameters:
@@ -227,22 +282,29 @@ coefficients are given as floats in the following order:
 
 α (offset), β (scale), x₀ (onset), τ (time constant)
 """
+    if isinstance(α, (typing.Sequence, np.ndarray)):
+        α, β, x0, τ = check_unpack_model_params_seq(α, 4)
+        
+    if not all(isinstance(v, float) for v in (α, β, x0, τ)):
+        raise TypeError("Expecting four comma-separated float scalars or a sequence of four float scalars")
+    
     return α + β * (1 - np.exp(-(x-x0)/τ))
 
-def generic_single_exponential_decay_model(x:np.ndarray | float, 
-                                           parameters:typing.Sequence[float]) -> np.ndarray | float:
-    r"""Alias to generic_single_exponential_decay, 
-with coefficients packed in an array-like object"""
-    return generic_single_exponential_decay(x, *parameters)
+# def generic_single_exponential_decay_model(x:np.ndarray | float, 
+#                                            parameters:typing.Sequence[float]) -> np.ndarray | float:
+#     r"""Alias to generic_single_exponential_decay, 
+# with coefficients packed in an array-like object"""
+#     return generic_single_exponential_decay(x, *parameters)
 
-def generic_single_exponential_rise_model(x:np.ndarray | float, /, 
-                                          parameters:typing.Sequence[float]) -> np.ndarray | float:
-    r"""Alias to generic_single_exponential_rise, 
-with coefficients packed in an array-like object"""
-    return generic_single_exponential_rise(x, *parameters)
+# def generic_single_exponential_rise_model(x:np.ndarray | float, /, 
+#                                           parameters:typing.Sequence[float]) -> np.ndarray | float:
+#     r"""Alias to generic_single_exponential_rise, 
+# with coefficients packed in an array-like object"""
+#     return generic_single_exponential_rise(x, *parameters)
 
-def alphaFunction(x:np.ndarray | float,
-                  α:float, β:float, x0:float, τ:float, /) -> np.ndarray | float:
+def alphaFunction(x:np.ndarray | float, α:typing.Union[typing.Sequence[float],np.ndarray,float], /,
+                  β:typing.Optional[float] = None, x0:typing.Optional[float] = None,
+                  τ:typing.Optional[float] = None) -> np.ndarray | float:
     r"""
 The Alpha function.
 
@@ -297,6 +359,11 @@ plt.plot(x,y)
     # characters such as sub- or super-scripts, so please use 'x0', not 'x₀'
     # in the code
     
+    if isinstance(α, (typing.Sequence, np.ndarray)):
+        α, β, x0, τ = check_unpack_model_params_seq(α, 4)
+        
+    if not all(isinstance(v, float) for v in (α, β, x0, τ)):
+        raise TypeError("Expecting four comma-separated float scalars or a sequence of four float scalars")
     
     # make sure x is a 1D array (vector)
     x = x.flatten()
@@ -312,18 +379,27 @@ plt.plot(x,y)
     
     return y
 
-def alphaFunction_model(x:np.ndarray | float, 
-                        parameters: typing.Sequence[float]) -> np.ndarray | float:
-    r"""Alias to alphaFunction with coefficients packed in an array-like object"""
-    return alphaFunction(x, *parameters)
+# def alphaFunction_model(x:np.ndarray | float, 
+#                         parameters: typing.Sequence[float]) -> np.ndarray | float:
+#     r"""Alias to alphaFunction with coefficients packed in an array-like object"""
+#     return alphaFunction(x, *parameters)
 
-def nsfa(x:np.ndarray | float, 
-         i:float|pq.Quantity, n:float|pq.Quantity, b: float|pq.Quantity) -> np.ndarray | float:
+def nsfa(x:np.ndarray | float, i:float|pq.Quantity|typing.Sequence[typing.Union[float, pq.Quantity]], /, 
+         n:typing.Optional[typing.Union[float, pq.Quantity]] = None, 
+         b:typing.Optional[typing.Union[float, pq.Quantity]] = None) -> np.ndarray | float:
     r"""
         y = x * i - x²/N + b
     
     Parameters: i, N, b: unitary current (pA), number of channels, background current variance (pA²))
-    """
+    
+WARNING: do not pass quantities for the parameters, yet; just use floats
+"""
+    if isinstance(i, typing.Sequence) and len(i) == 3 and all(isinstance(v, (float, pq.Quantity)) for v in i):
+        i, n, b = i
+        
+    if not all(isinstance(v, (float, pq.Quantity)) for v in (i, n, b)):
+        raise TypeError("Expecting three comma-separated float scalars or a sequence of three float scalars")
+        
     if isinstance(x, pq.Quantity):
         x = x.magnitude
         
@@ -332,13 +408,15 @@ def nsfa(x:np.ndarray | float,
     return x*i - x**2 / n + b
     
 
-def nsfa_model(x:np.ndarray | float, parameters:typing.Sequence[float]) -> np.ndarray | float:
-    return nfsa(x, *p)
+# def nsfa_model(x:np.ndarray | float, parameters:typing.Sequence[float]) -> np.ndarray | float:
+#     return nfsa(x, *p)
 
 def Clements_Bekkers_97(x:np.ndarray | float,
                         α:typing.Union[float, typing.Sequence[float]], /, 
-                        β:typing.Optional[float] = None, x0:typing.Optional[float] = None, 
-                        τ1:typing.Optional[float] = None, τ2:typing.Optional[float] = None,
+                        β:typing.Optional[float] = None, 
+                        x0:typing.Optional[float] = None, 
+                        τ1:typing.Optional[float] = None, 
+                        τ2:typing.Optional[float] = None,
                         **kwargs) -> np.ndarray | float:
     r"""
     Clements & Bekkers 1997 mEPSC waveform (alphafunction-like).
@@ -387,16 +465,18 @@ def Clements_Bekkers_97(x:np.ndarray | float,
     if isinstance(x, pq.Quantity):
         x = x.magnitude
         
-        
     x = x.flatten()
+    
+    # print(f"Clements_Bekkers_97: α = {α}")
     
     # NOTE: 2025-11-05 21:31:27
     # allow passing all parameters packed in a sequence, so as to do away with 
     # the *_model version of this function
-    if isinstance(α, typing.Sequence) and len(α) == 5 and all(isinstance(v, float) for v in α):
-        α,  β, x0, τ1, τ2 = α
+    if isinstance(α, (typing.Sequence, np.ndarray)):
+        α,  β, x0, τ1, τ2 = check_unpack_model_params_seq(α, 5)
         
     if not all(isinstance(v, float) for v in (α,  β, x0, τ1, τ2)):
+        scipywarn(f"Clements_Bekkers_97 got α = {α} ({type(α).__name__}),  β = {β}, x0 = {x0}, τ1 = {τ1}, τ2 = {τ2}")
         raise TypeError("Expecting a sequence of 'α,  β, x₀, τ₁ τ₂' scalar floats or a comma-separated list of scalar floats for 'α,  β, x₀, τ₁ τ₂'")
         
     # α, β, x0, τ1, τ2 = parameters
@@ -574,6 +654,10 @@ def exp_rise_multi_decay(x:np.ndarray|float, *parameters:float,
     """
     
     # NOTE: call np.squeeze on the argument BEFORE passing it to this function !!!
+    
+    if isinstance(x, np.ndarray):
+        x = np.squeeze(x)
+    
     returnDecays = kwargs.pop("returnDecays", False)
     if len(parameters) == 1 and isinstance(parameters[0], typing.Sequence) and all(isinstance(v, float) for v in parameters[0]):
         parameters = parameters[0]
@@ -643,6 +727,9 @@ def compound_exp_rise_multi_decay(x, *parameters, returnDecays = False):
     """
     #print("parameters", parameters)
     
+    if len(parameters) == 1 and isinstance(parameters[0], typing.Sequence):
+        parameter = parameters[0]
+    
     # NOTE: 2017-12-26 00:06:38
     # this is so that the function can be used with scipy.integrate.quad
     if isinstance(x, numbers.Real):
@@ -682,15 +769,18 @@ def compound_exp_rise_multi_decay(x, *parameters, returnDecays = False):
         else:
             return y, yc
         
-def compound_exp_rise_multi_decay_model(x, parameters, returnDecays = False):
-    return compound_exp_rise_multi_decay(x, *parameters, returnDecays = returnDecays)
+# def compound_exp_rise_multi_decay_model(x, parameters, returnDecays = False):
+#     return compound_exp_rise_multi_decay(x, *parameters, returnDecays = returnDecays)
 
-def Markwardt_Nilius(x, g, e, h, s):
+def Markwardt_Nilius(x:np.ndarray|float, γ:typing.Sequence[float]|float, /,
+                     ϵ:typing.Optional[float]=None, 
+                     χ:typing.Optional[float]=None, 
+                     σ:typing.Optional[float]=None):
     r"""Markwardt & Nilius model for voltage-gated Ca2+ channels I-V relationship
     
     Implements:
     
-            y = g × (x - e) / ( 1 + exp(-(x-h)/s))
+            y = γ × (x - ϵ) / ( 1 + exp(-(x-χ)/σ))
     
     See Markwardt & Nilius (1988), J Physiol (London)
     
@@ -700,17 +790,15 @@ def Markwardt_Nilius(x, g, e, h, s):
     
     The model parameters are (real scalars, corresponding to units in parentheses):
     
-    g  = slope conductance (nS)
+    γ  = slope conductance (nS)
     
-    e  = extrapolated reversal potential (mV) of the current (from slope conductance)
+    ϵ  = extrapolated reversal potential (mV) of the current (from slope conductance)
         i.e. same as the Thevenin equivalent e.m.f.
         
-    v  = Vm at half-maximal current activation (mV) (i.e. taken on the rising 
-        region of the I(V) curve)
     
-    h  = the "delay"
+    χ  = the "delay"
     
-    s  = slope parameter of Ca2+ channel activation (mV)
+    σ  = slope parameter of Ca2+ channel activation (mV)
     
     Returns:
     ======== 
@@ -718,7 +806,16 @@ def Markwardt_Nilius(x, g, e, h, s):
     A column vector Im = f(Vm) were f is the Markwardt & Nilius model
     
     """
-    y = g * (x - e) / (1 + np.exp(-(x-h)/s))
+    # v  = Vm at half-maximal current activation (mV) (i.e. taken on the rising 
+    #     region of the I(V) curve)
+    
+    if isinstance(γ, typing.Sequence) and len(γ) == 4 and all(isinstance(v, float) for v in γ):
+        γ, ϵ, χ, σ = γ
+        
+    if not all(isinstance(v, float) for v in (γ, ϵ, χ, σ)):
+        raise TypeError("Expecting a comma-separated list of four float scalars or a sequence of four float scalars")
+    
+    y = γ * (x - e) / (1 + np.exp(-(x-h)/s))
     
     return y
 
@@ -908,7 +1005,9 @@ def gaussianSum1D(x, *args, **kwargs):
     return ret
     
     
-def Frank_Fuortes(x, tau, x0):
+def Frank_Fuortes(x:np.ndarray | float, 
+                  τ:float | typing.Sequence[float], /,  
+                  x0: typing.Optional[float] = None) -> np.ndarray | float:
     r""" Frank & Fuortes 1956 expression Irh/I = 1 - exp(-(t-t0)/tau)
     
     In the Frank & Fuortes 1956 paper, Irheo is a constant experimentally measured.
@@ -936,23 +1035,38 @@ def Frank_Fuortes(x, tau, x0):
     Frank & Fuortes (1956) Stimulation of spinal motoneurones with 
     intracellular electrodes. J.Physiol. 134, 451-470
     """
-    return 1-np.exp(-(x-x0)/tau)
-    #return 1-np.exp(-x/tau)
+    if isinstance(τ, typing.Sequence) and len(τ) == 2 and all(isinstance(v, float) for v in τ):
+        τ, x0 = τ
+        
+    if not all(isinstance(v, float) for v in (τ, x0)):
+        raise TypeError("Expecting a sequence of two float scalars or a comma-separated list of two scalars")
 
-def Frank_Fuortes2(x, irh, tau, x0):
+    return 1-np.exp(-(x-x0)/tau)
+
+def Frank_Fuortes2(x:np.ndarray | float, irh:typing.Sequence[float] | float, /,
+                   τ:typing.Optional[float] = None, 
+                   x0: typing.Optional[float] = None) -> np.ndarray | float:
     r""" Implements 1/I = (1-exp(-t/tau)) / Irh 
     
     By rearranging the Frank & Fuortes 1956 equation
     one can also get a fitted value for Irheobase 
     
-    1/I = (1-exp(-t/tau)) / Irh                                     (2)
+    1/I = (1-exp(-t/τ)) / Irh                                     (2)
+    
+    where t = x - x0
+    
     References:
     
     Frank & Fuortes (1956) Stimulation of spinal motoneurones with 
     intracellular electrodes. J.Physiol. 134, 451-470
     """
-    return (1-np.exp(-(x-x0)/tau)) / irh
-    #return (1-np.exp(-x/tau)) / irh
+    if isinstance(irh, typing.Sequence) and len(irh) == 3 and all(isinstance(v, float) for v in irh):
+        irh, τ, x0 = irh
+        
+    if not all(isinstance(v, float) for v in (irh, τ, x0)):
+        raise TypeError("Expecting a sequence of three float scalars or a comma-separated list of three scalars")
+    
+    return (1-np.exp(-(x-x0)/τ)) / irh
 
     
 def Boltzmann(x, p, pos:bool=True):
