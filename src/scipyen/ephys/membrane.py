@@ -9649,12 +9649,12 @@ def detect_Events_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], wavefo
         raise ValueError("Incorrect waveform specification")
     
     if isinstance(waveform, neo.core.basesignal.BaseSignal):
-        mini_duration = waveform.duration
+        event_duration = waveform.duration
     else:
         # NOTE: 2022-10-25 18:16:26
         # make sure the waveform, if a plain numpy array, has the same
         # "sampling rate" as the signal
-        mini_duration = len(waveform) / x.sampling_rate
+        event_duration = len(waveform) / x.sampling_rate
     
     if sigp.is_positive_waveform(waveform):
         peakfunc = np.argmax
@@ -9698,12 +9698,12 @@ def detect_Events_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], wavefo
         if isinstance(raw_signal, type(x)) and raw_signal.shape == x.shape and \
             raw_signal.sampling_rate == x.sampling_rate and raw_signal.times.units == x.times.units and \
                 raw_signal.t_start == x.t_start and raw_signal.units == x.units:
-            ret_ = extract_event_waveforms(raw_signal[:,kt], mini_duration, t.θ, threshold, peakfunc)
+            ret_ = extract_event_waveforms(raw_signal[:,kt], event_duration, t.θ, threshold, peakfunc)
         else:
-            ret_ = extract_event_waveforms(x[:,kt], mini_duration, t.θ, threshold, peakfunc)
+            ret_ = extract_event_waveforms(x[:,kt], event_duration, t.θ, threshold, peakfunc)
         
         
-        # ret_ = extract_event_waveforms(x[:,kt], mini_duration, t.θ, threshold, peakfunc)
+        # ret_ = extract_event_waveforms(x[:,kt], event_duration, t.θ, threshold, peakfunc)
         
         if isinstance(ret_, neo.SpikeTrain):
             ret_.annotate(waveform = waveform, θ = θ, channel_id = x.array_annotations.get("channel_ids", [0])[0])
@@ -9920,9 +9920,11 @@ def slide_detect(x:np.ndarray, h:np.ndarray, padding:bool=True, data_cache = Non
     # return θ , α, β, ε, σ, xx
     
 def extract_event_waveforms(x:typing.Union[neo.AnalogSignal, DataSignal], 
-                            duration:pq.Quantity, θ:pq.Quantity, threshold, peakfunc) -> neo.SpikeTrain | None:
+                            event_duration:pq.Quantity, θ:pq.Quantity, threshold:pq.Quantity|float, 
+                            peakfunc:collections.abc.Callable) -> neo.SpikeTrain | None:
     r"""
-    Extracts detected waveforms (e.g. mEPSCs) in a signal.
+    Extracts detected waveforms (e.g. mEPSCs) in a signal, wraps their time 
+stamps and waveforms in a neo.SpikeTrain.
     
     Waveforms are detected by comparing the θ signal (containing a detection
     signal) to the scalar `threshold`, to determine the start & end time stamps
@@ -9937,7 +9939,7 @@ def extract_event_waveforms(x:typing.Union[neo.AnalogSignal, DataSignal],
     ==========-
     x: single-channel signal (neo.AnalogSignal or DataSignal)
     
-    duration: duration of the mPSC template (Quantity in units of the signal domain)
+    event_duration: duration of the event template (Quantity in units of the signal domain)
     
     θ: single-channel signal with detection criterion (can be cross-correlation
         of the result of sliding deteciton algorithm)
@@ -9946,8 +9948,10 @@ def extract_event_waveforms(x:typing.Union[neo.AnalogSignal, DataSignal],
         are considered to correspond to samples in the detected mPSCs
     
     peakfunc: function to extract the sample index of the extremum in the 
-        mPSC waveform (i.e., either argmax, for upward event waveform, or argmin
-        for downward event waveform)
+        event waveform (e.g., for "simple" event waveforms like those of a 
+        synaptic event this would typically be argmax() for an upward event 
+        waveform, or argmin() for a downward event waveform; for more complex 
+        waveforms you would almost surely supply a more appropriate function here)
     
     Returns:
     ========
@@ -9987,60 +9991,60 @@ def extract_event_waveforms(x:typing.Union[neo.AnalogSignal, DataSignal],
         raise TypeError(f"Expecting a vector; instead, the signal has {x.shape[1]} channels")
     flags =  θ >= threshold
     flag_bounds = np.ediff1d(flags.astype(np.dtype(float)))
-    peak_begins = np.where(flag_bounds > 0)[0] # sample indices
-    peak_ends   = np.where(flag_bounds < 0)[0] # sample indices
+    wave_begins = np.where(flag_bounds > 0)[0] # sample indices
+    wave_ends   = np.where(flag_bounds < 0)[0] # sample indices
     
-    # print(len(peak_begins), len(peak_ends))
+    # print(len(wave_begins), len(wave_ends))
     
-    if len(peak_begins) == 0 or len(peak_ends) == 0:
+    if len(wave_begins) == 0 or len(wave_ends) == 0:
         return # nothing detected ?!?
     
-    if len(peak_begins) > len(peak_ends):
-        if peak_begins[-1] > peak_ends[-1]:
-            peak_begins = peak_begins[0:-1]
-        elif peak_begins[-1] < peak_ends[-1]:
-            peak_begins = peak_begins[1:]
+    if len(wave_begins) > len(wave_ends):
+        if wave_begins[-1] > wave_ends[-1]:
+            wave_begins = wave_begins[0:-1]
+        elif wave_begins[-1] < wave_ends[-1]:
+            wave_begins = wave_begins[1:]
             
-    elif len(peak_begins) < len(peak_ends):
-        if peak_begins[0] > peak_ends[0]:
-            peak_ends = peak_ends[1:]
+    elif len(wave_begins) < len(wave_ends):
+        if wave_begins[0] > wave_ends[0]:
+            wave_ends = wave_ends[1:]
             
-        elif peak_begins[-1] > peak_ends[-1]:
-            peak_ends = peak_ends[0:-1]
+        elif wave_begins[-1] > wave_ends[-1]:
+            wave_ends = wave_ends[0:-1]
             
-    # print(f"peak begin, end: {[v for v in zip(peak_begins, peak_ends)]}")
+    # print(f"peak begin, end: {[v for v in zip(wave_begins, wave_ends)]}")
         
-    θmaxima = [np.argmax(θ[v[0]:v[1]]) + v[0] for v in zip(peak_begins, peak_ends) if len(θ[v[0]:v[1]]) > 0]
-    
-    # print(f"θmaxima {θmaxima}")
-    mini_starts = x.times[θmaxima]
-    
-    mini_ends = mini_starts + duration
+    # on each θ regions where θ >= threshold, the sample index of the θ maximum
+    # (i.e., local θ maximum in each interval of θ >= threshold) corresponds to
+    # the onset of the (detected) event waveform
+    θmaxima = [np.argmax(θ[v[0]:v[1]]) + v[0] for v in zip(wave_begins, wave_ends) if len(θ[v[0]:v[1]]) > 0]
+    event_starts = x.times[θmaxima]
+    # then the end of the event waveform is event start (onset) + event duration
+    event_ends = event_starts + event_duration
     
     # remove past-the-end intervals
-    intervals = [(t0,t1) for (t0,t1) in zip(mini_starts, mini_ends) if t1 < x.t_stop]
-    print(f"membrane.extract_event_waveforms: intervals = {intervals}")
-    
+    intervals = [(t0,t1) for (t0,t1) in zip(event_starts, event_ends) if t1 < x.t_stop]
+    # print(f"membrane.extract_event_waveforms: intervals = {intervals}")
     
     # generate new starts after removal of past-the-end
     starts = np.array([interval[0] for interval in intervals])
     # ends = starts + duration
     
-    # for ke, me in enumerate(mini_ends):
+    # for ke, me in enumerate(event_ends):
     #     if me > x.t_stop:
     #         me = x.t_stop
-    # print(mini_starts)
+    # print(event_starts)
 
-    minis = [x.time_slice(*interval) for interval in intervals]
-    
-    # minis = [x.time_slice(t0,t1) if t1 < x.t_stop else x.time_slice(t0,x.t_stop) for (t0, t1) in zip(mini_starts, mini_ends)]
-    # minis = [x.time_slice(t0,t1) for (t0, t1) in zip(mini_starts, mini_ends) if t1 < x.t_stop ]
-    if len(minis) == 0:
+    # nopte, use those intervals to extract "slices" from the 'x' signal; each
+    # slice of the waveform of an event — effectively, they are "analog" signals
+    event_waves = [x.time_slice(*interval) for interval in intervals]
+
+    if len(event_waves) == 0:
         return
     
-    print(f"membrane.extract_event_waveforms: minis[0] = {minis[0]}")
-    
-    mini_peaks = np.array([w.times[peakfunc(w[:,0])] for w in minis])*x.times.units
+    # time stamps of event "peaks" (or "troughs"): this is the value of the event_wave.times
+    # vector at the sample where we have a local extremum in the event waveform
+    event_peak_times = np.array([w.times[peakfunc(w[:,0])] for w in event_waves])*x.times.units
 
     chname = x.array_annotations.get("channel_names", [""])[0]
 
@@ -10048,7 +10052,7 @@ def extract_event_waveforms(x:typing.Union[neo.AnalogSignal, DataSignal],
         chname = "mPSC"
     chname +="_"
         
-    for km, m in enumerate(minis):
+    for km, m in enumerate(event_waves):
         m.annotations["Accept"] = np.array([True])
         m.name = f"{chname}{km}"
         m.array_annotate(**x.array_annotations)
@@ -10085,40 +10089,40 @@ def extract_event_waveforms(x:typing.Union[neo.AnalogSignal, DataSignal],
     # NOTE: 2022-12-17 22:22:41 
     # Although it would have been easier (and perhaps faster) to call directly
     # np.concatenate on the wave's magnitude, as in the next line,
-    # mPSCtrain_waves = np.concatenate([w.magnitude[:,:,np.newaxis] for w in minis], axis=2)
+    # events_train_waves = np.concatenate([w.magnitude[:,:,np.newaxis] for w in event_waves], axis=2)
     # we would be losing the array annotations (see NOTE: 2022-12-17 22:08:57);
     # therefore it would be better to merge signals one by one.
     #
     # However, this aproach has two shortcomings:
-    # 1) in order to merge them, minis must have the same t_start (which, of
+    # 1) in order to merge them, event_waves must have the same t_start (which, of
     # of course, they have not). We could set their time starts to 0, being
     # mindful that the TRUE start time is stored in the SpikeTrain, and their
     # peak time has already been collected above
     #
     # 2) The merged signal would efectively be a 2D array, whereas the 
     # the waveforms of the SpikeTrain need to be a 3D array. Taking the magnitude 
-    # of the merged minis and adding add a new axis would NOT solve this because
-    # the new axis would be a singleton (i.e., all minis in the merged object
+    # of the merged event_waves and adding add a new axis would NOT solve this because
+    # the new axis would be a singleton (i.e., all event_waves in the merged object
     # would be treated as channels of a same signal, and NOT as separate waveform
     # signals).
     #
     # Therefore the best approach is to np.concatenate as above, but to also
     # merge their array annotations separately
     #
-    mPSCtrain_waves = np.concatenate([w.magnitude[:,:,np.newaxis] for w in minis], axis=2)
-    minis_arr_ann = minis[0].array_annotations
-    for mw in minis[1:]:
+    events_train_waves = np.concatenate([w.magnitude[:,:,np.newaxis] for w in event_waves], axis=2)
+    minis_arr_ann = event_waves[0].array_annotations
+    for mw in event_waves[1:]:
         minis_arr_ann = neoutils.merge_array_annotations(minis_arr_ann, mw.array_annotations)
-    ret.waveforms = mPSCtrain_waves.T
-    # print(f"membrane.extract_event_waveforms: waves shape {mPSCtrain_waves.shape}, waveforms shape {ret.waveforms.shape}")
+    ret.waveforms = events_train_waves.T
+    # print(f"membrane.extract_event_waveforms: waves shape {events_train_waves.shape}, waveforms shape {ret.waveforms.shape}")
     ret.segment = x.segment
     
     # print(f"extract_event_waveforms x.name {x.name}")
     ret.annotate(
-                 peak_time = mini_peaks, 
-                 wave_name = [w.name for w in minis],
-                 event_fit = [w.annotations.get("event_fit", None) for w in minis],
-                 Accept = np.concatenate([w.annotations["Accept"] for w in minis]),
+                 peak_time = event_peak_times, 
+                 wave_name = [w.name for w in event_waves],
+                 event_fit = [w.annotations.get("event_fit", None) for w in event_waves],
+                 Accept = np.concatenate([w.annotations["Accept"] for w in event_waves]),
                  source="Event_detection",
                  signal_units = x.units, 
                  signal_origin = x.name,
@@ -10129,11 +10133,11 @@ def extract_event_waveforms(x:typing.Union[neo.AnalogSignal, DataSignal],
                  )
     
     ret.array_annotate(**minis_arr_ann)
-    ret.array_annotate(peak_time = mini_peaks)
-    ret.array_annotate(wave_name = [w.name for w in minis])
+    ret.array_annotate(peak_time = event_peak_times)
+    ret.array_annotate(wave_name = [w.name for w in event_waves])
     ret.array_annotate(accept = ret.annotations["Accept"])
-    ret.array_annotate(sampling_rate = [x.sampling_rate for w in minis])
-    # ret.array_annotate(accept = np.concatenate([w.annotations["Accept"] for w in minis]))
+    ret.array_annotate(sampling_rate = [x.sampling_rate for w in event_waves])
+    # ret.array_annotate(accept = np.concatenate([w.annotations["Accept"] for w in event_waves]))
     
     return ret
 
@@ -10266,27 +10270,6 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal],
     
     
     """
-# NOTE: 
-#  BEGIN OBSOLETE documentation
-#     A dict with keys:
-#     "mini_starts": a quantity array with the start times of the detected waveforms
-#     
-#     "mini_peaks": a quantity array with the times of the "mini's" peak (or trough)
-#     
-#     "minis": a list of AnalogSignal objects with the detected "mini" waveforms.
-#     
-#     "waveform": the actual waveform used as model or "template". 
-#     
-#         This is either:
-#     
-#         • the realization of the synthetic mPSC (when the `waveform` parameter 
-#             is the sequence of model parameters)
-#     
-#         • the `waveform` parameters itself, when it is a template (synthetic or
-#             otherwise)
-#         
-#     ATTENTION: When detection has failed, returns None
-#  END  OBSOLETE documentation
     
     # print(f"membrane.detect_Events: waveform is a {type(waveform).__name__}")
     if not isinstance(x, (neo.AnalogSignal, DataSignal)):
@@ -10335,13 +10318,13 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal],
         raise ValueError("Incorrect waveform specification")
     
     if isinstance(waveform, neo.core.basesignal.BaseSignal):
-        mini_duration = waveform.duration
+        event_duration = waveform.duration
         
     else:
         # NOTE: 2022-10-25 18:16:26
         # you need to make sure the waveform (if a plain numpy array) has the
         # same "sampling rate" as the signal
-        mini_duration = len(waveform) / x.sampling_rate
+        event_duration = len(waveform) / x.sampling_rate
     
     if sigp.is_positive_waveform(waveform):
         peakfunc = np.argmax
@@ -10352,8 +10335,8 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal],
         return detect_Events_CBsliding(x, waveform, threshold, outputDetection=outputDetection, raw_signal=raw_signal)
             
     else:
-        # 1) normalize the model waveform - only for the cross-correlation method
-        # i.e. when not useCBsliding:
+        # 1) peak-normalize the model waveform - only for the cross-correlation method
+        # i.e. when not useCBsliding — but keep its polarity:
         mdl = sigp.normalise_waveform(waveform)
         
         mdl = np.atleast_2d(waveform)
@@ -10381,20 +10364,22 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal],
         for k, c in enumerate(xc):
             # NOTE: 2025-11-04 14:22:44
             # 'c' is a cross-correlation vector (1D array)
-            # 'dxc' is the detrended version of 'c'
-            # 'threshold' is 10 × dxc RMS / dxc.max()
-            # 'dxc_n' is the scaled version of the 'dxc' (ie. scaled to 10/dxc.max())
+            # 'dxc' is the detrended version of 'xc' (per-channel)
             dxc = scipy.signal.detrend(c, type="constant",axis=0)
+            
             if threshold is None:
+                # 'threshold' is 10 × dxc RMS / dxc.max() by default
                 thr = sigp.rms(dxc) * 10 / dxc.max()
             else:
                 thr = threshold
             
+            # 'dxc_n' is the scaled version of the 'dxc' (ie. scaled to 10/dxc.max())
+            # so that we can choose a threshold between 0 and 10
             dxc_n = np.copy(dxc) # because next is mod-ing in place
             dxc_n = sigp.scale_waveform(dxc_n, 10, np.max(dxc[~np.isnan(dxc)]))
 
-            # θ and θ_norm are an "analog" signals wrapping, respectively, the dxc
-            # and the dxc_n vectors;
+            # θ and θ_norm are an "analog" signals wrapping, respectively, the 
+            # dxc and the dxc_n vectors;
             # only θ_norm is returned, as element of 'thetas'
             
             θ = type(x)(dxc, units = pq.dimensionless, t_start = x.t_start,
@@ -10407,10 +10392,14 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal],
                         name = f"{x.name}_θ_norm",
                         description = "Template cross-correlation (normalized)")
             
+            # thetas is the list of normalized cross-correlation signal (one for each
+            # channel in x)
             thetas.append(θ_norm)
             
             # extract event waveforms, either from:
+            #
             # • x (which is either a filtered signal or a raw, unfilterd signal)
+            #
             # • raw_signal, if given (when going after raw waveforms, having
             #   performed the detectino of a filtered signal)
             #
@@ -10418,15 +10407,15 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal],
             # possibly empty) SpikeTrain
             #
             
-            print(f"membrane.detect_Events: raw_signal is {type(raw_signal).__name__}")
+            # print(f"membrane.detect_Events: raw_signal is {type(raw_signal).__name__}")
             if isinstance(raw_signal, type(x)) and raw_signal.shape == x.shape and \
                 raw_signal.sampling_rate == x.sampling_rate and raw_signal.times.units == x.times.units and \
                     raw_signal.t_start == x.t_start and raw_signal.units == x.units:
                 # extract event waveforms from the unfilteterd signal 'raw_signal'
-                ret_ = extract_event_waveforms(raw_signal[:,k], mini_duration, dxc_n, thr, peakfunc)
+                ret_ = extract_event_waveforms(raw_signal[:,k], event_duration, dxc_n, thr, peakfunc)
             else:
                 # extract event waveforms from the (possibily filtered) signal 'x'
-                ret_ = extract_event_waveforms(x[:,k], mini_duration, dxc_n, thr, peakfunc)
+                ret_ = extract_event_waveforms(x[:,k], event_duration, dxc_n, thr, peakfunc)
             
             if isinstance(ret_, neo.SpikeTrain):
                 ret_.annotate(waveform = waveform, θ = θ, θ_norm=θ_norm,

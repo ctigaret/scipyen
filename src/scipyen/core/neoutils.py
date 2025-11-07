@@ -3593,7 +3593,7 @@ def splice_signals(*args, times=None):
 
         Furthermore, the signals must have:
         • the same signal units (e.g. cannot splice together pA and mV signals)
-        • the same size on the second axis (i.e., the same number of channels)
+        • the same size on the second axis (i.e., the same number of signal channels)
         • the same sampling rate and domain units (e.g., cannot splice together
             signals in the time domain and signals in the space domain)
 
@@ -3773,7 +3773,8 @@ def concatenate_signals(
     r"""Concatenates regularly sampled signals.
 
     Implements the functionality of neo.AnalogSignal's merge() and concatenate()
-    but allows a sequence of signals instead of being restricted to two signals.
+    methods, but allows a sequence of signal objects, instead of being restricted 
+    to two signal objects.
 
     When the 'axis' parameters is the default (1, one) this is useful to collapse
     several analog signals into a single multi-channel signal ('merging').
@@ -7029,18 +7030,31 @@ def extract_spike_train_waveforms(x: neo.SpikeTrain, waveunits: pq.Quantity, **k
         if not isinstance(prefix, str) or len(prefix.strip()) == 0:
             prefix = "wave"
 
+        # NOTE: 2025-11-07 22:40:09
+        # the waveforms in a SpikeTrain are stored as a 3D numpy array:
+        # axis 0 = waveform index (size == size of the spiketrain, i.e., one waveform per time stamp)
+        # axis 1 = waveform channels (usually, just one channel) — hence axis 1 size >= 1
+        # axis 2 = waveform samples per channel — the waveform itself (for the given channel, see above)
         for k in range(x.waveforms.shape[0]):
-            w = x.waveforms[k, :, :]
+            w = x.waveforms[k, :, :] # waveform for time stamp 'κ'
             if keep_time:
-                t_start = x[k] + left_sweep
+                # NOTE: 2025-11-07 22:44:30
+                # propagate the actual time stamps (adjusted with left_sweep) => the actual start time of the wave
+                t_start = x[k] + left_sweep # x[κ] is a Quantity: κᵗʰ time stamp in the SpikeTrain — 
             else:
+                # NOTE: 2025-11-07 22:45:48
+                # relative time: the wave starts at time 0
                 t_start = 0 * x.units
 
+            # NOTE: 2025-11-07 22:46:39
+            # the wave for event (time stamp) κ MUST be a column vector (albeit 
+            # possibly with more than one channel, hence 𝑛 column vectors for 𝑛 channels)
+            # therefore it must be transposed
             wave = neo.AnalogSignal(
                 w.T,
-                units=waveunits,
-                t_start=t_start,
-                sampling_rate=x.sampling_rate,
+                units = waveunits,
+                t_start = t_start,
+                sampling_rate = x.sampling_rate,
                 name=f"{prefix}_{k}",
             )
             wave.segment = x.segment
@@ -7058,8 +7072,8 @@ def extract_spike_train_waveforms(x: neo.SpikeTrain, waveunits: pq.Quantity, **k
             wave.annotate(spiketrain=x, wave_index=k)
 
             # NOTE: 2022-12-19 08:43:47
-            # we do NOT array annnotate the waveforms here.
-            # This is because
+            # DO NOT ARRAY-ANNOTATE the waveforms here.
+            # This is because the code below throws:
             # for key, val in x.array_annotations.items():
             #     if wave.shape[1] == 1:
             #         arr_ann = {key:val[k]}
