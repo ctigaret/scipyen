@@ -10019,6 +10019,8 @@ def extract_event_waveforms(x:typing.Union[neo.AnalogSignal, DataSignal],
     
     # remove past-the-end intervals
     intervals = [(t0,t1) for (t0,t1) in zip(mini_starts, mini_ends) if t1 < x.t_stop]
+    print(f"membrane.extract_event_waveforms: intervals = {intervals}")
+    
     
     # generate new starts after removal of past-the-end
     starts = np.array([interval[0] for interval in intervals])
@@ -10030,10 +10032,13 @@ def extract_event_waveforms(x:typing.Union[neo.AnalogSignal, DataSignal],
     # print(mini_starts)
 
     minis = [x.time_slice(*interval) for interval in intervals]
+    
     # minis = [x.time_slice(t0,t1) if t1 < x.t_stop else x.time_slice(t0,x.t_stop) for (t0, t1) in zip(mini_starts, mini_ends)]
     # minis = [x.time_slice(t0,t1) for (t0, t1) in zip(mini_starts, mini_ends) if t1 < x.t_stop ]
     if len(minis) == 0:
         return
+    
+    print(f"membrane.extract_event_waveforms: minis[0] = {minis[0]}")
     
     mini_peaks = np.array([w.times[peakfunc(w[:,0])] for w in minis])*x.times.units
 
@@ -10137,7 +10142,7 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal],
                   useCBsliding:bool=False,
                   threshold:typing.Optional[float]=None,
                   outputDetection:bool=False, 
-                  raw_signal=None):
+                  raw_signal:typing.Optional[typing.Union[neo.AnalogSignal, DataSignal]]=None):
     r"""Detect the onset times of events in a signal.
     
     Here, an "event" is a waveform, embedded in the signal, corresponding to a
@@ -10324,7 +10329,8 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal],
                                      t_start = 0*x.times.units,
                                      duration = waveduration,
                                      sampling_rate = x.sampling_rate)
-            
+        else:
+            raise ValueError("Expecting six float scalars")
     else:
         raise ValueError("Incorrect waveform specification")
     
@@ -10411,6 +10417,8 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal],
             # In either case, the 'extract_event_waveforms' function returns a 
             # possibly empty) SpikeTrain
             #
+            
+            print(f"membrane.detect_Events: raw_signal is {type(raw_signal).__name__}")
             if isinstance(raw_signal, type(x)) and raw_signal.shape == x.shape and \
                 raw_signal.sampling_rate == x.sampling_rate and raw_signal.times.units == x.times.units and \
                     raw_signal.t_start == x.t_start and raw_signal.units == x.units:
@@ -10432,7 +10440,7 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal],
             else:
                 return
         
-        result = neo.core.spiketrainlist.SpikeTrainList(items = ret, segment=x.segment)
+        result = neo.core.spiketrainlist.SpikeTrainList(items = ret)
         
         for st in result:
             st.segment = x.segment
