@@ -215,7 +215,8 @@ from .constants import (
     EQUAL_NAN,
 )
 
-from .scipyen_quantities import unitsConvertible, checkTimeUnits, nameFromUnit
+from .scipyen_quantities import (unitsConvertible, checkTimeUnits, nameFromUnit, 
+                                 unitQuantityFromNameOrSymbol)
 from .datasignal import (
     DataSignal,
     IrregularlySampledDataSignal,
@@ -6909,8 +6910,10 @@ def inverse_lookup(
     return ret, index, sigvals
 
 
-def extract_spike_train_waveforms(x: neo.SpikeTrain, waveunits: pq.Quantity, **kwargs):
-    r"""Extracts the waveforms from a spike train, as a list of AnalogSignals.
+def extract_spike_train_waveforms(x: neo.SpikeTrain, 
+                                  waveunits: typing.Optional[pq.Quantity] = None, 
+                                  **kwargs):
+    r"""Constructs neo signal objects from the waveforms embedded in a spike train.
     The waveforms represent the events with time stamps stored in the spike train.
     There seems to be no real convention as to what event-related time stamp is 
     stored:
@@ -6935,7 +6938,12 @@ def extract_spike_train_waveforms(x: neo.SpikeTrain, waveunits: pq.Quantity, **k
     ==========
     x:neo.SpikeTrain
     waveunits: units for the waveform signal (the spike trains store waveforms
-            as plain numpy arrays)
+            as plain numpy arrays).
+    
+        Optional; default is None, in which case the units for the generated signal
+        are taken from the spike train array annotation ["signal_units"] asssociated
+        with the corresponding time stamp; if that is not found, the generated
+        signal obejct will have dimensionless units.
 
     Var-keyword parameters (**kwargs)
     =================================
@@ -7050,9 +7058,25 @@ def extract_spike_train_waveforms(x: neo.SpikeTrain, waveunits: pq.Quantity, **k
             # the wave for event (time stamp) κ MUST be a column vector (albeit 
             # possibly with more than one channel, hence 𝑛 column vectors for 𝑛 channels)
             # therefore it must be transposed
+            if isinstance(waveunits, pq.Quantity):
+                units = waveunits
+            else:
+                if "signal_units" in x.array_annotations:
+                    # NOTE: 2025-11-09 15:43:33
+                    # Re-construct the units form their symnbols stored in the 
+                    # array annotations
+                    # see NOTE: 2025-11-09 15:42:12 in Scipyen's ephys.membrane 
+                    # module for why I need this gymnastics
+                    units = unitQuantityFromNameOrSymbol(x.array_annotations["signal_units"][k])
+                else:
+                    units = pq.dimensionless
+                    
+                    
+            print(f"neoutils.extract_event_waveforms: units = {units}")
+                    
             wave = neo.AnalogSignal(
                 w.T,
-                units = waveunits,
+                units = units,
                 t_start = t_start,
                 sampling_rate = x.sampling_rate,
                 name=f"{prefix}_{k}",

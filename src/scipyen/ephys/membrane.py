@@ -9921,7 +9921,8 @@ def slide_detect(x:np.ndarray, h:np.ndarray, padding:bool=True, data_cache = Non
     
 def extract_event_waveforms(x:typing.Union[neo.AnalogSignal, DataSignal], 
                             event_duration:pq.Quantity, θ:pq.Quantity, threshold:pq.Quantity|float, 
-                            peakfunc:collections.abc.Callable) -> neo.SpikeTrain | None:
+                            peakfunc:collections.abc.Callable,
+                            **kwargs) -> neo.SpikeTrain | None:
     r"""
     Extracts detected waveforms (e.g. mEPSCs) in a signal, wraps their time 
 stamps and waveforms in a neo.SpikeTrain.
@@ -9952,6 +9953,12 @@ stamps and waveforms in a neo.SpikeTrain.
         synaptic event this would typically be argmax() for an upward event 
         waveform, or argmin() for a downward event waveform; for more complex 
         waveforms you would almost surely supply a more appropriate function here)
+    
+    Var-keyword parameters:
+    =======================
+    Additional fields ot include in waveform array annotations; the values will
+    be assigned IN COMMON to all detected event waveforms, and MUST be of POD
+    types (scalars, string, boolean).
     
     Returns:
     ========
@@ -9985,6 +9992,88 @@ stamps and waveforms in a neo.SpikeTrain.
     per spike, further into the analysis function(s).
     
     """
+    
+    # NOTE: 2022-12-17 22:08:57 array_annotating a SpikeTrain — README NOW:
+    # ==========================================================================
+    #
+    # Metadata related to event waveform needs to be stored somewhow, and LINKED
+    # to the time stamps corresponding to the event onset.
+    #
+    # While in principle this COULD be done by way of the "annotations" attribute
+    # in neo's signal objects, the time stamps are stored as a spike train, which
+    # does not cope well with these annotations; instead, at least in Neo v 0.14.2,
+    # the spike train supports array_annotations, therefore I need to use this approach.
+    #
+    # As of 2025-11-09 12:22:13, the relevant metadata needed for an event waveform
+    # is (below is an example from a saved spike train encapsulating mEPSCs):
+    #
+    # key ↦ value:
+    # ------------
+    # 'channel_names': array(['Im_prim_1', 'Im_prim_1', 'Im_prim_1',
+    #                         'Im_prim_1'], dtype='<U9'),                       # NOTE: 2025-11-09 12:29:46 the name of the signal where the waveforms were taken from
+    #                                                                           #   Taken from the signal object origin of the waveform and depends on how the signal object was generated 
+    #                                                                           #   (i.e., acquired via Clampex or CED Signal, etc)
+    # 'channel_ids': array(['0', '0', '0', '0'], dtype='<U1'),                  # NOTE: 2025-11-09 12:30:13 the index of the signal channel where the waveforms were taken from
+    #                                                                           #   Taken from the signal object origin of the waveform and depends on how the signal object was generated 
+    #                                                                           #   (i.e., acquired via Clampex or CED Signal, etc)
+    # 'nADCNum': array([2, 2, 2, 2]),                                           # NOTE: 2025-11-09 12:30:34 the ADC number used to record the signal
+    #                                                                           #   Taken from the signal object origin of the waveform and depends on how the signal object was generated 
+    #                                                                           #   (i.e., acquired via Clampex or CED Signal, etc)
+    # 'peak_time': array([2.6335, 3.1902, 3.7878, 4.8891]) * s,                 # NOTE: 2025-11-09 12:23:36 the event "peak" time 
+    #                                                                           # CAUTION this really depends on the shape of the event waveform... For compound waveforms one may consider this
+    #                                                                           # to be the time of the "main" (i.e., "largest") peak or trough; depending on the shape of the waveform, one MAY
+    #                                                                           # add further fields here
+    # 'wave_name': array(['Im_prim_1_0', 'Im_prim_1_1', 'Im_prim_1_2', 
+    # 'Im_prim_1_3'], dtype='<U11'),                                            # NOTE: 2025-11-09 12:31:39 the name of the event waveform (NOTE the sub-index)
+    # 'accept': array([ True,  True,  True,  True]),                            # NOTE: 2025-11-09 12:24:01 for events that are to be further sifted (accepted/rejected) according to post-hoc criteria
+    # 'sampling_rate': array([10000., 10000., 10000., 10000.])                  # NOTE: 2025-11-09 12:24:46 necessary for reconstructing the event waveform as a signal object
+    #                                                                           # CAUTION: the t_start of this signal needs to be given at construction, and it can be:
+    #                                                                           #   • the corresponding time stamp in the spike train + the spike train's 'left_sweep' attribute, or
+    #                                                                           #   • set to an arbitrary value (i.e. common to ALL waveforms in the spike train)
+    # 'segment': array([0., ...])                                               # NOTE: 2025-11-09 12:38:43 to be able to link the waveform to the index of the segment they originate from
+    #
+    # NOTE: 2025-11-09 13:50:03 adding additional fields to array annotations:
+    # • values COMMON to all event waveform channels can be added by passing 
+    #   field_name ↦ POD value type in 'kwargs'
+    # • individual waves can also be array annotated with mapping:
+    #   field_name ↦ 1D numpy array, as long as this is a numeric or string, or 
+    #   boolean array and its size equals the number of channels in the waveform
+    #
+    # Normally, neo.DataObject take array annotations with as many elements per
+    # key as the size on the last axis (highest dimension).
+    # For AnalogSignal and such (e.g. DataSignal), this is also the number of 
+    # signal channels (2nd dimension of the underlying data array, where one signal
+    # channel is a column vector).
+    #
+    # Therefore, the API dealing with array_annotations checks for the annotation
+    # length against the size of the DataObject's data array on its last axis
+    # (i.e., shape[-1]).
+    #
+    # However, for a SpikeTrain, things are different: the "data" array in a 
+    # SpikeTrain is, BY DEFINITION, a 1D array (with shape (N,)). This means 
+    # that for a SpikeTrain array.shape[-1] is the same as array.shape[0] !!!
+    #
+    # If this is what the neo authors have intended (this is not explicit in 
+    # the documentation) then the justification seems to be that the array
+    # annotations of a SpikeTrain are intended to provide data related to
+    # each individual spike in the SpikeTrain. This is perfectly justifiable
+    # given that the spike waveform data is only stored in the SpikeTrain's 
+    # 'waveformns' attribute as a plain numpy array, and not as a signal object, 
+    # (and therefore, any array annotations associated with the original signal 
+    # from where the wavwforms were taken are lost). 
+    #
+    # This is unlike the array annotations for, say, an AnalogSignal, where they 
+    # provide information related to each individual channel, and NOT to individual
+    # data points (which would be penalizing in terms of resources and not very 
+    # useful anyway).
+    #
+    # While this seems an overkill (possibly replicating data for each time stamp)
+    # the alternative woudl be to store the metadata in a separate Python object 
+    # (a dict) which sould require mroe code to keep things in sync 😦
+    #
+    # WARNING: array annotations can only take POD types (strings, scalars, booleans)
+    # which will be converted by the neo API into numpy arrays of corresponding dtypes
+    #
     if not isinstance(x, (neo.AnalogSignal, DataSignal)):
         raise TypeError(f"Expecting a neo.AnalogSignal or DataSignal; got {type(x).__name__} instead")
     if x.shape[1] > 1:
@@ -10028,12 +10117,6 @@ stamps and waveforms in a neo.SpikeTrain.
     
     # generate new starts after removal of past-the-end
     starts = np.array([interval[0] for interval in intervals])
-    # ends = starts + duration
-    
-    # for ke, me in enumerate(event_ends):
-    #     if me > x.t_stop:
-    #         me = x.t_stop
-    # print(event_starts)
 
     # nopte, use those intervals to extract "slices" from the 'x' signal; each
     # slice of the waveform of an event — effectively, they are "analog" signals
@@ -10049,39 +10132,48 @@ stamps and waveforms in a neo.SpikeTrain.
     chname = x.array_annotations.get("channel_names", [""])[0]
 
     if len(chname.strip())==0:
-        chname = "mPSC"
+        chname = "event"
     chname +="_"
         
+    if isinstance(x.segment, neo.Segment):
+        segindex = x.segment.index
+    else:
+        segindex = None
+        scipywarn("Signal's segment is None' therefore event waveforms array annotations will not contain segment a index")
+    # WARNING: 2025-11-09 12:03:22
+    # these annotations WILL BE LOST once we assign the waves to the 'waveforms'
+    # attribute of the created spiketrain, below
+    # see also NOTE: 2022-12-17 22:08:57
+    #
+    
     for km, m in enumerate(event_waves):
         m.annotations["Accept"] = np.array([True])
         m.name = f"{chname}{km}"
+        # NOTE: 2025-11-09 12:10:51
+        # copy the array annotations from the original signal object (where the 
+        # waveform is taken from)
         m.array_annotate(**x.array_annotations)
+        # NOTE: 2025-11-09 15:42:12
+        # unfortunately, array annotations do NOT support quantities; so assigning
+        # a quantity here will only store its magnitude, "slicing" away the physical units
+        # hence I need to satore this as a string (stirng array)
+        m.array_annotate(signal_units = scq.unitSymbol(m.units))
+        if isinstance(segindex, int):
+            m.array_annotate(segment=x.segment.index)
+            
+        m.array_annotate(Accept=True)
+        
+        for key, val in kwargs.items():
+            m.array_annotate(key=val)
+            
+        wave_amplitudes = list()
+        
+        for channel in range(m.shape[1]):
+            wave_amplitudes.append(sigp.waveform_amplitude(m[:,channel]))
+            
+        m.array_annotate(amplitude = np.array(wave_amplitudes))
     
-    # NOTE: 2022-12-17 22:08:57 array_annotating a SpikeTrain:
-    # Normally, neo.DataObject take array annotations with as many elements per
-    # key as the sie on the last axis (highest dimension).
-    # For AnalogSignal and such, this is also the number of channels (2nd dimension
-    # of the underlying data array, where one channel is a column vector).
-    #
-    # Therefore, the API dealing with array_annotations checks for the annotation
-    # length against the size of the DataObject's data array on its last axis
-    # (i.e., shape[-1]).
-    #
-    # However, for a SpikeTrain, things are different: the "data" array in a 
-    # SpikeTrain is, BY DEFINITION, a 1D array (with shape (N,)). This means 
-    # that for a SpikeTrain array.shape[-1] is the same as array.shape[0] !!!
-    # If this is what the neo authors have intended (this is not explicit in 
-    # the documentation) then the justification seems to be that the array
-    # annotations of a SpikeTrain are intended to provide data related to
-    # each individual spike in the SpikeTrain. This is perfectly justifiable
-    # given that the spike waveform data is only stored as a plain numpy array, 
-    # and not as a signal, in the SpikeTrain (so that any of the array annotations
-    # associated with the original signal from where the spikes were taken are 
-    # lost). 
-    # This is unlike the array annotations for, say, an AnalogSignal, where they 
-    # provide information related to each individual channel, and NOT to individual
-    # data points (the latter being practically penalizing in terms of resources
-    # and not very useful anyway).
+    
     ret = neo.SpikeTrain(starts, t_start = x.t_start, units = x.times.units,
                          t_stop = x.times[-1], sampling_rate = x.sampling_rate,
                          name="mPSCs")
@@ -10110,20 +10202,28 @@ stamps and waveforms in a neo.SpikeTrain.
     # merge their array annotations separately
     #
     events_train_waves = np.concatenate([w.magnitude[:,:,np.newaxis] for w in event_waves], axis=2)
+    
+    # NOTE: 2025-11-09 12:08:39
+    # MERGE the waveform's array annotations (the original ones are 
+    # left copied from the full original snalog signal object the waveforms are
+    # taken from, see NOTE: 2025-11-09 12:10:51)
+    #
     minis_arr_ann = event_waves[0].array_annotations
     for mw in event_waves[1:]:
         minis_arr_ann = neoutils.merge_array_annotations(minis_arr_ann, mw.array_annotations)
+        
+    # NOTE: 2025-11-09 12:09:05
+    # this next line means the waveform's array annotations won't be propagated
     ret.waveforms = events_train_waves.T
-    # print(f"membrane.extract_event_waveforms: waves shape {events_train_waves.shape}, waveforms shape {ret.waveforms.shape}")
-    ret.segment = x.segment
     
-    # print(f"extract_event_wavefor
+    # ret.segment = x.segment # not used anymore; now is included int he waveform signals' array-annotations
     
+    # ### BEGIN array annotate the spike train
     # NOTE: 2025-11-09 11:28:37 see NOTE: 2025-11-09 11:26:33
     ret.annotate(
                  peak_time = event_peak_times, 
                  wave_name = [w.name for w in event_waves],
-                 event_fit = [w.annotations.get("event_fit", None) for w in event_waves],
+                 event_fits = [w.annotations.get("event_fit", None) for w in event_waves],
                  Accept = np.concatenate([w.annotations["Accept"] for w in event_waves]),
                  source="Event_detection",
                  signal_units = x.units, 
@@ -10135,11 +10235,12 @@ stamps and waveforms in a neo.SpikeTrain.
                  )
     
     ret.array_annotate(**minis_arr_ann)
-    ret.array_annotate(peak_time = event_peak_times)
-    ret.array_annotate(wave_name = [w.name for w in event_waves])
-    ret.array_annotate(accept = ret.annotations["Accept"])
-    ret.array_annotate(sampling_rate = [x.sampling_rate for w in event_waves])
-    # ret.array_annotate(accept = np.concatenate([w.annotations["Accept"] for w in event_waves]))
+    # ret.array_annotate(peak_time = event_peak_times)
+    # ret.array_annotate(wave_name = [w.name for w in event_waves])
+    # # ret.array_annotate(accept = ret.annotations["Accept"])
+    # ret.array_annotate(sampling_rate = [x.sampling_rate for w in event_waves])
+    # # ret.array_annotate(accept = np.concatenate([w.annotations["Accept"] for w in event_waves]))
+    # ### END   array annotate the spike train
     
     return ret
 
@@ -10148,7 +10249,8 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal],
                   useCBsliding:bool=False,
                   threshold:typing.Optional[float]=None,
                   outputDetection:bool=False, 
-                  raw_signal:typing.Optional[typing.Union[neo.AnalogSignal, DataSignal]]=None):
+                  raw_signal:typing.Optional[typing.Union[neo.AnalogSignal, DataSignal]]=None,
+                  **kwargs):
     r"""Detect the onset times of events in a signal.
     
     Here, an "event" is a waveform, embedded in the signal, corresponding to a
@@ -10162,6 +10264,9 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal],
     The actual signal scanning is implemented as the cross-correlation of the 
     signal with the template waveform, or by using the "sliding detection"
     algorithm in Clements & Bekkers, 1997, (Biophys J.).
+    
+    The detected time stamps and their waveforms are "packed" in a neo.SpikeTrain
+    by calling membrane.extract_event_waveforms(…)
     
     Parameters:
     ==========
@@ -10255,6 +10360,15 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal],
         This is useful when detection was performed on a pre-processed (e.g., 
         smoothed or otherise filtered) signal, while the intention is to retrieve 
         the "raw" (unfiltered) waveforms.
+    
+    Var-keyword parameters:
+    =======================
+    Additional fields ot include in waveform array annotations; the values will
+    be assigned IN COMMON to all detected event waveforms, and MUST be of POD
+    types (scalars, string, boolean).
+    
+    WARNING: These will be passed directly to membrane.extract_event_waveforms(…)
+    See also membrane.extract_event_waveforms
     
     Returns:
     ========
@@ -10422,10 +10536,10 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal],
                 raw_signal.sampling_rate == x.sampling_rate and raw_signal.times.units == x.times.units and \
                     raw_signal.t_start == x.t_start and raw_signal.units == x.units:
                 # extract event waveforms from the unfilteterd signal 'raw_signal'
-                ret_ = extract_event_waveforms(raw_signal[:,k], event_duration, dxc_n, thr, peakfunc)
+                ret_ = extract_event_waveforms(raw_signal[:,k], event_duration, dxc_n, thr, peakfunc, **kwargs)
             else:
                 # extract event waveforms from the (possibily filtered) signal 'x'
-                ret_ = extract_event_waveforms(x[:,k], event_duration, dxc_n, thr, peakfunc)
+                ret_ = extract_event_waveforms(x[:,k], event_duration, dxc_n, thr, peakfunc, **kwargs)
             
             if isinstance(ret_, neo.SpikeTrain):
                 ret_.annotate(waveform = waveform, θ = θ, θ_norm=θ_norm,
