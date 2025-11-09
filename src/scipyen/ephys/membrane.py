@@ -10117,7 +10117,9 @@ stamps and waveforms in a neo.SpikeTrain.
     # print(f"membrane.extract_event_waveforms: waves shape {events_train_waves.shape}, waveforms shape {ret.waveforms.shape}")
     ret.segment = x.segment
     
-    # print(f"extract_event_waveforms x.name {x.name}")
+    # print(f"extract_event_wavefor
+    
+    # NOTE: 2025-11-09 11:28:37 see NOTE: 2025-11-09 11:26:33
     ret.annotate(
                  peak_time = event_peak_times, 
                  wave_name = [w.name for w in event_waves],
@@ -10406,6 +10408,14 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal],
             # In either case, the 'extract_event_waveforms' function returns a 
             # possibly empty) SpikeTrain
             #
+            
+            #
+            # NOTE: 2025-11-09 11:26:33 
+            # DO NOT store data in the SpikeTrain object's 'annotations' attribute
+            # because it won't be saved/restored when pickling (BUG in neo library?);
+            # however, array annotations ARE acceptable (as long as they are simple,
+            # POD types)
+            
             
             # print(f"membrane.detect_Events: raw_signal is {type(raw_signal).__name__}")
             if isinstance(raw_signal, type(x)) and raw_signal.shape == x.shape and \
