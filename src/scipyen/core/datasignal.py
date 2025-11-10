@@ -16,6 +16,9 @@ from neo.core import basesignal
 from neo.core.basesignal import BaseSignal
 from neo.core import container
 from neo.core.dataobject import DataObject, ArrayDict
+from neo.core import spiketrain
+from neo.core.spiketrain import SpikeTrain
+from neo.core.objectlist import ObjectList as NeoObjectList
 
 from core.scipyen_quantities import (unitsConvertible, nameFromUnit)
 from core.strutils import is_path #, is_pathname_valid
@@ -67,6 +70,47 @@ def _new_IrregularlySampledDataSignal(cls, domain, signal, units=None, domain_un
     
     return obj
 
+def _new_places(
+    cls,
+    signal,
+    t_stop,
+    units=None,
+    dtype=None,
+    copy=None,
+    sampling_rate=1.0 * pq.Hz,
+    t_start=0.0 * pq.s,
+    waveforms=None,
+    left_sweep=None,
+    name=None,
+    file_origin=None,
+    description=None,
+    array_annotations=None,
+    annotations=None,
+    segment=None,
+    unit=None,
+)
+    if annotations is None:
+        annotations = {}
+    obj = SpikeTrain(
+        times=signal,
+        t_stop=t_stop,
+        units=units,
+        dtype=dtype,
+        copy=copy,
+        sampling_rate=sampling_rate,
+        t_start=t_start,
+        waveforms=waveforms,
+        left_sweep=left_sweep,
+        name=name,
+        file_origin=file_origin,
+        description=description,
+        array_annotations=array_annotations,
+        **annotations,
+    )
+    obj.segment = segment
+    obj.unit = unit
+    return obj
+
 
 class DataSignal(BaseSignal):
     r"""A "generic" neo.AnalogSignal with domain not restricted to time.
@@ -111,7 +155,22 @@ class DataSignal(BaseSignal):
     
     _recommended_attrs = neo.baseneo.BaseNeo._recommended_attrs
 
-    def __new__(cls, signal, units=None, domain_units=None, time_units = None, dtype=np.dtype("float64"), copy=True, t_start=0*pq.dimensionless, sampling_period=None, sampling_rate=None, name=None, domain_name=None, file_origin=None, description=None, array_annotations=None, **annotations):
+    def __new__(cls, 
+                signal, 
+                units=None, 
+                domain_units=None, 
+                time_units = None, 
+                dtype=np.dtype("float64"), 
+                copy=True, 
+                t_start=0*pq.dimensionless, 
+                sampling_period=None, 
+                sampling_rate=None, 
+                name=None, 
+                domain_name=None, 
+                file_origin=None, 
+                description=None, 
+                array_annotations=None, 
+                **annotations):
         # NOTE: 2021-12-09 21:45:08 try & sort out the mess from pickles saved with prev APIs
         # WARNING: This is NOT guaranteed to succeed
         # if trying to load an old pickle fails, you're better off going to the
@@ -2288,3 +2347,408 @@ class IrregularlySampledDataSignal(BaseSignal):
 
         return signal
 
+class Places(SpikeTrain):
+    r"""A generic SpikeTrain-like object where the domain is not restricted to time.
+        WARNING In development, do not use yet
+"""
+    _parent_objects = ("Segment",)
+    _parent_attrs = ("segment",)
+    _quantity_attr = "times"
+    _necessary_attrs = (("times", pq.Quantity, 1), 
+                        ("t_start", pq.Quantity, 0), 
+                        ("t_stop", pq.Quantity, 0))
+    _recommended_attrs = (
+        ("waveforms", pq.Quantity, 3),
+        ("left_sweep", pq.Quantity, 0),
+        ("sampling_rate", pq.Quantity, 0),
+    ) + BaseNeo._recommended_attrs
+  
+    def __new__(
+        cls,
+        times,
+        t_stop,
+        units=None,
+        dtype=None,
+        copy=None,
+        sampling_rate:typing.Union[float, pq.Quantity]=1.0,
+        t_start:typing.Union[float, pq.Quantity]=0.0,
+        waveforms=None,
+        left_sweep=None,
+        name=None,
+        file_origin=None,
+        description=None,
+        array_annotations=None,
+        **annotations,
+    ):
+        if copy is not None:
+            raise ValueError(
+                "`copy` is now deprecated in Neo due to removal in Quantites to support Numpy 2.0. "
+                "In order to facilitate the deprecation copy can be set to None but will raise an "
+                "error if set to True/False since this will silently do nothing. This argument will be completely "
+                "removed in Neo 0.15.0. Please update your code base as necessary."
+            )
+
+        if len(times) != 0 and waveforms is not None and len(times) != waveforms.shape[0]:
+            # len(times)!=0 has been used to workaround a bug occurring during neo import
+            raise ValueError("the number of waveforms should be equal to the number of spikes")
+
+        if dtype is not None and hasattr(times, "dtype") and times.dtype != dtype:
+            raise ValueError("cannot change dtype during construction due to change in copy behavior")
+
+            if hasattr(t_start, "dtype") and t_start.dtype != times.dtype:
+                t_start = t_start.astype(times.dtype)
+                
+            if hasattr(t_stop, "dtype") and t_stop.dtype != times.dtype:
+                t_stop = t_stop.astype(times.dtype)
+
+        times, dim = normalize_domain_array(times, units, dtype, copy)
+        
+        # Construct Quantity from data
+        obj = times.view(cls)
+
+        # spiketrain times always need to be 1-dimensional
+        if len(obj.shape) > 1:
+            raise ValueError("Spiketrain times array has more than 1 dimension")
+
+        # if the dtype and units match, just copy the values here instead
+        # of doing the much more expensive creation of a new Quantity
+        # using items() is orders of magnitude faster
+        if (
+            hasattr(t_start, "dtype")
+            and t_start.dtype == obj.dtype
+            and hasattr(t_start, "dimensionality")
+            and t_start.dimensionality.items() == dim.items()
+        ):
+            obj.t_start = t_start.copy()
+        else:
+            obj.t_start = pq.Quantity(t_start, units=dim, dtype=obj.dtype)
+
+        if (
+            hasattr(t_stop, "dtype")
+            and t_stop.dtype == obj.dtype
+            and hasattr(t_stop, "dimensionality")
+            and t_stop.dimensionality.items() == dim.items()
+        ):
+            obj.t_stop = t_stop.copy()
+        else:
+            obj.t_stop = pq.Quantity(t_stop, units=dim, dtype=obj.dtype)
+
+        # Store attributes
+        obj.waveforms = waveforms
+        obj.left_sweep = left_sweep
+        obj.sampling_rate = sampling_rate
+
+        # parents
+        obj.segment = None
+        obj.unit = None
+
+        _check_domain_in_range(obj, obj.t_start, obj.t_stop, view=True)
+
+        return obj
+    
+    def __init__(
+        self,
+        times,
+        t_stop,
+        units=None,
+        dtype=None,
+        copy=None,
+        sampling_rate:typing.Union[float, pq.Quantity]=1.0,
+        t_start:typing.Union[float, pq.Quantity]=0.0,
+        waveforms=None,
+        left_sweep=None,
+        name=None,
+        file_origin=None,
+        description=None,
+        array_annotations=None,
+        **annotations,
+    ):
+        DataObject.__init__(
+            self,
+            name=name,
+            file_origin=file_origin,
+            description=description,
+            array_annotations=array_annotations,
+            **annotations,
+        )
+    
+    def __reduce__(self):
+        """
+        Map the __new__ function onto _new_BaseAnalogSignal, so that pickle
+        works
+        """
+        import numpy
+
+        return _new_places, (
+            self.__class__,
+            numpy.array(self),
+            self.t_stop,
+            self.units,
+            self.dtype,
+            None,
+            self.sampling_rate,
+            self.t_start,
+            self.waveforms,
+            self.left_sweep,
+            self.name,
+            self.file_origin,
+            self.description,
+            self.array_annotations,
+            self.annotations,
+            self.segment,
+            self.unit,
+        )
+
+    def __repr__(self):
+        """
+        Returns a string representing the :class:`SpikeTrain`.
+        """
+        return f"<Places({super().__repr__()}, [{self.t_start}, {self.t_stop}])>"
+
+    def __add__(self, time):
+        """
+        Shifts the time point of all spikes by adding the amount in
+        :attr:`time` (:class:`Quantity`)
+
+        If `time` is a scalar, this also shifts :attr:`t_start` and :attr:`t_stop`.
+        If `time` is an array, :attr:`t_start` and :attr:`t_stop` are not changed unless
+        some of the new spikes would be outside this range.
+        In this case :attr:`t_start` and :attr:`t_stop` are modified if necessary to
+        ensure they encompass all spikes.
+
+        It is not possible to add two SpikeTrains (raises ValueError).
+        """
+        spikes = self.view(pq.Quantity)
+        # check_has_dimensions_time(time)
+        if isinstance(time, (Places, SpikeTrain)):
+            raise TypeError("Can't add two spike trains")
+        new_times = spikes + time
+        if time.size > 1:
+            t_start = min(self.t_start, np.min(new_times))
+            t_stop = max(self.t_stop, np.max(new_times))
+        else:
+            t_start = self.t_start + time
+            t_stop = self.t_stop + time
+        return Places(
+            times=new_times,
+            t_stop=t_stop,
+            units=self.units,
+            sampling_rate=self.sampling_rate,
+            t_start=t_start,
+            waveforms=self.waveforms,
+            left_sweep=self.left_sweep,
+            name=self.name,
+            file_origin=self.file_origin,
+            description=self.description,
+            array_annotations=deepcopy(self.array_annotations),
+            **self.annotations,
+        )
+
+   def __getitem__(self, i):
+        """
+        Get the item or slice :attr:`i`.
+        """
+        obj = super(DataObject, self).__getitem__(i)
+        if hasattr(obj, "waveforms") and obj.waveforms is not None:
+            obj.waveforms = obj.waveforms.__getitem__(i)
+        try:
+            obj.array_annotate(**deepcopy(self.array_annotations_at_index(i)))
+        except AttributeError:  # If Quantity was returned, not SpikeTrain
+            pass
+        return obj
+
+    def __setitem__(self, i, value):
+        """
+        Set the value the item or slice :attr:`i`.
+        """
+        if not hasattr(value, "units"):
+            value = pq.Quantity(value, units=self.units)  # or should we be strict: raise ValueError(
+            # "Setting a value  # requires a quantity")?
+        # check for values outside t_start, t_stop
+        _check_domain_in_range(value, self.t_start, self.t_stop)
+        super(DataObject, self).__setitem__(i, value)
+
+    def __setslice__(self, i, j, value):
+        if not hasattr(value, "units"):
+            value = pq.Quantity(value, units=self.units)
+        _check_domain_in_range(value, self.t_start, self.t_stop)
+        super(DataObject, self).__setslice__(i, j, value)
+
+    def duplicate_with_new_data(self, signal, t_start=None, t_stop=None, waveforms=None, deep_copy=True, units=None):
+        """
+        Create a new :class:`SpikeTrain` with the same metadata
+        but different data (times, t_start, t_stop)
+        Note: Array annotations can not be copied here because length of data can change
+        """
+        # using previous t_start and t_stop if no values are provided
+        if t_start is None:
+            t_start = self.t_start
+        if t_stop is None:
+            t_stop = self.t_stop
+        if waveforms is None:
+            waveforms = self.waveforms
+        if units is None:
+            units = self.units
+        else:
+            units = pq.quantity.validate_dimensionality(units)
+
+        signal = deepcopy(signal)
+        new_st = Places(signal, t_start=t_start, t_stop=t_stop, waveforms=waveforms, units=units)
+        new_st._copy_data_complement(self, deep_copy=deep_copy)
+
+        # Note: Array annotations are not copied here, because length of data could change
+
+        # overwriting t_start and t_stop with new values
+        new_st.t_start = t_start
+        new_st.t_stop = t_stop
+
+        # consistency check
+        _check_domain_in_range(new_st, new_st.t_start, new_st.t_stop, view=False)
+        spiketrain._check_waveform_dimensions(new_st)
+        return new_st
+
+    def time_shift(self, t_shift):
+        """
+        Shifts a :class:`SpikeTrain` to start at a new time.
+
+        Parameters
+        ----------
+        t_shift: Quantity (time)
+            Amount of time by which to shift the :class:`SpikeTrain`.
+
+        Returns
+        -------
+        spiketrain: :class:`SpikeTrain`
+            New instance of a :class:`SpikeTrain` object starting at t_shift later than the
+            original :class:`SpikeTrain` (the original :class:`SpikeTrain` is not modified).
+        """
+        # We need new to make a new SpikeTrain
+        times = self.times.copy() + t_shift
+        t_stop = self.t_stop + t_shift
+        t_start = self.t_start + t_shift
+        new_st = Places(
+            times=times,
+            t_stop=t_stop,
+            units=self.unit,
+            sampling_rate=self.sampling_rate,
+            t_start=t_start,
+            waveforms=self.waveforms,
+            left_sweep=self.left_sweep,
+            name=self.name,
+            file_origin=self.file_origin,
+            description=self.description,
+            array_annotations=deepcopy(self.array_annotations),
+            **self.annotations,
+        )
+
+        # Here we can safely copy the array annotations since we know that
+        # the length of the SpikeTrain does not change.
+        new_st.array_annotate(**self.array_annotations)
+
+        return new_st
+    
+def _check_domain_in_range(value, t_start, t_stop, view=False) -> None:
+    """
+    Verify that all times in `value` are between `t_start`
+    and `t_stop` (inclusive)
+
+    Parameters
+    ----------
+    value: array-like
+        An array-like object with times
+    t_start: float
+        The starting time
+    t_stop: float
+        The stopping time
+    view: bool, default: False
+        If true views are used for the test. This increases speed but
+        is only safe if certain that the dtype and units are the same.
+
+    Raises
+    ------
+    ValueError
+        * If t_stop < t_start
+        * value.min() < t_start
+        * value.max() > t_start
+
+    Returns
+    -------
+    None: If check passes
+    """
+
+    if t_start > t_stop:
+        raise ValueError(f"t_stop ({t_stop}) is before t_start ({t_start})")
+
+    if not value.size:
+        return
+
+    if view:
+        value = value.view(np.ndarray)
+        t_start = t_start.view(np.ndarray)
+        t_stop = t_stop.view(np.ndarray)
+
+    if value.min() < t_start:
+        raise ValueError(f"The first spike ({value}) is before t_start ({t_start})")
+    if value.max() > t_stop:
+        raise ValueError(f"The last spike ({value}) is after t_stop ({t_stop})")
+
+
+def normalize_domain_array(times, units=None, dtype=None, copy=None):
+    """
+    Return a quantity array with the correct units.
+    There are four scenarios:
+
+    A. times (NumPy array), units given as string or Quantities units
+    B. times (Quantity array), units=None
+    C. times (Quantity), units given as string or Quantities units
+    D. times (NumPy array), units=None
+
+    In scenarios A-C we return a tuple (times as a Quantity array, dimensionality)
+    In scenario C, we rescale the original array to match `units`
+    In scenario D, we raise a ValueError
+    """
+
+    if copy is not None:
+        raise ValueError(
+            "`copy` is now deprecated in Neo due to removal in Quantites to support Numpy 2.0. "
+            "In order to facilitate the deprecation copy can be set to None but will raise an "
+            "error if set to True/False since this will silently do nothing. This argument will be completely "
+            "removed in Neo 0.15.0. Please update your code base as necessary."
+        )
+
+    if dtype is None:
+        if not hasattr(times, "dtype"):
+            dtype = float
+    if units is None:
+        # No keyword units, so get from `times`
+        try:
+            dim = times.units.dimensionality
+        except AttributeError:
+            raise ValueError("you must specify units")
+    else:
+        if hasattr(units, "dimensionality"):
+            dim = units.dimensionality
+        else:
+            dim = pq.quantity.validate_dimensionality(units)
+
+        if hasattr(times, "dimensionality"):
+            if times.dimensionality.items() == dim.items():
+                units = None  # units will be taken from times, avoids copying
+            else:
+                raise ValueError("cannot rescale and return view")
+
+    # check to make sure the units are time
+    # this approach is orders of magnitude faster than comparing the
+    # reference dimensionality
+    # NOTE: 2025-11-10 21:26:53
+    # do away with checking for time units
+    # if len(dim) != 1 or list(dim.values())[0] != 1 or not isinstance(list(dim.keys())[0], pq.UnitTime):
+    #     ValueError(f"Units have dimensions {dim.simplified}, not [time]")
+    return (
+        pq.Quantity(
+            times,
+            units=units,
+            dtype=dtype,
+        ),
+        dim,
+    )
