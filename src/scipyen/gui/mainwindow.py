@@ -5478,7 +5478,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         saveVars.setToolTip("Export selected variables as HDF5 files")
         saveVars.setStatusTip("Export selected variables as HDF5 files")
         saveVars.setWhatsThis("Export selected variables as HDF5 files")
-        saveVars.triggered.connect(self.slot_saveSelectedVariables)
+        saveVars.triggered.connect(self.slot_exportSelectedVariablesToHDF5)
+        # saveVars.triggered.connect(self.slot_saveSelectedVariables)
         saveVars.hovered.connect(self._slot_showActionStatusMessage_)
 
         if all([isinstance(self.workspace[v], (pd.DataFrame, pd.Series, neo.basesignal.BaseSignal, neo.SpikeTrain, np.ndarray))] for v in varnames):
@@ -5740,82 +5741,44 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             obj.winTitle = newVarName
             
         self.workspaceModel.rebindObjectInNamespace(varName, newVarNameOK)
+        
+    def saveSelectedVariables(self, saver:typing.Callable):
+        indexList = self.workspaceView.selectedIndexes()
+        if len(indexList) == 0:
+            return
+        varSet = set()
+        for i in indexList:
+            varSet.add(self.workspaceModel.item(i.row(), 0).text())
+        varNames = sorted([n for n in varSet])
+        self.setCursor(QtCore.Qt.WaitCursor)
+        try:
+            for n in varNames:
+                if not isinstance(self.workspace[n], (QtWidgets.QWidget)):
+                    saver(self.workspace[n], n)
+            self.unsetCursor()
+        except Exception as e:
+            traceback.print_exc()
+            self.unsetCursor()
+        
+    @Slot()
+    def slot_exportSelectedVariablesToHDF5(self):
+        self.saveSelectedVariables(pio.saveHDF5)
 
     @Slot()
     @safewrapper
     def slot_saveSelectedVariables(self):
-        indexList = self.workspaceView.selectedIndexes()
         if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier):
             saver = pio.saveHDF5
         else:
             saver = pio.savePickleFile
-    
-
-        if len(indexList) == 0:
-            return
-
-        varSet = set()
-
-        for i in indexList:
-            varSet.add(self.workspaceModel.item(i.row(), 0).text())
-
-        varNames = sorted([n for n in varSet])
-
-        self.setCursor(QtCore.Qt.WaitCursor)
-
-        try:
-            # QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
-
-            for n in varNames:
-                if not isinstance(self.workspace[n], (QtWidgets.QWidget)):
-                    saver(self.workspace[n], n)
-                    # pio.saveHDF5(self.workspace[n], n)
-                    # pio.savePickleFile(self.workspace[n], n)
-
-            # QtWidgets.QApplication.restoreOverrideCursor()
-            self.unsetCursor()
-
-        except Exception as e:
-            traceback.print_exc()
-            # QtWidgets.QApplication.restoreOverrideCursor()
-            self.unsetCursor()
-
+            
+        self.saveSelectedVariables(saver)
+        
     @Slot()
     @safewrapper
     def slot_pickleSelectedVariables(self):
-        indexList = self.workspaceView.selectedIndexes()
-
-        if len(indexList) == 0:
-            return
-
-        # ret = self.questionMessage("Save data as pickle file", "Saving data as pickle file is not recommended for long-term data storage. Do you want to continue?")
-        # if ret != QtWidgets.QMessageBox.Yes:
-        #     return
-
-        varSet = set()
-
-        for i in indexList:
-            varSet.add(self.workspaceModel.item(i.row(), 0).text())
-
-        varNames = sorted([n for n in varSet])
-
-        self.setCursor(QtCore.Qt.WaitCursor)
-
-        try:
-            # QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
-
-            for n in varNames:
-                if not isinstance(self.workspace[n], (QtWidgets.QWidget)):
-                    # pio.saveHDF5(self.workspace[n], n)
-                    pio.savePickleFile(self.workspace[n], n)
-
-            # QtWidgets.QApplication.restoreOverrideCursor()
-            self.unsetCursor()
-
-        except Exception as e:
-            traceback.print_exc()
-            # QtWidgets.QApplication.restoreOverrideCursor()
-            self.unsetCursor()
+        saver = pio.savePickleFile
+        self.saveSelectedVariables(saver)
 
     @Slot()
     @safewrapper
@@ -8237,9 +8200,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 fileFilters.extend(imageFileFilters)
                 fileFilt = ';;'.join(fileFilters)
 
-                # fileFilt = 'All Image Types (' + ' '.join([''.join(i) for i in zip('*' * len(pio.SUPPORTED_IMAGE_TYPES), '.' * len(pio.SUPPORTED_IMAGE_TYPES), pio.SUPPORTED_IMAGE_TYPES)]) + ');;' +\
-                # ';;'.join('{I} (*.{i});;'.format(I=i.upper(), i=i) for i in pio.SUPPORTED_IMAGE_TYPES)
-
                 targetDir = self.recentDirectories[0]
 
                 if sys.platform.startswith("win32"):
@@ -8266,14 +8226,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
                     else:
                         if file_flt.startswith("HDF5"):
-                            # print(f"{self.__class__.__name__}.slot_saveFile saving {varname} as {fileName}")
                             pio.saveHDF5(data, fileName)
 
                         else:
                             pio.savePickleFile(data, fileName)
-                            # ret = self.questionMessage("Save data as pickle file", "Saving data as pickle file is not recommended for long-term data storage. Do you want to continue?")
-                            # if ret == QtWidgets.QMessageBox.Yes:
-                            #     pio.savePickleFile(data, fileName)
 
             else:
                 fileFilters = list()
@@ -8305,12 +8261,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
                     elif file_flt.startswith("Pickle"):
                         pio.savePickleFile(data, fileName)
-                        # ret = self.questionMessage("Save data as pickle file", "Saving data as pickle file is not recommended for long-term data storage. Do you want to continue?")
-                        # if ret == QtWidgets.QMessageBox.Yes:
-                        #     pio.savePickleFile(data, fileName)
                             
                     else:
-                        # print(f"{self.__class__.__name__}.slot_saveFile saving {varname} as {fileName} with type {file_flt}")
                         file_type = "unspecified"
                         if len(file_flt) == 0:
                             ext = pathlib.Path(fileName).suffix
