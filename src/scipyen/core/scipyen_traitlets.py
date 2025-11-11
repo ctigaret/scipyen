@@ -370,7 +370,7 @@ class DictTrait(Dict, ScipyenTraitTypeMixin):
                 silent = (new_hash == self.hashed)
 
             if silent:
-                silent = bool(old_value == new_value)
+                silent = bool(np.all(old_value == new_value))
             
         except:
             # if there is an error in comparing, default to not notify

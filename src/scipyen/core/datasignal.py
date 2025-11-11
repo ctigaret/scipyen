@@ -88,7 +88,7 @@ def _new_places(
     annotations=None,
     segment=None,
     unit=None,
-)
+):
     if annotations is None:
         annotations = {}
     obj = SpikeTrain(
@@ -2529,6 +2529,7 @@ class Places(SpikeTrain):
         else:
             t_start = self.t_start + time
             t_stop = self.t_stop + time
+            
         return Places(
             times=new_times,
             t_stop=t_stop,
@@ -2544,7 +2545,7 @@ class Places(SpikeTrain):
             **self.annotations,
         )
 
-   def __getitem__(self, i):
+    def __getitem__(self, i):
         """
         Get the item or slice :attr:`i`.
         """
@@ -2555,6 +2556,7 @@ class Places(SpikeTrain):
             obj.array_annotate(**deepcopy(self.array_annotations_at_index(i)))
         except AttributeError:  # If Quantity was returned, not SpikeTrain
             pass
+        
         return obj
 
     def __setitem__(self, i, value):

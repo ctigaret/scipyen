@@ -3645,6 +3645,7 @@ def splice_signals(*args, times=None):
     """
     if len(args) == 1:
         return args[0]
+    
     if all(isinstance(s, (neo.AnalogSignal, DataSignal)) for s in args):
         if len(args) == 1:
             return args[0]  # no splice
@@ -3660,12 +3661,15 @@ def splice_signals(*args, times=None):
 
         if any(args[0].shape[1] != s.shape[1] for s in args[1:]):
             raise ValueError("Signals have incompatible sizes on the 2ⁿᵈ dimension")
+        
+        # print(f"neoutils.splice_signals: signals shapes = {list((s.shape for s in args))}")
 
+        sp = args[0].sampling_period
         if times is None:
-            sp = args[0].sampling_period
             t0 = args[0].t_start
             t1 = args[-1].times[-1] + sp
-            tt = np.linspace(t0, t1, num=int((t1 - t0) * args[0].sampling_rate))
+            # t1 = args[-1].t_stop + sp
+            tt = np.linspace(t0, t1, num=int((t1 - t0 + sp) * args[0].sampling_rate))
         else:
             if times[0] > args[0].t_start:
                 raise ValueError(
@@ -3675,24 +3679,30 @@ def splice_signals(*args, times=None):
                 raise ValueError("the 'times' vector ends before the last signal")
             tt = times
 
+        # print(f"neoutils.splice_signals: tt.shape = {tt.shape}")
         y = np.full((tt.shape[0], args[0].shape[1]), fill_value=np.nan * args[0].units)
+        
+        # print(f"neoutils.splice_signals: y.shape = {y.shape}")
 
         for k, s in enumerate(args):
-            # print(f"y shape {y.shape}, s shape {s.shape}")
             # start_index = np.where(tt >= s.t_start)[0][0]
             # y[start_index:s.shape[0]] = s
-            tndx = (tt >= s.t_start) & (
-                tt <= s.t_start + s.duration
-            )  # s.times[-1]+s.sampling_period)
+            tndx = (tt >= s.t_start) & (tt <= (s.t_start + s.duration))  # s.times[-1]+s.sampling_period)
             # print(f"{k} index size = {np.where(tndx)[0].size}; signal size = {s.shape[0]}")
+            # print(f"neoutils.splice_signals: I) y.shape = {y.shape}, s.shape = {s.shape}, y[tndx].shape {y[tndx].shape},")
             # print(f"y[tndx] shape {y[tndx].shape}, s shape {s.shape}")
             if s.shape[0] > y[tndx].shape[0]:
-                tndx = (tt >= s.t_start) & (tt <= s.times[-1] + s.sampling_period)
+                # print(f"neoutils.splice_signals: IIa) s.shape[0] > y[tndx].shape[0] => y.shape = {y.shape}, s.shape = {s.shape}, y[tndx].shape {y[tndx].shape},")
+                shape_diff = s.shape[0] - y[tndx].shape[0]
+                tndx = (tt >= s.t_start) & (tt <= (s.times[-1] + s.sampling_period * shape_diff))
+                # print(f"neoutils.splice_signals: IIb) s.shape[0] > y[tndx].shape[0] => y.shape = {y.shape}, s.shape = {s.shape}, y[tndx].shape {y[tndx].shape},")
 
             elif y[tndx].shape[0] > s.shape[0]:
                 tndx = (tt >= s.t_start) & (tt <= s.times[-1])
+                # print(f"neoutils.splice_signals: III) y[tndx].shape[0] > s.shape[0] => y.shape = {y.shape}, s.shape = {s.shape}, y[tndx].shape {y[tndx].shape},")
                 if y[tndx].shape[0] < s.shape[0]:
                     s = s[: y[tndx].shape[0]]
+                    # print(f"neoutils.splice_signals: IV) y[tndx].shape[0] < s.shape[0] => y.shape = {y.shape}, s.shape = {s.shape}, y[tndx].shape {y[tndx].shape},")
                 # print(f"longer y[tndx] => new tndx: {y[tndx].shape}")
 
             y[tndx] = s
