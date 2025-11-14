@@ -3880,6 +3880,9 @@ def concatenate_signals(
     if len(args) == 1:
         if isinstance(args[0], (tuple, list)):
             signals = args[0]
+            
+        elif isinstance(args[0], (neo.AnalogSignal, DataSignal)):
+            signals = args
 
         else:
             raise TypeError(
