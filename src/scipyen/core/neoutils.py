@@ -48,15 +48,15 @@ lookup
 normalized_index
 
 
-IV. neo objects hierarchy
+IV. neo objects hierarchy including subclasses defined in Scipyen
 
 BaseNeo
     |
     |
 DataObject ------------------------------------------------------- ChannelView
-    |                                                        |
-    |                                                    Container
-    |                                                        |
+    |                             |                          |
+    |                             |                      Container
+    |                             |                          |
     |              _______________|___________           ____|____
     |              |              |          |           |   |   |
     |            Epoch            |      SpikeTrain      |   |   |
@@ -215,6 +215,7 @@ from .constants import (
     EQUAL_NAN,
 )
 
+import core.scipyen_quantities as scq
 from .scipyen_quantities import (unitsConvertible, checkTimeUnits, nameFromUnit, 
                                  unitQuantityFromNameOrSymbol)
 from .datasignal import (
@@ -3764,7 +3765,7 @@ def splice_signals(*args, times=None):
         )
 
     else:
-        raise TypeError("Expecting signal objects")
+        raise TypeError(f"Expecting signal objects; instead got {list(type(v).__name__ for v in args)}")
 
 
 @safewrapper
@@ -9428,7 +9429,48 @@ def parse_acquisition_metadata(
     if "software" in data.annotations:
         pass
 
+def plot_spiketrain_waveforms(x:neo.SpikeTrain,
+                              fig: typing.Optional[typing.Union[mpl.figure.Figure, int]] = None,
+                              pfun: typing.Callable = plt.plot,
+                              **kwargs):
+    if not isinstance(x.waveforms, np.ndarray) or x.waveforms.size == 0:
+        return
+    
+    if isinstance(fig, (mpl.figure.Figure, int)):
+        if isinstance(fig, int):
+            plt.figure(fig)
+        else:
+            plt.figure(fig.number)
 
+    else:
+        plt.gcf()
+        
+    waveform_units = x.annotations.get("waveform_units", None)
+    
+    w_start = 0 * x.units
+    w_stop = x.sampling_period.rescale(x.units) * x.waveforms.shape[-1]
+    w_times = np.linspace(w_start, w_stop, x.waveforms.shape[-1])
+        
+    for k in range(x.waveforms.shape[0]):
+        pfun(w_times, x.waveforms[k,:,:].T, label=f"Wave {k}", **kwargs)
+        
+    plt.xlabel(f"{nameFromUnit(x.units)} ({x.units.dimensionality})")
+    
+    if isinstance(waveform_units, pq.Quantity):
+        ylabel = f"{x.name} ({waveform_units.dimensionality})"
+    else:
+        ylabel = f"{x.name}"
+        
+    plt.ylabel(ylabel)
+        
+    plt.title("Waveforms")
+    plt.legend()
+    # if pfun == plt.plot and len(kwargs) == 0:
+    #     if isinstance(
+    #         obj, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)
+    #     ):
+    #         args = ["o"]
+    
 def plot_neo(
     obj: neo.core.basesignal.BaseSignal,
     fig: typing.Optional[typing.Union[mpl.figure.Figure, int]] = None,

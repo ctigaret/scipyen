@@ -10124,7 +10124,7 @@ def extract_event_waveforms(x:typing.Union[neo.AnalogSignal, DataSignal],
     # annotations of a SpikeTrain are intended to provide data related to
     # each individual spike in the SpikeTrain. This is perfectly justifiable
     # given that the spike waveform data is only stored in the SpikeTrain's 
-    # 'waveformns' attribute as a plain numpy array, and not as a signal object, 
+    # 'waveforms' attribute as a plain numpy array, and not as a signal object, 
     # (and therefore, any array annotations associated with the original signal 
     # from where the wavwforms were taken are lost). 
     #
@@ -10248,8 +10248,11 @@ def extract_event_waveforms(x:typing.Union[neo.AnalogSignal, DataSignal],
     #
     
     for km, m in enumerate(event_waves):
+        wave_amplitude = sigp.waveform_amplitude(m)
+        m.segment = x.segment
         m.annotations["Accept"] = np.array([True])
         m.annotations["left_sweep"] = left_sweep
+        m.annotations["amplitude"] = wave_amplitude
         m.name = f"{chname}{km}"
         # NOTE: 2025-11-09 12:10:51
         # copy the array annotations from the original signal object (where the 
@@ -10263,18 +10266,14 @@ def extract_event_waveforms(x:typing.Union[neo.AnalogSignal, DataSignal],
         if isinstance(segindex, int):
             m.array_annotate(segment=x.segment.index)
             
-        # wave_amplitudes = list(map(lambda k: sigp.waveform_amplitude(m[:,k]), range(m.shape[1])))
-        wave_amplitude = sigp.waveform_amplitude(m)
         m.array_annotate(amplitude = np.array([wave_amplitude]))
+        
         
         m.array_annotate(Accept=True)
         
         m.array_annotate(peak_time = event_peak_times[km])
         
         m.array_annotate(**kwargs)
-        
-        # for channel in range(m.shape[1]):
-        #     wave_amplitudes.append(sigp.waveform_amplitude(m[:,channel]))
             
     return starts, event_waves
     
