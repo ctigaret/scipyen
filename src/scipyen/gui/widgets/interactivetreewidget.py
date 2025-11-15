@@ -306,38 +306,11 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         self.widgets = []
         self.nodes = {}
         
-        #              data,                parent,                   …
-        # self.buildTree(self._private_data_, self.invisibleRootItem(), 
-        #                keyType = str,
-        #                typeStr = dataTypeStr, 
-        #                predicate=predicate, hideRoot=hideRoot)
-        
         worker = WorkerThread(self, self.buildTree, self._private_data_, self.invisibleRootItem(),
                               keyType = str, typeStr = dataTypeStr, predicate=predicate, hideRoot=hideRoot)
         worker.signals.signal_Finished.connect(self._slot_treeBuilt)
         worker.run()
         
-#         self.expandToDepth(3)
-#         self.resizeColumnToContents(0)
-#         
-#         self.topLevelItem(0).setText(0, self.top_title)
-#         
-#         # print(f"{self.__class__.__name__}<{self.parent().windowTitle()}, {self.parent().parent().windowTitle()}> last item {self._last_active_item_} column {self._last_active_item_column_}")
-#         if isinstance(self._last_active_item_, str) and len(self._last_active_item_.strip()) and \
-#             self._last_active_item_column_ < self.columnCount():
-#                 items = self.findItems(self._last_active_item_, QtCore.Qt.MatchExactly, 0)
-#                 if len(items) > 0:
-#                     # print(f"{self.__class__.__name__}<{self.parent().windowTitle()}, {self.parent().parent().windowTitle()}> last items {[i.data(0, QtCore.Qt.DisplayRole) for i in items]}")
-#                     item = items[0]
-#                     index = self.indexFromItem(item, self._last_active_item_column_)
-#                     target = self.itemFromIndex(index)
-#                     if __has_PyQt6__ or __has_PySide6__:
-#                         self.scrollToItem(target)#, self._last_active_item_column_)
-#                     else:
-#                         self.scrollToItem(target, self._last_active_item_column_)
-#                     target.setSelected(True)
-#                     self.scrollTo(index, QtWidgets.QAbstractItemView.PositionAtCenter)
-                    
     def _parse_dataclass(self, data) -> tuple:
         datafields = dataclasses.fields(data)
         return dict(map(lambda x: (x.name, getattr(data, x.name)), datafields))
@@ -465,7 +438,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         # column 1: type of the data represented by the child
         node = QtWidgets.QTreeWidgetItem([name, "", ""])
         node.setData(1, QtCore.Qt.UserRole, type(data))
-        node.setData(0, QtCore.Qt.UserRole, str) # beause top item representation is a string and it is NOt used in indexing pathway to leaves
+        node.setData(0, QtCore.Qt.UserRole, keyType) 
         parent.addChild(node)
             
         # print(f"{self.__class__.__name__}.buildTree: predicate = {predicate}")

@@ -352,9 +352,6 @@ class DataViewer(ScipyenViewer):
                                     dataTypeStr=type(obj).__name__)#, 
             self.docTitle = name
             
-            # for k in range(self.treeWidget.topLevelItemCount()):
-            #     self._collapse_expand_Recursive(self.treeWidget.topLevelItem(k), current=False)
-                
     @Slot()
     def _slot_treeWidgetPopulated(self):
         # self.docTitle = name
@@ -835,11 +832,11 @@ class DataViewer(ScipyenViewer):
                 item = pItem # this is crucial 
                 
             element = item.data(0, QtCore.Qt.DisplayRole)
-            elementDataType = item.data(1, QtCore.Qt.UserRole)
             parentIndexType = item.data(0, QtCore.Qt.UserRole)
+            elementDataType = item.data(1, QtCore.Qt.UserRole)
             targetDataType = dataclasses.MISSING # gets the data type resulting from the accessor
                 
-            # print(f"{self.__class__.__name__}._get_path_for_item_: element = {element}")
+            # print(f"{self.__class__.__name__}._get_path_for_item_: element = {element}, parentIndexType = {parentIndexType}, elementDataType = {elementDataType}")
             
             path_parts = [element] # the pathway from root to branch tip
             
@@ -855,8 +852,10 @@ class DataViewer(ScipyenViewer):
             # eval(accessexpr), where accessexpr is returned below
             # as ``access``
             # expr = [f"{element}" if parentIndexType == str else element]
-            expr = [element]
+            expr = [element] if parentIndexType == str else [parentIndexType(element)]
                             
+            # print(f"{self.__class__.__name__}._get_path_for_item_: first expr = {expr}")
+            
             p = item.parent()
             k: int = 0
             while p is not None:
@@ -864,15 +863,19 @@ class DataViewer(ScipyenViewer):
                 # print(f"{self.__class__.__name__}._get_path_for_item_: pdatatype -> {pdatatype}")
                 pKeyType = p.data(0, QtCore.Qt.UserRole)
                 element = p.data(0, QtCore.Qt.DisplayRole)
-                path_parts.append(f"'{element}'" if pKeyType == str else element) 
+                # print(f"{self.__class__.__name__}._get_path_for_item_: p = {p} -> element = {element}")
+                # path_parts.append(f"'{element}'" if pKeyType == str else element) 
+                path_parts.append(f"'{element}'" if pKeyType == str else pKeyType(element)) 
                 # expr.append(f"'{element}'" if pKeyType == str else element)
-                expr.append(element)
+                expr.append(element if pKeyType == str else pKeyType(element))
                 k += 1
                 if pdatatype in (typing.Sequence, tuple, list, dict, deque, types.MappingProxyType):
                     if is_namedtuple(pdatatype):
                         expr[k-1] = f".{expr[k-1]}"
+                        
                     elif issubclass(pdatatype, (dict, types.MappingProxyType)):
-                        expr[k-1] = f"['{expr[k-1]}']"
+                        expr[k-1] = f"['{expr[k-1]}']" if isinstance(expr[k-1], str) else f"[{pKeyType(expr[k-1])}]"
+                        
                     else:
                         expr[k-1] = f"[{expr[k-1]}]"
                         
@@ -898,6 +901,8 @@ class DataViewer(ScipyenViewer):
             path_parts.reverse()
             expr.reverse()
             directAccess = True
+            
+            # print(f"{self.__class__.__name__}._get_path_for_item_: expr = {expr}")
             
             access = ("".join(expr) if external else "".join(expr[1:]) if len(expr)>1 else "", "", elementDataType, targetDataType)
             # print(f"access: {access}")
@@ -1165,6 +1170,7 @@ class DataViewer(ScipyenViewer):
                                                         units = srcObj.units,
                                                     time_units = srcObj.times.units)
                         else:
+                            # print(f"{self.__class__.__name__}._export_data_items_: statement = {statement}")
                             if path_only:
                                 obj = f"{statement}"
                             else:
