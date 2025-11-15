@@ -320,7 +320,10 @@ def is_vector(x):
     
     elif x.ndim == 2:
         return any([s == 1 for s in x.shape])
-        
+    
+    elif x.ndim > 2:
+        return any(s == x.size for s in x.shape)
+    
     else:
         return False
         

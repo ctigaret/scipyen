@@ -9549,6 +9549,7 @@ def detect_Events_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal],
                                                              "extent": 0.05},
                                                 "threshold": None}},
                             raw_signal:typing.Optional[typing.Union[neo.AnalogSignal, DataSignal]]=None,
+                            left_sweep:typing.Optional[typing.Union[float, pq.Quantity]] = None,
                             **kwargs) -> dict:
     r"""Detect signal features with an optimally scaled template.
     Implements the "sliding template" algorithm in Clements & Bekkers 1997, Biophys.J.
@@ -9580,6 +9581,9 @@ def detect_Events_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal],
     
         This is useful when detection was performed on a pre-processed (e.g., 
         smoothed) signal but the "raw" waveforms are required.
+    
+    left_sweep: float or scalar Quantity: domain interval between the start of 
+        the event waveform and the detected start of the event
     
     Var-keyword parameters:
     =======================
@@ -9633,11 +9637,21 @@ def detect_Events_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal],
     result = dict()
 
     for channel, detection_mapping in detection.items():
-        channel_detection = dict()
-        
         if not isinstance(detection_mapping, dict):
             raise TypeError("Detection values must all be mapping types")
             
+        channel_detection = dict()
+        
+        if "channel_names" in x.array_annotations and channel in range(x.array_annotations.length):
+            ch_name = str(x.array_annotations["channel_names"][channel])
+        else:
+            ch_name = f"{x.name}_channel_{channel}"
+        
+        if "channel_ids" in x.array_annotations and channel in range(x.array_annotations.length):
+            ch_id = int(x.array_annotations["channel_ids"][channel])
+        else:
+            ch_id = channel
+        
         waveform = detection_mapping.get("waveform", None)
         
         # if isinstance(waveform, (np.ndarray, neo.core.basesignal.BaseSignal)):
@@ -9695,6 +9709,8 @@ def detect_Events_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal],
 
         h = waveform.magnitude[:,0]
         
+        # print(f"ephys.membrane.detect_Events_CBsliding: h shape = {h.shape}, x shape = {x.shape}")
+        
         N = h.shape[0]
         
         M = x.shape[0]
@@ -9729,12 +9745,19 @@ def detect_Events_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal],
                                 name = f"{θ.name}_scaled",
                                 description = f"{θ.description} scaled to 10/{θmax}")
         
+        θN.array_annotate(channel_names=[f"{ch_name}_θN"])
+        θN.array_annotate(channel_ids=[ch_id])
+        
         if isinstance(raw_signal, type(x)) and raw_signal.shape == x.shape and \
             raw_signal.sampling_rate == x.sampling_rate and raw_signal.times.units == x.times.units and \
                 raw_signal.t_start == x.t_start and raw_signal.units == x.units:
-            ret = extract_event_waveforms(raw_signal[:,kt], event_duration, t.θ, threshold, peakfunc, **kwargs)
+            ret = extract_event_waveforms(raw_signal[:,channel], event_duration,
+                                          θN, threshold, peakfunc, left_sweep,
+                                          **kwargs)
         else:
-            ret = extract_event_waveforms(x[:,kt], event_duration, t.θ, threshold, peakfunc, **kwargs)
+            ret = extract_event_waveforms(x[:,channel], event_duration, 
+                                          θN, threshold, peakfunc, left_sweep, 
+                                          **kwargs)
             
             
         if ret:
@@ -9754,11 +9777,17 @@ def detect_Events_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal],
         
 def calculate_template_scale_offset(x, h):
     r"""Testing function for development - do NOT use"""
-    if any(v.ndim != 1 for v in (x,h)):
-        raise TypeError("Expecting two 1D vectors")
+    if not all(datatypes.is_vector(v) for v in (x,h)):
+        raise TypeError("Expecting two 1D signals")
     
-    if x.shape[0] != h.shape[0]:
+    if x.size != h.size:
         raise ValueError("Both vectors must have the same length")
+    
+    if x.ndim > 1:
+        x = x.flatten()
+        
+    if h.ndim > 1:
+        h = h.flatten()
     
     N = h.shape[0]
     
@@ -9846,8 +9875,18 @@ def slide_detect(x:np.ndarray, h:np.ndarray, padding:bool=True, data_cache = Non
     padding: True/False
     data_cache: None, or 8-tuple with N, M, sum_h, sum_h_N, sum_h2, sum_h2_N, h_dot, beta_denom
     """
-    if any(v.ndim > 1 for v in (x,h)):
+    # print(f"ephys.membrane.slide_detect: h shape = {h.shape}, x shape = {x.shape}")
+    
+    # if any(v.ndim > 1 and vfor v in (x,h)):
+    if not all(datatypes.is_vector(v) for v in (x,h)):
         raise TypeError("Expecting two 1D signals")
+    
+    if x.ndim > 1:
+        x = x.flatten()
+        
+    if h.ndim > 1:
+        h = h.flatten()
+        
     
     units = kwargs.pop("units", None)
     t_start = kwargs.pop("t_start", None)
@@ -9886,6 +9925,7 @@ def slide_detect(x:np.ndarray, h:np.ndarray, padding:bool=True, data_cache = Non
     
     for k in time_range:
         y = xx[k:k+N]
+        # print(f"ephys.membrane.slide_detect; y.shape = {y.shape}")
         sum_y = np.sum(y) # Σ data
         sum_y_N = sum_y / N
         y_dot = np.dot(y, y)       # Σ(data²)
@@ -9974,6 +10014,9 @@ def extract_event_waveforms(x:typing.Union[neo.AnalogSignal, DataSignal],
         waveform, or argmin() for a downward event waveform; for more complex 
         waveforms you would almost surely supply a more appropriate function here)
     
+    left_sweep: float or scalar Quantity: domain interval between the start of 
+        the event waveform and the detected start of the event
+    
     Var-keyword parameters:
     =======================
     Additional fields ot include in waveform array annotations; the values will
@@ -10025,77 +10068,6 @@ def extract_event_waveforms(x:typing.Union[neo.AnalogSignal, DataSignal],
         
         'wave_amplitude': array of wave amplitude
     """
-    
-    # ### BEGIN Obsolete documentation
-#     Returns:
-#     ========
-#     A spike train, a sequence of neo signals with fitted copies of the waveforms
-#     and a sequence of neo signals containing aligned copies of the waveforms.
-#     
-#     CAUTION: 2022-12-18 23:11:33
-#     This extracts single-channel waveforms, which will carry the array annotations
-#     of the single-channel signal where the waveforms have been sliced from. 
-#     
-#     The waveforms are then concatenated into a 3D array stored as the `waveforms`
-#     attribute of the resulting spike train, losing their array annotations.
-#     
-#     When these waveforms are individually fitted, they will be converted again
-#     to individual analog signals waveforms which will be passed to the fitting
-#     function. As a result, they will gain a second channel 
-#     (channel 0 ↦ recorded waveform; channel 1 ↦ fitted waveform).
-# 
-#     There is no point using array annotations with the individual waveforms for 
-#     the following reasons:
-#     1. the waveform analgsignals will lose their metainformation (array annotations
-#     AND annotations) when embedded in the spike train
-#     2. after fitting, the original array annotations of the waveform signals (if
-#     present) will be incompatible with the shape of the new signals (which will
-#     contain both the original data and the fit curve, as explained above)
-#     
-#     Here, the array_annotations of the SINGLE-CHANNEL waveforms are merged as 
-#     array annotations in the spike train (where the keys are mapped to an 
-#     array of scalars with as many elements as spikes). These
-#     spike train array annotations are then used to carry the relevant metadata
-#     per spike, further into the analysis function(s).
-    # NOTE: 2022-12-17 22:08:57 array_annotating a SpikeTrain — README NOW:
-    # ==========================================================================
-    #
-    # Metadata related to event waveform needs to be stored somewhow, and LINKED
-    # to the time stamps corresponding to the event onset.
-    #
-    # While in principle this COULD be done by way of the "annotations" attribute
-    # in neo's signal objects, the time stamps are stored as a spike train, which
-    # does not cope well with these annotations; instead, at least in Neo v 0.14.2,
-    # the spike train supports array_annotations, therefore I need to use this approach.
-    #
-    # As of 2025-11-09 12:22:13, the relevant metadata needed for an event waveform
-    # is (below is an example from a saved spike train encapsulating mEPSCs):
-    #
-    # key ↦ value:
-    # ------------
-    # 'channel_names': array(['Im_prim_1', 'Im_prim_1', 'Im_prim_1',
-    #                         'Im_prim_1'], dtype='<U9'),                       # NOTE: 2025-11-09 12:29:46 the name of the signal where the waveforms were taken from
-    #                                                                           #   Taken from the signal object origin of the waveform and depends on how the signal object was generated 
-    #                                                                           #   (i.e., acquired via Clampex or CED Signal, etc)
-    # 'channel_ids': array(['0', '0', '0', '0'], dtype='<U1'),                  # NOTE: 2025-11-09 12:30:13 the index of the signal channel where the waveforms were taken from
-    #                                                                           #   Taken from the signal object origin of the waveform and depends on how the signal object was generated 
-    #                                                                           #   (i.e., acquired via Clampex or CED Signal, etc)
-    # 'nADCNum': array([2, 2, 2, 2]),                                           # NOTE: 2025-11-09 12:30:34 the ADC number used to record the signal
-    #                                                                           #   Taken from the signal object origin of the waveform and depends on how the signal object was generated 
-    #                                                                           #   (i.e., acquired via Clampex or CED Signal, etc)
-    # 'peak_time': array([2.6335, 3.1902, 3.7878, 4.8891]) * s,                 # NOTE: 2025-11-09 12:23:36 the event "peak" time 
-    #                                                                           # CAUTION this really depends on the shape of the event waveform... For compound waveforms one may consider this
-    #                                                                           # to be the time of the "main" (i.e., "largest") peak or trough; depending on the shape of the waveform, one MAY
-    #                                                                           # add further fields here
-    # 'wave_name': array(['Im_prim_1_0', 'Im_prim_1_1', 'Im_prim_1_2', 
-    # 'Im_prim_1_3'], dtype='<U11'),                                            # NOTE: 2025-11-09 12:31:39 the name of the event waveform (NOTE the sub-index)
-    # 'accept': array([ True,  True,  True,  True]),                            # NOTE: 2025-11-09 12:24:01 for events that are to be further sifted (accepted/rejected) according to post-hoc criteria
-    # 'sampling_rate': array([10000., 10000., 10000., 10000.])                  # NOTE: 2025-11-09 12:24:46 necessary for reconstructing the event waveform as a signal object
-    #                                                                           # CAUTION: the t_start of this signal needs to be given at construction, and it can be:
-    #                                                                           #   • the corresponding time stamp in the spike train + the spike train's 'left_sweep' attribute, or
-    #                                                                           #   • set to an arbitrary value (i.e. common to ALL waveforms in the spike train)
-    # 'segment': array([0., ...])                                               # NOTE: 2025-11-09 12:38:43 to be able to link the waveform to the index of the segment they originate from
-    # ### END   Obsolete documentation
     
     #
     # NOTE: 2025-11-09 13:50:03 adding additional fields to array annotations:
@@ -10194,7 +10166,8 @@ def extract_event_waveforms(x:typing.Union[neo.AnalogSignal, DataSignal],
     # (i.e., local θ maximum in each interval of θ >= threshold) corresponds to
     # the onset of the (detected) event waveform
     θmaxima = [np.argmax(θ[v[0]:v[1]]) + v[0] for v in zip(wave_begins, wave_ends) if len(θ[v[0]:v[1]]) > 0]
-    event_starts = x.times[θmaxima]
+    event_starts = np.sort(x.times[θmaxima], axis=None)
+    # event_starts = np.array(list(sorted(x.times[θmaxima])))*x.times.units
     
     if left_sweep != 0:
         if events_starts[0] - left_sweep < x.t_start:
@@ -10447,6 +10420,9 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal],
         smoothed or otherise filtered) signal, while the intention is to retrieve 
         the "raw" (unfiltered) waveforms.
     
+    left_sweep: float or scalar Quantity: domain interval between the start of 
+        the event waveform and the detected start of the event
+    
     Var-keyword parameters:
     =======================
     Additional fields to include in the waveforms array annotations; the values 
@@ -10483,43 +10459,6 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal],
     
     
     """
-# ### BEGIN obsolete documentation
-#             • A sequence of six scalars (float or pq.Quantity):
-#                 ∘ the first five are the Clements & Bekkers 1997 model parameters:
-#                     α, β, x₀, τ₁ and τ₂ (see functions models.Clements_Bekkers_97(…) 
-#                     for details) 
-#         
-#                 ∘ the 6ᵗʰ element is the duration of the model waveform (which will 
-#                     be generated ad-hoc); this last element is assumed to be in the 
-#                     units of the domain of x.
-#     
-#             By default, waveform is (0., -1., 0.01, 0.001, 0.01, 0.05) which means,
-#             for a membrane current signal `x` in pA:
-#     
-#             α  =  0.0 pA (ie. no offset)
-#             β  = -1.0 (i.e. downward deflection)
-#             x₀ =  0.01 (i.e. 10 ms from the start of the waveform)
-#             τ₁ =  0.001 (i.e., rising time constant of 1 ms)
-#             τ₂ =  0.01  (i.e., decay time constant of 10 ms)
-#         
-#             and 50 ms duration of the model waveform
-#     
-#             NOTE: When specified in this way the waveform will be generated ad-hoc
-#             using the sampling rate of the signal `x`.
-#     
-#             For example, if creating the waveform as a plain numpy array:
-#             
-#             t_start     = 0     # [s]
-#             duration    = 0.2   # [s]
-#             sr          = 1e4   # [Hz]
-#             
-#             t = np.linspace(0, duration, num = sr * duration)
-#             model = models.Clements_Bekkers_97(x, parameters)
-#             
-#             As a convenience, you can use PSCwaveform(...) function in this module 
-#             to generate a synthetic  waveform as a neo.AnalogSignal.
-# ### END   obsolete documentation
-    
     # print(f"membrane.detect_Events: waveform is a {type(waveform).__name__}")
     # if not isinstance(x, (neo.AnalogSignal, DataSignal)):
         # raise TypeError(f"Expecting a neo.AnalogSignal or DataSignal; got a {type(x).__name__} instead")
@@ -10554,11 +10493,21 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal],
         return detect_Events_CBsliding(x, detection, raw_signal, **kwargs)
     
     for channel, detection_mapping in detection.items():
-        channel_detection = dict()
-        
         if not isinstance(detection_mapping, dict):
             raise TypeError("Detection values must all be mapping types")
             
+        channel_detection = dict()
+        
+        if "channel_names" in x.array_annotations and channel in range(x.array_annotations.length):
+            ch_name = str(x.array_annotations["channel_names"][channel])
+        else:
+            ch_name = f"{x.name}_channel_{channel}"
+        
+        if "channel_ids" in x.array_annotations and channel in range(x.array_annotations.length):
+            ch_id = int(x.array_annotations["channel_ids"][channel])
+        else:
+            ch_id = channel
+        
         waveform = detection_mapping.get("waveform", None)
         
         # if isinstance(waveform, (np.ndarray, neo.core.basesignal.BaseSignal)):
@@ -10623,7 +10572,7 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal],
             # return detect_Events_CBsliding(x, waveform, threshold, raw_signal=raw_signal)
             # result[channel] = detect_Events_CBsliding(x[:,channel], waveform, threshold, raw_signal=raw_signal)
             sliding_detection = {channel: {"waveform": waveform, "threshold": threshold}}
-            sliding_detection_result = detect_Events_CBsliding(x, sliding_detection, raw_signal, **kwargs)
+            sliding_detection_result = detect_Events_CBsliding(x, sliding_detection, raw_signal, left_sweep, **kwargs)
             
             if sliding_detection_result[channel]["stamps"]:
                 result[channel] = sliding_detection_result[channel]
@@ -10662,16 +10611,20 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal],
             # respectively, the dxc and the dxc_n vectors;
             θ = type(x)(dxc, units = pq.dimensionless, t_start = x.t_start,
                         sampling_rate = x.sampling_rate,
-                        name = f"{x.name}_θ",
+                        name = f"{ch_name}_θ",
                         description = "Template cross-correlation")
             
-            # channels_θ.append(θ)
+            θ.array_annotate(channel_names=[f"{ch_name}_θ"])
+            θ.array_annotate(channel_ids=[ch_id])
             
             θN = type(x)(dxc_n, units = pq.dimensionless, t_start = x.t_start,
                         sampling_rate = x.sampling_rate,
-                        name = f"{x.name}_θ_norm",
+                        name = f"{θ.name}_norm",
                         description = "Template cross-correlation (normalized)")
             
+            θN.array_annotate(channel_names=[f"{ch_name}_θN"])
+            θN.array_annotate(channel_ids=[ch_id])
+        
             # channels_θN.append(θN)
             
             # TODO: 2025-11-10 22:25:07 add 'segment' to extract_event_waveforms
@@ -10680,10 +10633,14 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal],
                 raw_signal.sampling_rate == x.sampling_rate and raw_signal.times.units == x.times.units and \
                     raw_signal.t_start == x.t_start and raw_signal.units == x.units:
                 # extract event waveforms from the unfiltered signal 'raw_signal'
-                ret = extract_event_waveforms(raw_signal[:,channel], event_duration, dxc_n, thr, peakfunc, **kwargs)
+                ret = extract_event_waveforms(raw_signal[:,channel], event_duration,
+                                              dxc_n, thr, peakfunc, left_sweep,
+                                              **kwargs)
             else:
                 # extract event waveforms from the (possibily filtered) signal 'x'
-                ret = extract_event_waveforms(x[:,channel], event_duration, dxc_n, thr, peakfunc, **kwargs)
+                ret = extract_event_waveforms(x[:,channel], event_duration, 
+                                              dxc_n, thr, peakfunc, left_sweep, 
+                                              **kwargs)
                 
             # NOTE: 2025-11-11 15:33:50
             # don't append anything if detection failed
