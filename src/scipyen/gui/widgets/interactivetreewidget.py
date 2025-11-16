@@ -303,7 +303,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         # NOTE: 2022-12-15 23:25:05
         # super().setData(data) # calls self.buildTree(...), which then calls self.parse(...)
         self.clear()
-        self.widgets = []
+        # self.widgets = []
         self.nodes = {}
         
         worker = WorkerThread(self, self.buildTree, self._private_data_, self.invisibleRootItem(),
@@ -452,6 +452,12 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         # hashable, hence usable as dict key
         self.nodes[path] = node
         
+        # NOTE: 2025-11-16 14:31:50
+        # call self.parse(…) in order to get the type, descctiption, collection 
+        # of children (if any), the widget (delegate?) to display this data and 
+        # a couple of extra bits such as the tip indicating the data type, and 
+        # whether to show the description in the same row as the parent node
+        # or in a separate widget)
         typeStr_, desc, children, widget, typeTip, showDescInParentNode = self.parse(data, path, predicate=predicate)
         
         # print(f"{self.__class__.__name__}.buildTree for {type(data)} -> {len(children)} children")
@@ -478,7 +484,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         # I considered weakrefs, but NOT all object in Scipyen/Python support
         # weak references!
         
-        # NOTE: cahing code works but buggy, see BUG: 2025-05-27 17:32:09 FIXME/TODO
+        # NOTE: caching code works but is buggy, see BUG: 2025-05-27 17:32:09 FIXME/TODO
         # # limtations to the id() builtin
         # # needs self._visited_ as a dict !
         # I am using this because this bug is far less annoying than the one 
@@ -525,7 +531,11 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         # memoize(), getWidgetSelection(), _parse_data_(), _parse_dataclass(), _makeTableWidget_()
         # and maybe _slot_tableEditorWidgetSelectionChanged(), setSupportedDataTypes()
         if widget is not None:
-            self.widgets.append(widget)
+            # NOTE: 2025-11-16 14:36:15
+            # is a widget has been created by self.parse, use it as item widget
+            # for the newly created subnode
+            # 
+            # self.widgets.append(widget)
             subnode = QtWidgets.QTreeWidgetItem(["", "", ""])
             node.addChild(subnode)
             self.setItemWidget(subnode, 0, widget)
