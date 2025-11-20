@@ -125,22 +125,29 @@ class DataTreeModel(QtCore.QAbstractItemModel):
     #
     # See interactivetreewidget.InteractiveTreeWidget.parse(…)
 
-    def __init__(self, data:typing.Any, parent:typing.Optional[QtCore.QObject]=None):
+    def __init__(self, data:typing.Any, name:typing.Optional[str]=None,
+                 parent:typing.Optional[QtCore.QObject]=None,
+                 **kwargs):
         super().__init__(parent)
-        rootDataItems = list(map(QtCore.QVariant(v), ["Object", "Type", "Value/Information"]))
-        self._rootItem_ = DataTreeItem(rootDataItems)
+        self._rootItem_ = None
+        self._data_ = None 
+        self._data_name_ = name if isinstance(name, str) and len(name) else "/"
         
         self._editable_items_:bool = False
         
         self._introspect_:bool=False
         
-        self._data_ = None # TODO 2025-11-16 21:02:59 FIXME
-        self.has_dynamic_private = False
+        self._has_dynamic_private_ = False
         self._private_data_ = None
-        self._introspectPredicate_ = None
-        self._showPrivateMembers_ = False
+        self._introspectPredicate_ =  kwargs.pop("predicate", None)
+        self._showPrivateMembers_ = kwargs.pop("show_private", False)
+        self._has_dynamic_private_ = False
         
-        self._setupModelData(data, self._rootItem_)
+        self._supported_data_types_ = kwargs.pop("supported_data_types", tuple())
+        if not isinstance(self._supported_data_types_, tuple) or not all(isinstance(v, type) for v in self._supported_data_types_):
+            self._supported_data_types_ = tuple()
+        self._visited_ = dict() #{}
+        self._parse_data_(data)
         
     def flags(self, index:QtCore.QModelIndex) -> QtCore.Qt.ItemFlag:
         flags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsDragEnabled | QtCore.Qt.ItemIsEnabled
@@ -349,8 +356,52 @@ class DataTreeModel(QtCore.QAbstractItemModel):
                 return len(datatypes.inspect_members(data, self.introspectionPredicate)) > 0
             return False
         
-    def _setupModelData(self, data:typing.Any, rootItem:DataTreeItem):
+    def _setupModelData_(self, data:typing.Any, parent:DataTreeItem):
+        self._visited_ = clear()
+            
+            
         pass
+        
+    def _parse_data_(self, data) -> tuple:
+        r"""
+        Returns a tuple (a, b), where:
+        
+        a: dict is the iterable container (a mapping or otherwise) upon which the 
+            tree model is built.
+            'a' can be the data itself, or a mapping representation of its members
+            (i.e. a dictionary) generated using datatypes.inspect_members(…). This
+            is similar, but not identical, to accessing the __dict__ attribute 
+            of the data.
+        
+        b: flag indicating whether 'a' is the data itself or a mapping representation of its
+            attributes (for any non-iterable object/container)
+        
+            'b' is True when the data itself is a container suitable for representation
+            in a tree model
+        
+    """
+        self._data_ = data
+        mro = inspect.getmro(type(data))
+        if all(t not in self._supported_data_types_ for t in mro) and not inspect.isroutine(data) and data is not None:
+            # NOTE: 2025-06-28 13:57:28
+            # generate a mapping representation of data's members upon which
+            # the tree model is built
+            # return datatypes.inspect_members(data, self.predicate), True
+            self._private_data_ = datatypes.inspect_members(data, self._introspectPredicate_)
+            self._has_dynamic_private_ = True
+        else:
+            # NOTE: 2025-06-28 13:58:14
+            # The data is suitable for direct representation by a tree model
+            self._private_data_ = data
+            self._has_dynamic_private_ = True
+        
+        # rootDataItems = list(map(QtCore.QVariant(v), ["Object", "Type", "Value/Information"]))
+        if self._data_ is not None:
+            rootDataItems = [self._data_name_, type(self._data_).__name__, f"{len(self._data_)}"]
+        else:
+            rootDataItems = ["", "", ""]
+            
+        self._rootItem_ = DataTreeItem(list(map(QtCore.QVariant(v), rootDataItems)))
         
     @property
     def editableItems(self) -> bool:
