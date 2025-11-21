@@ -727,6 +727,10 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
 class TabularDataModel(QtCore.QAbstractTableModel):
     r"""Table item model for tabular data (numpy arrays, pandas data structures)
     Change log:
+    NOTE 2025-11-21 09:43:33
+        • enabled editing items, via a new PythonItemDelegate class
+        • allows setting immutable (i.e. NOT editable items)
+        
     NOTE  2018-11-25 01:24:39
     1. Read-only row/column headers
     2. Supports: 

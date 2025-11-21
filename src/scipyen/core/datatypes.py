@@ -25,7 +25,7 @@ from collections import deque, namedtuple
 from functools import (singledispatch, singledispatchmethod)
 import itertools
 import datetime
-from enum import (Enum, IntEnum, EnumMeta)
+from enum import (Enum, IntEnum, EnumMeta, EnumType)
 import inspect
 import numbers
 import math
@@ -212,6 +212,30 @@ MissingType: typing.TypeAlias = type(MISSING)
 # RELATIVE_TOLERANCE = 1e-4
 # ABSOLUTE_TOLERANCE = 1e-4
 # EQUAL_NAN = True
+
+def enum_names(data:EnumType) -> list | None:
+    r"""Lists the field names of an Enum.
+WARNING: Use to inspect enumerated types (collections of enum values), NOT an  
+individual enum value!
+"""
+    if isinstance(data, EnumType):
+        return list(map(lambda x: x.name, data))
+    
+def enum_values(data:EnumType) -> list | None:
+    r"""Lists the field values of an Enum
+WARNING: Use to inspect enumerated types (collections of enum values), NOT an  
+individual enum value!
+"""
+    if isinstance(data, EnumType):
+        return list(pam(lambda x: x.value, data))
+    
+def enum_to_dict(data:EnumType) -> dict | None:
+    r"""Creates a dictionary mapping field name ↦ fiueld value from an Enum
+WARNING: Use to inspect enumerated types (collections of enum values), NOT an  
+individual enum value!
+"""
+    if isinstance(data, EnumType):
+        return dict(map(lambda x: (x.name, x.value), data))
 
 def default_value(x:type):
     if not isinstance(x, type):
@@ -540,7 +564,7 @@ def enum2str(etype:Enum) -> str:
     return str()
 
 def enums2str(etypes: typing.Sequence[Enum]) -> list[str]:
-    r"""Like enum2str but does a single pass throughn the sequence"""
+    r"""Like enum2str but does a single pass through the sequence"""
     if len(etypes) == 0:
         return list()
     

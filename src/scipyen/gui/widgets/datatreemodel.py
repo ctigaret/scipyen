@@ -438,9 +438,52 @@ class DataTreeModel(QtCore.QAbstractItemModel):
 class DataTreeItem:
     r"""See Simple Tree Model example in Qt documentation.
     A DataTreeItem contains children (DataTreeItem objects) — one per row — and
-item data (QVariant objects wrapping Python data), one per column.
+    item data (QVariant objects wrapping Python data), one per column.
     The hierarchy is established by DataTreeItem objects being children of a higher
-level DataTreeItem; at the top of the hierarchy sits the "root" item.
+    level DataTreeItem; at the top of the hierarchy sits the "root" item.
+    
+    An item should contain (by item data role¹):
+    • in column 0: 
+        ∘ DisplayRole: 
+            str = a name — typically the symbol to which the data is bound in the
+                workspace, or the str representation of the key or index (hashable 
+                objects) under which the data is nested into its parent
+    
+        ∘ ToolTipRole, StatusTipRole, WhatsThisRole: 
+            a str: the type of the key or index, or (for the root item) an empty 
+                string
+    
+        ∘ EditRole: QVariant() (this is immutable)
+    
+        ∘ UserRole: 
+            type of Python data object or type of the index or mapping key
+    
+    • in column 1:
+        ∘ UserRole: type of child Python object
+    
+        
+    
+    
+    
+    ¹QtCore.Qt.ItemDataRole is an EnumType defining the following "flags":
+    
+        'DisplayRole',
+        'DecorationRole',
+        'EditRole',
+        'ToolTipRole',
+        'StatusTipRole',
+        'WhatsThisRole',
+        'FontRole',
+        'TextAlignmentRole',
+        'BackgroundRole',
+        'ForegroundRole',
+        'CheckStateRole',
+        'AccessibleTextRole',
+        'AccessibleDescriptionRole',
+        'SizeHintRole',
+        'InitialSortOrderRole',
+        'UserRole'
+    
 """
     def __init__(self, data:typing.List[QtCore.QVariant], parentItem:typing.Optional[typing.Self] = None):
         r"""DataTreeItem constructor
