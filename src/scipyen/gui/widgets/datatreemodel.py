@@ -443,26 +443,90 @@ class DataTreeItem:
     level DataTreeItem; at the top of the hierarchy sits the "root" item.
     
     An item should contain (by item data role¹):
-    • in column 0: 
+    • column 0: 
         ∘ DisplayRole: 
             str = a name — typically the symbol to which the data is bound in the
                 workspace, or the str representation of the key or index (hashable 
                 objects) under which the data is nested into its parent
     
+            for the root item, this is the symbol to which the data (a Python 
+                object) is bound, in the workspace (or in the namespace of the
+                DataViewer caller)
+    
+            A special display widget - when data is of special type (see below) 
+                AND when this item is NOT the root item.
+    
         ∘ ToolTipRole, StatusTipRole, WhatsThisRole: 
             a str: the type of the key or index, or (for the root item) an empty 
                 string
     
-        ∘ EditRole: QVariant() (this is immutable)
+        ∘ EditRole: QVariant that wraps the data object
     
         ∘ UserRole: 
-            type of Python data object or type of the index or mapping key
+            type of Python data object or type of the index or mapping key;
+            this should always be a hashable type, usable as index (int) or
+            key in a mapping, or a str (in a named tuple field, dataclass, 
+            attribute name, etc)
     
-    • in column 1:
-        ∘ UserRole: type of child Python object
+    • column 1:
+        ∘ DisplayRole: name of the type of the data bound to what is shown in   
+            column 0
     
-        
+        ∘ UserRole: string representation of the access of this child in its 
+            parent data
     
+        ∘ EditRole: QVariant() 
+    
+    
+    • column 2:
+        ∘ DisplayRole: either a str representation of, or a relevant information
+            related to, the data bound to what is shown in column 0.
+    
+    When the type of the data encapsulated by this DataTreeItem is a suitable
+    container-like type, the DataTreeItem will have children: DataTreeItem objects,
+    one each as follows:
+    
+    When data type          children encapsulate:
+    is a:
+    
+    mapping type:           key ↦ value "items" of the data
+    
+    named tuple type:       field name ↦ field value 
+    
+    dataclass:              field name ↦ field value
+    
+    sequence (e.g., list,   int index ↦ value of element at index
+    tuple, etc)
+    
+    any other type          attribute name ↦ attribute value
+    
+    In turn, when the objects in the right column have the appropriate types as
+    above, they will provide children (hence a deeper ensting level) to the 
+    child in the right column.
+    
+    Special Python data types, such as numpy arrays, pandas data frames, pandas
+    series and pandas indexes, need to be displayed in a table; in this case,
+    the item encapsulating these must contain a single child, where the data is
+    displayed in a special widget delegate for optional editing (such as a table)
+    
+    These are managed by the TreeView, via the TreeView's methods:
+    setIndexWidget (or perhaps better, setItemDelegate with a QStyledItemDelegate 
+    subclass). Behind the scenes, the TreeView updates two dictionaries:
+    QEditorIndexHash: QWidget * ↦ QPersistentModelIndex
+    QIndexEditorHash: QPersistentModelIndex ↦ QEditorInfo, where
+    QEditorInfo is a struct containing a QPointer<QWidget> and a isStatic:bool flag
+    (NOTE: none of these are available in Python! In particular, QPointer<QWidget>
+    is a C++—specific guarded pointer, which implements reference counting; 
+    Python offers its own mechanism to avoid dangling pointers in the C API so 
+    there's nok need to worry about that; we just pass a Python wrapped QWidget)
+    
+    All this means that the DataTreeItem does not need to worry about holding a 
+    reference to widgets; these are all managed by the tree view. But I'll need
+    to flag when to use item delegates, in the model itself, I guess 😄
+    
+    However, looking at the class QTreeModel, which is Qt's own private implementation
+    of QAbstractItemModel (don't try to read its documentation 'cause it's a private
+    Qt API), this KNOWS about QTreeWidgetItem data !
     
     
     ¹QtCore.Qt.ItemDataRole is an EnumType defining the following "flags":
@@ -485,15 +549,20 @@ class DataTreeItem:
         'UserRole'
     
 """
-    def __init__(self, data:typing.List[QtCore.QVariant], parentItem:typing.Optional[typing.Self] = None):
+    def __init__(self, data:typing.Union[QtCore.QVariant, typing.List[QtCore.QVariant]], 
+                 parentItem:typing.Optional[typing.Self] = None):
         r"""DataTreeItem constructor
     Parameters:
     ===========
-    data: list of QVariant objects — the item data stored in this DataTreeItem
+    data: a QVariant object or a list of QVariant objects — the item data stored in this DataTreeItem
     parentItem: the DataTreeItem, that has this DataTreeItem as a child
     """
         _childItems_:typing.List[typing.Self] = list()
-        _itemData_:typing.List[QtCore.QVariant] = data
+        if isinstance(data, list) and all(isinstance(d, QtCore.QVariant) for d in data):
+            _itemData_ = data[0]
+        elif isinstance(data, QtCore.QVariant):
+            _itemData_ = data
+            
         _parentItem_:typing.Optional[typing.Self] = parentItem
         
     
