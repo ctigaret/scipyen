@@ -107,8 +107,8 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         # FIXME: 2025-11-23 09:58:38 next line is DEPRECATED
         self._is_vigra_filter_kernel_:bool = False # needed in future implementations of editing functionality
         self._dataModel_ = TabularDataModel(parent=self)
-        self._dataModel_.sig_rowsPopulated.connect(self._slot_rowsPopulated)
-        self._dataModel_.sig_columnsPopulated.connect(self._slot_columnsPopulated)
+        # self._dataModel_.sig_rowsPopulated.connect(self._slot_rowsPopulated)
+        # self._dataModel_.sig_columnsPopulated.connect(self._slot_columnsPopulated)
         self._selectedIndexes_ = list()
         self._readOnly_:bool = readOnly == True
         
@@ -156,8 +156,8 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         r"""Called when this widget is part of TableEditor
     """
         from imaging import vigrautils
-        timer = QtCore.QElapsedTimer()
-        timer.start()
+        # timer = QtCore.QElapsedTimer()
+        # timer.start()
         if isinstance(data, (vigra.filters.Kernel1D, vigra.filters.Kernel2D)):
             data = vigrautils.kernel2array(data)
             self._is_vigra_filter_kernel_ = True
@@ -185,44 +185,29 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
             
             self.prevSliceToolbutton.setEnabled(True)
             self.nextSliceToolButton.setEnabled(True)
-            return
         
-#         if isinstance(data, np.ndarray):
-#             if data.ndim > 2:
-#                 self._slicingAxis_ = kwargs.get("sliceaxis", None)
-#                 if not isinstance(self._slicingAxis_, int) or self._slicingAxis_ < 0 or self._slicingAxis_ >= data.ndim:
-#                     self._slicingAxis_ = 2
-#                     
-#                 if data.ndim > 3:
-#                     new_shape = list(data.shape[0:self._slicingAxis_]) + [np.prod(data.shape[self._slicingAxis_:])]
-#                     self._data_ = np.squeeze(data).reshape(tuple(new_shape))
-#                     
-#                 self._currentSlice_ = 0
-#                 self._dataModel_.setModelData(self._data_[array_slice(self._data_, {self._slicingAxis_:self._currentSlice_})])
-#                 
-#                 self.prevSliceToolbutton.setEnabled(True)
-#                 self.nextSliceToolButton.setEnabled(True)
-#                 return
-#         
-
-        self.prevSliceToolbutton.setEnabled(False)
-        self.nextSliceToolButton.setEnabled(False)
-        self._dataModel_.setModelData(self._data_)
+        else:
+            self.prevSliceToolbutton.setEnabled(False)
+            self.nextSliceToolButton.setEnabled(False)
+            self._dataModel_.setModelData(self._data_)
         
-        
-#         if not self._readOnly_:
-#             # FIXME: 2025-11-23 10:50:49 TODO
-#             # This is way too time-consuming
-#             
-#             for row in range(self._dataModel_.rowCount()):
-#                 for col in range(self._dataModel_.columnCount()):
-#                     index = self._dataModel_.index(row, col)
-#                     indexdata = self._dataModel_.data(index).value()
-#                     if isinstance(indexdata, bool):
-#                         self.tableView.openPersistentEditor(index)
+        if not self._readOnly_:
+            # this opens a checkbox for bool cell data
+            for row in range(self._dataModel_.rowCount()):
+                for col in range(self._dataModel_.columnCount()):
+                    if self._immutability_["joint"]:
+                        immutable = col in self._immutability_["columns"] and row in self._immutability_["rows"]
+                    else:
+                        immutable = col in self._immutability_["columns"] or row in self._immutability_["rows"]
+                        
+                    if immutable:
+                        continue
+                    
+                    index = self._dataModel_.index(row, col)
+                    indexdata = self._dataModel_.data(index).value()
+                    if isinstance(indexdata, bool):
+                        self.tableView.openPersistentEditor(index)
                 
-        print(f"{self.__class__.__name__}.setData({type(data).__name__}) with {self._data_.size} samples took {timer.elapsed()} milliseconds")
-
     @Slot()
     def _slot_prevSlice(self):
         if isinstance(self._data_, np.ndarray) and self._data_.ndim > 2:
@@ -835,13 +820,13 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         
         self.setModelData(data)
         
-    #### BEGIN lazy display
+    #### BEGIN lazy (paged) display
     #
     def canFetchMore(self, parentIndex:QtCore.QModelIndex) -> bool:
-        # ret = False if parentIndex.isValid() else self._displayedRows_ < self._modelDataRows_
-        ret = False if parentIndex.isValid() else self._displayedRows_ < self._modelDataRows_ or self._displayedColumns_ < self._modelDataColumns_
-        print(f"{self.__class__.__name__}.canFetchMore -> {ret}")
-        return ret
+        return False if parentIndex.isValid() else self._displayedRows_ < self._modelDataRows_ or self._displayedColumns_ < self._modelDataColumns_
+        # ret = False if parentIndex.isValid() else self._displayedRows_ < self._modelDataRows_ or self._displayedColumns_ < self._modelDataColumns_
+        # print(f"{self.__class__.__name__}.canFetchMore -> {ret}")
+        # return ret
     
         # if parentIndex.isValid():
         #     return False
@@ -854,7 +839,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         
     def fetchMore(self, parentIndex):
         if parentIndex.isValid():
-            print(f"{self.__class__.__name__}.fetchMore: parent is valid, nothing to fetch")
+            # print(f"{self.__class__.__name__}.fetchMore: parent is valid, nothing to fetch")
             return 
         
         startRow:int = self._displayedRows_
@@ -865,7 +850,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         
         rowsToFetch = min(self._rowBatchSize_, remainingRows)
         columnsToFetch = min(self._columnBatchSize_, remainingColumns)
-        print(f"{self.__class__.__name__}.fetchMore: {rowsToFetch} rows and {columnsToFetch} columns to fetch")
+        # print(f"{self.__class__.__name__}.fetchMore: {rowsToFetch} rows and {columnsToFetch} columns to fetch")
         
         if rowsToFetch <= 0 and columnsToFetch <= 0:
             return
@@ -883,15 +868,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         self.sig_rowsPopulated.emit(startRow, rowsToFetch, self._modelDataRows_)
         self.sig_columnsPopulated.emit(startColumn, columnsToFetch, self._modelDataColumns_)
             
-        #if remainingColumns > 0:
-            #self.beginInsertColumns(QtCore.QModelIndex(), self._displayedColumns_, self._displayedColumns_ + columnsToFetch -1)
-            #self._displayedColumns_ += columnsToFetch
-            #self.endInsertColumns()
-            
-            #self.sig_columnsPopulated.emit(columnsToFetch)
-            
     #
-    #### END lazy display
+    #### END lazy (paged) display
                 
     #### BEGIN item data handling
     #
@@ -918,7 +896,6 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             traceback.print_exc()
             
     def headerData(self, section, orientation, role=QtCore.Qt.DisplayRole):
-        #print("TabularDataModel headerData")
         if self._modelData_ is None:
             return QtCore.QVariant()
         
@@ -934,8 +911,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         return 0 if parentIndex.isValid() else self._displayedColumns_
     
     #### BEGIN editable items
+    #
     def flags(self, modelIndex):
-        #print("TabularDataModel flags")
         if not modelIndex.isValid():
             return QtCore.Qt.ItemIsEnabled
         
@@ -1004,9 +981,9 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         from imaging import vigrautils
         
         # ### BEGIN Define timer to debug
-        #
-        timer = QtCore.QElapsedTimer()
-        timer.start()
+        # #
+        # timer = QtCore.QElapsedTimer()
+        # timer.start()
         #
         # ### END   Define timer debug
         try:
@@ -1016,8 +993,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             
             self.beginResetModel()
             
-            timer1 = QtCore.QElapsedTimer()
-            timer1.start()
+            # timer1 = QtCore.QElapsedTimer()
+            # timer1.start()
             
             self._is_vigra_filter_kernel_ = False
             self._original_data_ = None
@@ -1110,7 +1087,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 
             self._displayedRows_ = 0
             
-            print(f"{self.__class__.__name__}.setModelData({type(data).__name__}) execution during model reset took {timer1.elapsed()} milliseconds")
+            # print(f"{self.__class__.__name__}.setModelData({type(data).__name__}) execution during model reset took {timer1.elapsed()} milliseconds")
             
             self.endResetModel()
             
@@ -1125,7 +1102,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             
         # ### BEGIN report timing
         #
-        print(f"{self.__class__.__name__}.setModelData({type(data).__name__}) took {timer.elapsed()} milliseconds")
+        # print(f"{self.__class__.__name__}.setModelData({type(data).__name__}) took {timer.elapsed()} milliseconds")
         #
         # ### END   report timing
         

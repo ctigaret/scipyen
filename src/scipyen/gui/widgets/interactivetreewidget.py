@@ -479,11 +479,11 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         
         # ### BEGIN Timing measures for debugging
         # 
-        timer = QtCore.QElapsedTimer()
-        timer.start()
+        # timer = QtCore.QElapsedTimer()
+        # timer.start()
         typeStr_, desc, children, widget, typeTip, showDescInParentNode = self.parse(data, path, predicate=predicate)
         # print(f"{self.__class__.__name__}.buildTree: parsing {typeStr_} data with {len(children)} children and {type(widget).__name__} widget took {(timer.elapsed() *pq.ms).rescale(pq.s)}")
-        print(f"{self.__class__.__name__}.buildTree: parsing {typeStr_} data with {len(children)} children and {type(widget).__name__} widget took {timer.elapsed()} milliseconds")
+        # print(f"{self.__class__.__name__}.buildTree: parsing {typeStr_} data with {len(children)} children and {type(widget).__name__} widget took {timer.elapsed()} milliseconds")
         #
         # ### END   Timing measures for debugging
         
