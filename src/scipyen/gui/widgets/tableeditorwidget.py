@@ -108,6 +108,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         self._is_vigra_filter_kernel_:bool = False # needed in future implementations of editing functionality
         self._dataModel_ = TabularDataModel(parent=self)
         self._dataModel_.sig_rowsPopulated.connect(self._slot_rowsPopulated)
+        self._dataModel_.sig_columnsPopulated.connect(self._slot_columnsPopulated)
         self._selectedIndexes_ = list()
         self._readOnly_:bool = readOnly == True
         
@@ -156,7 +157,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
     """
         from imaging import vigrautils
         timer = QtCore.QElapsedTimer()
-        timer.startRow()
+        timer.start()
         if isinstance(data, (vigra.filters.Kernel1D, vigra.filters.Kernel2D)):
             data = vigrautils.kernel2array(data)
             self._is_vigra_filter_kernel_ = True
@@ -598,8 +599,12 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
 #                 raise RuntimeError("cannot cast %s to %s" % (value, dataDType))
             
     @Slot(int,int,int)
-    def _slot_rowsPopulated(self, startRow:int, fetched:int, total:int):
-        print(f"{self.__class__.__name__} fecthed rows: {startRow}...{fetched}/{total}")
+    def _slot_rowsPopulated(self, start:int, fetched:int, total:int):
+        print(f"{self.__class__.__name__} fetched rows: {start}...{fetched}/{total}")
+            
+    @Slot(int,int,int)
+    def _slot_columnsPopulated(self, start:int, fetched:int, total:int):
+        print(f"{self.__class__.__name__} fetched columns: {start}...{fetched}/{total}")
             
     @Slot()
     @safewrapper
@@ -762,8 +767,27 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         cm.popup(self.tableView.mapToGlobal(pos), copySelectedAction)
 
 class TabularDataModel(QtCore.QAbstractTableModel):
-    r"""Table item model for tabular data (numpy arrays, pandas data structures)
-    Change log:
+    r"""Table item model for tabular data in Scipyen.
+    Scipyen can handle two types of tabular data:
+    • numpy arrays:
+        ∘ arrays of up to two dimensions are considered collection of column
+            "vectors"; this means that the size of the array on the 1ˢᵗ axis (i.e.,
+            axis 0) is the number of "notional" rows of the data, whereas the size
+            of the array on the 2ⁿᵈ axis (i.e., axis 1), if present, is the number
+            of "notional" columns
+        
+        ∘ for arrays with more than two dimensions, the model raises exception
+            UNLESS the a "squeezed",two-dimensional, view, of the array is used
+            (which can only be possible when all dimensions higher than 3 are 
+            singleton., i.e., the array size is 1 on any axis k with k >= 2)
+        
+        ∘ these include Quantity arrays, and their specialized subclasses in the 
+            'neo' package
+        
+    • pandas data structures (DataFrame, Series, Index)
+    • vigra Kernel1D and Kernel2D, after conversion to numpy array
+    
+    CHANGELOG:
     NOTE 2025-11-21 09:43:33
         • enabled editing items, via a new PythonItemDelegate class
         • allows setting immutable (i.e. NOT editable items)
@@ -814,7 +838,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
     #### BEGIN lazy display
     #
     def canFetchMore(self, parentIndex:QtCore.QModelIndex) -> bool:
-        ret = False if parentIndex.isValid() else self._displayedRows_ < self._modelDataRows_
+        # ret = False if parentIndex.isValid() else self._displayedRows_ < self._modelDataRows_
+        ret = False if parentIndex.isValid() else self._displayedRows_ < self._modelDataRows_ or self._displayedColumns_ < self._modelDataColumns_
         print(f"{self.__class__.__name__}.canFetchMore -> {ret}")
         return ret
     
@@ -836,20 +861,27 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         startColumn:int = self._displayedColumns_
         
         remainingRows = self._modelDataRows_ - startRow
-        #remainingColumns = self._modelDataColumns_ - self._displayedColumns_
+        remainingColumns = self._modelDataColumns_ - startColumn
         
         rowsToFetch = min(self._rowBatchSize_, remainingRows)
-        #columnsToFetch = min(2, remainingColumns)
-        print(f"{self.__class__.__name__}.fetchMore: {rowsToFetch} rows to fetch")
+        columnsToFetch = min(self._columnBatchSize_, remainingColumns)
+        print(f"{self.__class__.__name__}.fetchMore: {rowsToFetch} rows and {columnsToFetch} columns to fetch")
         
-        if rowsToFetch <= 0:
+        if rowsToFetch <= 0 and columnsToFetch <= 0:
             return
         
-        self.beginInsertRows(QtCore.QModelIndex(), startRow, startRow + rowsToFetch -1)
-        self._displayedRows_ += rowsToFetch
-        self.endInsertRows()
+        if rowsToFetch > 0:
+            self.beginInsertRows(QtCore.QModelIndex(), startRow, startRow + rowsToFetch -1)
+            self._displayedRows_ += rowsToFetch
+            self.endInsertRows()
+            
+        if columnsToFetch > 0:
+            self.beginInsertColumns(QtCore.QModelIndex(), startColumn, startColumn + columnsToFetch -1)
+            self._displayedColumns_ += columnsToFetch
+            self.endInsertColumns()
         
         self.sig_rowsPopulated.emit(startRow, rowsToFetch, self._modelDataRows_)
+        self.sig_columnsPopulated.emit(startColumn, columnsToFetch, self._modelDataColumns_)
             
         #if remainingColumns > 0:
             #self.beginInsertColumns(QtCore.QModelIndex(), self._displayedColumns_, self._displayedColumns_ + columnsToFetch -1)
@@ -893,11 +925,12 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         return self._getHeaderData_(section, orientation, role)
         
     def rowCount(self, parentIndex:QtCore.QModelIndex = QtCore.QModelIndex()):
-        #print("TabularDataModel rowCount")
+        r"""Number of rows the model currently handles.
+        This may be less than the notional "rows" in the data 
+        """
         return 0 if parentIndex.isValid() else self._displayedRows_
         
     def columnCount(self, parentIndex:QtCore.QModelIndex = QtCore.QModelIndex()):
-        #print("TabularDataModel columnCount")
         return 0 if parentIndex.isValid() else self._displayedColumns_
     
     #### BEGIN editable items
@@ -973,7 +1006,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         # ### BEGIN Define timer to debug
         #
         timer = QtCore.QElapsedTimer()
-        timer.startRow()
+        timer.start()
         #
         # ### END   Define timer debug
         try:
@@ -984,7 +1017,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             self.beginResetModel()
             
             timer1 = QtCore.QElapsedTimer()
-            timer1.startRow()
+            timer1.start()
             
             self._is_vigra_filter_kernel_ = False
             self._original_data_ = None
