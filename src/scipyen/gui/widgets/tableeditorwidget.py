@@ -107,6 +107,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         # FIXME: 2025-11-23 09:58:38 next line is DEPRECATED
         self._is_vigra_filter_kernel_:bool = False # needed in future implementations of editing functionality
         self._dataModel_ = TabularDataModel(parent=self)
+        self._dataModel_.sig_rowsPopulated.connect(self._slot_rowsPopulated)
         self._selectedIndexes_ = list()
         self._readOnly_:bool = readOnly == True
         
@@ -155,7 +156,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
     """
         from imaging import vigrautils
         timer = QtCore.QElapsedTimer()
-        timer.start()
+        timer.startRow()
         if isinstance(data, (vigra.filters.Kernel1D, vigra.filters.Kernel2D)):
             data = vigrautils.kernel2array(data)
             self._is_vigra_filter_kernel_ = True
@@ -596,6 +597,10 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
 #             else:
 #                 raise RuntimeError("cannot cast %s to %s" % (value, dataDType))
             
+    @Slot(int,int,int)
+    def _slot_rowsPopulated(self, startRow:int, fetched:int, total:int):
+        print(f"{self.__class__.__name__} fecthed rows: {startRow}...{fetched}/{total}")
+            
     @Slot()
     @safewrapper
     def slot_resizeSelectedRowsToContents(self):
@@ -775,9 +780,9 @@ class TabularDataModel(QtCore.QAbstractTableModel):
     """
     sig_editCompleted = Signal([pd.DataFrame], [pd.Series], [np.ndarray], name="sig_editCompleted")
     sig_modelDataChanged = Signal(name="sig_modelDataChanged")
-    # NOTE: 2025-11-23 14:03:48 signal_rowsPopulated(start, count, total)
-    signal_rowsPopulated = Signal(int, int, int, name="signal_rowsPopulated")
-    signal_columnsPopulated = Signal(int, name="signal_columnsPopulated")
+    # NOTE: 2025-11-23 14:03:48 sig_rowsPopulated(startRow, count, total)
+    sig_rowsPopulated = Signal(int, int, int, name="sig_rowsPopulated")
+    sig_columnsPopulated = Signal(int, int, int, name="sig_columnsPopulated")
     
     def __init__(self, data=None, parent=None):
         super(TabularDataModel, self).__init__(parent=parent)
@@ -793,7 +798,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         self._modelDataRows_:int = 0
         self._modelDataColumns_:int = 0
         self._immutability_:dict = {"columns": list(), "rows": list(), "joint":False}
-        self._batchsize_:int = 10
+        self._rowBatchSize_:int = 10
+        self._columnBatchSize_:int = 10
         
         # self._immutableColumns_:typing.Sequence[int] = list()  # of column indexes
         # self._immutableRows_:typing.Sequence[int] = list()     # of row indexes
@@ -807,43 +813,50 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         
     #### BEGIN lazy display
     #
-    def canFetchMore(self, parentIndex:QtCore.QModelIndex):
-        if parentIndex.isValid():
-            return False
-        return self._displayedRows_ < self._modelDataRows_
-        #return self._displayedRows_ < self._modelDataRows_
-        #ret = self._displayedColumns_ < self._modelDataColumns_ or self._displayedRows_ < self._modelDataRows_
-        #print("displayed columns %d" % self._displayedColumns_, "rows %d" % self._displayedRows_)
-        #print("canFetchMore: %s" % ret)
-        #return ret
+    def canFetchMore(self, parentIndex:QtCore.QModelIndex) -> bool:
+        ret = False if parentIndex.isValid() else self._displayedRows_ < self._modelDataRows_
+        print(f"{self.__class__.__name__}.canFetchMore -> {ret}")
+        return ret
+    
+        # if parentIndex.isValid():
+        #     return False
+        # return self._displayedRows_ < self._modelDataRows_
+        # #return self._displayedRows_ < self._modelDataRows_
+        # #ret = self._displayedColumns_ < self._modelDataColumns_ or self._displayedRows_ < self._modelDataRows_
+        # #print("displayed columns %d" % self._displayedColumns_, "rows %d" % self._displayedRows_)
+        # #print("canFetchMore: %s" % ret)
+        # #return ret
         
     def fetchMore(self, parentIndex):
-        if not parentIndex.isValid():
+        if parentIndex.isValid():
+            print(f"{self.__class__.__name__}.fetchMore: parent is valid, nothing to fetch")
             return 
         
-        start:int = self._displayedRows_
+        startRow:int = self._displayedRows_
+        startColumn:int = self._displayedColumns_
         
-        remainingRows = self._modelDataRows_ - start
+        remainingRows = self._modelDataRows_ - startRow
         #remainingColumns = self._modelDataColumns_ - self._displayedColumns_
         
-        rowsToFetch = min(self._batchsize_, remainingRows)
+        rowsToFetch = min(self._rowBatchSize_, remainingRows)
         #columnsToFetch = min(2, remainingColumns)
+        print(f"{self.__class__.__name__}.fetchMore: {rowsToFetch} rows to fetch")
         
         if rowsToFetch <= 0:
             return
         
-        self.beginInsertRows(QtCore.QModelIndex(), start, start + rowsToFetch -1)
+        self.beginInsertRows(QtCore.QModelIndex(), startRow, startRow + rowsToFetch -1)
         self._displayedRows_ += rowsToFetch
         self.endInsertRows()
         
-        self.signal_rowsPopulated.emit(start, rowsToFetch, self._modelDataRows_)
+        self.sig_rowsPopulated.emit(startRow, rowsToFetch, self._modelDataRows_)
             
         #if remainingColumns > 0:
             #self.beginInsertColumns(QtCore.QModelIndex(), self._displayedColumns_, self._displayedColumns_ + columnsToFetch -1)
             #self._displayedColumns_ += columnsToFetch
             #self.endInsertColumns()
             
-            #self.signal_columnsPopulated.emit(columnsToFetch)
+            #self.sig_columnsPopulated.emit(columnsToFetch)
             
     #
     #### END lazy display
@@ -960,7 +973,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         # ### BEGIN Define timer to debug
         #
         timer = QtCore.QElapsedTimer()
-        timer.start()
+        timer.startRow()
         #
         # ### END   Define timer debug
         try:
@@ -971,7 +984,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             self.beginResetModel()
             
             timer1 = QtCore.QElapsedTimer()
-            timer1.start()
+            timer1.startRow()
             
             self._is_vigra_filter_kernel_ = False
             self._original_data_ = None
