@@ -136,15 +136,21 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         
         self._configureUI_()
         
+        self._defaultItemDelegate_ = self.tableView.itemDelegate()
+        self._editItemDelegate_ = PythonItemDelegate(parent=self)
+        
         # NOTE: 2021-08-16 17:22:20
         # By default, this is defined in the .ui file as:
         # QtWidgets.QAbstractItemView.DoubleClicked |
         # QtWidgets.QAbstractItemView.EditKeyPressed |
         # QtWidgets.QAbstractItemView.AnyKeyPressed
         self._defaultEditTriggers_ = self.tableView.editTriggers()
+        if self._readOnly_:
+            self.tableView.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+        else:
+            # FIXME: 2025-11-23 10:23:31 is this too time-consuming?
+            self.tableView.setItemDelegate(self._editItemDelegate_)
         
-        # FIXME: 2025-11-23 10:23:31 is this too time-consuming?
-        self.tableView.setItemDelegate(PythonItemDelegate(parent=self))
         
         self._data_ = None
         
@@ -204,22 +210,25 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
             self.nextSliceToolButton.setEnabled(False)
             self._dataModel_.setModelData(self._data_)
         
-        if not self._readOnly_:
-            # this opens a checkbox for bool cell data
-            for row in range(self._dataModel_.rowCount()):
-                for col in range(self._dataModel_.columnCount()):
-                    if self._immutability_["joint"]:
-                        immutable = col in self._immutability_["columns"] and row in self._immutability_["rows"]
-                    else:
-                        immutable = col in self._immutability_["columns"] or row in self._immutability_["rows"]
-                        
-                    if immutable:
-                        continue
-                    
-                    index = self._dataModel_.index(row, col)
-                    indexdata = self._dataModel_.data(index).value()
-                    if isinstance(indexdata, bool):
-                        self.tableView.openPersistentEditor(index)
+        # NOTE: 2025-11-23 19:53:14
+        # to show bool cell data as checkboxes
+        for row in range(self._dataModel_.rowCount()):
+            for col in range(self._dataModel_.columnCount()):
+                index = self._dataModel_.index(row, col)
+                if isinstance(indexdata, bool):
+                    self.tableView.openPersistentEditor(index)
+#                 if self._immutability_["joint"]:
+#                     immutable = col in self._immutability_["columns"] and row in self._immutability_["rows"]
+#                 else:
+#                     immutable = col in self._immutability_["columns"] or row in self._immutability_["rows"]
+#                     
+#                 if immutable:
+#                     continue
+#                 
+#                 index = self._dataModel_.index(row, col)
+#                 indexdata = self._dataModel_.data(index).value()
+#                 if isinstance(indexdata, bool):
+#                     self.tableView.openPersistentEditor(index)
                 
     @Slot()
     def _slot_prevSlice(self):
@@ -310,8 +319,10 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         self._readOnly_ = val == True
         if self._readOnly_:
             self.tableView.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+            self.tableView.setItemDelegate(self._editItemDelegate_)
         else:
             self.tableView.setEditTriggers(self._defaultEditTriggers_)
+            self.tableView.setItemDelegate(self._defaultItemDelegate_)
             
     def setEditTriggers(self, val):
         r"""See documentation for QtWidgets.QAbstractItemView.setEditTriggers()
@@ -525,77 +536,6 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
                 
         return ret
         
-            
-    # @Slot()
-    # @safewrapper
-    # def slot_copySelection(self):
-    #     # TODO 2023-11-17 15:00:12
-    #     quote = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier)
-    #     withHeaders = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.AltModifier)
-        
-        
-#     @Slot(QtWidgets.QTableWidgetItem)
-#     @safewrapper
-#     def slot_tableEdited(self, item):
-#         # TODO: 2025-11-02 20:47:58 - edit in light of using styled item delegate for editing
-#         # TODO code for xarray.DataArray
-#         # TODO code for multi-indexed pandas data frames
-#         # TODO code for as_type(...) for pandas data -- e.g. categorical
-#         col = item.column()
-#         row = item.row()
-#         value = item.text()
-#         
-#         if isinstance(self._data_, pd.DataFrame):
-#             colHeaderText = self.tableView.horizontalHeaderItem(col).text()
-#             
-#             if colHeaderText not in self._data_.columns:
-#                 raise RuntimeError("%s not found in data columns!" % colHeaderText)
-#             
-#             columnDType = self._data_[colHeaderText].dtype
-#             
-#             if np.can_cast(eval(value), columnDType):
-#                 if columnDType == np.dtype("bool"):
-#                     if value.lower().strip() in ("true, t, 1"):
-#                         value = "True"
-#                         
-#                     elif value.lower().strip() in ("false, f, 0"):
-#                         value = False
-#                         
-#                 # CAUTION here
-#                 data_value = np.array(eval(value), dtype=columnDType)
-#                 
-#                 self._data_.loc[self._data_.index[row], colHeaderText] = data_value
-#                 
-#             else:
-#                 raise RuntimeError("cannot cast %s to %s" % (value, columnDType))
-#             
-#             
-#         elif isinstance(self._data_, pd.Series):
-#             dataDType = self._data_.dtype
-#             
-#             if np.can_cast(eval(value), dataDType):
-#                 data_value = np.array(eval(value), dtype=dataDType)
-#             
-#                 self._data_.loc[self._data_.index[row]] = data_value
-#             
-#         elif isinstance(self._data_, np.ndarray):
-#             dataDType = self._data_.dtype
-#             
-#             if np.can_cast(eval(value), dataDType):
-#                 data_value = np.array(eval(value), dtype=dataDType)
-#                 
-#                 if self._data_.ndim == 3:
-#                     self._data_[row,col,self.frameNo] = data_value
-#                     
-#                 elif self._data_.ndim == 2:
-#                     self._data_[row,col] = data_value
-#                     
-#                 elif self._data_.ndim == 1:
-#                     self._data_[row] = data_value
-#            
-#             else:
-#                 raise RuntimeError("cannot cast %s to %s" % (value, dataDType))
-            
     @Slot(int,int,int)
     def _slot_rowsPopulated(self, start:int, fetched:int, total:int):
         print(f"{self.__class__.__name__} fetched rows: {start}...{fetched}/{total}")
@@ -1372,14 +1312,16 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                                 
                         else:
                             return QtCore.QVariant()
-                
             elif isinstance(self._modelData_, np.ndarray):
                 if role in (QtCore.Qt.DisplayRole, QtCore.Qt.AccessibleTextRole):
                     return QtCore.QVariant("%s" % section)
                 
                 elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
                     if orientation == QtCore.Qt.Horizontal:
-                        return QtCore.QVariant("%s" % self._modelData_[:,section].dtype)
+                        lbl = "%s" % self._modelData_[:,section].dtype
+                        if isinstance(self._modelData_, pq.Quantity):
+                            lbl += f" ({self._modelData_.units.dimensionality})"
+                        return QtCore.QVariant(lbl)
                         
                     else:
                         return QtCore.QVariant("%s" % self._modelData_[section,:].dtype)
@@ -1439,11 +1381,11 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                     val = self._modelData_.times[row]
                 else:
                     val = self._modelData_[row, col-1]
-                
+                    
                 if isinstance(val, datetime.datetime):
                     ret = val if role == QtCore.Qt.EditRole else ret.isoformat(" ")
                 else:
-                    ret = val if role == QtCore.Qt.EditRole else f"{val}"
+                    ret = val if role == QtCore.Qt.EditRole else f"{val.magnitude}"
                     
             elif isinstance(self._modelData_, np.ndarray):
                 if self._modelData_.ndim  == 0: # e.g. pq object
@@ -1459,7 +1401,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 if isinstance(val, datetime.datetime):
                     ret = val if role == QtCore.Qt.EditRole else ret.isoformat(" ")
                 else:
-                    ret = val if role == QtCore.Qt.EditRole else f"{val}"
+                    ret = val if role == QtCore.Qt.EditRole else f"{val.magnitude}" if isinstance(self._modelData_, pq.Quantity) else f"{val}"
                 
             else:
                 return QtCore.QVariant()

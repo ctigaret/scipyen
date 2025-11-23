@@ -250,6 +250,7 @@ class DataViewer(ScipyenViewer):
         
         self._obj_to_view_ = (dataclasses.MISSING, "")
         
+
         super().__init__(data=data, parent=parent, win_title=win_title, doc_title = doc_title, ID=ID, *args, **kwargs)
         
     def _configureUI_(self):
@@ -305,7 +306,7 @@ class DataViewer(ScipyenViewer):
         r"""
         Displays new data
         """
-        
+        self.update()
         if inspect.isfunction(predicate):
             self.predicate=predicate
             

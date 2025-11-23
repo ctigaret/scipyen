@@ -192,14 +192,13 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         if self._use_TableEditor_:
             # ### BEGIN Timing for debugging
             #
-            timer = QtCore.QElapsedTimer()
-            widget = TableEditorWidget(parent=self)
+            # timer = QtCore.QElapsedTimer()
+            widget = TableEditorWidget(parent=self, readOnly=True)
             signalBlocker = QtCore.QSignalBlocker(widget.tableView)
             
-            timer.start()
+            # timer.start()
             # NOTE: 2025-11-23 08:55:27
             # next line is equivalent to widget._dataModel_.setModelData(data)
-            # widget.tableView.model().setModelData(data)
             widget.setData(data)
             # print(f"↓{self.__class__.__name__}._makeTableWidget_ for {type(data).__name__}: setting table model data took {timer.elapsed()} milliseconds")
             #
