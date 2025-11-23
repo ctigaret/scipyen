@@ -4,7 +4,16 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
     
-r"""
+r"""DataViewer uses a subclass of QTreeWidget (InteractiveTreeWidget) as a GUI 
+    frontend. This is slow when displaying large objects with complex structure,
+    especially objects containing collections of large array objects, probably 
+    due to the use of specific widget for displaying these objects).
+    
+    Can I make this faster by subclassing QAbstractItemModel and passing the new
+    model class to a QTreeView?
+    
+    Not trivial...
+    
 """
 import sys, os, typing
 from qtpy import QtCore, QtGui, QtWidgets, QtSvg

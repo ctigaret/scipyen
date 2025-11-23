@@ -102,20 +102,24 @@ PODS = (bool, int, float, bytes, bytearray, str)
 
 # class InteractiveTreeWidget(DataTreeWidget):
 class InteractiveTreeWidget(QtWidgets.QTreeWidget):
-    r"""Extends pyqtgraph.widgets.DataTreeWidget.
+    r"""QTreeWidget that enables:
     
-    Enables the following:
+    1. Support for custom context menu.
     
-    1. Support for custom context menu to pyqtgraph.DataTreeWidget.
-    
-    2. Use Scipyen gui.tableeditor.TableEditorWidget instead of 
-        pyqtgraph.TableWidget
+    2. Use Scipyen gui.tableeditor.TableEditorWidget
     
     3. Support for any key type, as long as it is hashable.
     
     4. Support for circular references to hierarchical data objects (subsequent
         references ot the same object are NOT traversed; instead, a path to the 
         first encountered reference - in depth-first order - is displayed)
+
+    Inspired by pyqtgraph.widget.DataTreeWidget (originally, a subclass of it)
+
+    NOTE: 2025-11-23 08:22:37 
+    CHANGELOG:
+    Up to mid March 2025: subclass of pyqtgraph.widget.DataTreeWidget
+    After that: direct subclass of QtWidgets.QTreeWidget
     
     """
     # NOTE: 2025-05-24 22:21:05
@@ -353,8 +357,8 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                   name:str="", keyType:type=str, nameTip:str="", typeStr:typing.Optional[str] = None, 
                   predicate:typing.Optional[typing.Any]=None, 
                   hideRoot:bool=False, path:tuple=()):
-        r"""
-        Overrides pyqtgraph.DataTreeWidget.buildTree()
+        r"""Builds the tree hierarchy.
+        Originally overriding pyqtgraph.DataTreeWidget.buildTree(), now see NOTE: 2025-11-23 08:22:37 
         
         Positional parameters:
         ----------------------
@@ -369,6 +373,9 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         nameTip:str; default is the empty string ("")
         hideRoot:bool; default is False
         path: tuple; default is the empty tuple
+    
+        WARNING:
+        This function may call itself recursively if the data is a mapping collection !
         
         """
         #from pyqtgraph.python2_3 import asUnicode
@@ -458,7 +465,15 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         # a couple of extra bits such as the tip indicating the data type, and 
         # whether to show the description in the same row as the parent node
         # or in a separate widget)
+        
+        # ### BEGIN Timing measures for debugging
+        # 
+        timer = QtCore.QElapsedTimer()
+        timer.start()
         typeStr_, desc, children, widget, typeTip, showDescInParentNode = self.parse(data, path, predicate=predicate)
+        # print(f"{self.__class__.__name__}.buildTree: parsing {typeStr_} data with {len(children)} children and {type(widget).__name__} widget tool {(timer.elapsed() *pq.ms).rescale(pq.s)}")
+        print(f"{self.__class__.__name__}.buildTree: parsing {typeStr_} data with {len(children)} children and {type(widget).__name__} widget tool {timer.elapsed()} milliseconds")
+        # ### END   Timing measures for debugging
         
         # print(f"{self.__class__.__name__}.buildTree for {type(data)} -> {len(children)} children")
         
@@ -544,6 +559,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
             self.setFirstColumnSpanned(modelndx.row(), parentndx, True)
             # self.setFirstItemColumnSpanned(subnode, True) # obsolete !!!
             
+        # NOTE: 2025-11-23 08:43:04
         # recurse into children (a dict)
         if isinstance(children, dict):
             for key, child_data in children.items():
@@ -582,8 +598,9 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                             predicate=predicate, path=path+(keyrepr,)) # so hideRoot is always False?
 
     def parse(self, data, path, predicate=None, typeStr=None) -> tuple:
-        r"""
-        Overrides pyqtgraph.DataTreeWidget.parse()
+        r"""Figures out if data is to be represented as a (sub)tree or a widget.
+        
+        Originally overrided pyqtgraph.DataTreeWidget.parse(), but now see NOTE: 2025-11-23 08:22:37 
         
         Returns:
         ========
