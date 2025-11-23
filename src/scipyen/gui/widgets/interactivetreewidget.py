@@ -190,10 +190,21 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         
     def _makeTableWidget_(self, data):
         if self._use_TableEditor_:
+            # ### BEGIN Timing for debugging
+            #
+            timer = QtCore.QElapsedTimer()
             widget = TableEditorWidget(parent=self)
             signalBlocker = QtCore.QSignalBlocker(widget.tableView)
-            widget.tableView.model().setModelData(data)
-            widget.readOnly=True
+            
+            timer.start()
+            # NOTE: 2025-11-23 08:55:27
+            # next line is equivalent to widget._dataModel_.setModelData(data)
+            # widget.tableView.model().setModelData(data)
+            widget.setData(data)
+            # print(f"↓{self.__class__.__name__}._makeTableWidget_ for {type(data).__name__}: setting table model data took {timer.elapsed()} milliseconds")
+            #
+            # ### END   Timing for debugging
+            # widget.readOnly=True
             # don't delete; may be useful
             # widget.sig_selectionChanged.connect(self._slot_tableEditorWidgetSelectionChanged)
         else:
@@ -471,8 +482,9 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         timer = QtCore.QElapsedTimer()
         timer.start()
         typeStr_, desc, children, widget, typeTip, showDescInParentNode = self.parse(data, path, predicate=predicate)
-        # print(f"{self.__class__.__name__}.buildTree: parsing {typeStr_} data with {len(children)} children and {type(widget).__name__} widget tool {(timer.elapsed() *pq.ms).rescale(pq.s)}")
-        print(f"{self.__class__.__name__}.buildTree: parsing {typeStr_} data with {len(children)} children and {type(widget).__name__} widget tool {timer.elapsed()} milliseconds")
+        # print(f"{self.__class__.__name__}.buildTree: parsing {typeStr_} data with {len(children)} children and {type(widget).__name__} widget took {(timer.elapsed() *pq.ms).rescale(pq.s)}")
+        print(f"{self.__class__.__name__}.buildTree: parsing {typeStr_} data with {len(children)} children and {type(widget).__name__} widget took {timer.elapsed()} milliseconds")
+        #
         # ### END   Timing measures for debugging
         
         # print(f"{self.__class__.__name__}.buildTree for {type(data)} -> {len(children)} children")

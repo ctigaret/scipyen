@@ -101,14 +101,17 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
     sig_selectionChanged = Signal(name="sig_selectionChanged")
     sig_dataChanged = Signal(name="sig_dataChanged")
     
-    def __init__(self, parent:typing.Optional[QtWidgets.QMainWindow]=None) -> None:
+    def __init__(self, parent:typing.Optional[QtWidgets.QMainWindow]=None,
+                 readOnly:bool=True) -> None:
         super().__init__(parent=parent)
-        self._is_vigra_filter_kernel_ = False # needed in future implementations of editing functionality
+        # FIXME: 2025-11-23 09:58:38 next line is DEPRECATED
+        self._is_vigra_filter_kernel_:bool = False # needed in future implementations of editing functionality
         self._dataModel_ = TabularDataModel(parent=self)
         self._selectedIndexes_ = list()
+        self._readOnly_:bool = readOnly == True
         
         # NOTE: 2021-10-18 09:32:45
-        # ### BEGIN keep this  - you may re-enable the possibility to use custom tabular
+        # ### BEGIN keep this  - you may re-enable the possibility to use other custom tabular
         # data models
         
         #if model is None:
@@ -126,6 +129,8 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         # QtWidgets.QAbstractItemView.EditKeyPressed |
         # QtWidgets.QAbstractItemView.AnyKeyPressed
         self._defaultEditTriggers_ = self.tableView.editTriggers()
+        
+        # FIXME: 2025-11-23 10:23:31 is this too time-consuming?
         self.tableView.setItemDelegate(PythonItemDelegate(parent=self))
         
         self._data_ = None
@@ -146,9 +151,11 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
                        DataSignal, IrregularlySampledDataSignal,
                        TriggerEvent, TriggerProtocol,
                        np.ndarray, vigra.VigraArray, vigra.filters.Kernel1D, vigra.filters.Kernel2D), *args, **kwargs):
-        
+        r"""Called when this widget is part of TableEditor
+    """
         from imaging import vigrautils
-        
+        timer = QtCore.QElapsedTimer()
+        timer.start()
         if isinstance(data, (vigra.filters.Kernel1D, vigra.filters.Kernel2D)):
             data = vigrautils.kernel2array(data)
             self._is_vigra_filter_kernel_ = True
@@ -158,39 +165,62 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         self._data_ = data
         
         if getattr(data, "shape", (0,0))[0] > 10:
-            # avoid autio-resizing rows for data with more than 10 rows — it is
+            # avoid auto-resizing rows for data with more than 10 rows — it is
             # resource consuming
             self.resizeRowsToolButton.setEnabled(False)
         
-        if isinstance(data, np.ndarray):
-            if data.ndim > 2:
-                self._slicingAxis_ = kwargs.get("sliceaxis", None)
-                if not isinstance(self._slicingAxis_, int) or self._slicingAxis_ < 0 or self._slicingAxis_ >= data.ndim:
-                    self._slicingAxis_ = 2
-                    
-                if data.ndim > 3:
-                    new_shape = list(data.shape[0:self._slicingAxis_]) + [np.prod(data.shape[self._slicingAxis_:])]
-                    self._data_ = np.squeeze(data).reshape(tuple(new_shape))
-                    
-                self._currentSlice_ = 0
-                self._dataModel_.setModelData(self._data_[array_slice(self._data_, {self._slicingAxis_:self._currentSlice_})])
+        if isinstance(data, np.ndarray) and data.ndim > 2:
+            self._slicingAxis_ = kwargs.get("sliceaxis", None)
+            if not isinstance(self._slicingAxis_, int) or self._slicingAxis_ < 0 or self._slicingAxis_ >= data.ndim:
+                self._slicingAxis_ = 2
                 
-                self.prevSliceToolbutton.setEnabled(True)
-                self.nextSliceToolButton.setEnabled(True)
-                return
+            if data.ndim > 3:
+                new_shape = list(data.shape[0:self._slicingAxis_]) + [np.prod(data.shape[self._slicingAxis_:])]
+                self._data_ = np.squeeze(data).reshape(tuple(new_shape))
+                
+            self._currentSlice_ = 0
+            self._dataModel_.setModelData(self._data_[array_slice(self._data_, {self._slicingAxis_:self._currentSlice_})])
+            
+            self.prevSliceToolbutton.setEnabled(True)
+            self.nextSliceToolButton.setEnabled(True)
+            return
         
+#         if isinstance(data, np.ndarray):
+#             if data.ndim > 2:
+#                 self._slicingAxis_ = kwargs.get("sliceaxis", None)
+#                 if not isinstance(self._slicingAxis_, int) or self._slicingAxis_ < 0 or self._slicingAxis_ >= data.ndim:
+#                     self._slicingAxis_ = 2
+#                     
+#                 if data.ndim > 3:
+#                     new_shape = list(data.shape[0:self._slicingAxis_]) + [np.prod(data.shape[self._slicingAxis_:])]
+#                     self._data_ = np.squeeze(data).reshape(tuple(new_shape))
+#                     
+#                 self._currentSlice_ = 0
+#                 self._dataModel_.setModelData(self._data_[array_slice(self._data_, {self._slicingAxis_:self._currentSlice_})])
+#                 
+#                 self.prevSliceToolbutton.setEnabled(True)
+#                 self.nextSliceToolButton.setEnabled(True)
+#                 return
+#         
+
         self.prevSliceToolbutton.setEnabled(False)
         self.nextSliceToolButton.setEnabled(False)
         self._dataModel_.setModelData(self._data_)
         
-        for row in range(self._dataModel_.rowCount()):
-            for col in range(self._dataModel_.columnCount()):
-                index = self._dataModel_.index(row, col)
-                indexdata = self._dataModel_.data(index).value()
-                if isinstance(indexdata, bool):
-                    self.tableView.openPersistentEditor(index)
-                
         
+#         if not self._readOnly_:
+#             # FIXME: 2025-11-23 10:50:49 TODO
+#             # This is way too time-consuming
+#             
+#             for row in range(self._dataModel_.rowCount()):
+#                 for col in range(self._dataModel_.columnCount()):
+#                     index = self._dataModel_.index(row, col)
+#                     indexdata = self._dataModel_.data(index).value()
+#                     if isinstance(indexdata, bool):
+#                         self.tableView.openPersistentEditor(index)
+                
+        print(f"{self.__class__.__name__}.setData({type(data).__name__}) with {self._data_.size} samples took {timer.elapsed()} milliseconds")
+
     @Slot()
     def _slot_prevSlice(self):
         if isinstance(self._data_, np.ndarray) and self._data_.ndim > 2:
@@ -272,11 +302,13 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         
     @property
     def readOnly(self):
-        return self.tableView.editTriggers() == QtWidgets.QAbstractItemView.NoEditTriggers
+        return self._readOnly_
+        # return self.tableView.editTriggers() == QtWidgets.QAbstractItemView.NoEditTriggers
     
     @readOnly.setter
     def readOnly(self, val:bool):
-        if val:
+        self._readOnly_ = val == True
+        if self._readOnly_:
             self.tableView.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
         else:
             self.tableView.setEditTriggers(self._defaultEditTriggers_)
@@ -743,8 +775,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
     """
     sig_editCompleted = Signal([pd.DataFrame], [pd.Series], [np.ndarray], name="sig_editCompleted")
     sig_modelDataChanged = Signal(name="sig_modelDataChanged")
-    
-    signal_rowsPopulated = Signal(int, name="signal_rowsPopulated")
+    # NOTE: 2025-11-23 14:03:48 signal_rowsPopulated(start, count, total)
+    signal_rowsPopulated = Signal(int, int, int, name="signal_rowsPopulated")
     signal_columnsPopulated = Signal(int, name="signal_columnsPopulated")
     
     def __init__(self, data=None, parent=None):
@@ -755,55 +787,66 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         
         #if isinstance(data, np.ndarray) and data.ndim > 2:
             #raise TypeError("cannot support numpy array data with more than two dimensions")
-        
-        self._modelData_ = None
-        self._modelRows_ = 0
-        self._modelColumns_ = 0
+        self._is_vigra_filter_kernel_:bool = False
+        self._original_data_:typing.Any = None
+        self._modelData_:typing.Any= None
+        self._modelDataRows_:int = 0
+        self._modelDataColumns_:int = 0
         self._immutability_:dict = {"columns": list(), "rows": list(), "joint":False}
+        self._batchsize_:int = 10
+        
         # self._immutableColumns_:typing.Sequence[int] = list()  # of column indexes
         # self._immutableRows_:typing.Sequence[int] = list()     # of row indexes
         
         # NOTE: 2018-11-10 10:58:09
         # how many columns & rows are actually displayed
-        #self._displayedColumns = 0
-        self._displayedRows_ = 0
+        self._displayedColumns_:int = 0
+        self._displayedRows_:int = 0
         
         self.setModelData(data)
         
-    #### BEGIN paged display
+    #### BEGIN lazy display
     #
-    #def canFetchMore(self, parentIndex):
-        #return True
-        ##return self._displayedRows_ < self._modelRows_
-        ##ret = self._displayedColumns < self._modelColumns_ or self._displayedRows_ < self._modelRows_
-        ##print("displayed columns %d" % self._displayedColumns, "rows %d" % self._displayedRows_)
-        ##print("canFetchMore: %s" % ret)
-        ##return ret
+    def canFetchMore(self, parentIndex:QtCore.QModelIndex):
+        if parentIndex.isValid():
+            return False
+        return self._displayedRows_ < self._modelDataRows_
+        #return self._displayedRows_ < self._modelDataRows_
+        #ret = self._displayedColumns_ < self._modelDataColumns_ or self._displayedRows_ < self._modelDataRows_
+        #print("displayed columns %d" % self._displayedColumns_, "rows %d" % self._displayedRows_)
+        #print("canFetchMore: %s" % ret)
+        #return ret
         
-    #def fetchMore(self, parentIndex):
-        #remainingRows = self._modelRows_ - self._displayedRows_
-        ##remainingColumns = self._modelColumns_ - self._displayedColumns
-        ##print("remaining rows %d" % remainingRows, "columns %d" % remainingColumns)
+    def fetchMore(self, parentIndex):
+        if not parentIndex.isValid():
+            return 
         
-        #rowsToFetch = min(10, remainingRows)
-        ##columnsToFetch = min(2, remainingColumns)
+        start:int = self._displayedRows_
         
-        #if remainingRows > 0:
-            #self.beginInsertRows(QtCore.QModelIndex(), self._displayedRows_, self._displayedRows_ + rowsToFetch -1)
-            #self._displayedRows_ += rowsToFetch
-            #self.endInsertRows()
+        remainingRows = self._modelDataRows_ - start
+        #remainingColumns = self._modelDataColumns_ - self._displayedColumns_
+        
+        rowsToFetch = min(self._batchsize_, remainingRows)
+        #columnsToFetch = min(2, remainingColumns)
+        
+        if rowsToFetch <= 0:
+            return
+        
+        self.beginInsertRows(QtCore.QModelIndex(), start, start + rowsToFetch -1)
+        self._displayedRows_ += rowsToFetch
+        self.endInsertRows()
+        
+        self.signal_rowsPopulated.emit(start, rowsToFetch, self._modelDataRows_)
             
-            ##self.signal_rowsPopulated.emit(rowsToFetch)
+        #if remainingColumns > 0:
+            #self.beginInsertColumns(QtCore.QModelIndex(), self._displayedColumns_, self._displayedColumns_ + columnsToFetch -1)
+            #self._displayedColumns_ += columnsToFetch
+            #self.endInsertColumns()
             
-        ##if remainingColumns > 0:
-            ##self.beginInsertColumns(QtCore.QModelIndex(), self._displayedColumns, self._displayedColumns + columnsToFetch -1)
-            ##self._displayedColumns += columnsToFetch
-            ##self.endInsertColumns()
-            
-            ##self.signal_columnsPopulated.emit(columnsToFetch)
+            #self.signal_columnsPopulated.emit(columnsToFetch)
             
     #
-    #### END paged display
+    #### END lazy display
                 
     #### BEGIN item data handling
     #
@@ -818,10 +861,10 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             row = modelIndex.row()
             col = modelIndex.column()
             
-            if row >= self._modelRows_ or row < 0:
+            if row >= self._modelDataRows_ or row < 0:
                 return QtCore.QVariant()
             
-            if col >= self._modelColumns_ or row < 0:
+            if col >= self._modelDataColumns_ or row < 0:
                 return QtCore.QVariant()
             
             return self._getModelData_(row, col, role)
@@ -836,14 +879,13 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         
         return self._getHeaderData_(section, orientation, role)
         
-    def rowCount(self, parentIndex=QtCore.QModelIndex()):
+    def rowCount(self, parentIndex:QtCore.QModelIndex = QtCore.QModelIndex()):
         #print("TabularDataModel rowCount")
-        return self._modelRows_
+        return 0 if parentIndex.isValid() else self._displayedRows_
         
-    def columnCount(self, parentIndex=QtCore.QModelIndex()):
+    def columnCount(self, parentIndex:QtCore.QModelIndex = QtCore.QModelIndex()):
         #print("TabularDataModel columnCount")
-        return self._modelColumns_
-        
+        return 0 if parentIndex.isValid() else self._displayedColumns_
     
     #### BEGIN editable items
     def flags(self, modelIndex):
@@ -851,7 +893,11 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         if not modelIndex.isValid():
             return QtCore.Qt.ItemIsEnabled
         
+        # if self._readOnly_:
+        #     return QtCore.Qt.ItemIsSelectable
+        
         return QtCore.Qt.ItemIsEditable | super().flags(modelIndex)
+    
         #return QtCore.Qt.ItemIsEditable | QtCore.Qt.ItemIsSelectable
     
     def setData(self, modelIndex, value, role=QtCore.Qt.EditRole):
@@ -900,98 +946,125 @@ class TabularDataModel(QtCore.QAbstractTableModel):
     #### END editable items
     
     #### BEGIN resizable model
-    
+    #
+    #
     #### END resizable model
     
     #### END item data handling
 
+    @Slot(object)
     def setModelData(self, data):
         #print("TabularDataModel setModelData")
+        from imaging import vigrautils
+        
+        # ### BEGIN Define timer to debug
+        #
+        timer = QtCore.QElapsedTimer()
+        timer.start()
+        #
+        # ### END   Define timer debug
         try:
-            if not isinstance(data, (pd.Series, pd.DataFrame, pd.Index, np.ndarray, type(None))):
+            
+            if not isinstance(data, (pd.Series, pd.DataFrame, pd.Index, np.ndarray, vigra.filters.Kernel1D, vigra.filters.Kernel2D, type(None))):
                 raise TypeError("%s data is not yet supported" % type(data).__name__)
             
             self.beginResetModel()
             
-            #self._modelData_ = data
+            timer1 = QtCore.QElapsedTimer()
+            timer1.start()
+            
+            self._is_vigra_filter_kernel_ = False
+            self._original_data_ = None
             
             if isinstance(data, pd.DataFrame):
                 self._modelData_ = data
-                self._modelRows_ = data.shape[0]
-                self._modelColumns_ = data.shape[1]
+                self._modelDataRows_ = data.shape[0]
+                self._modelDataColumns_ = data.shape[1]
                 
             elif isinstance(data, pd.Series):
                 self._modelData_ = data
-                self._modelRows_ = data.shape[0]
-                self._modelColumns_ = 1
+                self._modelDataRows_ = data.shape[0]
+                self._modelDataColumns_ = 1
                 
             elif isinstance(data, pd.Index):
                 self._modelData_ = data
-                self._modelRows_ = data.shape[0]
-                self._modelColumns_ = 1
+                self._modelDataRows_ = data.shape[0]
+                self._modelDataColumns_ = 1
                 
-            elif isinstance(data, neo.core.dataobject.DataObject):
-                # NOTE: 2025-09-27 10:38:00
-                # for regularly sampled signals (neo.AnalogSignal, DataSignal)
-                # signal domain (e.g. time) is a dynamic property, calculated
-                # from the t_start and sampling_period attributes of the signal 
-                # object; hence, individual data points in the domain cannot
-                # be edited; however, the entire domain IS mutable (by changing
-                # the two attributes mentioned above)
-                #
-                if data.ndim:
-                    self._modelRows_ = data.shape[0]
-                    
-                    if data.ndim > 1:
-                        # include domain as the first column
-                        self._modelColumns_ = data.shape[1] + 1 
-                        
-                        if isinstance(data, (neo.AnalogSignal, DataSignal)):
-                            # NOTE: 2025-09-27 11:05:05 see NOTE: 2025-09-27 10:38:00
-                            # although the signal domain is shown as a regular column
-                            # (column 0),  editing data points in this column is
-                            # prevented, EXCEPT for the first data point - which is
-                            # the t_start
-                            #
-                            # This may sound contrived, but the native Qt option would
-                            # be to call setItemDelegateForColumn and setItemDelegateForRow
-                            # with a custom delegate returning a null widget (i.e. None)
-                            # but that is already baked in PythonItemDelegate class
-                            self._immutableColumns_ = [0]
-                            # below, allow editing t_start
-                            self._immutableRows_ = range(1,self._modelRows_)
-                        
-                else:
-                    self._modelRows_ = 1
-                    self._modelColumns_ = 1
-                
-                self._modelData_ = data
+            elif isinstance(data, (vigra.filters.Kernel1D, vigra.filters.Kernel2D)):
+                self._modelData_ = vigrautils.kernel2array(data)
+                self._modelDataRows_ = data.shape[0]
+                self._modelDataColumns_ = 1
+                self._is_vigra_filter_kernel_ = True
+                self._original_data_ = data
                 
             elif isinstance(data, np.ndarray):
-                if data.ndim > 2:
-                    if all (v == 1 for v in data.shape[2:]):
-                        self._modelData_ = np.squeeze(data).reshape((data.shape[0], np.prod(data.shape[1:])))
+                # trying to streamline this
+                # NOTE: 2025-11-23 09:45:45 FIXME/TODO - TOO SLOW!
+                if isinstance(data, neo.core.dataobject.DataObject):
+                    # NOTE: 2025-09-27 10:38:00
+                    # for regularly sampled signals (neo.AnalogSignal, DataSignal)
+                    # signal domain (e.g. time) is a dynamic property, calculated
+                    # from the t_start and sampling_period attributes of the signal 
+                    # object; hence, individual data points in the domain cannot
+                    # be edited; however, the entire domain IS mutable (by changing
+                    # the two attributes mentioned above)
+                    #
+                    if data.ndim:
+                        self._modelDataRows_ = data.shape[0]
+                        
+                        if data.ndim > 1:
+                            # include domain as the first column
+                            self._modelDataColumns_ = data.shape[1] + 1 
+                            
+                            if isinstance(data, (neo.AnalogSignal, DataSignal)):
+                                # NOTE: 2025-09-27 11:05:05 see NOTE: 2025-09-27 10:38:00
+                                # although the signal domain is shown as a regular column
+                                # (column 0),  editing data points in this column is
+                                # prevented, EXCEPT for the first data point - which is
+                                # the t_start
+                                #
+                                # This may sound contrived, but the native Qt option would
+                                # be to call setItemDelegateForColumn and setItemDelegateForRow
+                                # with a custom delegate returning a null widget (i.e. None)
+                                # but that is already baked in PythonItemDelegate class
+                                self._immutableColumns_ = [0]
+                                # below, allow editing t_start
+                                self._immutableRows_ = range(1,self._modelDataRows_)
+                            
                     else:
-                        raise ValueError("Arrays with more than two dimensions and with non-singleton dimensions higher than 2 are not supported")
-                else:
+                        self._modelDataRows_ = 1
+                        self._modelDataColumns_ = 1
+                    
                     self._modelData_ = data
                     
-                if self._modelData_.ndim:
-                    self._modelRows_ = self._modelData_.shape[0]
-                    if self._modelData_.ndim > 1:
-                        self._modelColumns_ = self._modelData_.shape[1]
+                else: # "plain" numpy arrays
+                    if data.ndim > 2:
+                        if all (v == 1 for v in data.shape[2:]):
+                            self._modelData_ = np.squeeze(data).reshape((data.shape[0], np.prod(data.shape[1:])))
+                        else:
+                            raise ValueError("Arrays with more than two dimensions and with non-singleton dimensions higher than 2 are not supported")
                     else:
-                        self._modelColumns_ = 1
-                else:
-                    self._modelRows_ = 1
-                    self._modelColumns_ = 1
+                        self._modelData_ = data
+                        
+                    if self._modelData_.ndim:
+                        self._modelDataRows_ = self._modelData_.shape[0]
+                        if self._modelData_.ndim > 1:
+                            self._modelDataColumns_ = self._modelData_.shape[1]
+                        else:
+                            self._modelDataColumns_ = 1
+                    else:
+                        self._modelDataRows_ = 1
+                        self._modelDataColumns_ = 1
                 
             elif data is None:
                 self._modelData_ = data
-                self._modelRows_ = 0
-                self._modelColumns_ = 0
+                self._modelDataRows_ = 0
+                self._modelDataColumns_ = 0
                 
             self._displayedRows_ = 0
+            
+            print(f"{self.__class__.__name__}.setModelData({type(data).__name__}) execution during model reset took {timer1.elapsed()} milliseconds")
             
             self.endResetModel()
             
@@ -999,13 +1072,24 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 self.headerDataChanged.emit(QtCore.Qt.Vertical, 0, 0)
                 
             else:
-                self.headerDataChanged.emit(QtCore.Qt.Vertical, 0, self._modelRows_)
+                self.headerDataChanged.emit(QtCore.Qt.Vertical, 0, self._modelDataRows_)
             
         except Exception as e:
             traceback.print_exc()
+            
+        # ### BEGIN report timing
+        #
+        print(f"{self.__class__.__name__}.setModelData({type(data).__name__}) took {timer.elapsed()} milliseconds")
+        #
+        # ### END   report timing
         
     @safewrapper
     def _getHeaderData_(self, section, orientation, role = QtCore.Qt.DisplayRole):
+        # ### BEGIN Timing to debug
+        #
+        # timer = QtCore.QElapsedTimer()
+        #
+        # ### END   Timing to debug
         try:
             if role not in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, 
                             QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleTextRole,
@@ -1275,6 +1359,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         except (IndexError, ):
             return QtCore.QVariant()
         
+        # print(f"{self.__class__.__name__}._getHeaderData_ took {timer.elapsed()} milliseconds")
+        
     def _getModelData_(self, row, col, role = QtCore.Qt.DisplayRole) -> QtCore.QVariant:
         try:
             if role not in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleTextRole):
@@ -1424,6 +1510,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                             
             elif isinstance(self._modelData_, np.ndarray):
                 self._modelData_[row, col] = pyvalue
+                if self._is_vigra_filter_kernel_:
+                    self._original_data_ = vigrautils.kernelfromarray(self._modelData_)
                         
             else:
                 return False
@@ -1442,7 +1530,10 @@ class TabularDataModel(QtCore.QAbstractTableModel):
     
     @property
     def sourceData(self):
-        r"""Access to the source data behind this model"""
+        r"""Access to the source data behind this model.
+    """
+        if self._is_vigra_filter_kernel_:
+            return self._original_data_
         return self._modelData_
     
     @property
