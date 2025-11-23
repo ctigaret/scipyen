@@ -111,10 +111,17 @@
     </layout>
    </item>
    <item row="1" column="0">
-    <widget class="QTableView" name="tableView"/>
+    <widget class="TableDataView" name="tableView"/>
    </item>
   </layout>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>TableDataView</class>
+   <extends>QTableView</extends>
+   <header location="global">gui.widgets.tabledataview</header>
+  </customwidget>
+ </customwidgets>
  <resources/>
  <connections/>
 </ui>

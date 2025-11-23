@@ -215,6 +215,22 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         
         return widget
     
+    def paintEvent(self, event):
+        r"""Paints a placeholder text when there is no data"""
+        super().paintEvent(event)
+        if self.model() is not None and self.model().rowCount() > 0:
+            return
+        painter = QtGui.QPainter(self.viewport())
+        painter.save()
+        col = self.palette().placeholderText().color()
+        painter.setPen(col)
+        fm = self.fontMetrics()
+        elided_text = fm.elidedText(
+            "No data", QtCore.Qt.ElideRight, self.viewport().width()
+        )
+        painter.drawText(self.viewport().rect(), QtCore.Qt.AlignCenter, elided_text)
+        painter.restore()
+
     def getWidgetSelection(self, widget:QtWidgets.QWidget) -> list:
         r"""Returns a list of selected QModelIndex objects from widgets
         asociated with tree items.

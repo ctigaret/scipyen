@@ -270,6 +270,7 @@ class DataViewer(ScipyenViewer):
         self.treeWidget.itemDoubleClicked[QtWidgets.QTreeWidgetItem, int].connect(self.slot_itemDoubleClicked)
         
         self.setCentralWidget(self.treeWidget)
+        self.treeWidget.update() # force drawing placeholder text ?!?
         
         self.toolBar = QtWidgets.QToolBar("Main", self)
         self.toolBar.setObjectName("%s_Main_Toolbar" % self.__class__.__name__)
@@ -282,6 +283,7 @@ class DataViewer(ScipyenViewer):
         
         expandAllAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("expand-all"), "Expand All")
         expandAllAction.triggered.connect(self.slot_expandAll)
+        
         
         # increaseWidgetHeight
         

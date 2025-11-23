@@ -1,3 +1,13 @@
+# -*- coding: utf-8 -*-
+# $Id: tableeditorwidget.py $
+# SPDX-FileCopyrightText: 2023 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
+r"""Table Editor widget and custom table model, for tabular-like data
+"""
+
+
 #### BEGIN core python modules
 from __future__ import print_function
 
@@ -71,6 +81,7 @@ from core import scipyen_quantities as scq
 from gui.scipyenviewer import ScipyenViewer #, ScipyenFrameViewer
 from gui import quickdialog
 from gui.delegates import PythonItemDelegate
+from gui.widgets.tabledataview import TableDataView
 # from gui import resources_rc
 # from gui import icons_rc
 #### END pict.gui modules
@@ -146,6 +157,8 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         
         if hasattr(self._dataModel_, "sig_modelDataChanged") and isinstance(type(self._dataModel_).sig_modelDataChanged, Signal):
             self._dataModel_.sig_modelDataChanged.connect(self.sig_dataChanged) # connect signal to signal directly
+            
+        # self.setData(None)
         
     def setData(self, data:(pd.DataFrame, pd.Series, neo.core.baseneo.BaseNeo,
                        neo.AnalogSignal, neo.IrregularlySampledSignal,
