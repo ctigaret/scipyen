@@ -100,7 +100,6 @@ from gui.pictgui import WorkerThread
 NOTMEMOIZED = (tuple, type(None), type(MISSING), type(pd.NA), type, np.ndarray)
 PODS = (bool, int, float, bytes, bytearray, str)
 
-# class InteractiveTreeWidget(DataTreeWidget):
 class InteractiveTreeWidget(QtWidgets.QTreeWidget):
     r"""QTreeWidget that enables:
     
