@@ -151,7 +151,6 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
             # FIXME: 2025-11-23 10:23:31 is this too time-consuming?
             self.tableView.setItemDelegate(self._editItemDelegate_)
         
-        
         self._data_ = None
         
         self._slicingAxis_ = None
