@@ -3468,6 +3468,12 @@ def summarize_object_properties(objname:str, obj:typing.Any, namespace="Internal
             memsz = str(getsizeof(obj))
             memsztip = "memory size: "
             
+        elif isinstance(obj, NeoObjectList):
+            sz = str(len(obj))
+            sizetip = "length: "
+            memsz    = str(getsizeof(obj))
+            memsztip = "memory size: "
+            
         elif isinstance(obj, (str, bytes, bytearray)):
             sz = str(len(obj))
             sizetip = "size: "

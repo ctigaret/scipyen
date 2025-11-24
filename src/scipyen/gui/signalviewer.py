@@ -255,7 +255,7 @@ from gui.scipyenviewer import (ScipyenViewer, ScipyenFrameViewer,Bunch)
 from gui.dataviewer import (InteractiveTreeWidget, DataViewer,)
 from gui.cursors import (DataCursor, SignalCursor, SignalCursorTypes, cursors2epoch)
 from gui.widgets.colorwidgets import ColorSelectionWidget, quickColorDialog
-from gui.pictgui import GuiWorker
+from gui.pictgui import (GuiWorker, WorkerThread)
 from gui.itemslistdialog import ItemsListDialog
 from gui import guiutils # should also register the new symbols
 
@@ -7610,14 +7610,15 @@ anything else       anything else       ❌
             
         
         uiParamsPrompt = kwargs.pop("uiParamsPrompt", False) # ?!?
-        
         if uiParamsPrompt:
             # TODO 2023-01-18 08:48:13 - finalize self._ui_getViewParams
             # this is to open up dialog for parameters
             pass
             # print(f"{self.__class__.__name__}.setData uiParamsPrompt")
             
-        self._set_data_(x,y, 
+        self._grab_focus_ = get_focus
+        
+        worker = WorkerThread(self, self._set_data_, x,y, 
                         doc_title = doc_title,
                         frameAxis = frameAxis, 
                         signalChannelAxis = signalChannelAxis,
@@ -7634,12 +7635,14 @@ anything else       anything else       ❌
                         plotStyle = plotStyle,
                         showFrame = showFrame,
                         **kwargs)
+        worker.signals.signal_Finished.connect(self._slot_set_data_finished)
+        worker.run()
         
-        if not self.isVisible():
-            self.setVisible(True)
-            
-        if get_focus:
-            self.activateWindow()
+#         if not self.isVisible():
+#             self.setVisible(True)
+#             
+#         if get_focus:
+#             self.activateWindow()
             
     def _ui_getViewParams(self, doc_title, frameAxis, signalChannelAxis,
                           frameIndex, signalIndex, signalChannelIndex,
@@ -11084,21 +11087,6 @@ anything else       anything else       ❌
             self.removeTargetsOverlay(ax)
             ax.clear()
             ax.setVisible(False)
-            
-
-    def setTitlePrefix(self, value):
-        r"""Sets the window-specific prefix of the window title
-        """
-        if isinstance(value, str) and len(value.strip()) > 0:
-            self._winTitle_ = value
-        else:
-            self._winTitle_ = "SignalViewer%d" % self._ID_
-
-        if isinstance(self._docTitle_, str) and len(self._docTitle_.strip()) > 0:
-            self.setWindowTitle("%s - %s" % (self._winTitle_, self._docTitle_))
-        else:
-            self.setWindowTitle(self._winTitle_)
-    
             
     @property
     def cursors(self):

@@ -1539,7 +1539,20 @@ class NeoSpikeTrainListTrait(NeoBaseNeoTrait):
                 result = len(old_value.all_channel_ids) == len(new_value.all_channel_ids)
                     
             if result:
-                result = old_value.all_channel_ids == new_value.all_channel_ids and old_value.t_start == new_value.t_start and old_value.t_stop == new_value.t_stop
+                result = old_value.all_channel_ids == new_value.all_channel_ids
+                
+            if all(len(v) > 0 for v in (old_value, new_value)):
+                if result:
+                    if all(hasattr(v, "t_start") for v in (old_value,  new_value)):
+                        result = result and old_value.t_start == new_value.t_start 
+                    elif any(hasattr(v, "t_start") for v in (old_value,  new_value)):
+                        result = False
+                        
+                if result:
+                    if all(hasattr(v, "t_stop") for v in (old_value,  new_value)):
+                        result = result and old_value.t_stop == new_value.t_stop 
+                    elif any(hasattr(v, "t_stop") for v in (old_value,  new_value)):
+                        result = False
                     
         except:
             traceback.print_exc()

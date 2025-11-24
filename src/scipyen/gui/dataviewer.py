@@ -361,6 +361,7 @@ class DataViewer(ScipyenViewer):
                 self._cache_index_ = len(self._obj_cache_) - 1
             obj, name = self._obj_cache_[self._cache_index_]
             # print(f"{self.__class__.__name__}._populate_tree_widget_: obj: {type(obj)}, name: {name}")
+            self.update_title(doc_title = name, win_title=self._winTitle_)
             what = {"data": obj, "predicate": self.predicate, "top_title": name,
                     "showPrivate": self._showPrivateMembers_,
                     "dataTypeStr": type(obj).__name__}
@@ -370,10 +371,11 @@ class DataViewer(ScipyenViewer):
             #                         showPrivate = self._showPrivateMembers_,
             #                         top_title = name, 
             #                         dataTypeStr=type(obj).__name__)
-            self.docTitle = name
+            # self.docTitle = name
             
     @Slot()
     def _slot_treeWidgetPopulated(self):
+        self._slot_update_title()
         for k in range(self.treeWidget.topLevelItemCount()):
             self._collapse_expand_Recursive(self.treeWidget.topLevelItem(k), current=False)
 
@@ -407,14 +409,20 @@ class DataViewer(ScipyenViewer):
         self.goNext.setEnabled(self._cache_index_ < len(self._obj_cache_)-1)
         self.goBack.setEnabled(self._cache_index_ > 0)
             
-        self._populate_tree_widget_()
+        worker = WorkerThread(self, self._populate_tree_widget_)
+        worker.signals.signal_Finished.connect(self._slot_treeWidgetPopulated)
+        worker.run()
+        # self._populate_tree_widget_()
         
     @Slot()
     def slot_goFirst(self):
         self._cache_index_ = 0
         self.goNext.setEnabled(self._cache_index_ < len(self._obj_cache_)-1)
         self.goBack.setEnabled(self._cache_index_ > 0)
-        self._populate_tree_widget_()
+        worker = WorkerThread(self, self._populate_tree_widget_)
+        worker.signals.signal_Finished.connect(self._slot_treeWidgetPopulated)
+        worker.run()
+        # self._populate_tree_widget_()
         
     @Slot()
     def slot_goNext(self):
@@ -424,7 +432,10 @@ class DataViewer(ScipyenViewer):
             
         self.goNext.setEnabled(self._cache_index_ < len(self._obj_cache_)-1)   
         self.goBack.setEnabled(self._cache_index_ >0)
-        self._populate_tree_widget_()
+        worker = WorkerThread(self, self._populate_tree_widget_)
+        worker.signals.signal_Finished.connect(self._slot_treeWidgetPopulated)
+        worker.run()
+        # self._populate_tree_widget_()
         
     @Slot(QtCore.QPoint)
     @safewrapper
