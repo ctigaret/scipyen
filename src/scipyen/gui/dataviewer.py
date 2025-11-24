@@ -135,6 +135,7 @@ class DataViewer(ScipyenViewer):
     sig_activated = Signal(int)
     closeMe  = Signal(int)
     signal_window_will_close = Signal()
+    _sig_setTreeWidgetData_ = Signal(dict, name="_sig_setTreeWidgetData_")
     
     # NOTE: 2022-11-20 22:09:07
     # reserved for future developmet of editing capabilities TODO
@@ -250,7 +251,6 @@ class DataViewer(ScipyenViewer):
         
         self._obj_to_view_ = (dataclasses.MISSING, "")
         
-
         super().__init__(data=data, parent=parent, win_title=win_title, doc_title = doc_title, ID=ID, *args, **kwargs)
         
     def _configureUI_(self):
@@ -271,7 +271,8 @@ class DataViewer(ScipyenViewer):
         self.treeWidget.itemDoubleClicked[QtWidgets.QTreeWidgetItem, int].connect(self.slot_itemDoubleClicked)
         
         self.setCentralWidget(self.treeWidget)
-        self.treeWidget.update() # force drawing placeholder text ?!?
+        self._sig_setTreeWidgetData_.connect(self.treeWidget.slot_setData)
+        # self.treeWidget.update() # force drawing placeholder text ?!?
         
         self.toolBar = QtWidgets.QToolBar("Main", self)
         self.toolBar.setObjectName("%s_Main_Toolbar" % self.__class__.__name__)
@@ -284,7 +285,6 @@ class DataViewer(ScipyenViewer):
         
         expandAllAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("expand-all"), "Expand All")
         expandAllAction.triggered.connect(self.slot_expandAll)
-        
         
         # increaseWidgetHeight
         
@@ -329,14 +329,27 @@ class DataViewer(ScipyenViewer):
                 
             self.goNext.setEnabled(len(self._obj_cache_) > 1 and self._cache_index_ < len(self._obj_cache_)-1)
             
+            # NOTE: 2025-11-24 16:46:10
+            # ### BEGIN DECIDE on
+            #
+            
+            #
+            # Either this:
+            #
             # self._populate_tree_widget_()
+            # self._slot_treeWidgetPopulated()
+            
+            #
+            # OR this:
+            #
+            
             worker = WorkerThread(self, self._populate_tree_widget_)
             worker.signals.signal_Finished.connect(self._slot_treeWidgetPopulated)
             worker.run()
             
-            # for k in range(self.treeWidget.topLevelItemCount()):
-            #     self._collapse_expand_Recursive(self.treeWidget.topLevelItem(k), current=False)
-                
+            #
+            # ### END   DECIDE on
+            
         if kwargs.get("show", True):
             self.activateWindow()
             
@@ -348,20 +361,21 @@ class DataViewer(ScipyenViewer):
                 self._cache_index_ = len(self._obj_cache_) - 1
             obj, name = self._obj_cache_[self._cache_index_]
             # print(f"{self.__class__.__name__}._populate_tree_widget_: obj: {type(obj)}, name: {name}")
-            self.treeWidget.setData(obj, 
-                                    predicate = self.predicate, 
-                                    showPrivate = self._showPrivateMembers_,
-                                    top_title = name, 
-                                    dataTypeStr=type(obj).__name__)#, 
+            what = {"data": obj, "predicate": self.predicate, "top_title": name,
+                    "showPrivate": self._showPrivateMembers_,
+                    "dataTypeStr": type(obj).__name__}
+            self._sig_setTreeWidgetData_.emit(what)
+            # self.treeWidget.setData(obj, 
+            #                         predicate = self.predicate, 
+            #                         showPrivate = self._showPrivateMembers_,
+            #                         top_title = name, 
+            #                         dataTypeStr=type(obj).__name__)
             self.docTitle = name
             
     @Slot()
     def _slot_treeWidgetPopulated(self):
-        # self.docTitle = name
-        
         for k in range(self.treeWidget.topLevelItemCount()):
             self._collapse_expand_Recursive(self.treeWidget.topLevelItem(k), current=False)
-        
 
     @Slot()
     @safewrapper

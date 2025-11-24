@@ -3446,7 +3446,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 wt = win_title[0].lower()
                 if len(win_title) > 1:
                     wt += win_title[1:]
-                win_title = wt
+                win_title = wt # + f": {win_title}"
 
             # print(f"{self.__class__.__name__}.newViewer for win_title = {win_title}")
             
@@ -3479,7 +3479,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             workspace_win_varname = workspace_win_varname[0].lower()+workspace_win_varname[1:]
             
             win.ID = counter_suffix
-            win.winTitle = workspace_win_varname
+            # win.winTitle = workspace_win_varname
+            win.winTitle = workspace_win_varname + f": {winClass.__name__}"
+            
 
         self.registerWindow(win)  # required !
         self.workspaceModel.bindObjectInNamespace(workspace_win_varname, win)

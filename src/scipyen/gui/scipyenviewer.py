@@ -10,6 +10,7 @@ import typing, warnings, inspect, sys, platform, os
 from dataclasses import MISSING
 from abc import (ABC, ABCMeta, abstractmethod,)
 from traitlets import Bunch
+import functools
 #from abc import (abstractmethod,)
 import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, QtDBus)
@@ -52,6 +53,7 @@ from core.utilities import safewrapper
 from gui.workspacegui import (WorkspaceGuiMixin, saveWindowSettings, loadWindowSettings)
 from gui.widgets.spinboxslider import SpinBoxSlider
 from gui.workspacemodel import WorkspaceModel
+from gui.pictgui import WorkerThread
 from core import sysutils, desktoputils
 from iolib import pictio as pio
 from pandas import NA
@@ -236,8 +238,12 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         elif sys.platform.startswith("linux") and os.getenv("XDG_SESSION_TYPE").lower() == "wayland":
             parent = None
             
+        self._ready_:bool = False
+        self._grab_focus_:bool = False
+            
         super().__init__(parent)
         WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs)
+        self.setAttribute(QtCore.Qt.WA_TranslucentBackground, False);
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose, on=False)
         self._docTitle_ = doc_title
         self._winTitle_ = win_title # force auto-set in update_title()
@@ -312,6 +318,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         else:
             self._ID_  = int(self.winId()) # this is the wm ID of the window
             
+        self.update()
         # NOTE: 2021-09-16 12:26:09
         # This SHOULD be implemented in the derived class
         self._configureUI_()
@@ -328,10 +335,13 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             # NOTE: 2022-01-17 12:39:49 this will call _set_data_
             # subclasses can override this by implementing their own setData()
             # see e.g., SignalViewer
+            # fn = functools.partialmethod(self.setData, data = data, doc_title = doc_title)
+            # QtCore.QTimer.singleShot(500, fn)
             self.setData(data = data, doc_title = doc_title)
             
         else:
             self.update_title(win_title = win_title, doc_title = doc_title)
+            self._slot_update_title()
             
         # NOTE: 2023-01-08 21:21:20
         # int(winId()) is the same for QMainWindow, QWindow, AND
@@ -506,11 +516,11 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         elif len(self._winTitle_.strip()) == 0:
             self._winTitle_ = self.scipyenWindow.applicationName
             
-        if isinstance(self._docTitle_, str) and len(self._docTitle_.strip()):
-            self.setWindowTitle("%s - %s" % (self._docTitle_, self._winTitle_))
-            
-        else:
-            self.setWindowTitle(self._winTitle_)
+#         if isinstance(self._docTitle_, str) and len(self._docTitle_.strip()):
+#             self.setWindowTitle("%s - %s" % (self._docTitle_, self._winTitle_))
+#             
+#         else:
+#             self.setWindowTitle(self._winTitle_)
             
     @abstractmethod
     def setDataDisplayEnabled(self, value):
@@ -561,7 +571,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             return all(__check_val_type_is_supported__(v) for v in value)
         else:
             return __check_val_type_is_supported__(value)
-        
+    
     def setData(self, *args, **kwargs):
         r"""Generic function to set the data to be displayed by this viewer.
         
@@ -627,6 +637,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
                     raise TypeError("Expecting one of the supported types: %s" % " ".join([s.__name__ for s in self.viewer_for_types]))
             
         get_focus = kwargs.get("get_focus", False)
+        self._grab_focus_ = get_focus
         
         doc_title = kwargs.get("doc_title", None)
         
@@ -641,16 +652,52 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         self.update_title(doc_title = doc_title, win_title=self._winTitle_)
         
         # print(f"ScipyenViewer<{self.__class__.__name__}>.setData")
-        
-        self._set_data_(*args, **kwargs)
+        worker = WorkerThread(self, self._set_data_, *args, **kwargs)
+        worker.signals.signal_Finished.connect(self._slot_set_data_finished)
+        worker.run()
+        # self._set_data_(*args, **kwargs)
         
         #print(f"In ScipyenViewer<{self.__class__.__name__}>.setData(): is visible: {self.isVisible()}")
         
+#         if not self.isVisible():
+#             self.setVisible(True)
+#         
+#         if get_focus:
+#             self.activateWindow()
+            
+    @Slot()
+    def _slot_set_data_finished(self):
+        self._slot_update_title()
+        self._ready_ = True
         if not self.isVisible():
             self.setVisible(True)
         
-        if get_focus:
+        if self._grab_focus_:
             self.activateWindow()
+            
+    @Slot()
+    def _slot_update_title(self):
+        if isinstance(self._docTitle_, str) and len(self._docTitle_.strip()):
+            self.setWindowTitle("%s - %s" % (self._docTitle_, self._winTitle_))
+            
+        else:
+            self.setWindowTitle(self._winTitle_)
+        
+        
+    def paintEvent(self, event:QtGui.QPaintEvent):
+        super().paintEvent(event)
+        if self._ready_:
+            return
+        painter = QtGui.QPainter(self)
+        painter.save()
+        col = self.palette().placeholderText().color()
+        painter.setPen(col)
+        fm = self.fontMetrics()
+        elided_text = fm.elidedText(
+            "No data", QtCore.Qt.ElideRight, self.width()
+        )
+        painter.drawText(self.rect(), QtCore.Qt.AlignCenter, elided_text)
+        painter.restore()
         
     @abstractmethod
     def _set_data_(self, data: object, *args, **kwargs):
@@ -717,6 +764,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             raise TypeError("Expecting a str, or None; got %s instead" % type(value.__name__))
         
         self.update_title(win_title = value, enforce=True)
+        self._slot_update_title()
         
             
     @property

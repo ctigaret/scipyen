@@ -135,6 +135,8 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         """
         parent =  kwargs.pop("parent", None)
         super().__init__(parent=parent)
+        self._ready_:bool = False
+
         self._use_TableEditor_ = kwargs.pop("useTableEditor", False)
         self._supported_data_types_ = kwargs.pop("supported_data_types", tuple())
         if not isinstance(self._supported_data_types_, tuple) or not all(isinstance(v, type) for v in self._supported_data_types_):
@@ -186,6 +188,8 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                     else:
                         self._scipyenWindow_ = f[0].f_globals["ScipyenWindow"].instance()
                     break
+                
+        self.update()
         
     def _makeTableWidget_(self, data):
         if self._use_TableEditor_:
@@ -213,10 +217,10 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         
         return widget
     
-    def paintEvent(self, event):
+    def paintEvent(self, event:QtGui.QPaintEvent):
         r"""Paints a placeholder text when there is no data"""
         super().paintEvent(event)
-        if self.model() is not None and self.model().rowCount() > 0:
+        if self._ready_ and self.model() is not None and self.model().rowCount() > 0:
             return
         painter = QtGui.QPainter(self.viewport())
         painter.save()
@@ -268,6 +272,8 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         
         self.topLevelItem(0).setText(0, self.top_title)
         
+        self._ready_ = True
+        
         # print(f"{self.__class__.__name__}<{self.parent().windowTitle()}, {self.parent().parent().windowTitle()}> last item {self._last_active_item_} column {self._last_active_item_column_}")
         if isinstance(self._last_active_item_, str) and len(self._last_active_item_.strip()) and \
             self._last_active_item_column_ < self.columnCount():
@@ -308,6 +314,19 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         if isinstance(types, tuple) and len(types):
             self._supported_data_types_ = types
             
+    @Slot(dict)
+    def slot_setData(self, what:dict):
+        data = what.get("data", None)
+        predicate = what.get("predicate", None)
+        showPrivate = what.get("showPrivate", None)
+        top_title = what.get("top_title", "")
+        dataTypeStr = what.get("dataTypeStr", None)
+        hideRoot = what.get("hideRoot", False)
+        
+        self.setData(data, predicate=predicate, showPrivate=showPrivate,
+                     top_title=top_title, dataTypeStr=dataTypeStr,
+                     hideRoot=hideRoot)
+            
     def setData(self, data, predicate=None, showPrivate:bool=False,
                 top_title:str = "", dataTypeStr = None, hideRoot=False):
         r"""data should be a dictionary."""
@@ -335,10 +354,29 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         # self.widgets = []
         self.nodes = {}
         
+        # NOTE: 2025-11-24 16:46:02
+        # ### BEGIN  DECIDE on one:
+        #
+        # Either this:
+        #
+#         self.buildTree(self._private_data_, self.invisibleRootItem(), 
+#                        keyType=str,typeStr=dataTypeStr, predicate=predicate,
+#                        hideRoot=hideRoot)
+#         
+#         self.topLevelItem(0).setText(0, self.top_title)
+        # self._slot_treeBuilt()
+        
+        #
+        # OR this:
+        #
+        
         worker = WorkerThread(self, self.buildTree, self._private_data_, self.invisibleRootItem(),
                               keyType = str, typeStr = dataTypeStr, predicate=predicate, hideRoot=hideRoot)
         worker.signals.signal_Finished.connect(self._slot_treeBuilt)
         worker.run()
+        
+        #
+        # ### END    DECIDE on one:
         
     def _parse_dataclass(self, data) -> tuple:
         datafields = dataclasses.fields(data)
