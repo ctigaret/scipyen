@@ -975,7 +975,7 @@ def categorize_data_frame_columns(data:pd.DataFrame, *column_names, inplace:bool
         return ret
     
    
-def inspect_members(obj:typing.Any, predicatetyping.Optional[typing.Callable] = None) -> dict:
+def inspect_members(obj:typing.Any, predicate:typing.Optional[typing.Callable] = None) -> dict:
     skips = ("__class__", "__module__", "__name__", "__qualname__", "__func__",
              "__self__", "__code__", "__defaults__", "__kwdefaults__", 
              "__globals__", "__builtins__", "__annotations__", "__doc__",

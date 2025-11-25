@@ -808,15 +808,15 @@ def fit_CB_wave(data, wave):
     
     result = dict()
     result["ModelFunction"] = None
-    result["Fit"] = scipy.optimize.OptimizeResult()()
+    result["Fit"] = optimize.OptimizeResult()()
     result["Coefficients"] = types.SimpleNamespace({"Names": list(), 
-                                                    "Initial": types.SimpleNamespace({"values": list(), "bounds": scipy.optimize.bounds()}),
+                                                    "Initial": types.SimpleNamespace({"values": list(), "bounds": optimize.bounds()}),
                                                     "Fitted": list(),
                                                     "GoF": types.SimpleNamespace({"Rsq": rsq, "R2adj":rsq, "SSE": sse, "RMSE": rmse})})
     return None, types.SimpleNamespace(result)
     
     
-def scale_fit_wave(x, y, p0 = 1, method="nelder-mead") -> scipy.optimize.OptimizeResult:
+def scale_fit_wave(x, y, p0 = 1, method="nelder-mead") -> optimize.OptimizeResult:
     r""" Finds a scale factor of y such that it matches x.
     
     The objective function being minimized is the scalar product x - p0 * y
@@ -866,7 +866,7 @@ def scale_fit_wave(x, y, p0 = 1, method="nelder-mead") -> scipy.optimize.Optimiz
     
     return res
 
-def scale_fit_wave2(x, y, p0 = (1,0))  -> scipy.optimize.OptimizeResult:
+def scale_fit_wave2(x, y, p0 = (1,0))  -> optimize.OptimizeResult:
     r"""Two-params version """
     def __wave_fun__(x_, y_, a, b):
         y = a - x_*b+y_
