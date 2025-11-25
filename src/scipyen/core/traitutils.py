@@ -85,6 +85,14 @@ from core.scipyen_quantities import unitsConvertible
 from core.utilities import gethash, safe_identity_test
 from .prog import (timefunc, processtimefunc, brief_repr, print_styled)
 
+# NOTE: ObjectList in recent neo versions: SpikeTrainList, Block.segments
+if neo.__version__ >= '0.13.0':
+    from neo.core.objectlist import ObjectList as NeoObjectList
+    
+else:
+    NeoObjectList = list # alias for backward compatibility :(
+
+
 # NOTE :2021-08-20 09:50:52
 # to figure out traitlets classes use the following idioms:
 #
@@ -459,7 +467,15 @@ def dynamic_trait(x, *args, **kwargs):
     if traitlet_class_name[0].islower():
         traitlet_class_name = traitlet_class_name.capitalize()
         
-    traitlet_class_name = f"{traitlet_class_name}Trait"
+    # NOTE: 2025-11-25 20:11:27
+    # avoid confusion of NeoObjectList with List, for older neo versions 😦
+    if myclass == NeoObjectList:
+        if issubclass(myclass, list):
+            traitlet_class_name = "ListTrait"
+        else:
+            traitlet_class_name = "NeoDataObjectTrait"
+    else:
+        traitlet_class_name = f"{traitlet_class_name}Trait"
     
     traitlet_class = sct.__dict__.get(traitlet_class_name, None)
     
