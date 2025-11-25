@@ -7,7 +7,13 @@ r"""
 Wrappers around scipy.optimize
 
 FIXME/TODO: 2022-10-25 23:57:08
-Harmonize the API (this is the role of the upcoming modelfitting.py module)
+Harmonize the API (prepare to migrate to the upcoming modelfitting.py module)
+In particular:
+• Harmonize between using single parameter list vs packed parameters tuple (*args) in
+    model functions ✓ (in models module, 2025-11-25 22:58:05)
+• Harmonize the return from various fit_* functions, to return a tuple:
+    fitted_curve and fit result (types.SimpleNamespace) as the fit_model(…) function does
+    (in progress, 2025-11-25 22:58:09)
 """
 
 #### BEGIN core python modules
@@ -44,6 +50,8 @@ def fitGauss1DSum(x, y, locations, **kwargs):
     """
     from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
     #from . import datatypes  
+    
+    model_func = models.gaussianSum1D
     
     if not isinstance(locations, (tuple, list, np.ndarray, numbers.Real)):
         raise TypeError("Locations expected to be a sequence of floats or a scalar")
@@ -137,15 +145,9 @@ def fitGauss1DSum(x, y, locations, **kwargs):
         
     params.append(offset)
     
-    #def __model_func__(x_, y_, *params):
-        #return models.gaussianSum1D(x_, y_, *params)
+    popt, pcov = optimize.curve_fit(model_func, xx, yy, params, bounds = (0, np.inf))
     
-    #popt, pcov = optimize.curve_fit(__model_func__, xx, yy, params)
-    popt, pcov = optimize.curve_fit(models.gaussianSum1D, xx, yy, params, bounds = (0, np.inf))
-    
-    #yfit = model_func(np.linspace(np.min(xx), np.max(xx), xx.shape[0], endpoint=False), *popt)
-    #yfit = __model_func__(xx, *popt)
-    yfit = models.gaussianSum1D(xx, *popt)
+    yfit = model_func(xx, *popt)
     
     return popt, pcov, yfit
     
@@ -513,7 +515,7 @@ def fit_compound_exp_rise_multi_decay(data, p0, bounds=(-np.inf, np.inf), method
     
     return fittedCurve, fittedComponentCurves, result
 
-def fit_Event_model(data, p0, **kwargs):
+def fit_CB_model(data, p0, **kwargs):
     r"""Fits a Clements & Bekkers '97 waveform through the data.
     
     Parameters:
@@ -557,10 +559,7 @@ def fit_Event_model(data, p0, **kwargs):
     ========
     fittedCurve: numpy array
     
-    result: dict with the mapping:
-        "Fit"           → the result of scipy.optimize.least_squares
-        "Coefficients"  → the fitted parameters for the Clements & Bekkers '97 model
-        "Rsq"           → the R² of the fit (goodness of fit)
+    result:  A SimpleNamespace with structure similar to that returned by fit_model
     
     
     """
@@ -568,6 +567,8 @@ def fit_Event_model(data, p0, **kwargs):
     # allow lower/upper bounds individually for each parameter
     from core import datatypes
     from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
+    
+    model_func = models.Clements_Bekkers_97
     
     jac         = kwargs.pop("jac",         "2-point")
     bounds      = kwargs.pop("bounds",      (-np.inf, np.inf))
@@ -602,7 +603,7 @@ def fit_Event_model(data, p0, **kwargs):
             t: independent variable
             y: the data (dependent variable)
         """
-        yf = models.Clements_Bekkers_97(t, x)
+        yf = model_func(t, x)
         
         ret = y-yf
         
@@ -715,14 +716,15 @@ def fit_Event_model(data, p0, **kwargs):
         raise ValueError(f"Incorrect upper bounds specified {u0}")
     
     
-    bnds = (lo, up)
+    # bnds = (lo, up)
+    bnds = optimize.Bounds(lo, up, keep_feasible = [True] * len(lo))
     
     # NOTE: 2022-10-30 14:39:57
     # solve a non-linear least-squares problem with bounds on the variables
     # x0 is the initial "guess" (initial values for model parameters, a.k.a the 
     # independent variables)
     res = optimize.least_squares(__cost_fun__, x0, args=(xdata, ydata), jac=jac,
-                                 bounds = bounds, method=method, loss=loss,
+                                 bounds = bnds, method=method, loss=loss,
                                  ftol=ftol, xtol=xtol, gtol=gtol, x_scale=x_scale,
                                  f_scale=f_scale, max_nfev=max_nfev, 
                                  diff_step=diff_step, tr_solver=tr_solver,
@@ -732,7 +734,7 @@ def fit_Event_model(data, p0, **kwargs):
     res_x = list(res.x.flatten())
     
     # create fitted curve
-    fC = models.Clements_Bekkers_97(xdata, res_x)
+    fC = model_func(xdata, res_x)
     
     sst = np.sum( (ydata - ydata.mean()) ** 2.)
     
@@ -741,6 +743,9 @@ def fit_Event_model(data, p0, **kwargs):
     # R² for the entire fit
     rsq = 1 - sse/sst # only one R²
     
+    df_res = fC.size - len(x0)
+    df_tot = fC.size - 1
+    
     # reconstruct final fitted curve (REMEMBER: we have taken out the NaNs!)
     initialSupport = np.full((data.shape[0],), np.nan)
     
@@ -748,22 +753,34 @@ def fit_Event_model(data, p0, **kwargs):
     
     fittedCurve[realDataNdx] = fC
     
-    result = dict()
-    result["Fit"] = res
-    result["Coefficients"] = res_x
-    result["Rsq"] = rsq
-    # result["amplitude"] = sigp.waveform_amplitude(fittedCurve)
-    # result["Accept"] = True # leave this here — I may use it at some point if I decide to implement further checks
+    coeff_names = models.model_parameters(model_func)
     
-    return fittedCurve, result
+    coefficients = types.SimpleNamespace({"Names": coeff_names,
+                                          "Initial": types.SimpleNamespace({"values": x0, "bounds": bnds}),
+                                          "Fitted": res_x,
+                                          "GoF": types.SimpleNamespace({"Rsq": rsq, "R2adj": arsq, "SSE": sse, "RMSE": rmse})})
+    result = dict()
+    result["ModelFunction"] = f"{model_func.__module__}.{model_func.__name__}"
+    result["Fit"] = res
+    result["Coefficients"] = coefficients
+    result["amplitude"] = sigp.waveform_amplitude(fittedCurve)
+    result["Accept"] = True # leave this here — I may use it at some point if I decide to implement further checks
+    
+    return fittedCurve, types.SimpleNamespace(result)
 
-def fit_Event_wave(data, wave):
+def fit_CB_wave(data, wave):
     r"""R² between data and a template waveform
     
     Not a curve fit but a measure of how well the data is matched by the waveform
     template - used when detecting mEPSCs using a template waveform (rather than
                 a synthetic mEPSC which is a realization of the Clements & Bekkers '97
                 waveform)
+        
+    Returns:
+    =======
+        A tuple (None, types.SimpleNamespace) where the SimpleNamespace has a
+        structure similar to that returned by fit_model
+        
     """
     
     if not isinstance(data, (neo.AnalogSignal, DataSignal)):
@@ -786,15 +803,20 @@ def fit_Event_wave(data, wave):
     
     sse = np.sum((wave.magnitude.flatten() - data.magnitude.flatten()) ** 2.)
     
+    rsq = 1 - sse/sst
+    rmse = np.sqrt(sse/wave.size)
+    
     result = dict()
-    result["Fit"] = tuple()
-    result["Coefficients"] = list()
-    result["Rsq"] = 1 - sse/sst
+    result["ModelFunction"] = None
+    result["Fit"] = scipy.optimize.OptimizeResult()()
+    result["Coefficients"] = types.SimpleNamespace({"Names": list(), 
+                                                    "Initial": types.SimpleNamespace({"values": list(), "bounds": scipy.optimize.bounds()}),
+                                                    "Fitted": list(),
+                                                    "GoF": types.SimpleNamespace({"Rsq": rsq, "R2adj":rsq, "SSE": sse, "RMSE": rmse})})
+    return None, types.SimpleNamespace(result)
     
-    return 1 - sse/sst
     
-    
-def scale_fit_wave(x, y, p0 = 1, method="nelder-mead"):
+def scale_fit_wave(x, y, p0 = 1, method="nelder-mead") -> scipy.optimize.OptimizeResult:
     r""" Finds a scale factor of y such that it matches x.
     
     The objective function being minimized is the scalar product x - p0 * y
@@ -844,7 +866,7 @@ def scale_fit_wave(x, y, p0 = 1, method="nelder-mead"):
     
     return res
 
-def scale_fit_wave2(x, y, p0 = (1,0)):
+def scale_fit_wave2(x, y, p0 = (1,0))  -> scipy.optimize.OptimizeResult:
     r"""Two-params version """
     def __wave_fun__(x_, y_, a, b):
         y = a - x_*b+y_
@@ -1161,15 +1183,24 @@ def fit_model(data, func, p0, *args, **kwargs):
     • fitted curve is the realization of the model in `func` using the fitted 
         parameters and the independent variable `x`
     
-    • the OrderedDict has the following keys:
+    • the types.SimpleNamespace contains the following fields:
     
-        Model           ↦ `func` module.name
-        Fit             ↦ the fit result output by scipy.optimize.least_squares
-        Coefficients    ↦ a tuple with fitted model parameter values
-        Rsq             ↦ R² correlation coefficient between the fitted curve 
-                         and the `data`
-    
-    
+        ModelFunction   ↦ str, `func` module.name
+        Fit             ↦ scipy.optimize.OptimizeResult, the fit result output 
+                            by scipy.optimize.least_squares
+        Coefficients    ↦ a types.SimpleNamespace, containing:
+                        "Names"     ↦ typing.Sequence[str], model coefficient (or parameter) names,
+                        "Initial"   ↦ types.SimpleNamespace with:
+                                        "values     ↦ typing.Sequence[float], initial coefficient values
+                                        "bounds"    ↦ scipy.optimize.Bounds object with "lo", "up", and "keep_feasible" fields
+                        "Fitted"    ↦ typing,Sequence[float], the fitted coefficient values
+                        "GoF"       ↦ types.SimpleNamespace with:
+                                        "Rsq"       ↦ float, the R²
+                                        "R2adj"     ↦ float, the adjusted R²
+                                        "SSE"       ↦ float, sum of squared errors between data and the fit
+                                        "RMSE"      ↦ float, root mean squared error between data and the fit
+
+
     """
     from dataclasses import MISSING # flag for badly-formed annotations
     
@@ -1296,7 +1327,11 @@ def fit_model(data, func, p0, *args, **kwargs):
                 coeff_names = coeff_names[0:len(p0)]
                 
     else:
-        coeff_names = [f"Coefficient {k}" for k in range(len(p0))]
+        try:
+            coeff_names = models.model_parameters(func)
+        except:
+            traceback.print_exc()
+            coeff_names = [f"Coefficient {k}" for k in range(len(p0))]
         
     # ### prepare constraints (bounds)
     lo = list()

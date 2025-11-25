@@ -8,7 +8,7 @@ r""" Steps towards a unified frameworks for model fitting.
 TODO/FIXME: This module is intended to supersede the models.py module (hopefully
 not before too long). For now, it is only EXPERIMENTAL and UNDER DEVELOPMENT
 
-DO NOT USE YET
+WARNING: DO NOT USE YET
 
 The intention is to use ModelExpression objects instead of the functions in 
 models.py. Until this is done, stick with models.py and curvefitting.py modules!

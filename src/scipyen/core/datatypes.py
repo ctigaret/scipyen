@@ -434,11 +434,11 @@ def sequence_element_type(s):
 
 
 def check_type(t:typing.Union[type, typing.Sequence[type], typing.Set[type]], 
-                     ref:typing.Union[type, typing.Sequence[type], typing.Set[type], typing._UnionGenericAlias],
-                     use_mro:bool=False,
-                     use_ref_mro:bool=False,
-                     check_elements:bool=False,
-                     check_keys:bool=False) -> bool:
+                ref:typing.Union[type, typing.Sequence[type], typing.Set[type], typing._UnionGenericAlias],
+                use_mro:bool=False,
+                use_ref_mro:bool=False,
+                check_elements:bool=False,
+                check_keys:bool=False) -> bool:
     r"""Checks a type in 't' against a reference type in 'ref'.
     
     't': a type, or a collection of types (i.e., tuple, list or set)
@@ -551,6 +551,119 @@ def check_type(t:typing.Union[type, typing.Sequence[type], typing.Set[type]],
     
     return len(t_set & ref_set) > 0 or any(issubclass(v, tuple(ref_set)) for v in t_set)
 
+def check_numpy_array(x:np.ndarray, /, dtype:typing.Optional[np.dtype] = None,
+                      dtype_comparison:str="eq",
+                      ndim:typing.Optional[int] = None, 
+                      ndim_comparison:str="eq",
+                      size:typing.Optional[int] = None, 
+                      size_comparison:str="eq",
+                      shape:typing.Optional[tuple] = None,
+                      quantity:bool=False,
+                      units:typing.Optional[pq.Quantity] = None,
+                      units_convertible:bool=False,
+                      ) -> bool:
+    r"""Atomic check for a numpy ndarray attributes.
+
+    Positional parameters:
+    ======================
+    x - the object to check
+    
+    Named parameters:
+    =================
+    dtype: optional, default is None; when given, x.dtype will be ckeched against
+        it using 'dtype_comparison'
+    dtype_comparison: default is "eq"; possible values are:
+        "eq", "==", "gt", ">", "ge", ">=", "lt", "<", "le" and "<="
+        anything else raises a ValueError
+    ndim: optional, default is None; when given, x.ndim will be ckeched against 
+        it using 'ndim_comparison'
+    ndim_comparison: default is "eq"; possible values are:
+        "eq", "==", "gt", ">", "ge", ">=", "lt", "<", "le" and "<="
+        anything else raises a ValueError
+    size: optional, default is None; when given, x.size will be ckeched against it using the 
+        size_comparison
+    size_comparison: default is "eq"; possible values are:
+        "eq", "==", "gt", ">", "ge", ">=", "lt", "<", "le" and "<="
+        anything else raises a ValueError
+    shape: optional, default is None; when given, x.shape will be check for 
+        equality to shape
+    quantity: optional default is False; when True, checks that 'x' is a Quantity
+        array (with any units)
+        NOTE: this parameter can be omitted when at least 'units' is passed with
+        a non-default value
+    units: optional, defaulkt is None; when given, checks that 'x' is a Quantity 
+        array with these units
+    units_convertible: optional default is False; when True, then if 'units' is
+        a pq.Quantity and x.units != units the array 'x' still checks True if 
+        x.units are convertible to 'units';
+    Returns:
+    ========
+    A bool
+"""
+    ret = isinstance(x, np.ndarray)
+    if isinstance(dtype, np.dtype) and ret:
+        if dtype_comparison in ("ge", ">="):
+            ret &= x.dtype >= dtype
+        elif dtype_comparison in ("gt", ">"):
+            ret &= x.dtype > dtype
+        elif dtype_comparison in ("le", "<="):
+            ret &= x.dtype <= dtype
+        elif dtype_comparison in ("lt", "<"):
+            ret &= x.dtype < dtype
+        elif dtype_comparison in ("eq", "=="):
+            ret &= x.dtype == dtype
+        else:
+            raise ValueError(f"'dtype_comparison' must be one of 'eq', '==', 'gt', '>', 'ge', '>=', 'lt' '<', 'le', '<='; instead got {dtype_comparison}")
+            
+    if ret and isinstance(ndim, int):
+        if ndim < 0:
+            raise ValueError(f"'ndim' must be >= 0; got {ndim} instead")
+        
+        if ndim_comparison in ("ge", ">="):
+            ret & x.ndim >= ndim
+        elif ndim_comparison in ("gt", ">"):
+            ret & x.ndim > ndim
+        elif ndim_comparison in ("le", "<="):
+            ret & x.ndim <= ndim
+        elif ndim_comparison in ("lt", "<"):
+            ret & x.ndim > ndim
+        elif ndim_comparison in ("eq", "=="):
+            ret & x.ndim == ndim
+        else:
+            raise ValueError(f"'ndim_comparison' must be one of 'eq', '==', 'gt', '>', 'ge', '>=', 'lt' '<', 'le', '<='; instead got {ndim_comparison}")
+            
+    if ret and isinstance(size, int):
+        if size < 0:
+            raise ValueError(f"'size' must be >= 0; got {size} instead")
+        if size_comparison in ("ge", ">="):
+            ret & x.size >= size
+        elif size_comparison in ("gt", ">"):
+            ret & x.size > size
+        elif size_comparison in ("le", "<="):
+            ret & x.size <= size
+        elif size_comparison in ("lt", "<"):
+            ret & x.size > size
+        elif size_comparison in ("eq", "=="):
+            ret & x.size == size
+        else:
+            raise ValueError(f"'size_comparison' must be one of 'eq', '==', 'gt', '>', 'ge', '>=', 'lt' '<', 'le', '<='; instead got {size_comparison}")
+            
+    if ret and isinstance(shape, tuple):
+        ret &= x.shape == shape
+        
+    if ret and quantity:
+        ret &= isinstance(x, pq.Quantity)
+        
+    if ret and isinstance(units, pq.Quantity):
+        ret &= isinstance(x, pq.Quantity)
+        if ret:
+            ok = x.units == units
+            if not ok and units_convertible:
+                ok = scq.units_convertible(x.units, units)
+            ret &= ok
+        
+    return ret
+
 def enum2str(etype:Enum) -> str:
     r"""Returns the symbol (NOT the value) of the enum type"""
     enumItems = list(filter(lambda x: x[1] == etype, 
@@ -615,7 +728,7 @@ def type2str(t:type) -> str:
     
     return t.__name__
     
-def array_slice(data:np.ndarray, slicing:(dict, type(None))):
+def array_slice(data:np.ndarray, slicing:(dict, type(None))) -> tuple:
     r"""Dynamic slicing of nD arrays and introducing new axis in the array.
     
     Parameters:
@@ -768,13 +881,13 @@ def array_slice(data:np.ndarray, slicing:(dict, type(None))):
     
     return tuple(indexobj)
 
-def is_unavailable(x):
+def is_unavailable(x:typing.Any) -> bool:
     return x is pd.NA or x is np.nan or x is math.nan or x is dataclasses.MISSING
     
-def is_dotted_name(s):
+def is_dotted_name(s:typing.Any) -> bool:
     return isinstance(s, str) and '.' in s
 
-def is_namedtuple(x):
+def is_namedtuple(x:typing.Any) -> bool:
     if isinstance(x, type):
         ret = issubclass(x, tuple)
     else:
@@ -785,7 +898,7 @@ def is_namedtuple(x):
         
     return ret
     
-def is_string(array):
+def is_string(array) -> bool:
     r"""Determine whether the argument has a string or character datatype, when
     converted to a NumPy array.
     
@@ -794,7 +907,7 @@ def is_string(array):
     """
     return np.asarray(array).dtype.kind in NUMPY_STRING_KINDS
 
-def is_numeric_string(array):
+def is_numeric_string(array) -> bool:
     r"""Determines if the argument is a string array that can be parsed as numeric.
     """
     if isinstance(array, str):
@@ -802,7 +915,7 @@ def is_numeric_string(array):
         
     return is_string(array) and not np.isnan(np.genfromtxt(array)).any()
 
-def is_numeric(array):
+def is_numeric(array) -> bool:
     r"""Determine whether the argument has a numeric datatype, when
     converted to a NumPy array.
 
@@ -825,22 +938,22 @@ def is_numeric(array):
     """
     return np.asarray(array).dtype.kind in NUMPY_NUMERIC_KINDS
 
-def __default_none__():
+def __default_none__() -> None:
     return None
 
-def __default_units__():
+def __default_units__() -> pq.Quantity:
     return arbitrary_unit
 
-def __default_undimensioned__():
+def __default_undimensioned__() -> pq.Quantity:
     return pq.dimensionless
 
-def categorize_data_frame_columns(data, *column_names, inplace=True):
+def categorize_data_frame_columns(data:pd.DataFrame, *column_names, inplace:bool=True) -> pd.DataFrame:
     r""""""
     if not isinstance(data, pd.DataFrame):
         raise TypeError("Expecting a pandas.DataFrame; got %s instead" % type(data).__name__)
     
     if len(column_names) == 0:
-        raise TypeError("Expectign at least one column")
+        raise TypeError("Expecting at least one column")
     
     if any([not isinstance(c, str) for c in column_names]):
         raise TypeError("All column names expected to be strings")
@@ -861,9 +974,8 @@ def categorize_data_frame_columns(data, *column_names, inplace=True):
             
         return ret
     
-            
    
-def inspect_members(obj, predicate=None):
+def inspect_members(obj:typing.Any, predicatetyping.Optional[typing.Callable] = None) -> dict:
     skips = ("__class__", "__module__", "__name__", "__qualname__", "__func__",
              "__self__", "__code__", "__defaults__", "__kwdefaults__", 
              "__globals__", "__builtins__", "__annotations__", "__doc__",
@@ -895,3 +1007,29 @@ def inspect_members(obj, predicate=None):
         
     return dict(mb)
 
+def namespace2dict(x:types.SimpleNamespace) -> dict:
+    r"""Returns a reference to the internal dictionary of the SimpleNamespace 'x'"""
+    if not isinstance(x, types.SimpleNamespace):
+        raise TypeError(f"Expecting a types.SimpleNamespace; instead got a {type(x).__name__}")
+    return x.__dict__
+
+def namespace_symbols(x:types.SimpleNamespace) -> typing.Generator:
+    r"""Yields the symbols (keys) in the SimpleNamespace object 'x'"""
+    if not isinstance(x, types.SimpleNamespace):
+        raise TypeError(f"Expecting a types.SimpleNamespace; instead got a {type(x).__name__}")
+    
+    yield from x.__dict__.keys()
+    
+def namespace_values(x:types.SimpleNamespace) -> typing.Generator:
+    r"""Yields the values in the SimpleNamespace object 'x'"""
+    if not isinstance(x, types.SimpleNamespace):
+        raise TypeError(f"Expecting a types.SimpleNamespace; instead got a {type(x).__name__}")
+    
+    yield from x.__dict__.values()
+    
+def namespace_objects(x:types.SimpleNamespace) -> typing.Generator:
+    r"""Yields the items in the SimpleNamespace object 'x'"""
+    if not isinstance(x, types.SimpleNamespace):
+        raise TypeError(f"Expecting a types.SimpleNamespace; instead got a {type(x).__name__}")
+    
+    yield from x.__dict__.items()

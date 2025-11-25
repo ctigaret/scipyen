@@ -71,7 +71,7 @@ import numpy as np
 import quantities as pq
 import numbers
 from core import scipyen_quantities as scq
-from core.prog import scipywarn
+from core.prog import (scipywarn, signature_as_dict)
 
 def check_unpack_model_params_seq(params:typing.Sequence | np.ndarray, n:int):
     if isinstance(params, typing.Sequence) and len(params) == n and all (isinstance(v, float) for v in params):
@@ -1368,3 +1368,14 @@ p: the parameters in the specific order: (x₀, y₀, x₁, y₁)
     
 
     
+def model_parameters(func):
+    sig_dict = signature_as_dict(func)
+    names = list()
+    if len(sig_dict["positional"]) > 1:
+        names.extend(list(sig_dict["positional"].keys())[1:])
+        
+    if len(sig_dict["named"]):
+        names.extend(list(sig_dict["named"]))
+        
+    return names
+        

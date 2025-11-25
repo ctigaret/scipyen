@@ -3459,6 +3459,12 @@ def summarize_object_properties(objname:str, obj:typing.Any, namespace="Internal
             memsz    = str(getsizeof(obj))
             memsztip = "memory size: "
             
+        elif isinstance(obj, types.SimpleNamespace):
+            sz = str(len(obj.__dict__))
+            sizetip = "length: "
+            memsz    = str(getsizeof(obj))
+            memsztip = "memory size: "
+            
         elif isinstance(obj, NeoContainer):
             try:
                 sz = pprint.pformat(obj.size)
