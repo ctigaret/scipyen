@@ -32,6 +32,8 @@ import numpy as np
 import neo
 from neo.core.dataobject import DataObject as NeoDataObject
 from neo.core.container import Container as NeoContainer
+
+# NOTE: SpikeTrainList is a ObjectList in recent nwo versions
 if neo.__version__ >= '0.13.0':
     from neo.core.objectlist import ObjectList as NeoObjectList
     
