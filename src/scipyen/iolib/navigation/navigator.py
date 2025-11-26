@@ -816,18 +816,22 @@ class UrlNavigatorMenu(QtWidgets.QMenu):
         if action is not None:
             self.sig_urlDropped.emit(action, evt)
         evt.accept()
+        super().dropEvent(evt)
             
     def leaveEvent(self, evt:QtCore.QEvent):
         self.sig_mouseLeave.emit()
         evt.accept()
+        super().leaveEvent(evt)
         
     def enterEvent(self, evt:QtCore.QEvent):
         self.sig_mouseEnter.emit()
         evt.accept()
+        super().enterEvent(evt)
         
     def closeEvent(self, evt:QtGui.QCloseEvent):
         self.sig_closed.emit()
         evt.accept()
+        super().closeEvent(evt)
     
     def mouseMoveEvent(self, evt:QtGui.QMouseEvent):
         if not self._mouseMoved_:
@@ -844,7 +848,9 @@ class UrlNavigatorMenu(QtWidgets.QMenu):
             action = self.actionAt(evt.pos())
             if action is not None:
                 self.mouseButtonClicked.emit(action, btn)
+                # self.triggered.emit(action)
                 self.setActiveAction(None)
+                self.close()
                 
             super().mouseReleaseEvent(evt)
             
@@ -1549,11 +1555,9 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         self._openSubDirsTimer.stop()
         if isinstance(self._subDirsJob_, ListDirsJob) and qtutils.isQObjectAlive(self._subDirsJob_):
             if self._subDirsJob_.isRunning():
-                # self._subDirsJob_.requestInterruption()
                 self._subDirsJob_.quit()
             self._subDirsJob_.deleteLater()
             self._subDirsJob_ = None
-        # pass
 
     @Slot()
     def slot_startSubDirsJob(self):
@@ -1751,8 +1755,7 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         options.initFrom(self)
         desktopHeight = guiutils.getDesktopHeight()
         availableSpace = desktopHeight - pos.y()
-        menuItemHeight = self.style().sizeFromContents(QtWidgets.QStyle.CT_MenuItem,
-                                                       options, self.size(), self).height()
+        menuItemHeight = self.style().sizeFromContents(QtWidgets.QStyle.CT_MenuItem,options, self.size(), self).height()
         maxItems = availableSpace // menuItemHeight
         # NOTE: 2025-01-21 08:58:06
         # populates the menu with subdirectory entries
@@ -2138,7 +2141,6 @@ class CoreUrlNavigator(QtCore.QObject):
                     url.setScheme("file")
                     firstUrlChild.setScheme("file")
                     
-
         # this is a LocationData
         data = self._history_[self._historyIndex_]
         
@@ -3202,6 +3204,8 @@ class UrlNavigator(QtWidgets.QWidget):
     # connect this signal (urlChanged) to an appropriate slot in ScipyenWindow or
     # the filesystemModel/fileSystemViewer in ScipyenWindow
     urlChanged              = Signal(QtCore.QUrl, name="urlChanged")
+    # urlChanged              = Signal(QtCore.QUrl, bool, name="urlChanged")
+    # urlChangedRefresh       = Signal(QtCore.QUrl, bool, name="urlChangedRefresh")
     urlAboutToBeChanged     = Signal(QtCore.QUrl, name = "urlAboutToBeChanged")
     editableStateChanged    = Signal(bool, name = "editableStateChanged")
     historyChanged          = Signal(name = "historyChanged")
@@ -3323,6 +3327,7 @@ class UrlNavigator(QtWidgets.QWidget):
             
         self.setLocationUrl(url)
         self.urlChanged.emit(url)
+        # self.urlChanged.emit(url, True)
             
     def setHomeUrl(self, url:QtCore.QUrl):
         self._nav_p_._homeUrl_ = url
@@ -3591,6 +3596,7 @@ class UrlNavigator(QtWidgets.QWidget):
     def slot_coreUrlNavigatorUrlChanged(self):
         self._nav_p_.updateContent() # !
         self.urlChanged.emit(self._nav_p_._coreUrlNavigator_.currentLocationUrl())
+        # self.urlChanged.emit(self._nav_p_._coreUrlNavigator_.currentLocationUrl(), True)
         
     @Slot(QtCore.QUrl)
     def slot_coreUrlNavigatorUrlAboutToBeChanged(self, url):

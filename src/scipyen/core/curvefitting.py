@@ -746,6 +746,8 @@ def fit_CB_model(data, p0, **kwargs):
     df_res = fC.size - len(x0)
     df_tot = fC.size - 1
     
+    arsq = 1 - sse * df_tot / (sst * df_res)
+    
     # reconstruct final fitted curve (REMEMBER: we have taken out the NaNs!)
     initialSupport = np.full((data.shape[0],), np.nan)
     
