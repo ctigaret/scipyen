@@ -1011,7 +1011,8 @@ def namespace2dict(x:types.SimpleNamespace) -> dict:
     r"""Returns a reference to the internal dictionary of the SimpleNamespace 'x'"""
     if not isinstance(x, types.SimpleNamespace):
         raise TypeError(f"Expecting a types.SimpleNamespace; instead got a {type(x).__name__}")
-    return x.__dict__
+    return dict(map(lambda i: (i[0], namespace2dict(i[1]) if isinstance(i[1], types.SimpleNamespace) else i[1]), x.__dict__.items()))
+    
 
 def namespace_symbols(x:types.SimpleNamespace) -> typing.Generator:
     r"""Yields the symbols (keys) in the SimpleNamespace object 'x'"""

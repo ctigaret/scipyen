@@ -37,6 +37,7 @@ from . import models
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
 from core import datatypes
 from core import prog
+import core.signalprocessing as sigp
 # from core.traitcontainers import DataBag
 #from .patchneo import *
 #### END pict.core modules
@@ -748,6 +749,7 @@ def fit_CB_model(data, p0, **kwargs):
     
     arsq = 1 - sse * df_tot / (sst * df_res)
     
+    rmse = np.sqrt(sse/fC.size)
     # reconstruct final fitted curve (REMEMBER: we have taken out the NaNs!)
     initialSupport = np.full((data.shape[0],), np.nan)
     
