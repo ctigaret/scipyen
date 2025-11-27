@@ -814,7 +814,7 @@ def fit_CB_wave(data, wave):
     result["ModelFunction"] = None
     result["Fit"] = optimize.OptimizeResult()()
     result["Coefficients"] = types.SimpleNamespace({"Names": list(), 
-                                                    "Initial": types.SimpleNamespace({"values": list(), "bounds": "lo": -np.inf, "up": np.inf, "keep_feasible": [False]}),
+                                                    "Initial": types.SimpleNamespace({"values": list(), "bounds": {"lo": -np.inf, "up": np.inf, "keep_feasible": [False]}}),
                                                     "Fitted": list(),
                                                     "GoF": types.SimpleNamespace({"Rsq": rsq, "R2adj":rsq, "SSE": sse, "RMSE": rmse})})
     return None, types.SimpleNamespace(result)
