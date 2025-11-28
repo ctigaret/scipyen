@@ -4476,7 +4476,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             url = QtCore.QUrl(pathlib.Path(newCwd).absolute().as_uri())
             self.navigator.setLocationUrl(url)
             
-            self._setRecentDirectory_(self.cwd)
+            self._set_recentDirectory_(self.cwd)
             self._updateFileSystemView_(self.cwd, False)
 
     def slot_updateHistory(self):
@@ -6700,6 +6700,11 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         icon = QtGui.QIcon.fromTheme("pythonbackend")
         # self.setWindowIcon(icon) # this doesn't work? -- next line does
         QtWidgets.QApplication.setWindowIcon(icon)
+        
+        # NOTE: 2025-11-28 20:49:40
+        # use QueuedConnection to eliminate flicker on recent directories menu 
+        # after selecting a directory
+        self.sig_changedDirectory.connect(self._slot_set_recentDirectory, type=QtCore.Qt.QueuedConnection)
 
     @Slot()
     @safewrapper
@@ -7482,16 +7487,12 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             if self.external_console:
                 self.external_console.execute("".join(["os.chdir('", targetDir, "')"]))
 
-            self._setRecentDirectory_(targetDir)
-
             self._updateFileSystemView_(targetDir, True)
-
             self.currentDirectory = targetDir
             mpl.rcParams["savefig.directory"] = targetDir
             self.setWindowTitle("Scipyen %s" % targetDir)
-            
+
             self.sig_changedDirectory.emit(targetDir)
-            
 
     def _slot_workdirChangedInConsole(self, targetDir):
         self._updateFileSystemView_(targetDir, cd=True)
@@ -7512,9 +7513,15 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # for this to work one has to set horizontalScrollBarPolicy
         # to ScrollBarAlwaysOff (e.g in QtDesigner)
         self._resizeFileColumn_()
+        
+    @Slot(str)
+    def _slot_set_recentDirectory(self, targetDir:str):
+        self._set_recentDirectory_(targetDir)
+
+       
 
     @safewrapper
-    def _setRecentDirectory_(self, newDir):
+    def _set_recentDirectory_(self, newDir):
         if newDir in self.recentDirectories:
             # move newDir to top of stack
             if newDir != self.recentDirectories[0]:
