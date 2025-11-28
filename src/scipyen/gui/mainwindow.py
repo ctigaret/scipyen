@@ -6879,6 +6879,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         dirsNames = list(self._recentDirectories)[startIndex : lastIndex]
         
         dirsActions = list(map(lambda x: QAction(guiutils.csqueeze(x.replace('&', '&&'), 60), self), dirsNames))
+        for action in dirsActions:
+            action.triggered.connect(self._slot_recentDirActionTriggered)
 
         if self.currentDirectory in dirsNames:
             currentIndex = dirsNames.index(self.currentDirectory)
@@ -7418,9 +7420,36 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         
     @Slot(QAction, QtCore.Qt.MouseButton)
     def slot_recentDirActivated(self, action:QAction, button:QtCore.Qt.MouseButton):
+        r"""Used when recent directories menu is actioned from a tool button"""
         from gui import guiutils
-        result = action.data() 
-        path = pathlib.Path(self._recentDirectories[result]).absolute() #.resolve()   # the path to the subdirectory pointed to by the action
+        index = action.data() 
+        print(f"{self.__class__.__name__}.slot_recentDirActivated: index = {index}")
+        if index < 0 or index >= len(self._recentDirectories):
+            return
+        path = pathlib.Path(self._recentDirectories[index]).absolute() #.resolve()   # the path to the subdirectory pointed to by the action
+        self._recentDirectoryActioned(path)
+#         if path.exists():
+#             url = QtCore.QUrl(path.as_uri())
+#             self.navigator.setLocationUrl(url)
+#             self.navigator.urlChanged.emit(url)
+#         else:
+#             p = pathlib.Path(path)
+#             while not p.exists():
+#                 if p == p.parent:
+#                     break
+#                 p = p.parent
+#             if p.exists():
+#                 url = QtCore.QUrl(p.as_uri())
+#                 self.navigator.setLocationUrl(url)
+#                 self.navigator.urlChanged.emit(url)
+#             else:
+#                 txt = p.as_posix()
+#                 
+#                 elided = guiutils.get_elided_text(f"Inaccessible directory: {txt}", self.width(), QtCore.Qt.ElideMiddle)
+#                 self.statusBar().showMessage(elided)
+#                 self.errorMessage("Navigation", f"Inaccessible recent directory:\n{txt}")
+                
+    def _recentDirectoryActioned(self, path:pathlib.Path):
         if path.exists():
             url = QtCore.QUrl(path.as_uri())
             self.navigator.setLocationUrl(url)
@@ -7441,6 +7470,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 elided = guiutils.get_elided_text(f"Inaccessible directory: {txt}", self.width(), QtCore.Qt.ElideMiddle)
                 self.statusBar().showMessage(elided)
                 self.errorMessage("Navigation", f"Inaccessible recent directory:\n{txt}")
+        
 
     @Slot()
     @safewrapper
@@ -7517,8 +7547,19 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     @Slot(str)
     def _slot_set_recentDirectory(self, targetDir:str):
         self._set_recentDirectory_(targetDir)
-
-       
+        
+    @Slot()
+    def _slot_recentDirActionTriggered(self):
+        r"""Needed for recent directory action in recent directories menu when 
+        shown as a submenu of File menu"""
+        action = self.sender()
+        index = action.data() 
+        print(f"{self.__class__.__name__}._slot_recentDirActionTriggered: index = {index}")
+        if index < 0 or index >= len(self._recentDirectories):
+            return
+        path = pathlib.Path(self._recentDirectories[index]).absolute() #.resolve()   # the path to the subdirectory pointed to by the action
+        self._recentDirectoryActioned(path)
+        
 
     @safewrapper
     def _set_recentDirectory_(self, newDir):
