@@ -760,7 +760,7 @@ def fit_CB_model(data, p0, **kwargs):
     coeff_names = models.model_parameters(model_func)
     
     coefficients = types.SimpleNamespace({"Names": coeff_names,
-                                          "Initial": types.SimpleNamespace({"values": x0, "bounds": {"lo": bnds.lo, "up": bnds.up, "keep_feasible": bnds.keep_feasible}}),
+                                          "Initial": types.SimpleNamespace({"values": x0, "bounds": {"lb": bnds.lb, "ub": bnds.ub, "keep_feasible": bnds.keep_feasible}}),
                                           "Fitted": res_x,
                                           "GoF": types.SimpleNamespace({"Rsq": rsq, "R2adj": arsq, "SSE": sse, "RMSE": rmse})})
     result = dict()

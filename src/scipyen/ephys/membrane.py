@@ -10190,7 +10190,7 @@ def extract_event_waveforms(x:typing.Union[neo.AnalogSignal, DataSignal],
     # print(f"membrane.extract_event_waveforms: intervals = {intervals}")
     
     # generate new starts after removal of past-the-end
-    starts = np.array([interval[0] for interval in intervals])
+    starts = np.array([interval[0] for interval in intervals])*x.times.units
 
     # nopte, use those intervals to extract "slices" from the 'x' signal; each
     # slice of the waveform of an event — effectively, they are "analog" signals

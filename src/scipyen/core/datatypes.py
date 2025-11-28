@@ -551,6 +551,27 @@ def check_type(t:typing.Union[type, typing.Sequence[type], typing.Set[type]],
     
     return len(t_set & ref_set) > 0 or any(issubclass(v, tuple(ref_set)) for v in t_set)
 
+def check_mapping_fields(x:dict, constraints:list) -> bool:
+    if not isinstance(x, dict):
+        return False
+    
+    for constraint in constraints:
+        field_name = constraint[0]
+        field_type = constraint[1]
+        field_predicate = constraint[2]
+        
+        if field_name not in x:
+            return False
+        
+        if not isinstance(x[field_name], field_type):
+            return False
+        
+        if isinstance(field_predicate, typing.Callable):
+            if not field_predicate(x[field_name]):
+                return False
+            
+    return True
+
 def check_numpy_array(x:np.ndarray, /, dtype:typing.Optional[np.dtype] = None,
                       dtype_comparison:str="eq",
                       ndim:typing.Optional[int] = None, 
