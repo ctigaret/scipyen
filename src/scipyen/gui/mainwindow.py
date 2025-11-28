@@ -7423,31 +7423,11 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         r"""Used when recent directories menu is actioned from a tool button"""
         from gui import guiutils
         index = action.data() 
-        print(f"{self.__class__.__name__}.slot_recentDirActivated: index = {index}")
+        # print(f"{self.__class__.__name__}.slot_recentDirActivated: index = {index}")
         if index < 0 or index >= len(self._recentDirectories):
             return
         path = pathlib.Path(self._recentDirectories[index]).absolute() #.resolve()   # the path to the subdirectory pointed to by the action
         self._recentDirectoryActioned(path)
-#         if path.exists():
-#             url = QtCore.QUrl(path.as_uri())
-#             self.navigator.setLocationUrl(url)
-#             self.navigator.urlChanged.emit(url)
-#         else:
-#             p = pathlib.Path(path)
-#             while not p.exists():
-#                 if p == p.parent:
-#                     break
-#                 p = p.parent
-#             if p.exists():
-#                 url = QtCore.QUrl(p.as_uri())
-#                 self.navigator.setLocationUrl(url)
-#                 self.navigator.urlChanged.emit(url)
-#             else:
-#                 txt = p.as_posix()
-#                 
-#                 elided = guiutils.get_elided_text(f"Inaccessible directory: {txt}", self.width(), QtCore.Qt.ElideMiddle)
-#                 self.statusBar().showMessage(elided)
-#                 self.errorMessage("Navigation", f"Inaccessible recent directory:\n{txt}")
                 
     def _recentDirectoryActioned(self, path:pathlib.Path):
         if path.exists():
@@ -7554,7 +7534,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         shown as a submenu of File menu"""
         action = self.sender()
         index = action.data() 
-        print(f"{self.__class__.__name__}._slot_recentDirActionTriggered: index = {index}")
+        # print(f"{self.__class__.__name__}._slot_recentDirActionTriggered: index = {index}")
         if index < 0 or index >= len(self._recentDirectories):
             return
         path = pathlib.Path(self._recentDirectories[index]).absolute() #.resolve()   # the path to the subdirectory pointed to by the action
