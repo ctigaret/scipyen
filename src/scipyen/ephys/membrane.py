@@ -10635,7 +10635,7 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal],
         else:
             # extract event waveforms from the (possibily filtered) signal 'x'
             ret = extract_event_waveforms(x[:,channel], event_duration, 
-                                            θN, thr, peakfunc, , 
+                                            θN, thr, peakfunc,  
                                             detection_mapping["useThresholdOnRsquared"],
                                             detection_mapping["rsqThreshold"],
                                             left_sweep,
