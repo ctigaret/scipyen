@@ -1313,7 +1313,11 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                             return QtCore.QVariant()
             elif isinstance(self._modelData_, np.ndarray):
                 if role in (QtCore.Qt.DisplayRole, QtCore.Qt.AccessibleTextRole):
-                    return QtCore.QVariant("%s" % section)
+                    lbl = f"{section}"
+                    if orientation == QtCore.Qt.Horizontal:
+                        if isinstance(self._modelData_, pq.Quantity):
+                            lbl = f"{scq.getUnitFamily(self._modelData_.units)} ({self._modelData_.units.dimensionality})"
+                    return QtCore.QVariant(lbl)
                 
                 elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
                     if orientation == QtCore.Qt.Horizontal:
