@@ -96,6 +96,7 @@ import core.signalprocessing as sigp
 import core.curvefitting as crvf
 import core.models as models
 import core.datatypes as datatypes 
+from core.datatypes import (check_mapping_fields, check_numpy_array)
 import plots.plots as plots
 import core.datasignal as datasignal
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
@@ -130,6 +131,34 @@ import iolib.pictio as pio
 import ephys.ephys as ephys
 #### END Scipyen ephys modules
 
+
+fit_bounds_fields = [("lb", object, None), ("ub", object, None), ("keep_feasible", object, None)]
+
+initial_coeffs_fields = [("values",    typing.Sequence,                None),
+                            ("bounds",    dict,                           lambda x: check_mapping_fields(x, fit_bounds_fields))]
+
+gof_fields = [("Rsq",   object, None), ("R2adj", object, None), ("SSE", object, None), ("RMSE", object, None)]
+
+coefficients_fields = [("Names",        typing.Sequence,                None),
+                        ("Initial",      dict,                           lambda x: check_mapping_fields(x, initial_coeffs_fields)),
+                        ("Fitted",       typing.Sequence,                None),
+                        ("GoF",          dict,                           lambda x: check_mapping_fields(x, gof_fields))]
+
+#                    name,              type,                           predicate
+event_fit_fields = [("Fit",             scipy.optimize.OptimizeResult,  None),
+                    ("Coefficients",    dict,                           lambda x: check_mapping_fields(x, coefficients_fields)),
+                    ("Rsq",             float,                          None),
+                    ("amplitude",       np.ndarray,                     lambda x: check_numpy_array(x, dtype=np.dtype(float), ndim=1, size=1, quantity=True)),
+                    ("Accept",          bool,                           None),
+                    ]
+
+#           name,           type,       predicate
+event_fitted_wave_fields = [("Accept",        np.ndarray, lambda x: check_numpy_array(x, dtype=np.dtype(bool),  ndim=1, size=1)),
+            ("left_sweep",    np.ndarray, lambda x: check_numpy_array(x, dtype=np.dtype(float), ndim=1, size=1, quantity=True)),
+            ("amplitude",     np.ndarray, lambda x: check_numpy_array(x, dtype=np.dtype(float), ndim=1, size=1, quantity=True)),
+            ("wave_index",    int,        lambda x: x>=0),
+            ("event_fit",     dict,       lambda x: check_mapping_fields(x, event_fit_fields)),
+            ]
 
     
 
@@ -10113,7 +10142,7 @@ def extract_event_waveforms(x:typing.Union[neo.AnalogSignal, DataSignal],
     # which will be converted by the neo API into numpy arrays of corresponding dtypes
     #
     if not isinstance(x, (neo.AnalogSignal, DataSignal)):
-        raise TypeError(f"'x' shoould be a neo.AnalogSignal or DataSignal; got {type(x).__name__} instead")
+        raise TypeError(f"'x' should be a neo.AnalogSignal or DataSignal; got {type(x).__name__} instead")
     if x.shape[1] > 1:
         raise TypeError(f"'x' should be a vector; instead, it has {x.shape[1]} channels")
     if not isinstance(θ, (neo.AnalogSignal, DataSignal, np.ndarray)):
@@ -10659,6 +10688,42 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal],
                     #                               "waves"     ↦ Sequence[neo DataObject]
                     #                               "θ"         ↦ neo DataObject
                     #                               "θN"        ↦ neo DataObject
+
+def parse_event_detection_spiketrain(train:neo.SpikeTrain) -> tuple:
+    channel_events = dict()
+    detection_channel = train.annotations.get("signal_channel", None)
+    detection_waveform = train.annotations.get("detection_waveform", None)
+    detection_threshold = train.annotations.get("detection_threshold", None)
+    if any(v is None for v in (detection_waveform, detection_threshold, detection_channel)):
+        scipywarn(f"Spike train {k} does not look like an event detection spike train")
+        return channel_events, None
+    
+    fitted_waves = train.annotations.get("fitted_waves", None)
+    # if not isinstance(fitted_waves, typing.Sequence) or not all(check_event_fitted_wave(v) for v in fitted_waves):
+    #     scipywarn(f"Spike train is not anotated with fitted waves")
+    #     return channel_events, None
+        
+    detection_useCBSliding = train.annotations.get("detection_useCBSliding", False)
+    detection_options = {"waveform": detection_waveform,
+                            "threshold": detection_threshold,
+                            "useCBsliding": detection_useCBSliding}
+                            
+    channel_events["stamps"] = train.times
+    channel_events["fitted_waves"] = fitted_waves
+    channel_events["waves"] = list(map(lambda w: w[:,0], fitted_waves))
+    channel_events["θ"] = train.annotations.get("θ", None)
+    channel_events["θN"] = train.annotations.get("θN", None)
+    
+    return channel_events, detection_channel
+    
+    
+def check_event_fitted_wave(wave:neo.AnalogSignal) -> bool:
+    if not isinstance(wave, neo.AnalogSignal) or wave.shape[1] != 2:
+        return False
+    
+    return check_mapping_fields(wave.annotations, event_fitted_wave_fields)
+    
+    
 
 def prep_for_nsfa(data):
     r"""Helper for the nsfa function
