@@ -716,9 +716,23 @@ def fit_CB_model(data, p0, **kwargs):
     else:
         raise ValueError(f"Incorrect upper bounds specified {u0}")
     
+    if len(bounds)==2:
+        if isinstance(bounds[2], bool):
+            keep_feasible = [bounds[2]] * len(lo)
+            
+        elif isinstance(bounds[2], typing.Sequence):
+            if len(bounds[2]) == len(lo) and all(isinstance(v, bool) for v in bounds[2]):
+                keep_feasible = bounds[2]
+            else:
+                raise ValueError(f"Invalid keep_feasible supplied with bounds: {keep_feasible}")
+            
+        else:
+            raise TypeError(f"Invalid keep_feasible supplied with bounds: {keep_feasible}")
+        
+    else:
+        keep_feasible = [True] * len(lo)
     
-    # bnds = (lo, up)
-    bnds = optimize.Bounds(lo, up, keep_feasible = [True] * len(lo))
+    bnds = optimize.Bounds(lo, up, keep_feasible = keep_feasible)
     
     # NOTE: 2022-10-30 14:39:57
     # solve a non-linear least-squares problem with bounds on the variables

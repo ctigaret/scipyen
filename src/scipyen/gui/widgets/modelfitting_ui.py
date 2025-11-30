@@ -84,7 +84,7 @@ class ModelParametersWidget(QtWidgets.QWidget):
     _spin_min_ = -math.inf
     _spin_max_ =  math.inf
     
-    _mandatory_columns_ = ("Initial Value:", "Lower Bound:", "Upper Bound:")
+    _mandatory_columns_ = ("Initial Value", "Lower Bound", "Upper Bound")
     
     def __init__(self, parent:QtWidgets.QWidget=None, **kwargs):
         r""" Constructor of ModelParametersWidget.
@@ -163,19 +163,12 @@ class ModelParametersWidget(QtWidgets.QWidget):
         self._parameters_ = self.setParameters(parameters, lower, upper, names,
                                                refresh=False)
             
-        # if not self._verticalLayout_:
-        #     self._parameters_ = self._parameters_.T
-        
-        self._configureUI_()# mus be called
+        self._configureUI_() # must be called even if we're not defined in a UI file
         
     def _generate_widgets(self):
         paramsDF = self._parameters_
-        # if self._verticalLayout_:
-        #     paramsDF = self._parameters_
-        # else:
-        #     paramsDF = self._parameters_.T
             
-        header = ["Parameters:"] + [c for c in self._parameters_.columns]
+        header = ["Parameters"] + [c for c in self._parameters_.columns]
         minSpinWidth = list()
         self.spinBoxes = list()
 
@@ -197,33 +190,38 @@ class ModelParametersWidget(QtWidgets.QWidget):
                     
                 else:
                     p = paramsDF.loc[i,c]
-                    # print(f"\tparam {i} {c} = {p}")
-                    w = QuantitySpinBox(self)
-                    w.setObjectName(f"{str2symbol(i)}_{str2symbol(c)}_spinBox")
+                    if isinstance(p, bool):
+                        w = QtWidgets.QCheckBox(self)
+                        w.setObjectName(f"{str2symbol(i)}_{str2symbol(c)}_checkBox")
+                        w.setChecked(p==True)
+                        w.toggled.connect(self._slot_setBool)
+                    else:
+                        w = QuantitySpinBox(self)
+                        w.setObjectName(f"{str2symbol(i)}_{str2symbol(c)}_spinBox")
                     
-                    # WARNING: 2022-11-03 23:39:21
-                    # This is for general case.
-                    # Depending on the model for which this is intended, one may
-                    # have to restrict these to physically (and mathematically)
-                    # reasonable values by accessing these spine boxes directly
-                    # (based on parameter name and value type i.e. initial, lower
-                    # or upper bound)
-                    # This can be done using self.getSpinBox() method, see
-                    # mPSCanalysis.EventAnalysis for an example
-                    w.setMinimum(self._spin_min_)
-                    w.setMaximum(self._spin_max_)
-                    
-                    w.setDecimals(self.spinDecimals)
-                    w.setSingleStep(self.spinStep)
-                    w.setStepType(QtWidgets.QAbstractSpinBox.AdaptiveDecimalStepType)
-                    # w.setCorrectionMode(QtWidgets.QAbstractSpinBox.CorrectToNearestValue)
-                    w.valueChanged[float].connect(self._slot_newValue)
-                    w.setAccelerated(True)
-                    w.setValue(p)
-                    
-                    t = w.text()
-                    minSpinWidth.append(guiutils.get_text_width(t))
-                    self.spinBoxes.append(w)
+                        # WARNING: 2022-11-03 23:39:21
+                        # This is for general case.
+                        # Depending on the model for which this is intended, one may
+                        # have to restrict these to physically (and mathematically)
+                        # reasonable values by accessing these spine boxes directly
+                        # (based on parameter name and value type i.e. initial, lower
+                        # or upper bound)
+                        # This can be done using self.getSpinBox() method, see
+                        # mPSCanalysis.EventAnalysis for an example
+                        w.setMinimum(self._spin_min_)
+                        w.setMaximum(self._spin_max_)
+                        
+                        w.setDecimals(self.spinDecimals)
+                        w.setSingleStep(self.spinStep)
+                        w.setStepType(QtWidgets.QAbstractSpinBox.AdaptiveDecimalStepType)
+                        # w.setCorrectionMode(QtWidgets.QAbstractSpinBox.CorrectToNearestValue)
+                        w.valueChanged[float].connect(self._slot_newValue)
+                        w.setAccelerated(True)
+                        w.setValue(p)
+                        
+                        t = w.text()
+                        minSpinWidth.append(guiutils.get_text_width(t))
+                        self.spinBoxes.append(w)
                     
                 self.widgetsLayout.addWidget(w, layout_row, layout_col, 1, 1)
                 
@@ -327,10 +325,10 @@ class ModelParametersWidget(QtWidgets.QWidget):
             
     @parameters.setter
     def parameters(self, params):
-        if isinstance(params, pd.DataFrame) and all(s in params.columns for s in ("Initial Value:", "Lower Bound:", "Upper Bound:")):
-            self.setParameters(params["Initial Value:"], 
-                               lower = params["Lower Bound:"], 
-                               upper = params["Upper Bound:"],
+        if isinstance(params, pd.DataFrame) and all(s in params.columns for s in ("Initial Value", "Lower Bound", "Upper Bound")):
+            self.setParameters(params["Initial Value"], 
+                               lower = params["Lower Bound"], 
+                               upper = params["Upper Bound"],
                                names = params.index,
                                refresh=True)
             
@@ -419,9 +417,9 @@ class ModelParametersWidget(QtWidgets.QWidget):
             else:
                 raise TypeError(f"'upper' expected to be a scalar or a sequence of {len(parameters)} elements; instead, got {upper}")
         
-            paramsDF = pd.DataFrame({"Initial Value:": parameters,
-                                     "Lower Bound:":lower,
-                                     "Upper Bound:":upper},
+            paramsDF = pd.DataFrame({"Initial Value": parameters,
+                                     "Lower Bound":lower,
+                                     "Upper Bound":upper},
                                      index = names)
             
         elif isinstance(parameters, pd.DataFrame):
@@ -501,9 +499,37 @@ class ModelParametersWidget(QtWidgets.QWidget):
     @spinStep.setter
     def spinStep(self, value:float):
         self._spinStep_ = float(value)
+        
+    @Slot(bool)
+    def _slot_setBool(self, value:bool):
+        widget = self.sender()
+        if self.isVertical: # FIXME/TODO/BUG
+            paramsDF = self._parameters_
+        else:
+            paramsDF = self._parameters_.T
+            
+        if isinstance(widget, QtWidgets.QCheckBox):
+            if index == -1: # this should never happen
+                return
+
+            layout_col = index // self.widgetsLayout.rowCount()
+            layout_row = index % self.widgetsLayout.rowCount()
+            
+            param_col = self._parameters_.columns[layout_col-1]
+            param_row = self._parameters_.index[layout_row-1]
+
+            old_val = self._parameters_.iloc[layout_row-1, layout_col-1]
+            
+            if old_val == value:
+                return
+            
+            self._parameters_.iloc[layout_row-1, layout_col-1] = value
+            self.sig_dataChanged.emit()
+            self.sig_parameterChanged.emit(self._parameters_.index[layout_row-1], 
+                                           self._parameters_.columns[layout_col-1])
     
     @Slot(float)
-    def _slot_newValue(self, value):
+    def _slot_newValue(self, value:float):
         widget = self.sender()
         if self.isVertical: # FIXME/TODO/BUG
             paramsDF = self._parameters_

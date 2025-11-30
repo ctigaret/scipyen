@@ -10023,7 +10023,9 @@ def extract_event_waveforms(x:typing.Union[neo.AnalogSignal, DataSignal],
                             peakfunc:collections.abc.Callable,
                             useThresholdOnRsquared:bool,
                             rsqThreshold:float,
+                            model_params:dict, 
                             left_sweep:typing.Union[float, pq.Quantity, np.ndarray] = 0.,
+                            eventTemplate:typing.Optional[typing.Union[neo.AnalogSignal, DataSignal]]=None,
                             **kwargs) -> tuple | None:
     r"""
     Extracts detected waveforms (e.g. mEPSCs) in a signal, wraps their domain 
@@ -10283,22 +10285,26 @@ def extract_event_waveforms(x:typing.Union[neo.AnalogSignal, DataSignal],
             
         m.array_annotate(amplitude = np.array([wave_amplitude]))
         
-        
         m.array_annotate(Accept=True)
         
         m.array_annotate(peak_time = event_peak_times[km])
         
         m.array_annotate(**kwargs)
         
-        fw = fit_event_wave(m, km, useThresholdOnRsquared, rsqThreshold)
+        fw = fit_event_wave(m, km, model_params, useThresholdOnRsquared, rsqThreshold, eventTemplate)
         fitted_waves.append(fw)
         
     return starts, event_waves, fitted_waves
     
 def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal], 
-                  detection:dict = {0:{"waveform": {"function": PSCwaveform,
+                  detection:dict = {0:{"waveform_detection": {"function": PSCwaveform,
                                                     "params": (0., -1., 0.01, 0.001, 0.01, 0.02),
-                                                    "extent": 0.05},
+                                                    "extent": 0.05,
+                                                    "fitparams": {"Initial value": (0., -1., 0.01, 0.001, 0.01, 0.02),
+                                                                  "Lower bounds": -np.inf,
+                                                                  "Upper bounds": np.inf,
+                                                                  "Keep feasible": True,
+                                                                  "Fit model": crvf.fit_CB_model}},
                                        "useCBsliding": False,
                                        "threshold": None,
                                        "useThresholdOnRsquared": None,
@@ -10340,20 +10346,21 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal],
     
         The values are of type dict with the following structure:
     
-        "waveform" -> neo.AnalogSignal, DataSignal, numpy.ndarray, sequence, 
-            or dict:
-            • A 1D neo.AnalogSignal, DataSignal or numpy array (vector, i.e., 
-            waveform.shape = (m,) where `m` is the number of samples in `waveform`),
-            representing the realization of an event model (ie. a "synthetic" waveform)
-            or a "template" waveform extracted from a signal — e.g., a mEPSC.
+        "waveform_detection" -> a dict, mapping:
+            "function"  ↦ neo.AnalogSignal, DataSignal, numpy.ndarray, sequence, 
+                or callable :
+                • When a 1D neo.AnalogSignal, DataSignal or numpy array, this must
+                    be a vector, i.e., waveform.shape = (m,) where `m` is the number
+                    of waveform samples, and represents the realization of an 
+                    event model (ie. a "synthetic" waveform) or a "template" 
+                    waveform extracted from a recorded signal — e.g., a mEPSC.
     
-            • A mapping (i.e., dict):
-            "function"  ↦ callable — model function with syntax: fun(x, params)
-                        or fun(x:*params) (e.g., models.Clements_Bekkers_97(…)) 
-                        which can realize a 1D waveform of the model
+                • A callable — model function with syntax: fun(x, params) or
+                    or fun(x:*params) (e.g., models.Clements_Bekkers_97(…)) 
+                    which can realize a 1D waveform of the model
+                    
     
             "params"    ↦ sequence of float or scalar Quantity objects: the 
-                        parameters expected by the callable above
     
                         WARNING: When scalar Quantities, the function MUST result
                         in a quantity array that is physically significant (and 
@@ -10364,11 +10371,20 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal],
                         the size of the model's support (i.e. the extent of the 
                         model's domain)
     
+            "fitparams" ↦ None, or mapping of:
+                        "Initial value" ↦ sequence of scalars
+                        "Lower bound"   ↦ sequence of scalars (same length as 
+                                            Initial value) or just one scalar
+                        "Upper bound"   ↦ sequence of scalars (same length as 
+                                            Initial value) or just one scalar
+                        "Keep feasible" ↦ bool (used the construction optimization 
+                                            Bounds for fitting)
+                        "Fit model"     ↦ a callable with syntax:
+                                            fun(x, params, bounds)
+                                        (see core.curvefitting module)
+    
                 ATTENTION: Make sure this model waveform has the SAME SAMPLING 
                 RATE as the signal!!!
-    
-            The default is a PSCWaveform with parameters 0., -1., 0.01, 0.001, 0.01, 0.02
-            and extend of 0.05 (in domain units of 'x')
     
         "useCBsliding"  ↦ bool
             When True (the default), the function uses the Clements & Bekkers 
@@ -10476,33 +10492,29 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal],
         else:
             ch_id = channel
         
-        waveform = detection_mapping.get("waveform", None)
+        waveform_detection = detection_mapping.get("waveform_detection", None)
         
-        if isinstance(waveform, (np.ndarray, neo.AnalogSignal)):
+        if not isinstance(waveform_detection, dict):
+            raise TypeError(f"'detection[{channel}][waveform_detection]' must be a mapping")
+        
+        waveform = waveform_detection["function"]
+        
+        if isinstance(waveform, (np.ndarray, neo.AnalogSignal, DataSignal)):
             if not datatypes.is_vector(waveform):
                 raise TypeError("waveform expected to be a vector")
             
             if isinstance(waveform, np.ndarray):
                 waveform = type(x)(waveform, units = x.units, t_start = 0 * x.times.units,
                                 sampling_rate = x.sampling_rate,
-                                name = "Event Waveform Template")
+                                name = "Event Waveform Template",
+                                decription = "Event Waveform Template")
             
-        elif isinstance(waveform, dict):
-            # NOTE: 2025-11-10 18:09:17 as a dict, this can be:
-            # • the mapping:
-            #   "function"  ↦ typing.Callable
-            #   "params"    ↦ typing.Sequence[typing.Union[float, pq.Quantity]] (all scalars)
-            #   "duration"  ↦ float or scalar pq.Quantity with units of the 'x' signal domain
-            # allow passing *_model version of model function (i.e. one expecting a sequence or parameters)
-            wave_func = waveform.get("function", None)
-            if not inspect.isfunction(model_func):
-                raise TypeError("Invalid waveform mapping; expecting a mapping containing a field 'function' mapped to a function")
-            
-            wave_params = waveform.get("params", None)
-            if not isinstance(model_params, typing.Sequence):
+        elif inspect.isfunction(waveform):
+            wave_params = waveform_detection.get("params", None)
+            if not isinstance(wave_params, typing.Sequence):
                 raise TypeError("Invalid waveform mapping; expecting a mapping containing a field 'params' mapped to a sequence of scalars")
             
-            wave_duration = waveform.get("extent",  None)
+            wave_duration = waveform_detection.get("extent",  None)
             
             if not isinstance(wave_duration, pq.Quantity) or wave_duration.size != 1 or not scq.unitsConvertible(wave_duration, x.times.units):
                 raise TypeError(f"Invalid waveform mapping; expecting a mapping containing a field 'duration' mapped to scalar Quantity scalable to {x.times.units}")
@@ -10516,14 +10528,57 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal],
             
             waveform = type(x)(y_, units = x.units, t_start = 0 * x.times.units,
                             sampling_rate = x.sampling_rate,
-                            name=f"Event Waveform Template ({wave_func.__name__})")
+                            name="Event Waveform Template",
+                            description=f"Event Waveform Template ({wave_func.__name__})",
+                            )
 
+            
         else:
-            raise ValueError(f"Incorrect waveform specification for signal channel {channel}")
+            raise TypeError(f"Invalid waveform_detection['function']; expecting a vector signal or a callable; got {type(waveform_detection['function']).__name__} instead")
+            
+#         elif isinstance(waveform, dict):
+#             # NOTE: 2025-11-10 18:09:17 as a dict, this can be:
+#             # • the mapping:
+#             #   "function"  ↦ typing.Callable
+#             #   "params"    ↦ typing.Sequence[typing.Union[float, pq.Quantity]] (all scalars)
+#             #   "duration"  ↦ float or scalar pq.Quantity with units of the 'x' signal domain
+#             # allow passielng *_model version of model function (i.e. one expecting a sequence or parameters)
+#             wave_func = waveform.get("function", None)
+#             if not inspect.isfunction(model_func):
+#                 raise TypeError("Invalid waveform mapping; expecting a mapping containing a field 'function' mapped to a function")
+#             
+#             wave_params = waveform.get("params", None)
+#             if not isinstance(wave_params, typing.Sequence):
+#                 raise TypeError("Invalid waveform mapping; expecting a mapping containing a field 'params' mapped to a sequence of scalars")
+#             
+#             wave_duration = waveform.get("extent",  None)
+#             
+#             if not isinstance(wave_duration, pq.Quantity) or wave_duration.size != 1 or not scq.unitsConvertible(wave_duration, x.times.units):
+#                 raise TypeError(f"Invalid waveform mapping; expecting a mapping containing a field 'duration' mapped to scalar Quantity scalable to {x.times.units}")
+# 
+#             x_ = np.linspace(0, wave_duration.magnitude, num=int(x.sampling_rate * wave_duration))
+#             
+#             if all(isinstance(p, pq.Quantity) for p in wave_params):
+#                 wave_params = tuple(map(lambda p: float(p), wave_params))
+#                 
+#             y_ = wave_func(x_, wave_params)
+#             
+#             waveform = type(x)(y_, units = x.units, t_start = 0 * x.times.units,
+#                             sampling_rate = x.sampling_rate,
+#                             name=f"Event Waveform Template ({wave_func.__name__})")
+# 
+#         else:
+#             raise ValueError(f"Incorrect waveform specification for signal channel {channel}")
         
         useCBsliding = detection_mapping.get("useCBsliding", False)
         
         threshold = detection_mapping.get("threshold", None)
+        
+        fitparams = detection_mapping.get("fitparams", None)
+        
+        useThresholdOnRsquared = detection_mapping.get("useThresholdOnRsquared", False)
+        
+        rsqThreshold = detection_mapping.get("rsqThreshold", 0.)
     
         # NOTE: 2025-11-10 12:56:52
         # As of now, all waveform templates are converted to neo BaseSignal (neo.AnalogSignal)
@@ -10620,26 +10675,23 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal],
         else:
             thr = threshold
         
-        # TODO: 2025-11-10 22:25:07 add 'segment' to extract_event_waveforms
-        # print(f"membrane.detect_Events: raw_signal is {type(raw_signal).__name__}")
         if isinstance(raw_signal, type(x)) and raw_signal.shape == x.shape and \
             raw_signal.sampling_rate == x.sampling_rate and raw_signal.times.units == x.times.units and \
                 raw_signal.t_start == x.t_start and raw_signal.units == x.units:
             # extract event waveforms from the unfiltered signal 'raw_signal'
-            ret = extract_event_waveforms(raw_signal[:,channel], event_duration,
-                                            θN, thr, peakfunc, 
-                                            detection_mapping["useThresholdOnRsquared"],
-                                            detection_mapping["rsqThreshold"], 
-                                            left_sweep,
-                                            **kwargs)
+            src = raw_signal[:,channel]
         else:
             # extract event waveforms from the (possibily filtered) signal 'x'
-            ret = extract_event_waveforms(x[:,channel], event_duration, 
-                                            θN, thr, peakfunc,  
-                                            detection_mapping["useThresholdOnRsquared"],
-                                            detection_mapping["rsqThreshold"],
-                                            left_sweep,
-                                            **kwargs)
+            src = x[:,channel]
+
+        ret = extract_event_waveforms(src, event_duration, 
+                                        θN, thr, peakfunc,  
+                                        useThresholdOnRsquared,
+                                        rsqThreshold, 
+                                        fit_params,
+                                        left_sweep,
+                                        waveform,
+                                        **kwargs)
             
         # NOTE: 2025-11-11 15:33:50
         # don't append anything if detection failed
@@ -10703,12 +10755,17 @@ def make_event_detection_trainlist(event_detection_result:dict,
     return neo.spiketrainlist.SpikeTrainList(per_channel_spike_trains)
 
 def fit_event_wave(w:typing.Union[neo.AnalogSignal, DataSignal], kw:int,
-                   useThresholdOnRsquared:bool, rsqThreshold:float) -> typing.Optional[typing.Union[neo.AnalogSignal, DataSignal]]:
+                   model_params:dict, useThresholdOnRsquared:bool, rsqThreshold:float,
+                   eventTemplate:typing.Optional[typing.Union[neo.AnalogSignal, DataSignal]] = None) -> typing.Optional[typing.Union[neo.AnalogSignal, DataSignal]]:
     try:
+        init_params = tuple(p.magnitude for p in model_params["Initial Value"])
+        lo = tuple(p.magnitude for p in model_params["Lower Bound"])
+        up = tuple(p.magnitude for p in model_params["Upper Bound"])
+        keep_feasible = model_params["Keep feasible"]
         w_amplitude = w.annotations.get("amplitude", sigp.waveform_amplitude(w))
         w0 = w.copy()
         w0.t_start = 0 * w.times.units
-        fw, fresult = crvf.fit_CB_model(w0, init_params, bounds = (lo, up))
+        fw, fresult = crvf.fit_CB_model(w0, init_params, bounds = (lo, up, keep_feasible))
         # NOTE: 2025-11-26 23:17:14
         # fresult is now a SimpleNamespace
         
