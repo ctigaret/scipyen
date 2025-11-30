@@ -786,7 +786,7 @@ def fit_CB_model(data, p0, **kwargs):
     
     return fittedCurve, types.SimpleNamespace(result)
 
-def fit_CB_wave(data, wave):
+def fit_CB_wave(data, wave, **kwargs):
     r"""R² between data and a template waveform
     
     Not a curve fit but a measure of how well the data is matched by the waveform
@@ -797,7 +797,7 @@ def fit_CB_wave(data, wave):
     Returns:
     =======
         A tuple (None, types.SimpleNamespace) where the SimpleNamespace has a
-        structure similar to that returned by fit_model
+        structure similar to that returned by fit_model and fit_*_model functions
         
     """
     

@@ -10023,9 +10023,8 @@ def extract_event_waveforms(x:typing.Union[neo.AnalogSignal, DataSignal],
                             peakfunc:collections.abc.Callable,
                             useThresholdOnRsquared:bool,
                             rsqThreshold:float,
-                            model_params:dict, 
+                            fit_params:dict, 
                             left_sweep:typing.Union[float, pq.Quantity, np.ndarray] = 0.,
-                            eventTemplate:typing.Optional[typing.Union[neo.AnalogSignal, DataSignal]]=None,
                             **kwargs) -> tuple | None:
     r"""
     Extracts detected waveforms (e.g. mEPSCs) in a signal, wraps their domain 
@@ -10112,50 +10111,6 @@ def extract_event_waveforms(x:typing.Union[neo.AnalogSignal, DataSignal],
         
         'wave_amplitude': array of wave amplitude
     """
-    
-    #
-    # NOTE: 2025-11-09 13:50:03 adding additional fields to array annotations:
-    # • values COMMON to all event waveform channels can be added by passing 
-    #   field_name ↦ POD value type in 'kwargs'
-    # • individual waves can also be array annotated with mapping:
-    #   field_name ↦ 1D numpy array, as long as this is a numeric or string, or 
-    #   boolean array and its size equals the number of channels in the waveform
-    #
-    # Normally, neo.DataObject take array annotations with as many elements per
-    # key as the size on the last axis (highest dimension).
-    # For AnalogSignal and such (e.g. DataSignal), this is also the number of 
-    # signal channels (2nd dimension of the underlying data array, where one signal
-    # channel is a column vector).
-    #
-    # Therefore, the API dealing with array_annotations checks for the annotation
-    # length against the size of the DataObject's data array on its last axis
-    # (i.e., shape[-1]).
-    #
-    # However, for a SpikeTrain, things are different: the "data" array in a 
-    # SpikeTrain is, BY DEFINITION, a 1D array (with shape (N,)). This means 
-    # that for a SpikeTrain array.shape[-1] is the same as array.shape[0] !!!
-    #
-    # If this is what the neo authors have intended (this is not explicit in 
-    # the documentation) then the justification seems to be that the array
-    # annotations of a SpikeTrain are intended to provide data related to
-    # each individual spike in the SpikeTrain. This is perfectly justifiable
-    # given that the spike waveform data is only stored in the SpikeTrain's 
-    # 'waveforms' attribute as a plain numpy array, and not as a signal object, 
-    # (and therefore, any array annotations associated with the original signal 
-    # from where the wavwforms were taken are lost). 
-    #
-    # This is unlike the array annotations for, say, an AnalogSignal, where they 
-    # provide information related to each individual channel, and NOT to individual
-    # data points (which would be penalizing in terms of resources and not very 
-    # useful anyway).
-    #
-    # While this seems an overkill (possibly replicating data for each time stamp)
-    # the alternative woudl be to store the metadata in a separate Python object 
-    # (a dict) which sould require mroe code to keep things in sync 😦
-    #
-    # WARNING: array annotations can only take POD types (strings, scalars, booleans)
-    # which will be converted by the neo API into numpy arrays of corresponding dtypes
-    #
     if not isinstance(x, (neo.AnalogSignal, DataSignal)):
         raise TypeError(f"'x' should be a neo.AnalogSignal or DataSignal; got {type(x).__name__} instead")
     if x.shape[1] > 1:
@@ -10211,7 +10166,6 @@ def extract_event_waveforms(x:typing.Union[neo.AnalogSignal, DataSignal],
     # the onset of the (detected) event waveform
     θmaxima = [np.argmax(θ[v[0]:v[1]]) + v[0] for v in zip(wave_begins, wave_ends) if len(θ[v[0]:v[1]]) > 0]
     event_starts = np.sort(x.times[θmaxima], axis=None)
-    # event_starts = np.array(list(sorted(x.times[θmaxima])))*x.times.units
     
     if left_sweep != 0:
         if events_starts[0] - left_sweep < x.t_start:
@@ -10231,13 +10185,13 @@ def extract_event_waveforms(x:typing.Union[neo.AnalogSignal, DataSignal],
     
     # remove past-the-end intervals
     intervals = [(t0,t1) for (t0,t1) in zip(event_starts, event_ends) if t1 < x.t_stop]
-    # print(f"membrane.extract_event_waveforms: intervals = {intervals}")
     
     # generate new starts after removal of past-the-end
     starts = np.array([interval[0] for interval in intervals])*x.times.units
 
-    # nopte, use those intervals to extract "slices" from the 'x' signal; each
-    # slice of the waveform of an event — effectively, they are "analog" signals
+    # NOTE: 2025-11-30 20:51:33 
+    # use 'intervals' to extract "slices" from the 'x' signal; each slice is the
+    # waveform of an event — effectively, they are "analog" signals
     event_waves = [x.time_slice(*interval) for interval in intervals]
 
     if len(event_waves) == 0:
@@ -10261,7 +10215,6 @@ def extract_event_waveforms(x:typing.Union[neo.AnalogSignal, DataSignal],
     # WARNING: 2025-11-09 12:03:22
     # these annotations WILL BE LOST once we assign the waves to the 'waveforms'
     # attribute of the created spiketrain, below
-    # see also NOTE: 2022-12-17 22:08:57
     #
     fitted_waves = list()
     for km, m in enumerate(event_waves):
@@ -10291,7 +10244,7 @@ def extract_event_waveforms(x:typing.Union[neo.AnalogSignal, DataSignal],
         
         m.array_annotate(**kwargs)
         
-        fw = fit_event_wave(m, km, model_params, useThresholdOnRsquared, rsqThreshold, eventTemplate)
+        fw = fit_event_wave(m, km, fit_params, useThresholdOnRsquared, rsqThreshold)
         fitted_waves.append(fw)
         
     return starts, event_waves, fitted_waves
@@ -10688,9 +10641,8 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal],
                                         θN, thr, peakfunc,  
                                         useThresholdOnRsquared,
                                         rsqThreshold, 
-                                        fit_params,
+                                        fitparams,
                                         left_sweep,
-                                        waveform,
                                         **kwargs)
             
         # NOTE: 2025-11-11 15:33:50
@@ -10755,17 +10707,30 @@ def make_event_detection_trainlist(event_detection_result:dict,
     return neo.spiketrainlist.SpikeTrainList(per_channel_spike_trains)
 
 def fit_event_wave(w:typing.Union[neo.AnalogSignal, DataSignal], kw:int,
-                   model_params:dict, useThresholdOnRsquared:bool, rsqThreshold:float,
-                   eventTemplate:typing.Optional[typing.Union[neo.AnalogSignal, DataSignal]] = None) -> typing.Optional[typing.Union[neo.AnalogSignal, DataSignal]]:
+                   fit_params:dict, useThresholdOnRsquared:bool, rsqThreshold:float) -> typing.Optional[typing.Union[neo.AnalogSignal, DataSignal]]:
     try:
-        init_params = tuple(p.magnitude for p in model_params["Initial Value"])
-        lo = tuple(p.magnitude for p in model_params["Lower Bound"])
-        up = tuple(p.magnitude for p in model_params["Upper Bound"])
-        keep_feasible = model_params["Keep feasible"]
+        init_params = tuple(p.magnitude for p in fit_params["Initial Value"])
+        lb = tuple(p.magnitude for p in fit_params["Lower Bound"])
+        ub = tuple(p.magnitude for p in fit_params["Upper Bound"])
+        keep_feasible = fit_params.get("Keep feasible", None)
+        fitfunc = fit_params["Fit model"]
+        if keep_feasible is None:
+            keep_feasible = [True] * len(lb)
+        elif isinstance(keep_feasible, typing.Sequence):
+            if all(isinstance(v, bool) for v in keep_feasible):
+                if len(keep_feasible) == 1:
+                    keep_feasible = keep_feasible * len(lb)
+                elif len(keep_feasible) != len(lb):
+                    raise ValueError(f"'keep_feasible' must have one or {len(lb)} elements; instead got {len(leep_feasible)}")
+            else:
+                raise TypeError("'keep_feasible' must contain only booleans")
+        else:
+            raise TypeError(f"'keep_feasible' should be a sequence of bool or None; instead, got {type(keep_feasible).__name__}")
+                
         w_amplitude = w.annotations.get("amplitude", sigp.waveform_amplitude(w))
         w0 = w.copy()
         w0.t_start = 0 * w.times.units
-        fw, fresult = crvf.fit_CB_model(w0, init_params, bounds = (lo, up, keep_feasible))
+        fw, fresult = fitfunc(w0, init_params, bounds = (lb, ub, keep_feasible))
         # NOTE: 2025-11-26 23:17:14
         # fresult is now a SimpleNamespace
         

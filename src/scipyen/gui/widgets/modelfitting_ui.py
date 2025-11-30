@@ -438,21 +438,21 @@ class ModelParametersWidget(QtWidgets.QWidget):
             # NOTE: 2022-11-24 23:14:36
             # perform sanity checks on bounds
             for i in paramsDF.index:
-                if paramsDF.loc[i, "Lower Bound:"] > paramsDF.loc[i, "Upper Bound:"]:
-                    lo = paramsDF.loc[i, "Upper Bound:"]
-                    up = paramsDF.loc[i, "Lower Bound:"]
-                    paramsDF.loc[i, "Lower Bound:"] = lo
-                    paramsDF.loc[i, "Upper Bound:"] = up
+                if paramsDF.loc[i, "Lower Bound"] > paramsDF.loc[i, "Upper Bound"]:
+                    lo = paramsDF.loc[i, "Upper Bound"]
+                    up = paramsDF.loc[i, "Lower Bound"]
+                    paramsDF.loc[i, "Lower Bound"] = lo
+                    paramsDF.loc[i, "Upper Bound"] = up
                     
                     # sig_badBounds.emit(str(i))
                     
-                if paramsDF.loc[i, "Lower Bound:"] > paramsDF.loc[i, "Initial Value:"]:
-                    paramsDF.loc[i, "Lower Bound:"] = paramsDF.loc[i, "Initial Value:"]
+                if paramsDF.loc[i, "Lower Bound"] > paramsDF.loc[i, "Initial Value"]:
+                    paramsDF.loc[i, "Lower Bound"] = paramsDF.loc[i, "Initial Value"]
                     
                     # sig_infeasible_x0.emit(str(i))
                     
-                if paramsDF.loc[i, "Upper Bound:"] < paramsDF.loc[i, "Initial Value:"]:
-                    paramsDF.loc[i, "Upper Bound:"] = paramsDF.loc[i, "Initial Value:"]
+                if paramsDF.loc[i, "Upper Bound"] < paramsDF.loc[i, "Initial Value"]:
+                    paramsDF.loc[i, "Upper Bound"] = paramsDF.loc[i, "Initial Value"]
                     
                     # sig_infeasible_x0.emit(str(i))
             
