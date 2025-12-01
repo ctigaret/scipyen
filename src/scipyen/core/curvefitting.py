@@ -593,11 +593,11 @@ def fit_CB_model(data, p0, **kwargs):
     if data.ndim == 2 and data.shape[1] > 1:
         raise ValueError("Data must contain a single channel")
     
-    if not isinstance(p0, (tuple, list)):
+    if not isinstance(p0, typing.Sequence):
         raise TypeError("Initial parameters expected to be a list; got %s instead" % type(p0).__name__)
     
-    if not isinstance(bounds, (tuple, list)) or len(bounds) != 2:
-        raise TypeError("bounds expected a 2-tuple or a 2-element list")
+    if not isinstance(bounds, typing.Sequence) or len(bounds) not in (2, 3):
+        raise TypeError("bounds expected a 2- or 3-element sequence")
     
     def __cost_fun__(x, t, y, *args, **kwargs):  # returns residuals
         r""" x: sequence of model params

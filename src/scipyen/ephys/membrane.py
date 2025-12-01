@@ -10218,36 +10218,36 @@ def extract_event_waveforms(x:typing.Union[neo.AnalogSignal, DataSignal],
     # attribute of the created spiketrain, below
     #
     fitted_waves = list()
-    if isinstance(fit_params, dict):
-        for km, m in enumerate(event_waves):
-            wave_amplitude = sigp.waveform_amplitude(m)
-            m.segment = x.segment
-            m.annotations["Accept"] = np.array([True])
-            m.annotations["left_sweep"] = left_sweep
-            m.annotations["amplitude"] = wave_amplitude
-            m.name = f"{chname}{km}"
-            # NOTE: 2025-11-09 12:10:51
-            # copy the array annotations from the original signal object (where the 
-            # waveform is taken from)
-            m.array_annotate(**x.array_annotations)
-            # NOTE: 2025-11-09 15:42:12
-            # unfortunately, array annotations do NOT support quantities; so assigning
-            # a quantity here will only store its magnitude, "slicing" away the physical units
-            # hence I need to satore this as a string (stirng array)
-            # m.array_annotate(signal_units = scq.unitSymbol(m.units)) # not needed: event_waveforms are Quantity objects which already attach physical units
-            if isinstance(segindex, int):
-                m.array_annotate(segment=x.segment.index)
-                
-            m.array_annotate(amplitude = np.array([wave_amplitude]))
+    print(f"membrane.extract_event_waveforms: fit_params = {fit_params}")
+    for km, m in enumerate(event_waves):
+        wave_amplitude = sigp.waveform_amplitude(m)
+        m.segment = x.segment
+        m.annotations["Accept"] = np.array([True])
+        m.annotations["left_sweep"] = left_sweep
+        m.annotations["amplitude"] = wave_amplitude
+        m.name = f"{chname}{km}"
+        # NOTE: 2025-11-09 12:10:51
+        # copy the array annotations from the original signal object (where the 
+        # waveform is taken from)
+        m.array_annotate(**x.array_annotations)
+        # NOTE: 2025-11-09 15:42:12
+        # unfortunately, array annotations do NOT support quantities; so assigning
+        # a quantity here will only store its magnitude, "slicing" away the physical units
+        # hence I need to satore this as a string (stirng array)
+        # m.array_annotate(signal_units = scq.unitSymbol(m.units)) # not needed: event_waveforms are Quantity objects which already attach physical units
+        if isinstance(segindex, int):
+            m.array_annotate(segment=x.segment.index)
             
-            m.array_annotate(Accept=True)
-            
-            m.array_annotate(peak_time = event_peak_times[km])
-            
-            m.array_annotate(**kwargs)
-            
-            fw = fit_event_wave(m, km, fit_params, useThresholdOnRsquared, rsqThreshold)
-            fitted_waves.append(fw)
+        m.array_annotate(amplitude = np.array([wave_amplitude]))
+        
+        m.array_annotate(Accept=True)
+        
+        m.array_annotate(peak_time = event_peak_times[km])
+        
+        m.array_annotate(**kwargs)
+        
+        fw = fit_event_wave(m, km, fit_params, useThresholdOnRsquared, rsqThreshold)
+        fitted_waves.append(fw)
         
     return starts, event_waves, fitted_waves
     
@@ -10327,14 +10327,14 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal],
                         model's domain)
     
             "fitparams" ↦ None, or mapping of:
-                        "Initial value" ↦ sequence of scalars
-                        "Lower bound"   ↦ sequence of scalars (same length as 
+                        "Initial Value" ↦ sequence of scalars
+                        "Lower Bound"   ↦ sequence of scalars (same length as 
                                             Initial value) or just one scalar
-                        "Upper bound"   ↦ sequence of scalars (same length as 
+                        "Upper Bound"   ↦ sequence of scalars (same length as 
                                             Initial value) or just one scalar
-                        "Keep feasible" ↦ bool (used the construction optimization 
+                        "Keep Feasible" ↦ bool (used the construction optimization 
                                             Bounds for fitting)
-                        "Fit model"     ↦ a callable with syntax:
+                        "Fit Model"     ↦ a callable with syntax:
                                             fun(x, params, bounds)
                                         (see core.curvefitting module)
     
@@ -10641,11 +10641,14 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal],
                     #           "detection_options"     ↦ dict
                     
 def make_event_detection_trainlist(event_detection_result:dict,
-                                    detection_waveform:typing.Union[neo.AnalogSignal, DataSignal],
-                                    origin:str) -> neo.spiketrainlist.SpikeTrainList | None:
+                                   detection_waveform:typing.Union[neo.AnalogSignal, DataSignal],
+                                   origin:typing.Union[neo.AnalogSignal, DataSignal]) -> neo.spiketrainlist.SpikeTrainList | None:
     if not isinstance(event_detection_result, dict) or len(event_detection_result) == 0:
         return
     per_channel_spike_trains = list()
+    segment = origin.segment
+    sweep_descr = f" sweep {segment.index}," if isinstance(segment, neo.Segment) else ""
+    common_descr = " ".join(["Spontaneous events detected in", sweep_descr, f"signal {origin.name}"])
     for channel, channel_result in event_detection_result.items():
         prep_wave = lambda w: w.magnitude.T[np.newaxis,np.newaxis,:] if w.ndim == 1 else w.magnitude[:,0].T[np.newaxis,np.newaxis,:]
         waveforms = np.vstack(list(map(prep_wave, channel_result["waves"])))
@@ -10654,22 +10657,23 @@ def make_event_detection_trainlist(event_detection_result:dict,
             wave_arr_ann = neoutils.merge_array_annotations(wave_arr_ann, w.array_annotations)
             
         # create SpikeTrain
+        print(f"membrane.make_event_detection_trainlist: channel_result['detection_options'] = {channel_result['detection_options']}")
         spike_train = neo.SpikeTrain(channel_result["stamps"],
-                                        t_stop = signal.t_stop,
-                                        units = signal.times.units,
-                                        sampling_rate = signal.sampling_rate,
-                                        t_start = signal.t_start,
+                                        t_stop = origin.t_stop,
+                                        units = origin.times.units,
+                                        sampling_rate = origin.sampling_rate,
+                                        t_start = origin.t_start,
                                         left_sweep = channel_result["waves"][0].annotations["left_sweep"],
                                         waveforms = waveforms,
                                         name = "Detected Events",
-                                        description=f"Spontaneous events detected in sweep {segment.index}, signal {signal.name}, channel {channel}",
+                                        description=f"{common_descr}, channel {channel}",
                                         array_annotations = wave_arr_ann,
                                         signal_channel = channel,
                                         waveform_units = channel_result["waves"][0].units,
                                         fitted_waves = channel_result.get("fitted_waves", list()),
                                         θ = channel_result["θ"],
                                         θN = channel_result["θN"],
-                                        signal_origin = origin,
+                                        signal_name = origin.name,
                                         detection_datetime = channel_result["detection_datetime"],
                                         detection_options = channel_result["detection_options"],
                                         detection_waveform = detection_waveform,
@@ -10683,12 +10687,15 @@ def fit_event_wave(w:typing.Union[neo.AnalogSignal, DataSignal], kw:int,
                    fit_params:dict, useThresholdOnRsquared:bool, rsqThreshold:float) -> typing.Optional[typing.Union[neo.AnalogSignal, DataSignal]]:
     try:
         fitfunc = fit_params.get("Fit Model", None)
+        print(f"membrane.fit_event_wave: fitfunc = {fitfunc}")
         init_params = tuple(p.magnitude for p in fit_params["Initial Value"])
         lb = tuple(p.magnitude for p in fit_params["Lower Bound"])
         ub = tuple(p.magnitude for p in fit_params["Upper Bound"])
         keep_feasible = fit_params.get("Keep Feasible", None)
         if keep_feasible is None:
             keep_feasible = [True] * len(lb)
+        elif isinstance(keep_feasible, bool):
+            keep_feasible = [keep_feasible] * len(lb)
         elif isinstance(keep_feasible, typing.Sequence):
             if all(isinstance(v, bool) for v in keep_feasible):
                 if len(keep_feasible) == 1:
@@ -10735,7 +10742,7 @@ def fit_event_wave(w:typing.Union[neo.AnalogSignal, DataSignal], kw:int,
         traceback.print_exc()
         excstr = traceback.format_exception(e)
         msg = f"Event {kw} in sweep {w.segment}:\n{excstr[-1]}"
-        scipywarn("Fitting event", "\n".join(excstr))
+        scipywarn(f"Fitting event, {'\n'.join(excstr)}")
         return
 
 
