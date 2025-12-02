@@ -65,6 +65,10 @@ There are two versions of model functions:
     to the appropriate function in the first category, and are required by the 
     model fitting functions defined in Scipyen's ``core.curvefitting`` module.
     
+    
+ATTENTION: Please decorate all model functions with the modelfunction decorator.
+This will help locating/accessing these functions easily from other Scipyen
+components.
 """
 import typing
 import numpy as np
@@ -73,7 +77,35 @@ import numbers
 from core import scipyen_quantities as scq
 from core.prog import (scipywarn, signature_as_dict)
 
+def modelfunction(f:typing.Callable, nvars:int=1):
+    r"""Decorator to tag a function as a mathematical model function.
+A mathematical model function realizes a function of one or more variables based 
+on a mathematical expression and a set of independent parameters.
+
+By using this decorator, model functions can be identified as such, regardless 
+of the module (in Scipyen's tree) where they are defined.
+
+Parameters:
+f: the decorated function
+nvars: number of independent variables; this determines the general syntax of the 
+    model function, e.g.:
+    one independent variable (i.e., 1D model):  f(x,   /, *params)
+    two independent variables (2D model):       f(x,y, /, *params)
+    ⋮
+    and so on...
+
+    Optional; default is 1. WARNING: do NOT confuse with the number of model 
+    parameters
+
+"""
+    def wrapper(f):
+        setattr(f,"model_function", True)
+        setyattr(f, "nvars", nvars)
+        return f
+    return wrapper(f)
+
 def check_unpack_model_params_seq(params:typing.Sequence | np.ndarray, n:int):
+    r"""Verifies and unpacks model parameters, when supplied as a Sequence or vector"""
     if isinstance(params, typing.Sequence) and len(params) == n and all (isinstance(v, float) for v in params):
         return tuple(params)
     
@@ -82,8 +114,6 @@ def check_unpack_model_params_seq(params:typing.Sequence | np.ndarray, n:int):
     
     else:
         raise TypeError(f"Expecting a sequence or a numpy array with {n} elements")
-    
-    
 
 def check_rise_decay_params(x:typing.Sequence[float]):
     r"""Returns the number of decay components for a exp-rise-multi-decay transient.
@@ -94,6 +124,7 @@ def check_rise_decay_params(x:typing.Sequence[float]):
     
     return (len(x)-3) // 2
 
+@modelfunction
 def biexponential(x:typing.Union[np.ndarray, float], 
                   β0:float|typing.Sequence[float]|np.ndarray, /,
                   β1:typing.Optional[float] = None, 
@@ -108,10 +139,7 @@ def biexponential(x:typing.Union[np.ndarray, float],
     
     return β0 * np.exp(λ0 * x) + β1 * np.exp(λ1 * x)
 
-# def biexponential_model(x:typing.Union[np.ndarray, float], 
-#                         p:typing.Sequence[float]) -> np.ndarray | float:
-#     return biexponential(x, *p)
-
+@modelfunction
 def biexponential_decay(x:typing.Union[np.ndarray, float], 
                         β0:float|typing.Sequence[float]|np.ndarray, /,
                         β1:typing.Optional[float] = None, 
@@ -126,10 +154,7 @@ def biexponential_decay(x:typing.Union[np.ndarray, float],
     
     return β0 * np.exp(-x / τ0) + β1 * np.exp(-x / τ1)
 
-# def biexponential_decay_model(x:typing.Union[np.ndarray, float], 
-#                               p:typing.Sequence) -> np.ndarray | float:
-#     return biexponential_decay(x, *p)
-
+@modelfunction
 def biased_biexponential_decay(x:np.ndarray | float, α:typing.Union[float,typing.Sequence[float], np.ndarray],/, 
                                β0:typing.Optional[float]=None, β1:typing.Optional[float]=None, 
                                τ0:typing.Optional[float]=None, τ1:typing.Optional[float]=None) -> np.ndarray | float:
@@ -141,10 +166,7 @@ def biased_biexponential_decay(x:np.ndarray | float, α:typing.Union[float,typin
 
     return α + β0 * np.exp(-x / τ0) + β1 * np.exp(-x / τ1)
 
-# def biased_biexponential_decay_model(x:typing.Union[np.ndarray, float], 
-#                                      p:typing.Sequence[float]) -> np.ndarray | float:
-#     return biased_biexponential_decay(x, *p)
-    
+@modelfunction
 def generic_biexponential_decay(x: np.ndarray | float, 
                                 α:typing.Union[float, typing.Sequence[float], np.ndarray], /, 
                                 β0:typing.Optional[float], 
@@ -160,10 +182,7 @@ def generic_biexponential_decay(x: np.ndarray | float,
 
     return α + β0 * np.exp(-(x-x0) / τ0) + β1 * np.exp(-(x-x0) / τ1)
 
-# def generic_biexponential_decay_model(x:np.ndarray | float,
-#                                       p:typing.Sequence[float]) -> np.ndarray | float:
-#     return generic_biexponential_decay(x, *p)
-
+@modelfunction
 def generic_exponential_prod_decay(x: np.ndarray | float, 
                                    α:typing.Sequence[float] | float | np.ndarray, /,
                                    β:typing.Optional[float] = None, 
@@ -224,10 +243,7 @@ NOTE: For calling purposes, α can be supplied as a sequence of (α, β, x0), an
         
     return α + β * np.exp(-(x-x0) / τc)
 
-# def generic_exponential_prod_decay_model(x:np.ndarray | float, 
-#                                          parameters: typing.Sequence[float]) -> np.ndarray | float:
-#     return generic_exponential_prod_decay(x, *parameters)
-
+@modelfunction
 def generic_single_exponential_decay(x:np.ndarray | float, 
                                      α:typing.Sequence[float] | np.ndarray | float, /,
                                      β:typing.Optional[float] = None, 
@@ -267,6 +283,7 @@ coefficients are given as floats in the following order:
     λ = 1/τ
     return α + β * np.exp(-(x-x0)*λ)
 
+@modelfunction
 def generic_single_exponential_rise(x:np.ndarray | float, 
                                     α:typing.Sequence[float]|np.ndarray, 
                                     β:typing.Optional[float] = None, 
@@ -290,18 +307,7 @@ coefficients are given as floats in the following order:
     
     return α + β * (1 - np.exp(-(x-x0)/τ))
 
-# def generic_single_exponential_decay_model(x:np.ndarray | float, 
-#                                            parameters:typing.Sequence[float]) -> np.ndarray | float:
-#     r"""Alias to generic_single_exponential_decay, 
-# with coefficients packed in an array-like object"""
-#     return generic_single_exponential_decay(x, *parameters)
-
-# def generic_single_exponential_rise_model(x:np.ndarray | float, /, 
-#                                           parameters:typing.Sequence[float]) -> np.ndarray | float:
-#     r"""Alias to generic_single_exponential_rise, 
-# with coefficients packed in an array-like object"""
-#     return generic_single_exponential_rise(x, *parameters)
-
+@modelfunction
 def alphaFunction(x:np.ndarray | float, α:typing.Union[typing.Sequence[float],np.ndarray,float], /,
                   β:typing.Optional[float] = None, x0:typing.Optional[float] = None,
                   τ:typing.Optional[float] = None) -> np.ndarray | float:
@@ -379,11 +385,7 @@ plt.plot(x,y)
     
     return y
 
-# def alphaFunction_model(x:np.ndarray | float, 
-#                         parameters: typing.Sequence[float]) -> np.ndarray | float:
-#     r"""Alias to alphaFunction with coefficients packed in an array-like object"""
-#     return alphaFunction(x, *parameters)
-
+@modelfunction
 def nsfa(x:np.ndarray | float, i:float|pq.Quantity|typing.Sequence[typing.Union[float, pq.Quantity]], /, 
          n:typing.Optional[typing.Union[float, pq.Quantity]] = None, 
          b:typing.Optional[typing.Union[float, pq.Quantity]] = None) -> np.ndarray | float:
@@ -407,10 +409,7 @@ WARNING: do not pass quantities for the parameters, yet; just use floats
     
     return x*i - x**2 / n + b
     
-
-# def nsfa_model(x:np.ndarray | float, parameters:typing.Sequence[float]) -> np.ndarray | float:
-#     return nfsa(x, *p)
-
+@modelfunction
 def Clements_Bekkers_97(x:np.ndarray | float,
                         α:typing.Union[float, typing.Sequence[float]], /, 
                         β:typing.Optional[float] = None, 
@@ -510,10 +509,6 @@ def Clements_Bekkers_97(x:np.ndarray | float,
     
     return y
 
-# def Clements_Bekkers_97_model(x:np.ndarray | float, parameters:typing.Sequence[float],
-#                               unit_amplitude:bool=False) -> np.ndarray | float:
-#     return Clements_Bekkers_97(x, *parameters, unit_amplitude = unit_amplitude)
-
 def get_CB_scale_for_unit_amplitude(β:float,τ_rise:float, τ_decay:float, x0:float = 0.):
     efunc       = lambda x, τ: np.exp(-x/τ)
     risefunc    = lambda x, τ: 1-efunc(x,τ)
@@ -525,7 +520,8 @@ def get_CB_scale_for_unit_amplitude(β:float,τ_rise:float, τ_decay:float, x0:f
     peak = -1. if β < 0 else 1.
     
     return peak/yₘ
-    
+
+@modelfunction
 def CBsum(x:np.ndarray | float, α:float | typing.Sequence[float], /, 
           β0:typing.Optional[float]=None, x0_0:typing.Optional[float]=None,
           τ0_0:typing.Optional[float]=None, τ0_1:typing.Optional[float]=None, 
@@ -570,13 +566,7 @@ def CBsum(x:np.ndarray | float, α:float | typing.Sequence[float], /,
     
     return y0 + y1
     
-# def CBsum_model(x:np.ndarray | float, parameters:typing.Sequence[float]) -> np.ndarray | float:
-#     return CBsum(c, *parameters)
-#     
-# def exp_rise_multi_decay_model(x:np.ndarray|float, parameters:typing.Sequence[float], 
-#                                returnDecays = False) -> np.ndarray | float:
-#     return exp_rise_multi_decay(x, *parameters, returnDecays = returnDecays)
-    
+@modelfunction
 def exp_rise_multi_decay(x:np.ndarray|float, *parameters:float,
                          **kwargs) -> np.ndarray|float:
     r""" Realization of a transient signal with a single exponential rise (r) and
@@ -709,6 +699,7 @@ def exp_rise_multi_decay(x:np.ndarray|float, *parameters:float,
         else:
             return y
 
+@modelfunction
 def compound_exp_rise_multi_decay(x, *parameters, returnDecays = False):
     r"""Compound transient signal -- linear sum of delayed single transient signals
     Arguments:
@@ -769,9 +760,7 @@ def compound_exp_rise_multi_decay(x, *parameters, returnDecays = False):
         else:
             return y, yc
         
-# def compound_exp_rise_multi_decay_model(x, parameters, returnDecays = False):
-#     return compound_exp_rise_multi_decay(x, *parameters, returnDecays = returnDecays)
-
+@modelfunction
 def Markwardt_Nilius(x:np.ndarray|float, γ:typing.Sequence[float]|float, /,
                      ϵ:typing.Optional[float]=None, 
                      χ:typing.Optional[float]=None, 
@@ -815,7 +804,7 @@ def Markwardt_Nilius(x:np.ndarray|float, γ:typing.Sequence[float]|float, /,
     if not all(isinstance(v, float) for v in (γ, ϵ, χ, σ)):
         raise TypeError("Expecting a comma-separated list of four float scalars or a sequence of four float scalars")
     
-    y = γ * (x - e) / (1 + np.exp(-(x-h)/s))
+    y = γ * (x - ϵ) / (1 + np.exp(-(x-χ)/σ))
     
     return y
 
@@ -835,6 +824,7 @@ def Markwardt_Nilius(x:np.ndarray|float, γ:typing.Sequence[float]|float, /,
 #     
 #     pass
 
+@modelfunction
 def Talbot_Sayer(x, a, b, c, x0, **kwargs):# t = 33 * pq.degC, o = 2.5 * pq.mM):
     r"""
     Talbot & Sayer model for voltage-gated Ca2+ channels I-V relationship.
@@ -845,22 +835,23 @@ def Talbot_Sayer(x, a, b, c, x0, **kwargs):# t = 33 * pq.degC, o = 2.5 * pq.mM):
     Positional parameters:
     =====================
     
-    x   = 1D numpy array (vector): definition domain (e.g. membrane voltage)
+    x   = 1D numpy array (vector): definition domain (e.g. membrane voltage) ↦ Voltage units
     
-    a   = real: initial value for Boltzman slope factor
+    a   = real: initial value for Boltzman slope factor ↦ pq.dimensionless
     
-    b   = real: initial scale value
+    b   = real: initial scale value ↦ mV × mM / pA  = kg × mol/(m × s³ × A²)
+                                                    = kg × mol/(m × s³ × C² × s⁻²)
     
-    c   = real: initial value for internal Ca2+ concentration (in mM)
+    c   = real: initial value for internal Ca2+ concentration ↦ concentration units (typically, mM)
     
-    x0  = real: initial value of onset ("shift")
+    x0  = real: initial value of onset ("shift") ↦ units of 'x' (i.e., Voltage)
     
     Var-keyword parameters 
     ======================
     
     t   = python quantity: temperature in degrees Celsius (degC); default: 33 degC
     
-    o   = python quantity: external Ca2+ concentration in mM; default: 2.5 mM
+    o   = python quantity: external Ca²⁺ concentration, in mM; default: 2.5 mM
     
     Returns:
     =======
@@ -922,15 +913,19 @@ def Talbot_Sayer(x, a, b, c, x0, **kwargs):# t = 33 * pq.degC, o = 2.5 * pq.mM):
     #k = 0.0379
     
     # see Kay & Wong (1987) J. Physiol, 392:603-616 ↦ Boltzmann eqn squared
-    boltzmann = 1 / (1 + np.exp(-a * k.magnitude * (x-x0)))**2
+    # NOTE: 2025-12-02 21:08:00
+    # dimensional analysis:
+    # k * (x-x0) = 1/V * V = dimensionless
+    boltzmann = 1 / (1 + np.exp(-a * k.magnitude * (x-x0)))**2 # ↦ pq.dimensionless
     
-    ghkexp = np.exp(-2 * x * k.magnitude)
+    ghkexp = np.exp(-2 * x * k.magnitude) # ↦ pq.dimensionless (see NOTE: 2025-12-02 21:08:00)
     
-    # Goldman-Hogkin-Katz
+    # Goldman-Hogkin-Katz current equation
     ghk = x * b * (c - o.magnitude * ghkexp) / (1-ghkexp)
 
-    return boltzmann * ghk
+    return boltzmann * ghk # ↦ Current units (typically, pA)
 
+@modelfunction
 def gaussianSum1D(x, *args, **kwargs):
     r""" Sum of shifted Gaussians in 1D.
     
@@ -1004,7 +999,7 @@ def gaussianSum1D(x, *args, **kwargs):
     
     return ret
     
-    
+@modelfunction
 def Frank_Fuortes(x:np.ndarray | float, 
                   τ:float | typing.Sequence[float], /,  
                   x0: typing.Optional[float] = None) -> np.ndarray | float:
@@ -1043,6 +1038,7 @@ def Frank_Fuortes(x:np.ndarray | float,
 
     return 1-np.exp(-(x-x0)/tau)
 
+@modelfunction
 def Frank_Fuortes2(x:np.ndarray | float, irh:typing.Sequence[float] | float, /,
                    τ:typing.Optional[float] = None, 
                    x0: typing.Optional[float] = None) -> np.ndarray | float:
@@ -1169,6 +1165,7 @@ voltage dependent channels Naᵥ and Kᵥ in the Hodgkin-Huxley formalism.
     # α = 1 if pos == True else -1
     # return 1/(1+np.exp(α * (x0 - x) / κ))
 
+@modelfunction
 def Heaviside(x:typing.Union[pq.Quantity, np.ndarray], 
               x0:typing.Union[float, pq.Quantity], 
               α:bool=True) -> np.ndarray:
@@ -1227,7 +1224,7 @@ def Heaviside(x:typing.Union[pq.Quantity, np.ndarray],
     
     return y
     
-    
+@modelfunction
 def Heaviside2(x:typing.Union[pq.Quantity, np.ndarray], 
               x0:typing.Union[float, pq.Quantity], 
               level0:float=0., level1:float=1.) -> np.ndarray:
@@ -1283,7 +1280,7 @@ def Heaviside2(x:typing.Union[pq.Quantity, np.ndarray],
     
     return y
     
-    
+@modelfunction
 def boxcar(x, p, up_first:bool=True):
     r"""Boxcar function: 
 Two successive Heaviside (step) functions of opposite directions"""
@@ -1300,6 +1297,7 @@ Two successive Heaviside (step) functions of opposite directions"""
         print(f"x0 >= x1 {x0 >= x1}; up_first: {up_first}")
         return Heaviside(x, x0, ud[0]) * Heaviside(x, x1, ud[1])# if up_first else Heaviside(x, x1, False) + Heaviside(x, x0, True)
 
+@modelfunction
 def boxcar2(x, p, level0=0., level1=1.):
     r"""Boxcar function:
 Two successive Heaviside2 (step) functions (general versions) in opposite directions"""
@@ -1307,6 +1305,7 @@ Two successive Heaviside2 (step) functions (general versions) in opposite direct
     
     return Heaviside2(x, x0, level0, level1) + Heaviside2(x, x1, level1, level0)
 
+@modelfunction
 def ramp(x, p = (0., 0., 1., 1.)):
     r"""Linear ramp from (x₀, y₀) to (x₁, y₁)
 
@@ -1364,10 +1363,6 @@ p: the parameters in the specific order: (x₀, y₀, x₁, y₁)
     
     return y
     
-    
-    
-
-    
 def model_parameters(func):
     sig_dict = signature_as_dict(func)
     names = list()
@@ -1379,3 +1374,9 @@ def model_parameters(func):
         
     return names
         
+
+def is_modelfunction(func:typing.Callable):
+    if not isinstance(func, typing.Callable):
+        return False
+    
+    return isinstance(getattr(func, "model_function", None), bool) and isinstance(getattr(func, "nvars", int))

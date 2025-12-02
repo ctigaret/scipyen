@@ -10219,43 +10219,44 @@ def extract_event_waveforms(x:typing.Union[neo.AnalogSignal, DataSignal],
     #
     fitted_waves = list()
     print(f"membrane.extract_event_waveforms: fit_params = {fit_params}")
-    for km, m in enumerate(event_waves):
-        wave_amplitude = sigp.waveform_amplitude(m)
-        m.segment = x.segment
-        m.annotations["Accept"] = np.array([True])
-        m.annotations["left_sweep"] = left_sweep
-        m.annotations["amplitude"] = wave_amplitude
-        m.name = f"{chname}{km}"
-        # NOTE: 2025-11-09 12:10:51
-        # copy the array annotations from the original signal object (where the 
-        # waveform is taken from)
-        m.array_annotate(**x.array_annotations)
-        # NOTE: 2025-11-09 15:42:12
-        # unfortunately, array annotations do NOT support quantities; so assigning
-        # a quantity here will only store its magnitude, "slicing" away the physical units
-        # hence I need to satore this as a string (stirng array)
-        # m.array_annotate(signal_units = scq.unitSymbol(m.units)) # not needed: event_waveforms are Quantity objects which already attach physical units
-        if isinstance(segindex, int):
-            m.array_annotate(segment=x.segment.index)
+    if isinstance(fit_params, dict):
+        for km, m in enumerate(event_waves):
+            wave_amplitude = sigp.waveform_amplitude(m)
+            m.segment = x.segment
+            m.annotations["Accept"] = np.array([True])
+            m.annotations["left_sweep"] = left_sweep
+            m.annotations["amplitude"] = wave_amplitude
+            m.name = f"{chname}{km}"
+            # NOTE: 2025-11-09 12:10:51
+            # copy the array annotations from the original signal object (where the 
+            # waveform is taken from)
+            m.array_annotate(**x.array_annotations)
+            # NOTE: 2025-11-09 15:42:12
+            # unfortunately, array annotations do NOT support quantities; so assigning
+            # a quantity here will only store its magnitude, "slicing" away the physical units
+            # hence I need to satore this as a string (stirng array)
+            # m.array_annotate(signal_units = scq.unitSymbol(m.units)) # not needed: event_waveforms are Quantity objects which already attach physical units
+            if isinstance(segindex, int):
+                m.array_annotate(segment=x.segment.index)
+                
+            m.array_annotate(amplitude = np.array([wave_amplitude]))
             
-        m.array_annotate(amplitude = np.array([wave_amplitude]))
-        
-        m.array_annotate(Accept=True)
-        
-        m.array_annotate(peak_time = event_peak_times[km])
-        
-        m.array_annotate(**kwargs)
-        
-        fw = fit_event_wave(m, km, fit_params, useThresholdOnRsquared, rsqThreshold)
-        fitted_waves.append(fw)
+            m.array_annotate(Accept=True)
+            
+            m.array_annotate(peak_time = event_peak_times[km])
+            
+            m.array_annotate(**kwargs)
+            
+            fw = fit_event_wave(m, km, fit_params, useThresholdOnRsquared, rsqThreshold)
+            fitted_waves.append(fw)
         
     return starts, event_waves, fitted_waves
     
 def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal], 
-                  detection:dict = {0:{"waveform_detection": {"function": PSCwaveform,
-                                                    "params": (0., -1., 0.01, 0.001, 0.01, 0.02),
-                                                    "extent": 0.05,
-                                                    "fitparams": {"Initial Value": (0., -1., 0.01, 0.001, 0.01, 0.02),
+                  detection:dict = {0:{"waveform_detection": {"function": models.Clements_Bekkers_97,
+                                                              "params": (0., -1., 0.01, 0.001, 0.01, 0.02),
+                                                              "extent": 0.05,
+                                                              "fitparams": {"Initial Value": (0., -1., 0.01, 0.001, 0.01, 0.02),
                                                                   "Lower Bound": -np.inf,
                                                                   "Upper Bound": np.inf,
                                                                   "Keep Feasible": True,
@@ -10264,26 +10265,34 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal],
                                        "threshold": None,
                                        "useThresholdOnRsquared": None,
                                        "rsqThreshold": None}},
+                  # detection:dict = {0:{"waveform_detection": {"function": PSCwaveform,
+                  #                                   "params": (0., -1., 0.01, 0.001, 0.01, 0.02),
+                  #                                   "extent": 0.05,
+                  #                                   "fitparams": {"Initial Value": (0., -1., 0.01, 0.001, 0.01, 0.02),
+                  #                                                 "Lower Bound": -np.inf,
+                  #                                                 "Upper Bound": np.inf,
+                  #                                                 "Keep Feasible": True,
+                  #                                                 "Fit Model": crvf.fit_CB_model}},
+                  #                      "useCBsliding": False,
+                  #                      "threshold": None,
+                  #                      "useThresholdOnRsquared": None,
+                  #                      "rsqThreshold": None}},
                   raw_signal:typing.Optional[typing.Union[neo.AnalogSignal, DataSignal]]=None,
                   left_sweep:typing.Optional[typing.Union[float, pq.Quantity]] = None,
                   **kwargs) -> dict:
     r"""Detect the onset of spontaneously occurring events or features in a signal.
     
-    Assuming the signal is a time-varying physical quantity, an "event" is a 
-    waveform, embedded in the signal, corresponding to a particular phenomenon
-    (biological event), e.g., a synaptic response such as an (I/E)PS(P/C), an 
-    action potential, or any other biologically meaningful waveform.
-    
-    In either case, the "events" or "features" occur spontaneously, as opposed to
-    trigger-induced events where the occurrence is expected to happen at possibly 
-    some defined delay after a trigger.
-    
-    The detection is carried out by scanning the signal or a waveform given as 
+    The detection is carried out by scanning the signal for a waveform given as 
     a "template", or by a function that generates such a waveform on the fly.
+    Here, "scanning" is implemented as the cross-correlation of the signal with 
+    the template waveform, or by using the "sliding detection" algorithm described
+    in Clements & Bekkers, 1997, (Biophys J.).
     
-    The actual signal scanning is implemented as the cross-correlation of the 
-    signal with the template waveform, or by using the "sliding detection"
-    algorithm in Clements & Bekkers, 1997, (Biophys J.).
+    Assuming the signal is a time-varying physical quantity, an "event" is a 
+    spontaneously occurring waveform embedded in the signal, corresponding to a 
+    particular phenomenon (biological event), e.g., a synaptic response such as 
+    an (I/E)PS(P/C), an action potential, or any other biologically meaningful 
+    waveform.
     
     Parameters:
     ==========
@@ -10455,6 +10464,8 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal],
         waveform = waveform_detection["function"]
         
         if isinstance(waveform, (np.ndarray, neo.AnalogSignal, DataSignal)):
+            # NOTE: 2025-12-01 21:36:51 a waveform template is provided here,
+            # but we still need model parameters to fit it against...
             if not datatypes.is_vector(waveform):
                 raise TypeError("waveform expected to be a vector")
             
@@ -10465,12 +10476,12 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal],
                                 decription = "Event Waveform Template")
             
         elif inspect.isfunction(waveform):
+            wave_func = waveform
             wave_params = waveform_detection.get("params", None)
             if not isinstance(wave_params, typing.Sequence):
                 raise TypeError("Invalid waveform mapping; expecting a mapping containing a field 'params' mapped to a sequence of scalars")
             
             wave_duration = waveform_detection.get("extent",  None)
-            
             if not isinstance(wave_duration, pq.Quantity) or wave_duration.size != 1 or not scq.unitsConvertible(wave_duration, x.times.units):
                 raise TypeError(f"Invalid waveform mapping; expecting a mapping containing a field 'duration' mapped to scalar Quantity scalable to {x.times.units}")
 
@@ -10496,7 +10507,6 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal],
         useCBsliding = channel_detection_mapping.get("useCBsliding", False)
         
         threshold = channel_detection_mapping.get("threshold", None)
-        
         
         useThresholdOnRsquared = channel_detection_mapping.get("useThresholdOnRsquared", False)
         
@@ -10701,7 +10711,7 @@ def fit_event_wave(w:typing.Union[neo.AnalogSignal, DataSignal], kw:int,
                 if len(keep_feasible) == 1:
                     keep_feasible = keep_feasible * len(lb)
                 elif len(keep_feasible) != len(lb):
-                    raise ValueError(f"'keep_feasible' must have one or {len(lb)} elements; instead got {len(leep_feasible)}")
+                    raise ValueError(f"'keep_feasible' must have one or {len(lb)} elements; instead got {len(keep_feasible)}")
             else:
                 raise TypeError("'keep_feasible' must contain only booleans")
         else:

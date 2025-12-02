@@ -5,7 +5,6 @@ import math, numbers, typing, os
 import numpy as np
 import quantities as pq
 import pandas as pd
-from core.strutils import str2symbol
 import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
 from qtpy.QtCore import (Signal, Slot, Property,)
@@ -32,19 +31,13 @@ else:
     QShortcut = QtWidgets.QShortcut
     __has_sip__ = True
     
+from core.strutils import str2symbol
+from core import models
 from gui import guiutils
 import gui.quickdialog as qd
 from gui.widgets.small_widgets import QuantitySpinBox
 
-
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
-
-# Ui_TestParamsWidgets2, QWidget = loadUiType(os.path.join(__module_path__, "TestParamsWidget2.ui"), from_imports=True, import_from="gui")
-# 
-# class TestParamsWidgets2(QWidget, Ui_TestParamsWidgets2):
-#     def __init__(self, parent=None):
-#         super().__init__(parent)
-#         self.setupUi(self)
 
 class ModelParametersWidget(QtWidgets.QWidget):
     r"""A widget composed of labels and spin boxes for input of numeric values
