@@ -1,5 +1,10 @@
 # -*- coding: utf-8 -*-
-r"""Widgets for parameter inputs
+# $Id: modelfitting_ui.py $
+# SPDX-FileCopyrightText: 2022 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
+r"""Widget for model parameter inputs
 """
 import math, numbers, typing, os
 import numpy as np
@@ -38,6 +43,7 @@ import gui.quickdialog as qd
 from gui.widgets.small_widgets import QuantitySpinBox
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
+Ui_ModelFittingWidget, QWidget = loadUiType(os.path.join(__module_path__, "ModelFittingWidget.ui"))
 
 class ModelParametersWidget(QtWidgets.QWidget):
     r"""A widget composed of labels and spin boxes for input of numeric values
@@ -626,3 +632,21 @@ class ModelParametersWidget(QtWidgets.QWidget):
     
     def getParameterValue(self, parameter_name:str, what:str):
         return self.parameters.loc[parameter_name, what]
+
+
+class ModelFittingWidget(Ui_ModelFittingWidget, QWidget):
+    def __init__(self, parent=None, **kwargs):
+        QWidget.__init__(self, parent=parent)
+        
+        self._configureUI_()
+        
+    def _configureUI_(self):
+        self.setupUi(self)
+        
+        self.modelParamsWidget.spinStep = 1e-4
+        self.modelParamsWidget.spinDecimals = 4
+        
+        self.modelParamsWidget.sig_parameterChanged[str, str].connect(self._slot_modelParameterChanged)
+        self.modelParamsWidget.sig_badBounds[str].connect(self._slot_badBounds)
+        self.modelParamsWidget.sig_infeasible_x0[str].connect(self._slot_infeasible_x0s)
+        
