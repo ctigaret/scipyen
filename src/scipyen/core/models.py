@@ -81,6 +81,7 @@ from core.prog import (scipywarn, signature_as_dict, decorator)
 def modelfunction(f:typing.Callable, nvars:int=1, 
                   parameter_names:typing.Optional[typing.Sequence[str]]=None,
                   n_parameters:typing.Optional[int] = None,
+                  parameter_units:typing.Optional[dict]=None,
                   **kwargs):
     r"""Decorator to tag a function as a mathematical model function.
 A mathematical model function realizes a function of one or more independent 
@@ -102,6 +103,8 @@ Model functions gain the following attributes:
     These parameters are also the ones that are determined in curve fitting (i.e.
     when fitting a model to some real data thought to follow the mathematical
     relation that defines the model).
+
+'parameter_units' (see below)
 
 Parameters:
 f: the decorated function
@@ -126,6 +129,36 @@ parameter_names: typing.Sequence[str] — names (symbols) for the parameters.
     When the model defines a variadic number of parameters (see e.g., generic_exponential_prod_decay)
     these are indicated by a * suffix
 
+parameter_units: optional mapping
+    parameter symbol:str ↦ physical unit: Quantity, UnitQuantity, or sequence of such
+
+    Default is None
+    When given, this flags that some model parameters actually have physical units;
+    the keys are the names of the model parameters (as in parameter_names).
+
+    When the model defines a variadic number of parameters (see e.g., 
+    generic_exponential_prod_decay) their keys are suffixed by a '*' (as above) 
+    and their associated units are the same.
+
+    Since not all parameters necessarily associate physical units, those that do not
+    may be omitted from this mapping. However, ATTENTION: the full sequence of
+    parameter names SHOULD be given in 'parameter_names', as above.
+
+    Some models may accept parameters with physical units that depend on the physical
+    dimensionality of the dependent variable. For example, alphaFunction — which 
+    models a time-varying function of ANY dependent physical variable, whether it
+    is current, voltage, fluorescence intensity, etc — takes an "offset" parameter 
+    (α) which by definition has the same units as the dependent variable.
+
+    In such cases you have the option to NOT specify a unit here
+
+    The safest practice is to associate these unitless parameters with pq.dimensionless
+    which will flag them as such.
+
+    WARNING: This does not mean that the decorated model function expects Quantities
+    as values for the parameter; it is up to the function what to do with its
+    own call arguments
+
 n_parameters: int: number of model parameters; again, this can be inferred from the 
     length of the paraneter names sequence, or indirectly by inspecting the 
     function's signature; however, this provides a direct access, useful for
@@ -135,6 +168,7 @@ n_parameters: int: number of model parameters; again, this can be inferred from 
 
     NOTE: this will be updated automatically wher 'parameternames' above is set 
     to a non-empty sequence of str
+
 
 Var-positional parameters:
 additional attributes to be set to the wrapped function WARNING under development
@@ -154,6 +188,35 @@ https://wiki.python.org/moin/PythonDecoratorLibrary#Creating_decorator_with_opti
             setattr(f, "parameter_names", parameter_names)
         else:
             setattr(f, "parameter_names", tuple())
+            
+        if isinstance(parameter_units, dict):
+            if len(parameter_units) and all(isinstance(k, str) for k in parameter_units.keys()):
+                pnames = getattr(f, "parameter_names", None)
+                if pnames is None or isinstance(pnames, typing.Sequence) and len(pnames) == 0:
+                    setattr(f, "parameter_names", tuple(parameter_units.keys()))
+                    
+                punits = dict()
+                for key, value in parameter_units:
+                    if key not in f.parameter_names:
+                        continue
+                    if (isinstance(value, pq.Quantity) and value.size==1) or (isinstance(value, typing.Sequence) and all(isinstance(v, pq.Quantity) and v.size==1 for v in value)):
+                        punits[key] = value
+                        
+                for pname in pnames:
+                    if pname not in punits:
+                        punits[pname] = pq.dimensionless
+            else:
+                pnames = getattr(f, "parameter_names", None)
+                if isinstance(pnames, typing.Sequence) and len(pnames) and all(isinstance(p, str) for p in pnames):
+                    punits = dict(map(lambda p: (p, pq.dimensionless), pnames))
+                    setattr(f, "parameter_units", punits)
+                    
+        else:
+            pnames = getattr(f, "parameter_names", None)
+            if isinstance(pnames, typing.Sequence) and len(pnames) and all(isinstance(p, str) for p in pnames):
+                punits = dict(map(lambda p: (p, pq.dimensionless), pnames))
+                setattr(f, "parameter_units", punits)
+                
             
         if isinstance(n_parameters, int) and len(f.parameter_names) == 0:
             # use 'nparameters' only when parameternames is not given
@@ -479,7 +542,8 @@ WARNING: do not pass quantities for the parameters, yet; just use floats
     
     return x*i - x**2 / n + b
     
-@modelfunction(parameter_names = ("α", "β", "x0", "τ1", "τ2"))
+@modelfunction(parameter_names = ("α", "β", "x0", "τ1", "τ2"),
+               parameter_units = {"α"})
 def Clements_Bekkers_97(x:np.ndarray | float,
                         α:typing.Union[float, typing.Sequence[float]], /, 
                         β:typing.Optional[float] = None, 

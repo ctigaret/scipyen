@@ -4,7 +4,9 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 r"""
-Wrappers around scipy.optimize
+Wrappers around scipy.optimize and functions for "guesstimating" initial model
+parameter values for some models, based on data that «might» be satisfied by the
+model.
 
 FIXME/TODO: 2022-10-25 23:57:08
 Harmonize the API (prepare to migrate to the upcoming modelfitting.py module)

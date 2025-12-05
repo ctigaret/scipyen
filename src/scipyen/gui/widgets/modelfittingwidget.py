@@ -47,17 +47,41 @@ Ui_ModelFittingWidget, QWidget = loadUiType(os.path.join(__module_path__, "Model
 
 class ModelFittingWidget(Ui_ModelFittingWidget, QWidget):
     def __init__(self, parent=None, **kwargs):
+        r"""
+    Var-keyword parameters:
+    model: can be 
+        • a pandas DataFrame with the following mandatory structure:
+            ∘ index: model parameter symbols (strings)
+            ∘ columns: 'Initial Value', 'Lower Bound', 'Upper Bound', 'Keep Feasible';
+                The first three columns contain scalar floats or scalar python Quantity objects
+                with the initial, lower and upper bound values for the corresponding model
+                parameter in the respective row.
+                The fourth column contains bool values.
+                
+    """
+        modelParameters = kwargs.get("model", None)
+        
         QWidget.__init__(self, parent=parent)
+        
+        self._data_:typing.Optional[pd.DataFrame] = None
         
         self._configureUI_()
         
+        if isinstance(self._data_, pd.DataFrame):
+            assert all(v in parameters.columns for v in ('Initial Value', 'Lower Bound', 'Upper Bound', 'Keep Feasible')), "Not a model parameters data frame"
+            self.modelParamsTable.setData(self._data_)
+        
     def _configureUI_(self):
         self.setupUi(self)
+        self.modelParamsTable.sig_dataChanged.connect(self._slot_modelParameterChanged)
         
-        self.modelParamsWidget.spinStep = 1e-4
-        self.modelParamsWidget.spinDecimals = 4
+        # self.modelParamsTable.spinStep = 1e-4
+        # self.modelParamsTable.spinDecimals = 4
         
-        self.modelParamsWidget.sig_parameterChanged[str, str].connect(self._slot_modelParameterChanged)
-        self.modelParamsWidget.sig_badBounds[str].connect(self._slot_badBounds)
-        self.modelParamsWidget.sig_infeasible_x0[str].connect(self._slot_infeasible_x0s)
+        # self.modelParamsTable.sig_parameterChanged[str, str].connect(self._slot_modelParameterChanged)
+        # self.modelParamsTable.sig_badBounds[str].connect(self._slot_badBounds)
+        # self.modelParamsTable.sig_infeasible_x0[str].connect(self._slot_infeasible_x0s)
+        
+    @Slot()
+    def _slot_modelParameterChanged(self):
         

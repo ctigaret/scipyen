@@ -15,7 +15,7 @@
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
-    <widget class="ModelParametersWidget" name="modelParamsWidget" native="true">
+    <widget class="TableEditorWidget" name="modelParamsTable" native="true">
      <property name="sizePolicy">
       <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
        <horstretch>1</horstretch>
@@ -146,9 +146,9 @@
    <header location="global">gui.widgets.small_widgets</header>
   </customwidget>
   <customwidget>
-   <class>ModelParametersWidget</class>
+   <class>TableEditorWidget</class>
    <extends>QWidget</extends>
-   <header location="global">gui.widgets.modelfitting_ui</header>
+   <header location="global">gui.widgets.tableeditorwidget</header>
    <container>1</container>
   </customwidget>
  </customwidgets>
