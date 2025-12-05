@@ -74,6 +74,7 @@ import typing
 import numpy as np
 import quantities as pq
 import numbers
+import dataclasses
 from core import scipyen_quantities as scq
 from core.prog import (scipywarn, signature_as_dict, decorator)
 
@@ -92,8 +93,10 @@ The function returns an nD array where 1 <= n <= nvars (see below)
 By using this decorator, model functions can be identified as such, regardless 
 of the module (in Scipyen's tree) where they are defined.
 
-Model functions gain the following attributes:
+This decorator sets the attributes listed below, to a model function. 
+
 'nvars': number of independent variables (e.g. 1D or nD function)
+
 'parameter_names': sequence of parameter symbols as they appear in the mathematical
     model; these parameters are "fixed" for a given model instance and are 
     responsible for generating a "family" of models from the same independent 
@@ -105,6 +108,9 @@ Model functions gain the following attributes:
     relation that defines the model).
 
 'parameter_units' (see below)
+
+NOTE: these attributes are NOT directly accessible from within the function's
+scope (i.e. excuted code). 
 
 Parameters:
 f: the decorated function
@@ -142,7 +148,12 @@ parameter_units: optional mapping
 
     Since not all parameters necessarily associate physical units, those that do not
     may be omitted from this mapping. However, ATTENTION: the full sequence of
-    parameter names SHOULD be given in 'parameter_names', as above.
+    parameter names SHOULD be given in 'parameter_names', as above. Parameters
+    that are omitted from parameter_units will by default get pq.dimensionless as
+    physical unit.
+
+    The safest practice is to associate these unitless parameters with pq.dimensionless
+    which will flag them as such.
 
     Some models may accept parameters with physical units that depend on the physical
     dimensionality of the dependent variable. For example, alphaFunction — which 
@@ -150,10 +161,12 @@ parameter_units: optional mapping
     is current, voltage, fluorescence intensity, etc — takes an "offset" parameter 
     (α) which by definition has the same units as the dependent variable.
 
-    In such cases you have the option to NOT specify a unit here
+    In such cases you have the option to specify None or dataclasses.MISSING in lieu
+    of units. Since the actual physical dimensionality of the dependent variable 
+    is often unknown before calling the model function, using MISSING or None as
+    dimensionality tag flags that the parameter should receive the units of the
+    dependent variable at runtime.
 
-    The safest practice is to associate these unitless parameters with pq.dimensionless
-    which will flag them as such.
 
     WARNING: This does not mean that the decorated model function expects Quantities
     as values for the parameter; it is up to the function what to do with its
@@ -169,11 +182,10 @@ n_parameters: int: number of model parameters; again, this can be inferred from 
     NOTE: this will be updated automatically wher 'parameternames' above is set 
     to a non-empty sequence of str
 
+    NOTE: the wrapper also gives access to these
 
 Var-positional parameters:
 additional attributes to be set to the wrapped function WARNING under development
-For example, one may want to configure the physical dimensionality of the function's
-variable, e.g. by passing units=<some Quantity or UnitQuantity object>
 
 NOTE for developers: this function defines a function decorator with optional
 arguments; this is made possible by decorating this function with the prog.decorator
@@ -189,22 +201,24 @@ https://wiki.python.org/moin/PythonDecoratorLibrary#Creating_decorator_with_opti
         else:
             setattr(f, "parameter_names", tuple())
             
+        
         if isinstance(parameter_units, dict):
+            check_value_type = lambda v: (isinstance(v, pq.Quantity) and v.size==1) or isinstance(v, (type(None), type(dataclasses.MISSING)))
             if len(parameter_units) and all(isinstance(k, str) for k in parameter_units.keys()):
                 pnames = getattr(f, "parameter_names", None)
                 if pnames is None or isinstance(pnames, typing.Sequence) and len(pnames) == 0:
                     setattr(f, "parameter_names", tuple(parameter_units.keys()))
                     
-                punits = dict()
-                for key, value in parameter_units:
+                punits = dict(map(lambda p: (p, pq.dimensionless), pnames))
+                
+                for key, value in parameter_units.items():
                     if key not in f.parameter_names:
                         continue
-                    if (isinstance(value, pq.Quantity) and value.size==1) or (isinstance(value, typing.Sequence) and all(isinstance(v, pq.Quantity) and v.size==1 for v in value)):
+                    if (check_value_type(value)) or (isinstance(value, typing.Sequence) and all(check_value_type(v) for v in value)):
                         punits[key] = value
                         
-                for pname in pnames:
-                    if pname not in punits:
-                        punits[pname] = pq.dimensionless
+                setattr(f, "parameter_units", punits)
+                
             else:
                 pnames = getattr(f, "parameter_names", None)
                 if isinstance(pnames, typing.Sequence) and len(pnames) and all(isinstance(p, str) for p in pnames):
@@ -235,6 +249,9 @@ https://wiki.python.org/moin/PythonDecoratorLibrary#Creating_decorator_with_opti
         return f
     
     return wrapper(f)
+    # wf = wrapper(f)
+    # setattr(wf, "self", f)
+    # return wf
 
 def check_unpack_model_params_seq(params:typing.Sequence | np.ndarray, n:int):
     r"""Verifies and unpacks model parameters, when supplied as a Sequence or vector"""
@@ -439,7 +456,8 @@ coefficients are given as floats in the following order:
     
     return α + β * (1 - np.exp(-(x-x0)/τ))
 
-@modelfunction(parameter_names = ("α", "β", "x0", "τ"))
+@modelfunction(parameter_names = ("α", "β", "x0", "τ"),
+               parameter_units={"α": dataclasses.MISSING,"β":pq.dimensionless,"x0":pq.s, "τ":pq.s})
 def alphaFunction(x:np.ndarray | float, α:typing.Union[typing.Sequence[float],np.ndarray,float], /,
                   β:typing.Optional[float] = None, x0:typing.Optional[float] = None,
                   τ:typing.Optional[float] = None) -> np.ndarray | float:
