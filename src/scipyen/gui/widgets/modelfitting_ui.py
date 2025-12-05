@@ -43,7 +43,6 @@ import gui.quickdialog as qd
 from gui.widgets.small_widgets import QuantitySpinBox
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
-Ui_ModelFittingWidget, QWidget = loadUiType(os.path.join(__module_path__, "ModelFittingWidget.ui"))
 
 class ModelParametersWidget(QtWidgets.QWidget):
     r"""A widget composed of labels and spin boxes for input of numeric values
@@ -634,19 +633,3 @@ class ModelParametersWidget(QtWidgets.QWidget):
         return self.parameters.loc[parameter_name, what]
 
 
-class ModelFittingWidget(Ui_ModelFittingWidget, QWidget):
-    def __init__(self, parent=None, **kwargs):
-        QWidget.__init__(self, parent=parent)
-        
-        self._configureUI_()
-        
-    def _configureUI_(self):
-        self.setupUi(self)
-        
-        self.modelParamsWidget.spinStep = 1e-4
-        self.modelParamsWidget.spinDecimals = 4
-        
-        self.modelParamsWidget.sig_parameterChanged[str, str].connect(self._slot_modelParameterChanged)
-        self.modelParamsWidget.sig_badBounds[str].connect(self._slot_badBounds)
-        self.modelParamsWidget.sig_infeasible_x0[str].connect(self._slot_infeasible_x0s)
-        

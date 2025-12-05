@@ -1481,4 +1481,4 @@ def is_modelfunction(func:typing.Callable):
     if not isinstance(func, typing.Callable):
         return False
     
-    return isinstance(getattr(func, "model_function", None), bool) and isinstance(getattr(func, "nvars", int))
+    return isinstance(getattr(func, "model_function", None), bool) and isinstance(getattr(func, "nvars", None), int)

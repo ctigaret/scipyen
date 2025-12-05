@@ -316,12 +316,17 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
     @readOnly.setter
     def readOnly(self, val:bool):
         self._readOnly_ = val == True
+        signalBlocker = QtCore.QSignalBlocker(self.setEditableToolButton)           
         if self._readOnly_:
             self.tableView.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
-            self.tableView.setItemDelegate(self._editItemDelegate_)
+            self.tableView.setItemDelegate(self._defaultItemDelegate_)
+            self.setEditableToolButton.setIcon(QtGui.QIcon.fromTheme("object-locked"))
+            self.setEditableToolButton.setToolTip("Editing disabled; toggle to enable")
         else:
             self.tableView.setEditTriggers(self._defaultEditTriggers_)
-            self.tableView.setItemDelegate(self._defaultItemDelegate_)
+            self.tableView.setItemDelegate(self._editItemDelegate_)
+            self.setEditableToolButton.setIcon(QtGui.QIcon.fromTheme("object-unlocked"))
+            self.setEditableToolButton.setToolTip("Editing enabled; toggle to disable")
             
     def setEditTriggers(self, val):
         r"""See documentation for QtWidgets.QAbstractItemView.setEditTriggers()
@@ -369,6 +374,20 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         self.prevSliceToolbutton.clicked.connect(self._slot_prevSlice)
         self.nextSliceToolButton.setEnabled(False)
         self.nextSliceToolButton.clicked.connect(self._slot_nextSlice)
+        
+        if self._readOnly_:
+            self.setEditableToolButton.setChecked(False)
+            self.setEditableToolButton.setIcon(QtGui.QIcon.fromTheme("object-locked"))
+            self.setEditableToolButton.setToolTip("Editing disabled; toggle to enable")
+        else:
+            self.setEditableToolButton.setChecked(True)
+            self.setEditableToolButton.setIcon(QtGui.QIcon.fromTheme("object-unlocked"))
+            self.setEditableToolButton.setToolTip("Editing enabled; toggle to disable")
+        self.setEditableToolButton.toggled.connect(self._slot_setEditable)
+        
+    @Slot(bool)
+    def _slot_setEditable(self, value:bool):
+        self.readOnly = not value
         
     @Slot(QtCore.QModelIndex)
     def slot_tableItemClicked(self, index:QtCore.QModelIndex):
@@ -892,6 +911,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             
         elif col >= self._modelData_.shape[1]:
             return False
+        
+        # print(f"{self.__class__.__name__}.setData: role = {role}")
             
         if role not in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole):
             return False
@@ -949,7 +970,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             # timer1.start()
             
             self._is_vigra_filter_kernel_ = False
-            self._original_data_ = None
+            self._original_data_ = data
             
             if isinstance(data, pd.DataFrame):
                 self._modelData_ = data
@@ -976,6 +997,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             elif isinstance(data, np.ndarray):
                 # trying to streamline this
                 # NOTE: 2025-11-23 09:45:45 FIXME/TODO - TOO SLOW!
+                # lazy display alleviates this to some degree (see self.fetchMore(…))
                 if isinstance(data, neo.core.dataobject.DataObject):
                     # NOTE: 2025-09-27 10:38:00
                     # for regularly sampled signals (neo.AnalogSignal, DataSignal)
@@ -1442,11 +1464,20 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             else:
                 pyvalue = value
                 
+            # print(f"{self.__class__.__name__}._setDataValue_: row={row}, col={col} -> pyvalue={pyvalue}")
+                
             if isinstance(self._modelData_, pd.DataFrame):
-                self._modelData_.at[data_row, data_col] = pyvalue
+                self._modelData_.iloc[row, col] = pyvalue
+                # self._modelData_.at[row, col] = pyvalue
+                # print(f"{self.__class__.__name__}._setDataValue_: self._modelData_.iloc[{row}, {col}] -> {self._modelData_.iloc[row, col]}")
+                return True
+                # self._modelData_.at[data_row, data_col] = pyvalue
                 
             elif isinstance(self._modelData_, pd.Series):
-                self._modelData_.at[data_row] = pyvalue
+                self._modelData_.iloc[row] = pyvalue
+                # self._modelData_.at[row] = pyvalue
+                return True
+                # self._modelData_.at[data_row] = pyvalue
                 
             elif isinstance(self._modelData_, neo.dataobject.DataObject):
                 if col == 0:
@@ -1458,42 +1489,54 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                                     raise ValueError(f"Expecting value units of {self._modelData_.times.units}; got ({pyvalue.units}) instead")
                                 
                                 self._modelData_.t_start = pyvalue
+                                return True
                                 
                             elif isinstance(pyvalue, (float, int, complex)):
                                 self._modelData_.t_start = pyvalue * self._modelData_.units
+                                return True
                             else:
-                                raise TypeError(f"Expecting a float or a Quantity in {self._modelData_.times.units}; got {type(pyvalue).__name__} instead")
+                                scipywarn(f"Expecting a float or a Quantity in {self._modelData_.times.units}; got {type(pyvalue).__name__} instead")
+                                return False
                         else:
-                            return
+                            return False
                     else:
                         if isinstance(pyvalue, pq.Quantity):
                             if pyvalue.units != self._modelData_.times.units:
-                                raise ValueError(f"Expecting value units of {self._modelData_.times.units}; got ({pyvalue.units}) instead")
+                                scipywarn(f"Expecting value units of {self._modelData_.times.units}; got ({pyvalue.units}) instead")
+                                return False
                             
                             self._modelData_.times[row] = pyvalue
+                            return True
                             
                         elif isinstance(pyvalue, (float, int, complex)):
                             self._modelData_.times[row] = pyvalue * self._modelData_.units
+                            return True
                         else:
-                            raise TypeError(f"Expecting a float or a Quantity in {self._modelData_.times.units}; got {type(pyvalue).__name__} instead")
+                            scipywarn(f"Expecting a float or a Quantity in {self._modelData_.times.units}; got {type(pyvalue).__name__} instead")
+                            return False
                         
                 else:
                     if isinstance(pyvalue, pq.Quantity):
                         if pyvalue.units != self._modelData_.units:
-                            raise ValueError(f"Expecting value units of {self._modelData_.units}; got ({pyvalue.units}) instead")
+                            scipywarn(f"Expecting value units of {self._modelData_.units}; got ({pyvalue.units}) instead")
+                            return False
                         
                         self._modelData_[row, col-1] = pyvalue
+                        return True
                         
                     elif isinstance(pyvalue, (float, int, complex)):
                         self._modelData_[row, col-1] = pyvalue * self._modelData_.units
+                        return True
                     else:
-                            raise TypeError(f"Expecting a float or a Quantity in {self._modelData_.units}; got {type(pyvalue).__name__} instead")
+                        scipywarn(f"Expecting a float or a Quantity in {self._modelData_.units}; got {type(pyvalue).__name__} instead")
+                        return False
                             
             elif isinstance(self._modelData_, np.ndarray):
                 self._modelData_[row, col] = pyvalue
                 if self._is_vigra_filter_kernel_:
                     self._original_data_ = vigrautils.kernelfromarray(self._modelData_)
-                        
+                    
+                return True
             else:
                 return False
             

@@ -108,6 +108,28 @@
        </property>
       </spacer>
      </item>
+     <item>
+      <widget class="QToolButton" name="setEditableToolButton">
+       <property name="toolTip">
+        <string>Allow/Prevent Editing</string>
+       </property>
+       <property name="statusTip">
+        <string>Allow/Prevent Editing</string>
+       </property>
+       <property name="whatsThis">
+        <string>Allow/Prevent Editing</string>
+       </property>
+       <property name="text">
+        <string>Edit</string>
+       </property>
+       <property name="icon">
+        <iconset theme="object-locked"/>
+       </property>
+       <property name="checkable">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
     </layout>
    </item>
    <item row="1" column="0">

@@ -372,7 +372,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         else:
             if isinstance(data, bool) or "bool" in type(data).__name__:
                 assert isinstance(editor, QtWidgets.QCheckBox), f"Incompatible editor widget type ({type(editor).__name__}) for boolean data"
-                editor.setChecked(data==True)
+                editor.setChecked(bool(data)==True) # because data may be of numpy.bool type
                 
             elif isinstance(data, int) or "int" in type(data).__name__:
                 assert isinstance(editor, QtWidgets.QSpinBox), f"Incompatible editor widget type ({type(editor).__name__}) for integer data"
