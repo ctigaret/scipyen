@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-FileCopyrightText: 2021 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
@@ -42,7 +42,7 @@ from core.traitcontainers import DataBag
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
 from core.utilities import reverse_mapping_lookup
 
-from core import models # we're still developing this one
+from core import models # I'm still developing this one
 
 #@contextmanager
 
@@ -50,7 +50,7 @@ class ModelExpression(object):
     r"""Class decorator to pass an expression to the model.
     
     Can use this instead of directly hard-coding the expression in the definition
-    if the fit model ::class::.
+    in the fit model ::class::.
     
     This is useful to dynamically create new FitModel ::classes:: 
     
@@ -103,10 +103,6 @@ class ModelExpression(object):
     
     def _make_canon_(self, name:str):
         frame = inspect.currentframe()
-        #print("globals in current frame:\n")
-        #pprint(frame.f_globals)
-        #print("locals in current frame:\n")
-        #pprint(frame.f_locals)
         for m in self._modules_:
             if name in m.__dict__:
                 # name is a member of module 'm'
@@ -137,8 +133,6 @@ class ModelExpression(object):
             # as an alias
             
                 return "%s.%s" % (m_name, name)
-
-            
         return name
 
 class FitModelMeta(type):
@@ -172,34 +166,41 @@ class FitModelMeta(type):
         def fset(instance, val):
             instance.initial[param] = val
             
-        def fget_lower(instance):
-            return instance.lower[param]
+        def fget_lb(instance):
+            return instance.lb[param]
             
-        def fset_lower(instance, val):
-            instance.lower[param] = val
+        def fset_lb(instance, val):
+            instance.lb[param] = val
             
-        def fget_upper(instance):
-            return instance.upper[param]
+        def fget_ub(instance):
+            return instance.ub[param]
             
-        def fset_upper(instance, val):
-            instance.upper[param] = val
+        def fset_ub(instance, val):
+            instance.ub[param] = val
             
-        initial = property(fget=fget,       fset=fset,       doc = "Initial value of %s model parameter '%s'"     % (classname, param))
-        lower   = property(fget=fget_lower, fset=fset_lower, doc = "Lower bound value of %s model parameter '%s'" % (classname, param))
-        upper   = property(fget=fget_upper, fset=fset_upper, doc = "Upper bound value of %s model parameter '%s'" % (classname, param))
+        def fget_kf(instance):
+            return instance.keep_feasible[param]
+            
+        def fset_kf(instance, val):
+            instance.keep_feasible[param] = val
+            
+        initial         = property(fget=fget,       fset=fset,          doc = "Initial value of %s model parameter '%s'"     % (classname, param))
+        lb              = property(fget=fget_lb,    fset=fset_lb,       doc = "Lower bound value of %s model parameter '%s'" % (classname, param))
+        ub              = property(fget=fget_ub,    fset=fset_ub,       doc = "Upper bound value of %s model parameter '%s'" % (classname, param))
+        keep_feasible   = property(fget=fget_kf,    fset=fset_kf,       doc = f"Keep bounds seafible for {classname} model parameter {param}")
         
-        return (initial, lower, upper)
+        return (initial, lb, ub, keep_feasible)
 
 class FitModel(metaclass=FitModelMeta):
     r"""Top parent :class: for all fit models
     
-    To drive from it:
+    To derive from it:
     1) define a new :class: with the body where AT LEAST the :class: attribute
         '_parameter_names_' is defined as a tuple of strings (the parameter names)
         
         See, for example, the ExponentialDecay :class: where '_parameter_names_'
         is: 
-            ("offset", "a", "x0", "tau")
+            ("α", "β", "x0", "τ")
             
     2) decorate the new :class: with @ModelExpression parameterized with:
         * a str: the model expression containing the parameters named as in the
@@ -207,7 +208,7 @@ class FitModel(metaclass=FitModelMeta):
             
             For example, in the case of ExponentialDecay this is:
             
-                'a * exp(-(x-x0)/tau) + offset'
+                ''α + β * (-(x-x0)/τ)'
             
         * a list of imported modules where the functions used in the expression
             are defined.
@@ -220,32 +221,30 @@ class FitModel(metaclass=FitModelMeta):
             
             np, scipy, cluster, optimize, signal, integrate
             
-            with 'np' an alias to numpy
+            with 'np' being an alias to numpy
     
     
     """
-    _parameter_names_   = tuple()
-    _default_initial_   = list()
-    _default_lower_     = list()
-    _default_upper_     = list()
-    _model_expression_  = str()
+    _parameter_names_       = tuple()
+    _default_initial_       = list()
+    _default_lb_            = list()
+    _default_ub_            = list()
+    _default_keep_feasible_ = list()
+    _model_expression_      = str()
     
     def __init__(self, **kwargs):
         self.initial = DataBag()
-        self.lower   = DataBag()
-        self.upper   = DataBag()
+        self.lb   = DataBag()
+        self.ub   = DataBag()
+        self.keep_feasible = DataBag()
         # NOTE: 2021-09-02 15:06:03
         # override this in derived for a more sophisticated initialization
         for k, name in enumerate(self._parameter_names_):
-            self.initial[name] = kwargs.get(name, self._default_initial_[k])
-            self.lower[name]   = kwargs.get(name, self._default_lower_[k])
-            self.upper[name]   = kwargs.get(name, self._default_upper_[k])
+            self.initial[name]          = kwargs.get(name, 0)
+            self.lb[name]               = kwargs.get(name, -np.inf)
+            self.ub[name]               = kwargs.get(name, np.inf)
+            self.keep_feasible[name]    = kwargs.get(name, True)
             
-
-    #def __repr__(self):
-        #pass
-        
-
     def __call__(self, x):
         if isinstance(self._call_expression_, str) and len(self._call_expression_.strip()):
             #print(self._call_expression_)
@@ -266,7 +265,7 @@ class FitModel(metaclass=FitModelMeta):
     
     @property
     def defaults(self) -> Bunch:
-        return Bunch(((name, Bunch(initial=self._default_initial_[k], lower=self._default_lower_[k], upper=self._default_upper_[k])) for k, name in enumerate(self._parameter_names_)))
+        return Bunch(((name, Bunch(initial=self._default_initial_[k], lb=self._default_lb_[k], ub=self._default_ub_[k], keep_feasible=self._default_keep_feasible_[k])) for k, name in enumerate(self._parameter_names_)))
     
     @property
     def parameters(self) -> Bunch:
@@ -308,12 +307,12 @@ class FitModel(metaclass=FitModelMeta):
                         else:
                             self.upper[name] = v
                             
-@ModelExpression('a * exp(-(x-x0)/tau) + offset')
+@ModelExpression('α + β * (-(x-x0)/τ)')
 class ExponentialDecay(FitModel):
     r"""Fit model :class: decorated with ModelExpression.
     
     """
-    _parameter_names_   = ("offset", "a", "x0", "tau")
+    _parameter_names_   = ("α", "β", "x0", "τ")
     _default_initial_   = (0., 1., 0., 0.1)
     _default_lower_     = tuple([None] * len(_parameter_names_))
     _default_upper_     = tuple([None] * len(_parameter_names_))
@@ -325,11 +324,11 @@ class ExponentialDecay2(FitModel):
     r"""Demonstrates defining a new fit model without a decorator.
     The attribute _model_expression_ needs to be harcoded in the definition
     """
-    _parameter_names_   = ("offset", "a", "x0", "tau")
+    _parameter_names_   = ("α", "β", "x0", "τ")
     _default_initial_   = (0., 1., 0., 0.1)
     _default_lower_     = tuple([None] * len(_parameter_names_))
     _default_upper_     = tuple([None] * len(_parameter_names_))
-    _model_expression_  = 'a * exp(-(x-x0)/tau) + offset'
+    _model_expression_  = 'α + β * exp(-(x-x0)/τ)'
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -348,7 +347,7 @@ class ExponentialDecay2(FitModel):
 
 # def check_rise_decay_params(x):
 #     r"""Returns the number of decay components for a exp-rise-multi-decay transient.
-#     x = iterable with model parameters (see exp_rise_multi_decay())
+#     x = iterable with model parameters (see exponential_rise_decays_product_biased_shifted())
 #     """
 #     if np.remainder(len(x)-3, 2) != 0:
 #         raise ValueError("Unexpected number of elements in the parameters vector; must be 2n + 3 where n is the number of decay components; instead got %d elements" % len(parameters))
@@ -415,7 +414,7 @@ class ExponentialDecay2(FitModel):
 #     
 #     return y
 #     
-# def exp_rise_multi_decay(x, parameters, returnDecays = False):
+# def exponential_rise_decays_product_biased_shifted(x, parameters, returnDecays = False):
 #     r""" Realization of a transient signal with a single exponential rise (r) and
 #         n exponential decays (d1..dn), at an onset (delay) x0 and a given 
 #         "DC" component (offset) o: 
@@ -532,13 +531,13 @@ class ExponentialDecay2(FitModel):
 #         else:
 #             return y
 # 
-# def compound_exp_rise_multi_decay(x, parameters, returnDecays = False):
+# def compound_exponential_rise_decays_product_biased_shifted(x, parameters, returnDecays = False):
 #     r"""Compound transient signal -- linear sum of delayed single transient signals
 #     Arguments:
 #         x = 1D predictor vector
 #         
 #         parameters = a list of parameter sequences where each sequence is as 
-#                     defined for the parameters argument of exp_rise_multi_decay
+#                     defined for the parameters argument of exponential_rise_decays_product_biased_shifted
 #         
 #     Returns:
 #         y   = realization of the compound signal model curve
@@ -558,7 +557,7 @@ class ExponentialDecay2(FitModel):
 #         #print("x: ", x)
 #         for p in parameters:
 #             #print("p: ", p)
-#             y += exp_rise_multi_decay(x, p)
+#             y += exponential_rise_decays_product_biased_shifted(x, p)
 #         
 #         return y # NOTE: returns one scalar !!!
 #     
@@ -575,7 +574,7 @@ class ExponentialDecay2(FitModel):
 #         for p in parameters:
 #             #print("p", p)
 #             
-#             (yc_, ycd_) = exp_rise_multi_decay(x, p, True)
+#             (yc_, ycd_) = exponential_rise_decays_product_biased_shifted(x, p, True)
 # 
 #             y += yc_
 #             

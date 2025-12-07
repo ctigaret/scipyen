@@ -154,7 +154,7 @@ def fitGauss1DSum(x, y, locations, **kwargs):
     
     return popt, pcov, yfit
     
-def fit_compound_exp_rise_multi_decay(data, p0, bounds=(-np.inf, np.inf), method="trf", loss="linear"):
+def fit_compound_exponential_rise_decays_product_biased_shifted(data, p0, bounds=(-np.inf, np.inf), method="trf", loss="linear"):
     r"""Fits CaT model to CaT data.
     
     Parameters:
@@ -164,7 +164,7 @@ def fit_compound_exp_rise_multi_decay(data, p0, bounds=(-np.inf, np.inf), method
     
     p0 = initial parameters; 
         (1) a sequence (iterable) of floats, see the "parameters" argument in the
-            docstring of models.exp_rise_multi_decay() function
+            docstring of models.exponential_rise_decays_product_biased_shifted() function
                 
             Essentially these are:
             
@@ -176,7 +176,7 @@ def fit_compound_exp_rise_multi_decay(data, p0, bounds=(-np.inf, np.inf), method
                 
         (2) a sequence (iterable) of sequences (iterables) of numbers, see 
             "parameters" argument in the  docstring of 
-            models.compound_exp_rise_multi_decay() function
+            models.compound_exponential_rise_decays_product_biased_shifted() function
                 
             Essentially these are:
             
@@ -200,7 +200,7 @@ def fit_compound_exp_rise_multi_decay(data, p0, bounds=(-np.inf, np.inf), method
             r   = tau rise
             x0  = delay (onset)
 
-        NOTE: models.compound_exp_rise_multi_decay calls models.exp_rise_multi_decay
+        NOTE: models.compound_exponential_rise_decays_product_biased_shifted calls models.exponential_rise_decays_product_biased_shifted
                     behind the scenes
 
     bounds: 2-tuple of data, each of the same layout as p0, or  2 -tuple of 
@@ -414,7 +414,7 @@ def fit_compound_exp_rise_multi_decay(data, p0, bounds=(-np.inf, np.inf), method
             x_ = [x]
             
             
-        (yf, yc) = models.compound_exp_rise_multi_decay(t, x_)
+        (yf, yc) = models.compound_exponential_rise_decays_product_biased_shifted(t, x_)
         
         ret = y-yf
         
@@ -447,7 +447,7 @@ def fit_compound_exp_rise_multi_decay(data, p0, bounds=(-np.inf, np.inf), method
     # fC  = the fitted curve for the compound EPSCaT
     # fCC = _LIST_ of fitted curves for individual EPSCaT components
     # each of these curves is a 1D numpy array (column vector)
-    (fC, fCC) = models.compound_exp_rise_multi_decay(xdata, res_x)
+    (fC, fCC) = models.compound_exponential_rise_decays_product_biased_shifted(xdata, res_x)
     
     
     # NOTE: 2018-09-17 10:28:43

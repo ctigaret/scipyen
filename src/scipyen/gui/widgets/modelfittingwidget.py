@@ -84,4 +84,4 @@ class ModelFittingWidget(Ui_ModelFittingWidget, QWidget):
         
     @Slot()
     def _slot_modelParameterChanged(self):
-        
+        pass

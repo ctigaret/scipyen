@@ -101,7 +101,7 @@ TODO:
 #
 #       fit model: (crvf is aliased to the curvefitting module in pict)
 #
-#       (fc, fcc, res) = crvf.fit_compound_exp_rise_multi_decay(CaT, p0, method="trf", bounds=[0, np.inf], loss="linear")
+#       (fc, fcc, res) = crvf.fit_compound_exponential_rise_decays_product_biased_shifted(CaT, p0, method="trf", bounds=[0, np.inf], loss="linear")
 #
 #       read scipy.optimize.least_squares documentation for method and loss options
 #
@@ -1866,7 +1866,7 @@ def analyseFrame(lsdata:ScanData, frame:int, unit=None, indicator_channel_ndx=No
         for signal in lsdata.scansBlock.segments[frame].analogsignals:
             coeffs = signal.annotations["FitResult"]["Coefficients"]
             x = signal.times
-            fc = models.compound_exp_rise_multi_decay(x.magnitude, coeffs)
+            fc = models.compound_exponential_rise_decays_product_biased_shifted(x.magnitude, coeffs)
             signal[:,1] = fc[0][:, np.newaxis]
         
         
@@ -2101,8 +2101,8 @@ def fitEPSCaT(data, p0, bounds, fitWindow = None, integration=None):
     
             for a single EPSCaT, p0 is a sequence of N x 2 + 3 values
                 where N is the number of decays 
-                (see models.compound_exp_rise_multi_decay()
-                and models.exp_rise_multi_decay())
+                (see models.compound_exponential_rise_decays_product_biased_shifted()
+                and models.exponential_rise_decays_product_biased_shifted())
                 
             for a compound EPSCaT, p0 is a sequence of sequences, where the nested
             sequences contain initial parameters for individual EPSCaT components, 
@@ -2153,7 +2153,7 @@ def fitEPSCaT(data, p0, bounds, fitWindow = None, integration=None):
     
     NOTE: 2018-06-11 09:43:37 Fitting:
     ==================================
-    Signal is fitted with a multi-component EPSCaT model (see models.compound_exp_rise_multi_decay())
+    Signal is fitted with a multi-component EPSCaT model (see models.compound_exponential_rise_decays_product_biased_shifted())
     
     The fitting can be applied to the entire signal, or to a signal region defined
     by the half-open interval specified in the "fitWindow" parameter (this includes
@@ -2203,7 +2203,7 @@ def fitEPSCaT(data, p0, bounds, fitWindow = None, integration=None):
     
     def _integral_func_(x, params):
         #print(params)
-        y = models.compound_exp_rise_multi_decay(x, params)
+        y = models.compound_exponential_rise_decays_product_biased_shifted(x, params)
         return y
     
     def _integrate_window_(x, window, name, column = 1):
@@ -2295,7 +2295,7 @@ def fitEPSCaT(data, p0, bounds, fitWindow = None, integration=None):
         
     originalAnnotations = data.annotations
     
-    fittedLSCaT, fittedLSCatComponents, fitResult = crvf.fit_compound_exp_rise_multi_decay(y_data, p0, bounds = bounds)
+    fittedLSCaT, fittedLSCatComponents, fitResult = crvf.fit_compound_exponential_rise_decays_product_biased_shifted(y_data, p0, bounds = bounds)
     
     # write the fitted curve(s) into an array the size of the original signal
     nColumns = len(fittedLSCatComponents)

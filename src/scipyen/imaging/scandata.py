@@ -9123,11 +9123,11 @@ def scanDataOptions(detection_predicate=1.3, roi_width = 10,
     #
     # NOTE: the EPSCaT fit model is a linear sum of several delayed waveforms, 
     # each with a single exponential rise + multiple exponential decays
-    # (see core.models.compound_exp_rise_multi_decay()).
+    # (see core.models.compound_exponential_rise_decays_product_biased_shifted()).
     #
     # A single Ca2+ transient event (single-component EPSCaT) is fitted by one such
     # waveform which takes at least five parameters
-    # (see core.models.exp_rise_multi_decays() function):
+    # (see core.models.exponential_rise_decays_product_biased_shifteds() function):
     #
     #   x0              = onset (delay) of the transient; only makes sense when x0 >= 0
     #   r               = rising phase time constant; 

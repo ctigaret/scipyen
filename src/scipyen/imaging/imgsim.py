@@ -62,7 +62,7 @@ def synthetic_transients(duration, sampling_frequency, *args, **kwargs):
     Variadic parameters:
     ====================
     
-    *args               : list of parameters for the models.compound_exp_rise_multi_decay() function
+    *args               : list of parameters for the models.compound_exponential_rise_decays_product_biased_shifted() function
                         used to generate an EPSP waveform
                         
     **kwargs            : var-keyword parameters (see waveform_signal for details)
@@ -74,7 +74,7 @@ def synthetic_transients(duration, sampling_frequency, *args, **kwargs):
     
     
     
-    The function uses models.compound_exp_rise_multi_decay to generate the waveform.
+    The function uses models.compound_exponential_rise_decays_product_biased_shifted to generate the waveform.
     
     Depending on the model parameters in *args, this can be used to generate
     any combination of exponential rise + decay time-varying waveforms that make physiological
@@ -104,7 +104,7 @@ def synthetic_transients(duration, sampling_frequency, *args, **kwargs):
     
     epsp_train = simulations.synthetic_transients(1, 1000, parameters, asSignal=True, units=pq.mV, sampling_rate=1000 * pq.Hz, name="EPSP train")
 
-    See also models.compound_exp_rise_multi_decay for details 
+    See also models.compound_exponential_rise_decays_product_biased_shifted for details 
     
     EXAMPLE 3: generate a train of epsp+ap at 100 Hz, delivered at 5 Hz (200 ms intervals):
     
@@ -137,7 +137,7 @@ def synthetic_transients(duration, sampling_frequency, *args, **kwargs):
      
     """
     def __f__(x, *args, **kwargs):
-        y = models.compound_exp_rise_multi_decay(x, *args, **kwargs)
+        y = models.compound_exponential_rise_decays_product_biased_shifted(x, *args, **kwargs)
         return y[0]
     
     asSignal = kwargs.get("asSignal", False)
@@ -262,9 +262,9 @@ def synthetic_EPSCaT_linescan(field_width, duration,
     
                 see models.gaussianSum1D() docstring for details
     
-    epscat_parameters: a sequence of parameters for the models.compound_exp_rise_multi_decay function
+    epscat_parameters: a sequence of parameters for the models.compound_exponential_rise_decays_product_biased_shifted function
     
-                see models.compound_exp_rise_multi_decay() docstring for details
+                see models.compound_exponential_rise_decays_product_biased_shifted() docstring for details
                 
     Named parameters (keywords):
     Default values indicated (in parenthesis are default values if field_width and duration are floats)
