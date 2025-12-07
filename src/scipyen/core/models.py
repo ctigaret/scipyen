@@ -133,7 +133,7 @@ parameter_units: optional mapping
     which will flag them as such.
 
     Some models may accept parameters with physical units that depend on the physical
-    dimensionality of the dependent variable. For example, alphaFunction — which 
+    dimensionality of the dependent variable. For example, alphaSynapse — which 
     models a time-varying function of ANY dependent physical variable, whether it
     is current, voltage, fluorescence intensity, etc — takes an "offset" parameter 
     (α) which by definition has the same units as the dependent variable.
@@ -453,16 +453,16 @@ def exponential_rise_biased_shifted(x:np.ndarray | float,
 
 @modelfunction(parameter_names = ("α", "β", "x0", "τ"),
                parameter_units={"α": dataclasses.MISSING,"β":pq.dimensionless,"x0":pq.s, "τ":pq.s})
-def alphaFunction(x:np.ndarray | float, α:typing.Union[typing.Sequence[float],np.ndarray,float], /,
+def alphaSynapse(x:np.ndarray | float, α:typing.Union[typing.Sequence[float],np.ndarray,float], /,
                   β:typing.Optional[float] = None, x0:typing.Optional[float] = None,
                   τ:typing.Optional[float] = None) -> np.ndarray | float:
     r"""
-The Alpha function.
+The AlphaSynapse function.
 
 A single exponential rise and decay, both with the same constant (τ):
 
         /    
-    y = | α + β × (x-x₀) × exp(-(x-x₀)/τ)           where x-x₀ >= 0 
+    y = | α + β × (x-x₀)/τ × exp(-(x-x₀)/τ)           where x-x₀ >= 0 
         | α                                           elsewhere
         \
 where:
@@ -472,9 +472,28 @@ where:
 
     x₀ is the shift (delay, or onset);
 
-    τ  is the time constant
+    τ  is the synaptic time constant
 
+NOTE: Inroduced by neural simulation sotware NEURON
+https://nrn.readthedocs.io/en/9.0.1/index.html
 
+as AlphaSynape in HOC (available as AlphaSynapse class in NEURON Python)
+and decsribed as (from nrnoc/syn.moc in NEURON's source tree)
+
+"a synaptic current with alpha function conductance defined by
+        i = g * (v - e)      i(nanoamps), g(microsiemens);
+        where
+         g = 0 for t < onset and
+         g = gmax * (t - onset)/tau * exp(-(t - onset - tau)/tau)
+          for t > onset
+this has the property that the maximum value is gmax and occurs at
+ t = delay + tau."
+
+also used by NEST
+https://www.nest-simulator.org/ 
+
+and described 
+ 
 Parameters:
 ===========
 x: predictor (independent variable) - 1D numpy ndarray
@@ -497,13 +516,26 @@ x = np.linspace(0.0,1.0, 1000);
 
 parameters = [0, -1, 0.05, 0.01];
 
-y = alphaFunction(x, *parameters)
+y = alphaSynapse(x, *parameters)
 
 OR: 
 
-y = alphaFunction_model(x, parameters)
+y = alphaSynapse_model(x, parameters)
 
 plt.plot(x,y)
+
+CHANGELOG:
+==========
+Renamed from alphaFunction to alphaSynapse to avoid confusion with the
+Alpha Function 
+
+    αₙ(𝑧) = E₋ₙ(𝑧)
+
+with Eₙ(𝑧) being the exponential integral
+
+     ∞
+    ∫₁ (e⁻ˣᵗdt/tⁿ)
+    
 
 """
     # NOTE: Python currently does not support unicode
