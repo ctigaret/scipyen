@@ -453,12 +453,13 @@ def exponential_rise_biased_shifted(x:np.ndarray | float,
 
 # @timefunc # uncomment this for testing 😄
 @modelfunction(parameter_names = ("α", "β", "x0", "τ"),
-               parameter_units={"α": dataclasses.MISSING,"β":pq.dimensionless,"x0":pq.s, "τ":pq.s})
+               parameter_units={"α": dataclasses.MISSING,"β":pq.dimensionless,"x0":pq.s, "τ":pq.s},
+               title="AlphaSynapse")
 def alphaSynapse(x:np.ndarray | float, α:typing.Union[typing.Sequence[float],np.ndarray,float], /,
                   β:typing.Optional[float] = None, x0:typing.Optional[float] = None,
                   τ:typing.Optional[float] = None) -> np.ndarray | float:
     r"""
-The AlphaSynapse function.
+NEURON AlphaSynapse function.
 
 A single exponential rise and decay, both with the same constant (τ):
 
@@ -475,11 +476,11 @@ where:
 
     τ  is the synaptic time constant
 
-NOTE: Inroduced by neural simulation sotware NEURON
-https://nrn.readthedocs.io/en/9.0.1/index.html
-
-as AlphaSynape in HOC (available as AlphaSynapse class in NEURON Python)
-and decsribed as (from nrnoc/syn.moc in NEURON's source tree)
+Introduced by NEURON simulation software (https://nrn.readthedocs.io/en/9.0.1/index.html)
+to describe the time course of the membrane current at an ideal synapse, evoked
+by a transmitter release event.
+The description below is taken from the nrnoc/syn.moc file in NEURON's source
+tree:
 
 "a synaptic current with alpha function conductance defined by
         i = g * (v - e)      i(nanoamps), g(microsiemens);
@@ -487,6 +488,7 @@ and decsribed as (from nrnoc/syn.moc in NEURON's source tree)
          g = 0 for t < onset and
          g = gmax * (t - onset)/tau * exp(-(t - onset - tau)/tau)
           for t > onset
+          
 this has the property that the maximum value is gmax and occurs at
  t = delay + tau."
 
