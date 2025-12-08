@@ -53,7 +53,7 @@ import pandas as pd
 import numbers
 import dataclasses
 from core import scipyen_quantities as scq
-from core.prog import (scipywarn, signature_as_dict, decorator)
+from core.prog import (scipywarn, signature_as_dict, decorator, timefunc)
 
 @decorator
 def modelfunction(f:typing.Callable, nvars:int=1, 
@@ -451,6 +451,7 @@ def exponential_rise_biased_shifted(x:np.ndarray | float,
     
     return α + β * (1 - np.exp(-(x-x0)/τ))
 
+# @timefunc # uncomment this for testing 😄
 @modelfunction(parameter_names = ("α", "β", "x0", "τ"),
                parameter_units={"α": dataclasses.MISSING,"β":pq.dimensionless,"x0":pq.s, "τ":pq.s})
 def alphaSynapse(x:np.ndarray | float, α:typing.Union[typing.Sequence[float],np.ndarray,float], /,
@@ -462,7 +463,7 @@ The AlphaSynapse function.
 A single exponential rise and decay, both with the same constant (τ):
 
         /    
-    y = | α + β × (x-x₀)/τ × exp(-(x-x₀)/τ)           where x-x₀ >= 0 
+    y = | α + β × (x-x₀)/τ × exp(-(x-x₀-τ)/τ)         where x-x₀ >= 0 
         | α                                           elsewhere
         \
 where:
@@ -492,16 +493,35 @@ this has the property that the maximum value is gmax and occurs at
 also used by NEST
 https://www.nest-simulator.org/ 
 
-and described 
- 
 Parameters:
 ===========
 x: predictor (independent variable) - 1D numpy ndarray
-a, b, x0, τ: see above 
+α, β, x0, τ: see above 
+When α is a sequence of scalars (1D array-like), it is interpreted as containing 
+the individual α, β, x0, τ coefficients 'packed' in this sequence (some optimization
+ functions expect this)
+    
 parameters: 1D array-like: numeric sequence (tuple, list, numpy array) with four
     elements in the following order (see above for their meaning):
 
-            
+The original alpha synapse in NEURON syn.mod does NOT include an additive bias;
+this is because it models an ideal system, whereas here I'm giving the possibility
+to use this function for fitting recorded data as well (where there exists a 
+DC component, equivalent to the 'offset' α). To obtain the same thing as in 
+NEURON just set α to 0.
+
+The β parameter here corresponds to the 𝑔ₘₐₓ in NEURON's code (see above).
+HOWEVER, whether β is a conductance (𝑔) or not depends on what exactly you use 
+THIS function for 😄. NEURON's syn.mod calculates 𝑔 THEN converts it to a 
+synaptic current 𝑖 (see above); if you use this function to model a current,
+you might want to adjust β accordingly (i.e. set it to YOUR 𝑔ₘₐₓ times the 
+electromotive force 𝑣 - 𝑒).
+
+The x0 parameter here corresponds to the 'onset' in NEURON's code (see above).
+
+Finally, 'x' here corresponds to 𝑡 in NEURON's code. If follows that x0 and τ
+have the same physical units as 'x'.
+    
 
 Returns:
 ========
@@ -526,41 +546,76 @@ plt.plot(x,y)
 
 CHANGELOG:
 ==========
-Renamed from alphaFunction to alphaSynapse to avoid confusion with the
-Alpha Function 
-
-    αₙ(𝑧) = E₋ₙ(𝑧)
-
-with Eₙ(𝑧) being the exponential integral
-
-     ∞
-    ∫₁ (e⁻ˣᵗdt/tⁿ)
+Renamed from alphaFunction to alphaSynapse to avoid confusion, especially with
+the mathematical Alpha Function (https://mathworld.wolfram.com/AlphaFunction.html)
     
-
 """
     # NOTE: Python currently does not support unicode
     # characters such as sub- or super-scripts, so please use 'x0', not 'x₀'
     # in the code
     
+    # unpack parameters
     if isinstance(α, (typing.Sequence, np.ndarray)):
         α, β, x0, τ = check_unpack_model_params_seq(α, 4)
         
     if not all(isinstance(v, float) for v in (α, β, x0, τ)):
         raise TypeError("Expecting four comma-separated float scalars or a sequence of four float scalars")
     
-    # make sure x is a 1D array (vector)
-    x = x.flatten()
+    assert(τ > 0.), "Time constant MUST be strictly positive"
     
-    # unpack parameters
-    # α, b, x0, tau = parameters
+    # NOTE: 2025-12-08 00:24:16
+    # the original "alpha" function in NEURON's syn.mod is 
+    # v * exp(1-v) with v being (x-onset)/tau
+    # (pretty similar to an exponential integral?)
+    #
+    # Here, I also include the multiplicative bias (β here is gₘₐₓ in syn.mod) 
+    # and the additive bias ("offset") α
+    def alpha(v):
+        # NOTE: 2025-12-08 00:28:34 
+        # using numpy builtin ufuncs here; 
+        # they're OK with scalar floats too, but they return a np.float64
+        # therefore I need to cast back to float, see NOTE: 2025-12-08 00:29:32 
+        return np.add(α, np.multiply(β, np.multiply(v, np.exp(1. - v))))
+    
+    # NOTE: 2025-12-08 00:48:54 
+    # DISCARD this option as is unefficient (frompyfunc returns PyObject and is
+    # MUCH slower, check '->' timings below and NOTE: 2025-12-08 00:50:00)
+    # # NOTE: 2025-12-08 00:23:08
+    # # vectorized version used when x is a numpy array
+    # valpha = np.frompyfunc(alpha, 1, 1) 
+    
+    # make sure x is a numpy array or a scalar
+    if not isinstance(x, (float, np.ndarray)):
+        raise TypeError(f"Independent variable 'x' has unexpected type: {type(x).__name__}")
     
     xt = (x-x0)/τ
     
-    y = np.full_like(x, α)
+    # NOTE: 2025-12-07 23:29:18
+    # in NEURON's syn.mod there is an additional condition for returning 0., when v > 10. - 
+    # probably to make sure that extremely small values from v × exp(1-v) truly vanish
+    # I don't use that here
+    #
+    if isinstance(x, float):
+        # x is a scalar, all simple!
+        # NOTE: 2025-12-08 00:29:32
+        # casting to plain float, see NOTE: 2025-12-08 00:28:34 
+        return float(alpha(xt)) if xt >=0 else 0.
     
-    y[xt>=0] = α + β * xt[xt>=0] * np.exp(-xt[xt>=0])
+    else:
+        if x.size == 1:
+            # no point in vectorizing on array with one element
+            return alpha(xt) if xt >=0 else np.array([α])
     
-    return y
+        y = np.full_like(x, α)
+        
+        # using built-in ufuncs (a LOT more efficient !!!)
+        # y[xt>=0] = α + β * xt[xt>=0] * np.exp(1.-xt[xt>=0]) # -> core.models.alphaSynapse : 0.0044766569990315475
+        y[xt>=0] = alpha(xt[xt>=0]) # -> core.models.alphaSynapse : 0.0031144210006459616
+        
+        # NOTE: 2025-12-08 00:50:00 -> TOO SLOW !!!
+        # valpha(xt, y, where = xt>=0, casting="unsafe") # outputs directly into y -> core.models.alphaSynapse : 0.6116345360023843
+        
+        return y
 
 @modelfunction(parameter_names = ("i", "n", "b"))
 def nsfa(x:np.ndarray | float, i:float|pq.Quantity|typing.Sequence[typing.Union[float, pq.Quantity]], /, 

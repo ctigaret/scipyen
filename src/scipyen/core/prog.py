@@ -2246,7 +2246,8 @@ def safeguiwrapper(f, *args, **kwargs):
 
 
 def timefunc(func):
-    r"""Recipe 14.13 "Profiling and Timing Your Programs"
+    r"""Decorator for timing function execution
+    Recipe 14.13 "Profiling and Timing Your Programs"
     From Python Cookbook 3rd Ed. 2013
     """
 
