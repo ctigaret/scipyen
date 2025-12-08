@@ -47,12 +47,14 @@ This will help locating/accessing these functions easily from other Scipyen
 components.
 """
 import typing
+import numbers
+import neo
 import numpy as np
 import quantities as pq
 import pandas as pd
-import numbers
 import dataclasses
 from core import scipyen_quantities as scq
+from core.datasignal import DataSignal
 from core.prog import (scipywarn, signature_as_dict, decorator, timefunc)
 
 @decorator
@@ -230,16 +232,30 @@ https://wiki.python.org/moin/PythonDecoratorLibrary#Creating_decorator_with_opti
     # setattr(wf, "self", f)
     # return wf
 
-def check_unpack_model_params_seq(params:typing.Sequence | np.ndarray, n:int):
+def check_unpack_model_params_seq(params:typing.Sequence[typing.Union[float, np.ndarray, np.float64]] | np.ndarray, 
+                                  n:int, strip_units:bool=True):
     r"""Verifies and unpacks model parameters, when supplied as a Sequence or vector"""
-    if isinstance(params, typing.Sequence) and len(params) == n and all (isinstance(v, float) for v in params):
-        return tuple(params)
+    if isinstance(params, typing.Sequence) and len(params) == n:
+        if all (isinstance(v, (float, np.float64)) for v in params):
+            return tuple(params)
+        
+        elif all(isinstance(v, np.ndarray) and v.size==1 and v.dtype==np.dtype("float64") for v in params):
+            return tuple(params)
+            
+        elif all(isinstance(v, pq.Quantity) and v.size==1 and v.dtype==np.dtype("float64") for v in params):
+            if strip_units:
+                return tuple(map(lambda v: float(v.magnitude), params))
+            else:
+                return tuple(params)
+            
+        else:
+            raise TypeError("Parameter sequence contains invalid object types; expecting float, numpy.float64 or numpy arrays with size 1 and dtype 'float64'")
     
-    elif isinstance(params, np.ndarray) and params.size == n:
+    elif isinstance(params, np.ndarray) and params.size == n and params.dtype == np.dype('float64'):
         return tuple(map(lambda v: float(v), params))
     
     else:
-        raise TypeError(f"Expecting a sequence or a numpy array with {n} elements")
+        raise TypeError(f"Expecting a sequence of float scalars or a float numpy array with {n} elements; got {type(params).__name__} instead")
 
 def check_rise_decay_params(x:typing.Sequence[float]):
     r"""Returns the number of decay components for a exp-rise-multi-decay transient.
@@ -250,7 +266,8 @@ def check_rise_decay_params(x:typing.Sequence[float]):
     
     return (len(x)-3) // 2
 
-@modelfunction(parameter_names = ("β0", "β1", "λ0", "λ1"))
+@modelfunction(parameter_names = ("β0", "β1", "λ0", "λ1"),
+               title="Biexponential")
 def biexponential(x:typing.Union[np.ndarray, float], 
                   β0:float|typing.Sequence[float]|np.ndarray, /,
                   β1:typing.Optional[float] = None, 
@@ -267,7 +284,8 @@ def biexponential(x:typing.Union[np.ndarray, float],
     
     return β0 * np.exp(λ0 * x) + β1 * np.exp(λ1 * x)
 
-@modelfunction(parameter_names = ("β0", "β1", "τ0", "τ1"))
+@modelfunction(parameter_names = ("β0", "β1", "τ0", "τ1"),
+               title="BioexponentialDecay")
 def biexponential_decay(x:typing.Union[np.ndarray, float], 
                         β0:float|typing.Sequence[float]|np.ndarray, /,
                         β1:typing.Optional[float] = None, 
@@ -282,7 +300,8 @@ def biexponential_decay(x:typing.Union[np.ndarray, float],
     
     return β0 * np.exp(-x / τ0) + β1 * np.exp(-x / τ1)
 
-@modelfunction(parameter_names = ("α", "β0", "β1", "τ0", "τ1"))
+@modelfunction(parameter_names = ("α", "β0", "β1", "τ0", "τ1"),
+               title="BiasedBiexponentialDecay")
 def biexponential_decay_biased(x:np.ndarray | float, α:typing.Union[float,typing.Sequence[float], np.ndarray],/, 
                                β0:typing.Optional[float]=None, β1:typing.Optional[float]=None, 
                                τ0:typing.Optional[float]=None, τ1:typing.Optional[float]=None) -> np.ndarray | float:
@@ -299,7 +318,8 @@ def biexponential_decay_biased(x:np.ndarray | float, α:typing.Union[float,typin
 
     return α + β0 * np.exp(-x / τ0) + β1 * np.exp(-x / τ1)
 
-@modelfunction(parameter_names = ("α", "β0", "β1", "x0", "τ0", "τ1"))
+@modelfunction(parameter_names = ("α", "β0", "β1", "x0", "τ0", "τ1"),
+               title="GenericBiexponentialDecay")
 def biexponential_decay_biased_shifted(x: np.ndarray | float, 
                                 α:typing.Union[float, typing.Sequence[float], np.ndarray], /, 
                                 β0:typing.Optional[float], 
@@ -320,7 +340,8 @@ def biexponential_decay_biased_shifted(x: np.ndarray | float,
 
     return α + β0 * np.exp(-(x-x0) / τ0) + β1 * np.exp(-(x-x0) / τ1)
 
-@modelfunction(parameter_names = ("α", "β", "x0", "τ*"))
+@modelfunction(parameter_names = ("α", "β", "x0", "τ*"),
+               title="GenericExponentialDecaysProduct")
 def exponential_decays_product_biased_shifted(x: np.ndarray | float, 
                                    α:typing.Sequence[float] | float | np.ndarray, /,
                                    β:typing.Optional[float] = None, 
@@ -383,7 +404,8 @@ NOTE: For calling purposes, α can be supplied as a sequence of (α, β, x0), an
         
     return α + β * np.exp(-(x-x0) / τc)
 
-@modelfunction(parameter_names = ("α", "β", "x0", "τ"))
+@modelfunction(parameter_names = ("α", "β", "x0", "τ"),
+               title="GenericExponentialDecay")
 def exponential_decay_biased_shifted(x:np.ndarray | float, 
                                      α:typing.Sequence[float] | np.ndarray | float, /,
                                      β:typing.Optional[float] = None, 
@@ -425,7 +447,8 @@ coefficients are given as floats in the following order:
     λ = 1/τ
     return α + β * np.exp(-(x-x0)*λ)
 
-@modelfunction(parameter_names = ("α", "β", "x0", "τ"))
+@modelfunction(parameter_names = ("α", "β", "x0", "τ"),
+               title="GenericExponentialRise")
 def exponential_rise_biased_shifted(x:np.ndarray | float, 
                                     α:typing.Sequence[float]|np.ndarray, 
                                     β:typing.Optional[float] = None, 
@@ -451,7 +474,7 @@ def exponential_rise_biased_shifted(x:np.ndarray | float,
     
     return α + β * (1 - np.exp(-(x-x0)/τ))
 
-# @timefunc # uncomment this for testing 😄
+@timefunc # uncomment this for testing 😄
 @modelfunction(parameter_names = ("α", "β", "x0", "τ"),
                parameter_units={"α": dataclasses.MISSING,"β":pq.dimensionless,"x0":pq.s, "τ":pq.s},
                title="AlphaSynapse")
@@ -459,7 +482,12 @@ def alphaSynapse(x:np.ndarray | float, α:typing.Union[typing.Sequence[float],np
                   β:typing.Optional[float] = None, x0:typing.Optional[float] = None,
                   τ:typing.Optional[float] = None) -> np.ndarray | float:
     r"""
-NEURON AlphaSynapse function.
+AlphaSynapse function.
+
+See: Rall, W. Distinguishing theoretical synaptic potentials computed for different
+soma-dendritic distributions of synaptic input. J Neurophysiol 30(5), 1138–68, 1967 
+
+---
 
 A single exponential rise and decay, both with the same constant (τ):
 
@@ -474,13 +502,12 @@ where:
 
     x₀ is the shift (delay, or onset);
 
-    τ  is the synaptic time constant
+    τ  is the synaptic constant
 
-Introduced by NEURON simulation software (https://nrn.readthedocs.io/en/9.0.1/index.html)
-to describe the time course of the membrane current at an ideal synapse, evoked
-by a transmitter release event.
-The description below is taken from the nrnoc/syn.moc file in NEURON's source
-tree:
+The implementation follows that in NEURON simulation software
+( M. L. Hines, N. T. Carnevale; The NEURON Simulation Environment. 
+Neural Comput 1997; 9 (6): 1179–1209. 
+doi: https://doi.org/10.1162/neco.1997.9.6.1179 ) :
 
 "a synaptic current with alpha function conductance defined by
         i = g * (v - e)      i(nanoamps), g(microsiemens);
@@ -492,12 +519,9 @@ tree:
 this has the property that the maximum value is gmax and occurs at
  t = delay + tau."
 
-also used by NEST
-https://www.nest-simulator.org/ 
-
 Parameters:
 ===========
-x: predictor (independent variable) - 1D numpy ndarray
+x: predictor (independent variable) - 1D numpy ndarray or float
 α, β, x0, τ: see above 
 When α is a sequence of scalars (1D array-like), it is interpreted as containing 
 the individual α, β, x0, τ coefficients 'packed' in this sequence (some optimization
@@ -557,12 +581,17 @@ the mathematical Alpha Function (https://mathworld.wolfram.com/AlphaFunction.htm
     # in the code
     
     # unpack parameters
-    if isinstance(α, (typing.Sequence, np.ndarray)):
-        α, β, x0, τ = check_unpack_model_params_seq(α, 4)
+    if all(v is None for v in (β, x0, τ)):
+        if isinstance(α, (typing.Sequence, np.ndarray)):
+            α, β, x0, τ = check_unpack_model_params_seq(α, 4)
+        else:
+            raise TypeError("All four parameters ('α', 'β', 'x0', 'τ') must be supplied, eithr as individual values or packed in a sequence or an array")
         
-    if not all(isinstance(v, float) for v in (α, β, x0, τ)):
-        raise TypeError("Expecting four comma-separated float scalars or a sequence of four float scalars")
-    
+    units = dict()
+    if all(isinstance(v, pq.Quantity) for v in (α, β, x0, τ)):
+        units.update(dict(map(lambda i: (i[0], i[1].units), zip(('α', 'β', 'x0', 'τ'), (α, β, x0, τ)))))
+        α, β, x0, τ = tuple(map(lambda v: float(v.magnitude), (α, β, x0, τ)))
+        
     assert(τ > 0.), "Time constant MUST be strictly positive"
     
     # NOTE: 2025-12-08 00:24:16
@@ -581,7 +610,7 @@ the mathematical Alpha Function (https://mathworld.wolfram.com/AlphaFunction.htm
     
     # NOTE: 2025-12-08 00:48:54 
     # DISCARD this option as is unefficient (frompyfunc returns PyObject and is
-    # MUCH slower, check '->' timings below and NOTE: 2025-12-08 00:50:00)
+    # MUCH slower
     # # NOTE: 2025-12-08 00:23:08
     # # vectorized version used when x is a numpy array
     # valpha = np.frompyfunc(alpha, 1, 1) 
@@ -590,6 +619,16 @@ the mathematical Alpha Function (https://mathworld.wolfram.com/AlphaFunction.htm
     if not isinstance(x, (float, np.ndarray)):
         raise TypeError(f"Independent variable 'x' has unexpected type: {type(x).__name__}")
     
+    x_class = None
+    
+    if isinstance(x, pq.Quantity):
+        if isinstance(x, (neo.AnalogSignal, DataSignal)):
+            x_class = type(x)
+        units['x'] = x.units
+        x = x.magnitude
+    else:
+        x = x
+        
     xt = (x-x0)/τ
     
     # NOTE: 2025-12-07 23:29:18
@@ -601,7 +640,7 @@ the mathematical Alpha Function (https://mathworld.wolfram.com/AlphaFunction.htm
         # x is a scalar, all simple!
         # NOTE: 2025-12-08 00:29:32
         # casting to plain float, see NOTE: 2025-12-08 00:28:34 
-        return float(alpha(xt)) if xt >=0 else 0.
+        return float(alpha(xt)) if xt >=0 else α
     
     else:
         if x.size == 1:
@@ -611,15 +650,15 @@ the mathematical Alpha Function (https://mathworld.wolfram.com/AlphaFunction.htm
         y = np.full_like(x, α)
         
         # using built-in ufuncs (a LOT more efficient !!!)
-        # y[xt>=0] = α + β * xt[xt>=0] * np.exp(1.-xt[xt>=0]) # -> core.models.alphaSynapse : 0.0044766569990315475
-        y[xt>=0] = alpha(xt[xt>=0]) # -> core.models.alphaSynapse : 0.0031144210006459616
+        y[xt>=0] = alpha(xt[xt>=0]) 
         
         # NOTE: 2025-12-08 00:50:00 -> TOO SLOW !!!
-        # valpha(xt, y, where = xt>=0, casting="unsafe") # outputs directly into y -> core.models.alphaSynapse : 0.6116345360023843
-        
-        return y
+        # valpha(xt, y, where = xt>=0, casting="unsafe")
+            
+        return y 
 
-@modelfunction(parameter_names = ("i", "n", "b"))
+@modelfunction(parameter_names = ("i", "n", "b"),
+               title="NonStationaryFluctuationAnalysis")
 def nsfa(x:np.ndarray | float, i:float|pq.Quantity|typing.Sequence[typing.Union[float, pq.Quantity]], /, 
          n:typing.Optional[typing.Union[float, pq.Quantity]] = None, 
          b:typing.Optional[typing.Union[float, pq.Quantity]] = None) -> np.ndarray | float:
@@ -630,7 +669,7 @@ def nsfa(x:np.ndarray | float, i:float|pq.Quantity|typing.Sequence[typing.Union[
     
 WARNING: do not pass quantities for the parameters, yet; just use floats
 """
-    if isinstance(i, typing.Sequence) and len(i) == 3 and all(isinstance(v, (float, pq.Quantity)) for v in i):
+    if isinstance(i, typing.Sequence) and len(i) == 3 and all(isinstance(v, (float, pq.Quantity)) for v in i) and all(v is None for v in (n,b)):
         i, n, b = check_unpack_model_params_seq(i, 3)
         # i, n, b = i
         
@@ -645,7 +684,8 @@ WARNING: do not pass quantities for the parameters, yet; just use floats
     return x*i - x**2 / n + b
     
 @modelfunction(parameter_names = ("α", "β", "x0", "τ1", "τ2"),
-               parameter_units = {"α"})
+               parameter_units = {"α"},
+               title="ClementsBekkers97")
 def Clements_Bekkers_97(x:np.ndarray | float,
                         α:typing.Union[float, typing.Sequence[float]], /, 
                         β:typing.Optional[float] = None, 
@@ -654,7 +694,7 @@ def Clements_Bekkers_97(x:np.ndarray | float,
                         τ2:typing.Optional[float] = None,
                         **kwargs) -> np.ndarray | float:
     r"""
-    Clements & Bekkers 1997 mEPSC waveform (alphafunction-like).
+    Clements & Bekkers 1997 mEPSC waveform (alphafunction-like?).
 
     This approximates a single exponential rise and decay each with their own 
     time constant:
@@ -1006,7 +1046,8 @@ def compound_exponential_rise_decays_product_biased_shifted(x:np.ndarray | float
         else:
             return y, yc
         
-@modelfunction(parameter_names=("γ", "ϵ", "χ", "σ"))
+@modelfunction(parameter_names=("γ", "ϵ", "χ", "σ"),
+               title="MarkwardtNilius88")
 def Markwardt_Nilius(x:np.ndarray|float, γ:typing.Sequence[float]|float, /,
                      ϵ:typing.Optional[float]=None, 
                      χ:typing.Optional[float]=None, 
@@ -1071,7 +1112,8 @@ def Markwardt_Nilius(x:np.ndarray|float, γ:typing.Sequence[float]|float, /,
 #     
 #     pass
 
-@modelfunction(parameter_names = ("a", "b", "c", "x0"))
+@modelfunction(parameter_names = ("a", "b", "c", "x0"),
+               title="TalbotSayer96")
 def Talbot_Sayer(x:typing.Union[float, np.ndarray], a:typing.Union[float, typing.Sequence[float]], /,
                  b:typing.Optional[float]=None, c:typing.Optional[float]=None, 
                  x0:typing.Optional[float]=None, **kwargs) -> np.ndarray | float:
@@ -1486,7 +1528,8 @@ def Heaviside(x:np.ndarray|float,
     
     return y
     
-@modelfunction(parameter_names=("x0",))
+@modelfunction(parameter_names=("x0",),
+               title="GenericHeaviside")
 def Heaviside2(x:np.ndarray|float, 
               x0:typing.Union[float, pq.Quantity], 
               level0:float=0., level1:float=1.) -> np.ndarray | float:
@@ -1542,7 +1585,8 @@ def Heaviside2(x:np.ndarray|float,
     
     return y
     
-@modelfunction(parameter_names = ("x0", "x1"))
+@modelfunction(parameter_names = ("x0", "x1"),
+               title="Boxcar")
 def boxcar(x:np.ndarray | float, x0:typing.Union[typing.Sequence[float], float], /, 
            x1:typing.Optional[float]=None, up_first:bool=True) -> np.ndarray | float:
     r"""Boxcar function: 
@@ -1554,14 +1598,16 @@ Two successive Heaviside (step) functions of opposite directions"""
     
     if x0 < x1:
         # print(f"x0 < x1 {x0 < x1}; up_first: {up_first}")
-        #       up then down                                                        down then up
-        return Heaviside(x, x0, ud[0]) * Heaviside(x, x1, ud[1])# if up_first else Heaviside(x, x0, False) + Heaviside(x, x1, True)
+        # up then down
+        return Heaviside(x, x0, ud[0]) * Heaviside(x, x1, ud[1])
         
     else:
-        print(f"x0 >= x1 {x0 >= x1}; up_first: {up_first}")
+        # print(f"x0 >= x1 {x0 >= x1}; up_first: {up_first}")
+        # down then up
         return Heaviside(x, x0, ud[0]) * Heaviside(x, x1, ud[1])# if up_first else Heaviside(x, x1, False) + Heaviside(x, x0, True)
 
-@modelfunction(parameter_names = ("x0", "x1"))
+@modelfunction(parameter_names = ("x0", "x1"),
+               title="GenericBoxcar")
 def boxcar2(x:np.ndarray | float, x0:typing.Union[typing.Sequence[float], float], /, 
             x1:typing.Optional[float]=None,
             level0:float=0., level1:float=1.) -> np.ndarray | float:
