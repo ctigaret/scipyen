@@ -59,9 +59,9 @@ from core.prog import (scipywarn, signature_as_dict, decorator, timefunc)
 
 @decorator
 def modelfunction(f:typing.Callable, nvars:int=1, 
-                  parameter_names:typing.Optional[typing.Sequence[str]]=None,
-                  n_parameters:typing.Optional[int] = None,
-                  parameter_units:typing.Optional[dict]=None,
+                  coefficient_names:typing.Optional[typing.Sequence[str]]=None,
+                  n_coefficients:typing.Optional[int] = None,
+                  coefficient_units:typing.Optional[dict]=None,
                   **kwargs):
     r"""Decorator to tag a function as a mathematical model function.
 A mathematical model function realizes a function of one or more independent 
@@ -76,7 +76,7 @@ This decorator sets the attributes listed below, to a model function.
 
 'nvars': number of independent variables (e.g. 1D or nD function)
 
-'parameter_names': sequence of parameter symbols as they appear in the mathematical
+'coefficient_names': sequence of parameter symbols as they appear in the mathematical
     model; these parameters are "fixed" for a given model instance and are 
     responsible for generating a "family" of models from the same independent 
     variable, such that the models in the family have one thing in common: the 
@@ -86,7 +86,7 @@ This decorator sets the attributes listed below, to a model function.
     when fitting a model to some real data thought to follow the mathematical
     relation that defines the model).
 
-'parameter_units' (see below)
+'coefficient_units' (see below)
 
 NOTE: these attributes are NOT directly accessible from within the function's
 scope (i.e. excuted code). 
@@ -103,7 +103,7 @@ nvars: number of independent variables; this determines the general syntax of th
     Optional; default is 1. WARNING: do NOT confuse with the number of model 
     parameters
 
-parameter_names: typing.Sequence[str] — names (symbols) for the parameters.
+coefficient_names: typing.Sequence[str] — names (symbols) for the parameters.
     These can usually be inferred from the function's signature via the 
     'inspect' module, which is what the function 'model_parameters(…)' in this
     module does. However, this can be tedious for model functions with a more 
@@ -114,12 +114,12 @@ parameter_names: typing.Sequence[str] — names (symbols) for the parameters.
     When the model defines a variadic number of parameters (see e.g., exponential_decays_product_biased_shifted)
     these are indicated by a * suffix
 
-parameter_units: optional mapping
+coefficient_units: optional mapping
     parameter symbol:str ↦ physical unit: Quantity, UnitQuantity, or sequence of such
 
     Default is None
     When given, this flags that some model parameters actually have physical units;
-    the keys are the names of the model parameters (as in parameter_names).
+    the keys are the names of the model parameters (as in coefficient_names).
 
     When the model defines a variadic number of parameters (see e.g., 
     exponential_decays_product_biased_shifted) their keys are suffixed by a '*' (as above) 
@@ -127,8 +127,8 @@ parameter_units: optional mapping
 
     Since not all parameters necessarily associate physical units, those that do not
     may be omitted from this mapping. However, ATTENTION: the full sequence of
-    parameter names SHOULD be given in 'parameter_names', as above. Parameters
-    that are omitted from parameter_units will by default get pq.dimensionless as
+    parameter names SHOULD be given in 'coefficient_names', as above. Parameters
+    that are omitted from coefficient_units will by default get pq.dimensionless as
     physical unit.
 
     The safest practice is to associate these unitless parameters with pq.dimensionless
@@ -151,7 +151,7 @@ parameter_units: optional mapping
     as values for the parameter; it is up to the function what to do with its
     own call arguments
 
-n_parameters: int: number of model parameters; again, this can be inferred from the 
+n_coefficients: int: number of model parameters; again, this can be inferred from the 
     length of the paraneter names sequence, or indirectly by inspecting the 
     function's signature; however, this provides a direct access, useful for
     model functions with a more complex signature
@@ -175,56 +175,64 @@ https://wiki.python.org/moin/PythonDecoratorLibrary#Creating_decorator_with_opti
     def wrapper(f):
         setattr(f, "model_function", True)
         setattr(f, "nvars", nvars)
-        if isinstance(parameter_names, typing.Sequence) and len(parameter_names) and all(isinstance(p, str) for p in parameter_names):
-            setattr(f, "parameter_names", parameter_names)
+        if isinstance(coefficient_names, typing.Sequence) and len(coefficient_names) and all(isinstance(p, str) for p in coefficient_names):
+            setattr(f, "coefficient_names", coefficient_names)
         else:
-            setattr(f, "parameter_names", tuple())
-            
+            setattr(f, "coefficient_names", tuple())
         
-        if isinstance(parameter_units, dict):
+        if isinstance(coefficient_units, dict):
             check_value_type = lambda v: (isinstance(v, pq.Quantity) and v.size==1) or isinstance(v, (type(None), type(dataclasses.MISSING)))
-            if len(parameter_units) and all(isinstance(k, str) for k in parameter_units.keys()):
-                pnames = getattr(f, "parameter_names", None)
+            if len(coefficient_units) and all(isinstance(k, str) for k in coefficient_units.keys()):
+                pnames = getattr(f, "coefficient_names", None)
                 if pnames is None or isinstance(pnames, typing.Sequence) and len(pnames) == 0:
-                    setattr(f, "parameter_names", tuple(parameter_units.keys()))
+                    setattr(f, "coefficient_names", tuple(coefficient_units.keys()))
                     
                 punits = dict(map(lambda p: (p, pq.dimensionless), pnames))
                 
-                for key, value in parameter_units.items():
-                    if key not in f.parameter_names:
+                for key, value in coefficient_units.items():
+                    if key not in f.coefficient_names:
                         continue
                     if (check_value_type(value)) or (isinstance(value, typing.Sequence) and all(check_value_type(v) for v in value)):
                         punits[key] = value
                         
-                setattr(f, "parameter_units", punits)
+                setattr(f, "coefficient_units", punits)
                 
             else:
-                pnames = getattr(f, "parameter_names", None)
+                pnames = getattr(f, "coefficient_names", None)
                 if isinstance(pnames, typing.Sequence) and len(pnames) and all(isinstance(p, str) for p in pnames):
                     punits = dict(map(lambda p: (p, pq.dimensionless), pnames))
-                    setattr(f, "parameter_units", punits)
+                    setattr(f, "coefficient_units", punits)
                     
         else:
-            pnames = getattr(f, "parameter_names", None)
+            pnames = getattr(f, "coefficient_names", None)
             if isinstance(pnames, typing.Sequence) and len(pnames) and all(isinstance(p, str) for p in pnames):
                 punits = dict(map(lambda p: (p, pq.dimensionless), pnames))
-                setattr(f, "parameter_units", punits)
+                setattr(f, "coefficient_units", punits)
                 
             
-        if isinstance(n_parameters, int) and len(f.parameter_names) == 0:
+        if isinstance(n_coefficients, int) and len(f.coefficient_names) == 0:
             # use 'nparameters' only when parameternames is not given
-            if n_parameters < -1:
+            if n_coefficients < -1:
                 raise ValueError("Number of parameters must be >= -1")
             
-            setattr(f, "n_parameters", n_parameters)
+            setattr(f, "n_coefficients", n_coefficients)
+            
         else:
-            if any("*" in p for p in f.parameter_names):
-                setattr(f, "n_parameters", -1)
+            if any("*" in p for p in f.coefficient_names):
+                setattr(f, "n_coefficients", -1)
             else:
-                setattr(f, "n_parameters", len(f.parameter_names))
+                setattr(f, "n_coefficients", len(f.coefficient_names))
         
+        # add other attributes from here **kwargs
         for key, value in kwargs.items():
             setattr(f, key, value)
+        
+        # enforce a "title" attribute
+        f_title = getattr(f, "title", None)
+        
+        if not isinstance(f_title, str) or len(f_title.strip()) == 0:
+            setattr(f, "title", f.__name__[0].upper() + f.__name__[1:])
+            
         return f
     
     return wrapper(f)
@@ -266,7 +274,7 @@ def check_rise_decay_params(x:typing.Sequence[float]):
     
     return (len(x)-3) // 2
 
-@modelfunction(parameter_names = ("β0", "β1", "λ0", "λ1"),
+@modelfunction(coefficient_names = ("β0", "β1", "λ0", "λ1"),
                title="Biexponential")
 def biexponential(x:typing.Union[np.ndarray, float], 
                   β0:float|typing.Sequence[float]|np.ndarray, /,
@@ -284,7 +292,7 @@ def biexponential(x:typing.Union[np.ndarray, float],
     
     return β0 * np.exp(λ0 * x) + β1 * np.exp(λ1 * x)
 
-@modelfunction(parameter_names = ("β0", "β1", "τ0", "τ1"),
+@modelfunction(coefficient_names = ("β0", "β1", "τ0", "τ1"),
                title="BioexponentialDecay")
 def biexponential_decay(x:typing.Union[np.ndarray, float], 
                         β0:float|typing.Sequence[float]|np.ndarray, /,
@@ -300,7 +308,7 @@ def biexponential_decay(x:typing.Union[np.ndarray, float],
     
     return β0 * np.exp(-x / τ0) + β1 * np.exp(-x / τ1)
 
-@modelfunction(parameter_names = ("α", "β0", "β1", "τ0", "τ1"),
+@modelfunction(coefficient_names = ("α", "β0", "β1", "τ0", "τ1"),
                title="BiasedBiexponentialDecay")
 def biexponential_decay_biased(x:np.ndarray | float, α:typing.Union[float,typing.Sequence[float], np.ndarray],/, 
                                β0:typing.Optional[float]=None, β1:typing.Optional[float]=None, 
@@ -318,7 +326,7 @@ def biexponential_decay_biased(x:np.ndarray | float, α:typing.Union[float,typin
 
     return α + β0 * np.exp(-x / τ0) + β1 * np.exp(-x / τ1)
 
-@modelfunction(parameter_names = ("α", "β0", "β1", "x0", "τ0", "τ1"),
+@modelfunction(coefficient_names = ("α", "β0", "β1", "x0", "τ0", "τ1"),
                title="GenericBiexponentialDecay")
 def biexponential_decay_biased_shifted(x: np.ndarray | float, 
                                 α:typing.Union[float, typing.Sequence[float], np.ndarray], /, 
@@ -340,7 +348,7 @@ def biexponential_decay_biased_shifted(x: np.ndarray | float,
 
     return α + β0 * np.exp(-(x-x0) / τ0) + β1 * np.exp(-(x-x0) / τ1)
 
-@modelfunction(parameter_names = ("α", "β", "x0", "τ*"),
+@modelfunction(coefficient_names = ("α", "β", "x0", "τ*"),
                title="GenericExponentialDecaysProduct")
 def exponential_decays_product_biased_shifted(x: np.ndarray | float, 
                                    α:typing.Sequence[float] | float | np.ndarray, /,
@@ -404,7 +412,7 @@ NOTE: For calling purposes, α can be supplied as a sequence of (α, β, x0), an
         
     return α + β * np.exp(-(x-x0) / τc)
 
-@modelfunction(parameter_names = ("α", "β", "x0", "τ"),
+@modelfunction(coefficient_names = ("α", "β", "x0", "τ"),
                title="GenericExponentialDecay")
 def exponential_decay_biased_shifted(x:np.ndarray | float, 
                                      α:typing.Sequence[float] | np.ndarray | float, /,
@@ -447,7 +455,7 @@ coefficients are given as floats in the following order:
     λ = 1/τ
     return α + β * np.exp(-(x-x0)*λ)
 
-@modelfunction(parameter_names = ("α", "β", "x0", "τ"),
+@modelfunction(coefficient_names = ("α", "β", "x0", "τ"),
                title="GenericExponentialRise")
 def exponential_rise_biased_shifted(x:np.ndarray | float, 
                                     α:typing.Sequence[float]|np.ndarray, 
@@ -475,8 +483,7 @@ def exponential_rise_biased_shifted(x:np.ndarray | float,
     return α + β * (1 - np.exp(-(x-x0)/τ))
 
 @timefunc # uncomment this for testing 😄
-@modelfunction(parameter_names = ("α", "β", "x0", "τ"),
-               parameter_units={"α": dataclasses.MISSING,"β":pq.dimensionless,"x0":pq.s, "τ":pq.s},
+@modelfunction(coefficient_names = ("α", "β", "x0", "τ"),
                title="AlphaSynapse")
 def alphaSynapse(x:np.ndarray | float, α:typing.Union[typing.Sequence[float],np.ndarray,float], /,
                   β:typing.Optional[float] = None, x0:typing.Optional[float] = None,
@@ -553,20 +560,22 @@ Returns:
 ========
 1D numpy array (vector)
 
-Example: (run in Scipyen's console)
+Example: 
 ========
+(code to run in Scipyen's console)
+
 
 from core import models
 
 x = np.linspace(0.0,1.0, 1000);
 
-parameters = [0, -1, 0.05, 0.01];
+α = 0.; β = -1.; x0 = 0.05; τ = 0.01;
+parameters = [α, β, x0, τ];
 
-y = alphaSynapse(x, *parameters)
-
-OR: 
-
-y = alphaSynapse_model(x, parameters)
+# any of the statements below are equivalent:
+y = alphaSynapse(x, α, β, x0, τ)
+# y = alphaSynapse(x, *parameters)
+# y = alphaSynapse(x, parameters)
 
 plt.plot(x,y)
 
@@ -657,7 +666,7 @@ the mathematical Alpha Function (https://mathworld.wolfram.com/AlphaFunction.htm
             
         return y 
 
-@modelfunction(parameter_names = ("i", "n", "b"),
+@modelfunction(coefficient_names = ("i", "n", "b"),
                title="NonStationaryFluctuationAnalysis")
 def nsfa(x:np.ndarray | float, i:float|pq.Quantity|typing.Sequence[typing.Union[float, pq.Quantity]], /, 
          n:typing.Optional[typing.Union[float, pq.Quantity]] = None, 
@@ -683,8 +692,8 @@ WARNING: do not pass quantities for the parameters, yet; just use floats
     
     return x*i - x**2 / n + b
     
-@modelfunction(parameter_names = ("α", "β", "x0", "τ1", "τ2"),
-               parameter_units = {"α"},
+@modelfunction(coefficient_names = ("α", "β", "x0", "τ1", "τ2"),
+               coefficient_units = {"α"},
                title="ClementsBekkers97")
 def Clements_Bekkers_97(x:np.ndarray | float,
                         α:typing.Union[float, typing.Sequence[float]], /, 
@@ -800,7 +809,7 @@ def get_CB_scale_for_unit_amplitude(β:float,τ_rise:float, τ_decay:float, x0:f
     
     return peak/yₘ
 
-@modelfunction(parameter_names = ("α", "β0", "x0_0", "τ0_0", "τ0_1", "β1", "x0_1", "τ1_0", "τ1_1"))
+@modelfunction(coefficient_names = ("α", "β0", "x0_0", "τ0_0", "τ0_1", "β1", "x0_1", "τ1_0", "τ1_1"))
 def CBsum(x:np.ndarray | float, α:float | typing.Sequence[float], /, 
           β0:typing.Optional[float]=None, x0_0:typing.Optional[float]=None,
           τ0_0:typing.Optional[float]=None, τ0_1:typing.Optional[float]=None, 
@@ -846,7 +855,7 @@ def CBsum(x:np.ndarray | float, α:float | typing.Sequence[float], /,
     
     return y0 + y1
     
-@modelfunction(parameter_names = ("x0", "ρ", "β*", "τ*", "α"))
+@modelfunction(coefficient_names = ("x0", "ρ", "β*", "τ*", "α"))
 def exponential_rise_decays_product_biased_shifted(x:np.ndarray|float, *parameters:float,
                          **kwargs) -> np.ndarray|float:
     r"""Realization of a transient signal as a biased (α) product of one 
@@ -984,7 +993,7 @@ def exponential_rise_decays_product_biased_shifted(x:np.ndarray|float, *paramete
         else:
             return y
 
-@modelfunction(parameter_names=("p*"))
+@modelfunction(coefficient_names=("p*"))
 def compound_exponential_rise_decays_product_biased_shifted(x:np.ndarray | float, *parameters, 
                                   returnDecays = False) -> np.ndarray | float:
     r"""Compound transient signal -- linear sum of delayed single transient signals
@@ -1046,7 +1055,7 @@ def compound_exponential_rise_decays_product_biased_shifted(x:np.ndarray | float
         else:
             return y, yc
         
-@modelfunction(parameter_names=("γ", "ϵ", "χ", "σ"),
+@modelfunction(coefficient_names=("γ", "ϵ", "χ", "σ"),
                title="MarkwardtNilius88")
 def Markwardt_Nilius(x:np.ndarray|float, γ:typing.Sequence[float]|float, /,
                      ϵ:typing.Optional[float]=None, 
@@ -1112,7 +1121,7 @@ def Markwardt_Nilius(x:np.ndarray|float, γ:typing.Sequence[float]|float, /,
 #     
 #     pass
 
-@modelfunction(parameter_names = ("a", "b", "c", "x0"),
+@modelfunction(coefficient_names = ("a", "b", "c", "x0"),
                title="TalbotSayer96")
 def Talbot_Sayer(x:typing.Union[float, np.ndarray], a:typing.Union[float, typing.Sequence[float]], /,
                  b:typing.Optional[float]=None, c:typing.Optional[float]=None, 
@@ -1220,7 +1229,7 @@ def Talbot_Sayer(x:typing.Union[float, np.ndarray], a:typing.Union[float, typing
 
     return boltzmann * ghk # ↦ Current units (typically, pA)
 
-@modelfunction(parameter_names = ("α*", "β*", "σ*", "δ"))
+@modelfunction(coefficient_names = ("α*", "β*", "σ*", "δ"))
 def gaussianSum1D(x:np.ndarray | float, *args, **kwargs) -> np.ndarray | float:
     r""" Sum of shifted Gaussians in 1D.
     
@@ -1305,7 +1314,7 @@ def gaussianSum1D(x:np.ndarray | float, *args, **kwargs) -> np.ndarray | float:
     
     return ret
     
-@modelfunction(parameter_names=("τ", "x0"))
+@modelfunction(coefficient_names=("τ", "x0"))
 def Frank_Fuortes(x:np.ndarray | float, 
                   τ:float | typing.Sequence[float], /,  
                   x0: typing.Optional[float] = None) -> np.ndarray | float:
@@ -1344,7 +1353,7 @@ def Frank_Fuortes(x:np.ndarray | float,
 
     return 1-np.exp(-(x-x0)/tau)
 
-@modelfunction(parameter_names=("irh", "τ", "x0"))
+@modelfunction(coefficient_names=("irh", "τ", "x0"))
 def Frank_Fuortes2(x:np.ndarray | float, irh:typing.Sequence[float] | float, /,
                    τ:typing.Optional[float] = None, 
                    x0: typing.Optional[float] = None) -> np.ndarray | float:
@@ -1370,7 +1379,7 @@ def Frank_Fuortes2(x:np.ndarray | float, irh:typing.Sequence[float] | float, /,
     
     return (1-np.exp(-(x-x0)/τ)) / irh
 
-@modelfunction(parameter_names=("x0", "κ"))
+@modelfunction(coefficient_names=("x0", "κ"))
 def Boltzmann(x:np.ndarray | float, x0:typing.Sequence[float] | float, /,
               κ:typing.Optional[float] = None,
               pos:bool=True) -> np.ndarray | float:
@@ -1469,7 +1478,7 @@ voltage dependent channels Naᵥ and Kᵥ in the Hodgkin-Huxley formalism.
     ξ /= κ
     return 1/(1+np.exp(ξ))
     
-@modelfunction(parameter_names=("x0", ))
+@modelfunction(coefficient_names=("x0", ))
 def Heaviside(x:np.ndarray|float, 
               x0:typing.Union[float, pq.Quantity], /, 
               α:bool=True) -> np.ndarray | float:
@@ -1528,7 +1537,7 @@ def Heaviside(x:np.ndarray|float,
     
     return y
     
-@modelfunction(parameter_names=("x0",),
+@modelfunction(coefficient_names=("x0",),
                title="GenericHeaviside")
 def Heaviside2(x:np.ndarray|float, 
               x0:typing.Union[float, pq.Quantity], 
@@ -1585,7 +1594,7 @@ def Heaviside2(x:np.ndarray|float,
     
     return y
     
-@modelfunction(parameter_names = ("x0", "x1"),
+@modelfunction(coefficient_names = ("x0", "x1"),
                title="Boxcar")
 def boxcar(x:np.ndarray | float, x0:typing.Union[typing.Sequence[float], float], /, 
            x1:typing.Optional[float]=None, up_first:bool=True) -> np.ndarray | float:
@@ -1606,7 +1615,7 @@ Two successive Heaviside (step) functions of opposite directions"""
         # down then up
         return Heaviside(x, x0, ud[0]) * Heaviside(x, x1, ud[1])# if up_first else Heaviside(x, x1, False) + Heaviside(x, x0, True)
 
-@modelfunction(parameter_names = ("x0", "x1"),
+@modelfunction(coefficient_names = ("x0", "x1"),
                title="GenericBoxcar")
 def boxcar2(x:np.ndarray | float, x0:typing.Union[typing.Sequence[float], float], /, 
             x1:typing.Optional[float]=None,
@@ -1617,7 +1626,7 @@ Two successive Heaviside2 (step) functions (general versions) in opposite direct
     
     return Heaviside2(x, x0, level0, level1) + Heaviside2(x, x1, level1, level0)
 
-@modelfunction(parameter_names = ("x0", "y0", "x1", "y1"))
+@modelfunction(coefficient_names = ("x0", "y0", "x1", "y1"))
 def ramp(x:typing.Union[float, np.ndarray], x0:typing.Union[float, np.ndarray], /, 
          y0=None, x1=None, y1=None) -> np.ndarray | float:
     r"""Linear ramp from (x₀, y₀) to (x₁, y₁)
@@ -1700,9 +1709,76 @@ def is_modelfunction(func:typing.Callable):
     
     return isinstance(getattr(func, "model_function", None), bool) and isinstance(getattr(func, "nvars", None), int)
 
-def get_default_parameter_values(func:typing.Callable) -> pd.DataFrame | None:
+def get_initial_coefficient_values(func:typing.Callable) -> pd.DataFrame | None:
     if not is_modelfunction(func):
         raise TypeError(f"{func} is not a model function")
     
-    if len(func.parameter_names) <= 0:
-        pass
+    if len(func.coefficient_names) == 0:
+        if func.n_coefficients <= 0:
+            print(f"The the model function {func.__name__} (entitled {func.title}) has variadic coefficients.\n")
+            print(f"You need to supply these values manually")
+
+def make_initial_coeffs(names:typing.Sequence[str]| dict, /, 
+                        initial:typing.Optional[typing.Sequence[float | pq.Quantity | np.ndarray | np.float64]] = None, 
+                        lower:typing.Optional[typing.Sequence[float | pq.Quantity | np.ndarray | np.float64]] = None,
+                        upper:typing.Optional[typing.Sequence[float | pq.Quantity | np.ndarray | np.float64]] = None, 
+                        feasible:typing.Optional[typing.Optional[typing.Sequence[bool] | bool]] = None) -> pd.DataFrame | None:
+    
+    if isinstance(names, dict):
+        # coeff_name ↦ Sequence(intial, lb, ub, keep_feasible)
+        assert all(isinstance(v, typing.Sequence) and len(v) in (3,4) for v in names), f"Wrong coefficient specification: {names}"
+        n_coeffs = len(names)
+        coeff_names = list()
+        ret = {"Initial Value": list(), "Lower Bound": list(), "Upper Bound": list(), "Keep Feasible": list()}
+        for k,v in names.items():
+            coeff_names.append(k)
+            iv, lb, ub = v[:-1]
+            kf = v[3] if len(v) == 4 else None
+            ret["Initial Value"].append(iv)
+            ret["Lower Bound"].append(lb)
+            ret["Upper Bound"].append(ub)
+            ret["Keep Feasible"].append(kf)
+            
+        setkf = tuple(filter(lambda v: isinstance(v, bool), ret["Keep Feasible"]))
+        if len(setkf) not in (1, n_coeffs):
+            raise ValueError(f"Either ALL {n_coeffs} coefficients or only one of them must specify keep feasible")
+        
+        if len(setkf) == 1:
+            ret["Keep Feasible"] = list(map(lambda k: setkf[0], range(n_coeffs)))
+            
+        elif len(setkf) == 0:
+            ret["Keep Feasible"] = list(map(lambda k: False, range(n_coeffs)))
+            
+        return pd.DataFrame(data = ret, index = coeff_names)
+            
+    if isinstance(names, typing.Sequence):
+        ret = dict()
+        assert len(names) > 0 and all(isinstance(v, str) for v in names), "'names' should contain strings"
+        n_coeffs= len(names)
+        
+        assert isinstance(initial, typing.Sequence) and len(initial) == n_coeffs and all(isinstance(v, (float, np.ndarray, np.float64)) for v in initial), f"Incorrect specification of initial values: {initial}"
+        assert isinstance(lower, typing.Sequence) and len(lower) == n_coeffs and all(isinstance(v, (float, np.ndarray, np.float64)) for v in lower), f"Incorrect specification of lower bounds: {lower}"
+        assert isinstance(upper, typing.Sequence) and len(upper) == n_coeffs and all(isinstance(v, (float, np.ndarray, np.float64)) for v in upper), f"Incorrect specification of upper bounds: {upper}"
+        
+        if isinstance(feasible, bool):
+            feasible = list(map(lambda k: feasible, range(n_coeffs)))
+            
+        elif isinstance(feasible, typing.Sequence):
+            if not all(isinstance(v, bool) for v in feasible):
+                raise TypeError("'feasible' should contain only bool values")
+            if len(feasible) == 0:
+                feasible = list(map(lambda k: False, range(n_coeffs)))
+                
+            elif len(feasible) == 1:
+                feasible = list(map(lambda k: feasible[0], range(n_coeffs)))
+                
+            elif len(feasible) != n_coeffs:
+                raise ValueError(f"Incorrect number of elements in 'feasible'; expecting {n_coeffs}, got {len(feasible)} instead.")
+            
+        elif isinstance(feasible, np.ndarray):
+            assert feasible.size in (1, n_coeffs), f"Incorrect number of elements in 'feasible'; expecting {n_coeffs}, got {len(feasible)} instead."
+            assert feasible.dtype == np.dtype("bool"), f"'feasible' should be a bool array"
+            if feasible.size == 1:
+                feasible
+        
+    
