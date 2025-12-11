@@ -273,7 +273,7 @@ Check that params and *extras amount to the required number of coefficients spec
     # result is a tuple of np.float64; these need to be cast to plain float
     # this is also the case for a Quantity array's 'magnitude' (which is the 
     # underlying float array without dimensionality, or physical units)
-    if isinstance(params, np.ndarray) and params.dtype == np.dype('float64'):
+    if isinstance(params, np.ndarray) and params.dtype == np.dtype('float64'):
         # coefficients packed as a numpy array, possibly a Quantity, and possibly
         # a singleton ("scalar")
         np = len(extras) + params.size
@@ -457,15 +457,18 @@ NOTE: For calling purposes, α can be supplied as a sequence of (α, β, x0), an
     
 """
     x = check_independent_variable_1D(x)
-    if isinstance(α, (typing.Sequence, np.ndarray)):
+    if isinstance(α, (typing.Sequence, np.ndarray) and α.size == 3):
         τ = (β, x0) + τ
-        α, β, x0 = check_unpack_model_coeffs(3, α, β, x0)
+        β = None
+        x0 = None
+    α, β, x0, *τ = check_unpack_model_coeffs(len(τ)+3, α, β, x0, *τ)
+    
+
         
-    if len(τ) == 0:
-        raise ValueError(f"τ must be supplied")
+    
     assert all(v > 0. for v in τ), "τ must be strictly positive"
     
-    elif len(τ) == 1:
+    if len(τ) == 1:
         return exponential_decay_biased_shifted(x, α, β, x0, τ[0])
     else:
         # λ = np.sum(list(map(lambda v: 1/v, τ)))
@@ -654,6 +657,11 @@ the mathematical Alpha Function (https://mathworld.wolfram.com/AlphaFunction.htm
     # NOTE: Python currently does not support unicode
     # characters such as sub- or super-scripts, so please use 'x0', not 'x₀'
     # in the code
+    
+    self = globals()["alphaSynapse"]
+    print(f"nvars:{self.nvars}")
+    print(f"coeff  names: {self.coefficient_names}")
+    print(f"n coeffs: {self.n_coefficients}")
     
     # unpack parameters
     α, β, x0, τ = check_unpack_model_coeffs(4, α, β, x0, τ)
