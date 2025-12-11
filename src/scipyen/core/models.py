@@ -57,6 +57,19 @@ from core import scipyen_quantities as scq
 from core.datasignal import DataSignal
 from core.prog import (scipywarn, signature_as_dict, decorator, timefunc)
 
+def check_independent_variable_1D(x:typing.Union[float, np.ndarray, np.float64]):
+    if not isinstance(x, (float, np.ndarray, np.float64)):
+        raise TypeError(f"Independent variable 'x' has unexpected type: {type(x).__name__}")
+    
+    if isinstance(x, pq.Quantity):
+        units['x'] = x.units
+        x = x.magnitude
+        
+    if isinstance(x, np.ndarray):
+        x = x.flatten()
+        
+    return x
+
 @decorator
 def modelfunction(f:typing.Callable, nvars:int=1, 
                   coefficient_names:typing.Optional[typing.Sequence[str]]=None,
@@ -240,30 +253,72 @@ https://wiki.python.org/moin/PythonDecoratorLibrary#Creating_decorator_with_opti
     # setattr(wf, "self", f)
     # return wf
 
-def check_unpack_model_params_seq(params:typing.Sequence[typing.Union[float, np.ndarray, np.float64]] | np.ndarray, 
-                                  n:int, strip_units:bool=True):
-    r"""Verifies and unpacks model parameters, when supplied as a Sequence or vector"""
-    if isinstance(params, typing.Sequence) and len(params) == n:
-        if all (isinstance(v, (float, np.float64)) for v in params):
-            return tuple(params)
+def check_unpack_model_coeffs(n:int, params:typing.Sequence[typing.Union[float, np.ndarray, np.float64]] | np.ndarray, 
+                              *extras, strip_units:bool=True) -> tuple[float]:
+    r"""Verifies and unpacks model coefficients, when supplied as a Sequence or vector
+Check that params and *extras amount to the required number of coefficients specified in 'n'
+    Params may be a sequence or numpy array; when extra is empty, params
+    """
+    import numpy as np
+    # extra coefficients. 
+    # when all expected coefficients are packed into the 'params' parameter, 
+    # extras should be either empty, or contain only None objects
+    iscoeff = lambda v: isinstance(v, (float, np.float64)) or (isinstance(v, np.ndarray) and v.size==1)
+    extras = tuple(filter(lambda v: iscoeff(v), extras))
+    # ensure extras contain scalar floats
+    extras = tuple(map(lambda v:float(v) if isinstance(v, (np.ndarray, np.float64)) else v, extras))
+    
+    # NOTE: 2025-12-10 22:11:32
+    # when a numpy array of floats is unpacked via tuple constructor, the 
+    # result is a tuple of np.float64; these need to be cast to plain float
+    # this is also the case for a Quantity array's 'magnitude' (which is the 
+    # underlying float array without dimensionality, or physical units)
+    if isinstance(params, np.ndarray) and params.dtype == np.dype('float64'):
+        # coefficients packed as a numpy array, possibly a Quantity, and possibly
+        # a singleton ("scalar")
+        np = len(extras) + params.size
+        assert np == n, f"Expecting {n} coefficients (packed or individual) but {np} were given"
         
-        elif all(isinstance(v, np.ndarray) and v.size==1 and v.dtype==np.dtype("float64") for v in params):
-            return tuple(params)
+        if isinstance(params, pq.Quantity):
+            if strip_units:
+                params = tuple(map(lambda v: float(v), params))
+            else:
+                params = tuple(params) # tuple of Quantity objects
+        else:
+            params = tuple(map(lambda v: float(v), params))
             
+        return params + extras
+            
+    elif isinstance(params, typing.Sequence):
+        # coefficients packed as a sequence (tuple, list, deque)
+        np = len(params) + len(extras)
+        assert np == n, f"Expecting {n} coefficients (packed or individual) but {np} were given"
+        
+        if all (isinstance(v, (float, np.float64)) for v in params):
+            params = tuple(map(lambda v: float(v), params)) # casting float to float should bring no penalty
+        
         elif all(isinstance(v, pq.Quantity) and v.size==1 and v.dtype==np.dtype("float64") for v in params):
             if strip_units:
-                return tuple(map(lambda v: float(v.magnitude), params))
+                params = tuple(map(lambda v: float(v.magnitude), params))
             else:
-                return tuple(params)
+                params = tuple(params) # tuple of Quantiy arrays each with one element !
+        
+        elif all(isinstance(v, np.ndarray) and v.size==1 and v.dtype==np.dtype("float64") for v in params):
+            params = tuple(map(lambda v: float(v), params)) # otherwise we get a tuple of np.float64
             
         else:
-            raise TypeError("Parameter sequence contains invalid object types; expecting float, numpy.float64 or numpy arrays with size 1 and dtype 'float64'")
+            raise TypeError("Coefficients sequence contains invalid object types; expecting float, numpy.float64 or numpy arrays with size 1 and dtype 'float64'")
+            
+        return params + extras
     
-    elif isinstance(params, np.ndarray) and params.size == n and params.dtype == np.dype('float64'):
-        return tuple(map(lambda v: float(v), params))
+    elif isinstance(params, (float, np.float64)):
+        np = len(extras) + 1
+        assert np == n, f"Expecting {n} coefficients (packed or individual) but {np} were given"
+        return (params, ) + extras
     
     else:
         raise TypeError(f"Expecting a sequence of float scalars or a float numpy array with {n} elements; got {type(params).__name__} instead")
+    
 
 def check_rise_decay_params(x:typing.Sequence[float]):
     r"""Returns the number of decay components for a exp-rise-multi-decay transient.
@@ -284,13 +339,13 @@ def biexponential(x:typing.Union[np.ndarray, float],
     r"""Sum of two exponentials:
     β0 × exp(λ0 × x) + β1 × exp(λ1 × x)
 """
-    if isinstance(β0, (typing.Sequence, np.ndarray)):
-        β0, β1, λ0, λ1 = check_unpack_model_params_seq(β0, 4)
-        
-    if not all(isinstance(v, float) for v in (β0, β1, λ0, λ1)):
-        raise TypeError("Expecting four comma-separated floats or a sequence of four floats")
+    β0, β1, λ0, λ1 = check_unpack_model_coeffs(4, β0, β1, λ0, λ1)
+    x = check_independent_variable_1D(x)
+    λ0x = np.multiply(λ0, x)
+    λ1x = np.multiply(λ1, x)
+    return np.add(np.multiply(β0, np.exp(λ0x)), np.multiply(β1, np.exp(λ1x)))
     
-    return β0 * np.exp(λ0 * x) + β1 * np.exp(λ1 * x)
+    # return β0 * np.exp(λ0 * x) + β1 * np.exp(λ1 * x)
 
 @modelfunction(coefficient_names = ("β0", "β1", "τ0", "τ1"),
                title="BioexponentialDecay")
@@ -300,13 +355,15 @@ def biexponential_decay(x:typing.Union[np.ndarray, float],
                         τ0:typing.Optional[float] = None, 
                         τ1:typing.Optional[float] = None) -> np.ndarray | float:
     r"""Sum of two exponential decays ('bi-exponential decay')"""
-    if isinstance(β0, (typing.Sequence, np.ndarray)):
-        β0, β1, τ0, τ1 = check_unpack_model_params_seq(β0, 4)
-        
-    if not all(isinstance(v, float) for v in (β0, β1, τ0, τ1)):
-        raise TypeError("Expecting four comma-separated float scalars or a sequence of four float scalars")
+    β0, β1, τ0, τ1 = check_unpack_model_coeffs(4, β0, β1, τ0, τ1)
+    assert all(v>0. for v in (τ0, τ1))
+    x = check_independent_variable_1D(x)
+    xτ0 = np.divide(np.negative(x), τ0)
+    xτ1 = np.divide(np.negative(x), τ1)
     
-    return β0 * np.exp(-x / τ0) + β1 * np.exp(-x / τ1)
+    return np.add(np.multiply(β0, np.exp(xτ0)), np.multiply(β1, np.exp(xτ1)))
+
+    # return β0 * np.exp(-x / τ0) + β1 * np.exp(-x / τ1)
 
 @modelfunction(coefficient_names = ("α", "β0", "β1", "τ0", "τ1"),
                title="BiasedBiexponentialDecay")
@@ -318,13 +375,15 @@ def biexponential_decay_biased(x:np.ndarray | float, α:typing.Union[float,typin
     
     α + β0 × exp(-x / τ0) + β1 × exp(-x / τ1)
 """
-    if isinstance(α, (typing.Sequence, np.ndarray)):
-        α, β0, β1, τ0, τ1 = check_unpack_model_params_seq(α, 5)
-        
-    if not all(isinstance(v, float) for v in (α, β0, β1, τ0, τ1)):
-        raise TypeError("Expecting a comma-separated list of 5 parameters or a sequence of 5 parameters (α, β0, β1, τ0, τ1)")
+    α, β0, β1, τ0, τ1 = check_unpack_model_coeffs(5, α, β0, β1, τ0, τ1)
+    assert all(v > 0. for v in (τ0, τ1)), "τ0, τ1 must be both strictly positive"
+    x = check_independent_variable_1D(x)
+    xτ0 = np.divide(np.negative(x), τ0)
+    xτ1 = np.divide(np.negative(x), τ1)
+    
+    return np.add(np.add(α, np.multiply(β0, np.exp(xτ0))), np.multiply(β1, np.exp(xτ1)))
 
-    return α + β0 * np.exp(-x / τ0) + β1 * np.exp(-x / τ1)
+    # return α + β0 * np.exp(-x / τ0) + β1 * np.exp(-x / τ1)
 
 @modelfunction(coefficient_names = ("α", "β0", "β1", "x0", "τ0", "τ1"),
                title="GenericBiexponentialDecay")
@@ -340,20 +399,22 @@ def biexponential_decay_biased_shifted(x: np.ndarray | float,
     
     α + β0 × exp(-(x-x0) / τ0) + β1 × exp(-(x-x0) / τ1)
 """
-    if isinstance(α, (typing.Sequence, np.ndarray)):
-        α, β0, β1, x0, τ0, τ1 = check_unpack_model_params_seq(α, 6)
-        
-    if not all(isinstance(v, float) for v in (α, β0, β1, x0, τ0, τ1)):
-        raise TypeError("Expecting a comma-separated list of 6 parameters or a sequence of 6 parameters (α, β0, β1, τ0, τ1)")
+    α, β0, β1, x0, τ0, τ1 = check_unpack_model_coeffs(6, α, β0, β1, x0, τ0, τ1)
+    assert all(v > 0. for v in (τ0, τ1)), "τ0, τ1 must be both strictly positive"
+    x = check_independent_variable_1D(x)
+    xxτ0 = np.divide(np.subtract(x0, x), τ0) # (x0-x)/τ0
+    xxτ1 = np.divide(np.subtract(x0, x), τ1) # (x0-x)/τ1
+    return np.add(np.add(α, np.multiply(β0, np.exp(xxτ0))) + np.multiply(β1, np.exp(xxτ1)))
 
-    return α + β0 * np.exp(-(x-x0) / τ0) + β1 * np.exp(-(x-x0) / τ1)
+    # return α + β0 * np.exp(-(x-x0) / τ0) + β1 * np.exp(-(x-x0) / τ1)
 
 @modelfunction(coefficient_names = ("α", "β", "x0", "τ*"),
                title="GenericExponentialDecaysProduct")
 def exponential_decays_product_biased_shifted(x: np.ndarray | float, 
                                    α:typing.Sequence[float] | float | np.ndarray, /,
                                    β:typing.Optional[float] = None, 
-                                   x0:typing.Optional[float] = None, *τ) -> np.ndarray | float:
+                                   x0:typing.Optional[float] = None, 
+                                   *τ) -> np.ndarray | float:
     r"""Product of several exponential decays, biased and shifted
 
     Realizes:
@@ -395,22 +456,25 @@ NOTE: For calling purposes, α can be supplied as a sequence of (α, β, x0), an
     arguments folowing it will be included in τ
     
 """
+    x = check_independent_variable_1D(x)
     if isinstance(α, (typing.Sequence, np.ndarray)):
         τ = (β, x0) + τ
-        α, β, x0 = check_unpack_model_params_seq(α, 3)
+        α, β, x0 = check_unpack_model_coeffs(3, α, β, x0)
         
-    if not all(isinstance(v, float) for v in (α, β0, β1, x0)) and not all(isinstance(v, float) for v in τ):
-        raise TypeError("Expecting a comma-separated list of parameters or a sequence of three parameters (α, β0, β1) followed by individual τ values")
-
     if len(τ) == 0:
         raise ValueError(f"τ must be supplied")
+    assert all(v > 0. for v in τ), "τ must be strictly positive"
+    
     elif len(τ) == 1:
         return exponential_decay_biased_shifted(x, α, β, x0, τ[0])
     else:
         # λ = np.sum(list(map(lambda v: 1/v, τ)))
         τc = np.prod(τ)/np.sum(τ)
+        xxτc = np.divide(np.subtract(x0,x),τc)
         
-    return α + β * np.exp(-(x-x0) / τc)
+        return np.add(α, np.multiply(β, np.exp(xxτc)))
+    
+        # return α + β * np.exp(-(x-x0) / τc)
 
 @modelfunction(coefficient_names = ("α", "β", "x0", "τ"),
                title="GenericExponentialDecay")
@@ -446,14 +510,14 @@ coefficients are given as floats in the following order:
 #     This works as well in jupyter qtconsole, but not in plain python REPL
     # y0, α, x0, τ = parameters
     
-    if isinstance(α, (typing.Sequence, np.ndarray)):
-        α, β, x0, τ = check_unpack_model_params_seq(α, 4)
-        
-    if not all(isinstance(v, float) for v in (α, β, x0, τ )):
-        raise TypeError("Expecting a sequence of floats or a comma-separated list of floats")
-    
-    λ = 1/τ
-    return α + β * np.exp(-(x-x0)*λ)
+    α, β, x0, τ = check_unpack_model_coeffs(4, α, β, x0, τ)
+    assert τ > 0., "τ must be strictly positive"
+    x = check_independent_variable_1D(x)
+    xxτ = np.divide(np.subtract(x0,x), τ) # (x0-x)/τ
+    return np.add(α, np.multiply(β, np.exp(xxτ)))
+
+    # λ = 1/τ
+    # return α + β * np.exp(-(x-x0)*λ)
 
 @modelfunction(coefficient_names = ("α", "β", "x0", "τ"),
                title="GenericExponentialRise")
@@ -474,13 +538,15 @@ def exponential_rise_biased_shifted(x:np.ndarray | float,
 
     α (bias), β (scale), x₀ (shift), τ (time constant)
 """
-    if isinstance(α, (typing.Sequence, np.ndarray)):
-        α, β, x0, τ = check_unpack_model_params_seq(α, 4)
-        
-    if not all(isinstance(v, float) for v in (α, β, x0, τ)):
-        raise TypeError("Expecting four comma-separated float scalars or a sequence of four float scalars")
+    α, β, x0, τ = check_unpack_model_coeffs(4, α, β, x0, τ)
+    assert τ > 0., "τ must be strictly positive"
+    x = check_independent_variable_1D(x)
+
+    xxτ = np.divide(np.subtract(x0,x), τ)
     
-    return α + β * (1 - np.exp(-(x-x0)/τ))
+    return np.add(α, np.multiply(β, np.subtract(1, np.exp(xxτ))))
+    
+    # return α + β * (1 - np.exp(-(x-x0)/τ))
 
 @timefunc # uncomment this for testing 😄
 @modelfunction(coefficient_names = ("α", "β", "x0", "τ"),
@@ -590,17 +656,8 @@ the mathematical Alpha Function (https://mathworld.wolfram.com/AlphaFunction.htm
     # in the code
     
     # unpack parameters
-    if all(v is None for v in (β, x0, τ)):
-        if isinstance(α, (typing.Sequence, np.ndarray)):
-            α, β, x0, τ = check_unpack_model_params_seq(α, 4)
-        else:
-            raise TypeError("All four parameters ('α', 'β', 'x0', 'τ') must be supplied, eithr as individual values or packed in a sequence or an array")
-        
-    units = dict()
-    if all(isinstance(v, pq.Quantity) for v in (α, β, x0, τ)):
-        units.update(dict(map(lambda i: (i[0], i[1].units), zip(('α', 'β', 'x0', 'τ'), (α, β, x0, τ)))))
-        α, β, x0, τ = tuple(map(lambda v: float(v.magnitude), (α, β, x0, τ)))
-        
+    α, β, x0, τ = check_unpack_model_coeffs(4, α, β, x0, τ)
+    # print(f"{α}")
     assert(τ > 0.), "Time constant MUST be strictly positive"
     
     # NOTE: 2025-12-08 00:24:16
@@ -613,9 +670,9 @@ the mathematical Alpha Function (https://mathworld.wolfram.com/AlphaFunction.htm
     def alpha(v):
         # NOTE: 2025-12-08 00:28:34 
         # using numpy builtin ufuncs here; 
-        # they're OK with scalar floats too, but they return a np.float64
+        # they're OK with scalar floats too, but they could return a np.float64
         # therefore I need to cast back to float, see NOTE: 2025-12-08 00:29:32 
-        return np.add(α, np.multiply(β, np.multiply(v, np.exp(1. - v))))
+        return np.add(α, np.multiply(β, np.multiply(v, np.exp(np.subtract(1.,v)))))
     
     # NOTE: 2025-12-08 00:48:54 
     # DISCARD this option as is unefficient (frompyfunc returns PyObject and is
@@ -625,20 +682,9 @@ the mathematical Alpha Function (https://mathworld.wolfram.com/AlphaFunction.htm
     # valpha = np.frompyfunc(alpha, 1, 1) 
     
     # make sure x is a numpy array or a scalar
-    if not isinstance(x, (float, np.ndarray)):
-        raise TypeError(f"Independent variable 'x' has unexpected type: {type(x).__name__}")
-    
-    x_class = None
-    
-    if isinstance(x, pq.Quantity):
-        if isinstance(x, (neo.AnalogSignal, DataSignal)):
-            x_class = type(x)
-        units['x'] = x.units
-        x = x.magnitude
-    else:
-        x = x
+    x = check_independent_variable_1D(x)
         
-    xt = (x-x0)/τ
+    xτ = np.divide(np.subtract(x,x0), τ)
     
     # NOTE: 2025-12-07 23:29:18
     # in NEURON's syn.mod there is an additional condition for returning 0., when v > 10. - 
@@ -649,17 +695,17 @@ the mathematical Alpha Function (https://mathworld.wolfram.com/AlphaFunction.htm
         # x is a scalar, all simple!
         # NOTE: 2025-12-08 00:29:32
         # casting to plain float, see NOTE: 2025-12-08 00:28:34 
-        return float(alpha(xt)) if xt >=0 else α
+        return float(alpha(xτ)) if xτ >=0 else α
     
     else:
         if x.size == 1:
             # no point in vectorizing on array with one element
-            return alpha(xt) if xt >=0 else np.array([α])
+            return alpha(xτ) if xτ >=0 else np.array([α])
     
         y = np.full_like(x, α)
         
         # using built-in ufuncs (a LOT more efficient !!!)
-        y[xt>=0] = alpha(xt[xt>=0]) 
+        y[xτ>=0] = alpha(xτ[xτ>=0]) 
         
         # NOTE: 2025-12-08 00:50:00 -> TOO SLOW !!!
         # valpha(xt, y, where = xt>=0, casting="unsafe")
@@ -678,22 +724,14 @@ def nsfa(x:np.ndarray | float, i:float|pq.Quantity|typing.Sequence[typing.Union[
     
 WARNING: do not pass quantities for the parameters, yet; just use floats
 """
-    if isinstance(i, typing.Sequence) and len(i) == 3 and all(isinstance(v, (float, pq.Quantity)) for v in i) and all(v is None for v in (n,b)):
-        i, n, b = check_unpack_model_params_seq(i, 3)
-        # i, n, b = i
-        
-    if not all(isinstance(v, (float, pq.Quantity)) for v in (i, n, b)):
-        raise TypeError("Expecting three comma-separated float scalars or a sequence of three float scalars")
-        
-    if isinstance(x, pq.Quantity):
-        x = x.magnitude
-        
-    x = x.flatten()
+    i, n, b = check_unpack_model_coeffs(3, i, n, b)
+    x = check_independent_variable_1D(x)
     
-    return x*i - x**2 / n + b
+    return np.add(np.subtract(np.multiply(x, i), np.divide(np.power(x, 2), n)), b)
+    
+    # return x*i - x**2 / n + b
     
 @modelfunction(coefficient_names = ("α", "β", "x0", "τ1", "τ2"),
-               coefficient_units = {"α"},
                title="ClementsBekkers97")
 def Clements_Bekkers_97(x:np.ndarray | float,
                         α:typing.Union[float, typing.Sequence[float]], /, 
@@ -721,7 +759,7 @@ def Clements_Bekkers_97(x:np.ndarray | float,
     
         x₀ = delay ("onset") (ms);
     
-        τ₁, τ₂ = time constants, respectively, for rise and decay
+        τ₁, τ₂ = time constants, respectively, for the rise and decay phases
     
     Parameters:
     ============
@@ -749,51 +787,43 @@ def Clements_Bekkers_97(x:np.ndarray | float,
     
     """
     unit_amplitude = kwargs.pop("unit_amplitude", False)
-    if isinstance(x, pq.Quantity):
-        x = x.magnitude
-        
-    x = x.flatten()
+    
+    α, β, x0, τ1, τ2 = check_unpack_model_coeffs(5, α, β, x0, τ1, τ2)
+    assert all(v >0. for v in (τ1, τ2))
+    
+    if unit_amplitude:
+        β = get_CB_scale_for_unit_amplitude(β, τ1, τ2) # do NOT include x0 here because we only work on xx>=0
+    
+    x = check_independent_variable_1D(x)
     
     # print(f"Clements_Bekkers_97: α = {α}")
     
-    # NOTE: 2025-11-05 21:31:27
-    # allow passing all parameters packed in a sequence, so as to do away with 
-    # the *_model version of this function
-    if isinstance(α, (typing.Sequence, np.ndarray)):
-        α,  β, x0, τ1, τ2 = check_unpack_model_params_seq(α, 5)
-        
-    if not all(isinstance(v, float) for v in (α,  β, x0, τ1, τ2)):
-        scipywarn(f"Clements_Bekkers_97 got α = {α} ({type(α).__name__}),  β = {β}, x0 = {x0}, τ1 = {τ1}, τ2 = {τ2}")
-        raise TypeError("Expecting a sequence of 'α,  β, x₀, τ₁ τ₂' scalar floats or a comma-separated list of scalar floats for 'α,  β, x₀, τ₁ τ₂'")
-        
-    # α, β, x0, τ1, τ2 = parameters
+    xx = np.subtract(x, x0)
+    decay = np.exp(np.divide(np.negative(xx), τ))
+    rise = np.subtract(1, decay)
+    y = np.full_like(x, α)
+    y[xx>=0] = np.multiply(np.multiply(β, rise), decay)
     
-    xx = x-x0
-    
-    efunc       = lambda x, τ: np.exp(-x/τ)
-    risefunc    = lambda x, τ: 1-efunc(x,τ)
+    efunc       = lambda x, τ: np.exp(np.divide(np.negative(x), τ)) #-x/τ)
+    risefunc    = lambda x, τ: np.subtract(1, efunc(x,τ))
     decayfunc   = efunc
     
-    y = np.full_like(xx, 0.)
+    y = np.full_like(xx, α)
+    
     
     
     if any(v == 0 for v in (τ1, τ2)):
-        y += α
+        # y += α
         y[xx>=0] = np.nan
     else:
         rise = risefunc(xx[xx>=0], τ1)
         decay = decayfunc(xx[xx>=0], τ2)
         
-        if unit_amplitude:
-            # xₘ = -τ1*np.log(τ1/(τ1+τ2))# + x0 # do NOT add x0 here because we only work on xx>=0
-            # yₘ = risefunc(xₘ, τ1) * decayfunc(xₘ, τ2)
-            # peak = -1. if β < 0 else 1.
-            # β = peak/yₘ
-            β = get_CB_scale_for_unit_amplitude(β, τ1, τ2)# + x0 # do NOT add x0 here because we only work on xx>=0
-            # print(f"yₘ {yₘ}, β {β}")
-            
-        y[xx>=0] = β * rise * decay
-        y += α
+        # y = np.full_like(x, α)
+        y[xx>=0] = np.multiply(np.multiply(β, rise), decay)
+        
+        # y[xx>=0] = β * rise * decay
+        # y += α
     
     return y
 
@@ -807,7 +837,7 @@ def get_CB_scale_for_unit_amplitude(β:float,τ_rise:float, τ_decay:float, x0:f
     yₘ = risefunc(xₘ, τ_rise) * decayfunc(xₘ, τ_decay)
     peak = -1. if β < 0 else 1.
     
-    return peak/yₘ
+    return np.divide(peak, yₘ)
 
 @modelfunction(coefficient_names = ("α", "β0", "x0_0", "τ0_0", "τ0_1", "β1", "x0_1", "τ1_0", "τ1_1"))
 def CBsum(x:np.ndarray | float, α:float | typing.Sequence[float], /, 
@@ -843,17 +873,20 @@ def CBsum(x:np.ndarray | float, α:float | typing.Sequence[float], /,
     # NOTE: 2025-11-05 21:31:42
     # allow passing all parameters packed in a sequence, so as to do away with 
     # the *_model version of this function
-    if isinstance(α, typing.Sequence) and len(α) == 9 and all(isinstance(v, float) for v in α):
-        α, β0, x0_0, t0_0, t0_1, β1, x0_1, t1_0, t1_1 = α
+    α, β0, x0_0, t0_0, t0_1, β1, x0_1, t1_0, t1_1 = check_unpack_model_coeffs(9, α, β0, x0_0, t0_0, t0_1, β1, x0_1, t1_0, t1_1)
+    # if isinstance(α, typing.Sequence) and len(α) == 9 and all(isinstance(v, float) for v in α):
+    #     α, β0, x0_0, t0_0, t0_1, β1, x0_1, t1_0, t1_1 = α
         
-    if not all(isinstance(v, float) for v in (α, β0, x0_0, τ0_0, τ0_1, β1, x0_1, τ1_0, τ1_1 )):
-        raise TypeError("Expecting a sequence of 'α, β0, x0_0, τ0_0, τ0_1, β1, x0_1, τ1_0, τ1_1' scalar floats or a coma-separated list of scalar floats for 'α, β0, x0_0, τ0_0, τ0_1, β1, x0_1, τ1_0, τ1_1'")
+    # if not all(isinstance(v, float) for v in (α, β0, x0_0, τ0_0, τ0_1, β1, x0_1, τ1_0, τ1_1 )):
+    #     raise TypeError("Expecting a sequence of 'α, β0, x0_0, τ0_0, τ0_1, β1, x0_1, τ1_0, τ1_1' scalar floats or a coma-separated list of scalar floats for 'α, β0, x0_0, τ0_0, τ0_1, β1, x0_1, τ1_0, τ1_1'")
         
+    x = check_independent_variable_1D(x)
+
     y0 = Clements_Bekkers_97(x, α, β0, x0_0, τ0_0, τ0_1)
     
     y1 = Clements_Bekkers_97(x, 0., β1, x0_1, τ1_0, τ1_1)
     
-    return y0 + y1
+    return np.add(y0, y1)
     
 @modelfunction(coefficient_names = ("x0", "ρ", "β*", "τ*", "α"))
 def exponential_rise_decays_product_biased_shifted(x:np.ndarray|float, *parameters:float,
@@ -1095,7 +1128,7 @@ def Markwardt_Nilius(x:np.ndarray|float, γ:typing.Sequence[float]|float, /,
     #     region of the I(V) curve)
     
     if isinstance(γ, typing.Sequence) and len(γ) == 4 and all(isinstance(v, float) for v in γ):
-        γ, ϵ, χ, σ = check_unpack_model_params_seq(γ, 4)
+        γ, ϵ, χ, σ = check_unpack_model_coeffs(γ, 4)
         # γ, ϵ, χ, σ = γ
         
     if not all(isinstance(v, float) for v in (γ, ϵ, χ, σ)):
@@ -1175,7 +1208,7 @@ def Talbot_Sayer(x:typing.Union[float, np.ndarray], a:typing.Union[float, typing
     o = 2.5 * pq.mM
     
     if isinstance(a, typing.Sequence) and len(i) == 4 and all(isinstance(v, (float, pq.Quantity)) for v in i):
-        a, b, c, x0 = check_unpack_model_params_seq(a, 4)
+        a, b, c, x0 = check_unpack_model_coeffs(a, 4)
     
     if len(kwargs) > 0:
         if "t" in kwargs:
@@ -1601,7 +1634,7 @@ def boxcar(x:np.ndarray | float, x0:typing.Union[typing.Sequence[float], float],
     r"""Boxcar function: 
 Two successive Heaviside (step) functions of opposite directions"""
     # x0, x1 = p
-    x0, x1 = check_unpack_model_params_seq(x0, 2)
+    x0, x1 = check_unpack_model_coeffs(x0, 2)
     
     ud = [True, False] if up_first else [False, True]
     
@@ -1622,7 +1655,7 @@ def boxcar2(x:np.ndarray | float, x0:typing.Union[typing.Sequence[float], float]
             level0:float=0., level1:float=1.) -> np.ndarray | float:
     r"""Boxcar function:
 Two successive Heaviside2 (step) functions (general versions) in opposite directions"""
-    x0, x1 = check_unpack_model_params_seq(x0, 2)
+    x0, x1 = check_unpack_model_coeffs(x0, 2)
     
     return Heaviside2(x, x0, level0, level1) + Heaviside2(x, x1, level1, level0)
 
@@ -1640,7 +1673,7 @@ p: the parameters in the specific order: (x₀, y₀, x₁, y₁)
 
 """
     if isinstance(x0, typing.Sequence) and len(x0) == 4:
-        x0, y0, x1, y1 = check_unpack_model_params_seq(x0, 4)
+        x0, y0, x1, y1 = check_unpack_model_coeffs(x0, 4)
     
     if isinstance(x, pq.Quantity):
         if isinstance(x0, pq.Quantity):
