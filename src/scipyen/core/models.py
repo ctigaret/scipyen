@@ -57,7 +57,7 @@ from core import scipyen_quantities as scq
 from core.datasignal import DataSignal
 from core.prog import (scipywarn, signature_as_dict, decorator, timefunc)
 
-def check_independent_variable_1D(x:typing.Union[float, np.ndarray, np.float64]):
+def check_independent_variable(x:typing.Union[float, np.ndarray, np.float64], ndim:typing.Optional[int]=None):
     if not isinstance(x, (float, np.ndarray, np.float64)):
         raise TypeError(f"Independent variable 'x' has unexpected type: {type(x).__name__}")
     
@@ -65,8 +65,14 @@ def check_independent_variable_1D(x:typing.Union[float, np.ndarray, np.float64])
         units['x'] = x.units
         x = x.magnitude
         
-    if isinstance(x, np.ndarray):
-        x = x.flatten()
+    if isinstance(ndim, int):
+        if ndim < 1:
+            raise ValueError(f"'ndim' expected >=1; instead, got {ndim}")
+        if ndim == 1:
+            if isinstance(x, np.ndarray):
+                x = x.flatten()
+        elif ndim > 1:
+            assert x.ndim == ndim, f"Expecting 'x' with {ndim} dimensions; instead got an array with {x.ndim} dimensions"
         
     return x
 
@@ -329,166 +335,98 @@ def check_rise_decay_params(x:typing.Sequence[float]):
     
     return (len(x)-3) // 2
 
-@modelfunction(coefficient_names = ("β0", "β1", "λ0", "λ1"),
+@modelfunction(coefficient_names = ("α", "β0", "β1", "λ0", "λ1", "x0"),
                title="Biexponential")
 def biexponential(x:typing.Union[np.ndarray, float], 
-                  β0:float|typing.Sequence[float]|np.ndarray, /,
+                  α:float|typing.Sequence[float]|np.ndarray, /,
+                  β0:typing.Optional[float] = None,
                   β1:typing.Optional[float] = None, 
                   λ0:typing.Optional[float] = None, 
-                  λ1:typing.Optional[float] = None) -> np.ndarray | float:
-    r"""Sum of two exponentials:
-    β0 × exp(λ0 × x) + β1 × exp(λ1 × x)
+                  λ1:typing.Optional[float] = None,
+                  x0:typing.Optional[float] = None) -> np.ndarray | float:
+    r"""Sum of two exponentials with shift and bias (multiplicative and additive)
+    y = α + β0 × exp(λ0 × (x-x₀)) + β1 × exp(λ1 × (x-x₀))
+    
+    Parameters:
+    ===========
+    x: independent variable
+    α: additive bias ("offset")
+    β0, β1: multiplicative bias for each exponential
+    λ0, λ1: exponential constants
+    x0: shift (delay, or onset)
+    
 """
-    β0, β1, λ0, λ1 = check_unpack_model_coeffs(4, β0, β1, λ0, λ1)
-    x = check_independent_variable_1D(x)
-    λ0x = np.multiply(λ0, x)
-    λ1x = np.multiply(λ1, x)
-    return np.add(np.multiply(β0, np.exp(λ0x)), np.multiply(β1, np.exp(λ1x)))
+    α, β0, β1, λ0, λ1, x0 = check_unpack_model_coeffs(6, α, β0, β1, λ0, λ1, x0)
+    x = check_independent_variable(x)
+    λ0x = np.multiply(λ0, np.subtract(x, x0))
+    λ1x = np.multiply(λ1, np.subtract(x, x0))
+    return np.add(np.add(np.multiply(β0, np.exp(λ0x)), np.multiply(β1, np.exp(λ1x))), α)
     
     # return β0 * np.exp(λ0 * x) + β1 * np.exp(λ1 * x)
 
-@modelfunction(coefficient_names = ("β0", "β1", "τ0", "τ1"),
-               title="BioexponentialDecay")
-def biexponential_decay(x:typing.Union[np.ndarray, float], 
-                        β0:float|typing.Sequence[float]|np.ndarray, /,
-                        β1:typing.Optional[float] = None, 
-                        τ0:typing.Optional[float] = None, 
-                        τ1:typing.Optional[float] = None) -> np.ndarray | float:
-    r"""Sum of two exponential decays ('bi-exponential decay')"""
-    β0, β1, τ0, τ1 = check_unpack_model_coeffs(4, β0, β1, τ0, τ1)
-    assert all(v>0. for v in (τ0, τ1))
-    x = check_independent_variable_1D(x)
-    xτ0 = np.divide(np.negative(x), τ0)
-    xτ1 = np.divide(np.negative(x), τ1)
-    
-    return np.add(np.multiply(β0, np.exp(xτ0)), np.multiply(β1, np.exp(xτ1)))
-
-    # return β0 * np.exp(-x / τ0) + β1 * np.exp(-x / τ1)
-
-@modelfunction(coefficient_names = ("α", "β0", "β1", "τ0", "τ1"),
-               title="BiasedBiexponentialDecay")
-def biexponential_decay_biased(x:np.ndarray | float, α:typing.Union[float,typing.Sequence[float], np.ndarray],/, 
-                               β0:typing.Optional[float]=None, β1:typing.Optional[float]=None, 
-                               τ0:typing.Optional[float]=None, τ1:typing.Optional[float]=None) -> np.ndarray | float:
-    r"""Sum of two exponential decays ('bi-exponential decay') with bias
-     ('offset'):
-    
-    α + β0 × exp(-x / τ0) + β1 × exp(-x / τ1)
-"""
-    α, β0, β1, τ0, τ1 = check_unpack_model_coeffs(5, α, β0, β1, τ0, τ1)
-    assert all(v > 0. for v in (τ0, τ1)), "τ0, τ1 must be both strictly positive"
-    x = check_independent_variable_1D(x)
-    xτ0 = np.divide(np.negative(x), τ0)
-    xτ1 = np.divide(np.negative(x), τ1)
-    
-    return np.add(np.add(α, np.multiply(β0, np.exp(xτ0))), np.multiply(β1, np.exp(xτ1)))
-
-    # return α + β0 * np.exp(-x / τ0) + β1 * np.exp(-x / τ1)
-
-@modelfunction(coefficient_names = ("α", "β0", "β1", "x0", "τ0", "τ1"),
-               title="GenericBiexponentialDecay")
-def biexponential_decay_biased_shifted(x: np.ndarray | float, 
-                                α:typing.Union[float, typing.Sequence[float], np.ndarray], /, 
-                                β0:typing.Optional[float], 
-                                β1:typing.Optional[float], 
-                                x0:typing.Optional[float], 
-                                τ0:typing.Optional[float], 
-                                τ1:typing.Optional[float]) -> np.ndarray | float:
-    r"""Sum of two exponential decays (a.k.a 'bi-exponential decay') with bias
-    ('offset') AND a shift ('onset'):
-    
-    α + β0 × exp(-(x-x0) / τ0) + β1 × exp(-(x-x0) / τ1)
-"""
-    α, β0, β1, x0, τ0, τ1 = check_unpack_model_coeffs(6, α, β0, β1, x0, τ0, τ1)
-    assert all(v > 0. for v in (τ0, τ1)), "τ0, τ1 must be both strictly positive"
-    x = check_independent_variable_1D(x)
-    xxτ0 = np.divide(np.subtract(x0, x), τ0) # (x0-x)/τ0
-    xxτ1 = np.divide(np.subtract(x0, x), τ1) # (x0-x)/τ1
-    return np.add(np.add(α, np.multiply(β0, np.exp(xxτ0))) + np.multiply(β1, np.exp(xxτ1)))
-
-    # return α + β0 * np.exp(-(x-x0) / τ0) + β1 * np.exp(-(x-x0) / τ1)
-
-@modelfunction(coefficient_names = ("α", "β", "x0", "τ*"),
-               title="GenericExponentialDecaysProduct")
-def exponential_decays_product_biased_shifted(x: np.ndarray | float, 
-                                   α:typing.Sequence[float] | float | np.ndarray, /,
-                                   β:typing.Optional[float] = None, 
-                                   x0:typing.Optional[float] = None, 
-                                   *τ) -> np.ndarray | float:
+@modelfunction(coefficient_names = ("α", "β", "x0", "λ*"),
+               title="ExponentialProduct")
+def exponential_product(x: np.ndarray | float, 
+                        α:typing.Sequence[float] | float | np.ndarray, /,
+                        β:typing.Optional[float] = None, 
+                        x0:typing.Optional[float] = None, 
+                        *λ) -> np.ndarray | float:
     r"""Product of several exponential decays, biased and shifted
 
     Realizes:
                 ₙ₋₁
-    y = α + β × Π  exp(-(x-x₀)/τₖ) = α + β × exp(-(x-x₀)/τᵪ)    , where:
+    y = α + β × Π  exp((x-x₀)λₖ) = α + β × exp((x-x₀)λᵪ)    , where:
                 ᵏ⁼⁰
 
-    • τ is a sequence of floats with the individual time constants, one for
-    each decay component
-    • τᵪ is the "combined" decay time constant
+    • λ is a sequence of floats with the individual rate constants, one for
+        each exponential factor
+    • λᵪ is the "combined" decay time constant: Σλₖ
     • 𝑛 is the number of exponentials in the product above and the length of the
-        τ sequence - currently, a maximum of two exponential is supported
+        λ sequence
 
-    For two exponentials, this is (using python 0-based indexing):
-    
-    τᵪ = (τ₀ × τ₁)/(τ₀ + τ₁), where τ₀ = τ[0] and τ₁ = τ[1] 
-    
-    Let:
-    λ₀ = 1/τ₀, λ₁ = 1/τ₁, λᵪ = λ₀ + λ₁ = 1/τ₀ + 1/τ₁ = (τ₀ + τ₁) / (τ₀ × τ₁)
-    
-    ⟹ τᵪ = 1/λᵪ = (τ₀ × τ₁ / (τ₀ + τ₁))
-    
-    Then:
-    exp(x / τ₀) × exp(x / τ₁) = exp(x × λ₀) × exp(x × λ₁) = 
-    exp(x × (λ₀ + λ₁))        = exp(x × λᵪ) = exp(x/τᵪ)
-    
-    Although it can be extended to a product of more than two exponentials, this 
+    Although it can be used with a product of more than two exponentials, this 
     is likely to introduce more errors/instability, and to make it harder for the
     solver to converge on a solution.
     
     The function core.curvefitting.guess_init_two_exp_prod can be used to generate
-    initial coefficient values for a product of two exponentials, but be aware 
-    that the last two values in the result of that function have to be inverted 
-    (1/x) to be used as time constants (see documentation for guess_init_two_exp_prod()).
+    initial coefficient values for a product of two exponentials.
     
 The other parameters are as for exponential_decay_biased_shifted.
     
 NOTE: For calling purposes, α can be supplied as a sequence of (α, β, x0), and any
-    arguments folowing it will be included in τ
+    arguments folowing it will be included in λ
     
 """
-    x = check_independent_variable_1D(x)
+    x = check_independent_variable(x)
     if isinstance(α, (typing.Sequence, np.ndarray) and α.size == 3):
-        τ = (β, x0) + τ
+        λ= (β, x0) + λ
         β = None
         x0 = None
-    α, β, x0, *τ = check_unpack_model_coeffs(len(τ)+3, α, β, x0, *τ)
+    α, β, x0, *λ = check_unpack_model_coeffs(len(λ)+3, α, β, x0, *λ)
     
-
-        
+    # assert all(v > 0. for v in τ), "τ must be strictly positive"
     
-    assert all(v > 0. for v in τ), "τ must be strictly positive"
-    
-    if len(τ) == 1:
-        return exponential_decay_biased_shifted(x, α, β, x0, τ[0])
+    if len(λ) == 1:
+        return exponential(x, α, β, x0, λ[0])
     else:
         # λ = np.sum(list(map(lambda v: 1/v, τ)))
-        τc = np.prod(τ)/np.sum(τ)
-        xxτc = np.divide(np.subtract(x0,x),τc)
+        λc = np.sum(λ)
+        xxλc = np.multiply(np.subtract(x, x0),λc)
         
-        return np.add(α, np.multiply(β, np.exp(xxτc)))
+        return np.add(α, np.multiply(β, np.exp(xxλc)))
     
         # return α + β * np.exp(-(x-x0) / τc)
+        
+@modelfunction(coefficient_names = ("α", "β", "x0", "λ"),
+                title="Exponential")
+def exponential(x:np.ndarray | float, 
+                α:typing.Sequence[float] | np.ndarray | float, /,
+                β:typing.Optional[float] = None, 
+                x0:typing.Optional[float] = None, 
+                τ:typing.Optional[float] = None) -> np.ndarray | float:
+    r"""Single exponential with bias and shift
 
-@modelfunction(coefficient_names = ("α", "β", "x0", "τ"),
-               title="GenericExponentialDecay")
-def exponential_decay_biased_shifted(x:np.ndarray | float, 
-                                     α:typing.Sequence[float] | np.ndarray | float, /,
-                                     β:typing.Optional[float] = None, 
-                                     x0:typing.Optional[float] = None, 
-                                     τ:typing.Optional[float] = None) -> np.ndarray | float:
-    r"""Single exponential decay, with bias and shift
-
-    y = α + β × exp(-(x-x₀)/τ)
+    y = α + β × exp((x-x₀)λ)
     
 Parameters:
 ===========
@@ -496,42 +434,35 @@ x: independent variable (e.g., time): 1D numpy array
 
 coefficients are given as floats in the following order:
 
-α (offset), β (scale), x₀ (onset), τ (time constant)
-    
+α (offset), β (scale), x₀ (onset), λ (exponential constant)
+
+NOTE: "rate" constant τ is the inverse of λ: τ = 1/λ
+
 """
 
-#     NOTE: Python 3 only supports a subset of the unicode character set for 
-#     identifiers (or variable names). 
-#     
-#     For example, the following are invalid variable names: 'a₀' or 'α₀', although
-#     they MAY be used in documetation; on the other hand the following ARE valid:
-#     'a0', 'a_0', 'α0', or 'α_0'
-# 
-#     To insert unicode characters in variable names in Scipyen's console, use
-#     '\'followed by 'Tab' key (and if necessary, press 'Tab' a second time).
-#     
-#     This works as well in jupyter qtconsole, but not in plain python REPL
-    # y0, α, x0, τ = parameters
-    
-    α, β, x0, τ = check_unpack_model_coeffs(4, α, β, x0, τ)
-    assert τ > 0., "τ must be strictly positive"
-    x = check_independent_variable_1D(x)
-    xxτ = np.divide(np.subtract(x0,x), τ) # (x0-x)/τ
-    return np.add(α, np.multiply(β, np.exp(xxτ)))
 
-    # λ = 1/τ
-    # return α + β * np.exp(-(x-x0)*λ)
 
-@modelfunction(coefficient_names = ("α", "β", "x0", "τ"),
+@modelfunction(coefficient_names = ("α", "β", "x0", "λ"),
                title="GenericExponentialRise")
 def exponential_rise_biased_shifted(x:np.ndarray | float, 
                                     α:typing.Sequence[float]|np.ndarray, 
                                     β:typing.Optional[float] = None, 
                                     x0:typing.Optional[float] = None, 
-                                    τ:typing.Optional[float] = None) -> np.ndarray | float:
-    r"""Single exponential rise, with bias and shift.
+                                    λ:typing.Optional[float] = None) -> np.ndarray | float:
+    r"""Single exponential rise.
 
-    Realizes α + β × [1 - exp(-(x-x₀)/τ)]
+    Realizes α + β × [1 - exp((x-x₀)λ)]
+
+NOTE This can be easily expressed as the exponential
+
+    α₁ + β₁ × exp((x-x₀)λ), where
+
+    β₁ = -β
+
+    α₁ = α - β₁
+
+This means you cna always use the exponential(…) model function with appropriate
+values for α, β, and with appropriate sign of λ
 
     Parameters:
     ===========
@@ -539,15 +470,13 @@ def exponential_rise_biased_shifted(x:np.ndarray | float,
 
     coefficients are given as floats in the following order:
 
-    α (bias), β (scale), x₀ (shift), τ (time constant)
+    α (bias), β (scale), x₀ (shift), λ (exponential constant)
 """
-    α, β, x0, τ = check_unpack_model_coeffs(4, α, β, x0, τ)
-    assert τ > 0., "τ must be strictly positive"
-    x = check_independent_variable_1D(x)
-
-    xxτ = np.divide(np.subtract(x0,x), τ)
+    α, β, x0, λ = check_unpack_model_coeffs(4, α, β, x0, λ)
+    x = check_independent_variable(x)
+    xxλ = np.divide(np.subtract(x,x0), λ)
     
-    return np.add(α, np.multiply(β, np.subtract(1, np.exp(xxτ))))
+    return np.add(α, np.multiply(β, np.subtract(1, np.exp(xxλ))))
     
     # return α + β * (1 - np.exp(-(x-x0)/τ))
 
@@ -690,7 +619,7 @@ the mathematical Alpha Function (https://mathworld.wolfram.com/AlphaFunction.htm
     # valpha = np.frompyfunc(alpha, 1, 1) 
     
     # make sure x is a numpy array or a scalar
-    x = check_independent_variable_1D(x)
+    x = check_independent_variable(x)
         
     xτ = np.divide(np.subtract(x,x0), τ)
     
@@ -733,7 +662,7 @@ def nsfa(x:np.ndarray | float, i:float|pq.Quantity|typing.Sequence[typing.Union[
 WARNING: do not pass quantities for the parameters, yet; just use floats
 """
     i, n, b = check_unpack_model_coeffs(3, i, n, b)
-    x = check_independent_variable_1D(x)
+    x = check_independent_variable(x)
     
     return np.add(np.subtract(np.multiply(x, i), np.divide(np.power(x, 2), n)), b)
     
@@ -802,7 +731,7 @@ def Clements_Bekkers_97(x:np.ndarray | float,
     if unit_amplitude:
         β = get_CB_scale_for_unit_amplitude(β, τ1, τ2) # do NOT include x0 here because we only work on xx>=0
     
-    x = check_independent_variable_1D(x)
+    x = check_independent_variable(x)
     
     # print(f"Clements_Bekkers_97: α = {α}")
     
@@ -888,7 +817,7 @@ def CBsum(x:np.ndarray | float, α:float | typing.Sequence[float], /,
     # if not all(isinstance(v, float) for v in (α, β0, x0_0, τ0_0, τ0_1, β1, x0_1, τ1_0, τ1_1 )):
     #     raise TypeError("Expecting a sequence of 'α, β0, x0_0, τ0_0, τ0_1, β1, x0_1, τ1_0, τ1_1' scalar floats or a coma-separated list of scalar floats for 'α, β0, x0_0, τ0_0, τ0_1, β1, x0_1, τ1_0, τ1_1'")
         
-    x = check_independent_variable_1D(x)
+    x = check_independent_variable(x)
 
     y0 = Clements_Bekkers_97(x, α, β0, x0_0, τ0_0, τ0_1)
     
