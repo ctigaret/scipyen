@@ -443,26 +443,27 @@ NOTE: "rate" constant τ is the inverse of λ: τ = 1/λ
 
 
 @modelfunction(coefficient_names = ("α", "β", "x0", "λ"),
-               title="GenericExponentialRise")
-def exponential_rise_biased_shifted(x:np.ndarray | float, 
-                                    α:typing.Sequence[float]|np.ndarray, 
-                                    β:typing.Optional[float] = None, 
-                                    x0:typing.Optional[float] = None, 
-                                    λ:typing.Optional[float] = None) -> np.ndarray | float:
-    r"""Single exponential rise.
+               title="BoundedExponentialRise")
+def bounded_exponential_rise(x:np.ndarray | float, 
+                             α:typing.Sequence[float]|np.ndarray, 
+                             β:typing.Optional[float] = None, 
+                             x0:typing.Optional[float] = None, 
+                             λ:typing.Optional[float] = None) -> np.ndarray | float:
+    r"""Particular case of single exponential rise.
 
-    Realizes α + β × [1 - exp((x-x₀)λ)]
+    Realizes α + β × [1 - exp((x-x₀)λ)] where λ < -1.
 
-NOTE This can be easily expressed as the exponential
+NOTE This is equivalent to the generic exponential
 
-    α₁ + β₁ × exp((x-x₀)λ), where
+    α₁ + β₁ × exp((x-x₀)λ), 
 
-    β₁ = -β
+    where:
+        β₁ = -β
+        α₁ = α - β₁
+        and λ < -1
 
-    α₁ = α - β₁
-
-This means you cna always use the exponential(…) model function with appropriate
-values for α, β, and with appropriate sign of λ
+This means you can always use the exponential(…) model function with appropriate
+values for α, β, and with appropriate value & sign of λ
 
     Parameters:
     ===========
@@ -472,10 +473,11 @@ values for α, β, and with appropriate sign of λ
 
     α (bias), β (scale), x₀ (shift), λ (exponential constant)
 """
-    α, β, x0, λ = check_unpack_model_coeffs(4, α, β, x0, λ)
     x = check_independent_variable(x)
-    xxλ = np.divide(np.subtract(x,x0), λ)
+    α, β, x0, λ = check_unpack_model_coeffs(4, α, β, x0, λ)
+    assert λ < -1., "For this particular model, λ must be < -1"
     
+    xxλ = np.divide(np.subtract(x,x0), λ)
     return np.add(α, np.multiply(β, np.subtract(1, np.exp(xxλ))))
     
     # return α + β * (1 - np.exp(-(x-x0)/τ))
@@ -497,17 +499,18 @@ soma-dendritic distributions of synaptic input. J Neurophysiol 30(5), 1138–68,
 A single exponential rise and decay, both with the same constant (τ):
 
         /    
-    y = | α + β × (x-x₀)/τ × exp(-(x-x₀-τ)/τ)         where x-x₀ >= 0 
+        | α + β × (x-x₀)/τ × exp(-(x-x₀-τ)/τ)         where x-x₀ >= 0 
+    y = |
         | α                                           elsewhere
         \
 where:
-    α  is the additive bias (offset);
+    α  ↦ additive bias (offset);
 
-    β  is the multiplicative bias (scale);
+    β  ↦ multiplicative bias (scale);
 
-    x₀ is the shift (delay, or onset);
+    x₀ ↦ shift (delay, or onset);
 
-    τ  is the synaptic constant
+    τ  ↦ the synaptic constant
 
 The implementation follows that in NEURON simulation software
 ( M. L. Hines, N. T. Carnevale; The NEURON Simulation Environment. 
@@ -588,23 +591,32 @@ the mathematical Alpha Function (https://mathworld.wolfram.com/AlphaFunction.htm
     # in the code
     
     self = globals()["alphaSynapse"]
-    print(f"nvars:{self.nvars}")
-    print(f"coeff  names: {self.coefficient_names}")
-    print(f"n coeffs: {self.n_coefficients}")
+    # print(f"nvars:{self.nvars}")
+    # print(f"coeff  names: {self.coefficient_names}")
+    # print(f"n coeffs: {self.n_coefficients}")
     
     # unpack parameters
     α, β, x0, τ = check_unpack_model_coeffs(4, α, β, x0, τ)
     # print(f"{α}")
     assert(τ > 0.), "Time constant MUST be strictly positive"
     
-    # NOTE: 2025-12-08 00:24:16
-    # the original "alpha" function in NEURON's syn.mod is 
-    # v * exp(1-v) with v being (x-onset)/tau
-    # (pretty similar to an exponential integral?)
-    #
-    # Here, I also include the multiplicative bias (β here is gₘₐₓ in syn.mod) 
-    # and the additive bias ("offset") α
     def alpha(v):
+        # NOTE: 2025-12-08 00:24:16
+        # the original "alpha" function in NEURON's syn.mod is 
+        #   v * exp(1-v),
+        #   with:
+        #       v = (x-onset)/tau
+        #   (pretty similar to an exponential integral?)
+        #
+        #   
+        #   This is equivalent to:
+        #       (x-x₀)/τ × exp(1-(x-x₀)/τ) = 
+        #       (x-x₀)/τ × exp((τ - x + x₀)/τ)
+        #
+        # Here, I also include the multiplicative bias (β here is gₘₐₓ in syn.mod) 
+        # and the additive bias ("offset") α
+        #
+        #
         # NOTE: 2025-12-08 00:28:34 
         # using numpy builtin ufuncs here; 
         # they're OK with scalar floats too, but they could return a np.float64
@@ -680,13 +692,13 @@ def Clements_Bekkers_97(x:np.ndarray | float,
     r"""
     Clements & Bekkers 1997 mEPSC waveform (alphafunction-like?).
 
-    This approximates a single exponential rise and decay each with their own 
-    time constant:
+    This is a product of two exponentials ("rise" and "decay", each with their 
+    own time constant), with additive and mutiplicative bias:
     
         /
-        | α + β × (1 - exp(-(x-x₀)/τ₁)) × exp(-(x-x₀)/τ₂) for x-x₀ >= 0, 
+        | α + β × (1 - exp(-(x-x₀)/τ₁)) × exp(-(x-x₀)/τ₂)   where x-x₀ >= 0
     y = |
-        | α elsewhere
+        | α                                                 elsewhere
         \
             
     where:
