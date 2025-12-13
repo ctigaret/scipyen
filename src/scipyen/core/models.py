@@ -526,6 +526,12 @@ doi: https://doi.org/10.1162/neco.1997.9.6.1179 ) :
           
 this has the property that the maximum value is gmax and occurs at
  t = delay + tau."
+ 
+NOTE: 
+1. Rall 1967 uses the notation T for t - onset, and Tₚ for τ
+2. The function has:
+• extremum (1.0 × gmax) at t-onset = τ
+• 
 
 Parameters:
 ===========
@@ -575,8 +581,8 @@ parameters = [α, β, x0, τ];
 
 # any of the statements below are equivalent:
 y = alphaSynapse(x, α, β, x0, τ)
-# y = alphaSynapse(x, *parameters)
-# y = alphaSynapse(x, parameters)
+y = alphaSynapse(x, *parameters)
+y = alphaSynapse(x, parameters)
 
 plt.plot(x,y)
 
@@ -603,18 +609,21 @@ the mathematical Alpha Function (https://mathworld.wolfram.com/AlphaFunction.htm
     def alpha(v):
         # NOTE: 2025-12-08 00:24:16
         # the original "alpha" function in NEURON's syn.mod is 
-        #   v * exp(1-v),
+        #   v × exp(1-v),
         #   with:
         #       v = (x-onset)/tau
         #   (pretty similar to an exponential integral?)
-        #
         #   
-        #   This is equivalent to:
-        #       (x-x₀)/τ × exp(1-(x-x₀)/τ) = 
-        #       (x-x₀)/τ × exp((τ - x + x₀)/τ)
+        #   Let x₀ = onset
         #
-        # Here, I also include the multiplicative bias (β here is gₘₐₓ in syn.mod) 
-        # and the additive bias ("offset") α
+        #   Then v × exp(1-v) is equivalent to:
+        #       (x-x₀)/τ × exp(1-(x-x₀)/τ)      = 
+        #       (x-x₀)/τ × exp((τ - x + x₀)/τ)  =
+        #       (x-x₀)/τ × exp(-(x - x₀ - τ)/τ) ∎
+        #
+        # Here, the multiplicative bias β is gₘₐₓ in syn.mod; I also include an
+        # additive bias α ("offset") to allow thus function to be applied to a
+        # signal with DC component ≠ 0
         #
         #
         # NOTE: 2025-12-08 00:28:34 
@@ -654,6 +663,20 @@ the mathematical Alpha Function (https://mathworld.wolfram.com/AlphaFunction.htm
         y = np.full_like(x, α)
         
         # using built-in ufuncs (a LOT more efficient !!!)
+        # NOTE: 2025-12-13 12:04:38 
+        # about the condition xτ >= 0:
+        # This condition is amenable to the use of 'where' parameter in the call
+        # syntax of numpy ufuncs (see numpy documentation). Bassically, it applies
+        # the ufunc to any element of the arugment 'x' that statistfies the condition,
+        # skipping the others (and therefore leaving the corresponding elements 
+        # in the output array 'y' untouched, hence possibly undefined).
+        #
+        # HOWEVER, here, ufuncs are used 
+        # by the alpha function def'ed above, while the alpha function itself is 
+        # NOT an ufunc; so rather that passing any data to alpha (and using 'where'
+        # in the ufunc calls in there, with the caveat above), I apply the alpha
+        # function directly to the elements of xτ that satisfy this condition (and
+        # store the output in the corresponding elements of 'y')
         y[xτ>=0] = alpha(xτ[xτ>=0]) 
         
         # NOTE: 2025-12-08 00:50:00 -> TOO SLOW !!!
