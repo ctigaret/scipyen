@@ -676,7 +676,7 @@ on the same axes, the curves
     # And the width at half-maximum:
     fwhm = x_1 - x_0
     fwhm
-    -> 2.4463244632446317   ≈ 2.45τ                                            
+    -> 2.4463244632446317   ≈ 2.45τ
 
     # Finally the area under the curve:
     # (we now express (1) in t)
@@ -823,7 +823,7 @@ def Clements_Bekkers_97(x:np.ndarray | float,
                         τ2:typing.Optional[float] = None,
                         **kwargs) -> np.ndarray | float:
     r"""
-    Clements & Bekkers 1997 mEPSC waveform (alphafunction-like?).
+    Clements & Bekkers 1997 mEPSC waveform).
 
     This is a product of two exponentials ("rise" and "decay", each with their 
     own time constant), with additive and mutiplicative bias:
@@ -864,6 +864,14 @@ def Clements_Bekkers_97(x:np.ndarray | float,
     ========
     1D numpy array (vector)
     
+    NOTE:
+    =====
+    • extremum (≈ 0.5824 for α = 0., β = 1.) is at x = τ1 × ln(τ2/τ1 +1) + x0
+        (analytically determined as the solution of f′(x)dx = 0 where f′(x) dx is
+        the 1ˢᵗ order derivative of the Clements & Bekkers function in 'x')
+        So to get a curve spanning the interval [0., 1.], the coefficient β
+        should be ≈ 1/0.5824 ≈ 1.717, but WARNING this will also change the FWHM!
+    
     NOTE: the DURATION of the waveform is determined by the independent variable
     'x'
     
@@ -881,31 +889,31 @@ def Clements_Bekkers_97(x:np.ndarray | float,
     # print(f"Clements_Bekkers_97: α = {α}")
     
     xx = np.subtract(x, x0)
-    decay = np.exp(np.divide(np.negative(xx), τ))
-    rise = np.subtract(1, decay)
+    decay = np.exp(np.divide(np.negative(xx[xx>=0]), τ2))
+    rise  = np.subtract(1, np.exp(np.divide(np.negative(xx[xx>=0]), τ1)))
     y = np.full_like(x, α)
-    y[xx>=0] = np.multiply(np.multiply(β, rise), decay)
+    y[xx>=0] = np.add(α, np.multiply(np.multiply(β, rise), decay))
     
-    efunc       = lambda x, τ: np.exp(np.divide(np.negative(x), τ)) #-x/τ)
-    risefunc    = lambda x, τ: np.subtract(1, efunc(x,τ))
-    decayfunc   = efunc
-    
-    y = np.full_like(xx, α)
-    
-    
-    
-    if any(v == 0 for v in (τ1, τ2)):
-        # y += α
-        y[xx>=0] = np.nan
-    else:
-        rise = risefunc(xx[xx>=0], τ1)
-        decay = decayfunc(xx[xx>=0], τ2)
-        
-        # y = np.full_like(x, α)
-        y[xx>=0] = np.multiply(np.multiply(β, rise), decay)
-        
-        # y[xx>=0] = β * rise * decay
-        # y += α
+#     efunc       = lambda x, τ: np.exp(np.divide(np.negative(x), τ)) #-x/τ)
+#     risefunc    = lambda x, τ: np.subtract(1, efunc(x,τ))
+#     decayfunc   = efunc
+#     
+#     y = np.full_like(xx, α)
+#     
+#     
+#     
+#     if any(v == 0 for v in (τ1, τ2)):
+#         # y += α
+#         y[xx>=0] = np.nan
+#     else:
+#         rise = risefunc(xx[xx>=0], τ1)
+#         decay = decayfunc(xx[xx>=0], τ2)
+#         
+#         # y = np.full_like(x, α)
+#         y[xx>=0] = np.multiply(np.multiply(β, rise), decay)
+#         
+#         # y[xx>=0] = β * rise * decay
+#         # y += α
     
     return y
 
