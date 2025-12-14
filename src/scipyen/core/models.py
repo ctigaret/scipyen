@@ -527,11 +527,6 @@ doi: https://doi.org/10.1162/neco.1997.9.6.1179 ) :
 this has the property that the maximum value is gmax and occurs at
  t = delay + tau."
  
-NOTE: 
-1. Rall 1967 uses the notation T for t - onset, and Tₚ for τ
-2. The function has:
-• extremum (1.0 × gmax) at t-onset = τ
-• 
 
 Parameters:
 ===========
@@ -544,24 +539,6 @@ the individual α, β, x0, τ coefficients 'packed' in this sequence (some optim
 parameters: 1D array-like: numeric sequence (tuple, list, numpy array) with four
     elements in the following order (see above for their meaning):
 
-The original alpha synapse in NEURON syn.mod does NOT include an additive bias;
-this is because it models an ideal system, whereas here I'm giving the possibility
-to use this function for fitting recorded data as well (where there exists a 
-DC component, equivalent to the 'offset' α). To obtain the same thing as in 
-NEURON just set α to 0.
-
-The β parameter here corresponds to the 𝑔ₘₐₓ in NEURON's code (see above).
-HOWEVER, whether β is a conductance (𝑔) or not depends on what exactly you use 
-THIS function for 😄. NEURON's syn.mod calculates 𝑔 THEN converts it to a 
-synaptic current 𝑖 (see above); if you use this function to model a current,
-you might want to adjust β accordingly (i.e. set it to YOUR 𝑔ₘₐₓ times the 
-electromotive force 𝑣 - 𝑒).
-
-The x0 parameter here corresponds to the 'onset' in NEURON's code (see above).
-
-Finally, 'x' here corresponds to 𝑡 in NEURON's code. If follows that x0 and τ
-have the same physical units as 'x'.
-    
 
 Returns:
 ========
@@ -586,6 +563,139 @@ y = alphaSynapse(x, parameters)
 
 plt.plot(x,y)
 
+NOTE: 
+====
+1. Rall 1967 uses the notation T for t - onset, and Tₚ for τ ⟹
+2. Rall's "alpha" function 
+
+        /
+        | (T/Tₚ)exp(1 - T/Tₚ)   for Tₚ > 0                                   (1)
+f(T) =  | 
+        | 0                     otherwise
+        \
+
+and it has†
+• extremum (1.0) at T = Tₚ (i.e. t - onset = τ)
+• value of 0.5 at t ∈ {≈ 0.23τ, ≈ 2.68τ}, hence:
+• half-width (with at half of peak amplitude) ≈ 2.45τ
+• area under the entire curve: 𝑒τ, where 𝑒 is Euler's number (Napier's constant)
+
+3. The code in NEURON syn.mod does NOT include the additive bias α. I include α
+for the case where the transient modelled by alphaSynapse takes place on top of
+a constant signal (the "direct current", or "DC" component — this nomenclature
+is not always appropriate e.g. when modelling the change in membrane potential
+the "DC" component is rather some steady-state initial voltage V₀, such as the
+resting membrane potential).
+
+4. The β parameter here corresponds to the 𝑔ₘₐₓ in NEURON's code.
+Whether β is a conductance (𝑔) or not depends on what are you use this function
+for. NEURON's syn.mod calculates 𝑔 THEN converts it to a synaptic current 𝑖 
+(see above); if you use this function to model a current, you might want to adjust
+ β accordingly (i.e. set it to YOUR 𝑔ₘₐₓ times the electromotive force 𝑣 - 𝑒).
+
+4. The x0 parameter here corresponds to the 'onset' in NEURON (and Rall) code.
+
+5. Finally, 'x' here corresponds to 𝑡 in NEURON's code. If follows that x0 and τ
+have the same physical units as 'x'.
+
+† At f(x) = 0.5 and noting χ  = (t-onset)/τ for τ > 0,  expression (1) becomes
+    
+    χ × exp(1-χ) = 0.5.                                                      (2)
+
+It follows that χ = 0.5 × exp(χ-1).
+
+This is a transcendental equation which can be solved graphically by plotting, 
+on the same axes, the curves
+    g(t) = χ
+    h(t) = exp(χ-1) × 0.5
+    
+    The intersections between the two curves are the solutions χ₀, χ₁ of eq. (2)
+    (you may want to plot the region of the curves where x <= 0.2, in order to
+    visualize the intersections).
+    
+    Example:
+    
+    
+    x = np.linspace(0,1,int(1e5))
+    τ = 0.05
+    g = x/τ
+    h = np.exp(xτ - 1.)/2.
+    
+    plt.plot(x[x <= 0.2], g[x <= 0.2], label="xτ")
+    plt.plot(x[x <= 0.2], h[x <= 0.2], label="0.5 * exp(xτ-1)")
+    
+    # Locate these intersections on the 'x' axis 
+    # NOTE: you may have to play with 'rtol' and 'atol'
+    
+    ndxx = np.where(np.isclose(g, h, rtol=1e-4, atol=1e-5))[0]
+    -> array([ 1160, 13391, 13392]) # NOTE: because we're using discrete curves,
+                                    # you won't get EXACT solutions!
+                                            
+    # And the solutions (in 'x') are:
+    
+    x[ndxx]
+    -> array([0.0116, 0.1339, 0.1339])  
+    
+    # NOTE: the last two values ARE different but they SEEM identical due to the
+    # display precision:
+                                        
+    with np.printoptions(precision=10, floatmode="fixed"):
+        print(x[ndxx])
+        
+    -> [0.0116001160 0.1339113391 0.1339213392]
+
+    # Finally, to express the solutions in terms of τ:
+    
+    σ = x[ndxx]/τ
+    
+    σ
+    ->  array([0.232 , 2.6782, 2.6784])
+    
+    with np.printoptions(precision=10, floatmode="fixed"):
+        print(σ)
+        
+    -> [0.2320023200 2.6782267823 2.6784267843]
+    
+    # Clearly, the first element is most likely one of the solutions in 'x'
+    
+    x_0 = float(σ[0])
+    
+    # The last two elements are very close, suggesting the "real" solution is
+    # somewhere between them; we will approximate it with a linear interpolation
+    # (i.e. the average of these two points, which are both on the 'x' axis)
+    
+    x_1 = float(σ[1:].mean())
+    
+    # So, the approximate solutions are (expressed as factors of τ)
+    x_0
+    -> 0.23200232002320023  ≈ 0.23τ
+
+    x_1
+    -> 2.678326783267832    ≈ 2.68τ
+    
+    # And the width at half-maximum:
+    fwhm = x_1 - x_0
+    fwhm
+    -> 2.4463244632446317   ≈ 2.45τ                                            
+
+    # Finally the area under the curve:
+    # (we now express (1) in t)
+    
+            /
+            | t/τ × exp(1-t/τ)          for τ > 0                            (3)
+    f(t) =  |
+            | 0                         otherwise
+            \
+
+    ∞
+    ∫ f(x) dx = e × τ                                                        (4)
+    0
+    ∎
+    
+    NOTE: the integral (4) is divergent for τ < 0, and the expression (3) is
+    undefined for τ = 0; therefore f(x) above needs to be defined as shown.
+                                    
+    
 CHANGELOG:
 ==========
 Renamed from alphaFunction to alphaSynapse to avoid confusion, especially with
