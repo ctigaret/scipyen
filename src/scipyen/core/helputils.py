@@ -296,7 +296,7 @@ def mypylight(text):
     if isDarkGui():
         style = "KeplerDark"
     else:
-        style="default"
+        style = "default"
         
     lexer = get_lexer_by_name("python", stripall=True)
     return highlight(text, lexer, HtmlFormatter(noclasses=True, nobackground=True, style=style))

@@ -44,7 +44,7 @@ some of the lost variables across kill - restart cycles.
 import os
 import signal
 import json
-import sys, typing, traceback, itertools, subprocess, asyncio
+import sys, typing, traceback, itertools, subprocess, asyncio, re
 # BEGIN NOTE: 2022-03-05 16:07:04 For execute_request
 import inspect, time
 # from ipykernel.jsonutil import json_clean
@@ -3174,20 +3174,22 @@ class ScipyenConsoleWidget(ConsoleWidget):
     def __init__(self, *args, **kwargs):
         ''' ScipyenConsole constructor
         
-        Using Qt5 gui by default
-        NOTE:
-        Since August 2016 -- using Jupyter/IPython 4.x and qtconsole
         
         Changelog (most recent first):
         -------------------------------
-        NOTE 2020-07-07 12:32:40
-        ALWAYS uses the in-proces Qt kernel manager
-        
+        NOTE 2025: using Qt6/PyQt6 by default
+    
         NOTE 2021-10-06 13:52:58
         Use a customized InProcessKernel, see
         ScipyenInProcessKernelManager and ScipyenInProcessKernel
         for details
         
+        NOTE 2020-07-07 12:32:40
+        ALWAYS uses the in-proces Qt kernel manager
+        
+        NOTE:
+        Since August 2016 -- using Jupyter/IPython 4.x and qtconsole
+        Using Qt5 gui by default
         '''
         self.mainWindow = kwargs.pop("mainWindow", None)
         self.banner = kwargs.pop("banner", None)
@@ -3645,15 +3647,53 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     
     def _saveToFile(self, text, mode="python"):
         from iolib import pictio as pio
+        
+        if self.consoleWidget.banner in text:
+            text = text.replace(self.consoleWidget.banner, "")
+            
+        # NOTE: 2025-12-15 23:06:53
+        # last line in ipkernel banner is dynamically generated every time the 
+        # 'banner' property of the ipkernel is accessed (is a dynamic property);
+        # while that's great, it has the incovenience of thwarting any simple 
+        # attempts to remove it from the console text
+        #
+        # therefore, I first remove the "static" part of the ipkernel banner
+        # ('tipless') - thankfully, this dynamic tip is just one line (so far...)
+        ipkbanner = self.consoleWidget.ipkernel.banner.split("\n")
+        nlines = len(ipkbanner)-1
+
+        tipless = "\n".join(ipkbanner[:-2])
+        
+        # print(f"tipless = {tipless}")
+        
+        if tipless in text:
+            # NOTE: 2025-12-15 23:31:15
+            # fish out the ipkernel banner's tip line (the one present in the console)'
+            # but only is the resty of ipkernel banner is present, otherwise this 
+            # WILL eat out other matching lines
+            m = re.search("(?m)Tip:.*$", text)
+            if isinstance(m, re.Match):
+                # tip line found, remove it
+                tiptext = m.group(0)
+                text = text.replace(tiptext, "")
+            # now remove the rest of the ipkernel banner 😄
+            text = text.replace(tipless, "")
+            
+        # BUG/FIXME: 2025-12-15 23:38:41 one last hitch above:
+        # there are too many empty lines left there TODO
+            
         if not isinstance(mode, str) or len(mode.strip()) == 0:
             mode = "python"
             
         if mode.lower() == "raw":
             fileflt = ";;".join(["Text files (*.txt)", "All Files (*.*)"])
+            
         elif mode.lower() == "html/xml":
             fileflt = ";;".join(["HTML file (*.htm*)", "XML file (*.xml)", "All Files (*.*)"])
+            
         else:
             fileflt = ";;".join(["Python source file (*.py)", "All Files (*.*)"])
+            
         if len(text.strip()):
             filename, filefilter = self.chooseFile("Save buffer to file",
                                                    fileFilter = fileflt,
