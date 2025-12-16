@@ -869,7 +869,7 @@ def Clements_Bekkers_97(x:np.ndarray | float,
     • extremum (≈ 0.5824 for α = 0., β = 1.) is at x = τ1 × ln(τ2/τ1 +1) + x0
         (analytically determined as the solution of f′(x)dx = 0 where f′(x) dx is
         the 1ˢᵗ order derivative of the Clements & Bekkers function in 'x')
-        So to get a curve spanning the interval [0., 1.], the coefficient β
+        So to get a curve spanning the interval [0., 1.] in 'y', the coefficient β
         should be ≈ 1/0.5824 ≈ 1.717, but WARNING this will also change the FWHM!
     
     NOTE: the DURATION of the waveform is determined by the independent variable
