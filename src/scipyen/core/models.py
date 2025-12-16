@@ -574,7 +574,7 @@ f(T) =  |
         | 0                     otherwise
         \
 
-and it has†
+and it has:†
 • extremum (1.0) at T = Tₚ (i.e. t - onset = τ)
 • value of 0.5 at t ∈ {≈ 0.23τ, ≈ 2.68τ}, hence:
 • half-width (with at half of peak amplitude) ≈ 2.45τ
@@ -828,12 +828,12 @@ def Clements_Bekkers_97(x:np.ndarray | float,
     This is a product of two exponentials ("rise" and "decay", each with their 
     own time constant), with additive and mutiplicative bias:
     
-        /
-        | α + β × (1 - exp(-(x-x₀)/τ₁)) × exp(-(x-x₀)/τ₂)   where x-x₀ >= 0
-    y = |
-        | α                                                 elsewhere
-        \
-            
+            /
+            | α + β × (1 - exp(-(x-x₀)/τ₁)) × exp(-(x-x₀)/τ₂)   where x-x₀ >= 0
+    f(x) =  |
+            | α                                                 elsewhere
+            \
+                
     where:
         α  = offset (usually, 0.);
     
@@ -866,12 +866,19 @@ def Clements_Bekkers_97(x:np.ndarray | float,
     
     NOTE:
     =====
-    • extremum (≈ 0.5824 for α = 0., β = 1.) is at x = τ1 × ln(τ2/τ1 +1) + x0
-        (analytically determined as the solution of f′(x)dx = 0 where f′(x) dx is
-        the 1ˢᵗ order derivative of the Clements & Bekkers function in 'x')
+    
+    • extremum is (τ2/(τ1+τ2)) * np.pow(τ1, τ1/τ2)/np.pow(τ1+τ2, τ1/τ2) ≈ 0.5824 
+        ∘ for α = 0., β = 1. 
+        ∘ is at x = τ1 × ln(τ2/τ1 +1) + x0
+        analytically determined as the solution of f′(x)dx = 0
         So to get a curve spanning the interval [0., 1.] in 'y', the coefficient β
         should be ≈ 1/0.5824 ≈ 1.717, but WARNING this will also change the FWHM!
-    
+    • FWHM: x coordinates for half-max need to be determined graphically
+        (see e.g., documentation for alphaSynapse)
+    • area under the curve:
+             ∞   
+             ∫f(x)dx = (β × τ2²)/(τ1+τ2), for α = 0, x0 = 0, and τ1, τ2 > 0
+             0
     NOTE: the DURATION of the waveform is determined by the independent variable
     'x'
     
