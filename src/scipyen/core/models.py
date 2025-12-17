@@ -867,13 +867,14 @@ def Clements_Bekkers_97(x:np.ndarray | float,
     NOTE:
     =====
     
-    • extremum is (τ2/(τ1+τ2)) * np.pow(τ1, τ1/τ2)/np.pow(τ1+τ2, τ1/τ2) ≈ 0.5824 
+    • the extremum is (τ2/(τ1+τ2)) * np.pow(τ1, τ1/τ2)/np.pow(τ1+τ2, τ1/τ2) ≈ 0.5824 
         ∘ for α = 0., β = 1. 
-        ∘ at x = τ1 × ln(τ2/τ1 +1) + x0
+        ∘ and occurs at x = τ1 × ln(τ2/τ1 +1) + x0
         (analytically determined as the solution of f′(x)dx = 0)
         So to get a curve spanning the interval [0., 1.] in 'y', the coefficient β
         should be ≈ 1/0.5824 ≈ 1.717, but WARNING this will also change the FWHM!
-    • FWHM: x coordinates for half-max need to be determined graphically
+    • FWHM: x coordinates for full width at half-max need to be determined 
+        graphically as the intersection between y(x) and the line y₁(x)=ymax/2
         (see e.g., documentation for alphaSynapse)
     • area under the curve:
              ∞   
