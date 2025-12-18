@@ -57,8 +57,11 @@ from core import scipyen_quantities as scq
 from core.datasignal import DataSignal
 from core.prog import (scipywarn, signature_as_dict, decorator, timefunc)
 
-def check_independent_variable(x:typing.Union[float, np.ndarray, np.float64], ndim:typing.Optional[int]=None):
-    if not isinstance(x, (float, np.ndarray, np.float64)):
+Real: typing.TypeAlias = typing.Union[int, float, np.int64, np.float64]
+Complex: typing.TypeAlias = typing.Union[complex, np.complex128]
+
+def check_independent_variable(x:typing.Union[Real, np.ndarray], ndim:typing.Optional[int]=None):
+    if not isinstance(x, (Real, np.ndarray)):
         raise TypeError(f"Independent variable 'x' has unexpected type: {type(x).__name__}")
     
     if isinstance(x, pq.Quantity):
@@ -259,7 +262,7 @@ https://wiki.python.org/moin/PythonDecoratorLibrary#Creating_decorator_with_opti
     # setattr(wf, "self", f)
     # return wf
 
-def check_unpack_model_coeffs(n:int, params:typing.Sequence[typing.Union[float, np.ndarray, np.float64]] | np.ndarray, 
+def check_unpack_model_coeffs(n:int, params:typing.Sequence[typing.Union[Real, np.ndarray]] | np.ndarray, 
                               *extras, strip_units:bool=True) -> tuple[float]:
     r"""Verifies and unpacks model coefficients, when supplied as a Sequence or vector
 Check that params and *extras amount to the required number of coefficients specified in 'n'
@@ -269,17 +272,17 @@ Check that params and *extras amount to the required number of coefficients spec
     # extra coefficients. 
     # when all expected coefficients are packed into the 'params' parameter, 
     # extras should be either empty, or contain only None objects
-    iscoeff = lambda v: isinstance(v, (float, np.float64)) or (isinstance(v, np.ndarray) and v.size==1)
+    iscoeff = lambda v: isinstance(v, (Real)) or (isinstance(v, np.ndarray) and v.size==1)
     extras = tuple(filter(lambda v: iscoeff(v), extras))
     # ensure extras contain scalar floats
-    extras = tuple(map(lambda v:float(v) if isinstance(v, (np.ndarray, np.float64)) else v, extras))
+    extras = tuple(map(lambda v:float(v) if isinstance(v, (np.ndarray, Real)) else v, extras))
     
     # NOTE: 2025-12-10 22:11:32
     # when a numpy array of floats is unpacked via tuple constructor, the 
     # result is a tuple of np.float64; these need to be cast to plain float
     # this is also the case for a Quantity array's 'magnitude' (which is the 
     # underlying float array without dimensionality, or physical units)
-    if isinstance(params, np.ndarray) and params.dtype == np.dtype('float64'):
+    if isinstance(params, np.ndarray) and params.dtype in (np.dtype('float64'), np.dtype("int64")):
         # coefficients packed as a numpy array, possibly a Quantity, and possibly
         # a singleton ("scalar")
         np = len(extras) + params.size
@@ -300,7 +303,7 @@ Check that params and *extras amount to the required number of coefficients spec
         np = len(params) + len(extras)
         assert np == n, f"Expecting {n} coefficients (packed or individual) but {np} were given"
         
-        if all (isinstance(v, (float, np.float64)) for v in params):
+        if all (isinstance(v, Real) for v in params):
             params = tuple(map(lambda v: float(v), params)) # casting float to float should bring no penalty
         
         elif all(isinstance(v, pq.Quantity) and v.size==1 and v.dtype==np.dtype("float64") for v in params):
@@ -317,7 +320,7 @@ Check that params and *extras amount to the required number of coefficients spec
             
         return params + extras
     
-    elif isinstance(params, (float, np.float64)):
+    elif isinstance(params, Real):
         np = len(extras) + 1
         assert np == n, f"Expecting {n} coefficients (packed or individual) but {np} were given"
         return (params, ) + extras
@@ -337,13 +340,13 @@ def check_rise_decay_params(x:typing.Sequence[float]):
 
 @modelfunction(coefficient_names = ("α", "β0", "β1", "λ0", "λ1", "x0"),
                title="Biexponential")
-def biexponential(x:typing.Union[np.ndarray, float], 
-                  α:float|typing.Sequence[float]|np.ndarray, /,
-                  β0:typing.Optional[float] = None,
-                  β1:typing.Optional[float] = None, 
-                  λ0:typing.Optional[float] = None, 
-                  λ1:typing.Optional[float] = None,
-                  x0:typing.Optional[float] = None) -> np.ndarray | float:
+def biexponential(x:typing.Union[np.ndarray, Real], 
+                  α:Real|typing.Sequence[Real]|np.ndarray, /,
+                  β0:typing.Optional[Real] = None,
+                  β1:typing.Optional[Real] = None, 
+                  λ0:typing.Optional[Real] = None, 
+                  λ1:typing.Optional[Real] = None,
+                  x0:typing.Optional[Real] = None) -> np.ndarray | float:
     r"""Sum of two exponentials with shift and bias (multiplicative and additive)
     y = α + β0 × exp(λ0 × (x-x₀)) + β1 × exp(λ1 × (x-x₀))
     
@@ -366,11 +369,11 @@ def biexponential(x:typing.Union[np.ndarray, float],
 
 @modelfunction(coefficient_names = ("α", "β", "x0", "λ*"),
                title="ExponentialProduct")
-def exponential_product(x: np.ndarray | float, 
-                        α:typing.Sequence[float] | float | np.ndarray, /,
-                        β:typing.Optional[float] = None, 
-                        x0:typing.Optional[float] = None, 
-                        *λ) -> np.ndarray | float:
+def exponential_product(x: np.ndarray | Real, 
+                        α:typing.Sequence[Real] | Real | np.ndarray, /,
+                        β:typing.Optional[Real] = None, 
+                        x0:typing.Optional[Real] = None, 
+                        *λ) -> np.ndarray | Real:
     r"""Product of several exponential decays, biased and shifted
 
     Realizes:
@@ -419,11 +422,11 @@ NOTE: For calling purposes, α can be supplied as a sequence of (α, β, x0), an
         
 @modelfunction(coefficient_names = ("α", "β", "x0", "λ"),
                 title="Exponential")
-def exponential(x:np.ndarray | float, 
-                α:typing.Sequence[float] | np.ndarray | float, /,
-                β:typing.Optional[float] = None, 
-                x0:typing.Optional[float] = None, 
-                τ:typing.Optional[float] = None) -> np.ndarray | float:
+def exponential(x:np.ndarray | Real, 
+                α:typing.Sequence[Real] | np.ndarray | Real, /,
+                β:typing.Optional[Real] = None, 
+                x0:typing.Optional[Real] = None, 
+                τ:typing.Optional[Real] = None) -> np.ndarray | Real:
     r"""Single exponential with bias and shift
 
     y = α + β × exp((x-x₀)λ)
@@ -444,11 +447,11 @@ NOTE: "rate" constant τ is the inverse of λ: τ = 1/λ
 
 @modelfunction(coefficient_names = ("α", "β", "x0", "λ"),
                title="BoundedExponentialRise")
-def bounded_exponential_rise(x:np.ndarray | float, 
-                             α:typing.Sequence[float]|np.ndarray, 
-                             β:typing.Optional[float] = None, 
-                             x0:typing.Optional[float] = None, 
-                             λ:typing.Optional[float] = None) -> np.ndarray | float:
+def bounded_exponential_rise(x:np.ndarray | Real, 
+                             α:typing.Sequence[Real]|np.ndarray, 
+                             β:typing.Optional[Real] = None, 
+                             x0:typing.Optional[Real] = None, 
+                             λ:typing.Optional[Real] = None) -> np.ndarray | float:
     r"""Particular case of single exponential rise.
 
     Realizes α + β × [1 - exp((x-x₀)λ)] where λ < -1.
@@ -485,9 +488,9 @@ values for α, β, and with appropriate value & sign of λ
 @timefunc # uncomment this for testing 😄
 @modelfunction(coefficient_names = ("α", "β", "x0", "τ"),
                title="AlphaSynapse")
-def alphaSynapse(x:np.ndarray | float, α:typing.Union[typing.Sequence[float],np.ndarray,float], /,
-                  β:typing.Optional[float] = None, x0:typing.Optional[float] = None,
-                  τ:typing.Optional[float] = None) -> np.ndarray | float:
+def alphaSynapse(x:np.ndarray | Real, α:typing.Union[typing.Sequence[Real],np.ndarray,Real], /,
+                  β:typing.Optional[Real] = None, x0:typing.Optional[Real] = None,
+                  τ:typing.Optional[Real] = None) -> np.ndarray | float:
     r"""
 AlphaSynapse function.
 
@@ -796,9 +799,9 @@ the mathematical Alpha Function (https://mathworld.wolfram.com/AlphaFunction.htm
 
 @modelfunction(coefficient_names = ("i", "n", "b"),
                title="NonStationaryFluctuationAnalysis")
-def nsfa(x:np.ndarray | float, i:float|pq.Quantity|typing.Sequence[typing.Union[float, pq.Quantity]], /, 
-         n:typing.Optional[typing.Union[float, pq.Quantity]] = None, 
-         b:typing.Optional[typing.Union[float, pq.Quantity]] = None) -> np.ndarray | float:
+def nsfa(x:np.ndarray | Real, i:Real|pq.Quantity|typing.Sequence[typing.Union[Real, pq.Quantity]], /, 
+         n:typing.Optional[typing.Union[Real, pq.Quantity]] = None, 
+         b:typing.Optional[typing.Union[Real, pq.Quantity]] = None) -> np.ndarray | float:
     r"""
         y = x * i - x²/N + b
     
@@ -815,13 +818,13 @@ WARNING: do not pass quantities for the parameters, yet; just use floats
     
 @modelfunction(coefficient_names = ("α", "β", "x0", "τ1", "τ2"),
                title="ClementsBekkers97")
-def Clements_Bekkers_97(x:np.ndarray | float,
-                        α:typing.Union[float, typing.Sequence[float]], /, 
-                        β:typing.Optional[float] = None, 
-                        x0:typing.Optional[float] = None, 
-                        τ1:typing.Optional[float] = None, 
-                        τ2:typing.Optional[float] = None,
-                        **kwargs) -> np.ndarray | float:
+def Clements_Bekkers_97(x:np.ndarray | Real,
+                        α:typing.Union[Real, typing.Sequence[Real], np.ndarray], /, 
+                        β:typing.Optional[Real|int] = None, 
+                        x0:typing.Optional[Real] = None, 
+                        τ1:typing.Optional[Real] = None, 
+                        τ2:typing.Optional[Real] = None,
+                        **kwargs) -> np.ndarray | Real:
     r"""
     Clements & Bekkers 1997 mEPSC waveform).
 
@@ -867,12 +870,13 @@ def Clements_Bekkers_97(x:np.ndarray | float,
     NOTE:
     =====
     
-    • the extremum is (τ2/(τ1+τ2)) * np.pow(τ1, τ1/τ2)/np.pow(τ1+τ2, τ1/τ2) ≈ 0.5824 
+    • the extremum is (τ2/(τ1+τ2)) * np.pow(τ1, τ1/τ2)/np.pow(τ1+τ2, τ1/τ2)
         ∘ for α = 0., β = 1. 
         ∘ and occurs at x = τ1 × ln(τ2/τ1 +1) + x0
         (analytically determined as the solution of f′(x)dx = 0)
         So to get a curve spanning the interval [0., 1.] in 'y', the coefficient β
-        should be ≈ 1/0.5824 ≈ 1.717, but WARNING this will also change the FWHM!
+        should be 1/extremum (for α = 0.0) , but WARNING this 
+        will also change the FWHM!
     • FWHM: x coordinates for full width at half-max need to be determined 
         graphically as the intersection between y(x) and the line y₁(x)=ymax/2
         (see e.g., documentation for alphaSynapse)
@@ -890,7 +894,7 @@ def Clements_Bekkers_97(x:np.ndarray | float,
     assert all(v >0. for v in (τ1, τ2))
     
     if unit_amplitude:
-        β = get_CB_scale_for_unit_amplitude(β, τ1, τ2) # do NOT include x0 here because we only work on xx>=0
+        β = get_CB_scale_for_unit_amplitude(τ1, τ2, β>0) 
     
     x = check_independent_variable(x)
     
@@ -902,47 +906,30 @@ def Clements_Bekkers_97(x:np.ndarray | float,
     y = np.full_like(x, α)
     y[xx>=0] = np.add(α, np.multiply(np.multiply(β, rise), decay))
     
-#     efunc       = lambda x, τ: np.exp(np.divide(np.negative(x), τ)) #-x/τ)
-#     risefunc    = lambda x, τ: np.subtract(1, efunc(x,τ))
-#     decayfunc   = efunc
-#     
-#     y = np.full_like(xx, α)
-#     
-#     
-#     
-#     if any(v == 0 for v in (τ1, τ2)):
-#         # y += α
-#         y[xx>=0] = np.nan
-#     else:
-#         rise = risefunc(xx[xx>=0], τ1)
-#         decay = decayfunc(xx[xx>=0], τ2)
-#         
-#         # y = np.full_like(x, α)
-#         y[xx>=0] = np.multiply(np.multiply(β, rise), decay)
-#         
-#         # y[xx>=0] = β * rise * decay
-#         # y += α
-    
     return y
 
-def get_CB_scale_for_unit_amplitude(β:float,τ_rise:float, τ_decay:float, x0:float = 0.):
-    efunc       = lambda x, τ: np.exp(-x/τ)
-    risefunc    = lambda x, τ: 1-efunc(x,τ)
-    decayfunc   = efunc
-    
-    xₘ = -τ_rise * np.log(τ_rise/(τ_rise + τ_decay)) + x0
-    
-    yₘ = risefunc(xₘ, τ_rise) * decayfunc(xₘ, τ_decay)
-    peak = -1. if β < 0 else 1.
-    
+def get_CB_scale_for_unit_amplitude(τ_rise:Real, τ_decay:Real, positive:bool=True):
+    yₘ = (τ_decay/(τ_rise+τ_decay)) * np.pow(τ_rise, τ_rise/τ_decay)/np.pow(τ_rise+τ_decay, τ_rise/τ_decay)
+    peak = 1. if positive else -1.
     return np.divide(peak, yₘ)
+    
+#     efunc       = lambda x, τ: np.exp(-x/τ)
+#     risefunc    = lambda x, τ: 1-efunc(x,τ)
+#     decayfunc   = efunc
+#     
+#     xₘ = -τ_rise * np.log(τ_rise/(τ_rise + τ_decay)) + x0
+#     
+#     yₘ = risefunc(xₘ, τ_rise) * decayfunc(xₘ, τ_decay)
+#     peak = -1. if β < 0 else 1. if β > 0 else 0
+#     
+#     return np.divide(peak, yₘ)
 
 @modelfunction(coefficient_names = ("α", "β0", "x0_0", "τ0_0", "τ0_1", "β1", "x0_1", "τ1_0", "τ1_1"))
-def CBsum(x:np.ndarray | float, α:float | typing.Sequence[float], /, 
-          β0:typing.Optional[float]=None, x0_0:typing.Optional[float]=None,
-          τ0_0:typing.Optional[float]=None, τ0_1:typing.Optional[float]=None, 
-          β1:typing.Optional[float]=None, x0_1:typing.Optional[float]=None, 
-          τ1_0:typing.Optional[float]=None, τ1_1:typing.Optional[float]=None) -> np.ndarray | float:
+def CBsum(x:np.ndarray | Real, α:Real | typing.Sequence[Real], /, 
+          β0:typing.Optional[Real]=None, x0_0:typing.Optional[Real]=None,
+          τ0_0:typing.Optional[Real]=None, τ0_1:typing.Optional[Real]=None, 
+          β1:typing.Optional[Real]=None, x0_1:typing.Optional[Real]=None, 
+          τ1_0:typing.Optional[Real]=None, τ1_1:typing.Optional[Real]=None) -> np.ndarray | float:
     r"""Realizes a sum of two Clements_Bekkers_97 functions, on x.
     
     Let 𝒙 a 1D domain vector:
@@ -987,7 +974,7 @@ def CBsum(x:np.ndarray | float, α:float | typing.Sequence[float], /,
     return np.add(y0, y1)
     
 @modelfunction(coefficient_names = ("x0", "ρ", "β*", "τ*", "α"))
-def exponential_rise_decays_product_biased_shifted(x:np.ndarray|float, *parameters:float,
+def exponential_rise_decays_product_biased_shifted(x:np.ndarray|Real, *parameters:Real,
                          **kwargs) -> np.ndarray|float:
     r"""Realization of a transient signal as a biased (α) product of one 
         exponential rise with constant ρ and a sum of 𝑛 exponential 
@@ -1074,12 +1061,12 @@ def exponential_rise_decays_product_biased_shifted(x:np.ndarray|float, *paramete
         x = np.squeeze(x)
     
     returnDecays = kwargs.pop("returnDecays", False)
-    if len(parameters) == 1 and isinstance(parameters[0], typing.Sequence) and all(isinstance(v, float) for v in parameters[0]):
+    if len(parameters) == 1 and isinstance(parameters[0], typing.Sequence) and all(isinstance(v, Real) for v in parameters[0]):
         parameters = parameters[0]
         
     nDecays = check_rise_decay_params(parameters)
     
-    if isinstance(x, numbers.Real):
+    if isinstance(x, Real):
         # for using this function with scipy.integrate.quad, which evaluates the
         # model function at a single point
         #x = x - parameters[-1]
@@ -1125,7 +1112,7 @@ def exponential_rise_decays_product_biased_shifted(x:np.ndarray|float, *paramete
             return y
 
 @modelfunction(coefficient_names=("p*"))
-def compound_exponential_rise_decays_product_biased_shifted(x:np.ndarray | float, *parameters, 
+def compound_exponential_rise_decays_product_biased_shifted(x:np.ndarray | Real, *parameters:Real, 
                                   returnDecays = False) -> np.ndarray | float:
     r"""Compound transient signal -- linear sum of delayed single transient signals
     Arguments:
@@ -1149,7 +1136,7 @@ def compound_exponential_rise_decays_product_biased_shifted(x:np.ndarray | float
     
     # NOTE: 2017-12-26 00:06:38
     # this is so that the function can be used with scipy.integrate.quad
-    if isinstance(x, numbers.Real):
+    if isinstance(x, Real):
         y = 0
         #print("parameters: ", parameters)
         #print("x: ", x)
@@ -1188,10 +1175,10 @@ def compound_exponential_rise_decays_product_biased_shifted(x:np.ndarray | float
         
 @modelfunction(coefficient_names=("γ", "ϵ", "χ", "σ"),
                title="MarkwardtNilius88")
-def Markwardt_Nilius(x:np.ndarray|float, γ:typing.Sequence[float]|float, /,
-                     ϵ:typing.Optional[float]=None, 
-                     χ:typing.Optional[float]=None, 
-                     σ:typing.Optional[float]=None) -> np.ndarray | float:
+def Markwardt_Nilius(x:np.ndarray|Real, γ:typing.Sequence[Real]|Real|np.ndarray, /,
+                     ϵ:typing.Optional[Real]=None, 
+                     χ:typing.Optional[Real]=None, 
+                     σ:typing.Optional[Real]=None) -> np.ndarray | float:
     r"""Markwardt & Nilius model for voltage-gated Ca2+ channels I-V relationship
     
     Implements:
@@ -1225,13 +1212,8 @@ def Markwardt_Nilius(x:np.ndarray|float, γ:typing.Sequence[float]|float, /,
     # v  = Vm at half-maximal current activation (mV) (i.e. taken on the rising 
     #     region of the I(V) curve)
     
-    if isinstance(γ, typing.Sequence) and len(γ) == 4 and all(isinstance(v, float) for v in γ):
-        γ, ϵ, χ, σ = check_unpack_model_coeffs(γ, 4)
-        # γ, ϵ, χ, σ = γ
+    γ, ϵ, χ, σ = check_unpack_model_coeffs(4, γ)
         
-    if not all(isinstance(v, float) for v in (γ, ϵ, χ, σ)):
-        raise TypeError("Expecting a comma-separated list of four float scalars or a sequence of four float scalars")
-    
     y = γ * (x - ϵ) / (1 + np.exp(-(x-χ)/σ))
     
     return y
@@ -1254,9 +1236,9 @@ def Markwardt_Nilius(x:np.ndarray|float, γ:typing.Sequence[float]|float, /,
 
 @modelfunction(coefficient_names = ("a", "b", "c", "x0"),
                title="TalbotSayer96")
-def Talbot_Sayer(x:typing.Union[float, np.ndarray], a:typing.Union[float, typing.Sequence[float]], /,
-                 b:typing.Optional[float]=None, c:typing.Optional[float]=None, 
-                 x0:typing.Optional[float]=None, **kwargs) -> np.ndarray | float:
+def Talbot_Sayer(x:typing.Union[Real, np.ndarray], a:typing.Union[Real, typing.Sequence[Real], np.ndarray], /,
+                 b:typing.Optional[Real]=None, c:typing.Optional[Real]=None, 
+                 x0:typing.Optional[Real]=None, **kwargs) -> np.ndarray | float:
     r"""
     Talbot & Sayer model for voltage-gated Ca2+ channels I-V relationship.
     
@@ -1305,7 +1287,7 @@ def Talbot_Sayer(x:typing.Union[float, np.ndarray], a:typing.Union[float, typing
     t_ = 33
     o = 2.5 * pq.mM
     
-    if isinstance(a, typing.Sequence) and len(i) == 4 and all(isinstance(v, (float, pq.Quantity)) for v in i):
+    if isinstance(a, typing.Sequence) and len(i) == 4 and all(isinstance(v, (Real, pq.Quantity)) for v in i):
         a, b, c, x0 = check_unpack_model_coeffs(a, 4)
     
     if len(kwargs) > 0:
@@ -1315,7 +1297,7 @@ def Talbot_Sayer(x:typing.Union[float, np.ndarray], a:typing.Union[float, typing
             if isinstance(t, pq.Quantity) and t.dimensionality == (1*pq.degC).dimensionality:
                 t_ = t.magnitude
                 
-            elif isinstance(t, numbers.Real):
+            elif isinstance(t, Real):
                 t_ = t
                 
             else:
@@ -1324,7 +1306,7 @@ def Talbot_Sayer(x:typing.Union[float, np.ndarray], a:typing.Union[float, typing
         if "o" in kwargs:
             o = kwargs["o"]
             
-            if isinstance(o, numbers.Real):
+            if isinstance(o, Real):
                 o *= pq.mM
                 
             else:
@@ -1361,7 +1343,7 @@ def Talbot_Sayer(x:typing.Union[float, np.ndarray], a:typing.Union[float, typing
     return boltzmann * ghk # ↦ Current units (typically, pA)
 
 @modelfunction(coefficient_names = ("α*", "β*", "σ*", "δ"))
-def gaussianSum1D(x:np.ndarray | float, *args, **kwargs) -> np.ndarray | float:
+def gaussianSum1D(x:np.ndarray | Real, *args, **kwargs) -> np.ndarray | float:
     r""" Sum of shifted Gaussians in 1D.
     
     Implements:
@@ -1446,9 +1428,9 @@ def gaussianSum1D(x:np.ndarray | float, *args, **kwargs) -> np.ndarray | float:
     return ret
     
 @modelfunction(coefficient_names=("τ", "x0"))
-def Frank_Fuortes(x:np.ndarray | float, 
-                  τ:float | typing.Sequence[float], /,  
-                  x0: typing.Optional[float] = None) -> np.ndarray | float:
+def Frank_Fuortes(x:np.ndarray | Real, 
+                  τ:Real | typing.Sequence[Real], /,  
+                  x0: typing.Optional[Real] = None) -> np.ndarray | float:
     r""" Frank & Fuortes 1956 expression Irh/I = 1 - exp(-(t-t0)/tau)
     
     In the Frank & Fuortes 1956 paper, Irheo is a constant experimentally measured.
@@ -1485,9 +1467,9 @@ def Frank_Fuortes(x:np.ndarray | float,
     return 1-np.exp(-(x-x0)/tau)
 
 @modelfunction(coefficient_names=("irh", "τ", "x0"))
-def Frank_Fuortes2(x:np.ndarray | float, irh:typing.Sequence[float] | float, /,
-                   τ:typing.Optional[float] = None, 
-                   x0: typing.Optional[float] = None) -> np.ndarray | float:
+def Frank_Fuortes2(x:np.ndarray | Real, irh:typing.Sequence[Real] | Real, /,
+                   τ:typing.Optional[Real] = None, 
+                   x0: typing.Optional[Real] = None) -> np.ndarray | float:
     r""" Implements 1/I = (1-exp(-t/tau)) / Irh 
     
     By rearranging the Frank & Fuortes 1956 equation
@@ -1511,8 +1493,8 @@ def Frank_Fuortes2(x:np.ndarray | float, irh:typing.Sequence[float] | float, /,
     return (1-np.exp(-(x-x0)/τ)) / irh
 
 @modelfunction(coefficient_names=("x0", "κ"))
-def Boltzmann(x:np.ndarray | float, x0:typing.Sequence[float] | float, /,
-              κ:typing.Optional[float] = None,
+def Boltzmann(x:np.ndarray | Real, x0:typing.Sequence[Real] | Real, /,
+              κ:typing.Optional[Real] = None,
               pos:bool=True) -> np.ndarray | float:
     r""" Boltzmann function:
 
@@ -1601,7 +1583,7 @@ The equation is also an empyrical model of the "gating" mechanism for
 voltage dependent channels Naᵥ and Kᵥ in the Hodgkin-Huxley formalism.
     
 """
-    if isinstance(x0, typing.Sequence) and len(x0)==2 and all(isinstance(v, float) for v in x0):
+    if isinstance(x0, typing.Sequence) and len(x0)==2 and all(isinstance(v, Real) for v in x0):
         x0, κ = z0
     
     # sign of ξ
@@ -1610,8 +1592,8 @@ voltage dependent channels Naᵥ and Kᵥ in the Hodgkin-Huxley formalism.
     return 1/(1+np.exp(ξ))
     
 @modelfunction(coefficient_names=("x0", ))
-def Heaviside(x:np.ndarray|float, 
-              x0:typing.Union[float, pq.Quantity], /, 
+def Heaviside(x:np.ndarray|Real, 
+              x0:typing.Union[Real, pq.Quantity], /, 
               α:bool=True) -> np.ndarray | float:
     r"""Heaviside (step) function:
     
@@ -1670,9 +1652,9 @@ def Heaviside(x:np.ndarray|float,
     
 @modelfunction(coefficient_names=("x0",),
                title="GenericHeaviside")
-def Heaviside2(x:np.ndarray|float, 
-              x0:typing.Union[float, pq.Quantity], 
-              level0:float=0., level1:float=1.) -> np.ndarray | float:
+def Heaviside2(x:np.ndarray|Real, 
+              x0:typing.Union[Real, pq.Quantity], 
+              level0:Real=0., level1:Real=1.) -> np.ndarray | float:
     """Heaviside (step) function - general version
     
     Step transition from level0 to level1. by default the levels are
@@ -1727,12 +1709,12 @@ def Heaviside2(x:np.ndarray|float,
     
 @modelfunction(coefficient_names = ("x0", "x1"),
                title="Boxcar")
-def boxcar(x:np.ndarray | float, x0:typing.Union[typing.Sequence[float], float], /, 
-           x1:typing.Optional[float]=None, up_first:bool=True) -> np.ndarray | float:
+def boxcar(x:np.ndarray | Real, x0:typing.Union[typing.Sequence[Real], Real], /, 
+           x1:typing.Optional[Real]=None, up_first:bool=True) -> np.ndarray | float:
     r"""Boxcar function: 
 Two successive Heaviside (step) functions of opposite directions"""
     # x0, x1 = p
-    x0, x1 = check_unpack_model_coeffs(x0, 2)
+    x0, x1 = check_unpack_model_coeffs(2, x0, x1)
     
     ud = [True, False] if up_first else [False, True]
     
@@ -1748,18 +1730,18 @@ Two successive Heaviside (step) functions of opposite directions"""
 
 @modelfunction(coefficient_names = ("x0", "x1"),
                title="GenericBoxcar")
-def boxcar2(x:np.ndarray | float, x0:typing.Union[typing.Sequence[float], float], /, 
-            x1:typing.Optional[float]=None,
-            level0:float=0., level1:float=1.) -> np.ndarray | float:
+def boxcar2(x:np.ndarray | Real, x0:typing.Union[typing.Sequence[Real], Real, np.ndarray], /, 
+            x1:typing.Optional[Real]=None,
+            level0:Real=0., level1:Real=1.) -> np.ndarray | float:
     r"""Boxcar function:
 Two successive Heaviside2 (step) functions (general versions) in opposite directions"""
-    x0, x1 = check_unpack_model_coeffs(x0, 2)
+    x0, x1 = check_unpack_model_coeffs(2, x0, x1)
     
     return Heaviside2(x, x0, level0, level1) + Heaviside2(x, x1, level1, level0)
 
 @modelfunction(coefficient_names = ("x0", "y0", "x1", "y1"))
-def ramp(x:typing.Union[float, np.ndarray], x0:typing.Union[float, np.ndarray], /, 
-         y0=None, x1=None, y1=None) -> np.ndarray | float:
+def ramp(x:typing.Union[Real, np.ndarray], x0:typing.Union[Real, np.ndarray, typing.Sequence[Real]], /, 
+         y0:typing.Optional[Real]=None, x1:typing.Optional[Real]=None, y1:typing.Optional[Real]=None) -> np.ndarray | float:
     r"""Linear ramp from (x₀, y₀) to (x₁, y₁)
     defaults are  = (0., 0., 1., 1.))
 
@@ -1770,8 +1752,7 @@ x: the domain vector (e.g. time vector) - numpy array
 p: the parameters in the specific order: (x₀, y₀, x₁, y₁)
 
 """
-    if isinstance(x0, typing.Sequence) and len(x0) == 4:
-        x0, y0, x1, y1 = check_unpack_model_coeffs(x0, 4)
+    x0, y0, x1, y1 = check_unpack_model_coeffs(4, x0, y0, x1, y1)
     
     if isinstance(x, pq.Quantity):
         if isinstance(x0, pq.Quantity):
@@ -1908,7 +1889,7 @@ def make_initial_coeffs(names:typing.Sequence[str]| dict, /,
             
         elif isinstance(feasible, np.ndarray):
             assert feasible.size in (1, n_coeffs), f"Incorrect number of elements in 'feasible'; expecting {n_coeffs}, got {len(feasible)} instead."
-            assert feasible.dtype == np.dtype("bool"), f"'feasible' should be a bool array"
+            assert feasible.dtype == np.dtype("bool"), "'feasible' should be a bool array"
             if feasible.size == 1:
                 feasible
         
