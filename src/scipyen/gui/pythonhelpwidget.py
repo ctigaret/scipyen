@@ -169,14 +169,11 @@ class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin
                 
             return cls._instance
         
-    _placeHolder_ = "\n".join(["Scipyen-specific NOTES:",
+    _scipyen_specific_ = "\n".join(["Scipyen-specific NOTES:",
                                 "------------------------ ",
                                 "Enter a query to access the help system of IPython (e.g. one of `thing`, `?thing`, `thing?`, `??thing`, `thing??`, `?`, or `??`) or Python (e.g., `help(thing)`)",
-                                "",
                                 "Supports help-related IPython tools: `?`, `??`, and the line magics `quickref` and `psearch`",
-                                "",
                                 "Enter the magic name without the `%` prefix, followed by arguments, to execute it (e.g. `psearch <pattern…>`), or the magic name WITH the `%` prefix to read its documentation (e.g. `%psearch`)",
-                                ""
                                 "NOTE: This does not substitute the Python 'help' command or IPython's help system ('?<object>') at the console, but it does help to 'free' up the console during such queries."])
     
     def __init__(self, shell:InteractiveShell, parent:typing.Optional[QtWidgets.QMainWindow] = None,
@@ -190,33 +187,40 @@ class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin
         self._helpThread_.message[str].connect(self._slot_displayMessage)
         self._helpThread_.ready[QtGui.QTextDocument].connect(self._slot_displayReply)
         self._queryHistory_ = deque()
+        self.placeHolder_msg = 'Enter a help topic in the field above (e.g., "topics", "pywt.Wavelet"), "?", or "help"'
         try:
             with io.StringIO() as bf:
                 helper = pydoc.Helper(output = bf)
                 helper.intro()
                 msg = bf.getvalue()
+                # print(f"{self.__class__.__name__}.__init__: msg = {msg}")
                 parts = list(map(lambda s: s.replace("\n", " "), msg.split("\n\n")))
                 parts = parts[:-1]
-                parts += (self._placeHolder_.splitlines())
+                parts += (self._scipyen_specific_.splitlines())
                 # parts.append("\n".join(["Scipyen-specific NOTES:",
                 #                         "---------------------- ",
                 #                         "Queries for Python objects must be entered by their fully-qualified names, and not by alias: e.g., search for 'gui.scipyenviewer' and not for 'scipyenviewer', or whatever alias there may be, such as 'sv', etc.",
                 #                         "This window is not a substitute to the Python 'help' command or IPython's help system ('?<object>') at the console, but it does 'free' up the console during such queries.",
                 #                         "(Expect many bugs 😦)"]))
                 self.intro_msg = "\n\n".join(parts)
+                # print(f"{self.__class__.__name__}.__init__: placeHolder_msg = {self.placeHolder_msg}")
             
         except:
             traceback.print_exc()
-            self.intro_msg = 'Enter a help topic in the field above (e.g., "topics", "pywt.Wavelet", etc)'
+            self.intro_msg = ""
         
         WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs)
-                
+        
+        self._textColorCache_ = QtWidgets.QApplication.palette().color(QtGui.QPalette.Text)
+        
         self._configureUI_()
+        self._showCustomPlaceHolderText_()
         self.__class__._instance = self
         
     def _configureUI_(self):
         self.setupUi(self)
-        self.helpDisplay.setPlaceholderText(self.intro_msg)
+        # self.helpDisplay.setPlaceholderText(self.placeHolder_msg)
+        self.helpDisplay.setPlaceholderText('Enter a help topic in the field above (e.g., "topics", "pywt.Wavelet"), "?", or "help"')
         self.removQueryAction = QAction(QtGui.QIcon.fromTheme("edit-delete"),
                                                                 "Remove this query from history",
                                                                 self.queryComboBox.lineEdit())
@@ -241,10 +245,18 @@ class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin
         self.prevToolButton.clicked.connect(self._slot_prevQuery)
         self.nextToolButton.clicked.connect(self._slot_nextQuery)
         
+    def _showCustomPlaceHolderText_(self):
+        self.helpDisplay.clear()
+        if len(self.intro_msg):
+            self._textColorCache_ = self.helpDisplay.textColor()
+            self.helpDisplay.setTextColor(QtWidgets.QApplication.palette().color(QtGui.QPalette.PlaceholderText))
+            self.helpDisplay.setPlainText(self.intro_msg)
+            
+    
     @Slot(str)
     def _slot_queryTextChanged(self, text:str):
         if len(text.strip()) == 0:
-            self.helpDisplay.clear()
+            self._showCustomPlaceHolderText_()
         
     @Slot()
     def _slot_processQuery(self):
@@ -307,23 +319,28 @@ class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin
     def _slot_displayMessage(self, txt:str):
         if len(txt.strip()):
             self.helpDisplay.setPlainText(txt)
+            if self.helpDisplay.textColor() == QtWidgets.QApplication.palette().color(QtGui.QPalette.PlaceholderText):
+                self.helpDisplay.setTextColor(self._textColorCache_)
         else:
-            self.helpDisplay.clear()
+            self._showCustomPlaceHolderText_()
         
     @Slot(QtGui.QTextDocument)
     @Slot(str)
     def _slot_displayReply(self, doc:typing.Union[QtGui.QTextDocument, str]):
         if isinstance(doc, QtGui.QTextDocument):
             if doc.isEmpty():
-                self.helpDisplay.clear()
+                self._showCustomPlaceHolderText_()
             else:
                 self.helpDisplay.setDocument(doc)
                 
         elif isinstance(doc, str):
             if len(doc.strip()):
                 self.helpDisplay.setPlainText(doc)
+                if self.helpDisplay.textColor() == QtWidgets.QApplication.palette().color(QtGui.QPalette.PlaceholderText):
+                    self.helpDisplay.setTextColor(self._textColorCache_)
             else:
-                self.helpDisplay.clear()
+                self._showCustomPlaceHolderText_()
+                # self.helpDisplay.clear()
 
 class PythonHelpWindow(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     def __init__(self, shell, parent=None):

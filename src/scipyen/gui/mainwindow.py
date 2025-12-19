@@ -5231,11 +5231,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         from gui.pythonhelpwidget import PythonHelpWindow
         if not isinstance(self.pythonHelpWindow, QtWidgets.QMainWindow):
             self.pythonHelpWindow = PythonHelpWindow(self.shell, self)
-            # self.pythonHelpWindow = QtWidgets.QMainWindow(self)
-            # self.pythonHelpWindow.setWindowTitle("Scipyen — Python help")
-            # if not isinstance(self.helpWidget, QtWidgets.QWidget):
-            #     self.helpWidget = PythonHelpWidget(self.shell, self.pythonHelpWindow)
-            # self.pythonHelpWindow.setCentralWidget(self.helpWidget)
         self.pythonHelpWindow.show()
 
     @Slot(QtCore.QModelIndex)

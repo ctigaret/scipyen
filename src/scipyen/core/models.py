@@ -329,24 +329,27 @@ Check that params and *extras amount to the required number of coefficients spec
         raise TypeError(f"Expecting a sequence of float scalars or a float numpy array with {n} elements; got {type(params).__name__} instead")
     
 
-def check_rise_decay_params(x:typing.Sequence[float]):
+def check_rise_decay_params(x:typing.Sequence[Real]|np.ndarray) -> int:
     r"""Returns the number of decay components for a exp-rise-multi-decay transient.
     x = iterable with model parameters (see exponential_rise_decays_product_biased_shifted())
     """
-    if np.remainder(len(x)-3, 2) != 0:
-        raise ValueError("Unexpected number of elements in the parameters vector; must be 2n + 3 where n is the number of decay components; instead got %d elements" % len(parameters))
+    nx = len(x) if isinstance(x, typing.Sequence) else x.size
+    if np.remainder(nx-3, 2) != 0:
+        raise ValueError(f"Unexpected number of elements in the parameters vector; must be 2n + 3 where n is the number of decay components; instead got {nx} elements")
     
-    return (len(x)-3) // 2
+    return (nx-3) // 2
 
-@modelfunction(coefficient_names = ("α", "β0", "β1", "λ0", "λ1", "x0"),
+# @timefunc # uncomment this for testing 😄
+@modelfunction(coefficient_names = ("α", "β0", "β1", "x0", "λ0", "λ1"),
                title="Biexponential")
 def biexponential(x:typing.Union[np.ndarray, Real], 
                   α:Real|typing.Sequence[Real]|np.ndarray, /,
                   β0:typing.Optional[Real] = None,
                   β1:typing.Optional[Real] = None, 
+                  x0:typing.Optional[Real] = None,
                   λ0:typing.Optional[Real] = None, 
                   λ1:typing.Optional[Real] = None,
-                  x0:typing.Optional[Real] = None) -> np.ndarray | float:
+                  ) -> np.ndarray | float:
     r"""Sum of two exponentials with shift and bias (multiplicative and additive)
     y = α + β0 × exp(λ0 × (x-x₀)) + β1 × exp(λ1 × (x-x₀))
     
@@ -367,6 +370,7 @@ def biexponential(x:typing.Union[np.ndarray, Real],
     
     # return β0 * np.exp(λ0 * x) + β1 * np.exp(λ1 * x)
 
+# @timefunc # uncomment this for testing 😄
 @modelfunction(coefficient_names = ("α", "β", "x0", "λ*"),
                title="ExponentialProduct")
 def exponential_product(x: np.ndarray | Real, 
@@ -401,7 +405,7 @@ NOTE: For calling purposes, α can be supplied as a sequence of (α, β, x0), an
     
 """
     x = check_independent_variable(x)
-    if isinstance(α, (typing.Sequence, np.ndarray) and α.size == 3):
+    if isinstance(α, (typing.Sequence)) and len(α) == 3 or isinstance(α, np.ndarray) and α.size == 3:
         λ= (β, x0) + λ
         β = None
         x0 = None
@@ -418,33 +422,37 @@ NOTE: For calling purposes, α can be supplied as a sequence of (α, β, x0), an
         
         return np.add(α, np.multiply(β, np.exp(xxλc)))
     
-        # return α + β * np.exp(-(x-x0) / τc)
-        
+# @timefunc # uncomment this for testing 😄
 @modelfunction(coefficient_names = ("α", "β", "x0", "λ"),
                 title="Exponential")
 def exponential(x:np.ndarray | Real, 
                 α:typing.Sequence[Real] | np.ndarray | Real, /,
                 β:typing.Optional[Real] = None, 
                 x0:typing.Optional[Real] = None, 
-                τ:typing.Optional[Real] = None) -> np.ndarray | Real:
+                λ:typing.Optional[Real] = None) -> np.ndarray | Real:
     r"""Single exponential with bias and shift
 
     y = α + β × exp((x-x₀)λ)
     
-Parameters:
-===========
-x: independent variable (e.g., time): 1D numpy array
+    Parameters:
+    ===========
+    x: independent variable (e.g., time): 1D numpy array
 
-coefficients are given as floats in the following order:
+    coefficients are given as floats in the following order:
 
-α (offset), β (scale), x₀ (onset), λ (exponential constant)
+    α (offset or additive bias, in units of "y"), 
+    β (scale, or multiplicative bias; dimensionless), 
+    x₀ (onset, delay or shift, in units of "x"), 
+    λ (exponential constant; in (units of "x")⁻¹)
 
-NOTE: "rate" constant τ is the inverse of λ: τ = 1/λ
+    NOTE: "rate" constant τ is the inverse of λ: τ = 1/λ
 
-"""
+    """
+    x = check_independent_variable(x)
+    α, β, x0, λ = check_unpack_model_coeffs(4, α, β, x0, λ)
+    return np.add(α, np.multiply(β, np.exp(np.multiply(np.subtract(x,x0), λ))))
 
-
-
+# @timefunc # uncomment this for testing 😄
 @modelfunction(coefficient_names = ("α", "β", "x0", "λ"),
                title="BoundedExponentialRise")
 def bounded_exponential_rise(x:np.ndarray | Real, 
@@ -454,7 +462,7 @@ def bounded_exponential_rise(x:np.ndarray | Real,
                              λ:typing.Optional[Real] = None) -> np.ndarray | float:
     r"""Particular case of single exponential rise.
 
-    Realizes α + β × [1 - exp((x-x₀)λ)] where λ < -1.
+    Realizes α + β × [1 - exp((x-x₀)λ)] where λ < 0.
 
 NOTE This is equivalent to the generic exponential
 
@@ -463,7 +471,7 @@ NOTE This is equivalent to the generic exponential
     where:
         β₁ = -β
         α₁ = α - β₁
-        and λ < -1
+        and λ < 0
 
 This means you can always use the exponential(…) model function with appropriate
 values for α, β, and with appropriate value & sign of λ
@@ -473,19 +481,21 @@ values for α, β, and with appropriate value & sign of λ
     x: independent variable (e.g., time): 1D numpy array
 
     coefficients are given as floats in the following order:
+    
+    α (offset or additive bias, in units of "y"), 
+    β (scale, or multiplicative bias; dimensionless), 
+    x₀ (onset, delay or shift, in units of "x"), 
+    λ (exponential constant; in (units of "x")⁻¹)
 
-    α (bias), β (scale), x₀ (shift), λ (exponential constant)
 """
     x = check_independent_variable(x)
     α, β, x0, λ = check_unpack_model_coeffs(4, α, β, x0, λ)
-    assert λ < -1., "For this particular model, λ must be < -1"
+    # assert λ < -1., "For this particular model, λ must be < -1"
     
     xxλ = np.divide(np.subtract(x,x0), λ)
     return np.add(α, np.multiply(β, np.subtract(1, np.exp(xxλ))))
     
-    # return α + β * (1 - np.exp(-(x-x0)/τ))
-
-@timefunc # uncomment this for testing 😄
+# @timefunc # uncomment this for testing 😄
 @modelfunction(coefficient_names = ("α", "β", "x0", "τ"),
                title="AlphaSynapse")
 def alphaSynapse(x:np.ndarray | Real, α:typing.Union[typing.Sequence[Real],np.ndarray,Real], /,
@@ -507,13 +517,13 @@ A single exponential rise and decay, both with the same constant (τ):
         | α                                           elsewhere
         \
 where:
-    α  ↦ additive bias (offset);
+    α  ↦ additive bias (offset); units of "y"
 
-    β  ↦ multiplicative bias (scale);
+    β  ↦ multiplicative bias (scale); dimensionless
 
-    x₀ ↦ shift (delay, or onset);
+    x₀ ↦ shift (delay, or onset); units of "x"
 
-    τ  ↦ the synaptic constant
+    τ  ↦ the synaptic constant; units of "x"
 
 The implementation follows that in NEURON simulation software
 ( M. L. Hines, N. T. Carnevale; The NEURON Simulation Environment. 
@@ -714,6 +724,9 @@ the mathematical Alpha Function (https://mathworld.wolfram.com/AlphaFunction.htm
     # print(f"coeff  names: {self.coefficient_names}")
     # print(f"n coeffs: {self.n_coefficients}")
     
+    # make sure x is a numpy array or a scalar
+    x = check_independent_variable(x)
+        
     # unpack parameters
     α, β, x0, τ = check_unpack_model_coeffs(4, α, β, x0, τ)
     # print(f"{α}")
@@ -752,9 +765,6 @@ the mathematical Alpha Function (https://mathworld.wolfram.com/AlphaFunction.htm
     # # vectorized version used when x is a numpy array
     # valpha = np.frompyfunc(alpha, 1, 1) 
     
-    # make sure x is a numpy array or a scalar
-    x = check_independent_variable(x)
-        
     xτ = np.divide(np.subtract(x,x0), τ)
     
     # NOTE: 2025-12-07 23:29:18
@@ -762,7 +772,7 @@ the mathematical Alpha Function (https://mathworld.wolfram.com/AlphaFunction.htm
     # probably to make sure that extremely small values from v × exp(1-v) truly vanish
     # I don't use that here
     #
-    if isinstance(x, float):
+    if isinstance(x, Real):
         # x is a scalar, all simple!
         # NOTE: 2025-12-08 00:29:32
         # casting to plain float, see NOTE: 2025-12-08 00:28:34 
@@ -784,12 +794,12 @@ the mathematical Alpha Function (https://mathworld.wolfram.com/AlphaFunction.htm
         # skipping the others (and therefore leaving the corresponding elements 
         # in the output array 'y' untouched, hence possibly undefined).
         #
-        # HOWEVER, here, ufuncs are used 
-        # by the alpha function def'ed above, while the alpha function itself is 
-        # NOT an ufunc; so rather that passing any data to alpha (and using 'where'
-        # in the ufunc calls in there, with the caveat above), I apply the alpha
-        # function directly to the elements of xτ that satisfy this condition (and
-        # store the output in the corresponding elements of 'y')
+        # HOWEVER, here, ufuncs are used by the alpha function def'ed above, while
+        # the alpha function itself is NOT an ufunc; so rather that passing any 
+        # data to alpha (and using 'where' in the ufunc calls in there, with the 
+        # caveat above), I apply the alpha function directly to the elements of 
+        # xτ that satisfy this condition (and store the output in the corresponding 
+        # elements of 'y')
         y[xτ>=0] = alpha(xτ[xτ>=0]) 
         
         # NOTE: 2025-12-08 00:50:00 -> TOO SLOW !!!
@@ -838,13 +848,14 @@ def Clements_Bekkers_97(x:np.ndarray | Real,
             \
                 
     where:
-        α  = offset (usually, 0.);
+        α           — the offset (additive bias; usually, 0.); units of "y"
     
-        β  = scale;
+        β           — the scale (multiplicative bias); dimensionless
     
-        x₀ = delay ("onset") (ms);
+        x₀          — the delay ("onset", or "shift"); units of "x"
     
-        τ₁, τ₂ = time constants, respectively, for the rise and decay phases
+        τ₁, τ₂ > 0. — the time constants, respectively, for the rise and decay phases
+                        units of "x"
     
     Parameters:
     ============
@@ -901,6 +912,12 @@ def Clements_Bekkers_97(x:np.ndarray | Real,
     # print(f"Clements_Bekkers_97: α = {α}")
     
     xx = np.subtract(x, x0)
+    if isinstance(x, Real):
+        return float(α + β * (1- np.exp(-xx/τ1))*np.exp(-xx/τ2)) if xx > 0 else float(α)
+    else:
+        if x.size == 1:
+            return np.array([float(α + β * (1- np.exp(-xx/τ1))*np.exp(-xx/τ2))]) if xx > 0 else np.array([float(α)])
+    
     decay = np.exp(np.divide(np.negative(xx[xx>=0]), τ2))
     rise  = np.subtract(1, np.exp(np.divide(np.negative(xx[xx>=0]), τ1)))
     y = np.full_like(x, α)
@@ -955,17 +972,11 @@ def CBsum(x:np.ndarray | Real, α:Real | typing.Sequence[Real], /,
         α, β₀, x₀₀, τ₀₀, τ₁₀, β₁, x₀₁, τ₀₁, τ₁₁
 
     """
+    x = check_independent_variable(x)
     # NOTE: 2025-11-05 21:31:42
     # allow passing all parameters packed in a sequence, so as to do away with 
     # the *_model version of this function
     α, β0, x0_0, t0_0, t0_1, β1, x0_1, t1_0, t1_1 = check_unpack_model_coeffs(9, α, β0, x0_0, t0_0, t0_1, β1, x0_1, t1_0, t1_1)
-    # if isinstance(α, typing.Sequence) and len(α) == 9 and all(isinstance(v, float) for v in α):
-    #     α, β0, x0_0, t0_0, t0_1, β1, x0_1, t1_0, t1_1 = α
-        
-    # if not all(isinstance(v, float) for v in (α, β0, x0_0, τ0_0, τ0_1, β1, x0_1, τ1_0, τ1_1 )):
-    #     raise TypeError("Expecting a sequence of 'α, β0, x0_0, τ0_0, τ0_1, β1, x0_1, τ1_0, τ1_1' scalar floats or a coma-separated list of scalar floats for 'α, β0, x0_0, τ0_0, τ0_1, β1, x0_1, τ1_0, τ1_1'")
-        
-    x = check_independent_variable(x)
 
     y0 = Clements_Bekkers_97(x, α, β0, x0_0, τ0_0, τ0_1)
     
@@ -973,8 +984,9 @@ def CBsum(x:np.ndarray | Real, α:Real | typing.Sequence[Real], /,
     
     return np.add(y0, y1)
     
-@modelfunction(coefficient_names = ("x0", "ρ", "β*", "τ*", "α"))
-def exponential_rise_decays_product_biased_shifted(x:np.ndarray|Real, *parameters:Real,
+@modelfunction(coefficient_names = ("x0", "ρ", "β*", "τ*", "α"),
+               title="ExpnentialRiseMultiDecays")
+def exponential_rise_with_product_decays(x:np.ndarray|Real, *parameters:Real,
                          **kwargs) -> np.ndarray|float:
     r"""Realization of a transient signal as a biased (α) product of one 
         exponential rise with constant ρ and a sum of 𝑛 exponential 
