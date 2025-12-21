@@ -80,9 +80,10 @@ def check_independent_variable(x:typing.Union[Real, np.ndarray], ndim:typing.Opt
     return x
 
 @decorator
-def modelfunction(f:typing.Callable, nvars:int=1, 
-                  coefficient_names:typing.Optional[typing.Sequence[str]]=None,
-                  n_coefficients:typing.Optional[int] = None,
+def modelfunction(f:typing.Callable, /, 
+                  nvars:int=1, 
+                  coefficients:typing.Optional[typing.Sequence[str]]=None,
+                  title:typing.Optional[str] = None ,
                   coefficient_units:typing.Optional[dict]=None,
                   **kwargs):
     r"""Decorator to tag a function as a mathematical model function.
@@ -94,24 +95,50 @@ The function returns an nD array where 1 <= n <= nvars (see below)
 By using this decorator, model functions can be identified as such, regardless 
 of the module (in Scipyen's tree) where they are defined.
 
-This decorator sets the attributes listed below, to a model function. 
+This decorator sets adorns a model function with the following attributes:
 
 'nvars': number of independent variables (e.g. 1D or nD function)
 
-'coefficient_names': sequence of parameter symbols as they appear in the mathematical
-    model; these parameters are "fixed" for a given model instance and are 
-    responsible for generating a "family" of models from the same independent 
-    variable, such that the models in the family have one thing in common: the 
-    mathematical relation between the independent variable(s) and the parameter.
+'title': A descriptive name, not bound by Python's rules for symbol composition
 
-    These parameters are also the ones that are determined in curve fitting (i.e.
-    when fitting a model to some real data thought to follow the mathematical
-    relation that defines the model).
+'coefficients': tuple of coefficient symbols as they appear in the mathematical
+    model; these parameters are "fixed" for a given model instance and are 
+    responsible for generating a "family" of models from the same mathematical
+    expresison.
+
+    These coefficients are also the ones that are determined in curve fitting.
+
+    Some of the models involve a variable number of components (factors or terms)
+    defined by the same mathematical expresison. Their coefficient symbols are
+    tagged with a "*" to indicate this. Each such "starred" coefficient is counted
+    ONCE. 
+
+    ATTENTION: Python syntax forbids the use of more than one var-positional
+    parameter (e.g. *args) in a function call. This means that, for an actual 
+    funciton call, the starred coefficients need to be lumped together in a single
+    var-positional parameter; it is up to the function code to deal with the 
+    contents of this parameter.
+
+'starred_coefficients': tuple of starred coefficient symbols.
 
 'coefficient_units' (see below)
 
-NOTE: these attributes are NOT directly accessible from within the function's
-scope (i.e. excuted code). 
+NOTE: These attributes can be accessed from within the model function code by
+    assigning the function object to a local variable (e.g., 'self'). In turn,
+    the function object is accessed from the globals() namespace as the object
+    bound to the name of the function. 
+
+    For example, say you've defined a model function 'func' decorated with this
+    wrapper:
+
+    @modelfunction(coefficients = ("a", "b", "c", "d*"))
+    def func(...):
+        # inside the function, you can access the function object as present in 
+        # the globals: 
+        self = glopbals()['func']
+        # which allows you to retrieve the coefficient names as defined in the 
+        # wrapper
+        self.coefficients
 
 Parameters:
 f: the decorated function
@@ -123,25 +150,31 @@ nvars: number of independent variables; this determines the general syntax of th
     and so on...
 
     Optional; default is 1. WARNING: do NOT confuse with the number of model 
-    parameters
+    coefficients!
 
-coefficient_names: typing.Sequence[str] — names (symbols) for the parameters.
+title: A user-defined name; default is None, which results in a CamelCase name
+    taken from the wrapped function.
+
+coefficients: typing.Sequence[str] — names (symbols) for the parameters.
     These can usually be inferred from the function's signature via the 
     'inspect' module, which is what the function 'model_parameters(…)' in this
     module does. However, this can be tedious for model functions with a more 
     complex syntax; hence this attribute comes in handy.
 
-    Optional, default is tuple() (empty tuple)
+    Optional default is None (which results in an empty tuple)
 
-    When the model defines a variadic number of parameters (see e.g., exponential_decays_product_biased_shifted)
-    these are indicated by a * suffix
+    Variadic coefficients are indicated by a * suffix ('starred' coefficients)
+    NOTE: Even if the notation is similar to that of variadic function parameters
+    ('*args') is NOT identical to that and does not havwe the same meaning; here
+    the '*' comes after ther symbol and indicated that there must be AT LEAST one
+    coefficient with that symbol, in the coefficients sequence.
 
 coefficient_units: optional mapping
     parameter symbol:str ↦ physical unit: Quantity, UnitQuantity, or sequence of such
 
     Default is None
     When given, this flags that some model parameters actually have physical units;
-    the keys are the names of the model parameters (as in coefficient_names).
+    the keys are the names of the model parameters (as in coefficients).
 
     When the model defines a variadic number of parameters (see e.g., 
     exponential_decays_product_biased_shifted) their keys are suffixed by a '*' (as above) 
@@ -149,7 +182,7 @@ coefficient_units: optional mapping
 
     Since not all parameters necessarily associate physical units, those that do not
     may be omitted from this mapping. However, ATTENTION: the full sequence of
-    parameter names SHOULD be given in 'coefficient_names', as above. Parameters
+    parameter names SHOULD be given in 'coefficients', as above. Parameters
     that are omitted from coefficient_units will by default get pq.dimensionless as
     physical unit.
 
@@ -173,20 +206,9 @@ coefficient_units: optional mapping
     as values for the parameter; it is up to the function what to do with its
     own call arguments
 
-n_coefficients: int: number of model parameters; again, this can be inferred from the 
-    length of the paraneter names sequence, or indirectly by inspecting the 
-    function's signature; however, this provides a direct access, useful for
-    model functions with a more complex signature
-
-    Optional default is 0, or -1 for variadic parameters
-
-    NOTE: this will be updated automatically wher 'parameternames' above is set 
-    to a non-empty sequence of str
-
-    NOTE: the wrapper also gives access to these
-
 Var-positional parameters:
-additional attributes to be set to the wrapped function WARNING under development
+additional attributes to be set to the wrapped function.
+NOTE: A useful one is the "title"
 
 NOTE for developers: this function defines a function decorator with optional
 arguments; this is made possible by decorating this function with the prog.decorator
@@ -197,63 +219,56 @@ https://wiki.python.org/moin/PythonDecoratorLibrary#Creating_decorator_with_opti
     def wrapper(f):
         setattr(f, "model_function", True)
         setattr(f, "nvars", nvars)
-        if isinstance(coefficient_names, typing.Sequence) and len(coefficient_names) and all(isinstance(p, str) for p in coefficient_names):
-            setattr(f, "coefficient_names", coefficient_names)
+        if isinstance(coefficients, typing.Sequence) and len(coefficients) and all(isinstance(p, str) for p in coefficients):
+            setattr(f, "coefficients", coefficients)
         else:
-            setattr(f, "coefficient_names", tuple())
+            setattr(f, "coefficients", tuple())
+        
+        starred = tuple(filter(lambda c: "*" in c, f.coefficients))
+        setattr(f, "starred_coefficients", starred)
         
         if isinstance(coefficient_units, dict):
             check_value_type = lambda v: (isinstance(v, pq.Quantity) and v.size==1) or isinstance(v, (type(None), type(dataclasses.MISSING)))
             if len(coefficient_units) and all(isinstance(k, str) for k in coefficient_units.keys()):
-                pnames = getattr(f, "coefficient_names", None)
+                pnames = getattr(f, "coefficients", None)
                 if pnames is None or isinstance(pnames, typing.Sequence) and len(pnames) == 0:
-                    setattr(f, "coefficient_names", tuple(coefficient_units.keys()))
+                    setattr(f, "coefficients", tuple(coefficient_units.keys()))
                     
                 punits = dict(map(lambda p: (p, pq.dimensionless), pnames))
                 
                 for key, value in coefficient_units.items():
-                    if key not in f.coefficient_names:
+                    if key not in f.coefficients:
                         continue
+                    
                     if (check_value_type(value)) or (isinstance(value, typing.Sequence) and all(check_value_type(v) for v in value)):
                         punits[key] = value
                         
                 setattr(f, "coefficient_units", punits)
                 
             else:
-                pnames = getattr(f, "coefficient_names", None)
+                pnames = getattr(f, "coefficients", None)
                 if isinstance(pnames, typing.Sequence) and len(pnames) and all(isinstance(p, str) for p in pnames):
                     punits = dict(map(lambda p: (p, pq.dimensionless), pnames))
                     setattr(f, "coefficient_units", punits)
                     
         else:
-            pnames = getattr(f, "coefficient_names", None)
+            pnames = getattr(f, "coefficients", None)
             if isinstance(pnames, typing.Sequence) and len(pnames) and all(isinstance(p, str) for p in pnames):
                 punits = dict(map(lambda p: (p, pq.dimensionless), pnames))
                 setattr(f, "coefficient_units", punits)
                 
-            
-        if isinstance(n_coefficients, int) and len(f.coefficient_names) == 0:
-            # use 'nparameters' only when parameternames is not given
-            if n_coefficients < -1:
-                raise ValueError("Number of parameters must be >= -1")
-            
-            setattr(f, "n_coefficients", n_coefficients)
-            
-        else:
-            if any("*" in p for p in f.coefficient_names):
-                setattr(f, "n_coefficients", -1)
-            else:
-                setattr(f, "n_coefficients", len(f.coefficient_names))
-        
-        # add other attributes from here **kwargs
-        for key, value in kwargs.items():
-            setattr(f, key, value)
-        
+        # add the title
+        setattr(f, "title", title)
         # enforce a "title" attribute
         f_title = getattr(f, "title", None)
         
         if not isinstance(f_title, str) or len(f_title.strip()) == 0:
             setattr(f, "title", f.__name__[0].upper() + f.__name__[1:])
+            
+        # add other attributes from here **kwargs
+        for key, value in kwargs.items():
+            setattr(f, key, value)
+        
             
         return f
     
@@ -341,7 +356,7 @@ def check_rise_decay_params(x:typing.Sequence[Real]|np.ndarray) -> int:
     return (nx-3) // 2
 
 # @timefunc # uncomment this for testing 😄
-@modelfunction(coefficient_names = ("α", "β0", "β1", "x0", "λ0", "λ1"),
+@modelfunction(coefficients = ("α", "β0", "β1", "x0", "λ0", "λ1"),
                title="Biexponential")
 def biexponential(x:typing.Union[np.ndarray, Real], 
                   α:Real|typing.Sequence[Real]|np.ndarray, /,
@@ -372,7 +387,7 @@ def biexponential(x:typing.Union[np.ndarray, Real],
     # return β0 * np.exp(λ0 * x) + β1 * np.exp(λ1 * x)
 
 # @timefunc # uncomment this for testing 😄
-@modelfunction(coefficient_names = ("α", "β", "x0", "λ*"),
+@modelfunction(coefficients = ("α", "β", "x0", "λ*"),
                title="ExponentialProduct")
 def exponential_product(x: np.ndarray | Real, 
                         α:typing.Sequence[Real] | Real | np.ndarray, /,
@@ -386,23 +401,17 @@ def exponential_product(x: np.ndarray | Real,
     y = α + β × Π  exp((x-x₀)λₖ) = α + β × exp((x-x₀)λᵪ)    , where:
                 ᵏ⁼⁰
 
+    • α is the additive bias (offset)
+    • β is the multiplicative bias (scale)
     • λ is a sequence of floats with the individual rate constants, one for
         each exponential factor
     • λᵪ is the "combined" decay time constant: Σλₖ
-    • 𝑛 is the number of exponentials in the product above and the length of the
-        λ sequence
+    • 𝑛 = len(λ) is the number of exponentials in the product
 
-    Although it can be used with a product of more than two exponentials, this 
-    is likely to introduce more errors/instability, and to make it harder for the
-    solver to converge on a solution.
-    
-    The function core.curvefitting.guess_init_two_exp_prod can be used to generate
-    initial coefficient values for a product of two exponentials.
-    
-The other parameters are as for exponential_decay_biased_shifted.
-    
-NOTE: For calling purposes, α can be supplied as a sequence of (α, β, x0), and any
-    arguments folowing it will be included in λ
+    NOTE: For a product of TWO exponentials, intial coefficients used for fitting 
+    can be generated analytically by the function guess_init_two_exp_prod(…) in 
+    the core.curvefitting module
+
     
 """
     x = check_independent_variable(x)
@@ -424,7 +433,7 @@ NOTE: For calling purposes, α can be supplied as a sequence of (α, β, x0), an
         return np.add(α, np.multiply(β, np.exp(xxλc)))
     
 # @timefunc # uncomment this for testing 😄
-@modelfunction(coefficient_names = ("α", "β", "x0", "λ"),
+@modelfunction(coefficients = ("α", "β", "x0", "λ"),
                 title="Exponential")
 def exponential(x:np.ndarray | Real, 
                 α:typing.Sequence[Real] | np.ndarray | Real, /,
@@ -454,7 +463,7 @@ def exponential(x:np.ndarray | Real,
     return np.add(α, np.multiply(β, np.exp(np.multiply(np.subtract(x,x0), λ))))
 
 # @timefunc # uncomment this for testing 😄
-@modelfunction(coefficient_names = ("α", "β", "x0", "λ"),
+@modelfunction(coefficients = ("α", "β", "x0", "λ"),
                title="BoundedExponentialRise")
 def bounded_exponential_rise(x:np.ndarray | Real, 
                              α:typing.Sequence[Real]|np.ndarray, 
@@ -497,7 +506,7 @@ values for α, β, and with appropriate value & sign of λ
     return np.add(α, np.multiply(β, np.subtract(1, np.exp(xxλ))))
     
 # @timefunc # uncomment this for testing 😄
-@modelfunction(coefficient_names = ("α", "β", "x0", "τ"),
+@modelfunction(coefficients = ("α", "β", "x0", "τ"),
                title="AlphaSynapse")
 def alphaSynapse(x:np.ndarray | Real, α:typing.Union[typing.Sequence[Real],np.ndarray,Real], /,
                   β:typing.Optional[Real] = None, x0:typing.Optional[Real] = None,
@@ -722,8 +731,7 @@ the mathematical Alpha Function (https://mathworld.wolfram.com/AlphaFunction.htm
     
     self = globals()["alphaSynapse"]
     # print(f"nvars:{self.nvars}")
-    # print(f"coeff  names: {self.coefficient_names}")
-    # print(f"n coeffs: {self.n_coefficients}")
+    # print(f"coeff  names: {self.coefficients}")
     
     # make sure x is a numpy array or a scalar
     x = check_independent_variable(x)
@@ -808,7 +816,7 @@ the mathematical Alpha Function (https://mathworld.wolfram.com/AlphaFunction.htm
             
         return y 
 
-@modelfunction(coefficient_names = ("i", "n", "b"),
+@modelfunction(coefficients = ("i", "n", "b"),
                title="NonStationaryFluctuationAnalysis")
 def nsfa(x:np.ndarray | Real, i:Real|pq.Quantity|typing.Sequence[typing.Union[Real, pq.Quantity]], /, 
          n:typing.Optional[typing.Union[Real, pq.Quantity]] = None, 
@@ -827,7 +835,7 @@ WARNING: do not pass quantities for the parameters, yet; just use floats
     
     # return x*i - x**2 / n + b
     
-@modelfunction(coefficient_names = ("α", "β", "x0", "τ1", "τ2"),
+@modelfunction(coefficients = ("α", "β", "x0", "τ1", "τ2"),
                title="ClementsBekkers97")
 def Clements_Bekkers_97(x:np.ndarray | Real,
                         α:typing.Union[Real, typing.Sequence[Real], np.ndarray], /, 
@@ -947,7 +955,7 @@ def get_CB_scale_for_unit_amplitude(τ_rise:Real, τ_decay:Real, positive:bool=T
 #     
 #     return np.divide(peak, yₘ)
 
-@modelfunction(coefficient_names = ("α", "β0", "x0_0", "τ0_0", "τ0_1", "β1", "x0_1", "τ1_0", "τ1_1"))
+@modelfunction(coefficients = ("α", "β0", "x0_0", "τ0_0", "τ0_1", "β1", "x0_1", "τ1_0", "τ1_1"))
 def CBsum(x:np.ndarray | Real, α:Real | typing.Sequence[Real], /, 
           β0:typing.Optional[Real]=None, x0_0:typing.Optional[Real]=None,
           τ0_0:typing.Optional[Real]=None, τ0_1:typing.Optional[Real]=None, 
@@ -990,7 +998,7 @@ def CBsum(x:np.ndarray | Real, α:Real | typing.Sequence[Real], /,
     
     return np.add(y0, y1)
     
-@modelfunction(coefficient_names = ("α", "x0", "ρ", "β*", "τ*"),
+@modelfunction(coefficients = ("α", "x0", "ρ", "β*", "τ*"),
                title="ExponentialRiseMultiDecays")
 def exponential_rise_multi_decays(x:np.ndarray|Real, 
                                   α:typing.Sequence[Real] | Real | np.ndarray, /,
@@ -1029,38 +1037,33 @@ def exponential_rise_multi_decays(x:np.ndarray|Real,
 
     ρ           = rising phase time constant; (unitys of "x")⁻¹
 
-    βτ          = sequence of β₀...βₙ₋₁, τ₀...τₙ₋₁
+    Var-positional parameter:
+    =========================
+    This is a sequence that packs together the coefficients βₖ and τₖ for the
+        decay component k:
+    βτ          = sequence of β₀, τ₀, β₁, τ₁, …, βₙ₋₁, τₙ₋₁
         where:
-        β₀...βₙ₋₁   = scale (multiplicative bias); dimensionless
-        τ₀...τₙ₋₁   = time constant; (units of "x")⁻¹
-        for each decay component
+        n is the number of decays
+        β₀...βₙ₋₁ are the scale (multiplicative bias); dimensionless
+        τ₀...τₙ₋₁ are the decay time constant; (units of "x")⁻¹
         
-    ATTENTION: ORDER OF MODEL PARAMETERS:
+    ATTENTION: ORDER OF MODEL COEFFICIENTS:
     
     For each decay component k there are two coefficients: 
-    βₖ (scale) and τₖ (decay constant). These MUST be given in the following
-    order:
+    βₖ (scale) and τₖ (decay constant). These MUST be passed in the order (β,τ):
     
-    β₀, τ₀, <β₁, τ₁, ...βₙ₋₁, τₙ₋₁>
+        β₀, τ₀, <β₁, τ₁, ...βₙ₋₁, τₙ₋₁>
     
-    Thus the entire coefficients are given in the following order:
+    Thus the entire coefficients are passed in the following order:
     
     α, x0, ρ, β₀, τ₀, <β₁, τ₁, ...βₙ₋₁, τₙ₋₁>
-    
-    i.e., decay components are given in order (scale₀, decay₀, scale₁, decay₁, etc)
-    followed by offset (o), rise time constant (r) and delay (x₀).
-    
-    For example, [β₀, τ₀, β₁, τ₁, α, ρ, x₀] specifies a transient signal 
-    with two decay components, (β₀, τ₀, β₁, τ₁)
-    
-    The exponential constants (ρ, τ₀, τ₁, ...) and the shift x₀ are taken
-    as having same physical units as x. The bias α is considered to have
-    the same units as the result, and the scale parameters β are unitless.
     
     Returns:
     ========
     
     y = the model curve
+    
+    When returnDecays is True, also returns:
     
     yd = a 2D numpoy array of scaled decay components (as columns); 
         
@@ -1086,19 +1089,13 @@ def exponential_rise_multi_decays(x:np.ndarray|Real,
             x0 = None
                 
     nβτ = len(βτ)
-    # print(f"nβτ = {nβτ}")
+
     ncoeffs = nα + nβτ
     assert (ncoeffs - 3) % 2 == 0, f"Unexpected number of coefficients ({ncoeffs}); must be 2n + 3 where n is the number of decay components"
         
-    # print(α, x0, ρ, *βτ)
     α, x0, ρ, *βτ = check_unpack_model_coeffs(ncoeffs, α, x0, ρ, *βτ)
     
-    # print(α, x0, ρ, *βτ)
-        
-    
     nDecays = len(βτ)//2
-    
-    # print(f"nDecays = {nDecays}")
     
     xx = np.subtract(x, x0)
     
@@ -1132,26 +1129,40 @@ def exponential_rise_multi_decays(x:np.ndarray|Real,
         else:
             return y
 
-@modelfunction(coefficient_names=("p*"),
-               title="CompoundTransients")
-def compound_transients(x:np.ndarray | Real, *coefficients:Real, 
-                                  returnDecays = False) -> np.ndarray | float:
-    r"""Compound transients signal -- linear sum of delayed single transient signals
-    Arguments:
-        x = 1D predictor vector
+@modelfunction(coefficients=("p*"),
+               title="CompoundTransient")
+def compound_transient(x:np.ndarray | Real,
+                       func:typing.Callable, 
+                       *coefficients:Real, 
+                       returnDecays = False) -> np.ndarray | float:
+    r"""Compound transients signal -- linear sum of delayed single transients
+    Parameters:
+        x       — 1D predictor vector
+        func    — model function generating a single transientl; this MIUST be one
+            of the model functions defined here (i.e. wrapped by model_function)
         
-        coefficients = coefficient sequences where each sequence is as defined for
-                    the `coefficients` argument of exponential_rise_multi_decays
+        coefficients = sequence of coefficients, in the order expected by 'func'
+            There must be 𝒏 × 𝒎 coefficients, where 𝒏 is the number of single
+            transients, and 𝒎 is the number of coefficients expected by 'func'.
         
     Returns:
         y   = realization of the compound signal model curve
         yc  = list of individual transient models within the compound signal
-        ycd = list of individual decay components
+    
+        When returnDecays is True, it also returns:
+        ycd = list of individual decay components for each single transient
         
-        NOTE: for a single-component EPSCaT, y and yc contain the same data
+        NOTE: for a single-component transient, y and yc contain the same data
         
     """
     #print("parameters", parameters)
+    
+    x = check_independent_variable(x)
+    
+    assert is_modelfunction(func), f"Single transient function {func.__name__} must be a model function"
+    
+    singlecoeffs = func.coefficients
+    
     
     if len(parameters) == 1 and isinstance(parameters[0], typing.Sequence):
         parameter = parameters[0]
@@ -1195,7 +1206,7 @@ def compound_transients(x:np.ndarray | Real, *coefficients:Real,
         else:
             return y, yc
         
-@modelfunction(coefficient_names=("γ", "ϵ", "χ", "σ"),
+@modelfunction(coefficients=("γ", "ϵ", "χ", "σ"),
                title="MarkwardtNilius88")
 def Markwardt_Nilius(x:np.ndarray|Real, γ:typing.Sequence[Real]|Real|np.ndarray, /,
                      ϵ:typing.Optional[Real]=None, 
@@ -1256,7 +1267,7 @@ def Markwardt_Nilius(x:np.ndarray|Real, γ:typing.Sequence[Real]|Real|np.ndarray
 #     
 #     pass
 
-@modelfunction(coefficient_names = ("a", "b", "c", "x0"),
+@modelfunction(coefficients = ("a", "b", "c", "x0"),
                title="TalbotSayer96")
 def Talbot_Sayer(x:typing.Union[Real, np.ndarray], a:typing.Union[Real, typing.Sequence[Real], np.ndarray], /,
                  b:typing.Optional[Real]=None, c:typing.Optional[Real]=None, 
@@ -1364,7 +1375,7 @@ def Talbot_Sayer(x:typing.Union[Real, np.ndarray], a:typing.Union[Real, typing.S
 
     return boltzmann * ghk # ↦ Current units (typically, pA)
 
-@modelfunction(coefficient_names = ("α*", "β*", "σ*", "δ"))
+@modelfunction(coefficients = ("α*", "β*", "σ*", "δ"))
 def gaussianSum1D(x:np.ndarray | Real, *args, **kwargs) -> np.ndarray | float:
     r""" Sum of shifted Gaussians in 1D.
     
@@ -1449,7 +1460,7 @@ def gaussianSum1D(x:np.ndarray | Real, *args, **kwargs) -> np.ndarray | float:
     
     return ret
     
-@modelfunction(coefficient_names=("τ", "x0"))
+@modelfunction(coefficients=("τ", "x0"))
 def Frank_Fuortes(x:np.ndarray | Real, 
                   τ:Real | typing.Sequence[Real], /,  
                   x0: typing.Optional[Real] = None) -> np.ndarray | float:
@@ -1488,7 +1499,7 @@ def Frank_Fuortes(x:np.ndarray | Real,
 
     return 1-np.exp(-(x-x0)/tau)
 
-@modelfunction(coefficient_names=("irh", "τ", "x0"))
+@modelfunction(coefficients=("irh", "τ", "x0"))
 def Frank_Fuortes2(x:np.ndarray | Real, irh:typing.Sequence[Real] | Real, /,
                    τ:typing.Optional[Real] = None, 
                    x0: typing.Optional[Real] = None) -> np.ndarray | float:
@@ -1514,7 +1525,7 @@ def Frank_Fuortes2(x:np.ndarray | Real, irh:typing.Sequence[Real] | Real, /,
     
     return (1-np.exp(-(x-x0)/τ)) / irh
 
-@modelfunction(coefficient_names=("x0", "κ"))
+@modelfunction(coefficients=("x0", "κ"))
 def Boltzmann(x:np.ndarray | Real, x0:typing.Sequence[Real] | Real, /,
               κ:typing.Optional[Real] = None,
               pos:bool=True) -> np.ndarray | float:
@@ -1613,7 +1624,7 @@ voltage dependent channels Naᵥ and Kᵥ in the Hodgkin-Huxley formalism.
     ξ /= κ
     return 1/(1+np.exp(ξ))
     
-@modelfunction(coefficient_names=("x0", ))
+@modelfunction(coefficients=("x0", ))
 def Heaviside(x:np.ndarray|Real, 
               x0:typing.Union[Real, pq.Quantity], /, 
               α:bool=True) -> np.ndarray | float:
@@ -1672,7 +1683,7 @@ def Heaviside(x:np.ndarray|Real,
     
     return y
     
-@modelfunction(coefficient_names=("x0",),
+@modelfunction(coefficients=("x0",),
                title="GenericHeaviside")
 def Heaviside2(x:np.ndarray|Real, 
               x0:typing.Union[Real, pq.Quantity], 
@@ -1729,7 +1740,7 @@ def Heaviside2(x:np.ndarray|Real,
     
     return y
     
-@modelfunction(coefficient_names = ("x0", "x1"),
+@modelfunction(coefficients = ("x0", "x1"),
                title="Boxcar")
 def boxcar(x:np.ndarray | Real, x0:typing.Union[typing.Sequence[Real], Real], /, 
            x1:typing.Optional[Real]=None, up_first:bool=True) -> np.ndarray | float:
@@ -1750,7 +1761,7 @@ Two successive Heaviside (step) functions of opposite directions"""
         # down then up
         return Heaviside(x, x0, ud[0]) * Heaviside(x, x1, ud[1])# if up_first else Heaviside(x, x1, False) + Heaviside(x, x0, True)
 
-@modelfunction(coefficient_names = ("x0", "x1"),
+@modelfunction(coefficients = ("x0", "x1"),
                title="GenericBoxcar")
 def boxcar2(x:np.ndarray | Real, x0:typing.Union[typing.Sequence[Real], Real, np.ndarray], /, 
             x1:typing.Optional[Real]=None,
@@ -1761,7 +1772,7 @@ Two successive Heaviside2 (step) functions (general versions) in opposite direct
     
     return Heaviside2(x, x0, level0, level1) + Heaviside2(x, x1, level1, level0)
 
-@modelfunction(coefficient_names = ("x0", "y0", "x1", "y1"))
+@modelfunction(coefficients = ("x0", "y0", "x1", "y1"))
 def ramp(x:typing.Union[Real, np.ndarray], x0:typing.Union[Real, np.ndarray, typing.Sequence[Real]], /, 
          y0:typing.Optional[Real]=None, x1:typing.Optional[Real]=None, y1:typing.Optional[Real]=None) -> np.ndarray | float:
     r"""Linear ramp from (x₀, y₀) to (x₁, y₁)
@@ -1847,7 +1858,7 @@ def get_initial_coefficient_values(func:typing.Callable) -> pd.DataFrame | None:
     if not is_modelfunction(func):
         raise TypeError(f"{func} is not a model function")
     
-    if len(func.coefficient_names) == 0:
+    if len(func.coefficients) == 0:
         if func.n_coefficients <= 0:
             print(f"The the model function {func.__name__} (entitled {func.title}) has variadic coefficients.\n")
             print(f"You need to supply these values manually")

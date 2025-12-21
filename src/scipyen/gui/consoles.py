@@ -53,6 +53,8 @@ from functools import partial, partialmethod
 from collections import OrderedDict
 from warnings import warn
 
+import matplotlib as mpl
+
 import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets)
 from qtpy.QtCore import (Signal, Slot)
@@ -344,7 +346,6 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
     """
     # NOTE: This is , ultimately, a qtconsole.frontend_widget.FrontentWidget
     def __init__(self, *args, **kw):
-        super(RichJupyterWidget, self).__init__(*args, **kw)
         self._console_pygment = ""
         self._console_colors = ""
         self.available_colors = ("nocolor", "linux", "lightbg")
@@ -362,10 +363,15 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
 #         self.kind = "plain"
 #         self.custom_page_control = QtWidgets.QPlainTextEdit()
         self.kind = "rich"
-        self.custom_page_control = QtWidgets.QTextEdit()
+        super(RichJupyterWidget, self).__init__(*args, **kw)
+        # self.custom_page_control = QtWidgets.QTextEdit() if self.kind=="rich" else QtWidgets.QPlainTextEdit()
+        # if self.kind == "rich":
+        #     self.custom_page_control.setAcceptRichText(False)
+        #     self.custom_page_control.setMouseTracking(True)
+            
         
-        if not hasattr(self, "_name_to_svg_map"):
-            self._name_to_svg_map = dict()
+        # if not hasattr(self, "_name_to_svg_map"):
+        #     self._name_to_svg_map = dict()
 
         ScipyenConfigurable.__init__(self)
         
@@ -456,12 +462,12 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
             # In PyQt6 (via qtpy) this throws 
             # argument 1 has unexpected type 'LayoutDirection'
             self._control.setLayoutDirection(value)
-            self.custom_page_control.setLayoutDirection(value) # doesn't work !?
+            # self.custom_page_control.setLayoutDirection(value) # doesn't work !?
         except:
             try:
                 val = QtCore.Qt.LayoutDirection(value.value)
                 self._control.setLayoutDirection(val)
-                self.custom_page_control.setLayoutDirection(val) # doesn't work !?
+                # self.custom_page_control.setLayoutDirection(val) # doesn't work !?
             except:
                 traceback.print_exc()
                 
@@ -3607,6 +3613,18 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         self.settings_menu.addAction(self.set_useAutomagicAction)
         self.addAction(self.set_useAutomagicAction)
         
+        self.set_useInlineMatplotlibAction = QAction("Use Inline Matplotlib Figures")
+        self.set_useInlineMatplotlibAction.setCheckable(True)
+        self.set_useInlineMatplotlibAction.setChecked(mpl.get_backend() == "inline")
+        self.set_useInlineMatplotlibAction.toggled.connect(self._slot_useInlineMatplotlib)
+        self.settings_menu.addAction(self.set_useInlineMatplotlibAction)
+        self.addAction(self.set_useInlineMatplotlibAction)
+        
+    
+    @Slot(bool)
+    def _slot_useInlineMatplotlib(self, val:bool):
+        self.mpl_inline = val
+    
     @Slot(bool)
     def _slot_useAutomagic(self, val:bool):
         self.shellAutomagic = val==True
@@ -3740,8 +3758,23 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         
     @property
     def ipkernel(self):
-        r"""The IPython kernel runnin in this console"""
+        r"""The IPython kernel running in this console"""
         return self.consoleWidget.ipkernel
+    
+    @property
+    def mpl_inline(self) -> bool:
+        return mpl.get_backend() == "inline"
+    
+    @markConfigurable("UseInlineMatplotlib")
+    @mpl_inline.setter
+    def mpl_inline(self, val:bool):
+        sigBlock = QtCore.QSignalBlocker(self.set_useInlineMatplotlibAction)
+        if val == True:
+            mpl.use("inline")
+        else:
+            mpl.use("qtagg")
+            
+        self.set_useInlineMatplotlibAction.setChecked(mpl.get_backend() == "inline")
         
     @property
     def stdout(self):

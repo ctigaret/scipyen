@@ -3203,6 +3203,7 @@ def reverse_mapping_lookup(x:dict, y:typing.Any) -> typing.Optional[typing.Union
     
 def library_for_module(x: str) -> str:
     from core.workspacefunctions import getMainScipyenWindow
+    # print(f"utilities.library_for_module({x})")
     mainWindow = getMainScipyenWindow()
     plugins_dir = None
     scipyen_dir = None
@@ -3301,7 +3302,7 @@ def summarize_object_properties(objname:str, obj:typing.Any, namespace="Internal
     objtype = type(obj)
     typename = objtype.__name__
     module_name = obj.__module__ if isinstance(obj, type) else objtype.__module__
-    module_library = library_for_module(module_name)
+    module_library = library_for_module(module_name) if isinstance(module_name, str) and len(module_name.strip()) else ""
         
     objcls = obj.__class__
     clsname = objcls.__name__
