@@ -363,15 +363,10 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
 #         self.kind = "plain"
 #         self.custom_page_control = QtWidgets.QPlainTextEdit()
         self.kind = "rich"
+        if not hasattr(self, "_name_to_svg_map"):
+            self._name_to_svg_map = dict()
         super(RichJupyterWidget, self).__init__(*args, **kw)
-        # self.custom_page_control = QtWidgets.QTextEdit() if self.kind=="rich" else QtWidgets.QPlainTextEdit()
-        # if self.kind == "rich":
-        #     self.custom_page_control.setAcceptRichText(False)
-        #     self.custom_page_control.setMouseTracking(True)
-            
         
-        # if not hasattr(self, "_name_to_svg_map"):
-        #     self._name_to_svg_map = dict()
 
         ScipyenConfigurable.__init__(self)
         
