@@ -6,7 +6,7 @@
 r"""Various string utilties"""
 
 from __future__ import print_function
-import errno, os
+import errno, os, io
 import locale
 import sys
 import typing
@@ -22,7 +22,10 @@ from numbers import (
 import numpy as np
 import quantities as pq
 
+import matplotlib.pyplot as plt
+
 import inflect
+import PIL # to convert latex strings to PIL Image
 
 InflectEngine = inflect.engine()
 
@@ -634,7 +637,38 @@ def isnumber(s: str) -> bool:
 
     except:
         return False
+    
+def latex_to_img(tex:str, fontsize:int = 30, darkmode:bool=True):
+    # print(f"fontsize = {fontsize}, darkmode={darkmode}")
+    if isinstance(fontsize, bool):
+        darkmode = fontsize
+        fontsize = 30
+    buf = io.BytesIO()
+    fig, ax  = plt.subplots()
+    if darkmode:
+        ax.patch.set_facecolor("black")
+        fig.patch.set_facecolor("black")
+    else:
+        ax.patch.set_facecolor("white")
+        fig.patch.set_facecolor("white")
+    textcolor="white" if darkmode else "black"
+    ax.text(0.5, 0.5, f'$${tex}$$', fontsize=30, ha='center', va='center', color=textcolor)
+    ax.axis('off')
+    plt.savefig(buf, format='png', bbox_inches="tight")
+    plt.close()
 
+    im = PIL.ImageOps.grayscale(PIL.Image.open(buf))
+    if not darkmode:
+        im = PIL.ImageOps.invert(im)
+    im = PIL.ImageOps.expand(im.crop(im.getbbox()), border=(2, 2, 2, 2), fill=(0))
+    if not darkmode:
+        im = PIL.ImageOps.invert(im)
+    im = im.convert("RGBA")
+    is_background = lambda item: all(v == 0 if darkmode else v==255 for v in item[0:3])
+    set_transparent = lambda x: tuple(x[0:3]) + (0,)
+    data = list(map(lambda item: set_transparent(item) if is_background(item) else item, im.getdata()))
+    im.putdata(data)
+    return im
 
 def parse_version_string(s: str):
     parts = s.split(".")

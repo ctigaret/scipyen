@@ -50,6 +50,7 @@ import typing
 import numbers
 import neo
 import numpy as np
+import sympy
 import quantities as pq
 import pandas as pd
 import dataclasses
@@ -267,6 +268,7 @@ https://wiki.python.org/moin/PythonDecoratorLibrary#Creating_decorator_with_opti
             
         # add other attributes from here **kwargs
         for key, value in kwargs.items():
+            # print(f"modelfunction key {key} ↦ value {value}")
             setattr(f, key, value)
         
             
@@ -507,7 +509,8 @@ values for α, β, and with appropriate value & sign of λ
     
 # @timefunc # uncomment this for testing 😄
 @modelfunction(coefficients = ("α", "β", "x0", "τ"),
-               title="AlphaSynapse")
+               title="AlphaSynapse",
+               expression=sympy.Symbol("alpha") + sympy.Symbol("beta") * (sympy.Symbol("x")-sympy.Symbol("x_0"))/sympy.Symbol("tau") * sympy.exp(-(sympy.Symbol("x")-sympy.Symbol("x_0") - sympy.Symbol("tau"))/sympy.Symbol("tau")))
 def alphaSynapse(x:np.ndarray | Real, α:typing.Union[typing.Sequence[Real],np.ndarray,Real], /,
                   β:typing.Optional[Real] = None, x0:typing.Optional[Real] = None,
                   τ:typing.Optional[Real] = None) -> np.ndarray | float:
