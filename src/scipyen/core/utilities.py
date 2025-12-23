@@ -30,6 +30,8 @@ import dataclasses
 from dataclasses import MISSING
 import numpy as np
 import sympy
+import PIL
+    
 import neo
 from neo.core.dataobject import DataObject as NeoDataObject
 from neo.core.container import Container as NeoContainer
@@ -83,7 +85,7 @@ else:
 #     from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg,)
 
 from core import prog
-from .prog import safewrapper, deprecation, with_doc, is_hashable
+from .prog import safewrapper, deprecation, with_doc, is_hashable, scipywarn
 
 from .strutils import get_int_sfx
 from .scipyen_quantities import unitsConvertible
@@ -5097,12 +5099,171 @@ def timelineDateString(year:int, month:int, day:int=0):
 def posixUTC(d:datetime.datetime) -> float:
     return (d - datetime.datetime(1970, 1, 1)) / datetime.timedelta(seconds=1)
 
-def expr_to_img(expr:sympy.Expr) -> QtGui.QPixmap:
+def sympy2pic(expr:sympy.Expr, backend:str="auto", darkmode:bool=True, outtype:str="pil", 
+              **kwargs):
+    r"""Generate a QPixmap from a sympy expression
+    Positional parameters:
+    ======================
+    expr: a sympy Expression
+    
+    Named parameters:
+    =================
+    backend: one of "auto", "dvipng", "matplotlib", "sympy" (all case-insensitive)
+        When 'backend' is "auto" (the default), the function will try IPython's 
+        latex_to_png (from IPython.lib.latextools package) using the IPython's
+        "dvipng" backend or, if this fails, the IPytyon's "matplotlib" backend. 
+
+        If the latter also fails, then the function will call sympy.preview(…), 
+        which here is the equivalent to the "sympy" backend.
+    
+        Any other backend will force the use of the corresponding option described
+        above.
+    
+    darkmode:bool Determines whether the foreground is white (when True) or 
+        black (when False)
+    
+        The default (True) creates pixmaps suitable for dark background GUI 
+        palette. 
+    
+        NOTE: The generated pixmaps have transparent background.
+    
+    outtype:strt, one of "pil" (default), "img" (QImage) or "pix" (QPixmap)
+    
+    Var-keyword parameters:
+    =======================
+    • used by the "sympy" backend (i.e. by sympy.preview(…) function):
+    
+    euler:bool — whether to use Euler fonts
+    fontsize:str|int — when a str is SHOULD be in typogrtaphic points (e.g "12pt")
+        which is the default
+    
+    • a subset of those used by the sympy.latex(…) function: 
+    
+    NOTE: the default value of the 'mode' keyword is set to "equation*" and 
+    should NOT be changed
+    
+    full_prec=False,
+    fold_frac_powers=False,
+    fold_func_brackets=False,
+    # fold_short_frac=None,
+    inv_trig_style='abbreviated',
+    itex=False,
+    ln_notation=False,
+    long_frac_ratio=None,
+    mat_delim='[',
+    mat_str=None,
+    mul_symbol=None,
+    order=None,
+    symbol_names={},
+    root_notation=True,
+    mat_symbol_style='plain',
+    imaginary_unit='i',
+    gothic_re_im=False,
+    decimal_separator='period',
+    perm_cyclic=True,
+    parenthesize_super=True,
+    min=None,
+    max=None,
+    diff_operator='d',
+    adjoint_style='dagger',
+    disable_split_super_sub=False,    
+"""
     from io import BytesIO
-    import PIL
-    sympy.preview(expr2, output='png', viewer='BytesIO', outputbuffer=obj)
-    im = PIL.Image.open(obj)
-    return im.toqpixmap()
+    from IPython.lib import latextools
+
+    if not isinstance(backend, str) or backend.lower() not in ("auto", "dvipng", "matplotlib", "sympy"):
+        backend="auto"
+        
+    color = "white" if darkmode else "black" 
+    euler = kwargs.pop("euler", True)
+    fontsize = kwargs.pop("fontsize", None)
+    itex = kwargs.pop("itex", None)
+    mode = kwargs.pop("mode", "equation*")
+    
+    # mode = kwargs.pop("mode", "inline")
+    # print(f"mode = {mode}")
+    # if not isinstance(mode, str) or mode == "plain":
+    #     kwargs["mode"] = "inline"
+        
+    # print(f"kwargs = {kwargs}")
+    
+    def _sympypng_(ex, darkmode, euler, fontsize, **kw):
+        print(f"kw = {kw}")
+        png = BytesIO()
+        sympy.preview(expr, output='png', viewer='BytesIO', outputbuffer=png, euler=euler, fontsize=fontsize, mode="equation*", itex=itex, **kw)
+        im = PIL.Image.open(BytesIO(png))
+        if outtype.lower() == "pix":
+            return im.toqpixmap()
+        elif outtype.lower() == "img":
+            return im.toqimage()
+        else:
+            return im
+#         ret = im.toqpixmap()
+#         if darkmode:
+#             img = ret.toImage()
+#             img.invertPixels()
+#             ret = QtGui.QPixmap.fromImage(img)
+#             
+#         return ret
+        
+    if backend.lower()=="auto":
+        png = latextools.latex_to_png(sympy.latex(expr, mode="equation*", itex=itex, **kwargs), backend="dvipng", wrap=False, color=color)
+        if isinstance(png, bytes):
+            im = PIL.Image.open(BytesIO(png))
+            if outtype.lower() == "pix":
+                return im.toqpixmap()
+            elif outtype.lower() == "img":
+                return im.toqimage()
+            else:
+                return im
+            
+        else:
+            scipywarn("The 'dvipng' backend failed; trying 'matplotlib'")
+            png = latextools.latex_to_png(sympy.latex(expr, mode="equation*", itex=itex, **kwargs), backend="matplotlib", wrap=False, color=color)
+            if isinstance(png, bytes):
+                im = PIL.Image.open(BytesIO(png))
+                if outtype.lower() == "pix":
+                    return im.toqpixmap()
+                elif outtype.lower() == "img":
+                    return im.toqimage()
+                else:
+                    return im
+            else:
+                scipywarn("The 'matplotlib' backend failed; trying 'sympy'")
+                ret = _sympypng_(expr, darkmode, euler, fontsize, **kwargs)
+                    
+    elif backend.lower() == "dvipng":
+        png = latextools.latex_to_png(sympy.latex(expr, mode="equation*", itex=itex, **kwargs), backend="dvipng", wrap=False, color=color)
+        assert isinstance(png, bytes), f"The {backend} backend failed"
+        im = PIL.Image.open(BytesIO(png))
+        if outtype.lower() == "pix":
+            return im.toqpixmap()
+        elif outtype.lower() == "img":
+            return im.toqimage()
+        else:
+            return im
+        # ret = im.toqpixmap()
+        
+    elif backend.lower() == "matplotlib":
+        png = latextools.latex_to_png(sympy.latex(expr, mode="equation*", itex=itex, **kwargs), backend="matplotlib", wrap=False, color=color)
+        assert isinstance(png, bytes), f"The {backend} backend failed"
+        im = PIL.Image.open(BytesIO(png))
+        if outtype.lower() == "pix":
+            return im.toqpixmap()
+        elif outtype.lower() == "img":
+            return im.toqimage()
+        else:
+            return im
+        # ret = im.toqpixmap()
+        
+    elif backend.lower() == "sympy":
+        return _sympypng_(expr, darkmode, euler, fontsize, **kwargs)
+            
+    else:
+        raise ValueError(f"Unknown/unsupported backend {backend}")
+    
+    # return ret
+                    
     
 
             
