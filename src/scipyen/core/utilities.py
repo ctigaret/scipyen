@@ -29,6 +29,7 @@ from collections import deque, OrderedDict
 import dataclasses
 from dataclasses import MISSING
 import numpy as np
+import sympy
 import neo
 from neo.core.dataobject import DataObject as NeoDataObject
 from neo.core.container import Container as NeoContainer
@@ -5096,5 +5097,12 @@ def timelineDateString(year:int, month:int, day:int=0):
 def posixUTC(d:datetime.datetime) -> float:
     return (d - datetime.datetime(1970, 1, 1)) / datetime.timedelta(seconds=1)
 
+def expr_to_img(expr:sympy.Expr) -> QtGui.QPixmap:
+    from io import BytesIO
+    import PIL
+    sympy.preview(expr2, output='png', viewer='BytesIO', outputbuffer=obj)
+    im = PIL.Image.open(obj)
+    return im.toqpixmap()
+    
 
             

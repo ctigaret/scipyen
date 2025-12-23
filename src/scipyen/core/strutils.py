@@ -638,7 +638,7 @@ def isnumber(s: str) -> bool:
     except:
         return False
     
-def latex_to_img(tex:str, fontsize:int = 30, darkmode:bool=True):
+def latex_to_img_(tex:str, fontsize:int = 30, darkmode:bool=True):
     # print(f"fontsize = {fontsize}, darkmode={darkmode}")
     if isinstance(fontsize, bool):
         darkmode = fontsize
