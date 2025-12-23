@@ -10,7 +10,7 @@ channels:
   - conda-forge
   - nodefaults
 dependencies:
-  - python>=3.11
+  - python>=3.13
   - pip
   - sphinx
   - isodate
@@ -29,12 +29,7 @@ dependencies:
   - matplotlib
   - more-itertools
   - ipyparallel
-  # - conda-forge::dbus-python # linux, osx
   - conda-forge::pywin32
-  # - conda-forge::pyqt6
-  # - conda-forge::pyqt6-sip
-  # - conda-forge::pyqt6-charts
-  # - conda-forge::pyqt6-webengine
   - conda-forge::jupyter_cms
   - conda-forge::jupyter_qtconsole_colorschemes
   - conda-forge::biopython
@@ -70,11 +65,7 @@ dependencies:
   - libNeuroML
   - matlab_kernel
   - octave_kernel
-  # - python-magic
   - pyinstaller
-  # - openmath
-  # - openexpressions
-  # - scscp
   - pip:
       - openmath
       - openexpressions
