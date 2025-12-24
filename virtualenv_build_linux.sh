@@ -1405,15 +1405,6 @@ for i in "$@" ; do
         build_pyside6=0
         shift
         ;;
-#         --build_pyqt6)
-#         with_pyqt6=1
-#         build_pyqt6=1
-#         with_pyqt5=0
-#         build_pyqt5=0 
-#         with_pyside6=0
-#         build_pyside6=0
-#         shift
-#         ;;
         --with_coreneuron)
         use_core_neuron=1
         shift
@@ -1442,59 +1433,6 @@ for i in "$@" ; do
         reinstall="${i#*=}"
         shift
         case $reinstall in
-#             pyqt5)
-#             reinstall_pyqt5=1
-#             build_pyqt5=0
-#             reinstall_pyqt6=0
-#             build_pyqt6=0
-#             reinstall_pyside6=0
-#             build_pyside6=0
-#             ;;
-#             build_pyqt5)
-#             reinstall_pyqt5=1
-#             build_pyqt5=1
-#             reinstall_pyqt6=0
-#             build_pyqt6=0
-#             reinstall_pyside6=0
-#             build_pyside6=0
-#             ;;
-#             pyqt6)
-#             reinstall_pyqt6=1
-#             build_pyqt6=0
-#             ;;
-#             build_pyqt6)
-#             reinstall_pyqt5=0
-#             build_pyqt5=0
-#             reinstall_pyqt6=1
-#             build_pyqt6=1
-#             reinstall_pyside6=0
-#             build_pyside6=0
-#             ;;
-#             pyside6)
-#             reinstall_pyqt5=0
-#             build_pyqt5=0
-#             reinstall_pyqt6=0
-#             build_pyqt6=0
-#             reinstall_pyside6=1
-#             build_pyside6=0
-#             ;;
-#             build_pyside6)
-#             reinstall_pyqt5=0
-#             build_pyqt5=0
-#             reinstall_pyqt6=0
-#             build_pyqt6=0
-#             reinstall_pyside6=1
-#             build_pyside6=1
-#             ;;
-#             vigra)
-#             reinstall_vigra=1
-#             ;;
-#             VIGRA)
-#             reinstall_vigra=1
-#             ;;
-#             Vigra)
-#             reinstall_vigra=1
-#             ;;
             neuron)
             reinstall_neuron=1
             ;;    
@@ -1582,13 +1520,6 @@ elif [[ $with_pyqt5 -eq 1 ]] ; then
         virtual_env_pfx=${virtual_env_pfx}_pyqt5_pypi
     fi
 fi
-# elif [[ $with_pyqt6 -eq 1 ]] ; then
-#     if [[ $build_pyqt6 -eq 1 ]] ; then
-#         virtual_env_pfx=${virtual_env_pfx}_pyqt6_build
-#     else
-#         virtual_env_pfx=${virtual_env_pfx}_pyqt6_pypi
-#     fi
-# fi
 
 if ! [ -v VIRTUAL_ENV ] ; then
     virtual_env=${install_dir}/${virtual_env_pfx}
@@ -1606,7 +1537,6 @@ if [[ -z ${using_python} ]]; then
 using_python=${python_exec}
 fi
 # makes a virtual environment and activates it
-# if ! [ -v ${VIRTUAL_ENV} ] ; then
 if [[ -z ${VIRTUAL_ENV} ]] ; then
 # NOTE: 2023-06-25 20:57:31 
 # these two MUST be run
@@ -1627,8 +1557,6 @@ if [[ -z ${VIRTUAL_ENV} ]] ; then
     echo -e "Not in an active environment! Goodbye!\n"
     exit 1
 fi
-
-# exit
 
 if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
     echo -e "Checking for, or making 'src' directory inside $VIRTUAL_ENV ...\n"

@@ -5099,8 +5099,9 @@ def timelineDateString(year:int, month:int, day:int=0):
 def posixUTC(d:datetime.datetime) -> float:
     return (d - datetime.datetime(1970, 1, 1)) / datetime.timedelta(seconds=1)
 
-def sympy2pic(expr:sympy.Expr, backend:str="auto", darkmode:bool=True, outtype:str="pil", 
-              **kwargs):
+def sympy2pic(expr:sympy.Expr, backend:str="auto", outtype:str="pix", 
+              darkmode:typing.Optional[bool]=None, 
+              **kwargs) -> typing.Optional[typing.Union[PIL.Image, QtGui.QPixmap, QtGui.QImage]]:
     r"""Generate a QPixmap from a sympy expression
     Positional parameters:
     ======================
@@ -5170,9 +5171,14 @@ def sympy2pic(expr:sympy.Expr, backend:str="auto", darkmode:bool=True, outtype:s
 """
     from io import BytesIO
     from IPython.lib import latextools
-
+    
     if not isinstance(backend, str) or backend.lower() not in ("auto", "dvipng", "matplotlib", "sympy"):
         backend="auto"
+        
+    if not isinstance(darkmode, bool):
+        windowColor = QtWidgets.QApplication.palette().color(QtGui.QPalette.Window)
+        _,_,v,_ = windowColor.getHsv()
+        darkmode = v<=128
         
     color = "white" if darkmode else "black" 
     euler = kwargs.pop("euler", True)
@@ -5189,80 +5195,95 @@ def sympy2pic(expr:sympy.Expr, backend:str="auto", darkmode:bool=True, outtype:s
     
     def _sympypng_(ex, darkmode, euler, fontsize, **kw):
         print(f"kw = {kw}")
-        png = BytesIO()
-        sympy.preview(expr, output='png', viewer='BytesIO', outputbuffer=png, euler=euler, fontsize=fontsize, mode="equation*", itex=itex, **kw)
-        im = PIL.Image.open(BytesIO(png))
-        if outtype.lower() == "pix":
-            return im.toqpixmap()
-        elif outtype.lower() == "img":
-            return im.toqimage()
-        else:
-            return im
-#         ret = im.toqpixmap()
-#         if darkmode:
-#             img = ret.toImage()
-#             img.invertPixels()
-#             ret = QtGui.QPixmap.fromImage(img)
-#             
-#         return ret
+        # kw["mode"] = mode
+        dataio = BytesIO()
+        sympy.preview(expr, output='png', viewer='BytesIO', outputbuffer=dataio, euler=euler, fontsize=fontsize, itex=itex, **kw)
+        data = dataio.getvalue()
+        return data
         
     if backend.lower()=="auto":
-        png = latextools.latex_to_png(sympy.latex(expr, mode="equation*", itex=itex, **kwargs), backend="dvipng", wrap=False, color=color)
-        if isinstance(png, bytes):
-            im = PIL.Image.open(BytesIO(png))
-            if outtype.lower() == "pix":
-                return im.toqpixmap()
-            elif outtype.lower() == "img":
-                return im.toqimage()
-            else:
-                return im
-            
-        else:
-            scipywarn("The 'dvipng' backend failed; trying 'matplotlib'")
-            png = latextools.latex_to_png(sympy.latex(expr, mode="equation*", itex=itex, **kwargs), backend="matplotlib", wrap=False, color=color)
-            if isinstance(png, bytes):
-                im = PIL.Image.open(BytesIO(png))
-                if outtype.lower() == "pix":
-                    return im.toqpixmap()
-                elif outtype.lower() == "img":
-                    return im.toqimage()
-                else:
-                    return im
-            else:
-                scipywarn("The 'matplotlib' backend failed; trying 'sympy'")
-                ret = _sympypng_(expr, darkmode, euler, fontsize, **kwargs)
+        # scipywarn("Trying 'dvipng' backend")
+        data = latextools.latex_to_png(sympy.latex(expr, mode=mode, itex=itex, **kwargs), backend="dvipng", wrap=False, color=color)
+        if not isinstance(data, bytes):
+            # scipywarn("The 'dvipng' backend failed; trying 'matplotlib'")
+            data = latextools.latex_to_png(sympy.latex(expr, mode=mode, itex=itex, **kwargs), backend="matplotlib", wrap=False, color=color)
+            if not isinstance(data, bytes):
+                # scipywarn("The 'matplotlib' backend failed; trying 'sympy'")
+                data = _sympypng_(expr, darkmode, euler, fontsize, **kwargs)
+                if not isinstance(data, bytes):
+                    assert isinstance(data, bytes), "All available backends have failed; check the parameters to this function call"
+                    return
+#                     
+#                 
+#         if isinstance(png, bytes):
+#             im = PIL.Image.open(BytesIO(png))
+#             if outtype.lower() == "pix":
+#                 return im.toqpixmap()
+#             elif outtype.lower() == "img":
+#                 return im.toqimage()
+#             else:
+#                 return im
+#             
+#         else:
+#             scipywarn("The 'dvipng' backend failed; trying 'matplotlib'")
+#             png = latextools.latex_to_png(sympy.latex(expr, mode=mode, itex=itex, **kwargs), backend="matplotlib", wrap=False, color=color)
+#             if isinstance(png, bytes):
+#                 im = PIL.Image.open(BytesIO(png))
+#                 if outtype.lower() == "pix":
+#                     return im.toqpixmap()
+#                 elif outtype.lower() == "img":
+#                     return im.toqimage()
+#                 else:
+#                     return im
+#             else:
+#                 scipywarn("The 'matplotlib' backend failed; trying 'sympy'")
+#                 ret = _sympypng_(expr, darkmode, euler, fontsize, **kwargs)
                     
     elif backend.lower() == "dvipng":
-        png = latextools.latex_to_png(sympy.latex(expr, mode="equation*", itex=itex, **kwargs), backend="dvipng", wrap=False, color=color)
-        assert isinstance(png, bytes), f"The {backend} backend failed"
-        im = PIL.Image.open(BytesIO(png))
-        if outtype.lower() == "pix":
-            return im.toqpixmap()
-        elif outtype.lower() == "img":
-            return im.toqimage()
-        else:
-            return im
+        data = latextools.latex_to_png(sympy.latex(expr, mode=mode, itex=itex, **kwargs), backend="dvipng", wrap=False, color=color)
+        assert isinstance(data, bytes), f"The {backend} backend failed"
+        # im = PIL.Image.open(BytesIO(png))
+        # if outtype.lower() == "pix":
+        #     return im.toqpixmap()
+        # elif outtype.lower() == "img":
+        #     return im.toqimage()
+        # else:
+        #     return im
         # ret = im.toqpixmap()
         
     elif backend.lower() == "matplotlib":
-        png = latextools.latex_to_png(sympy.latex(expr, mode="equation*", itex=itex, **kwargs), backend="matplotlib", wrap=False, color=color)
-        assert isinstance(png, bytes), f"The {backend} backend failed"
-        im = PIL.Image.open(BytesIO(png))
-        if outtype.lower() == "pix":
-            return im.toqpixmap()
-        elif outtype.lower() == "img":
-            return im.toqimage()
-        else:
-            return im
+        data = latextools.latex_to_png(sympy.latex(expr, mode=mode, itex=itex, **kwargs), backend="matplotlib", wrap=False, color=color)
+        assert isinstance(data, bytes), f"The {backend} backend failed"
+        # im = PIL.Image.open(BytesIO(png))
+        # if outtype.lower() == "pix":
+        #     return im.toqpixmap()
+        # elif outtype.lower() == "img":
+        #     return im.toqimage()
+        # else:
+        #     return im
         # ret = im.toqpixmap()
         
     elif backend.lower() == "sympy":
-        return _sympypng_(expr, darkmode, euler, fontsize, **kwargs)
+        data = _sympypng_(expr, darkmode, euler, fontsize, **kwargs)
+        assert isinstance(data, bytes), f"The {backend} backend failed"
             
     else:
         raise ValueError(f"Unknown/unsupported backend {backend}")
     
-    # return ret
+    if outtype.lower() == "pil":
+        return PIL.Image.open(BytesIO(data))
+    else:
+        ret = QtGui.QPixmap()
+        ok = ret.loadFromData(QtCore.QByteArray(data))
+        if not ok:
+            scipywarn("Cannot convert data to a pixmap")
+            return
+        if outtype.lower()=="img":
+            return ret.toImage()
+        
+        else:
+            return ret
+        
                     
     
 

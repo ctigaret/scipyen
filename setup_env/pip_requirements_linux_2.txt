@@ -39,18 +39,8 @@
 # accommodate installation of PyQt6
 #
 # 2025-03-13 08:44:24
-# breakdown in two parts for building pyqt5 locally
+# breakdown in two parts for building pyqt5/6 locally
 
-# pywayland ; sys_platform == "linux"
-# required to build PyQt5/6 locally using the host's Qt stack
-# required to build PyQt5 locally using the host's Qt stack
-# PyQt5 ; sys_platform == 'win32'         # on Windows run 'pip install PyQt5'; on Unix must build  - see INSTALL file
-# required to build PyQt6 locally using the host's Qt stack
-# Pyqt6-sip ; sys_platform == 'linux'
-# PyQt6 ; sys_platform == 'win32'         # on Windows run 'pip install PyQt5'; on Unix must build  - see INSTALL file
-#pyside2
-#pyside6
-# qdarkstyle ; sys_platform == 'win32'
 docrepr
 setuptools-scm
 qasync
@@ -185,7 +175,6 @@ pylmeasure      # optional
 pymongo
 pyneuroml       # optional
 pyparsing
-#pyqt5-tools ; sys_platform == 'win32'
 pyqtgraph
 pyserial
 pyudev ; sys_platform == 'linux'
@@ -215,13 +204,9 @@ scipy<1.16.0
 seaborn
 shapely
 scscp
-# slytherin
 smart-open
 smmap
 sniffio
-# spacy
-# spacy-legacy
-# spacy-loggers
 sphinx          
 sphinx_rtd_theme
 srsly
@@ -234,7 +219,6 @@ tenacity
 termcolor
 terminado
 testpath
-# thinc
 tiffile
 termcolor
 termcolor2
@@ -252,6 +236,7 @@ widgetsnbextension
 winshell ; sys_platform == 'win32'
 xarray
 xyzservices
+ziamath
 zipp
 
 # NOTE: since 2024-11-19 22:04:24
@@ -265,7 +250,6 @@ swick
 ### NOTE: thiese below will also install:
 ### brainglobe-atlasapi, brainglobe-space, brainglobe-utils, 
 brainglobe-workflows
-### cellfinder, cellfinder[napari], morphapi
 napari[all]
 brainglobe
 brainrender 

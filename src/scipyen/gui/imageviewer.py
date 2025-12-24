@@ -61,6 +61,8 @@ from traitlets import Bunch
 import numpy as np
 import quantities as pq
 import neo
+import PIL
+PILImage = PIL.Image.Image
 from core.vigra_patches import vigra
 from pandas import NA
 #from core.vigra_patches import vigra.pyqt 
@@ -962,7 +964,7 @@ class AxesCalibrationDialog2(QDialog, Ui_AxesCalibrationDialog2):
         
 class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     r"""Scipyen's image viewer.
-    Use with VIGRA arrays, numpy arrays, QImage & QPixmap objects.
+    Use with VIGRA arrays, numpy arrays, PILImage, QImage & QPixmap objects.
  """
     closeMe                 = Signal(int)
     
@@ -980,6 +982,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                         np.ndarray:0, 
                         QtGui.QImage:99, 
                         QtGui.QPixmap:99, 
+                        PILImage:99,
                         tuple:0, 
                         list:0}
     
@@ -2698,10 +2701,17 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         elif isinstance(self._data_, (QtGui.QImage, QtGui.QPixmap)):
             # NOTE 2018-09-14 11:45:13
             # TODO/FIXME adapt code to select channels from a Qimage is not allGray() or not isGrayscale()
+            
             self.viewerWidget.view(self._data_)
             
             w = self._data_.width()
             h = self._data_.height()
+            shapeTxt = "W x H: %d x %d " % (w, h)
+            
+        elif isinstance(self._data_, PILImage):
+            self.viewerWidget.view(self._data_.toqpixmap())
+            w = self._data_.width
+            h = self._data_.height
             shapeTxt = "W x H: %d x %d " % (w, h)
             
         elif isinstance(self._data_, np.ndarray):
@@ -3413,32 +3423,37 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                 crstxt = ""
 
             if isinstance(self._data_, QtGui.QImage):
-                #val = self._data_.pixel(x,y)
-                if self._data_.isGrayscale():
-                    val = self._data_.pixel(x,y)
-                    
+                if x < 0 or x >= w or y < 0 or y >= h:
+                    val = ""
                 else:
-                    pval = self._data_.pixelColor(x,y)
-                    val = "R: %d, G: %d, B: %d, A: %d" % (pval.red(), pval.green(), pval.blue(), pval.alpha())
-                    
+                    if self._data_.isGrayscale():
+                        val = self._data_.pixel(x,y)
+                        
+                    else:
+                        pval = self._data_.pixelColor(x,y)
+                        val = "R: %d, G: %d, B: %d, A: %d" % (pval.red(), pval.green(), pval.blue(), pval.alpha())
                     
                 msg = "%s<X %d%s, Y %d%s> : %s" % \
                     (crstxt, x, swx, y, swy, val)
 
             elif isinstance(self._data_, QtGui.QPixmap):
                 pix = self._data_.toImage()
-                if pix.isGrayscale():
-                    val = pix.pixel(x,y)
-                    
+                if x < 0 or x >= w or y < 0 or y >= h:
+                    val = ""
                 else:
-                    pval = pix.pixelColor(x,y)
-                    val = "R: %d, G: %d, B: %d, A: %d" % (pval.red(), pval.green(), pval.blue(), pval.alpha())
+                    if pix.isGrayscale():
+                        val = pix.pixel(x,y)
+                        
+                    else:
+                        pval = pix.pixelColor(x,y)
+                        val = "R: %d, G: %d, B: %d, A: %d" % (pval.red(), pval.green(), pval.blue(), pval.alpha())
                 
                 msg = "%s<X %d%s, Y %d%s> : %s" % \
                     (crstxt, x, swx, y, swy, val)
 
             else:
                 val = None
+                msg = ""
 
             self.statusBar().showMessage(msg)
             
@@ -3833,6 +3848,17 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                     raise ValueError(f"For QImage or QPixmap, arrayAxes — if specified — must have exactly two elements, not {len(arrayAxes)}")
             else:
                 arrayAxes = vigra.VigraArray.defaultAxistags(2, noChannels=True)
+            self._axes_calibration_ = AxesCalibration(arrayAxes)
+            self.frameAxis = None
+            self.displayFrame()
+            
+        elif isinstance(data, PILImage):
+            # TODO: 2025-12-24 15:05:24
+            # chgeckout channel organization of the PIL image
+            self._number_of_frames_ = 1
+            self.frameIndex = range(self._number_of_frames_)
+            self._data_  = data
+            arrayAxes = vigra.VigraArray.defaultAxistags(2, noChannels=True)
             self._axes_calibration_ = AxesCalibration(arrayAxes)
             self.frameAxis = None
             self.displayFrame()
