@@ -57,6 +57,7 @@ import dataclasses
 from core import scipyen_quantities as scq
 from core.datasignal import DataSignal
 from core.prog import (scipywarn, signature_as_dict, decorator, timefunc)
+from core import utilities
 
 Real: typing.TypeAlias = typing.Union[int, float, np.int64, np.float64]
 Complex: typing.TypeAlias = typing.Union[complex, np.complex128]

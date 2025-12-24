@@ -31,7 +31,7 @@ from dataclasses import MISSING
 import numpy as np
 import sympy
 import PIL
-    
+PILImage = PIL.Image.Image
 import neo
 from neo.core.dataobject import DataObject as NeoDataObject
 from neo.core.container import Container as NeoContainer
@@ -3549,6 +3549,12 @@ def summarize_object_properties(objname:str, obj:typing.Any, namespace="Internal
             memsz = str(getsizeof(obj))
             memsztip = "memory size: "
             
+        elif isinstance(obj, PILImage):
+            sz = str(obj.size)
+            sizetip = "size: "
+            shp = f"({obj.width}, {obj.height})"
+            shapetip = "shape: "
+            
         elif isinstance(obj, np.ndarray):
             dtype = obj.dtype
             dtypestr = str(obj.dtype)
@@ -5100,9 +5106,10 @@ def posixUTC(d:datetime.datetime) -> float:
     return (d - datetime.datetime(1970, 1, 1)) / datetime.timedelta(seconds=1)
 
 def sympy2pic(expr:sympy.Expr, backend:str="auto", outtype:str="pix", 
+              parser:str="sympy",
               darkmode:typing.Optional[bool]=None, 
               **kwargs) -> typing.Optional[typing.Union[PIL.Image, QtGui.QPixmap, QtGui.QImage]]:
-    r"""Generate a QPixmap from a sympy expression
+    r"""Generates a latex rendering of a sympy expression, as a bitmap image.
     Positional parameters:
     ======================
     expr: a sympy Expression
@@ -5119,6 +5126,13 @@ def sympy2pic(expr:sympy.Expr, backend:str="auto", outtype:str="pix",
     
         Any other backend will force the use of the corresponding option described
         above.
+    
+    parser: one of "sympy" or "shell"
+        Specifies the parser of the expression that generates a latex string.
+        "sympy" uses the sympy.latex(…) function to generate a latex string;
+        "shell" uses the Scipyen console shell's default formatter — WARNING I 
+        cannot get the shell formatter to play nice with "matplotlib" backend
+        (see below)
     
     darkmode:bool Determines whether the foreground is white (when True) or 
         black (when False)
@@ -5153,6 +5167,7 @@ def sympy2pic(expr:sympy.Expr, backend:str="auto", outtype:str="pix",
     long_frac_ratio=None,
     mat_delim='[',
     mat_str=None,
+    mode='inline',
     mul_symbol=None,
     order=None,
     symbol_names={},
@@ -5168,12 +5183,57 @@ def sympy2pic(expr:sympy.Expr, backend:str="auto", outtype:str="pix",
     diff_operator='d',
     adjoint_style='dagger',
     disable_split_super_sub=False,    
+    
+    WARNING about backends
+    ======================
+    The "dvipng" and "sympy" backends rely on the existence of a tex/latex
+    software stack on your platform, which MUST include a 'dvipng' utility.
+    
+    The "matplotlib" backend uses 'matplotlib.mathtext', unless 
+    matplotlib.rcParams["text.usetex"] is True; however, 'mathtext' does NOT 
+    play very nice with a mode other than 'inline'.
+    Setting matplotlib.rcParams["text.usetex"] to True relies the existence of a 
+    tex/latex software stack on your platform.
+    
+    I am having trouble with mathtext failing to parse the output from the shell
+    parser. 
+    
+    The "dvipng" and "matplotlib" backends rely on IPytyhon.lib.latextools
+    (which in turn MAY require on a tex/latex software stack, as above).
+    
+    Therefore, in a nutshell:
+    -------------------------
+    • if tex/latex and 'dvipng' are available, you can specify 'dvipng' or 
+        'sympy' as backend, which are the most flexible; for 'dvipng' backend
+        you can use 'shell' parser
+    
+    • if tex/latex and 'dvipng' are NOT available, you can only specify 
+        'matplotlib' as backend, and you MUST pass 'sympy' for parser and 'inline'
+        for mode.
+    
+    • when not sure, see bottomline below
+    
+    • the "sympy" backend uses the "sympy" parser by default (hence "parser" 
+        parameter has no effect)
+        
+    • use "sympy" parser by default; use the "shell" parser only with the "dvipng"
+     backend for now.
+    
+    • bottomline: safest option is to pass "auto" as backend, "sympy" as parser
+        and mode="inline"
+    
 """
     from io import BytesIO
     from IPython.lib import latextools
+    from ipykernel.inprocess.ipkernel import InProcessInteractiveShell
     
     if not isinstance(backend, str) or backend.lower() not in ("auto", "dvipng", "matplotlib", "sympy"):
-        backend="auto"
+        backend = "auto"
+    else:
+        backend = backend.lower()
+        
+    if parser not in ("sympy", "shell"):
+        parser = "sympy"
         
     if not isinstance(darkmode, bool):
         windowColor = QtWidgets.QApplication.palette().color(QtGui.QPalette.Window)
@@ -5194,76 +5254,56 @@ def sympy2pic(expr:sympy.Expr, backend:str="auto", outtype:str="pix",
     # print(f"kwargs = {kwargs}")
     
     def _sympypng_(ex, darkmode, euler, fontsize, **kw):
-        print(f"kw = {kw}")
+        # print(f"kw = {kw}")
         # kw["mode"] = mode
         dataio = BytesIO()
         sympy.preview(expr, output='png', viewer='BytesIO', outputbuffer=dataio, euler=euler, fontsize=fontsize, itex=itex, **kw)
         data = dataio.getvalue()
         return data
         
-    if backend.lower()=="auto":
+    def _shell_parse_(sh, ex):
+        # print(f"sh = {sh}")
+        return sh.display_formatter.format(ex, include="text/latex")[0]["text/latex"].replace("$", "")
+        
+    if parser == "sympy":
+        if backend == "matplotlib":
+            parse = functools.partial(sympy.latex, mode="inline", itex=itex, **kwargs)
+        else:
+            parse = functools.partial(sympy.latex, mode=mode, itex=itex, **kwargs)
+            
+    else:
+        windows = list(filter(lambda w: "ScipyenWindow" in type(w).__name__, QtWidgets.QApplication.topLevelWidgets()))
+        assert len(windows)==1, "Not a Scipyen session"
+        mainWindow = windows[0]
+        shell = mainWindow.shell
+        assert isinstance(shell, InProcessInteractiveShell), "Not using an in-process interactive shell"
+        parse = functools.partial(_shell_parse_, shell)
+            
+    if backend == "auto":
         # scipywarn("Trying 'dvipng' backend")
-        data = latextools.latex_to_png(sympy.latex(expr, mode=mode, itex=itex, **kwargs), backend="dvipng", wrap=False, color=color)
+        data = latextools.latex_to_png(parse(expr), backend="dvipng", wrap=False, color=color)
+        # data = latextools.latex_to_png(sympy.latex(expr, mode=mode, itex=itex, **kwargs), backend="dvipng", wrap=False, color=color)
         if not isinstance(data, bytes):
             # scipywarn("The 'dvipng' backend failed; trying 'matplotlib'")
-            data = latextools.latex_to_png(sympy.latex(expr, mode=mode, itex=itex, **kwargs), backend="matplotlib", wrap=False, color=color)
+            data = latextools.latex_to_png(parse(expr), backend="matplotlib", wrap=False, color=color)
+            # data = latextools.latex_to_png(sympy.latex(expr, mode=mode, itex=itex, **kwargs), backend="matplotlib", wrap=False, color=color)
             if not isinstance(data, bytes):
                 # scipywarn("The 'matplotlib' backend failed; trying 'sympy'")
                 data = _sympypng_(expr, darkmode, euler, fontsize, **kwargs)
                 if not isinstance(data, bytes):
                     assert isinstance(data, bytes), "All available backends have failed; check the parameters to this function call"
-                    return
-#                     
-#                 
-#         if isinstance(png, bytes):
-#             im = PIL.Image.open(BytesIO(png))
-#             if outtype.lower() == "pix":
-#                 return im.toqpixmap()
-#             elif outtype.lower() == "img":
-#                 return im.toqimage()
-#             else:
-#                 return im
-#             
-#         else:
-#             scipywarn("The 'dvipng' backend failed; trying 'matplotlib'")
-#             png = latextools.latex_to_png(sympy.latex(expr, mode=mode, itex=itex, **kwargs), backend="matplotlib", wrap=False, color=color)
-#             if isinstance(png, bytes):
-#                 im = PIL.Image.open(BytesIO(png))
-#                 if outtype.lower() == "pix":
-#                     return im.toqpixmap()
-#                 elif outtype.lower() == "img":
-#                     return im.toqimage()
-#                 else:
-#                     return im
-#             else:
-#                 scipywarn("The 'matplotlib' backend failed; trying 'sympy'")
-#                 ret = _sympypng_(expr, darkmode, euler, fontsize, **kwargs)
                     
-    elif backend.lower() == "dvipng":
-        data = latextools.latex_to_png(sympy.latex(expr, mode=mode, itex=itex, **kwargs), backend="dvipng", wrap=False, color=color)
+    elif backend == "dvipng":
+        data = latextools.latex_to_png(parse(expr), backend="dvipng", wrap=False, color=color)
+        # data = latextools.latex_to_png(sympy.latex(expr, mode=mode, itex=itex, **kwargs), backend="dvipng", wrap=False, color=color)
         assert isinstance(data, bytes), f"The {backend} backend failed"
-        # im = PIL.Image.open(BytesIO(png))
-        # if outtype.lower() == "pix":
-        #     return im.toqpixmap()
-        # elif outtype.lower() == "img":
-        #     return im.toqimage()
-        # else:
-        #     return im
-        # ret = im.toqpixmap()
         
-    elif backend.lower() == "matplotlib":
-        data = latextools.latex_to_png(sympy.latex(expr, mode=mode, itex=itex, **kwargs), backend="matplotlib", wrap=False, color=color)
+    elif backend == "matplotlib":
+        data = latextools.latex_to_png(parse(expr), backend="matplotlib", wrap=False, color=color)
+        # data = latextools.latex_to_png(sympy.latex(expr, mode=mode, itex=itex, **kwargs), backend="matplotlib", wrap=False, color=color)
         assert isinstance(data, bytes), f"The {backend} backend failed"
-        # im = PIL.Image.open(BytesIO(png))
-        # if outtype.lower() == "pix":
-        #     return im.toqpixmap()
-        # elif outtype.lower() == "img":
-        #     return im.toqimage()
-        # else:
-        #     return im
-        # ret = im.toqpixmap()
         
-    elif backend.lower() == "sympy":
+    elif backend == "sympy":
         data = _sympypng_(expr, darkmode, euler, fontsize, **kwargs)
         assert isinstance(data, bytes), f"The {backend} backend failed"
             
