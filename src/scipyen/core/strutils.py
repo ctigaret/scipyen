@@ -21,11 +21,16 @@ from numbers import (
 )
 import numpy as np
 import quantities as pq
-
+import sympy
+from sympy import abc as symabc
+import PIL
+from PIL.Image import Image as PILImage
 import matplotlib.pyplot as plt
+from IPython.core.latex_symbols import (latex_symbols, reverse_latex_symbol)
+from IPython.display import Image as IPImage
 
 import inflect
-import PIL # to convert latex strings to PIL Image
+# import PIL # to convert latex strings to PIL Image
 
 InflectEngine = inflect.engine()
 
@@ -63,6 +68,7 @@ else:
 #     from PySide6 import QtCore, QtGui
 # else:
 #     from qtpy import QtCore, QtGui
+
 
 REGEXP_METACHARACTERS = (
     ".",
@@ -638,38 +644,79 @@ def isnumber(s: str) -> bool:
     except:
         return False
     
-def latex_to_img_(tex:str, fontsize:int = 30, darkmode:bool=True):
-    # print(f"fontsize = {fontsize}, darkmode={darkmode}")
-    if isinstance(fontsize, bool):
-        darkmode = fontsize
-        fontsize = 30
-    buf = io.BytesIO()
-    fig, ax  = plt.subplots()
-    if darkmode:
-        ax.patch.set_facecolor("black")
-        fig.patch.set_facecolor("black")
+def render_latex(l:str, backend:str="auto", out:str="ipython", 
+                darkmode:typing.Optional[bool]=None, wrap:bool=False) -> typing.Optional[typing.Union[PIL.Image, QtGui.QPixmap, QtGui.QImage, IPImage]]:
+    from io import BytesIO
+    from IPython.lib import latextools
+    from core.prog import scipywarn
+
+    if not isinstance(backend, str) or backend.lower() not in ("auto", "dvipng", "matplotlib"):
+        backend = "auto"
     else:
-        ax.patch.set_facecolor("white")
-        fig.patch.set_facecolor("white")
-    textcolor="white" if darkmode else "black"
-    ax.text(0.5, 0.5, f'$${tex}$$', fontsize=30, ha='center', va='center', color=textcolor)
-    ax.axis('off')
-    plt.savefig(buf, format='png', bbox_inches="tight")
-    plt.close()
+        backend = backend.lower()
+        
+    if not isinstance(darkmode, bool):
+        windowColor = QtWidgets.QApplication.palette().color(QtGui.QPalette.Window)
+        _,_,v,_ = windowColor.getHsv()
+        darkmode = v<=128
+        
+    color = "white" if darkmode else "black" 
+    
+    if backend == "auto":
+        data = latextools.latex_to_png(l, backend="dvipng", wrap=wrap, color=color)
+        if not isinstance(data, bytes):
+            # scipywarn("The 'dvipng' backend failed; trying 'matplotlib'")
+            data = latextools.latex_to_png(l, backend="matplotlib", wrap=wrap, color=color)
+            if not isinstance(data, bytes):
+                scipywarn("All available backends have failed; check the parameters to this function call")
+                return
+                
+    elif backend in ("dvipng", "matplotlib"):
+        data = latextools.latex_to_png(l, backend=backend, wrap=wrap, color=color)
+        # data = latextools.latex_to_png(sympy.latex(expr, mode=mode, itex=itex, **kwargs), backend="dvipng", wrap=False, color=color)
+        if not isinstance(data, bytes):
+            scipywarn("All available backends have failed; check the parameters to this function call")
+            return
+        
+    else:
+        raise ValueError(f"Unknown/unsupported backend {backend}")
+    
+    if out.lower() not in ("bytes", "img", "pix", "pil", "ipython"):
+        raise ValueError(f"I do not understand 'out' ({out}); expecting one of 'bytes', 'img', 'pix', 'pil', 'ipython' (case-insensitive)")
+    elif out.lower() == "ipython":
+        return IPImage(data)
+    elif out.lower() == "bytes":
+        return data
+    elif out.lower() == "pil":
+        return PIL.Image.open(BytesIO(data))
+    else:
+        ret = QtGui.QPixmap()
+        ok = ret.loadFromData(QtCore.QByteArray(data))
+        if not ok:
+            scipywarn("Cannot convert data to a pixmap")
+            return
+        if out.lower()=="img":
+            return ret.toImage()
+        
+        else:
+            return ret
+    
+    
+def latexunicode2sympy(c, asSymbol:bool=True) -> typing.Optional[str | sympy.Symbol]:
+    from core.prog import scipywarn
 
-    im = PIL.ImageOps.grayscale(PIL.Image.open(buf))
-    if not darkmode:
-        im = PIL.ImageOps.invert(im)
-    im = PIL.ImageOps.expand(im.crop(im.getbbox()), border=(2, 2, 2, 2), fill=(0))
-    if not darkmode:
-        im = PIL.ImageOps.invert(im)
-    im = im.convert("RGBA")
-    is_background = lambda item: all(v == 0 if darkmode else v==255 for v in item[0:3])
-    set_transparent = lambda x: tuple(x[0:3]) + (0,)
-    data = list(map(lambda item: set_transparent(item) if is_background(item) else item, im.getdata()))
-    im.putdata(data)
-    return im
-
+    if c in reverse_latex_symbol:
+        c_rep = reverse_latex_symbol[c].replace("\\", "")
+        if asSymbol:
+            if c_rep in symabc.__dict__:
+                return symabc.__dict__[c_rep]
+            else:
+                return sympy.Symbol(c_rep)
+        else:
+            return c_rep
+    else:
+        scipywarn(f"No appropriate symbol found for {c}")
+        
 def parse_version_string(s: str):
     parts = s.split(".")
 

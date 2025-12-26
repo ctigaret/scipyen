@@ -46,11 +46,12 @@ ATTENTION: Please decorate all model functions with the modelfunction decorator.
 This will help locating/accessing these functions easily from other Scipyen
 components.
 """
-import typing
+import typing, types
 import numbers
 import neo
 import numpy as np
 import sympy
+from sympy import abc as symabc
 import quantities as pq
 import pandas as pd
 import dataclasses
@@ -84,9 +85,10 @@ def check_independent_variable(x:typing.Union[Real, np.ndarray], ndim:typing.Opt
 @decorator
 def modelfunction(f:typing.Callable, /, 
                   nvars:int=1, 
-                  coefficients:typing.Optional[typing.Sequence[str]]=None,
                   title:typing.Optional[str] = None ,
+                  coefficients:typing.Optional[typing.Sequence[str]]=None,
                   coefficient_units:typing.Optional[dict]=None,
+                  expression:typing.Optional[typing.Union[sympy.Basic, str]] = None,
                   **kwargs):
     r"""Decorator to tag a function as a mathematical model function.
 A mathematical model function realizes a function of one or more independent 
@@ -117,11 +119,19 @@ This decorator sets adorns a model function with the following attributes:
 
     ATTENTION: Python syntax forbids the use of more than one var-positional
     parameter (e.g. *args) in a function call. This means that, for an actual 
-    funciton call, the starred coefficients need to be lumped together in a single
+    function call, the starred coefficients need to be lumped together in a single
     var-positional parameter; it is up to the function code to deal with the 
     contents of this parameter.
 
 'starred_coefficients': tuple of starred coefficient symbols.
+
+'expression': a latex string, or a sympy expression construct (i.e., a sympy.Basic
+    or subclass of it):
+    • the latex string MUST be given either as a 'raw' string, or with the latex 
+    escape characters ('\') escaped (i.e. use '\\' everywhere latex expects a 
+    single '\')
+    • the sympy expresion is currently used just for inspection purposes; no
+    computation is performed involving sympy expressions.
 
 'coefficient_units' (see below)
 
@@ -171,46 +181,86 @@ coefficients: typing.Sequence[str] — names (symbols) for the parameters.
     the '*' comes after ther symbol and indicated that there must be AT LEAST one
     coefficient with that symbol, in the coefficients sequence.
 
-coefficient_units: optional mapping
-    parameter symbol:str ↦ physical unit: Quantity, UnitQuantity, or sequence of such
+expression: sympy expression construct or latex string (see above); optional, 
+    default is None
 
-    Default is None
-    When given, this flags that some model parameters actually have physical units;
-    the keys are the names of the model parameters (as in coefficients).
+    WARNING: beware of using sympy.sympify(…) function to convert a string 
+    containing a mathematical expression to a sympy expression (sympy.Expr), or 
+    importing all of sympy package in the namespace or the module where you defined
+    the decorated model function:
 
-    When the model defines a variadic number of parameters (see e.g., 
-    exponential_decays_product_biased_shifted) their keys are suffixed by a '*' (as above) 
-    and their associated units are the same.
+    • Avoid calling sympy.init_session() or sympy.init_printing() unless you know 
+    what you are doing. 
 
-    Since not all parameters necessarily associate physical units, those that do not
-    may be omitted from this mapping. However, ATTENTION: the full sequence of
-    parameter names SHOULD be given in 'coefficients', as above. Parameters
-    that are omitted from coefficient_units will by default get pq.dimensionless as
-    physical unit.
+    • Avoid using sympy.sympify(…) when using unicode characters as symbols (e.g. 
+    'α', 'β', etc). The recommended way is also to avoid 'latex' unicode characters
 
-    The safest practice is to associate these unitless parameters with pq.dimensionless
-    which will flag them as such.
+    Instead use one of the following approaches:
+        1. use the latin spelling for greek characters, e.g.:
+            sympy.Symbol("alpha") ↦ α 
+            In particular use sympy.Symbol("beta") instead of sympy.beta which 
+            means the Beta function...
 
-    Some models may accept parameters with physical units that depend on the physical
+        2. use trailing underscore ('_') then character for subscripts, e.g.:
+            sympy.Symbol("lambda_0") ↦ λ₀
+            sympy.Symbol("lambda_n") ↦ λₙ
+
+        3. use trailing caret ('^') then character for superscripts, e.g.:
+            sympy.Symbol("lambda^0") ↦ λ⁰
+            sympy.Symbol("lambda^n") ↦ λⁿ
+
+        4. use sympy.exp() instead of exp()
+
+        5. use '*' for multiplication instead of ×, ⨱, or ⋅
+
+        6. use sympy.functions.elementary.piecewise.Piecewise for dichotmous
+            functions based on a condition.
+            
+
+    • The best practice is to import the sympy module as a whole, then create the
+    expression directly (manually) using specific sympy components and arithmetic
+    operators, and generating symbols on the fly.
+
+    See alphaSynapse definition for an example.
+
+
+coefficient_units: optional mapping of
+    coefficient symbol:str ↦ physical unit: Quantity, UnitQuantity, or sequence 
+                                            of such
+
+    Default is None. 
+    When given, this flags that some model coefficient have physical units;
+    the keys are the names of the model coefficients as given by the 
+    'coefficients' paramneter, described above.
+
+    Since not all coefficients necessarily associate physical units, those that 
+    do not may be omitted from this mapping. However, ATTENTION: the full sequence
+    of coefficient names SHOULD be given in 'coefficients', as above. Coefficients
+    that are omitted from 'coefficient_units' will by default get pq.dimensionless
+    as physical unit.
+
+    The safest practice is to associate these unitless coefficients with pq.dimensionless.
+
+    Some models may accept coefficients with physical units that depend on the physical
     dimensionality of the dependent variable. For example, alphaSynapse — which 
     models a time-varying function of ANY dependent physical variable, whether it
-    is current, voltage, fluorescence intensity, etc — takes an "offset" parameter 
+    is current, voltage, fluorescence intensity, etc — takes an "offset" coefficient 
     (α) which by definition has the same units as the dependent variable.
 
-    In such cases you have the option to specify None or dataclasses.MISSING in lieu
-    of units. Since the actual physical dimensionality of the dependent variable 
-    is often unknown before calling the model function, using MISSING or None as
-    dimensionality tag flags that the parameter should receive the units of the
-    dependent variable at runtime.
+    In such cases you have the option to specify None or dataclasses.MISSING in 
+    lieu of Quantity objects. Since the actual physical dimensionality of the 
+    dependent variable may be unknown before calling the model function, using 
+    MISSING or None as dimensionality tag flags that the coefficient should receive
+    the units of the dependent variable at runtime.
 
 
     WARNING: This does not mean that the decorated model function expects Quantities
-    as values for the parameter; it is up to the function what to do with its
+    as values for the coefficient; it is up to the function what to do with its
     own call arguments
 
 Var-positional parameters:
+==========================
 additional attributes to be set to the wrapped function.
-NOTE: A useful one is the "title"
 
 NOTE for developers: this function defines a function decorator with optional
 arguments; this is made possible by decorating this function with the prog.decorator
@@ -218,6 +268,11 @@ taken from PythonDecoratorLibrary, see
 https://wiki.python.org/moin/PythonDecoratorLibrary#Creating_decorator_with_optional_arguments
 
 """
+    import inspect
+    from IPython.core import display_functions
+    from core.strutils import render_latex
+    from core.utilities import render_sympy
+    
     def wrapper(f):
         setattr(f, "model_function", True)
         setattr(f, "nvars", nvars)
@@ -228,6 +283,48 @@ https://wiki.python.org/moin/PythonDecoratorLibrary#Creating_decorator_with_opti
         
         starred = tuple(filter(lambda c: "*" in c, f.coefficients))
         setattr(f, "starred_coefficients", starred)
+        
+        setattr(f, "expression", expression)
+        def __display__(f):
+            if isinstance(f.expression, str):
+                return render_latex(f.expression)
+            elif isinstance(f.expression, sympy.Basic):
+                return render_sympy(f.expression)
+        setattr(f, "display", types.MethodType(__display__, f))
+        
+        def __display_png__(f):
+            if isinstance(f.expression, str):
+                return render_latex(f.expression, out="bytes")
+            elif isinstance(f.expression, sympy.Basic):
+                return render_sympy(f.expression, out="bytes")
+            
+        
+        def __display_pretty__(f):
+            return f"<{type(f).__name__} {f.__module__}.{f.__name__}{inspect.signature(f)}> at {hex(id(f))}"
+        
+        def __display_all__(f):
+            bundle = {"text/plain": f"<{type(f).__name__} {f.__module__}.{f.__name__}{inspect.signature(f)}> at {hex(id(f))}",
+                     "text/latex": sympy.latex(f.expression, mode="equation*") if isinstance(f.expression, sympy.Basic) else f.expression,
+                     "image/png": render_sympy(f.expression, out="bytes") if isinstance(f.expression, sympy.Basic) else render_latex(f.expression, out="bytes"),
+                      }
+            # metadata = dict()
+            # metadata = {"text/latex": sympy.latex(f.expression, mode="equation*") if isinstance(f.expression, sympy.Basic) else f.expression,
+            #             "image/png": render_sympy(f.expression, out="bytes") if isinstance(f.expression, sympy.Basic) else render_latex(f.expression, out="bytes")
+            #           }
+            # bundle = {"text/latex": sympy.latex(f.expression, mode="equation*") if isinstance(f.expression, sympy.Basic) else f.expression,
+            #           "text/plain": f"<{type(f).__name__} {f.__module__}.{f.__name__}{inspect.signature(f)}> at {hex(id(f))}"
+            #     }
+            metadata = {"text/plain": f"<{type(f).__name__} {f.__module__}.{f.__name__}{inspect.signature(f)}> at {hex(id(f))}"}
+            display_functions.display(bundle, metadata=metadata, raw=True)
+            
+        # setattr(f, "_repr_png_", types.MethodType(__display_png__, f))
+        # setattr(f, "_repr_pretty_", types.MethodType(__display_pretty__, f))
+        setattr(f, "_ipython_display_", types.MethodType(__display_all__, f))
+        
+        setattr(f, "__str__", types.MethodType(__display_pretty__, f))
+        setattr(f, "__repr__", types.MethodType(__display_pretty__, f))
+            
+        # setattr(f, "display", property(fget=f.__display__()))
         
         if isinstance(coefficient_units, dict):
             check_value_type = lambda v: (isinstance(v, pq.Quantity) and v.size==1) or isinstance(v, (type(None), type(dataclasses.MISSING)))
@@ -360,7 +457,12 @@ def check_rise_decay_params(x:typing.Sequence[Real]|np.ndarray) -> int:
 
 # @timefunc # uncomment this for testing 😄
 @modelfunction(coefficients = ("α", "β0", "β1", "x0", "λ0", "λ1"),
-               title="Biexponential")
+               title="Biexponential",
+               expression = sympy.Eq(sympy.Symbol("y"),
+                                     sympy.Symbol("alpha")  + sympy.Symbol("beta_0") * sympy.exp(sympy.Symbol("lambda_0") * (sympy.Symbol("x")-sympy.Symbol("x_0"))) +
+                                                              sympy.Symbol("beta_1") * sympy.exp(sympy.Symbol("lambda_1") * (sympy.Symbol("x")-sympy.Symbol("x_0")))
+                                     ),
+               )
 def biexponential(x:typing.Union[np.ndarray, Real], 
                   α:Real|typing.Sequence[Real]|np.ndarray, /,
                   β0:typing.Optional[Real] = None,
@@ -391,7 +493,14 @@ def biexponential(x:typing.Union[np.ndarray, Real],
 
 # @timefunc # uncomment this for testing 😄
 @modelfunction(coefficients = ("α", "β", "x0", "λ*"),
-               title="ExponentialProduct")
+               title="ExponentialProduct",
+               expression = sympy.Eq(sympy.Symbol("y"),
+                                     sympy.functions.elementary.piecewise.Piecewise((sympy.Symbol("alpha") + sympy.Symbol("beta") * 
+                                                                                        sympy.Product(sympy.exp((sympy.Symbol("x")-sympy.Symbol("x_0")) * sympy.Symbol("lambda_k")),
+                                                                                                      (sympy.Symbol("k", integer=True), 0, sympy.Symbol("n", positive=True, integer=True)-1)),
+                                                                                     sympy.Symbol("n") > 0))
+                                     ),
+               )
 def exponential_product(x: np.ndarray | Real, 
                         α:typing.Sequence[Real] | Real | np.ndarray, /,
                         β:typing.Optional[Real] = None, 
@@ -437,7 +546,11 @@ def exponential_product(x: np.ndarray | Real,
     
 # @timefunc # uncomment this for testing 😄
 @modelfunction(coefficients = ("α", "β", "x0", "λ"),
-                title="Exponential")
+                title="Exponential",
+                expression = sympy.Eq(sympy.Symbol("y"),
+                                      sympy.Symbol("alpha") + 
+                                      sympy.Symbol("beta") * sympy.exp((sympy.Symbol("x")-sympy.Symbol("x_0")) * sympy.Symbol("lambda"))),
+                )
 def exponential(x:np.ndarray | Real, 
                 α:typing.Sequence[Real] | np.ndarray | Real, /,
                 β:typing.Optional[Real] = None, 
@@ -467,7 +580,15 @@ def exponential(x:np.ndarray | Real,
 
 # @timefunc # uncomment this for testing 😄
 @modelfunction(coefficients = ("α", "β", "x0", "λ"),
-               title="BoundedExponentialRise")
+               title="BoundedExponentialRise",
+               expression = sympy.Eq(sympy.Symbol("y"),
+                                     sympy.Symbol("alpha") +
+                                     sympy.Symbol("beta") * (1 - sympy.exp(-1 * (sympy.Symbol("x")-sympy.Symbol("x_0"))*sympy.Symbol("lambda")))),
+               # expression = sympy.Eq(sympy.Symbol("y"),
+               #                       sympy.functions.elementary.piecewise.Piecewise((sympy.Symbol("alpha") +
+               #                                                                       sympy.Symbol("beta") * (1 - sympy.exp(-1 * (sympy.Symbol("x")-sympy.Symbol("x_0"))*sympy.Symbol("lambda"))),
+               #                                                                       sympy.Symbol("lambda") > 0))),
+               )
 def bounded_exponential_rise(x:np.ndarray | Real, 
                              α:typing.Sequence[Real]|np.ndarray, 
                              β:typing.Optional[Real] = None, 
@@ -511,7 +632,12 @@ values for α, β, and with appropriate value & sign of λ
 # @timefunc # uncomment this for testing 😄
 @modelfunction(coefficients = ("α", "β", "x0", "τ"),
                title="AlphaSynapse",
-               expression=sympy.Symbol("alpha") + sympy.Symbol("beta") * (sympy.Symbol("x")-sympy.Symbol("x_0"))/sympy.Symbol("tau") * sympy.exp(-(sympy.Symbol("x")-sympy.Symbol("x_0") - sympy.Symbol("tau"))/sympy.Symbol("tau")))
+               expression = sympy.Eq(sympy.Symbol("y"), 
+                                     sympy.functions.elementary.piecewise.Piecewise((sympy.Symbol("alpha") + sympy.Symbol("beta") * (sympy.Symbol("x")-sympy.Symbol("x_0"))/sympy.Symbol("tau") * sympy.exp(-(sympy.Symbol("x")-sympy.Symbol("x_0") - sympy.Symbol("tau"))/sympy.Symbol("tau")),
+                                                                                     sympy.Symbol("x")-sympy.Symbol("x_0") >= 0), 
+                                                                                    (sympy.Symbol("alpha"), 
+                                                                                     sympy.Symbol("x")-sympy.Symbol("x_0") < 0)))
+               )
 def alphaSynapse(x:np.ndarray | Real, α:typing.Union[typing.Sequence[Real],np.ndarray,Real], /,
                   β:typing.Optional[Real] = None, x0:typing.Optional[Real] = None,
                   τ:typing.Optional[Real] = None) -> np.ndarray | float:
@@ -524,7 +650,7 @@ soma-dendritic distributions of synaptic input. J Neurophysiol 30(5), 1138–68,
 ---
 
 A single exponential rise and decay, both with the same constant (τ):
-
+    
         /    
         | α + β × (x-x₀)/τ × exp(-(x-x₀-τ)/τ)         where x-x₀ >= 0 
     y = |
@@ -1529,11 +1655,17 @@ def Frank_Fuortes2(x:np.ndarray | Real, irh:typing.Sequence[Real] | Real, /,
     
     return (1-np.exp(-(x-x0)/τ)) / irh
 
-@modelfunction(coefficients=("x0", "κ"))
+@modelfunction(coefficients=("x0", "κ"),
+               expression = sympy.Eq(sympy.Symbol("y"),
+                                     sympy.functions.elementary.piecewise.Piecewise((1/(1+sympy.exp(-(sympy.Symbol("x")-sympy.Symbol("x_0"))/sympy.Symbol("kappa"))),
+                                                                                     sympy.Symbol("activation")),
+                                                                                    (1/(1+sympy.exp((sympy.Symbol("x")-sympy.Symbol("x_0"))/sympy.Symbol("kappa"))),
+                                                                                     sympy.Symbol("inactivation")))),
+               )
 def Boltzmann(x:np.ndarray | Real, x0:typing.Sequence[Real] | Real, /,
               κ:typing.Optional[Real] = None,
               pos:bool=True) -> np.ndarray | float:
-    r""" Boltzmann function:
+    r""" Boltzmann function — empirical description of voltage-gated ion channel kinetics
 
 Realises y = 1/(1+exp(±(x₀ - x)/κ))
 
@@ -1628,7 +1760,9 @@ voltage dependent channels Naᵥ and Kᵥ in the Hodgkin-Huxley formalism.
     ξ /= κ
     return 1/(1+np.exp(ξ))
     
-@modelfunction(coefficients=("x0", ))
+@modelfunction(coefficients=("x0", ),
+               expression = r"$\theta(x) = \begin{cases} 0 & \text{for}\: x = 0 \\1 & \text{for}\: x > 0 \end{cases}$",
+               )
 def Heaviside(x:np.ndarray|Real, 
               x0:typing.Union[Real, pq.Quantity], /, 
               α:bool=True) -> np.ndarray | float:

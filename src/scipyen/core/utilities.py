@@ -31,7 +31,8 @@ from dataclasses import MISSING
 import numpy as np
 import sympy
 import PIL
-PILImage = PIL.Image.Image
+from PIL.Image import Image as PILImage
+from IPython.display import Image as IPImage
 import neo
 from neo.core.dataobject import DataObject as NeoDataObject
 from neo.core.container import Container as NeoContainer
@@ -5105,10 +5106,11 @@ def timelineDateString(year:int, month:int, day:int=0):
 def posixUTC(d:datetime.datetime) -> float:
     return (d - datetime.datetime(1970, 1, 1)) / datetime.timedelta(seconds=1)
 
-def sympy2pic(expr:sympy.Expr, backend:str="auto", outtype:str="pix", 
+def render_sympy(expr:sympy.Expr, backend:str="auto", out:str="ipython", 
               parser:str="sympy",
               darkmode:typing.Optional[bool]=None, 
-              **kwargs) -> typing.Optional[typing.Union[PIL.Image, QtGui.QPixmap, QtGui.QImage]]:
+              wrap:bool=False,
+              **kwargs) -> typing.Optional[typing.Union[PIL.Image, QtGui.QPixmap, QtGui.QImage, IPImage]]:
     r"""Generates a latex rendering of a sympy expression, as a bitmap image.
     Positional parameters:
     ======================
@@ -5142,7 +5144,8 @@ def sympy2pic(expr:sympy.Expr, backend:str="auto", outtype:str="pix",
     
         NOTE: The generated pixmaps have transparent background.
     
-    outtype:strt, one of "pil" (default), "img" (QImage) or "pix" (QPixmap)
+    out:str, one of "ipython" (IPython.Image.Image; default), "pil" (PIL.Image.Image), 
+            "img" (QtGui.QImage), "pix" (QtGui.QPixmap), or "bytes" (bytes)
     
     Var-keyword parameters:
     =======================
@@ -5226,14 +5229,12 @@ def sympy2pic(expr:sympy.Expr, backend:str="auto", outtype:str="pix",
     from io import BytesIO
     from IPython.lib import latextools
     from ipykernel.inprocess.ipkernel import InProcessInteractiveShell
+    from core.strutils import render_latex
     
     if not isinstance(backend, str) or backend.lower() not in ("auto", "dvipng", "matplotlib", "sympy"):
         backend = "auto"
     else:
         backend = backend.lower()
-        
-    if parser not in ("sympy", "shell"):
-        parser = "sympy"
         
     if not isinstance(darkmode, bool):
         windowColor = QtWidgets.QApplication.palette().color(QtGui.QPalette.Window)
@@ -5253,78 +5254,68 @@ def sympy2pic(expr:sympy.Expr, backend:str="auto", outtype:str="pix",
         
     # print(f"kwargs = {kwargs}")
     
-    def _sympypng_(ex, darkmode, euler, fontsize, **kw):
+    def _sympypng_(ex, out, darkmode, euler, fontsize, **kw):
         # print(f"kw = {kw}")
         # kw["mode"] = mode
         dataio = BytesIO()
         sympy.preview(expr, output='png', viewer='BytesIO', outputbuffer=dataio, euler=euler, fontsize=fontsize, itex=itex, **kw)
         data = dataio.getvalue()
-        return data
+        if out.lower() not in ("bytes", "img", "pix", "pil", "ipython"):
+            raise ValueError(f"I do not understand 'out' ({out}); expecting one of 'bytes', 'img', 'pix', 'pil', 'ipython' (case-insensitive)")
+        elif out.lower() == "ipython":
+            return IPImage(data)
+        elif out.lower() == "bytes":
+            return data
+        elif out.lower() == "pil":
+            return PIL.Image.open(BytesIO(data))
+        else:
+            ret = QtGui.QPixmap()
+            ok = ret.loadFromData(QtCore.QByteArray(data))
+            if not ok:
+                scipywarn("Cannot convert data to a pixmap")
+                return
+            if out.lower()=="img":
+                return ret.toImage()
+            else:
+                return ret
         
     def _shell_parse_(sh, ex):
         # print(f"sh = {sh}")
         return sh.display_formatter.format(ex, include="text/latex")[0]["text/latex"].replace("$", "")
         
-    if parser == "sympy":
+    if parser.lower() == "sympy":
         if backend == "matplotlib":
             parse = functools.partial(sympy.latex, mode="inline", itex=itex, **kwargs)
         else:
             parse = functools.partial(sympy.latex, mode=mode, itex=itex, **kwargs)
             
-    else:
+    elif parser.lower() == "shell":
         windows = list(filter(lambda w: "ScipyenWindow" in type(w).__name__, QtWidgets.QApplication.topLevelWidgets()))
         assert len(windows)==1, "Not a Scipyen session"
         mainWindow = windows[0]
         shell = mainWindow.shell
         assert isinstance(shell, InProcessInteractiveShell), "Not using an in-process interactive shell"
         parse = functools.partial(_shell_parse_, shell)
+        
+    else:
+        raise ValueError(f"Invalid 'parser' specified ({parser}); expecting one of 'sympy', 'shell' (case-insensitive)")
             
     if backend == "auto":
         # scipywarn("Trying 'dvipng' backend")
-        data = latextools.latex_to_png(parse(expr), backend="dvipng", wrap=False, color=color)
-        # data = latextools.latex_to_png(sympy.latex(expr, mode=mode, itex=itex, **kwargs), backend="dvipng", wrap=False, color=color)
-        if not isinstance(data, bytes):
-            # scipywarn("The 'dvipng' backend failed; trying 'matplotlib'")
-            data = latextools.latex_to_png(parse(expr), backend="matplotlib", wrap=False, color=color)
-            # data = latextools.latex_to_png(sympy.latex(expr, mode=mode, itex=itex, **kwargs), backend="matplotlib", wrap=False, color=color)
-            if not isinstance(data, bytes):
-                # scipywarn("The 'matplotlib' backend failed; trying 'sympy'")
-                data = _sympypng_(expr, darkmode, euler, fontsize, **kwargs)
-                if not isinstance(data, bytes):
-                    assert isinstance(data, bytes), "All available backends have failed; check the parameters to this function call"
-                    
-    elif backend == "dvipng":
-        data = latextools.latex_to_png(parse(expr), backend="dvipng", wrap=False, color=color)
-        # data = latextools.latex_to_png(sympy.latex(expr, mode=mode, itex=itex, **kwargs), backend="dvipng", wrap=False, color=color)
-        assert isinstance(data, bytes), f"The {backend} backend failed"
-        
-    elif backend == "matplotlib":
-        data = latextools.latex_to_png(parse(expr), backend="matplotlib", wrap=False, color=color)
-        # data = latextools.latex_to_png(sympy.latex(expr, mode=mode, itex=itex, **kwargs), backend="matplotlib", wrap=False, color=color)
-        assert isinstance(data, bytes), f"The {backend} backend failed"
-        
+        data = render_latex(parse(expr), backend=backend, darkmode=darkmode, out=out, wrap=wrap)
+        if data is None:
+            return _sympypng_(expr, out, darkmode, euler, fontsize, **kwargs)
+        return data
+        # data = latextools.latex_to_png(parse(expr), backend="dvipng", wrap=False, color=color)
+        # # data = latextools.latex_to_png(sympy.latex(expr, mode=mode, itex=itex, **kwargs), backend="dvipng", wrap=False, color=color)
+        # if not isinstance(data, bytes):
+        #     # scipywarn("The 'dvipng' backend failed; trying 'matplotlib'")
+        #     data = latextools.latex_to_png(parse(expr), backend="matplotlib", wrap=False, color=color)
+        #     # data = latextools.latex_to_png(sympy.latex(expr, mode=mode, itex=itex, **kwargs), backend="matplotlib", wrap=False, color=color)
+    elif backend in ("dvipng", "matplotlib"):
+        return render_latex(parse(expr), backend=backend, darkmode=darkmode, out=out, wrap=wrap)
     elif backend == "sympy":
-        data = _sympypng_(expr, darkmode, euler, fontsize, **kwargs)
-        assert isinstance(data, bytes), f"The {backend} backend failed"
-            
+        return _sympypng_(expr, out, darkmode, euler, fontsize, **kwargs)
     else:
         raise ValueError(f"Unknown/unsupported backend {backend}")
     
-    if outtype.lower() == "pil":
-        return PIL.Image.open(BytesIO(data))
-    else:
-        ret = QtGui.QPixmap()
-        ok = ret.loadFromData(QtCore.QByteArray(data))
-        if not ok:
-            scipywarn("Cannot convert data to a pixmap")
-            return
-        if outtype.lower()=="img":
-            return ret.toImage()
-        
-        else:
-            return ret
-        
-                    
-    
-
-            
