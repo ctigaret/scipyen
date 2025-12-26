@@ -356,6 +356,11 @@ def treeWidgetItems(tree: QtWidgets.QTreeWidget):
         yield it.value()
         it += 1
 
+def isDarkGui() -> bool:
+    windowColor = QtWidgets.QApplication.palette().color(QtGui.QPalette.Window)
+    _,_,v,_ = windowColor.getHsv()
+    return v <= 128
+
 # def testme():
 #     import pywt
 #     old_stdout = sys.stdout

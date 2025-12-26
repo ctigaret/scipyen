@@ -675,7 +675,12 @@ soma-dendritic distributions of synaptic input. J Neurophysiol 30(5), 1138–68,
 ---
 
 A single exponential rise and decay, both with the same constant (τ):
-    
+
+
+$
+y = \\begin{cases} \\alpha + \\beta \\left(x - x_{0}\\right) e^{\\left(\\tau - x + x_{0}\\right) / \\tau} / \\tau & \\text{for}\\: x - x_{0} \\geq 0 \\\\\\alpha & \\text{otherwise} \\end{cases}
+$
+
         /    
         | α + β × (x-x₀)/τ × exp(-(x-x₀-τ)/τ)         where x-x₀ >= 0 
     y = |

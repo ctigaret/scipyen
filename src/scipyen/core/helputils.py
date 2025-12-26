@@ -66,6 +66,7 @@ from pygments.formatters import HtmlFormatter
 import docutils
 import docutils.core, docutils.utils
 from docutils.core import publish_parts
+from gui import guiutils
 
 
 _extra_info_fields = ["methods", "descriptors", "functions", "classes", "data"]
@@ -152,7 +153,7 @@ def rst_to_html_with_highlighting(rst_text):
 This one  "ByWilliam	July 8, 2025
 https://www.bomberbot.com/python/converting-restructuredtext-to-html-with-python-for-documentation/
  """
-    if isDarkGui():
+    if guiutils.isDarkGui():
         style = "KeplerDark"
     else:
         style="default"
@@ -199,7 +200,7 @@ https://www.bomberbot.com/python/converting-restructuredtext-to-html-with-python
 
 
 def reSThighlight(text):
-    if isDarkGui():
+    if guiutils.isDarkGui():
         style = "KeplerDark"
     else:
         style="default"
@@ -227,7 +228,7 @@ def reSThighlight(text):
     return rst_html
 
 def mdhighlight(text):
-    if isDarkGui():
+    if guiutils.isDarkGui():
         style = "KeplerDark"
     else:
         style="default"
@@ -283,9 +284,6 @@ def mdhighlight(text):
         new_code_section = new_code_section.replace('</code></pre>', '')
         new_code_section = html.unescape(new_code_section)
         new_code_section_highlight = mypylight(new_code_section)
-        # lexer = get_lexer_by_name("python", stripall=True) # <--
-        # formatter = HtmlFormatter(linenos=True, cssclass="github-dark", style='default') # <--
-        # new_code_section_highlight = highlight(new_code_section, lexer, formatter) # <--
         formatted = formatted.replace(code_section, new_code_section_highlight)
         
     return formatted
@@ -293,7 +291,7 @@ def mdhighlight(text):
 def mypylight(text):
     r"""Highlights Python code in a text"""
     # return highlight(code, PythonLexer(), HtmlFormatter(noclasses=True, nobackground=True))
-    if isDarkGui():
+    if guiutils.isDarkGui():
         style = "KeplerDark"
     else:
         style = "default"
@@ -1036,8 +1034,6 @@ def hpinfo(shell, cmd, namespaces = None, detail_level:int=0,
     
     return ret, reformat
      
-    
-    
 def hinspect(shell:InteractiveShell, bf:io.StringIO, oname=str, namespaces=None, **kw):
     r"""Stand-in for shell._inspect, called by pinfo magic.
     Named as `hinspect` to avoid clash with the standard library module `inspect`.

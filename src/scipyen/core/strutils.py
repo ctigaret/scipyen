@@ -650,6 +650,7 @@ def render_latex(l:str, backend:str="auto", out:str="ipython",
     from io import BytesIO
     from IPython.lib import latextools
     from core.prog import scipywarn
+    from gui.guiutils import isDarkGui
 
     if not isinstance(backend, str) or backend.lower() not in ("auto", "dvipng", "matplotlib"):
         backend = "auto"
@@ -657,9 +658,7 @@ def render_latex(l:str, backend:str="auto", out:str="ipython",
         backend = backend.lower()
         
     if not isinstance(darkmode, bool):
-        windowColor = QtWidgets.QApplication.palette().color(QtGui.QPalette.Window)
-        _,_,v,_ = windowColor.getHsv()
-        darkmode = v<=128
+        darkmode = isDarkGui()
         
     color = "white" if darkmode else "black" 
     

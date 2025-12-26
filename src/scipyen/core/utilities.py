@@ -8,10 +8,11 @@
 '''
 Various utilities
 '''
-import traceback, re, itertools, functools, time, typing, types, warnings, operator, inspect
-import random, math, pprint, datetime, pathlib, sys, os
+import traceback, re, itertools, functools, time, typing, types, warnings
+import operator, inspect, random, math, pprint, datetime, pathlib, sys, os
+import collections, collections.abc, dataclasses
 from numbers import Number
-from sys import getsizeof, stderr
+from sys import (getsizeof, stderr)
 from copy import (copy, deepcopy,)
 from inspect import (getmro, ismodule, isclass, isbuiltin, isfunction,
                      isgeneratorfunction, iscoroutinefunction,
@@ -23,10 +24,7 @@ from inspect import (getmro, ismodule, isclass, isbuiltin, isfunction,
                      )
 from functools import (partial, partialmethod, reduce, singledispatch)
 from itertools import chain
-import collections
-import collections.abc
 from collections import deque, OrderedDict
-import dataclasses
 from dataclasses import MISSING
 import numpy as np
 import sympy
@@ -36,6 +34,14 @@ from IPython.display import Image as IPImage
 import neo
 from neo.core.dataobject import DataObject as NeoDataObject
 from neo.core.container import Container as NeoContainer
+
+__has_graphviz__:bool = False
+try:
+    import graphviz
+    GraphSource:typing.TypeAlias = graphviz.Source
+    __has_graphviz__ = True
+except:
+    GraphSource:typing.TypeAlias = types.NoneType
 
 # NOTE: SpikeTrainList is a ObjectList in recent nwo versions
 if neo.__version__ >= '0.13.0':
@@ -5229,7 +5235,7 @@ def render_sympy(expr:sympy.Expr, backend:str="auto", out:str="ipython",
     from io import BytesIO
     from IPython.lib import latextools
     from core.strutils import render_latex
-    from gui.guiutils import getScipyenConsoleShell
+    from gui.guiutils import (getScipyenConsoleShell, isDarkGui)
     
     if not isinstance(backend, str) or backend.lower() not in ("auto", "dvipng", "matplotlib", "sympy"):
         backend = "auto"
@@ -5237,9 +5243,7 @@ def render_sympy(expr:sympy.Expr, backend:str="auto", out:str="ipython",
         backend = backend.lower()
         
     if not isinstance(darkmode, bool):
-        windowColor = QtWidgets.QApplication.palette().color(QtGui.QPalette.Window)
-        _,_,v,_ = windowColor.getHsv()
-        darkmode = v<=128
+        darkmode = isDarkGui()
         
     color = "white" if darkmode else "black" 
     euler = kwargs.pop("euler", True)
@@ -5314,4 +5318,14 @@ def render_sympy(expr:sympy.Expr, backend:str="auto", out:str="ipython",
         return _sympypng_(expr, out, darkmode, euler, fontsize, **kwargs)
     else:
         raise ValueError(f"Unknown/unsupported backend {backend}")
+    
+def sympygraph(s:sympy.Basic) -> GraphSource:
+    if not isinstance(s, sympy.Basic):
+        raise TypeError(f"Expecting a sympy Basic object;got a {type(s).__name__} instead")
+    
+    if not __has_graphviz__:
+        scipywarn("Graphviz package is not installed")
+        return GraphSource()
+    
+    return GraphSource(sympy.dotprint(s))
     
