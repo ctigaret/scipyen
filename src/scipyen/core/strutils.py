@@ -645,7 +645,8 @@ def isnumber(s: str) -> bool:
         return False
     
 def render_latex(l:str, backend:str="auto", out:str="ipython", 
-                darkmode:typing.Optional[bool]=None, wrap:bool=False) -> typing.Optional[typing.Union[PIL.Image, QtGui.QPixmap, QtGui.QImage, IPImage]]:
+                darkmode:typing.Optional[bool]=None, wrap:bool=False,
+                **kwargs) -> typing.Optional[typing.Union[PIL.Image, QtGui.QPixmap, QtGui.QImage, IPImage]]:
     from io import BytesIO
     from IPython.lib import latextools
     from core.prog import scipywarn
@@ -662,11 +663,16 @@ def render_latex(l:str, backend:str="auto", out:str="ipython",
         
     color = "white" if darkmode else "black" 
     
+    encode = kwargs.get("encode", False)
+    
+    if encode is True:
+        out = "base64"
+    
     if backend == "auto":
-        data = latextools.latex_to_png(l, backend="dvipng", wrap=wrap, color=color)
+        data = latextools.latex_to_png(l, backend="dvipng", wrap=wrap, color=color, **kwargs)
         if not isinstance(data, bytes):
             # scipywarn("The 'dvipng' backend failed; trying 'matplotlib'")
-            data = latextools.latex_to_png(l, backend="matplotlib", wrap=wrap, color=color)
+            data = latextools.latex_to_png(l, backend="matplotlib", wrap=wrap, color=color, **kwargs)
             if not isinstance(data, bytes):
                 scipywarn("All available backends have failed; check the parameters to this function call")
                 return
@@ -681,10 +687,12 @@ def render_latex(l:str, backend:str="auto", out:str="ipython",
     else:
         raise ValueError(f"Unknown/unsupported backend {backend}")
     
-    if out.lower() not in ("bytes", "img", "pix", "pil", "ipython"):
-        raise ValueError(f"I do not understand 'out' ({out}); expecting one of 'bytes', 'img', 'pix', 'pil', 'ipython' (case-insensitive)")
+    if out.lower() not in ("bytes", "img", "pix", "pil", "ipython", "base64"):
+        raise ValueError(f"I do not understand 'out' parameter ({out}); expecting one of 'bytes', 'img', 'pix', 'pil', 'ipython' (case-insensitive)")
     elif out.lower() == "ipython":
         return IPImage(data)
+    elif out.lower() == "base64": # not sure I need this
+        return data.decode("ascii")
     elif out.lower() == "bytes":
         return data
     elif out.lower() == "pil":

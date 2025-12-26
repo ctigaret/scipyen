@@ -5228,8 +5228,8 @@ def render_sympy(expr:sympy.Expr, backend:str="auto", out:str="ipython",
 """
     from io import BytesIO
     from IPython.lib import latextools
-    from ipykernel.inprocess.ipkernel import InProcessInteractiveShell
     from core.strutils import render_latex
+    from gui.guiutils import getScipyenConsoleShell
     
     if not isinstance(backend, str) or backend.lower() not in ("auto", "dvipng", "matplotlib", "sympy"):
         backend = "auto"
@@ -5290,11 +5290,7 @@ def render_sympy(expr:sympy.Expr, backend:str="auto", out:str="ipython",
             parse = functools.partial(sympy.latex, mode=mode, itex=itex, **kwargs)
             
     elif parser.lower() == "shell":
-        windows = list(filter(lambda w: "ScipyenWindow" in type(w).__name__, QtWidgets.QApplication.topLevelWidgets()))
-        assert len(windows)==1, "Not a Scipyen session"
-        mainWindow = windows[0]
-        shell = mainWindow.shell
-        assert isinstance(shell, InProcessInteractiveShell), "Not using an in-process interactive shell"
+        shell = guiutils.getScipyenConsoleShell()
         parse = functools.partial(_shell_parse_, shell)
         
     else:

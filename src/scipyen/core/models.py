@@ -272,6 +272,11 @@ https://wiki.python.org/moin/PythonDecoratorLibrary#Creating_decorator_with_opti
     from IPython.core import display_functions
     from core.strutils import render_latex
     from core.utilities import render_sympy
+    from gui.guiutils import getScipyenConsoleShell
+    
+#     shell = getScipyenConsoleShell()
+#     
+#     print(f"shell: {shell}")
     
     def wrapper(f):
         setattr(f, "model_function", True)
@@ -285,46 +290,66 @@ https://wiki.python.org/moin/PythonDecoratorLibrary#Creating_decorator_with_opti
         setattr(f, "starred_coefficients", starred)
         
         setattr(f, "expression", expression)
-        def __display__(f):
-            if isinstance(f.expression, str):
-                return render_latex(f.expression)
-            elif isinstance(f.expression, sympy.Basic):
-                return render_sympy(f.expression)
-        setattr(f, "display", types.MethodType(__display__, f))
         
-        def __display_png__(f):
-            if isinstance(f.expression, str):
-                return render_latex(f.expression, out="bytes")
-            elif isinstance(f.expression, sympy.Basic):
-                return render_sympy(f.expression, out="bytes")
+        # ### BEGIN NOTE: 2025-12-26 14:50:30 various optins - do NOT delete; instead, keep for future reference
+        #
+        # def __display__(f):
+        #     if isinstance(f.expression, str):
+        #         return render_latex(f.expression)
+        #     elif isinstance(f.expression, sympy.Basic):
+        #         return render_sympy(f.expression)
+        # setattr(f, "display", types.MethodType(__display__, f))
+        
+        # def __display_png__(f):
+        #     if isinstance(f.expression, str):
+        #         return render_latex(f.expression, out="bytes")
+        #     elif isinstance(f.expression, sympy.Basic):
+        #         return render_sympy(f.expression, out="bytes")
             
         
-        def __display_pretty__(f):
-            return f"<{type(f).__name__} {f.__module__}.{f.__name__}{inspect.signature(f)}> at {hex(id(f))}"
+        # def __display_pretty__(f):
+        #     return f"<{type(f).__name__} {f.__module__}.{f.__name__}{inspect.signature(f)}> at {hex(id(f))}"
         
-        def __display_all__(f):
-            bundle = {"text/plain": f"<{type(f).__name__} {f.__module__}.{f.__name__}{inspect.signature(f)}> at {hex(id(f))}",
-                     "text/latex": sympy.latex(f.expression, mode="equation*") if isinstance(f.expression, sympy.Basic) else f.expression,
-                     "image/png": render_sympy(f.expression, out="bytes") if isinstance(f.expression, sympy.Basic) else render_latex(f.expression, out="bytes"),
-                      }
-            # metadata = dict()
-            # metadata = {"text/latex": sympy.latex(f.expression, mode="equation*") if isinstance(f.expression, sympy.Basic) else f.expression,
-            #             "image/png": render_sympy(f.expression, out="bytes") if isinstance(f.expression, sympy.Basic) else render_latex(f.expression, out="bytes")
-            #           }
-            # bundle = {"text/latex": sympy.latex(f.expression, mode="equation*") if isinstance(f.expression, sympy.Basic) else f.expression,
-            #           "text/plain": f"<{type(f).__name__} {f.__module__}.{f.__name__}{inspect.signature(f)}> at {hex(id(f))}"
-            #     }
-            metadata = {"text/plain": f"<{type(f).__name__} {f.__module__}.{f.__name__}{inspect.signature(f)}> at {hex(id(f))}"}
-            display_functions.display(bundle, metadata=metadata, raw=True)
-            
+        # def __display_all__(f):
+        #     bundle = {"text/plain": f"<{type(f).__name__} {f.__module__}.{f.__name__}{inspect.signature(f)}> at {hex(id(f))}",
+        #              "text/latex": sympy.latex(f.expression, mode="equation*") if isinstance(f.expression, sympy.Basic) else f.expression,
+        #              "image/png": render_sympy(f.expression, out="bytes") if isinstance(f.expression, sympy.Basic) else render_latex(f.expression, out="bytes"),
+        #               }
+        #     # metadata = dict()
+        #     # metadata = {"text/latex": sympy.latex(f.expression, mode="equation*") if isinstance(f.expression, sympy.Basic) else f.expression,
+        #     #             "image/png": render_sympy(f.expression, out="bytes") if isinstance(f.expression, sympy.Basic) else render_latex(f.expression, out="bytes")
+        #     #           }
+        #     # bundle = {"text/latex": sympy.latex(f.expression, mode="equation*") if isinstance(f.expression, sympy.Basic) else f.expression,
+        #     #           "text/plain": f"<{type(f).__name__} {f.__module__}.{f.__name__}{inspect.signature(f)}> at {hex(id(f))}"
+        #     #     }
+        #     metadata = {"text/plain": f"<{type(f).__name__} {f.__module__}.{f.__name__}{inspect.signature(f)}> at {hex(id(f))}"}
+        #     display_functions.display(bundle, metadata=metadata, raw=True)
+        
         # setattr(f, "_repr_png_", types.MethodType(__display_png__, f))
         # setattr(f, "_repr_pretty_", types.MethodType(__display_pretty__, f))
-        setattr(f, "_ipython_display_", types.MethodType(__display_all__, f))
+        # setattr(f, "_ipython_display_", types.MethodType(__display_all__, f))
         
-        setattr(f, "__str__", types.MethodType(__display_pretty__, f))
-        setattr(f, "__repr__", types.MethodType(__display_pretty__, f))
+        # NOTE: 2025-12-26 14:54:51
+        # these two are now obsolete (and QtConsole woudl have overlooked them
+        # anyway, because the implementatiopn of the special method '_ipython_display_',
+        # below, takes over 😄)
+        # setattr(f, "__str__", types.MethodType(__display_pretty__, f))
+        # setattr(f, "__repr__", types.MethodType(__display_pretty__, f))
             
-        # setattr(f, "display", property(fget=f.__display__()))
+        #
+        # ### END   NOTE: 2025-12-26 14:50:30 various optins - do NOT delete; instead, keep for future reference
+        
+        
+        # NOTE: 2025-12-26 14:55:28
+        # enable the display of the function call syntax (a.k.a quick help) AND
+        # of the graphic (LaTeX) representation of its mathematical expression
+        # in supporting frontends (currently, Scipyen's internal QtConsole)
+        def __special_display__(f):
+            shell = getScipyenConsoleShell()
+            shell.display_pub.publish(data={"text/plain": f"<{type(f).__name__} {f.__module__}.{f.__name__}{inspect.signature(f)}> at {hex(id(f))}\n\nImplements:\n"})
+            shell.display_pub.publish(data={"image/png": render_sympy(f.expression, out="bytes") if isinstance(f.expression, sympy.Basic) else render_latex(f.expression, out="bytes")})
+            
+        setattr(f, "_ipython_display_", types.MethodType(__special_display__, f))
         
         if isinstance(coefficient_units, dict):
             check_value_type = lambda v: (isinstance(v, pq.Quantity) and v.size==1) or isinstance(v, (type(None), type(dataclasses.MISSING)))

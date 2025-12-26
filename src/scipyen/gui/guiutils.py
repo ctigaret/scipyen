@@ -7,6 +7,7 @@ r"""Various helpers for GUI
 """
 import sys, os, typing, warnings, math, io
 import numpy as np
+from ipykernel.inprocess.ipkernel import InProcessInteractiveShell
 from core.utilities import get_least_pwr10
 
 import qtpy
@@ -150,6 +151,16 @@ def getDesktopGeometry():
             raise RuntimeError("No screens found!")
     else:
         return QtWidgets.QApplication.desktop().geometry()
+    
+def getScipyenConsoleShell() -> InProcessInteractiveShell:
+    windows = list(filter(lambda w: "ScipyenWindow" in type(w).__name__, QtWidgets.QApplication.topLevelWidgets()))
+    assert len(windows)==1, "Not a Scipyen session"
+    mainWindow = windows[0]
+    shell = mainWindow.shell
+    assert isinstance(shell, InProcessInteractiveShell), "Not using an in-process interactive shell"
+    return shell
+    
+    
     
 def validatorString(val:typing.Union[QtGui.QValidator.State, int]):
     r"""String representation of a QValidator.State value

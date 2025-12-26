@@ -175,6 +175,7 @@ pylmeasure      # optional
 pymongo
 pyneuroml       # optional
 pyparsing
+pypng
 pyqtgraph
 pyserial
 pyudev ; sys_platform == 'linux'
