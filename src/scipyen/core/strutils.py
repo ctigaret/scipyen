@@ -707,8 +707,41 @@ def render_latex(l:str, backend:str="auto", out:str="ipython",
         
         else:
             return ret
+
+def findlatex(s:str):
     
+    # GTP-4o mini
+    # Explanation of the Pattern:
+    # 
+    # \$[^\$]*\$: Matches inline LaTeX surrounded by dollar signs (e.g., $E = mc^2$).
+    # |: Acts as an OR operator.
+    # \\(begin|end)\{[^\}]*\}: Matches LaTeX environments, like \begin{equation} and \end{equation}.
+    # |\\[a-zA-Z]+(?:\{[^\}]*\})?: Matches LaTeX commands (e.g., \frac{a}{b}), where the command may have optional braces for arguments.
+    # 
+    # Usage
+    # 
+    # This pattern allows you to extract LaTeX content from your strings, which is particularly useful for processing documents that contain mathematical notation or formatting commands.
+    # 
+    # You can adjust the pattern according to your needs, adding more LaTeX commands or structures as necessary.
     
+    import re
+
+    # Sample string with LaTeX
+    # text = "Here is some LaTeX: $E = mc^2$ and \\begin{equation} x = y + z \\end{equation}."
+
+    # Regular expression to capture LaTeX commands
+    # latex_pattern = r'(\$[^\$]*\$|\\(begin|end)\{[^\}]*\}|\\[a-zA-Z]+(?:\{[^\}]*\})?)'
+    latex_pattern = r'(\$\$([^$]*)\$\$|\\begin\{[^\}]+\}.*?\\end\{[^\}]+\}|(\$[^\$]*\$|\\[a-zA-Z]+(?:\{[^\}]*\})?))'
+
+    matches = re.findall(latex_pattern, s)
+
+    # # Display matches
+    # for match in matches:
+    #     print(match[0])  # match[0] contains the full matched LaTeX
+        
+    return list(map(lambda m: m[0].replace("\\\\", "\\"), matches))
+    
+
 def latexunicode2sympy(c, asSymbol:bool=True) -> typing.Optional[str | sympy.Symbol]:
     from core.prog import scipywarn
 

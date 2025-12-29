@@ -70,10 +70,21 @@ from gui import guiutils
 
 
 _extra_info_fields = ["methods", "descriptors", "functions", "classes", "data"]
+
+docutils_settings_overrides={'output_encoding': 'unicode',
+                             'output_encoding_error_handler': 'ignore',
+                             'input_encoding_error_handler': 'ignore',
+                             'report_level': 5,
+                             'halt_level': 5,
+                             'syntax_highlight': 'long',
+                             'table_style': 'borderless',
+                             'math_output': 'mathjax',}
+
 try:
     import docrepr.sphinxify as sphx
 
     def sphinxify(oinfo):
+        print(f"helpsystem.helputils.sphinxify(oinfo={oinfo})")
         wrapped_docstring = sphx.wrap_main_docstring(oinfo)
 
         def sphinxify_docstring(docstring):
@@ -104,40 +115,40 @@ PYTHON_HELP_SECTIONS = ["NAME",
 
 PythonHelpDict = typing.TypedDict("PythonHelpDict", dict(map(lambda x: (x.lower(), typing.Optional[typing.Union[str, typing.List[str]]]), PYTHON_HELP_SECTIONS)))
 
-def isDarkGui() -> bool:
-    windowColor = QtWidgets.QApplication.palette().color(QtGui.QPalette.Window)
-    _,_,v,_ = windowColor.getHsv()
-    return v <= 128
+# NOTE: 2025-12-27 13:43:03 the function below is moved to gui.guiutils module
+# def isDarkGui() -> bool:
+#     windowColor = QtWidgets.QApplication.palette().color(QtGui.QPalette.Window)
+#     _,_,v,_ = windowColor.getHsv()
+#     return v <= 128
 
 def convert_rst_to_html(rst_content):
     r"""RST 2 HTML conversion using docutils.
-Changes:
-• Throwing pygments in the mix.
-
 
 Original author: Dimity Margaret 
 https://dnmtechs.com/converting-restructuredtext-to-html-using-python-3/
 """
+    print("helpsystem.helputils.convert_rst_to_html")
     # settings = docutils.frontend.OptionParser().get_default_values()
-    shut_up_level = docutils.utils.Reporter.SEVERE_LEVEL + 1
-    settings_overrides={'output_encoding': 'unicode',
-                        'output_encoding_error_handler': 'replace',
-                        'input_encoding_error_handler': 'ignore',
-                        'report_level': shut_up_level,
-                        'syntax_highlight': 'long',
-                        'table_style': 'borderless',
-                        'math_output': 'mathjax',}
+    # shut_up_level = docutils.utils.Reporter.SEVERE_LEVEL + 1
+    # settings_overrides={'output_encoding': 'unicode',
+    #                     'output_encoding_error_handler': 'ignore',
+    #                     'input_encoding_error_handler': 'ignore',
+    #                     'report_level': 5,
+    #                     'halt_level': 5,
+    #                     'syntax_highlight': 'long',
+    #                     'table_style': 'borderless',
+    #                     'math_output': 'mathjax',}
 
     html_content = docutils.core.publish_string(
         source=rst_content,
         writer_name='html',
-        settings_overrides=settings_overrides,
+        settings_overrides=docutils_settings_overrides,
     )
     return html_content
 
 def writedoc(bf, thing, forceload=0):
     r"""Write HTML documentation to a file in the current directory.
-Shamelessly copiued from the standard library module pydoc.
+Shamelessly copied from the standard library module pydoc.
 """
     object, name = pydoc.resolve(thing, forceload)
     page = pydoc.HTMLDoc().page(describe(object), html.document(object, name))
@@ -145,30 +156,46 @@ Shamelessly copiued from the standard library module pydoc.
     # with open(name + '.html', 'w', encoding='utf-8') as file:
     #     file.write(page)
     # print('wrote', name + '.html')
+    
+def parse_pydoc_output(s:str) -> dict:
+    ret = dict()
+    pyhelp_header_pattern = r"(Help on.*:)"
+    pyhelp_header_matches = re.findall(pyhelp_header_pattern, s, re.MULTILINE)
+    ret["pyhelp_header"] = list(map(lambda m: f"**{m}**", pyhelp_header_matches))
+    
+    
+    return ret
 
-
+def pub_rst(s:str) -> str:
+    parts = publish_parts(s, writer_name='html5', settings_overrides=docutils_settings_overrides)
+    ret_html = parts['html_body']
+    return ret_html
+    
+    
 
 def rst_to_html_with_highlighting(rst_text):
     r"""Another RST 2 HTML converter.
-This one  "ByWilliam	July 8, 2025
+This one  "By William	July 8, 2025
 https://www.bomberbot.com/python/converting-restructuredtext-to-html-with-python-for-documentation/
  """
+    print(f"helpsystem.helputils.rst_to_html_with_highlighting()")
+    # print(f"helpsystem.helputils.rst_to_html_with_highlighting(rst_text={rst_text})")
     if guiutils.isDarkGui():
         style = "KeplerDark"
     else:
         style="default"
-    settings = docutils.frontend.get_default_settings()
-    shut_up_level = docutils.utils.Reporter.SEVERE_LEVEL + 1
-    settings_overrides={'output_encoding': 'unicode',
-                        'output_encoding_error_handler': 'replace',
-                        'input_encoding_error_handler': 'ignore',
-                        'report_level': shut_up_level,
-                        # 'report_level': docutils.utils.Reporter.INFO_LEVEL,
-                        'syntax_highlight': 'long',
-                        'table_style': 'borderless',
-                        'math_output': 'mathjax',}
+    # settings = docutils.frontend.get_default_settings()
+    # shut_up_level = docutils.utils.Reporter.SEVERE_LEVEL + 1
+    # settings_overrides={'output_encoding': 'unicode',
+    #                     'output_encoding_error_handler': 'ignore',
+    #                     'input_encoding_error_handler': 'ignore',
+    #                     'report_level': 5,
+    #                     'halt_level': 5,
+    #                     'syntax_highlight': 'long',
+    #                     'table_style': 'borderless',
+    #                     'math_output': 'mathjax',}
     # parts = publish_parts(rst_text, writer_name='html')
-    parts = publish_parts(rst_text, writer_name='html5', settings=setting,  settings_overrides=settings_overrides,)
+    parts = publish_parts(rst_text, writer_name='html5', settings_overrides=docutils_settings_overrides)
     ret_html = parts['html_body']
     
     # print('<pre class=' in ret_html)
@@ -177,29 +204,35 @@ https://www.bomberbot.com/python/converting-restructuredtext-to-html-with-python
     
     def replace_code_block(match):
         code = match.group(1)
+        print(f"helpsystem.helputils.rst_to_html_with_highlighting.replace_code_block: code = {code}")
         # lang = match.group(2)
         # print(f"lang = {lang}")
         # lexer = get_lexer_by_name(lang, stripall=True) # <--
         # formatter = HtmlFormatter(linenos=True, cssclass="source", noclasses=True, nobackground=True, style=style) # <--
         # formatter = HtmlFormatter(linenos=True, cssclass="source") # <--
         # return highlight(code, PythonLexer(stripall=True), formatter) # <--
+        code = code.replace("&gt;", ">").replace("&lt;", "<")
         return mypylight(code)
 
 
     # import re # already imported at the top
-    # pattern = r'<pre class="literal-block">\n(.+?)\n</pre>'
-    pattern1 = r'<pre class="code python doctest">(.+?)</pre>'
+    pattern = r'<pre class="literal-block">(.+?)</pre>' # docutils writes this, NOT "code python doctest"
+    # pattern1 = r'<pre class="code python doctest">(.+?)</pre>'
     # pattern = r'<pre>\n(.+?)\n</pre>'
     # rematch = re.match(pattern1, ret_html, flags=re.DOTALL)
     # if rematch:
     #     print(f"group1:{rematch.group(1)}, group2: {rematch.group(2)}")
-    ret_html = re.sub(pattern1, replace_code_block, ret_html, flags=re.DOTALL)
-    ret_html = html.unescape(ret_html)
+    
+    
+    ret_html = re.sub(pattern, replace_code_block, ret_html, flags=re.DOTALL)
+    # ret_html = html.unescape(ret_html)
 
     return ret_html
 
 
 def reSThighlight(text):
+    r"""Highlight reStructuredText"""
+    print(f"helpsystem.helputils.reSThighlight")
     if guiutils.isDarkGui():
         style = "KeplerDark"
     else:
@@ -214,7 +247,7 @@ def reSThighlight(text):
     
     # formatter = HtmlFormatter(linenos=True, cssclass="github-dark", style='default') # <--
     
-    for code_section in re.findall(recmd, rst_html):
+    for code_section in re.findall(pattern1, rst_html):
         new_code_section = code_section.replace('<pre><code>', '')
         new_code_section = new_code_section.replace('</code></pre>', '')
         new_code_section = html.unescape(new_code_section)
@@ -290,6 +323,8 @@ def mdhighlight(text):
 
 def mypylight(text):
     r"""Highlights Python code in a text"""
+    print(f"hyelpsystem.mypylight(text = {text})")
+    # uses pygments.highlight()
     # return highlight(code, PythonLexer(), HtmlFormatter(noclasses=True, nobackground=True))
     if guiutils.isDarkGui():
         style = "KeplerDark"
@@ -736,11 +771,11 @@ def hpsearch(shell, bf:io.StringIO, pattern, ns_table, ns_search=[],
     
 def object_inspect(shell, oname=str, detail_level:int=0):
     r"""Emulates shell.object_inspect"""
-    info = get_object_info(oname)
+    info = object_find(oname)
     if info.found:
         pass # TODO
     
-def get_object_info(shell, oname=str, namespaces=None) -> oinspect.OInfo:
+def object_find(shell, oname=str, namespaces=None) -> oinspect.OInfo:
     r"""Emulates shell._object_find()"""
     if namespaces is None:
         namespaces = [ ('Interactive', shell.user_ns),
@@ -766,15 +801,11 @@ def get_object_info(shell, oname=str, namespaces=None) -> oinspect.OInfo:
         if parts[0]:
             for part in parts[1]:
                 subname = subname.replace(f"{part}.", "")
-                # print(f"subname = {subname}")
                 sinfo = shell._object_find(subname, namespaces)
                 if sinfo.found:
                     info = sinfo
                     return info
                 
-            # if isinstance(info, oinspect.OInfo) and info.found:
-            #     return info
-        
             # do a reverse search
             subname = oname
             for part in reversed(parts[1]):
@@ -784,7 +815,26 @@ def get_object_info(shell, oname=str, namespaces=None) -> oinspect.OInfo:
                 if sinfo.found:
                     info = sinfo
                     return info
-                
+        
+        # 3) the object has not been imported in any of the namespaces
+        # WARNING: this can be problematic: in theory, the object could be available
+        # by importing an already installed package (from site_packages) but why
+        # would I want to do that !? 
+        #
+        # So, from this point of view, is better to return an info object with 
+        # the "found" attribute set to False. This is what IPython does, as the ?
+        # or ?? (pinfo) help system ONLY works with objects that are imported in
+        # the user namespace.
+        #
+        # On the other hand, I can see a benefit in trying to get help about an
+        # object available in Scipyen's tree (as a (sub)package etc) BEFORE 
+        # actually using (loading, or importing) it.
+        #
+        # In fact, calling "help('a.b.c')" uses Python's own help system to retrieve
+        # information on object 'c' in module 'b', package 'a'. However, this is 
+        # the gist: the user may not know a priori that 'c' is the symbol of an 
+        # object defined in module 'b' of the package 'a'...
+        #
     return info
 
 def happend_info_field(shell, bundle: UnformattedBundle,
@@ -964,8 +1014,8 @@ def hinfo(shell, obj, oname:str="", info:typing.Optional[oinspect.OInfo]=None,
 def hget_info(shell, obj, oname:str="", formatter=None, info:typing.Optional[oinspect.OInfo]=None,
               detail_level:int = 0, omit_sections:typing.Union[typing.List[str], typing.Tuple[str]] = ()) -> tuple[dict]:
     r"""Emulates shell.inspector._get_info"""
-    # TODO 2025-10-13 13:25:09
-    
+    # TODO 2025-12-27 15:33:28
+    # Implement latex rendering in docstrings!
     # info_dict = shell.inspector.info(obj, oname=oname, info=info, detail_level=detail_level)
     info_dict = hinfo(shell, obj, oname=oname, info=info, detail_level=detail_level)
     omit_sections = list(omit_sections)
@@ -1009,6 +1059,7 @@ def hget_info(shell, obj, oname:str="", formatter=None, info:typing.Optional[oin
 def hpinfo(shell, cmd, namespaces = None, detail_level:int=0,
                                     enable_html:bool=True):
     r"""Emulates a IPython pinfo call"""
+    print(f"helpsystem.helputils.hpinfo(cmd={cmd}, namespaces={namespaces}, detail_level={detail_level}, enable_html={enable_html})")
     ret = None
     reformat = False
     
@@ -1021,6 +1072,10 @@ def hpinfo(shell, cmd, namespaces = None, detail_level:int=0,
                 redirect_psearch(shell, bf, oname)
                 reformat=True
             else:
+                # NOTE: 2025-12-27 13:53:06
+                # this branch actually runs the ipython "help" algorithm ↦
+                # extracts various useful information about the object, including 
+                # its docstring
                 hinspect(shell, bf, oname, namespaces=namespaces,
                                 detail_level = detail_level,
                                 enable_html = enable_html,
@@ -1038,30 +1093,35 @@ def hinspect(shell:InteractiveShell, bf:io.StringIO, oname=str, namespaces=None,
     r"""Stand-in for shell._inspect, called by pinfo magic.
     Named as `hinspect` to avoid clash with the standard library module `inspect`.
 
-?symbol or symbol? in console triggers the following call chain:
+    NOTE: executing '?symbol' or 'symbol?' in console triggers the following call 
+    chain:
 
     NamespaceMagics.pinfo (parameter_s = "", namespaces = None) 
-        with `parameter_s` = the symbol and 'namespaces set to None (default)
+        with 'parameter_s' being the symbol and 'namespaces' set to None (default)
     ↓
-        • pinfo,qmark1,oname,qmark2 = re.match(r'(pinfo )?(\?*)(.*?)(\??$)',parameter_s).groups()
+    pinfo,qmark1,oname,qmark2 = re.match(r'(pinfo )?(\?*)(.*?)(\??$)',parameter_s).groups()
         
-    shell._inspect("pinfo", oname)
+    shell._inspect("pinfo", oname) ← role taken up by THIS function, whkch also 
+                                     redirects output to 'bf' (a StringIO )
     ↓
-    page.page(data, start, screen_lines, pager_cmd) with: 
-        data: a Bundle/dict generated in shell._inspect(); 
+    page.page(data, start, screen_lines, pager_cmd) with:       
+        data: a Bundle/dict generated in shell._inspect() — actually, here, by hinspect; 
         start: 0
         screen_lines: 0
         pager_cmd: None
+                                    ← role of page is taken up by bf_page function
+                                      in this module
     ⇊
     eiher 
         • shell.hooks.show_in_pager
         • page.pager_page(data)
 """
     from core.prog import scipywarn
+    print(f"helpsystem.helputils.hinspect(oname={oname}, namespaces={namespaces}, **kw={kw})")
     detail_level = kw.get("detail_level", 0)
     enable_html = kw.get("enable_html", True)
-    info = get_object_info(shell, oname, namespaces)
-    # print(f"core.helputils.hinspect: info = {info}")
+    info = object_find(shell, oname, namespaces)
+    print(f"helpsystem.helputils.hinspect: info = {info}")
     if namespaces is None:
         namespaces = [ ('Interactive', shell.user_ns),
                         ('Interactive (global)', shell.user_global_ns),
@@ -1074,7 +1134,8 @@ def hinspect(shell:InteractiveShell, bf:io.StringIO, oname=str, namespaces=None,
         if shell.sphinxify_docstring:
             if sphinxify is None:
                 raise ImportError("Module ``docrepr`` required but missing")
-            docformat = sphinxify(shell.object_inspect(oname))
+            # docformat = sphinxify(shell.object_inspect(oname))
+            docformat = sphinxify(object_inspect(shell, oname))
         else:
             if "docstring" in info_dict:
                 docformat = format_screen
@@ -1109,6 +1170,7 @@ WARNING: Potentially problematic...
     return
     
 def run_python_help(shell, cmd:str, enable_html=True, ) -> str | None:
+    print(f"helpsystem.helputils.run_python_help → pydoc.Helper(cmd={cmd})")
     ret = None
     with io.StringIO() as bf:
         helper = pydoc.Helper(output = bf)
@@ -1138,9 +1200,6 @@ def run_python_help(shell, cmd:str, enable_html=True, ) -> str | None:
     return ret
 
 def make_python_help_dict(s:str, special:typing.Optional[str] = None) -> dict:
-    # from pydoc import HTMLDoc
-    # htmlPydoc = HTMLDoc()
-    
     # lines = list(filter(lambda l: len(l.strip()) > 0, s.splitlines()))
     lines = s.splitlines()
     # NOTE 2025-10-14 11:55:56 
@@ -1162,8 +1221,6 @@ def make_python_help_dict(s:str, special:typing.Optional[str] = None) -> dict:
             return {lines[0]: "\n".join(lines)}
         else:
             return {lines[0]: "\n".join(lines[1:])}
-    # else:
-    #     return {lines[0]: "\n".join(lines[1:])}
     
     sections = list(map(lambda x: x.lower(), PYTHON_HELP_SECTIONS))
     helpdict = PythonHelpDict(**{field:None for field in sections})
@@ -1226,6 +1283,12 @@ def format_python_help_output(shell, data:PythonHelpDict, formatter=None):
             'text/html': rst_to_html_with_highlighting(text)
             }
     
+    def pyhelp_formatter2(text) -> Bundle:
+        return {
+            'text/plain': _format(text),
+            'text/html': reSThighlight(text)
+            }
+    
     def append_field(shell, bundle:UnformattedBundle, title:str, key:str, hd:PythonHelpDict, formatter):
         field = hd[key]
         if field is not None:
@@ -1243,6 +1306,7 @@ def format_python_help_output(shell, data:PythonHelpDict, formatter=None):
         title = titlekey #if titlekey not in data else ""
         try:
             append_field(shell, bundle, title, titlekey, data, pyhelp_formatter)
+            # append_field(shell, bundle, title, titlekey, data, pyhelp_formatter2)
         except:
             # traceback.print_exc()
             append_field(shell, bundle, title, titlekey, data, format_screen)
@@ -1263,12 +1327,12 @@ def run_help_command(shell, cmd:str, namespaces=None, **kw) -> str | None:
     """
 kw: 
 enable_html: bool, default, is True
-detail_level: int, 0 or 1
+detail_level: int, 0 or 1, default is 0
 """
     # NOTE: 2025-10-13 11:21:18
     # code shamelessly adapted/copied from IPython
     
-    # print(f"core.helputils.run_help_command({cmd})")
+    print(f"helpsystem.helputils.run_help_command({cmd})")
     from IPython.core.magic import Magics, magics_class, line_magic, magic_escapes 
     import pydoc, traceback
     if not isinstance(cmd, str) or len(cmd.strip()) == 0:
@@ -1342,13 +1406,14 @@ detail_level: int, 0 or 1
                     method_name = ""
                     
                 cmd = " ".join([method_name, target])
-            
+            print(f"helpsystem.helputils.run_help_command for ? command: cmd = {cmd}")
             ret, reformat = hpinfo(shell, cmd, namespaces, detail_level = detail_level,
                                     enable_html = enable_html)
 
                
         if isinstance(ret, str):
             if ret.startswith("No Python documentation found"):
+                print(f"helpsystem.helputils.run_help_command — calling helpsystem.helputils.run_python_help for command: cmd = {cmd}")
                 ret = run_python_help(shell, cmd)
                 reformat = True
         else:

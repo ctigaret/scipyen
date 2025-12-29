@@ -669,17 +669,13 @@ def alphaSynapse(x:np.ndarray | Real, α:typing.Union[typing.Sequence[Real],np.n
     r"""
 AlphaSynapse function.
 
-See: Rall, W. Distinguishing theoretical synaptic potentials computed for different
-soma-dendritic distributions of synaptic input. J Neurophysiol 30(5), 1138–68, 1967 
-
----
+Description:
+============
 
 A single exponential rise and decay, both with the same constant (τ):
 
 
-$
-y = \\begin{cases} \\alpha + \\beta \\left(x - x_{0}\\right) e^{\\left(\\tau - x + x_{0}\\right) / \\tau} / \\tau & \\text{for}\\: x - x_{0} \\geq 0 \\\\\\alpha & \\text{otherwise} \\end{cases}
-$
+$y = \\begin{cases} \\alpha + \\beta \\left(x - x_{0}\\right) e^{\\left(\\tau - x + x_{0}\\right) / \\tau} / \\tau & \\text{for}\\: x - x_{0} \\geq 0 \\\\\\alpha & \\text{otherwise} \\end{cases}$
 
         /    
         | α + β × (x-x₀)/τ × exp(-(x-x₀-τ)/τ)         where x-x₀ >= 0 
@@ -694,6 +690,10 @@ where:
     x₀ ↦ shift (delay, or onset); units of "x"
 
     τ  ↦ the synaptic constant; units of "x"
+
+See: Rall, W. Distinguishing theoretical synaptic potentials computed for 
+different soma-dendritic distributions of synaptic input. J Neurophysiol 30(5),
+1138–68, 1967.
 
 The implementation follows that in NEURON simulation software
 ( M. L. Hines, N. T. Carnevale; The NEURON Simulation Environment. 
@@ -731,20 +731,21 @@ Example:
 ========
 (code to run in Scipyen's console)
 
+.. code_block:: python
 
-from core import models
+    from core import models
 
-x = np.linspace(0.0,1.0, 1000);
+    x = np.linspace(0.0,1.0, 1000);
 
-α = 0.; β = -1.; x0 = 0.05; τ = 0.01;
-parameters = [α, β, x0, τ];
+    α = 0.; β = -1.; x0 = 0.05; τ = 0.01;
+    parameters = [α, β, x0, τ];
 
-# any of the statements below are equivalent:
-y = alphaSynapse(x, α, β, x0, τ)
-y = alphaSynapse(x, *parameters)
-y = alphaSynapse(x, parameters)
+    # any of the statements below are equivalent:
+    y = alphaSynapse(x, α, β, x0, τ)
+    y = alphaSynapse(x, *parameters)
+    y = alphaSynapse(x, parameters)
 
-plt.plot(x,y)
+    plt.plot(x,y)
 
 NOTE: 
 ====

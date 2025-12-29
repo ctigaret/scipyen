@@ -81,7 +81,8 @@ from IPython.core.interactiveshell import InteractiveShell
 from core import prog
 from core.prog import safewrapper, safeguiwrapper, scipywarn
 from core.sysutils import adapt_ui_path
-from core import helputils
+# from core import helputils
+from helpsystem import helputils
 from gui.workspacegui import WorkspaceGuiMixin
 # import numpy as np # cheeky
 __module_path__ = os.path.abspath(os.path.dirname(__file__))

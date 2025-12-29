@@ -3187,12 +3187,17 @@ def get_specs(infos:list) -> list:
     r"""Returns a list of module specs using the ModuleInfo in infos."""
     return list(map(lambda i: importlib.util.find_spec(i.name), infos))
 
-def walk_packages(path=None, prefix=''):
+def walk_packages(path:typing.Optional[typing.Union[str, pathlib.Path,typing.Sequence[str|pathlib.Path]]]=None, prefix=''):
     def seen(p, m={}):
         if p in m:
             return True
         m[p] = True
 
+    if isinstance(path, (str, pathlib.Path)):
+        path = [path]
+    elif isinstance(path, typing.Sequence) and len(path) == 0:
+        path = None
+        
     for info in pkgutil.iter_modules(path, prefix):
         yield info
         if info.ispkg:
