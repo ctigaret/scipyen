@@ -125,12 +125,12 @@ This decorator sets adorns a model function with the following attributes:
 
 'starred_coefficients': tuple of starred coefficient symbols.
 
-'expression': a latex string, or a sympy expression construct (i.e., a sympy.Basic
+'expression': a LaTeX string, or a sympy expression construct (i.e., a sympy.Basic
     or subclass of it):
-    • the latex string MUST be given either as a 'raw' string, or with the latex 
-    escape characters ('\') escaped (i.e. use '\\' everywhere latex expects a 
-    single '\')
-    • the sympy expresion is currently used just for inspection purposes; no
+    • The LaTeX string MUST be given EITHER as a 'raw' string, OR a string with 
+    the LaTeX  escape characters ('\') escaped (i.e. use '\\' everywhere LaTeX 
+    expects a single '\'). WARNING: LaTeX assumes package amsmath is in use.
+    • The sympy expresion is currently used just for inspection purposes; no
     computation is performed involving sympy expressions.
 
 'coefficient_units' (see below)
@@ -345,9 +345,20 @@ https://wiki.python.org/moin/PythonDecoratorLibrary#Creating_decorator_with_opti
         # of the graphic (LaTeX) representation of its mathematical expression
         # in supporting frontends (currently, Scipyen's internal QtConsole)
         def __special_display__(f):
+            from core import strutils
             shell = getScipyenConsoleShell()
-            shell.display_pub.publish(data={"text/plain": f"<{type(f).__name__} {f.__module__}.{f.__name__}{inspect.signature(f)}> at {hex(id(f))}\n\nImplements:\n"})
-            shell.display_pub.publish(data={"image/png": render_sympy(f.expression, out="bytes") if isinstance(f.expression, sympy.Basic) else render_latex(f.expression, out="bytes")})
+            if isinstance(f.expression, sympy.Basic) or (isinstance(f.expression, str) and strutils.islatex(f.expression)):
+                try:
+                    img = render_sympy(f.expression, out="bytes") if isinstance(f.expression, sympy.Basic) else render_latex(f.expression, out="bytes")
+                except:
+                    img = None
+                if isinstance(img, bytes):
+                    shell.display_pub.publish(data={"text/plain": f"<{type(f).__name__} {f.__module__}.{f.__name__}{inspect.signature(f)}> at {hex(id(f))}\n\nImplements:\n"})
+                    shell.display_pub.publish(data={"image/png": img})
+                    return
+            shell.display_pub.publish(data={"text/plain": f"<{type(f).__name__} {f.__module__}.{f.__name__}{inspect.signature(f)}> at {hex(id(f))}\n\n"})
+            # else:
+            #     shell.display_pub.publish(data={"text/plain": f"<{type(f).__name__} {f.__module__}.{f.__name__}{inspect.signature(f)}> at {hex(id(f))}\n\n"})
             
         setattr(f, "_ipython_display_", types.MethodType(__special_display__, f))
         
@@ -667,21 +678,20 @@ def alphaSynapse(x:np.ndarray | Real, α:typing.Union[typing.Sequence[Real],np.n
                   β:typing.Optional[Real] = None, x0:typing.Optional[Real] = None,
                   τ:typing.Optional[Real] = None) -> np.ndarray | float:
     r"""
+======================
 AlphaSynapse function.
+======================
 
 Description:
 ============
 
 A single exponential rise and decay, both with the same constant (τ):
 
+Eq. 1
+-----
 
-$y = \\begin{cases} \\alpha + \\beta \\left(x - x_{0}\\right) e^{\\left(\\tau - x + x_{0}\\right) / \\tau} / \\tau & \\text{for}\\: x - x_{0} \\geq 0 \\\\\\alpha & \\text{otherwise} \\end{cases}$
+$$f(x) = \\begin{cases} \\alpha + \\beta \\left(x - x_{0}\\right) e^{\\left(\\tau - x + x_{0}\\right) / \\tau} / \\tau & \\text{for}\\: x - x_{0} \\geq 0 \\\\\\alpha & \\text{otherwise} \\end{cases}$$
 
-        /    
-        | α + β × (x-x₀)/τ × exp(-(x-x₀-τ)/τ)         where x-x₀ >= 0 
-    y = |
-        | α                                           elsewhere
-        \
 where:
     α  ↦ additive bias (offset); units of "y"
 
@@ -700,26 +710,23 @@ The implementation follows that in NEURON simulation software
 Neural Comput 1997; 9 (6): 1179–1209. 
 doi: https://doi.org/10.1162/neco.1997.9.6.1179 ) :
 
-"a synaptic current with alpha function conductance defined by
-        i = g * (v - e)      i(nanoamps), g(microsiemens);
-        where
-         g = 0 for t < onset and
-         g = gmax * (t - onset)/tau * exp(-(t - onset - tau)/tau)
-          for t > onset
-          
-this has the property that the maximum value is gmax and occurs at
- t = delay + tau."
+
+| "a synaptic current with alpha function conductance defined by
+| i = g * (v - e)      i(nanoamps), g(microsiemens);
+| where:
+|     g = 0 for t < onset and
+|     g = gmax * (t - onset)/tau * exp(-(t - onset - tau)/tau) for t > onset
+| this has the property that the maximum value is gmax and occurs at t = delay + tau."
  
 
 Parameters:
 ===========
-x: predictor (independent variable) - 1D numpy ndarray or float
-α, β, x0, τ: see above 
-When α is a sequence of scalars (1D array-like), it is interpreted as containing 
-the individual α, β, x0, τ coefficients 'packed' in this sequence (some optimization
- functions expect this)
+:x: Predictor (independent variable) - 1D numpy ndarray or float
+:α, β, x0, τ: See above. When α is a sequence of scalars (1D array-like), it is 
+    interpreted as containing the individual α, β, x0, τ coefficients 'packed' 
+    in this sequence (some optimization functions expect this)
     
-parameters: 1D array-like: numeric sequence (tuple, list, numpy array) with four
+:parameters: 1D array-like: numeric sequence (tuple, list, numpy array) with four
     elements in the following order (see above for their meaning):
 
 
@@ -731,7 +738,7 @@ Example:
 ========
 (code to run in Scipyen's console)
 
-.. code_block:: python
+.. code:: python
 
     from core import models
 
@@ -748,58 +755,67 @@ Example:
     plt.plot(x,y)
 
 NOTE: 
-====
-1. Rall 1967 uses the notation T for t - onset, and Tₚ for τ ⟹
-2. Rall's "alpha" function 
+=====
+1. Rall 1967 uses the notation T for t - onset, and Tₚ for τ in the "alpha" function below:
 
-        /
-        | (T/Tₚ)exp(1 - T/Tₚ)   for Tₚ > 0                                   (1)
-f(T) =  | 
-        | 0                     otherwise
-        \
+Eq. 2
+-----
 
-and it has:†
+$$f(T) = \\begin{cases} \\left( T / T_{p} \\right) \\times e^{\\left( 1 - T / T_{p} \\right)} & \\text{for}\\: T_{p} > 0 \\\\0 & \\text{otherwise} \\end{cases}$$
+
+which has:†
+
 • extremum (1.0) at T = Tₚ (i.e. t - onset = τ)
 • value of 0.5 at t ∈ {≈ 0.23τ, ≈ 2.68τ}, hence:
 • half-width (with at half of peak amplitude) ≈ 2.45τ
 • area under the entire curve: 𝑒τ, where 𝑒 is Euler's number (Napier's constant)
 
-3. The code in NEURON syn.mod does NOT include the additive bias α. I include α
+2. The code in NEURON syn.mod does NOT include the additive bias α. I include α
 for the case where the transient modelled by alphaSynapse takes place on top of
 a constant signal (the "direct current", or "DC" component — this nomenclature
 is not always appropriate e.g. when modelling the change in membrane potential
 the "DC" component is rather some steady-state initial voltage V₀, such as the
 resting membrane potential).
 
-4. The β parameter here corresponds to the 𝑔ₘₐₓ in NEURON's code.
+3. The β parameter here corresponds to the 𝑔ₘₐₓ in NEURON's code.
 Whether β is a conductance (𝑔) or not depends on what are you use this function
 for. NEURON's syn.mod calculates 𝑔 THEN converts it to a synaptic current 𝑖 
 (see above); if you use this function to model a current, you might want to adjust
- β accordingly (i.e. set it to YOUR 𝑔ₘₐₓ times the electromotive force 𝑣 - 𝑒).
+β accordingly (i.e. set it to YOUR 𝑔ₘₐₓ times the electromotive force 𝑣 - 𝑒).
 
 4. The x0 parameter here corresponds to the 'onset' in NEURON (and Rall) code.
 
 5. Finally, 'x' here corresponds to 𝑡 in NEURON's code. If follows that x0 and τ
 have the same physical units as 'x'.
 
-† At f(x) = 0.5 and noting χ  = (t-onset)/τ for τ > 0,  expression (1) becomes
+† At $f(x) = 0.5$
+and noting $\\chi  = \\left(t - \\text{onset}\\right)/\\tau \\text{ for } \\tau > 0$
+`Eq. 2` becomes
     
-    χ × exp(1-χ) = 0.5.                                                      (2)
+Eq. 3
+-----
 
-It follows that χ = 0.5 × exp(χ-1).
+$$\\chi \\times e^{\\left(1-\\chi\\right)} = 0.5$$
+
+It follows that 
+
+$$\\chi = 0.5 \\times e^{\\left(\\chi - 1\\right)}$$
 
 This is a transcendental equation which can be solved graphically by plotting, 
 on the same axes, the curves
-    g(t) = χ
-    h(t) = exp(χ-1) × 0.5
+
+$$g(t) = \\chi$$
+and
+$$h(t) = e^{\\left(\\chi - 1\\right)} \\times 0.5$$
     
-    The intersections between the two curves are the solutions χ₀, χ₁ of eq. (2)
-    (you may want to plot the region of the curves where x <= 0.2, in order to
-    visualize the intersections).
+The intersections between the two curves are the solutions χ₀, χ₁ of `Eq. 3`
+(you may want to plot the region of the curves where x <= 0.2, in order to
+visualize the intersections).
     
-    Example:
+Example:
     
-    
+.. code:: python
+
     x = np.linspace(0,1,int(1e5))
     τ = 0.05
     g = x/τ
@@ -862,22 +878,21 @@ on the same axes, the curves
     fwhm
     -> 2.4463244632446317   ≈ 2.45τ
 
-    # Finally the area under the curve:
-    # (we now express (1) in t)
-    
-            /
-            | t/τ × exp(1-t/τ)          for τ > 0                            (3)
-    f(t) =  |
-            | 0                         otherwise
-            \
+Finally, expressing `Eq. 2` in t:
 
-    ∞
-    ∫ f(x) dx = e × τ                                                        (4)
-    0
-    ∎
+Eq. 4
+-----
+
+$$f(t) = \\begin{cases} t/\\tau \\times e^{\\left(1-t/\\tau\\right)} & \\text{for}\\: \\tau > 0 \\\\0 & \\text{otherwise} \\end{cases}$$
+
+the area under the curve is:
+
+Eq. 5
+-----
+$$\\int_{0}^{\\infty} f(x)dx = e \\times \\tau \\qed$$
     
-    NOTE: the integral (4) is divergent for τ < 0, and the expression (3) is
-    undefined for τ = 0; therefore f(x) above needs to be defined as shown.
+.. note:: The integral (`Eq. 5`) is divergent for τ < 0, and `Eq. 4` is
+   undefined for τ = 0
                                     
     
 CHANGELOG:
@@ -997,7 +1012,9 @@ WARNING: do not pass quantities for the parameters, yet; just use floats
     # return x*i - x**2 / n + b
     
 @modelfunction(coefficients = ("α", "β", "x0", "τ1", "τ2"),
-               title="ClementsBekkers97")
+               title = "ClementsBekkers97",
+               expression = r"$y(x) = \begin{cases} \alpha + \beta \times \left(1 - e^{-\left(x-x_{0}\right) / \tau_{1}}\right) \times e^{-\left(x-x_{0}\right) / \tau_{2}} & \text{for}\: x - x_{0} \geq 0 \\\alpha & \text{otherwise} \end{cases}$",
+)
 def Clements_Bekkers_97(x:np.ndarray | Real,
                         α:typing.Union[Real, typing.Sequence[Real], np.ndarray], /, 
                         β:typing.Optional[Real|int] = None, 
@@ -1006,17 +1023,16 @@ def Clements_Bekkers_97(x:np.ndarray | Real,
                         τ2:typing.Optional[Real] = None,
                         **kwargs) -> np.ndarray | Real:
     r"""
-    Clements & Bekkers 1997 mEPSC waveform).
+    Clements & Bekkers 1997 mEPSC waveform.
+
+    Description:
+    ============
 
     This is a product of two exponentials ("rise" and "decay", each with their 
     own time constant), with additive and mutiplicative bias:
-    
-            /
-            | α + β × (1 - exp(-(x-x₀)/τ₁)) × exp(-(x-x₀)/τ₂)   where x-x₀ >= 0
-    f(x) =  |
-            | α                                                 elsewhere
-            \
-                
+
+    $y(x) = \\begin{cases} \\alpha + \\beta \\times \\left(1 - e^{-\\left(x-x_{0}\\right) / \\tau_{1}}\\right) \\times e^{-\\left(x-x_{0}\\right) / \\tau_{2}} & \\text{for}\\: x - x_{0} \\geq 0 \\\\\\alpha & \\text{otherwise} \\end{cases}$
+
     where:
         α           — the offset (additive bias; usually, 0.); units of "y"
     
@@ -1029,9 +1045,10 @@ def Clements_Bekkers_97(x:np.ndarray | Real,
     
     Parameters:
     ============
-    x: predictor (independent variable e.g., time) - 1D numpy ndarray
+    
+    :x: predictor (independent variable e.g., time) - 1D numpy ndarray
 
-    α, β, x₀, τ₁ and τ₂: float scalars, where:
+    :α, β, x₀, τ₁ and τ₂: float scalars, where:
         α is considered in pA,
         β is dimensionless,
         x₀, τ₁ and τ₂ are considered to be given in s
@@ -1040,12 +1057,14 @@ def Clements_Bekkers_97(x:np.ndarray | Real,
     
     Var-keyword parameters:
     =======================
-    unit_amplitude: optional, default is False
+    
+    :unit_amplitude: optional, default is False
         When True, return a waveform with baseline 0 and peak value +1 , using 
         the given time constants τ₁ and τ₂
     
     Returns:
     ========
+    
     1D numpy array (vector)
     
     NOTE:
@@ -1797,9 +1816,14 @@ voltage dependent channels Naᵥ and Kᵥ in the Hodgkin-Huxley formalism.
 def Heaviside(x:np.ndarray|Real, 
               x0:typing.Union[Real, pq.Quantity], /, 
               α:bool=True) -> np.ndarray | float:
-    r"""Heaviside (step) function:
+    r"""Heaviside (step) function.
+
+    Description:
+    =============
     
-    Step transition between two levels (0 and 1)
+    Step transition between two levels (0 and 1) :
+
+    r"$\theta(x) = \begin{cases} 0 & \text{for}\: x = 0 \\1 & \text{for}\: x > 0 \end{cases}$"
     
     Parameters:
     ===========

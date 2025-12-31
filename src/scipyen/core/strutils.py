@@ -249,7 +249,9 @@ def str2sequence(s: str) -> typing.List[str]:
 
 def is_path(s: str) -> bool:
     r"""Returns True if s is a string representation of a file system path."""
-    return isinstance(s, str) and any(c in s for c in (os.sep, os.pathsep, ";", "\\"))
+    import pydoc
+    return pydoc.ispath(s)
+    # return isinstance(x, str) and x.find(os.sep) >= 0
 
 
 def str2range(s: str) -> range:
@@ -644,10 +646,71 @@ def isnumber(s: str) -> bool:
     except:
         return False
     
+def islatex(s:str) -> bool:
+    latex_combined_pattern = r'(\$\$([^$]*)\$\$|\\begin\{[^\}]+\}.*?\\end\{[^\}]+\}|(\$[^\$]*\$|\\[a-zA-Z]+(?:\{[^\}]*\})?))'
+    matches = _re.findall(latex_combined_pattern, s, _re.DOTALL)
+    return len(matches)>0 and len(matches[0])>0
+    
 def render_latex(l:str, backend:str="auto", out:str="ipython", 
                 darkmode:typing.Optional[bool]=None, wrap:bool=False,
                 **kwargs) -> typing.Optional[typing.Union[PIL.Image, QtGui.QPixmap, QtGui.QImage, IPImage]]:
+    r"""Graphic rendering of a LaTeX string.
+
+    Positional parameters:
+    =======================
+    
+    :l: The LaTeX string to be rendered. Must contain a math LaTeX environment,
+        and assumes the use of the 'amsmath' LaTeX package. The string is NOT
+        verified for compliance with LaTeX.
+    
+    :backend: The backend used to render the LaTeX string 'l'. 
+        One of "auto" (default), "dvipng", "matplotlib".
+        The "dvipng" backend uses the 'dvipng' utility, which requires a LaTeX
+        distribution installed locally.
+        The "matplotlib" backend uses the renderer supplied by the 'matplotlib'
+        package, which *may* use the 'dvipng' utility from a local LaTeX 
+        distribution (if available) or the 'matplotlib.mathtext' module as fallback.
+        Both "dvipng" and "matplotlib" backends are involed indirectly, via 
+        ``IPython.lib.latextools.latex_to_png(…)`` function.
+        The "auto" backend tries "dvipng" first, then "matplotlib", before failing.
+        
+    :out: The kind of output generated. One of "ipython" (default), "bytes", 
+        "img", "pix", or "pil".
+        * "ipython" generates an IPython Image object that is readily displayed
+            by suitable IPython frontends (e.g. qtconsole)
+        * "bytes" generates a bytes image data object (PNG)
+        * "pix" generates a QtGui.QPixmap object
+        * "img" generates a QtGui.QImage object
+        * "pil" generates a PIL.Image.Image object
+    
+    :darkmode: Flag indicating if the generated graphic is suitable for a dark 
+        (True) or bright (False) background. Except for the "pil" output and the
+        "matplotlib" backend, the graphic data has transparent background. This
+        flag simply determines the foregreound color (white for ``darkmode=True``,
+        black for ``darkmode=False``)
+    
+    :wrap: Flag passed on to IPython's ``latex_to_png(…)`` function
+    
+    Var-keyword parameters:
+    =======================
+    
+    :kwargs: passed directly to ``IPython.lib.latextools.latex_to_png(…)`` 
+    function
+    
+    Returns:
+    ========
+    
+    An object of the type determined by the value of the 'out' parameter:
+    
+    * "ipython" ↦ ``IPython.core.display.Image``
+    * "bytes"   ↦ ``bytes``
+    * "pix"     ↦ ``QtGui.QPixmap``
+    * "img"     ↦ ``QtGui.QImage``
+    * "pil"     ↦ ``PIL.Image.Image``
+        
+"""
     from io import BytesIO
+    from base64 import b64encode
     from IPython.lib import latextools
     from core.prog import scipywarn
     from gui.guiutils import isDarkGui
@@ -691,7 +754,7 @@ def render_latex(l:str, backend:str="auto", out:str="ipython",
     elif out.lower() == "ipython":
         return IPImage(data)
     elif out.lower() == "base64": # not sure I need this
-        return data.decode("ascii")
+        return b64encode(data)
     elif out.lower() == "bytes":
         return data
     elif out.lower() == "pil":

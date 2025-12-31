@@ -544,7 +544,7 @@ def reload_plugin(obj:types.ModuleType) -> types.ModuleType:
     # after the first import of the module and Y.__name__ is the same!
     try:
         spec = importlib.util.find_spec(obj.__name__)
-        print(f"reload_plugin: spec found by importlib = {spec}")
+        # print(f"reload_plugin: spec found by importlib = {spec}")
     except:
         # NOTE: 2025-03-18 22:59:47
         # I dont't quite understand why __spec__ is re-set to None; compensating
@@ -557,7 +557,7 @@ def reload_plugin(obj:types.ModuleType) -> types.ModuleType:
             else:
                 setattr(obj, "__spec__", spec)
                 
-    print(f"reload_plugin: spec = {spec}")
+    # print(f"reload_plugin: spec = {spec}")
     spec.loader.exec_module(obj) # I think this is the culprit, but there has to be a way to spot differences between old & new versions and replace only what has changed
     sys.modules[spec.name] = obj
     loaded_plugins[spec.name] = obj

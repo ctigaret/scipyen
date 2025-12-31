@@ -184,39 +184,20 @@ https://www.bomberbot.com/python/converting-restructuredtext-to-html-with-python
         style = "KeplerDark"
     else:
         style="default"
-    # settings = docutils.frontend.get_default_settings()
-    # shut_up_level = docutils.utils.Reporter.SEVERE_LEVEL + 1
-    # settings_overrides={'output_encoding': 'unicode',
-    #                     'output_encoding_error_handler': 'ignore',
-    #                     'input_encoding_error_handler': 'ignore',
-    #                     'report_level': 5,
-    #                     'halt_level': 5,
-    #                     'syntax_highlight': 'long',
-    #                     'table_style': 'borderless',
-    #                     'math_output': 'mathjax',}
-    # parts = publish_parts(rst_text, writer_name='html')
+
     parts = publish_parts(rst_text, writer_name='html5', settings_overrides=docutils_settings_overrides)
     ret_html = parts['html_body']
-    
-    # print('<pre class=' in ret_html)
-
-    # formatter = HtmlFormatter(noclasses=True, nobackground=True, style=style) # <--
     
     def replace_code_block(match):
         code = match.group(1)
         print(f"helpsystem.helputils.rst_to_html_with_highlighting.replace_code_block: code = {code}")
-        # lang = match.group(2)
-        # print(f"lang = {lang}")
-        # lexer = get_lexer_by_name(lang, stripall=True) # <--
-        # formatter = HtmlFormatter(linenos=True, cssclass="source", noclasses=True, nobackground=True, style=style) # <--
-        # formatter = HtmlFormatter(linenos=True, cssclass="source") # <--
-        # return highlight(code, PythonLexer(stripall=True), formatter) # <--
         code = code.replace("&gt;", ">").replace("&lt;", "<")
         return mypylight(code)
 
 
     # import re # already imported at the top
-    pattern = r'<pre class="literal-block">(.+?)</pre>' # docutils writes this, NOT "code python doctest"
+    # BUG: FIXME: 2025-12-31 00:07:08 TODO
+    pattern = r'<pre class="literal-block">(.+?)</pre>|<pre class="code python literal-block"><code>(.+?)</code></pre>' 
     # pattern1 = r'<pre class="code python doctest">(.+?)</pre>'
     # pattern = r'<pre>\n(.+?)\n</pre>'
     # rematch = re.match(pattern1, ret_html, flags=re.DOTALL)
@@ -1233,14 +1214,6 @@ def make_python_help_dict(s:str, special:typing.Optional[str] = None) -> dict:
             if "function" in line:
                 helpdict[line] = list()
                 section = line
-            # if section:
-            #     helpdict[section] = None
-            # else:
-            #     helpdict[line] = None
-            # NOTE: 2025-10-14 11:57:53
-            # now, this is moot, see NOTE 2025-10-14 11:55:56
-            # if not line.startswith("Help on"): 
-            #     section = line
         else:
             if line.lower() in helpdict:
                 section = line.lower()
@@ -1248,7 +1221,6 @@ def make_python_help_dict(s:str, special:typing.Optional[str] = None) -> dict:
                 if section:
                     if section not in helpdict or not isinstance(helpdict[section], list):
                         helpdict[section] = list()
-                    # helpdict[section].append(f"{line}<br>")
                     helpdict[section].append(line)
                     
     for section in helpdict:
@@ -1283,11 +1255,11 @@ def format_python_help_output(shell, data:PythonHelpDict, formatter=None):
             'text/html': rst_to_html_with_highlighting(text)
             }
     
-    def pyhelp_formatter2(text) -> Bundle:
-        return {
-            'text/plain': _format(text),
-            'text/html': reSThighlight(text)
-            }
+    # def pyhelp_formatter2(text) -> Bundle:
+    #     return {
+    #         'text/plain': _format(text),
+    #         'text/html': reSThighlight(text)
+    #         }
     
     def append_field(shell, bundle:UnformattedBundle, title:str, key:str, hd:PythonHelpDict, formatter):
         field = hd[key]
@@ -1306,7 +1278,6 @@ def format_python_help_output(shell, data:PythonHelpDict, formatter=None):
         title = titlekey #if titlekey not in data else ""
         try:
             append_field(shell, bundle, title, titlekey, data, pyhelp_formatter)
-            # append_field(shell, bundle, title, titlekey, data, pyhelp_formatter2)
         except:
             # traceback.print_exc()
             append_field(shell, bundle, title, titlekey, data, format_screen)
