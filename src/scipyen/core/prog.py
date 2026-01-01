@@ -84,7 +84,7 @@ ModSpec = importlib.machinery.ModuleSpec  # saves me some typing
 
 class NoData:
     r"""Empty placeholder class that signifies lack of any data.
-        Used in Descritpr validation, in order to allow the use of None, MISSING,
+        Used in Descriptor validation, in order to allow the use of None, MISSING,
         pandas NAType as values in descriptors.
     Cannot be instantiated.
     """

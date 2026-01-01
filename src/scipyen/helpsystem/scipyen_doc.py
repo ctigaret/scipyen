@@ -55,8 +55,8 @@ Reference Manual pages.
 # # # #     the current directory is changed with os.chdir(), an incorrect
 # # # #     path will be displayed.
 
-# import ast
-# import __future__
+import ast
+import __future__
 import builtins
 import importlib._bootstrap
 import importlib._bootstrap_external
@@ -65,36 +65,38 @@ import importlib.util
 import inspect
 import io
 import os
-# import pkgutil
+import pkgutil
 import platform
 import re
 import sys
-# import sysconfig
-# import time
-# import tokenize
-# import urllib.parse
-# import warnings
-# from collections import deque
-# from reprlib import Repr
-# from traceback import format_exception_only
+import sysconfig
+import time
+import tokenize
+import urllib.parse
+import warnings
+from collections import deque
+from reprlib import Repr
+from traceback import format_exception_only
 
 # NOTE: 2025-12-29 23:34:50 These below are MY imports:
 # NOTE: TODO 2025-12-28 21:22:21 import here relevant stuff from pydoc, then remove it from this module 
+import types, typing
 import pydoc
 import tempfile
 import pathlib
+from collections import deque
 
-# from _pyrepl.pager import (get_pager, plain, pipe_pager,
-#                            plain_pager, tempfile_pager, tty_pager)
+from _pyrepl.pager import (get_pager, plain, pipe_pager,
+                           plain_pager, tempfile_pager, tty_pager)
 
 
 # --------------------------------------------------------- old names
 
-# getpager = get_pager
-# pipepager = pipe_pager
-# plainpager = plain_pager
-# tempfilepager = tempfile_pager
-# ttypager = tty_pager
+getpager = get_pager
+pipepager = pipe_pager
+plainpager = plain_pager
+tempfilepager = tempfile_pager
+ttypager = tty_pager
 
 
 # --------------------------------------------------------- common routines
@@ -186,7 +188,7 @@ def _getowndoc(obj):
     except AttributeError:
         return None
 
-def _getdoc(object):
+def _getdoc(object): 
     """Get the documentation string for an object.
 
     All tabs are expanded to spaces.  To clean up docstrings that are
@@ -202,10 +204,10 @@ def _getdoc(object):
         return None
     return inspect.cleandoc(doc)
 
-# def getdoc(object):
-#     """Get the doc string or comments for an object."""
-#     result = _getdoc(object) or inspect.getcomments(object)
-#     return result and re.sub('^ *\n', '', result.rstrip()) or ''
+def getdoc(object):
+    """Get the doc string or comments for an object."""
+    result = _getdoc(object) or inspect.getcomments(object)
+    return result and re.sub('^ *\n', '', result.rstrip()) or ''
 
 def splitdoc(doc):
     """Split a doc string into a synopsis line (if any) and the rest."""
@@ -216,52 +218,52 @@ def splitdoc(doc):
         return lines[0], '\n'.join(lines[2:])
     return '', '\n'.join(lines)
 
-# def _getargspec(object):
-#     try:
-#         signature = inspect.signature(object)
-#         if signature:
-#             name = getattr(object, '__name__', '')
-#             # <lambda> function are always single-line and should not be formatted
-#             max_width = (80 - len(name)) if name != '<lambda>' else None
-#             return signature.format(max_width=max_width)
-#     except (ValueError, TypeError):
-#         argspec = getattr(object, '__text_signature__', None)
-#         if argspec:
-#             if argspec[:2] == '($':
-#                 argspec = '(' + argspec[2:]
-#             if getattr(object, '__self__', None) is not None:
-#                 # Strip the bound argument.
-#                 m = re.match(r'\(\w+(?:(?=\))|,\s*(?:/(?:(?=\))|,\s*))?)', argspec)
-#                 if m:
-#                     argspec = '(' + argspec[m.end():]
-#         return argspec
-#     return None
+def _getargspec(object):
+    try:
+        signature = inspect.signature(object)
+        if signature:
+            name = getattr(object, '__name__', '')
+            # <lambda> function are always single-line and should not be formatted
+            max_width = (80 - len(name)) if name != '<lambda>' else None
+            return signature.format(max_width=max_width)
+    except (ValueError, TypeError):
+        argspec = getattr(object, '__text_signature__', None)
+        if argspec:
+            if argspec[:2] == '($':
+                argspec = '(' + argspec[2:]
+            if getattr(object, '__self__', None) is not None:
+                # Strip the bound argument.
+                m = re.match(r'\(\w+(?:(?=\))|,\s*(?:/(?:(?=\))|,\s*))?)', argspec)
+                if m:
+                    argspec = '(' + argspec[m.end():]
+        return argspec
+    return None
 
-# def classname(object, modname):
-#     """Get a class name and qualify it with a module name if necessary."""
-#     name = object.__name__
-#     if object.__module__ != modname:
-#         name = object.__module__ + '.' + name
-#     return name
-# 
-# def parentname(object, modname):
-#     """Get a name of the enclosing class (qualified it with a module name
-#     if necessary) or module."""
-#     if '.' in object.__qualname__:
-#         name = object.__qualname__.rpartition('.')[0]
-#         if object.__module__ != modname and object.__module__ is not None:
-#             return object.__module__ + '.' + name
-#         else:
-#             return name
-#     else:
-#         if object.__module__ != modname:
-#             return object.__module__
-# 
-# def isdata(object):
-#     """Check if an object is of a type that probably means it's data."""
-#     return not (inspect.ismodule(object) or inspect.isclass(object) or
-#                 inspect.isroutine(object) or inspect.isframe(object) or
-#                 inspect.istraceback(object) or inspect.iscode(object))
+def classname(object, modname):
+    """Get a class name and qualify it with a module name if necessary."""
+    name = object.__name__
+    if object.__module__ != modname:
+        name = object.__module__ + '.' + name
+    return name
+
+def parentname(object, modname):
+    """Get a name of the enclosing class (qualified it with a module name
+    if necessary) or module."""
+    if '.' in object.__qualname__:
+        name = object.__qualname__.rpartition('.')[0]
+        if object.__module__ != modname and object.__module__ is not None:
+            return object.__module__ + '.' + name
+        else:
+            return name
+    else:
+        if object.__module__ != modname:
+            return object.__module__
+
+def isdata(object):
+    """Check if an object is of a type that probably means it's data."""
+    return not (inspect.ismodule(object) or inspect.isclass(object) or
+                inspect.isroutine(object) or inspect.isframe(object) or
+                inspect.istraceback(object) or inspect.iscode(object))
 
 def replace(text, *pairs):
     """Do a series of global replacements on a string."""
@@ -325,8 +327,8 @@ def _split_list(s, predicate):
             no.append(x)
     return yes, no
 
-# _future_feature_names = set(__future__.all_feature_names)
-_future_feature_names = pydoc._future_feature_names
+_future_feature_names = set(__future__.all_feature_names)
+# _future_feature_names = pydoc._future_feature_names
 
 def visiblename(name, all=None, obj=None):
     """Decide whether to show documentation on a variable."""
@@ -454,142 +456,142 @@ def synopsis(filename, cache={}):
         cache[filename] = (mtime, result)
     return result
 
-# class ErrorDuringImport(Exception):
-#     """Errors that occurred while trying to import something to document it."""
-#     def __init__(self, filename, exc_info):
-#         if not isinstance(exc_info, tuple):
-#             assert isinstance(exc_info, BaseException)
-#             self.exc = type(exc_info)
-#             self.value = exc_info
-#             self.tb = exc_info.__traceback__
-#         else:
-#             warnings.warn("A tuple value for exc_info is deprecated, use an exception instance",
-#                           DeprecationWarning)
-# 
-#             self.exc, self.value, self.tb = exc_info
-#         self.filename = filename
-# 
-#     def __str__(self):
-#         exc = self.exc.__name__
-#         return 'problem in %s - %s: %s' % (self.filename, exc, self.value)
+class ErrorDuringImport(Exception):
+    """Errors that occurred while trying to import something to document it."""
+    def __init__(self, filename, exc_info):
+        if not isinstance(exc_info, tuple):
+            assert isinstance(exc_info, BaseException)
+            self.exc = type(exc_info)
+            self.value = exc_info
+            self.tb = exc_info.__traceback__
+        else:
+            warnings.warn("A tuple value for exc_info is deprecated, use an exception instance",
+                          DeprecationWarning)
 
-# def importfile(path):
-#     """Import a Python source file or compiled file given its path."""
-#     magic = importlib.util.MAGIC_NUMBER
-#     with open(path, 'rb') as file:
-#         is_bytecode = magic == file.read(len(magic))
-#     filename = os.path.basename(path)
-#     name, ext = os.path.splitext(filename)
-#     if is_bytecode:
-#         loader = importlib._bootstrap_external.SourcelessFileLoader(name, path)
-#     else:
-#         loader = importlib._bootstrap_external.SourceFileLoader(name, path)
-#     # XXX We probably don't need to pass in the loader here.
-#     spec = importlib.util.spec_from_file_location(name, path, loader=loader)
-#     try:
-#         return importlib._bootstrap._load(spec)
-#     except BaseException as err:
-#         raise ErrorDuringImport(path, err)
+            self.exc, self.value, self.tb = exc_info
+        self.filename = filename
 
-# def safeimport(path, forceload=0, cache={}):
-#     """Import a module; handle errors; return None if the module isn't found.
-# 
-#     If the module *is* found but an exception occurs, it's wrapped in an
-#     ErrorDuringImport exception and reraised.  Unlike __import__, if a
-#     package path is specified, the module at the end of the path is returned,
-#     not the package at the beginning.  If the optional 'forceload' argument
-#     is 1, we reload the module from disk (unless it's a dynamic extension)."""
-#     try:
-#         # If forceload is 1 and the module has been previously loaded from
-#         # disk, we always have to reload the module.  Checking the file's
-#         # mtime isn't good enough (e.g. the module could contain a class
-#         # that inherits from another module that has changed).
-#         if forceload and path in sys.modules:
-#             if path not in sys.builtin_module_names:
-#                 # Remove the module from sys.modules and re-import to try
-#                 # and avoid problems with partially loaded modules.
-#                 # Also remove any submodules because they won't appear
-#                 # in the newly loaded module's namespace if they're already
-#                 # in sys.modules.
-#                 subs = [m for m in sys.modules if m.startswith(path + '.')]
-#                 for key in [path] + subs:
-#                     # Prevent garbage collection.
-#                     cache[key] = sys.modules[key]
-#                     del sys.modules[key]
-#         module = importlib.import_module(path)
-#     except BaseException as err:
-#         # Did the error occur before or after the module was found?
-#         if path in sys.modules:
-#             # An error occurred while executing the imported module.
-#             raise ErrorDuringImport(sys.modules[path].__file__, err)
-#         elif type(err) is SyntaxError:
-#             # A SyntaxError occurred before we could execute the module.
-#             raise ErrorDuringImport(err.filename, err)
-#         elif isinstance(err, ImportError) and err.name == path:
-#             # No such module in the path.
-#             return None
-#         else:
-#             # Some other error occurred during the importing process.
-#             raise ErrorDuringImport(path, err)
-#     return module
+    def __str__(self):
+        exc = self.exc.__name__
+        return 'problem in %s - %s: %s' % (self.filename, exc, self.value)
+
+def importfile(path):
+    """Import a Python source file or compiled file given its path."""
+    magic = importlib.util.MAGIC_NUMBER
+    with open(path, 'rb') as file:
+        is_bytecode = magic == file.read(len(magic))
+    filename = os.path.basename(path)
+    name, ext = os.path.splitext(filename)
+    if is_bytecode:
+        loader = importlib._bootstrap_external.SourcelessFileLoader(name, path)
+    else:
+        loader = importlib._bootstrap_external.SourceFileLoader(name, path)
+    # XXX We probably don't need to pass in the loader here.
+    spec = importlib.util.spec_from_file_location(name, path, loader=loader)
+    try:
+        return importlib._bootstrap._load(spec)
+    except BaseException as err:
+        raise ErrorDuringImport(path, err)
+
+def safeimport(path, forceload=0, cache={}):
+    """Import a module; handle errors; return None if the module isn't found.
+
+    If the module *is* found but an exception occurs, it's wrapped in an
+    ErrorDuringImport exception and reraised.  Unlike __import__, if a
+    package path is specified, the module at the end of the path is returned,
+    not the package at the beginning.  If the optional 'forceload' argument
+    is 1, we reload the module from disk (unless it's a dynamic extension)."""
+    try:
+        # If forceload is 1 and the module has been previously loaded from
+        # disk, we always have to reload the module.  Checking the file's
+        # mtime isn't good enough (e.g. the module could contain a class
+        # that inherits from another module that has changed).
+        if forceload and path in sys.modules:
+            if path not in sys.builtin_module_names:
+                # Remove the module from sys.modules and re-import to try
+                # and avoid problems with partially loaded modules.
+                # Also remove any submodules because they won't appear
+                # in the newly loaded module's namespace if they're already
+                # in sys.modules.
+                subs = [m for m in sys.modules if m.startswith(path + '.')]
+                for key in [path] + subs:
+                    # Prevent garbage collection.
+                    cache[key] = sys.modules[key]
+                    del sys.modules[key]
+        module = importlib.import_module(path)
+    except BaseException as err:
+        # Did the error occur before or after the module was found?
+        if path in sys.modules:
+            # An error occurred while executing the imported module.
+            raise ErrorDuringImport(sys.modules[path].__file__, err)
+        elif type(err) is SyntaxError:
+            # A SyntaxError occurred before we could execute the module.
+            raise ErrorDuringImport(err.filename, err)
+        elif isinstance(err, ImportError) and err.name == path:
+            # No such module in the path.
+            return None
+        else:
+            # Some other error occurred during the importing process.
+            raise ErrorDuringImport(path, err)
+    return module
 
 # ---------------------------------------------------- formatter base class
 
-# class Doc:
-# 
-#     PYTHONDOCS = os.environ.get("PYTHONDOCS",
-#                                 "https://docs.python.org/%d.%d/library"
-#                                 % sys.version_info[:2])
-# 
-#     def document(self, object, name=None, *args):
-#         """Generate documentation for an object."""
-#         args = (object, name) + args
-#         # 'try' clause is to attempt to handle the possibility that inspect
-#         # identifies something in a way that pydoc itself has issues handling;
-#         # think 'super' and how it is a descriptor (which raises the exception
-#         # by lacking a __name__ attribute) and an instance.
-#         try:
-#             if inspect.ismodule(object): return self.docmodule(*args)
-#             if inspect.isclass(object): return self.docclass(*args)
-#             if inspect.isroutine(object): return self.docroutine(*args)
-#         except AttributeError:
-#             pass
-#         if inspect.isdatadescriptor(object): return self.docdata(*args)
-#         return self.docother(*args)
-# 
-#     def fail(self, object, name=None, *args):
-#         """Raise an exception for unimplemented types."""
-#         message = "don't know how to document object%s of type %s" % (
-#             name and ' ' + repr(name), type(object).__name__)
-#         raise TypeError(message)
-# 
-#     docmodule = docclass = docroutine = docother = docproperty = docdata = fail
-# 
-#     def getdocloc(self, object, basedir=sysconfig.get_path('stdlib')):
-#         """Return the location of module docs or None"""
-# 
-#         try:
-#             file = inspect.getabsfile(object)
-#         except TypeError:
-#             file = '(built-in)'
-# 
-#         docloc = os.environ.get("PYTHONDOCS", self.PYTHONDOCS)
-# 
-#         basedir = os.path.normcase(basedir)
-#         if (isinstance(object, type(os)) and
-#             (object.__name__ in ('errno', 'exceptions', 'gc',
-#                                  'marshal', 'posix', 'signal', 'sys',
-#                                  '_thread', 'zipimport') or
-#              (file.startswith(basedir) and
-#               not file.startswith(os.path.join(basedir, 'site-packages')))) and
-#             object.__name__ not in ('xml.etree', 'test.test_pydoc.pydoc_mod')):
-#             if docloc.startswith(("http://", "https://")):
-#                 docloc = "{}/{}.html".format(docloc.rstrip("/"), object.__name__.lower())
-#             else:
-#                 docloc = os.path.join(docloc, object.__name__.lower() + ".html")
-#         else:
-#             docloc = None
-#         return docloc
+class Doc:
+
+    PYTHONDOCS = os.environ.get("PYTHONDOCS",
+                                "https://docs.python.org/%d.%d/library"
+                                % sys.version_info[:2])
+
+    def document(self, object, name=None, *args):
+        """Generate documentation for an object."""
+        args = (object, name) + args
+        # 'try' clause is to attempt to handle the possibility that inspect
+        # identifies something in a way that pydoc itself has issues handling;
+        # think 'super' and how it is a descriptor (which raises the exception
+        # by lacking a __name__ attribute) and an instance.
+        try:
+            if inspect.ismodule(object): return self.docmodule(*args)
+            if inspect.isclass(object): return self.docclass(*args)
+            if inspect.isroutine(object): return self.docroutine(*args)
+        except AttributeError:
+            pass
+        if inspect.isdatadescriptor(object): return self.docdata(*args)
+        return self.docother(*args)
+
+    def fail(self, object, name=None, *args):
+        """Raise an exception for unimplemented types."""
+        message = "don't know how to document object%s of type %s" % (
+            name and ' ' + repr(name), type(object).__name__)
+        raise TypeError(message)
+
+    docmodule = docclass = docroutine = docother = docproperty = docdata = fail
+
+    def getdocloc(self, object, basedir=sysconfig.get_path('stdlib')):
+        """Return the location of module docs or None"""
+
+        try:
+            file = inspect.getabsfile(object)
+        except TypeError:
+            file = '(built-in)'
+
+        docloc = os.environ.get("PYTHONDOCS", self.PYTHONDOCS)
+
+        basedir = os.path.normcase(basedir)
+        if (isinstance(object, type(os)) and
+            (object.__name__ in ('errno', 'exceptions', 'gc',
+                                 'marshal', 'posix', 'signal', 'sys',
+                                 '_thread', 'zipimport') or
+             (file.startswith(basedir) and
+              not file.startswith(os.path.join(basedir, 'site-packages')))) and
+            object.__name__ not in ('xml.etree', 'test.test_pydoc.pydoc_mod')):
+            if docloc.startswith(("http://", "https://")):
+                docloc = "{}/{}.html".format(docloc.rstrip("/"), object.__name__.lower())
+            else:
+                docloc = os.path.join(docloc, object.__name__.lower() + ".html")
+        else:
+            docloc = None
+        return docloc
 
 # -------------------------------------------- HTML documentation generator
 
@@ -1229,37 +1231,37 @@ def synopsis(filename, cache={}):
 
 # -------------------------------------------- text documentation generator
 
-# class TextRepr(Repr):
-#     """Class for safely making a text representation of a Python object."""
-#     def __init__(self):
-#         Repr.__init__(self)
-#         self.maxlist = self.maxtuple = 20
-#         self.maxdict = 10
-#         self.maxstring = self.maxother = 100
-# 
-#     def repr1(self, x, level):
-#         if hasattr(type(x), '__name__'):
-#             methodname = 'repr_' + '_'.join(type(x).__name__.split())
-#             if hasattr(self, methodname):
-#                 return getattr(self, methodname)(x, level)
-#         return cram(stripid(repr(x)), self.maxother)
-# 
-#     def repr_string(self, x, level):
-#         test = cram(x, self.maxstring)
-#         testrepr = repr(test)
-#         if '\\' in test and '\\' not in replace(testrepr, r'\\', ''):
-#             # Backslashes are only literal in the string and are never
-#             # needed to make any special characters, so show a raw string.
-#             return 'r' + testrepr[0] + test + testrepr[0]
-#         return testrepr
-# 
-#     repr_str = repr_string
-# 
-#     def repr_instance(self, x, level):
-#         try:
-#             return cram(stripid(repr(x)), self.maxstring)
-#         except:
-#             return '<%s instance>' % x.__class__.__name__
+class TextRepr(Repr):
+    """Class for safely making a text representation of a Python object."""
+    def __init__(self):
+        Repr.__init__(self)
+        self.maxlist = self.maxtuple = 20
+        self.maxdict = 10
+        self.maxstring = self.maxother = 100
+
+    def repr1(self, x, level):
+        if hasattr(type(x), '__name__'):
+            methodname = 'repr_' + '_'.join(type(x).__name__.split())
+            if hasattr(self, methodname):
+                return getattr(self, methodname)(x, level)
+        return cram(stripid(repr(x)), self.maxother)
+
+    def repr_string(self, x, level):
+        test = cram(x, self.maxstring)
+        testrepr = repr(test)
+        if '\\' in test and '\\' not in replace(testrepr, r'\\', ''):
+            # Backslashes are only literal in the string and are never
+            # needed to make any special characters, so show a raw string.
+            return 'r' + testrepr[0] + test + testrepr[0]
+        return testrepr
+
+    repr_str = repr_string
+
+    def repr_instance(self, x, level):
+        try:
+            return cram(stripid(repr(x)), self.maxstring)
+        except:
+            return '<%s instance>' % x.__class__.__name__
 
 class TextDoc(pydoc.Doc):
     """Formatter class for text documentation."""
@@ -1657,7 +1659,7 @@ location listed above.
             if chop < 0: repr = repr[:chop] + '...'
         line = (name and self.bold(name) + ' = ' or '') + repr
         if not doc:
-            doc = getdoc(object)
+            doc = pydoc.getdoc(object)
         if doc:
             line += '\n' + self.indent(str(doc)) + '\n'
         return line
@@ -1673,7 +1675,7 @@ class ReSTDoc(pydoc.TextDoc):
     
     _section_levels = {0:"=", 1:"-", 2:"~", 3:"_", 4:"#"}
     
-    def __init__(self):#, imagestempdir:typing.Optional[str|pathlib.Path]=None):
+    def __init__(self, tempDir:tempfile.TemporaryDirectory):#, imagestempdir:typing.Optional[str|pathlib.Path]=None):
         super().__init__()
         # if isinstance(imagestempdir, str) and os.path.isdir(imagestempdir):
         #     self.imagesdir = imagestempdir
@@ -1682,7 +1684,7 @@ class ReSTDoc(pydoc.TextDoc):
         # else:
         #     self.imagedir = tempfile.TemporaryDirectory(ignore_cleanup_errors=True, delete=False)
             
-        self.imagedir = tempfile.TemporaryDirectory(ignore_cleanup_errors=True, delete=False)
+        self.imagedir = tempDir
     
     def bold(self, text):
         return f"**{text}**"
@@ -1769,11 +1771,11 @@ class ReSTDoc(pydoc.TextDoc):
         contents = []
         push = contents.append
 
-        argspec = _getargspec(object)
+        argspec = pydoc._getargspec(object)
         if argspec and argspec != '()':
             push(name + self.render_code(argspec) + '\n')
 
-        doc = getdoc(object)
+        doc = pydoc.getdoc(object)
         if doc:
             push(doc + '\n')
 
@@ -1844,7 +1846,7 @@ class ReSTDoc(pydoc.TextDoc):
             return attrs
 
         def spilldescriptors(msg, attrs, predicate):
-            ok, attrs = _split_list(attrs, predicate)
+            ok, attrs = pydoc._split_list(attrs, predicate)
             if ok:
                 hr.maybe()
                 push(msg)
@@ -1853,12 +1855,12 @@ class ReSTDoc(pydoc.TextDoc):
             return attrs
 
         def spilldata(msg, attrs, predicate):
-            ok, attrs = _split_list(attrs, predicate)
+            ok, attrs = pydoc._split_list(attrs, predicate)
             if ok:
                 hr.maybe()
                 push(msg)
                 for name, kind, homecls, value in ok:
-                    doc = getdoc(value)
+                    doc = pydoc.getdoc(value)
                     try:
                         obj = getattr(object, name)
                     except AttributeError:
@@ -1869,14 +1871,14 @@ class ReSTDoc(pydoc.TextDoc):
 
         attrs = [(name, kind, cls, value)
                  for name, kind, cls, value in classify_class_attrs(object)
-                 if visiblename(name, obj=object)]
+                 if pydoc.visiblename(name, obj=object)]
 
         while attrs:
             if mro:
                 thisclass = mro.popleft()
             else:
                 thisclass = attrs[0][2]
-            attrs, inherited = _split_list(attrs, lambda t: t[2] is thisclass)
+            attrs, inherited = pydoc._split_list(attrs, lambda t: t[2] is thisclass)
 
             if object is not builtins.object and thisclass is builtins.object:
                 attrs = inherited
@@ -1884,10 +1886,10 @@ class ReSTDoc(pydoc.TextDoc):
             elif thisclass is object:
                 tag = "defined here"
             else:
-                tag = "inherited from %s" % classname(thisclass,
+                tag = "inherited from %s" % pydoc.classname(thisclass,
                                                       object.__module__)
 
-            sort_attributes(attrs, object)
+            pydoc.sort_attributes(attrs, object)
 
             # Pump out the attrs, segregated by kind.
             attrs = spill("Methods %s:\n" % tag, attrs,
@@ -1911,17 +1913,138 @@ class ReSTDoc(pydoc.TextDoc):
             return title + '\n'
         return title + '\n' + self.indent(contents.rstrip(), ' |  ') + '\n'
     
-    def docmodule(self, object, name=None, mod=None, *ignored): # TODO 2025-12-30 13:45:23
-        pass
+    def docmodule(self, object, name=None, mod=None, *ignored): 
+        """Produce text documentation for a given module object."""
+        name = object.__name__ # ignore the passed-in name
+        synop, desc = pydoc.splitdoc(pydoc.getdoc(object))
+        result = self.section('NAME', name + (synop and ' - ' + synop))
+        all = getattr(object, '__all__', None)
+        docloc = self.getdocloc(object)
+        if docloc is not None:
+            result = result + self.section('MODULE REFERENCE', docloc + """
+
+The following documentation is automatically generated from the Python
+source files.  It may be incomplete, incorrect or include features that
+are considered implementation detail and may vary between Python
+implementations.  When in doubt, consult the module reference at the
+location listed above.
+""")
+
+        if desc:
+            result = result + self.section('DESCRIPTION', desc)
+
+        classes = []
+        for key, value in inspect.getmembers(object, inspect.isclass):
+            # if __all__ exists, believe it.  Otherwise use old heuristic.
+            if (all is not None
+                or (inspect.getmodule(value) or object) is object):
+                if pydoc.visiblename(key, all, object):
+                    classes.append((key, value))
+        funcs = []
+        for key, value in inspect.getmembers(object, inspect.isroutine):
+            # if __all__ exists, believe it.  Otherwise use a heuristic.
+            if (all is not None
+                or inspect.isbuiltin(value)
+                or (inspect.getmodule(value) or object) is object):
+                if pydoc.visiblename(key, all, object):
+                    funcs.append((key, value))
+        data = []
+        for key, value in inspect.getmembers(object, isdata):
+            if pydoc.visiblename(key, all, object):
+                data.append((key, value))
+
+        modpkgs = []
+        modpkgs_names = set()
+        if hasattr(object, '__path__'):
+            for importer, modname, ispkg in pkgutil.iter_modules(object.__path__):
+                modpkgs_names.add(modname)
+                if ispkg:
+                    modpkgs.append(modname + ' (package)')
+                else:
+                    modpkgs.append(modname)
+
+            modpkgs.sort()
+            result = result + self.section(
+                'PACKAGE CONTENTS', '\n'.join(modpkgs))
+
+        # Detect submodules as sometimes created by C extensions
+        submodules = []
+        for key, value in inspect.getmembers(object, inspect.ismodule):
+            if value.__name__.startswith(name + '.') and key not in modpkgs_names:
+                submodules.append(key)
+        if submodules:
+            submodules.sort()
+            result = result + self.section(
+                'SUBMODULES', '\n'.join(submodules))
+
+        if classes:
+            classlist = [value for key, value in classes]
+            contents = [self.formattree(
+                inspect.getclasstree(classlist, 1), name)]
+            for key, value in classes:
+                contents.append(self.document(value, key, name))
+            result = result + self.section('CLASSES', '\n'.join(contents))
+
+        if funcs:
+            contents = []
+            for key, value in funcs:
+                contents.append(self.document(value, key, name))
+            result = result + self.section('FUNCTIONS', '\n'.join(contents))
+
+        if data:
+            contents = []
+            for key, value in data:
+                contents.append(self.docother(value, key, name, maxlen=70))
+            result = result + self.section('DATA', '\n'.join(contents))
+
+        if hasattr(object, '__version__'):
+            version = str(object.__version__)
+            if version[:11] == '$' + 'Revision: ' and version[-1:] == '$':
+                version = version[11:-1].strip()
+            result = result + self.section('VERSION', version)
+        if hasattr(object, '__date__'):
+            result = result + self.section('DATE', str(object.__date__))
+        if hasattr(object, '__author__'):
+            result = result + self.section('AUTHOR', str(object.__author__))
+        if hasattr(object, '__credits__'):
+            result = result + self.section('CREDITS', str(object.__credits__))
+        try:
+            file = inspect.getabsfile(object)
+        except TypeError:
+            file = '(built-in)'
+        result = result + self.section('FILE', file)
+        return result
     
     def docdata(self, object, name=None, mod=None, cl=None, *ignored): # TODO 2025-12-30 13:45:51
-        pass
+        results = []
+        push = results.append
+
+        if name:
+            push(f"**{name}**")
+            push('\n')
+        doc = pydoc.getdoc(object) or ''
+        if doc:
+            push(self.indent(doc))
+            push('\n')
+        return ''.join(results)
     
     docproperty = docdata
     
     def docother(self, object, name=None, mod=None, parent=None, *ignored,
                  maxlen=None, doc=None): # TODO 2025-12-30 13:46:26
-        pass
+        """Produce text documentation for a data object."""
+        repr = self.repr(object)
+        if maxlen:
+            line = (name and name + ' = ' or '') + repr
+            chop = maxlen - len(line)
+            if chop < 0: repr = repr[:chop] + '...'
+        line = (name and f"**{name}**" + ' = ' or '') + repr
+        # line = (name and self.bold(name) + ' = ' or '') + repr
+        if not doc:
+            doc = pydoc.getdoc(object)
+        if doc:
+            line += '\n' + self.indent(str(doc)) + '\n'
+        return line
    
     def docroutine(self, object, name=None, mod=None, cl=None, homecls=None):
         """Produce text documentation for a function or method object."""
@@ -2010,8 +2133,8 @@ class ReSTDoc(pydoc.TextDoc):
             return decl + '\n' + (doc and doc.rstrip() + '\n')
             # return decl + '\n' + (doc and self.indent(doc).rstrip() + '\n')
 
-    def formattree(self, tree, modname, parent=None, prefix=''): # TODO 2025-12-30 13:47:12
-        pass
+    # def formattree(self, tree, modname, parent=None, prefix=''): # TODO 2025-12-30 13:47:12
+    #     pass
 
 
 # --------------------------------------------------------- user interfaces
@@ -2049,24 +2172,42 @@ class ReSTDoc(pydoc.TextDoc):
 #         return 'method ' + thing.__name__
 #     return type(thing).__name__
 
-def locate(path, forceload=0):
+def locate(path:str, forceload:int=0):
     """Locate an object by name or dotted path, importing as necessary."""
-    parts = [part for part in path.split('.') if part]
-    module, n = None, 0
-    while n < len(parts):
-        nextmodule = safeimport('.'.join(parts[:n+1]), forceload)
-        if nextmodule: module, n = nextmodule, n + 1
-        else: break
-    if module:
-        object = module
+    from core.workspacefunctions import getMainScipyenWindow
+    mainWindow = getMainScipyenWindow()
+    # print(f"scipyen_doc.locate(path={path}): {mainWindow} -> {mainWindow}")
+    shell = mainWindow.shell
+    if path in shell.user_ns:
+        obj = shell.user_ns[path]
+        if isinstance(obj, types.ModuleType) and forceload:
+            shell.run_cell(f"reload({path})", store_history=False, silent=True, shell_futures=True)
+    elif path in shell.user_ns_hidden:
+        obj = shell.user_ns_hidden[path]
+        if isinstance(obj, types.ModuleType) and forceload:
+            shell.run_cell(f"reload({path})", store_history=False, silent=True, shell_futures=True)
+    elif path in mainWindow.user_ns_hidden:
+        obj = mainWindow.user_ns_hidden[path]
+        if isinstance(obj, types.ModuleType) and forceload:
+            shell.run_cell(f"reload({path})", store_history=False, silent=True, shell_futures=True)
+        
     else:
-        object = builtins
-    for part in parts[n:]:
-        try:
-            object = getattr(object, part)
-        except AttributeError:
-            return None
-    return object
+        parts = [part for part in path.split('.') if part]
+        module, n = None, 0
+        while n < len(parts):
+            nextmodule = safeimport('.'.join(parts[:n+1]), forceload)
+            if nextmodule: module, n = nextmodule, n + 1
+            else: break
+        if module:
+            obj = module
+        else:
+            obj = builtins
+        for part in parts[n:]:
+            try:
+                obj = getattr(obj, part)
+            except AttributeError:
+                return None
+    return obj
 
 # --------------------------------------- interactive interpreter interface
 # 
@@ -2074,73 +2215,74 @@ def locate(path, forceload=0):
 # plaintext = _PlainTextDoc()
 # html = HTMLDoc()
 
-# def resolve(thing, forceload=0):
-#     """Given an object or a path to an object, get the object and its name."""
-#     if isinstance(thing, str):
-#         object = locate(thing, forceload)
-#         if object is None:
-#             raise ImportError('''\
-# No Python documentation found for %r.
-# Use help() to get the interactive help utility.
-# Use help(str) for help on the str class.''' % thing)
-#         return object, thing
-#     else:
-#         name = getattr(thing, '__name__', None)
-#         return thing, name if isinstance(name, str) else None
+def resolve(thing, forceload=0):
+    """Given an object or a path to an object, get the object and its name."""
+    if isinstance(thing, str):
+        obj = locate(thing, forceload)
+        if obj is None:
+            raise ImportError('''\
+No Python documentation found for %r.
+Use help() to get the interactive help utility.
+Use help(str) for help on the str class.''' % thing)
+        return obj, thing
+    else:
+        name = getattr(thing, '__name__', None)
+        return thing, name if isinstance(name, str) else None
 
-def render_rst(thing:str, title:str='Python Library Documentation: %s', forceload:int|bool=0):
+def render_rst(tempdir:tempfile.TemporaryDirectory, thing:str, 
+               title:str='Python Library Documentation: %s', forceload:int|bool=0):
     """Render text documentation, given an object or a path to an object."""
-    renderer = ReSTDoc()
-    object, name = pydoc.resolve(thing, forceload) # NOTE: to replace with a better(?) resolve
-    desc = pydoc.describe(object)
-    module = inspect.getmodule(object)
+    renderer = ReSTDoc(tempDir=tempdir)
+    obj, name = resolve(thing, forceload) # NOTE: to replace with a better(?) resolve
+    desc = pydoc.describe(obj)
+    module = inspect.getmodule(obj)
     if name and '.' in name:
         desc += ' in ' + name[:name.rfind('.')]
-    elif module and module is not object:
+    elif module and module is not obj:
         desc += ' in module ' + module.__name__
 
-    if not (inspect.ismodule(object) or
-              inspect.isclass(object) or
-              inspect.isroutine(object) or
-              inspect.isdatadescriptor(object) or
-              pydoc._getdoc(object)):
-        # If the passed object is a piece of data or an instance,
+    if not (inspect.ismodule(obj) or
+              inspect.isclass(obj) or
+              inspect.isroutine(obj) or
+              inspect.isdatadescriptor(obj) or
+              pydoc._getdoc(obj)):
+        # If the passed obj is a piece of data or an instance,
         # document its available methods instead of its value.
-        if hasattr(object, '__origin__'):
-            object = object.__origin__
+        if hasattr(obj, '__origin__'):
+            obj = obj.__origin__
         else:
-            object = type(object)
-            desc += ' object'
+            obj = type(obj)
+            # desc += ' object'
             
     title = title % desc
+    print(f"scipyen_doc.render_rst:\ntitle -> {title}")
     title = renderer.render_title(title)
-    return title + '\n\n' + renderer.document(object, name)
-    # return title % desc + '\n\n' + renderer.document(object, name)
+    return title + '\n\n' + renderer.document(obj, name)
+    # return title % desc + '\n\n' + renderer.document(obj, name)
 
-def doc(thing, title='Python Library Documentation: %s', forceload=0,
-        output=None, is_cli=False):
+def doc(tempdir:tempfile.TemporaryDirectory, output, thing, title='Python Library Documentation: %s', forceload=0):
     """Display text documentation, given an object or a path to an object."""
-    if output is None:
-        try:
-            if isinstance(thing, str):
-                what = thing
-            else:
-                what = getattr(thing, '__qualname__', None)
-                if not isinstance(what, str):
-                    what = getattr(thing, '__name__', None)
-                    if not isinstance(what, str):
-                        what = type(thing).__name__ + ' object'
-            pydoc.pager(render_rst(thing, title, forceload), f'Help on {what!s}')
-        except ImportError as exc:
-            if is_cli:
-                raise
-            print(exc)
-    else:
-        try:
-            s = render_rst(thing, title, forceload, plaintext)
-        except ImportError as exc:
-            s = str(exc)
-        output.write(s)
+    # if output is None:
+    #     try:
+    #         if isinstance(thing, str):
+    #             what = thing
+    #         else:
+    #             what = getattr(thing, '__qualname__', None)
+    #             if not isinstance(what, str):
+    #                 what = getattr(thing, '__name__', None)
+    #                 if not isinstance(what, str):
+    #                     what = type(thing).__name__ + ' object'
+    #         pydoc.pager(render_rst(thing, title, forceload), f'Help on {what!s}')
+    #     except ImportError as exc:
+    #         if is_cli:
+    #             raise
+    #         print(exc)
+    # else:
+    try:
+        s = render_rst(tempdir, thing, title, forceload)#, plaintext)
+    except ImportError as exc:
+        s = str(exc)
+    output.write(s)
 
 # def writedoc(thing, forceload=0):
 #     """Write HTML documentation to a file in the current directory."""
@@ -2635,17 +2777,17 @@ def doc(thing, title='Python Library Documentation: %s', forceload=0,
 #         if completer:
 #             completer()
 
-def apropos(key):
-    """Print all the one-line module summaries that contain a substring."""
-    def callback(path, modname, desc):
-        if modname[-9:] == '.__init__':
-            modname = modname[:-9] + ' (package)'
-        print(modname, desc and '- ' + desc)
-    def onerror(modname):
-        pass
-    with warnings.catch_warnings():
-        warnings.filterwarnings('ignore') # ignore problems during import
-        ModuleScanner().run(callback, key, onerror=onerror)
+# def apropos(key):
+#     """Print all the one-line module summaries that contain a substring."""
+#     def callback(path, modname, desc):
+#         if modname[-9:] == '.__init__':
+#             modname = modname[:-9] + ' (package)'
+#         print(modname, desc and '- ' + desc)
+#     def onerror(modname):
+#         pass
+#     with warnings.catch_warnings():
+#         warnings.filterwarnings('ignore') # ignore problems during import
+#         ModuleScanner().run(callback, key, onerror=onerror)
 
 # --------------------------------------- enhanced web browser interface
 
@@ -3073,8 +3215,8 @@ def apropos(key):
 
 # -------------------------------------------------- command-line interface
 
-def ispath(x):
-    return isinstance(x, str) and x.find(os.sep) >= 0
+# def ispath(x):
+#     return isinstance(x, str) and x.find(os.sep) >= 0
 
 # def _get_revised_path(given_path, argv0):
 #     """Ensures current directory is on returned path, and argv0 directory is not
