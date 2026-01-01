@@ -1746,7 +1746,170 @@ class ReSTDoc(pydoc.TextDoc):
         return txt
 
     def docclass(self, obj, name=None, mod=None, *ignored): # TODO 2025-12-30 13:44:38
-        pass
+        """Produce text documentation for a given class object."""
+        realname = object.__name__
+        name = name or realname
+        bases = object.__bases__
+
+        def makename(c, m=object.__module__):
+            return classname(c, m)
+
+        if name == realname:
+            title = f"class **{realname}**"
+        else:
+            title = f"**{name}** = class {realname}"
+        
+        
+        if bases:
+            parents = map(makename, bases)
+            title = title + '(%s)' % ', '.join(parents)
+
+        title = self.render_title(f"class **{realname}**" if name == realname else f"**{name}** = class {realname}")
+        
+        contents = []
+        push = contents.append
+
+        argspec = _getargspec(object)
+        if argspec and argspec != '()':
+            push(name + self.render_code(argspec) + '\n')
+
+        doc = getdoc(object)
+        if doc:
+            push(doc + '\n')
+
+        # List the mro, if non-trivial.
+        mro = deque(inspect.getmro(object))
+        if len(mro) > 2:
+            mrosection  = self.section("Method resolution order:", ", ".join([f"{makename(base)}" for base in mro]), 0)
+            push(mrosection)
+            # push("Method resolution order:")
+            # for base in mro:
+            #     push('    ' + makename(base))
+            # push('')
+
+        # List the built-in subclasses, if any:
+        subclasses = sorted(
+            (str(cls.__name__) for cls in type.__subclasses__(object)
+             if not cls.__name__.startswith("_") and cls.__module__ == "builtins"),
+            key=str.lower
+        )
+        no_of_subclasses = len(subclasses)
+        MAX_SUBCLASSES_TO_DISPLAY = 4
+        if subclasses:
+            subcls = list()
+            for subclassname in subclasses[:MAX_SUBCLASSES_TO_DISPLAY]:
+                subcls.append(subclassname)
+            if no_of_subclasses > MAX_SUBCLASSES_TO_DISPLAY:
+                subcls.append(' ... and ' +
+                     str(no_of_subclasses - MAX_SUBCLASSES_TO_DISPLAY) +
+                     ' other subclasses')
+                
+            subclssection = self.section("Built-in subclasses:", ", ".join(subcls), 0)
+            push(subclssection)
+            
+            # push("Built-in subclasses:")
+            # for subclassname in subclasses[:MAX_SUBCLASSES_TO_DISPLAY]:
+            #     push('    ' + subclassname)
+            # if no_of_subclasses > MAX_SUBCLASSES_TO_DISPLAY:
+            #     push('    ... and ' +
+            #          str(no_of_subclasses - MAX_SUBCLASSES_TO_DISPLAY) +
+            #          ' other subclasses')
+            # push('')
+
+        # Cute little class to pump out a horizontal rule between sections.
+        class HorizontalRule:
+            def __init__(self):
+                self.needone = 0
+            def maybe(self):
+                if self.needone:
+                    push('-' * 70)
+                self.needone = 1
+        hr = HorizontalRule()
+
+        def spill(msg, attrs, predicate):
+            ok, attrs = _split_list(attrs, predicate)
+            if ok:
+                hr.maybe()
+                push(msg)
+                for name, kind, homecls, value in ok:
+                    try:
+                        value = getattr(object, name)
+                    except Exception:
+                        # Some descriptors may meet a failure in their __get__.
+                        # (bug #1785)
+                        push(self.docdata(value, name, mod))
+                    else:
+                        push(self.document(value,
+                                        name, mod, object, homecls))
+            return attrs
+
+        def spilldescriptors(msg, attrs, predicate):
+            ok, attrs = _split_list(attrs, predicate)
+            if ok:
+                hr.maybe()
+                push(msg)
+                for name, kind, homecls, value in ok:
+                    push(self.docdata(value, name, mod))
+            return attrs
+
+        def spilldata(msg, attrs, predicate):
+            ok, attrs = _split_list(attrs, predicate)
+            if ok:
+                hr.maybe()
+                push(msg)
+                for name, kind, homecls, value in ok:
+                    doc = getdoc(value)
+                    try:
+                        obj = getattr(object, name)
+                    except AttributeError:
+                        obj = homecls.__dict__[name]
+                    push(self.docother(obj, name, mod, maxlen=70, doc=doc) +
+                         '\n')
+            return attrs
+
+        attrs = [(name, kind, cls, value)
+                 for name, kind, cls, value in classify_class_attrs(object)
+                 if visiblename(name, obj=object)]
+
+        while attrs:
+            if mro:
+                thisclass = mro.popleft()
+            else:
+                thisclass = attrs[0][2]
+            attrs, inherited = _split_list(attrs, lambda t: t[2] is thisclass)
+
+            if object is not builtins.object and thisclass is builtins.object:
+                attrs = inherited
+                continue
+            elif thisclass is object:
+                tag = "defined here"
+            else:
+                tag = "inherited from %s" % classname(thisclass,
+                                                      object.__module__)
+
+            sort_attributes(attrs, object)
+
+            # Pump out the attrs, segregated by kind.
+            attrs = spill("Methods %s:\n" % tag, attrs,
+                          lambda t: t[1] == 'method')
+            attrs = spill("Class methods %s:\n" % tag, attrs,
+                          lambda t: t[1] == 'class method')
+            attrs = spill("Static methods %s:\n" % tag, attrs,
+                          lambda t: t[1] == 'static method')
+            attrs = spilldescriptors("Readonly properties %s:\n" % tag, attrs,
+                                     lambda t: t[1] == 'readonly property')
+            attrs = spilldescriptors("Data descriptors %s:\n" % tag, attrs,
+                                     lambda t: t[1] == 'data descriptor')
+            attrs = spilldata("Data and other attributes %s:\n" % tag, attrs,
+                              lambda t: t[1] == 'data')
+
+            assert attrs == []
+            attrs = inherited
+
+        contents = '\n'.join(contents)
+        if not contents:
+            return title + '\n'
+        return title + '\n' + self.indent(contents.rstrip(), ' |  ') + '\n'
     
     def docmodule(self, object, name=None, mod=None, *ignored): # TODO 2025-12-30 13:45:23
         pass

@@ -9,10 +9,27 @@ Helper script to replace pydoc "modules" & "apropos" invocation
 in order to bypass the issues related to importing problematic modules.
 
 Meant to be used by gui.pythonhelpwidget
+
+.. note:: 
+    Documentation strings (*docstrings*) should use reStructuredText (ReST) formatting.
+    
+    Python's ``pydoc`` help output does not always format the (entire) output as 
+    ReST, so there is some "gymnastic" performed by helpsystem.scipyen_doc module.
+    
+    The idea is to format the help output as ReST, then generate HTML5 from it.
+    
+    **HOWEVER**, I am having trouble getting docutils to apply pygments syntax 
+    highlighting for Python code included in ReST docstrings processed with the
+    ``docutils`` package (I tried the directives ``.. code-block:: python3``
+    and ``.. literal-block::``, to no avail).
+    
+    Therefore I am falling back on simply using the ``::`` directive in docstrings,
+    so that the ``docutils.publish*`` functions will output the directive contents
+    un-tagged text between ``<pre class="literal-block">`` and ``</pre>`` HTML tags
+    and apply the pygments highlighter on *this* output.
+    )
+
 """
-# WARNING: 2025-06-02 22:55:00
-# DO NOT import any of scipyen's modules here, so that this can be run in a 
-# separate python process
 
 import sys, os, typing, inspect, types, importlib, io, dataclasses, inspect, re
 import traceback
@@ -22,6 +39,7 @@ import html
 from functools import (singledispatch, partial)
 from contextlib import redirect_stdout
 from tempfile import TemporaryDirectory
+# from rst2html5 import HTML5Writer
 
 import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
@@ -61,8 +79,8 @@ from IPython.core.usage import (interactive_usage, quick_reference)
 import markdown # for converstion of md to html
 # from pymarkdown.api import PyMarkdownApi # MD linter
 from pygments import highlight
-from pygments.lexers import (PythonLexer, get_lexer_by_name, guess_lexer)
-from pygments.formatters import HtmlFormatter
+from pygments.lexers import (PythonLexer, get_lexer_by_name, guess_lexer, )
+from pygments.formatters import (HtmlFormatter, get_formatter_by_name)
 import docutils
 import docutils.core, docutils.utils
 from docutils.core import publish_parts
@@ -78,7 +96,7 @@ docutils_settings_overrides={'output_encoding': 'unicode',
                              'halt_level': 5,
                              'syntax_highlight': 'long',
                              'table_style': 'borderless',
-                             'math_output': 'mathjax',}
+                             'math_output': 'mathjax'}
 
 try:
     import docrepr.sphinxify as sphx
@@ -185,61 +203,58 @@ https://www.bomberbot.com/python/converting-restructuredtext-to-html-with-python
     else:
         style="default"
 
-    parts = publish_parts(rst_text, writer_name='html5', settings_overrides=docutils_settings_overrides)
-    ret_html = parts['html_body']
+    parts = publish_parts(rst_text, writer_name='html4', settings_overrides=docutils_settings_overrides)
+    # parts = publish_parts(source=rst_text, writer=HTML5Writer(), settings_overrides=docutils_settings_overrides)
+    ret_html = parts['body']
     
     def replace_code_block(match):
+        # print(f"helputils.rst_to_html_with_highlighting.replace_code_block(match = {match})")
         code = match.group(1)
-        print(f"helpsystem.helputils.rst_to_html_with_highlighting.replace_code_block: code = {code}")
+        # print(f"helpsystem.helputils.rst_to_html_with_highlighting.replace_code_block: code = {code}")
         code = code.replace("&gt;", ">").replace("&lt;", "<")
         return mypylight(code)
 
 
     # import re # already imported at the top
-    # BUG: FIXME: 2025-12-31 00:07:08 TODO
-    pattern = r'<pre class="literal-block">(.+?)</pre>|<pre class="code python literal-block"><code>(.+?)</code></pre>' 
-    # pattern1 = r'<pre class="code python doctest">(.+?)</pre>'
-    # pattern = r'<pre>\n(.+?)\n</pre>'
-    # rematch = re.match(pattern1, ret_html, flags=re.DOTALL)
-    # if rematch:
-    #     print(f"group1:{rematch.group(1)}, group2: {rematch.group(2)}")
+    # BUG: FIXME: 2025-12-31 00:07:08 TODO — NOTE: see the Note module docstring
+    pattern = r'<pre class="literal-block">(.+?)</pre>' 
     
-    
-    ret_html = re.sub(pattern, replace_code_block, ret_html, flags=re.DOTALL)
-    # ret_html = html.unescape(ret_html)
-
-    return ret_html
+    try:
+        return re.sub(pattern, replace_code_block, ret_html, flags=re.DOTALL|re.MULTILINE)
+    except:
+        traceback.print_exc()
+        return ret_html
 
 
-def reSThighlight(text):
-    r"""Highlight reStructuredText"""
-    print(f"helpsystem.helputils.reSThighlight")
-    if guiutils.isDarkGui():
-        style = "KeplerDark"
-    else:
-        style="default"
-    
-    formatter = HtmlFormatter(nobackground=True, noclasses=True, style=style)
-    
-    pattern1 = r'<pre class="code python doctest">(.+?)</pre>'
-    # pattern2 = r"\<pre\>\<code\>[\s\S]*?\<\/code\>\<\/pre\>"
-    
-    rst_html = convert_rst_to_html(text)
-    
-    # formatter = HtmlFormatter(linenos=True, cssclass="github-dark", style='default') # <--
-    
-    for code_section in re.findall(pattern1, rst_html):
-        new_code_section = code_section.replace('<pre><code>', '')
-        new_code_section = new_code_section.replace('</code></pre>', '')
-        new_code_section = html.unescape(new_code_section)
-        new_code_section_highlight = mypylight(new_code_section) #, lexer, formatter)
-        # lexer = get_lexer_by_name("python", stripall=True) # <--
-        # formatter = HtmlFormatter(linenos=True, cssclass="github-dark", style='default') # <--
-        # new_code_section_highlight = highlight(new_code_section, lexer, formatter) # <--
-        rst_html = rst_html.replace(code_section, new_code_section_highlight)
-    
-    
-    return rst_html
+# def reSThighlight(text):
+#     r"""Highlight reStructuredText"""
+#     print(f"helpsystem.helputils.reSThighlight")
+#     if guiutils.isDarkGui():
+#         style = "KeplerDark"
+#     else:
+#         style="default"
+#     
+#     formatter = HtmlFormatter(nobackground=True, noclasses=True, style=style)
+#     
+#     pattern1 = r'<pre class="code python doctest">(.+?)</pre>'
+#     # pattern2 = r"\<pre\>\<code\>[\s\S]*?\<\/code\>\<\/pre\>"
+#     
+#     rst_html = convert_rst_to_html(text)
+#     
+#     # formatter = HtmlFormatter(linenos=True, cssclass="github-dark", style='default') # <--
+#     
+#     for code_section in re.findall(pattern1, rst_html):
+#         new_code_section = code_section.replace('<pre><code>', '')
+#         new_code_section = new_code_section.replace('</code></pre>', '')
+#         new_code_section = html.unescape(new_code_section)
+#         new_code_section_highlight = mypylight(new_code_section) #, lexer, formatter)
+#         # lexer = get_lexer_by_name("python", stripall=True) # <--
+#         # formatter = HtmlFormatter(linenos=True, cssclass="github-dark", style='default') # <--
+#         # new_code_section_highlight = highlight(new_code_section, lexer, formatter) # <--
+#         rst_html = rst_html.replace(code_section, new_code_section_highlight)
+#     
+#     
+#     return rst_html
 
 def mdhighlight(text):
     if guiutils.isDarkGui():
@@ -303,8 +318,15 @@ def mdhighlight(text):
     return formatted
 
 def mypylight(text):
-    r"""Highlights Python code in a text"""
-    print(f"hyelpsystem.mypylight(text = {text})")
+    r"""Highlights Python code in a text.
+    This is applied to un-tagged literal block of text output by docutils.publish*
+    functions with html5 writer as enclosed between ``<pre class="literal-block">``
+    and ``</pre>`` HTML tags.
+ 
+    Uses ``pygments.highlight()`` function with pygments' ``HTMLFormatter`` and 
+    the "python" lexer.
+    """
+    # print(f"hyelpsystem.mypylight(text = {text})")
     # uses pygments.highlight()
     # return highlight(code, PythonLexer(), HtmlFormatter(noclasses=True, nobackground=True))
     if guiutils.isDarkGui():
@@ -314,7 +336,6 @@ def mypylight(text):
         
     lexer = get_lexer_by_name("python", stripall=True)
     return highlight(text, lexer, HtmlFormatter(noclasses=True, nobackground=True, style=style))
-    # return highlight(text, PythonLexer(), HtmlFormatter(noclasses=True, nobackground=True, style=style))
 
 def make_multicolumn_html(strings:typing.List[str], columns:int=4, fn:typing.Callable = lambda s: s) -> str:
     r"""Emulates pydoc.HTMLDoc.multicolumn with configurable number of columns"""

@@ -5,11 +5,6 @@
 
 r""" Collection of 1D and nD functions and helper functions, for use in model fitting.
 
-WARNING: This module is on its way to deprecation, and it wil be superseded by
-modelfitting.py in the (hopefully not too distant) future.
-
-For now, stick with THIS module.
-
 NOTE: 2025-05-08 10:39:04
 
 Parametric models are defined by functions taking one independent variable, ``𝑥`` 
@@ -682,6 +677,8 @@ def alphaSynapse(x:np.ndarray | Real, α:typing.Union[typing.Sequence[Real],np.n
 AlphaSynapse function.
 ======================
 
+.. highlight:: python
+
 Description:
 ============
 
@@ -738,7 +735,7 @@ Example:
 ========
 (code to run in Scipyen's console)
 
-.. code:: python
+::
 
     from core import models
 
@@ -814,7 +811,7 @@ visualize the intersections).
     
 Example:
     
-.. code:: python
+::
 
     x = np.linspace(0,1,int(1e5))
     τ = 0.05
