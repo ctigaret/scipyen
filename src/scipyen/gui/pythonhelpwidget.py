@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-r""" A QWidget offering a veru basic — yet workable — interface to Python's help.
+r""" A QWidget offering a very basic — yet workable — interface to Python's help.
 
 Allow accessing Python's help in parallel (and without interfering) with the 
 user's workflow at Scipyen console.
@@ -131,7 +131,8 @@ class _PythonHelpThread_(QtCore.QThread):
                 reformat = False
                 # print(f"{self.__class__.__name__}.run: fullcmd = {fullcmd}")
                 try:
-                    reply, reformat = helputils.run_help_command(self.shell, " ".join(cmdParts), tempdir=self.tempdir)
+                    reply, reformat = helputils.run_help_command(self.shell, " ".join(cmdParts),
+                                                                 tempdir=self.tempdir)
                 except:
                     traceback.print_exc()
 
@@ -198,7 +199,6 @@ class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin
                 helper = pydoc.Helper(output = bf)
                 helper.intro()
                 msg = bf.getvalue()
-                # print(f"{self.__class__.__name__}.__init__: msg = {msg}")
                 parts = list(map(lambda s: s.replace("\n", " "), msg.split("\n\n")))
                 parts = parts[:-1]
                 parts += (self._scipyen_specific_.splitlines())
@@ -217,6 +217,8 @@ class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin
         WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs)
         
         self._textColorCache_ = QtWidgets.QApplication.palette().color(QtGui.QPalette.Text)
+        
+        self._lastQuery_ = None
         
         self._configureUI_()
         self._showCustomPlaceHolderText_()
@@ -284,12 +286,17 @@ class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin
     @Slot()
     def _slot_processQuery(self):
         query = self.queryComboBox.lineEdit().text()
-        self.processQuery(query)
+        if query != self._lastQuery_:
+            self._lastQuery_ = query
+            self.processQuery(query)
             
     @Slot(int)
     def _slot_processQueryNdx(self, index:int):
         query = self.queryComboBox.itemText(index)
-        self.processQuery(query)
+        if query == self.queryComboBox.lineEdit().text():
+            if query != self._lastQuery_:
+                self._lastQuery_ = query
+                self.processQuery(query)
             
     @Slot()
     def _slot_nextQuery(self):
@@ -308,6 +315,8 @@ class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin
         index = self.queryComboBox.currentIndex()
         signalBlocker = QtCore.QSignalBlocker(self.queryComboBox)
         self.queryComboBox.removeItem(index)
+        if self.queryComboBox.count() > 0:
+            self._slot_processQueryNdx(self.queryComboBox.currentIndex())
         
     @Slot()
     def _slot_clearQueryHistory(self):
@@ -341,7 +350,6 @@ class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin
             else:
                 self._showCustomPlaceHolderText_()
                 self.tempdir.cleanup()
-                # self.helpDisplay.clear()
 
 class PythonHelpWindow(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     def __init__(self, shell, parent=None):
@@ -355,3 +363,5 @@ class PythonHelpWindow(QtWidgets.QMainWindow, WorkspaceGuiMixin):
 
     def closeEvent(self, evt):
         self.saveSettings()
+        if isinstance(self.helpWidget.tempdir, TemporaryDirectory) and os.path.isdir(self.helpWidget.tempdir.name):
+            self.helpWidget.tempdir.cleanup()

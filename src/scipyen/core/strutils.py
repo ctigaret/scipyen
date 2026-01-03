@@ -822,6 +822,13 @@ def latexunicode2sympy(c, asSymbol:bool=True) -> typing.Optional[str | sympy.Sym
         
 def parse_version_string(s: str):
     parts = s.split(".")
+    
+def jaccard(s1, s2) -> float:
+    r"""Calculates Jaccard similarity between two strings 's1' and 's2'"""
+    set1 = set(s1)
+    set2 = set(s2)
+    
+    return len(set1 & set2) / len(set1 | set2)
 
     # ### BEGIN fool around, do NOT delete
 

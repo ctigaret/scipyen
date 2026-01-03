@@ -5,10 +5,15 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 r"""
-Helper script to replace pydoc "modules" & "apropos" invocation
-in order to bypass the issues related to importing problematic modules.
+This module contains functions meant to be used by gui.pythonhelpwidget.
 
-Meant to be used by gui.pythonhelpwidget
+Output from the help systems of IPython (i.e., ``pinfo``, ``pinfo2``) and Python
+(i.e., ``pydoc``) is converted to html with syntax highlighting of embedded Python 
+code and with embedded LaTeX mathematical expressions rendered as PNG.
+
+Additional functions include alternatives to Python's ``pydoc.modules`` and 
+``pydoc.apropos`` to bypass the issues related to importing problematic modules.
+
 
 .. note:: 
     Documentation strings (*docstrings*) should use reStructuredText (ReST) formatting.
@@ -84,6 +89,7 @@ from pygments.lexers import (PythonLexer, get_lexer_by_name, guess_lexer, )
 from pygments.formatters import (HtmlFormatter, get_formatter_by_name)
 import docutils
 import docutils.core, docutils.utils
+
 from docutils.core import publish_parts
 from gui import guiutils
 
@@ -205,19 +211,15 @@ https://www.bomberbot.com/python/converting-restructuredtext-to-html-with-python
         style="default"
 
     parts = publish_parts(rst_text, writer_name='html4', settings_overrides=docutils_settings_overrides)
-    # parts = publish_parts(source=rst_text, writer=HTML5Writer(), settings_overrides=docutils_settings_overrides)
-    ret_html = parts['body']
+    ret_html = parts['html_body']
     
     def replace_code_block(match):
         # print(f"helputils.rst_to_html_with_highlighting.replace_code_block(match = {match})")
         code = match.group(1)
-        # print(f"helpsystem.helputils.rst_to_html_with_highlighting.replace_code_block: code = {code}")
-        code = code.replace("&gt;", ">").replace("&lt;", "<")
+        code = html.unescape(code)
         return mypylight(code)
 
-
-    # import re # already imported at the top
-    # BUG: FIXME: 2025-12-31 00:07:08 TODO — NOTE: see the Note module docstring
+    # NOTE: 2025-12-31 00:07:08 — see the Note module docstring
     pattern = r'<pre class="literal-block">(.+?)</pre>' 
     
     try:
@@ -225,37 +227,6 @@ https://www.bomberbot.com/python/converting-restructuredtext-to-html-with-python
     except:
         traceback.print_exc()
         return ret_html
-
-
-# def reSThighlight(text):
-#     r"""Highlight reStructuredText"""
-#     print(f"helpsystem.helputils.reSThighlight")
-#     if guiutils.isDarkGui():
-#         style = "KeplerDark"
-#     else:
-#         style="default"
-#     
-#     formatter = HtmlFormatter(nobackground=True, noclasses=True, style=style)
-#     
-#     pattern1 = r'<pre class="code python doctest">(.+?)</pre>'
-#     # pattern2 = r"\<pre\>\<code\>[\s\S]*?\<\/code\>\<\/pre\>"
-#     
-#     rst_html = convert_rst_to_html(text)
-#     
-#     # formatter = HtmlFormatter(linenos=True, cssclass="github-dark", style='default') # <--
-#     
-#     for code_section in re.findall(pattern1, rst_html):
-#         new_code_section = code_section.replace('<pre><code>', '')
-#         new_code_section = new_code_section.replace('</code></pre>', '')
-#         new_code_section = html.unescape(new_code_section)
-#         new_code_section_highlight = mypylight(new_code_section) #, lexer, formatter)
-#         # lexer = get_lexer_by_name("python", stripall=True) # <--
-#         # formatter = HtmlFormatter(linenos=True, cssclass="github-dark", style='default') # <--
-#         # new_code_section_highlight = highlight(new_code_section, lexer, formatter) # <--
-#         rst_html = rst_html.replace(code_section, new_code_section_highlight)
-#     
-#     
-#     return rst_html
 
 def mdhighlight(text):
     if guiutils.isDarkGui():
@@ -336,7 +307,7 @@ def mypylight(text):
         style = "default"
         
     lexer = get_lexer_by_name("python", stripall=True)
-    return highlight(text, lexer, HtmlFormatter(noclasses=True, nobackground=True, style=style))
+    return _fix_html_highlight(highlight(text, lexer, HtmlFormatter(noclasses=True, nobackground=True, style=style)))
 
 def make_multicolumn_html(strings:typing.List[str], columns:int=4, fn:typing.Callable = lambda s: s) -> str:
     r"""Emulates pydoc.HTMLDoc.multicolumn with configurable number of columns"""
@@ -654,25 +625,30 @@ def format_common_help_reply(msg:str):
             
     return "<br>\n".join(parts)
 
+def _fix_html_highlight(s:str) -> str:
+    s = s.replace("<br>", "").replace("\n", "<br>").replace("<p>", "<br>").replace("<br><br>", "<br>").replace("</h1><br>", "</h1>")
+    # s = s.replace('&quot;', '"')
+    return s
+
+# def helpdisp(shell, tempdir:TemporaryDirectory, info:oinspect.OInfo,
+#              bf:io.StringIO, oname:str="", detail_level=0, enable_html=True, omit_sections=()):
 def helpdisp(shell, tempdir:TemporaryDirectory, info:oinspect.OInfo,
-             bf:io.StringIO, oname:str="", detail_level=0, enable_html=True, omit_sections=()):
-    r"""Stand-in for oinspect.Inspector.pinfo"""
+             bf:io.StringIO, oname:str="", detail_level=0, omit_sections=()):
+    r"""Stand-in for oinspect.Inspector.pinfo.
+    Outpout is redirected to a buffered IO stream.
+    """
     from core.prog import scipywarn
     assert isinstance(info, oinspect.OInfo), f"Expecting an oinspect.OInfo object; got {type(info).__name__} instead"
     
     info_b = hget_info(shell, tempdir, info.obj, oname, info, detail_level, 
                        omit_sections=omit_sections)
     
-    if enable_html:
-        strng = info_b["text/html"]
-        strng = strng.replace("<br>", "").replace("\n", "<br>\n").replace("<p>", "<br>").replace("<br><br>", "<br>").replace("</h1><br>", "</h1>")
-    else:
-        strng = info_b['text/plain']
+    strng = info_b["text/html"]
+    # strng = strng.replace("<br>", "").replace("\n", "<br>").replace("<p>", "<br>").replace("<br><br>", "<br>").replace("</h1><br>", "</h1>")
 
     bf_page(bf, strng)
     
 def bf_page(bf:io.StringIO, strng:str):
-    # print(f"bf_page split lines: {strng.splitlines()}")
     for line in strng.splitlines():
         bf.write(line)
    
@@ -783,12 +759,15 @@ def object_inspect(shell, oname=str, detail_level:int=0) -> oinspect.InfoDict:
     
 def object_find(shell, oname=str, namespaces=None) -> oinspect.OInfo:
     r"""Emulates shell._object_find()"""
+    from core import strutils
+
     if namespaces is None:
         namespaces = [ ('Interactive', shell.user_ns),
                         ('Interactive (global)', shell.user_global_ns),
                         ('Python builtin', shell.ns_table["builtin"]),
                         ]
     info = shell._object_find(oname, namespaces) # this is an oinspect.OInfo object
+    msg = ""
     if not info.found:
         # this might happen when either:
         # 1) the object exists in the namespaces, but has been imported under an alias
@@ -809,8 +788,10 @@ def object_find(shell, oname=str, namespaces=None) -> oinspect.OInfo:
                 subname = subname.replace(f"{part}.", "")
                 sinfo = shell._object_find(subname, namespaces)
                 if sinfo.found:
+                    print(f"helputils.object_find found sinfo = {sinfo}")
+                    # BUG: 2026-01-03 22:17:06 TODO/FIXME
                     info = sinfo
-                    return info
+                    return sinfo, ""
                 
             # do a reverse search
             subname = oname
@@ -819,8 +800,35 @@ def object_find(shell, oname=str, namespaces=None) -> oinspect.OInfo:
                 # print(f"subname = {subname}")
                 sinfo = shell._object_find(subname, namespaces)
                 if sinfo.found:
-                    info = sinfo
-                    return info
+                    print(f"helputils.object_find reverse search found sinfo = {sinfo}")
+                    # BUG: 2026-01-03 22:24:51 FIXME/TODO
+                    # This branch currently return sinfo if sinfo.found is True,
+                    # which is WRONG:
+                    #
+                    # sinfo is likely a parent module; therefore, check if it 
+                    # indeed is a module
+                    # 
+                    # if a module, then check 'oname' against module.__dict__.keys() (all lower)
+                    # or for some similarity
+                    # if anything found:
+                    # if only one item is found, then return its info
+                    # if more than one candidate is foubnd, then create a message
+                    # to propose those candidates as objects for which info should
+                    # be returned.
+                    #
+                    # else, give up gracefully!
+                    # see also BUG: 2026-01-03 22:17:06 TODO/FIXME
+                    if isinstance(sinfo.obj, types.ModuleType):
+                        members = list(sinfo.obj.__dict__.keys())
+                        sims = list(map(lambda k: strutils.jaccard(k, parts[1][-1]), members))
+                        acc = list(filter(lambda s: s > 0.5, sims))
+                        if len(acc):
+                            candidates = list(map(lambda s: members[sims.index(s)], acc))
+                            msg = "\n".join([f"No Python documentation found for {oname}", "Did you mean: "] + list(map(lambda c: f"{part}.{c}", candidates)))
+                            return info, msg
+                        
+                    # info = sinfo
+                    # return info
         
         # 3) the object has not been imported in any of the namespaces
         # WARNING: this can be problematic: in theory, the object could be available
@@ -841,22 +849,25 @@ def object_find(shell, oname=str, namespaces=None) -> oinspect.OInfo:
         # the gist: the user may not know a priori that 'c' is the symbol of an 
         # object defined in module 'b' of the package 'a'...
         #
-    return info
+    return info, msg
 
 def happend_info_field(shell, bundle: UnformattedBundle,
         title: str,
         key: str,
-        info,
+        info:oinspect.InfoDict,
         omit_sections: typing.List[str],
-        formatter,
+        formatter:typing.Optional[types.FunctionType],
+        hide_title_in_html:bool,
         ):
     if title in omit_sections or key in omit_sections:
+        return
+    if key not in info:
         return
     field = info[key]
     if field is not None:
         formatted_field = shell.inspector._mime_format(field, formatter)
         bundle["text/plain"].append((title, formatted_field["text/plain"]))
-        bundle["text/html"].append((title, formatted_field["text/html"]))
+        bundle["text/html"].append(("" if hide_title_in_html else title, formatted_field["text/html"]))
 
 
 def hmake_info_unformatted(shell:InteractiveShell, obj:object, info:oinspect.InfoDict, 
@@ -865,13 +876,14 @@ def hmake_info_unformatted(shell:InteractiveShell, obj:object, info:oinspect.Inf
                            tempdir:TemporaryDirectory) -> UnformattedBundle:
     r"""Emulates shell.inspector._make_info_unformatted"""
     # TODO 2025-10-13 13:25:09
-    formatter = partial(format_latex, tempdir=tempdir)
+    latex_formatter = partial(format_latex, tempdir=tempdir)
     bundle: UnformattedBundle = {
         "text/plain": [],
         "text/html": [],
     }
-    def append_field(shell, 
-        bundle: UnformattedBundle, title: str, key: str, formatter:types.FunctionType=None
+    def append_field(shell, bundle: UnformattedBundle, title: str, key: str, 
+                     formatter:typing.Optional[types.FunctionType]=None, 
+                     hide_title_in_html:bool=False
     ):
         happend_info_field(
             shell,
@@ -881,15 +893,20 @@ def hmake_info_unformatted(shell:InteractiveShell, obj:object, info:oinspect.Inf
             info=info,
             omit_sections=omit_sections,
             formatter=formatter,
+            hide_title_in_html=hide_title_in_html,
         )
         
     _format = lambda t: shell.inspector.format(t)
 
-    def code_formatter(text) -> Bundle:
+    def rst_formatter(text) -> Bundle:
         return {
             'text/plain': _format(text),
-            # 'text/html': mypylight(text)
-            'text/html': rst_to_html_with_highlighting(formatter(text))
+            'text/html': rst_to_html_with_highlighting(latex_formatter(text))
+        }
+    def py_formatter(text) -> Bundle:
+        return {
+            'text/plain': _format(text),
+            'text/html': mypylight(text)
         }
 
     if info["isalias"]:
@@ -897,47 +914,48 @@ def hmake_info_unformatted(shell:InteractiveShell, obj:object, info:oinspect.Inf
 
     elif info['ismagic']:
         if detail_level > 0:
-            append_field(shell, bundle, "Source", "source", code_formatter)
+            append_field(shell, bundle, "Source", "source", py_formatter)
         else:
-            append_field(shell, bundle, "Docstring", "docstring", code_formatter)
+            append_field(shell, bundle, "Docstring", "docstring", rst_formatter, hide_title_in_html=True)
             
         append_field(shell, bundle, "File", "file")
 
     elif info['isclass'] or oinspect.is_simple_callable(obj):
         # Functions, methods, classes
-        append_field(shell, bundle, "Signature", "definition", code_formatter)
-        append_field(shell, bundle, "Init signature", "init_definition", code_formatter)
-        append_field(shell, bundle, "Docstring", "docstring", code_formatter)
+        append_field(shell, bundle, "Signature", "definition", py_formatter)
+        append_field(shell, bundle, "Init signature", "init_definition", rst_formatter)
+        append_field(shell, bundle, "Docstring", "docstring", rst_formatter, hide_title_in_html=True)
         
         if detail_level > 0 and info["source"]:
-            append_field(shell, bundle, "Source", "source", code_formatter)
+            append_field(shell, bundle, "Source", "source", py_formatter)
         else:
-            append_field(shell, bundle, "Init docstring", "init_docstring", code_formatter)
+            append_field(shell, bundle, "Init docstring", "init_docstring", rst_formatter)
             if not oinspect.is_simple_callable(obj):
                 for field in _extra_info_fields:
                     if info[field]:
-                        fmt = code_formatter if field in ("methods", "descriptors", "functions") else formatter
+                        fmt = py_formatter if field in ("methods", "descriptors", "functions", "classes") else rst_formatter
                         append_field(shell, bundle, field.capitalize(), field, fmt)
 
         append_field(shell, bundle, "File", "file")
-        append_field(shell, bundle, "Type", "type_name")
+        append_field(shell, bundle, "Type", "type_name", py_formatter)
+        
         if not oinspect.is_simple_callable(obj):
-            append_field(shell, bundle, "Subclasses", "subclasses")
+            append_field(shell, bundle, "Subclasses", "subclasses", py_formatter)
 
     else:
         # General Python objects
-        append_field(shell, bundle, "Signature", "definition", code_formatter)
-        append_field(shell, bundle, "Call signature", "call_def", code_formatter)
-        append_field(shell, bundle, "Type", "type_name")
-        append_field(shell, bundle, "String form", "string_form")
+        append_field(shell, bundle, "Signature", "definition", py_formatter)
+        append_field(shell, bundle, "Call signature", "call_def", py_formatter)
+        append_field(shell, bundle, "Type", "type_name", py_formatter)
+        append_field(shell, bundle, "String form", "string_form", rst_formatter)
 
         # Namespace
         if info["namespace"] != "Interactive":
             append_field(shell, bundle, "Namespace", "namespace")
 
-        append_field(shell, bundle, "Class docstring", "class_docstring", code_formatter)
-        append_field(shell, bundle, "Init docstring", "init_docstring", code_formatter)
-        append_field(shell, bundle, "Call docstring", "call_docstring", code_formatter)
+        append_field(shell, bundle, "Class docstring", "class_docstring", rst_formatter)
+        append_field(shell, bundle, "Init docstring", "init_docstring", rst_formatter)
+        append_field(shell, bundle, "Call docstring", "call_docstring", py_formatter)
         
         append_field(shell, bundle, "Length", "length")
         append_field(shell, bundle, "File", "file")
@@ -945,13 +963,13 @@ def hmake_info_unformatted(shell:InteractiveShell, obj:object, info:oinspect.Inf
         # Source or docstring, depending on detail level and whether
         # source found.
         if detail_level > 0 and info["source"]:
-            append_field(shell, bundle, "Source", "source", code_formatter)
+            append_field(shell, bundle, "Source", "source", py_formatter)
         else:
-            append_field(shell, bundle, "Docstring", "docstring", code_formatter)
+            append_field(shell, bundle, "Docstring", "docstring", rst_formatter)
             for field in _extra_info_fields:
                 if info[field]:
-                    append_field(shell, bundle, field.capitalize(), field, code_formatter)
-                    # fmt = code_formatter if field in ("methods", "descriptors", "functions", "classes", "data") else formatter
+                    append_field(shell, bundle, field.capitalize(), field, py_formatter if field in ("methods", "descriptors", "functions", "classes", "data") else rst_formatter)
+                    # fmt = rst_formatter if field in ("methods", "descriptors", "functions", "classes", "data") else formatter
                     # append_field(shell, bundle, field.capitalize(), field, fmt)
 
     return bundle
@@ -982,7 +1000,7 @@ def hinfo(shell:InteractiveShell, info:oinspect.OInfo,
     
     def _get_sig_or_type(o):
         try:
-            sig = inspect.signature(o)
+            sig = f" {inspect.signature(o)}"
         except:
             sig = f" <{type(o).__name__}>"
         return sig
@@ -1073,56 +1091,53 @@ def format_latex(txt:str, tempdir:TemporaryDirectory)->str:
 def hget_info(shell:InteractiveShell, tempdir:TemporaryDirectory,
               obj:object, oname:str="",
               info:typing.Optional[oinspect.OInfo]=None,
-              detail_level:int = 0, omit_sections:typing.Union[typing.List[str], typing.Tuple[str]] = ()) -> tuple[dict]:
-    r"""Emulates shell.inspector._get_info"""
-    # TODO 2025-12-27 15:33:28
-    # Implement latex rendering in docstrings!
-    # info_dict = shell.inspector.info(obj, oname=oname, info=info, detail_level=detail_level)
+              detail_level:int = 0, omit_sections:typing.Union[typing.List[str], typing.Tuple[str]] = ()) -> Bundle:
+    r"""Based on shell.inspector._get_info"""
     info_dict = hinfo(shell, info, obj, oname=oname, detail_level=detail_level)
     omit_sections = list(omit_sections)
-    
-    # if "docstring" in info_dict:
-    #     formatter = partial(format_latex, tempdir=tempdir)
     
     bundle = hmake_info_unformatted(shell, obj, info_dict,
                                     detail_level = detail_level, 
                                     omit_sections = omit_sections,
                                     tempdir=tempdir) 
     
-    if shell.inspector.mime_hooks:
-        hook_data = oinspector.InspectorHookData(
-            obj=obj,
-            info=info,
-            info_dict=info_dict,
-            detail_level=detail_level,
-            omit_sections=omit_sections,
-        )
-        for key, hook in self.mime_hooks.items():  # type:ignore
-            required_parameters = [
-                parameter
-                for parameter in inspect.signature(hook).parameters.values()
-                if parameter.default != inspect.Parameter.default
-            ]
-            if len(required_parameters) == 1:
-                res = hook(hook_data)
-            else:
-                warnings.warn(
-                    "MIME hook format changed in IPython 8.22; hooks should now accept"
-                    " a single parameter (InspectorHookData); support for hooks requiring"
-                    " two-parameters (obj and info) will be removed in a future version",
-                    DeprecationWarning,
-                    stacklevel=2,
-                )
-                res = hook(obj, info)
-            if res is not None:
-                bundle[key] = res
+    # ### BEGIN NOTE: 2026-01-03 16:27:39 I don't think this is necessary
+    #
+    # if shell.inspector.mime_hooks:
+    #     hook_data = oinspector.InspectorHookData(
+    #         obj=obj,
+    #         info=info,
+    #         info_dict=info_dict,
+    #         detail_level=detail_level,
+    #         omit_sections=omit_sections,
+    #     )
+    #     for key, hook in self.mime_hooks.items():  # type:ignore
+    #         required_parameters = [
+    #             parameter
+    #             for parameter in inspect.signature(hook).parameters.values()
+    #             if parameter.default != inspect.Parameter.default
+    #         ]
+    #         if len(required_parameters) == 1:
+    #             res = hook(hook_data)
+    #         else:
+    #             warnings.warn(
+    #                 "MIME hook format changed in IPython 8.22; hooks should now accept"
+    #                 " a single parameter (InspectorHookData); support for hooks requiring"
+    #                 " two-parameters (obj and info) will be removed in a future version",
+    #                 DeprecationWarning,
+    #                 stacklevel=2,
+    #             )
+    #             res = hook(obj, info)
+    #         if res is not None:
+    #             bundle[key] = res
+    #
+    # ### END   NOTE: 2026-01-03 16:27:39 I don't think this is necessary
                 
+    
+    # return bundle
     return shell.inspector.format_mime(bundle)
-
     
-    
-def hpinfo(shell, cmd, namespaces = None, detail_level:int=0,
-                                    enable_html:bool=True, tempdir=None):
+def hpinfo(shell, cmd, namespaces = None, detail_level:int=0, tempdir=None):
     r"""Emulates a IPython pinfo call"""
     # print(f"helpsystem.helputils.hpinfo(cmd={cmd}, namespaces={namespaces}, detail_level={detail_level}, enable_html={enable_html})")
     ret = None
@@ -1144,7 +1159,6 @@ def hpinfo(shell, cmd, namespaces = None, detail_level:int=0,
                 # strings embedded in the docstrings
                 hinspect(shell, bf, oname, namespaces=namespaces,
                          detail_level = detail_level,
-                         enable_html = enable_html,
                          tempdir=tempdir,
                          )
                 reformat=False
@@ -1187,8 +1201,8 @@ def hinspect(shell:InteractiveShell, bf:io.StringIO, oname=str, namespaces=None,
     from core.prog import scipywarn
     # print(f"helpsystem.helputils.hinspect(oname={oname}, namespaces={namespaces}, **kw={kw})")
     detail_level = kw.get("detail_level", 0)
-    enable_html = kw.get("enable_html", True)
-    info = object_find(shell, oname, namespaces) # this is an oinspect.OInfo object
+    # enable_html = kw.get("enable_html", True)
+    info, msg = object_find(shell, oname, namespaces) # info is an oinspect.OInfo object
     # print(f"helpsystem.helputils.hinspect: info = {info}")
     if namespaces is None:
         namespaces = [ ('Interactive', shell.user_ns),
@@ -1209,13 +1223,9 @@ def hinspect(shell:InteractiveShell, bf:io.StringIO, oname=str, namespaces=None,
         #     else:
         #         docformat = None
 
-        # pmethod = getattr(shell.inspector, meth)
-        # TODO: only apply format_screen to the plain/text repr of the mime
-        # bundle.
-        # formatter = format_screen if info.ismagic else docformat
-        helpdisp(shell, bf, info.obj, oname, tempdir, info, detail_level, enable_html)
+        helpdisp(shell, tempdir, info, bf, oname, detail_level)#, enable_html)
     else:
-        bf.write("No Python documentation found")
+        bf.write(msg)
         # scipywarn('Object `%s` not found.' % oname)
         # return 'not found'  # so callers can take other action
         
@@ -1329,7 +1339,7 @@ def format_python_help_output(shell, data:PythonHelpDict, formatter=None):
 
     _format = lambda t: shell.inspector.format(t)
     
-    def code_formatter(text) -> Bundle:
+    def rst_formatter(text) -> Bundle:
         return {
             'text/plain': _format(text),
             'text/html': mypylight(text)
@@ -1340,12 +1350,6 @@ def format_python_help_output(shell, data:PythonHelpDict, formatter=None):
             'text/plain': _format(text),
             'text/html': rst_to_html_with_highlighting(text)
             }
-    
-    # def pyhelp_formatter2(text) -> Bundle:
-    #     return {
-    #         'text/plain': _format(text),
-    #         'text/html': reSThighlight(text)
-    #         }
     
     def append_field(shell, bundle:UnformattedBundle, title:str, key:str, hd:PythonHelpDict, formatter):
         field = hd[key]
@@ -1374,7 +1378,7 @@ def format_python_help_output(shell, data:PythonHelpDict, formatter=None):
     for key in data:
         if key != titlekey:
             if data[key]:
-                fmt = code_formatter if key in ("data", "classes", "functions") else formatter
+                fmt = rst_formatter if key in ("data", "classes", "functions") else formatter
                 append_field(shell, bundle, key.capitalize(), key, data, fmt)
         
     return bundle
@@ -1396,7 +1400,7 @@ detail_level: int, 0 or 1, default is 0
         return
     
     detail_level = kw.get("detail_level", 0)
-    enable_html = kw.get("enable_html", True)
+    # enable_html = kw.get("enable_html", True)
     
     ret = None
     reformat:bool = False
@@ -1449,7 +1453,7 @@ detail_level: int, 0 or 1, default is 0
                     
             else:
                 ret, reformat = hpinfo(shell, "psearch", namespaces, detail_level = detail_level,
-                                    enable_html = enable_html, tempdir=tempdir)
+                                       tempdir=tempdir)#, enable_html=enable_html)
                 
         else:
             if cmd.startswith("?") or cmd.endswith("?"):
@@ -1464,8 +1468,11 @@ detail_level: int, 0 or 1, default is 0
                     
                 cmd = " ".join([method_name, target])
             print(f"helpsystem.helputils.run_help_command for ? command: cmd = {cmd}")
+            
+            # NOTE: 2026-01-03 22:11:32
+            # this also works when cmd does not have '?' in it 
             ret, reformat = hpinfo(shell, cmd, namespaces, detail_level = detail_level,
-                                    enable_html = enable_html)
+                                   tempdir=tempdir)#, enable_html = enable_html)
 
         if isinstance(ret, str):
             if ret.startswith("No Python documentation found"):

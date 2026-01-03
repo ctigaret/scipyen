@@ -1018,7 +1018,9 @@ def Clements_Bekkers_97(x:np.ndarray | Real,
                         τ2:typing.Optional[Real] = None,
                         **kwargs) -> np.ndarray | Real:
     r"""
+    =======================================
     Clements & Bekkers 1997 mEPSC waveform.
+    =======================================
 
     Description:
     ============
