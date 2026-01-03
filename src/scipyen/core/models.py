@@ -677,8 +677,6 @@ def alphaSynapse(x:np.ndarray | Real, α:typing.Union[typing.Sequence[Real],np.n
 AlphaSynapse function.
 ======================
 
-.. highlight:: python
-
 Description:
 ============
 

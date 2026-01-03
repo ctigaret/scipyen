@@ -48,6 +48,7 @@ fail
 #
 #
 import sys, os, io, typing, traceback, inspect, subprocess, pydoc, runpy
+from tempfile import TemporaryDirectory
 from collections import deque
 import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
@@ -103,6 +104,7 @@ class _PythonHelpThread_(QtCore.QThread):
         self.helpProcess = None
         self.columns = 4
         self.width = 80
+        self.tempdir = None
 
     def run(self):
         doc = QtGui.QTextDocument()
@@ -129,7 +131,7 @@ class _PythonHelpThread_(QtCore.QThread):
                 reformat = False
                 # print(f"{self.__class__.__name__}.run: fullcmd = {fullcmd}")
                 try:
-                    reply, reformat = helputils.run_help_command(self.shell, " ".join(cmdParts), )
+                    reply, reformat = helputils.run_help_command(self.shell, " ".join(cmdParts), tempdir=self.tempdir)
                 except:
                     traceback.print_exc()
 
@@ -183,6 +185,8 @@ class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin
             super().__init__(parent)
         else:
             super(QtWidgets.QWidget, self).__init__(parent)
+            
+        self.tempdir = None
         
         self._helpThread_ = _PythonHelpThread_(self, shell)
         self._helpThread_.message[str].connect(self._slot_displayMessage)
@@ -253,33 +257,12 @@ class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin
             self.helpDisplay.setTextColor(QtWidgets.QApplication.palette().color(QtGui.QPalette.PlaceholderText))
             self.helpDisplay.setPlainText(self.intro_msg)
             
-    
-    @Slot(str)
-    def _slot_queryTextChanged(self, text:str):
-        if len(text.strip()) == 0:
-            self._showCustomPlaceHolderText_()
+    def processQuery(self, query:str):
+        if isinstance(self.tempdir, TemporaryDirectory):
+            if os.path.isdir(self.tempdir.name):
+                self.tempdir.cleanup()
+        self.tempdir = TemporaryDirectory(ignore_cleanup_errors=True, delete=False)
         
-    @Slot()
-    def _slot_processQuery(self):
-        query = self.queryComboBox.lineEdit().text()
-        if len(query.strip()):
-            # if query not in self._queryHistory_:
-            #     self._queryHistory_.append(query)
-            if self.queryComboBox.count() > 0:
-                # NOTE: 2025-05-31 22:22:42
-                # insert policy is insertAtTop
-                self.nextToolButton.setEnabled(self.queryComboBox.currentIndex() > 0)
-                self.prevToolButton.setEnabled(self.queryComboBox.currentIndex() < self.queryComboBox.count()-1)
-            else:
-                self.prevToolButton.setEnabled(False)
-                self.nextToolButton.setEnabled(False)
-                
-            self._helpThread_.helpCommand = query
-            self._helpThread_.run()
-            
-    @Slot(int)
-    def _slot_processQueryNdx(self, index:int):
-        query = self.queryComboBox.itemText(index)
         if len(query.strip()):
             if self.queryComboBox.count() > 0:
                 # NOTE: 2025-05-31 22:22:42
@@ -290,7 +273,23 @@ class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin
                 self.prevToolButton.setEnabled(False)
                 self.nextToolButton.setEnabled(False)
             self._helpThread_.helpCommand = query
+            self._helpThread_.tempdir = self.tempdir
             self._helpThread_.run()
+        
+    @Slot(str)
+    def _slot_queryTextChanged(self, text:str):
+        if len(text.strip()) == 0:
+            self._showCustomPlaceHolderText_()
+        
+    @Slot()
+    def _slot_processQuery(self):
+        query = self.queryComboBox.lineEdit().text()
+        self.processQuery(query)
+            
+    @Slot(int)
+    def _slot_processQueryNdx(self, index:int):
+        query = self.queryComboBox.itemText(index)
+        self.processQuery(query)
             
     @Slot()
     def _slot_nextQuery(self):
@@ -315,7 +314,6 @@ class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin
         signalBlocker = QtCore.QSignalBlocker(self.queryComboBox)
         self.queryComboBox.clear()
         
-        
     @Slot(str)
     def _slot_displayMessage(self, txt:str):
         if len(txt.strip()):
@@ -331,6 +329,7 @@ class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin
         if isinstance(doc, QtGui.QTextDocument):
             if doc.isEmpty():
                 self._showCustomPlaceHolderText_()
+                self.tempdir.cleanup()
             else:
                 self.helpDisplay.setDocument(doc)
                 
@@ -341,6 +340,7 @@ class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin
                     self.helpDisplay.setTextColor(self._textColorCache_)
             else:
                 self._showCustomPlaceHolderText_()
+                self.tempdir.cleanup()
                 # self.helpDisplay.clear()
 
 class PythonHelpWindow(QtWidgets.QMainWindow, WorkspaceGuiMixin):

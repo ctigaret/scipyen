@@ -334,7 +334,7 @@ from . import signalviewer as sv
 from . import matrixviewer as matview
 from . import imageviewer as iv
 from . import dataviewer as dv
-from gui.pythonhelpwidget import PythonHelpWidget
+# from gui.pythonhelpwidget import PythonHelpWidget
 
 from .consoles import styles, pstyles
 from .cursors import (SignalCursor, SignalCursorTypes,DataCursor, 

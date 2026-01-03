@@ -34,6 +34,7 @@ Meant to be used by gui.pythonhelpwidget
 import sys, os, typing, inspect, types, importlib, io, dataclasses, inspect, re
 import traceback
 import itertools
+import pathlib
 import pydoc
 import html
 from functools import (singledispatch, partial)
@@ -101,8 +102,8 @@ docutils_settings_overrides={'output_encoding': 'unicode',
 try:
     import docrepr.sphinxify as sphx
 
-    def sphinxify(oinfo):
-        print(f"helpsystem.helputils.sphinxify(oinfo={oinfo})")
+    def sphinxify(oinfo:oinspect.InfoDict):
+        # print(f"helpsystem.helputils.sphinxify(oinfo={oinfo})")
         wrapped_docstring = sphx.wrap_main_docstring(oinfo)
 
         def sphinxify_docstring(docstring):
@@ -191,7 +192,7 @@ def pub_rst(s:str) -> str:
     
     
 
-def rst_to_html_with_highlighting(rst_text):
+def rst_to_html_with_highlighting(rst_text) -> str:
     r"""Another RST 2 HTML converter.
 This one  "By William	July 8, 2025
 https://www.bomberbot.com/python/converting-restructuredtext-to-html-with-python-for-documentation/
@@ -319,9 +320,9 @@ def mdhighlight(text):
 
 def mypylight(text):
     r"""Highlights Python code in a text.
-    This is applied to un-tagged literal block of text output by docutils.publish*
-    functions with html5 writer as enclosed between ``<pre class="literal-block">``
-    and ``</pre>`` HTML tags.
+    This can also be applied to un-tagged literal block of text enclosed between 
+    ``<pre class="literal-block">``  and ``</pre>`` HTML tags, as output by
+    docutils.publish* functions using the docutils "html5" writer.
  
     Uses ``pygments.highlight()`` function with pygments' ``HTMLFormatter`` and 
     the "python" lexer.
@@ -653,21 +654,14 @@ def format_common_help_reply(msg:str):
             
     return "<br>\n".join(parts)
 
-def helpdisp(shell, bf:io.StringIO, obj, oname="", formatter=None, info:typing.Optional[oinspect.OInfo] = None,
-        detail_level=0, enable_html=True, omit_sections=()):
+def helpdisp(shell, tempdir:TemporaryDirectory, info:oinspect.OInfo,
+             bf:io.StringIO, oname:str="", detail_level=0, enable_html=True, omit_sections=()):
     r"""Stand-in for oinspect.Inspector.pinfo"""
     from core.prog import scipywarn
-    assert info is not None
+    assert isinstance(info, oinspect.OInfo), f"Expecting an oinspect.OInfo object; got {type(info).__name__} instead"
     
-    # original_pylight = oinspect.pylight
-    # oinspect.pylight = mypylight
-    # info_dict = shell.inspector.info(info.obj, oname, info, detail_level)
-    # info_b = shell.inspector._get_info(
-    #     obj, oname, formatter, info, detail_level)#, omit_sections=omit_sections
-    info_dict = hinfo(shell, info.obj, oname, info, detail_level)
-    info_b = hget_info(shell, obj, oname, formatter, info, detail_level, omit_sections=omit_sections)
-    
-    # oinspect.pylight = original_pylight
+    info_b = hget_info(shell, tempdir, info.obj, oname, info, detail_level, 
+                       omit_sections=omit_sections)
     
     if enable_html:
         strng = info_b["text/html"]
@@ -771,11 +765,21 @@ def hpsearch(shell, bf:io.StringIO, pattern, ns_table, ns_search=[],
 
     bf_page(bf, '<p>\n'.join(list(sorted(search_result))))
     
-def object_inspect(shell, oname=str, detail_level:int=0):
+def object_inspect(shell, oname=str, detail_level:int=0) -> oinspect.InfoDict:
     r"""Emulates shell.object_inspect"""
+    
+    # NOTE: 2026-01-02 14:28:47 
+    # ``info`` is an oinspect.OInfo object
     info = object_find(oname)
+    
+    # NOTE: 2026-01-02 14:29:21
+    # either branch below produces an oinspect.InfoDict object (effectively, a dict)
     if info.found:
-        pass # TODO
+        # create an oinspect.InfoDict based on ``info``
+        return hinfo(info.obj, oname, info=info, detail_level=detail_level) 
+    else:
+        # create a generic oinspect.InfoDict based on ``oname``
+        return oinspect.object_info(name=oname, found=False) 
     
 def object_find(shell, oname=str, namespaces=None) -> oinspect.OInfo:
     r"""Emulates shell._object_find()"""
@@ -784,7 +788,7 @@ def object_find(shell, oname=str, namespaces=None) -> oinspect.OInfo:
                         ('Interactive (global)', shell.user_global_ns),
                         ('Python builtin', shell.ns_table["builtin"]),
                         ]
-    info = shell._object_find(oname, namespaces)
+    info = shell._object_find(oname, namespaces) # this is an oinspect.OInfo object
     if not info.found:
         # this might happen when either:
         # 1) the object exists in the namespaces, but has been imported under an alias
@@ -846,7 +850,6 @@ def happend_info_field(shell, bundle: UnformattedBundle,
         omit_sections: typing.List[str],
         formatter,
         ):
-    # TODO 2025-10-13 13:25:09
     if title in omit_sections or key in omit_sections:
         return
     field = info[key]
@@ -856,15 +859,19 @@ def happend_info_field(shell, bundle: UnformattedBundle,
         bundle["text/html"].append((title, formatted_field["text/html"]))
 
 
-def hmake_info_unformatted(shell, obj, info, formatter, detail_level, omit_sections) -> UnformattedBundle:
+def hmake_info_unformatted(shell:InteractiveShell, obj:object, info:oinspect.InfoDict, 
+                           detail_level:int, 
+                           omit_sections:typing.Union[typing.List[str], typing.Tuple[str]], 
+                           tempdir:TemporaryDirectory) -> UnformattedBundle:
     r"""Emulates shell.inspector._make_info_unformatted"""
     # TODO 2025-10-13 13:25:09
+    formatter = partial(format_latex, tempdir=tempdir)
     bundle: UnformattedBundle = {
         "text/plain": [],
         "text/html": [],
     }
     def append_field(shell, 
-        bundle: UnformattedBundle, title: str, key: str, formatter=None
+        bundle: UnformattedBundle, title: str, key: str, formatter:types.FunctionType=None
     ):
         happend_info_field(
             shell,
@@ -881,7 +888,8 @@ def hmake_info_unformatted(shell, obj, info, formatter, detail_level, omit_secti
     def code_formatter(text) -> Bundle:
         return {
             'text/plain': _format(text),
-            'text/html': mypylight(text)
+            # 'text/html': mypylight(text)
+            'text/html': rst_to_html_with_highlighting(formatter(text))
         }
 
     if info["isalias"]:
@@ -891,7 +899,7 @@ def hmake_info_unformatted(shell, obj, info, formatter, detail_level, omit_secti
         if detail_level > 0:
             append_field(shell, bundle, "Source", "source", code_formatter)
         else:
-            append_field(shell, bundle, "Docstring", "docstring", formatter)
+            append_field(shell, bundle, "Docstring", "docstring", code_formatter)
             
         append_field(shell, bundle, "File", "file")
 
@@ -899,12 +907,12 @@ def hmake_info_unformatted(shell, obj, info, formatter, detail_level, omit_secti
         # Functions, methods, classes
         append_field(shell, bundle, "Signature", "definition", code_formatter)
         append_field(shell, bundle, "Init signature", "init_definition", code_formatter)
-        append_field(shell, bundle, "Docstring", "docstring", formatter)
+        append_field(shell, bundle, "Docstring", "docstring", code_formatter)
         
         if detail_level > 0 and info["source"]:
             append_field(shell, bundle, "Source", "source", code_formatter)
         else:
-            append_field(shell, bundle, "Init docstring", "init_docstring", formatter)
+            append_field(shell, bundle, "Init docstring", "init_docstring", code_formatter)
             if not oinspect.is_simple_callable(obj):
                 for field in _extra_info_fields:
                     if info[field]:
@@ -927,9 +935,9 @@ def hmake_info_unformatted(shell, obj, info, formatter, detail_level, omit_secti
         if info["namespace"] != "Interactive":
             append_field(shell, bundle, "Namespace", "namespace")
 
-        append_field(shell, bundle, "Class docstring", "class_docstring", formatter)
-        append_field(shell, bundle, "Init docstring", "init_docstring", formatter)
-        append_field(shell, bundle, "Call docstring", "call_docstring", formatter)
+        append_field(shell, bundle, "Class docstring", "class_docstring", code_formatter)
+        append_field(shell, bundle, "Init docstring", "init_docstring", code_formatter)
+        append_field(shell, bundle, "Call docstring", "call_docstring", code_formatter)
         
         append_field(shell, bundle, "Length", "length")
         append_field(shell, bundle, "File", "file")
@@ -939,7 +947,7 @@ def hmake_info_unformatted(shell, obj, info, formatter, detail_level, omit_secti
         if detail_level > 0 and info["source"]:
             append_field(shell, bundle, "Source", "source", code_formatter)
         else:
-            append_field(shell, bundle, "Docstring", "docstring", formatter)
+            append_field(shell, bundle, "Docstring", "docstring", code_formatter)
             for field in _extra_info_fields:
                 if info[field]:
                     append_field(shell, bundle, field.capitalize(), field, code_formatter)
@@ -948,11 +956,28 @@ def hmake_info_unformatted(shell, obj, info, formatter, detail_level, omit_secti
 
     return bundle
 
-def hinfo(shell, obj, oname:str="", info:typing.Optional[oinspect.OInfo]=None,
-          detail_level:int = 0) -> oinspect.InfoDict:
-    r"""Augments shell.inspect.info()
+def hinfo(shell:InteractiveShell, info:oinspect.OInfo,
+          obj:object, oname:str="", detail_level:int = 0) -> oinspect.InfoDict:
+    r"""Augments shell.inspector.info().
+    
+    The actual doctring is mapped to the "docstring" key of the returned object.
+    
+    .. note::
+        The extra fields are defined at module level as ``helputils._extra_info_fields``
+    
+    Returns:
+    ========
+    An ``IPython.core.oinspect.InfoDict`` object with additional fields: "methods", 
+    "descriptors", "functions", "classes", "data".
+    
  """
+    # NOTE: 2026-01-02 14:46:25
+    # this is the 'basic' oinspect.InfoDict object that the shell's current inspector
+    # (by default, an oinspect.Inspector) returns.
     info_dict = shell.inspector.info(obj, oname=oname, info=info, detail_level=detail_level)
+    
+    # NOTE: 2026-01-02 14:47:36
+    # adding the extra fields, to be populated further below
     info_dict.update(**{field: None for field in _extra_info_fields if field not in info_dict})
     
     def _get_sig_or_type(o):
@@ -985,8 +1010,6 @@ def hinfo(shell, obj, oname:str="", info:typing.Optional[oinspect.OInfo]=None,
     
     _is_descriptor = lambda x: inspect.isdatadescriptor(x) or inspect.ismemberdescriptor(x) or inspect.isgetsetdescriptor(x)
     
-    # datas = list(sorted(map(lambda f: f"{_get_name(f[1])}{_get_sig_or_type(f[1])}", 
-    #                         filter(lambda f: not f[0].startswith("_"), inspect.getmembers_static(obj, _is_data)))))
     datas = list(sorted(map(lambda f: f"{f[0]}:{type(f[1]).__name__} = {f[1]}", 
                             filter(lambda f: not f[0].startswith("_"), inspect.getmembers_static(obj, _is_data)))))
     
@@ -1013,18 +1036,58 @@ def hinfo(shell, obj, oname:str="", info:typing.Optional[oinspect.OInfo]=None,
         
     return info_dict
 
-def hget_info(shell, obj, oname:str="", formatter=None, info:typing.Optional[oinspect.OInfo]=None,
+def format_latex(txt:str, tempdir:TemporaryDirectory)->str:
+    r"""Replace latex mathematical expressions with ReST image links"""
+    from core import strutils
+    # Combined regular expression to capture all types of LaTeX
+    latex_combined_pattern = r'(\$\$([^$]*)\$\$|\\begin\{[^\}]+\}.*?\\end\{[^\}]+\}|(\$[^\$]*\$|\\[a-zA-Z]+(?:\{[^\}]*\})?))'
+
+    # Finding all matches
+    matches = re.findall(latex_combined_pattern, txt, re.DOTALL)
+    
+    # return list(map(lambda m: strutils.render_latex(m[0], out="base64")))
+    # self.imagesdir.cleanup()
+    
+    for k, match in enumerate(matches):
+        # match[0] contains the complete matched substring
+        ltx = match[0].strip()
+        # print(f"ltx = {ltx}")
+        ll = ltx.replace("\\\\", "\\")
+        pngdata = strutils.render_latex(ll, out="bytes", wrap=ll.startswith("$$"))
+        # print(f"pngdata = {pngdata}")
+        filepath = pathlib.Path(tempdir.name) / f"png{k}.png"
+        with open(filepath.as_posix(), "wb") as pngfile:
+            pngfile.write(pngdata)
+            
+        snippet = f"\n .. image:: {filepath.as_posix()}\n"
+        # snippet = f" .. image:: {filepath.as_posix()}\n    :alt: {ll}"
+        
+        if ll.startswith("$$"):
+            snippet = "\n\n" + snippet + "\n\n"
+            
+        txt = txt.replace(ltx, snippet)
+        
+    return txt
+    
+
+def hget_info(shell:InteractiveShell, tempdir:TemporaryDirectory,
+              obj:object, oname:str="",
+              info:typing.Optional[oinspect.OInfo]=None,
               detail_level:int = 0, omit_sections:typing.Union[typing.List[str], typing.Tuple[str]] = ()) -> tuple[dict]:
     r"""Emulates shell.inspector._get_info"""
     # TODO 2025-12-27 15:33:28
     # Implement latex rendering in docstrings!
     # info_dict = shell.inspector.info(obj, oname=oname, info=info, detail_level=detail_level)
-    info_dict = hinfo(shell, obj, oname=oname, info=info, detail_level=detail_level)
+    info_dict = hinfo(shell, info, obj, oname=oname, detail_level=detail_level)
     omit_sections = list(omit_sections)
     
-    bundle = hmake_info_unformatted(shell, obj, info_dict, formatter,
+    # if "docstring" in info_dict:
+    #     formatter = partial(format_latex, tempdir=tempdir)
+    
+    bundle = hmake_info_unformatted(shell, obj, info_dict,
                                     detail_level = detail_level, 
-                                    omit_sections = omit_sections) 
+                                    omit_sections = omit_sections,
+                                    tempdir=tempdir) 
     
     if shell.inspector.mime_hooks:
         hook_data = oinspector.InspectorHookData(
@@ -1059,9 +1122,9 @@ def hget_info(shell, obj, oname:str="", formatter=None, info:typing.Optional[oin
     
     
 def hpinfo(shell, cmd, namespaces = None, detail_level:int=0,
-                                    enable_html:bool=True):
+                                    enable_html:bool=True, tempdir=None):
     r"""Emulates a IPython pinfo call"""
-    print(f"helpsystem.helputils.hpinfo(cmd={cmd}, namespaces={namespaces}, detail_level={detail_level}, enable_html={enable_html})")
+    # print(f"helpsystem.helputils.hpinfo(cmd={cmd}, namespaces={namespaces}, detail_level={detail_level}, enable_html={enable_html})")
     ret = None
     reformat = False
     
@@ -1077,11 +1140,13 @@ def hpinfo(shell, cmd, namespaces = None, detail_level:int=0,
                 # NOTE: 2025-12-27 13:53:06
                 # this branch actually runs the ipython "help" algorithm ↦
                 # extracts various useful information about the object, including 
-                # its docstring
+                # its docstring; tempdir, if present, is used when rendering LaTeX
+                # strings embedded in the docstrings
                 hinspect(shell, bf, oname, namespaces=namespaces,
-                                detail_level = detail_level,
-                                enable_html = enable_html,
-                                )
+                         detail_level = detail_level,
+                         enable_html = enable_html,
+                         tempdir=tempdir,
+                         )
                 reformat=False
                 
             ret = bf.getvalue()
@@ -1091,7 +1156,8 @@ def hpinfo(shell, cmd, namespaces = None, detail_level:int=0,
     
     return ret, reformat
      
-def hinspect(shell:InteractiveShell, bf:io.StringIO, oname=str, namespaces=None, **kw):
+def hinspect(shell:InteractiveShell, bf:io.StringIO, oname=str, namespaces=None,
+             tempdir:typing.Optional[TemporaryDirectory]=None, **kw):
     r"""Stand-in for shell._inspect, called by pinfo magic.
     Named as `hinspect` to avoid clash with the standard library module `inspect`.
 
@@ -1103,7 +1169,7 @@ def hinspect(shell:InteractiveShell, bf:io.StringIO, oname=str, namespaces=None,
     ↓
     pinfo,qmark1,oname,qmark2 = re.match(r'(pinfo )?(\?*)(.*?)(\??$)',parameter_s).groups()
         
-    shell._inspect("pinfo", oname) ← role taken up by THIS function, whkch also 
+    shell._inspect("pinfo", oname) ← role taken up by THIS function, which also 
                                      redirects output to 'bf' (a StringIO )
     ↓
     page.page(data, start, screen_lines, pager_cmd) with:       
@@ -1119,11 +1185,11 @@ def hinspect(shell:InteractiveShell, bf:io.StringIO, oname=str, namespaces=None,
         • page.pager_page(data)
 """
     from core.prog import scipywarn
-    print(f"helpsystem.helputils.hinspect(oname={oname}, namespaces={namespaces}, **kw={kw})")
+    # print(f"helpsystem.helputils.hinspect(oname={oname}, namespaces={namespaces}, **kw={kw})")
     detail_level = kw.get("detail_level", 0)
     enable_html = kw.get("enable_html", True)
-    info = object_find(shell, oname, namespaces)
-    print(f"helpsystem.helputils.hinspect: info = {info}")
+    info = object_find(shell, oname, namespaces) # this is an oinspect.OInfo object
+    # print(f"helpsystem.helputils.hinspect: info = {info}")
     if namespaces is None:
         namespaces = [ ('Interactive', shell.user_ns),
                         ('Interactive (global)', shell.user_global_ns),
@@ -1131,24 +1197,23 @@ def hinspect(shell:InteractiveShell, bf:io.StringIO, oname=str, namespaces=None,
                         ]
     
     if info.found or hasattr(info.parent, oinspect.HOOK_NAME):
-        # info_dict = shell.inspector.info(info.obj, oname, info, detail_level)
-        info_dict = hinfo(shell, info.obj, oname, info, detail_level)
-        if shell.sphinxify_docstring:
-            if sphinxify is None:
-                raise ImportError("Module ``docrepr`` required but missing")
-            # docformat = sphinxify(shell.object_inspect(oname))
-            docformat = sphinxify(object_inspect(shell, oname))
-        else:
-            if "docstring" in info_dict:
-                docformat = format_screen
-            else:
-                docformat = None
+        # info_dict = hinfo(shell, info.obj, oname, info, detail_level, tempdir) # this is an oinspect.InfoDict NOTE: 2026-01-02 14:09:05 do not confuse with oinspect.OInfo
+        # if shell.sphinxify_docstring:
+        #     if sphinxify is None:
+        #         raise ImportError("Module ``docrepr`` required but missing")
+        #     # docformat = sphinxify(shell.object_inspect(oname))
+        #     docformat = sphinxify(object_inspect(shell, oname))
+        # else:
+        #     if "docstring" in info_dict:
+        #         docformat = format_screen
+        #     else:
+        #         docformat = None
 
         # pmethod = getattr(shell.inspector, meth)
         # TODO: only apply format_screen to the plain/text repr of the mime
         # bundle.
-        formatter = format_screen if info.ismagic else docformat
-        helpdisp(shell, bf, info.obj, oname, formatter, info, detail_level, enable_html)
+        # formatter = format_screen if info.ismagic else docformat
+        helpdisp(shell, bf, info.obj, oname, tempdir, info, detail_level, enable_html)
     else:
         bf.write("No Python documentation found")
         # scipywarn('Object `%s` not found.' % oname)
@@ -1171,7 +1236,7 @@ WARNING: Potentially problematic...
         
     return
     
-def run_python_help(shell, cmd:str, enable_html=True, ) -> str | None:
+def run_python_help(shell, cmd:str, enable_html=True, tempdir=None) -> str | None:
     print(f"helpsystem.helputils.run_python_help → pydoc.Helper(cmd={cmd})")
     ret = None
     with io.StringIO() as bf:
@@ -1315,7 +1380,7 @@ def format_python_help_output(shell, data:PythonHelpDict, formatter=None):
     return bundle
     
 
-def run_help_command(shell, cmd:str, namespaces=None, **kw) -> str | None:
+def run_help_command(shell, cmd:str, namespaces=None, tempdir=None, **kw) -> str | None:
     """
 kw: 
 enable_html: bool, default, is True
@@ -1340,8 +1405,8 @@ detail_level: int, 0 or 1, default is 0
         cmd = cmd.strip("help").strip("(").strip(")").strip("\"")
         if len(cmd) == 0:
             cmd = "help"
-        ret = run_python_help(shell, cmd)
-        reformat = True
+        ret = run_python_help(shell, cmd, tempdir=tempdir)
+        reformat = False
         
     else:
         if cmd in ("?", "??"):
@@ -1384,7 +1449,7 @@ detail_level: int, 0 or 1, default is 0
                     
             else:
                 ret, reformat = hpinfo(shell, "psearch", namespaces, detail_level = detail_level,
-                                    enable_html = enable_html)
+                                    enable_html = enable_html, tempdir=tempdir)
                 
         else:
             if cmd.startswith("?") or cmd.endswith("?"):
@@ -1402,7 +1467,6 @@ detail_level: int, 0 or 1, default is 0
             ret, reformat = hpinfo(shell, cmd, namespaces, detail_level = detail_level,
                                     enable_html = enable_html)
 
-               
         if isinstance(ret, str):
             if ret.startswith("No Python documentation found"):
                 print(f"helpsystem.helputils.run_help_command — calling helpsystem.helputils.run_python_help for command: cmd = {cmd}")
