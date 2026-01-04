@@ -646,7 +646,10 @@ def isnumber(s: str) -> bool:
     except:
         return False
     
-def islatex(s:str) -> bool:
+def is_html(s:str) -> bool:
+    return all(v in s for v in ("<html>", "</html>"))
+    
+def is_latex(s:str) -> bool:
     latex_combined_pattern = r'(\$\$([^$]*)\$\$|\\begin\{[^\}]+\}.*?\\end\{[^\}]+\}|(\$[^\$]*\$|\\[a-zA-Z]+(?:\{[^\}]*\})?))'
     matches = _re.findall(latex_combined_pattern, s, _re.DOTALL)
     return len(matches)>0 and len(matches[0])>0

@@ -82,10 +82,9 @@ from IPython.core.interactiveshell import InteractiveShell
 from core import prog
 from core.prog import safewrapper, safeguiwrapper, scipywarn
 from core.sysutils import adapt_ui_path
-# from core import helputils
+from core import strutils
 from helpsystem import helputils
 from gui.workspacegui import WorkspaceGuiMixin
-# import numpy as np # cheeky
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __ui_path__ = adapt_ui_path(__module_path__,'pythonhelpwidget.ui')
 
@@ -108,20 +107,23 @@ class _PythonHelpThread_(QtCore.QThread):
         self.tempdir = None
 
     def run(self):
-        doc = QtGui.QTextDocument()
+        # doc = QtGui.QTextDocument()
         reformat:bool = False
-        qreply = {"query":self.helpCommand, "tempdir":self.tempdir, "doc":None}
+        qreply = {"query":self.helpCommand, "tempdir":self.tempdir, "contents":None}
         if isinstance(self.helpCommand, str) and len(self.helpCommand.strip()):
             cmdParts = self.helpCommand.split(" ")
             # if any(s in cmdParts for s in ("modules", "module")):
             if "modules" in cmdParts:
-                doc.setHtml(helputils.module_infos("Modules", 
+                contents = helputils.module_infos("Modules", 
                                                    "Module names and their aliases.<p>",
-                                                  self.columns))
-                qreply["doc"] = doc
-                self.ready.emit(qreply)
+                                                  self.columns)
+                # doc.setHtml(helputils.module_infos("Modules", 
+                #                                    "Module names and their aliases.<p>",
+                #                                   self.columns))
+                qreply["contents"] = contents
+                # self.ready.emit(qreply)
                 # self.ready.emit(doc)
-                return
+                # return
             else:
                 # NOTE: 2025-06-02 17:02:10
                 # do NOT delete the next line - it works (kind of)
@@ -161,9 +163,12 @@ class _PythonHelpThread_(QtCore.QThread):
                     out.append(body)
                     out.append("</body>")
                     out.append("</html>")
-                    doc.setHtml("\n".join(out))
+                    contents = "\n".join(out)
+                else:
+                    contents = None
+                    # doc.setHtml()
                     
-                    qreply["doc"] = doc
+            qreply["contents"] = contents
                 
             self.ready.emit(qreply)
             self.helpCommand = None
@@ -279,7 +284,7 @@ class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin
                 self.prevToolButton.setEnabled(False)
                 self.nextToolButton.setEnabled(False)
             if query in self._cache_:
-                cquery = {"query":query, "tempdir": self._cache_[query]["tempdir"], "doc":self._cache_[query]["doc"]}
+                cquery = {"query":query, "tempdir": self._cache_[query]["tempdir"], "contents":self._cache_[query]["contents"]}
                 self._slot_displayReply(cquery)
             else:
                     
@@ -358,26 +363,41 @@ class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin
     @Slot(dict)
     # def _slot_displayReply(self, doc:typing.Union[QtGui.QTextDocument, str], tempdir:TemporaryDirectory):
     def _slot_displayReply(self, reply:dict):
-        doc = reply.get("doc", None)
+        contents = reply.get("contents", None)
         tempdir = reply.get("tempdir", None)
         query = reply.get("query", None)
-        if isinstance(doc, QtGui.QTextDocument):
-            if doc.isEmpty():
-                self._showCustomPlaceHolderText_()
+        # if isinstance(doc, QtGui.QTextDocument):
+        if not isinstance(contents, str) or len(contents.strip()) == 0:
+            self._showCustomPlaceHolderText_()
+            if isinstance(tempdir, TemporaryDirectory):
                 tempdir.cleanup()
-            else:
-                self._cache_[query] = {"doc":doc, "tempdir":tempdir}
+        else:
+            if strutils.is_html(contents):
+                doc = QtGui.QTextDocument()
+                doc.setHtml(contents)
                 self.helpDisplay.setDocument(doc)
-                
-        elif isinstance(doc, str):
-            if len(doc.strip()):
-                self._cache_["query"] = {"doc":doc, "tempdir":tempdir}
+            else:
                 self.helpDisplay.setPlainText(doc)
                 if self.helpDisplay.textColor() == QtWidgets.QApplication.palette().color(QtGui.QPalette.PlaceholderText):
                     self.helpDisplay.setTextColor(self._textColorCache_)
-            else:
-                self._showCustomPlaceHolderText_()
-                tempdir.cleanup()
+            if query not in self._cache_:
+                self._cache_[query] = {"contents":contents, "tempdir":tempdir}
+            # if doc.isEmpty():
+            #     self._showCustomPlaceHolderText_()
+            #     tempdir.cleanup()
+            # else:
+            #     self._cache_[query] = {"doc":doc, "tempdir":tempdir}
+            #     self.helpDisplay.setDocument(doc)
+                
+        # elif isinstance(doc, str):
+        #     if len(doc.strip()):
+        #         self._cache_["query"] = {"doc":doc, "tempdir":tempdir}
+        #         self.helpDisplay.setPlainText(doc)
+        #         if self.helpDisplay.textColor() == QtWidgets.QApplication.palette().color(QtGui.QPalette.PlaceholderText):
+        #             self.helpDisplay.setTextColor(self._textColorCache_)
+        #     else:
+        #         self._showCustomPlaceHolderText_()
+        #         tempdir.cleanup()
 
 class PythonHelpWindow(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     def __init__(self, shell, parent=None):

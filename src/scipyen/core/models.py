@@ -342,7 +342,7 @@ https://wiki.python.org/moin/PythonDecoratorLibrary#Creating_decorator_with_opti
         def __special_display__(f):
             from core import strutils
             shell = getScipyenConsoleShell()
-            if isinstance(f.expression, sympy.Basic) or (isinstance(f.expression, str) and strutils.islatex(f.expression)):
+            if isinstance(f.expression, sympy.Basic) or (isinstance(f.expression, str) and strutils.is_latex(f.expression)):
                 try:
                     img = render_sympy(f.expression, out="bytes") if isinstance(f.expression, sympy.Basic) else render_latex(f.expression, out="bytes")
                 except:
