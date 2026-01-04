@@ -93,7 +93,8 @@ Ui_PythonHelpWidget, QWidget = loadUiType(__ui_path__)
 
 class _PythonHelpThread_(QtCore.QThread):
     # ready = Signal(str, name="ready")
-    ready = Signal(QtGui.QTextDocument, name="ready")
+    # ready = Signal(QtGui.QTextDocument, TemporaryDirectory, name="ready")
+    ready = Signal(dict, name="ready")
     message = Signal(str, name="ready")
     # threadRunning = Signal(str, name="threadRunning")
     
@@ -109,6 +110,7 @@ class _PythonHelpThread_(QtCore.QThread):
     def run(self):
         doc = QtGui.QTextDocument()
         reformat:bool = False
+        qreply = {"query":self.helpCommand, "tempdir":self.tempdir, "doc":None}
         if isinstance(self.helpCommand, str) and len(self.helpCommand.strip()):
             cmdParts = self.helpCommand.split(" ")
             # if any(s in cmdParts for s in ("modules", "module")):
@@ -116,18 +118,20 @@ class _PythonHelpThread_(QtCore.QThread):
                 doc.setHtml(helputils.module_infos("Modules", 
                                                    "Module names and their aliases.<p>",
                                                   self.columns))
-                self.ready.emit(doc)
+                qreply["doc"] = doc
+                self.ready.emit(qreply)
+                # self.ready.emit(doc)
                 return
             else:
                 # NOTE: 2025-06-02 17:02:10
                 # do NOT delete the next line - it works (kind of)
                 # fullcmd = [sys.executabdle, "-Xfrozen_modules=off", "-m", "pydoc"] + cmdParts
                 # NOTE: 2025-06-02 17:01:56
-                # testing, don;t delete
+                # testing, don't delete
                 # fullcmd = [sys.executable, "-Xfrozen_modules=off", "-m", helputils.__name__] + cmdParts
-                self.message.emit("Please wait...")
+                # self.message.emit("Please wait...")
                 reply = None
-                errors = None
+                # errors = None
                 reformat = False
                 # print(f"{self.__class__.__name__}.run: fullcmd = {fullcmd}")
                 try:
@@ -153,16 +157,19 @@ class _PythonHelpThread_(QtCore.QThread):
                             body = reply.replace("\n", "<br>")
                     else:
                         body = reply
+                        
                     out.append(body)
                     out.append("</body>")
                     out.append("</html>")
                     doc.setHtml("\n".join(out))
+                    
+                    qreply["doc"] = doc
                 
-            self.ready.emit(doc)
+            self.ready.emit(qreply)
             self.helpCommand = None
                 
 class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin, ):
-    _instance = None # singleton pattern
+    _instance = None # singleton patformat_common_help_replytern
     
     # NOTE: 2025-06-25 16:45:49
     # see NOTE: 2025-06-20 23:27:26 WARNING in gui.mainwindow
@@ -187,11 +194,12 @@ class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin
         else:
             super(QtWidgets.QWidget, self).__init__(parent)
             
-        self.tempdir = None
+        # self.tempdir = None
+        self._cache_ = dict()
         
         self._helpThread_ = _PythonHelpThread_(self, shell)
         self._helpThread_.message[str].connect(self._slot_displayMessage)
-        self._helpThread_.ready[QtGui.QTextDocument].connect(self._slot_displayReply)
+        self._helpThread_.ready[dict].connect(self._slot_displayReply)
         self._queryHistory_ = deque()
         self.placeHolder_msg = 'Enter a help topic in the field above (e.g., "topics", "pywt.Wavelet"), "?", or "help"'
         try:
@@ -260,11 +268,7 @@ class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin
             self.helpDisplay.setPlainText(self.intro_msg)
             
     def processQuery(self, query:str):
-        if isinstance(self.tempdir, TemporaryDirectory):
-            if os.path.isdir(self.tempdir.name):
-                self.tempdir.cleanup()
-        self.tempdir = TemporaryDirectory(ignore_cleanup_errors=True, delete=False)
-        
+        self._slot_displayMessage("Please wait...")
         if len(query.strip()):
             if self.queryComboBox.count() > 0:
                 # NOTE: 2025-05-31 22:22:42
@@ -274,9 +278,14 @@ class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin
             else:
                 self.prevToolButton.setEnabled(False)
                 self.nextToolButton.setEnabled(False)
-            self._helpThread_.helpCommand = query
-            self._helpThread_.tempdir = self.tempdir
-            self._helpThread_.run()
+            if query in self._cache_:
+                cquery = {"query":query, "tempdir": self._cache_[query]["tempdir"], "doc":self._cache_[query]["doc"]}
+                self._slot_displayReply(cquery)
+            else:
+                    
+                self._helpThread_.helpCommand = query
+                self._helpThread_.tempdir = TemporaryDirectory(ignore_cleanup_errors=True, delete=False)
+                self._helpThread_.run()
         
     @Slot(str)
     def _slot_queryTextChanged(self, text:str):
@@ -313,8 +322,13 @@ class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin
     @Slot()
     def _slot_removeCurrentQuery(self):
         index = self.queryComboBox.currentIndex()
+        query = self,queryComboBox.itemText(index)
         signalBlocker = QtCore.QSignalBlocker(self.queryComboBox)
         self.queryComboBox.removeItem(index)
+        self._lastQuery_ = None
+        cquery = self._cache_.pop(query, None)
+        if isinstance(cquery, dict) and isinstance(cquery.get("tempdir", None), TemporaryDirectory):
+            cquery["tempdir"].cleanup()
         if self.queryComboBox.count() > 0:
             self._slot_processQueryNdx(self.queryComboBox.currentIndex())
         
@@ -322,6 +336,12 @@ class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin
     def _slot_clearQueryHistory(self):
         signalBlocker = QtCore.QSignalBlocker(self.queryComboBox)
         self.queryComboBox.clear()
+        self._lastQuery_ = None
+        for q in self._cache_:
+            if isinstance(q.get("tempdir", None), TemporaryDirectory):
+                q["tempdir"].cleanup()
+                
+        self._cache_.clear()
         
     @Slot(str)
     def _slot_displayMessage(self, txt:str):
@@ -332,24 +352,32 @@ class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin
         else:
             self._showCustomPlaceHolderText_()
         
-    @Slot(QtGui.QTextDocument)
-    @Slot(str)
-    def _slot_displayReply(self, doc:typing.Union[QtGui.QTextDocument, str]):
+    # @Slot(QtGui.QTextDocument, TemporaryDirectory)
+    # @Slot(str, TemporaryDirectory)
+    # @Slot(QtGui.QTextDocument, TemporaryDirectory)
+    @Slot(dict)
+    # def _slot_displayReply(self, doc:typing.Union[QtGui.QTextDocument, str], tempdir:TemporaryDirectory):
+    def _slot_displayReply(self, reply:dict):
+        doc = reply.get("doc", None)
+        tempdir = reply.get("tempdir", None)
+        query = reply.get("query", None)
         if isinstance(doc, QtGui.QTextDocument):
             if doc.isEmpty():
                 self._showCustomPlaceHolderText_()
-                self.tempdir.cleanup()
+                tempdir.cleanup()
             else:
+                self._cache_[query] = {"doc":doc, "tempdir":tempdir}
                 self.helpDisplay.setDocument(doc)
                 
         elif isinstance(doc, str):
             if len(doc.strip()):
+                self._cache_["query"] = {"doc":doc, "tempdir":tempdir}
                 self.helpDisplay.setPlainText(doc)
                 if self.helpDisplay.textColor() == QtWidgets.QApplication.palette().color(QtGui.QPalette.PlaceholderText):
                     self.helpDisplay.setTextColor(self._textColorCache_)
             else:
                 self._showCustomPlaceHolderText_()
-                self.tempdir.cleanup()
+                tempdir.cleanup()
 
 class PythonHelpWindow(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     def __init__(self, shell, parent=None):
@@ -363,5 +391,7 @@ class PythonHelpWindow(QtWidgets.QMainWindow, WorkspaceGuiMixin):
 
     def closeEvent(self, evt):
         self.saveSettings()
-        if isinstance(self.helpWidget.tempdir, TemporaryDirectory) and os.path.isdir(self.helpWidget.tempdir.name):
-            self.helpWidget.tempdir.cleanup()
+        if len(self.helpWidget._cache_):
+            for cquery in self.helpWidget._cache_.values():
+                if isinstance(cquery, dict) and isinstance(cquery.get("tempdir", None), TemporaryDirectory):
+                    cquery["tempdir"].cleanup()

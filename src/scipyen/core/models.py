@@ -803,9 +803,7 @@ $$g(t) = \\chi$$
 and
 $$h(t) = e^{\\left(\\chi - 1\\right)} \\times 0.5$$
     
-The intersections between the two curves are the solutions χ₀, χ₁ of `Eq. 3`
-(you may want to plot the region of the curves where x <= 0.2, in order to
-visualize the intersections).
+The intersections between the two curves are the solutions χ₀, χ₁ of `Eq. 3 ` (you may want to plot the region of the curves where x <= 0.2, in order to  visualize the intersections).
     
 Example:
     

@@ -626,12 +626,10 @@ def format_common_help_reply(msg:str):
     return "<br>\n".join(parts)
 
 def _fix_html_highlight(s:str) -> str:
-    s = s.replace("<br>", "").replace("\n", "<br>").replace("<p>", "<br>").replace("<br><br>", "<br>").replace("</h1><br>", "</h1>")
+    s = s.replace("<br>", " ").replace("\n", "<br>").replace("<p>", "<br>").replace("<br><br>", "<br>").replace("</h1><br>", "</h1>")
     # s = s.replace('&quot;', '"')
     return s
 
-# def helpdisp(shell, tempdir:TemporaryDirectory, info:oinspect.OInfo,
-#              bf:io.StringIO, oname:str="", detail_level=0, enable_html=True, omit_sections=()):
 def helpdisp(shell, tempdir:TemporaryDirectory, info:oinspect.OInfo,
              bf:io.StringIO, oname:str="", detail_level=0, omit_sections=()):
     r"""Stand-in for oinspect.Inspector.pinfo.
