@@ -429,6 +429,16 @@ def module_infos(title:str, header:str, columns:int = 4) -> str:
     return "\n".join(out)
 
 def listmodules() -> tuple:
+    r"""A faster module walker which groups modules according to their availability.
+Returns:
+========
+
+:env_pkg_names: list of names of package modules available in Scipyen's virtual environment but outside Scipyen
+:env_non_pkg_names: list of names of non-package modules available in Scipyen's virtual environment but outside Scipyen
+:scipyen_pkg_names: list of names of package modules in Scipyen's tree
+:scipyen_non_pkg_names: list of names of non-package modules in Scipyen's tree
+:scipyen_plugins: list of Scipyen plugin modules
+"""
     from core.workspacefunctions import getMainScipyenWindow
     from core.prog import walk_packages
     infos = list(filter(lambda i: "." not in i.name, walk_packages())) # list of available module infos
@@ -494,7 +504,6 @@ def listmodules() -> tuple:
         env_packages_not_in_ns  = list(filter(lambda n: n not in shell_package_names, env_module_names))
         
         env_pkg_names =  list(sorted(env_packages_in_ns + env_packages_not_in_ns))
-        
         
     return env_pkg_names, env_non_pkg_names, scipyen_pkg_names, scipyen_non_pkg_names, list(sorted(plugins.keys()))
     

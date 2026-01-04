@@ -152,15 +152,24 @@ def getDesktopGeometry():
     else:
         return QtWidgets.QApplication.desktop().geometry()
     
-def getScipyenConsoleShell() -> InProcessInteractiveShell:
+def getScipyenMainWindow() -> QtWidgets.QMainWindow | None:
+    # NOTE: 2026-01-04 22:33:13
+    # this is redundant: there's already core.workspacefunctions.getMainScipyenWindow()
+    # but I'd rather use this one as it is more direct (the one in workspacefunctions
+    # is a bit convoluted as it walks up the call stack — or frames — and may fail)
     windows = list(filter(lambda w: "ScipyenWindow" in type(w).__name__, QtWidgets.QApplication.topLevelWidgets()))
     assert len(windows)==1, "Not a Scipyen session"
     mainWindow = windows[0]
+    return mainWindow
+    
+def getScipyenConsoleShell() -> InProcessInteractiveShell:
+    # windows = list(filter(lambda w: "ScipyenWindow" in type(w).__name__, QtWidgets.QApplication.topLevelWidgets()))
+    # assert len(windows)==1, "Not a Scipyen session"
+    # mainWindow = windows[0]
+    mainWindow = getScipyenMainWindow()
     shell = mainWindow.shell
     assert isinstance(shell, InProcessInteractiveShell), "Not using an in-process interactive shell"
     return shell
-    
-    
     
 def validatorString(val:typing.Union[QtGui.QValidator.State, int]):
     r"""String representation of a QValidator.State value

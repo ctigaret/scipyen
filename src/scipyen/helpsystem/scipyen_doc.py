@@ -84,6 +84,7 @@ import types, typing
 import pydoc
 import tempfile
 import pathlib
+import functools
 from collections import deque
 
 from _pyrepl.pager import (get_pager, plain, pipe_pager,
@@ -2716,78 +2717,102 @@ def doc(tempdir:tempfile.TemporaryDirectory, output, thing, title='Python Librar
 # 
 # help = Helper()
 
-# class ModuleScanner:
-#     """An interruptible scanner that searches module synopses."""
-# 
-#     def run(self, callback, key=None, completer=None, onerror=None):
-#         if key: key = key.lower()
-#         self.quit = False
-#         seen = {}
-# 
-#         for modname in sys.builtin_module_names:
-#             if modname != '__main__':
-#                 seen[modname] = 1
-#                 if key is None:
-#                     callback(None, modname, '')
-#                 else:
-#                     name = __import__(modname).__doc__ or ''
-#                     desc = name.split('\n')[0]
-#                     name = modname + ' - ' + desc
-#                     if name.lower().find(key) >= 0:
-#                         callback(None, modname, desc)
-# 
-#         for importer, modname, ispkg in pkgutil.walk_packages(onerror=onerror):
-#             if self.quit:
-#                 break
-# 
-#             if key is None:
-#                 callback(None, modname, '')
-#             else:
-#                 try:
-#                     spec = importer.find_spec(modname)
-#                 except SyntaxError:
-#                     # raised by tests for bad coding cookies or BOM
-#                     continue
-#                 loader = spec.loader
-#                 if hasattr(loader, 'get_source'):
-#                     try:
-#                         source = loader.get_source(modname)
-#                     except Exception:
-#                         if onerror:
-#                             onerror(modname)
-#                         continue
-#                     desc = source_synopsis(io.StringIO(source)) or ''
-#                     if hasattr(loader, 'get_filename'):
-#                         path = loader.get_filename(modname)
-#                     else:
-#                         path = None
-#                 else:
-#                     try:
-#                         module = importlib._bootstrap._load(spec)
-#                     except ImportError:
-#                         if onerror:
-#                             onerror(modname)
-#                         continue
-#                     desc = module.__doc__.splitlines()[0] if module.__doc__ else ''
-#                     path = getattr(module,'__file__',None)
-#                 name = modname + ' - ' + desc
-#                 if name.lower().find(key) >= 0:
-#                     callback(path, modname, desc)
-# 
-#         if completer:
-#             completer()
+class ModuleScanner:
+    """Modified version of pydoc.ModuleScanner - An interruptible scanner that searches module synopses."""
 
-# def apropos(key):
-#     """Print all the one-line module summaries that contain a substring."""
-#     def callback(path, modname, desc):
-#         if modname[-9:] == '.__init__':
-#             modname = modname[:-9] + ' (package)'
-#         print(modname, desc and '- ' + desc)
-#     def onerror(modname):
-#         pass
-#     with warnings.catch_warnings():
-#         warnings.filterwarnings('ignore') # ignore problems during import
-#         ModuleScanner().run(callback, key, onerror=onerror)
+    def run(self, callback, key=None, restrict:bool=False,
+            completer=None, onerror=None):
+        # NOTE: 2026-01-04 22:31:45
+        # this is redundant — there's already a getMainScipyenWindow function in core.workspacefunctions
+        from gui import guiutils
+        if key: key = key.lower()
+        self.quit = False
+        seen = {}
+
+        if not restrict:
+            for modname in sys.builtin_module_names:
+                if modname != '__main__':
+                    seen[modname] = 1
+                    if key is None:
+                        callback(None, modname, '')
+                    else:
+                        name = __import__(modname).__doc__ or ''
+                        desc = name.split('\n')[0]
+                        name = modname + ' - ' + desc
+                        if name.lower().find(key) >= 0:
+                            callback(None, modname, desc)
+                            
+        # NOTE: 2026-01-04 22:31:09
+        # consider using core.prog.walk_packages instead
+        if restrict:
+            mainWindow = guiutils.getScipyenMainWindow()
+            path = [mainWindow.scipyenDir]
+            if isinstance(mainWindow.userPluginsDirectory, str) and os.path.isdir(mainWindow.userPluginsDirectory):
+                path.append(mainWindow.userPluginsDirectory)
+            assert all(p in sys.path for p in path), "This module does not seem to be run in a Scipyen session"
+            package_walker = functools.partial(pkgutil.walk_packages, path=path)
+        else:
+            package_walker = pkgutil.walk_packages
+            
+        # for importer, modname, ispkg in pkgutil.walk_packages(onerror=onerror):
+        for importer, modname, ispkg in package_walker(onerror=onerror):
+            if self.quit:
+                break
+
+            if key is None:
+                callback(None, modname, '')
+            else:
+                try:
+                    spec = importer.find_spec(modname)
+                except SyntaxError:
+                    # raised by tests for bad coding cookies or BOM
+                    continue
+                loader = spec.loader
+                if hasattr(loader, 'get_source'):
+                    try:
+                        source = loader.get_source(modname)
+                    except Exception:
+                        if onerror:
+                            onerror(modname)
+                        continue
+                    desc = source_synopsis(io.StringIO(source)) or ''
+                    if hasattr(loader, 'get_filename'):
+                        path = loader.get_filename(modname)
+                    else:
+                        path = None
+                else:
+                    try:
+                        module = importlib._bootstrap._load(spec)
+                    except ImportError:
+                        if onerror:
+                            onerror(modname)
+                        continue
+                    desc = module.__doc__.splitlines()[0] if module.__doc__ else ''
+                    path = getattr(module,'__file__',None)
+                name = modname + ' - ' + desc
+                if name.lower().find(key) >= 0:
+                    callback(path, modname, desc)
+
+        if completer:
+            completer()
+
+def apropos(key:str, restrict:bool=False) -> tuple:
+    """Return all the one-line module summaries that contain a substring."""
+    errmods = list()
+    found = list()
+    def callback(path, modname, desc):
+        if modname[-9:] == '.__init__':
+            modname = modname[:-9] + ' (package)'
+        found.append((modname, desc and '- ' + desc))
+        # print(modname, desc and '- ' + desc)
+    def onerror(modname):
+        errmods.append(modname)
+    
+    with warnings.catch_warnings():
+        warnings.filterwarnings('ignore') # ignore problems during import
+        ModuleScanner().run(callback, key, restrict = restrict, onerror=onerror)
+        
+    return found, errmods
 
 # --------------------------------------- enhanced web browser interface
 
