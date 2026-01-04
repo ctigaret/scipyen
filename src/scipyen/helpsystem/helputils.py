@@ -824,7 +824,7 @@ def object_find(shell, oname=str, namespaces=None) -> oinspect.OInfo:
                         acc = list(filter(lambda s: s > 0.5, sims))
                         if len(acc):
                             candidates = list(map(lambda s: members[sims.index(s)], acc))
-                            msg = "\n".join([f"No Python documentation found for {oname}", "Did you mean: "] + list(map(lambda c: f"{part}.{c}", candidates)))
+                            msg = "\n".join(["<pre>", f"<h1>No Python documentation found for {oname}</h1>", "Did you mean: "] + list(map(lambda c: f"<li>{subname}.{c}</li>", candidates)) + ["</pre>"])
                             return info, msg
                         
                     # info = sinfo
@@ -1204,11 +1204,11 @@ def hinspect(shell:InteractiveShell, bf:io.StringIO, oname=str, namespaces=None,
     # enable_html = kw.get("enable_html", True)
     info, msg = object_find(shell, oname, namespaces) # info is an oinspect.OInfo object
     # print(f"helpsystem.helputils.hinspect: info = {info}")
-    if namespaces is None:
-        namespaces = [ ('Interactive', shell.user_ns),
-                        ('Interactive (global)', shell.user_global_ns),
-                        ('Python builtin', shell.ns_table["builtin"]),
-                        ]
+    # if namespaces is None:
+    #     namespaces = [ ('Interactive', shell.user_ns),
+    #                     ('Interactive (global)', shell.user_global_ns),
+    #                     ('Python builtin', shell.ns_table["builtin"]),
+    #                     ]
     
     if info.found or hasattr(info.parent, oinspect.HOOK_NAME):
         # info_dict = hinfo(shell, info.obj, oname, info, detail_level, tempdir) # this is an oinspect.InfoDict NOTE: 2026-01-02 14:09:05 do not confuse with oinspect.OInfo
@@ -1474,12 +1474,13 @@ detail_level: int, 0 or 1, default is 0
             ret, reformat = hpinfo(shell, cmd, namespaces, detail_level = detail_level,
                                    tempdir=tempdir)#, enable_html = enable_html)
 
-        if isinstance(ret, str):
-            if ret.startswith("No Python documentation found"):
-                print(f"helpsystem.helputils.run_help_command — calling helpsystem.helputils.run_python_help for command: cmd = {cmd}")
-                ret = run_python_help(shell, cmd)
-                reformat = True
-        else:
+        # if isinstance(ret, str):
+        #     if ret.startswith("No Python documentation found"):
+        #         print(f"helpsystem.helputils.run_help_command — calling helpsystem.helputils.run_python_help for command: cmd = {cmd}")
+        #         ret = run_python_help(shell, cmd)
+        #         reformat = True
+        # else:
+        if not isinstance(ret, str):
             ret = f"No Python documentation found for {cmd}"
             ret += "\nCheck the spelling; you may need to enter a valid dotted path e.g. 'package.module.object.member'"
             reformat = True
