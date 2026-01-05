@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 r"""
-This module contains functions meant to be used by gui.pythonhelpwidget.
+This module contains functions used by gui.pythonhelpwidget.
 
 Output from the help systems of IPython (i.e., ``pinfo``, ``pinfo2``) and Python
 (i.e., ``pydoc``) is converted to html with syntax highlighting of embedded Python 
@@ -748,6 +748,7 @@ def object_inspect(shell, oname=str, detail_level:int=0) -> oinspect.InfoDict:
     
 def object_find(shell, oname=str, namespaces=None) -> oinspect.OInfo:
     r"""Emulates shell._object_find()"""
+    from IPython.core.alias import Alias, AliasManager
     from core import strutils
 
     if namespaces is None:
@@ -770,10 +771,10 @@ def object_find(shell, oname=str, namespaces=None) -> oinspect.OInfo:
         #
         # so let me try this here
         subname = oname
-        parts = shell._find_parts(subname)
+        parts_OK, parts = shell._find_parts(subname)
         sinfo = None
-        if parts[0]:
-            for part in parts[1]:
+        if parts_OK:
+            for part in parts:
                 subname = subname.replace(f"{part}.", "")
                 sinfo = shell._object_find(subname, namespaces)
                 if sinfo.found:
@@ -782,9 +783,9 @@ def object_find(shell, oname=str, namespaces=None) -> oinspect.OInfo:
                     info = sinfo
                     return sinfo, ""
                 
-            # do a reverse search
+            # now, do a reverse search
             subname = oname
-            for part in reversed(parts[1]):
+            for part in reversed(parts):
                 subname = subname.replace(f".{part}", "")
                 # print(f"subname = {subname}")
                 sinfo = shell._object_find(subname, namespaces)
@@ -809,7 +810,7 @@ def object_find(shell, oname=str, namespaces=None) -> oinspect.OInfo:
                     # see also BUG: 2026-01-03 22:17:06 TODO/FIXME
                     if isinstance(sinfo.obj, types.ModuleType):
                         members = list(sinfo.obj.__dict__.keys())
-                        sims = list(map(lambda k: strutils.jaccard(k, parts[1][-1]), members))
+                        sims = list(map(lambda k: strutils.jaccard(k, parts[-1]), members))
                         acc = list(filter(lambda s: s > 0.5, sims))
                         if len(acc):
                             candidates = list(map(lambda s: members[sims.index(s)], acc))
@@ -838,6 +839,81 @@ def object_find(shell, oname=str, namespaces=None) -> oinspect.OInfo:
         # the gist: the user may not know a priori that 'c' is the symbol of an 
         # object defined in module 'b' of the package 'a'...
         #
+
+        # NOTE: 2026-01-05 17:24:05
+        # check if oname is a symbol on the currently loaded modules
+        else:
+            found = False
+            # I use the approach of shell._object_find, except that in this case
+            # I apply it to module.__dict__, rather than namespaces
+            oname_head, oname_rest = parts[0],parts[1:]
+            for module in sys.modules.values():
+                try:
+                    obj = shell._getattr_property(module, oname_head)
+                except KeyError:
+                    continue
+                else:
+                    for idx, part in enumerate(oname_rest):
+                        try:
+                            parent = obj
+                                if idx == len(oname_rest) - 1:
+                                    obj = self._getattr_property(obj, part)
+                                else:
+                                    if strutils.is_integer_string(part):
+                                        obj = obj[int(part)]
+                                    else:
+                                        obj = getattr(obj, part)
+                        except:
+                            # Blanket except b/c some badly implemented objects
+                            # allow __getattr__ to raise exceptions other than
+                            # AttributeError, which then crashes IPython.
+                            break
+                    else:
+                        # If we finish the for loop (no break), we got all members
+                        found = True
+                        ospace = 'imported modules'
+                        break  # modules loop
+
+            # NOTE: 2026-01-05 18:41:55 TODO
+            # now, look through modules in site-packages, which haven't been loaded
+            # TODO !!!
+
+            # Try to see if it's magic
+            if not found:
+                obj = None
+                if oname.startswith(ESC_MAGIC2):
+                    oname = oname.lstrip(ESC_MAGIC2)
+                    obj = shell.find_cell_magic(oname)
+                elif oname.startswith(ESC_MAGIC):
+                    oname = oname.lstrip(ESC_MAGIC)
+                    obj = shell.find_line_magic(oname)
+                else:
+                    # search without prefix, so run? will find %run?
+                    obj = shell.find_line_magic(oname)
+                    if obj is None:
+                        obj = shell.find_cell_magic(oname)
+                if obj is not None:
+                    found = True
+                    ospace = 'IPython internal'
+                    ismagic = True
+                    isalias = isinstance(obj, Alias)
+
+            # Last try: special-case some literals like '', [], {}, etc:
+            if not found and oname_head in ["''",'""','[]','{}','()']:
+                obj = eval(oname_head)
+                found = True
+                ospace = 'Interactive'
+
+            info = OInfo(
+                obj=obj,
+                found=found,
+                parent=parent,
+                ismagic=ismagic,
+                isalias=isalias,
+                namespace=ospace,
+            )
+
+
     return info, msg
 
 def happend_info_field(shell, bundle: UnformattedBundle,

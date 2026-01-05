@@ -50,6 +50,7 @@ fail
 import sys, os, io, typing, traceback, inspect, subprocess, pydoc, runpy
 from tempfile import TemporaryDirectory
 from collections import deque
+
 import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
 from qtpy.QtCore import (Signal, Slot, Property,)

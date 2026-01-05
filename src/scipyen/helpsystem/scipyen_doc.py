@@ -91,6 +91,32 @@ from _pyrepl.pager import (get_pager, plain, pipe_pager,
                            plain_pager, tempfile_pager, tty_pager)
 
 
+import qtpy
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
+from qtpy.QtCore import (Signal, Slot, Property,)
+__has_PySide6__ = False
+__has_PyQt6__ = False
+__has_sip__ = False
+if os.environ["QT_API"] == "pyside6":
+    __has_PySide6__ = True
+    import PySide6
+    from PySide6 import Shiboken
+    # from PySide6.QtCore import (Signal, Slot, Property,)
+    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    QShortcut = QtGui.QShortcut
+else:
+    if os.environ["QT_API"] == "pyqt6":
+        __has_PyQt6__ = True
+
+    from qtpy import sip
+    from qtpy.uic import loadUiType
+    QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
+    __has_sip__ = True
+
 # --------------------------------------------------------- old names
 
 getpager = get_pager
@@ -2717,50 +2743,73 @@ def doc(tempdir:tempfile.TemporaryDirectory, output, thing, title='Python Librar
 # 
 # help = Helper()
 
-class ModuleScanner:
-    """Modified version of pydoc.ModuleScanner - An interruptible scanner that searches module synopses."""
+# class _ModuleScannerThread(QtCore.QThread)
 
-    def run(self, callback, key=None, restrict:bool=False,
-            completer=None, onerror=None):
+class ModuleScanner(QtCore.QThread):
+    """Modified version of pydoc.ModuleScanner - An interruptible scanner that searches module synopses.
+    Do NOT use yet!
+"""
+
+    def __init__(self, callback:types.FunctionType, key:typing.Optional[str]=None,
+                 restrict:bool=False, completer:typing.Optional[types.FunctionType]=None,
+                 onerror:typing.Optional[types.FunctionType] = None,
+                 parent:typing.Optional[QtCore.QObject]=None,):
+
+        from gui import guiutils #, pictgui
+        super().__init__(parent)
+        self.mainWindow = guiutils.getScipyenMainWindow()
+        self.signals = pitgui.ProgressWorkerSignals()
+        self.callback = callback
+        self.key = key
+        self.restrict = restrict
+        self.completer = completer
+        self.onerror = onerror
+        # self.loopWorker = pictgui.LoopWorkerThread()
+
+        # NOTE: 2026-01-04 22:31:09
+        # consider using core.prog.walk_packages instead
+        if self.restrict:
+            # mainWindow = guiutils.getScipyenMainWindow()
+            walk_path = [self.mainWindow.scipyenDir]
+            if isinstance(self.mainWindow.userPluginsDirectory, str) and os.path.isdir(self.mainWindow.userPluginsDirectory):
+                walk_path.append(self.mainWindow.userPluginsDirectory)
+            assert all(p in sys.path for p in walk_path), "This module does not seem to be run in a Scipyen session"
+            self.package_walker = functools.partial(pkgutil.walk_packages, path=walk_path)
+        else:
+            self.package_walker = pkgutil.walk_packages
+
+
+
+    # def run(self, callback, key=None, restrict:bool=False,
+    #         completer=None, onerror=None):
+    def run(self):
         # NOTE: 2026-01-04 22:31:45
         # this is redundant — there's already a getMainScipyenWindow function in core.workspacefunctions
-        from gui import guiutils
-        if key: key = key.lower()
+        if self.key:
+            key = self.key.lower()
         self.quit = False
         seen = {}
 
-        if not restrict:
+        if not self.restrict:
             for modname in sys.builtin_module_names:
                 if modname != '__main__':
                     seen[modname] = 1
                     if key is None:
-                        callback(None, modname, '')
+                        self.callback(None, modname, '')
                     else:
                         name = __import__(modname).__doc__ or ''
                         desc = name.split('\n')[0]
                         name = modname + ' - ' + desc
                         if name.lower().find(key) >= 0:
-                            callback(None, modname, desc)
-                            
-        # NOTE: 2026-01-04 22:31:09
-        # consider using core.prog.walk_packages instead
-        if restrict:
-            mainWindow = guiutils.getScipyenMainWindow()
-            path = [mainWindow.scipyenDir]
-            if isinstance(mainWindow.userPluginsDirectory, str) and os.path.isdir(mainWindow.userPluginsDirectory):
-                path.append(mainWindow.userPluginsDirectory)
-            assert all(p in sys.path for p in path), "This module does not seem to be run in a Scipyen session"
-            package_walker = functools.partial(pkgutil.walk_packages, path=path)
-        else:
-            package_walker = pkgutil.walk_packages
+                            self.callback(None, modname, desc)
+
             
-        # for importer, modname, ispkg in pkgutil.walk_packages(onerror=onerror):
-        for importer, modname, ispkg in package_walker(onerror=onerror):
+        for importer, modname, ispkg in package_walker(onerror=self.onerror):
             if self.quit:
                 break
 
             if key is None:
-                callback(None, modname, '')
+                self.callback(None, modname, '')
             else:
                 try:
                     spec = importer.find_spec(modname)
@@ -2772,8 +2821,8 @@ class ModuleScanner:
                     try:
                         source = loader.get_source(modname)
                     except Exception:
-                        if onerror:
-                            onerror(modname)
+                        if self.onerror:
+                            self.onerror(modname)
                         continue
                     desc = source_synopsis(io.StringIO(source)) or ''
                     if hasattr(loader, 'get_filename'):
@@ -2784,17 +2833,17 @@ class ModuleScanner:
                     try:
                         module = importlib._bootstrap._load(spec)
                     except ImportError:
-                        if onerror:
-                            onerror(modname)
+                        if self.onerror:
+                            self.onerror(modname)
                         continue
                     desc = module.__doc__.splitlines()[0] if module.__doc__ else ''
                     path = getattr(module,'__file__',None)
                 name = modname + ' - ' + desc
                 if name.lower().find(key) >= 0:
-                    callback(path, modname, desc)
+                    self.callback(path, modname, desc)
 
-        if completer:
-            completer()
+        if self.completer:
+            self.completer()
 
 def apropos(key:str, restrict:bool=False) -> tuple:
     """Return all the one-line module summaries that contain a substring."""

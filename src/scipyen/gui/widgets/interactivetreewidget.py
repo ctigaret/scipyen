@@ -14,6 +14,7 @@ import os, warnings, types, traceback, itertools, inspect, dataclasses, numbers
 import pathlib
 import datetime
 import fractions, decimal
+import pkgutil
 import typing
 import enum
 from collections import deque
@@ -97,7 +98,7 @@ from gui.widgets.tablewidget import SimpleTableWidget
 from gui.widgets.tableeditorwidget import (TableEditorWidget, TabularDataModel,)
 from gui.pictgui import WorkerThread
 
-NOTMEMOIZED = (tuple, type(None), type(MISSING), type(pd.NA), type, np.ndarray)
+NOTMEMOIZED = (tuple, type(None), type(MISSING), type(pd.NA), type, np.ndarray, types.ModuleType, pkgutil.ModuleInfo)
 PODS = (bool, int, float, bytes, bytearray, str)
 
 class InteractiveTreeWidget(QtWidgets.QTreeWidget):
@@ -401,7 +402,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         
     """
         mro = inspect.getmro(type(data))
-        if all(t not in self._supported_data_types_ for t in mro) and not inspect.isroutine(data) and data is not None:
+        if all(t not in self._supported_data_types_ for t in mro) and not inspect.isroutine(data) and not isinstance(data, (types.ModuleType, pkgutil.ModuleInfo)) and data is not None:
             # NOTE: 2025-06-28 13:57:28
             # generate a mapping representation of data's members upon which
             # the tree model is built
@@ -690,7 +691,11 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         override superclass parse to use SimpleTableWidget instead
         
         """
-        from pyqtgraph.widgets.DataTreeWidget import HAVE_METAARRAY
+        try:
+            from pyqtgraph.widgets.DataTreeWidget import HAVE_METAARRAY
+        except:
+            HAVE_METAARRAY = None
+
         from core.datatypes import (is_namedtuple, TypeEnum)
         from imaging.axiscalibration import (AxesCalibration, AxisCalibrationData, ChannelCalibrationData)
         from imaging.axisutils import axisTypeStrings
@@ -767,6 +772,9 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                 desc = type(data).__name__
                 if isinstance(data, enum.EnumType):
                     children = data.__members__
+
+            if isinstance(data, pkgutil.ModuleInfo):
+                desc = " ".join(["Fields:", "; ".join(list(map(lambda f: f" {f} = {getattr(data, f, None)}", data._fields)))])
                 
             elif isinstance(data, NestedFinder.nesting_types + (set,)):
                 # NOTE: 2025-05-21 16:15:26
@@ -964,6 +972,9 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                 
             elif isinstance(data, pathlib.Path):
                 desc = data.as_posix()
+
+            elif isinstance(data, types.ModuleType):
+                desc = data.__name__
             else:
                 desc = type(data).__name__
                 

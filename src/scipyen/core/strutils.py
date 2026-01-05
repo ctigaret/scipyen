@@ -28,6 +28,7 @@ from PIL.Image import Image as PILImage
 import matplotlib.pyplot as plt
 from IPython.core.latex_symbols import (latex_symbols, reverse_latex_symbol)
 from IPython.display import Image as IPImage
+from IPython.core.interactiveshell import is_integer_string
 
 import inflect
 # import PIL # to convert latex strings to PIL Image

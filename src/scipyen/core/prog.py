@@ -3197,13 +3197,16 @@ def walk_packages(path:typing.Optional[typing.Union[str, pathlib.Path,typing.Seq
     if isinstance(path, (str, pathlib.Path)):
         path = [path]
         
-    elif isinstance(path, typing.Sequence) and len(path) == 0:
-        path = None
+    elif isinstance(path, typing.Sequence):
+        paths = list(filter(lambda p: isinstance(p, (str, pathlib.Path)), path))
+        if len(paths) == 0:
+            path = None
+        else:
+            path = paths
         
     for info in pkgutil.iter_modules(path, prefix):
         yield info
         if info.ispkg:
             path = [(pathlib.Path(info.module_finder.path)/info.name).as_posix()]
-            # print(f"name: {info.name} -> path: {path}")
             path = [p for p in path if not seen(p)]
             yield from walk_packages(path, info.name+".")
