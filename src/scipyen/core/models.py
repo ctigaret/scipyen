@@ -1070,8 +1070,10 @@ def Clements_Bekkers_97(x:np.ndarray | Real,
         ∘ and occurs at x = τ1 × ln(τ2/τ1 +1) + x0
         (analytically determined as the solution of f′(x)dx = 0)
         So to get a curve spanning the interval [0., 1.] in 'y', the coefficient β
-        should be 1/extremum (for α = 0.0) , but WARNING this 
-        will also change the FWHM!
+        should be 1/extremum (for α = 0.0)
+    .. warning::
+        this will also change the FWHM!
+
     • FWHM: x coordinates for full width at half-max need to be determined 
         graphically as the intersection between y(x) and the line y₁(x)=ymax/2
         (see e.g., documentation for alphaSynapse)
@@ -1079,8 +1081,8 @@ def Clements_Bekkers_97(x:np.ndarray | Real,
              ∞   
              ∫f(x)dx = (β × τ2²)/(τ1+τ2), for α = 0, x0 = 0, and τ1, τ2 > 0
              0
-    NOTE: the DURATION of the waveform is determined by the independent variable
-    'x'
+    .. note::
+        the DURATION of the waveform is determined by the independent variable ``x``
     
     """
     unit_amplitude = kwargs.pop("unit_amplitude", False)

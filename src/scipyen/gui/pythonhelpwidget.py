@@ -109,7 +109,7 @@ class _PythonHelpThread_(QtCore.QThread):
     def run(self):
         # doc = QtGui.QTextDocument()
         reformat:bool = False
-        qreply = {"query":self.helpCommand, "tempdir":self.tempdir, "contents":None}
+        qreply = {"query":self.helpCommand, "tempdir":self.tempdir, "contents":None, "success":False}
         if isinstance(self.helpCommand, str) and len(self.helpCommand.strip()):
             cmdParts = self.helpCommand.split(" ")
             # if any(s in cmdParts for s in ("modules", "module")):
@@ -159,13 +159,19 @@ class _PythonHelpThread_(QtCore.QThread):
                             body = reply.replace("\n", "<br>")
                     else:
                         body = reply
-                        
+
+                    if "No Python documentation" in body:
+                        qreply["success"] = False
+                    else:
+                        qreply["success"] = True
+
                     out.append(body)
                     out.append("</body>")
                     out.append("</html>")
                     contents = "\n".join(out)
                 else:
                     contents = None
+                    qreply["success"] = False
                     # doc.setHtml()
                     
             qreply["contents"] = contents
@@ -283,8 +289,9 @@ class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin
             else:
                 self.prevToolButton.setEnabled(False)
                 self.nextToolButton.setEnabled(False)
+
             if query in self._cache_:
-                cquery = {"query":query, "tempdir": self._cache_[query]["tempdir"], "contents":self._cache_[query]["contents"]}
+                cquery = {"query":query, "tempdir": self._cache_[query]["tempdir"], "contents":self._cache_[query]["contents"], "success":self._cache_[query]["success"]}
                 self._slot_displayReply(cquery)
             else:
                     
@@ -327,7 +334,7 @@ class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin
     @Slot()
     def _slot_removeCurrentQuery(self):
         index = self.queryComboBox.currentIndex()
-        query = self,queryComboBox.itemText(index)
+        query = self.queryComboBox.itemText(index)
         signalBlocker = QtCore.QSignalBlocker(self.queryComboBox)
         self.queryComboBox.removeItem(index)
         self._lastQuery_ = None
@@ -366,7 +373,8 @@ class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin
         contents = reply.get("contents", None)
         tempdir = reply.get("tempdir", None)
         query = reply.get("query", None)
-        # if isinstance(doc, QtGui.QTextDocument):
+        success = reply.get("success", False)
+
         if not isinstance(contents, str) or len(contents.strip()) == 0:
             self._showCustomPlaceHolderText_()
             if isinstance(tempdir, TemporaryDirectory):
@@ -380,24 +388,9 @@ class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin
                 self.helpDisplay.setPlainText(doc)
                 if self.helpDisplay.textColor() == QtWidgets.QApplication.palette().color(QtGui.QPalette.PlaceholderText):
                     self.helpDisplay.setTextColor(self._textColorCache_)
+
             if query not in self._cache_:
-                self._cache_[query] = {"contents":contents, "tempdir":tempdir}
-            # if doc.isEmpty():
-            #     self._showCustomPlaceHolderText_()
-            #     tempdir.cleanup()
-            # else:
-            #     self._cache_[query] = {"doc":doc, "tempdir":tempdir}
-            #     self.helpDisplay.setDocument(doc)
-                
-        # elif isinstance(doc, str):
-        #     if len(doc.strip()):
-        #         self._cache_["query"] = {"doc":doc, "tempdir":tempdir}
-        #         self.helpDisplay.setPlainText(doc)
-        #         if self.helpDisplay.textColor() == QtWidgets.QApplication.palette().color(QtGui.QPalette.PlaceholderText):
-        #             self.helpDisplay.setTextColor(self._textColorCache_)
-        #     else:
-        #         self._showCustomPlaceHolderText_()
-        #         tempdir.cleanup()
+                self._cache_[query] = {"contents":contents, "tempdir":tempdir, "success":success}
 
 class PythonHelpWindow(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     def __init__(self, shell, parent=None):
