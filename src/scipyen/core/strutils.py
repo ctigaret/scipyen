@@ -706,7 +706,7 @@ def render_latex(l:str, backend:str="auto", out:str="ipython",
     An object of the type determined by the value of the 'out' parameter:
     
     * "ipython" ↦ ``IPython.core.display.Image``
-    * "bytes"   ↦ ``bytes``
+    * "bytes"   ↦ ``bytes`` (PNG data)
     * "pix"     ↦ ``QtGui.QPixmap``
     * "img"     ↦ ``QtGui.QImage``
     * "pil"     ↦ ``PIL.Image.Image``
@@ -725,14 +725,16 @@ def render_latex(l:str, backend:str="auto", out:str="ipython",
         
     if not isinstance(darkmode, bool):
         darkmode = isDarkGui()
-        
-    color = "white" if darkmode else "black" 
-    
+
+    color = "#FFFFFF" if darkmode else "#000000"
+
     encode = kwargs.get("encode", False)
-    
+
     if encode is True:
         out = "base64"
-    
+
+    print(f"strutils.render_latex: darkmode = {darkmode}, color={color}, backend={backend}, encode={encode}, out={out}")
+        
     if backend == "auto":
         data = latextools.latex_to_png(l, backend="dvipng", wrap=wrap, color=color, **kwargs)
         if not isinstance(data, bytes):
@@ -746,7 +748,7 @@ def render_latex(l:str, backend:str="auto", out:str="ipython",
         data = latextools.latex_to_png(l, backend=backend, wrap=wrap, color=color)
         # data = latextools.latex_to_png(sympy.latex(expr, mode=mode, itex=itex, **kwargs), backend="dvipng", wrap=False, color=color)
         if not isinstance(data, bytes):
-            scipywarn("All available backends have failed; check the parameters to this function call")
+            scipywarn(f"The backend {backend} failed; check the parameters to this function call")
             return
         
     else:

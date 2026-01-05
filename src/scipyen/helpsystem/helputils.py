@@ -205,10 +205,10 @@ https://www.bomberbot.com/python/converting-restructuredtext-to-html-with-python
  """
     print(f"helpsystem.helputils.rst_to_html_with_highlighting()")
     # print(f"helpsystem.helputils.rst_to_html_with_highlighting(rst_text={rst_text})")
-    if guiutils.isDarkGui():
-        style = "KeplerDark"
-    else:
-        style="default"
+    # if guiutils.isDarkGui():
+    #     style = "KeplerDark"
+    # else:
+    #     style="default"
 
     parts = publish_parts(rst_text, writer_name='html4', settings_overrides=docutils_settings_overrides)
     ret_html = parts['html_body']
