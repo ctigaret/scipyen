@@ -92,6 +92,7 @@ import docutils.core, docutils.utils
 
 from docutils.core import publish_parts
 from gui import guiutils
+from core import prog
 
 
 _extra_info_fields = ["methods", "descriptors", "functions", "classes", "data"]
@@ -730,192 +731,6 @@ def hpsearch(shell, bf:io.StringIO, pattern, ns_table, ns_search=[],
 
     bf_page(bf, '<p>\n'.join(list(sorted(search_result))))
     
-def object_inspect(shell, oname=str, detail_level:int=0) -> oinspect.InfoDict:
-    r"""Emulates shell.object_inspect"""
-    
-    # NOTE: 2026-01-02 14:28:47 
-    # ``info`` is an oinspect.OInfo object
-    info = object_find(oname)
-    
-    # NOTE: 2026-01-02 14:29:21
-    # either branch below produces an oinspect.InfoDict object (effectively, a dict)
-    if info.found:
-        # create an oinspect.InfoDict based on ``info``
-        return hinfo(info.obj, oname, info=info, detail_level=detail_level) 
-    else:
-        # create a generic oinspect.InfoDict based on ``oname``
-        return oinspect.object_info(name=oname, found=False) 
-    
-def object_find(shell, oname=str, namespaces=None) -> oinspect.OInfo:
-    r"""Emulates shell._object_find()"""
-    from IPython.core.alias import Alias, AliasManager
-    from core import strutils
-
-    if namespaces is None:
-        namespaces = [ ('Interactive', shell.user_ns),
-                        ('Interactive (global)', shell.user_global_ns),
-                        ('Python builtin', shell.ns_table["builtin"]),
-                        ]
-    info = shell._object_find(oname, namespaces) # this is an oinspect.OInfo object
-    msg = ""
-    if not info.found:
-        # this might happen when either:
-        # 1) the object exists in the namespaces, but has been imported under an alias
-        oname1 = _find_by_alias(shell, oname, namespaces)
-        if isinstance(oname1, str) and len(oname1.strip()):
-            return shell._object_find(oname1, namespaces)
-        # 2) the first part in oname is not found by the shell
-        # a reason might be because oname contains a fully qualified object name
-        # (e.g. 'X.Y.Z.…' such as a module which was imported directly e.g. from X import Y (hence
-        # shell 'knows' nothing about 'X' but may know about 'Y' and what follows next)
-        #
-        # so let me try this here
-        subname = oname
-        parts_OK, parts = shell._find_parts(subname)
-        sinfo = None
-        if parts_OK:
-            for part in parts:
-                subname = subname.replace(f"{part}.", "")
-                sinfo = shell._object_find(subname, namespaces)
-                if sinfo.found:
-                    # print(f"helputils.object_find found sinfo = {sinfo}")
-                    # BUG: 2026-01-03 22:17:06 TODO/FIXME
-                    info = sinfo
-                    return sinfo, ""
-                
-            # now, do a reverse search
-            subname = oname
-            for part in reversed(parts):
-                subname = subname.replace(f".{part}", "")
-                # print(f"subname = {subname}")
-                sinfo = shell._object_find(subname, namespaces)
-                if sinfo.found:
-                    # print(f"helputils.object_find reverse search found sinfo = {sinfo}")
-                    # BUG: 2026-01-03 22:24:51 FIXME/TODO
-                    # This branch currently return sinfo if sinfo.found is True,
-                    # which is WRONG:
-                    #
-                    # sinfo is likely a parent module; therefore, check if it 
-                    # indeed is a module
-                    # 
-                    # if a module, then check 'oname' against module.__dict__.keys() (all lower)
-                    # or for some similarity
-                    # if anything found:
-                    # if only one item is found, then return its info
-                    # if more than one candidate is foubnd, then create a message
-                    # to propose those candidates as objects for which info should
-                    # be returned.
-                    #
-                    # else, give up gracefully!
-                    # see also BUG: 2026-01-03 22:17:06 TODO/FIXME
-                    if isinstance(sinfo.obj, types.ModuleType):
-                        members = list(sinfo.obj.__dict__.keys())
-                        sims = list(map(lambda k: strutils.jaccard(k, parts[-1]), members))
-                        acc = list(filter(lambda s: s > 0.5, sims))
-                        if len(acc):
-                            candidates = list(map(lambda s: members[sims.index(s)], acc))
-                            msg = "\n".join([f"<b>No Python documentation found for {oname}</b><br>", "Did you mean: "] + list(map(lambda c: f"<li>{subname}.{c}</li>", candidates)))
-                            return info, msg
-                        
-                    # info = sinfo
-                    # return info
-        
-        # 3) the object has not been imported in any of the namespaces
-        # WARNING: this can be problematic: in theory, the object could be available
-        # by importing an already installed package (from site_packages) but why
-        # would I want to do that !? 
-        #
-        # So, from this point of view, is better to return an info object with 
-        # the "found" attribute set to False. This is what IPython does, as the ?
-        # or ?? (pinfo) help system ONLY works with objects that are imported in
-        # the user namespace.
-        #
-        # On the other hand, I can see a benefit in trying to get help about an
-        # object available in Scipyen's tree (as a (sub)package etc) BEFORE 
-        # actually using (loading, or importing) it.
-        #
-        # In fact, calling "help('a.b.c')" uses Python's own help system to retrieve
-        # information on object 'c' in module 'b', package 'a'. However, this is 
-        # the gist: the user may not know a priori that 'c' is the symbol of an 
-        # object defined in module 'b' of the package 'a'...
-        #
-
-        # NOTE: 2026-01-05 17:24:05
-        # check if oname is a symbol on the currently loaded modules
-        else:
-            found = False
-            # I use the approach of shell._object_find, except that in this case
-            # I apply it to module.__dict__, rather than namespaces
-            oname_head, oname_rest = parts[0],parts[1:]
-            for module in sys.modules.values():
-                try:
-                    obj = shell._getattr_property(module, oname_head)
-                except KeyError:
-                    continue
-                else:
-                    for idx, part in enumerate(oname_rest):
-                        try:
-                            parent = obj
-                                if idx == len(oname_rest) - 1:
-                                    obj = self._getattr_property(obj, part)
-                                else:
-                                    if strutils.is_integer_string(part):
-                                        obj = obj[int(part)]
-                                    else:
-                                        obj = getattr(obj, part)
-                        except:
-                            # Blanket except b/c some badly implemented objects
-                            # allow __getattr__ to raise exceptions other than
-                            # AttributeError, which then crashes IPython.
-                            break
-                    else:
-                        # If we finish the for loop (no break), we got all members
-                        found = True
-                        ospace = 'imported modules'
-                        break  # modules loop
-
-            # NOTE: 2026-01-05 18:41:55 TODO
-            # now, look through modules in site-packages, which haven't been loaded
-            # TODO !!!
-
-            # Try to see if it's magic
-            if not found:
-                obj = None
-                if oname.startswith(ESC_MAGIC2):
-                    oname = oname.lstrip(ESC_MAGIC2)
-                    obj = shell.find_cell_magic(oname)
-                elif oname.startswith(ESC_MAGIC):
-                    oname = oname.lstrip(ESC_MAGIC)
-                    obj = shell.find_line_magic(oname)
-                else:
-                    # search without prefix, so run? will find %run?
-                    obj = shell.find_line_magic(oname)
-                    if obj is None:
-                        obj = shell.find_cell_magic(oname)
-                if obj is not None:
-                    found = True
-                    ospace = 'IPython internal'
-                    ismagic = True
-                    isalias = isinstance(obj, Alias)
-
-            # Last try: special-case some literals like '', [], {}, etc:
-            if not found and oname_head in ["''",'""','[]','{}','()']:
-                obj = eval(oname_head)
-                found = True
-                ospace = 'Interactive'
-
-            info = OInfo(
-                obj=obj,
-                found=found,
-                parent=parent,
-                ismagic=ismagic,
-                isalias=isalias,
-                namespace=ospace,
-            )
-
-
-    return info, msg
-
 def happend_info_field(shell, bundle: UnformattedBundle,
         title: str,
         key: str,
@@ -1267,8 +1082,8 @@ def hinspect(shell:InteractiveShell, bf:io.StringIO, oname=str, namespaces=None,
     # print(f"helpsystem.helputils.hinspect(oname={oname}, namespaces={namespaces}, **kw={kw})")
     detail_level = kw.get("detail_level", 0)
     # enable_html = kw.get("enable_html", True)
-    info, msg = object_find(shell, oname, namespaces) # info is an oinspect.OInfo object
-    # print(f"helpsystem.helputils.hinspect: info = {info}")
+    info, msg = prog.object_find(shell, oname, namespaces) # info is an oinspect.OInfo object
+    print(f"helpsystem.helputils.hinspect: info = {info}, msg={msg}")
     # if namespaces is None:
     #     namespaces = [ ('Interactive', shell.user_ns),
     #                     ('Interactive (global)', shell.user_global_ns),
@@ -1294,22 +1109,22 @@ def hinspect(shell:InteractiveShell, bf:io.StringIO, oname=str, namespaces=None,
         # scipywarn('Object `%s` not found.' % oname)
         # return 'not found'  # so callers can take other action
         
-def _find_by_alias(shell, oname:str, namespaces=None):
-    r"""Find an object by its alias - typically applies to imported modules
-WARNING: Potentially problematic...
- """
-    if namespaces is None:
-        namespaces = [ ('Interactive', shell.user_ns),
-                        ('Interactive (global)', shell.user_global_ns),
-                        ('Python builtin', shell.ns_table["builtin"]),
-                        ]
-        
-    for nsname,ns in namespaces:
-        obj_list = list(filter(lambda x: inspect.ismodule(x[1]) and oname in x[1].__name__, ns.items()))
-        if len(obj_list):
-            return obj_list[0][0]
-        
-    return
+# def _find_by_alias(shell, oname:str, namespaces=None):
+#     r"""Find an object by its alias - typically applies to imported modules
+# WARNING: Potentially problematic...
+#  """
+#     if namespaces is None:
+#         namespaces = [ ('Interactive', shell.user_ns),
+#                         ('Interactive (global)', shell.user_global_ns),
+#                         ('Python builtin', shell.ns_table["builtin"]),
+#                         ]
+#         
+#     for nsname,ns in namespaces:
+#         obj_list = list(filter(lambda x: inspect.ismodule(x[1]) and oname in x[1].__name__, ns.items()))
+#         if len(obj_list):
+#             return obj_list[0][0]
+#         
+#     return
     
 def run_python_help(shell, cmd:str, enable_html=True, tempdir=None) -> str | None:
     print(f"helpsystem.helputils.run_python_help → pydoc.Helper(cmd={cmd})")
