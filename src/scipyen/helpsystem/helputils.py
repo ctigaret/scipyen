@@ -203,12 +203,8 @@ def rst_to_html_with_highlighting(rst_text) -> str:
 This one  "By William	July 8, 2025
 https://www.bomberbot.com/python/converting-restructuredtext-to-html-with-python-for-documentation/
  """
-    print(f"helpsystem.helputils.rst_to_html_with_highlighting()")
+    # print(f"helpsystem.helputils.rst_to_html_with_highlighting()")
     # print(f"helpsystem.helputils.rst_to_html_with_highlighting(rst_text={rst_text})")
-    # if guiutils.isDarkGui():
-    #     style = "KeplerDark"
-    # else:
-    #     style="default"
 
     parts = publish_parts(rst_text, writer_name='html4', settings_overrides=docutils_settings_overrides)
     ret_html = parts['html_body']
@@ -335,20 +331,6 @@ def make_multicolumn_html(strings:typing.List[str], columns:int=4, fn:typing.Cal
     
     rows = (len(strings) + (columns-1)) // columns
     
-    # result = f"<table style='width:{fullwidth}px'>{thead}"
-#     for row in range(rows):
-#         result = result + "<tr>"
-#         
-#         for col in range(columns):
-#             k = row*columns + col
-#             if k < len(strings):
-#                 result = result  + '<td class="multicolumn">' + fn(strings[k]) + "</td>"
-#             
-#         result = result + "</tr>"
-#     
-#     result  = result + "</table>"
-#     return result
-        
     result = ""
     for col in range(columns):
         result = result + '<td class="multicolumn">'
@@ -1400,7 +1382,7 @@ detail_level: int, 0 or 1, default is 0
     # NOTE: 2025-10-13 11:21:18
     # code shamelessly adapted/copied from IPython
     
-    print(f"helpsystem.helputils.run_help_command({cmd})")
+    # print(f"helpsystem.helputils.run_help_command({cmd})")
     from IPython.core.magic import Magics, magics_class, line_magic, magic_escapes 
     import pydoc, traceback
     if not isinstance(cmd, str) or len(cmd.strip()) == 0:
@@ -1474,7 +1456,7 @@ detail_level: int, 0 or 1, default is 0
                     method_name = ""
                     
                 cmd = " ".join([method_name, target])
-            print(f"helpsystem.helputils.run_help_command for ? command: cmd = {cmd}")
+            # print(f"helpsystem.helputils.run_help_command for ? command: cmd = {cmd}")
             
             # NOTE: 2026-01-03 22:11:32
             # this also works when cmd does not have '?' in it 

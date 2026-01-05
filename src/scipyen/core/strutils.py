@@ -733,7 +733,7 @@ def render_latex(l:str, backend:str="auto", out:str="ipython",
     if encode is True:
         out = "base64"
 
-    print(f"strutils.render_latex: darkmode = {darkmode}, color={color}, backend={backend}, encode={encode}, out={out}")
+    # print(f"strutils.render_latex: darkmode = {darkmode}, color={color}, backend={backend}, encode={encode}, out={out}")
         
     if backend == "auto":
         data = latextools.latex_to_png(l, backend="dvipng", wrap=wrap, color=color, **kwargs)
