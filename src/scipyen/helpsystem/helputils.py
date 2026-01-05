@@ -777,7 +777,7 @@ def object_find(shell, oname=str, namespaces=None) -> oinspect.OInfo:
                 subname = subname.replace(f"{part}.", "")
                 sinfo = shell._object_find(subname, namespaces)
                 if sinfo.found:
-                    print(f"helputils.object_find found sinfo = {sinfo}")
+                    # print(f"helputils.object_find found sinfo = {sinfo}")
                     # BUG: 2026-01-03 22:17:06 TODO/FIXME
                     info = sinfo
                     return sinfo, ""
@@ -789,7 +789,7 @@ def object_find(shell, oname=str, namespaces=None) -> oinspect.OInfo:
                 # print(f"subname = {subname}")
                 sinfo = shell._object_find(subname, namespaces)
                 if sinfo.found:
-                    print(f"helputils.object_find reverse search found sinfo = {sinfo}")
+                    # print(f"helputils.object_find reverse search found sinfo = {sinfo}")
                     # BUG: 2026-01-03 22:24:51 FIXME/TODO
                     # This branch currently return sinfo if sinfo.found is True,
                     # which is WRONG:
@@ -813,7 +813,7 @@ def object_find(shell, oname=str, namespaces=None) -> oinspect.OInfo:
                         acc = list(filter(lambda s: s > 0.5, sims))
                         if len(acc):
                             candidates = list(map(lambda s: members[sims.index(s)], acc))
-                            msg = "\n".join(["<pre>", f"<h1>No Python documentation found for {oname}</h1>", "Did you mean: "] + list(map(lambda c: f"<li>{subname}.{c}</li>", candidates)) + ["</pre>"])
+                            msg = "\n".join([f"<b>No Python documentation found for {oname}</b><br>", "Did you mean: "] + list(map(lambda c: f"<li>{subname}.{c}</li>", candidates)))
                             return info, msg
                         
                     # info = sinfo
