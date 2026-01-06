@@ -3,38 +3,37 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-r""" Scipyen configuration module to manage and store GUI- and non-GUI-related 
-configuration data (a.k.a "settings") specific to Scipyen, beyond the lifetime
-of a running Scipyen session.
+r""" Scipyen configuration module.
+
+Manages and stores GUI- and non-GUI-related configuration data (a.k.a "settings") specific to Scipyen, beyond the lifetime of a running Scipyen session.
 
 There are three sets of settings in Scipyen:
+============================================
 
 1) Qt settings.
+---------------
 These relate to Scipyen's graphical user interface (GUI). Examples include the
 geometry and state of Scipyen's windows (and, where applicable, their docklets),
 and other UI-related information such as the filters for file and/or variable 
 names, directory history, etc).
 
-    Because Scipyen's GUI is built using the Qt toolkit (via PyQt5) these
-    settings are managed and stored using Qt toolkit QSettings framework in Qt 
-    Core module.
-    
-    The Qt settings are stored across Scipyen sessions in the fioe "Scipyen.conf"
-    at a location that depends on the OS.
-    
-    On Linux distributions with the latest directory hierarchy standard (the 
-    XDG Base Directory Specification¹) the "Scipyen.conf" file is in 
-    "NativeFormat" and is located in $HOME/.config/Scipyen.
-    
-    The location of the Qt settings data can be found by calling
-    
-    `mainWindow.qsettings.fileName()`
-    
-    or
-    
-    `scipyenconf.get_QtSettings_file()`
-    
-    at the Scipyen console
+Because Scipyen's GUI is built using the Qt toolkit (via PyQt5) these settings are managed and stored using Qt toolkit QSettings framework in Qt Core module.
+
+The Qt settings are stored across Scipyen sessions in the file *Scipyen.conf* at a location that depends on the operating system.
+
+On Linux distributions with the latest directory hierarchy standard (the 
+XDG Base Directory Specification¹) the "Scipyen.conf" file is in 
+"NativeFormat" and is located in $HOME/.config/Scipyen.
+
+The location of the Qt settings data can be found by calling
+
+``mainWindow.qsettings.fileName()``
+
+or
+
+``scipyenconf.get_QtSettings_file()``
+
+at the Scipyen console
     
 
 2) Non-Qt settings

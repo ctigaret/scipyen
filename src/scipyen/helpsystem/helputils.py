@@ -1083,12 +1083,7 @@ def hinspect(shell:InteractiveShell, bf:io.StringIO, oname=str, namespaces=None,
     detail_level = kw.get("detail_level", 0)
     # enable_html = kw.get("enable_html", True)
     info, msg = prog.object_find(shell, oname, namespaces) # info is an oinspect.OInfo object
-    print(f"helpsystem.helputils.hinspect: info = {info}, msg={msg}")
-    # if namespaces is None:
-    #     namespaces = [ ('Interactive', shell.user_ns),
-    #                     ('Interactive (global)', shell.user_global_ns),
-    #                     ('Python builtin', shell.ns_table["builtin"]),
-    #                     ]
+    # print(f"helpsystem.helputils.hinspect: info = {info}, msg={msg}")
     
     if info.found or hasattr(info.parent, oinspect.HOOK_NAME):
         # info_dict = hinfo(shell, info.obj, oname, info, detail_level, tempdir) # this is an oinspect.InfoDict NOTE: 2026-01-02 14:09:05 do not confuse with oinspect.OInfo
@@ -1362,6 +1357,9 @@ detail_level: int, 0 or 1, default is 0
         # else:
         if not isinstance(ret, str):
             ret = f"No Python documentation found for {cmd}"
+            ret += "\nCheck the spelling; you may need to enter a valid dotted path e.g. 'package.module.object.member'"
+            reformat = True
+        elif ret.startswith("No Python documentation found"):
             ret += "\nCheck the spelling; you may need to enter a valid dotted path e.g. 'package.module.object.member'"
             reformat = True
         

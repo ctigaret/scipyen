@@ -3191,7 +3191,7 @@ def get_specs(infos:list) -> list:
     return list(map(lambda i: importlib.util.find_spec(i.name), infos))
 
 def _find_in_sys_modules(shell, head:str, rest:list):
-    print(f"core.prog._find_in_sys_modules(head={head}, rest={rest})")
+    # print(f"core.prog._find_in_sys_modules(head={head}, rest={rest})")
     obj = None
     found = False
     parent=None
@@ -3199,17 +3199,17 @@ def _find_in_sys_modules(shell, head:str, rest:list):
     isalias=False
     ospace=None
     
+    opath = list()
+    
     for module in sys.modules.values():
         try:
             obj = shell._getattr_property(module, head)
-            # found = True
-            # ospace = module.__name__
-            # break
+            opath.append(module.__name__)
         except:# KeyError:
             continue
         else:
             for idx, part in enumerate(rest):
-                print(f"\tlooking for part {part} in {obj}")
+                # print(f"\tlooking for part {part} in {obj}")
                 try:
                     parent = obj
                     if idx == len(rest) - 1:
@@ -3267,7 +3267,7 @@ def _check_is_magic(shell, oname) -> tuple:
     
     return found, obj, ospace, ismagic, isalias
 
-def _find_by_alias(shell, oname:str, namespaces=None) -> list | None:
+def _find_by_alias(shell, oname:str, namespaces=None) -> set:
     r"""Find an object by its alias - typically applies to imported modules
 WARNING: Potentially problematic...
  """
@@ -3277,10 +3277,46 @@ WARNING: Potentially problematic...
                         ('Python builtin', shell.ns_table["builtin"]),
                         ]
         
+    candidates = set()
     for nsname,ns in namespaces:
         obj_list = list(filter(lambda x: inspect.ismodule(x[1]) and oname in x[1].__name__, ns.items()))
-        if len(obj_list):
-            return obj_list[0][0]
+        # print(f"prog._find_by_alias(oname={oname}) found {obj_list}")
+        # NOTE: 2026-01-06 09:59:20
+        # object is found by alias if oname is the last part of object path
+        # else, it may be that oname is one of the parent of the object in obj_list
+        for oo in obj_list:
+            parts_ok, parts = shell._find_parts(oo[1].__name__)
+            # print(f"oo = {oo}, parts = {parts}")
+            if oname in parts: # NOTE: 2026-01-06 10:21:39 not the same as oname in oo[1].__name__ !!!
+                ndx = parts.index(oname)
+                # print(f"\t{oname} found at ndx = {ndx}")
+                if ndx == len(parts)-1:
+                    print(f"\t\twill add {oo[1].__name__}")
+                    candidates.add(oo[1])
+                    # candidates.add(oo[1].__name__)
+                else:
+                    if ndx > 0:
+                        oname1 = ".".join(parts[:ndx])
+                        obj1info = shell._object_find(oname1, [(nsname, ns)])
+                        if obj1info.found:
+                            print(f"\t\twill add {oname1}")
+                            candidates.add(obj1info.obj)
+                            
+                    else:
+                        oname1 = oo[1].__name__
+                        obj1info = shell._object_find(oname1, [(nsname, ns)])
+                        
+                    if len(oname1):
+                        # # obj1info = shell._object_find(oname1, [(nsname, ns)])
+                        # if obj1info.found:
+                        #     obj1 = obj1info.obj
+                        print(f"\t\twill add {oname1}")
+                        candidates.add(oname1)
+                
+    return candidates
+            
+        # if len(obj_list):
+        #     return obj_list[0][0]
         
     # return
     
@@ -3311,14 +3347,36 @@ def object_find(shell, oname=str, namespaces=None) -> oinspect.OInfo:
                         ('Interactive (global)', shell.user_global_ns),
                         ('Python builtin', shell.ns_table["builtin"]),
                         ]
-    info = shell._object_find(oname, namespaces) # this is an oinspect.OInfo object
     msg = f"<b>No Python documentation found for '{oname}'</b><br>"
+    info = shell._object_find(oname, namespaces) # this is an oinspect.OInfo object
+    if info.found:
+        print(f"prog.object_find info for {oname} found by shell._object_find")
+        return info, ""
+    
     if not info.found:
+        print(f"prog.object_find info for {oname} NOT found by shell._object_find")
         # this might happen when either:
         # 1) the object exists in the namespaces, but has been imported under an alias
-        oname1 = _find_by_alias(shell, oname, namespaces)
-        if isinstance(oname1, str) and len(oname1.strip()):
-            return shell._object_find(oname1, namespaces)
+        candidates = _find_by_alias(shell, oname, namespaces)
+        print(f"prog.object_find info for {oname} ↦ shell._object_find found candidates = {candidates} ")
+        if len(candidates) == 1:
+            info = shell._object_find(candidates[0], namespaces)
+            if info.found:
+                print(f"prog.object_find info for {oname} found by shell._object_find as {candidates[0]} alias")
+                return info, ""
+            
+        elif len(candidates) > 1:
+            msg = "\n".join([f"<b>No Python documentation found for {oname}</b><br>", "Did you mean: "] + list(map(lambda c: f"<li>{c}</li>", candidates)))
+            return info, msg
+            
+        # # # # oname1 = _find_by_alias(shell, oname, namespaces)
+        # # # # if isinstance(oname1, str) and len(oname1.strip()):
+        # # # #     info = shell._object_find(oname1, namespaces)
+        # # # #     if info.found:
+        # # # #         print(f"prog.object_find info for {oname} found by shell._object_find as {oname1} alias")
+        # # # #         return info, ""
+        
+        
         # 2) the first part in oname is not found by the shell
         # a reason might be because oname contains a fully qualified object name
         # (e.g. 'X.Y.Z.…' such as a module which was imported directly e.g. from X import Y (hence
@@ -3349,7 +3407,7 @@ def object_find(shell, oname=str, namespaces=None) -> oinspect.OInfo:
             subname = oname
             for part in reversed(parts):
                 subname = subname.replace(f".{part}", "")
-                # print(f"subname = {subname}")
+                print(f"prog.object_find reverse search subname = {subname}")
                 sinfo = shell._object_find(subname, namespaces)
                 if sinfo.found:
                     # print(f"helputils.object_find reverse search found sinfo = {sinfo}")
@@ -3364,7 +3422,7 @@ def object_find(shell, oname=str, namespaces=None) -> oinspect.OInfo:
                     # or for some similarity
                     # if anything found:
                     # if only one item is found, then return its info
-                    # if more than one candidate is foubnd, then create a message
+                    # if more than one candidate is found, then create a message
                     # to propose those candidates as objects for which info should
                     # be returned.
                     #
