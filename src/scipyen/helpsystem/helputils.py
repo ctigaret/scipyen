@@ -622,16 +622,20 @@ def _fix_html_highlight(s:str) -> str:
     # s = s.replace('&quot;', '"')
     return s
 
-def helpdisp(shell, tempdir:TemporaryDirectory, info:oinspect.OInfo,
-             bf:io.StringIO, oname:str="", detail_level=0, omit_sections=()):
+def helpdisp(tempdir:TemporaryDirectory, info:oinspect.OInfo,
+             bf:io.StringIO, oname:str="", detail_level=0, omit_sections=(),
+             shell:typing.Optional[InteractiveShell]=None):
     r"""Stand-in for oinspect.Inspector.pinfo.
     Outpout is redirected to a buffered IO stream.
     """
     from core.prog import scipywarn
     assert isinstance(info, oinspect.OInfo), f"Expecting an oinspect.OInfo object; got {type(info).__name__} instead"
     
-    info_b = hget_info(shell, tempdir, info.obj, oname, info, detail_level, 
-                       omit_sections=omit_sections)
+    if not isinstance(shell, InteractiveShell):
+        shell = guiutils.getScipyenConsoleShell()
+   
+    info_b = hget_info(tempdir, info.obj, oname, info, detail_level, 
+                       omit_sections=omit_sections, shell=shell)
     
     strng = info_b["text/html"]
     # strng = strng.replace("<br>", "").replace("\n", "<br>").replace("<p>", "<br>").replace("<br><br>", "<br>").replace("</h1><br>", "</h1>")
@@ -642,13 +646,15 @@ def bf_page(bf:io.StringIO, strng:str):
     for line in strng.splitlines():
         bf.write(line)
    
-def redirect_psearch(shell, bf, cmd:str):
+def redirect_psearch(bf, cmd:str, shell:typing.Optional[InteractiveShell]=None):
     r"""Emulates NamespaceMagics.psearch"""
     # print(f"redirect_psearch({cmd})")
     # NOTE: 2025-10-13 12:00:25 
     # contextlib.redirect_stdout doesn't work here
     # so let's disembowel this a bit and use what we need
     #
+    if not isinstance(shell, InteractiveShell):
+        shell = guiutils.getScipyenConsoleShell()
     psearchfn = shell.find_line_magic("psearch") # the psearch magic function that shell would use
     magicobj = psearchfn.__self__ # the magics object that owns `psearchfn`
     def_search = ['user_local', 'user_global', 'builtin']
@@ -677,8 +683,9 @@ def redirect_psearch(shell, bf, cmd:str):
 
     # Call the actual search
     try:
-        hpsearch(shell, bf, args, shell.ns_table, ns_search,
-                ignore_case=ignore_case, show_all=opt('a'), list_types=list_types)
+        hpsearch(bf, args, shell.ns_table, ns_search,
+                ignore_case=ignore_case, show_all=opt('a'), list_types=list_types,
+                shell=shell)
             
     except:
         traceback.print_exc()
@@ -686,8 +693,9 @@ def redirect_psearch(shell, bf, cmd:str):
 
     # return ret, True
         
-def hpsearch(shell, bf:io.StringIO, pattern, ns_table, ns_search=[],
-             ignore_case=False, show_all=False, *, list_types=False):
+def hpsearch(bf:io.StringIO, pattern, ns_table, ns_search=[],
+             ignore_case=False, show_all=False, *, list_types=False,
+             shell:typing.Optional[InteractiveShell]=None):
     r"""Emulates shell.inspector.psearch"""
     # print(f"hpsearch({pattern}, ns_table = {type(ns_table).__name__}, ns_search = {ns_search}, ignore_case={ignore_case}, show_all = {show_all}, list_types = {list_types})")
     type_pattern = 'all'
@@ -711,6 +719,9 @@ def hpsearch(shell, bf:io.StringIO, pattern, ns_table, ns_search=[],
         raise ValueError('invalid argument string for psearch: <%s>' %
                             pattern)
 
+    if not isinstance(shell, InteractiveShell):
+        shell = guiutils.getScipyenConsoleShell()
+
     # filter search namespaces
     for name in ns_search:
         if name not in ns_table:
@@ -731,14 +742,17 @@ def hpsearch(shell, bf:io.StringIO, pattern, ns_table, ns_search=[],
 
     bf_page(bf, '<p>\n'.join(list(sorted(search_result))))
     
-def happend_info_field(shell, bundle: UnformattedBundle,
+def happend_info_field(bundle: UnformattedBundle,
         title: str,
         key: str,
         info:oinspect.InfoDict,
         omit_sections: typing.List[str],
         formatter:typing.Optional[types.FunctionType],
         hide_title_in_html:bool,
+        shell:typing.Optional[InteractiveShell]=None
         ):
+    if not isinstance(shell, InteractiveShell):
+        shell = guiutils.getScipyenConsoleShell()
     if title in omit_sections or key in omit_sections:
         return
     if key not in info:
@@ -750,23 +764,24 @@ def happend_info_field(shell, bundle: UnformattedBundle,
         bundle["text/html"].append(("" if hide_title_in_html else title, formatted_field["text/html"]))
 
 
-def hmake_info_unformatted(shell:InteractiveShell, obj:object, info:oinspect.InfoDict, 
-                           detail_level:int, 
-                           omit_sections:typing.Union[typing.List[str], typing.Tuple[str]], 
-                           tempdir:TemporaryDirectory) -> UnformattedBundle:
+def hmake_info_unformatted(obj:object, info:oinspect.InfoDict, detail_level:int, 
+                           tempdir:TemporaryDirectory, 
+                           omit_sections:typing.Union[typing.List[str], typing.Tuple[str]]=list(), 
+                           shell:typing.Optional[InteractiveShell]=None) -> UnformattedBundle:
     r"""Emulates shell.inspector._make_info_unformatted"""
-    # TODO 2025-10-13 13:25:09
+    if not isinstance(shell, InteractiveShell):
+        shell = guiutils.getScipyenConsoleShell()
     latex_formatter = partial(format_latex, tempdir=tempdir)
     bundle: UnformattedBundle = {
         "text/plain": [],
         "text/html": [],
     }
-    def append_field(shell, bundle: UnformattedBundle, title: str, key: str, 
+    def append_field(bundle: UnformattedBundle, title: str, key: str, 
                      formatter:typing.Optional[types.FunctionType]=None, 
-                     hide_title_in_html:bool=False
+                     hide_title_in_html:bool=False,
+                     shell:typing.Optional[InteractiveShell]=None
     ):
         happend_info_field(
-            shell,
             bundle,
             title=title,
             key=key,
@@ -774,6 +789,7 @@ def hmake_info_unformatted(shell:InteractiveShell, obj:object, info:oinspect.Inf
             omit_sections=omit_sections,
             formatter=formatter,
             hide_title_in_html=hide_title_in_html,
+            shell=shell
         )
         
     _format = lambda t: shell.inspector.format(t)
@@ -790,72 +806,70 @@ def hmake_info_unformatted(shell:InteractiveShell, obj:object, info:oinspect.Inf
         }
 
     if info["isalias"]:
-        append_field(shell, bundle, "Repr", "string_form")
+        append_field(bundle, "Repr", "string_form", shell=shell)
 
     elif info['ismagic']:
         if detail_level > 0:
-            append_field(shell, bundle, "Source", "source", py_formatter)
+            append_field(bundle, "Source", "source", py_formatter, shell=shell)
         else:
-            append_field(shell, bundle, "Docstring", "docstring", rst_formatter, hide_title_in_html=True)
+            append_field(bundle, "Docstring", "docstring", rst_formatter, hide_title_in_html=True, shell=shell)
             
-        append_field(shell, bundle, "File", "file")
+        append_field(bundle, "File", "file", shell=shell)
 
     elif info['isclass'] or oinspect.is_simple_callable(obj):
         # Functions, methods, classes
-        append_field(shell, bundle, "Signature", "definition", py_formatter)
-        append_field(shell, bundle, "Init signature", "init_definition", rst_formatter)
-        append_field(shell, bundle, "Docstring", "docstring", rst_formatter, hide_title_in_html=True)
+        append_field(bundle, "Signature", "definition", py_formatter, shell=shell)
+        append_field(bundle, "Init signature", "init_definition", rst_formatter, shell=shell)
+        append_field(bundle, "Docstring", "docstring", rst_formatter, hide_title_in_html=True, shell=shell)
         
         if detail_level > 0 and info["source"]:
-            append_field(shell, bundle, "Source", "source", py_formatter)
+            append_field(bundle, "Source", "source", py_formatter, shell=shell)
         else:
-            append_field(shell, bundle, "Init docstring", "init_docstring", rst_formatter)
+            append_field(bundle, "Init docstring", "init_docstring", rst_formatter, shell=shell)
             if not oinspect.is_simple_callable(obj):
                 for field in _extra_info_fields:
                     if info[field]:
                         fmt = py_formatter if field in ("methods", "descriptors", "functions", "classes") else rst_formatter
-                        append_field(shell, bundle, field.capitalize(), field, fmt)
+                        append_field(bundle, field.capitalize(), field, fmt, shell=shell)
 
-        append_field(shell, bundle, "File", "file")
-        append_field(shell, bundle, "Type", "type_name", py_formatter)
+        append_field(bundle, "File", "file", shell=shell)
+        append_field(bundle, "Type", "type_name", py_formatter, shell=shell)
         
         if not oinspect.is_simple_callable(obj):
-            append_field(shell, bundle, "Subclasses", "subclasses", py_formatter)
+            append_field(bundle, "Subclasses", "subclasses", py_formatter, shell=shell)
 
     else:
         # General Python objects
-        append_field(shell, bundle, "Signature", "definition", py_formatter)
-        append_field(shell, bundle, "Call signature", "call_def", py_formatter)
-        append_field(shell, bundle, "Type", "type_name", py_formatter)
-        append_field(shell, bundle, "String form", "string_form", rst_formatter)
+        append_field(bundle, "Signature", "definition", py_formatter, shell=shell)
+        append_field(bundle, "Call signature", "call_def", py_formatter, shell=shell)
+        append_field(bundle, "Type", "type_name", py_formatter, shell=shell)
+        append_field(bundle, "String form", "string_form", rst_formatter, shell=shell)
 
         # Namespace
         if info["namespace"] != "Interactive":
-            append_field(shell, bundle, "Namespace", "namespace")
+            append_field(bundle, "Namespace", "namespace", shell=shell)
 
-        append_field(shell, bundle, "Class docstring", "class_docstring", rst_formatter)
-        append_field(shell, bundle, "Init docstring", "init_docstring", rst_formatter)
-        append_field(shell, bundle, "Call docstring", "call_docstring", py_formatter)
+        append_field(bundle, "Class docstring", "class_docstring", rst_formatter, shell=shell)
+        append_field(bundle, "Init docstring", "init_docstring", rst_formatter, shell=shell)
+        append_field(bundle, "Call docstring", "call_docstring", py_formatter, shell=shell)
         
-        append_field(shell, bundle, "Length", "length")
-        append_field(shell, bundle, "File", "file")
+        append_field(bundle, "Length", "length", shell=shell)
+        append_field(bundle, "File", "file", shell=shell)
 
         # Source or docstring, depending on detail level and whether
         # source found.
         if detail_level > 0 and info["source"]:
-            append_field(shell, bundle, "Source", "source", py_formatter)
+            append_field(bundle, "Source", "source", py_formatter, shell=shell)
         else:
-            append_field(shell, bundle, "Docstring", "docstring", rst_formatter)
+            append_field(bundle, "Docstring", "docstring", rst_formatter, shell=shell)
             for field in _extra_info_fields:
                 if info[field]:
-                    append_field(shell, bundle, field.capitalize(), field, py_formatter if field in ("methods", "descriptors", "functions", "classes", "data") else rst_formatter)
-                    # fmt = rst_formatter if field in ("methods", "descriptors", "functions", "classes", "data") else formatter
-                    # append_field(shell, bundle, field.capitalize(), field, fmt)
+                    append_field(bundle, field.capitalize(), field, py_formatter if field in ("methods", "descriptors", "functions", "classes", "data") else rst_formatter, shell=shell)
 
     return bundle
 
-def hinfo(shell:InteractiveShell, info:oinspect.OInfo,
-          obj:object, oname:str="", detail_level:int = 0) -> oinspect.InfoDict:
+def hinfo(info:oinspect.OInfo, obj:object, oname:str="", detail_level:int = 0, 
+          shell:typing.Optional[InteractiveShell]=None) -> oinspect.InfoDict:
     r"""Augments shell.inspector.info().
     
     The actual doctring is mapped to the "docstring" key of the returned object.
@@ -869,6 +883,8 @@ def hinfo(shell:InteractiveShell, info:oinspect.OInfo,
     "descriptors", "functions", "classes", "data".
     
  """
+    if not isinstance(shell, InteractiveShell):
+        shell = guiutils.getScipyenConsoleShell()
     # NOTE: 2026-01-02 14:46:25
     # this is the 'basic' oinspect.InfoDict object that the shell's current inspector
     # (by default, an oinspect.Inspector) returns.
@@ -968,18 +984,22 @@ def format_latex(txt:str, tempdir:TemporaryDirectory)->str:
     return txt
     
 
-def hget_info(shell:InteractiveShell, tempdir:TemporaryDirectory,
+def hget_info(tempdir:TemporaryDirectory,
               obj:object, oname:str="",
               info:typing.Optional[oinspect.OInfo]=None,
-              detail_level:int = 0, omit_sections:typing.Union[typing.List[str], typing.Tuple[str]] = ()) -> Bundle:
+              detail_level:int = 0, omit_sections:typing.Union[typing.List[str], typing.Tuple[str]] = (),
+              shell:typing.Optional[InteractiveShell]=None) -> Bundle:
     r"""Based on shell.inspector._get_info"""
-    info_dict = hinfo(shell, info, obj, oname=oname, detail_level=detail_level)
+    if not isinstance(shell, InteractiveShell):
+        shell = guiutils.getScipyenConsoleShell()
+    info_dict = hinfo(info, obj, oname=oname, detail_level=detail_level, shell=shell)
     omit_sections = list(omit_sections)
     
-    bundle = hmake_info_unformatted(shell, obj, info_dict,
+    bundle = hmake_info_unformatted(obj, info_dict,
                                     detail_level = detail_level, 
                                     omit_sections = omit_sections,
-                                    tempdir=tempdir) 
+                                    tempdir = tempdir,
+                                    shell = shell) 
     
     # ### BEGIN NOTE: 2026-01-03 16:27:39 I don't think this is necessary
     #
@@ -1017,9 +1037,12 @@ def hget_info(shell:InteractiveShell, tempdir:TemporaryDirectory,
     # return bundle
     return shell.inspector.format_mime(bundle)
     
-def hpinfo(shell, cmd, namespaces = None, detail_level:int=0, tempdir=None):
+def hpinfo(cmd, namespaces = None, detail_level:int=0, tempdir=None,
+           shell:typing.Optional[InteractiveShell]=None):
     r"""Emulates a IPython pinfo call"""
     # print(f"helpsystem.helputils.hpinfo(cmd={cmd}, namespaces={namespaces}, detail_level={detail_level}, enable_html={enable_html})")
+    if not isinstance(shell, InteractiveShell):
+        shell = guiutils.getScipyenConsoleShell()
     ret = None
     reformat = False
     
@@ -1029,7 +1052,7 @@ def hpinfo(shell, cmd, namespaces = None, detail_level:int=0, tempdir=None):
             if pinfo or qmark1 or qmark2:
                 detail_level = 1
             if "*" in oname:
-                redirect_psearch(shell, bf, oname)
+                redirect_psearch(bf, oname, shell=shell)
                 reformat=True
             else:
                 # NOTE: 2025-12-27 13:53:06
@@ -1037,9 +1060,10 @@ def hpinfo(shell, cmd, namespaces = None, detail_level:int=0, tempdir=None):
                 # extracts various useful information about the object, including 
                 # its docstring; tempdir, if present, is used when rendering LaTeX
                 # strings embedded in the docstrings
-                hinspect(shell, bf, oname, namespaces=namespaces,
+                hinspect(bf, oname, namespaces=namespaces,
                          detail_level = detail_level,
                          tempdir=tempdir,
+                         shell=shell
                          )
                 reformat=False
                 
@@ -1050,8 +1074,9 @@ def hpinfo(shell, cmd, namespaces = None, detail_level:int=0, tempdir=None):
     
     return ret, reformat
      
-def hinspect(shell:InteractiveShell, bf:io.StringIO, oname=str, namespaces=None,
-             tempdir:typing.Optional[TemporaryDirectory]=None, **kw):
+def hinspect(bf:io.StringIO, oname=str, namespaces=None,
+             tempdir:typing.Optional[TemporaryDirectory]=None,
+             shell:typing.Optional[InteractiveShell]=None, **kw):
     r"""Stand-in for shell._inspect, called by pinfo magic.
     Named as `hinspect` to avoid clash with the standard library module `inspect`.
 
@@ -1079,51 +1104,25 @@ def hinspect(shell:InteractiveShell, bf:io.StringIO, oname=str, namespaces=None,
         • page.pager_page(data)
 """
     from core.prog import scipywarn
+    if not isinstance(shell, InteractiveShell):
+        shell = guiutils.getScipyenConsoleShell()
     # print(f"helpsystem.helputils.hinspect(oname={oname}, namespaces={namespaces}, **kw={kw})")
     detail_level = kw.get("detail_level", 0)
     # enable_html = kw.get("enable_html", True)
-    info, msg = prog.object_find(shell, oname, namespaces) # info is an oinspect.OInfo object
+    info, msg = prog.object_find(oname, namespaces, shell=shell) # info is an oinspect.OInfo object
     # print(f"helpsystem.helputils.hinspect: info = {info}, msg={msg}")
     
     if info.found or hasattr(info.parent, oinspect.HOOK_NAME):
-        # info_dict = hinfo(shell, info.obj, oname, info, detail_level, tempdir) # this is an oinspect.InfoDict NOTE: 2026-01-02 14:09:05 do not confuse with oinspect.OInfo
-        # if shell.sphinxify_docstring:
-        #     if sphinxify is None:
-        #         raise ImportError("Module ``docrepr`` required but missing")
-        #     # docformat = sphinxify(shell.object_inspect(oname))
-        #     docformat = sphinxify(object_inspect(shell, oname))
-        # else:
-        #     if "docstring" in info_dict:
-        #         docformat = format_screen
-        #     else:
-        #         docformat = None
-
-        helpdisp(shell, tempdir, info, bf, oname, detail_level)#, enable_html)
+        helpdisp(tempdir, info, bf, oname, detail_level, shell=shell)#, enable_html)
     else:
         bf.write(msg)
-        # scipywarn('Object `%s` not found.' % oname)
-        # return 'not found'  # so callers can take other action
         
-# def _find_by_alias(shell, oname:str, namespaces=None):
-#     r"""Find an object by its alias - typically applies to imported modules
-# WARNING: Potentially problematic...
-#  """
-#     if namespaces is None:
-#         namespaces = [ ('Interactive', shell.user_ns),
-#                         ('Interactive (global)', shell.user_global_ns),
-#                         ('Python builtin', shell.ns_table["builtin"]),
-#                         ]
-#         
-#     for nsname,ns in namespaces:
-#         obj_list = list(filter(lambda x: inspect.ismodule(x[1]) and oname in x[1].__name__, ns.items()))
-#         if len(obj_list):
-#             return obj_list[0][0]
-#         
-#     return
-    
-def run_python_help(shell, cmd:str, enable_html=True, tempdir=None) -> str | None:
+def run_python_help(cmd:str, enable_html=True, tempdir=None,
+                    shell:typing.Optional[InteractiveShell]=None) -> str | None:
     print(f"helpsystem.helputils.run_python_help → pydoc.Helper(cmd={cmd})")
     ret = None
+    if not isinstance(shell, InteractiveShell):
+        shell = guiutils.getScipyenConsoleShell()
     with io.StringIO() as bf:
         helper = pydoc.Helper(output = bf)
         try:
@@ -1138,7 +1137,7 @@ def run_python_help(shell, cmd:str, enable_html=True, tempdir=None) -> str | Non
         ret += "\nCheck the spelling; you may need to enter a valid dotted path e.g. 'package.module.object.member'"
     else:
         special = cmd if cmd in ("keywords", "symbols", "topics") else None
-        ret_bundle = shell.inspector.format_mime(format_python_help_output(shell, make_python_help_dict(ret, special)))
+        ret_bundle = shell.inspector.format_mime(format_python_help_output(make_python_help_dict(ret, special), shell=shell))
         if enable_html:
             strng = ret_bundle["text/html"]
             strng = strng.replace("<br>", "").replace("\n", "<br>")#.replace("<p>", "<br>").replace("<br><br>", "<br>").replace("</h1><br>", "</h1>")
@@ -1201,9 +1200,13 @@ def make_python_help_dict(s:str, special:typing.Optional[str] = None) -> dict:
             
     return helpdict
 
-def format_python_help_output(shell, data:PythonHelpDict, formatter=None):
+def format_python_help_output(data:PythonHelpDict, formatter=None,
+                              shell:typing.Optional[InteractiveShell]=None):
     r"""Attempt for format standard Python help output similarly to IPython's help output.
  """
+    if not isinstance(shell, InteractiveShell):
+        shell = guiutils.getScipyenConsoleShell()
+        
     bundle: UnformattedBundle = {
         "text/plain": [],
         "text/html": [],
@@ -1226,7 +1229,7 @@ def format_python_help_output(shell, data:PythonHelpDict, formatter=None):
             'text/html': rst_to_html_with_highlighting(text)
             }
     
-    def append_field(shell, bundle:UnformattedBundle, title:str, key:str, hd:PythonHelpDict, formatter):
+    def append_field(bundle:UnformattedBundle, title:str, key:str, hd:PythonHelpDict, formatter):
         field = hd[key]
         if field is not None:
             formatted_field = shell.inspector._mime_format(field, formatter)
@@ -1242,10 +1245,10 @@ def format_python_help_output(shell, data:PythonHelpDict, formatter=None):
         titlekey = titlekey[0]
         title = titlekey #if titlekey not in data else ""
         try:
-            append_field(shell, bundle, title, titlekey, data, pyhelp_formatter)
+            append_field(bundle, title, titlekey, data, pyhelp_formatter)
         except:
             # traceback.print_exc()
-            append_field(shell, bundle, title, titlekey, data, format_screen)
+            append_field(bundle, title, titlekey, data, format_screen)
                 
     else:
         titlekey = ""
@@ -1254,12 +1257,13 @@ def format_python_help_output(shell, data:PythonHelpDict, formatter=None):
         if key != titlekey:
             if data[key]:
                 fmt = rst_formatter if key in ("data", "classes", "functions") else formatter
-                append_field(shell, bundle, key.capitalize(), key, data, fmt)
+                append_field(bundle, key.capitalize(), key, data, fmt)
         
     return bundle
     
 
-def run_help_command(shell, cmd:str, namespaces=None, tempdir=None, **kw) -> str | None:
+def run_help_command(cmd:str, namespaces=None, tempdir=None,
+                     shell:typing.Optional[InteractiveShell]=None, **kw) -> str | None:
     """
 kw: 
 enable_html: bool, default, is True
@@ -1274,6 +1278,9 @@ detail_level: int, 0 or 1, default is 0
     if not isinstance(cmd, str) or len(cmd.strip()) == 0:
         return
     
+    if not isinstance(shell, InteractiveShell):
+        shell = guiutils.getScipyenConsoleShell()
+    
     detail_level = kw.get("detail_level", 0)
     # enable_html = kw.get("enable_html", True)
     
@@ -1284,7 +1291,7 @@ detail_level: int, 0 or 1, default is 0
         cmd = cmd.strip("help").strip("(").strip(")").strip("\"")
         if len(cmd) == 0:
             cmd = "help"
-        ret = run_python_help(shell, cmd, tempdir=tempdir)
+        ret = run_python_help(cmd, tempdir=tempdir, shell=shell)
         reformat = False
         
     else:
@@ -1319,7 +1326,7 @@ detail_level: int, 0 or 1, default is 0
             s = cmd.strip("psearch").strip()
             if len(s):
                 with io.StringIO() as bf:
-                    redirect_psearch(shell, bf, s)
+                    redirect_psearch(bf, s, shell=shell)
                     ret = bf.getvalue()
                     if len(ret.strip()) == 0:
                         ret = f"Nothing found matching the pattern {s}<p>"
@@ -1327,8 +1334,8 @@ detail_level: int, 0 or 1, default is 0
                     reformat = True
                     
             else:
-                ret, reformat = hpinfo(shell, "psearch", namespaces, detail_level = detail_level,
-                                       tempdir=tempdir)#, enable_html=enable_html)
+                ret, reformat = hpinfo("psearch", namespaces, detail_level = detail_level,
+                                       tempdir=tempdir, shell=shell)#, enable_html=enable_html)
                 
         else:
             if cmd.startswith("?") or cmd.endswith("?"):
@@ -1346,15 +1353,9 @@ detail_level: int, 0 or 1, default is 0
             
             # NOTE: 2026-01-03 22:11:32
             # this also works when cmd does not have '?' in it 
-            ret, reformat = hpinfo(shell, cmd, namespaces, detail_level = detail_level,
-                                   tempdir=tempdir)#, enable_html = enable_html)
+            ret, reformat = hpinfo(cmd, namespaces, detail_level = detail_level,
+                                   tempdir=tempdir, shell=shell)#, enable_html = enable_html)
 
-        # if isinstance(ret, str):
-        #     if ret.startswith("No Python documentation found"):
-        #         print(f"helpsystem.helputils.run_help_command — calling helpsystem.helputils.run_python_help for command: cmd = {cmd}")
-        #         ret = run_python_help(shell, cmd)
-        #         reformat = True
-        # else:
         if not isinstance(ret, str):
             ret = f"No Python documentation found for {cmd}"
             ret += "\nCheck the spelling; you may need to enter a valid dotted path e.g. 'package.module.object.member'"

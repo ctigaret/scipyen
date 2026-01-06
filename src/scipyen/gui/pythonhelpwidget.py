@@ -86,6 +86,8 @@ from core.sysutils import adapt_ui_path
 from core import strutils
 from helpsystem import helputils
 from gui.workspacegui import WorkspaceGuiMixin
+from gui import guiutils
+
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __ui_path__ = adapt_ui_path(__module_path__,'pythonhelpwidget.ui')
 
@@ -98,9 +100,12 @@ class _PythonHelpThread_(QtCore.QThread):
     message = Signal(str, name="ready")
     # threadRunning = Signal(str, name="threadRunning")
     
-    def __init__(self, parent: QtCore.QObject, shell:InteractiveShell):
+    def __init__(self, parent: QtCore.QObject, shell:typing.Optional[InteractiveShell]=None):
         QtCore.QThread.__init__(self, parent)
+        if not isinstance(shell, InteractiveShell):
+            shell = guiutils.getScipyenConsoleShell()
         self.shell = shell
+            
         self.helpCommand = None
         self.helpProcess = None
         self.columns = 4
@@ -138,8 +143,9 @@ class _PythonHelpThread_(QtCore.QThread):
                 reformat = False
                 # print(f"{self.__class__.__name__}.run: fullcmd = {fullcmd}")
                 try:
-                    reply, reformat = helputils.run_help_command(self.shell, " ".join(cmdParts),
-                                                                 tempdir=self.tempdir)
+                    reply, reformat = helputils.run_help_command(" ".join(cmdParts),
+                                                                 tempdir=self.tempdir,
+                                                                 shell=self.shell)
                 except:
                     traceback.print_exc()
 
@@ -199,7 +205,8 @@ class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin
                                 "Enter the magic name without the `%` prefix, followed by arguments, to execute it (e.g. `psearch <pattern…>`), or the magic name WITH the `%` prefix to read its documentation (e.g. `%psearch`)",
                                 "NOTE: This does not substitute the Python 'help' command or IPython's help system ('?<object>') at the console, but it does help to 'free' up the console during such queries."])
     
-    def __init__(self, shell:InteractiveShell, parent:typing.Optional[QtWidgets.QMainWindow] = None,
+    def __init__(self, parent:typing.Optional[QtWidgets.QMainWindow] = None,
+                 shell:typing.Optional[InteractiveShell]=None,
                  **kwargs):
         if __has_PySide6__:# or __has_PyQt6__:
             super().__init__(parent)
@@ -209,7 +216,11 @@ class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin
         # self.tempdir = None
         self._cache_ = dict()
         
+        if not isinstance(shell, InteractiveShell):
+            shell = guiutils.getScipyenConsoleShell()
+
         self._helpThread_ = _PythonHelpThread_(self, shell)
+        
         self._helpThread_.message[str].connect(self._slot_displayMessage)
         self._helpThread_.ready[dict].connect(self._slot_displayReply)
         self._queryHistory_ = deque()
@@ -398,7 +409,7 @@ class PythonHelpWindow(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         super().__init__(parent=parent)
         WorkspaceGuiMixin.__init__(self, parent=parent)
         self.setWindowTitle("Scipyen — Python help")
-        self.helpWidget = PythonHelpWidget(shell, self)
+        self.helpWidget = PythonHelpWidget(shell=shell, parent=self)
         self.setCentralWidget(self.helpWidget)
         
         self.loadSettings()
