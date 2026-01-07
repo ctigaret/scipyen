@@ -3203,22 +3203,35 @@ def _find_in_sys_modules(head:str, rest:list, shell:typing.Optional[InteractiveS
     isalias=False
     ospace=None
     
-    opath = list()
-    
     for module in sys.modules.values():
+        if not isinstance(module, types.ModuleType):
+            continue
+        # opath = list()
+        # print(f"looking for {head} in {module}")
         try:
             obj = shell._getattr_property(module, head)
-            opath.append(module.__name__)
+            # print(f"module: {module.__name__}")
+            # opath.append(module.__name__)
             parent=module
         except:# KeyError:
+            # print(f"continue after {module}")
             continue
         else:
+            # print(f"\tfound head '{head}' as {obj} in {module}; parent is {parent}")
+            # BUG: 2026-01-07 16:13:40 FIXME
+            # if obj is imported by 'module' then 'module' will be wrongly shown
+            # as 'parent' when in fact it is not
+            # — what I'm after is the actual point where the module is defined
+            # if isinstance(obj, types.ModuleType):
+                
             for idx, part in enumerate(rest):
-                # print(f"\tlooking for part {part} in {obj}")
+                # print(f"\tlooking for part {idx}: {part} in {obj}")
                 try:
                     parent = obj
-                    if isinstance(parent, types.ModuleType):
-                        opath.append(parent.__name__.split(".")[-1])
+#                     if isinstance(parent, types.ModuleType):
+#                         # print(f"\t\tparent: {parent.__name__}, from {parent.__spec__.origin}")
+#                         
+#                         opath.append(parent.__name__.split(".")[-1])
                     if idx == len(rest) - 1:
                         obj = shell._getattr_property(obj, part)
                     else:
@@ -3227,6 +3240,7 @@ def _find_in_sys_modules(head:str, rest:list, shell:typing.Optional[InteractiveS
                         else:
                             obj = getattr(obj, part)
                 except:
+                    # print(f"break after idx {idx} (part {part})")
                     # Blanket except b/c some badly implemented objects
                     # allow __getattr__ to raise exceptions other than
                     # AttributeError, which then crashes IPython.
@@ -3235,7 +3249,8 @@ def _find_in_sys_modules(head:str, rest:list, shell:typing.Optional[InteractiveS
                 # If we finish the for loop (no break), we got all members
                 found = True
                 # ospace = f"module {parent.__name__}" if isinstance(parent, types.ModuleType) else 'sys modules'
-                ospace = f"module {'.'.join(opath)}" if len(opath) else 'sys modules'
+                # ospace = f"module {'.'.join(opath)}" if len(opath) else 'sys modules'
+                ospace = None # this is bettern as it reflects the fact that whatever is found does not belong to a namespace
                 # msg = ""
                 break  # modules loop
     
@@ -3350,7 +3365,7 @@ WARNING: Potentially problematic...
                 parts_ok, parts = shell._find_parts(ooname)
                 # print(f"oo = {oo}, parts = {parts}")
                 if oname in parts and ooname not in aliases: # NOTE: 2026-01-06 10:21:39 not the same as oname in ooname !!!
-                    cinfo = shell._object_find(ooname, namespaces=[nsname, ns])
+                    cinfo = shell._object_find(ooname, namespaces=[(nsname, ns)])
                     candidates.append((ooname, cinfo))
                 
     return aliases, candidates
@@ -3403,8 +3418,24 @@ def object_find(oname=str, namespaces=None, shell:typing.Optional[InteractiveShe
     if not info.found:
         # print(f"core.prog.object_find info for {oname} NOT found by shell._object_find\n")
         # this might happen when either:
+        
+        # 0) try pkgutil
+        try:
+            obj = pkgutil.resolve_name(oname)
+            if isinstance(obj, (types.FunctionType, types.MethodType, type)):
+                oinfo = oinspect.OInfo(obj=obj, found=True)
+                parentinfo, _ = object_find(obj.__module__)
+                if parentinfo.found:
+                    oinfo.parent = parentinfo.obj
+                    oinfo.namespace = f"module {oinfo.parent.__name__}"
+                    
+                return oinfo, ""
+                
+        except:
+            pass
+        
         #
-        # 1) the object exists in the namespaces, but has been imported under an alias
+        # 1) the object might exist in the namespaces, but has been imported under an alias
         aliases, cnds = _find_by_alias(oname, namespaces, shell=shell)
         # print(f"\tcore.prog.object_find _find_by_alias for {oname} ↦ shell._object_find found aliases = {aliases}, candidates = {cnds} ")
         if len(aliases) == 1:
@@ -3550,14 +3581,33 @@ def object_find(oname=str, namespaces=None, shell:typing.Optional[InteractiveShe
             msg = ""
 
         if not info.found:
+            candidates = utilities.unique(candidates)
+            if len(candidates) == 1:
+                entry = candidates[0][0]
+                cinfo = candidates[0][1]
+                cname = _get_pyobj_name_(cinfo.obj)
+                pname = _get_pyobj_name_(cinfo.parent)
+                cpname = f"{pname}.{cname}"
+                cok, cparts = shell._find_parts(cpname)
+                ook, oparts = shell._find_parts(oname)
+                
+                rcparts = list(reversed(cparts))
+                roparts = list(reversed(oparts))
+                
+                sub, sup = (roparts, rcparts) if len(roparts) < len(rcparts) else (rcparts, roparts)
+                
+                issub = all(list(map(lambda k: sub[k] == sup[k], range(len(sub)))))
+                if issub:
+                    return cinfo, ""
+                
             info.obj    = None
             info.parent = None
             info.ismagic=False
             info.isalias=False
             info.namespace=None
-            candidates = utilities.unique(candidates)
             if len(candidates):
-                msg = "\n".join([f"<b>No Python documentation found for '{oname}'</b><br>", "Did you mean: "] + list(map(lambda c: f"<li>'{c[0]}' in '{_get_pyobj_name_(c[1].parent)}' {type(c[1].parent).__name__}</li>", sorted(list(candidates), key=lambda x: x[0]))))
+                get_parent_name = lambda o: f"in '{_get_pyobj_name_(o)}' {type(o).__name__}" if o is not None else f'{_get_pyobj_name_(o)}'
+                msg = "\n".join([f"<b>No Python documentation found for '{oname}'</b><br>", "Did you mean: "] + list(map(lambda c: f"<li>'{c[0]}' {get_parent_name(c[1].parent)}</li>", sorted(list(candidates), key=lambda x: x[0]))))
             else:
                 msg = f"<b>No Python documentation found for '{oname}'</b><br>"
 

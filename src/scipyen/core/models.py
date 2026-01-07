@@ -743,9 +743,9 @@ Example:
     parameters = [α, β, x0, τ];
 
     # any of the statements below are equivalent:
-    y = alphaSynapse(x, α, β, x0, τ)
-    y = alphaSynapse(x, *parameters)
-    y = alphaSynapse(x, parameters)
+    y = models.alphaSynapse(x, α, β, x0, τ)
+    y = models.alphaSynapse(x, *parameters)
+    y = models.alphaSynapse(x, parameters)
 
     plt.plot(x,y)
 

@@ -95,7 +95,7 @@ from gui import guiutils
 from core import prog
 
 
-_extra_info_fields = ["methods", "descriptors", "functions", "classes", "data"]
+_extra_info_fields = ["methods", "descriptors", "functions", "classes", "data", "access"]
 
 docutils_settings_overrides={'output_encoding': 'unicode',
                              'output_encoding_error_handler': 'ignore',
@@ -819,6 +819,7 @@ def hmake_info_unformatted(obj:object, info:oinspect.InfoDict, detail_level:int,
     elif info['isclass'] or oinspect.is_simple_callable(obj):
         # Functions, methods, classes
         append_field(bundle, "Signature", "definition", py_formatter, shell=shell)
+        append_field(bundle, "Access", "access", py_formatter, shell=shell)
         append_field(bundle, "Init signature", "init_definition", rst_formatter, shell=shell)
         append_field(bundle, "Docstring", "docstring", rst_formatter, hide_title_in_html=True, shell=shell)
         
@@ -864,7 +865,7 @@ def hmake_info_unformatted(obj:object, info:oinspect.InfoDict, detail_level:int,
             append_field(bundle, "Docstring", "docstring", rst_formatter, shell=shell)
             for field in _extra_info_fields:
                 if info[field]:
-                    append_field(bundle, field.capitalize(), field, py_formatter if field in ("methods", "descriptors", "functions", "classes", "data") else rst_formatter, shell=shell)
+                    append_field(bundle, field.capitalize(), field, py_formatter if field in ("methods", "descriptors", "functions", "classes", "data", "access") else rst_formatter, shell=shell)
 
     return bundle
 
@@ -914,7 +915,7 @@ def hinfo(info:oinspect.OInfo, obj:object, oname:str="", detail_level:int = 0,
     _test_docstring = partial(_is_docstring, obj)
             
     # NOTE: 2025-10-13 18:55:39
-    # throughout below we exttratc only the public API
+    # throughout below we extract only the public API
     
     _is_data = lambda x: not(inspect.isclass(x) or inspect.isroutine(x) or inspect.ismethod(x) or inspect.isfunction(x) or inspect.ismodule(x) or _test_docstring(x))
     
@@ -939,8 +940,15 @@ def hinfo(info:oinspect.OInfo, obj:object, oname:str="", detail_level:int = 0,
         classes = list(sorted(map(lambda f: f"{_get_name(f[1])}{_get_sig_or_type(f[1])}", 
                                 filter(lambda f: not _get_name(f[1]).startswith("_"), inspect.getmembers_static(obj, inspect.isclass)))))
         info_dict["classes"] = "\n".join(classes) if len(classes) else None
-        
+        if "." in obj.__name__:
+            pok, parts = shell._find_parts(obj.__name__)
+            accmsg = f"    from {'.'.join(parts[:-1])} import {parts[-1]}"
+        else:
+            accmsg = f"    import {obj.__name__}"
+        info_dict["access"] = "\n".join(["Example:", accmsg])
     else:
+        objparent = info.obj.__module__ if info.parent is None else info.parent
+        info_dict["access"] = "\n".join(["Example:", f"   from {_get_name(objparent)} import {oname}"])
         methods = list(sorted(map(lambda f: f"{_get_name(f[1])}{_get_sig_or_type(f[1])}", 
                              filter(lambda f: not _get_name(f[1]).startswith("_"), inspect.getmembers_static(obj, _is_method)))))
         descriptors = list(sorted(map(lambda f: f"{_get_name(f[1])}{_get_sig_or_type(f[1])}", 
