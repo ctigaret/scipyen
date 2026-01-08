@@ -110,12 +110,12 @@ class _PythonHelpThread_(QtCore.QThread):
         self.helpProcess = None
         self.columns = 4
         self.width = 80
-        self.tempdir = None
+        self.imgdir = None
 
     def run(self):
         # doc = QtGui.QTextDocument()
         reformat:bool = False
-        qreply = {"query":self.helpCommand, "tempdir":self.tempdir, "contents":None, "success":False}
+        qreply = {"query":self.helpCommand, "imgdir":self.imgdir, "contents":None, "success":False}
         if isinstance(self.helpCommand, str) and len(self.helpCommand.strip()):
             cmdParts = self.helpCommand.split(" ")
             # if any(s in cmdParts for s in ("modules", "module")):
@@ -144,7 +144,7 @@ class _PythonHelpThread_(QtCore.QThread):
                 # print(f"{self.__class__.__name__}.run: fullcmd = {fullcmd}")
                 try:
                     reply, reformat = helputils.run_help_command(" ".join(cmdParts),
-                                                                 tempdir=self.tempdir,
+                                                                 imgdir=self.imgdir,
                                                                  shell=self.shell)
                 except:
                     traceback.print_exc()
@@ -214,7 +214,6 @@ class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin
         else:
             super(QtWidgets.QWidget, self).__init__(parent)
             
-        # self.tempdir = None
         self._cache_ = dict()
         
         if not isinstance(shell, InteractiveShell):
@@ -304,12 +303,11 @@ class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin
                 self.nextToolButton.setEnabled(False)
 
             if query in self._cache_:
-                cquery = {"query":query, "tempdir": self._cache_[query]["tempdir"], "contents":self._cache_[query]["contents"], "success":self._cache_[query]["success"]}
+                cquery = {"query":query, "imgdir": self._cache_[query]["imgdir"], "contents":self._cache_[query]["contents"], "success":self._cache_[query]["success"]}
                 self._slot_displayReply(cquery)
             else:
-                    
                 self._helpThread_.helpCommand = query
-                self._helpThread_.tempdir = TemporaryDirectory(ignore_cleanup_errors=True, delete=False)
+                self._helpThread_.imgdir = TemporaryDirectory(ignore_cleanup_errors=True, delete=False)
                 self._helpThread_.run()
         
     @Slot(str)
@@ -352,8 +350,8 @@ class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin
         self.queryComboBox.removeItem(index)
         self._lastQuery_ = None
         cquery = self._cache_.pop(query, None)
-        if isinstance(cquery, dict) and isinstance(cquery.get("tempdir", None), TemporaryDirectory):
-            cquery["tempdir"].cleanup()
+        if isinstance(cquery, dict) and isinstance(cquery.get("imgdir", None), TemporaryDirectory):
+            cquery["imgdir"].cleanup()
         if self.queryComboBox.count() > 0:
             self._slot_processQueryNdx(self.queryComboBox.currentIndex())
         
@@ -363,8 +361,8 @@ class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin
         self.queryComboBox.clear()
         self._lastQuery_ = None
         for q in self._cache_:
-            if isinstance(q.get("tempdir", None), TemporaryDirectory):
-                q["tempdir"].cleanup()
+            if isinstance(q.get("imgdir", None), TemporaryDirectory):
+                q["imgdir"].cleanup()
                 
         self._cache_.clear()
         
@@ -381,17 +379,17 @@ class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin
     # @Slot(str, TemporaryDirectory)
     # @Slot(QtGui.QTextDocument, TemporaryDirectory)
     @Slot(dict)
-    # def _slot_displayReply(self, doc:typing.Union[QtGui.QTextDocument, str], tempdir:TemporaryDirectory):
+    # def _slot_displayReply(self, doc:typing.Union[QtGui.QTextDocument, str], imgdir:TemporaryDirectory):
     def _slot_displayReply(self, reply:dict):
         contents = reply.get("contents", None)
-        tempdir = reply.get("tempdir", None)
+        imgdir = reply.get("imgdir", None)
         query = reply.get("query", None)
         success = reply.get("success", False)
 
         if not isinstance(contents, str) or len(contents.strip()) == 0:
             self._showCustomPlaceHolderText_()
-            if isinstance(tempdir, TemporaryDirectory):
-                tempdir.cleanup()
+            if isinstance(imgdir, TemporaryDirectory):
+                imgdir.cleanup()
         else:
             if strutils.is_html(contents):
                 doc = QtGui.QTextDocument()
@@ -403,7 +401,7 @@ class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin
                     self.helpDisplay.setTextColor(self._textColorCache_)
 
             if query not in self._cache_:
-                self._cache_[query] = {"contents":contents, "tempdir":tempdir, "success":success}
+                self._cache_[query] = {"contents":contents, "imgdir":imgdir, "success":success}
 
 class PythonHelpWindow(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     def __init__(self, shell, parent=None):
@@ -419,5 +417,5 @@ class PythonHelpWindow(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         self.saveSettings()
         if len(self.helpWidget._cache_):
             for cquery in self.helpWidget._cache_.values():
-                if isinstance(cquery, dict) and isinstance(cquery.get("tempdir", None), TemporaryDirectory):
-                    cquery["tempdir"].cleanup()
+                if isinstance(cquery, dict) and isinstance(cquery.get("imgdir", None), TemporaryDirectory):
+                    cquery["imgdir"].cleanup()

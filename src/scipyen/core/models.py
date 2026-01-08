@@ -286,7 +286,7 @@ https://wiki.python.org/moin/PythonDecoratorLibrary#Creating_decorator_with_opti
         
         setattr(f, "expression", expression)
         
-        # ### BEGIN NOTE: 2025-12-26 14:50:30 various optins - do NOT delete; instead, keep for future reference
+        # ### BEGIN NOTE: 2025-12-26 14:50:30 various optins - do NOT delete these; instead, keep for future reference
         #
         # def __display__(f):
         #     if isinstance(f.expression, str):
@@ -352,8 +352,6 @@ https://wiki.python.org/moin/PythonDecoratorLibrary#Creating_decorator_with_opti
                     shell.display_pub.publish(data={"image/png": img})
                     return
             shell.display_pub.publish(data={"text/plain": f"<{type(f).__name__} {f.__module__}.{f.__name__}{inspect.signature(f)}> at {hex(id(f))}\n\n"})
-            # else:
-            #     shell.display_pub.publish(data={"text/plain": f"<{type(f).__name__} {f.__module__}.{f.__name__}{inspect.signature(f)}> at {hex(id(f))}\n\n"})
             
         setattr(f, "_ipython_display_", types.MethodType(__special_display__, f))
         
@@ -397,16 +395,12 @@ https://wiki.python.org/moin/PythonDecoratorLibrary#Creating_decorator_with_opti
             
         # add other attributes from here **kwargs
         for key, value in kwargs.items():
-            # print(f"modelfunction key {key} ↦ value {value}")
             setattr(f, key, value)
         
             
         return f
     
     return wrapper(f)
-    # wf = wrapper(f)
-    # setattr(wf, "self", f)
-    # return wf
 
 def check_unpack_model_coeffs(n:int, params:typing.Sequence[typing.Union[Real, np.ndarray]] | np.ndarray, 
                               *extras, strip_units:bool=True) -> tuple[float]:

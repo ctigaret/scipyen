@@ -2804,7 +2804,6 @@ class ModuleScanner:#(QtCore.QThread):
                         if name.lower().find(key) >= 0:
                             self.callback(None, modname, desc)
 
-            
         for importer, modname, ispkg in self.package_walker(onerror=self.onerror):
             if self.quit:
                 break

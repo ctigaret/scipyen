@@ -5492,6 +5492,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                     "Export as comma-separated ASCII file")
                 exportCSVAction.hovered.connect(
                     self._slot_showActionStatusMessage_)
+                
+        if all([isinstance(self.workspace[v], str) for v in varnames]):
+            exportTextAction = cm.addAction("Save as text file")
+            exportTextAction.triggered.connect(self.slot_exportSelectedVariablesText)
 
         delVars = cm.addAction("Delete")
         delVars.setToolTip("Delete selected variables")
@@ -9232,6 +9236,25 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         action = self.sender()
         if isinstance(action, QAction):
             action.showStatusText(self)
+            
+    @Slot()
+    @safewrapper
+    def slot_exportSelectedVariablesText(self):
+        indexList = self.workspaceView.selectedIndexes()
+
+        if len(indexList) == 0:
+            return
+
+        item, varname = self._getWorkspaceVarItemAndName_(indexList[0])
+
+        items, varnames = zip(
+            *list(self._getWorkspaceVarItemAndName_(index) for index in indexList))
+        
+        if all([isinstance(self.workspace[v], str) for v in varnames]):
+            for v in varnames:
+                filename = "".join([v, ".txt"])
+                pio.saveText(self.workspace[v], filename)
+        
 
     @Slot()
     @safewrapper
