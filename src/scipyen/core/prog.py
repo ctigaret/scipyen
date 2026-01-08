@@ -3390,7 +3390,9 @@ def object_inspect(oname=str, detail_level:int=0,
         # create a generic oinspect.InfoDict based on ``oname``
         return oinspect.object_info(name=oname, found=False) 
 
-def object_find(oname=str, namespaces=None, shell:typing.Optional[InteractiveShell]=None) -> oinspect.OInfo:
+def object_find(oname=str, namespaces=None,
+                shell:typing.Optional[InteractiveShell]=None,
+                with_candidates:bool=True) -> oinspect.OInfo:
     r"""Emulates shell._object_find()"""
     # NOTE: 2026-01-06 23:50:22 FIXME/TODO URGENT
     # first try pgkutil.resolve_object() or my own resolve_object() in this module
@@ -3402,7 +3404,7 @@ def object_find(oname=str, namespaces=None, shell:typing.Optional[InteractiveShe
     if not isinstance(shell, InteractiveShell):
         shell = guiutils.getScipyenConsoleShell()
         
-    # foundinfos = list()
+    foundinfos = list()
 
     candidates = list()
 
@@ -3415,7 +3417,9 @@ def object_find(oname=str, namespaces=None, shell:typing.Optional[InteractiveShe
     info = shell._object_find(oname, namespaces) # this is an oinspect.OInfo object — a dataclass!
     if info.found:
         # print(f"core.prog.object_find info for {oname} found by shell._object_find; DONE!")
-        return info, ""
+        if not with_candidates:
+            return info, ""
+        foundinfos.append(info)
     
     if not info.found:
         # print(f"core.prog.object_find info for {oname} NOT found by shell._object_find\n")
@@ -3429,6 +3433,7 @@ def object_find(oname=str, namespaces=None, shell:typing.Optional[InteractiveShe
             parentinfo = oinspect.OInfo(obj=None, found=False, ismagic=False, isalias=False, 
                                    namespace=None, parent=None)
             objname = _get_pyobj_name_(obj)
+
             if isinstance(obj, (types.FunctionType, types.MethodType, type)):
                 parentinfo, _ = object_find(obj.__module__)
             
@@ -3441,7 +3446,12 @@ def object_find(oname=str, namespaces=None, shell:typing.Optional[InteractiveShe
                 oinfo.parent = parentinfo.obj
                 oinfo.namespace = f"module {oinfo.parent.__name__}"
                 
-            return oinfo, ""
+            if not with_candidates:
+                return oinfo, ""
+            if len(foundinfos) == 0:
+                foundinfos.append(oinfo)
+            else:
+                candidates.append((objname, oinfo))
                 
         except:
             # traceback.print_exc()
@@ -3456,11 +3466,17 @@ def object_find(oname=str, namespaces=None, shell:typing.Optional[InteractiveShe
             info = shell._object_find(aname, namespaces)
             if info.found:
                 # print(f"\tcore.prog.object_find _find_by_alias for {oname} found by shell._object_find as {aname} alias; DONE!")
-                return info, ""
-        # else:
-        cnds.extend(aliases)
-        if len(cnds):
-            candidates.extend(cnds)
+                if not with_candidates:
+                    return info, ""
+                if len(foundinfos) == 0:
+                    foundinfos.append(info)
+                else:
+                    candidates.append((aname, info))
+        else:
+            cnds.extend(aliases)
+            if len(cnds):
+                candidates.extend(cnds)
+
             # print(f"\tcore.prog.object_find _find_by_alias for {oname} found candidates {candidates}\n")
             # msg = "\n".join([f"<b>No Python documentation found for {oname}</b><br>", "Did you mean: "] + list(map(lambda c: f"<li>{c}</li>", candidates)))
 
@@ -3489,10 +3505,15 @@ def object_find(oname=str, namespaces=None, shell:typing.Optional[InteractiveShe
                     soname = _get_pyobj_name_(sinfo.obj)
                     if oname == soname:
                         # print(f"\t\tfound soname = {soname} for '{subname}'")
-                        return sinfo, ""
-                # else:
-                    # print(f"\t\tfound soname = {soname} as candidate for '{subname}'")
-                    candidates.append((soname, sinfo))
+                        if not with_candidates:
+                            return sinfo, ""
+
+                        if len(foundinfos) == 0:
+                            foudninfos.append(sinfo)
+                        else:
+                            candidate.append((soname, sinfo))
+                    else:
+                        candidates.append((soname, sinfo))
 
                 else:
                     # sinfo NOT found
@@ -3503,10 +3524,16 @@ def object_find(oname=str, namespaces=None, shell:typing.Optional[InteractiveShe
                             soname = _get_pyobj_name_(sinfo.obj)
                             if oname == soname:
                                 # print(f"\t\tfound soname = {soname} with subname '{subname}' in sys modules")
-                                return sinfo, ""
-                        # else:
-                            # print(f"\t\tfound soname = {soname} as candidate for '{subname}' in sys modules; part={part}, rest={rest}")
-                            candidates.append((soname, sinfo))
+                                if not with_candidates:
+                                    return sinfo, ""
+
+                                if len(foundinfos) == 0:
+                                    foundinfos.append(sinfo)
+                                else:
+                                    candidates.append((soname, sinfo))
+                            else:
+                                # print(f"\t\tfound soname = {soname} as candidate for '{subname}' in sys modules; part={part}, rest={rest}")
+                                candidates.append((soname, sinfo))
 
             # now, do a reverse search
             subname = oname
@@ -3565,11 +3592,13 @@ def object_find(oname=str, namespaces=None, shell:typing.Optional[InteractiveShe
         )
 
 
-        if not info.found:
-            # NOTE: 2026-01-05 18:41:55 TODO
-            # now, look through modules in site-packages, which haven't been loaded
-            # TODO !!!
-            pass
+        # NOTE: 2026-01-08 11:23:56
+        # this might not be necessary
+        # # # if not info.found:
+        # # #     # NOTE: 2026-01-05 18:41:55 TODO
+        # # #     # now, look through modules in site-packages, which haven't been loaded
+        # # #     # TODO !!!
+        # # #     pass
 
         # Try to see if it's magic
         if not info.found:
@@ -3581,7 +3610,14 @@ def object_find(oname=str, namespaces=None, shell:typing.Optional[InteractiveShe
                 info.ismagic=ismagic
                 info.isalias=isalias
                 info.parent = None
-                msg = ""
+                if not with_candidates:
+                    return info, ""
+
+                if len(foundinfos) == 0:
+                    foundinfos.append(info)
+                else:
+                    candidates.append((oname, info))
+                # msg = ""
 
         # Last try: special-case some literals like '', [], {}, etc:
         if not info.found and oname_head in ["''",'""','[]','{}','()']:
@@ -3591,7 +3627,14 @@ def object_find(oname=str, namespaces=None, shell:typing.Optional[InteractiveShe
             info.ismagic=False
             info.isalias=False
             info.parent=None
-            msg = ""
+            if not with_candidates:
+                return info, ""
+
+            if len(foundinfos) == 0:
+                foundinfos.append(info)
+            else:
+                candidates.append((oname, info))
+            # msg = ""
 
         if not info.found:
             candidates = utilities.unique(candidates)
@@ -3603,28 +3646,40 @@ def object_find(oname=str, namespaces=None, shell:typing.Optional[InteractiveShe
                 cpname = f"{pname}.{cname}"
                 cok, cparts = shell._find_parts(cpname)
                 ook, oparts = shell._find_parts(oname)
-                
+
                 rcparts = list(reversed(cparts))
                 roparts = list(reversed(oparts))
-                
+
                 sub, sup = (roparts, rcparts) if len(roparts) < len(rcparts) else (rcparts, roparts)
-                
+
                 issub = all(list(map(lambda k: sub[k] == sup[k], range(len(sub)))))
                 if issub:
-                    return cinfo, ""
+                    if not with_candidates:
+                        return cinfo, ""
+                    if len(foundinfos) == 0:
+                        foundinfos.append(cinfo)
+                    else:
+                        candidates.append((cname, cinfo))
                 
             info.obj    = None
             info.parent = None
             info.ismagic=False
             info.isalias=False
             info.namespace=None
-            if len(candidates):
-                get_parent_name = lambda o: f"in '{_get_pyobj_name_(o)}' {type(o).__name__}" if o is not None else f'{_get_pyobj_name_(o)}'
-                msg = "\n".join([f"<b>No Python documentation found for '{oname}'</b><br>", "Did you mean: "] + list(map(lambda c: f"<li>'{c[0]}' {get_parent_name(c[1].parent)}</li>", sorted(list(candidates), key=lambda x: x[0]))))
-            else:
-                msg = f"<b>No Python documentation found for '{oname}'</b><br>"
 
-    return info, msg #, candidates
+
+    rinfo = foundinfos[0] if (len(foundinfos) and isinstance(foundinfos[0], oinspect.OInfo)) else info
+
+    if rinfo.found:
+        candidates = list(filter(lambda c: c[1].obj is not rinfo.obj, candidates))
+
+    if len(candidates):
+        get_parent_name = lambda o: f"in '{_get_pyobj_name_(o)}' {type(o).__name__}" if o is not None else f'{_get_pyobj_name_(o)}'
+        msg = "\n".join([f"<b>No Python documentation found for '{oname}'</b><br>", "Did you mean: "] + list(map(lambda c: f"<li>'{c[0]}' {get_parent_name(c[1].parent)}</li>", sorted(list(candidates), key=lambda x: x[0]))))
+    else:
+        msg = f"<b>No Python documentation found for '{oname}'</b><br>" if len(foundinfos) == 0 else ""
+
+    return rinfo, msg, candidates
 
 
 def walk_packages(path:typing.Optional[typing.Union[str, pathlib.Path,typing.Sequence[str|pathlib.Path]]]=None,

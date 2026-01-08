@@ -304,6 +304,7 @@ def mypylight(text):
         style = "default"
         
     lexer = get_lexer_by_name("python", stripall=True)
+
     return _fix_html_highlight(highlight(text, lexer, HtmlFormatter(noclasses=True, nobackground=True, style=style)))
 
 def make_multicolumn_html(strings:typing.List[str], columns:int=4, fn:typing.Callable = lambda s: s) -> str:
@@ -624,6 +625,7 @@ def _fix_html_highlight(s:str) -> str:
 
 def helpdisp(tempdir:TemporaryDirectory, info:oinspect.OInfo,
              bf:io.StringIO, oname:str="", detail_level=0, omit_sections=(),
+             candidates_msg:typing.Optional[str] = None,
              shell:typing.Optional[InteractiveShell]=None):
     r"""Stand-in for oinspect.Inspector.pinfo.
     Outpout is redirected to a buffered IO stream.
@@ -635,7 +637,7 @@ def helpdisp(tempdir:TemporaryDirectory, info:oinspect.OInfo,
         shell = guiutils.getScipyenConsoleShell()
    
     info_b = hget_info(tempdir, info.obj, oname, info, detail_level, 
-                       omit_sections=omit_sections, shell=shell)
+                       omit_sections=omit_sections, candidates_msg=candidates_msg, shell=shell)
     
     strng = info_b["text/html"]
     # strng = strng.replace("<br>", "").replace("\n", "<br>").replace("<p>", "<br>").replace("<br><br>", "<br>").replace("</h1><br>", "</h1>")
@@ -804,6 +806,11 @@ def hmake_info_unformatted(obj:object, info:oinspect.InfoDict, detail_level:int,
             'text/plain': _format(text),
             'text/html': mypylight(text)
         }
+    def bland_formatter(text) -> Bundle:
+        return {
+            'text/plain': _format(text),
+            'text/html': text
+        }
 
     if info["isalias"]:
         append_field(bundle, "Repr", "string_form", shell=shell)
@@ -819,14 +826,15 @@ def hmake_info_unformatted(obj:object, info:oinspect.InfoDict, detail_level:int,
     elif info['isclass'] or oinspect.is_simple_callable(obj):
         # Functions, methods, classes
         append_field(bundle, "Signature", "definition", py_formatter, shell=shell)
-        append_field(bundle, "Access", "access", py_formatter, shell=shell)
-        append_field(bundle, "Init signature", "init_definition", rst_formatter, shell=shell)
+        # append_field(bundle, "Init signature", "init_definition", rst_formatter, shell=shell)
+        append_field(bundle, "Init signature", "init_definition", py_formatter, shell=shell)
         append_field(bundle, "Docstring", "docstring", rst_formatter, hide_title_in_html=True, shell=shell)
-        
+
         if detail_level > 0 and info["source"]:
             append_field(bundle, "Source", "source", py_formatter, shell=shell)
         else:
-            append_field(bundle, "Init docstring", "init_docstring", rst_formatter, shell=shell)
+            append_field(bundle, "Init docstring", "init_docstring", py_formatter, shell=shell)
+            # append_field(bundle, "Init docstring", "init_docstring", rst_formatter, shell=shell)
             if not oinspect.is_simple_callable(obj):
                 for field in _extra_info_fields:
                     if info[field]:
@@ -835,6 +843,7 @@ def hmake_info_unformatted(obj:object, info:oinspect.InfoDict, detail_level:int,
 
         append_field(bundle, "File", "file", shell=shell)
         append_field(bundle, "Type", "type_name", py_formatter, shell=shell)
+        append_field(bundle, "Access", "access", py_formatter, shell=shell)
         
         if not oinspect.is_simple_callable(obj):
             append_field(bundle, "Subclasses", "subclasses", py_formatter, shell=shell)
@@ -851,7 +860,8 @@ def hmake_info_unformatted(obj:object, info:oinspect.InfoDict, detail_level:int,
             append_field(bundle, "Namespace", "namespace", shell=shell)
 
         append_field(bundle, "Class docstring", "class_docstring", rst_formatter, shell=shell)
-        append_field(bundle, "Init docstring", "init_docstring", rst_formatter, shell=shell)
+        append_field(bundle, "Init docstring", "init_docstring", py_formatter, shell=shell)
+        # append_field(bundle, "Init docstring", "init_docstring", rst_formatter, shell=shell)
         append_field(bundle, "Call docstring", "call_docstring", py_formatter, shell=shell)
         
         append_field(bundle, "Length", "length", shell=shell)
@@ -865,11 +875,18 @@ def hmake_info_unformatted(obj:object, info:oinspect.InfoDict, detail_level:int,
             append_field(bundle, "Docstring", "docstring", rst_formatter, shell=shell)
             for field in _extra_info_fields:
                 if info[field]:
-                    append_field(bundle, field.capitalize(), field, py_formatter if field in ("methods", "descriptors", "functions", "classes", "data", "access") else rst_formatter, shell=shell)
+                    append_field(bundle, field.capitalize(), field, py_formatter if field in ("methods", "descriptors", "functions", "classes", "access", "data") else rst_formatter, shell=shell)
+                    # append_field(bundle, field.capitalize(), field, py_formatter if field in ("methods", "descriptors", "functions", "classes", "access") else bland_formatter if field == "data" else rst_formatter, shell=shell)
+                    # append_field(bundle, field.capitalize(), field, py_formatter if field in ("methods", "descriptors", "functions", "classes", "access") else rst_formatter, shell=shell)
+
+
+    if "candidates" in info:
+        append_field(bundle, "See also", "candidates", rst_formatter, shell=shell)
 
     return bundle
 
 def hinfo(info:oinspect.OInfo, obj:object, oname:str="", detail_level:int = 0, 
+          candidates_msg:typing.Optional[str]=None,
           shell:typing.Optional[InteractiveShell]=None) -> oinspect.InfoDict:
     r"""Augments shell.inspector.info().
     
@@ -884,8 +901,11 @@ def hinfo(info:oinspect.OInfo, obj:object, oname:str="", detail_level:int = 0,
     "descriptors", "functions", "classes", "data".
     
  """
+    # from core import prog
+    from helpsystem import scipyen_doc
     if not isinstance(shell, InteractiveShell):
         shell = guiutils.getScipyenConsoleShell()
+
     # NOTE: 2026-01-02 14:46:25
     # this is the 'basic' oinspect.InfoDict object that the shell's current inspector
     # (by default, an oinspect.Inspector) returns.
@@ -924,11 +944,25 @@ def hinfo(info:oinspect.OInfo, obj:object, oname:str="", detail_level:int = 0,
     _is_method = lambda x: inspect.isfunction(x) or inspect.isroutine(x) or inspect.ismethod(x) or inspect.isgenerator(x)
     
     _is_descriptor = lambda x: inspect.isdatadescriptor(x) or inspect.ismemberdescriptor(x) or inspect.isgetsetdescriptor(x)
-    
-    datas = list(sorted(map(lambda f: f"{f[0]}:{type(f[1]).__name__} = {f[1]}", 
+
+    # _no_angle = lambda s: s.replace("<", "").replace(">", "")
+    # _simple_repr = lambda o: "" if (f"{o}".startswith("<property") and type(o).__name__ == "property") else "(property)" if f"{o}".startswith("<property") else _no_angle(f"{o}")
+
+    _simple_repr = lambda o: "" if type(o).__name__ == "property" else "= " + scipyen_doc.stripid(f"{o}")
+
+    datas = list(sorted(map(lambda f: f"{f[0]} <{type(f[1]).__name__}> {_simple_repr(f[1])}",
                             filter(lambda f: not f[0].startswith("_"), inspect.getmembers_static(obj, _is_data)))))
-    
-    info_dict["data"] = "\n".join(datas) if len(datas) else None
+
+    # datas = list(sorted(map(lambda f: f"{f[0]}: {type(f[1]).__name__} {_simple_repr(f[1])}",
+    #                         filter(lambda f: not f[0].startswith("_"), inspect.getmembers_static(obj, _is_data)))))
+
+    # print(f"helputils.hinfo: datas = {datas}")
+    #
+
+    data_str = "\n".join(datas) if len(datas) else ""
+
+    info_dict["data"] = data_str if len(data_str) else None
+    # shell.user_ns["info_dict"] = info_dict
     
     if inspect.ismodule(obj):
         functions = list(sorted(map(lambda f: f"{_get_name(f[1])}{_get_sig_or_type(f[1])}", 
@@ -946,15 +980,22 @@ def hinfo(info:oinspect.OInfo, obj:object, oname:str="", detail_level:int = 0,
         else:
             accmsg = f"    import {obj.__name__}"
         info_dict["access"] = "\n".join(["Example:", accmsg])
+
     else:
         objparent = info.obj.__module__ if info.parent is None else info.parent
-        info_dict["access"] = "\n".join(["Example:", f"   from {_get_name(objparent)} import {oname}"])
+
+        objname = prog._get_pyobj_name_(info.obj) or _get_name(info.obj)
+
+        info_dict["access"] = "\n".join(["Example:", f"   from {_get_name(objparent)} import {objname}"])
         methods = list(sorted(map(lambda f: f"{_get_name(f[1])}{_get_sig_or_type(f[1])}", 
                              filter(lambda f: not _get_name(f[1]).startswith("_"), inspect.getmembers_static(obj, _is_method)))))
         descriptors = list(sorted(map(lambda f: f"{_get_name(f[1])}{_get_sig_or_type(f[1])}", 
                              filter(lambda f: not _get_name(f[1]).startswith("_"), inspect.getmembers_static(obj, _is_descriptor)))))
         info_dict["methods"] = "\n".join(methods) if len(methods) else None
         info_dict["descriptors"] = "\n".join(descriptors) if len(descriptors) else None
+
+    if isinstance(candidates_msg, str) and len(candidates_msg.strip()):
+        info_dict["candidates"] = candidates_msg
         
     return info_dict
 
@@ -996,11 +1037,15 @@ def hget_info(tempdir:TemporaryDirectory,
               obj:object, oname:str="",
               info:typing.Optional[oinspect.OInfo]=None,
               detail_level:int = 0, omit_sections:typing.Union[typing.List[str], typing.Tuple[str]] = (),
+              candidates_msg:typing.Optional[str]=None,
               shell:typing.Optional[InteractiveShell]=None) -> Bundle:
     r"""Based on shell.inspector._get_info"""
     if not isinstance(shell, InteractiveShell):
         shell = guiutils.getScipyenConsoleShell()
-    info_dict = hinfo(info, obj, oname=oname, detail_level=detail_level, shell=shell)
+
+    info_dict = hinfo(info, obj, oname=oname, detail_level=detail_level,
+                      candidates_msg=candidates_msg, shell=shell)
+
     omit_sections = list(omit_sections)
     
     bundle = hmake_info_unformatted(obj, info_dict,
@@ -1117,11 +1162,25 @@ def hinspect(bf:io.StringIO, oname=str, namespaces=None,
     # print(f"helpsystem.helputils.hinspect(oname={oname}, namespaces={namespaces}, **kw={kw})")
     detail_level = kw.get("detail_level", 0)
     # enable_html = kw.get("enable_html", True)
-    info, msg = prog.object_find(oname, namespaces, shell=shell) # info is an oinspect.OInfo object
+
+    # info, msg = prog.object_find(oname, namespaces, shell=shell) # info is an oinspect.OInfo object
+    info, msg, candidates = prog.object_find(oname, namespaces, shell=shell, with_candidates=True) # info is an oinspect.OInfo object
+
+    # print(f"helputils.hinspect: candidates = {candidates}")
+
+    candidates_msg = None
+    if len(candidates):
+        rstfmt = ReSTFormatter()
+        get_parent_name = lambda o: f"in '{prog._get_pyobj_name_(o)}' {type(o).__name__}" if o is not None else f'{prog._get_pyobj_name_(o)}'
+
+        cndlst = "\n".join(list(map(lambda c: f"• {c[0]} {get_parent_name(c[1].parent)}", sorted(list(candidates), key=lambda x: x[0]))))
+        candidates_msg = rstfmt.render_code(cndlst)
+        # candidates_msg = "\n".join([rstfmt.render_title(f"No Python documentation found for '{oname}'"),
+        #                        "Did you mean: ", rstfmt.render_code(cndlst)])
     # print(f"helpsystem.helputils.hinspect: info = {info}, msg={msg}")
     
     if info.found or hasattr(info.parent, oinspect.HOOK_NAME):
-        helpdisp(tempdir, info, bf, oname, detail_level, shell=shell)#, enable_html)
+        helpdisp(tempdir, info, bf, oname, detail_level, candidates_msg=candidates_msg, shell=shell)#, enable_html)
     else:
         bf.write(msg)
         
@@ -1225,7 +1284,7 @@ def format_python_help_output(data:PythonHelpDict, formatter=None,
 
     _format = lambda t: shell.inspector.format(t)
     
-    def rst_formatter(text) -> Bundle:
+    def pyrst_formatter(text) -> Bundle:
         return {
             'text/plain': _format(text),
             'text/html': mypylight(text)
@@ -1237,7 +1296,7 @@ def format_python_help_output(data:PythonHelpDict, formatter=None,
             'text/html': rst_to_html_with_highlighting(text)
             }
     
-    def append_field(bundle:UnformattedBundle, title:str, key:str, hd:PythonHelpDict, formatter):
+    def pyappend_field(bundle:UnformattedBundle, title:str, key:str, hd:PythonHelpDict, formatter):
         field = hd[key]
         if field is not None:
             formatted_field = shell.inspector._mime_format(field, formatter)
@@ -1253,10 +1312,10 @@ def format_python_help_output(data:PythonHelpDict, formatter=None,
         titlekey = titlekey[0]
         title = titlekey #if titlekey not in data else ""
         try:
-            append_field(bundle, title, titlekey, data, pyhelp_formatter)
+            pyappend_field(bundle, title, titlekey, data, pyhelp_formatter)
         except:
             # traceback.print_exc()
-            append_field(bundle, title, titlekey, data, format_screen)
+            pyappend_field(bundle, title, titlekey, data, format_screen)
                 
     else:
         titlekey = ""
@@ -1264,8 +1323,8 @@ def format_python_help_output(data:PythonHelpDict, formatter=None,
     for key in data:
         if key != titlekey:
             if data[key]:
-                fmt = rst_formatter if key in ("data", "classes", "functions") else formatter
-                append_field(bundle, key.capitalize(), key, data, fmt)
+                fmt = pyrst_formatter if key in ("data", "classes", "functions") else formatter
+                pyappend_field(bundle, key.capitalize(), key, data, fmt)
         
     return bundle
     
@@ -1373,4 +1432,92 @@ detail_level: int, 0 or 1, default is 0
             reformat = True
         
     return ret, reformat
+
+class ReSTFormatter():
+    _section_levels = {0:"=", 1:"-", 2:"~", 3:"_", 4:"#"}
+
+    def bold(self, text):
+        return f"**{text}**"
+
+    def indent(self, text, prefix='    '):
+        """Indent text by prepending a given prefix to each line."""
+        if not text: return ''
+        lines = [(prefix + line).rstrip() for line in text.split('\n')]
+        return '\n'.join(lines)
+
+    def render_code(self, text):
+        return "\n".join(["::", "", self.indent(text), "", ""])
+
+    def section(self, title, contents, level:int=0):
+        clean_contents = contents.rstrip()
+        if level < 0:
+            level = 0
+        elif level > 4:
+            level = 4
+        adornment = "".join([self._section_levels[level]]*len(title))
+        return "\n".join([title, adornment, clean_contents, ""])
+
+    def render_title(self, title:str) -> str:
+        if len(title):
+            adornment = "".join([self._section_levels[0]]*len(title))
+            return "\n".join([adornment, title, adornment])
+
+        return title
+
+    def render_synopsis(self, txt:str):
+        return "\n".join([self.section("Synopsis:", txt, 0)])
+
+    def render_latex(self, txt:str, imagedir:typing.Union[TemporaryDirectory, pathlib.Path, str]) -> str:
+        r"""Replace latex mathematical expressions with ReST image links"""
+        from core import strutils
+
+        if isinstance(imagedir, TemporaryDirectory):
+            dest = imagedir.name
+
+        elif isinstance(imagedir, pathlib.Path):
+            if imagedir.is_dir():
+                dest = imagedir.as_posix()
+            else:
+                raise ValueError(f"{imagedir} is not an accessible directory")
+
+        elif isinstance(imagedir, str):
+            if os.path.isdir(imagedir):
+                dest = imagedir
+            else:
+                raise ValueError(f"{imagedir} does not exist")
+        else:
+            raise TypeError(f"Bad parameter 'imagedir': {type(imagedir).__name__}")
+
+        # Combined regular expression to capture all types of LaTeX
+        latex_combined_pattern = r'(\$\$([^$]*)\$\$|\\begin\{[^\}]+\}.*?\\end\{[^\}]+\}|(\$[^\$]*\$|\\[a-zA-Z]+(?:\{[^\}]*\})?))'
+
+        # Finding all matches
+        matches = re.findall(latex_combined_pattern, txt, re.DOTALL)
+
+        # return list(map(lambda m: strutils.render_latex(m[0], out="base64")))
+        # self.imagesdir.cleanup()
+
+        for k, match in enumerate(matches):
+            # match[0] contains the complete matched substring
+            ltx = match[0].strip()
+            # print(f"ltx = {ltx}")
+            ll = ltx.replace("\\\\", "\\")
+            pngdata = strutils.render_latex(ll, out="bytes", wrap=ll.startswith("$$"))
+            # print(f"pngdata = {pngdata}")
+            filepath = pathlib.Path(dest) / f"png{k}.png"
+            with open(filepath.as_posix(), "wb") as pngfile:
+                pngfile.write(pngdata)
+
+            snippet = f"\n .. image:: {filepath.as_posix()}\n"
+            # snippet = f" .. image:: {filepath.as_posix()}\n    :alt: {ll}"
+
+            if ll.startswith("$$"):
+                snippet = "\n\n" + snippet + "\n\n"
+
+            # else:
+            #     snippet.replace(".. image:: ", ".. |eq{k}| image:: ")
+
+            txt = txt.replace(ltx, snippet)
+
+        return txt
 

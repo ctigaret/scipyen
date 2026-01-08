@@ -176,6 +176,7 @@ class _PythonHelpThread_(QtCore.QThread):
                     out.append("</body>")
                     out.append("</html>")
                     contents = "\n".join(out)
+                    # self.shell.user_ns["help_contents"] = contents
                 else:
                     contents = None
                     qreply["success"] = False
