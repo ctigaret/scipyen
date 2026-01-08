@@ -960,11 +960,11 @@ class ScipyenFrameViewer(ScipyenViewer):
         the slice view is taken the array axis designated as "frame axis".
     
     Use SignalViewer to display:
-        one neo.Segment out of a sequence of neo.Segments, possibly contained in a neo.Block
-        
-        one neo.BaseSignal (or its derivative) out of a stand-alone collection of signals
-        
-        one 1D array view (slice) of a 2D array (e.g. numpy ndarray or vigra.VigraArray)
+    * one neo.Segment out of a sequence of neo.Segments, possibly contained in a neo.Block
+    
+    * one neo.BaseSignal (or its derivative) out of a stand-alone collection of signals
+    
+    * one 1D array view (slice) of a 2D array (e.g. numpy ndarray or vigra.VigraArray)
         
     ATTENTION: Synchronizing frame navigation across instances of ScipyenFrameViewer.
     
@@ -994,7 +994,7 @@ class ScipyenFrameViewer(ScipyenViewer):
     In Scipyen code tree:
         ImageViewer, SignalViewer
 
-    In scipyen_plugins (outside main Scipyehn code tree):
+    In scipyen_plugins (outside main Scipyen code tree):
         LSCaTWindow, EventAnalysis, LTPAnalysis, APTrains.
         (NOTE: Some of these still need to be finalised/written)
 
@@ -1014,10 +1014,10 @@ class ScipyenFrameViewer(ScipyenViewer):
         → indicates function call):
         
         self.__int__() → super().__init__() → self._configureUI_()
-                                ↓
-                         super().__init__() → self.loadSettings()
-                                ↓
-                         super().__init__() → self.setData → self._set_data_()
+        ↓
+        super().__init__() → self.loadSettings()
+        ↓
+        super().__init__() → self.setData → self._set_data_()
         
         The above call sequence mandates that instance variables of the derived
         class be assigned default values BEFORE calling super().__init__()
