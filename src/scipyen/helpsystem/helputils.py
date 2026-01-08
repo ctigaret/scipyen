@@ -141,21 +141,22 @@ PYTHON_HELP_SECTIONS = ["NAME",
 
 PythonHelpDict = typing.TypedDict("PythonHelpDict", dict(map(lambda x: (x.lower(), typing.Optional[typing.Union[str, typing.List[str]]]), PYTHON_HELP_SECTIONS)))
 
-class HyperBundle(Bundle):
-    def _ipython_display_(self):
-        from core import strutils
-        shell = guiutils.getScipyenConsoleShell()
-        shell.display_pub.publish(data=self["text/html"])
-        # if isinstance(f.expression, sympy.Basic) or (isinstance(f.expression, str) and strutils.is_latex(f.expression)):
-        #     try:
-        #         img = render_sympy(f.expression, out="bytes") if isinstance(f.expression, sympy.Basic) else render_latex(f.expression, out="bytes")
-        #     except:
-        #         img = None
-        #     if isinstance(img, bytes):
-        #         shell.display_pub.publish(data={"text/plain": f"<{type(f).__name__} {f.__module__}.{f.__name__}{inspect.signature(f)}> at {hex(id(f))}\n\nImplements:\n"})
-        #         shell.display_pub.publish(data={"image/png": img})
-        #         return
-        # shell.display_pub.publish(data={"text/plain": f"<{type(f).__name__} {f.__module__}.{f.__name__}{inspect.signature(f)}> at {hex(id(f))}\n\n"})
+# NOTE: 2026-01-08 23:28:06 QtConsole does NOT render HTML objects!
+# class HyperBundle(Bundle):
+#     def _ipython_display_(self):
+#         from core import strutils
+#         shell = guiutils.getScipyenConsoleShell()
+#         shell.display_pub.publish(data=self["text/html"])
+#         # if isinstance(f.expression, sympy.Basic) or (isinstance(f.expression, str) and strutils.is_latex(f.expression)):
+#         #     try:
+#         #         img = render_sympy(f.expression, out="bytes") if isinstance(f.expression, sympy.Basic) else render_latex(f.expression, out="bytes")
+#         #     except:
+#         #         img = None
+#         #     if isinstance(img, bytes):
+#         #         shell.display_pub.publish(data={"text/plain": f"<{type(f).__name__} {f.__module__}.{f.__name__}{inspect.signature(f)}> at {hex(id(f))}\n\nImplements:\n"})
+#         #         shell.display_pub.publish(data={"image/png": img})
+#         #         return
+#         # shell.display_pub.publish(data={"text/plain": f"<{type(f).__name__} {f.__module__}.{f.__name__}{inspect.signature(f)}> at {hex(id(f))}\n\n"})
     
 
 class ReSTFormatter():
@@ -909,17 +910,17 @@ def hmake_info_unformatted(obj:object, info:oinspect.InfoDict, detail_level:int,
         
     _format = lambda t: shell.inspector.format(t)
 
-    def rst_formatter(text) -> HyperBundle:
+    def rst_formatter(text) -> Bundle:
         return {
             'text/plain': _format(text),
             'text/html': rst_to_html_with_highlighting(latex_formatter(text))
         }
-    def py_formatter(text) -> HyperBundle:
+    def py_formatter(text) -> Bundle:
         return {
             'text/plain': _format(text),
             'text/html': mypylight(text)
         }
-    def bland_formatter(text) -> HyperBundle:
+    def bland_formatter(text) -> Bundle:
         return {
             'text/plain': _format(text),
             'text/html': text
@@ -1167,7 +1168,7 @@ def hget_info(imgdir:TemporaryDirectory,
               info:typing.Optional[oinspect.OInfo]=None,
               detail_level:int = 0, omit_sections:typing.Union[typing.List[str], typing.Tuple[str]] = (),
               candidates_msg:typing.Optional[str]=None,
-              shell:typing.Optional[InteractiveShell]=None) -> HyperBundle:
+              shell:typing.Optional[InteractiveShell]=None) -> Bundle:
     r"""Emulates shell.inspector._get_info.
 Returns:
 --------
@@ -1221,10 +1222,10 @@ A formatted (complete) mime bundle with two fields:
     #
     # ### END   NOTE: 2026-01-03 16:27:39 I don't think this is necessary
                 
-    ret = HyperBundle()
-    ret.update(shell.inspector.format_mime(bundle))
-    return ret
-    # return shell.inspector.format_mime(bundle)
+    # ret = HyperBundle()
+    # ret.update(shell.inspector.format_mime(bundle))
+    # return ret
+    return shell.inspector.format_mime(bundle)
     
 def hpinfo(cmd, namespaces = None, detail_level:int=0, imgdir=None,
            # to_console:bool=False,
@@ -1419,13 +1420,13 @@ def format_python_help_output(data:PythonHelpDict, formatter=None,
 
     _format = lambda t: shell.inspector.format(t)
     
-    def pyrst_formatter(text) -> HyperBundle:
+    def pyrst_formatter(text) -> Bundle:
         return {
             'text/plain': _format(text),
             'text/html': mypylight(text)
         }
     
-    def pyhelp_formatter(text) -> HyperBundle:
+    def pyhelp_formatter(text) -> Bundle:
         return {
             'text/plain': _format(text),
             'text/html': rst_to_html_with_highlighting(text)
