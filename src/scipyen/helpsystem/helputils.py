@@ -1012,6 +1012,7 @@ def hinfo(info:oinspect.OInfo, obj:object, oname:str="", detail_level:int = 0,
  """
     # from core import prog
     from helpsystem import scipyen_doc
+    from core.utilities import unique
     if not isinstance(shell, InteractiveShell):
         shell = guiutils.getScipyenConsoleShell()
 
@@ -1019,6 +1020,16 @@ def hinfo(info:oinspect.OInfo, obj:object, oname:str="", detail_level:int = 0,
     # this is the 'basic' oinspect.InfoDict object that the shell's current inspector
     # (by default, an oinspect.Inspector) returns.
     info_dict = shell.inspector.info(obj, oname=oname, info=info, detail_level=detail_level)
+    
+    # NOTE: 2026-01-08 23:45:18
+    # also correct for duplicate subclass names returned by shell.inspector
+    subclasses = info_dict.get("subclasses", "")
+    if len(subclasses):
+        subclassnames = sorted(unique(list(map(lambda s: s.__name__, type.__subclasses__(obj)))))
+        if len(subclassnames) < 10:
+            info_dict["subclasses"] = ", ".join(subclassnames)
+        else:
+            info_dict["subclasses"] = ", ".join(subclassnames[:10] + ["..."])
     
     # NOTE: 2026-01-02 14:47:36
     # adding the extra fields, to be populated further below

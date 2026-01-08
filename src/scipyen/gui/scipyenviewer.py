@@ -989,106 +989,98 @@ class ScipyenFrameViewer(ScipyenViewer):
     Navigating across frames in one viewer is propagated to all viewers that
     are synchronized with it.
     
-    Derived classes:
-    ----------------
-    In Scipyen code tree:
-        ImageViewer, SignalViewer
-
-    In scipyen_plugins (outside main Scipyen code tree):
-        LSCaTWindow, EventAnalysis, LTPAnalysis, APTrains.
-        (NOTE: Some of these still need to be finalised/written)
-
-    ATTENTION: When deriving a viewer window type from ScipyenFrameViewer:
-
-    • in the __init__ method of the derived type call `super().__init__(...)` in  
-        order to create an instance of the superclass ScipyenFrameViewer.
-        
-        The superclass __init__ method calls two methods which have to be 
-        implemented specifically in the derived viewer class:
-        
-        ∘ `self._configureUI_` 
-
-        ∘ `self._set_data_`
-        
-        The call order is as follows (↓ indicates temporal succession,
-        → indicates function call):
-        
-        self.__int__() → super().__init__() → self._configureUI_()
-        ↓
-        super().__init__() → self.loadSettings()
-        ↓
-        super().__init__() → self.setData → self._set_data_()
-        
-        The above call sequence mandates that instance variables of the derived
-        class be assigned default values BEFORE calling super().__init__()
-
-    • define (implement) `self._set_data_()` method:
-        This is called by self.setData (defined in ScipoyenViewer superclass) 
-        and will parse the data to be displayed in order to set up properties 
-        of the various GUI widgets in the derived class.
-        
-        If specific customizations are rewuired by the derived viewer you may
-        call super().__init__() with `data` parameter set to None, then call 
-        `self._set_data_` manually in the subclass __init__, passing custom 
-        parameters to it. This ensures self._set_data_ is called AFTER the call
-        to self._configureUI_
-        
-        NOTE: `self._set_data_` can be called either directly or indirectly by 
-        calling `self.setData` method inherited all the way from ScipyenViewer.
-        
-        The self._set_data_ method MUST:
-        ∘ assign the "data" object to self._data_ property (inherited all the
-            way from ScipyenViewer)
-        
-        ∘ assign values to the following instance attributes inherited from 
-            ScipyenFrameViewer:
-            □ self._data_var_name_
-            □ self._data_frames_
-            □ self._frameIndex_
-            □ self._number_of_frames_
-        
-        ∘ assign values to instance attributes of the derived class, containing
-            properties of GUI widgets of the derived class.
-        
-        ∘ set the properties of the GUI widgets according to the instance 
-            attributes listed above
-        
-    • implement widgets for frame navigation; you need:
-        
-        ∘ EITHER one QSpinBox instance named '_frames_spinner_' AND 
-                 one QSlider  instance named '_frames_slider_'
-        
-        ∘ OR an instance of a SpinBoxSlider, named '_frames_spinBoxSlider_'
-        
-        These names are expected to be there among the instance attributes of 
-        the class derived from ScipyenFrameViewer.
-        
-    • If the derived class managed several instances of ScipyenFrameViewer (e.g.
-        several image and/or signal viewer instances that display one 'frame' at a
-        time from the same number of 'frames') then, in __init__ make sure you
-        call self.linkToViewers(...)
-
-    • define (implement) `self._configureUI_()`, but do NOT call it directly:
-        ∘ this method is called by the ScipyenFrameViewer __init__ (see above).
-
-        ∘ the method instantiates the GUI widgets and connects their signals to 
-            appropriate slots (Qt framework)
-        
-            WARNING: Make sure these slots are defined (implemented) in the 
-                derived class, unless they are already inherited (and NOT defined
-                as abstract methods) from the ScipyenFrameViewer or ScipyenViewer
-                superclasses.
-
-        ∘ ATTENTION: in classes that use UI forms generated with Qt 5 Designer, 
-            this method MUST call `self.setupUi(self)` first thing, in order to
-            instantiate all the widgets declared in the UI form.
-        
-        ∘ CAUTION: the widgets properties may require certain class or instance
-            attributes having default values  - make sure these conditions are 
-            met.
-        
 
     """
+    
+#     ATTENTION: When deriving a viewer window type from ScipyenFrameViewer:
+# 
+#     • in the __init__ method of the derived type call `super().__init__(...)` in  
+#         order to create an instance of the superclass ScipyenFrameViewer.
+#         
+#         The superclass __init__ method calls two methods which have to be 
+#         implemented specifically in the derived viewer class:
+#         
+#         ∘ `self._configureUI_` 
+# 
+#         ∘ `self._set_data_`
+#         
+#         The call order is as follows (↓ indicates temporal succession,
+#         → indicates function call):
+#         
+#         self.__int__() → super().__init__() → self._configureUI_()
+#         ↓
+#         super().__init__() → self.loadSettings()
+#         ↓
+#         super().__init__() → self.setData → self._set_data_()
+#         
+#         The above call sequence mandates that instance variables of the derived
+#         class be assigned default values BEFORE calling super().__init__()
+# 
+#     • define (implement) `self._set_data_()` method:
+#         This is called by self.setData (defined in ScipoyenViewer superclass) 
+#         and will parse the data to be displayed in order to set up properties 
+#         of the various GUI widgets in the derived class.
+#         
+#         If specific customizations are rewuired by the derived viewer you may
+#         call super().__init__() with `data` parameter set to None, then call 
+#         `self._set_data_` manually in the subclass __init__, passing custom 
+#         parameters to it. This ensures self._set_data_ is called AFTER the call
+#         to self._configureUI_
+#         
+#         NOTE: `self._set_data_` can be called either directly or indirectly by 
+#         calling `self.setData` method inherited all the way from ScipyenViewer.
+#         
+#         The self._set_data_ method MUST:
+#         ∘ assign the "data" object to self._data_ property (inherited all the
+#             way from ScipyenViewer)
+#         
+#         ∘ assign values to the following instance attributes inherited from 
+#             ScipyenFrameViewer:
+#             □ self._data_var_name_
+#             □ self._data_frames_
+#             □ self._frameIndex_
+#             □ self._number_of_frames_
+#         
+#         ∘ assign values to instance attributes of the derived class, containing
+#             properties of GUI widgets of the derived class.
+#         
+#         ∘ set the properties of the GUI widgets according to the instance 
+#             attributes listed above
+#         
+#     • implement widgets for frame navigation; you need:
+#         
+#         ∘ EITHER one QSpinBox instance named '_frames_spinner_' AND 
+#                  one QSlider  instance named '_frames_slider_'
+#         
+#         ∘ OR an instance of a SpinBoxSlider, named '_frames_spinBoxSlider_'
+#         
+#         These names are expected to be there among the instance attributes of 
+#         the class derived from ScipyenFrameViewer.
+#         
+#     • If the derived class managed several instances of ScipyenFrameViewer (e.g.
+#         several image and/or signal viewer instances that display one 'frame' at a
+#         time from the same number of 'frames') then, in __init__ make sure you
+#         call self.linkToViewers(...)
+# 
+#     • define (implement) `self._configureUI_()`, but do NOT call it directly:
+#         ∘ this method is called by the ScipyenFrameViewer __init__ (see above).
+# 
+#         ∘ the method instantiates the GUI widgets and connects their signals to 
+#             appropriate slots (Qt framework)
+#         
+#             WARNING: Make sure these slots are defined (implemented) in the 
+#                 derived class, unless they are already inherited (and NOT defined
+#                 as abstract methods) from the ScipyenFrameViewer or ScipyenViewer
+#                 superclasses.
+# 
+#         ∘ ATTENTION: in classes that use UI forms generated with Qt 5 Designer, 
+#             this method MUST call `self.setupUi(self)` first thing, in order to
+#             instantiate all the widgets declared in the UI form.
+#         
+#         ∘ CAUTION: the widgets properties may require certain class or instance
+#             attributes having default values  - make sure these conditions are 
+#             met.
+#         
     
     # signal emitted when the viewer displays a data frame; value:int = the
     # index of the frame in the data
