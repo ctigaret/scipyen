@@ -2745,7 +2745,7 @@ def doc(tempdir:tempfile.TemporaryDirectory, output, thing, title='Python Librar
 
 # class _ModuleScannerThread(QtCore.QThread)
 
-class ModuleScanner(QtCore.QThread):
+class ModuleScanner:#(QtCore.QThread):
     """Modified version of pydoc.ModuleScanner - An interruptible scanner that searches module synopses.
     Do NOT use yet!
 """
@@ -2755,12 +2755,12 @@ class ModuleScanner(QtCore.QThread):
                  onerror:typing.Optional[types.FunctionType] = None,
                  parent:typing.Optional[QtCore.QObject]=None,):
 
-        from gui import guiutils #, pictgui
-        super().__init__(parent)
-        self.mainWindow = guiutils.getScipyenMainWindow()
-        self.signals = pitgui.ProgressWorkerSignals()
+        # from gui import guiutils #, pictgui
+        # super().__init__(parent)
+        # self.mainWindow = guiutils.getScipyenMainWindow()
+        # self.signals = pictgui.ProgressWorkerSignals()
         self.callback = callback
-        self.key = key
+        # self.key = key
         self.restrict = restrict
         self.completer = completer
         self.onerror = onerror
@@ -2782,11 +2782,12 @@ class ModuleScanner(QtCore.QThread):
 
     # def run(self, callback, key=None, restrict:bool=False,
     #         completer=None, onerror=None):
-    def run(self):
+    def run(self, key=None):
+        from core.sysutils import SuperLazyLoader
         # NOTE: 2026-01-04 22:31:45
         # this is redundant — there's already a getMainScipyenWindow function in core.workspacefunctions
-        if self.key:
-            key = self.key.lower()
+        if key:
+            key = key.lower()
         self.quit = False
         seen = {}
 
@@ -2804,10 +2805,10 @@ class ModuleScanner(QtCore.QThread):
                             self.callback(None, modname, desc)
 
             
-        for importer, modname, ispkg in package_walker(onerror=self.onerror):
+        for importer, modname, ispkg in self.package_walker(onerror=self.onerror):
             if self.quit:
                 break
-
+            
             if key is None:
                 self.callback(None, modname, '')
             else:
@@ -2816,31 +2817,40 @@ class ModuleScanner(QtCore.QThread):
                 except SyntaxError:
                     # raised by tests for bad coding cookies or BOM
                     continue
-                loader = spec.loader
-                if hasattr(loader, 'get_source'):
-                    try:
+                # loader = importlib.util.LazyLoader(spec.loader)
+                loader = SuperLazyLoader(spec.loader)
+                spec.loader = loader
+                try:
+                    if hasattr(loader, 'get_source'):
                         source = loader.get_source(modname)
-                    except Exception:
-                        if self.onerror:
-                            self.onerror(modname)
-                        continue
-                    desc = source_synopsis(io.StringIO(source)) or ''
-                    if hasattr(loader, 'get_filename'):
-                        path = loader.get_filename(modname)
+                        desc = source_synopsis(io.StringIO(source)) or ''
+                        if hasattr(loader, 'get_filename'):
+                            path = loader.get_filename(modname)
+                        else:
+                            path = None
+                        # try:
+                        # except Exception:
+                        #     if self.onerror:
+                        #         self.onerror(modname)
+                        #     continue
                     else:
-                        path = None
-                else:
-                    try:
-                        module = importlib._bootstrap._load(spec)
-                    except ImportError:
-                        if self.onerror:
-                            self.onerror(modname)
-                        continue
-                    desc = module.__doc__.splitlines()[0] if module.__doc__ else ''
-                    path = getattr(module,'__file__',None)
-                name = modname + ' - ' + desc
-                if name.lower().find(key) >= 0:
-                    self.callback(path, modname, desc)
+                        # module = importlib._bootstrap._load(spec)
+                        module = importlib.util.module_from_spec(spec)
+                        loader.exec_module(module)
+                        desc = module.__doc__.splitlines()[0] if module.__doc__ else ''
+                        path = getattr(module,'__file__',None)
+                        # try:
+                        # except:# ImportError:
+                        #     if self.onerror:
+                        #         self.onerror(modname)
+                        #     continue
+                    name = modname + ' - ' + desc
+                    if name.lower().find(key) >= 0:
+                        self.callback(path, modname, desc)
+                except:# ImportError:
+                    if self.onerror:
+                        self.onerror(modname)
+                    continue
 
         if self.completer:
             self.completer()
@@ -2859,7 +2869,7 @@ def apropos(key:str, restrict:bool=False) -> tuple:
     
     with warnings.catch_warnings():
         warnings.filterwarnings('ignore') # ignore problems during import
-        ModuleScanner().run(callback, key, restrict = restrict, onerror=onerror)
+        ModuleScanner(callback, restrict = restrict, onerror=onerror).run(key)
         
     return found, errmods
 

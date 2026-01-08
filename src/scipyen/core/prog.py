@@ -3153,7 +3153,7 @@ def _(where:types.NoneType, n:str) -> object:
                     if m:
                         nl_modules.append(m)
                 except:
-                    traceback_print_exc()
+                    traceback.print_exc()
                     
         else:
             for mi in nlmodinfos:
@@ -3398,8 +3398,11 @@ def object_find(oname=str, namespaces=None, shell:typing.Optional[InteractiveShe
     from core import strutils, utilities
     from gui import guiutils
     
+    
     if not isinstance(shell, InteractiveShell):
         shell = guiutils.getScipyenConsoleShell()
+        
+    # foundinfos = list()
 
     candidates = list()
 
@@ -3412,7 +3415,6 @@ def object_find(oname=str, namespaces=None, shell:typing.Optional[InteractiveShe
     info = shell._object_find(oname, namespaces) # this is an oinspect.OInfo object — a dataclass!
     if info.found:
         # print(f"core.prog.object_find info for {oname} found by shell._object_find; DONE!")
-        msg = ""
         return info, ""
     
     if not info.found:
@@ -3422,16 +3424,27 @@ def object_find(oname=str, namespaces=None, shell:typing.Optional[InteractiveShe
         # 0) try pkgutil
         try:
             obj = pkgutil.resolve_name(oname)
+            oinfo = oinspect.OInfo(obj=obj, found=True, ismagic=False, isalias=False, 
+                                   namespace=None, parent=None)
+            parentinfo = oinspect.OInfo(obj=None, found=False, ismagic=False, isalias=False, 
+                                   namespace=None, parent=None)
+            objname = _get_pyobj_name_(obj)
             if isinstance(obj, (types.FunctionType, types.MethodType, type)):
-                oinfo = oinspect.OInfo(obj=obj, found=True)
                 parentinfo, _ = object_find(obj.__module__)
-                if parentinfo.found:
-                    oinfo.parent = parentinfo.obj
-                    oinfo.namespace = f"module {oinfo.parent.__name__}"
+            
+            elif isinstance(obj, types.ModuleType):
+                pok, pp = shell._find_parts(objname)
+                if len(pp)>1:
+                    parentinfo, _ = object_find(".".join([pp[:-1]]))
                     
-                return oinfo, ""
+            if parentinfo.found:
+                oinfo.parent = parentinfo.obj
+                oinfo.namespace = f"module {oinfo.parent.__name__}"
+                
+            return oinfo, ""
                 
         except:
+            # traceback.print_exc()
             pass
         
         #
@@ -3616,6 +3629,7 @@ def object_find(oname=str, namespaces=None, shell:typing.Optional[InteractiveShe
 
 def walk_packages(path:typing.Optional[typing.Union[str, pathlib.Path,typing.Sequence[str|pathlib.Path]]]=None,
                   prefix=''):
+    # import pkgutil
     def seen(p, m={}):
         if p in m:
             return True
