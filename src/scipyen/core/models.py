@@ -497,15 +497,16 @@ def biexponential(x:typing.Union[np.ndarray, Real],
                   λ1:typing.Optional[Real] = None,
                   ) -> np.ndarray | float:
     r"""Sum of two exponentials with shift and bias (multiplicative and additive)
-    y = α + β0 × exp(λ0 × (x-x₀)) + β1 × exp(λ1 × (x-x₀))
     
-    Parameters:
-    ===========
-    x: independent variable
-    α: additive bias ("offset")
-    β0, β1: multiplicative bias for each exponential
-    λ0, λ1: exponential constants
-    x0: shift (delay, or onset)
+    $$y(x) = \\alpha + \\beta_{0} \\times exp(\\lambda_{0} \\times (x-x_{0})) + \\beta_{1} \\times exp(\\lambda_{1} \\times (x-x_{0}))$$
+    
+Parameters:
+===========
+:x: independent variable
+:α: additive bias ("offset")
+:β0, β1: multiplicative bias for each exponential
+:λ0, λ1: exponential constants
+:x0: shift (delay, or onset)
     
 """
     α, β0, β1, λ0, λ1, x0 = check_unpack_model_coeffs(6, α, β0, β1, λ0, λ1, x0)
@@ -980,16 +981,25 @@ the mathematical Alpha Function (https://mathworld.wolfram.com/AlphaFunction.htm
         return y 
 
 @modelfunction(coefficients = ("i", "n", "b"),
-               title="NonStationaryFluctuationAnalysis")
+               title="NonStationaryFluctuationAnalysis",
+               expression = r"$y(x) = x \times i - x^{2}/N + b$")
 def nsfa(x:np.ndarray | Real, i:Real|pq.Quantity|typing.Sequence[typing.Union[Real, pq.Quantity]], /, 
          n:typing.Optional[typing.Union[Real, pq.Quantity]] = None, 
          b:typing.Optional[typing.Union[Real, pq.Quantity]] = None) -> np.ndarray | float:
-    r"""
-        y = x * i - x²/N + b
+    r"""Non-stationary fluctuation model
     
-    Parameters: i, N, b: unitary current (pA), number of channels, background current variance (pA²))
+Implements
+    $y(x) = x \\times i - \\frac{x^{2}}{N} + b$
     
-WARNING: do not pass quantities for the parameters, yet; just use floats
+Parameters: 
+-----------
+
+:i: unitary current (pA),
+:N: number of channels,
+:b: background current variance (pA²)
+    
+.. warning:: 
+    Do not pass quantities for the parameters, yet; just use floats
 """
     i, n, b = check_unpack_model_coeffs(3, i, n, b)
     x = check_independent_variable(x)
@@ -2016,20 +2026,20 @@ p: the parameters in the specific order: (x₀, y₀, x₁, y₁)
     
     return y
     
-def model_parameter_names(func) -> list[str]:
-    r"""WARNING: on its way to become DEPRECATED 
-    Model functions should be defined using the @modelfunction decorator
-    (see function modelfunction(…) in this module)
-    """
-    sig_dict = signature_as_dict(func)
-    names = list()
-    if len(sig_dict["positional"]) > 1:
-        names.extend(list(sig_dict["positional"].keys())[1:])
-        
-    if len(sig_dict["named"]):
-        names.extend(list(sig_dict["named"]))
-        
-    return names
+# def model_parameter_names(func) -> list[str]:
+#     r"""WARNING: on its way to become DEPRECATED 
+#     Model functions should be defined using the @modelfunction decorator
+#     (see function modelfunction(…) in this module)
+#     """
+#     sig_dict = signature_as_dict(func)
+#     names = list()
+#     if len(sig_dict["positional"]) > 1:
+#         names.extend(list(sig_dict["positional"].keys())[1:])
+#         
+#     if len(sig_dict["named"]):
+#         names.extend(list(sig_dict["named"]))
+#         
+#     return names
         
 
 def is_modelfunction(func:typing.Callable):

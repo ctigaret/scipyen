@@ -3416,15 +3416,11 @@ def object_find(oname=str, namespaces=None,
     msg = f"<b>No Python documentation found for '{oname}'</b><br>"
     info = shell._object_find(oname, namespaces) # this is an oinspect.OInfo object — a dataclass!
     if info.found:
-        # print(f"core.prog.object_find info for {oname} found by shell._object_find; DONE!")
         if not with_candidates:
             return info, ""
         foundinfos.append(info)
     
     if not info.found:
-        # print(f"core.prog.object_find info for {oname} NOT found by shell._object_find\n")
-        # this might happen when either:
-        
         # 0) try pkgutil
         try:
             obj = pkgutil.resolve_name(oname)
@@ -3460,12 +3456,10 @@ def object_find(oname=str, namespaces=None,
         #
         # 1) the object might exist in the namespaces, but has been imported under an alias
         aliases, cnds = _find_by_alias(oname, namespaces, shell=shell)
-        # print(f"\tcore.prog.object_find _find_by_alias for {oname} ↦ shell._object_find found aliases = {aliases}, candidates = {cnds} ")
         if len(aliases) == 1:
             aname = aliases[0].name
             info = shell._object_find(aname, namespaces)
             if info.found:
-                # print(f"\tcore.prog.object_find _find_by_alias for {oname} found by shell._object_find as {aname} alias; DONE!")
                 if not with_candidates:
                     return info, ""
                 if len(foundinfos) == 0:
@@ -3477,10 +3471,6 @@ def object_find(oname=str, namespaces=None,
             if len(cnds):
                 candidates.extend(cnds)
 
-            # print(f"\tcore.prog.object_find _find_by_alias for {oname} found candidates {candidates}\n")
-            # msg = "\n".join([f"<b>No Python documentation found for {oname}</b><br>", "Did you mean: "] + list(map(lambda c: f"<li>{c}</li>", candidates)))
-
-        
         # 2) the first part in oname is not found by the shell
         # a reason might be because oname contains a fully qualified object name
         # (e.g. 'X.Y.Z.…' such as a module which was imported directly e.g. from X import Y (hence
@@ -3495,16 +3485,11 @@ def object_find(oname=str, namespaces=None,
         if parts_OK:
             # print(f"core.prog.object_find performs FORWARD search:\n")
             for kpart, part in enumerate(parts):
-                # print(f"\tpart {kpart}: {part}")
                 subname = subname.replace(f"{part}.", "")
                 sinfo = shell._object_find(subname, namespaces)
                 if sinfo.found:
-                    # print(f"\tforward search found sinfo = {sinfo} for '{subname}'")
-                    # BUG: 2026-01-03 22:17:06 TODO/FIXME
-                    # info = sinfo
                     soname = _get_pyobj_name_(sinfo.obj)
                     if oname == soname:
-                        # print(f"\t\tfound soname = {soname} for '{subname}'")
                         if not with_candidates:
                             return sinfo, ""
 
@@ -3523,7 +3508,6 @@ def object_find(oname=str, namespaces=None,
                         if sinfo.found:
                             soname = _get_pyobj_name_(sinfo.obj)
                             if oname == soname:
-                                # print(f"\t\tfound soname = {soname} with subname '{subname}' in sys modules")
                                 if not with_candidates:
                                     return sinfo, ""
 
@@ -3532,31 +3516,22 @@ def object_find(oname=str, namespaces=None,
                                 else:
                                     candidates.append((soname, sinfo))
                             else:
-                                # print(f"\t\tfound soname = {soname} as candidate for '{subname}' in sys modules; part={part}, rest={rest}")
                                 candidates.append((soname, sinfo))
 
             # now, do a reverse search
             subname = oname
             sinfo = None
-            # print(f"\ncore.prog.object_find performs REVERSE search\n")
             make_name_info = lambda n,k,p,o: (n, oinspect.OInfo(ismagic=False,isalias=False,found=True,namespace=p.__name__,parent=p, obj=o))
             for part in reversed(parts):
                 subname = subname.replace(f".{part}", "")
-                # print(f"prog.object_find reverse search subname = {subname}")
                 sinfo = shell._object_find(subname, namespaces)
                 if sinfo.found:
-                    # print(f"\t\t found info for subname = {subname}")
                     if isinstance(sinfo.obj, types.ModuleType):
                         members = list(sinfo.obj.__dict__.keys())
                         sims = list(map(lambda k: strutils.jaccard(k, parts[-1]), members))
                         acc = list(filter(lambda s: s > 0.5, sims))
-                        # print(f"prog.object_find reverse search found candidates: {acc}")
                         if len(acc):
                             candidates.extend(list(map(make_name_info(subname, s, sinfo.obj, sinfo.obj.__dict__[members[sims.index(s)]]),  acc)))
-                            # candidates |= set(list(map(lambda s: f"{subname}.{members[sims.index(s)]}", acc)))
-                            # return info, msg
-
-        # print(f"candidates so far: {candidates}")
 
         # 3) the object has not been imported in any of the namespaces
         # WARNING: this can be problematic: in theory, the object could be available
@@ -3634,7 +3609,6 @@ def object_find(oname=str, namespaces=None,
                 foundinfos.append(info)
             else:
                 candidates.append((oname, info))
-            # msg = ""
 
         if not info.found:
             candidates = utilities.unique(candidates)
@@ -3677,7 +3651,7 @@ def object_find(oname=str, namespaces=None,
         get_parent_name = lambda o: f"in '{_get_pyobj_name_(o)}' {type(o).__name__}" if o is not None else f'{_get_pyobj_name_(o)}'
         msg = "\n".join([f"<b>No Python documentation found for '{oname}'</b><br>", "Did you mean: "] + list(map(lambda c: f"<li>'{c[0]}' {get_parent_name(c[1].parent)}</li>", sorted(list(candidates), key=lambda x: x[0]))))
     else:
-        msg = f"<b>No Python documentation found for '{oname}'</b><br>" if len(foundinfos) == 0 else ""
+        msg = f"<b>No Python documentation found for '{oname}'</b><br>Check the spelling; you may need to enter a valid dotted path e.g. 'package.module.object.member' <br>" if len(foundinfos) == 0 else ""
 
     return rinfo, msg, candidates
 

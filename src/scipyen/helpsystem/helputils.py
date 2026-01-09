@@ -1024,7 +1024,7 @@ def hinfo(info:oinspect.OInfo, obj:object, oname:str="", detail_level:int = 0,
     # NOTE: 2026-01-08 23:45:18
     # also correct for duplicate subclass names returned by shell.inspector
     subclasses = info_dict.get("subclasses", "")
-    if len(subclasses):
+    if isinstance(subclasses, str) and len(subclasses.strip()):
         subclassnames = sorted(unique(list(map(lambda s: s.__name__, type.__subclasses__(obj)))))
         if len(subclassnames) < 10:
             info_dict["subclasses"] = ", ".join(subclassnames)
@@ -1160,17 +1160,20 @@ reStructuredText-formatted text with ``image`` links
         # match[0] contains the complete matched substring
         ltx = match[0].strip()
         ll = ltx.replace("\\\\", "\\")
+        filepath = pathlib.Path(destdir) / f"png{k}.png"
         pngdata = strutils.render_latex(ll, out="bytes", wrap=ll.startswith("$$"))
-        filepath = pathlib.Path(destdir.name) / f"png{k}.png"
-        with open(filepath.as_posix(), "wb") as pngfile:
-            pngfile.write(pngdata)
+        if pngdata:
+            with open(filepath.as_posix(), "wb") as pngfile:
+                pngfile.write(pngdata)
+                
+            snippet = f"\n .. image:: {filepath.as_posix()}\n"
             
-        snippet = f"\n .. image:: {filepath.as_posix()}\n"
-        
-        if ll.startswith("$$"):
-            snippet = "\n\n" + snippet + "\n\n"
-            
-        txt = txt.replace(ltx, snippet)
+            if ll.startswith("$$"):
+                snippet = "\n\n" + snippet + "\n\n"
+                
+            txt = txt.replace(ltx, snippet)
+        else:
+            prog.scipywarn(f"LaTeX rendering error for string {ltx}")
         
     return txt
     
