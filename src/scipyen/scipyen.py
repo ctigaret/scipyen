@@ -60,13 +60,11 @@ if sys.platform.startswith("linux"):
     # restore window sizes and positions from Scipyen.conf (Wayland does not allow
     # an application 'client' to control window position)
     # NOTE: 2024-11-09 21:03:16
-    # code below introuced to allow positoning of windows based on saved geometry(ies)
+    # code below introuced to allow positioning of windows based on saved geometry(ies)
     # which doesn't work on wayland
     if os.getenv("XDG_SESSION_TYPE", None) == "wayland":
         os.environ["QT_QPA_PLATFORM"]="xcb"
-    # if os.getenv("XDG_SESSION_TYPE", None) == "wayland":
-    #     os.environ["QT_QPA_PLATFORM"]="wayland"
-        
+
     new_xdg_data_dirs = [os.path.join(os.environ["HOME"], ".local", "share")]
 
     # conda_env_prefix was defined above
