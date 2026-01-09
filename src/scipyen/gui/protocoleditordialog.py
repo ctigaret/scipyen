@@ -4,8 +4,7 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 
-import os
-from numbers import (Number, Real,)
+import os, numbers
 import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
 from qtpy.QtCore import (Signal, Slot, Property,)
@@ -228,7 +227,7 @@ class TriggerProtocolsTableModel(QtCore.QAbstractTableModel):
                         if isinstance(val, (tuple, list)):
                             event_times = np.array(v)
                             
-                        elif isinstance(val, Number):
+                        elif isinstance(val, numbers.Number):
                             event_times = np.array([v])
                             
                         event = TriggerEvent(times = event_times * pq.s,

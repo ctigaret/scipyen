@@ -192,6 +192,11 @@ ndarray_type = ndarray.__name__
 NUMPY_NUMERIC_KINDS = set("buifc")
 NUMPY_STRING_KINDS = set("SU")
 
+Real: typing.TypeAlias = typing.Union[int, float, np.int64, np.float64]
+Complex: typing.TypeAlias = typing.Union[complex, np.complex128]
+Number: typing.TypeAlias = typing.Union[Real, Complex]
+
+
 UnitTypes = collections.defaultdict(lambda: "NA", 
                                     {"a":"axon", "b":"bouton", "c":"cell", 
                                      "d":"dendrite", "e":"excitatory", 

@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 import typing
-from numbers import Number
+import numbers
 import numpy as np
 from core.vigra_patches import vigra
 
@@ -45,7 +45,7 @@ def g_blob(meanX:float = 64., meanY:float = 64., meanZ:typing.Optional[float]=No
     
     ret = rng.multivariate_normal(mean, cov, size=n)
     
-    if isinstance(meanZ, Number):
+    if isinstance(meanZ, numbers.Number):
         vals = rng.normal(meanZ, varZ, n)
         return np.hstack([ret, vals[:,np.newaxis]])
     

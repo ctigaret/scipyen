@@ -40,9 +40,11 @@ from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
 from core import datatypes
 from core import prog
 import core.signalprocessing as sigp
+from core.datatypes import (Real, Complex, Number)
 # from core.traitcontainers import DataBag
 #from .patchneo import *
 #### END pict.core modules
+
 
 def fitGauss1DSum(x, y, locations, **kwargs):
     r"""Fits a sum of shifted 1D Gaussians.

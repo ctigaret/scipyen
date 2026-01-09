@@ -13,8 +13,8 @@ Changelog:
 """
 import warnings
 import typing
+import numbers
 #from enum import IntEnum
-from numbers import (Number, Real,)
 from copy import (deepcopy, copy,)
 from itertools import chain
 import numpy as np
@@ -242,7 +242,7 @@ class DataMark(neo.Event):
             
         if isinstance(value, (tuple, list)):
             # value is a sequence of...
-            if all([isinstance(v, Number) for v in value]): # plain numbers
+            if all([isinstance(v, numbers.Number) for v in value]): # plain numbers
                 times = np.array(value) * units
                 
             #elif all([isinstance(v, pq.Quantity) and checkTimeUnits(v) for v in value]): # python quantities
@@ -288,7 +288,7 @@ class DataMark(neo.Event):
             else:
                 raise TypeError("When a sequence, the value must contain elements of the same type, either number scalars or python quantities with time units")
                     
-        elif isinstance(value, Number):
+        elif isinstance(value, numbers.Number):
             times = np.array([value]) * units # create a dimensioned array
             
         elif isinstance(value, pq.Quantity):

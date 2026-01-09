@@ -913,7 +913,7 @@ def hmake_info_unformatted(obj:object, info:oinspect.InfoDict, detail_level:int,
     def rst_formatter(text) -> Bundle:
         return {
             'text/plain': _format(text),
-            'text/html': rst_to_html_with_highlighting(latex_formatter(text))
+            'text/html': rst_to_html_with_highlighting(latex_formatter(text.replace("\n", "\n ")))
         }
     def py_formatter(text) -> Bundle:
         return {
@@ -1166,10 +1166,10 @@ reStructuredText-formatted text with ``image`` links
             with open(filepath.as_posix(), "wb") as pngfile:
                 pngfile.write(pngdata)
                 
-            snippet = f"\n .. image:: {filepath.as_posix()}\n"
+            snippet = f"\n\n\n .. image:: {filepath.as_posix()}\n\n"
             
-            if ll.startswith("$$"):
-                snippet = "\n\n" + snippet + "\n\n"
+            # if ll.startswith("$$"):
+            #     snippet = "\n\n" + snippet + "\n\n"
                 
             txt = txt.replace(ltx, snippet)
         else:

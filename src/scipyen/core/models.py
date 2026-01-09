@@ -5,8 +5,6 @@
 
 r""" Collection of 1D and nD functions and helper functions, for use in model fitting.
 
-NOTE: 2025-05-08 10:39:04
-
 Parametric models are defined by functions taking one independent variable, ``𝑥`` 
 (the predictor) and a set of coefficients, and implement the mathematical expression
 to generate a waveform (dependent variable ``𝑦``). The mathematical expression
@@ -37,9 +35,8 @@ A biased, scaled and shifted version of (1) is:
     AFTER the start of the predictor 𝑥
     
     
-ATTENTION: Please decorate all model functions with the modelfunction decorator.
-This will help locating/accessing these functions easily from other Scipyen
-components.
+.. attention:: Please consider decorating all model functions with the ``modelfunction`` decorator.
+This will help identifying these functions easily from other Scipyen components.
 """
 import typing, types
 import numbers
@@ -54,9 +51,22 @@ from core import scipyen_quantities as scq
 from core.datasignal import DataSignal
 from core.prog import (scipywarn, signature_as_dict, decorator, timefunc)
 from core import utilities
+# from core import datatypes
+from core.datatypes import (Real, Complex, Number)
 
-Real: typing.TypeAlias = typing.Union[int, float, np.int64, np.float64]
-Complex: typing.TypeAlias = typing.Union[complex, np.complex128]
+# Real: typing.TypeAlias = typing.Union[int, float, np.int64, np.float64]
+# Complex: typing.TypeAlias = typing.Union[complex, np.complex128]
+
+FittingCoefficientsDict = typing.TypedDict("FittingCoefficientsDict", {"initial": typing.Union[Real, typing.Sequence[Real]],
+                                                                       "lower": typing.Union[Real, typing.Sequence[Real]],
+                                                                       "upper": typing.Union[Real, typing.Sequence[Real]]})
+
+def isFittingCoefficientsDict(x:dict):
+    r"""Required because TypedDict does not support instance and class checks"""
+    if not isinstance(x, dict):
+        return False
+    
+    return all(map(lambda k: k in FittingCoefficientsDict.__required_keys__, x.keys())) and all(map(lambda k: k in x.keys(), FittingCoefficientsDict.__required_keys__))
 
 def check_independent_variable(x:typing.Union[Real, np.ndarray], ndim:typing.Optional[int]=None):
     if not isinstance(x, (Real, np.ndarray)):
@@ -84,51 +94,41 @@ def modelfunction(f:typing.Callable, /,
                   coefficients:typing.Optional[typing.Sequence[str]]=None,
                   coefficient_units:typing.Optional[dict]=None,
                   expression:typing.Optional[typing.Union[sympy.Basic, str]] = None,
+                  fitting:typing.Optional[FittingCoefficientsDict]=None,
                   **kwargs):
     r"""Decorator to tag a function as a mathematical model function.
-A mathematical model function realizes a function of one or more independent 
-variables based on a mathematical expression and a set of independent parameters.
 
-The function returns an nD array where 1 <= n <= nvars (see below)
+Description:
+============
 
-By using this decorator, model functions can be identified as such, regardless 
-of the module (in Scipyen's tree) where they are defined.
+Function decorator used to identify user-created Python functions implementing a
+ mathematical model (function of one or more independent variables based on a set
+ of coefficients).
 
-This decorator sets adorns a model function with the following attributes:
+The decorator adorns a model function with the following attributes:
 
-'nvars': number of independent variables (e.g. 1D or nD function)
+*nvars* number of independent variables (e.g. 1D or nD function)
 
-'title': A descriptive name, not bound by Python's rules for symbol composition
+*title* A descriptive name, not bound by Python's rules for symbol composition
 
-'coefficients': tuple of coefficient symbols as they appear in the mathematical
+*coefficients*: tuple of coefficient symbols as they appear in the mathematical
     model; these parameters are "fixed" for a given model instance and are 
     responsible for generating a "family" of models from the same mathematical
     expresison.
 
     These coefficients are also the ones that are determined in curve fitting.
 
-    Some of the models involve a variable number of components (factors or terms)
-    defined by the same mathematical expresison. Their coefficient symbols are
-    tagged with a "*" to indicate this. Each such "starred" coefficient is counted
-    ONCE. 
 
-    ATTENTION: Python syntax forbids the use of more than one var-positional
-    parameter (e.g. *args) in a function call. This means that, for an actual 
-    function call, the starred coefficients need to be lumped together in a single
-    var-positional parameter; it is up to the function code to deal with the 
-    contents of this parameter.
+*starred_coefficients*: tuple of starred coefficient symbols (see below).
 
-'starred_coefficients': tuple of starred coefficient symbols.
+*expression*: a LaTeX math mode string or a sympy expression object (i.e., a 
+    sympy.Basic or derived).
 
-'expression': a LaTeX string, or a sympy expression construct (i.e., a sympy.Basic
-    or subclass of it):
-    • The LaTeX string MUST be given EITHER as a 'raw' string, OR a string with 
-    the LaTeX  escape characters ('\') escaped (i.e. use '\\' everywhere LaTeX 
-    expects a single '\'). WARNING: LaTeX assumes package amsmath is in use.
-    • The sympy expresion is currently used just for inspection purposes; no
-    computation is performed involving sympy expressions.
+*coefficient_units* (see below)
 
-'coefficient_units' (see below)
+*fitting*: a ``dict`` with intial, lower & upper bound values
+
+Other user-defined attributes (see below)
 
 NOTE: These attributes can be accessed from within the model function code by
     assigning the function object to a local variable (e.g., 'self'). In turn,
@@ -148,8 +148,13 @@ NOTE: These attributes can be accessed from within the model function code by
         self.coefficients
 
 Parameters:
-f: the decorated function
-nvars: number of independent variables; this determines the general syntax of the 
+===========
+
+All are optional and default to `None`.
+
+:f: the decorated function
+
+:nvars: number of independent variables; this determines the general syntax of the 
     model function, e.g.:
     one independent variable (i.e., 1D model):  f(x,   /, *params)
     two independent variables (2D model):       f(x,y, /, *params)
@@ -159,25 +164,40 @@ nvars: number of independent variables; this determines the general syntax of th
     Optional; default is 1. WARNING: do NOT confuse with the number of model 
     coefficients!
 
-title: A user-defined name; default is None, which results in a CamelCase name
-    taken from the wrapped function.
+:title: A user-defined name; when `None` (the default), the function will get a
+    CamelCase name taken from the wrapped Python function.
 
-coefficients: typing.Sequence[str] — names (symbols) for the parameters.
+:coefficients: typing.Sequence[str] — names (symbols) for the parameters.
     These can usually be inferred from the function's signature via the 
     'inspect' module, which is what the function 'model_parameters(…)' in this
     module does. However, this can be tedious for model functions with a more 
     complex syntax; hence this attribute comes in handy.
 
-    Optional default is None (which results in an empty tuple)
+    Some of the models involve a variable number of components (factors or terms)
+    defined by the same mathematical expresison, which implies a variadic number of
+    coefficients (see "compound_transient" for an example). The symbols for these
+    "variadic" coefficients tagged with a "*" to indicate this ('starred' coefficients).
 
-    Variadic coefficients are indicated by a * suffix ('starred' coefficients)
-    NOTE: Even if the notation is similar to that of variadic function parameters
-    ('*args') is NOT identical to that and does not havwe the same meaning; here
-    the '*' comes after ther symbol and indicated that there must be AT LEAST one
-    coefficient with that symbol, in the coefficients sequence.
+    .. warning:: Python syntax forbids the use of more than one var-positional
+    parameter (e.g. *args) in a function call. This means that, for an actual 
+    function call, the starred coefficients need to be lumped together in a single
+    var-positional parameter; it is up to the function code to deal with the 
+    contents of this parameter. Each such "starred" coefficient is counted once.
+    ONCE. 
 
-expression: sympy expression construct or latex string (see above); optional, 
-    default is None
+:fitting: Mapping with the mandatory keys:
+    *initial* ↦ scalar or sequence of scalars
+    *lower* ↦ scalar or sequence of scalars
+    *upper* ↦ scalar or sequence of scalars
+
+:expression: sympy expression construct or latex string.
+
+    • The LaTeX string MUST be given EITHER as a 'raw' string, OR a string with 
+    the LaTeX escape characters ('\') escaped (i.e. use '\\' everywhere LaTeX 
+    expects a single '\'). WARNING: LaTeX assumes package amsmath is in use.
+
+    • The sympy expresion is currently used just for inspection purposes; no
+    computation is performed involving sympy expressions.
 
     WARNING: beware of using sympy.sympify(…) function to convert a string 
     containing a mathematical expression to a sympy expression (sympy.Expr), or 
@@ -190,7 +210,7 @@ expression: sympy expression construct or latex string (see above); optional,
     • Avoid using sympy.sympify(…) when using unicode characters as symbols (e.g. 
     'α', 'β', etc). The recommended way is also to avoid 'latex' unicode characters
 
-    Instead use one of the following approaches:
+    I recommend using one of the following approaches:
         1. use the latin spelling for greek characters, e.g.:
             sympy.Symbol("alpha") ↦ α 
             In particular use sympy.Symbol("beta") instead of sympy.beta which 
@@ -209,21 +229,20 @@ expression: sympy expression construct or latex string (see above); optional,
         5. use '*' for multiplication instead of ×, ⨱, or ⋅
 
         6. use sympy.functions.elementary.piecewise.Piecewise for dichotmous
-            functions based on a condition.
-            
+            functions based on a condition (equivalent to a ``cases`` environment
+            in LaTeX).
 
     • The best practice is to import the sympy module as a whole, then create the
-    expression directly (manually) using specific sympy components and arithmetic
-    operators, and generating symbols on the fly.
+    expression manually using specific sympy components and arithmetic operators, 
+    and generating symbols on the fly. See the definition of ``alphaSynapse`` 
+    for an example.
 
-    See alphaSynapse definition for an example.
 
+:coefficient_units: optional mapping of
 
-coefficient_units: optional mapping of
-    coefficient symbol:str ↦ physical unit: Quantity, UnitQuantity, or sequence 
-                                            of such
+    `coefficient symbol:str` ↦ physical unit: `Quantity`, `UnitQuantity` or 
+            sequence of such
 
-    Default is None. 
     When given, this flags that some model coefficient have physical units;
     the keys are the names of the model coefficients as given by the 
     'coefficients' paramneter, described above.
@@ -253,13 +272,18 @@ coefficient_units: optional mapping of
     as values for the coefficient; it is up to the function what to do with its
     own call arguments
 
-Var-positional parameters:
-==========================
-additional attributes to be set to the wrapped function.
+Var-keyword parameters:
+=======================
+
+:**kwargs:
+
+These are additional attributes to be set to the wrapped function (e.g. initial
+coefficient values and lower/upper bounds, which may be useful for use in curve 
+fitting)
 
 NOTE for developers: this function defines a function decorator with optional
-arguments; this is made possible by decorating this function with the prog.decorator
-taken from PythonDecoratorLibrary, see
+arguments; for details, see the PythonDecoratorLibrary:
+
 https://wiki.python.org/moin/PythonDecoratorLibrary#Creating_decorator_with_optional_arguments
 
 """
@@ -268,10 +292,6 @@ https://wiki.python.org/moin/PythonDecoratorLibrary#Creating_decorator_with_opti
     from core.strutils import render_latex
     from core.utilities import render_sympy
     from gui.guiutils import getScipyenConsoleShell
-    
-#     shell = getScipyenConsoleShell()
-#     
-#     print(f"shell: {shell}")
     
     def wrapper(f):
         setattr(f, "model_function", True)
@@ -285,6 +305,8 @@ https://wiki.python.org/moin/PythonDecoratorLibrary#Creating_decorator_with_opti
         setattr(f, "starred_coefficients", starred)
         
         setattr(f, "expression", expression)
+        
+        setattr(f, "fitting", fitting)
         
         # ### BEGIN NOTE: 2025-12-26 14:50:30 various optins - do NOT delete these; instead, keep for future reference
         #
@@ -662,7 +684,10 @@ values for α, β, and with appropriate value & sign of λ
                                      sympy.functions.elementary.piecewise.Piecewise((sympy.Symbol("alpha") + sympy.Symbol("beta") * (sympy.Symbol("x")-sympy.Symbol("x_0"))/sympy.Symbol("tau") * sympy.exp(-(sympy.Symbol("x")-sympy.Symbol("x_0") - sympy.Symbol("tau"))/sympy.Symbol("tau")),
                                                                                      sympy.Symbol("x")-sympy.Symbol("x_0") >= 0), 
                                                                                     (sympy.Symbol("alpha"), 
-                                                                                     sympy.Symbol("x")-sympy.Symbol("x_0") < 0)))
+                                                                                     sympy.Symbol("x")-sympy.Symbol("x_0") < 0))),
+               fitting = FittingCoefficientsDict(initial= (0., 1., 0., 0.01), 
+                          lower=(-np.inf, -np.inf, 0., 0.),
+                          upper=(np.inf, np.inf, np.inf, np.inf))
                )
 def alphaSynapse(x:np.ndarray | Real, α:typing.Union[typing.Sequence[Real],np.ndarray,Real], /,
                   β:typing.Optional[Real] = None, x0:typing.Optional[Real] = None,
@@ -677,10 +702,7 @@ Description:
 
 A single exponential rise and decay, both with the same constant (τ):
 
-Eq. 1
------
-
-$$f(x) = \\begin{cases} \\alpha + \\beta \\left(x - x_{0}\\right) e^{\\left(\\tau - x + x_{0}\\right) / \\tau} / \\tau & \\text{for}\\: x - x_{0} \\geq 0 \\\\\\alpha & \\text{otherwise} \\end{cases}$$
+$$f(x) = \\begin{cases} \\alpha + \\beta \\left(x - x_{0}\\right) e^{\\left(\\tau - x + x_{0}\\right) / \\tau} / \\tau & \\text{for}\\: x - x_{0} \\geq 0 \\\\\\alpha & \\text{otherwise} \\end{cases} \\qquad{} (1)$$
 
 where:
     α  ↦ additive bias (offset); units of "y"
@@ -712,14 +734,13 @@ doi: https://doi.org/10.1162/neco.1997.9.6.1179 ) :
 Parameters:
 ===========
 :x: Predictor (independent variable) - 1D numpy ndarray or float
-:α, β, x0, τ: See above. When α is a sequence of scalars (1D array-like), it is 
+:α: Offset, scalar, or sequence of scalars (1D array-like). If the latter, it is 
     interpreted as containing the individual α, β, x0, τ coefficients 'packed' 
-    in this sequence (some optimization functions expect this)
+    in this order
+:β: Scale
+:x0: Onset
+τ: Synaptic time constant
     
-:parameters: 1D array-like: numeric sequence (tuple, list, numpy array) with four
-    elements in the following order (see above for their meaning):
-
-
 Returns:
 ========
 1D numpy array (vector)
@@ -735,67 +756,71 @@ Example:
     x = np.linspace(0.0,1.0, 1000);
 
     α = 0.; β = -1.; x0 = 0.05; τ = 0.01;
-    parameters = [α, β, x0, τ];
+
+    # optionally, "pack" the coefficients in a sequence
+    coefficients = [α, β, x0, τ];
 
     # any of the statements below are equivalent:
     y = models.alphaSynapse(x, α, β, x0, τ)
-    y = models.alphaSynapse(x, *parameters)
-    y = models.alphaSynapse(x, parameters)
+    y = models.alphaSynapse(x, *coefficients)
+    y = models.alphaSynapse(x, coefficients)
 
+    # plot the generated curve
     plt.plot(x,y)
 
-NOTE: 
-=====
-1. Rall 1967 uses the notation T for t - onset, and Tₚ for τ in the "alpha" function below:
+.. note:: 
+    Rall 1967 uses the notation T for t - onset, and Tₚ for τ in the "alpha" function below:
 
-Eq. 2
------
+$$f(T) = \\begin{cases} \\left( T / T_{p} \\right) \\times e^{\\left( 1 - T / T_{p} \\right)} & \\text{for}\\: T_{p} > 0 \\\\0 & \\text{otherwise} \\end{cases} \\qquad{} (2)$$
 
-$$f(T) = \\begin{cases} \\left( T / T_{p} \\right) \\times e^{\\left( 1 - T / T_{p} \\right)} & \\text{for}\\: T_{p} > 0 \\\\0 & \\text{otherwise} \\end{cases}$$
+which has
 
-which has:†
+* extremum (1.0) at T = Tₚ (i.e. t - onset = τ)
+* value of 0.5 at t ∈ {≈ 0.23τ, ≈ 2.68τ}, hence:
+* half-width (with at half of peak amplitude) ≈ 2.45τ
+* area under the entire curve: 𝑒τ, where 𝑒 is Euler's number (Napier's constant)
 
-• extremum (1.0) at T = Tₚ (i.e. t - onset = τ)
-• value of 0.5 at t ∈ {≈ 0.23τ, ≈ 2.68τ}, hence:
-• half-width (with at half of peak amplitude) ≈ 2.45τ
-• area under the entire curve: 𝑒τ, where 𝑒 is Euler's number (Napier's constant)
-
-2. The code in NEURON syn.mod does NOT include the additive bias α. I include α
+#. The code in NEURON syn.mod does NOT include the additive bias α. I include α
 for the case where the transient modelled by alphaSynapse takes place on top of
 a constant signal (the "direct current", or "DC" component — this nomenclature
 is not always appropriate e.g. when modelling the change in membrane potential
 the "DC" component is rather some steady-state initial voltage V₀, such as the
 resting membrane potential).
 
-3. The β parameter here corresponds to the 𝑔ₘₐₓ in NEURON's code.
+#. The β parameter here corresponds to the 𝑔ₘₐₓ in NEURON's code.
 Whether β is a conductance (𝑔) or not depends on what are you use this function
 for. NEURON's syn.mod calculates 𝑔 THEN converts it to a synaptic current 𝑖 
 (see above); if you use this function to model a current, you might want to adjust
 β accordingly (i.e. set it to YOUR 𝑔ₘₐₓ times the electromotive force 𝑣 - 𝑒).
 
-4. The x0 parameter here corresponds to the 'onset' in NEURON (and Rall) code.
+#. The x0 parameter here corresponds to the 'onset' in NEURON (and Rall) code.
 
-5. Finally, 'x' here corresponds to 𝑡 in NEURON's code. If follows that x0 and τ
-have the same physical units as 'x'.
+#. Finally, 'x' here corresponds to 𝑡 in NEURON's code. If follows that x0 and τ
+have the same physical units as 'x' (and t₀ is x0).
 
-† At $f(x) = 0.5$
-and noting $\\chi  = \\left(t - \\text{onset}\\right)/\\tau \\text{ for } \\tau > 0$
-`Eq. 2` becomes
+At
+
+$f(x) = 0.5$
+
+and noting
+
+$\\chi  = \\left(t - t_{0}\\right)/\\tau \\text{ for } \\tau > 0$ with t₀ the onset,
+
+eq. 2 becomes
     
-Eq. 3
------
+$$\\chi \\times e^{\\left(1-\\chi\\right)} = 0.5 \\qquad{} (3)$$
 
-$$\\chi \\times e^{\\left(1-\\chi\\right)} = 0.5$$
-
-It follows that 
+It follows that
 
 $$\\chi = 0.5 \\times e^{\\left(\\chi - 1\\right)}$$
 
 This is a transcendental equation which can be solved graphically by plotting, 
-on the same axes, the curves
+on the same axes, the curve
 
 $$g(t) = \\chi$$
+
 and
+
 $$h(t) = e^{\\left(\\chi - 1\\right)} \\times 0.5$$
     
 The intersections between the two curves are the solutions χ₀, χ₁ of `Eq. 3 ` (you may want to plot the region of the curves where x <= 0.2, in order to  visualize the intersections).
@@ -866,27 +891,17 @@ Example:
     fwhm
     -> 2.4463244632446317   ≈ 2.45τ
 
-Finally, expressing `Eq. 2` in t:
+Finally, expressing eq. 3 in t
 
-Eq. 4
------
+$$f(t) = \\begin{cases} t/\\tau \\times e^{\\left(1-t/\\tau\\right)} & \\text{for}\\: \\tau > 0 \\\\0 & \\text{otherwise} \\end{cases} \\qquad{} (4)$$
 
-$$f(t) = \\begin{cases} t/\\tau \\times e^{\\left(1-t/\\tau\\right)} & \\text{for}\\: \\tau > 0 \\\\0 & \\text{otherwise} \\end{cases}$$
+the area under the curve is
 
-the area under the curve is:
-
-Eq. 5
------
-$$\\int_{0}^{\\infty} f(x)dx = e \\times \\tau \\qed$$
+$$\\int_{0}^{\\infty} f(x)dx = e \\times \\tau \\qed \\qquad{} (5)$$
     
-.. note:: The integral (`Eq. 5`) is divergent for τ < 0, and `Eq. 4` is
-   undefined for τ = 0
+.. note:: 
+    Eq. 4 is  undefined for τ = 0, and the integral (`eq. 5`) is divergent for τ < 0
                                     
-    
-CHANGELOG:
-==========
-Renamed from alphaFunction to alphaSynapse to avoid confusion, especially with
-the mathematical Alpha Function (https://mathworld.wolfram.com/AlphaFunction.html)
     
 """
     # NOTE: Python currently does not support unicode

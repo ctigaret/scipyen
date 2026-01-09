@@ -5,7 +5,7 @@
 
 
 import os, typing
-from numbers import (Number, Real,)
+import numbers
 import itertools
 import traceback
 from collections import deque
@@ -382,8 +382,8 @@ class TriggerDetectWidget(QWidget, Ui_TriggerDetectWidget):
     
     sig_dataChanged = Signal()
     
-    def __init__(self, ephys_start:typing.Union[Real, pq.Quantity]=0, 
-                 ephys_end:typing.Union[Real, pq.Quantity]=1, n_channels:int=0,
+    def __init__(self, ephys_start:typing.Union[numbers.Real, pq.Quantity]=0, 
+                 ephys_end:typing.Union[numbers.Real, pq.Quantity]=1, n_channels:int=0,
                  presyn:typing.Optional[typing.Union[dict, tuple, list]]=None, 
                  postsyn:typing.Optional[typing.Union[dict, tuple, list]]=None,
                  photo:typing.Optional[typing.Union[dict, tuple, list]]=None,
@@ -574,7 +574,7 @@ class TriggerDetectWidget(QWidget, Ui_TriggerDetectWidget):
     
     @nChannels.setter
     def nChannels(self, value):
-        if isinstance(value, Real):
+        if isinstance(value, numbers.Real):
             if value < 0:
                 self._n_channels_ = 0
                 
@@ -597,7 +597,7 @@ class TriggerDetectWidget(QWidget, Ui_TriggerDetectWidget):
             else:
                 raise TypeError("Unexpected units for signal start: %s" % value.units.dimensionality)
             
-        elif isinstance(value, Real):
+        elif isinstance(value, numbers.Real):
             value = float(value)
             
         elif value is None:
@@ -791,7 +791,7 @@ class TriggerDetectWidget(QWidget, Ui_TriggerDetectWidget):
             
             value = float(value)
             
-        elif isinstance(value, Real):
+        elif isinstance(value, numbers.Real):
             value = float(value)
             
         elif value is None:

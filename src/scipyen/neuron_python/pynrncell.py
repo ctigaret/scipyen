@@ -17,7 +17,7 @@ Created on Sun May 10 14:05:54 2020
 
 """
 import os, typing, warnings
-from numbers import Number, Real
+import numbers
 import numpy as np
 import scipy as sp
 import pandas as pd

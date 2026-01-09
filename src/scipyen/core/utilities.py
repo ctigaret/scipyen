@@ -11,6 +11,7 @@ Various utilities
 import traceback, re, itertools, functools, time, typing, types, warnings
 import operator, inspect, random, math, pprint, datetime, pathlib, sys, os
 import collections, collections.abc, dataclasses
+import numbers
 from numbers import Number
 from sys import (getsizeof, stderr)
 from copy import (copy, deepcopy,)
@@ -158,7 +159,7 @@ class SafeComparator(object):
             if isinstance(x, partial):
                 return x.func == y.func and x.args == y.args and x.keywords == y.keywords
                 
-            if isinstance(x, (np.ndarray, str, Number)):
+            if isinstance(x, (np.ndarray, str, numbers.Number)):
                 #return operator.eq(x,y)
                 return self.comp(x,y)
             
@@ -219,16 +220,16 @@ class SafeComparator(object):
             #print("y:", y)
             return False
         
-def __check_isclose_args__(rtol:typing.Optional[Number]=None, 
-                           atol:typing.Optional[Number]=None, 
+def __check_isclose_args__(rtol:typing.Optional[numbers.Number]=None, 
+                           atol:typing.Optional[numbers.Number]=None, 
                            use_math:bool=True, equal_nan:bool=True, 
                            equal_na:bool=True) -> bool:
     # TODO:2024-12-19 17:17:28
     # implement equal_na
-    if not isinstance(rtol, Number):
+    if not isinstance(rtol, numbers.Number):
         rtol = inspect.signature(math.isclose).parameters["rel_tol"].default if use_math else inspect.signature(np.isclose).parameters["rtol"].default
         
-    if not isinstance(atol, Number):
+    if not isinstance(atol, numbers.Number):
         atol = inspect.signature(math.isclose).parameters["abs_tol"].default if use_math else inspect.signature(np.isclose).parameters["atol"].default
         
     f_isclose = partial(math.isclose, rel_tol=rtol, abs_tol=atol) if use_math else partial(np.isclose, rtol=rtol, atol=atol, equal_nan=equal_nan)
@@ -244,7 +245,7 @@ def is_NA(x:object)-> bool:
     return pd.isna(x)
         
 @singledispatch
-def is_same_as(x, y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, 
+def is_same_as(x, y, rtol:typing.Optional[numbers.Number]=None, atol:typing.Optional[numbers.Number]=None, 
                use_math:bool=True, equal_nan:bool=False, comparator = operator.eq) -> bool:
     r"""Compares two objects.
     
@@ -274,12 +275,12 @@ def is_same_as(x, y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Num
     return operator.eq(x,y)
 
 @is_same_as.register(str)
-def _(x, y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, 
+def _(x, y, rtol:typing.Optional[numbers.Number]=None, atol:typing.Optional[numbers.Number]=None, 
       use_math:bool=True, equal_nan:bool=False, comparator = operator.eq) -> bool:
     return comparator(x,y)
 
 @is_same_as.register(np.ndarray)
-def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, 
+def _(x,y, rtol:typing.Optional[numbers.Number]=None, atol:typing.Optional[numbers.Number]=None, 
       use_math:bool=True, equal_nan:bool=False, comparator = operator.eq) -> bool:
     
     if comparator not in (operator.eq, isclose):
@@ -305,7 +306,7 @@ def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None,
     return ret
 
 @is_same_as.register(pq.Quantity)
-def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, 
+def _(x,y, rtol:typing.Optional[numbers.Number]=None, atol:typing.Optional[numbers.Number]=None, 
       use_math:bool=True, equal_nan:bool=False, comparator = operator.eq) -> bool:
     
     if comparator not in (operator.eq, isclose):
@@ -341,7 +342,7 @@ def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None,
     return ret
 
 @is_same_as.register(collections.abc.Sequence)
-def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None,
+def _(x,y, rtol:typing.Optional[numbers.Number]=None, atol:typing.Optional[numbers.Number]=None,
       use_math:bool=True, equal_nan:bool=False, comparator = operator.eq) -> bool:
     
     if comparator is isclose:
@@ -357,7 +358,7 @@ def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None,
     return ret
 
 @is_same_as.register(collections.abc.Mapping)
-def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, 
+def _(x,y, rtol:typing.Optional[numbers.Number]=None, atol:typing.Optional[numbers.Number]=None, 
       use_math:bool=True, equal_nan:bool=False, comparator = operator.eq) -> bool:
     
     # use for comparisons between mapping values
@@ -382,7 +383,7 @@ def ideq(x,y) -> bool:
     return id(x) == id(y)
 
 @singledispatch
-def isclose(x:typing.Union[Number, np.ndarray], y:typing.Union[Number, np.ndarray, pq.Quantity], rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, use_math:bool=True, equal_nan:bool=False):
+def isclose(x:typing.Union[numbers.Number, np.ndarray], y:typing.Union[numbers.Number, np.ndarray, pq.Quantity], rtol:typing.Optional[numbers.Number]=None, atol:typing.Optional[numbers.Number]=None, use_math:bool=True, equal_nan:bool=False):
     r"""Generalized isclose.
     
     Parameters:
@@ -448,22 +449,22 @@ def isclose(x:typing.Union[Number, np.ndarray], y:typing.Union[Number, np.ndarra
     raise NotImplementedError(f"{type(x).__name__} objects are not supported")
 
 @isclose.register(type(None))
-def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, 
+def _(x,y, rtol:typing.Optional[numbers.Number]=None, atol:typing.Optional[numbers.Number]=None, 
       use_math:bool=True, equal_nan:bool=False) -> bool:
     if any(v is None for v in (x,y)):
         return x is None and y is None
 
 @isclose.register(str)
-def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, 
+def _(x,y, rtol:typing.Optional[numbers.Number]=None, atol:typing.Optional[numbers.Number]=None, 
       use_math:bool=True, equal_nan:bool=False) -> bool:
     # TODO/FIXME: 2023-03-24 15:51:03
     # use difflib.SequenceMatcher
     from difflib import SequenceMatcher
     ret = SequenceMatcher(None, x, y).ratio()
     
-    if isinstance(rtol, Number):
+    if isinstance(rtol, numbers.Number):
         return ret >= 1.0-abs(rtol)
-    elif isinstance(atol, Number):
+    elif isinstance(atol, numbers.Number):
         return ret >= 1.0-abs(atol)
     else:
         return ret == 1.0
@@ -471,7 +472,7 @@ def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None,
     # return x.lower() == y.lower()
 
 @isclose.register(np.ndarray)
-def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, 
+def _(x,y, rtol:typing.Optional[numbers.Number]=None, atol:typing.Optional[numbers.Number]=None, 
       use_math:bool=True, equal_nan:bool=False) -> bool:
     
     if any(v.size > 1 for v in (x,y)):
@@ -496,7 +497,7 @@ def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None,
     return f_isclose(x,y)
 
 @isclose.register(pq.Quantity)
-def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, 
+def _(x,y, rtol:typing.Optional[numbers.Number]=None, atol:typing.Optional[numbers.Number]=None, 
       use_math:bool=True, equal_nan:bool=False) -> bool:
     
     if any(v.size > 1 for v in (x,y)):
@@ -528,8 +529,8 @@ def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None,
     
     return f_isclose(x,y)
 
-@isclose.register(Number)
-def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, 
+@isclose.register(numbers.Number)
+def _(x,y, rtol:typing.Optional[numbers.Number]=None, atol:typing.Optional[numbers.Number]=None, 
       use_math:bool=True, equal_nan:bool=False) -> bool:
     
     f_isclose, rtol, atol = __check_isclose_args__(rtol, atol, use_math)
@@ -537,7 +538,7 @@ def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None,
     return f_isclose(x,y)
 
 @isclose.register(complex)
-def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, 
+def _(x,y, rtol:typing.Optional[numbers.Number]=None, atol:typing.Optional[numbers.Number]=None, 
       use_math:bool=True, equal_nan:bool=False) -> bool:
     
     f_isclose, rtol, atol = __check_isclose_args__(rtol, atol, use_math)
@@ -1383,7 +1384,7 @@ def safe_identity_test(x:object, y:object, idcheck:bool=True,
         #
         # if not ret and not np.any(map(lambda v: np.all(pd.isna(v)), (x,y))): # ret is False NOT because one is pd.NA!
         if not ret and not np.any(map(lambda v: np.all(is_NA(v)), (x,y))): # ret is False NOT because one is pd.NA!
-            if all(map(lambda v: isinstance(v, Number), (x,y))):
+            if all(map(lambda v: isinstance(v, numbers.Number), (x,y))):
                 ret = all(map(math.isnan, (x,y)))
             elif all(map(lambda v: isinstance(v, np.ndarray), (x,y))):
                 ret = np.all(tuple(map(math.isnan, (x,y))))
@@ -1552,7 +1553,7 @@ def safe_identity_test(x:object, y:object, idcheck:bool=True,
 #                 if not ret:
 #                     return ret
             
-            # if isinstance(x, (np.ndarray, str, Number, pd.DataFrame, pd.Series, pd.Index)):
+            # if isinstance(x, (np.ndarray, str, numbers.Number, pd.DataFrame, pd.Series, pd.Index)):
             #     ret &= np.all(x==y)
                 
                 # return ret
@@ -2345,7 +2346,7 @@ class NestedFinder(object):
                 # customized support for qualified comparators e.g., np.isclose
                 # and string comparisons (using pandas parser. etc) according to
                 # the column's dtype
-                if isinstance(item, (Number, str)):
+                if isinstance(item, (numbers.Number, str)):
                     try:
                         ndx = var == item
                         if np.any(ndx): # check in values
@@ -2466,10 +2467,10 @@ class NestedFinder(object):
                 # customized application of qualified comparators e..g, 
                 # np.isclose for numeric arrays and other comparisons for non-numeric
                 # dtypes
-                if isinstance(item, (Number, str)) or (isinstance(item, np.ndarray) and item.size == 1):
+                if isinstance(item, (numbers.Number, str)) or (isinstance(item, np.ndarray) and item.size == 1):
                     try:
                         ndx = np.array([False])
-                        if isinstance(item, (Number,str)):
+                        if isinstance(item, (numbers.Number,str)):
                             ai = np.array([item])
                             if ai.dtype == var.dtype:
                                 ndx = var == item
@@ -3435,7 +3436,7 @@ def summarize_object_properties(objname:str, obj:typing.Any, namespace="Internal
             # icon = QtGui.QIcon.fromTheme("datatype")
             pass
         elif isinstance(obj, sequence_types):
-            if len(obj) and all([isinstance(v, Number) for v in obj]):
+            if len(obj) and all([isinstance(v, numbers.Number) for v in obj]):
                 datamin = str(min(obj))
                 mintip = "min: "
                 datamax = str(max(obj))
@@ -3449,7 +3450,7 @@ def summarize_object_properties(objname:str, obj:typing.Any, namespace="Internal
             memsztip = "memory size: "
             
         elif isinstance(obj, set_types):
-            if len(obj) and all([isinstance(v, Number) for v in obj]):
+            if len(obj) and all([isinstance(v, numbers.Number) for v in obj]):
                 datamin = str(min([v for v in obj]))
                 mintip = "min: "
                 datamax = str(max([v for v in obj]))
@@ -3506,7 +3507,7 @@ def summarize_object_properties(objname:str, obj:typing.Any, namespace="Internal
             memsz = str(getsizeof(obj))
             memsztip = "memory size: "
             
-        elif isinstance(obj, Number):
+        elif isinstance(obj, numbers.Number):
             dtypestr = tt
             datamin = str(obj)
             mintip = "min: "
@@ -4968,7 +4969,7 @@ def sp_set_loc(x, index, columns, val):
     return x    
 
 def get_least_pwr10(x:typing.Sequence)-> int:
-    if not all(isinstance(v, Number) or (isinstance(v, pq.Quantity) and v.size == 1) for v in x):
+    if not all(isinstance(v, numbers.Number) or (isinstance(v, pq.Quantity) and v.size == 1) for v in x):
         raise TypeError("Expecting a sequence of scalars or scalar Quantity objects")
     
     if any (math.isinf(v) for v in x):

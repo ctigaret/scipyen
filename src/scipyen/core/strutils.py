@@ -15,10 +15,7 @@ import string
 import itertools
 import ast
 import re as _re
-from numbers import (
-    Number,
-    Real,
-)
+import numbers
 import numpy as np
 import quantities as pq
 import sympy
@@ -558,7 +555,7 @@ def make_ordinal(n):
 
 
 def numbers2str(
-    value: typing.Optional[typing.Union[Number, np.ndarray, tuple, list]],
+    value: typing.Optional[typing.Union[numbers.Number, np.ndarray, tuple, list]],
     precision: int = 5,
     format: str = "g",
     show_units=False,
@@ -589,11 +586,11 @@ def numbers2str(
     if isinstance(value, np.ndarray):
         val = value.flatten()
 
-    elif isinstance(value, Number):
+    elif isinstance(value, numbers.Number):
         val = np.array([value]).flatten()
 
     elif isinstance(value, (tuple, list)) and all(
-        [isinstance(v, Number) for v in value]
+        [isinstance(v, numbers.Number) for v in value]
     ):
         val = value
 
@@ -641,7 +638,7 @@ def isnumber(s: str) -> bool:
 
     try:
         v = eval(s)
-        if isinstance(v, Number):
+        if isinstance(v, numbers.Number):
             return True
 
     except:

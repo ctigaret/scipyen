@@ -201,7 +201,7 @@ class ModelParametersWidget(QtWidgets.QWidget):
                         # This is for general case.
                         # Depending on the model for which this is intended, one may
                         # have to restrict these to physically (and mathematically)
-                        # reasonable values by accessing these spine boxes directly
+                        # reasonable values by accessing these spin boxes directly
                         # (based on parameter name and value type i.e. initial, lower
                         # or upper bound)
                         # This can be done using self.getSpinBox() method, see

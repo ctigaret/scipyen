@@ -43,7 +43,7 @@ from dataclasses import dataclass
 from itertools import chain
 from copy import (deepcopy, copy,)
 from datetime import datetime, date, time, timedelta
-from numbers import (Number, Real,)
+import numbers
 from functools import partial
 import numpy as np
 import quantities as pq
