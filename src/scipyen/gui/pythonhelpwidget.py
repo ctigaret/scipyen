@@ -150,7 +150,9 @@ class _PythonHelpThread_(QtCore.QThread):
                     traceback.print_exc()
 
                 if isinstance(reply, str) and len(reply.strip()):
-                    background = pygments.styles.get_style_by_name(self.console.consoleWidget.pygment).background_color
+                    pygment_style = pygments.styles.get_style_by_name(self.console.consoleWidget.pygment)
+                    background = pygment_style.background_color
+                    foreground = pygment_style.styles[pygments.token.Token]
                     out = list()
                     out += ['<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"',
                             '    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">']
@@ -158,12 +160,14 @@ class _PythonHelpThread_(QtCore.QThread):
                     out += ["<head>", 
                             f"<title>{self.helpCommand}</title>", 
                             '<style>',
-                            '<body>',
+                            'body{',
+                            f'color: {foreground};',
                             f'background-color: {background};',
-                            '</body>',
+                            '}',
                             'img {',
                             'display: block;',
                             'margin: 20px 20px;',
+                            'float: none;',
                             '}',
                             '</style>',
                             "</head>"]
@@ -181,6 +185,7 @@ class _PythonHelpThread_(QtCore.QThread):
                     else:
                         qreply["success"] = True
 
+                    body = body.replace("<div>", "\n<div>")
                     out.append(body)
                     out.append("</body>")
                     out.append("</html>")

@@ -797,12 +797,12 @@ Things to keep in mind:
 #. Finally, 'x' here corresponds to 𝑡 in NEURON's code. 
     If follows that x0 and τ have the same physical units as 'x' (and t₀ is x0).
 
-Given the following:
+Given: \ \ 
 
 $$\\begin{aligned} f(x) & = 0.5 \\\\ \\chi & = \\left(t - t_{0}\\right)/\\tau \\text{ for } \\tau > 0 \\end{aligned}$$
 
 
-with t₀ the onset, eq. 2 becomes
+with t₀ the onset, eq. 2 becomes \ \ 
 
     
 $$\\chi \\times e^{\\left(1-\\chi\\right)} = 0.5 \\qquad{} (3)$$
@@ -883,11 +883,11 @@ Example: ::
     fwhm
     -> 2.4463244632446317   ≈ 2.45τ
 
-Finally, expressing eq. 3 in t
+Finally, expressing eq. 3 in t \ \ 
 
 $$f(t) = \\begin{cases} t/\\tau \\times e^{\\left(1-t/\\tau\\right)} & \\text{for}\\: \\tau > 0 \\\\0 & \\text{otherwise} \\end{cases} \\qquad{} (4)$$
 
-the area under the curve is
+the area under the curve is \ \ 
 
 $$\\int_{0}^{\\infty} f(x)dx = e \\times \\tau \\qed \\qquad{} (5)$$
     

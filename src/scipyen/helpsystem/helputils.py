@@ -310,11 +310,23 @@ def rst_latex_2_html(text:str,
     
     html = rst_to_html_with_highlighting(latex_formatter(text.replace("\n", "\n ")))
     pattern = r'<img\s+[^>]*>'
+    # pattern = r'<img\s+[^>]*src=["\']([^"\']+)["\'][^>]*>'
+    # pattern = r'<img\s+[^>]*(src=["\']([^"\']+)["\'][^>]*)>'
+    # src_pattern = r'src=["\']([^"\']+)["\'][^>]*>'
     matches = re.findall(pattern, html)
     for match in matches:
         # print(f"match = {match}")
+        # src_match = re.findall(src_pattern, match)
+        # print(f"src_match = {src_match}")
+        # if len(src_match):
+        #     src_match = src_match[0]
+        #     match = match.replace(src_match, f"src='{src_match}'")
+        #     smatch = match.replace(src_match)
         # html.replace(match, f"<div><br>{match}<br></div>")
-        html.replace(match, f"<table><tr><td>{match}</td></tr></table>")
+        # html.replace(match, f"<div><table><tr><td>{match}</td></tr></table></div>")
+        # html.replace(match, f"<p><div>{match}</div><p>")
+        smatch = match.replace("/>", ' style="display: block; margin: 0 auto;" />')
+        html.replace(match, f"<p><div>{smatch}</div><p>")
     
     return html
 
@@ -327,7 +339,8 @@ https://www.bomberbot.com/python/converting-restructuredtext-to-html-with-python
     # print(f"helpsystem.helputils.rst_to_html_with_highlighting(rst_text={rst_text})")
 
     parts = publish_parts(rst_text, writer_name='html5', settings_overrides=docutils_settings_overrides)
-    ret_html = parts['html_body']
+    body_html = parts['html_body']
+    # ret_html = parts['whole']
     
     def replace_code_block(match):
         # print(f"helputils.rst_to_html_with_highlighting.replace_code_block(match = {match})")
@@ -341,12 +354,12 @@ https://www.bomberbot.com/python/converting-restructuredtext-to-html-with-python
     pattern = r'<pre class="literal-block">(.+?)</pre>' 
     
     try:
-        out_html = re.sub(pattern, replace_code_block, ret_html, flags=re.DOTALL|re.MULTILINE)
+        out_html = re.sub(pattern, replace_code_block, body_html, flags=re.DOTALL|re.MULTILINE)
     except:
         traceback.print_exc()
-        out_html = ret_html
+        out_html = body_html
         
-    # NOTE: 2026-01-10 14:07:32
+    # NOTE: 2026-01-10 14:07:32 FIXME/TODO
     # finally, make then inline images "stand" on their own
     
     return out_html
@@ -431,7 +444,7 @@ def mypylight(text):
         
     lexer = get_lexer_by_name("python", stripall=True)
 
-    return _fix_html_highlight(highlight(text, lexer, HtmlFormatter(noclasses=True, nobackground=True, style=style)))
+    return _fix_html_py_highlight(highlight(text, lexer, HtmlFormatter(noclasses=True, nobackground=True, style=style)))
     # return highlight(text, lexer, HtmlFormatter(noclasses=True, nobackground=True, style=style))
 
 def make_multicolumn_html(strings:typing.List[str], columns:int=4, fn:typing.Callable = lambda s: s) -> str:
@@ -745,7 +758,7 @@ def format_common_help_reply(msg:str):
             
     return "<br>\n".join(parts)
 
-def _fix_html_highlight(s:str) -> str:
+def _fix_html_py_highlight(s:str) -> str:
     s = s.replace("<br>", " ").replace("\n", "<br>").replace("<p>", "<br>").replace("<br><br>", "<br>").replace("</h1><br>", "</h1>")
     return s
 
@@ -1188,10 +1201,11 @@ reStructuredText-formatted text with ``.. image::`` directives
             with open(filepath.as_posix(), "wb") as pngfile:
                 pngfile.write(pngdata)
                 
-            snippet = f"\n\n\n .. image:: \n    {filepath.as_posix()}\n    :align: left\n\n"
+            snippet = f"\n .. image:: {filepath.as_posix()}\n"
+            # snippet = f"\n\n\n .. image:: \n    {filepath.as_posix()}\n    :align: left\n\n"
             
-            if ll.startswith("$$"):
-                snippet = "\n\n" + snippet + "\n\n"
+            # if ll.startswith("$$"):
+            #     snippet = "\n\n" + snippet + "\n\n"
                 
             txt = txt.replace(ltx, snippet)
         else:
