@@ -77,9 +77,8 @@ else:
     QShortcut = QtWidgets.QShortcut
     __has_sip__ = True
     
-
-
 from IPython.core.interactiveshell import InteractiveShell
+import pygments
 from core import prog
 from core.prog import safewrapper, safeguiwrapper, scipywarn
 from core.sysutils import adapt_ui_path
@@ -87,6 +86,7 @@ from core import strutils
 from helpsystem import helputils
 from gui.workspacegui import WorkspaceGuiMixin
 from gui import guiutils
+# from gui.scipyen_console_styles.keplerdark import KeplerDark
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __ui_path__ = adapt_ui_path(__module_path__,'pythonhelpwidget.ui')
@@ -105,7 +105,7 @@ class _PythonHelpThread_(QtCore.QThread):
         if not isinstance(shell, InteractiveShell):
             shell = guiutils.getScipyenConsoleShell()
         self.shell = shell
-            
+        self.console = shell.user_ns["console"]
         self.helpCommand = None
         self.helpProcess = None
         self.columns = 4
@@ -150,13 +150,22 @@ class _PythonHelpThread_(QtCore.QThread):
                     traceback.print_exc()
 
                 if isinstance(reply, str) and len(reply.strip()):
+                    background = pygments.styles.get_style_by_name(self.console.consoleWidget.pygment).background_color
                     out = list()
                     out += ['<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"',
                             '    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">']
                     out.append('<html>')
                     out += ["<head>", 
                             f"<title>{self.helpCommand}</title>", 
-                            '<meta> name="generator" content="Kate Editor"</meta>', 
+                            '<style>',
+                            '<body>',
+                            f'background-color: {background};',
+                            '</body>',
+                            'img {',
+                            'display: block;',
+                            'margin: 20px 20px;',
+                            '}',
+                            '</style>',
                             "</head>"]
                     out.append("<body>")
                     if reformat:
@@ -375,11 +384,7 @@ class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin
         else:
             self._showCustomPlaceHolderText_()
         
-    # @Slot(QtGui.QTextDocument, TemporaryDirectory)
-    # @Slot(str, TemporaryDirectory)
-    # @Slot(QtGui.QTextDocument, TemporaryDirectory)
     @Slot(dict)
-    # def _slot_displayReply(self, doc:typing.Union[QtGui.QTextDocument, str], imgdir:TemporaryDirectory):
     def _slot_displayReply(self, reply:dict):
         contents = reply.get("contents", None)
         imgdir = reply.get("imgdir", None)
@@ -402,6 +407,8 @@ class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin
 
             if query not in self._cache_:
                 self._cache_[query] = {"contents":contents, "imgdir":imgdir, "success":success}
+                
+        # self.exportDataToWorkspace(contents, "help_output", dialog=False)
 
 class PythonHelpWindow(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     def __init__(self, shell, parent=None):

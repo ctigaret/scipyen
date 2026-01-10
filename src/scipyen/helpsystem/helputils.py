@@ -303,8 +303,20 @@ def pub_rst(s:str) -> str:
     parts = publish_parts(s, writer_name='html5', settings_overrides=docutils_settings_overrides)
     ret_html = parts['html_body']
     return ret_html
+
+def rst_latex_2_html(text:str, 
+                     imgdir:typing.Optional[typing.Union[TemporaryDirectory, pathlib.Path, str]]=None) -> str:
+    latex_formatter = partial(format_latex, imgdir=imgdir)
     
+    html = rst_to_html_with_highlighting(latex_formatter(text.replace("\n", "\n ")))
+    pattern = r'<img\s+[^>]*>'
+    matches = re.findall(pattern, html)
+    for match in matches:
+        # print(f"match = {match}")
+        # html.replace(match, f"<div><br>{match}<br></div>")
+        html.replace(match, f"<table><tr><td>{match}</td></tr></table>")
     
+    return html
 
 def rst_to_html_with_highlighting(rst_text) -> str:
     r"""Another RST 2 HTML converter.
@@ -314,7 +326,7 @@ https://www.bomberbot.com/python/converting-restructuredtext-to-html-with-python
     # print(f"helpsystem.helputils.rst_to_html_with_highlighting()")
     # print(f"helpsystem.helputils.rst_to_html_with_highlighting(rst_text={rst_text})")
 
-    parts = publish_parts(rst_text, writer_name='html4', settings_overrides=docutils_settings_overrides)
+    parts = publish_parts(rst_text, writer_name='html5', settings_overrides=docutils_settings_overrides)
     ret_html = parts['html_body']
     
     def replace_code_block(match):
@@ -323,14 +335,21 @@ https://www.bomberbot.com/python/converting-restructuredtext-to-html-with-python
         code = html.unescape(code)
         return mypylight(code)
 
-    # NOTE: 2025-12-31 00:07:08 — see the Note module docstring
+    # NOTE: 2025-12-31 00:07:08 — see the Note module docstring;
+    # I'm having trouble with how the ``.. code-block::`` directive is rendered
+    # but WITHOUT colour highlighting...
     pattern = r'<pre class="literal-block">(.+?)</pre>' 
     
     try:
-        return re.sub(pattern, replace_code_block, ret_html, flags=re.DOTALL|re.MULTILINE)
+        out_html = re.sub(pattern, replace_code_block, ret_html, flags=re.DOTALL|re.MULTILINE)
     except:
         traceback.print_exc()
-        return ret_html
+        out_html = ret_html
+        
+    # NOTE: 2026-01-10 14:07:32
+    # finally, make then inline images "stand" on their own
+    
+    return out_html
 
 def mdhighlight(text):
     if guiutils.isDarkGui():
@@ -413,6 +432,7 @@ def mypylight(text):
     lexer = get_lexer_by_name("python", stripall=True)
 
     return _fix_html_highlight(highlight(text, lexer, HtmlFormatter(noclasses=True, nobackground=True, style=style)))
+    # return highlight(text, lexer, HtmlFormatter(noclasses=True, nobackground=True, style=style))
 
 def make_multicolumn_html(strings:typing.List[str], columns:int=4, fn:typing.Callable = lambda s: s) -> str:
     r"""Emulates pydoc.HTMLDoc.multicolumn with configurable number of columns"""
@@ -887,7 +907,8 @@ def hmake_info_unformatted(obj:object, info:oinspect.InfoDict, detail_level:int,
 """
     if not isinstance(shell, InteractiveShell):
         shell = guiutils.getScipyenConsoleShell()
-    latex_formatter = partial(format_latex, imgdir=imgdir)
+    # latex_formatter = partial(format_latex, imgdir=imgdir)
+    rst_latex_fmt = partial(rst_latex_2_html, imgdir=imgdir)
     bundle: UnformattedBundle = {
         "text/plain": [],
         "text/html": [],
@@ -913,7 +934,8 @@ def hmake_info_unformatted(obj:object, info:oinspect.InfoDict, detail_level:int,
     def rst_formatter(text) -> Bundle:
         return {
             'text/plain': _format(text),
-            'text/html': rst_to_html_with_highlighting(latex_formatter(text.replace("\n", "\n ")))
+            # 'text/html': rst_to_html_with_highlighting(latex_formatter(text.replace("\n", "\n ")))
+            'text/html': rst_latex_fmt(text)
         }
     def py_formatter(text) -> Bundle:
         return {
@@ -1132,7 +1154,7 @@ LaTeX mathematical expressions are rendered as `*.png` files stored in *imgdir*.
  
 Returns:
 --------
-reStructuredText-formatted text with ``image`` links
+reStructuredText-formatted text with ``.. image::`` directives
 """
     from core import strutils
     # Combined regular expression to capture all types of LaTeX
@@ -1166,10 +1188,10 @@ reStructuredText-formatted text with ``image`` links
             with open(filepath.as_posix(), "wb") as pngfile:
                 pngfile.write(pngdata)
                 
-            snippet = f"\n\n\n .. image:: {filepath.as_posix()}\n\n"
+            snippet = f"\n\n\n .. image:: \n    {filepath.as_posix()}\n    :align: left\n\n"
             
-            # if ll.startswith("$$"):
-            #     snippet = "\n\n" + snippet + "\n\n"
+            if ll.startswith("$$"):
+                snippet = "\n\n" + snippet + "\n\n"
                 
             txt = txt.replace(ltx, snippet)
         else:

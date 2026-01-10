@@ -1231,7 +1231,9 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         return list()
     
     @safewrapper
-    def exportDataToWorkspace(self, data:typing.Any, var_name:str, title:str="Export data to workspace"):
+    def exportDataToWorkspace(self, data:typing.Any, var_name:str, 
+                              title:str="Export data to workspace",
+                              dialog:bool=True):
         newVarName = strutils.str2symbol(var_name)
         if self.isTopLevel and self.appWindow:
             scipyenWindow = self.appWindow
@@ -1247,32 +1249,38 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
             
         newVarName = validate_varname(newVarName, ws = scipyenWindow.workspace)
         
-        dlg = qd.QuickDialog(self, title)
-        namePrompt = qd.StringInput(dlg, "Export data as:")
-        
-        namePrompt.variable.setClearButtonEnabled(True)
-        namePrompt.variable.redoAvailable=True
-        namePrompt.variable.undoAvailable=True
-        
-        namePrompt.setText(newVarName)
-        dlg.adjustSize()
-        
-        if dlg.exec() == QtWidgets.QDialog.Accepted:
-            newVarName = namePrompt.text()
-            # newVarName = validate_varname(namePrompt.text(), scipyenWindow.workspace)
-            if newVarName in scipyenWindow.workspace:
-                accept = self.questionMessage(title, f"A variable named {newVarName} exists in the workspace. Overwrite?")
-                # accept = self.questionMessage("Export to workspace", f"A variable named {newVarName} exists in the workspace. Overwrite?")
-                if accept not in (QtWidgets.QMessageBox.Ok, QtWidgets.QMessageBox.Yes):
-                    return
+        if dialog:
+            dlg = qd.QuickDialog(self, title)
+            namePrompt = qd.StringInput(dlg, "Export data as:")
+            
+            namePrompt.variable.setClearButtonEnabled(True)
+            namePrompt.variable.redoAvailable=True
+            namePrompt.variable.undoAvailable=True
+            
+            namePrompt.setText(newVarName)
+            dlg.adjustSize()
+            
+            if dlg.exec() == QtWidgets.QDialog.Accepted:
+                newVarName = namePrompt.text()
+                # newVarName = validate_varname(namePrompt.text(), scipyenWindow.workspace)
+                if newVarName in scipyenWindow.workspace:
+                    accept = self.questionMessage(title, f"A variable named {newVarName} exists in the workspace. Overwrite?")
+                    # accept = self.questionMessage("Export to workspace", f"A variable named {newVarName} exists in the workspace. Overwrite?")
+                    if accept not in (QtWidgets.QMessageBox.Ok, QtWidgets.QMessageBox.Yes):
+                        return
+                    
+                scipyenWindow.assignToWorkspace(newVarName, data)
                 
+                if hasattr(data, "modified") and isinstance(data.modified, bool):
+                    data.modified=False
+                
+                self.statusBar().showMessage("Done!")
+        else:
             scipyenWindow.assignToWorkspace(newVarName, data)
             
             if hasattr(data, "modified") and isinstance(data.modified, bool):
                 data.modified=False
             
-            self.statusBar().showMessage("Done!")
-        
     def getDataSymbolInWorkspace_(self, data=None):
         r"""Calls workspacefunctions.get_symbol_in_namespace for the data.
         """

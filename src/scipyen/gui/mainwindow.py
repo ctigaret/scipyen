@@ -9252,8 +9252,12 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         
         if all([isinstance(self.workspace[v], str) for v in varnames]):
             for v in varnames:
-                filename = "".join([v, ".txt"])
-                pio.saveText(self.workspace[v], filename)
+                o = self.workspace[v]
+                if strutils.is_html(o):
+                    filename = "".join([v, ".html"])
+                else:
+                    filename = "".join([v, ".txt"])
+                pio.saveText(o, filename)
         
 
     @Slot()

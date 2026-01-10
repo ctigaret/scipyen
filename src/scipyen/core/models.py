@@ -747,9 +747,7 @@ Returns:
 
 Example: 
 ========
-(code to run in Scipyen's console)
-
-::
+(code to run in Scipyen's console) ::
 
     from core import models
 
@@ -773,62 +771,56 @@ Example:
 
 $$f(T) = \\begin{cases} \\left( T / T_{p} \\right) \\times e^{\\left( 1 - T / T_{p} \\right)} & \\text{for}\\: T_{p} > 0 \\\\0 & \\text{otherwise} \\end{cases} \\qquad{} (2)$$
 
-which has
+which has:
 
-* extremum (1.0) at T = Tₚ (i.e. t - onset = τ)
-* value of 0.5 at t ∈ {≈ 0.23τ, ≈ 2.68τ}, hence:
-* half-width (with at half of peak amplitude) ≈ 2.45τ
-* area under the entire curve: 𝑒τ, where 𝑒 is Euler's number (Napier's constant)
+* extremum (1.0) at T = Tₚ (i.e. t - onset = τ);
+* value of 0.5 at t ∈ {≈ 0.23 × τ, ≈ 2.68 × τ};
+* half-width (with at half of peak amplitude) ≈ 2.45 × τ;
+* area under the entire curve: 𝑒τ, where 𝑒 is Euler's number (Napier's constant).
 
-#. The code in NEURON syn.mod does NOT include the additive bias α. I include α
-for the case where the transient modelled by alphaSynapse takes place on top of
-a constant signal (the "direct current", or "DC" component — this nomenclature
-is not always appropriate e.g. when modelling the change in membrane potential
-the "DC" component is rather some steady-state initial voltage V₀, such as the
-resting membrane potential).
+Things to keep in mind:
+
+#. The code in NEURON syn.mod does NOT include the additive bias α. 
+
+    I include α for the case where the transient modelled by alphaSynapse takes place on top of a constant signal.
 
 #. The β parameter here corresponds to the 𝑔ₘₐₓ in NEURON's code.
-Whether β is a conductance (𝑔) or not depends on what are you use this function
-for. NEURON's syn.mod calculates 𝑔 THEN converts it to a synaptic current 𝑖 
-(see above); if you use this function to model a current, you might want to adjust
-β accordingly (i.e. set it to YOUR 𝑔ₘₐₓ times the electromotive force 𝑣 - 𝑒).
+
+    Whether β is a conductance (𝑔) or not depends on what are you use this function for.
+
+    NEURON's syn.mod calculates 𝑔 THEN converts it to a synaptic current 𝑖 (see above).
+
+    If you use this function to model a current, you might want to adjust β accordingly (i.e. set it to YOUR 𝑔ₘₐₓ times the electromotive force 𝑣 - 𝑒).
 
 #. The x0 parameter here corresponds to the 'onset' in NEURON (and Rall) code.
 
-#. Finally, 'x' here corresponds to 𝑡 in NEURON's code. If follows that x0 and τ
-have the same physical units as 'x' (and t₀ is x0).
+#. Finally, 'x' here corresponds to 𝑡 in NEURON's code. 
+    If follows that x0 and τ have the same physical units as 'x' (and t₀ is x0).
 
-At
+Given the following:
 
-$f(x) = 0.5$
+$$\\begin{aligned} f(x) & = 0.5 \\\\ \\chi & = \\left(t - t_{0}\\right)/\\tau \\text{ for } \\tau > 0 \\end{aligned}$$
 
-and noting
 
-$\\chi  = \\left(t - t_{0}\\right)/\\tau \\text{ for } \\tau > 0$ with t₀ the onset,
+with t₀ the onset, eq. 2 becomes
 
-eq. 2 becomes
     
 $$\\chi \\times e^{\\left(1-\\chi\\right)} = 0.5 \\qquad{} (3)$$
 
-It follows that
+It follows that \ \ 
 
 $$\\chi = 0.5 \\times e^{\\left(\\chi - 1\\right)}$$
 
 This is a transcendental equation which can be solved graphically by plotting, 
-on the same axes, the curve
+on the same axes, the curves \ \ 
+    
+$$\\begin{aligned} g(t) & = \\chi \\\\ h(t) & = e^{\\left(\\chi - 1\\right)} \\times 0.5 \\end{aligned}$$
 
-$$g(t) = \\chi$$
-
-and
-
-$$h(t) = e^{\\left(\\chi - 1\\right)} \\times 0.5$$
     
 The intersections between the two curves are the solutions χ₀, χ₁ of `Eq. 3 ` (you may want to plot the region of the curves where x <= 0.2, in order to  visualize the intersections).
     
-Example:
+Example: ::
     
-::
-
     x = np.linspace(0,1,int(1e5))
     τ = 0.05
     g = x/τ
