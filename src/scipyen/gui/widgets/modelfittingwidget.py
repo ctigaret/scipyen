@@ -6,7 +6,7 @@
 
 r"""Widget for model parameter inputs
 """
-import math, numbers, typing, os
+import math, numbers, typing, os, types
 import numpy as np
 import quantities as pq
 import pandas as pd
@@ -46,29 +46,48 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 Ui_ModelFittingWidget, QWidget = loadUiType(os.path.join(__module_path__, "ModelFittingWidget.ui"))
 
 class ModelFittingWidget(Ui_ModelFittingWidget, QWidget):
-    def __init__(self, parent=None, **kwargs):
+    def __init__(self, model: typing.Optional[typing.Union[pd.DataFrame, types.FunctionType]]=None, parent=None):
         r"""
-    Var-keyword parameters:
-    model: can be 
-        • a pandas DataFrame with the following mandatory structure:
-            ∘ index: model parameter symbols (strings)
-            ∘ columns: 'Initial Value', 'Lower Bound', 'Upper Bound', 'Keep Feasible';
-                The first three columns contain scalar floats or scalar python Quantity objects
-                with the initial, lower and upper bound values for the corresponding model
-                parameter in the respective row.
-                The fourth column contains bool values.
-                
-    """
-        modelParameters = kwargs.get("model", None)
-        
+Parameters:
+===========
+
+:model: one of
+    * a pandas DataFrame with the following mandatory structure:
+        * index: model parameter symbols (strings)
+        * columns: 'Initial Value', 'Lower Bound', 'Upper Bound', 'Keep Feasible';
+            The first three columns contain scalar floats or scalar python Quantity objects
+            with the initial, lower and upper bound values for the corresponding model
+            parameter in the respective row.
+            The fourth column contains bool values.
+    * a modelfunction — a Python function decorated with the ``modelfunction`` decorator (see core.models)
+            
+"""
         QWidget.__init__(self, parent=parent)
         
         self._data_:typing.Optional[pd.DataFrame] = None
+        self._model_name_:typing.Optional[str] = None
+        
+        if isinstance(model, pd.DataFrame):
+            assert all(v in model.columns for v in ('Initial Value', 'Lower Bound', 'Upper Bound', 'Keep Feasible')), "Not a model parameters data frame"
+            self._data_ = model
+            
+        elif models.is_modelfunction(model):
+            fitting_dict = dict()
+            coefficients = model.coefficients
+            if model.fitting:
+                fitting_dict["Initial Value"] = model.fitting["initial"]
+                fitting_dict["Lower Bound"] = model.fitting["lower"]
+                fitting_dict["Upper Bound"] = model.fitting["upper"]
+            else:
+                fitting_dict = {'Initial Value': [0.] * len(coefficients), 'Lower Bound': [-np.inf] * len(coefficients), "Upper Bound": [np.inf] * len(coefficients)}
+            fitting_dict["Keep Feasible"] = [True] * len(coefficients)
+            
+            self._data_ = pd.DataFrame(fitting_dict, index=coefficients)
+            
         
         self._configureUI_()
         
         if isinstance(self._data_, pd.DataFrame):
-            assert all(v in parameters.columns for v in ('Initial Value', 'Lower Bound', 'Upper Bound', 'Keep Feasible')), "Not a model parameters data frame"
             self.modelParamsTable.setData(self._data_)
         
     def _configureUI_(self):

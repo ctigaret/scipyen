@@ -323,8 +323,8 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                 
             elif isinstance(data, float) or "float" in type(data).__name__: # to include numpy array float dtypes
                 widget = QtWidgets.QDoubleSpinBox(parent)
-                widget.setMinimum(-1e3)
-                widget.setMaximum(1e3)
+                widget.setMinimum(-math.inf)
+                widget.setMaximum(math.inf)
                 widget.setSingleStep(1)
                 
             elif isinstance(data, pq.Quantity):
