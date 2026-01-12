@@ -74,6 +74,12 @@
      </item>
      <item>
       <widget class="QuantitySpinBox" name="durationSpinBox">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
        <property name="toolTip">
         <string>Duration of synthetic mPSC waveform</string>
        </property>
@@ -84,6 +90,36 @@
         <string>Duration of synthetic mPSC waveform</string>
        </property>
       </widget>
+     </item>
+     <item>
+      <widget class="QLabel" name="samplingRateLabel">
+       <property name="text">
+        <string>Sampling Rate:</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QuantitySpinBox" name="samplingRateSpinBox">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <spacer name="horizontalSpacer_2">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
      </item>
      <item>
       <widget class="QPushButton" name="makeUnitAmplitudePushButton">
@@ -100,19 +136,6 @@
         <string>Unit Amplitude</string>
        </property>
       </widget>
-     </item>
-     <item>
-      <spacer name="horizontalSpacer_2">
-       <property name="orientation">
-        <enum>Qt::Horizontal</enum>
-       </property>
-       <property name="sizeHint" stdset="0">
-        <size>
-         <width>40</width>
-         <height>20</height>
-        </size>
-       </property>
-      </spacer>
      </item>
      <item>
       <widget class="QToolButton" name="plot_eventWaveformToolButton">

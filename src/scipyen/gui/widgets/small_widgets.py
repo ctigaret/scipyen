@@ -712,17 +712,28 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         elif s.lower() == "nan":
             return math.nan * self.units
         else:
-            ret = float(s) if len(s) else math.nan
+            if len(s.strip()) == 0:
+                ret = math.nan
+            else:
+                if s.startswith("e"):
+                    s = "1"+s
+                elif s.startswith("+e"):
+                    s = s.replace("+e", "+1e")
+                elif s.startswith("-e"):
+                    s = s.replace("-e", "11e")
+                ret = float(s) 
             # print(f"{self.__class__.__name__}.valueFromText(text={text}) -> ret {ret}")
             units = self.units
             return ret * units.units if isinstance(units, pq.Quantity) else ret
 
     def textFromValue(self, value:typing.Union[float, pq.Quantity, np.ndarray]):
+        print(f"{self.__class__.__name__}.textFromValue({value})")
         if isinstance(value, (pq.Quantity, np.ndarray)):
             if value.size > 1:
                 return "NA"
                 
             units = value.units if isinstance(value, pq.Quantity) else pq.dimensionless
+            
             prefix = ""
             suffix = ""
             family = scq.getUnitFamily(units)
@@ -736,7 +747,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             if np.isnan(fval):
                 ret = "NaN"
             elif np.isinf(fval):
-                ret = "-Inf" if fval in (-np.inf, -mathl.inf) else "Inf"
+                ret = "-Inf" if fval in (-np.inf, -math.inf) else "Inf"
             else:
                 ret = f"{fval:.{self.decimals}}"
                 # ret = super().textFromValue(float(value.magnitude))
@@ -745,6 +756,8 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
                 ret = f"{prefix} {ret}"
             if len(suffix):
                 ret = f"{ret} {suffix}"
+                
+            print(f"\t ret -> {ret}")
                 
             return ret
             
@@ -805,10 +818,12 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
                 text = specialText
                 
             if len(self._prefix_):
-                text = f"{self._prefix_} {text}"
+                text = f"{self._prefix_} {text} "
                 
             if len(self._suffix_):
-                text = f"{text} {self._suffix_}"
+                text = f" {text} {self._suffix_}"
+                
+            print(f"{self.__class__.__name__}.setValue({value}) -> text = {text}")
                 
             self.lineEdit().setText(text)
             
