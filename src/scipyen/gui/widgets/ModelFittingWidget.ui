@@ -7,34 +7,24 @@
     <x>0</x>
     <y>0</y>
     <width>691</width>
-    <height>345</height>
+    <height>441</height>
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Form</string>
+   <string>ModelFittingWidget</string>
   </property>
-  <layout class="QVBoxLayout" name="verticalLayout">
-   <item>
-    <widget class="TableEditorWidget" name="modelParamsTable" native="true">
-     <property name="sizePolicy">
-      <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-       <horstretch>1</horstretch>
-       <verstretch>0</verstretch>
-      </sizepolicy>
-     </property>
-    </widget>
-   </item>
-   <item>
+  <property name="accessibleName">
+   <string>ModelFittingWidget</string>
+  </property>
+  <layout class="QGridLayout" name="gridLayout">
+   <item row="0" column="0">
     <layout class="QHBoxLayout" name="horizontalLayout">
      <item>
-      <widget class="QLabel" name="label_Model">
+      <widget class="QLabel" name="modelNameLabel">
        <property name="text">
-        <string>Model:</string>
+        <string/>
        </property>
       </widget>
-     </item>
-     <item>
-      <widget class="QComboBox" name="modelsComboBox"/>
      </item>
      <item>
       <spacer name="horizontalSpacer">
@@ -49,6 +39,20 @@
        </property>
       </spacer>
      </item>
+    </layout>
+   </item>
+   <item row="1" column="0">
+    <widget class="TableEditorWidget" name="modelCoefficientsTable" native="true">
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+       <horstretch>1</horstretch>
+       <verstretch>1</verstretch>
+      </sizepolicy>
+     </property>
+    </widget>
+   </item>
+   <item row="2" column="0">
+    <layout class="QHBoxLayout" name="horizontalLayout_2">
      <item>
       <widget class="QLabel" name="label_Duration">
        <property name="toolTip">
@@ -96,6 +100,19 @@
         <string>Unit Amplitude</string>
        </property>
       </widget>
+     </item>
+     <item>
+      <spacer name="horizontalSpacer_2">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
      </item>
      <item>
       <widget class="QToolButton" name="plot_eventWaveformToolButton">
