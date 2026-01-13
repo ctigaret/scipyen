@@ -76,7 +76,16 @@ class InftyDoubleValidator(QtGui.QDoubleValidator):
         self.suffix = suffix if isinstance(suffix, str) else ""
         
     def validate(self, s:str, pos:int):
-        ss = s.strip(self.suffix)
+        sfxndx = s.find(self.suffix)
+        if sfxndx > 0:
+            ss = s[:sfxndx]
+        else:
+            ss = s
+        # ss = s.strip(self.suffix)
+        # ### BEGIN
+        # pname = f"{self.parent.objectName()}: " if isinstance(self.parent, QtWidgets.QWidget) else ""
+        # print(f"{pname}{self.__class__.__name__}.validate(s={s}, pos={pos}): ss -> {ss}")
+        # ### END
         
         if ss.lower() in ("-", "-i", "i", "-in", "in"):
             ret = (QtGui.QValidator.Intermediate, ss, pos)

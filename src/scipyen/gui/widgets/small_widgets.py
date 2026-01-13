@@ -378,32 +378,35 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         else:
             raise TypeError(f"decimals expected to be an int >= 0 or None; instead, got {decimals}")
 
-        # print(f"{self.__class__.__name__}.__init__:  decimals -> {self.decimals}")
+        # print(f"{self.objectName()}: {self.__class__.__name__}.__init__:  decimals -> {self.decimals}")
             
         self._internal_minimum = self._default_internal_minimum
         self._internal_maximum = self._default_internal_maximum
         
         self.setContextMenuPolicy(QtCore.Qt.DefaultContextMenu)
-        # print(f"{self.__class__.__name__}.__init__ DONE")
+        # print(f"{self.objectName()}: {self.__class__.__name__}.__init__ DONE")
         
-        super().setValue(self._magnitude_)
+        # super().setSuffix(self._suffix_)
+        # super().setPrefix(self._prefix_)
+
+        super().setValue(self._magnitude_) # will also set prefix suffix and specialValueText
         super().setSingleStep(self._singleStep_)
         super().setDecimals(self._decimals_)
+
         if isinstance(stepType, QtWidgets.QAbstractSpinBox.StepType):
             super().setStepType(stepType)
         else:
             super().setStepType(QtWidgets.QAbstractSpinBox.DefaultStepType)
-        
+
         super().setRange(self._internal_minimum, self._internal_maximum)
         if isinstance(stepType, QtWidgets.QAbstractSpinBox.StepType):
             super().setStepType(stepType)
-        super().setSuffix(self._suffix_)
-        super().setPrefix(self._prefix_)
         
         if isinstance(units, pq.Quantity) and not isinstance(units, pq.UnitQuantity):
             self.setValue(units)
         
         super().valueChanged.connect(self._slot_valueChanged)
+        # self.lineEdit().setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
         self.lineEdit().textChanged.connect(self._slot_valueTextChanged)
         
     @property
@@ -455,6 +458,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             super().setSpecialValueText(text)
         else:
             text = f"{self._magnitude_:.{self.decimals}}"
+            super().setSpecialValueText("")
             
         super().setSuffix(self._suffix_)
         super().setPrefix(self._prefix_)
@@ -464,6 +468,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         if len(self._suffix_):
             text = f"{text}{self._suffix_}"
             
+        # print(f"{self.objectName()}: {self.__class__.__name__}.units.setter({value}): text -> {text}")
         self.lineEdit().setText(text)
             
     @Slot(str)
@@ -482,7 +487,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         self.keepDimensionless = val
             
     def contextMenuEvent(self, evt):
-        # print(f"{self.__class__.__name__}.contextMenuEvent: _enforceImmutableUnits_ = {self._enforceImmutableUnits_}")
+        # print(f"{self.objectName()}: {self.__class__.__name__}.contextMenuEvent: _enforceImmutableUnits_ = {self._enforceImmutableUnits_}")
         cm = QtWidgets.QMenu("Options", self)
         if not (self._keepDimensionless_ or self._forceDimensionless_ or self._disableUnitChange_ or self._enforceImmutableUnits_):
             setUnitsAction = cm.addAction("Set units")
@@ -651,7 +656,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             return ret
         return ret * self.units
     
-    def value(self) -> pq.Quantity:
+    def value(self) -> pq.Quantity | type(pd.NA):
         r""" Reimplements QDoubleSpinBox.value() to return a quantity
         """
         if self.specialValueText() == "NA":
@@ -689,7 +694,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         validator.setDecimals(self.getDecimals()) 
         valid = validator.validate(text, pos)
         validstr = validatorString(valid[0])
-        # print(f"{self.__class__.__name__}[{self.objectName()}].validate text: {text}, pos: {pos} ⇒ {validstr}")
+        # print(f"{self.objectName()}: {self.__class__.__name__}.validate text: {text}, pos: {pos} ⇒ {validstr}")
         return valid
     
     def valueFromText(self, text:str):
@@ -705,7 +710,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             
         s = s.replace(",", "")
         
-        # print(f"{self.__class__.__name__}.valueFromText(text={text}) -> s: {s}")
+        # print(f"{self.objectName()}: {self.__class__.__name__}.valueFromText(text={text}) -> s: {s}")
             
         if s == "NA":
             return pd.NA
@@ -722,12 +727,12 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
                 elif s.startswith("-e"):
                     s = s.replace("-e", "11e")
                 ret = float(s) 
-            # print(f"{self.__class__.__name__}.valueFromText(text={text}) -> ret {ret}")
+            # print(f"{self.objectName()}: {self.__class__.__name__}.valueFromText(text={text}) -> ret {ret}")
             units = self.units
             return ret * units.units if isinstance(units, pq.Quantity) else ret
 
     def textFromValue(self, value:typing.Union[float, pq.Quantity, np.ndarray]):
-        print(f"{self.__class__.__name__}.textFromValue({value})")
+        # print(f"{self.objectName()}: {self.__class__.__name__}.textFromValue({value})")
         if isinstance(value, (pq.Quantity, np.ndarray)):
             if value.size > 1:
                 return "NA"
@@ -757,10 +762,10 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             if len(suffix):
                 ret = f"{ret} {suffix}"
                 
-            print(f"\t ret -> {ret}")
-                
+            # print(f"\t ret -> {ret}")
+
             return ret
-            
+
         elif isinstance(value, float):
             if np.isnan(value):
                 ret = "NaN"
@@ -769,7 +774,8 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             else:
                 ret = f"{value:.{self.decimals}}"
                 # ret = super().textFromValue(value)
-            
+
+            # print(f"\t ret -> {ret}")
             return ret
 
         else:
@@ -805,6 +811,9 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         
         elif isinstance(value, int):
             self._magnitude_ = float(value)
+
+        elif isinstance(value, (np.float64, np.int64)):
+            self._magnitude_ = float(value)
             
         else:
             raise ValueError(f"Incompatible value: {value}")
@@ -816,6 +825,8 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             if len(specialText):
                 super().setSpecialValueText(specialText)
                 text = specialText
+            else:
+                super().setSpecialValueText("")
                 
             if len(self._prefix_):
                 text = f"{self._prefix_} {text} "
@@ -823,24 +834,25 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             if len(self._suffix_):
                 text = f" {text} {self._suffix_}"
                 
-            print(f"{self.__class__.__name__}.setValue({value}) -> text = {text}")
-                
+            # print(f"{self.objectName()}: {self.__class__.__name__}.setValue({value}) -> text = {text}")
+
             self.lineEdit().setText(text)
-            
+
         elif self._magnitude_ in (pd.NA, math.nan, np.nan):
             super().setMinimum(-math.inf)
             specialText = "NA" if self._magnitude_ is pd.NA else "NaN"
             super().setSpecialValueText(specialText)
             super().setValue(-math.inf)
-            
+
             text = specialText
-            
+
             if len(self._prefix_):
                 text = f"{self._prefix_} {text}"
-                
+
             if len(self._suffix_):
                 text = f"{text} {self._suffix_}"
-            
+
+            # print(f"{self.objectName()}: {self.__class__.__name__}.setValue({value}) -> text = {text}")
             self.lineEdit().setText(text)
                 
         else:
@@ -1634,16 +1646,6 @@ class ComplexSpinBox(QtWidgets.QFrame):
                 self._prefix_ = ""
                 self._suffix_ = f" ({symbol})"
         
-        # if np.isnan(self._magnitude_):
-        #     text = "NaN"
-        #     super().setSpecialValueText(text)
-            
-        # elif np.isinf(self._magnitude_):
-        #     text = "-Inf" if self._magnitude_ in (-np.inf, -math.inf) else "Inf"
-        #     super().setSpecialValueText(text)
-        # else:
-        #     text = f"{self._magnitude_:.{self.decimals}}"
-            
         self.prefixLabel.setText(self._prefix_)
         self.suffixLabel.setText(self._suffix_)
         
