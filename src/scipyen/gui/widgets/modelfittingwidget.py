@@ -47,30 +47,34 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 Ui_ModelFittingWidget, QWidget = loadUiType(os.path.join(__module_path__, "ModelFittingWidget.ui"))
 
 class ModelFittingWidget(Ui_ModelFittingWidget, QWidget):
-    def __init__(self, model: typing.Optional[typing.Union[pd.DataFrame, types.FunctionType]]=None,
+    sig_waveformReady = Signal(object, name="sig_waveformReady")
+    def __init__(self, model: typing.Optional[types.FunctionType]=None,
+                 coefficients:typing.Optional[typing.Union[pd.DataFrame, dict]] = None,
+                 waveformUnits:typing.Optional[pq.Quantity]=None,
                  parent=None):
         r"""
 Parameters:
 ===========
 
-:model: one of
-    * a pandas DataFrame with the following mandatory structure:
+:model: a model function — a Python function decorated with the ``modelfunction`` decorator (see core.models)
+
+:coefficients: a pandas DataFrame with the following mandatory structure:
         * index: model parameter symbols (strings)
         * columns: 'Initial Value', 'Lower Bound', 'Upper Bound', 'Keep Feasible';
             The first three columns contain scalar floats or scalar python Quantity objects
             with the initial, lower and upper bound values for the corresponding model
             parameter in the respective row.
             The fourth column contains bool values.
-    * a model function — a Python function decorated with the ``modelfunction`` decorator (see core.models)
 
             
 """
         QWidget.__init__(self, parent=parent)
         
-        self._data_:typing.Optional[pd.DataFrame] = None
+        self._model_coefficients_:typing.Optional[pd.DataFrame] = None
         self._model_name_:typing.Optional[str] = None
         self._waveformDuration_:pq.Quantity = 1*pq.s
         self._waveformSamplingRate_:pq.Quantity = 1e4 * 1/self._waveformDuration_.units
+        self._waveformUnits_:typing.Optional[pq.Quantity] = waveformUnits
         
         durationFamily = scq.getUnitFamily(self._waveformDuration_)
         if durationFamily == "Time":
@@ -81,7 +85,7 @@ Parameters:
             self._waveformSamplingRate_.rescale(pq.angle_frequency_unit)
             
         
-        if models.is_modelfunction(model):
+        if models.isModelFunction(model):
             self._model_ = model
             fitting_dict = dict()
             coefficients = model.coefficients
@@ -93,13 +97,31 @@ Parameters:
                 fitting_dict = {'Initial Value': [0.] * len(coefficients), 'Lower Bound': [-np.inf] * len(coefficients), "Upper Bound": [np.inf] * len(coefficients)}
             fitting_dict["Keep Feasible"] = [True] * len(coefficients)
 
-            self._data_ = pd.DataFrame(fitting_dict, index=coefficients)
+            self._model_coefficients_ = pd.DataFrame(fitting_dict, index=coefficients)
             self._model_name_ = model.title
+            
+        if isinstance(coefficients, pd.DataFrame):
+            # NOTE: 2026-01-13 23:26:42
+            # override coefficients given by model only if the indexes are the same
+            assert all(c in coefficients.index for c in self._model_.coefficients) and all(c in self._model_.coefficients for c in coefficients), "Incompatible coefficients data were supplied"
+            # assert 
+            self._model_coefficients_ = coefficients
+            
+        elif isinstance(coefficients, dict):
+            assert models.isFittingCoefficientsDict(coefficients) and all(c in coefficients.keys() for c in self._model_.coefficients) and all(c in self._model_.coefficients_ for c in coefficients.keys()), "Incompatible coefficients data supplied"
+            fitting_dict["Initial Value"] = coefficients["initial"]
+            fitting_dict["Lower Bound"] = coefficients["lower"]
+            fitting_dict["Upper Bound"] = coefficients["upper"]
+            fitting_dict["Keep Feasible"] = [True] * len(coefficients["initial"])
+            self._model_coefficients_ = pd.DataFrame(fitting_dict, index=coefficients)
+            
+        if isinstance(self._model_coefficients_, pd.DataFrame):
+            self.setModelData(self._model_coefficients_)
+            
+            
 
         self._configureUI_()
         
-        if isinstance(self._data_, pd.DataFrame):
-            self.setModelData(self._data_)
 
     def _configureUI_(self):
         self.setupUi(self)
@@ -121,14 +143,16 @@ Parameters:
         # self.modelCoefficientsTable.sig_badBounds[str].connect(self._slot_badBounds)
         # self.modelCoefficientsTable.sig_infeasible_x0[str].connect(self._slot_infeasible_x0s)
         # self.setMinimumSize(self.modelCoefficientsTable.tableView.viewportSizeHint())
+        
+        self.generateWaveformToolButton.triggered.connect(self._slot_generateWaveform)
 
     def setModelData(self, data:typing.Optional[pd.DataFrame]=None):
         if isinstance(data, pd.DataFrame):
             assert all(v in data.columns for v in ('Initial Value', 'Lower Bound', 'Upper Bound', 'Keep Feasible')), "Not a model parameters data frame"
-            self._data_ = data
+            self._model_coefficients_ = data
             
-        if isinstance(self._data_, pd.DataFrame):
-            self.modelCoefficientsTable.setData(self._data_)
+        if isinstance(self._model_coefficients_, pd.DataFrame):
+            self.modelCoefficientsTable.setData(self._model_coefficients_)
             # self.setMinimumSize(self.modelCoefficientsTable.tableView.viewportSizeHint())
 
     def _calculateWaveformSamples(self) -> int:
@@ -140,11 +164,28 @@ Parameters:
         return np.linspace(t_start.magnitude, self._waveformDuration_.magnitude, self._calculateWaveformSamples())
         
     def _generateWaveform_(self) -> np.ndarray:
-        return self._model_(self._generateWaveformDomain_(), self._data_["Initial Values"])
+        return self._model_(self._generateWaveformDomain_(), self._model_coefficients_["Initial Values"])
         
     @Slot()
     def _slot_modelParameterChanged(self):
         pass
+    
+    @Slot()
+    def _slot_generateWaveform(self):
+        from core import datasignal
+        if not isinstance(self._model_, types.FunctionType) or not models.isModelFunction(self._model_):
+            return
+        x = self._generateWaveformDomain_()
+        coeffs = self._model_coefficients_["Initial Value"]
+        y = self._model_(x, coeffs)
+        sigUnits = self._waveformUnits_.units if isinstance(self._waveformUnits_, pq.Quantity) else pq.dimensionless
+        if scq.checkTimeUnits(self._waveformDuration_):
+            sig = neo.AnalogSignal(y, t_start = 0*self._waveformDuration_.units, units = sigUnits, sampling_rate=self._waveformSamplingRate_, name=self._model_name_)
+        else:
+            sig = datasignal.DataSignal(y, t_start = 0*self._waveformDuration_.units, units = sigUnits, domain_units = self._waveformDuration_.units, 
+                                        sampling_rate=self._waveformSamplingRate_, name=self._model_name_)
+        self.sig_waveformReady.emit(sig)
+        
 
 
     @Slot()

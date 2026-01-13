@@ -57,9 +57,11 @@ from core.datatypes import (Real, Complex, Number)
 # Real: typing.TypeAlias = typing.Union[int, float, np.int64, np.float64]
 # Complex: typing.TypeAlias = typing.Union[complex, np.complex128]
 
-FittingCoefficientsDict = typing.TypedDict("FittingCoefficientsDict", {"initial": typing.Union[Real, typing.Sequence[Real]],
+FittingCoefficientsDict = typing.TypedDict("FittingCoefficientsDict", {"names": typing.Union[str, typing.Sequence[str]],
+                                                                       "initial": typing.Union[Real, typing.Sequence[Real]],
                                                                        "lower": typing.Union[Real, typing.Sequence[Real]],
-                                                                       "upper": typing.Union[Real, typing.Sequence[Real]]})
+                                                                       "upper": typing.Union[Real, typing.Sequence[Real]]
+                                                                       })
 
 def isFittingCoefficientsDict(x:dict):
     r"""Required because TypedDict does not support instance and class checks"""
@@ -1347,7 +1349,7 @@ def compound_transient(x:np.ndarray | Real,
     
     x = check_independent_variable(x)
     
-    assert is_modelfunction(func), f"Single transient function {func.__name__} must be a model function"
+    assert isModelFunction(func), f"Single transient function {func.__name__} must be a model function"
     
     singlecoeffs = func.coefficients
     
@@ -2049,14 +2051,14 @@ p: the parameters in the specific order: (x₀, y₀, x₁, y₁)
 #     return names
         
 
-def is_modelfunction(func:typing.Callable):
+def isModelFunction(func:typing.Callable):
     if not isinstance(func, typing.Callable):
         return False
     
     return isinstance(getattr(func, "model_function", None), bool) and isinstance(getattr(func, "nvars", None), int)
 
 def get_initial_coefficient_values(func:typing.Callable) -> pd.DataFrame | None:
-    if not is_modelfunction(func):
+    if not isModelFunction(func):
         raise TypeError(f"{func} is not a model function")
     
     if len(func.coefficients) == 0:
