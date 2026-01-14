@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>691</width>
-    <height>441</height>
+    <width>522</width>
+    <height>439</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -138,7 +138,7 @@
       </widget>
      </item>
      <item>
-      <widget class="QToolButton" name="generateWaveformToolButton">
+      <widget class="QPushButton" name="generateWaveformPushButton">
        <property name="toolTip">
         <string>Generate waveform</string>
        </property>
@@ -149,7 +149,7 @@
         <string>Generate waveform</string>
        </property>
        <property name="text">
-        <string>Plot mPSC model</string>
+        <string/>
        </property>
        <property name="icon">
         <iconset theme="waveform"/>

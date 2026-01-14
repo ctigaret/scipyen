@@ -60,7 +60,8 @@ from core.datatypes import (Real, Complex, Number)
 FittingCoefficientsDict = typing.TypedDict("FittingCoefficientsDict", {"names": typing.Union[str, typing.Sequence[str]],
                                                                        "initial": typing.Union[Real, typing.Sequence[Real]],
                                                                        "lower": typing.Union[Real, typing.Sequence[Real]],
-                                                                       "upper": typing.Union[Real, typing.Sequence[Real]]
+                                                                       "upper": typing.Union[Real, typing.Sequence[Real]],
+                                                                       "feasbile": typing.Union[bool, typing.Sequence[bool]]
                                                                        })
 
 def isFittingCoefficientsDict(x:dict):
@@ -68,7 +69,12 @@ def isFittingCoefficientsDict(x:dict):
     if not isinstance(x, dict):
         return False
     
-    return all(map(lambda k: k in FittingCoefficientsDict.__required_keys__, x.keys())) and all(map(lambda k: k in x.keys(), FittingCoefficientsDict.__required_keys__))
+    ret = all(map(lambda k: k in FittingCoefficientsDict.__required_keys__, x.keys())) and all(map(lambda k: k in x.keys(), FittingCoefficientsDict.__required_keys__))
+
+    if ret:
+        ret &= all(isinstance(v, typing.Sequence) for v in x.values()) and all(len(x[k]) == len(x["names"]) for k in ("initial", "lower", "upper"))
+
+    return ret
 
 def check_independent_variable(x:typing.Union[Real, np.ndarray], ndim:typing.Optional[int]=None):
     if not isinstance(x, (Real, np.ndarray)):
@@ -308,8 +314,20 @@ https://wiki.python.org/moin/PythonDecoratorLibrary#Creating_decorator_with_opti
         
         setattr(f, "expression", expression)
         
-        setattr(f, "fitting", fitting)
-        
+        setattr(f, "fitting", None)
+
+        if isFittingCoefficientsDict(fitting):
+            # NOTE: 2026-01-14 11:19:43
+            # silently ignore incomparible fitting data
+            if len(getattr(f, "coefficients")) == 0:
+                setattr(f, "fitting", fitting)
+
+            elif set(fitting["names"]) == set(getattr(f, "coefficients")):
+                setattr(f, "fitting", fitting)
+
+            else:
+                setattr(f, "fitting", None)
+
         # ### BEGIN NOTE: 2025-12-26 14:50:30 various optins - do NOT delete these; instead, keep for future reference
         #
         # def __display__(f):
@@ -912,7 +930,7 @@ $$\\int_{0}^{\\infty} f(x)dx = e \\times \\tau \\qed \\qquad{} (5)$$
     # unpack parameters
     α, β, x0, τ = check_unpack_model_coeffs(4, α, β, x0, τ)
     # print(f"{α}")
-    assert(τ > 0.), "Time constant MUST be strictly positive"
+    assert(τ > 0.), "Time constant τ MUST be strictly positive"
     
     def alpha(v):
         # NOTE: 2025-12-08 00:24:16
