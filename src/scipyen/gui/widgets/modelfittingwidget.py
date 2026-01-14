@@ -146,10 +146,25 @@ Named Parameters:
         if isinstance(self._model_coefficients_, pd.DataFrame):
             self.setModelData(self._model_coefficients_)
 
-        exprimg = models.renderModelExpression(self._model_.expression)
-        if isinstance(exprimg, QtGui.QPixmap):
-            self.modelExpressionLabel.setPixmap(exprimg)
-            self.modelExpressionLabel.setScaledContents(True)
+        self.modelExpressionLabel.setScaledContents(True)
+        self.exprPix = models.renderModelExpression(self._model_.expression)
+        self.resizeEvent(None)
+
+        if isinstance(self.exprPix, QtGui.QPixmap):
+            scaledPix = self._rescaleExprPix_()
+            self.modelExpressionLabel.setPixmap(scaledPix)
+
+    def resizeEvent(self, evt:QtGui.QResizeEvent):
+        if isinstance(self.exprPix, QtGui.QPixmap) and not self.exprPix.isNull() and self.modelExpressionLabel.size().isValid():
+            scaledPix = self._rescaleExprPix_()
+            self.modelExpressionLabel.setPixmap(scaledPix)
+
+
+
+    def _rescaleExprPix_(self) -> QtGui.QPixmap:
+        return self.exprPix.scaled(self.modelExpressionLabel.size(),
+                                    QtCore.Qt.KeepAspectRatio, QtCore.Qt.FastTransformation)
+
 
 
     def _configureUI_(self):

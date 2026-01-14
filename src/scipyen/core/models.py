@@ -38,7 +38,7 @@ A biased, scaled and shifted version of (1) is:
 .. attention:: Please consider decorating all model functions with the ``modelfunction`` decorator.
 This will help identifying these functions easily from other Scipyen components.
 """
-import typing, types
+import typing, types, traceback
 import numbers
 import neo
 import numpy as np
@@ -2150,11 +2150,12 @@ def make_initial_coeffs(names:typing.Sequence[str]| dict, /,
     
 def renderModelExpression(expression:typing.Union[sympy.Basic, str], out:str = "pix"):
     from core.utilities import render_sympy
+    from core.strutils import (is_latex, render_latex)
     if out not in ('ipython', 'pil', 'img', 'pix', 'bytes'):
         raise ValueError(f"Invalid output type specified ({out}); expecting one of {('ipython', 'pil', 'img', 'pix', 'bytes')}")
-    if isinstance(expression, sympy.Basic) or (isinstance(expression, str) and strutils.is_latex(expression)):
+    if isinstance(expression, sympy.Basic) or (isinstance(expression, str) and is_latex(expression)):
         try:
-            img = render_sympy(expression, out=out) if isinstance(expression, sympy.Basic) else render_latex(expression, out="bytes")
+            img = render_sympy(expression, out=out) if isinstance(expression, sympy.Basic) else render_latex(expression, out=out)
         except:
             traceback.print_exc()
             img = None
