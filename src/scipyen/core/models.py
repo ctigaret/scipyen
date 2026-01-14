@@ -2148,3 +2148,15 @@ def make_initial_coeffs(names:typing.Sequence[str]| dict, /,
                 feasible
         
     
+def renderModelExpression(expression:typing.Union[sympy.Basic, str], out:str = "pix"):
+    from core.utilities import render_sympy
+    if out not in ('ipython', 'pil', 'img', 'pix', 'bytes'):
+        raise ValueError(f"Invalid output type specified ({out}); expecting one of {('ipython', 'pil', 'img', 'pix', 'bytes')}")
+    if isinstance(expression, sympy.Basic) or (isinstance(expression, str) and strutils.is_latex(expression)):
+        try:
+            img = render_sympy(expression, out=out) if isinstance(expression, sympy.Basic) else render_latex(expression, out="bytes")
+        except:
+            traceback.print_exc()
+            img = None
+
+        return img

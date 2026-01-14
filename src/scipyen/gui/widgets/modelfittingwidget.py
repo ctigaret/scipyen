@@ -49,7 +49,7 @@ Ui_ModelFittingWidget, QWidget = loadUiType(os.path.join(__module_path__, "Model
 
 class ModelFittingWidget(Ui_ModelFittingWidget, QWidget, workspacegui.GuiMessages):
     sig_waveformReady = Signal(object, name="sig_waveformReady")
-    def __init__(self, model: typing.Optional[types.FunctionType]=None,
+    def __init__(self, model: types.FunctionType,
                  coefficients:typing.Optional[typing.Union[pd.DataFrame, dict]] = None,
                  waveformUnits:typing.Optional[pq.Quantity]=None,
                  parent=None):
@@ -61,7 +61,8 @@ Parameters:
 
     This function supplies a ``title`` for the mathematical model and a coefficients table containing coefficient names, their initial values and lower & upper bounds for curve fitting using the model function
 
-
+Named Parameters:
+=================
 :coefficients: Optional, default is None
 
     * a pandas DataFrame with the following mandatory structure:
@@ -116,6 +117,9 @@ Parameters:
 
             self._model_coefficients_ = pd.DataFrame(fitting_dict, index=coefficients)
             self._model_name_ = model.title
+
+        else:
+            raise ValueError(f"Expecting a model function; instead, got {model}")
             
         if isinstance(coefficients, pd.DataFrame):
             # NOTE: 2026-01-13 23:26:42
@@ -141,6 +145,11 @@ Parameters:
         
         if isinstance(self._model_coefficients_, pd.DataFrame):
             self.setModelData(self._model_coefficients_)
+
+        exprimg = models.renderModelExpression(self._model_.expression)
+        if isinstance(exprimg, QtGui.QPixmap):
+            self.modelExpressionLabel.setPixmap(exprimg)
+            self.modelExpressionLabel.setScaledContents(True)
 
 
     def _configureUI_(self):
