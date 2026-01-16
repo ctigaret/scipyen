@@ -5117,7 +5117,7 @@ def render_sympy(expr:sympy.Expr, backend:str="auto", out:str="ipython",
               parser:str="sympy",
               darkmode:typing.Optional[bool]=None, 
               wrap:bool=False,
-              **kwargs) -> typing.Optional[typing.Union[PIL.Image, QtGui.QPixmap, QtGui.QImage, IPImage]]:
+              **kwargs) -> typing.Optional[typing.Union[PIL.Image, QtGui.QPixmap, QtGui.QImage, IPImage, dict]]:
     r"""Generates a latex rendering of a sympy expression, as a bitmap image.
     Positional parameters:
     ======================
@@ -5151,8 +5151,15 @@ def render_sympy(expr:sympy.Expr, backend:str="auto", out:str="ipython",
     
         NOTE: The generated pixmaps have transparent background.
     
-    out:str, one of "ipython" (IPython.Image.Image; default), "pil" (PIL.Image.Image), 
-            "img" (QtGui.QImage), "pix" (QtGui.QPixmap), or "bytes" (bytes)
+    out:str, one of (value ↦ output type):
+        * "ipython" ↦ IPython.Image.Image (the *default*), 
+        * "pil" ↦ PIL.Image.Image, 
+        * "img" ↦ QtGui.QImage
+        * "pix" ↦ QtGui.QPixmap
+        * "bytes" ↦ bytes (PNG data)
+        * "svg" ↦ dict with SVG string mapped to "svg" key inside the dict (uses latex2svg)
+    
+        .. note:: When ``out`` is "svg", the ``backend`` parmeter is ignored.
     
     Var-keyword parameters:
     =======================
@@ -5245,6 +5252,11 @@ def render_sympy(expr:sympy.Expr, backend:str="auto", out:str="ipython",
         
     if not isinstance(darkmode, bool):
         darkmode = isDarkGui()
+        
+    if out == "svg":
+        ltx = "".join(["$", sympy.latex(expr), "$"])
+        return render_latex(ltx, out="svg")
+        
         
     color = "white" if darkmode else "black" 
     euler = kwargs.pop("euler", True)
