@@ -92,31 +92,18 @@ Named Parameters:
         self._model_:typing.Optional[types.FunctionType] = None
         self._model_fit_coefficients_:typing.Optional[pd.DataFrame] = None
         self._model_name_:typing.Optional[str] = None
-        self._rendered_model_expression_:typing.Optional[QtGui.QPixmap] = None
-        self._waveformDuration_:typing.optiopnal[pq.Quantity] = None
+        self._model_expression_svg_:typing.Optional[QtGui.QPixmap] = None
+        self._waveformDuration_:typing.Optional[pq.Quantity] = None
         self._waveformSamplingRate_:typing.Optional[pq.Quantity] = None
         self._waveformUnits_:typing.Optional[pq.Quantity] = None
         self._model_expression_window_:typing.Optional[QtWidgets.QMainWindow] = None
         
         self._configureUI_()
         
-        self._setModel_(model, duration, samplingRate, waveformUnits, coefficients)
+        self._setModelData_(model, duration, samplingRate, waveformUnits, coefficients)
         
         if isinstance(self._model_fit_coefficients_, pd.DataFrame):
             self.populateCoefficientsTable(self._model_fit_coefficients_)
-
-        # if isinstance(self.exprPix, QtGui.QPixmap):
-        #     scaledPix = self._rescaleExprPix_()
-        #     self.modelExpressionLabel.setPixmap(scaledPix)
-
-    # def resizeEvent(self, evt:QtGui.QResizeEvent):
-    #     if isinstance(self.exprPix, QtGui.QPixmap) and not self.exprPix.isNull() and self.modelExpressionLabel.size().isValid():
-    #         scaledPix = self._rescaleExprPix_()
-    #         self.modelExpressionLabel.setPixmap(scaledPix)
-
-    # def _rescaleExprPix_(self) -> QtGui.QPixmap:
-    #     return self.exprPix.scaled(self.modelExpressionLabel.size(),
-    #                                 QtCore.Qt.KeepAspectRatio, QtCore.Qt.FastTransformation)
 
     def _configureUI_(self):
         self.setupUi(self)
@@ -143,7 +130,7 @@ Named Parameters:
         # self.setMinimumSize(self.modelCoefficientsTable.tableView.viewportSizeHint())
         
         
-    def _setModel_(self, model:types.FunctionType, duration:pq.Quantity=1*pq.s, samplingRate:pq.Quantity=1e4*pq.Hz, 
+    def _setModelData_(self, model:types.FunctionType, duration:pq.Quantity=1*pq.s, samplingRate:pq.Quantity=1e4*pq.Hz, 
                  waveformUnits:pq.Quantity = pq.dimensionless,
                  coefficients:typing.Optional[typing.Union[dict, pd.DataFrame]] = None):
         assert isinstance(duration, pq.Quantity) and duration.size==1, f"'duration' must be a scalar quantity; instead, got {duration}"
@@ -175,10 +162,15 @@ Named Parameters:
                 self.populateCoefficientsTable(self._model_fit_coefficients_)
                 
     def _setModelFunction_(self, model:types.FunctionType):
+        # BUG: 2026-01-16 17:46:26 TODO/FIXME
+        # the svgWidget does not paint the svg — why ?!?
+        from core.strutils import is_svg
         assert models.isModelFunction(model), f"Expecting a model function — which is NOT a regular Python function; instead, got {model}"
         self._model_ = model
         self._model_name_ = model.title
-        self._rendered_model_expression_ = models.renderModelExpression(self._model_.expression)
+        
+        self.modelNameLabel.setText(self._model_name_)
+        
         fitting_dict = dict()
         if model.fitting:
             fitting_dict["Initial Value"] = model.fitting["initial"]
@@ -190,20 +182,83 @@ Named Parameters:
         
         self._model_fit_coefficients_ = pd.DataFrame(fitting_dict, index=(model.coefficients))
         
-                
+        svg_out = models.renderModelExpression(self._model_, out="svg")
+        
+        if isinstance(svg_out, dict) and "svg" in svg_out:
+            # print(f"{self.__class__.__name__}._setModelFunction_: {svg_out['svg']} \n is svg: {is_svg(svg_out['svg'])}")
+            self._model_expression_svg_ = svg_out["svg"]
+            # print(f"{self.__class__.__name__}._setModelFunction_: self._model_expression_svg_ is svg@ {is_svg(self._model_expression_svg_)}")
+            self.svgWidget.setSvg(svg_out["svg"])
+            # self.svgWidget.setSvg(self._model_expression_svg_)
+        
     @property
     def model(self) -> types.FunctionType:
         return self._model_
     
     @model.setter
     def model(self, model:types.FunctionType):
+        # NOTE: 2026-01-16 15:30:46
+        # this exclusively sets the model function and dependent attributes,
+        # leaving duratin, sampling rate and waveform units unchanged
         self._setModelFunction_(model)
         self.populateCoefficientsTable(self._model_fit_coefficients_)
         if isinstance(self._model_name_, str) and len(self._model_name_.strip()):
             self.modelNameLabel.setText(self._model_name_)
         else:
             self.modelNameLabel.setText("")
+            
+    @property
+    def waveformDuration(self) -> pq.Quantity:
+        return self._waveformDuration_
+    
+    @waveformDuration.setter
+    def waveformDuration(self, val:pq.Quantity):
+        # NOTE: 2026-01-16 15:35:43
+        # setting a new duration with different units:
+        # if new units are not scalable to the current duration units, this will 
+        #   also change the sampling rate units but leave their magnitude untouched
+        # is new units ARE scalable/convertible to the current duration units, then
+        #   the new duration will be rescaled to the current duration units
+        assert isinstance(val, pq.Quantity) and duration.size==1, f"'duration' must be a scalar quantity; instead, got {val}"
+        
+        if isinstance(self._waveformDuration_, pq.Quantity):
+            newUnits = False
+            if self._waveformDuration_.units != val.units:
+                if scq.unitsConvertible(val, self._waveformDuration_):
+                    val = val.rescale(self._waveformDuration_.units)
+                else:
+                    newUnits = True
+        else:
+            newUnits = True
                 
+        self._waveformDuration_ = val
+
+        if newUnits:
+            durationFamily = scq.getUnitFamily(self._waveformDuration_)
+            if durationFamily == "Time":
+                self._waveformSamplingRate_.rescale(pq.Hz)
+            elif durationFamily in ("Length", "Space"):
+                self._waveformSamplingRate_.rescale(pq.space_frequency_unit)
+            elif durationFamily == "Angle" or self._waveformDuration_.units == pq.rad:
+                self._waveformSamplingRate_.rescale(pq.angle_frequency_unit)
+
+        signalBlockers = list(map(lambda w: QtCore.QSignalBlocker(w), [self.durationSpinBox, self.samplingRateSpinBox]))#, self.waveformUnitsChooser]))
+        self.durationSpinBox.setValue(self._waveformDuration_)
+        self.samplingRateSpinBox.setValue(self._waveformSamplingRate_)
+    
+    @property
+    def waveformSamplingRate(self)->pq.Quantity:
+        return self._waveformSamplingRate_
+    
+    @waveformSamplingRate.setter
+    def waveformSamplingRate(self, val:pq.Quantity):
+        assert isinstance(val, pq.Quantity) and val.size==1 and val.units == 1/self._waveformSamplingRate_.units, f"'sampling rate' must be a scalar quantity in units of, or convertible to, {1/self._waveformDuration_.units}; instead, got {val}"
+        self._waveformSamplingRate_ = samplingRate
+        
+        signalBlockers = list(map(lambda w: QtCore.QSignalBlocker(w), [self.samplingRateSpinBox]))#, self.waveformUnitsChooser]))
+        self.samplingRateSpinBox.setValue(self._waveformSamplingRate_)
+        
+        
     @property
     def fittingCoefficients(self) -> pd.DataFrame:
         return self._model_fit_coefficients_
@@ -265,7 +320,7 @@ Named Parameters:
     
     @Slot()
     def _slot_showModelExpression(self):
-        if isinstance(self._rendered_model_expression_, QtGui.QPixmap):
+        if isinstance(self._model_expression_svg_, QtGui.QPixmap):
             pass
             
     

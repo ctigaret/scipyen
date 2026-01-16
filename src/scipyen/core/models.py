@@ -38,15 +38,44 @@ A biased, scaled and shifted version of (1) is:
 .. attention:: Please consider decorating all model functions with the ``modelfunction`` decorator.
 This will help identifying these functions easily from other Scipyen components.
 """
-import typing, types, traceback
+import typing, types, traceback, sys, os
 import numbers
 import neo
 import numpy as np
+import PIL
 import sympy
 from sympy import abc as symabc
 import quantities as pq
 import pandas as pd
 import dataclasses
+from IPython.display import Image as IPImage
+
+import qtpy
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
+from qtpy.QtCore import (Signal, Slot, Property,)
+__has_PySide6__ = False
+__has_PyQt6__ = False
+__has_sip__ = False
+if os.environ["QT_API"] == "pyside6":
+    __has_PySide6__ = True
+    import PySide6
+    from PySide6 import Shiboken
+    # from PySide6.QtCore import (Signal, Slot, Property,)
+    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    QShortcut = QtGui.QShortcut
+else:
+    if os.environ["QT_API"] == "pyqt6":
+        __has_PyQt6__ = True
+        
+    from qtpy import sip
+    from qtpy.uic import loadUiType
+    QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
+    __has_sip__ = True
+    
 from core import scipyen_quantities as scq
 from core.datasignal import DataSignal
 from core.prog import (scipywarn, signature_as_dict, decorator, timefunc)
@@ -1037,7 +1066,7 @@ Parameters:
     
 @modelfunction(coefficients = ("α", "β", "x0", "τ1", "τ2"),
                title = "ClementsBekkers97",
-               expression = r"$y(x) = \begin{cases} \alpha + \beta \times \left(1 - e^{-\left(x-x_{0}\right) / \tau_{1}}\right) \times e^{-\left(x-x_{0}\right) / \tau_{2}} & \text{for}\: x - x_{0} \geq 0 \\\alpha & \text{otherwise} \end{cases}$",
+               expression = r"$y(x) = \begin{cases} \alpha + \beta \times \left(1 - e^{-\left(x-x_{0}\right) / \tau_{1}}\right) \times e^{-\left(x-x_{0}\right) / \tau_{2}} & \text{for}\: x - x_{0} \geq 0 \\ \alpha & \text{otherwise} \end{cases}$",
 )
 def Clements_Bekkers_97(x:np.ndarray | Real,
                         α:typing.Union[Real, typing.Sequence[Real], np.ndarray], /, 
@@ -2148,16 +2177,29 @@ def make_initial_coeffs(names:typing.Sequence[str]| dict, /,
                 feasible
         
     
-def renderModelExpression(expression:typing.Union[sympy.Basic, str], out:str = "pix"):
+def renderModelExpression(expression:typing.Union[sympy.Basic, sympy.Expr, str, types.FunctionType], 
+                          out:str = "pix") -> typing.Optional[typing.Union[PIL.Image, QtGui.QPixmap, QtGui.QImage, IPImage, dict]]:
     from core.utilities import render_sympy
     from core.strutils import (is_latex, render_latex)
-    if out not in ('ipython', 'pil', 'img', 'pix', 'bytes'):
+    
+    if out not in ('ipython', 'pil', 'img', 'pix', 'bytes', 'svg'):
         raise ValueError(f"Invalid output type specified ({out}); expecting one of {('ipython', 'pil', 'img', 'pix', 'bytes')}")
-    if isinstance(expression, sympy.Basic) or (isinstance(expression, str) and is_latex(expression)):
-        try:
-            img = render_sympy(expression, out=out) if isinstance(expression, sympy.Basic) else render_latex(expression, out=out)
-        except:
-            traceback.print_exc()
-            img = None
+    
+    if isModelFunction(expression):
+        expression = expression.expression
+    
+    assert isinstance(expression, (sympy.Basic, sympy.Expr)) or is_latex(expression), f"expecting a model function, latex str, sympy.Basic or Sympy.Expr object; instead, got {type(expression).__name__}"
+    
+    try:
+        if isinstance(expression, (sympy.Basic, sympy.Expr)):
+            ret = render_sympy(expression, out=out)
+        elif is_latex(expression):
+            ret = render_latex(expression, out=out)
+        else:
+            ret = None
+            
+    except:
+        traceback.print_exc()
+        ret = None
 
-        return img
+    return ret

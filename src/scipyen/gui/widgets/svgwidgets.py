@@ -34,56 +34,81 @@ else:
     __has_sip__ = True
     
 from core.prog import scipywarn
+from core.strutils import is_svg
 
 class SimpleSVGWidget(QtWidgets.QWidget):
     # from qtsvg SVGViewer example
-    def __init__(self, svg:typing.Optional[str]=None, parent:typing.Optional[QtWidgets.QWidget]=None):
+    def __init__(self, svg:typing.Optional[str]=None, 
+                 parent:typing.Optional[QtWidgets.QWidget]=None):
         super().__init__(parent)
         self._scale:float = 1.0
         self._renderer:QtSvg.QSvgRenderer = QtSvg.QSvgRenderer()
         self._renderer.repaintNeeded.connect(self.update)
-        if isinstance(svg, str) and len(svg.strip()):
-            if not self._renderer.load(QtCore.QByteArray(bytes(svg.encode()))):
-                raise ValueError("Invalid svg string")
+        self.setSvg(svg)
+        # # if isinstance(svg, str) and len(svg.strip()):
+        # if is_svg(svg):
+        #     if self._renderer.load(QtCore.QByteArray(bytes(svg.encode()))):
+        #         pw = self.parentWidget()
+        #         widgetSize = QtCore.QSize(pw.width(), pw.height()) if isinstance(pw, QtWidgets.QWidget) else  QtCore.QSize(self.width(), self.height())
+        #         # self.setSvg(svg)
+        #         if self._renderer.isValid():
+        #             defSize = self._renderer.defaultSize()
+        #             newSize = svgSize.scaled(widgetSize, QtCore.Qt.KeepAspectRatio)
+        #             self._scale =  (newSize.width() / svgSize.width(), newSize.height() / svgSize.height())
+        #             self.update()
+        #         # self.resizeEvent()
+        # #     if not self._renderer.load(QtCore.QByteArray(bytes(svg.encode()))):
+        # #         raise ValueError("Invalid svg string")
         
     def paintEvent(self, event:QtGui.QPaintEvent):
-        if not self._renderer.isValid():
-            return
-        
-        defSize = self._renderer.defaultSize()
-        if isinstance(self._scale, float):
-            svgSize = defSize * self._scale 
-        elif isinstance(self._scale, typing.Sequence) and all([isinstance(v, (float, int) for v in self._scale])):
-            svgSize = QtCore.QSize(int(defSize.width() * self._scale[0]), int(defSize.height() * self._scale[1])
-        self.setBaseSize(svgSize)
-        # pw = self.parentWidget()
-        # widgetSize = QtCore.QSize(pw.width(), pw.height()) if isinstance(pw, QtWidgets.QWidget) else  QtCore.QSize(self.width(), self.height())
-        # self.setFixedSize(svgSize.expandedTo(widgetSize))
+        if self._renderer.isValid():
+            defSize = self._renderer.defaultSize()
+            if isinstance(self._scale, float):
+                svgSize = defSize * self._scale 
+            elif isinstance(self._scale, typing.Sequence) and all([isinstance(v, (float, int)) for v in self._scale]):
+                svgSize = QtCore.QSize(int(defSize.width() * self._scale[0]), int(defSize.height() * self._scale[1]))
+            self.setBaseSize(svgSize)
+            pw = self.parentWidget()
+            widgetSize = QtCore.QSize(pw.width(), pw.height()) if isinstance(pw, QtWidgets.QWidget) else  QtCore.QSize(self.width(), self.height())
+            # self.setFixedSize(svgSize.expandedTo(widgetSize))
+            
+        else:
+            widgetSize = QtCore.QSize(128,128)
+            svgSize = widgetSize
+            self.setBaseSize(widgetSize)
         
         painter = QtGui.QPainter(self)
         # painter.fillRect(0, 0, self.width(), self.height(), QtCore.Qt.transparent)
-        painter.save()
-        bounds = QtCore.QRectF((widgetSize.width() - svgSize.width()) / 2,
-                              (widgetSize.height() - svgSize.height()) / 2,
-                              svgSize.width(), svgSize.height())
-        painter.setClipRect(bounds)
-        
-        self._renderer.render(painter, bounds)
-        painter.restore()
+        if self._renderer.isValid():
+            painter.save()
+            bounds = QtCore.QRectF((widgetSize.width() - svgSize.width()) / 2,
+                                (widgetSize.height() - svgSize.height()) / 2,
+                                svgSize.width(), svgSize.height())
+            painter.setClipRect(bounds)
+            self._renderer.render(painter, bounds)
+            painter.restore()
         painter.end()
         
-    def resizeEvent(self, event:QtCore.QEvent):
+    def setSvg(self, svg:str):
+        print(f"{self.__class__.__name__}.setSvg(svg={type(svg).__name__})")
+        if is_svg(svg):
+            if not self._renderer.load(QtCore.QByteArray(bytes(svg.encode()))):
+                scipywarn(f"Could not render {svg}")
+        else:
+            scipywarn(f"Expecting a svg string; instead, got {svg}")
+        self.update()
+        self.resizeEvent()
+            
+    def resizeEvent(self, event:typing.Optional[QtCore.QEvent]=None):
         if not self._renderer.isValid():
             return
         svgSize = self._renderer.defaultSize()
         pw = self.parentWidget()
         widgetSize = QtCore.QSize(pw.width(), pw.height()) if isinstance(pw, QtWidgets.QWidget) else  QtCore.QSize(self.width(), self.height())
         newSize = svgSize.scaled(widgetSize, QtCore.Qt.KeepAspectRatio)
-        
-        scaleX = svgSize.width() / newSize.width()
-        scaleY = svgSize.height() / newSize.height()
-        
-        self._ scale =  (scaleX, scaleY)
+        scaleX = newSize.width() / svgSize.width()
+        scaleY = newSize.height() / svgSize.height()
+        self._scale =  (newSize.width() / svgSize.width(), newSize.height() / svgSize.height())
         
         self.update()
         
@@ -94,11 +119,6 @@ class SimpleSVGWidget(QtWidgets.QWidget):
         self._renderer.render(painter, QtCore.QRectF(QtCore.QPointF(), QtCore.QSizeF(imageSize)))
         return image
     
-    def setSvg(self, svg:str):
-        if not self._renderer.load(QtCore.QByteArray(bytes(svg.encode()))):
-            raise ValueError("Invalid svg string")
-        self.update()
-
     def reload(self):
         if not self._renderer.isValid():
             return
@@ -113,7 +133,14 @@ class SimpleSVGWidget(QtWidgets.QWidget):
         self.update()
         
     def sizeHint(self) -> QtCore.QSize:
-        return self._renderer.defaultSize() * self._scale if self._renderer.isValid() else QtCore.QSize(1, 1)
+        if self._renderer.isValid():
+            defSize = self._renderer.defaultSize()
+            if isinstance(self._scale, (float, int)):
+                return defSize * self._scale
+            elif isinstance(self._scale, typing.Sequence) and all([isinstance(v, (float, int)) for v in self._scale]):
+                return QtCore.QSize(int(defSize.width() * self._scale[0]), int(defSize.height()* self._scale[1]))
+        else:
+            return QtCore.QSize(1, 1)
 
     def fileSize(self) -> QtCore.QSize:
         return self._renderer.defaultSize() if self._renderer.isValid() else QtCore.QSize()

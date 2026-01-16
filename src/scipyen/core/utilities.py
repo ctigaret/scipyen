@@ -5113,7 +5113,7 @@ def timelineDateString(year:int, month:int, day:int=0):
 def posixUTC(d:datetime.datetime) -> float:
     return (d - datetime.datetime(1970, 1, 1)) / datetime.timedelta(seconds=1)
 
-def render_sympy(expr:sympy.Expr, backend:str="auto", out:str="ipython", 
+def render_sympy(expr:typing.Union[sympy.Expr, sympy.Basic], backend:str="auto", out:str="ipython", 
               parser:str="sympy",
               darkmode:typing.Optional[bool]=None, 
               wrap:bool=False,
@@ -5244,6 +5244,9 @@ def render_sympy(expr:sympy.Expr, backend:str="auto", out:str="ipython",
     from IPython.lib import latextools
     from core.strutils import render_latex
     from gui.guiutils import (getScipyenConsoleShell, isDarkGui)
+    
+    if not isinstance(expr, (sympy.Expr, sympy.Basic)):
+        raise TypeError(f"Expecxting a sympy Basic, or a sympy Expr object instead, got a {type(expr).__name__}")
     
     if not isinstance(backend, str) or backend.lower() not in ("auto", "dvipng", "matplotlib", "sympy"):
         backend = "auto"

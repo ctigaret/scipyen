@@ -781,7 +781,7 @@ def render_latex(l:str, backend:str="auto", out:str="ipython",
     
     hasLatex2SVG = False
     
-    if not isinstance(s, str) or len(s.strip()) == 0:
+    if not isinstance(l, str) or len(l.strip()) == 0:
         return
     
     try:
@@ -832,6 +832,8 @@ def render_latex(l:str, backend:str="auto", out:str="ipython",
             pparts.append("\\usepackage{xcolor}")
             params["preamble"] = "\n".join([""] + pparts + [""])
             
+            # print("strutils.render_latex: 'l' contains single backslashes : ", "\\" in l)
+            
             if l.startswith("$$") and l.endswith("$$"):
                 lparts = l.split("$$")
                 lparts[0] = "$$\\begingroup\\color{white}"
@@ -839,8 +841,8 @@ def render_latex(l:str, backend:str="auto", out:str="ipython",
                 
             elif l.startswith("$") and l.endswith("$"):
                 lparts = l.split("$")
-                lparts[0] = "$\\begingroup\\color{white}"
-                lparts[-1] = "\\endgroup$"
+                lparts.insert(0, "$\\begingroup\\color{white} ")
+                lparts.append(" \\endgroup$")
                 l = "".join(lparts)
                 
         return latex2svg.latex2svg(l, params)
