@@ -964,7 +964,8 @@ class VTH(object):
         r"""Returns a list of specifications for handling `variable`.
 
         If `variable` is a type registered with VTH, or `variable` is an
-        instance of a type registered with VTH, returns a 3-tuple:
+        instance of a type registered with VTH, or a unary predicate (see ``prog.is_predicate``),
+        returns a 3-tuple:
         (viewer type, action name, priority), where:
 
             • viewer type is the Scipyen viewer class suitable to view the type
@@ -985,18 +986,35 @@ class VTH(object):
         else:
             vartype = type(variable)
 
+        # NOTE: 2026-01-16 11:02:34
+        # skip types and Qt widgets as there is no need to handle these: 
+        # types are described at the console, and widgets — well, they just show themselves ⌣
         if vartype in VTH.gui_handlers.keys() or QtWidgets.QWidget in inspect.getmro(vartype):
             return list()
 
         vartypemro = inspect.getmro(vartype)
         act_np = set()
 
-        for vtype in vartypemro:
-            for k, v in VTH.gui_handlers.items():
-                if vtype in v["types"]:
+        for k, v in VTH.gui_handlers.items():
+            v_types = list(filter(lambda x: isinstance(x, type), v["types"].keys()))
+            v_predicates = list(filter(lambda x: prog.is_predicate(x), v["types"].keys()))
+            
+            for vtype in vartypemro:
+                if vtype in v_types:
                     #           viewer type,   action name   priority
-                    act_np.add(
-                        (k,             v["action"],  v["types"][vtype]))
+                    act_np.add((k,             v["action"],  v["types"][vtype]))
+                    
+            for vpred in v_predicates:
+                if vpred(variable):
+                    #           viewer type,   action name   priority
+                    act_np.add((k,             v["action"],  v["types"][vpred]))
+                    
+        # for vtype in vartypemro:
+        #     for k, v in VTH.gui_handlers.items():
+        #         if vtype in v["types"]:
+        #             #           viewer type,   action name   priority
+        #             act_np.add(
+        #                 (k,             v["action"],  v["types"][vtype]))
 
         if len(act_np):
             # sort in ascending order by action name, and in descending order by
@@ -5494,8 +5512,23 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                     self._slot_showActionStatusMessage_)
                 
         if all([isinstance(self.workspace[v], str) for v in varnames]):
-            exportTextAction = cm.addAction("Save as text file")
+            exportTextAction = cm.addAction("Save as plain text file")
             exportTextAction.triggered.connect(self.slot_exportSelectedVariablesText)
+            if all([strutils.is_html(self.workspace[v]) for v in varnames]):
+                exportHTMLAction = cm.addAction("Save as HTML file")
+                exportHTMLAction.triggered.connect(self.slot_exportSelectedVariablesAsHTML)
+            elif all([strutils.is_svg(self.workspace[v]) for v in varnames]):
+                exportXMLAction = cm.addAction("Save as SVG file")
+                exportXMLAction.triggered.connect(self.slot_exportSelectedVariablesAsSVG)
+            elif all([strutils.is_markdown(self.workspace[v]) for v in varnames]):
+                exportXMLAction = cm.addAction("Save as Markdown file")
+                exportXMLAction.triggered.connect(self.slot_exportSelectedVariablesAsMarkdown)
+            elif all([strutils.is_ReST(self.workspace[v]) for v in varnames]):
+                exportXMLAction = cm.addAction("Save as ReStructuredText file")
+                exportXMLAction.triggered.connect(self.slot_exportSelectedVariablesAsReST)
+            elif all([strutils.is_xml(self.workspace[v]) for v in varnames]):
+                exportXMLAction = cm.addAction("Save as XML file")
+                exportXMLAction.triggered.connect(self.slot_exportSelectedVariablesAsXML)
 
         delVars = cm.addAction("Delete")
         delVars.setToolTip("Delete selected variables")
@@ -9259,6 +9292,101 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                     filename = "".join([v, ".txt"])
                 pio.saveText(o, filename)
         
+    @Slot()
+    @safewrapper
+    def slot_exportSelectedVariablesAsHTML(self):
+        indexList = self.workspaceView.selectedIndexes()
+
+        if len(indexList) == 0:
+            return
+
+        item, varname = self._getWorkspaceVarItemAndName_(indexList[0])
+
+        items, varnames = zip(
+            *list(self._getWorkspaceVarItemAndName_(index) for index in indexList))
+        
+        if all([isinstance(self.workspace[v], str) for v in varnames]):
+            for v in varnames:
+                o = self.workspace[v]
+                filename = "".join([v, ".html"])
+                pio.saveText(o, filename)
+        
+    @Slot()
+    @safewrapper
+    def slot_exportSelectedVariablesAsMarkdown(self):
+        indexList = self.workspaceView.selectedIndexes()
+
+        if len(indexList) == 0:
+            return
+
+        item, varname = self._getWorkspaceVarItemAndName_(indexList[0])
+
+        items, varnames = zip(
+            *list(self._getWorkspaceVarItemAndName_(index) for index in indexList))
+        
+        if all([isinstance(self.workspace[v], str) for v in varnames]):
+            for v in varnames:
+                o = self.workspace[v]
+                filename = "".join([v, ".md"])
+                pio.saveText(o, filename)
+        
+    @Slot()
+    @safewrapper
+    def slot_exportSelectedVariablesAsReST(self):
+        indexList = self.workspaceView.selectedIndexes()
+
+        if len(indexList) == 0:
+            return
+
+        item, varname = self._getWorkspaceVarItemAndName_(indexList[0])
+
+        items, varnames = zip(
+            *list(self._getWorkspaceVarItemAndName_(index) for index in indexList))
+        
+        if all([isinstance(self.workspace[v], str) for v in varnames]):
+            for v in varnames:
+                o = self.workspace[v]
+                filename = "".join([v, ".rst"])
+                pio.saveText(o, filename)
+        
+    @Slot()
+    @safewrapper
+    def slot_exportSelectedVariablesAsSVG(self):
+        indexList = self.workspaceView.selectedIndexes()
+
+        if len(indexList) == 0:
+            return
+
+        item, varname = self._getWorkspaceVarItemAndName_(indexList[0])
+
+        items, varnames = zip(
+            *list(self._getWorkspaceVarItemAndName_(index) for index in indexList))
+        
+        if all([isinstance(self.workspace[v], str) for v in varnames]):
+            for v in varnames:
+                o = self.workspace[v]
+                filename = "".join([v, ".svg"])
+                pio.saveText(o, filename)
+        
+
+    @Slot()
+    @safewrapper
+    def slot_exportSelectedVariablesAsXML(self):
+        indexList = self.workspaceView.selectedIndexes()
+
+        if len(indexList) == 0:
+            return
+
+        item, varname = self._getWorkspaceVarItemAndName_(indexList[0])
+
+        items, varnames = zip(
+            *list(self._getWorkspaceVarItemAndName_(index) for index in indexList))
+        
+        if all([isinstance(self.workspace[v], str) for v in varnames]):
+            for v in varnames:
+                o = self.workspace[v]
+                filename = "".join([v, ".xml"])
+                pio.saveText(o, filename)
 
     @Slot()
     @safewrapper
@@ -10841,13 +10969,20 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 action_name = x.__name__
 
             if isinstance(x.viewer_for_types, dict) and len(x.viewer_for_types):
-                if all(isinstance(k, type) and isinstance(v, int) for k, v in x.viewer_for_types.items()):
-                    VTH.default_handlers[x] = {
-                        "action": action_name, "types": x.viewer_for_types}
-                    VTH.gui_handlers[x] = {
-                        "action": action_name, "types": x.viewer_for_types}
+                for k,v in x.viewer_for_types.items():
+                    if (isinstance(k, type) or prog.is_predicate(k)) and isinstance(v, int):
+                            VTH.default_handlers[x] = {
+                                "action": action_name, "types": x.viewer_for_types}
+                            VTH.gui_handlers[x] = {
+                                "action": action_name, "types": x.viewer_for_types}
+                            
+                # if all(isinstance(k, type) and isinstance(v, int) for k, v in x.viewer_for_types.items()):
+                #     VTH.default_handlers[x] = {
+                #         "action": action_name, "types": x.viewer_for_types}
+                #     VTH.gui_handlers[x] = {
+                #         "action": action_name, "types": x.viewer_for_types}
 
-            elif isinstance(x.viewer_for_types, (tuple, list)) and len(x.viewer_for_types) and all(isinstance(v, type) for v in x.viewer_for_types):
+            elif isinstance(x.viewer_for_types, (tuple, list)) and len(x.viewer_for_types) and all((isinstance(v, type) or prog.is_predicate(v)) for v in x.viewer_for_types):
                 viewer_for_types = dict((t, 0) for t in x.viewer_for_types)
                 VTH.default_handlers[x] = {
                     "action": action_name, "types": viewer_for_types}

@@ -103,7 +103,7 @@ import errno, os
 
 def is_sequence(s: str) -> bool:
     r"""Return True if the s is a string representation of a tuple or list"""
-    if not isinstance(s, str):
+    if not isinstance(s, str) or len(s.strip())==0:
         return False
 
     possibleSequence = False
@@ -128,17 +128,17 @@ def is_sequence(s: str) -> bool:
 
 def is_cached_output_varname(s: str) -> bool:
     r"""Returns True if s is an IPython cached output variable"""
-    return __output_cache_regexp__.match(s) is not None
+    return isinstance(s, str) and len(s.strip()) and __output_cache_regexp__.match(s) is not None
 
 
 def is_cached_input_varname(s: str) -> bool:
     r"""Returns True if s is an IPython cached input variable"""
-    return __input_cache_regexp__.match(s) is not None
+    return isinstance(s, str) and len(s.strip()) and __input_cache_regexp__.match(s) is not None
 
 
 def is_glob(s: str) -> bool:
     r"""Returns True if s is a string containing the '*' character"""
-    return isinstance(s, str) and any(c in s for c in ("*", "?"))
+    return isinstance(s, str) and len(s.strip()) and any(c in s for c in ("*", "?"))
 
 
 def is_regexp(s: str) -> bool:
@@ -149,10 +149,10 @@ def is_regexp(s: str) -> bool:
     ".", "^", "$", "*", "+", "?", "{", "}", "[", "]", "\\", "|", "(", ")"
 
     """
-    return isinstance(s, str) and any(c in s for c in REGEXP_METACHARACTERS)
+    return isinstance(s, str) and len(s.strip()) and any(c in s for c in REGEXP_METACHARACTERS)
 
 
-def ordinalToLetters(x: int, upperCase: bool = True):
+def ordinalToLetters(x: int, upperCase: bool = True) -> str:
     r"""Returns a string given an integer ordinal `x`.
 
     The string is the element with index `x` from the complete ascii sequence¹
@@ -168,6 +168,7 @@ def ordinalToLetters(x: int, upperCase: bool = True):
     `upperCase` parameter.
 
     """
+    assert(isinstance(x, int)), f"Expecting an int; got {type(x.__name__)} instead."
     if x < 0:
         return "?"
 
@@ -186,14 +187,16 @@ def ordinalToLetters(x: int, upperCase: bool = True):
 ordinal2letters = ordinalToLetters
 
 
-def lettersToOrdinal(x: str):
+def lettersToOrdinal(x: str) -> int:
     r"""The inverse of ordinalToLetters.
     Case-insensitive.
 
-    Returns -1 if `x` is nto of the form '𝒙' or '𝒙𝒚' where 𝒙 and 𝒚 are characters
-    in the complete ascii set (upper or lower case)
+    Returns -1 if `x` is not of the form '𝒙' or '𝒙𝒚' where 𝒙 and 𝒚 are characters
+    in the complete ascii set (upper or lower case), or `x` is not a string.
     """
-
+    if not isinstance(x, str) or len(x.strip()) == 0:
+        return -1
+    
     x = "".join(tuple(x.lower()))
 
     l = list(string.ascii_lowercase)
@@ -213,6 +216,9 @@ letters2ordinal = lettersToOrdinal
 
 def str2sequence(s: str) -> typing.List[str]:
     r"""Parses the string representation of a sequence into a sequence of strings"""
+    if not isinstance(s, str) or len(s.strip()) == 0:
+        return list()
+    
     possibleSequence = False
 
     if s.startswith("(") and s.endswith(")"):
@@ -249,12 +255,17 @@ def str2sequence(s: str) -> typing.List[str]:
 def is_path(s: str) -> bool:
     r"""Returns True if s is a string representation of a file system path."""
     import pydoc
+    if not isinstance(s, str) or len(s.strip()) == 0:
+        return False
     return pydoc.ispath(s)
     # return isinstance(x, str) and x.find(os.sep) >= 0
 
 
 def str2range(s: str) -> range:
     r"""Parses the string representation of a range into a range object"""
+    if not isinstance(s, str) or len(s.strip()) == 0:
+        return range(0,0)
+    
     parts = list(int(s_) for s_ in s.split(":"))
     if len(parts) <= 3:
         return range(*parts)
@@ -369,6 +380,9 @@ def get_int_sfx(s: str, sep: str = "_", use_re: bool = False) -> typing.Tuple[st
 
 
     """
+    if not isinstance(s, str) or len(s.strip()) == 0:
+        return ("", 0)
+    
     if not isinstance(sep, str) or len(sep) == 0 or use_re:
         # regexp = _re.compile(r"^(\D+)*(\d*)$")
         regexp = _re.compile(r"(.*?)??(\d*)$")
@@ -404,12 +418,16 @@ def get_int_sfx(s: str, sep: str = "_", use_re: bool = False) -> typing.Tuple[st
     return base, sfx
 
 
-def pluralize(s: str, n: int) -> str:
+def pluralize(s: str, n: int = 1) -> str:
+    if not isinstance(s.str):
+        return ""
     return InflectEngine.plural(s, n)
 
 
 def simplify(s: str) -> str:
     r"""Strips spaces at ends and converts inner double spaces to single spaces"""
+    if not isinstance(s.str):
+        return ""
     s = s.strip()
     while "  " in s:
         s = s.replace("  ", " ")
@@ -430,8 +448,9 @@ def str2symbol(s: str) -> str:
         prepends "data_" and returns it
 
     """
-    if not isinstance(s, str):
-        raise TypeError("Expecting a str; got %s instead" % type(s).__name__)
+    if not isinstance(s, str) or len(s.strip()) == 0:
+        return ""
+        # raise TypeError("Expecting a str; got %s instead" % type(s).__name__)
 
     if s.isidentifier():
         return s
@@ -464,6 +483,9 @@ def str2identifier(s: str) -> str:
 
 def strcat(a: str, b: str) -> str:
     r"""Just a convenience function for ''.join((a,b))"""
+    if not all([isinstance(s, str) for s in (a,b)]):
+        return ""
+    
     return "".join((a, b))
 
 
@@ -471,8 +493,9 @@ def str2R(s: str) -> str:
     r"""Converts the string s into a form usable in R.
     The non-alpha-numeric characters are replaced with dots ('.')
     """
-    if not isinstance(s, str):
-        raise TypeError("Expecting a str; got %s instead" % type(s).__name__)
+    if not isinstance(s, str) or len(s.strip()) == 0:
+        return "data"
+        # raise TypeError("Expecting a str; got %s instead" % type(s).__name__)
 
     if keyword.iskeyword(s):
         s = "data." + s
@@ -531,7 +554,7 @@ class QRNameValidator(QtGui.QValidator):
         return str2R(value)
 
 
-def make_ordinal(n):
+def make_ordinal(n:int) -> str:
     """
     Convert an integer into its ordinal representation::
 
@@ -615,8 +638,8 @@ def numbers2str(
 
 
 def str2float(s: str) -> float:
-    r"""Parse the stirng s into a float value"""
-    if not isinstance(s, str):
+    r"""Parse the string s into a float value"""
+    if not isinstance(s, str) or len(s.strip()) == 0:
         return np.nan
 
     try:
@@ -644,12 +667,42 @@ def isnumber(s: str) -> bool:
     except:
         return False
     
+def is_svg(s:str) -> bool:
+    if not isinstance(s, str) or len(s.strip()) == 0:
+        return False
+    pattern = r'<svg[^>]*>(.*?)<\/svg>'
+    matches = _re.findall(pattern, s, _re.DOTALL)
+    return len(matches)>0 and len(matches[0])>0
+    
 def is_html(s:str) -> bool:
+    if not isinstance(s, str) or len(s.strip()) == 0:
+        return False
     return all(v in s for v in ("<html>", "</html>"))
     
+def is_xml(s:str) -> bool:
+    if not isinstance(s, str) or len(s.strip()) == 0:
+        return False
+    return "<xml" in s
+    
 def is_latex(s:str) -> bool:
-    latex_combined_pattern = r'(\$\$([^$]*)\$\$|\\begin\{[^\}]+\}.*?\\end\{[^\}]+\}|(\$[^\$]*\$|\\[a-zA-Z]+(?:\{[^\}]*\})?))'
-    matches = _re.findall(latex_combined_pattern, s, _re.DOTALL)
+    if not isinstance(s, str) or len(s.strip()) == 0:
+        return False
+    pattern = r'(\$\$([^$]*)\$\$|\\begin\{[^\}]+\}.*?\\end\{[^\}]+\}|(\$[^\$]*\$|\\[a-zA-Z]+(?:\{[^\}]*\})?))'
+    matches = _re.findall(pattern, s, _re.DOTALL)
+    return len(matches)>0 and len(matches[0])>0
+
+def is_ReST(s:str) -> bool:
+    if not isinstance(s, str) or len(s.strip()) == 0:
+        return False
+    pattern = r"(^[=]+$|^[-]+$|^~+$|^`[^`]+`_|\s*:\w+:\s+.*|^\s*[\*\+\-]\s+.*|^\s*\d+\.\s+.*|^\s*.. .*)"
+    matches = _re.findall(pattern, s, _re.MULTILINE)# | _re.DOTALL)
+    return len(matches)>0 and len(matches[0])>0
+    
+def is_markdown(s:str) -> bool:
+    if not isinstance(s, str) or len(s.strip()) == 0:
+        return False
+    pattern = r"(^#{1,6}\s.*|^\s*[*+-] .*$|^\s*\d+\.\s.*$|!\[.*\]\(.*\)|\[[^\]]+\]\(.*\)|\*\*.*?\*\*|__.*?__|`[^`]+`|~{2}.*?~{2})"
+    matches = _re.findall(pattern, s, _re.MULTILINE)# | _re.DOTALL)
     return len(matches)>0 and len(matches[0])>0
     
 def render_latex(l:str, backend:str="auto", out:str="ipython", 
@@ -727,6 +780,9 @@ def render_latex(l:str, backend:str="auto", out:str="ipython",
     from gui.guiutils import isDarkGui
     
     hasLatex2SVG = False
+    
+    if not isinstance(s, str) or len(s.strip()) == 0:
+        return
     
     try:
         import latex2svg
@@ -843,7 +899,7 @@ def render_latex(l:str, backend:str="auto", out:str="ipython",
         else:
             return ret
 
-def findlatex(s:str):
+def findlatex(s:str) -> list:
     
     # GTP-4o mini
     # Explanation of the Pattern:
@@ -861,6 +917,9 @@ def findlatex(s:str):
     
     import re
 
+    if not isinstance(s, str) or len(s.strip()) == 0:
+        return list()
+
     # Sample string with LaTeX
     # text = "Here is some LaTeX: $E = mc^2$ and \\begin{equation} x = y + z \\end{equation}."
 
@@ -877,8 +936,11 @@ def findlatex(s:str):
     return list(map(lambda m: m[0].replace("\\\\", "\\"), matches))
     
 
-def latexunicode2sympy(c, asSymbol:bool=True) -> typing.Optional[str | sympy.Symbol]:
+def latexunicode2sympy(c:str, asSymbol:bool=True) -> typing.Optional[str | sympy.Symbol]:
     from core.prog import scipywarn
+
+    if not isinstance(s, str) or len(s.strip()) == 0:
+        return
 
     if c in reverse_latex_symbol:
         c_rep = reverse_latex_symbol[c].replace("\\", "")
@@ -892,10 +954,14 @@ def latexunicode2sympy(c, asSymbol:bool=True) -> typing.Optional[str | sympy.Sym
     else:
         scipywarn(f"No appropriate symbol found for {c}")
         
-def parse_version_string(s: str):
+def parse_version_string(s: str) -> list:
+    if not isinstance(s, str) or len(s.strip()) == 0:
+        return list()
     parts = s.split(".")
     
 def jaccard(s1, s2) -> float:
+    if not all([isinstance(s, str) and len(s.strip()) for s in (s1,s2)]):
+        return 0.
     r"""Calculates Jaccard similarity between two strings 's1' and 's2'"""
     set1 = set(s1)
     set2 = set(s2)

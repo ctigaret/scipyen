@@ -2316,8 +2316,18 @@ def processtimeblock(label):
 
 # ### END Context managers
 
+def is_predicate(x:typing.Any, n:int=1) -> bool:
+    ret = isinstance(x, types.FunctionType)
+    if ret:
+        ret &= len(inspect.signature(x).parameters) == n
+    
+    if ret:
+        annots = inspect.get_annotations(x)
+        ret &= len(annots) and annots["return"] == bool
+        
+    return ret
 
-def is_hashable(x):
+def is_hashable(x) -> bool:
     r"""Returns True if x is hashable, i.e. hash(x) succeeds and returns an int"""
     ret = bool(getattr(x, "__hash__", None) is not None)
     if ret:
@@ -2331,7 +2341,7 @@ def is_hashable(x):
     return ret
 
 
-def unravel_types(x):
+def unravel_types(x) -> set:
     ret = set()
     origin = typing.get_origin(x)
     if origin is None:
@@ -2352,7 +2362,7 @@ def unravel_types(x):
         
     return ret
             
-def is_type_or_subclass(x: typing.Any, y:typing.Union[type, typing._Final]):
+def is_type_or_subclass(x: typing.Any, y:typing.Union[type, typing._Final]) -> bool:
     if not isinstance(y, (type, typing._Final)):
         raise TypeError(f"Second argument must be a type; instead, got {type(y).__name__}")
     
@@ -2365,7 +2375,7 @@ def is_type_or_subclass(x: typing.Any, y:typing.Union[type, typing._Final]):
     else:
         return False
     
-def __check_array_attribute__(rt, param):
+def __check_array_attribute__(rt, param) -> None:
     import vigra
     from core.scipyen_quantities import unitsConvertible
 
