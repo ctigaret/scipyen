@@ -89,37 +89,39 @@ Named Parameters:
 """
         QWidget.__init__(self, parent=parent)
         
+        self._model_:typing.Optional[types.FunctionType] = None
         self._model_fit_coefficients_:typing.Optional[pd.DataFrame] = None
         self._model_name_:typing.Optional[str] = None
-        
-        
-        
+        self._rendered_model_expression_:typing.Optional[QtGui.QPixmap] = None
+        self._waveformDuration_:typing.optiopnal[pq.Quantity] = None
+        self._waveformSamplingRate_:typing.Optional[pq.Quantity] = None
+        self._waveformUnits_:typing.Optional[pq.Quantity] = None
+        self._model_expression_window_:typing.Optional[QtWidgets.QMainWindow] = None
         
         self._configureUI_()
+        
+        self._setModel_(model, duration, samplingRate, waveformUnits, coefficients)
         
         if isinstance(self._model_fit_coefficients_, pd.DataFrame):
             self.populateCoefficientsTable(self._model_fit_coefficients_)
 
-        self.modelExpressionLabel.setScaledContents(True)
-        self.exprPix = models.renderModelExpression(self._model_.expression)
-        self.resizeEvent(None)
+        # if isinstance(self.exprPix, QtGui.QPixmap):
+        #     scaledPix = self._rescaleExprPix_()
+        #     self.modelExpressionLabel.setPixmap(scaledPix)
 
-        if isinstance(self.exprPix, QtGui.QPixmap):
-            scaledPix = self._rescaleExprPix_()
-            self.modelExpressionLabel.setPixmap(scaledPix)
+    # def resizeEvent(self, evt:QtGui.QResizeEvent):
+    #     if isinstance(self.exprPix, QtGui.QPixmap) and not self.exprPix.isNull() and self.modelExpressionLabel.size().isValid():
+    #         scaledPix = self._rescaleExprPix_()
+    #         self.modelExpressionLabel.setPixmap(scaledPix)
 
-    def resizeEvent(self, evt:QtGui.QResizeEvent):
-        if isinstance(self.exprPix, QtGui.QPixmap) and not self.exprPix.isNull() and self.modelExpressionLabel.size().isValid():
-            scaledPix = self._rescaleExprPix_()
-            self.modelExpressionLabel.setPixmap(scaledPix)
-
-    def _rescaleExprPix_(self) -> QtGui.QPixmap:
-        return self.exprPix.scaled(self.modelExpressionLabel.size(),
-                                    QtCore.Qt.KeepAspectRatio, QtCore.Qt.FastTransformation)
+    # def _rescaleExprPix_(self) -> QtGui.QPixmap:
+    #     return self.exprPix.scaled(self.modelExpressionLabel.size(),
+    #                                 QtCore.Qt.KeepAspectRatio, QtCore.Qt.FastTransformation)
 
     def _configureUI_(self):
         self.setupUi(self)
         self.makeUnitAmplitudePushButton.clicked.connect(self._slot_makeUnitAmplitudeModel)
+        self.waveformExpressionPushButton.clicked.connect(self._slot_showModelExpression)
         self.durationSpinBox.sig_valueChanged.connect(self._slot_waveformDurationChanged)
         self.samplingRateSpinBox.sig_valueChanged.connect(self._slot_waveformSamplingRateChanged)
         self.generateWaveformPushButton.clicked.connect(self._slot_generateWaveform)
@@ -148,9 +150,9 @@ Named Parameters:
         assert isinstance(samplingRate, pq.Quantity) and samplingRate.size==1 and samplingRate.units == 1/duration.units, f"'samplingRate' must be a scalar quantity in units of, or convertible to, {1/duration.units}; instead, got {samplingRate}"
         assert (isinstance(waveformUnits, pq.Quantity) and waveformUnits.size==1) or waveformUnits is None, f"'waveformUnits' , must be a scalar quantity or None; instead, gor {waveformUnits}"
         
-        self._waveformDuration_:pq.Quantity = duration
-        self._waveformSamplingRate_:pq.Quantity = samplingRate
-        self._waveformUnits_:typing.Optional[pq.Quantity] = waveformUnits if isinstance(waveformUnits, pq.Quantity) else pq.dimensionless
+        self._waveformDuration_ = duration
+        self._waveformSamplingRate_ = samplingRate
+        self._waveformUnits_ = waveformUnits if isinstance(waveformUnits, pq.Quantity) else pq.dimensionless
         
         durationFamily = scq.getUnitFamily(self._waveformDuration_)
         if durationFamily == "Time":
@@ -160,7 +162,7 @@ Named Parameters:
         elif durationFamily == "Angle" or self._waveformDuration_.units == pq.rad:
             self._waveformSamplingRate_.rescale(pq.angle_frequency_unit)
             
-        signalBlockers = list(map(lambda w: QtCore.QSignalBlocker(w), [self.durationSpinBox, self.samplingRateSpinBox, self.waveformUnitsChooser]))
+        signalBlockers = list(map(lambda w: QtCore.QSignalBlocker(w), [self.durationSpinBox, self.samplingRateSpinBox]))#, self.waveformUnitsChooser]))
         self.durationSpinBox.setValue(self._waveformDuration_)
         self.samplingRateSpinBox.setValue(self._waveformSamplingRate_)
            
@@ -174,8 +176,9 @@ Named Parameters:
                 
     def _setModelFunction_(self, model:types.FunctionType):
         assert models.isModelFunction(model), f"Expecting a model function — which is NOT a regular Python function; instead, got {model}"
+        self._model_ = model
         self._model_name_ = model.title
-        self._model_expr_pixmap_ = models.renderModelExpression(self._model_.expression)
+        self._rendered_model_expression_ = models.renderModelExpression(self._model_.expression)
         fitting_dict = dict()
         if model.fitting:
             fitting_dict["Initial Value"] = model.fitting["initial"]
@@ -207,12 +210,13 @@ Named Parameters:
     
     @fittingCoefficients.setter
     def fittingCoefficients(self, coefficients: typing.Union[pd.DataFrame, dict]):
-         if isinstance(coefficients, pd.DataFrame):
+        if isinstance(coefficients, pd.DataFrame):
             # NOTE: 2026-01-13 23:26:42
             # override coefficients given by model only if the indexes are the same
             if isinstance(self._model_fit_coefficients_, pd.DataFrame):
                 assert coefficients.size == self._model_fit_coefficients_.size, "Incompatible coefficients data were supplied"
                 assert all(c in coefficients.index for c in self._model_.coefficients) and all(c in self._model_.coefficients for c in coefficients), "Incompatible coefficients data were supplied"
+            
             self._model_fit_coefficients_ = coefficients
             
         elif isinstance(coefficients, dict):
@@ -258,6 +262,12 @@ Named Parameters:
     # @Slot()
     # def _slot_modelCoefficientsChanged(self):
     #     pass
+    
+    @Slot()
+    def _slot_showModelExpression(self):
+        if isinstance(self._rendered_model_expression_, QtGui.QPixmap):
+            pass
+            
     
     @Slot()
     def _slot_generateWaveform(self):

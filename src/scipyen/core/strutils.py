@@ -13,6 +13,7 @@ import typing
 import keyword
 import string
 import itertools
+import subprocess
 import ast
 import re as _re
 import numbers
@@ -626,7 +627,6 @@ def str2float(s: str) -> float:
 
     return ret
 
-
 def isnumber(s: str) -> bool:
     r"""Returns True if string s can be evalated to a numbers.Number
 
@@ -654,7 +654,7 @@ def is_latex(s:str) -> bool:
     
 def render_latex(l:str, backend:str="auto", out:str="ipython", 
                 darkmode:typing.Optional[bool]=None, wrap:bool=False,
-                **kwargs) -> typing.Optional[typing.Union[PIL.Image, QtGui.QPixmap, QtGui.QImage, IPImage]]:
+                **kwargs) -> typing.Optional[typing.Union[PIL.Image, QtGui.QPixmap, QtGui.QImage, IPImage, dict]]:
     r"""Graphic rendering of a LaTeX string.
 
     Positional parameters:
@@ -674,6 +674,9 @@ def render_latex(l:str, backend:str="auto", out:str="ipython",
         Both "dvipng" and "matplotlib" backends are involed indirectly, via 
         ``IPython.lib.latextools.latex_to_png(…)`` function.
         The "auto" backend tries "dvipng" first, then "matplotlib", before failing.
+    
+        .. note::
+            This parameter is *ignored* if ``out`` is "svg" (see below)
         
     :out: The kind of output generated. One of "ipython" (default), "bytes", 
         "img", "pix", or "pil".
@@ -683,12 +686,19 @@ def render_latex(l:str, backend:str="auto", out:str="ipython",
         * "pix" generates a QtGui.QPixmap object
         * "img" generates a QtGui.QImage object
         * "pil" generates a PIL.Image.Image object
+        * "svg" generates an SVG string and *ignores* the ``backend`` parameter; returns a mapping where the SVG output is found under the key ``svg``
     
-    :darkmode: Flag indicating if the generated graphic is suitable for a dark 
+        .. note::
+            The "svg" output requires the package latex2png from https://github.com/Moonbase59/latex2svg.git#
+    
+    :darkmode: Optional flag indicating if the generated graphic is suitable for a dark 
         (True) or bright (False) background. Except for the "pil" output and the
         "matplotlib" backend, the graphic data has transparent background. This
         flag simply determines the foregreound color (white for ``darkmode=True``,
-        black for ``darkmode=False``)
+        black for ``darkmode=False``)   
+    
+        .. note::
+            By default, this is None, in which case the use of dark mode style will be detected
     
     :wrap: Flag passed on to IPython's ``latex_to_png(…)`` function
     
@@ -715,15 +725,74 @@ def render_latex(l:str, backend:str="auto", out:str="ipython",
     from IPython.lib import latextools
     from core.prog import scipywarn
     from gui.guiutils import isDarkGui
+    
+    hasLatex2SVG = False
+    
+    try:
+        import latex2svg
+        hasLatex2SVG = True
+    except:
+        pass
+    
+    if not isinstance(darkmode, bool):
+        darkmode = isDarkGui()
 
     if not isinstance(backend, str) or backend.lower() not in ("auto", "dvipng", "matplotlib"):
         backend = "auto"
     else:
         backend = backend.lower()
         
-    if not isinstance(darkmode, bool):
-        darkmode = isDarkGui()
-
+    if out.lower() == "svg":
+        if not hasLatex2SVG:
+            scipywarn("The Python package latex2svg is required. Please install it.")
+            return
+        
+        # NOTE: 2026-01-16 00:13:14 
+        # special case of SVG output requested
+        # syscheck = subprocess.run("dvisvgm", capture_output=True)
+        # if syscheck.returncode != 0:
+        #     scipywarn("The 'dvisvgm' utility is not available. Is LaTeX installed?")
+        #     return
+        
+        params = latex2svg.default_params.copy()
+        params["optimizer"] = None
+        
+        if darkmode:
+            try:
+                syscheck = subprocess.run(["kpsewhich", "xcolor.sty"], capture_output=True)
+                if syscheck.returncode==0:
+                    cpackage = "xcolor"
+                else:
+                    syscheck = subprocess.run(["kpsewhich", "color.sty"], capture_output=True)
+                    if syscheck.returncode==0:
+                        cpackage = "color"
+                    else:
+                        scipywarn("Neither latex packages 'xcolor' or 'color' are available. Cannot adapt to dark background")
+            except FileNotFoundError:
+                scipywarn("LaTeX 'kpsewhich' utility do not appear to be installed. bailing out")
+                return
+                
+            pparts = params["preamble"].strip().split("\n")
+            pparts.append("\\usepackage{xcolor}")
+            params["preamble"] = "\n".join([""] + pparts + [""])
+            
+            if l.startswith("$$") and l.endswith("$$"):
+                lparts = l.split("$$")
+                lparts[0] = "$$\\begingroup\\color{white}"
+                lparts[-1] = "\\endgroup$$"
+                
+            elif l.startswith("$") and l.endswith("$"):
+                lparts = l.split("$")
+                lparts[0] = "$\\begingroup\\color{white}"
+                lparts[-1] = "\\endgroup$"
+                l = "".join(lparts)
+                
+        return latex2svg.latex2svg(l, params)
+        # out = latex2svg.latex2svg(l, params)
+        # if darkmode:
+        #     out["svg"] = re.sub(r'fill=["\'](.*?)["\']', 'fill="#ffffff"', out["svg"])
+            
+        
     color = "#FFFFFF" if darkmode else "#000000"
 
     encode = kwargs.get("encode", False)
