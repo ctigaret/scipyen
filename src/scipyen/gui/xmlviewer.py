@@ -62,6 +62,7 @@ else:
 
 #### BEGIN pict.core modules
 import core.xmlutils as xmlutils
+from core import strutils
 #### END pict.core modules
 
 #### BEGIN pict.gui modules
@@ -423,7 +424,8 @@ class XMLViewer(ScipyenViewer):
                         xmlutils.xml.etree.ElementTree.Element: 99, 
                         QtXml.QDomNode: 99, 
                         QtXml.QDomDocument: 99, 
-                        str: 0}
+                        str: 0,
+                        strutils.is_svg:0}
     # view_action_name = "XML Object"
         
     def __init__(self, data: (xml.etree.ElementTree.Element, xml.dom.minidom.Document, QtXml.QDomNode, QtXml.QDomDocument, str, type(None)) = None, 

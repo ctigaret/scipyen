@@ -54,6 +54,7 @@ import quantities as pq
 from core.pyqtgraph_patch import pyqtgraph as pg
 
 from core import strutils
+from core import xmlutils
 
 class UnitsStringValidator(QtGui.QValidator):
     def __init__(self, parent=None):
@@ -378,6 +379,39 @@ def isDarkGui() -> bool:
     windowColor = QtWidgets.QApplication.palette().color(QtGui.QPalette.Window)
     _,_,v,_ = windowColor.getHsv()
     return v <= 128
+
+def svg2pixmap(s:str, scale:float=1.0) -> QtGui.QPixmap:
+    if not strutils.is_svg(s):
+        return QtGui.QPixmap()
+    
+    w, h = xmlutils.get_svg_size(s)
+    
+    if all([v is None for v in (w,h)]):
+        return QtGui.QPixmap()
+    if w is None:
+        w = h
+    elif h is None:
+        h = w
+    pix = QtGui.QPixmap(QtCore.QSize(int(w),int(h)))
+    renderer = QtSvg.QSvgRenderer()
+    renderer.load(QtCore.QByteArray(bytes(s.encode())))
+    pix.fill(QtCore.Qt.transparent)
+    painter = QtGui.QPainter(pix)
+    if renderer.isValid():
+        defSize = renderer.defaultSize()
+        renderSize = defSize * scale 
+        painter.save()
+        bounds = QtCore.QRectF((w - renderSize.width()) / 2,
+                            (h - renderSize.height()) / 2,
+                            renderSize.width(), renderSize.height())
+        painter.setClipRect(bounds)
+        renderer.render(painter, bounds)
+        painter.restore()
+    painter.end()
+    return pix
+    
+    
+    
 
 # def testme():
 #     import pywt

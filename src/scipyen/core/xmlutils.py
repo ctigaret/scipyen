@@ -727,4 +727,58 @@ def composeStringListForXMLElement(tagname, value):
     
     return ret
     
+def get_svg_size(s:str) -> tuple:
+    from core import strutils
     
+    try:
+        attrib = dict()
+        if not strutils.is_svg(s) and not strutils.is_xml(s):
+            if isinstance(s, str) and os.path.isfile(s):
+                element = ET.parse(s)
+                root = tree.getroot()
+                attrib = root.attrib
+            else:
+                return None, None
+        else:
+            # Parse the SVG file
+            root = ET.fromstring(s)
+            attrib = root.attrib
+            
+        # Extract width and height attributes
+        width = attrib.get('width', None)
+        height = attrib.get('height', None)
+        viewBox = attrib.get('viewBox', None)
+        
+        # If width and height are None, check viewBox
+        if (width is None or height is None) and viewBox:
+            viewBox_values = viewBox.split()
+            if len(viewBox_values) >= 4:
+                width = viewBox_values[2]  # Width from viewBox
+                height = viewBox_values[3]  # Height from viewBox
+                
+        # print(f"viewBox: {viewBox}, width: {width}, height: {height}")
+
+        # Convert width and height to floats
+        if width is not None and height is not None:
+            return float(width), float(height)
+        else:
+            return None, None
+
+    except ET.ParseError:
+        print("Error parsing the SVG file.")
+        return None, None
+    
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return None, None
+    
+
+
+# # Example usage
+# file_path = 'path/to/your/file.svg'
+# width, height = get_svg_size(file_path)
+# if width is not None and height is not None:
+#     print(f"SVG Width: {width}, Height: {height}")
+# else:
+#     print("Could not determine the size.")
+

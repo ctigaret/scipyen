@@ -37,7 +37,7 @@ else:
     QShortcut = QtWidgets.QShortcut
     __has_sip__ = True
     
-from core.strutils import str2symbol
+from core.strutils import (str2symbol, is_svg, str2svg)
 from core import models
 from core import scipyen_quantities as scq
 from gui import guiutils, workspacegui
@@ -55,10 +55,10 @@ class _ModelFunctionExpressionSVGGenerator_(QtCore.QThread):
         self._modelFunc_ = modelFunc
         
     def run(self):
-        from core import strutils
+        # from core import strutils
         # svg_out = models.renderModelExpression(self._modelFunc_, out="svg")
         svg = self._modelFunc_.expressionAsSVG()
-        if strutils.is_svg(svg):
+        if is_svg(svg):
             self.ready.emit(svg)
     
 
@@ -122,7 +122,14 @@ Named Parameters:
             self.populateCoefficientsTable(self._model_fit_coefficients_)
 
     def _configureUI_(self):
+        from gui.guiutils import svg2pixmap
         self.setupUi(self)
+        dsvg = str2svg("1", 16, 16, x=0, y=16, font_size=16).as_svg()
+        pix = svg2pixmap(dsvg)
+        if not pix.isNull():
+            self.makeUnitAmplitudePushButton.setIcon(QtGui.QIcon(pix))
+            self.makeUnitAmplitudePushButton.setText("")
+            self.makeUnitAmplitudePushButton.setFlat(True)
         self.makeUnitAmplitudePushButton.clicked.connect(self._slot_makeUnitAmplitudeModel)
         self.waveformExpressionPushButton.clicked.connect(self._slot_showModelExpression)
         self.durationSpinBox.sig_valueChanged.connect(self._slot_waveformDurationChanged)
@@ -169,9 +176,7 @@ Named Parameters:
                 self.populateCoefficientsTable(self._model_fit_coefficients_)
                 
     def _setModelFunction_(self, model:types.FunctionType):
-        # BUG: 2026-01-16 17:46:26 TODO/FIXME
-        # the svgWidget does not paint the svg — why ?!?
-        from core.strutils import is_svg
+        # from core.strutils import is_svg
         assert models.isModelFunction(model), f"Expecting a model function — which is NOT a regular Python function; instead, got {model}"
         self._model_ = model
         self._model_name_ = model.title
@@ -343,7 +348,7 @@ Named Parameters:
     
     @Slot()
     def _slot_showModelExpression(self):
-        from core.strutils import is_svg
+        # from core.strutils import is_svg
         if not isinstance(self._model_expression_svg_, QtGui.QPixmap) and not is_svg(self._model_expression_svg_):
             print("invalid expression")
             return
@@ -354,7 +359,7 @@ Named Parameters:
             self._expressionWindow_.show()
             
     def _setupExpressionWindow(self):
-        from core.strutils import is_svg
+        # from core.strutils import is_svg
         from gui.widgets import svgwidgets
         if not isinstance(self._expressionWindow_, QtWidgets.QMainWindow):
             self._expressionWindow_ = QtWidgets.QMainWindow()

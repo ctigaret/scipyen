@@ -712,7 +712,7 @@ def str2svg(s:str, width:int, height:int, /,
             stroke_width:typing.Optional[int]=None,
             stroke:typing.Optional[str]="auto", 
             fill:typing.Optional[str]="auto",
-            *args, **kwargs) -> dw.Drawing:
+            *args, **kwargs) -> dw.Drawing | None:
     r"""Draws a string as SVG using the ``drawsvg 2.x`` package.
     Returns:
     ========
@@ -730,6 +730,9 @@ def str2svg(s:str, width:int, height:int, /,
     from gui.guiutils import isDarkGui
     from gui.scipyen_colormaps import is_color
     from functools import partial
+    
+    if not isinstance(s, str) or len(s.strip()) == 0:
+        return
     
     if not is_color(fill):
         if fill == "auto":

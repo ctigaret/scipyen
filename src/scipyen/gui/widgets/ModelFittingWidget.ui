@@ -180,6 +180,22 @@
       </spacer>
      </item>
      <item>
+      <widget class="QPushButton" name="makeUnitAmplitudePushButton">
+       <property name="toolTip">
+        <string>Adjust β such that the model has unit amplitude</string>
+       </property>
+       <property name="statusTip">
+        <string>Adjust β such that the model has unit amplitude</string>
+       </property>
+       <property name="whatsThis">
+        <string>Adjust β such that the model has unit amplitude</string>
+       </property>
+       <property name="text">
+        <string>Unit Amplitude</string>
+       </property>
+      </widget>
+     </item>
+     <item>
       <widget class="QPushButton" name="waveformExpressionPushButton">
        <property name="toolTip">
         <string>Reveal the model's mathematical expression in a separate window</string>
@@ -279,22 +295,6 @@
         </size>
        </property>
       </spacer>
-     </item>
-     <item>
-      <widget class="QPushButton" name="makeUnitAmplitudePushButton">
-       <property name="toolTip">
-        <string>Adjust β such that the model has unit amplitude</string>
-       </property>
-       <property name="statusTip">
-        <string>Adjust β such that the model has unit amplitude</string>
-       </property>
-       <property name="whatsThis">
-        <string>Adjust β such that the model has unit amplitude</string>
-       </property>
-       <property name="text">
-        <string>Unit Amplitude</string>
-       </property>
-      </widget>
      </item>
     </layout>
    </item>
