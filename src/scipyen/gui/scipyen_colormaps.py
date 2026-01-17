@@ -961,8 +961,6 @@ def is_color(s:str) -> bool:
         palette = ColorPalette(fmt=QtGui.QColor.HexRgb)
         return s in palette
     
-    
-    
 def standardQColor(i:int):
     return paletteQColor(standardPalette, i)
 

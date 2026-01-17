@@ -716,7 +716,7 @@ def str2svg(s:str, width:int, height:int, /,
     r"""Draws a string as SVG using the ``drawsvg 2.x`` package.
     Returns:
     ========
-    A drawsvg.Draeing object.
+    A drawsvg.Drawing object.
     
     The SVG string is obtained by calling
     
@@ -733,6 +733,10 @@ def str2svg(s:str, width:int, height:int, /,
     
     if not isinstance(s, str) or len(s.strip()) == 0:
         return
+    # if not isinstance(s, str):
+    #     raise TypeError(f"Expecting a string; isnetad got a {type(s).__name))}") 
+    # if len(s.strip()) == 0:
+    #     return
     
     if not is_color(fill):
         if fill == "auto":
@@ -752,7 +756,6 @@ def str2svg(s:str, width:int, height:int, /,
     d.append(DrawText(s))
     
     return d
-    
     
 def render_latex(l:str, backend:str="auto", out:str="ipython", 
                 darkmode:typing.Optional[bool]=None, wrap:bool=False,
@@ -895,10 +898,6 @@ def render_latex(l:str, backend:str="auto", out:str="ipython",
                 l = "".join(lparts)
                 
         return latex2svg.latex2svg(l, params)
-        # out = latex2svg.latex2svg(l, params)
-        # if darkmode:
-        #     out["svg"] = re.sub(r'fill=["\'](.*?)["\']', 'fill="#ffffff"', out["svg"])
-            
         
     color = "#FFFFFF" if darkmode else "#000000"
 
@@ -924,7 +923,6 @@ def render_latex(l:str, backend:str="auto", out:str="ipython",
         if not isinstance(data, bytes):
             scipywarn(f"The backend {backend} failed; check the parameters to this function call")
             return
-        
     else:
         raise ValueError(f"Unknown/unsupported backend {backend}")
     
@@ -946,7 +944,6 @@ def render_latex(l:str, backend:str="auto", out:str="ipython",
             return
         if out.lower()=="img":
             return ret.toImage()
-        
         else:
             return ret
 

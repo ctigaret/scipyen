@@ -124,7 +124,7 @@ Named Parameters:
     def _configureUI_(self):
         from gui.guiutils import svg2pixmap
         self.setupUi(self)
-        dsvg = str2svg("1", 16, 16, x=0, y=16, font_size=16).as_svg()
+        dsvg = str2svg("1:1", 16, 16, x=8, y=15, font_size=16, text_anchor="middle", dominant_baseline="hanging").as_svg()
         pix = svg2pixmap(dsvg)
         if not pix.isNull():
             self.makeUnitAmplitudePushButton.setIcon(QtGui.QIcon(pix))
