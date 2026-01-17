@@ -76,6 +76,7 @@ cython
 debugpy
 descartes
 dill
+drawsvg
 editdistance
 exceptiongroup
 executing

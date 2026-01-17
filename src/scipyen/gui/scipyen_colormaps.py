@@ -351,7 +351,9 @@ all_palettes = Bunch(
     )
         
 class ColorPalette(object):
-    def __init__(self, collection_name:typing.Optional[str]="all", fmt:QtGui.QColor.NameFormat=QtGui.QColor.HexRgb, **color_collections):
+    def __init__(self, collection_name:typing.Optional[str]="all", 
+                 fmt:QtGui.QColor.NameFormat=QtGui.QColor.HexRgb, 
+                 **color_collections):
         r"""
         collection_name: str (optional, default is "all")
             Only used when color_collections (see below) is empty
@@ -872,7 +874,9 @@ def hexpalette(palette:typing.Union[dict, tuple, list], fmt:QtGui.QColor.NameFor
     else:
         raise TypeError("Palette expected a dict or sequence; got %s instead" % type(palette).__name__)
         
-def get_name_color(x:typing.Union[str, tuple, list, QtCore.Qt.GlobalColor, QtGui.QColor], palette:typing.Optional[typing.Union[dict, tuple, list, str, ColorPalette]]=None, case_sensitive=False, tuple_strict=False, fmt:QtGui.QColor.NameFormat=QtGui.QColor.HexRgb):
+def get_name_color(x:typing.Union[str, tuple, list, QtCore.Qt.GlobalColor, QtGui.QColor], 
+                   palette:typing.Optional[typing.Union[dict, tuple, list, str, ColorPalette]]=None, 
+                   case_sensitive=False, tuple_strict=False, fmt:QtGui.QColor.NameFormat=QtGui.QColor.HexRgb):
     r"""Return a tuple (color name, QColor) given 'x' and optionally, a palette.
     
     """
@@ -907,11 +911,14 @@ def get_name_color(x:typing.Union[str, tuple, list, QtCore.Qt.GlobalColor, QtGui
         
     if palette:
         if isinstance(x, str):
-            if x.startswith("#"):
-                if len(x) == 7:
-                    hpal = hexpalette(palette, alpha=False)
-                elif len(x) == 9:
-                    hpal = hexpalette(palette, alpha=True)
+            if all([v.lower() in "0123456789abcdef" for v in x[1:]]):
+                if x.startswith("#"):
+                    if len(x) == 7:
+                        hpal = hexpalette(palette, alpha=False)
+                    elif len(x) == 9:
+                        hpal = hexpalette(palette, alpha=True)
+                    else:
+                        raise ValueError("%s is not a valid color string")
                 else:
                     raise ValueError("%s is not a valid color string")
                 
@@ -942,6 +949,19 @@ def get_name_color(x:typing.Union[str, tuple, list, QtCore.Qt.GlobalColor, QtGui
     name = x if isinstance(x, str) else color.name(fmt) # fallback!
     
     return (name, color)
+
+def is_color(s:str) -> bool:
+    r"""Checks if the string ``s`` is a valid color name found int he current color palettes, or a valid colro HEX string"""
+    if not isinstance(s, str) or len(s.strip()) == 0:
+        return False
+    if s.startswith("#") and len(s) in (7, 9) and all([v in "#0123456789abcdefABCDEF" for v in s[1:]]):
+        return True
+    
+    else:
+        palette = ColorPalette(fmt=QtGui.QColor.HexRgb)
+        return s in palette
+    
+    
     
 def standardQColor(i:int):
     return paletteQColor(standardPalette, i)

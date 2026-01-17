@@ -56,7 +56,7 @@ from warnings import warn
 import matplotlib as mpl
 
 import qtpy
-from qtpy import (QtCore, QtGui, QtWidgets)
+from qtpy import (QtCore, QtGui, QtWidgets, QtSvg)
 from qtpy.QtCore import (Signal, Slot)
 
 __has_PySide6__ = False
@@ -600,12 +600,60 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
         styleName = action.text()
         print(f"{self.__class__.__name__}._slot_set_syntax_style: styleName {styleName}")
         self._set_syntax_style(styleName)
-
-    # @Slot(str)
-    # def _slot_setSyntaxStyle(self, stylename:str):
-    #     # NOTE: 2024-09-20 09:50:44 duplicate of the above
-    #     self.syntaxStyle = stylename
         
+#     def _svg_to_image(self, string, size=None):
+#         """ Convert a SVG document to a QImage.
+# 
+#         Parameters
+#         ----------
+#         string : basestring
+#             A Python string containing a SVG document.
+# 
+#         size : QSize, optional
+#             The size of the image that is produced. If not specified, the SVG
+#             document's default size is used.
+#         
+#         Raises
+#         ------
+#         ValueError
+#             If an invalid SVG string is provided.
+# 
+#         Returns
+#         -------
+#         A QImage of format QImage.Format_ARGB32.
+#         """
+#         # NOTE: 2026-01-16 22:37:39
+#         # taken from qtconsole.svg module
+#         if isinstance(string, str):
+#             string = bytes(string.encode('utf-8')) # this what I think is missing in the original
+#         # ba = 
+#         renderer = QtSvg.QSvgRenderer(QtCore.QByteArray(string))
+#         if not renderer.isValid():
+#             raise ValueError('Invalid SVG data.')
+# 
+#         if size is None:
+#             size = renderer.defaultSize()
+#         image = QtGui.QImage(size, QtGui.QImage.Format_ARGB32)
+#         image.fill(0)
+#         painter = QtGui.QPainter(image)
+#         renderer.render(painter)
+#         return image
+#     
+#         
+#     def _insert_svg(self, cursor, svg):
+#         """ Insert raw SVG data into the widget.
+#         """
+#         try:
+#             image = self._svg_to_image(svg)
+#         except ValueError:
+#             self._insert_plain_text(cursor, 'Received invalid SVG data.')
+#         else:
+#             format = self._add_image(image)
+#             self._name_to_svg_map[format.name()] = svg
+#             cursor.insertBlock()
+#             cursor.insertImage(format)
+#             cursor.insertBlock()
+
     @property
     def syntaxStyle(self):
         r"""Name of the syntax highlight pygment (str)

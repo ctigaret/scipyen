@@ -23,6 +23,8 @@ import sympy
 from sympy import abc as symabc
 import PIL
 from PIL.Image import Image as PILImage
+import drawsvg as dw
+
 import matplotlib.pyplot as plt
 from IPython.core.latex_symbols import (latex_symbols, reverse_latex_symbol)
 from IPython.display import Image as IPImage
@@ -704,6 +706,50 @@ def is_markdown(s:str) -> bool:
     pattern = r"(^#{1,6}\s.*|^\s*[*+-] .*$|^\s*\d+\.\s.*$|!\[.*\]\(.*\)|\[[^\]]+\]\(.*\)|\*\*.*?\*\*|__.*?__|`[^`]+`|~{2}.*?~{2})"
     matches = _re.findall(pattern, s, _re.MULTILINE)# | _re.DOTALL)
     return len(matches)>0 and len(matches[0])>0
+
+def str2svg(s:str, width:int, height:int, /, 
+            font_size:int=10, x:int=0, y:int=0, 
+            stroke_width:typing.Optional[int]=None,
+            stroke:typing.Optional[str]="auto", 
+            fill:typing.Optional[str]="auto",
+            *args, **kwargs) -> dw.Drawing:
+    r"""Draws a string as SVG using the ``drawsvg 2.x`` package.
+    Returns:
+    ========
+    A drawsvg.Draeing object.
+    
+    The SVG string is obtained by calling
+    
+    ::
+        d.as_svg()
+
+    .. note::
+    This is NOT to be used to render LaTeX strings as SVG. For this purpose, pass
+    a LaTeX expression string to ``render_latex`` with ``out="svg"``.
+"""
+    from gui.guiutils import isDarkGui
+    from gui.scipyen_colormaps import is_color
+    from functools import partial
+    
+    if not is_color(fill):
+        if fill == "auto":
+            fill = "#ffffff" if isDarkGui() else "#000000"
+        else:
+            fill = None
+        
+    if not is_color(stroke):
+        if stroke == "auto":
+            stroke = "#ffffff" if isDarkGui() else "#000000"
+        else:
+            stroke = None
+        
+    d = dw.Drawing(width, height)
+    DrawText = partial(dw.Text, font_size=font_size, x=x, y=y, stroke_width=stroke_width, stroke=stroke, fill = fill, *args, **kwargs)
+        
+    d.append(DrawText(s))
+    
+    return d
+    
     
 def render_latex(l:str, backend:str="auto", out:str="ipython", 
                 darkmode:typing.Optional[bool]=None, wrap:bool=False,

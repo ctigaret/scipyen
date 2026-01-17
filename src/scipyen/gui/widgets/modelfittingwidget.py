@@ -47,6 +47,21 @@ from gui.widgets.small_widgets import QuantitySpinBox
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 Ui_ModelFittingWidget, QWidget = loadUiType(os.path.join(__module_path__, "ModelFittingWidget.ui"))
 
+class _ModelFunctionExpressionSVGGenerator_(QtCore.QThread):
+    ready = Signal(str, name="ready")
+    
+    def __init__(self, modelFunc:typing.Union[types.FunctionType, str], parent:QtCore.QObject):
+        QtCore.QThread.__init__(self, parent)
+        self._modelFunc_ = modelFunc
+        
+    def run(self):
+        from core import strutils
+        # svg_out = models.renderModelExpression(self._modelFunc_, out="svg")
+        svg = self._modelFunc_.expressionAsSVG()
+        if strutils.is_svg(svg):
+            self.ready.emit(svg)
+    
+
 class ModelFittingWidget(Ui_ModelFittingWidget, QWidget, workspacegui.GuiMessages):
     sig_waveformReady = Signal(object, name="sig_waveformReady")
     def __init__(self, model: types.FunctionType,
@@ -97,6 +112,7 @@ Named Parameters:
         self._waveformSamplingRate_:typing.Optional[pq.Quantity] = None
         self._waveformUnits_:typing.Optional[pq.Quantity] = None
         self._model_expression_window_:typing.Optional[QtWidgets.QMainWindow] = None
+        self._expressionWindow_:typing.Optional[QtWidgets.QMainWindow] = None
         
         self._configureUI_()
         
@@ -112,24 +128,15 @@ Named Parameters:
         self.durationSpinBox.sig_valueChanged.connect(self._slot_waveformDurationChanged)
         self.samplingRateSpinBox.sig_valueChanged.connect(self._slot_waveformSamplingRateChanged)
         self.generateWaveformPushButton.clicked.connect(self._slot_generateWaveform)
-        
-        # if isinstance(self._model_name_, str) and len(self._model_name_.strip()):
-        #     self.modelNameLabel.setText(self._model_name_)
-        # else:
-        #     self.modelNameLabel.setText("")
-
-        # self.modelCoefficientsTable.sig_dataChanged.connect(self._slot_modelCoefficientsChanged)
-        # self.durationSpinBox.setValue(self._waveformDuration_)
-        # self.samplingRateSpinBox.setValue(self._waveformSamplingRate_)
-        # self.modelCoefficientsTable.spinStep = 1e-4
-        # self.modelCoefficientsTable.spinDecimals = 4
-
-        # self.modelCoefficientsTable.sig_parameterChanged[str, str].connect(self._slot_modelCoefficientsChanged)
-        # self.modelCoefficientsTable.sig_badBounds[str].connect(self._slot_badBounds)
-        # self.modelCoefficientsTable.sig_infeasible_x0[str].connect(self._slot_infeasible_x0s)
-        # self.setMinimumSize(self.modelCoefficientsTable.tableView.viewportSizeHint())
-        
-        
+        self.waveformUnitsPushButton.clicked.connect(self._slot_changeWaveformUnits)
+        if self._waveformUnits_ is None:
+            self.unitsLabel.setText("")
+            self.unitsLabel.setToolTip("Dimensionless")
+        else:
+            symbol = scq.shortSymbol(self._waveformUnits_)
+            self.unitsLabel.setText(symbol)
+            self.unitsLabel.setToolTip(symbol)
+            
     def _setModelData_(self, model:types.FunctionType, duration:pq.Quantity=1*pq.s, samplingRate:pq.Quantity=1e4*pq.Hz, 
                  waveformUnits:pq.Quantity = pq.dimensionless,
                  coefficients:typing.Optional[typing.Union[dict, pd.DataFrame]] = None):
@@ -182,15 +189,31 @@ Named Parameters:
         
         self._model_fit_coefficients_ = pd.DataFrame(fitting_dict, index=(model.coefficients))
         
-        svg_out = models.renderModelExpression(self._model_, out="svg")
+        # svg_out = models.renderModelExpression(self._model_, out="svg")
+        self._generateModelExpressionSVG()
         
-        if isinstance(svg_out, dict) and "svg" in svg_out:
+        self._setupExpressionWindow()
+        
+    def _generateModelExpressionSVG(self):
+        worker = _ModelFunctionExpressionSVGGenerator_(self._model_, parent=self)
+        worker.ready.connect(self._slot_modelExpressionGenerated)
+        worker.run()
+        worker.deleteLater()
+        
+    @Slot(str)
+    def _slot_modelExpressionGenerated(self, svg:str):
+        # if isinstance(d, dict) and "svg" in d:
             # print(f"{self.__class__.__name__}._setModelFunction_: {svg_out['svg']} \n is svg: {is_svg(svg_out['svg'])}")
-            self._model_expression_svg_ = svg_out["svg"]
-            # print(f"{self.__class__.__name__}._setModelFunction_: self._model_expression_svg_ is svg@ {is_svg(self._model_expression_svg_)}")
-            self.svgWidget.setSvg(svg_out["svg"])
-            # self.svgWidget.setSvg(self._model_expression_svg_)
-        
+        self._model_expression_svg_ = svg
+        # print(f"{self.__class__.__name__}._setModelFunction_: self._model_expression_svg_ is svg@ {is_svg(self._model_expression_svg_)}")
+        self.svgWidget.setSvg(self._model_expression_svg_)
+        svgSize = self.svgWidget.svgSize()
+        if svgSize.width()>0 and svgSize.height() > 0:
+            splitterMinSize = self.labelsSplitter.minimumSize()
+            newSplitterMinSize = QtCore.QSize(splitterMinSize)
+            newSplitterMinSize.setHeight(svgSize.height())
+            
+            
     @property
     def model(self) -> types.FunctionType:
         return self._model_
@@ -320,13 +343,41 @@ Named Parameters:
     
     @Slot()
     def _slot_showModelExpression(self):
-        if isinstance(self._model_expression_svg_, QtGui.QPixmap):
-            pass
+        from core.strutils import is_svg
+        if not isinstance(self._model_expression_svg_, QtGui.QPixmap) and not is_svg(self._model_expression_svg_):
+            print("invalid expression")
+            return
+        self._setupExpressionWindow()
+            
+        if not self._expressionWindow_.isVisible():
+            self._expressionWindow_.resize(self._expressionWindow_.centralWidget().svgSize())
+            self._expressionWindow_.show()
+            
+    def _setupExpressionWindow(self):
+        from core.strutils import is_svg
+        from gui.widgets import svgwidgets
+        if not isinstance(self._expressionWindow_, QtWidgets.QMainWindow):
+            self._expressionWindow_ = QtWidgets.QMainWindow()
+            sWidget = None
+            if isinstance(self._model_expression_svg_, QtGui.QPixmap):
+                sWidget = QtCore.QLabel(parent=self._expressionWindow_)
+                sWidget.setPixmap(self._model_expression_svg_)
+            elif is_svg(self._model_expression_svg_):
+                sWidget = svgwidgets.SimpleSVGWidget(svg=self._model_expression_svg_, parent=self._expressionWindow_)
+            if sWidget:
+                self._expressionWindow_.setCentralWidget(sWidget)
+                
+        else:
+            if isinstance(self._model_expression_svg_, QtGui.QPixmap):
+                self._expressionWindow_.centralWidget().setPixmap(self._model_expression_svg_)
+            elif is_svg(self._model_expression_svg_):
+                self._expressionWindow_.centralWidget().setSvg(self._model_expression_svg_)
+                
+        self._expressionWindow_.setWindowTitle(f"{QtWidgets.QApplication.instance().applicationName()} - {self._model_name_} model")
             
     
     @Slot()
     def _slot_generateWaveform(self):
-        # print(f"{self.__class__.__name__}._slot_generateWaveform")
         from core import datasignal
         from gui.guiutils import getScipyenMainWindow
         if not isinstance(self._model_, types.FunctionType) or not models.isModelFunction(self._model_):
@@ -338,6 +389,7 @@ Named Parameters:
             coeffs = list(self._model_fit_coefficients_["Initial Value"])
             y = self._model_(x, coeffs)
             sigUnits = self._waveformUnits_.units if isinstance(self._waveformUnits_, pq.Quantity) else pq.dimensionless
+            
             if scq.checkTimeUnits(self._waveformDuration_):
                 sig = neo.AnalogSignal(y, t_start = 0*self._waveformDuration_.units, units = sigUnits, sampling_rate=self._waveformSamplingRate_, name=self._model_name_)
             else:
@@ -361,6 +413,18 @@ Named Parameters:
     def _slot_makeUnitAmplitudeModel(self):
         pass
     
+    @Slot()
+    def _slot_changeWaveformUnits(self):
+        from gui.quickdialog import QuickDialog
+        from gui.widgets import small_widgets
+        dlg = QuickDialog(title="Choose waveform units")
+        units = self._waveformUnits_.units if isinstance(self._waveformUnits_, pq.Quantity) else pq.dimensionless
+        qc = small_widgets.QuantityChooserWidget(parent=dlg, unit = units)
+        dlg.addWidget(qc)
+        if dlg.exec():
+            self.waveformUnits = qc.value()
+            
+    
     @Slot(object)
     def _slot_waveformDurationChanged(self, val:typing.Union[pq.Quantity, float, int, np.float64, np.int64]):
         duration = self._waveformDuration_
@@ -380,8 +444,6 @@ Named Parameters:
         if scq.unitsConvertible(1/self._waveformSamplingRate_, duration):
             if duration.units != 1/self._waveformSamplingRate_:
                 rate = self._waveformSamplingRate_.rescale(1/duration.units)
-            # else:
-            #     rate = self._waveformSamplingRate_ * 1/duration.units
                 
         else:
             rate = self._waveformSamplingRate_.magnitude / duration.units
@@ -433,3 +495,12 @@ Named Parameters:
             self._waveformUnits_ = None
         else:
             self._waveformUnits_ = val.units
+            
+        if self._waveformUnits_ is None:
+            self.unitsLabel.setText("")
+            self.unitsLabel.setToolTip("Dimensionless")
+        else:
+            symbol = scq.shortSymbol(self._waveformUnits_)
+            self.unitsLabel.setText(symbol)
+            self.unitsLabel.setToolTip(symbol)
+            

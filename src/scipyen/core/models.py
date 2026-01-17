@@ -132,6 +132,7 @@ def modelfunction(f:typing.Callable, /,
                   coefficient_units:typing.Optional[dict]=None,
                   expression:typing.Optional[typing.Union[sympy.Basic, str]] = None,
                   fitting:typing.Optional[FittingCoefficientsDict]=None,
+                  displaySVG:bool=False,
                   **kwargs):
     r"""Decorator to tag a function as a mathematical model function.
 
@@ -141,6 +142,10 @@ Description:
 Function decorator used to identify user-created Python functions implementing a
  mathematical model (function of one or more independent variables based on a set
  of coefficients).
+    
+In addition, makes such objects display the associated mathematical expression
+ (see below) rendered as SVG or as an image, in a console that supports this 
+ (currently, supporting consoles are jupyter's **qtconsole** and **Scipyen's console**).
 
 The decorator adorns a model function with the following attributes:
 
@@ -159,11 +164,14 @@ The decorator adorns a model function with the following attributes:
 *starred_coefficients*: tuple of starred coefficient symbols (see below).
 
 *expression*: a LaTeX math mode string or a sympy expression object (i.e., a 
-    sympy.Basic or derived).
+    sympy.Basic or sympy.Expr).
 
 *coefficient_units* (see below)
 
 *fitting*: a ``dict`` with intial, lower & upper bound values
+    
+*displaySVG*: a flag indicating if the display of the function should render the
+    *expression* as SVG or as PNG image byte data.
 
 Other user-defined attributes (see below)
 
@@ -308,6 +316,35 @@ All are optional and default to `None`.
     WARNING: This does not mean that the decorated model function expects Quantities
     as values for the coefficient; it is up to the function what to do with its
     own call arguments
+    
+:fitting: a dictionary of names, and default initial, lower and upper bounds values 
+    for the model coefficients.
+    
+    .. note::
+    The ``names`` field of this dictionary may seem redundant, but is included 
+    here to compensate the case when no ``coefficients`` are specified (see above).
+    
+:displaySVG: boolean flag indicating how the ``expression`` (if given) is to be
+    rendered in supportinf frontends (e.g. Jupyter qtconsole, Scipyen console, and
+    possibly others).
+    
+    When ``True``, the expression will be rendered as an ``SVG`` string (mime-type `image/svg+xml`);
+    when ``False``, the expression will be rendered as ``PNG`` image bytes
+    
+    .. note::
+    By default this is False, as the ``SVG`` rendering creates small glyphs which 
+    may be harder to read. This can be always toggled manually, e.g. the code
+    below will trigger the use of SVG rendering
+    
+    ::
+        modelFun.displaySVG = True
+    
+    .. attention::
+        Rendering of the mathematical expressions *requires* :
+            * a LaTeX distribution that includes the utility programs ``latex``, ``dvipng``, ``dvisvgm`` **and** the 
+                LaTeX packages ("styles") ``amsmath``, ``color`` or ``xcolor``, 
+            * the ``matplotlib`` package (used as a fallback when ``latex`` is not available)
+            * the ``latex2svg`` package from https://github.com/Moonbase59/latex2svg.git#
 
 Var-keyword parameters:
 =======================
@@ -356,6 +393,8 @@ https://wiki.python.org/moin/PythonDecoratorLibrary#Creating_decorator_with_opti
 
             else:
                 setattr(f, "fitting", None)
+                
+        setattr(f, "displaySVG", displaySVG is True)
 
         # ### BEGIN NOTE: 2025-12-26 14:50:30 various optins - do NOT delete these; instead, keep for future reference
         #
@@ -405,6 +444,12 @@ https://wiki.python.org/moin/PythonDecoratorLibrary#Creating_decorator_with_opti
         #
         # ### END   NOTE: 2025-12-26 14:50:30 various optins - do NOT delete; instead, keep for future reference
         
+        def __expression2SVG__(f):
+            d = renderModelExpression(f.expression, out="svg")
+            return d.get("svg", None) if isinstance(d, dict) else None
+            
+        setattr(f, "expressionAsSVG", types.MethodType(__expression2SVG__, f))
+        
         
         # NOTE: 2025-12-26 14:55:28
         # enable the display of the function call syntax (a.k.a quick help) AND
@@ -413,12 +458,20 @@ https://wiki.python.org/moin/PythonDecoratorLibrary#Creating_decorator_with_opti
         def __special_display__(f):
             from core import strutils
             shell = getScipyenConsoleShell()
-            if isinstance(f.expression, sympy.Basic) or (isinstance(f.expression, str) and strutils.is_latex(f.expression)):
+            if isinstance(f.expression, (sympy.Basic, sympy.Expr)) or (isinstance(f.expression, str) and strutils.is_latex(f.expression)):
                 try:
-                    img = render_sympy(f.expression, out="bytes") if isinstance(f.expression, sympy.Basic) else render_latex(f.expression, out="bytes")
+                    svg = f.expressionAsSVG()
+                except:
+                    svg = None
+                try:
+                    img = render_sympy(f.expression, out="bytes") if isinstance(f.expression, (sympy.Basic, sympy.Expr)) else render_latex(f.expression, out="bytes")
                 except:
                     img = None
-                if isinstance(img, bytes):
+                if strutils.is_svg(svg) and getattr(f, "displaySVG", False):
+                    shell.display_pub.publish(data={"text/plain": f"<{type(f).__name__} {f.__module__}.{f.__name__}{inspect.signature(f)}> at {hex(id(f))}\n\nImplements:\n"})
+                    shell.display_pub.publish(data={"image/svg+xml": svg})
+                    return
+                elif isinstance(img, bytes):
                     shell.display_pub.publish(data={"text/plain": f"<{type(f).__name__} {f.__module__}.{f.__name__}{inspect.signature(f)}> at {hex(id(f))}\n\nImplements:\n"})
                     shell.display_pub.publish(data={"image/png": img})
                     return
