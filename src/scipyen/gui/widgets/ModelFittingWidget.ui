@@ -177,6 +177,13 @@
       </widget>
      </item>
      <item>
+      <widget class="QLabel" name="unitsLabel">
+       <property name="text">
+        <string/>
+       </property>
+      </widget>
+     </item>
+     <item>
       <widget class="QPushButton" name="waveformUnitsPushButton">
        <property name="toolTip">
         <string>Choose physical units for the model waveform</string>
@@ -276,13 +283,6 @@
        </property>
        <property name="flat">
         <bool>true</bool>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QLabel" name="unitsLabel">
-       <property name="text">
-        <string/>
        </property>
       </widget>
      </item>
