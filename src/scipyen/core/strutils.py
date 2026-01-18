@@ -910,13 +910,20 @@ def render_latex(l:str, backend:str="auto", out:str="ipython",
             
             # print("strutils.render_latex: 'l' contains single backslashes : ", "\\" in l)
             
+            # NOTE: 2026-01-18 11:47:19
+            # below, avoid splitting by "$" or "$$" as these characters may be encountered
+            # WITHIN the actual expression
             if l.startswith("$$") and l.endswith("$$"):
-                lparts = l.split("$$")
-                lparts[0] = "$$\\begingroup\\color{white}"
-                lparts[-1] = "\\endgroup$$"
+                # lparts = l.split("$$")
+                # lparts = [l[:2], l[2:-2], l[-2:]]
+                lparts = [l[2:-2]]
+                lparts.insert(0,"$$\\begingroup\\color{white}")
+                lparts.append("\\endgroup$$")
+                l = "".join(lparts)
                 
             elif l.startswith("$") and l.endswith("$"):
-                lparts = l.split("$")
+                # lparts = l.split("$")
+                lparts = [l[1:-1]]
                 lparts.insert(0, "$\\begingroup\\color{white} ")
                 lparts.append(" \\endgroup$")
                 l = "".join(lparts)

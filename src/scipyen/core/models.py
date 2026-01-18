@@ -782,11 +782,12 @@ values for α, β, and with appropriate value & sign of λ
 # @timefunc # uncomment this for testing 😄
 @modelfunction(coefficients = ("α", "β", "x0", "τ"),
                title="AlphaSynapse",
-               expression = sympy.Eq(sympy.Symbol("y"), 
-                                     sympy.functions.elementary.piecewise.Piecewise((sympy.Symbol("alpha") + sympy.Symbol("beta") * (sympy.Symbol("x")-sympy.Symbol("x_0"))/sympy.Symbol("tau") * sympy.exp(-(sympy.Symbol("x")-sympy.Symbol("x_0") - sympy.Symbol("tau"))/sympy.Symbol("tau")),
-                                                                                     sympy.Symbol("x")-sympy.Symbol("x_0") >= 0), 
-                                                                                    (sympy.Symbol("alpha"), 
-                                                                                     sympy.Symbol("x")-sympy.Symbol("x_0") < 0))),
+               expression = "$$f(x) = \\begin{cases} \\alpha + \\frac{\\beta \\left(x - x_{0}\\right) \\times e^{\\frac{\\left(\\tau - x + x_{0}\\right)} {\\tau}} } {\\tau} & \\text{for}\\: \\left(x - x_{0}\\right) \\geq 0 \\textrm{, }\\tau>0 \\\\\\alpha & \\text{otherwise} \\end{cases}$$",
+               # expression = sympy.Eq(sympy.Symbol("y"), 
+               #                       sympy.functions.elementary.piecewise.Piecewise((sympy.Symbol("alpha") + sympy.Symbol("beta") * (sympy.Symbol("x")-sympy.Symbol("x_0"))/sympy.Symbol("tau") * sympy.exp(-(sympy.Symbol("x")-sympy.Symbol("x_0") - sympy.Symbol("tau"))/sympy.Symbol("tau")),
+               #                                                                       sympy.Symbol("x")-sympy.Symbol("x_0") >= 0), 
+               #                                                                      (sympy.Symbol("alpha"), 
+               #                                                                       sympy.Symbol("x")-sympy.Symbol("x_0") < 0))),
                fitting = FittingCoefficientsDict(initial= (0., 1., 0., 0.01), 
                           lower=(-np.inf, -np.inf, 0., 0.),
                           upper=(np.inf, np.inf, np.inf, np.inf))
@@ -804,7 +805,7 @@ Description:
 
 A single exponential rise and decay, both with the same constant (τ):
 
-$$f(x) = \\begin{cases} \\alpha + \\beta \\left(x - x_{0}\\right) e^{\\left(\\tau - x + x_{0}\\right) / \\tau} / \\tau & \\text{for}\\: x - x_{0} \\geq 0 \\\\\\alpha & \\text{otherwise} \\end{cases} \\qquad{} (1)$$
+$$f(x) = \\begin{cases} \\alpha + \\frac{\\beta \\left(x - x_{0}\\right) \\times e^{\\frac{\\left(\\tau - x + x_{0}\\right)} {\\tau}} } {\\tau} & \\text{for}\\: \\left(x - x_{0}\\right) \\geq 0\\textrm{, }\\tau>0 \\\\\\alpha & \\text{otherwise} \\end{cases} \\ \\qquad{} (1)$$
 
 where:
     α  ↦ additive bias (offset); units of "y"
@@ -1120,7 +1121,7 @@ Parameters:
     
 @modelfunction(coefficients = ("α", "β", "x0", "τ1", "τ2"),
                title = "ClementsBekkers97",
-               expression = r"$y(x) = \begin{cases} \alpha + \beta \times \left(1 - e^{-\left(x-x_{0}\right) / \tau_{1}}\right) \times e^{-\left(x-x_{0}\right) / \tau_{2}} & \text{for}\: x - x_{0} \geq 0 \\ \alpha & \text{otherwise} \end{cases}$",
+               expression = r"$y(x) = \begin{cases} \alpha + \beta \times \left(1 - e^{-\left(x-x_{0}\right) / \tau_{1}}\right) \times e^{-\left(x-x_{0}\right) / \tau_{2}} & \text{for}\: \left(x - x_{0}\right) \geq 0\textrm{, }\tau_{1}>0\textrm{, }\tau_{2}>0 \\ \alpha & \text{otherwise} \end{cases}$",
 )
 def Clements_Bekkers_97(x:np.ndarray | Real,
                         α:typing.Union[Real, typing.Sequence[Real], np.ndarray], /, 
@@ -1140,7 +1141,7 @@ Description:
 This is a product of two exponentials ("rise" and "decay", each with their 
 own time constant), with additive and mutiplicative bias:
 
-$y(x) = \\begin{cases} \\alpha + \\beta \\times \\left(1 - e^{-\\left(x-x_{0}\\right) / \\tau_{1}}\\right) \\times e^{-\\left(x-x_{0}\\right) / \\tau_{2}} & \\text{for}\\: x - x_{0} \\geq 0 \\\\\\alpha & \\text{otherwise} \\end{cases}$
+$y(x) = \\begin{cases} \\alpha + \\beta \\times \\left(1 - e^{-\\left(x-x_{0}\\right) / \\tau_{1}}\\right) \\times e^{-\\left(x-x_{0}\\right) / \\tau_{2}} & \\text{for}\\: \\left(x - x_{0}\\right) \\geq 0 \\textrm{, } \\tau_{1} > 0 \\textrm{, } \\tau_{2}>0 \\\\\\alpha & \\text{otherwise} \\end{cases}$
 
     x₀ ↦         — the delay ("onset", or "shift"); units of "x"
 
@@ -1197,7 +1198,14 @@ Waveform properties:
     # unit_amplitude = kwargs.pop("unit_amplitude", False)
     
     α, β, x0, τ1, τ2 = check_unpack_model_coeffs(5, α, β, x0, τ1, τ2)
-    assert all(v >0. for v in (τ1, τ2))
+    
+    # NOTE 2026-01-18 12:11:13
+    # practically, when β is 0, it does not make a difference if condition below is not met
+    # however, the function is defined ONLY if the consition IS met
+    # so even the difference seems to be in nuance and mostly academic, I can see
+    # a case where the user COULD hastily pass taus <= 0 with a β ≠ 0 and get numeric errors
+    # assert all(v > 0. for v in (τ1, τ2)), "All time constants must be > 0"
+    assert all(v > 0. if β != 0 else True for v in (τ1, τ2)), "All time constants must be > 0"
     
     # if unit_amplitude:
     #     β = get_CB_scale_for_unit_amplitude(τ1, τ2, β>0) 
@@ -1221,6 +1229,10 @@ Waveform properties:
     decay = np.exp(np.divide(np.negative(xx[xx>=0]), τ2))
     rise  = np.subtract(1, np.exp(np.divide(np.negative(xx[xx>=0]), τ1)))
     y = np.full_like(x, α)
+    
+    if β == 0:
+        return y
+    
     y[xx>=0] = np.add(α, np.multiply(np.multiply(β, rise), decay))
     
     return y
