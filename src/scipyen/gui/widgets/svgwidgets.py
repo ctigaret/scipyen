@@ -77,15 +77,16 @@ class SimpleSVGWidget(QtWidgets.QWidget):
             painter.restore()
         painter.end()
         
-    def setSvg(self, svg:str):
+    def setSvg(self, svg:str|None):
         # print(f"{self.__class__.__name__}.setSvg(svg={type(svg).__name__})")
         if is_svg(svg):
             if not self._renderer.load(QtCore.QByteArray(bytes(svg.encode()))):
                 scipywarn(f"Could not render {svg}")
-        # else:
-        #     scipywarn(f"Expecting a svg string; instead, got {svg}")
-        self.update()
-        self.resizeEvent()
+            self.update()
+            self.resizeEvent()
+        else:
+            self._renderer = QtSvg.QSvgRenderer()
+            self.update()
             
     def resizeEvent(self, event:typing.Optional[QtCore.QEvent]=None):
         if not self._renderer.isValid():

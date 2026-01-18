@@ -296,13 +296,18 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
                         
                     self._dataModel_.setModelData(self._data_[array_slice(self._data_, {self._slicingAxis_:self._currentSlice_})])
                         
-                        
+    def clear(self):
+        self._dataModel_ = TabularDataModel(parent=self)
+        self.tableView.setModel(self._dataModel_)
+        
+        
+        
     @property
     def model(self):
         return self.tableView.model()
     
     @model.setter
-    def model(self, md):
+    def model(self, md:QtCore.QAbstractTableModel|None):
         self._dataModel_ = md
         self.tableView.setModel(self._dataModel_)
         if hasattr(self._dataModel_, "sig_modelDataChanged") and isinstance(type(self._dataModel_).sig_modelDataChanged, Signal):

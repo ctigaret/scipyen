@@ -141,22 +141,22 @@ PYTHON_HELP_SECTIONS = ["NAME",
 
 PythonHelpDict = typing.TypedDict("PythonHelpDict", dict(map(lambda x: (x.lower(), typing.Optional[typing.Union[str, typing.List[str]]]), PYTHON_HELP_SECTIONS)))
 
-# NOTE: 2026-01-08 23:28:06 QtConsole does NOT render HTML objects!
-# class HyperBundle(Bundle):
-#     def _ipython_display_(self):
-#         from core import strutils
-#         shell = guiutils.getScipyenConsoleShell()
-#         shell.display_pub.publish(data=self["text/html"])
-#         # if isinstance(f.expression, sympy.Basic) or (isinstance(f.expression, str) and strutils.is_latex(f.expression)):
-#         #     try:
-#         #         img = render_sympy(f.expression, out="bytes") if isinstance(f.expression, sympy.Basic) else render_latex(f.expression, out="bytes")
-#         #     except:
-#         #         img = None
-#         #     if isinstance(img, bytes):
-#         #         shell.display_pub.publish(data={"text/plain": f"<{type(f).__name__} {f.__module__}.{f.__name__}{inspect.signature(f)}> at {hex(id(f))}\n\nImplements:\n"})
-#         #         shell.display_pub.publish(data={"image/png": img})
-#         #         return
-#         # shell.display_pub.publish(data={"text/plain": f"<{type(f).__name__} {f.__module__}.{f.__name__}{inspect.signature(f)}> at {hex(id(f))}\n\n"})
+class HyperBundle(Bundle):
+    # NOTE: 2026-01-08 23:28:06 QtConsole does NOT render HTML objects!
+    def _ipython_display_(self):
+        from core import strutils
+        shell = guiutils.getScipyenConsoleShell()
+        shell.display_pub.publish(data=self["text/html"])
+        # if isinstance(f.expression, sympy.Basic) or (isinstance(f.expression, str) and strutils.is_latex(f.expression)):
+        #     try:
+        #         img = render_sympy(f.expression, out="bytes") if isinstance(f.expression, sympy.Basic) else render_latex(f.expression, out="bytes")
+        #     except:
+        #         img = None
+        #     if isinstance(img, bytes):
+        #         shell.display_pub.publish(data={"text/plain": f"<{type(f).__name__} {f.__module__}.{f.__name__}{inspect.signature(f)}> at {hex(id(f))}\n\nImplements:\n"})
+        #         shell.display_pub.publish(data={"image/png": img})
+        #         return
+        # shell.display_pub.publish(data={"text/plain": f"<{type(f).__name__} {f.__module__}.{f.__name__}{inspect.signature(f)}> at {hex(id(f))}\n\n"})
     
 
 class ReSTFormatter():
@@ -308,7 +308,8 @@ def rst_latex_2_html(text:str,
                      imgdir:typing.Optional[typing.Union[TemporaryDirectory, pathlib.Path, str]]=None) -> str:
     latex_formatter = partial(format_latex, imgdir=imgdir)
     
-    html = rst_to_html_with_highlighting(latex_formatter(text.replace("\n", "\n ")))
+    # html = rst_to_html_with_highlighting(latex_formatter(text.replace("\n", "\n ")))
+    html = rst_to_html_with_highlighting(latex_formatter(text))
     pattern = r'<img\s+[^>]*>'
     # pattern = r'<img\s+[^>]*src=["\']([^"\']+)["\'][^>]*>'
     # pattern = r'<img\s+[^>]*(src=["\']([^"\']+)["\'][^>]*)>'
@@ -1231,6 +1232,9 @@ A formatted (complete) mime bundle with two fields:
         
     info_dict = hinfo(info, obj, oname=oname, detail_level=detail_level,
                       candidates_msg=candidates_msg, shell=shell)
+    
+    # WARNING NOTE: 2026-01-17 22:17:04 for debugging only; comment out when finished
+    # shell.user_ns["mainWindow"].assignToWorkspace("info_dict", info_dict)
 
     omit_sections = list(omit_sections)
     
@@ -1278,9 +1282,14 @@ A formatted (complete) mime bundle with two fields:
     return shell.inspector.format_mime(bundle)
     
 def hpinfo(cmd, namespaces = None, detail_level:int=0, imgdir=None,
-           # to_console:bool=False,
+           to_console:bool=False,
            shell:typing.Optional[InteractiveShell]=None) -> tuple:
     r"""Emulates a IPython pinfo call"""
+    # NOTE: 2026-01-17 22:09:35:
+    # to fix bugs, bypass hinspect and use:
+    # in sequence, prog.object_find then helpdisp, or
+    # hget_info
+
     if not isinstance(shell, InteractiveShell):
         shell = guiutils.getScipyenConsoleShell()
     ret = None
@@ -1312,10 +1321,10 @@ def hpinfo(cmd, namespaces = None, detail_level:int=0, imgdir=None,
         except:
             traceback.print_exc()
             
-    # if to_console:
-    #     ret = HyperBundle()
-    #     ret.update({"text/plain":"", "text/html":ret})
-    #     return ret
+    if to_console:
+        ret = HyperBundle()
+        ret.update({"text/plain":"", "text/html":ret})
+        return ret
     
     return ret, reformat
      

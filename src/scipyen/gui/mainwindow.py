@@ -960,10 +960,10 @@ class VTH(object):
 
     gui_handlers = deepcopy(default_handlers)
 
-    def get_handler_spec(variable):
-        r"""Returns a list of specifications for handling `variable`.
+    def get_handler_spec(obj):
+        r"""Returns a list of specifications for handling `varget_handler_speciable`.
 
-        If `variable` is a type registered with VTH, or `variable` is an
+        If `obj` is a type registered with VTH, or `obj` is an
         instance of a type registered with VTH, or a unary predicate (see ``prog.is_predicate``),
         returns a 3-tuple:
         (viewer type, action name, priority), where:
@@ -971,56 +971,66 @@ class VTH(object):
             • viewer type is the Scipyen viewer class suitable to view the type
 
             • action name (str) - the name of the menu action for viewing the
-                variable (in the workspace viewer context menu)
+                obj (in the workspace viewer context menu)
 
             • priority (int) - used when several viewer types can handle the 
-                same variable name; the viewer class with the highest priority
+                same obj name; the viewer class with the highest priority
                 for the given type is used first
 
         The returned list is sorted by descending order of priority and ascending
         order of action name.
 
         """
-        if inspect.isclass(variable) or isinstance(variable, type):
-            vartype = variable
+        if inspect.isclass(obj) or isinstance(obj, type):
+            objtype = obj
         else:
-            vartype = type(variable)
+            objtype = type(obj)
+            
+        # if isinstance(obj, str):
+        #     print(obj[:10])
 
         # NOTE: 2026-01-16 11:02:34
         # skip types and Qt widgets as there is no need to handle these: 
         # types are described at the console, and widgets — well, they just show themselves ⌣
-        if vartype in VTH.gui_handlers.keys() or QtWidgets.QWidget in inspect.getmro(vartype):
+        if objtype in VTH.gui_handlers.keys() or QtWidgets.QWidget in inspect.getmro(objtype):
             return list()
 
-        vartypemro = inspect.getmro(vartype)
+        objtypemro = inspect.getmro(objtype)
         act_np = set()
 
         for k, v in VTH.gui_handlers.items():
             v_types = list(filter(lambda x: isinstance(x, type), v["types"].keys()))
             v_predicates = list(filter(lambda x: prog.is_predicate(x), v["types"].keys()))
+            # print(f"VTH.get_handler_spec: v_types = {v_types}, v_predicates = {v_predicates}")
+            # if len(v_predicates):
+                # print(f"\tv_predicates for {k} = {v_predicates}")
             
-            for vtype in vartypemro:
-                if vtype in v_types:
-                    #           viewer type,   action name   priority
-                    act_np.add((k,             v["action"],  v["types"][vtype]))
-                    
             for vpred in v_predicates:
-                if vpred(variable):
+                # print(f"\t\t{vpred}() -> {vpred(obj)}")
+                if vpred(obj):
+                    # print(f"\t\t\tadding{(k, v['action'],  v['types'][vpred])}")
                     #           viewer type,   action name   priority
                     act_np.add((k,             v["action"],  v["types"][vpred]))
                     
-        # for vtype in vartypemro:
-        #     for k, v in VTH.gui_handlers.items():
-        #         if vtype in v["types"]:
-        #             #           viewer type,   action name   priority
-        #             act_np.add(
-        #                 (k,             v["action"],  v["types"][vtype]))
-
+            for vtype in objtypemro:
+                if vtype in v_types:
+                    if len(v_predicates):
+                        for vpred in v_predicates:
+                            # print(f"\t\tvtype: {vtype} -> {vpred}() -> {vpred(obj)}")
+                            if vpred(obj):
+                                # print(f"\t\t\tadding{(k, v['action'],  v['types'][vpred])}")
+                                #           viewer type,   action name   priority
+                                act_np.add((k,             v["action"],  v["types"][vtype]))
+                    else:
+                        #           viewer type,   action name   priority
+                        # print(f"\t\t\tvtype: {vtype} -> adding{(k, v['action'],  v['types'][vtype])}")
+                        act_np.add((k,             v["action"],  v["types"][vtype]))
+                    
         if len(act_np):
+            # print(f"act_np = {act_np}")
             # sort in ascending order by action name, and in descending order by
             # priority
-            actions = sorted(
-                sorted(list(act_np), key=lambda x: x[1]), key=lambda x: x[2], reverse=True)
+            actions = sorted(sorted(list(act_np), key=lambda x: x[1]), key=lambda x: x[2], reverse=True)
             return actions
 
         return list()
@@ -5250,6 +5260,14 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         if not isinstance(self.pythonHelpWindow, QtWidgets.QMainWindow):
             self.pythonHelpWindow = PythonHelpWindow(shell=self.shell, parent=self)
         self.pythonHelpWindow.show()
+        
+    def runPythonHelpGUI(self, cmd:str):
+        from gui.pythonhelpwidget import PythonHelpWindow
+        if not isinstance(self.pythonHelpWindow, QtWidgets.QMainWindow):
+            self.pythonHelpWindow = PythonHelpWindow(shell=self.shell, parent=self)
+        self.pythonHelpWindow.show()
+        self.pythonHelpWindow.help(cmd)
+        
 
     @Slot(QtCore.QModelIndex)
     @safewrapper
@@ -5422,7 +5440,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 return
 
             else:
-                handler_specs = VTH.get_handler_spec(varType)
+                # handler_specs = VTH.get_handler_spec(varType)
+                handler_specs = VTH.get_handler_spec(obj)
                 if len(handler_specs):
                     specialViewMenu = cm.addMenu("View with")
                     for handler_spec in handler_specs:
@@ -9557,7 +9576,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         variable = self.workspace[varname]
         vartype = type(variable)
 
-        handler_specs = VTH.get_handler_spec(vartype)
+        # handler_specs = VTH.get_handler_spec(vartype)
+        handler_specs = VTH.get_handler_spec(variable)
         # FIXME/BUG: 2022-12-26 22:17:07
         # this can easily get buggered if the user decides to set an action
         # name other than the viewer class name
@@ -9953,7 +9973,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 raise ValueError("Unknown viewer type %s" % winType.__name__)
 
         elif winType is None:
-            handler_specs = VTH.get_handler_spec(type(obj))
+            # handler_specs = VTH.get_handler_spec(type(obj))
+            handler_specs = VTH.get_handler_spec(obj)
             # print(viewers_type_list)
             if len(handler_specs) == 0:
                 return False

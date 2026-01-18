@@ -64,7 +64,7 @@ from gui.widgets import svgwidgets
 __scipyen_plugin__ = None
 
 class SVGViewer(ScipyenViewer):
-    viewer_for_types = {str: 99, strutils.is_svg:90}
+    viewer_for_types = {strutils.is_svg:90}
 
     def __init__(self, data:typing.Optional[str]=None, 
                  parent:typing.Optional[QtWidgets.QWidget]=None,

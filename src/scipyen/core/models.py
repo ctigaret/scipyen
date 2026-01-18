@@ -835,11 +835,12 @@ doi: https://doi.org/10.1162/neco.1997.9.6.1179 ) :
 
 Parameters:
 ===========
+
 :x: Predictor (independent variable) - 1D numpy ndarray or float
-:α: Offset, scalar, or sequence of scalars (1D array-like). If the latter, it is 
+:α: Offset (additive bias), scalar, or sequence of scalars (1D array-like). If the latter, it is 
     interpreted as containing the individual α, β, x0, τ coefficients 'packed' 
-    in this order
-:β: Scale
+    in this order. Units of ``f(x)``
+:β: Scale (multiplicative bias), scalar, 
 :x0: Onset
 τ: Synaptic time constant
     
@@ -1129,82 +1130,77 @@ def Clements_Bekkers_97(x:np.ndarray | Real,
                         τ2:typing.Optional[Real] = None,
                         **kwargs) -> np.ndarray | Real:
     r"""
-    =======================================
-    Clements & Bekkers 1997 mEPSC waveform.
-    =======================================
+=======================================
+Clements & Bekkers 1997 mEPSC waveform.
+=======================================
 
-    Description:
-    ============
+Description:
+============
 
-    This is a product of two exponentials ("rise" and "decay", each with their 
-    own time constant), with additive and mutiplicative bias:
+This is a product of two exponentials ("rise" and "decay", each with their 
+own time constant), with additive and mutiplicative bias:
 
-    $y(x) = \\begin{cases} \\alpha + \\beta \\times \\left(1 - e^{-\\left(x-x_{0}\\right) / \\tau_{1}}\\right) \\times e^{-\\left(x-x_{0}\\right) / \\tau_{2}} & \\text{for}\\: x - x_{0} \\geq 0 \\\\\\alpha & \\text{otherwise} \\end{cases}$
+$y(x) = \\begin{cases} \\alpha + \\beta \\times \\left(1 - e^{-\\left(x-x_{0}\\right) / \\tau_{1}}\\right) \\times e^{-\\left(x-x_{0}\\right) / \\tau_{2}} & \\text{for}\\: x - x_{0} \\geq 0 \\\\\\alpha & \\text{otherwise} \\end{cases}$
 
-    where:
-        α           — the offset (additive bias; usually, 0.); units of "y"
-    
-        β           — the scale (multiplicative bias); dimensionless
-    
-        x₀          — the delay ("onset", or "shift"); units of "x"
-    
-        τ₁, τ₂ > 0. — the time constants, respectively, for the rise and decay phases
-                        units of "x"
-    
-    Parameters:
-    ============
-    
-    :x: predictor (independent variable e.g., time) - 1D numpy ndarray
+    x₀ ↦         — the delay ("onset", or "shift"); units of "x"
 
-    :α, β, x₀, τ₁ and τ₂: float scalars, where:
-        α is considered in pA,
-        β is dimensionless,
-        x₀, τ₁ and τ₂ are considered to be given in s
+    τ₁, τ₂ > 0. ↦ the time constants, respectively, for the rise and decay phases
+                    units of "x"
 
-        and τ₁ > 0 τ₂ > 0
-    
-    Var-keyword parameters:
-    =======================
-    
-    :unit_amplitude: optional, default is False
-        When True, return a waveform with baseline 0 and peak value +1 , using 
-        the given time constants τ₁ and τ₂
-    
-    Returns:
-    ========
-    
-    1D numpy array (vector)
-    
-    NOTE:
-    =====
-    
-    • the extremum is (τ2/(τ1+τ2)) * np.pow(τ1, τ1/τ2)/np.pow(τ1+τ2, τ1/τ2)
-        ∘ for α = 0., β = 1. 
-        ∘ and occurs at x = τ1 × ln(τ2/τ1 +1) + x0
-        (analytically determined as the solution of f′(x)dx = 0)
-        So to get a curve spanning the interval [0., 1.] in 'y', the coefficient β
-        should be 1/extremum (for α = 0.0)
-    .. warning::
-        this will also change the FWHM!
+Parameters:
+===========
 
-    • FWHM: x coordinates for full width at half-max need to be determined 
-        graphically as the intersection between y(x) and the line y₁(x)=ymax/2
-        (see e.g., documentation for alphaSynapse)
-    • area under the curve:
-             ∞   
-             ∫f(x)dx = (β × τ2²)/(τ1+τ2), for α = 0, x0 = 0, and τ1, τ2 > 0
-             0
-    .. note::
-        the DURATION of the waveform is determined by the independent variable ``x``
+:x: predictor (independent variable e.g., time) - 1D numpy ndarray
+:α: offset (additive bias; usually, 0.); units of ``y``
+:β: scale (multiplicative bias); dimensionless
+:x0: delay ("onset", or "shift"); units of "x"
+:τ0: time constant of the "rising" phase (> 0); units of ``x``
+:τ1: time constant of the "decaying" phase (> 0); units of ``x``
+
+Returns:
+========
+
+1D numpy array (vector)
+
+Waveform properties:
+====================
+
+* The extremum
+    * is 
+
+        $\\frac{\\tau_{1}}{\\tau_{0} + \\tau_{1}} \\times \\left( \\frac{\\tau{0}}{\\tau_{0} + \\tau_{1}} \\right)^{ \\tau_{0} / \\tau_{1} } \\textrm{ for } \\alpha = 0, \\beta = 1$
+        
+    * occurs at 
+
+        $x = \\tau_{0} \\times \\ln\\left( \\tau_{1}/\\tau_{0} + 1 \\right) + x_{0} \\textrm{ analytic solution of } f^{\\prime}(x)dx = 0$
+
+    So to get a curve spanning the interval [0., 1.] in 'y', the coefficient β
+    should be 1/extremum (for α = 0.0)
+
+.. warning::
+    this will also change the FWHM!
+
+• FWHM: x coordinates for full width at half-max need to be determined 
+    graphically as the intersection between y(x) and the line y₁(x)=ymax/2
+    (see e.g., documentation for alphaSynapse)
+
+• area under the curve:
     
-    """
-    unit_amplitude = kwargs.pop("unit_amplitude", False)
+    $\\int_{0}^{\\infty}f\\left(x\\right)dx=$$\\beta\\frac{\\tau_{1}^{2}}{\\tau_{0}+\\tau{_1}}\\textrm{ for }\\alpha=0,x_{0}=0,\\tau_{0}>0,\\tau_{1}>0$
+            ∞   
+            ∫f(x)dx = (β × τ2²)/(τ1+τ2), for α = 0, x0 = 0, and τ1, τ2 > 0
+            0
+.. note::
+    the DURATION of the waveform is determined by the independent variable ``x``
+    
+"""
+    # unit_amplitude = kwargs.pop("unit_amplitude", False)
     
     α, β, x0, τ1, τ2 = check_unpack_model_coeffs(5, α, β, x0, τ1, τ2)
     assert all(v >0. for v in (τ1, τ2))
     
-    if unit_amplitude:
-        β = get_CB_scale_for_unit_amplitude(τ1, τ2, β>0) 
+    # if unit_amplitude:
+    #     β = get_CB_scale_for_unit_amplitude(τ1, τ2, β>0) 
     
     x = check_independent_variable(x)
     
@@ -1230,7 +1226,8 @@ def Clements_Bekkers_97(x:np.ndarray | Real,
     return y
 
 def get_CB_scale_for_unit_amplitude(τ_rise:Real, τ_decay:Real, positive:bool=True):
-    yₘ = (τ_decay/(τ_rise+τ_decay)) * np.pow(τ_rise, τ_rise/τ_decay)/np.pow(τ_rise+τ_decay, τ_rise/τ_decay)
+    # yₘ = (τ_decay/(τ_rise+τ_decay)) * np.pow(τ_rise, τ_rise/τ_decay)/np.pow(τ_rise+τ_decay, τ_rise/τ_decay) # NOTE 2026-01-17 21:13:11 next line does the same thing but only calls np.pow once
+    yₘ = (τ_decay/(τ_rise+τ_decay)) * np.pow(τ_rise/(τ_rise+τ_decay), τ_rise/τ_decay)
     peak = 1. if positive else -1.
     return np.divide(peak, yₘ)
     

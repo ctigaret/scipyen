@@ -424,6 +424,11 @@ class PythonHelpWindow(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         self.setCentralWidget(self.helpWidget)
         
         self.loadSettings()
+        
+    def help(self, cmd:str):
+        signalBlockers = QtCore.QSignalBlocker(self.helpWidget.queryComboBox)
+        self.helpWidget.queryComboBox.lineEdit().setText(cmd)
+        self.helpWidget._slot_processQuery()
 
     def closeEvent(self, evt):
         self.saveSettings()

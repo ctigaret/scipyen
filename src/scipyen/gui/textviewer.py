@@ -42,6 +42,7 @@ else:
 
 #### BEGIN pict.core modules
 import core.xmlutils as xmlutils
+import core.strutils as strutils
 #### END pict.core modules
 
 #### BEGIN pict.gui modules
@@ -73,7 +74,7 @@ class TextViewer(ScipyenViewer):
     # signal_window_will_close = Signal()
     sig_textChanged = Signal(name = "sig_textChanged")
     
-    viewer_for_types = {str: 99, QtGui.QTextDocument: 99}
+    viewer_for_types = {str: 99, QtGui.QTextDocument: 99, strutils.is_html:99}
     # view_action_name = "Text"
     
     # FIXME/TODO: 2019-11-10 13:16:56

@@ -64,7 +64,7 @@ class _ModelFunctionExpressionSVGGenerator_(QtCore.QThread):
 
 class ModelFittingWidget(Ui_ModelFittingWidget, QWidget, workspacegui.GuiMessages):
     sig_waveformReady = Signal(object, name="sig_waveformReady")
-    def __init__(self, model: types.FunctionType,
+    def __init__(self, model: types.FunctionType|None = None,
                  duration:pq.Quantity = 1*pq.s,
                  samplingRate:pq.Quantity = 1e4*pq.Hz,
                  coefficients:typing.Optional[typing.Union[pd.DataFrame, dict]] = None,
@@ -116,10 +116,11 @@ Named Parameters:
         
         self._configureUI_()
         
-        self._setModelData_(model, duration, samplingRate, waveformUnits, coefficients)
+        if isinstance(model, types.FunctionType):
+            self._setModelData_(model, duration, samplingRate, waveformUnits, coefficients)
         
-        if isinstance(self._model_fit_coefficients_, pd.DataFrame):
-            self.populateCoefficientsTable(self._model_fit_coefficients_)
+            if isinstance(self._model_fit_coefficients_, pd.DataFrame):
+                self.populateCoefficientsTable(self._model_fit_coefficients_)
 
     def _configureUI_(self):
         from gui.guiutils import svg2pixmap
@@ -131,11 +132,16 @@ Named Parameters:
             self.makeUnitAmplitudePushButton.setText("")
             self.makeUnitAmplitudePushButton.setFlat(True)
         self.makeUnitAmplitudePushButton.clicked.connect(self._slot_makeUnitAmplitudeModel)
-        self.waveformExpressionPushButton.clicked.connect(self._slot_showModelExpression)
         self.durationSpinBox.sig_valueChanged.connect(self._slot_waveformDurationChanged)
         self.samplingRateSpinBox.sig_valueChanged.connect(self._slot_waveformSamplingRateChanged)
-        self.generateWaveformPushButton.clicked.connect(self._slot_generateWaveform)
         self.waveformUnitsPushButton.clicked.connect(self._slot_changeWaveformUnits)
+        self.generateWaveformPushButton.clicked.connect(self._slot_generateWaveform)
+        self.waveformExpressionPushButton.clicked.connect(self._slot_showModelExpression)
+        self.pythonHelpPushButton.clicked.connect(self._slot_pythonHelpForModel)
+        self.pythonHelpPushButton.setEnabled(False)
+        self.generateWaveformPushButton.setEnabled(False)
+        self.waveformExpressionPushButton.setEnabled(False)
+        self.makeUnitAmplitudePushButton.setEnabled(False)
         if self._waveformUnits_ is None:
             self.unitsLabel.setText("")
             self.unitsLabel.setToolTip("Dimensionless")
@@ -182,7 +188,14 @@ Named Parameters:
         self._model_name_ = model.title
         
         self.modelNameLabel.setText(self._model_name_)
-        
+        self.modelNameLabel.setToolTip(f"Model function: {self._model_.__module__}.{self._model_.__name__}")
+        self.pythonHelpPushButton.setToolTip(f"Python help for function {self._model_.__module__}.{self._model_.__name__}")
+        self.pythonHelpPushButton.setEnabled(True)
+        self.generateWaveformPushButton.setEnabled(True)
+        self.waveformExpressionPushButton.setEnabled(True)
+        # NOTE: 2026-01-18 01:06:02 TODO
+        # make this contingent on the modelfunction offering a solution to this problem
+        self.makeUnitAmplitudePushButton.setEnabled(True)
         fitting_dict = dict()
         if model.fitting:
             fitting_dict["Initial Value"] = model.fitting["initial"]
@@ -193,7 +206,8 @@ Named Parameters:
         fitting_dict["Keep Feasible"] = [True] * len(model.coefficients)
         
         self._model_fit_coefficients_ = pd.DataFrame(fitting_dict, index=(model.coefficients))
-        
+        if not isinstance(self.modelCoefficientsTable._data_, pd.DataFrame) or self.modelCoefficientsTable._data_.size==0:
+            self.populateCoefficientsTable(self._model_fit_coefficients_)
         # svg_out = models.renderModelExpression(self._model_, out="svg")
         self._generateModelExpressionSVG()
         
@@ -206,7 +220,7 @@ Named Parameters:
         worker.deleteLater()
         
     @Slot(str)
-    def _slot_modelExpressionGenerated(self, svg:str):
+    def _slot_modelExpressionGenerated(self, svg:str|None):
         # if isinstance(d, dict) and "svg" in d:
             # print(f"{self.__class__.__name__}._setModelFunction_: {svg_out['svg']} \n is svg: {is_svg(svg_out['svg'])}")
         self._model_expression_svg_ = svg
@@ -227,13 +241,21 @@ Named Parameters:
     def model(self, model:types.FunctionType):
         # NOTE: 2026-01-16 15:30:46
         # this exclusively sets the model function and dependent attributes,
-        # leaving duratin, sampling rate and waveform units unchanged
-        self._setModelFunction_(model)
-        self.populateCoefficientsTable(self._model_fit_coefficients_)
-        if isinstance(self._model_name_, str) and len(self._model_name_.strip()):
-            self.modelNameLabel.setText(self._model_name_)
+        # leaving duration, sampling rate and waveform units unchanged
+        if models.isModelFunction(model):
+            if models.isModelFunction(self._model_):
+                # just change the model function
+                self._setModelFunction_(model)
+                self.populateCoefficientsTable(self._model_fit_coefficients_)
+                if isinstance(self._model_name_, str) and len(self._model_name_.strip()):
+                    self.modelNameLabel.setText(self._model_name_)
+                else:
+                    self.modelNameLabel.setText("")
+            else:
+                self._setModelData_(model)
         else:
-            self.modelNameLabel.setText("")
+            self.clear()
+        
             
     @property
     def waveformDuration(self) -> pq.Quantity:
@@ -324,15 +346,37 @@ Named Parameters:
     @modelName.setter
     def modelname(self, val:str):
         self._model_name_ = val
+        
+    def clear(self):
+        from gui.widgets import svgwidgets
+        self.modelNameLabel.setText("")
+        self.modelNameLabel.setToolTip(f"")
+        self.pythonHelpPushButton.setToolTip(f"")
+        self.pythonHelpPushButton.setEnabled(False)
+        self.generateWaveformPushButton.setEnabled(False)
+        self.waveformExpressionPushButton.setEnabled(False)
+        self.makeUnitAmplitudePushButton.setEnabled(False)
+        self.populateCoefficientsTable(pd.DataFrame())
+        if isinstance(self._expressionWindow_, QtWidgets.QMainWindow):
+            if isinstance(self._expressionWindow_.centralWidget(), svgwidgets.SimpleSVGWidget):
+                self._expressionWindow_.centralWidget().setSvg(None)
+            elif isinstance(self._expressionWindow_.centralWidget(), QtCore.QLabel):
+                self._expressionWindow_.centralWidget().setPixmap(QtGui.QPixmap())
+        self._model_ = None
+        self._model_name_ = None
+        self._model_expression_svg_ = None
+        self.svgWidget.setSvg(self._model_expression_svg_)
 
     def populateCoefficientsTable(self, data:typing.Optional[pd.DataFrame]=None):
-        if isinstance(data, pd.DataFrame):
+        if isinstance(data, pd.DataFrame) and data.size > 0:
             assert all(v in data.columns for v in ('Initial Value', 'Lower Bound', 'Upper Bound', 'Keep Feasible')), "Not a model parameters data frame"
             self._model_fit_coefficients_ = data
-            
-        if isinstance(self._model_fit_coefficients_, pd.DataFrame):
             self.modelCoefficientsTable.setData(self._model_fit_coefficients_)
-            # self.setMinimumSize(self.modelCoefficientsTable.tableView.viewportSizeHint())
+            
+        else:
+            self._model_fit_coefficients_ = None
+            self.modelCoefficientsTable.clear()
+            
 
     def _calculateWaveformSamples(self) -> int:
         assert(scq.unitsConvertible(1/self._waveformSamplingRate_, self._waveformDuration_)), f"Waveform duration ({self._waveformDuration_}) and sampling rate ({self._waveformSamplingRate_}) have incompatible units"
@@ -350,7 +394,7 @@ Named Parameters:
     def _slot_showModelExpression(self):
         # from core.strutils import is_svg
         if not isinstance(self._model_expression_svg_, QtGui.QPixmap) and not is_svg(self._model_expression_svg_):
-            print("invalid expression")
+            # print("invalid expression")
             return
         self._setupExpressionWindow()
             
@@ -416,7 +460,18 @@ Named Parameters:
 
     @Slot()
     def _slot_makeUnitAmplitudeModel(self):
+        if not isinstance(self._model_, types.FunctionType) or not models.isModelFunction(self._model_):
+            return
         pass
+    
+    @Slot()
+    def _slot_pythonHelpForModel(self):
+        from gui import guiutils
+        if not isinstance(self._model_, types.FunctionType) or not models.isModelFunction(self._model_):
+            return
+        
+        mainWindow = guiutils.getScipyenMainWindow()
+        mainWindow.runPythonHelpGUI(f"{self._model_.__name__}")
     
     @Slot()
     def _slot_changeWaveformUnits(self):

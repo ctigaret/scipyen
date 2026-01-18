@@ -670,18 +670,42 @@ def isnumber(s: str) -> bool:
         return False
     
 def is_svg(s:str) -> bool:
+    from lxml import etree
     if not isinstance(s, str) or len(s.strip()) == 0:
         return False
-    pattern = r'<svg[^>]*>(.*?)<\/svg>'
-    matches = _re.findall(pattern, s, _re.DOTALL)
-    return len(matches)>0 and len(matches[0])>0
+    
+    ret = False
+    try:
+        root = etree.fromstring(s)
+        if root.tag == '{http://www.w3.org/2000/svg}svg':
+            ret = True
+    except:
+        ret = False
+    if not ret:
+        pattern = r'<svg[^>]*>(.*?)<\/svg>'
+        matches = _re.findall(pattern, s, _re.DOTALL)
+        ret = len(matches)>0 and len(matches[0])>0
+        
+    return ret
     
 def is_html(s:str) -> bool:
+    from lxml import html
     if not isinstance(s, str) or len(s.strip()) == 0:
         return False
-    return all(v in s for v in ("<html>", "</html>"))
+    try:
+        test = html.fromstring(s)
+        return True
+    except:
+        return False
+    # return all(v in s for v in ("<html>", "</html>"))
     
 def is_xml(s:str) -> bool:
+    from lxml import etree
+    try:
+        test = etree.fromstring(s)
+        return True
+    except:
+        return False
     if not isinstance(s, str) or len(s.strip()) == 0:
         return False
     return "<xml" in s

@@ -558,12 +558,14 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         self.setData(data, doc_title=doc_title, *args, **kwargs)
         
     def _check_supports_parameter_type_(self, value):
+        from core import prog
         def __check_val_type_is_supported__(val):
             mro = inspect.getmro(type(value))
             # types = list(v[0] for v in self.viewer_for_types)
-            types = list(self.viewer_for_types)
+            types = list(filter(lambda x: isinstance(x, type), self.viewer_for_types.keys()))
+            predicates = list(filter(lambda x: prog.is_predicate(x), self.viewer_for_types.keys()))
             
-            return any(t in types for t in mro)
+            return any(t in types for t in mro) or any(pred(val) for pred in predicates)
             
             # return isinstance(value, tuple(self.viewer_for_types.keys())) or any([t in type(value).mro() for t in tuple(self.viewer_for_types.keys())])
             
