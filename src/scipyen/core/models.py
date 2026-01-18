@@ -808,31 +808,14 @@ A single exponential rise and decay, both with the same constant (τ):
 $$f(x) = \\begin{cases} \\alpha + \\frac{\\beta \\left(x - x_{0}\\right) \\times e^{\\frac{\\left(\\tau - x + x_{0}\\right)} {\\tau}} } {\\tau} & \\text{for}\\: \\left(x - x_{0}\\right) \\geq 0\\textrm{, }\\tau>0 \\\\\\alpha & \\text{otherwise} \\end{cases} \\ \\qquad{} (1)$$
 
 where:
-    α  ↦ additive bias (offset); units of "y"
+    α  ↦ additive bias (offset); units of ``f(x)``
 
     β  ↦ multiplicative bias (scale); dimensionless
 
-    x₀ ↦ shift (delay, or onset); units of "x"
+    x₀ ↦ shift (delay, or onset); units of ``x``
 
-    τ  ↦ the synaptic constant; units of "x"
+    τ  ↦ the synaptic constant; units of ``x``
 
-See: Rall, W. Distinguishing theoretical synaptic potentials computed for 
-different soma-dendritic distributions of synaptic input. J Neurophysiol 30(5),
-1138–68, 1967.
-
-The implementation follows that in NEURON simulation software
-( M. L. Hines, N. T. Carnevale; The NEURON Simulation Environment. 
-Neural Comput 1997; 9 (6): 1179–1209. 
-doi: https://doi.org/10.1162/neco.1997.9.6.1179 ) :
-
-
-| "a synaptic current with alpha function conductance defined by
-| i = g * (v - e)      i(nanoamps), g(microsiemens);
-| where:
-|     g = 0 for t < onset and
-|     g = gmax * (t - onset)/tau * exp(-(t - onset - tau)/tau) for t > onset
-| this has the property that the maximum value is gmax and occurs at t = delay + tau."
- 
 
 Parameters:
 ===========
@@ -870,8 +853,28 @@ Example:
     # plot the generated curve
     plt.plot(x,y)
 
-.. note:: 
-    Rall 1967 uses the notation T for t - onset, and Tₚ for τ in the "alpha" function below:
+
+Details and waveform properties:
+================================
+
+The function was introduced by Rall, W. Distinguishing theoretical synaptic potentials computed for 
+different soma-dendritic distributions of synaptic input. J Neurophysiol 30(5),
+1138–68, 1967. 
+
+The implementation follows that in NEURON simulation software
+( M. L. Hines, N. T. Carnevale; The NEURON Simulation Environment. 
+Neural Comput 1997; 9 (6): 1179–1209. doi: https://doi.org/10.1162/neco.1997.9.6.1179 ) :
+
+
+| "a synaptic current with alpha function conductance defined by
+| i = g * (v - e)      i(nanoamps), g(microsiemens);
+| where:
+|     g = 0 for t < onset and
+|     g = gmax * (t - onset)/tau * exp(-(t - onset - tau)/tau) for t > onset
+| this has the property that the maximum value is gmax and occurs at t = delay + tau."
+ 
+
+Rall 1967 uses the notation T for t - onset, and Tₚ for τ in the "alpha" function below:
 
 $$f(T) = \\begin{cases} \\left( T / T_{p} \\right) \\times e^{\\left( 1 - T / T_{p} \\right)} & \\text{for}\\: T_{p} > 0 \\\\0 & \\text{otherwise} \\end{cases} \\qquad{} (2)$$
 
@@ -1121,7 +1124,7 @@ Parameters:
     
 @modelfunction(coefficients = ("α", "β", "x0", "τ1", "τ2"),
                title = "ClementsBekkers97",
-               expression = r"$y(x) = \begin{cases} \alpha + \beta \times \left(1 - e^{-\left(x-x_{0}\right) / \tau_{1}}\right) \times e^{-\left(x-x_{0}\right) / \tau_{2}} & \text{for}\: \left(x - x_{0}\right) \geq 0\textrm{, }\tau_{1}>0\textrm{, }\tau_{2}>0 \\ \alpha & \text{otherwise} \end{cases}$",
+               expression = r"$f(x) = \begin{cases} \alpha + \beta \times \left(1 - e^{-\left(x-x_{0}\right) / \tau_{1}}\right) \times e^{-\left(x-x_{0}\right) / \tau_{2}} & \text{for}\: \left(x - x_{0}\right) \geq 0\textrm{, }\tau_{1}>0\textrm{, }\tau_{2}>0 \\ \alpha & \text{otherwise} \end{cases}$",
 )
 def Clements_Bekkers_97(x:np.ndarray | Real,
                         α:typing.Union[Real, typing.Sequence[Real], np.ndarray], /, 
@@ -1141,22 +1144,30 @@ Description:
 This is a product of two exponentials ("rise" and "decay", each with their 
 own time constant), with additive and mutiplicative bias:
 
-$y(x) = \\begin{cases} \\alpha + \\beta \\times \\left(1 - e^{-\\left(x-x_{0}\\right) / \\tau_{1}}\\right) \\times e^{-\\left(x-x_{0}\\right) / \\tau_{2}} & \\text{for}\\: \\left(x - x_{0}\\right) \\geq 0 \\textrm{, } \\tau_{1} > 0 \\textrm{, } \\tau_{2}>0 \\\\\\alpha & \\text{otherwise} \\end{cases}$
+$f(x) = \\begin{cases} \\alpha + \\beta \\times \\left(1 - e^{-\\left(x-x_{0}\\right) / \\tau_{1}}\\right) \\times e^{-\\left(x-x_{0}\\right) / \\tau_{2}} & \\text{for}\\: \\left(x - x_{0}\\right) \\geq 0 \\textrm{, } \\tau_{1} > 0 \\textrm{, } \\tau_{2}>0 \\\\\\alpha & \\text{otherwise} \\end{cases}$
 
-    x₀ ↦         — the delay ("onset", or "shift"); units of "x"
+where:
+    α  ↦ additive bias (offset), units of ``f(x)``
 
-    τ₁, τ₂ > 0. ↦ the time constants, respectively, for the rise and decay phases
-                    units of "x"
+    β  ↦ multiplicative bias (scale), dimensionless
+
+    x₀ ↦ shift (delay, or onset), units of ``x``
+
+    τ₁ ↦ the time constant of the "rising" phase, units of ``x``
+
+    τ₂ ↦ the time constant of the "decaying" phase, units of ``x``
+
 
 Parameters:
 ===========
 
 :x: predictor (independent variable e.g., time) - 1D numpy ndarray
-:α: offset (additive bias; usually, 0.); units of ``y``
+:α: offset (additive bias; usually, 0.) or sequence of scalars (1D array-like). If the latter, it is 
+    interpreted as containing the individual α, β, x0, τ₁, τ₂ coefficients 'packed' in this order. Units of ``f(x)``
 :β: scale (multiplicative bias); dimensionless
 :x0: delay ("onset", or "shift"); units of "x"
-:τ0: time constant of the "rising" phase (> 0); units of ``x``
-:τ1: time constant of the "decaying" phase (> 0); units of ``x``
+:τ1: time constant of the "rising" phase (> 0); units of ``x``
+:τ2: time constant of the "decaying" phase (> 0); units of ``x``
 
 Returns:
 ========
@@ -1166,31 +1177,32 @@ Returns:
 Waveform properties:
 ====================
 
-* The extremum
-    * is 
+**The extremum**
 
-        $\\frac{\\tau_{1}}{\\tau_{0} + \\tau_{1}} \\times \\left( \\frac{\\tau{0}}{\\tau_{0} + \\tau_{1}} \\right)^{ \\tau_{0} / \\tau_{1} } \\textrm{ for } \\alpha = 0, \\beta = 1$
-        
-    * occurs at 
+$$\\frac{\\tau_{1}}{\\tau_{0} + \\tau_{1}} \\times \\left( \\frac{\\tau{0}}{\\tau_{0} + \\tau_{1}} \\right)^{ \\tau_{0} / \\tau_{1} }$$
+    
+occurs at
 
-        $x = \\tau_{0} \\times \\ln\\left( \\tau_{1}/\\tau_{0} + 1 \\right) + x_{0} \\textrm{ analytic solution of } f^{\\prime}(x)dx = 0$
+$$x = \\tau_{0} \\times \\ln\\left( \\tau_{1}/\\tau_{0} + 1 \\right) + x_{0} $$
 
-    So to get a curve spanning the interval [0., 1.] in 'y', the coefficient β
-    should be 1/extremum (for α = 0.0)
+as analytic solution of
+
+$$f^{\\prime}(x)dx = 0$$
+
+So to get a curve spanning the interval [0., 1.] in 'y', the coefficient β should be 1/extremum
+
 
 .. warning::
     this will also change the FWHM!
 
-• FWHM: x coordinates for full width at half-max need to be determined 
+**FWHM** x coordinates for full width at half-max need to be determined 
     graphically as the intersection between y(x) and the line y₁(x)=ymax/2
     (see e.g., documentation for alphaSynapse)
 
-• area under the curve:
+**Area under the curve**
     
-    $\\int_{0}^{\\infty}f\\left(x\\right)dx=$$\\beta\\frac{\\tau_{1}^{2}}{\\tau_{0}+\\tau{_1}}\\textrm{ for }\\alpha=0,x_{0}=0,\\tau_{0}>0,\\tau_{1}>0$
-            ∞   
-            ∫f(x)dx = (β × τ2²)/(τ1+τ2), for α = 0, x0 = 0, and τ1, τ2 > 0
-            0
+$\\int_{0}^{\\infty}f\\left(x\\right)dx=$$\\beta\\frac{\\tau_{1}^{2}}{\\tau_{0}+\\tau{_1}}\\textrm{ for }\\alpha=0,x_{0}=0,\\tau_{0}>0,\\tau_{1}>0$
+
 .. note::
     the DURATION of the waveform is determined by the independent variable ``x``
     
@@ -1833,137 +1845,111 @@ def Frank_Fuortes2(x:np.ndarray | Real, irh:typing.Sequence[Real] | Real, /,
                )
 def Boltzmann(x:np.ndarray | Real, x0:typing.Sequence[Real] | Real, /,
               κ:typing.Optional[Real] = None,
-              pos:bool=True) -> np.ndarray | float:
-    r""" Boltzmann function — empirical description of voltage-gated ion channel kinetics
-
-Realises y = 1/(1+exp(±(x₀ - x)/κ))
+              actvation:bool=True) -> np.ndarray | float:
+    r""" 
+==================
+Boltzmann function
+==================
+    
+Description:
+============
+    
+Empirical model of voltage-gated ion channel kinetics. Describes ionic current through the channel as function of membrane voltage according to
+    
+$$f(x) = \\begin{cases} \\frac{1}{e^{\\frac{\\left(-x_{0} + x\\right)} {\\kappa} } } & \\text{activation} \\\\\\frac{1}{e^{\\frac{\\left(x_{0} - x\\right)} {\\kappa} } } & \\text{inactivation} \\end{cases}\\textrm{, }\\kappa>0$$
 
 Parameters:
 ==========
-x: float scalar (e.g., membrane voltage)
+:x: Predictor (independent variable, e.g., membrane voltage) — 1D numpy ndarray or float
 
-p: array-like, with two float elements: x₀ and κ (in THIS order)
+:x0: Predictor value at half-maximum (e.g. half-activation voltage, V½) — float scalar, or array-like with two float elements: x₀ and κ (in THIS order).
+    
+    For example, this is the membrane voltage where ensemble channel current is half the maximum, or where half of the channels are active.
+    
+:κ: "Slope" factor — float scalar (ignored when ``x0`` is array-like). 
+    
+    When fitting I-V (or G-V) relationships, κ usually is 𝒛𝑹𝑻/𝑭 (e.g., see Cui et al, 1997, J Gen Physiol), where:
 
-pos: bool, optional (default is True) — the sign of the exponent:
-    When True, the function uses a positive exponential argument (e.g. useful
-    to fit an activation curve)
+    𝒛 ↦ apparent gating charge [C]
+    
+    𝑻 ↦ temperature [K]
+    
+    𝑹 ↦ molar gas constant 8.31446261815324 [J K⁻¹ mol⁻¹]
+    
+    𝑭 ↦ Faraday constant 96485.33212331001 [C mol⁻¹]
 
-    When False, the exponential argument is negative (e.g., useful to fit an 
-    inactivation curve)
+:activation: flag indicating if the function is used to describe activation — bool, optional (default is True)
 
 Returns:
 ========
-A scalar (e.g., membrane current)
+A scalar or vector (e.g., membrane current or conductance)
 
-Notes:
-======
+Details and properties:
+=======================
+    
+Boltzmann's function is commonly used to describe the voltage-dependent gating of voltage-gated ion channels:
 
-Boltzmann's equation is commonly used to describe the voltage-dependent gating
-of voltage-gated ion channels:
+It is also used as empirical model of the "gating" mechanism for voltage dependent channels Naᵥ and Kᵥ in the Hodgkin-Huxley formalism.
 
-    Activation:
+In the above expresion, and given Vₘ the membrane voltage, ``f(x)`` can be:
 
-    Iₘ = 1/(1+exp((V½ - Vₘ)/κ))                                 (1)
+* the recorded membrane current (Iₘ) at a range of Vₘ values, normalized to the maximal recorded current value
 
-    Inactivation:
+* fractional open time (for recordings from a small number of channels, see e.g., Magee & Johnston, JPhysiol, 1995) - by definition, this is normalized.
 
-    Iₘ = 1/(1+exp(-(V½ - Vₘ)/κ))                                (2)
+* chord or slope conductance (Gₘ) normalized to maximal value, e.g., see Magee & Johnston 1995
 
-where:
+.. note::
+    Iₘ (or Gₘ) is specific to the studied channel only when all other channels are blocked.
+    
+    V½ and κ are often different for activation and inactivation
 
-Iₘ can be:
-    ∘ the recorded membrane current at a range of Vₘ values, normalized to 
-        the maximal recorded current value
+    When fitting experimental data, the fitted parameters are x₀ and κ.
 
-    ∘ fractional open time (for recordings from a small number of channels, 
-        see e.g., Magee & Johnston, JPhysiol, 1995) - by definition 
-        normalized.
-
-    ∘ chord or slope conductance normalized to maximal value, e.g., see
-        Magee & Johnston 1995
-
-    When all other channels are blocked, Iₘ is specific to the studied
-    channels.
-
-Vₘ is the membrane voltage
-
-V½ is the "half-maximum" voltage - the voltage where ensemble channel 
-current is half the maximum, or where half of the channels are active
-
-κ is a "slope" factor; when fitting I-V (or G-V) relationships, κ usually is
-𝒛𝑹𝑻/𝑭 (e.g., see Cui et al, 1997, J Gen Physiol), where:
-
-𝒛  apparent gating charge [C]
-𝑻  temperature [K]
-𝑹  molar gas constant 8.31446261815324 [J K⁻¹ mol⁻¹]
-𝑭  Faraday constant 96485.33212331001 [C mol⁻¹]
-
-NOTE V½ and κ are often different for activation and inactivation
-
-Let ξ = (V½ - Vₘ)/κ
-
-
-Then:
-
-(Vₘ-V½)/κ = -ξ
-
-and:
-
-1/(1+exp(-ξ)) = 1/(1+1/exp(ξ)) = exp(ξ)/(1+exp(ξ)) = exp(ξ) × 1/(1+exp(ξ))
-|___________|                                                 |__________|
-inactivation                                                   activation
-
-(NOTE the change in sign of the exponential argument!)
-
-When fitting experimental data, the fitted parameters are x₀ and κ.
-
-The equation is also an empyrical model of the "gating" mechanism for 
-voltage dependent channels Naᵥ and Kᵥ in the Hodgkin-Huxley formalism.
     
 """
     if isinstance(x0, typing.Sequence) and len(x0)==2 and all(isinstance(v, Real) for v in x0):
         x0, κ = z0
     
     # sign of ξ
-    ξ = x0 - x if pos else x - x0
+    ξ = x0 - x if activation else x - x0
     ξ /= κ
     return 1/(1+np.exp(ξ))
     
 @modelfunction(coefficients=("x0", ),
-               expression = r"$\theta(x) = \begin{cases} 0 & \text{for}\: x = 0 \\1 & \text{for}\: x > 0 \end{cases}$",
+               expression = r"$\theta(x) = \begin{cases} 0 & \text{for}\: \left(x -x_{0}\right) \leq 0 \\1 & \text{for}\: \left(x -x_{0}\right) > 0 \end{cases}$",
                )
 def Heaviside(x:np.ndarray|Real, 
-              x0:typing.Union[Real, pq.Quantity], /, 
-              α:bool=True) -> np.ndarray | float:
+              x0:typing.Union[Real, pq.Quantity]) -> np.ndarray | float:
     r"""Heaviside (step) function.
 
-    Description:
-    =============
-    
-    Step transition between two levels (0 and 1) :
+Description:
+=============
 
-    r"$\theta(x) = \begin{cases} 0 & \text{for}\: x = 0 \\1 & \text{for}\: x > 0 \end{cases}$"
+Step transition between two levels (0 and 1) :
+
+r"$\theta(x) = \begin{cases} 0 & \text{for}\\: \\left(x -x_{0}\\right) \\leq 0 \\1 & \text{for}\\: \\left(x -x_{0}\\right)x > 0 \\end{cases}$"
+
+Parameters:
+===========
+
+:x: domain vector
+
+:x0: coordinate of the step change (in the function domain)
     
-    Parameters:
-    ===========
-    x: domain vector
-    x0: coordinate of the step change (in domain space)
-    α: bool, default is True.
-        Flag for the direction of step change:
-        True (default) → 0 → 1 transition
-        False ⇒ transition 1 → 0
-        
-    """
+"""
+    # print(f"{type(x0).__name__}: {x0}")
     from core.datatypes import is_vector
-    if not is_vector(x):
-        raise TypeError(f"Domain (x) is not a vector")
+    x = check_independent_variable(x)
     
-    if isinstance(x0, np.ndarray):
-        if x0.size != 1:
-            raise TypeError(f"x0 expected an array of size 1; got {x0.size} instead")
-        
-    elif not isinstance(x0, float):
-        raise TypeError(f"x0 must be a scalar float or an array with size 1")
+    x0 = check_unpack_model_coeffs(1, x0)
+    
+#     if isinstance(x0, np.ndarray):
+#         if x0.size != 1:
+#             raise TypeError(f"x0 expected an array of size 1; got {x0.size} instead")
+#         
+#     elif not isinstance(x0, float):
+#         raise TypeError(f"x0 must be a scalar float or an array with size 1")
         
     # if all(isinstance(v, pq.Quantity) for v in (x, x0)):
     if isinstance(x, pq.Quantity):
@@ -1987,43 +1973,57 @@ def Heaviside(x:np.ndarray|Real,
     
     xx = x - x0
     
-    ν = 0. if α else 1.
-    λ = 1. if α else 0.
+    ν = 0. #if α else 1.
+    λ = 1. #if α else 0.
     
     y = np.full_like(x, fill_value = ν)
     y[xx >= 0] = λ
     
     return y
     
-@modelfunction(coefficients=("x0",),
-               title="GenericHeaviside")
+@modelfunction(coefficients=("x0","λ0", "λ1"),
+               title="GenericHeaviside",
+               expression = r"$\theta(x) = \begin{cases} \lambda_{0} & \text{for}\: \left(x -x_{0}\right) \leq 0 \\\lambda_{1} & \text{for}\: \left(x -x_{0}\right) > 0 \end{cases}$"
+               )
 def Heaviside2(x:np.ndarray|Real, 
-              x0:typing.Union[Real, pq.Quantity], 
-              level0:Real=0., level1:Real=1.) -> np.ndarray | float:
+              x0:typing.Union[Real, typing.Sequence[Real]], /, 
+              λ0:typing.Optional[Real]=None, 
+              λ1:typing.Optional[Real]=None) -> np.ndarray | float:
     """Heaviside (step) function - general version
     
-    Step transition from level0 to level1. by default the levels are
-    0. and 1. (floats)
+Step transition from λ0 level to λ1.
     
-    Parameters:
-    ===========
-    x: domain vector
-    x0: coordinate of the step change (in domain space)
-    level0, level1:float; optional, defaults are 0 and 1, respectively
-        The initial and the final level of the step function.
-        
-    """
+$\\theta(x) = \\begin{cases} \\lambda_{0} & \\text{for}\\: \\left(x -x_{0}\\right) \\leq 0 \\\\\\lambda_{1} & \\text{for}\\: \\left(x -x_{0}\\right) > 0 \\end{cases}$"
+    
+    
+
+Parameters:
+===========
+    
+:x: domain vector
+    
+:x0: coordinate of the step change (in domain space)
+    
+:λ0: float; optional, default is 0
+
+:λ1: float; optional, default is 1        
+"""
     from core.datatypes import is_vector
     
-    if not is_vector(x):
-        raise TypeError(f"Domain (x) is not a vector")
+    x = check_independent_variable(x)
     
-    if isinstance(x0, np.ndarray):
-        if x0.size != 1:
-            raise TypeError(f"x0 expected an array of size 1; got {x0.size} instead")
-        
-    elif not isinstance(x0, float):
-        raise TypeError(f"x0 must be a scalar float or an array with size 1")
+    # print(f"x0={x0}, λ0={λ0}, λ1={λ1}")
+    
+    x0, λ0, λ1 = check_unpack_model_coeffs(3, x0, λ0, λ1)
+#     if not is_vector(x):
+#         raise TypeError(f"Domain (x) is not a vector")
+#     
+#     if isinstance(x0, np.ndarray):
+#         if x0.size != 1:
+#             raise TypeError(f"x0 expected an array of size 1; got {x0.size} instead")
+#         
+#     elif not isinstance(x0, float):
+#         raise TypeError(f"x0 must be a scalar float or an array with size 1")
         
     # if all(isinstance(v, pq.Quantity) for v in (x, x0)):
     if isinstance(x, pq.Quantity):
@@ -2047,8 +2047,8 @@ def Heaviside2(x:np.ndarray|Real,
     
     xx = x - x0
     
-    y = np.full_like(x, fill_value = level0)
-    y[xx >= 0] = level1
+    y = np.full_like(x, fill_value = λ0)
+    y[xx >= 0] = λ1
     
     return y
     
@@ -2057,32 +2057,48 @@ def Heaviside2(x:np.ndarray|Real,
 def boxcar(x:np.ndarray | Real, x0:typing.Union[typing.Sequence[Real], Real], /, 
            x1:typing.Optional[Real]=None, up_first:bool=True) -> np.ndarray | float:
     r"""Boxcar function: 
-Two successive Heaviside (step) functions of opposite directions"""
+Two successive Heaviside (step) functions of opposite directions.
+
+Implements the product of two Heaviside models.
+
+Parameters:
+===========
+
+
+
+"""
     # x0, x1 = p
     x0, x1 = check_unpack_model_coeffs(2, x0, x1)
     
     ud = [True, False] if up_first else [False, True]
     
+    # return Heaviside(x, x0) * (1-Heaviside(x, x1))
     if x0 < x1:
         # print(f"x0 < x1 {x0 < x1}; up_first: {up_first}")
         # up then down
-        return Heaviside(x, x0, ud[0]) * Heaviside(x, x1, ud[1])
+        return Heaviside(x, x0) * (1-Heaviside(x, x1))
+        # return Heaviside(x, x0, ud[0]) * Heaviside(x, x1, ud[1])
         
     else:
         # print(f"x0 >= x1 {x0 >= x1}; up_first: {up_first}")
         # down then up
-        return Heaviside(x, x0, ud[0]) * Heaviside(x, x1, ud[1])# if up_first else Heaviside(x, x1, False) + Heaviside(x, x0, True)
+        return (1-Heaviside(x, x0)) * Heaviside(x, x1)# if up_first else Heaviside(x, x1, False) + Heaviside(x, x0, True)
+        # return Heaviside(x, x0, ud[0]) * Heaviside(x, x1, ud[1])# if up_first else Heaviside(x, x1, False) + Heaviside(x, x0, True)
 
-@modelfunction(coefficients = ("x0", "x1"),
+@modelfunction(coefficients = ("x0", "x1", "λ0", "λ1"),
                title="GenericBoxcar")
 def boxcar2(x:np.ndarray | Real, x0:typing.Union[typing.Sequence[Real], Real, np.ndarray], /, 
             x1:typing.Optional[Real]=None,
-            level0:Real=0., level1:Real=1.) -> np.ndarray | float:
+            λ0:typing.Optional[Real]=None, λ1:typing.Optional[Real]=None) -> np.ndarray | float:
     r"""Boxcar function:
 Two successive Heaviside2 (step) functions (general versions) in opposite directions"""
-    x0, x1 = check_unpack_model_coeffs(2, x0, x1)
+    x0, x1, λ0, λ1 = check_unpack_model_coeffs(4, x0, x1, λ0, λ1)
     
-    return Heaviside2(x, x0, level0, level1) + Heaviside2(x, x1, level1, level0)
+    if x0 < x1:
+        return Heaviside2(x, x0, λ0, λ1) * (λ1 + λ0 - Heaviside2(x, x1, λ1, λ0))
+    else:
+        return (λ1 + λ0 - Heaviside2(x, x0, λ0, λ1)) * Heaviside2(x, x1, λ1, λ0)
+                                        
 
 @modelfunction(coefficients = ("x0", "y0", "x1", "y1"))
 def ramp(x:typing.Union[Real, np.ndarray], x0:typing.Union[Real, np.ndarray, typing.Sequence[Real]], /, 
@@ -2249,8 +2265,6 @@ def renderModelExpression(expression:typing.Union[sympy.Basic, sympy.Expr, str, 
     
     if isModelFunction(expression):
         expression = expression.expression
-    
-    assert isinstance(expression, (sympy.Basic, sympy.Expr)) or is_latex(expression), f"expecting a model function, latex str, sympy.Basic or Sympy.Expr object; instead, got {type(expression).__name__}"
     
     try:
         if isinstance(expression, (sympy.Basic, sympy.Expr)):

@@ -354,6 +354,20 @@ https://www.bomberbot.com/python/converting-restructuredtext-to-html-with-python
     # but WITHOUT colour highlighting...
     pattern = r'<pre class="literal-block">(.+?)</pre>' 
     
+#     try:
+#         matches = re.findall(pattern, body_html, re.DOTALL|re.MULTILINE)
+#         for k, match in matches:
+#             print(f"helputils.rst_to_html_with_highlighting: match {k} = {match[0]}")
+#             snippet = replace_code_block(match[0])
+#             body_html = body_html.replace(match[0], snippet)
+#         
+#         out_html = body_html
+#     except:
+#         traceback.print_exc()
+#         out_html = body_html
+        
+    # out_html = body_html
+    
     try:
         out_html = re.sub(pattern, replace_code_block, body_html, flags=re.DOTALL|re.MULTILINE)
     except:
@@ -369,7 +383,7 @@ def mdhighlight(text):
     if guiutils.isDarkGui():
         style = "KeplerDark"
     else:
-        style="default"
+        style = "default"
         
     # NOTE: 2025-10-14 22:34:50
     # there are issues with pip-installed pymarkdown:
@@ -1194,6 +1208,7 @@ reStructuredText-formatted text with ``.. image::`` directives
     
     for k, match in enumerate(matches):
         # match[0] contains the complete matched substring
+        # print(f"helputils.format_latex: match {k} = {match[0]}")
         ltx = match[0].strip()
         ll = ltx.replace("\\\\", "\\")
         filepath = pathlib.Path(destdir) / f"png{k}.png"
@@ -1203,6 +1218,8 @@ reStructuredText-formatted text with ``.. image::`` directives
                 pngfile.write(pngdata)
                 
             snippet = f"\n .. image:: {filepath.as_posix()}\n"
+            # print(f"\tsnippet {k} = {snippet}")
+            
             # snippet = f"\n\n\n .. image:: \n    {filepath.as_posix()}\n    :align: left\n\n"
             
             # if ll.startswith("$$"):

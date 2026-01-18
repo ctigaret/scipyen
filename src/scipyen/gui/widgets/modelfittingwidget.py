@@ -60,6 +60,8 @@ class _ModelFunctionExpressionSVGGenerator_(QtCore.QThread):
         svg = self._modelFunc_.expressionAsSVG()
         if is_svg(svg):
             self.ready.emit(svg)
+        else:
+            self.ready.emit("")
     
 
 class ModelFittingWidget(Ui_ModelFittingWidget, QWidget, workspacegui.GuiMessages):
@@ -208,7 +210,7 @@ Named Parameters:
         self._model_fit_coefficients_ = pd.DataFrame(fitting_dict, index=(model.coefficients))
         if not isinstance(self.modelCoefficientsTable._data_, pd.DataFrame) or self.modelCoefficientsTable._data_.size==0:
             self.populateCoefficientsTable(self._model_fit_coefficients_)
-        # svg_out = models.renderModelExpression(self._model_, out="svg")
+
         self._generateModelExpressionSVG()
         
         self._setupExpressionWindow()
@@ -226,12 +228,13 @@ Named Parameters:
         self._model_expression_svg_ = svg
         # print(f"{self.__class__.__name__}._setModelFunction_: self._model_expression_svg_ is svg@ {is_svg(self._model_expression_svg_)}")
         self.svgWidget.setSvg(self._model_expression_svg_)
-        svgSize = self.svgWidget.svgSize()
-        if svgSize.width()>0 and svgSize.height() > 0:
-            splitterMinSize = self.labelsSplitter.minimumSize()
-            newSplitterMinSize = QtCore.QSize(splitterMinSize)
-            newSplitterMinSize.setHeight(svgSize.height())
-            
+        if is_svg(self._model_expression_svg_):
+            svgSize = self.svgWidget.svgSize()
+            if svgSize.width()>0 and svgSize.height() > 0:
+                splitterMinSize = self.labelsSplitter.minimumSize()
+                newSplitterMinSize = QtCore.QSize(splitterMinSize)
+                newSplitterMinSize.setHeight(svgSize.height())
+        self._setupExpressionWindow()
             
     @property
     def model(self) -> types.FunctionType:
@@ -407,23 +410,18 @@ Named Parameters:
         from gui.widgets import svgwidgets
         if not isinstance(self._expressionWindow_, QtWidgets.QMainWindow):
             self._expressionWindow_ = QtWidgets.QMainWindow()
-            sWidget = None
-            if isinstance(self._model_expression_svg_, QtGui.QPixmap):
-                sWidget = QtCore.QLabel(parent=self._expressionWindow_)
-                sWidget.setPixmap(self._model_expression_svg_)
-            elif is_svg(self._model_expression_svg_):
-                sWidget = svgwidgets.SimpleSVGWidget(svg=self._model_expression_svg_, parent=self._expressionWindow_)
-            if sWidget:
-                self._expressionWindow_.setCentralWidget(sWidget)
-                
-        else:
-            if isinstance(self._model_expression_svg_, QtGui.QPixmap):
-                self._expressionWindow_.centralWidget().setPixmap(self._model_expression_svg_)
-            elif is_svg(self._model_expression_svg_):
-                self._expressionWindow_.centralWidget().setSvg(self._model_expression_svg_)
-                
-        self._expressionWindow_.setWindowTitle(f"{QtWidgets.QApplication.instance().applicationName()} - {self._model_name_} model")
+            sWidget = svgwidgets.SimpleSVGWidget(parent=self._expressionWindow_)
+            self._expressionWindow_.setCentralWidget(sWidget)
             
+        if is_svg(self._model_expression_svg_):
+            self._expressionWindow_.centralWidget().setSvg(self._model_expression_svg_)
+        else:
+            self._expressionWindow_.centralWidget().setSvg(None)
+                
+        if isinstance(self._model_name_, str):
+            self._expressionWindow_.setWindowTitle(f"{QtWidgets.QApplication.instance().applicationName()} - {self._model_name_} model")
+        else:
+            self._expressionWindow_.setWindowTitle(f"{QtWidgets.QApplication.instance().applicationName()} - no model")
     
     @Slot()
     def _slot_generateWaveform(self):
