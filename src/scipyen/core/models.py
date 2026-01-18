@@ -1845,7 +1845,7 @@ def Frank_Fuortes2(x:np.ndarray | Real, irh:typing.Sequence[Real] | Real, /,
                )
 def Boltzmann(x:np.ndarray | Real, x0:typing.Sequence[Real] | Real, /,
               κ:typing.Optional[Real] = None,
-              actvation:bool=True) -> np.ndarray | float:
+              activation:bool=True) -> np.ndarray | float:
     r""" 
 ==================
 Boltzmann function
@@ -1908,8 +1908,10 @@ In the above expresion, and given Vₘ the membrane voltage, ``f(x)`` can be:
 
     
 """
-    if isinstance(x0, typing.Sequence) and len(x0)==2 and all(isinstance(v, Real) for v in x0):
-        x0, κ = z0
+    x = check_independent_variable(x)
+    x0, κ = check_unpack_model_coeffs(2, x0, κ)
+    # if isinstance(x0, typing.Sequence) and len(x0)==2 and all(isinstance(v, Real) for v in x0):
+    #     x0, κ = z0
     
     # sign of ξ
     ξ = x0 - x if activation else x - x0
@@ -1938,10 +1940,7 @@ Parameters:
 :x0: coordinate of the step change (in the function domain)
     
 """
-    # print(f"{type(x0).__name__}: {x0}")
-    from core.datatypes import is_vector
     x = check_independent_variable(x)
-    
     x0 = check_unpack_model_coeffs(1, x0)
     
 #     if isinstance(x0, np.ndarray):
@@ -2053,52 +2052,127 @@ Parameters:
     return y
     
 @modelfunction(coefficients = ("x0", "x1"),
-               title="Boxcar")
+               title="Boxcar",
+               expression = "$$f(x) = \\begin{cases} 0 & \\text{for}\\: \\left(x-x_{0}\\right)\\leq0 \\\\1 & \\text{for}\\: \\left(x-x_{0}\\right) > 0   \\end{cases}$$")
 def boxcar(x:np.ndarray | Real, x0:typing.Union[typing.Sequence[Real], Real], /, 
-           x1:typing.Optional[Real]=None, up_first:bool=True) -> np.ndarray | float:
-    r"""Boxcar function: 
-Two successive Heaviside (step) functions of opposite directions.
+           x1:typing.Optional[Real]=None) -> np.ndarray | float:
+    r"""
+===============
+Boxcar function
+===============
 
-Implements the product of two Heaviside models.
+Upward rectangular waveform from 0. to 1.
+
+Implements
+
+$$f(x) = \\begin{cases} 0 & \\text{for}\\: \\left(x-x_{0}\\right)\\leq0 \\\\1 & \\text{for}\\: \\left(x-x_{0}\\right) > 0   \\end{cases}$$
+
+
+.. warning::
+    Do NOT confuse with scipy.signal.boxcar function. See **Usage** below.
+
+
 
 Parameters:
 ===========
+:x: Predictor (scalar real or numpy array)
 
+:x0: first inflection point on ``x`` (scalar) or a sequence of two scalars in the order ``x0``, ``x1``
 
+:x1: second inflection point; optional; when None, :x0: must be a sequence of two scalars
+
+Details and waveform properties:
+=================================
+
+1-f(x) is the downward version i.e., from 1. to 0.
+
+f(x)-1 is the upward version from -1. to 0.
+
+f(x)*(-1) is the downward version from 0. to -1.
+
+.. caution::
+    Multiplication is NOT commutative for neo signal objects: do f(x) * (-1) instead of (-1) * f(x), when f(x) is, e.g., an AnalogSignal.
+
+Usage
+=====
+
+**Never** import both this and scipy.signal.boxcar functions directly in the same namespace. 
+
+The one imported last one **will** overwrite the one imported first.
+
+If you **do** need them both, then import **only** one of them directly, or use aliases: ::
+
+    # Do either:
+    #
+    from scipy.signal import boxcar # call scipy function as boxcar(…)
+    from core import models  # call this function as  models.boxcar(…)
+    #
+    # or:
+    #
+    from scipy import signal # call signal.boxcar(…) to use scipy function
+    from core models import boxcar # call boxcar(…) to use this function
+    #
+    # Of course you can always import them under an alias, for example:
+    #
+    from scipy.signal import boxcar as scipyboxcar
+    from core.models import boxcar as mboxcar
+    #
+    # The last example is the recommended practice even if you only use just one
+    # of them in a given namespace, as it will help you figure out which `boxcar`
+    # function is being used in the code.
 
 """
-    # x0, x1 = p
+    x = check_independent_variable(x)
     x0, x1 = check_unpack_model_coeffs(2, x0, x1)
+    y = np.full_like(x, fill_value = 0.)
     
-    ud = [True, False] if up_first else [False, True]
+    xx0 = x-x0
+    xx1 = x-x1
+    y[(xx0>=0) & (xx1<0)] = 1.
+    return y
     
-    # return Heaviside(x, x0) * (1-Heaviside(x, x1))
-    if x0 < x1:
-        # print(f"x0 < x1 {x0 < x1}; up_first: {up_first}")
-        # up then down
-        return Heaviside(x, x0) * (1-Heaviside(x, x1))
-        # return Heaviside(x, x0, ud[0]) * Heaviside(x, x1, ud[1])
-        
-    else:
-        # print(f"x0 >= x1 {x0 >= x1}; up_first: {up_first}")
-        # down then up
-        return (1-Heaviside(x, x0)) * Heaviside(x, x1)# if up_first else Heaviside(x, x1, False) + Heaviside(x, x0, True)
-        # return Heaviside(x, x0, ud[0]) * Heaviside(x, x1, ud[1])# if up_first else Heaviside(x, x1, False) + Heaviside(x, x0, True)
-
 @modelfunction(coefficients = ("x0", "x1", "λ0", "λ1"),
-               title="GenericBoxcar")
+               title="GenericBoxcar",
+               expression="$$f(x) = \\begin{cases} \\lambda_{0} & \\text{for}\\: \\left(x-x_{0}\\right)\\leq0 \\\\\\lambda_{1} & \\text{for}\\: \\left(x-x_{0}\\right) > 0   \\end{cases}$$")
 def boxcar2(x:np.ndarray | Real, x0:typing.Union[typing.Sequence[Real], Real, np.ndarray], /, 
             x1:typing.Optional[Real]=None,
             λ0:typing.Optional[Real]=None, λ1:typing.Optional[Real]=None) -> np.ndarray | float:
-    r"""Boxcar function:
-Two successive Heaviside2 (step) functions (general versions) in opposite directions"""
+    r"""
+
+=========================
+"Generic" Boxcar function
+=========================
+
+A boxcar between arbitrary levels λ₀ and λ₁ (upward from λ₀ to λ₁).
+
+Implements
+
+$$f(x) = \\begin{cases} \\lambda_{0} & \\text{for}\\: \\left(x-x_{0}\\right)\\leq0 \\\\\\lambda_{1} & \\text{for}\\: \\left(x-x_{0}\\right) > 0   \\end{cases}$$
+
+Details and waveform properties:
+=================================
+
+(λ₀ + λ₁)-f(x) is the downward version from λ₁ to λ₀
+
+f(x)*(-1) is the downward version from -λ₀ to -λ₁
+
+You can always swap around the levels (λ₀ and λ₁).
+
+.. caution::
+    Multiplication is NOT commutative for neo signal objects: do f(x) * (-1) instead of (-1) * f(x), when f(x) is, e.g., an AnalogSignal.
+
+"""
+    x = check_independent_variable(x)
     x0, x1, λ0, λ1 = check_unpack_model_coeffs(4, x0, x1, λ0, λ1)
     
-    if x0 < x1:
-        return Heaviside2(x, x0, λ0, λ1) * (λ1 + λ0 - Heaviside2(x, x1, λ1, λ0))
-    else:
-        return (λ1 + λ0 - Heaviside2(x, x0, λ0, λ1)) * Heaviside2(x, x1, λ1, λ0)
-                                        
+    y = np.full_like(x, fill_value = λ0)
+    xx0 = x-x0
+    xx1 = x-x1
+    
+    y[(xx0>=0) & (xx1<0)] = λ1
+    
+    return y
+    
 
 @modelfunction(coefficients = ("x0", "y0", "x1", "y1"))
 def ramp(x:typing.Union[Real, np.ndarray], x0:typing.Union[Real, np.ndarray, typing.Sequence[Real]], /, 

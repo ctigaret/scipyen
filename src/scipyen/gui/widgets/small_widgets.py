@@ -470,6 +470,8 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             
         # print(f"{self.objectName()}: {self.__class__.__name__}.units.setter({value}): text -> {text}")
         self.lineEdit().setText(text)
+        
+        self.sig_valueChanged.emit(self.value())
             
     @Slot(str)
     def _slot_valueTextChanged(self, s:str):
@@ -996,9 +998,11 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             unitsLabel = self._prefix_ if len(self._prefix_) else self._suffix_ if len(self._suffix_) else ""
         label = f" ({unitsLabel})" if len(unitsLabel) else ""
         minimumInput = qd.HSpinBox(group, f"Minimum{label}:", widget_type="f")
-        minimumInput.setValue(super().minimum())
+        # minimumInput.setValue(super().minimum())
+        minimumInput.setValue(self._default_internal_minimum)
         maximumInput = qd.HSpinBox(group, f"Maximum{label}:", widget_type="f")
-        maximumInput.setValue(super().maximum())
+        # maximumInput.setValue(super().maximum())
+        maximumInput.setValue(self._default_internal_maximum)
         group.addWidget(minimumInput)
         group.addWidget(maximumInput)
         dlg.addWidget(group)

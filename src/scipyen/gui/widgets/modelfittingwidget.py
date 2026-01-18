@@ -68,6 +68,7 @@ class ModelFittingWidget(Ui_ModelFittingWidget, QWidget, workspacegui.GuiMessage
     sig_waveformReady = Signal(object, name="sig_waveformReady")
     def __init__(self, model: types.FunctionType|None = None,
                  duration:pq.Quantity = 1*pq.s,
+                 start:pq.Quantity = 0*pq.s,
                  samplingRate:pq.Quantity = 1e4*pq.Hz,
                  coefficients:typing.Optional[typing.Union[pd.DataFrame, dict]] = None,
                  waveformUnits:typing.Optional[pq.Quantity]=None,
@@ -110,6 +111,7 @@ Named Parameters:
         self._model_fit_coefficients_:typing.Optional[pd.DataFrame] = None
         self._model_name_:typing.Optional[str] = None
         self._model_expression_svg_:typing.Optional[QtGui.QPixmap] = None
+        self._waveformStart_:typing.Optional[pq.Quantity] = None
         self._waveformDuration_:typing.Optional[pq.Quantity] = None
         self._waveformSamplingRate_:typing.Optional[pq.Quantity] = None
         self._waveformUnits_:typing.Optional[pq.Quantity] = None
@@ -119,7 +121,7 @@ Named Parameters:
         self._configureUI_()
         
         if isinstance(model, types.FunctionType):
-            self._setModelData_(model, duration, samplingRate, waveformUnits, coefficients)
+            self._setModelData_(model, start, duration, samplingRate, waveformUnits, coefficients)
         
             if isinstance(self._model_fit_coefficients_, pd.DataFrame):
                 self.populateCoefficientsTable(self._model_fit_coefficients_)
@@ -134,6 +136,8 @@ Named Parameters:
             self.makeUnitAmplitudePushButton.setText("")
             self.makeUnitAmplitudePushButton.setFlat(True)
         self.makeUnitAmplitudePushButton.clicked.connect(self._slot_makeUnitAmplitudeModel)
+        self.startSpinBox.sig_valueChanged.connect(self._slot_waveformStartChanged)
+        self.durationSpinBox.sig_valueChanged.connect(self._slot_waveformDurationChanged)
         self.durationSpinBox.sig_valueChanged.connect(self._slot_waveformDurationChanged)
         self.samplingRateSpinBox.sig_valueChanged.connect(self._slot_waveformSamplingRateChanged)
         self.waveformUnitsPushButton.clicked.connect(self._slot_changeWaveformUnits)
@@ -152,26 +156,31 @@ Named Parameters:
             self.unitsLabel.setText(symbol)
             self.unitsLabel.setToolTip(symbol)
             
-    def _setModelData_(self, model:types.FunctionType, duration:pq.Quantity=1*pq.s, samplingRate:pq.Quantity=1e4*pq.Hz, 
+    def _setModelData_(self, model:types.FunctionType, start:pq.Quantity=0*pq.s, duration:pq.Quantity=1*pq.s, samplingRate:pq.Quantity=1e4*pq.Hz, 
                  waveformUnits:pq.Quantity = pq.dimensionless,
                  coefficients:typing.Optional[typing.Union[dict, pd.DataFrame]] = None):
+        assert isinstance(start, pq.Quantity) and start.size==1, f"'duration' must be a scalar quantity; instead, got {start}"
         assert isinstance(duration, pq.Quantity) and duration.size==1, f"'duration' must be a scalar quantity; instead, got {duration}"
         assert isinstance(samplingRate, pq.Quantity) and samplingRate.size==1 and samplingRate.units == 1/duration.units, f"'samplingRate' must be a scalar quantity in units of, or convertible to, {1/duration.units}; instead, got {samplingRate}"
         assert (isinstance(waveformUnits, pq.Quantity) and waveformUnits.size==1) or waveformUnits is None, f"'waveformUnits' , must be a scalar quantity or None; instead, gor {waveformUnits}"
         
+        self._waveformStart_ = start
         self._waveformDuration_ = duration
         self._waveformSamplingRate_ = samplingRate
         self._waveformUnits_ = waveformUnits if isinstance(waveformUnits, pq.Quantity) else pq.dimensionless
         
-        durationFamily = scq.getUnitFamily(self._waveformDuration_)
-        if durationFamily == "Time":
+        domainUnitsFamily = scq.getUnitFamily(self._waveformDuration_)
+        if domainUnitsFamily == "Time":
             self._waveformSamplingRate_.rescale(pq.Hz)
-        elif durationFamily in ("Length", "Space"):
+        elif domainUnitsFamily in ("Length", "Space"):
             self._waveformSamplingRate_.rescale(pq.space_frequency_unit)
-        elif durationFamily == "Angle" or self._waveformDuration_.units == pq.rad:
+        elif domainUnitsFamily == "Angle" or self._waveformDuration_.units == pq.rad:
             self._waveformSamplingRate_.rescale(pq.angle_frequency_unit)
+        else:
+            self._waveformSamplingRate_.rescale(1/self._waveformDuration_.units)
             
-        signalBlockers = list(map(lambda w: QtCore.QSignalBlocker(w), [self.durationSpinBox, self.samplingRateSpinBox]))#, self.waveformUnitsChooser]))
+        signalBlockers = list(map(lambda w: QtCore.QSignalBlocker(w), [self.startSpinBox, self.durationSpinBox, self.samplingRateSpinBox]))#, self.waveformUnitsChooser]))
+        self.startSpinBox.setValue(self._waveformStart_)
         self.durationSpinBox.setValue(self._waveformDuration_)
         self.samplingRateSpinBox.setValue(self._waveformSamplingRate_)
            
@@ -259,7 +268,46 @@ Named Parameters:
         else:
             self.clear()
         
-            
+    @property
+    def waveformStart(self) -> pq.Quantity:
+        return self._waveformStart_
+    
+    @waveformStart.setter
+    def waveformStart(self, val:pq.Quantity):
+        assert isinstance(val, pq.Quantity) and val.size==1, f"'duration' must be a scalar quantity; instead, got {val}"
+        if isinstance(self._waveformStart_, pq.Quantity):
+            newUnits = False
+            if self._waveformStart_.units != val.units:
+                if scq.unitsConvertible(val, self._waveformStart_):
+                    val = val.rescale(self._waveformStart_.units)
+                else:
+                    newUnits = True
+        else:
+            newUnits = True
+                
+        # print(f"{self.__class__.__name__} start setter: newUnits: {newUnits}")
+                
+        self._waveformStart_ = val
+    
+        if newUnits:
+            self._waveformDuration_ = self._waveformDuration_.magnitude * self._waveformStart_.units
+            if scq.unitsConvertible(self.waveformDuration, 1/self._waveformSamplingRate_.units):
+                domainUnitsFamily = scq.getUnitFamily(self._waveformStart_)
+                if domainUnitsFamily == "Time":
+                    self._waveformSamplingRate_.rescale(pq.Hz)
+                elif domainUnitsFamily in ("Length", "Space"):
+                    self._waveformSamplingRate_.rescale(pq.space_frequency_unit)
+                elif domainUnitsFamily == "Angle" or self._waveformStart_.units == pq.rad:
+                    self._waveformSamplingRate_.rescale(pq.angle_frequency_unit)
+            else:
+                self._waveformSamplingRate_ = self._waveformSamplingRate_.magnitude / self._waveformStart_.units
+
+        signalBlockers = list(map(lambda w: QtCore.QSignalBlocker(w), [self.startSpinBox, self.durationSpinBox, self.samplingRateSpinBox]))#, self.waveformUnitsChooser]))
+        self.startSpinBox.setValue(self._waveformStart_)
+        self.durationSpinBox.setValue(self._waveformDuration_)
+        self.samplingRateSpinBox.setValue(self._waveformSamplingRate_)
+        
+        
     @property
     def waveformDuration(self) -> pq.Quantity:
         return self._waveformDuration_
@@ -272,7 +320,7 @@ Named Parameters:
         #   also change the sampling rate units but leave their magnitude untouched
         # is new units ARE scalable/convertible to the current duration units, then
         #   the new duration will be rescaled to the current duration units
-        assert isinstance(val, pq.Quantity) and duration.size==1, f"'duration' must be a scalar quantity; instead, got {val}"
+        assert isinstance(val, pq.Quantity) and val.size==1, f"'duration' must be a scalar quantity; instead, got {val}"
         
         if isinstance(self._waveformDuration_, pq.Quantity):
             newUnits = False
@@ -283,19 +331,24 @@ Named Parameters:
                     newUnits = True
         else:
             newUnits = True
-                
+            
         self._waveformDuration_ = val
 
         if newUnits:
-            durationFamily = scq.getUnitFamily(self._waveformDuration_)
-            if durationFamily == "Time":
-                self._waveformSamplingRate_.rescale(pq.Hz)
-            elif durationFamily in ("Length", "Space"):
-                self._waveformSamplingRate_.rescale(pq.space_frequency_unit)
-            elif durationFamily == "Angle" or self._waveformDuration_.units == pq.rad:
-                self._waveformSamplingRate_.rescale(pq.angle_frequency_unit)
+            self._waveformStart_ = self._waveformStart_.magnitude * self._waveformDuration_.units
+            if scq.unitsConvertible(self._waveformDuration_, 1/self._waveformSamplingRate_.units):
+                domainUnitsFamily = scq.getUnitFamily(self._waveformDuration_)
+                if domainUnitsFamily == "Time":
+                    self._waveformSamplingRate_.rescale(pq.Hz)
+                elif domainUnitsFamily in ("Length", "Space"):
+                    self._waveformSamplingRate_.rescale(pq.space_frequency_unit)
+                elif domainUnitsFamily == "Angle" or self._waveformDuration_.units == pq.rad:
+                    self._waveformSamplingRate_.rescale(pq.angle_frequency_unit)
+            else:
+                self._waveformSamplingRate_ = self._waveformSamplingRate_.magnitude /  1/self._waveformDuration_.units
 
-        signalBlockers = list(map(lambda w: QtCore.QSignalBlocker(w), [self.durationSpinBox, self.samplingRateSpinBox]))#, self.waveformUnitsChooser]))
+        signalBlockers = list(map(lambda w: QtCore.QSignalBlocker(w), [self.startSpinBox, self.durationSpinBox, self.samplingRateSpinBox]))#, self.waveformUnitsChooser]))
+        self.startSpinBox.setValue(self._waveformStart_)
         self.durationSpinBox.setValue(self._waveformDuration_)
         self.samplingRateSpinBox.setValue(self._waveformSamplingRate_)
     
@@ -305,8 +358,8 @@ Named Parameters:
     
     @waveformSamplingRate.setter
     def waveformSamplingRate(self, val:pq.Quantity):
-        assert isinstance(val, pq.Quantity) and val.size==1 and val.units == 1/self._waveformSamplingRate_.units, f"'sampling rate' must be a scalar quantity in units of, or convertible to, {1/self._waveformDuration_.units}; instead, got {val}"
-        self._waveformSamplingRate_ = samplingRate
+        assert isinstance(val, pq.Quantity) and val.size==1 and scq.unitsConvertible(val.units, 1/self._waveformDuration_.units), f"'sampling rate' must be a scalar quantity in units of, or convertible to, {1/self._waveformDuration_.units}; instead, got {val}"
+        self._waveformSamplingRate_ = val
         
         signalBlockers = list(map(lambda w: QtCore.QSignalBlocker(w), [self.samplingRateSpinBox]))#, self.waveformUnitsChooser]))
         self.samplingRateSpinBox.setValue(self._waveformSamplingRate_)
@@ -386,8 +439,8 @@ Named Parameters:
         return int(self._waveformDuration_ * self._waveformSamplingRate_.simplified.magnitude)
     
     def _generateWaveformDomain_(self) -> np.ndarray:
-        t_start = 0* self._waveformDuration_.units
-        return np.linspace(t_start.magnitude, self._waveformDuration_.magnitude, self._calculateWaveformSamples())
+        # t_start = 0* self._waveformDuration_.units
+        return np.linspace(self._waveformStart_.magnitude, self._waveformDuration_.magnitude, self._calculateWaveformSamples())
         
     # @Slot()
     # def _slot_modelCoefficientsChanged(self):
@@ -438,9 +491,9 @@ Named Parameters:
             sigUnits = self._waveformUnits_.units if isinstance(self._waveformUnits_, pq.Quantity) else pq.dimensionless
             
             if scq.checkTimeUnits(self._waveformDuration_):
-                sig = neo.AnalogSignal(y, t_start = 0*self._waveformDuration_.units, units = sigUnits, sampling_rate=self._waveformSamplingRate_, name=self._model_name_)
+                sig = neo.AnalogSignal(y, t_start = self._waveformStart_, units = sigUnits, sampling_rate=self._waveformSamplingRate_, name=self._model_name_)
             else:
-                sig = datasignal.DataSignal(y, t_start = 0*self._waveformDuration_.units, units = sigUnits, domain_units = self._waveformDuration_.units,
+                sig = datasignal.DataSignal(y, t_start = self._waveformStart_, units = sigUnits, domain_units = self._waveformDuration_.units,
                                         sampling_rate=self._waveformSamplingRate_, name=self._model_name_)
 
         except:
@@ -482,7 +535,38 @@ Named Parameters:
         if dlg.exec():
             self.waveformUnits = qc.value()
             
-    
+    @Slot(object)
+    def _slot_waveformStartChanged(self, val:typing.Union[pq.Quantity, float, int, np.float64, np.int64]):
+        # print(f"{self.__class__.__name__}._slot_waveformStartChanged({val})")
+        start = self._waveformStart_
+        if isinstance(val, pq.Quantity):
+            assert(val.size == 1), "Expecting a scalar Quantity"
+            start = val
+            
+        elif isinstance(val, (float, np.float64, int, np.int64)):
+            start = val * self._waveformStart_.units
+            
+        else:
+            raise TypeError(f"Wrong value type ({type(val).__name__})")
+        
+        self.waveformStart = start
+        
+#         rate = self._waveformSamplingRate_
+#         
+#         if scq.unitsConvertible(1/self._waveformSamplingRate_, start):
+#             if start.units != 1/self._waveformSamplingRate_:
+#                 rate = self._waveformSamplingRate_.rescale(1/start.units)
+#                 
+#         else:
+#             rate = self._waveformSamplingRate_.magnitude / start.units
+#             
+#         self._waveformStart_ = start
+#             
+#         if rate != self._waveformSamplingRate_:
+#             self._waveformSamplingRate_ = rate
+#             signalBlocker = QtCore.QSignalBlocker(self.samplingRateSpinBox)
+#             self.samplingRateSpinBox.setValue(rate)
+        
     @Slot(object)
     def _slot_waveformDurationChanged(self, val:typing.Union[pq.Quantity, float, int, np.float64, np.int64]):
         duration = self._waveformDuration_
@@ -497,21 +581,23 @@ Named Parameters:
         else:
             raise TypeError(f"Wrong value type ({type(val).__name__})")
         
-        rate = self._waveformSamplingRate_
+        self.waveformDuration = duration
         
-        if scq.unitsConvertible(1/self._waveformSamplingRate_, duration):
-            if duration.units != 1/self._waveformSamplingRate_:
-                rate = self._waveformSamplingRate_.rescale(1/duration.units)
-                
-        else:
-            rate = self._waveformSamplingRate_.magnitude / duration.units
-            
-        self._waveformDuration_ = duration
-            
-        if rate != self._waveformSamplingRate_:
-            self._waveformSamplingRate_ = rate
-            signalBlocker = QtCore.QSignalBlocker(self.samplingRateSpinBox)
-            self.samplingRateSpinBox.setValue(rate)
+#         rate = self._waveformSamplingRate_
+#         
+#         if scq.unitsConvertible(1/self._waveformSamplingRate_, duration):
+#             if duration.units != 1/self._waveformSamplingRate_:
+#                 rate = self._waveformSamplingRate_.rescale(1/duration.units)
+#                 
+#         else:
+#             rate = self._waveformSamplingRate_.magnitude / duration.units
+#             
+#         self._waveformDuration_ = duration
+#             
+#         if rate != self._waveformSamplingRate_:
+#             self._waveformSamplingRate_ = rate
+#             signalBlocker = QtCore.QSignalBlocker(self.samplingRateSpinBox)
+#             self.samplingRateSpinBox.setValue(rate)
             
     
     @Slot(object)
@@ -528,20 +614,22 @@ Named Parameters:
         else:
             raise TypeError(f"Wrong value type ({type(val).__name__})")
         
-        duration = self._waveformDuration_
-            
-        if not scq.unitsConvertible(1/rate, self._waveformDuration_):
-            if self._waveformDuration_.units != 1/rate.units:
-                duration = self._waveformDuration_.rescale(1/rate.units)
-        else:
-            duration = self._waveformDuration_.magnitude  / rate.units
-            
-        self._waveformSamplingRate_ = rate
+        self.waveformSamplingRate = rate
         
-        if duration != self._waveformDuration_:
-            self._waveformDuration_ = duration
-            signalBlocker = QtCore.QSignalBlocker(self.durationSpinBox)
-            self.durationSpinBox.setValue(duration)
+#         duration = self._waveformDuration_
+#             
+#         if not scq.unitsConvertible(1/rate, self._waveformDuration_):
+#             if self._waveformDuration_.units != 1/rate.units:
+#                 duration = self._waveformDuration_.rescale(1/rate.units)
+#         else:
+#             duration = self._waveformDuration_.magnitude  / rate.units
+#             
+#         self._waveformSamplingRate_ = rate
+#         
+#         if duration != self._waveformDuration_:
+#             self._waveformDuration_ = duration
+#             signalBlocker = QtCore.QSignalBlocker(self.durationSpinBox)
+#             self.durationSpinBox.setValue(duration)
         
     @property
     def waveformUnits(self) -> pq.Quantity | None:
