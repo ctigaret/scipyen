@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>632</width>
-    <height>462</height>
+    <width>522</width>
+    <height>351</height>
    </rect>
   </property>
   <property name="acceptDrops">
@@ -21,7 +21,7 @@
     <item row="0" column="0">
      <widget class="QTableWidget" name="scriptsTable">
       <property name="contextMenuPolicy">
-       <enum>Qt::CustomContextMenu</enum>
+       <enum>Qt::ContextMenuPolicy::CustomContextMenu</enum>
       </property>
       <property name="acceptDrops">
        <bool>true</bool>
@@ -30,7 +30,7 @@
        <number>0</number>
       </property>
       <property name="editTriggers">
-       <set>QAbstractItemView::NoEditTriggers</set>
+       <set>QAbstractItemView::EditTrigger::NoEditTriggers</set>
       </property>
       <property name="dragDropOverwriteMode">
        <bool>false</bool>
@@ -39,7 +39,7 @@
        <bool>true</bool>
       </property>
       <property name="selectionMode">
-       <enum>QAbstractItemView::ExtendedSelection</enum>
+       <enum>QAbstractItemView::SelectionMode::ExtendedSelection</enum>
       </property>
       <property name="showGrid">
        <bool>false</bool>
@@ -73,7 +73,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>632</width>
+     <width>522</width>
      <height>28</height>
     </rect>
    </property>

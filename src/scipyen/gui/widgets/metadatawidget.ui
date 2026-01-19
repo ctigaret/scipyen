@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>597</width>
-    <height>266</height>
+    <width>517</width>
+    <height>262</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -28,10 +28,10 @@
         <string>Name of the variable in the workspace</string>
        </property>
        <property name="frameShape">
-        <enum>QFrame::NoFrame</enum>
+        <enum>QFrame::Shape::NoFrame</enum>
        </property>
        <property name="frameShadow">
-        <enum>QFrame::Plain</enum>
+        <enum>QFrame::Shadow::Plain</enum>
        </property>
        <property name="lineWidth">
         <number>0</number>
@@ -40,14 +40,14 @@
         <string/>
        </property>
        <property name="textInteractionFlags">
-        <set>Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
+        <set>Qt::TextInteractionFlag::TextSelectableByKeyboard|Qt::TextInteractionFlag::TextSelectableByMouse</set>
        </property>
       </widget>
      </item>
      <item>
       <spacer name="horizontalSpacer">
        <property name="orientation">
-        <enum>Qt::Horizontal</enum>
+        <enum>Qt::Orientation::Horizontal</enum>
        </property>
        <property name="sizeHint" stdset="0">
         <size>
@@ -264,7 +264,7 @@
         <number>3</number>
        </property>
        <property name="insertPolicy">
-        <enum>QComboBox::NoInsert</enum>
+        <enum>QComboBox::InsertPolicy::NoInsert</enum>
        </property>
        <property name="minimumContentsLength">
         <number>3</number>
@@ -340,8 +340,7 @@
         <string>Biometrics</string>
        </property>
        <property name="icon">
-        <iconset theme="package">
-         <normaloff>.</normaloff>.</iconset>
+        <iconset theme="package"/>
        </property>
        <property name="autoRaise">
         <bool>true</bool>
@@ -363,8 +362,7 @@
         <string>Procedure</string>
        </property>
        <property name="icon">
-        <iconset theme="configure">
-         <normaloff>.</normaloff>.</iconset>
+        <iconset theme="configure"/>
        </property>
        <property name="autoRaise">
         <bool>true</bool>
@@ -386,8 +384,7 @@
         <string>Triggers</string>
        </property>
        <property name="icon">
-        <iconset theme="network-connect">
-         <normaloff>.</normaloff>.</iconset>
+        <iconset theme="network-connect"/>
        </property>
        <property name="autoRaise">
         <bool>true</bool>
@@ -409,8 +406,7 @@
         <string>Date, time</string>
        </property>
        <property name="icon">
-        <iconset theme="change-date-symbolic">
-         <normaloff>.</normaloff>.</iconset>
+        <iconset theme="change-date-symbolic"/>
        </property>
        <property name="autoRaise">
         <bool>true</bool>
@@ -432,8 +428,7 @@
         <string>Annotations</string>
        </property>
        <property name="icon">
-        <iconset theme="settings-configure">
-         <normaloff>.</normaloff>.</iconset>
+        <iconset theme="settings-configure"/>
        </property>
        <property name="autoRaise">
         <bool>true</bool>
@@ -455,8 +450,7 @@
         <string>Notes</string>
        </property>
        <property name="icon">
-        <iconset theme="description">
-         <normaloff>.</normaloff>.</iconset>
+        <iconset theme="description"/>
        </property>
        <property name="autoRaise">
         <bool>true</bool>
@@ -478,8 +472,7 @@
         <string>Export</string>
        </property>
        <property name="icon">
-        <iconset theme="document-export">
-         <normaloff>.</normaloff>.</iconset>
+        <iconset theme="document-export"/>
        </property>
        <property name="autoRaise">
         <bool>true</bool>
@@ -501,8 +494,7 @@
         <string>Save</string>
        </property>
        <property name="icon">
-        <iconset theme="document-save">
-         <normaloff>.</normaloff>.</iconset>
+        <iconset theme="document-save"/>
        </property>
        <property name="autoRaise">
         <bool>true</bool>
@@ -524,8 +516,7 @@
         <string>Import</string>
        </property>
        <property name="icon">
-        <iconset theme="document-import">
-         <normaloff>.</normaloff>.</iconset>
+        <iconset theme="document-import"/>
        </property>
        <property name="autoRaise">
         <bool>true</bool>
@@ -547,8 +538,7 @@
         <string>Load from file</string>
        </property>
        <property name="icon">
-        <iconset theme="document-open">
-         <normaloff>.</normaloff>.</iconset>
+        <iconset theme="document-open"/>
        </property>
        <property name="autoRaise">
         <bool>true</bool>
@@ -558,7 +548,7 @@
      <item>
       <spacer name="horizontalSpacer_2">
        <property name="orientation">
-        <enum>Qt::Horizontal</enum>
+        <enum>Qt::Orientation::Horizontal</enum>
        </property>
        <property name="sizeHint" stdset="0">
         <size>
@@ -573,7 +563,7 @@
    <item>
     <spacer name="verticalSpacer">
      <property name="orientation">
-      <enum>Qt::Vertical</enum>
+      <enum>Qt::Orientation::Vertical</enum>
      </property>
      <property name="sizeHint" stdset="0">
       <size>

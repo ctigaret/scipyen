@@ -484,10 +484,15 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         if objName == "startSpinBox":
             pname = f"{self.parent.objectName()}: " if isinstance(self.parent, QtWidgets.QWidget) else objName if len(objName.strip()) else ""
             print(f"{pname}{self.__class__.__name__}._slot_valueTextChanged(s = {s})")
-        val = self.valueFromText(s)
-        if isinstance(val, (pq.Quantity, float)):
-            self._magnitude_ = float(val)
-            self.sig_valueChanged.emit(self.value())
+        if self._validText_ == QtGui.QValidator.Acceptable:
+            val = self.valueFromText(s)
+            if objName == "startSpinBox":
+                pname = f"{self.parent.objectName()}: " if isinstance(self.parent, QtWidgets.QWidget) else objName if len(objName.strip()) else ""
+                print(f"{pname}{self.__class__.__name__}._slot_valueTextChanged(s = {s}) -> val = {val}")
+            if isinstance(val, (pq.Quantity, float)):
+                self._magnitude_ = float(val)
+                # self.setValue(self._magnitude_ * self._units)
+                self.sig_valueChanged.emit(self.value())
         # if self._validText_:
         #     val = self.valueFromText(s)
         #     if isinstance(val, (pq.Quantity, float)):
@@ -710,28 +715,28 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         self._decimals_ = val
         super().setDecimals(self._decimals_)
     
-    def validate(self, text, pos):
-        sfxndx = text.find(self.suffix())
-        if sfxndx > 0:
-            ss = text[:sfxndx]
-            pos -= len(self.suffix())
-        else:
-            ss = text
-        valid = super().validate(ss, pos)
+    def validate(self, text:str, pos:int):
+        # sfxndx = text.find(self.suffix())
+        # if sfxndx > 0:
+        #     ss = text[:sfxndx]
+        #     pos -= len(self.suffix())
+        # else:
+        #     ss = text
+        # valid = super().validate(ss, pos)
         
-        return valid # for now...
+        # self._validText_ = valid[0]
+        # return valid # for now...
             
             
-        # validator = InftyDoubleValidator(parent=self)
-        # validator.suffix = self.suffix()
-        # validator.setDecimals(self.getDecimals()) 
-        # valid = validator.validate(ss, pos)
-        # validstr = validatorString(valid[0])
-        # objName = self.objectName()
-        # if objName == "startSpinBox":
-        #     print(f"{self.objectName()}: {self.__class__.__name__}.validate text: {text}, pos: {pos} ⇒ {validstr}")#: {valid[0]}")
-        # self._validText_ = valid[0] == QtGui.QValidator.Acceptable
-        # return valid
+        validator = InftyDoubleValidator(parent=self)
+        validator.suffix = self.suffix()
+        validator.setDecimals(self.getDecimals()) 
+        valid = validator.validate(text, pos)
+        self._validText_ = valid[0]
+        objName = self.objectName()
+        if objName == "startSpinBox":
+            print(f"{self.objectName()}: {self.__class__.__name__}.validate text: {text}, pos: {pos} ⇒ {validatorString(valid[0])}")#: {valid[0]}")
+        return valid
     
     def valueFromText(self, text:str):
         suffix = self._suffix_
@@ -746,7 +751,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             
         s = s.replace(",", "")
         
-        # print(f"{self.objectName()}: {self.__class__.__name__}.valueFromText(text={text}) -> s: {s}")
+        print(f"{self.objectName()}: {self.__class__.__name__}.valueFromText(text = {text}) -> s: {s}")
             
         if s == "NA":
             return pd.NA
@@ -875,6 +880,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
                 
             # print(f"{self.objectName()}: {self.__class__.__name__}.setValue({value}) -> text = {text}")
 
+            signalBlock = QtCore.QSignalBlocker(self.lineEdit())
             self.lineEdit().setText(text)
 
         elif self._magnitude_ in (pd.NA, math.nan, np.nan):
@@ -892,6 +898,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
                 text = f"{text} {self._suffix_}"
 
             # print(f"{self.objectName()}: {self.__class__.__name__}.setValue({value}) -> text = {text}")
+            signalBlock = QtCore.QSignalBlocker(self.lineEdit())
             self.lineEdit().setText(text)
                 
         else:

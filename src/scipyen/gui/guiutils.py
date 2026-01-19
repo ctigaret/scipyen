@@ -89,7 +89,7 @@ class InftyDoubleValidator(QtGui.QDoubleValidator):
         # ### END
         
         if ss.lower() in ("-", "-i", "i", "-in", "in"):
-            print('\tone of "-", "-i", "i", "-in", "in"')
+            # print('\tone of "-", "-i", "i", "-in", "in"')
             ret = (QtGui.QValidator.Intermediate, ss, pos)
             
         elif ss.lower() in ("-inf", "inf"):

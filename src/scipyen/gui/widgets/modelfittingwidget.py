@@ -468,11 +468,11 @@ Named Parameters:
 
     def _calculateWaveformSamples(self) -> int:
         assert(scq.unitsConvertible(1/self._waveformSamplingRate_, self._waveformDuration_)), f"Waveform duration ({self._waveformDuration_}) and sampling rate ({self._waveformSamplingRate_}) have incompatible units"
-        return int(self._waveformDuration_ * self._waveformSamplingRate_.simplified.magnitude)
+        return int(self._waveformDuration_ * self._waveformSamplingRate_.magnitude)
     
     def _generateWaveformDomain_(self) -> np.ndarray:
         # t_start = 0* self._waveformDuration_.units
-        return np.linspace(self._waveformStart_.magnitude, self._waveformDuration_.magnitude, self._calculateWaveformSamples())
+        return np.linspace(self._waveformStart_.magnitude, self._waveformStart_.magnitude + self._waveformDuration_.magnitude, self._calculateWaveformSamples())
         
     # @Slot()
     # def _slot_modelCoefficientsChanged(self):

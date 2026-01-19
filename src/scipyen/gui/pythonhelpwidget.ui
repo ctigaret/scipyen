@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>400</width>
+    <width>378</width>
     <height>300</height>
    </rect>
   </property>
@@ -37,7 +37,7 @@
         <bool>true</bool>
        </property>
        <property name="insertPolicy">
-        <enum>QComboBox::InsertAtTop</enum>
+        <enum>QComboBox::InsertPolicy::InsertAtTop</enum>
        </property>
        <property name="placeholderText">
         <string>Type a query</string>
