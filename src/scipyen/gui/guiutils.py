@@ -76,7 +76,7 @@ class InftyDoubleValidator(QtGui.QDoubleValidator):
         self.setDecimals(decimals)
         self.suffix = suffix if isinstance(suffix, str) else ""
         
-    def validate(self, s:str, pos:int):
+    def validate(self, s:str, pos:int) -> tuple:
         sfxndx = s.find(self.suffix)
         if sfxndx > 0:
             ss = s[:sfxndx]
@@ -90,6 +90,7 @@ class InftyDoubleValidator(QtGui.QDoubleValidator):
         
         if ss.lower() in ("-", "-i", "i", "-in", "in"):
             ret = (QtGui.QValidator.Intermediate, ss, pos)
+            
         elif ss.lower() in ("-inf", "inf"):
             ret = (QtGui.QValidator.Acceptable, ss, pos)
             
@@ -97,12 +98,22 @@ class InftyDoubleValidator(QtGui.QDoubleValidator):
             ret = (QtGui.QValidator.Acceptable, ss, pos)
             
         else:
-            # return (QtGui.QValidator.Invalid, s, pos)
             ret = super().validate(ss, pos)
             
-        result = (ret[0], ret[1] + self.suffix, ret[2])
+        state, substring, pos = (ret[0], ret[1] + self.suffix, ret[2])
         
-        return result
+        return (state, substring, pos)
+        # try:
+        #     value = float(substring)
+        #     return (state, substring, pos)
+        # except ValueError:
+        #     return (QtGui.QValidator.Invalid, substring, pos)
+            
+#             result = (ret[0], ret[1] + self.suffix, ret[2])
+#         
+#         # print(f"{pname}{self.__class__.__name__}.validate result -> {result}")
+#         
+#         return result
         
 class ComplexValidator(InftyDoubleValidator):
     def __init__(self, bottom:float=-math.inf, top:float=math.inf, decimals:int=4, parent=None):

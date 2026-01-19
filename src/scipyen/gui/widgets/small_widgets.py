@@ -320,6 +320,8 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         self._rescaleOnUnitChange_:bool = False
         self._forceDimensionless_:bool = False
         
+        self._validText_:QtGui.QValidator.State = QtGui.QValidator.Invalid
+        
         self._units_:pq.Quantity = self._default_units_
         self._magnitude_:float = 0.0
         self._prefix_ = ""
@@ -405,9 +407,11 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         if isinstance(units, pq.Quantity) and not isinstance(units, pq.UnitQuantity):
             self.setValue(units)
         
-        super().valueChanged.connect(self._slot_valueChanged)
+        # super().valueChanged.connect(self._slot_valueChanged)
         # self.lineEdit().setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
-        self.lineEdit().textChanged.connect(self._slot_valueTextChanged)
+        # self.lineEdit().textChanged.connect(self._slot_valueTextChanged)
+        
+        self.lineEdit().installEventFilter(self)
         
     @property
     def units(self):
@@ -469,19 +473,25 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             text = f"{text}{self._suffix_}"
             
         # print(f"{self.objectName()}: {self.__class__.__name__}.units.setter({value}): text -> {text}")
+        signalBlock = QtCore.QSignalBlocker(self.lineEdit())
         self.lineEdit().setText(text)
         
         self.sig_valueChanged.emit(self.value())
             
     @Slot(str)
     def _slot_valueTextChanged(self, s:str):
-        val = self.valueFromText(s)
-        if isinstance(val, (pq.Quantity, float)):
-            self._magnitude_ = float(val)
-            self.sig_valueChanged.emit(self.value())
+        pname = f"{self.parent.objectName()}: " if isinstance(self.parent, QtWidgets.QWidget) else ""
+        print(f"{pname}{self.__class__.__name__}._slot_valueTextChanged(s={s}")
+        if self._validText_:
+            val = self.valueFromText(s)
+            if isinstance(val, (pq.Quantity, float)):
+                self._magnitude_ = float(val)
+                self.sig_valueChanged.emit(self.value())
             
     @Slot(float)
     def _slot_valueChanged(self, val):
+        pname = f"{self.parent.objectName()}: " if isinstance(self.parent, QtWidgets.QWidget) else ""
+        print(f"{pname}{self.__class__.__name__}._slot_valueChanged(val={val}")
         self.sig_valueChanged.emit(self.value())
         
     @Slot(bool)
@@ -666,6 +676,10 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         elif self.specialValueText() == "NaN":
             return np.nan * self.units
         else:
+            # val = self.valueFromText(self.lineEdit().text())
+            # if isinstance(val, (pq.Quantity, float)):
+            #     self._magnitude_ = float(val)
+                # self.sig_valueChanged.emit(self.value())
             ret = self._magnitude_
             if self._keepDimensionless_ or self._forceDimensionless_:
                 return ret
@@ -697,6 +711,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         valid = validator.validate(text, pos)
         validstr = validatorString(valid[0])
         # print(f"{self.objectName()}: {self.__class__.__name__}.validate text: {text}, pos: {pos} ⇒ {validstr}")
+        self._validText_ = valid[0] == QtGui.QValidator.Acceptable
         return valid
     
     def valueFromText(self, text:str):
@@ -727,9 +742,12 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
                 elif s.startswith("+e"):
                     s = s.replace("+e", "+1e")
                 elif s.startswith("-e"):
-                    s = s.replace("-e", "11e")
+                    s = s.replace("-e", "-1e")
+                
                 ret = float(s) 
-            # print(f"{self.objectName()}: {self.__class__.__name__}.valueFromText(text={text}) -> ret {ret}")
+                # try:
+                # except ValueError:
+                #     pass
             units = self.units
             return ret * units.units if isinstance(units, pq.Quantity) else ret
 
@@ -859,6 +877,22 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
                 
         else:
             raise TypeError(f"Expecting a scalar quantity, a float or pd.NA; instead, got {type(value).__name__}")
+        
+    def eventFilter(self, watched:QtCore.QObject, evt:QtCore.QEvent) -> bool:
+        eType = evt.type()
+        if isinstance(evt, QtGui.QKeyEvent) and watched == self.lineEdit():
+            if evt.key() in (QtCore.Qt.Enter, QtCore.Qt.Return):
+                try:
+                    val = self.valueFromText(self.linEdit().text())
+                    if isinstance(val, (pq.Quantity, float)):
+                        self._magnitude_ = float(val)
+                        self.sig_valueChanged.emit(self.value())
+                        return True
+                except:
+                    traceback.print_exc()
+                    return False
+                
+        return super().eventFilter(watched, evt)
         
     @property
     def disableUnitChange(self) -> bool:

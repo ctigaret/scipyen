@@ -148,6 +148,11 @@ Named Parameters:
         self.generateWaveformPushButton.setEnabled(False)
         self.waveformExpressionPushButton.setEnabled(False)
         self.makeUnitAmplitudePushButton.setEnabled(False)
+        self.waveformUnitsPushButton.setEnabled(False)
+        self.startSpinBox.setEnabled(False)
+        self.durationSpinBox.setEnabled(False)
+        self.samplingRateSpinBox.setEnabled(False)
+
         if self._waveformUnits_ is None:
             self.unitsLabel.setText("")
             self.unitsLabel.setToolTip("Dimensionless")
@@ -155,6 +160,14 @@ Named Parameters:
             symbol = scq.shortSymbol(self._waveformUnits_)
             self.unitsLabel.setText(symbol)
             self.unitsLabel.setToolTip(symbol)
+            
+        # NOTE: 2026-01-19 15:35:18
+        # have the expression widget (svgWidget) collapsed in the splitter, by default
+        sizes = self.labelsSplitter.sizes()
+        # print(f"{self.__class__.__name__}._configureUI_: lapbelsSplitter.sizes() -> {sizes}")
+        sizes[0] = 0
+        sizes[-1] = self.modelCoefficientsTable.size().height()
+        self.labelsSplitter.setSizes(sizes)
             
     def _setModelData_(self, model:types.FunctionType, start:pq.Quantity=0*pq.s, duration:pq.Quantity=1*pq.s, samplingRate:pq.Quantity=1e4*pq.Hz, 
                  waveformUnits:pq.Quantity = pq.dimensionless,
@@ -207,16 +220,31 @@ Named Parameters:
         # NOTE: 2026-01-18 01:06:02 TODO
         # make this contingent on the modelfunction offering a solution to this problem
         self.makeUnitAmplitudePushButton.setEnabled(True)
+        self.waveformUnitsPushButton.setEnabled(True)
+        self.startSpinBox.setEnabled(True)
+        self.durationSpinBox.setEnabled(True)
+        self.samplingRateSpinBox.setEnabled(True)
+
         fitting_dict = dict()
+        new_fit_params = False
         if model.fitting:
             fitting_dict["Initial Value"] = model.fitting["initial"]
             fitting_dict["Lower Bound"] = model.fitting["lower"]
             fitting_dict["Upper Bound"] = model.fitting["upper"]
+            new_fit_params = True
         else:
             fitting_dict = {'Initial Value': [0.] * len(model.coefficients), 'Lower Bound': [-np.inf] * len(model.coefficients), "Upper Bound": [np.inf] * len(model.coefficients)}
+            
         fitting_dict["Keep Feasible"] = [True] * len(model.coefficients)
         
-        self._model_fit_coefficients_ = pd.DataFrame(fitting_dict, index=(model.coefficients))
+        fitting_df = pd.DataFrame(fitting_dict, index=(model.coefficients))
+        
+        # print(f"{self.__class__.__name__}._setModelFunction_: fitting_df = {fitting_df}")
+        
+        
+        if not(isinstance(self._model_fit_coefficients_, pd.DataFrame) and self._model_fit_coefficients_.shape == fitting_df.shape and self._model_fit_coefficients_.index == fitting_df.index) or new_fit_params:
+            self._model_fit_coefficients_ = fitting_df
+            
         if not isinstance(self.modelCoefficientsTable._data_, pd.DataFrame) or self.modelCoefficientsTable._data_.size==0:
             self.populateCoefficientsTable(self._model_fit_coefficients_)
 
@@ -412,6 +440,10 @@ Named Parameters:
         self.generateWaveformPushButton.setEnabled(False)
         self.waveformExpressionPushButton.setEnabled(False)
         self.makeUnitAmplitudePushButton.setEnabled(False)
+        self.waveformUnitsPushButton.setEnabled(False)
+        self.startSpinBox.setEnabled(False)
+        self.durationSpinBox.setEnabled(False)
+        self.samplingRateSpinBox.setEnabled(False)
         self.populateCoefficientsTable(pd.DataFrame())
         if isinstance(self._expressionWindow_, QtWidgets.QMainWindow):
             if isinstance(self._expressionWindow_.centralWidget(), svgwidgets.SimpleSVGWidget):
