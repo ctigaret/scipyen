@@ -1837,11 +1837,12 @@ def Frank_Fuortes2(x:np.ndarray | Real, irh:typing.Sequence[Real] | Real, /,
     return (1-np.exp(-(x-x0)/τ)) / irh
 
 @modelfunction(coefficients=("x0", "κ"),
-               expression = sympy.Eq(sympy.Symbol("y"),
-                                     sympy.functions.elementary.piecewise.Piecewise((1/(1+sympy.exp(-(sympy.Symbol("x")-sympy.Symbol("x_0"))/sympy.Symbol("kappa"))),
-                                                                                     sympy.Symbol("activation")),
-                                                                                    (1/(1+sympy.exp((sympy.Symbol("x")-sympy.Symbol("x_0"))/sympy.Symbol("kappa"))),
-                                                                                     sympy.Symbol("inactivation")))),
+               expression = "$$f(x) = \\begin{cases} \\frac{1}{e^{\\frac{\\left(-x_{0} + x\\right)} {\\kappa} } } & \\text{activation} \\\\\\frac{1}{e^{\\frac{\\left(x_{0} - x\\right)} {\\kappa} } } & \\text{inactivation} \\end{cases}\\textrm{ for }\\kappa>0$$",
+               # expression = sympy.Eq(sympy.Symbol("y"),
+               #                       sympy.functions.elementary.piecewise.Piecewise((1/(1+sympy.exp(-(sympy.Symbol("x")-sympy.Symbol("x_0"))/sympy.Symbol("kappa"))),
+               #                                                                       sympy.Symbol("activation")),
+               #                                                                      (1/(1+sympy.exp((sympy.Symbol("x")-sympy.Symbol("x_0"))/sympy.Symbol("kappa"))),
+               #                                                                       sympy.Symbol("inactivation")))),
                )
 def Boltzmann(x:np.ndarray | Real, x0:typing.Sequence[Real] | Real, /,
               κ:typing.Optional[Real] = None,
@@ -1856,7 +1857,7 @@ Description:
     
 Empirical model of voltage-gated ion channel kinetics. Describes ionic current through the channel as function of membrane voltage according to
     
-$$f(x) = \\begin{cases} \\frac{1}{e^{\\frac{\\left(-x_{0} + x\\right)} {\\kappa} } } & \\text{activation} \\\\\\frac{1}{e^{\\frac{\\left(x_{0} - x\\right)} {\\kappa} } } & \\text{inactivation} \\end{cases}\\textrm{, }\\kappa>0$$
+$$f(x) = \\begin{cases} \\frac{1}{e^{\\frac{\\left(-x_{0} + x\\right)} {\\kappa} } } & \\text{activation} \\\\\\frac{1}{e^{\\frac{\\left(x_{0} - x\\right)} {\\kappa} } } & \\text{inactivation} \\end{cases}\\textrm{ for }\\kappa>0$$
 
 Parameters:
 ==========

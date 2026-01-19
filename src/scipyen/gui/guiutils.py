@@ -89,6 +89,7 @@ class InftyDoubleValidator(QtGui.QDoubleValidator):
         # ### END
         
         if ss.lower() in ("-", "-i", "i", "-in", "in"):
+            print('\tone of "-", "-i", "i", "-in", "in"')
             ret = (QtGui.QValidator.Intermediate, ss, pos)
             
         elif ss.lower() in ("-inf", "inf"):
@@ -101,6 +102,8 @@ class InftyDoubleValidator(QtGui.QDoubleValidator):
             ret = super().validate(ss, pos)
             
         state, substring, pos = (ret[0], ret[1] + self.suffix, ret[2])
+        
+        print(f"{self.__class__.__name__}.validate(s = {s}): suffix = {self.suffix}, ss = {ss} -> {state}")
         
         return (state, substring, pos)
         # try:

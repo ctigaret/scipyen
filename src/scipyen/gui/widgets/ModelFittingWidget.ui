@@ -52,6 +52,9 @@
        <verstretch>0</verstretch>
       </sizepolicy>
      </property>
+     <property name="toolTip">
+      <string>Drag splitter (⇓) to reveal the mathematical expression</string>
+     </property>
      <property name="orientation">
       <enum>Qt::Orientation::Vertical</enum>
      </property>

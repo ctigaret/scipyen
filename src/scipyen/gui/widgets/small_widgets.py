@@ -409,9 +409,9 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         
         # super().valueChanged.connect(self._slot_valueChanged)
         # self.lineEdit().setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
-        # self.lineEdit().textChanged.connect(self._slot_valueTextChanged)
+        self.lineEdit().textChanged.connect(self._slot_valueTextChanged)
         
-        self.lineEdit().installEventFilter(self)
+        # self.lineEdit().installEventFilter(self)
         
     @property
     def units(self):
@@ -480,18 +480,24 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             
     @Slot(str)
     def _slot_valueTextChanged(self, s:str):
-        pname = f"{self.parent.objectName()}: " if isinstance(self.parent, QtWidgets.QWidget) else ""
-        print(f"{pname}{self.__class__.__name__}._slot_valueTextChanged(s={s}")
-        if self._validText_:
-            val = self.valueFromText(s)
-            if isinstance(val, (pq.Quantity, float)):
-                self._magnitude_ = float(val)
-                self.sig_valueChanged.emit(self.value())
+        objName = self.objectName()
+        if objName == "startSpinBox":
+            pname = f"{self.parent.objectName()}: " if isinstance(self.parent, QtWidgets.QWidget) else objName if len(objName.strip()) else ""
+            print(f"{pname}{self.__class__.__name__}._slot_valueTextChanged(s = {s})")
+        val = self.valueFromText(s)
+        if isinstance(val, (pq.Quantity, float)):
+            self._magnitude_ = float(val)
+            self.sig_valueChanged.emit(self.value())
+        # if self._validText_:
+        #     val = self.valueFromText(s)
+        #     if isinstance(val, (pq.Quantity, float)):
+        #         self._magnitude_ = float(val)
+        #         self.sig_valueChanged.emit(self.value())
             
     @Slot(float)
     def _slot_valueChanged(self, val):
         pname = f"{self.parent.objectName()}: " if isinstance(self.parent, QtWidgets.QWidget) else ""
-        print(f"{pname}{self.__class__.__name__}._slot_valueChanged(val={val}")
+        print(f"{pname}{self.__class__.__name__}._slot_valueChanged(val = {val}")
         self.sig_valueChanged.emit(self.value())
         
     @Slot(bool)
@@ -705,14 +711,27 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         super().setDecimals(self._decimals_)
     
     def validate(self, text, pos):
-        validator = InftyDoubleValidator(parent=self)
-        validator.suffix = self.suffix()
-        validator.setDecimals(self.getDecimals()) 
-        valid = validator.validate(text, pos)
-        validstr = validatorString(valid[0])
-        # print(f"{self.objectName()}: {self.__class__.__name__}.validate text: {text}, pos: {pos} ⇒ {validstr}")
-        self._validText_ = valid[0] == QtGui.QValidator.Acceptable
-        return valid
+        sfxndx = text.find(self.suffix())
+        if sfxndx > 0:
+            ss = text[:sfxndx]
+            pos -= len(self.suffix())
+        else:
+            ss = text
+        valid = super().validate(ss, pos)
+        
+        return valid # for now...
+            
+            
+        # validator = InftyDoubleValidator(parent=self)
+        # validator.suffix = self.suffix()
+        # validator.setDecimals(self.getDecimals()) 
+        # valid = validator.validate(ss, pos)
+        # validstr = validatorString(valid[0])
+        # objName = self.objectName()
+        # if objName == "startSpinBox":
+        #     print(f"{self.objectName()}: {self.__class__.__name__}.validate text: {text}, pos: {pos} ⇒ {validstr}")#: {valid[0]}")
+        # self._validText_ = valid[0] == QtGui.QValidator.Acceptable
+        # return valid
     
     def valueFromText(self, text:str):
         suffix = self._suffix_
@@ -879,7 +898,10 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             raise TypeError(f"Expecting a scalar quantity, a float or pd.NA; instead, got {type(value).__name__}")
         
     def eventFilter(self, watched:QtCore.QObject, evt:QtCore.QEvent) -> bool:
+        objName = self.objectName()
         eType = evt.type()
+        if objName == "startSpinBox":
+            print(f"eventFilter(watched = {watched}, evt = {evt}")
         if isinstance(evt, QtGui.QKeyEvent) and watched == self.lineEdit():
             if evt.key() in (QtCore.Qt.Enter, QtCore.Qt.Return):
                 try:
