@@ -52,7 +52,19 @@
        <verstretch>0</verstretch>
       </sizepolicy>
      </property>
+     <property name="mouseTracking">
+      <bool>true</bool>
+     </property>
+     <property name="tabletTracking">
+      <bool>true</bool>
+     </property>
      <property name="toolTip">
+      <string>Drag splitter (⇓) to reveal the mathematical expression</string>
+     </property>
+     <property name="statusTip">
+      <string>Drag splitter (⇓) to reveal the mathematical expression</string>
+     </property>
+     <property name="whatsThis">
       <string>Drag splitter (⇓) to reveal the mathematical expression</string>
      </property>
      <property name="orientation">

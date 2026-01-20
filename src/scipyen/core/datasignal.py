@@ -348,7 +348,7 @@ class DataSignal(BaseSignal):
                     annots["array_annotations"] = v
                     
                 elif isinstance(v, dict): # can be array_annotations or anotations; brrr...
-                    if len(v) == signal.shape[1]: # likely array annotations, too
+                    if signal.ndim > 1 and len(v) == signal.shape[1]: # likely array annotations, too
                         if annots["array_annotations"] is None:
                             arr_ann = ArrayDict(signal.shape[1])
                             for ka,va in v.items():

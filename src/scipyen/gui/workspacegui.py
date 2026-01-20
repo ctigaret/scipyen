@@ -517,6 +517,23 @@ class GuiMessages(object):
             msgbox.setDetailedText(detail)
             
         return msgbox.exec()
+
+    @safewrapper
+    def unpackWarnings(self, wrn:typing.Sequence[warnings.WarningMessage]) -> str|None:
+        if all(isinstance(wm, warnings.WarningMessage) for wm in wrn):
+            ret = list()
+            for wm in wrn:
+                if os.path.isfile(wm.filename) and isinstance(wm.lineno, int) and wm.lineno > 0:
+                    f = open(wm.filename, "r", encoding="utf-8")
+                    text = f.readlines()
+                    f.close()
+                    offendingLine = text[wm.lineno-1]
+                    ret.append("\n".join([f"{wm.message}:", offendingLine.strip(), f" in file {wm.filename}"]))
+
+            return "\n".join(ret)
+
+
+
     
 class DirectoryObserver(QtCore.QObject):
     # NOTE: 2024-05-19 10:58:13 TODO 

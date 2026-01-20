@@ -69,19 +69,27 @@ class UnitsStringValidator(QtGui.QValidator):
             return QtGui.QValidator.Invalid
         
 class InftyDoubleValidator(QtGui.QDoubleValidator):
-    def __init__(self, bottom:float=-math.inf, top:float=math.inf, decimals:int=4, suffix:str="", parent=None):
+    def __init__(self, bottom:float=-math.inf, top:float=math.inf,
+                 decimals:int=4, suffix:str="", prefix:str="",
+                 parent=None):
         QtGui.QDoubleValidator.__init__(self,parent)
         self.setBottom(bottom)
         self.setTop(top)
         self.setDecimals(decimals)
-        self.suffix = suffix if isinstance(suffix, str) else ""
+        self.suffix = suffix if isinstance(suffix, str) and len(suffix.strip()) else ""
+        self.prefix = prefix if isinstance(suffix, str) and len(prefix.strip()) else ""
         
     def validate(self, s:str, pos:int) -> tuple:
         sfxndx = s.find(self.suffix)
+        ss = s
         if sfxndx > 0:
-            ss = s[:sfxndx]
-        else:
-            ss = s
+            ss = ss[:sfxndx]
+
+        if len(self.prefix):
+            ss = ss[len(self.prefix):]
+
+        ss = ss.strip()
+
         # ss = s.strip(self.suffix)
         # ### BEGIN
         # pname = f"{self.parent.objectName()}: " if isinstance(self.parent, QtWidgets.QWidget) else ""
@@ -101,22 +109,19 @@ class InftyDoubleValidator(QtGui.QDoubleValidator):
         else:
             ret = super().validate(ss, pos)
             
+        # state, substring, pos = (ret[0], ret[1], ret[2])
         state, substring, pos = (ret[0], ret[1] + self.suffix, ret[2])
-        
-        print(f"{self.__class__.__name__}.validate(s = {s}): suffix = {self.suffix}, ss = {ss} -> {state}")
+
+        # oName = ""
+        # objectName = ""
+        # if self.parent():
+        #     objectName = self.parent().objectName()
+        #     if objectName:
+        #         oName = objectName + ": "
+        # if objectName.endswith("startSpinBox"):
+        #     print(f"{oName}{self.__class__.__name__}.validate(s = '{s}', pos={pos}): suffix = '{self.suffix}', ss = '{ss}' -> {state}")
         
         return (state, substring, pos)
-        # try:
-        #     value = float(substring)
-        #     return (state, substring, pos)
-        # except ValueError:
-        #     return (QtGui.QValidator.Invalid, substring, pos)
-            
-#             result = (ret[0], ret[1] + self.suffix, ret[2])
-#         
-#         # print(f"{pname}{self.__class__.__name__}.validate result -> {result}")
-#         
-#         return result
         
 class ComplexValidator(InftyDoubleValidator):
     def __init__(self, bottom:float=-math.inf, top:float=math.inf, decimals:int=4, parent=None):
