@@ -227,7 +227,6 @@ Named Parameters:
             duration = duration.magnitude * model.domainUnits.units
             samplingRate = samplingRate.magnitude / model.domainUnits.units
             
-        
         if isinstance(model.units, pq.Quantity):
             waveformUnits = waveformUnits.magnitude * model.units if isinstance(waveformUnits, pq.Quantity) else waveformUnits * model.units if isinstance(waveformUnits, float) else 1*model.units
             
@@ -275,15 +274,20 @@ Named Parameters:
         self.durationSpinBox.setEnabled(True)
         self.samplingRateSpinBox.setEnabled(True)
 
-        fitting_df = self._parseModelCoefficients_(model)
+        fitting_df = self._parseModelCoefficients_(model, coefficients)
 
-        print(f"{self.__class__.__name__}._setModelFunction_: fitting_df = {fitting_df}")
-
-        if not(isinstance(self._model_fit_coefficients_, pd.DataFrame) and self._model_fit_coefficients_.shape == fitting_df.shape and np.all(self._model_fit_coefficients_.index == fitting_df.index)) or new_fit_params:
+        # print(f"{self.__class__.__name__}._setModelFunction_: fitting_df = {fitting_df}")
+        
+        if isinstance(fitting_df, pd.DataFrame):
             self._model_fit_coefficients_ = fitting_df
-
-        if not isinstance(self.modelCoefficientsTable._data_, pd.DataFrame) or self.modelCoefficientsTable._data_.size==0:
             self._populateCoefficientsTable_(self._model_fit_coefficients_)
+            
+
+        # if not(isinstance(self._model_fit_coefficients_, pd.DataFrame) and self._model_fit_coefficients_.shape == fitting_df.shape and np.all(self._model_fit_coefficients_.index == fitting_df.index)) or new_fit_params:
+        #     self._model_fit_coefficients_ = fitting_df
+        # 
+        # if not isinstance(self.modelCoefficientsTable._data_, pd.DataFrame):# or self.modelCoefficientsTable._data_.size==0:
+        #     self._populateCoefficientsTable_(self._model_fit_coefficients_)
 
         self._generateModelExpressionSVG()
 
@@ -305,81 +309,88 @@ Named Parameters:
         ret = pd.DataFrame()
 
         if len(model.coefficients):
-            starred = list(filter(lambda c: c.endswith("*"), model.coefficients))
-            destarred = list(map(lambda c: c.strip("*"), starred))
-            unstarred = list(filter(lambda c: not c.endswith("*"), model.coefficients))
-
-            order = list(map(lambda c: model.coefficients.index(c), unstarred + starred))
-            unstarredorder = list(map(lambda c: model.coefficients.index(c), unstarred))
-            starredorder = list(map(lambda c: model.coefficients.index(c), starred))
-
-            concrete_names = unstarred + list(map(lambda c: f"{c}0", destarred))
-
+            starred = model.starred_coefficients
+            ret, destarred, starredGroups = model.generateFitTable()
+            
             self._nStarredCoeffs_ = len(starred)
             self._destarredCoeffs_= destarred
-            self._nStarredGroups_ = 1
-
-
-            # NOTE: 2026-01-21 12:03:46
-            # for the actual function call, the starred coefficients ALWAYS go last
-            # as sequence c0_0, c1_0, c2_0, c0_1, c1_1, c2_1, ... etc
-
-            # so, currently we need to create a tuple of starred coeffs and repeat this at least once
-
-            fdict = dict()
-
-            fdict["Names"] = concrete_names
-            fdict["Initial Value"] = [0.] * len(fdict["Names"])
-            fdict["Lower Bound"] = [-np.inf] * len(fdict["Names"])
-            fdict["Upper Bound"] = [np.inf] * len(fdict["Names"])
-            fdict["Keep Feasible"] = [True] * len(fdict["Names"])
-
-            if not models.isFittingCoefficientsDict(model.fitting):
-                fd = fdict.copy()
-                fd.pop("Names")
-                ret = pd.DataFrame(fd, index=(concrete_names))
-                return ret
-
-            mfd = {"Names":list(), "Initial Value": list(), "Lower Bound": list(), "Upper Bound": list(), "Keep Feasible": list()}
-
-            names       = model.fitting.get("names", list())
-            ncoeffs     = len(names)
-
-            assert(ncoeffs >= len(fdict["Names"]) and (ncoeffs-len(unstarred)) % len(starred) ) == 0, f"Unexpected number of coefficients ({ncoeffs}); must be {self._nStarredCoeffs_} × n + {len(unstarred)} for n components"
-
-            initial     = model.fitting.get("initial", list())
-            lower       = model.fitting.get("lower", list())
-            upper       = model.fitting.get("upper", list())
-            feasible    = model.fitting.get("feasible", list())
-
-            assert(all(len(v) == len(initial) for v in (lower, upper, feasible))), "Model has inconsistent fitting attribute"
-
-            for k, name in enumerate(names):
-                if name in fdict["Names"]:
-                    ndx = fdict["Names"].index(name)
-                    if ndx < len(initial):
-                        fdict["Initial Value"][ndx] = initial[ndx]
-                    if ndx < len(lower):
-                        fdict["Lower Bound"][ndx] = lower[ndx]
-                    if ndx < len(upper):
-                        fdict["Upper Bound"][ndx] = upper[ndx]
-                    if ndx < len(feasible):
-                        fdict["Keep Feasible"][ndx] = feasible[ndx]
-
-
-                else:
-                    # add possibly extra concrete values for starred coeffs
-                    stripped, sfx = strutils.get_int_sfx(name, sep="")
-                    if f"{stripped}*" in starred:
-                        fdict["Names"].append(name)
-                        fdict["Initial Value"].append(initial[k])
-                        fdict["Lower Bound"].append(lower[k])
-                        fdict["Upper Bound"].append(upper[k])
-                        fdict["Keep Feasible"].append(feasible[k])
-
-            fd = fdict.copy()
-            fd.pop("Names")
-            ret = pd.DataFrame(fd, index=(fdict["Names"]))
+            self._nStarredGroups_ = starredGroups
+            
+#             starred = list(filter(lambda c: c.endswith("*"), model.coefficients))
+#             destarred = list(map(lambda c: c.strip("*"), starred))
+#             unstarred = list(filter(lambda c: not c.endswith("*"), model.coefficients))
+# 
+#             order = list(map(lambda c: model.coefficients.index(c), unstarred + starred))
+#             unstarredorder = list(map(lambda c: model.coefficients.index(c), unstarred))
+#             starredorder = list(map(lambda c: model.coefficients.index(c), starred))
+# 
+#             concrete_names = unstarred + list(map(lambda c: f"{c}0", destarred))
+# 
+#             self._nStarredCoeffs_ = len(starred)
+#             self._destarredCoeffs_= destarred
+#             self._nStarredGroups_ = 1
+# 
+# 
+#             # NOTE: 2026-01-21 12:03:46
+#             # for the actual function call, the starred coefficients ALWAYS go last
+#             # as sequence c0_0, c1_0, c2_0, c0_1, c1_1, c2_1, ... etc
+# 
+#             # so, currently we need to create a tuple of starred coeffs and repeat this at least once
+# 
+#             fdict = dict()
+# 
+#             fdict["Names"] = concrete_names
+#             fdict["Initial Value"] = [0.] * len(fdict["Names"])
+#             fdict["Lower Bound"] = [-np.inf] * len(fdict["Names"])
+#             fdict["Upper Bound"] = [np.inf] * len(fdict["Names"])
+#             fdict["Keep Feasible"] = [True] * len(fdict["Names"])
+# 
+#             if not models.isFittingCoefficientsDict(model.fitting):
+#                 fd = fdict.copy()
+#                 fd.pop("Names")
+#                 ret = pd.DataFrame(fd, index=(concrete_names))
+#                 return ret
+# 
+#             mfd = {"Names":list(), "Initial Value": list(), "Lower Bound": list(), "Upper Bound": list(), "Keep Feasible": list()}
+# 
+#             names       = model.fitting.get("names", list())
+#             ncoeffs     = len(names)
+# 
+#             assert(ncoeffs >= len(fdict["Names"]) and (ncoeffs-len(unstarred)) % len(starred) ) == 0, f"Unexpected number of coefficients ({ncoeffs}); must be {self._nStarredCoeffs_} × n + {len(unstarred)} for n components"
+# 
+#             initial     = model.fitting.get("initial", list())
+#             lower       = model.fitting.get("lower", list())
+#             upper       = model.fitting.get("upper", list())
+#             feasible    = model.fitting.get("feasible", list())
+# 
+#             assert(all(len(v) == len(initial) for v in (lower, upper, feasible))), "Model has inconsistent fitting attribute"
+# 
+#             for k, name in enumerate(names):
+#                 if name in fdict["Names"]:
+#                     ndx = fdict["Names"].index(name)
+#                     if ndx < len(initial):
+#                         fdict["Initial Value"][ndx] = initial[ndx]
+#                     if ndx < len(lower):
+#                         fdict["Lower Bound"][ndx] = lower[ndx]
+#                     if ndx < len(upper):
+#                         fdict["Upper Bound"][ndx] = upper[ndx]
+#                     if ndx < len(feasible):
+#                         fdict["Keep Feasible"][ndx] = feasible[ndx]
+# 
+# 
+#                 else:
+#                     # add possibly extra concrete values for starred coeffs
+#                     stripped, sfx = strutils.get_int_sfx(name, sep="")
+#                     if f"{stripped}*" in starred:
+#                         fdict["Names"].append(name)
+#                         fdict["Initial Value"].append(initial[k])
+#                         fdict["Lower Bound"].append(lower[k])
+#                         fdict["Upper Bound"].append(upper[k])
+#                         fdict["Keep Feasible"].append(feasible[k])
+# 
+#             fd = fdict.copy()
+#             fd.pop("Names")
+#             ret = pd.DataFrame(fd, index=(fdict["Names"]))
 
         else:
             if isinstance(coefficients, pd.DataFrame):
@@ -558,20 +569,55 @@ Named Parameters:
         return list(self._model_fit_coefficients_["Initial Value"])
         
     @property
-    def fittingCoefficients(self) -> pd.DataFrame:
+    def fittingCoefficients(self) -> pd.DataFrame | None:
         return self._model_fit_coefficients_
     
     @fittingCoefficients.setter
     def fittingCoefficients(self, coefficients: pd.DataFrame):
+        if not models.isModelFunction(self._model_):
+            return
+        
         if isinstance(coefficients, pd.DataFrame):
-            # NOTE: 2026-01-13 23:26:42
-            # override coefficients given by model only if the indexes are the same
-            if isinstance(self._model_fit_coefficients_, pd.DataFrame):
-                assert coefficients.size == self._model_fit_coefficients_.size, "Incompatible coefficients data were supplied"
-                assert all(c in coefficients.index for c in self._model_.coefficients) and all(c in self._model_.coefficients for c in coefficients), "Incompatible coefficients data were supplied"
-
-            self._model_fit_coefficients_ = coefficients
-            self._populateCoefficientsTable_(self._model_fit_coefficients_)
+            OK, unstarred, var, groups = models.parseCoefficientsFitTable(self._model_, coefficients)
+            
+            if OK:
+                self._model_fit_coefficients_ = coefficients
+                self._populateCoefficientsTable_(self._model_fit_coefficients_) # just replace it all, for now
+                
+            else:
+                self.criticalMessage("Table is not compatible with this model")
+                
+#                 # NOTE: 2026-01-13 23:26:42
+#                 # override coefficients given by model only if the indexes are the same
+#                 if isinstance(self._model_fit_coefficients_, pd.DataFrame) and models.parseCoefficientsFitTable(self._model_,self._model_fit_coefficients_)[0]:
+#                     for c in unstarred:
+#                         self._model_fit_coefficients_.loc[c,:] = coefficients.loc[c,:]
+#                     varToAdd = list()
+#                     for v in var:
+#                         if c in self._model_fit_coefficients_.index:
+#                             self._model_fit_coefficients_.loc[c,:] = coefficients.loc[c,:]
+#                         else:
+#                             self._model_fit_coefficients_ = pd.concat([self._model_fit_coefficients_, pd.DataFrame(coefficients.loc[c,:])].T)
+#                             
+#                     for g in groups:
+#                         for c in g:
+#                             if c in self._model_fit_coefficients_.index:
+#                                 self._model_fit_coefficients_.loc[c,:] = coefficients.loc[c,:]
+#                             else:
+#                                 self._model_fit_coefficients_ = pd.concat([self._model_fit_coefficients_, pd.DataFrame(coefficients.loc[c,:])].T)
+                            
+                    
+                    
+            
+        
+            # # NOTE: 2026-01-13 23:26:42
+            # # override coefficients given by model only if the indexes are the same
+            # if isinstance(self._model_fit_coefficients_, pd.DataFrame):
+            #     assert coefficients.size == self._model_fit_coefficients_.size, "Incompatible coefficients data were supplied"
+            #     assert all(c in coefficients.index for c in self._model_.coefficients) and all(c in self._model_.coefficients for c in coefficients), "Incompatible coefficients data were supplied"
+            # 
+            # self._model_fit_coefficients_ = coefficients
+            # self._populateCoefficientsTable_(self._model_fit_coefficients_)
 
 #         elif isinstance(coefficients, dict):
 #             assert models.isFittingCoefficientsDict(coefficients), "Incompatible coefficients data supplied"

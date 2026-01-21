@@ -457,7 +457,7 @@ https://wiki.python.org/moin/PythonDecoratorLibrary#Creating_decorator_with_opti
 
         if isFittingCoefficientsDict(fitting):
             # NOTE: 2026-01-14 11:19:43
-            # silently ignore incomparible fitting data
+            # silently ignore incompatible fitting data
             if len(getattr(f, "coefficients")) == 0:
                 setattr(f, "fitting", fitting)
 
@@ -527,6 +527,10 @@ https://wiki.python.org/moin/PythonDecoratorLibrary#Creating_decorator_with_opti
             
         setattr(f, "expressionAsSVG", types.MethodType(__expression2SVG__, f))
         
+        def __generateFitTable__(f) -> tuple:
+            return makeCoefficientsFitTable(f)
+        
+        setattr(f, "generateFitTable", types.MethodType(__generateFitTable__, f))
         
         # NOTE: 2025-12-26 14:55:28
         # enable the display of the function call syntax (a.k.a quick help) AND
@@ -603,6 +607,169 @@ https://wiki.python.org/moin/PythonDecoratorLibrary#Creating_decorator_with_opti
     
     return wrapper(f)
 
+def makeCoefficientsFitTable(f:types.FunctionType) -> tuple:
+    from core import strutils
+    assert isModelFunction(f), f"Expecting a model function ('@modelfunction'-decorated regular Python function); instead, got {f}"
+    ret = pd.DataFrame()
+    destarred:list = list()
+    starredGroups:int = 0
+
+    if len(f.coefficients):
+        starred = list(filter(lambda c: c.endswith("*"), f.coefficients))
+        destarred = list(map(lambda c: c.strip("*"), starred))
+        unstarred = list(filter(lambda c: not c.endswith("*"), f.coefficients))
+
+        order = list(map(lambda c: f.coefficients.index(c), unstarred + starred))
+        unstarredorder = list(map(lambda c: f.coefficients.index(c), unstarred))
+        starredorder = list(map(lambda c: f.coefficients.index(c), starred))
+
+        concrete_names = unstarred + list(map(lambda c: f"{c}0", destarred))
+
+        # nStarredCoeffs = len(starred)
+        # self._destarredCoeffs_= destarred
+        starredGroups = 1
+
+
+        # NOTE: 2026-01-21 12:03:46
+        # for the actual function call, the starred coefficients ALWAYS go last
+        # as sequence c0_0, c1_0, c2_0, c0_1, c1_1, c2_1, ... etc
+
+        # so, currently we need to create a tuple of starred coeffs and repeat this at least once
+
+        fdict = dict()
+
+        fdict["Names"] = concrete_names
+        fdict["Initial Value"] = [0.] * len(fdict["Names"])
+        fdict["Lower Bound"] = [-np.inf] * len(fdict["Names"])
+        fdict["Upper Bound"] = [np.inf] * len(fdict["Names"])
+        fdict["Keep Feasible"] = [True] * len(fdict["Names"])
+
+        if not isFittingCoefficientsDict(f.fitting):
+            fd = fdict.copy()
+            fd.pop("Names")
+            ret = pd.DataFrame(fd, index=(concrete_names))
+            return ret, destarred, starredGroups
+
+        mfd = {"Names":list(), "Initial Value": list(), "Lower Bound": list(), "Upper Bound": list(), "Keep Feasible": list()}
+
+        names       = f.fitting.get("names", list())
+        ncoeffs     = len(names)
+
+        assert(ncoeffs >= len(fdict["Names"]) and (ncoeffs-len(unstarred)) % len(starred) ) == 0, f"Unexpected number of coefficients ({ncoeffs}); must be {nStarredCoeffs} × n + {len(unstarred)} for n components"
+
+        initial     = f.fitting.get("initial", list())
+        lower       = f.fitting.get("lower", list())
+        upper       = f.fitting.get("upper", list())
+        feasible    = f.fitting.get("feasible", list())
+
+        assert(all(len(v) == len(initial) for v in (lower, upper, feasible))), "Model has inconsistent fitting attribute"
+
+        for k, name in enumerate(names):
+            if name in fdict["Names"]:
+                ndx = fdict["Names"].index(name)
+                if ndx < len(initial):
+                    fdict["Initial Value"][ndx] = initial[ndx]
+                if ndx < len(lower):
+                    fdict["Lower Bound"][ndx] = lower[ndx]
+                if ndx < len(upper):
+                    fdict["Upper Bound"][ndx] = upper[ndx]
+                if ndx < len(feasible):
+                    fdict["Keep Feasible"][ndx] = feasible[ndx]
+
+            else:
+                # add possibly extra concrete values for starred coeffs
+                stripped, sfx = strutils.get_int_sfx(name, sep="")
+                if f"{stripped}*" in starred:
+                    fdict["Names"].append(name)
+                    fdict["Initial Value"].append(initial[k])
+                    fdict["Lower Bound"].append(lower[k])
+                    fdict["Upper Bound"].append(upper[k])
+                    fdict["Keep Feasible"].append(feasible[k])
+
+        fd = fdict.copy()
+        fd.pop("Names")
+        ret = pd.DataFrame(fd, index=(fdict["Names"]))
+        
+    return ret, destarred, starredGroups
+    
+def parseCoefficientsFitTable(f: types.FunctionType, df:typing.Union[pd.DataFrame, dict]) -> tuple:
+    from core import strutils
+    assert isModelFunction(f), f"Expecting a model function ('@modelfunction'-decorated regular Python function); instead, got {f}"
+    assert len(f.coefficients) > 0, f"The model function {f.__module__}.{f.__name__} must publish its coefficients"
+    defaultTable, variadics, groups = f.generateFitTable()
+    if not np.all(df.columns == defaultTable.columns):
+        return False, list(), list(), list()
+    
+    # starred = f.starred_coefficients
+    unstarred = list(filter(lambda c: not c.endswith("*"), f.coefficients))
+    if not isinstance(df, pd.DataFrame):
+        return False, list(), list(), list()
+
+    defaultCoeffs = list(defaultTable.index)
+    dfCoeffs = list(df.index)
+    
+    # check for mandatories (unstarred)
+    if len(dfCoeffs) < len(defaultCoeffs):
+        return False, list(), list(), list()
+    
+    if not all(dfCoeffs[k] == defaultCoeffs[k] for k in range(len(defaultCoeffs))):
+        print(f"defaults: {defaultCoeffs}, dfCoeffs: {dfCoeffs[:len(defaultCoeffs)]}")
+        return False, list(), list(), list()
+    
+    # check for presence of variadics
+    # mandatory  variadics
+    if (len(dfCoeffs) - len(unstarred)) % len(variadics) != 0:
+        print("Invalid number of coefficients")
+        return False, list(), list(), list()
+    # check mandatory group is group 0 and comes in the right order
+    varCoeffs = dfCoeffs[len(unstarred):len(unstarred)+len(variadics)]
+    cgList = list(map(lambda s: strutils.get_int_sfx(s, sep=""), varCoeffs)) # e.g., [('β', 0), ('τ', 0)]
+    c = list(map(lambda t:t[0], cgList))
+    if not all(c[k] == variadics[k] for k in range(len(variadics))):
+        print("missing variadics")
+        return False, list(), list(), list()
+    n = list(map(lambda t:t[1], cgList))
+    if len(set(n)) != 1:
+        print("Unexpected group index change in first group")
+        return False , list(), list(), list()
+    if n[-1] != 0:
+        print(f"Invalid index for first group: {n[-1]}")
+        return False, list(), list(), list()
+    
+    firstVariadics = varCoeffs
+    
+    # check additional variadics
+    # this also checks for monotonic increase in group index 
+    groups = list()
+    mandatories = len(unstarred) + len(variadics)
+    if len(dfCoeffs) > mandatories:
+        # check we have more than one group of variadic values, with index suffix starting from 1 onwards
+        if (len(dfCoeffs) - mandatories) % len(variadics) != 0:
+            print(f"Invalid number of extra coefficients: ({len(dfCoeffs)}-{mandatories})%{len(variadics)}={(len(dfCoeffs) - mandatories) % len(variadics)}")
+            return False, list(), list(), list()
+        extraVarCoeffs = dfCoeffs[mandatories:]
+        groupNdx = 1
+        for k in range(0, len(extraVarCoeffs), len(variadics)):
+            cgList = list(map(lambda s: strutils.get_int_sfx(s, sep=""), extraVarCoeffs[k:k+len(variadics)]))
+            c = list(map(lambda t:t[0], cgList))
+            if not all(c[k] == variadics[k] for k in range(len(variadics))):
+                return False, list(), list(), list()
+            n = list(map(lambda t:t[1], cgList))
+            
+            if len(set(n)) != 1:
+                print("Unexpected group index change")
+                return False, list(), list(), list()
+            if n[-1] != groupNdx:
+                print(f"Wrong group number: {n[-1]} instead of {groupNdx}")
+                return False, list(), list(), list()
+            
+            groups.append(extraVarCoeffs[k:k+len(variadics)])
+            groupNdx += 1
+            
+        # print(groups)
+    return True, unstarred, firstVariadics, groups
+        
+    
 def check_unpack_model_coeffs(n:int, params:typing.Sequence[typing.Union[Real, np.ndarray]] | np.ndarray, 
                               *extras, strip_units:bool=True) -> tuple[float]:
     r"""Verifies and unpacks model coefficients, when supplied as a Sequence or vector
@@ -2429,7 +2596,7 @@ def make_initial_coeffs(names:typing.Sequence[str]| dict, /,
         
     
 def renderModelExpression(expression:typing.Union[sympy.Basic, sympy.Expr, str, types.FunctionType], 
-                          out:str = "pix") -> typing.Optional[typing.Union[PIL.Image, QtGui.QPixmap, QtGui.QImage, IPImage, dict]]:
+                          out:str = "ipython") -> typing.Optional[typing.Union[PIL.Image, QtGui.QPixmap, QtGui.QImage, IPImage, dict]]:
     from core.utilities import render_sympy
     from core.strutils import (is_latex, render_latex)
     
