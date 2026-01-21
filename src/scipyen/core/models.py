@@ -90,7 +90,7 @@ FittingCoefficientsDict = typing.TypedDict("FittingCoefficientsDict", {"names": 
                                                                        "initial": typing.Union[Real, typing.Sequence[Real]],
                                                                        "lower": typing.Union[Real, typing.Sequence[Real]],
                                                                        "upper": typing.Union[Real, typing.Sequence[Real]],
-                                                                       "feasbile": typing.Union[bool, typing.Sequence[bool]]
+                                                                       "feasible": typing.Union[bool, typing.Sequence[bool]]
                                                                        })
 
 def isFittingCoefficientsDict(x:dict):
@@ -125,7 +125,7 @@ def check_independent_variable(x:typing.Union[Real, np.ndarray], ndim:typing.Opt
     return x
 
 @decorator
-def modelfunction(f:typing.Callable, /, 
+def modelfunction(f:typing.Callable, /,
                   nvars:int=1, 
                   title:typing.Optional[str] = None ,
                   coefficients:typing.Optional[typing.Sequence[str]] = None,
@@ -189,7 +189,7 @@ NOTE: These attributes can be accessed from within the model function code by
     def func(...):
         # inside the function, you can access the function object as present in 
         # the globals: 
-        self = glopbals()['func']
+        self = globals()['func']
         # which allows you to retrieve the coefficient names as defined in the 
         # wrapper
         self.coefficients
@@ -216,26 +216,97 @@ All are optional and default to `None`.
 
 :coefficients: typing.Sequence[str] — names (symbols) for the parameters.
     These can usually be inferred from the function's signature via the 
+
     'inspect' module, which is what the function 'model_parameters(…)' in this
+
     module does. However, this can be tedious for model functions with a more 
+
     complex syntax; hence this attribute comes in handy.
 
-    Some of the models involve a variable number of components (factors or terms)
-    defined by the same mathematical expresison, which implies a variadic number of
-    coefficients (see "compound_transient" for an example). The symbols for these
-    "variadic" coefficients tagged with a "*" to indicate this ('starred' coefficients).
+    .. note::
 
-    .. warning:: Python syntax forbids the use of more than one var-positional
-    parameter (e.g. *args) in a function call. This means that, for an actual 
-    function call, the starred coefficients need to be lumped together in a single
-    var-positional parameter; it is up to the function code to deal with the 
-    contents of this parameter. Each such "starred" coefficient is counted once.
-    ONCE. 
+        The coefficient names must be given **in the same order** as in the function's signature.
 
-:fitting: Mapping with the mandatory keys:
+        Some of the models involve a variable number of components (factors or terms)
+
+        defined by the same mathematical expresison, which implies a variadic number of
+
+        coefficients (see "compound_transient" for an example). The symbols for these
+
+        "variadic" coefficients are tagged with a "*" to indicate this ('starred'
+
+        coefficients).
+
+
+
+    .. warning::
+
+        Python syntax forbids the use of more than one var-positional
+
+        parameter (e.g. *args) in a function call. This means that, for an actual
+
+        function call, the starred coefficients need to be lumped together in a single
+
+        var-positional parameter; it is up to the function code to deal with the
+
+        contents of this parameter. Here, each "starred" coefficient is counted once.
+
+
+    When more than one starred coefficient is given, they must be packed together
+
+    in a var-positional parameter (e.g., ``*args``) for the actual function call.
+
+    It is *assumed* that the function expects the *same* number of values for
+
+    each starred coefficient.
+
+    By *convention* these values are passed as a sequence which contains the values
+
+    of each starred coefficient value (in the order expected by the function)
+
+    for the index 'k'; such sequence must then repeated n-1 times, with
+
+    corresponding values for the respective index.
+
+
+    For example, see ``exponential_rise_multi_decays`` where the β* and τ* must
+
+    be passed as a variadic parameter *βτ containing the sequence
+
+    β₀, τ₀, β₁, τ₁, …, βₖ, τₖ, …, βₙ₋₁, τₙ₋₁
+
+    for 𝑛 decays.
+
+
+:fitting: Mapping with the keys:
+
+    *names* ↦ str or sequence of str (coefficient names)
+
     *initial* ↦ scalar or sequence of scalars
+
     *lower* ↦ scalar or sequence of scalars
+
     *upper* ↦ scalar or sequence of scalars
+
+    *feasible* ↦ bool or sequence of bool
+
+    Listing the coefficient names here again might seem redundant, but is useful
+
+    in cases where initial, bounds and feasible flag needs to be set for a starred
+
+    coefficient (see above). In such cases the coefficient name MUST be suffixed
+
+    with an integer >= 0 e.g. for λ*, the fitting might contain the keys:
+
+    λ0, λ1, etc.
+
+    Furthermore, the order of the names must be exactly as in the *coefficients*
+
+    parameter, and exactly as in the function's signature.
+
+    .. warning::
+
+        These rules are not checked and deviations may lead to unexpected beaviour.
 
 :expression: sympy expression construct or latex string.
 
@@ -639,7 +710,9 @@ Parameters:
 :x0: shift (delay, or onset)
     
 """
-    α, β0, β1, λ0, λ1, x0 = check_unpack_model_coeffs(6, α, β0, β1, λ0, λ1, x0)
+    # WARNING: 2026-01-21 10:19:11 the order MATTERS, here!
+    α, β0, β1, x0, λ0, λ1 = check_unpack_model_coeffs(6, α, β0, β1, x0, λ0, λ1)
+    # print(f"α = {α}, β0 = {β0}, β1 = {β1}, λ0 = {λ0}, λ1 = {λ1}, x0 = {x0}")
     x = check_independent_variable(x)
     λ0x = np.multiply(λ0, np.subtract(x, x0))
     λ1x = np.multiply(λ1, np.subtract(x, x0))
@@ -665,20 +738,30 @@ def exponential_product(x: np.ndarray | Real,
     r"""Product of several exponential decays, biased and shifted
 
     Realizes:
-                ₙ₋₁
-    y = α + β × Π  exp((x-x₀)λₖ) = α + β × exp((x-x₀)λᵪ)    , where:
-                ᵏ⁼⁰
 
-    • α is the additive bias (offset)
-    • β is the multiplicative bias (scale)
-    • λ is a sequence of floats with the individual rate constants, one for
-        each exponential factor
-    • λᵪ is the "combined" decay time constant: Σλₖ
-    • 𝑛 = len(λ) is the number of exponentials in the product
+    $$f(x)=\\alpha + \\beta \\times \\prod_{k=0}^{n-1} e^{\\left(x-x_{0}\\right)\\lambda_{k} } = \\alpha + \\beta \\times  e^{\\left(x-x{0}\\right)\\lambda_{\\chi}}$$
 
-    NOTE: For a product of TWO exponentials, intial coefficients used for fitting 
-    can be generated analytically by the function guess_init_two_exp_prod(…) in 
-    the core.curvefitting module
+    where:
+
+    * α is the additive bias (offset)
+
+    * β is the multiplicative bias (scale)
+
+    * λ is a sequence of floats with the individual rate constants, one for each exponential factor
+
+    * λᵪ is the "combined" decay time constant: Σλₖ. This means that one can calculate λᵪ beforehand and pass it here or to the exponential modelfunction
+
+    * 𝑛 = len(λ) is the number of exponentials in the product
+
+    .. note::
+        For a product of TWO exponentials, intial coefficients used for fitting
+
+        can be generated analytically by the function guess_init_two_exp_prod(…) in
+
+        the core.curvefitting module
+
+    .. note::
+
 
     
 """
@@ -1322,7 +1405,7 @@ def CBsum(x:np.ndarray | Real, α:Real | typing.Sequence[Real], /,
     return np.add(y0, y1)
     
 @modelfunction(coefficients = ("α", "x0", "ρ", "β*", "τ*"),
-               expression="$$f(x)=\\alpha + \\left(1 - e^{-\\frac{x-x_{0} } {\\rho} }\\right) \\times \\sum_{k=0}^{n} \\beta_{k} \\times e^{-\\frac{\\left(x-x_{0}\\right)}{\\tau_{0}}} $$",
+               expression="$$f(x)=\\alpha + \\left(1 - e^{-\\frac{x-x_{0} } {\\rho} }\\right) \\times \\sum_{k=0}^{n-1} \\beta_{k} \\times e^{-\\frac{\\left(x-x_{0}\\right)}{\\tau_{k}}} $$",
                title="ExponentialRiseMultiDecays")
 def exponential_rise_multi_decays(x:np.ndarray|Real, 
                                   α:typing.Sequence[Real] | Real | np.ndarray, /,
@@ -1355,7 +1438,7 @@ def exponential_rise_multi_decays(x:np.ndarray|Real,
 
     :x₀: shift ('onset', 'delay') of the transient; units of "x"
 
-    :ρ: rising phase time constant; (unitys of "x")⁻¹
+    :ρ: rising phase time constant; (units of "x")⁻¹
 
     Var-positional parameter:
     =========================

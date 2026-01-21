@@ -52,6 +52,21 @@
        <verstretch>0</verstretch>
       </sizepolicy>
      </property>
+     <property name="mouseTracking">
+      <bool>true</bool>
+     </property>
+     <property name="tabletTracking">
+      <bool>true</bool>
+     </property>
+     <property name="toolTip">
+      <string>Drag splitter (⇓) to reveal the mathematical expression</string>
+     </property>
+     <property name="statusTip">
+      <string>Drag splitter (⇓) to reveal the mathematical expression</string>
+     </property>
+     <property name="whatsThis">
+      <string>Drag splitter (⇓) to reveal the mathematical expression</string>
+     </property>
      <property name="orientation">
       <enum>Qt::Orientation::Vertical</enum>
      </property>
@@ -217,76 +232,22 @@
         </item>
        </layout>
       </widget>
-      <widget class="QWidget" name="">
-       <layout class="QVBoxLayout" name="verticalLayout_2">
-        <item>
-         <widget class="TableEditorWidget" name="modelCoefficientsTable" native="true">
-          <property name="sizePolicy">
-           <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-            <horstretch>1</horstretch>
-            <verstretch>1</verstretch>
-           </sizepolicy>
-          </property>
-          <property name="toolTip">
-           <string>Model coefficient values used for waveform generation and curve fitting</string>
-          </property>
-          <property name="statusTip">
-           <string>Model coefficient values used for waveform generation and curve fitting</string>
-          </property>
-          <property name="whatsThis">
-           <string>Model coefficient values used for waveform generation and curve fitting</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <layout class="QHBoxLayout" name="horizontalLayout_2">
-          <item>
-           <widget class="QPushButton" name="addStarredRowsPushButton">
-            <property name="toolTip">
-             <string>Add one instance each, of starred coefficients</string>
-            </property>
-            <property name="statusTip">
-             <string>Add one instance each, of starred coefficients</string>
-            </property>
-            <property name="whatsThis">
-             <string>Add one instance each, of starred coefficients</string>
-            </property>
-            <property name="text">
-             <string>Add</string>
-            </property>
-            <property name="icon">
-             <iconset theme="QIcon::ThemeIcon::ListAdd"/>
-            </property>
-            <property name="flat">
-             <bool>true</bool>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QPushButton" name="removeStarredRowsPushButton">
-            <property name="toolTip">
-             <string>Remove one instance each, of starred coefficients</string>
-            </property>
-            <property name="statusTip">
-             <string>Remove one instance each, of starred coefficients</string>
-            </property>
-            <property name="whatsThis">
-             <string>Remove one instance each, of starred coefficients</string>
-            </property>
-            <property name="text">
-             <string>Remove</string>
-            </property>
-            <property name="icon">
-             <iconset theme="QIcon::ThemeIcon::ListRemove"/>
-            </property>
-            <property name="flat">
-             <bool>true</bool>
-            </property>
-           </widget>
-          </item>
-         </layout>
-        </item>
-       </layout>
+      <widget class="TableEditorWidget" name="modelCoefficientsTable" native="true">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+         <horstretch>1</horstretch>
+         <verstretch>1</verstretch>
+        </sizepolicy>
+       </property>
+       <property name="toolTip">
+        <string>Model coefficient values used for waveform generation and curve fitting</string>
+       </property>
+       <property name="statusTip">
+        <string>Model coefficient values used for waveform generation and curve fitting</string>
+       </property>
+       <property name="whatsThis">
+        <string>Model coefficient values used for waveform generation and curve fitting</string>
+       </property>
       </widget>
      </widget>
     </widget>

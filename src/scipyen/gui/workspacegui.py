@@ -406,8 +406,12 @@ class GuiMessages(object):
     def warningMessage_static(obj:typing.Optional[QtWidgets.QWidget]=None, title:str="Warning", text:str="", default=QtWidgets.QMessageBox.No):
         return QtWidgets.QMessageBox.warning(obj, title, text, defaultButton=default)
         
+
     @safewrapper
-    def detailedMessage(self, title:str, text:str, info:typing.Optional[str]="", detail:typing.Optional[str]="", msgType:typing.Optional[typing.Union[str, QtGui.QPixmap]]="Critical"):
+    def detailedMessage(self, title:str, text:str, info:typing.Optional[str]="", detail:typing.Optional[str]="",
+                        msgType:typing.Optional[typing.Union[str, QtGui.QPixmap]]="Critical",
+                        buttons:typing.Optional[QtWidgets.QMessageBox.StandardButton]=QtWidgets.QMessageBox.Ok,
+                        defaultButton:typing.Optional[QtWidgets.QMessageBox.StandardButton]=None):
         r"""Detailed generic message dialog box
         title: str  = dialog title
         text:str =  main message
@@ -420,6 +424,10 @@ class GuiMessages(object):
             pixmap file name, or a valid theme icon name.
             
         """
+        # from core.strutils import (is_html, is_markdown)
+        from gui import guiutils
+        from helpsystem import helputils # TODO 2026-01-21 09:03:35 transfer code from the following, to strutils: mypylight
+
         if isinstance(msgType, str) and len(msgType.strip()):
             if getattr(QtWidgets.QMessageBox.Icon, msgType, None) is not None:
                 icon = getattr(QtWidgets.QMessageBox.Icon, msgType, QtWidgets.QMessageBox.NoIcon)
@@ -435,7 +443,9 @@ class GuiMessages(object):
                     icon = QtWidgets.QMessageBox.NoIcon
         
         msgbox = QtWidgets.QMessageBox(parent=self)
-        msgbox.addButton(QtWidgets.QMessageBox.Ok)
+        msgbox.setStandardButtons(buttons)
+        if isinstance(defaultButton, QtWidgets.QMessageBox.StandardButton):
+            msgbox.setDefaultbutton(defaultButton)
         if isinstance(icon, QtGui.QPixmap):
             msgbox.setIconPixmap(icon)
         elif isinstance(icon, QtWidgets.QMessageBox.Icon):
@@ -445,7 +455,11 @@ class GuiMessages(object):
             
         msgbox.setSizeGripEnabled(True)
         msgbox.setWindowTitle(title)
-        msgbox.setText(text)
+        lexer = helputils.get_lexer_by_name("python", stripall=True)
+        style = "KeplerDark" if guiutils.isDarkGui() else "default"
+        msgText = helputils.highlight(text, lexer, helputils.HtmlFormatter(noclasses=True, nobackground=True, style=style))
+        msgbox.setText(msgText)
+        msgbox.setTextFormat(QtCore.Qt.RichText)
         
         if isinstance(info, str) and len(info.strip()):
             msgbox.setInformativeText(info)

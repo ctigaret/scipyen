@@ -9555,7 +9555,10 @@ def plot_neo(
     if name is None or len(name.strip()) == 0:
         name = unitFamilyName(obj.units)
     sig_name = obj.annotations.get("signal_name", name)
-    ylabel = f"{name} ({obj.units.dimensionality.string})"
+    ylabel = f"{name}"
+    if obj.units != pq.dimensionless:
+        ylabel += f" ({obj.units.dimensionality.string})"
+
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     if isinstance(sig_name, str) and len(sig_name.strip()):
