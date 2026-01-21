@@ -40,6 +40,8 @@ else:
 from core.strutils import (str2symbol, is_svg, str2svg)
 from core import models
 from core import scipyen_quantities as scq
+from core import datasignal
+
 from iolib import pictio as pio
 from gui import guiutils, workspacegui
 import gui.quickdialog as qd
@@ -180,10 +182,42 @@ Named Parameters:
         assert isinstance(samplingRate, pq.Quantity) and samplingRate.size==1 and samplingRate.units == 1/duration.units, f"'samplingRate' must be a scalar quantity in units of, or convertible to, {1/duration.units}; instead, got {samplingRate}"
         assert (isinstance(waveformUnits, pq.Quantity) and waveformUnits.size==1) or waveformUnits is None, f"'waveformUnits' , must be a scalar quantity or None; instead, gor {waveformUnits}"
         
+        assert models.isModelFunction(model), f"Expecting a model function — which is NOT a regular Python function; instead, got {model}"
+        
+        if isinstance(start, (float, int)):
+            start = start*pq.s
+        elif not isinstance(start, pq.Quantity):
+            start = 0*pq.s
+            
+        if isinstance(duration, (float, int)):
+            duration = duration*pq.s
+        elif not isinstance(start, pq.Quantity):
+            start = 0*pq.s
+            
+        assert scq.unitsConvertible(duration, start), f"Duration rate units ({duration.units}) and domain units ({start.units}) are incompatible"
+        assert duration > 0, f"Cannot accept duration <= {0*duration.units}"
+        
+        if isinstance(samplingRate, (float, int)):
+            samplingRate = samplingRate*pq.Hz
+        elif not isinstance(samplingRate, pq.Quantity):
+            samplingRate = 0*pq.Hz
+            
+        assert scq.unitsConvertible(1/samplingRate, start), f"Sampling rate units ({samplingRate.units}) and domain units ({start.units}) are incompatible"
+        assert samplingRate > 0, f"Cannot accept duration <= {0*samplingRate.units}"
+        
+        if isinstance(model.domainUnits, pq.Quantity):
+            start = start.magnitude * model.domainUnits.units
+            duration = duration.magnitude * model.domainUnits.units
+            samplingRate = samplingRate.magnitude / model.domainUnits.units
+            
+        
+        if isinstance(model.units, pq.Quantity):
+            waveformUnits = waveformUnits.magnitude * model.units if isinstance(waveformUnits, pq.Quantity) else waveformUnits * model.units if isinstance(waveformUnits, float) else 1*model.units
+            
         self._waveformStart_ = start
         self._waveformDuration_ = duration
         self._waveformSamplingRate_ = samplingRate
-        self._waveformUnits_ = waveformUnits if isinstance(waveformUnits, pq.Quantity) else pq.dimensionless
+        self._waveformUnits_ = waveformUnits
         
         domainUnitsFamily = scq.getUnitFamily(self._waveformDuration_)
         if domainUnitsFamily == "Time":
@@ -199,6 +233,7 @@ Named Parameters:
         self.startSpinBox.setValue(self._waveformStart_)
         self.durationSpinBox.setValue(self._waveformDuration_)
         self.samplingRateSpinBox.setValue(self._waveformSamplingRate_)
+        # self.waveformUnitsChooser.setValue(self._waveformUnits_)
            
         self._setModelFunction_(model)
         
@@ -484,6 +519,8 @@ Named Parameters:
             
 
     def _calculateWaveformSamples(self) -> int:
+        self._waveformDuration_ = self.durationSpinBox.value()
+        self._waveformSamplingRate_ = self.samplingRateSpinBox.value()
         assert(scq.unitsConvertible(1/self._waveformSamplingRate_, self._waveformDuration_)), f"Waveform duration ({self._waveformDuration_}) and sampling rate ({self._waveformSamplingRate_}) have incompatible units"
         return int(self._waveformDuration_ * self._waveformSamplingRate_.magnitude)
     
@@ -493,6 +530,64 @@ Named Parameters:
         self._waveformDuration_ = self.durationSpinBox.value()
         self._waveformSamplingRate_ = self.samplingRateSpinBox.value()
         return np.linspace(self._waveformStart_.magnitude, self._waveformStart_.magnitude + self._waveformDuration_.magnitude, self._calculateWaveformSamples())
+        
+    def generateWaveform(self) -> neo.basesignal.BaseSignal | None:
+        from gui.guiutils import getScipyenMainWindow
+        if not isinstance(self._model_, types.FunctionType) or not models.isModelFunction(self._model_):
+            return
+        try:
+            self._waveformStart_ = self.startSpinBox.value()
+            self._waveformDuration_ = self.durationSpinBox.value()
+            self._waveformSamplingRate_ = self.samplingRateSpinBox.value()
+
+            x = self._generateWaveformDomain_()
+
+            coeffs = self.coefficientValues
+            # coeffs = list(self._model_fit_coefficients_["Initial Value"])
+
+            with warnings.catch_warnings(record=True) as wrn:
+                y = self._model_(x, coeffs)
+
+            sigUnits = self._waveformUnits_.units if isinstance(self._waveformUnits_, pq.Quantity) else pq.dimensionless
+            
+            if scq.checkTimeUnits(self._waveformDuration_):
+                sig = neo.AnalogSignal(y, t_start = self._waveformStart_, units = sigUnits, sampling_rate=self._waveformSamplingRate_, signal_name=self._model_name_)
+            else:
+                sig = datasignal.DataSignal(y, t_start = self._waveformStart_, units = sigUnits, domain_units = self._waveformDuration_.units,
+                                        sampling_rate=self._waveformSamplingRate_, signal_name=self._model_name_)
+                # if scq.unitsConvertible(sig.times.units, pq.V):
+                #     scq.domain_name = "Potential"
+                
+            if sig.units != pq.dimensionless.units:
+                sig.name = scq.unitFamilyName(sig.units)
+                
+                
+            
+
+            if wrn:
+                warningMessages = self.unpackWarnings(wrn)
+                msgBox = QtWidgets.QMessageBox(self)
+                msgBox.setWindowTitle("Warning")
+                msgBox.setText(warningMessages)
+                msgBox.setTextFormat(QtCore.Qt.RichText)
+                msgBox.setStandardButtons(QtWidgets.QMessageBox.Ok)
+                msgBox.exec()
+                # self.warningMessage(self.modelName, warningMessages,default=QtWidgets.QMessageBox.NoButton)
+
+        except:
+            traceback.print_exc()
+            exc = sys.exception()
+            msg = "".join(traceback.format_exception_only(exc))
+            self.errorMessage(type(exc).__name__, msg)
+            return
+
+        self.sig_waveformReady.emit(sig)
+
+        if self.receivers(self.sig_waveformReady) == 0:
+            varname = f"{self._model_name_}_waveform" if isinstance(self._model_name_, str) and len(self._model_name_.strip()) else "model_waveform"
+            getScipyenMainWindow().assignToWorkspace(varname, sig)
+            
+        return sig
         
     # @Slot()
     # def _slot_modelCoefficientsChanged(self):
@@ -530,51 +625,7 @@ Named Parameters:
     
     @Slot()
     def _slot_generateWaveform(self):
-        from core import datasignal
-        from gui.guiutils import getScipyenMainWindow
-        if not isinstance(self._model_, types.FunctionType) or not models.isModelFunction(self._model_):
-            return
-
-
-
-        try:
-            self._waveformStart_ = self.startSpinBox.value()
-            self._waveformDuration_ = self.durationSpinBox.value()
-            self._waveformSamplingRate_ = self.samplingRateSpinBox.value()
-
-            x = self._generateWaveformDomain_()
-
-            coeffs = self.coefficientValues
-            # coeffs = list(self._model_fit_coefficients_["Initial Value"])
-
-            with warnings.catch_warnings(record=True) as wrn:
-                y = self._model_(x, coeffs)
-
-
-            sigUnits = self._waveformUnits_.units if isinstance(self._waveformUnits_, pq.Quantity) else pq.dimensionless
-            
-            if scq.checkTimeUnits(self._waveformDuration_):
-                sig = neo.AnalogSignal(y, t_start = self._waveformStart_, units = sigUnits, sampling_rate=self._waveformSamplingRate_, name=self._model_name_)
-            else:
-                sig = datasignal.DataSignal(y, t_start = self._waveformStart_, units = sigUnits, domain_units = self._waveformDuration_.units,
-                                        sampling_rate=self._waveformSamplingRate_, name=self._model_name_)
-
-            if wrn:
-                warningMessages = self.unpackWarnings(wrn)
-                self.warningMessage(self.modelName, warningMessages)
-
-        except:
-            traceback.print_exc()
-            exc = sys.exception()
-            msg = "".join(traceback.format_exception_only(exc))
-            self.errorMessage(type(exc).__name__, msg)
-            return
-
-        self.sig_waveformReady.emit(sig)
-
-        if self.receivers(self.sig_waveformReady) == 0:
-            varname = f"{self._model_name_}_waveform" if isinstance(self._model_name_, str) and len(self._model_name_.strip()) else "model_waveform"
-            getScipyenMainWindow().assignToWorkspace(varname, sig)
+        self.generateWaveform()
 
 
     @Slot()
@@ -598,10 +649,11 @@ Named Parameters:
         from gui.widgets import small_widgets
         dlg = QuickDialog(title="Choose waveform units")
         units = self._waveformUnits_.units if isinstance(self._waveformUnits_, pq.Quantity) else pq.dimensionless
-        qc = small_widgets.QuantityChooserWidget(parent=dlg, unit = units)
+        qc = small_widgets.QuantityChooserWidget(parent=dlg)
+        qc.units = units
         dlg.addWidget(qc)
         if dlg.exec():
-            self.waveformUnits = qc.value()
+            self.waveformUnits = qc.units
             
     @Slot(object)
     def _slot_waveformStartChanged(self, val:typing.Union[pq.Quantity, float, int, np.float64, np.int64]):

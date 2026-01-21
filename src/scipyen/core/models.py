@@ -128,11 +128,13 @@ def check_independent_variable(x:typing.Union[Real, np.ndarray], ndim:typing.Opt
 def modelfunction(f:typing.Callable, /, 
                   nvars:int=1, 
                   title:typing.Optional[str] = None ,
-                  coefficients:typing.Optional[typing.Sequence[str]]=None,
-                  coefficient_units:typing.Optional[dict]=None,
+                  coefficients:typing.Optional[typing.Sequence[str]] = None,
+                  coefficient_units:typing.Optional[dict] = None,
                   expression:typing.Optional[typing.Union[sympy.Basic, str]] = None,
-                  fitting:typing.Optional[FittingCoefficientsDict]=None,
-                  displaySVG:bool=False,
+                  fitting:typing.Optional[FittingCoefficientsDict] = None,
+                  displaySVG:bool = False,
+                  domainUnits:typing.Optional[pq.Quantity] = None,
+                  units:typing.Optional[pq.Quantity] = None,
                   **kwargs):
     r"""Decorator to tag a function as a mathematical model function.
 
@@ -393,6 +395,10 @@ https://wiki.python.org/moin/PythonDecoratorLibrary#Creating_decorator_with_opti
 
             else:
                 setattr(f, "fitting", None)
+                
+        setattr(f, "domainUnits", domainUnits.units if isinstance(domainUnits, pq.Quantity) else None)
+        
+        setattr(f, "units", units.units if isinstance(units, pq.Quantity) else None)
                 
         setattr(f, "displaySVG", displaySVG is True)
 
@@ -708,7 +714,7 @@ def exponential(x:np.ndarray | Real,
                 λ:typing.Optional[Real] = None) -> np.ndarray | Real:
     r"""Single exponential with bias and shift
 
-    y = α + β × exp((x-x₀)λ)
+    $$f(x) = \\alpha + \\beta \\times e^{\\left(x-x_{0}\\right)\\lambda}$$
     
     Parameters:
     ===========
@@ -746,7 +752,9 @@ def bounded_exponential_rise(x:np.ndarray | Real,
                              λ:typing.Optional[Real] = None) -> np.ndarray | float:
     r"""Particular case of single exponential rise.
 
-    Realizes α + β × [1 - exp((x-x₀)λ)] where λ < 0.
+    Realizes
+    
+    $$\\alpha + \\beta \\times \\left[1-e^{\\left(x-x_{0}\\right)\\lambda}\\right]\\textrm{, }\\lambda < 0$$
 
 NOTE This is equivalent to the generic exponential
 
@@ -790,7 +798,9 @@ values for α, β, and with appropriate value & sign of λ
                #                                                                       sympy.Symbol("x")-sympy.Symbol("x_0") < 0))),
                fitting = FittingCoefficientsDict(initial= (0., 1., 0., 0.01), 
                           lower=(-np.inf, -np.inf, 0., 0.),
-                          upper=(np.inf, np.inf, np.inf, np.inf))
+                          upper=(np.inf, np.inf, np.inf, np.inf)),
+               domainUnits = pq.s,
+               units = pq.pA
                )
 def alphaSynapse(x:np.ndarray | Real, α:typing.Union[typing.Sequence[Real],np.ndarray,Real], /,
                   β:typing.Optional[Real] = None, x0:typing.Optional[Real] = None,
@@ -1125,6 +1135,8 @@ Parameters:
 @modelfunction(coefficients = ("α", "β", "x0", "τ1", "τ2"),
                title = "ClementsBekkers97",
                expression = r"$f(x) = \begin{cases} \alpha + \beta \times \left(1 - e^{-\left(x-x_{0}\right) / \tau_{1}}\right) \times e^{-\left(x-x_{0}\right) / \tau_{2}} & \text{for}\: \left(x - x_{0}\right) \geq 0\textrm{, }\tau_{1}>0\textrm{, }\tau_{2}>0 \\ \alpha & \text{otherwise} \end{cases}$",
+               domainUnits = pq.s,
+               units = pq.pA
 )
 def Clements_Bekkers_97(x:np.ndarray | Real,
                         α:typing.Union[Real, typing.Sequence[Real], np.ndarray], /, 
@@ -1310,6 +1322,7 @@ def CBsum(x:np.ndarray | Real, α:Real | typing.Sequence[Real], /,
     return np.add(y0, y1)
     
 @modelfunction(coefficients = ("α", "x0", "ρ", "β*", "τ*"),
+               expression="$$f(x)=\\alpha + \\left(1 - e^{-\\frac{x-x_{0} } {\\rho} }\\right) \\times \\sum_{k=0}^{n} \\beta_{k} \\times e^{-\\frac{\\left(x-x_{0}\\right)}{\\tau_{0}}} $$",
                title="ExponentialRiseMultiDecays")
 def exponential_rise_multi_decays(x:np.ndarray|Real, 
                                   α:typing.Sequence[Real] | Real | np.ndarray, /,
@@ -1318,41 +1331,37 @@ def exponential_rise_multi_decays(x:np.ndarray|Real,
                                   *βτ:Real, 
                                   **kwargs) -> np.ndarray|Real:
     r"""Clements & Bekkers 1997 model with sum of exponential decays.
+    
+    Implements
+    
+    $$f(x)=\\alpha + \\left(1 - e^{-\\frac{x-x_{0} } {\\rho} }\\right) \\times \\sum_{k=0}^{n} \\beta_{k} \\times e^{-\\frac{\\left(x-x_{0}\\right)}{\\tau_{0}}} \\qquad \\textrm{(1)}$$
 
-        y = α + (1 - exp( -(x-x₀)/ρ ) × ( β₀     × exp( -(x-x₀)/τ₀)     + 
-                                          β₁     × exp( -(x-x₀)/τ₁)     +
-                                          .                             +
-                                          .                             +
-                                          βₙ₋₁   × exp( -(x-x₀)/τₙ₋₁ ))      (1)
+    where:
 
-
-        where:
-
-            α           = additive bias, or offset (`DC' component)
-            x₀          = shift ('onset', 'delay') of the transient
-            ρ           = rising phase time constant; 
-            β₀...βₙ₋₁   = scale (multiplicative bias) for each decay component
-            τ₀...τₙ₋₁   = time constant for each decay component
+        α           = additive bias, or offset (`DC' component)
+        x₀          = shift ('onset', 'delay') of the transient
+        ρ           = rising phase time constant; 
+        β₀...βₙ₋₁   = scale (multiplicative bias) for each decay component
+        τ₀...τₙ₋₁   = time constant for each decay component
     
     Positional parameters:
     =====================
     
-    x   =   the independent (predictor) data; represents the definition domain 
+    :x:  the independent (predictor) data; represents the definition domain 
             for the model function e.g., a time vector, if modelling a time-
             varying process
             
-    α           = additive bias, or offset (`DC' component); units of the result 
-                signal
+    :α: additive bias, or offset (`DC' component); units of the result signal
 
-    x₀          = shift ('onset', 'delay') of the transient; units of "x"
+    :x₀: shift ('onset', 'delay') of the transient; units of "x"
 
-    ρ           = rising phase time constant; (unitys of "x")⁻¹
+    :ρ: rising phase time constant; (unitys of "x")⁻¹
 
     Var-positional parameter:
     =========================
     This is a sequence that packs together the coefficients βₖ and τₖ for the
         decay component k:
-    βτ          = sequence of β₀, τ₀, β₁, τ₁, …, βₙ₋₁, τₙ₋₁
+    :βτ:  = sequence of β₀, τ₀, β₁, τ₁, …, βₙ₋₁, τₙ₋₁
         where:
         n is the number of decays
         β₀...βₙ₋₁ are the scale (multiplicative bias); dimensionless
@@ -1448,13 +1457,14 @@ def compound_transient(x:np.ndarray | Real,
                        returnDecays = False) -> np.ndarray | float:
     r"""Compound transients signal -- linear sum of delayed single transients
     Parameters:
-        x       — 1D predictor vector
-        func    — model function generating a single transientl; this MIUST be one
-            of the model functions defined here (i.e. wrapped by model_function)
-        
-        coefficients = sequence of coefficients, in the order expected by 'func'
-            There must be 𝒏 × 𝒎 coefficients, where 𝒏 is the number of single
-            transients, and 𝒎 is the number of coefficients expected by 'func'.
+    ===========
+    :x:    1D predictor vector
+    :func: model function generating a single transient; this MUST be one
+        of the model functions defined here (i.e. wrapped by model_function)
+    
+    :coefficients: sequence of coefficients, in the order expected by 'func'
+        There must be 𝒏 × 𝒎 coefficients, where 𝒏 is the number of single
+        transients, and 𝒎 is the number of coefficients expected by 'func'.
         
     Returns:
         y   = realization of the compound signal model curve
@@ -1473,7 +1483,6 @@ def compound_transient(x:np.ndarray | Real,
     assert isModelFunction(func), f"Single transient function {func.__name__} must be a model function"
     
     singlecoeffs = func.coefficients
-    
     
     if len(parameters) == 1 and isinstance(parameters[0], typing.Sequence):
         parameter = parameters[0]
@@ -1518,7 +1527,11 @@ def compound_transient(x:np.ndarray | Real,
             return y, yc
         
 @modelfunction(coefficients=("γ", "ϵ", "χ", "σ"),
-               title="MarkwardtNilius88")
+               expression="$$f(x)=\\gamma \\times \\frac{\\left(x-\\epsilon\\right)}{1+e^{-\\frac{\\left(x-\\chi\\right)}{\\sigma} }} \\textrm{ , } \\sigma > 0$$",
+               title="MarkwardtNilius88",
+               domainUnits=pq.mV,
+               units = pq.pA,
+               )
 def Markwardt_Nilius(x:np.ndarray|Real, γ:typing.Sequence[Real]|Real|np.ndarray, /,
                      ϵ:typing.Optional[Real]=None, 
                      χ:typing.Optional[Real]=None, 
@@ -1527,7 +1540,7 @@ def Markwardt_Nilius(x:np.ndarray|Real, γ:typing.Sequence[Real]|Real|np.ndarray
     
     Implements:
     
-            y = γ × (x - ϵ) / ( 1 + exp(-(x-χ)/σ))
+    $$f(x)=\\gamma \\times \\frac{\\left(x-\\epsilon\\right)}{1+e^{-\\frac{\\left(x-\\chi\\right)}{\\sigma} }} \\textrm{ for } \\sigma > 0$$
     
     See Markwardt & Nilius (1988), J Physiol (London)
     
@@ -1545,7 +1558,7 @@ def Markwardt_Nilius(x:np.ndarray|Real, γ:typing.Sequence[Real]|Real|np.ndarray
     
     χ  = the "delay"
     
-    σ  = slope parameter of Ca2+ channel activation (mV)
+    σ  = slope parameter of Ca2+ channel activation (mV) (see also Boltzmann "activation")
     
     Returns:
     ======== 
@@ -1838,6 +1851,8 @@ def Frank_Fuortes2(x:np.ndarray | Real, irh:typing.Sequence[Real] | Real, /,
 
 @modelfunction(coefficients=("x0", "κ"),
                expression = "$$f(x) = \\begin{cases} \\frac{1}{e^{\\frac{\\left(x-x_{0}\\right)} {\\kappa} } } & \\text{activation} \\\\\\frac{1}{e^{-\\frac{\\left(x-x_{0}\\right)} {\\kappa} } } & \\text{inactivation} \\end{cases}\\textrm{ for }\\kappa\\ne0$$",
+               domainUnits = pq.mV,
+               units = pq.pA,
                # expression = sympy.Eq(sympy.Symbol("y"),
                #                       sympy.functions.elementary.piecewise.Piecewise((1/(1+sympy.exp(-(sympy.Symbol("x")-sympy.Symbol("x_0"))/sympy.Symbol("kappa"))),
                #                                                                       sympy.Symbol("activation")),

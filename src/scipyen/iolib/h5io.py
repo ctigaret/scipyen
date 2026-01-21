@@ -156,7 +156,7 @@ from core.scipyen_quantities import(arbitrary_unit,
                             week_in_vitro, postnatal_day, postnatal_month,
                             embryonic_day, embryonic_week, embryonic_month,
                             unitQuantityFromNameOrSymbol,
-                            nameFromUnit, unitsConvertible,
+                            unitFamilyName, unitsConvertible,
                             str2quantity, quantity2str)
 
 from core.typeenum import TypeEnum
@@ -1895,8 +1895,8 @@ def _(obj:neo.core.dataobject.DataObject, axisindex:int):
         raise TypeError(f"'axisindex' expected to be an int; got {type(axisindex).__name__} instead")
     
     seed = dict()
-    seed["name"] = nameFromUnit(obj.times.units) if axisindex == 0 else nameFromUnit(obj.units)
-    seed["key"] = nameFromUnit(obj.times.units, True) if axisindex == 0 else nameFromUnit(obj.units, True)
+    seed["name"] = unitFamilyName(obj.times.units) if axisindex == 0 else unitFamilyName(obj.units)
+    seed["key"] = unitFamilyName(obj.times.units, True) if axisindex == 0 else unitFamilyName(obj.units, True)
     seed["array_annotations"] = extract_array_annotations(obj)
     
     # NOTE: 2022-10-07 11:26:34
@@ -2074,8 +2074,8 @@ def _(obj:neo.ImageSequence, axisindex):
     elif axisindex == 3:
         ret["units"] = obj.units
         ret["dtype"] = jsonio.dtype2JSON(obj.dtype)
-        ret["name"] = nameFromUnit(obj.units)
-        ret["key"] = nameFromUnit(obj.units, True)
+        ret["name"] = unitFamilyName(obj.units)
+        ret["key"] = unitFamilyName(obj.units, True)
         
     else:
         raise ValueError(f"Invalid axis index {axisindex} for {type(obj).__name__} object")

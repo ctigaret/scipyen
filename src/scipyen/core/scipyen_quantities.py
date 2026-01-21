@@ -45,6 +45,7 @@ from functools import (reduce, partial, cache)
 import more_itertools
 
 from core import unicode_symbols
+from core import strutils
 from core.unicode_symbols import uchar
 from core.prog import BaseDescriptorValidator
 
@@ -1020,8 +1021,43 @@ def quantity2str(x:typing.Union[pq.Quantity, pq.UnitQuantity, pq.dimensionality.
     
     return " ".join([fmt % x.magnitude, x.units.dimensionality.string])
 
+def unitName(x:pq.Quantity) -> str:
+    r"""Returns the name of the dimensionality unit.
+For the name of the units family to which it belongs, see unitFamilyName.
+
+.. attention::
+    Do NOT use this to generate python symbols; only use for display purposes.
+"""
+    if not isinstance(x, pq.Quantity):
+        raise TypeError(f"Expecting a Quantity; instead got a {type(x).__name__}")
+    
+    if isinstance(x, pq.UnitQuantity):
+        return x.name
+    else:
+        d = x.dimensionality
+        if len(d.keys()) == 0:
+            return ""
+        
+        unitQuantity = list(d.keys()) # [k for k in dim.keys()]
+        unitQuantityPower = list(d.items()) # [k for k in dim.keys()]
+        
+        if len(unitQuantity) == 1: # irreducible
+            if unitQuantityPower[0][0]==1:
+                return unitQuantity[0].name
+            else:
+                pws = strutils.superscript(f"{unitQuantityPower[0][0]}")
+                return f"{unitQuantity[0].name}{pws}"
+        else:
+            ret = list()
+            for upwr in unitQuantityPower:
+                ustr = upwr[0].name
+                pstr = strutils.superscript(f"{upwr[1]}")
+                ret.append(f"{usrt}{pstr}")
+                
+            return "×".join(ret)
+       
 #@cache
-def nameFromUnit(u, as_key:bool=False):
+def unitFamilyName(u, as_key:bool=False):
     r"""
     FIXME make it more intelligent!
     """
@@ -1042,7 +1078,7 @@ def nameFromUnit(u, as_key:bool=False):
     unitQuantityPower = list(dim.items()) # [k for k in dim.keys()]
     #unitPowers
     
-    if len(unitQuantity) == 1: # irreducible
+    if len(unitQuantity) == 1: 
         unitQuantity = unitQuantityPower[0][0] 
         power = unitQuantityPower[0][1]
         
@@ -1083,22 +1119,22 @@ def nameFromUnit(u, as_key:bool=False):
                     if len(physQuants):
                         physQname = physQuants[0]
                         if physQname == "electromagnetism":
-                            if "ampere" in d_name.lower():
+                            if "ampere" in d_name.lower() or unitsConvertible(unitQuantity, pq.A):
                                 return "Current" if not as_key else "I"
                             
-                            if "coulomb" in d_name.lower():
+                            if "coulomb" in d_name.lower() or unitsConvertible(unitQuantity, pq.C):
                                 return "Charge" if not as_key else "Q"
                             
-                            if "farad" in d_name.lower():
+                            if "farad" in d_name.lower() or unitsConvertible(unitQuantity, pq.F):
                                 return "Capacitance" if not as_key else "C"
                             
-                            if "volt" in d_name.lower():
+                            if "volt" in d_name.lower() or unitsConvertible(unitQuantity, pq.V):
                                 return "Potential" if not as_key else "Psi"
                                 
-                            if "siemens" in d_name.lower():
+                            if "siemens" in d_name.lower() or unitsConvertible(unitQuantity, pq.S):
                                 return "Conductance" if not as_key else "G"
                                 
-                            if "ohm" in d_name.lower():
+                            if "ohm" in d_name.lower() or unitsConvertible(unitQuantity, pq.ohm):
                                 return "Resistance" if not as_key else "R"
                                 
                         return physQname.capitalize() if not as_key else physQname[0].upper()

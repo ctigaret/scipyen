@@ -70,6 +70,44 @@ else:
 # else:
 #     from qtpy import QtCore, QtGui
 
+SUPERSCRIPT_UNICODE = {"-":"⁻",
+                    "+":"⁺",
+                    "0":"⁰",
+                    "1":"¹",
+                    "2":"²",
+                    "3":"³",
+                    "4":"⁴",
+                    "5":"⁵",
+                    "6":"⁶",
+                    "7":"⁷",
+                    "8":"⁸",
+                    "9":"⁹",
+                    "a":"ᵃ", 
+                    "b":"ᵇ",
+                    "c":"ᶜ",
+                    "d":"ᵈ",
+                    "e":"ᵉ",
+                    "f":"ᶠ",
+                    "g":"ᵍ",
+                    "h":"ʰ",
+                    "i":"ⁱ",
+                    "j":"ʲ",
+                    "k":"ᵏ",
+                    "l":"ˡ",
+                    "m":"ᵐ",
+                    "n":"ⁿ",
+                    "o":"ᵒ",
+                    "p":"ᵖ",
+                    "r":"ʳ",
+                    "s":"ˢ",
+                    "t":"ᵗ",
+                    "u":"ᵘ",
+                    "v":"ᵛ",
+                    "w":"ʷ",
+                    "x":"ˣ",
+                    "y":"ʸ",
+                    "z":"ᶻ"}
+
 
 REGEXP_METACHARACTERS = (
     ".",
@@ -101,6 +139,13 @@ __output_cache_regexp__ = _re.compile(r"^(_o)|(_+)(h|\d*)$")
 __input_cache_regexp__ = _re.compile(r"^_i+(h|\d*)$")
 
 import errno, os
+
+def superscript(s:str)->str:
+    if len(s)==1:
+        return SUPERSCRIPT_UNICODE.get(s, s)
+    
+    return "".join(list(map(lambda c: SUPERSCRIPT_UNICODE.get(c,c), s)))
+        
 
 
 def is_sequence(s: str) -> bool:

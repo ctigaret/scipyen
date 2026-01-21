@@ -159,8 +159,10 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
         u_names = list(map(lambda x: x.name, self._currentUnitFamilyUnits))
         u_names_display = list(map(lambda x: f"{x.name} ({x.dimensionality.unicode})" if (x != pq.dimensionless and x.name != x.dimensionality.unicode) else x.name, self._currentUnitFamilyUnits))
         self.unitComboBox.addItems(u_names_display)
-        if self._units_.name in u_names:
-            self.unitComboBox.setCurrentIndex(u_names.index(self._units_.name))
+        u_name = scq.unitName(self._units_)
+        # print(f"{self.__class__.__name__}._setupUnitCombo: u_name -> {u_name}")
+        if u_name in u_names:
+            self.unitComboBox.setCurrentIndex(u_names.index(u_name))
         else:
             self.unitComboBox.setCurrentIndex(0)
         

@@ -11013,7 +11013,7 @@ def nsfa(xdata:np.ndarray, ydata:np.ndarray, /, i=0, N=1, b=0, **kwargs):
         Vm *= pq.mV
         
     elif isinstance(Vm, pq.Quantity):
-        uname = scq.nameFromUnit(Vm)
+        uname = scq.unitFamilyName(Vm)
         if uname != "Potential":
             raise TypeError("Vm expected to be a Potential; got {uname} instead")
         Vm  = Vm.rescale(pq.mV)
@@ -11025,7 +11025,7 @@ def nsfa(xdata:np.ndarray, ydata:np.ndarray, /, i=0, N=1, b=0, **kwargs):
         Erev *= pq.mV
         
     elif isinstance(Erev, pq.Quantity):
-        uname = scq.nameFromUnit(Erev)
+        uname = scq.unitFamilyName(Erev)
         if uname != "Potential":
             raise TypeError("Erev expected to be a Potential; got {uname} instead")
         Erev  = Erev.rescale(pq.mV)

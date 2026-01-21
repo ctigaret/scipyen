@@ -20,7 +20,7 @@ from neo.core import spiketrain
 from neo.core.spiketrain import SpikeTrain
 from neo.core.objectlist import ObjectList as NeoObjectList
 
-from core.scipyen_quantities import (unitsConvertible, nameFromUnit)
+from core.scipyen_quantities import (unitsConvertible, unitFamilyName)
 from core.strutils import is_path #, is_pathname_valid
 
 
@@ -253,7 +253,11 @@ class DataSignal(BaseSignal):
 
         return obj
     
-    def __init__(self, signal, units=None, domain_units = None, time_units = None, dtype=None, copy=True, t_start=0*pq.dimensionless, sampling_rate=None, sampling_period=None, name=None, domain_name = None, file_origin=None, description=None, array_annotations=None, **annotations):
+    def __init__(self, signal, units=None, domain_units = None, time_units = None,
+                 dtype=None, copy=True, 
+                 t_start=0*pq.dimensionless, sampling_rate=None, sampling_period=None, 
+                 name=None, domain_name = None, file_origin=None, description=None, 
+                 array_annotations=None, **annotations):
         
         r"""DataSignal constructor.
         """
@@ -368,6 +372,8 @@ class DataSignal(BaseSignal):
                     elif k in ("t_start", "sampling_period", "sampling_rate"):
                         domainargs[k] = v
                         
+        # print(f"{self.__class__.__name__}.__init__: quants = {quants}")
+        # print(f"{self.__class__.__name__}.__init__: domainargs = {domainargs}")
         # harmonize time_units with domain_units
         if quants["domain_units"] is None:
             quants["domain_units"] = quants["time_units"]
@@ -377,38 +383,25 @@ class DataSignal(BaseSignal):
         # print(f"{self.__class__.__name__}.__init__ domainargs {domainargs}\n")
         # print(f"{self.__class__.__name__}.__init__ annots {annots}\n")
         
+        if not isinstance(domainargs["t_start"], pq.Quantity):
+            domainargs["t_start"] = 0 * (quants["domain_units"].units  if isinstance(quants["domain_units"], pq.Quantity)  else pq.dimensionless)
+            
         if isinstance(domainargs["sampling_period"], pq.Quantity):
             #print("sampling_period", domainargs["sampling_period"])
-            if unitsConvertible(1/domainargs["sampling_period"], quants["domain_units"]):
-                domainargs["sampling_rate"] = domainargs["sampling_period"]
-                domainargs["sampling_period"] = 1/domainargs["sampling_period"]
+            if unitsConvertible(domainargs["sampling_period"], domainargs["t_start"]):
+                domainargs["sampling_rate"] = 1/domainargs["sampling_period"]
+            elif domainargs["sampling_period"].units != domainargs["t_start"].units:
+                raise ValueError(f"Sampling period units {domainargs["sampling_period"].units} and t_start units {domainargs["t_start"].units} are incompatible")
+                # domainargs["sampling_period"] = 1/domainargs["sampling_period"]
         else:
-            if not isinstance(domainargs["t_start"], pq.Quantity):
-                domainargs["t_start"] = 0*pq.dimensionless
-
-            domainargs["sampling_period"] = 1 * domainargs["t_start"].units
-                
-        # else:
-        #     sp = domainargs["sampling_period"]
+            if isinstance(domainargs["sampling_rate"], pq.Quantity):
+                if unitsConvertible(1/domainargs["sampling_rate"], domainargs["t_start"].units):
+                    domainargs["sampling_period"] = 1/domainargs["sampling_rate"]
+                elif domainargs["sampling_rate"].units !=1/domainargs["t_start"].units:
+                    raise ValueError(f"Sampling rate units {domainargs["sampling_rate"].units} and t_start units {domainargs["t_start"].units} are incompatible")
+            else:
+                raise ValueError("At least one of 'sampling_rate' or 'sampling_period' must be specified")
             
-                
-        if isinstance(domainargs["sampling_rate"], pq.Quantity):
-            if unitsConvertible(domainargs["sampling_rate"], quants["domain_units"]):
-                domainargs["sampling_period"] = 1/domainargs["sampling_rate"]
-            
-        if all(isinstance(d, pq.Quantity) for d in (domainargs["t_start"], domainargs["sampling_period"])) :
-            if domainargs["t_start"] == 1/domainargs["sampling_period"]:
-                sr = domainargs["sampling_period"]
-                domainargs["sampling_period"] = domainargs["t_start"]
-                domainargs["sampling_rate"] = sr
-                domainargs["t_start"] = 0 * quants["domain_units"]
-            
-        elif all(isinstance(d, pq.Quantity) for d in (domainargs["t_start"], domainargs["sampling_rate"])) :
-            if domainargs["t_start"] == 1/domainargs["sampling_rate"]:
-                domainargs["sampling_period"] = domainargs["t_start"]
-                domainargs["t_start"] = 0 * quants["domain_units"]
-                
-                
         anns = annots.get("annotations", dict())
         
         if anns is None:
@@ -426,10 +419,11 @@ class DataSignal(BaseSignal):
         self._sampling_period = domainargs["sampling_period"]
 
         if not isinstance(self._domain_name_, str) or len(self._domain_name_.strip()) == 0:
-            self._domain_name_ = nameFromUnit(self._origin)
+            self._domain_name_ = unitFamilyName(self._origin)
         
         if not hasattr(self, "_name_") or not isinstance(self._name_, str) or len(self._name_.strip()) == 0:
-            self._name_ = nameFromUnit(self.units)
+            self._name_ = strings["name"]
+            # self._name_ = unitFamilyName(self.units)
     
     def __array_finalize__(self, obj):
         super(DataSignal, self).__array_finalize__(obj)
@@ -448,7 +442,7 @@ class DataSignal(BaseSignal):
         
         self.segment            = getattr(obj, "segment",       None)
         self.array_annotations  = getattr(obj, "array_annotations", None)
-        self._domain_name_    = nameFromUnit(self._origin)
+        self._domain_name_    = unitFamilyName(self._origin)
     
     def __reduce__(self):
         return _new_DataSignal, (self.__class__, 
@@ -748,7 +742,7 @@ class DataSignal(BaseSignal):
         r"""A brief description of the domain name
         """
         if self._domain_name_ is None:
-            self._domain_name_ = nameFromUnit(self.domain)
+            self._domain_name_ = unitFamilyName(self.domain)
             
         return self._domain_name_
     
@@ -1551,12 +1545,12 @@ class IrregularlySampledDataSignal(BaseSignal):
                             **annots["annotations"])
 
         
-        self._domain_name_ = nameFromUnit(self._domain)
+        self._domain_name_ = unitFamilyName(self._domain)
         
         if isinstance(name, str):
             self._name_ = name
         else:
-            self._name_ = nameFromUnit(self.units)
+            self._name_ = unitFamilyName(self.units)
     
     def __reduce__(self):
         return _new_IrregularlySampledDataSignal, (self.__class__,
@@ -1587,7 +1581,7 @@ class IrregularlySampledDataSignal(BaseSignal):
         #self.channel_index      = getattr(obj, "channel_index", None)
         self.array_annotations  = getattr(obj, "array_annotations", None)
         if isinstance(self._domain, pq.Quantity):
-            self._domain_name_    = nameFromUnit(self._domain)
+            self._domain_name_    = unitFamilyName(self._domain)
         else:
             self._domain_name_    = "Dimensionless"
         
@@ -1980,7 +1974,7 @@ class IrregularlySampledDataSignal(BaseSignal):
         r"""A brief description of the domain name
         """
         if self._domain_name_ is None:
-            self._domain_name_ = nameFromUnit(self.domain) if isinstance(self.domain, pq.Quantity) else "Dimensionless"
+            self._domain_name_ = unitFamilyName(self.domain) if isinstance(self.domain, pq.Quantity) else "Dimensionless"
             
         return self._domain_name_
     

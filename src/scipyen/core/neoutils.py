@@ -216,7 +216,7 @@ from .constants import (
 )
 
 import core.scipyen_quantities as scq
-from .scipyen_quantities import (unitsConvertible, checkTimeUnits, nameFromUnit, 
+from .scipyen_quantities import (unitsConvertible, checkTimeUnits, unitFamilyName, 
                                  unitQuantityFromNameOrSymbol)
 from .datasignal import (
     DataSignal,
@@ -400,7 +400,7 @@ def get_domain_name(obj):
 @get_domain_name.register(neo.Event)
 @get_domain_name.register(neo.SpikeTrain)
 def _(obj):
-    return nameFromUnit(obj.times)
+    return unitFamilyName(obj.times)
 
 
 @get_domain_name.register(DataSignal)
@@ -413,7 +413,7 @@ def _(obj):
 @get_domain_name.register(DataMark)
 @get_domain_name.register(TriggerEvent)
 def _(obj):
-    return nameFromUnit(obj.times)
+    return unitFamilyName(obj.times)
 
 
 @singledispatch
@@ -9454,7 +9454,7 @@ def plot_spiketrain_waveforms(x:neo.SpikeTrain,
     for k in range(x.waveforms.shape[0]):
         pfun(w_times, x.waveforms[k,:,:].T, label=f"Wave {k}", **kwargs)
         
-    plt.xlabel(f"{nameFromUnit(x.units)} ({x.units.dimensionality})")
+    plt.xlabel(f"{unitFamilyName(x.units)} ({x.units.dimensionality})")
     
     if isinstance(waveform_units, pq.Quantity):
         ylabel = f"{x.name} ({waveform_units.dimensionality})"
@@ -9549,16 +9549,17 @@ def plot_neo(
     xlabel = (
         ""
         if times_units_str == "dimensionless"
-        else f"{nameFromUnit(obj.times.units)} ({obj.times.units.dimensionality.string})"
+        else f"{unitFamilyName(obj.times.units)} ({obj.times.units.dimensionality.string})"
     )
     name = obj.name
     if name is None or len(name.strip()) == 0:
-        name = nameFromUnit(obj.units)
+        name = unitFamilyName(obj.units)
+    sig_name = obj.annotations.get("signal_name", name)
     ylabel = f"{name} ({obj.units.dimensionality.string})"
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
-    if isinstance(name, str) and len(name.strip()):
-        plt.title(name)
+    if isinstance(sig_name, str) and len(sig_name.strip()):
+        plt.title(sig_name)
 
     plt.legend()
     

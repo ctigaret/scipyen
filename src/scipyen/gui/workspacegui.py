@@ -520,17 +520,33 @@ class GuiMessages(object):
 
     @safewrapper
     def unpackWarnings(self, wrn:typing.Sequence[warnings.WarningMessage]) -> str|None:
+        from gui import guiutils
         if all(isinstance(wm, warnings.WarningMessage) for wm in wrn):
             ret = list()
-            for wm in wrn:
+            for k, wm in enumerate(wrn):
                 if os.path.isfile(wm.filename) and isinstance(wm.lineno, int) and wm.lineno > 0:
                     f = open(wm.filename, "r", encoding="utf-8")
                     text = f.readlines()
                     f.close()
-                    offendingLine = text[wm.lineno-1]
-                    ret.append("\n".join([f"{wm.message}:", offendingLine.strip(), f" in file {wm.filename}"]))
+                    
+                    c1 = "#ffaa00" if guiutils.isDarkGui() else "#ff5500"
+                    c2 = "#00ffff" if guiutils.isDarkGui() else "#008080"
+                    c3 = "#aaaa7f" if guiutils.isDarkGui() else "#4d4716"
+                    category = f"<b><font color='{c1}'>{wm.category.__name__}:</font></b>"
+                    # print(category)
+                    # print(wm.message.args)
+                    if len(wm.message.args) > 1:
+                        msg = "<br>".join(list(wm.message.args))
+                    else:
+                        msg = wm.message.args[0]
+                    # print(msg)
+                    
+                    offendingLine = f"<font color='{c2}'>{text[wm.lineno-1]}</font>"
+                    
+                    ret.append("<br>".join([f"{category}", f"{msg}", offendingLine.strip(), f" in file <font color={c3}>{wm.filename}</font>"]))
 
-            return "\n".join(ret)
+            return "<p>".join(ret)
+            # return "<html>" + "<p>".join(ret) + "</html>"
 
 
 

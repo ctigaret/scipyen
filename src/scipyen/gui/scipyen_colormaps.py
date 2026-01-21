@@ -1008,12 +1008,13 @@ def getPalette(name:str="std"):
     elif name in ("qt",):
         return qtGlobalColors
     
-    #elif name in ("a", "all"):
-        #ret = dict()
-        #for d in (qtGlobalColors,svgPalette,mplTab,mplXKCD):
-            #ret.update(d)
+    # BUG: 2026-01-20 21:57:18 TODO/FIXME
+    elif name in ("a", "all"):
+        ret = dict()
+        for d in all_palettes:
+            ret.update(d)
             
-        #return ret
+        return ret
     
     else:
         return standardPaletteDict

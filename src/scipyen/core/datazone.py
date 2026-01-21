@@ -192,7 +192,7 @@ class DataZone(neo.Epoch):
                             description=description, 
                             array_annotations=array_annotations, **annotations)
                 
-        self.__domain_name__ = cq.nameFromUnit(self.places)
+        self.__domain_name__ = cq.unitFamilyName(self.places)
             
             
     def __reduce__(self):
@@ -213,7 +213,7 @@ class DataZone(neo.Epoch):
         self.segment = getattr(obj, "segment", None)
         if not hasattr(self, "array_annotations"):
             self.array_annotations = ArrayDict(self._get_arr_ann_length())
-        self.__domain_name__ = cq.nameFromUnit(self.units)
+        self.__domain_name__ = cq.unitFamilyName(self.units)
         
     def __repr__(self):
         objs = ['%s@%s for %s' % (label, str(time), str(dur)) for label, time, dur in
@@ -429,7 +429,7 @@ class DataZone(neo.Epoch):
         r"""A brief description of the domain name
         """
         if self.__domain_name__ is None:
-            self.__domain_name__ = nameFromUnit(self.domain)
+            self.__domain_name__ = unitFamilyName(self.domain)
             
         return self.__domain_name__
     
@@ -677,7 +677,7 @@ coordinates are NOT restricted to time units.
                             array_annotations = array_annotations,
                             **annotations)
         
-        self.__domain_name__ = cq.nameFromUnit(self.times)
+        self.__domain_name__ = cq.unitFamilyName(self.times)
         
     def __reduce__(self):
         return _newInterval_, (self.__class__, pq.Quantity(self), self._t1, self.units,
@@ -698,7 +698,7 @@ coordinates are NOT restricted to time units.
         self.segment = getattr(obj, "segment", None)
         if not hasattr(self, "array_annotations"):
             self.array_annotations = ArrayDict(self._get_arr_ann_length())
-        self.__domain_name__ = cq.nameFromUnit(self.units)
+        self.__domain_name__ = cq.unitFamilyName(self.units)
         
     def __repr__(self):
         times = list(self.times)
@@ -923,7 +923,7 @@ coordinates are NOT restricted to time units.
         r"""A brief description of the domain name
         """
         if self.__domain_name__ is None:
-            self.__domain_name__ = nameFromUnit(self.units)
+            self.__domain_name__ = unitFamilyName(self.units)
             
         return self.__domain_name__
     
