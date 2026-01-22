@@ -703,7 +703,11 @@ coordinates are NOT restricted to time units.
     def __repr__(self):
         times = list(self.times)
         durations = list(self.durations)
-        labels = list(self.labels) if self.labes.size>0 else [""]
+        # print(f"{self.__class__.__name__}.__repr__: labels = {self.labels}")
+        if isinstance(self.labels, np.ndarray) and self.labels.ndim>0 and self.labels.size>0:
+            labels = list(self.labels)
+        else:
+            labels = [""]
         objs = ['%s@%s for %s' % (label, str(time), str(dur)) for label, time, dur in
                 zip(labels, times, durations)]
         return f"<{self.__class__.__name__}:{', '.join(objs)}>"
@@ -1407,8 +1411,9 @@ def intervals2epoch(*args, **kwargs):
     
     # takes care of getting durations right, for "true" intervals, and also
     # checks interval labels uniqueness
-    interval_labels = [] # used in the comprehension below, via __make_unique_label__
-    epoch_intervals = list(map(lambda x: (x.t0, x.t1, __make_unique_label__(x.name, interval_labels)) if x.extent else (x.t0, x.t1-x.t0, __make_unique_label__(x.name, interval_labels)), intervals))
+    interval_labels = kwargs.pop("labels", list()) # used in the comprehension below, via __make_unique_label__
+    uniquename = lambda x:  __make_unique_label__(x.name, interval_labels) if len(interval_labels) else x.name
+    epoch_intervals = list(map(lambda x: (x.t0, x.t1, uniquename(x)) if x.extent else (x.t0, x.t1-x.t0, uniquename(x)), intervals))
     # epoch_intervals = list(map(lambda x: (x.t0, x.t1, __make_unique_label__(x.name, interval_labels)) if x.extent else (min(x.t0, x.t1), abs(x.t1-x.t0), __make_unique_label__(x.name, interval_labels)), args))
 
     # cache the units, because conversion from a list to a numpy array 'slices'
@@ -1429,7 +1434,7 @@ def intervals2epoch(*args, **kwargs):
     
     name = kwargs.pop("name", klass.__name__)
     
-    return klass(times, durations=durations, labels=labels, name=name)
+    return klass(times.flatten(), durations=durations.flatten(), labels=labels, name=name)
     
 @safewrapper
 def epoch2cursors(epoch: typing.Union[neo.Epoch, DataZone], 

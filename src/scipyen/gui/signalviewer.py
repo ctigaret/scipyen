@@ -5934,11 +5934,19 @@ anything else       anything else       ❌
                 for k, seg in enumerate(segments):
                     # NOTE: 2024-09-17 15:31:30
                     # see datazone cursors2epochs for logic
-                    tdls = [(seg_starts[k] + rel_starts[i] - 0.5 * cursors[i].xwindow * seg_starts[k].units, cursors[i].xwindow * seg_starts[k].units, cursors[i].name) for i in range(len(cursors))]
+                    tdls = [(seg_starts[k] + rel_starts[i] - 0.5 * cursors[i].xwindow * seg_starts[k].units, 
+                             cursors[i].xwindow * seg_starts[k].units, 
+                             seg_starts[k].units, 
+                             cursors[i].name, 
+                             False) for i in range(len(cursors))]
+                    # print(f"{self.__class__.__name__}.cursorsToEpoch: tdls = {tdls}")
                     
-                    intervals = [Interval(*v, True) for v in tdls]
+                    intervals = [Interval(*v) for v in tdls]
+                    # print(f"{self.__class__.__name__}.cursorsToEpoch: intervals = {intervals}")
                     # intervals = [Interval(s_start + rel_starts[i] - cursors[i].xwindow*s_start.units/2, s_start + rel_starts[i] + cursors[i].xwindow*s_start.units/2, cursors[i].name, True) for i in range(len(cursors))]
                     seg_epoch = intervals2epoch(*intervals, name=name)
+                    seg_epoch.set_labels(list(map(lambda t: t[3], tdls)))
+                    # print(f"{self.__class__.__name__}.cursorsToEpoch: seg_epoch.labels = {seg_epoch.labels}")
                     epochs.append(seg_epoch)
                     if embed:
                         if overwrite:
