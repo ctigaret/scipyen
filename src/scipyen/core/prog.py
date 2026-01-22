@@ -3541,7 +3541,8 @@ def object_find(oname=str, namespaces=None,
                         sims = list(map(lambda k: strutils.jaccard(k, parts[-1]), members))
                         acc = list(filter(lambda s: s > 0.5, sims))
                         if len(acc):
-                            candidates.extend(list(map(make_name_info(subname, s, sinfo.obj, sinfo.obj.__dict__[members[sims.index(s)]]),  acc)))
+                            candidates.extend(list(map(lambda s: 
+                                                           make_name_info(subname, s, sinfo.obj, sinfo.obj.__dict__[members[sims.index(s)]]),  acc)))
 
         # 3) the object has not been imported in any of the namespaces
         # WARNING: this can be problematic: in theory, the object could be available

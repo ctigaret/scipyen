@@ -54,7 +54,7 @@ import cmath
 
 # BEGIN 3rd party modules
 
-# BEGIN PyQtxxx and utilities for setting GUI appearance
+# BEGIN PyQtxxx
 import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
 from qtpy.QtCore import (Signal, Slot, Property,)
@@ -1680,6 +1680,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.currentSessionTreeWidgetItem = None
 
         self.fileSystemModel = QtWidgets.QFileSystemModel(parent=self)
+        self.fileSystemModel.setReadOnly(False)
         self.fileSystemModel.setNameFilterDisables(False)
 
         self.currentVarItem = None
@@ -6572,6 +6573,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
 
         # ### BEGIN file system view,  navigation widgets & actions
+        #
+        
         # self.fileSystemTreeView.setUniformRowHeights(True) # set in the ui file
         self.fileSystemTreeView.setModel(self.fileSystemModel)
         self.fileSystemTreeView.setAlternatingRowColors(True)
@@ -7075,6 +7078,12 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                          if item.column() == 0]  # list of QModelIndex
 
         action_0 = None
+        copy_action = None
+        move_action = None
+        trash_action = None
+        remove_action = None
+        rename_action = None
+        open_link_target_action = None
 
         scripts = set()
         spreads = set()
@@ -7085,6 +7094,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
             # print("fileNames", fileNames)
 
+            if not all(pio.checkFileReadAccess(f) for f in fileNames):
+                return
+            
             openFileObjects = cm.addAction("Open")
             openFileObjects.triggered.connect(self.slot_openSelectedFileItems)
 
@@ -7092,8 +7104,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             #     if pio.checkFileReadAccess(f):
             #         mime_file_type = pio.getMimeAndFileType(f)
 
-            if not all(pio.checkFileReadAccess(f) for f in fileNames):
-                return
 
             spreads = set([f for f in fileNames if pio.is_spreadsheet(f)])
             scripts = set([f for f in fileNames if pio.is_python_source(f)])
@@ -7111,12 +7121,17 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             fileNamesToConsole.triggered.connect(self._sendFileNamesToConsole_)
 
             cm.addSeparator()
-            openFilesInSystemApp = cm.addAction(
-                "Open With Default Application")
-            openFilesInSystemApp.triggered.connect(
-                self.slot_systemOpenSelectedFiles)
+            openFilesInSystemApp = cm.addAction("Open With Default Application")
+            openFilesInSystemApp.triggered.connect(self.slot_systemOpenSelectedFiles)
 
             action_0 = openFileObjects
+            cm.addSeparator()
+            
+            
+            
+            # for f in fileNames:
+                
+            
 
         cm.addSeparator()
         openParentFolderInSystemApp = cm.addAction(
@@ -11009,7 +11024,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                     "action": action_name, "types": viewer_for_types}
                 VTH.gui_handlers[x] = {
                     "action": action_name, "types": viewer_for_types}
-
+                
+    def _qt_checkPermissions(self, Qt):
+        pass
+                
 
 class WindowEventFilter(QtCore.QObject):
     def __init__(self, mpl_fig, parent=None):
