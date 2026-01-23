@@ -221,7 +221,7 @@ from core.scipyen_quantities import (arbitrary_unit, checkTimeUnits, unitsConver
                             unitQuantityFromNameOrSymbol, )
 from core.datatypes import UnitTypes
 from core.workspacefunctions import validate_varname
-from core.utilities import (get_nested_value, set_nested_value, counter_suffix, 
+from core.utilities import (get_nested_value, set_nested_value, 
                             reverse_mapping_lookup, 
                             get_index_for_seq, 
                             safe_identity_test,
@@ -231,7 +231,6 @@ from core.utilities import (get_nested_value, set_nested_value, counter_suffix,
                             unique,
                             duplicates,
                             GeneralIndexType,
-                            counter_suffix,
                             yyMdd,
                             NestedFinder)
 
@@ -251,6 +250,7 @@ from core.traitcontainers import DataBag
 # from core.traitutils import (TraitsObserver, trait_from_type, )
                                   
 from core.sysutils import adapt_ui_path
+from core.strutils import counter_suffix
 
 #### END pict.core modules
 

@@ -3649,3 +3649,5 @@ class UrlNavigator(QtWidgets.QWidget):
     @property
     def navigatorButtons(self) -> list:
         return list(filter(lambda x: isinstance(x, UrlNavigatorButton), self.children()))
+
+

@@ -35,7 +35,8 @@ else:
 
 from core.prog import safewrapper
 
-from core.utilities import (counter_suffix, reverse_dict, reverse_mapping_lookup)
+from core.utilities import (reverse_dict, reverse_mapping_lookup)
+from core.strutils import counter_suffix
 
 from gui.painting_shared import (HoverPoints, x_less_than, y_less_than,
                               qtGlobalColors, standardPalette, standardPaletteDict, 

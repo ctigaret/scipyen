@@ -36,6 +36,7 @@ from core.scipyen_quantities import(arbitrary_unit,
                             checkTimeUnits)
 
 from core.utilities import (get_index_for_seq, sp_set_loc )
+from core.strutils import counter_suffix
 
 from core.datatypes import (UnitTypes, GENOTYPES, )
 

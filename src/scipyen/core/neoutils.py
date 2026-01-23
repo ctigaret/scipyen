@@ -240,11 +240,9 @@ from core.utilities import (
     elements_types,
     index_of,
     isclose,
-    similar_strings,
-    counter_suffix,
 )
 
-from core.strutils import InflectEngine, pluralize
+from core.strutils import (InflectEngine, pluralize, counter_suffix, similar_strings)
 # from core import pyabfbridge as pab # commented-out, to avoid circular imports!
 
 #### END pict.core modules

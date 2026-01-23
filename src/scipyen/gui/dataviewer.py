@@ -366,12 +366,6 @@ class DataViewer(ScipyenViewer):
                     "showPrivate": self._showPrivateMembers_,
                     "dataTypeStr": type(obj).__name__}
             self._sig_setTreeWidgetData_.emit(what)
-            # self.treeWidget.setData(obj, 
-            #                         predicate = self.predicate, 
-            #                         showPrivate = self._showPrivateMembers_,
-            #                         top_title = name, 
-            #                         dataTypeStr=type(obj).__name__)
-            # self.docTitle = name
             
     @Slot()
     def _slot_treeWidgetPopulated(self):
@@ -865,7 +859,8 @@ class DataViewer(ScipyenViewer):
             targetDataType = dataclasses.MISSING # gets the data type resulting from the accessor
                 
             # print(f"{self.__class__.__name__}._get_path_for_item_: element = {element}, parentIndexType = {parentIndexType}, elementDataType = {elementDataType}")
-            
+            # if parentIndexType == pathlib.Path:
+            #     element = 
             path_parts = [element] # the pathway from root to branch tip
             
             # elements of the expression used to access for the 

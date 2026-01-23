@@ -150,8 +150,8 @@ from qtconsole.manager import QtKernelManager
 from core.prog import (safewrapper, with_doc)
 from core.extipyutils_client import (init_commands, execute, ForeignCall,
                                     nrn_ipython_initialization_cmd,)
-from core.strutils import str2symbol
-from core.utilities import counter_suffix
+from core.strutils import str2symbol, counter_suffix
+# from core.utilities import 
 
 from core.scipyen_config import (markConfigurable, ScipyenConfigurable,
                                  saveWindowSettings, loadWindowSettings,)

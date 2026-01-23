@@ -913,8 +913,8 @@ def validate_varname(arg, ws:typing.Optional[dict]=None,
         
     
     """
-    from core.utilities import counter_suffix
-    from core.strutils import str2symbol
+    # from core.utilities import 
+    from core.strutils import str2symbol, counter_suffix
     
     if ws is None:
         frame_records = inspect.getouterframes(inspect.currentframe())

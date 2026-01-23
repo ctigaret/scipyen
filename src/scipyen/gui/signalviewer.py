@@ -219,7 +219,7 @@ from core.prog import (safewrapper, show_caller_stack, with_doc, scipywarn)
 from core.datatypes import (array_slice, is_column_vector, is_vector, )
 
 from core.utilities import (normalized_index, normalized_axis_index, 
-                            normalized_sample_index, counter_suffix,
+                            normalized_sample_index,
                             safe_identity_test)
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
 from core.triggerprotocols import TriggerProtocol
@@ -231,7 +231,7 @@ from core.workspacefunctions import validate_varname
 from core.scipyen_config import markConfigurable
 from core.traitcontainers import DataBag
 
-from core.strutils import (InflectEngine, get_int_sfx)
+from core.strutils import (InflectEngine, get_int_sfx, counter_suffix)
 
 from core.sysutils import adapt_ui_path
 
@@ -4206,7 +4206,6 @@ anything else       anything else       ❌
         return crsId
     
     def _editCursor_(self, crsId=None, choose=False):
-        from core.utilities import counter_suffix
         
         if len(self._data_cursors_) == 0:
             return

@@ -88,8 +88,9 @@ from core.scipyen_quantities import (arbitrary_unit,
 from core.datatypes import (is_numeric, is_numeric_string, MissingType)
 from core.constants import ( RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE, EQUAL_NAN)
 
-from core.utilities import (reverse_mapping_lookup, unique, counter_suffix,
+from core.utilities import (reverse_mapping_lookup, unique,
                             isclose, all_or_all_not)
+from core.strutils import counter_suffix
 
 from core.traitcontainers import DataBag
 

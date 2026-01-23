@@ -464,12 +464,131 @@ def get_int_sfx(s: str, sep: str = "_", use_re: bool = False) -> typing.Tuple[st
 
     return base, sfx
 
+def counter_suffix(x:str, strings:typing.List[str], sep:str="_", start:int=0, ret:bool=False):
+    r"""Appends a counter suffix to x:str if x is found in the list of strings
+    
+    Parameters:
+    ==========
+    
+    x = str: string to check for existence
+    
+    strings = sequence of str to check for existence of x
+    
+    sep: str, default is "_"; suffix separator
+    
+    start: 
+    
+    """
+    # TODO:
+    
+    #base = "AboveTheSky"
+    #p = re.compile("^%s_{0,1}\d*$" % base)
+    #p = re.compile("^%s_{0,1}\d*$" % base)
+    #items = list(filter(lambda x: p.match(x), standardQtGradientPresets.keys()))
+    #items
+    #names = list(standardQtGradientPresets.keys())
+    #names.append("AboveTheSky_1")
+    #items = list(filter(lambda x: p.match(x), names))
+    #items
+
+    if not isinstance(strings, (tuple, list)) and not hasattr(strings, "__iter__"):
+        raise TypeError("Second positional parameter was expected to be an iterable; got %s instead" % type(strings).__name__)
+    
+    if not all ([isinstance(s, str) for s in strings]):
+        raise TypeError("Second positional parameter was expected to contain str elements only")
+    
+    if not isinstance(sep, str):
+        raise TypeError("Separator must be a str; got %s instead" % type(sep).__name__)
+    
+    # if len(sep.strip()) == 0:
+    #     raise ValueError("Separator cannot be an empty string")
+    
+    if not isinstance(start, int):
+        raise TypeError(f"'start' expected to be an int; got {type(start).__name__} instead")
+    
+    if start < 0:
+        raise ValueError(f"'start' expected to be a positive int (>= 0); instead, got {start}")
+    
+    # print(f"counter_suffix: x = {x}, strings = {strings}, start = {start}")
+    # print(f"counter_suffix: x = {x}, start = {start}, ret = {ret}")
+    
+    if len(strings):
+        base, cc = get_int_sfx(x, sep=sep)#, bracketed=bracketed)
+        
+        # print(f"counter_suffix: base = {base}, cc = {cc}")
+        
+        #p = re.compile(base)
+        # if bracketed:
+        #     p = re.compile(r"^%s%s{0,1}\(\d*\)$" % (base, sep))
+        # else:
+        #     p = re.compile(r"^%s%s{0,1}\d*$" % (base, sep))
+        p = re.compile(r"^%s%s{0,1}\d*$" % (base, sep))
+        
+        items = sorted(list(filter(lambda x: p.match(x), strings)))
+        
+        # print(f"counter_suffix items = {items}")
+        newsfx = None
+        if len(items):
+            full_ndx = list(range(start, len(items)))
+            currentsfx = list(x[1] for x in sorted(list(filter(lambda x: isinstance(x[1], int), (map(lambda x: get_int_sfx(x, sep=sep), items)))), key=lambda x: x[1]))
+            # currentsfx = list(x[1] for x in sorted(list(filter(lambda x: isinstance(x[1], int), (map(lambda x: get_int_sfx(x, sep=sep, bracketed=bracketed), items)))), key=lambda x: x[1]))
+            if len(currentsfx):
+                min_current = min(currentsfx)
+                max_current = max(currentsfx)
+                if  len(full_ndx) == 0:
+                    newsfx = 0
+                else:
+                    if min_current > min(full_ndx):
+                        newsfx = min(full_ndx)
+                    else:
+                        # find out missing indices
+                        if len(currentsfx) > 1:
+                            dsfx = np.ediff1d(currentsfx)
+                            locs = np.where(dsfx > 1)[0]
+                            if len(locs):
+                                newsfx = locs[0] + 1
+                            else:
+                                newsfx = currentsfx[-1] + 1
+                        else:
+                            newsfx = currentsfx[-1] + 1
+                        
+                    # newsfx = full_ndx[-1]
+                    
+            else:
+                newsfx = start   
+                
+            # if bracketed:
+            #     result = sep.join([base, "(%d)" % newsfx])
+            # else:
+            #     result = sep.join([base, "%d" % newsfx])
+            result = sep.join([base, "%d" % newsfx])
+            
+            if ret:
+                return result, newsfx
+            
+            return result
+        
+        else:
+            result = x
+            if ret:
+                return x, None
+            return x
+        
+    if ret:
+        return x, None
+    return x
+                
+def similar_strings(a:str, b:str) -> bool:
+    r"""Similarity between two strings using difflib.SequenceMatcher./
+See also jaccard
+"""
+    from difflib import SequenceMatcher
+    return SequenceMatcher(None, a, b).ratio()
 
 def pluralize(s: str, n: int = 1) -> str:
     if not isinstance(s.str):
         return ""
     return InflectEngine.plural(s, n)
-
 
 def simplify(s: str) -> str:
     r"""Strips spaces at ends and converts inner double spaces to single spaces"""
@@ -1086,7 +1205,9 @@ def parse_version_string(s: str) -> list:
 def jaccard(s1, s2) -> float:
     if not all([isinstance(s, str) and len(s.strip()) for s in (s1,s2)]):
         return 0.
-    r"""Calculates Jaccard similarity between two strings 's1' and 's2'"""
+    r"""Calculates Jaccard similarity between two strings 's1' and 's2'.
+See also similar_strings, which uses difflib.SequenceMatcher
+"""
     set1 = set(s1)
     set2 = set(s2)
     

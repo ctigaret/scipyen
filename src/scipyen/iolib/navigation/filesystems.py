@@ -40,6 +40,31 @@ else:
 # from . import networkmounts
 # from iolib.navigation.networkmounts import (NetworkMounts, NetworkMountsType)
 
+# NOTE: 2026-01-23 14:45:04
+# "standard" file system item operations for the file system viewer - single item selected
+#
+#                               Shown for   Enabled if:                                         Acts on:
+#                               item type   item permissions        parent item permissions 
+#                                           ReadOwner|WriteOwner|   ReadOwner|WriteOwner|ReadGroup|WriteGroup
+#                                           ReadGroup|WriteGroup    
+# ---------------------------------------------------------------------------------------------------------
+# Create New -> submenu         directory                                                       item
+# Cut                           all                                 WriteOwner|WriteGroup       item
+# Copy                          all                                                             item
+# Copy location                 all                                                             item
+# Paste Clipboard Contents      directory                                                       item
+# Duplicate here                all         ReadOwner|WriteOwner    WriteOwner|WriteGroup       parent item
+# Rename                        all                                 WriteOwner|WriteGroup       parent item, item
+# Move to Trash                 all                                 WriteOwner|WriteGroup       parent item
+# Delete                        all                                 WriteOwner|WriteGroup       parent item
+# ----------------------------------------------------------------------------------------------------------
+#
+#                                                                   NOTE: when parent item (always a directory)
+#                                                                   is not readable the tree should collapse and hide its contents
+#                                                                   thjerefore, ReadOwner is implied to be True, in this column
+
+
+
 class FsType(IntEnum):pass
 FsType = IntEnum("FsType", 
                  ["Unknown", 

@@ -36,6 +36,7 @@ from core.prog import (safewrapper, deprecation, iter_attribute,
                        filter_type, filterfalse_type, 
                        filter_attribute, filterfalse_attribute,
                        filter_attr, filterfalse_attr)
+from core.strutils import counter_suffix
 from core.sysutils import adapt_ui_path
 from core.vigra_patches import vigra
 from gui import pictgui as pgui
@@ -767,7 +768,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             if isinstance(params, pgui.PlanarGraphics) and (isinstance(params.name, str) and len(params.name) > 0):
                 tryName = params.name
                 if tryName in rDict.keys():
-                    tryName = utilities.counter_suffix(tryName, [s for s in rDict.keys()])
+                    tryName = counter_suffix(tryName, [s for s in rDict.keys()])
                     
                 roiId = tryName
                 

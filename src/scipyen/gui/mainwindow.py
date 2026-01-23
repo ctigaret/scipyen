@@ -275,6 +275,7 @@ import core.data_analysis as anl
 import core.desktoputils as desktoputils
 import core.scipyen_quantities as cq
 import core.strutils as strutils
+from core.strutils import counter_suffix
 import core.signalprocessing as sigp
 import core.sysutils as sysutils
 import core.tiwt as tiwt
@@ -1600,7 +1601,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         
         self.sig_splashMessage.emit("Scipyen is initializing, please wait...")
         
-        # self.__version__ = checkVersion()
+        # self.__version__ = checkVersion() 
         
         # ### BEGIN long comment - wrap it for KDE's Kate
         # NOTE: 2023-05-27 22:00:37
@@ -5644,17 +5645,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
             self.currentVarItem, self.currentVarItemName = self._getWorkspaceVarItemAndName_(
                 modelIndex)
-
-#             if modelIndex.column()==0:
-#                 self.workspaceModel.currentItem = self.workspaceModel.itemFromIndex(modelIndex)
-#                 self.workspaceModel.currentItemName = self.workspaceModel.itemFromIndex(modelIndex).text()
-#
-#             else:
-#                 row = modelIndex.row()
-#                 self.workspaceModel.currentItem = self.workspaceModel.item(row,0)
-#                 self.workspaceModel.currentItemName = self.workspaceModel.item(row,0).text()
-
-            # item = self.workspace[self.workspaceModel.currentItemName]
             obj = self.workspace[self.currentVarItemName]
 
         else:
@@ -6811,6 +6801,26 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         else:
             warnings.warn(f"Launching a terminal on {sys.platform} is not yet supported")
         
+    @Slot()
+    def _slot_createNewFolder(self):
+        selectedItems = [item for item in self.fileSystemTreeView.selectedIndexes()
+                         if item.column() == 0]
+        if len(selectedItems) != 1:
+            return
+        item = selectedItems[0]
+        # parent = item.parent()
+        info = item.data(QtGui.QFileSystemModel.FileInfoRole)
+        if not info.exists() or not info.isDir() or not info.isWritable():
+            return
+        
+        folder = QtCore.QDir()
+        
+        folderName = "New folder"
+        
+        d = qd.QuickDialog(self, "Create New Folder")
+        folderNameInput = qd.StringInput(d, "New folder name:")
+        folderNameInput.setValue(folderName)
+        
         
     @Slot()
     @safewrapper
@@ -7078,6 +7088,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                          if item.column() == 0]  # list of QModelIndex
 
         action_0 = None
+        create_new = None
         copy_action = None
         move_action = None
         trash_action = None
@@ -7125,7 +7136,25 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             openFilesInSystemApp.triggered.connect(self.slot_systemOpenSelectedFiles)
 
             action_0 = openFileObjects
+            
+        if len(selectedItems) == 1:
+            item = selectedItems[0]
+            info = item.data(QtGui.QFileSystemModel.FileInfoRole)
             cm.addSeparator()
+            if info.exists() and info.isDir() and info.isWritable():
+                createNewFolderAction = cm.addAction("Create New Folder")
+                createNewFolderAction.triggered.connect(self._slot_createNewFolder)
+                
+            
+            parent = item.parent()
+            
+            while self.fileSystemModel.rootPath() != self.fileSystemModel.filePath(parent):
+                parent = parent.parent()
+                
+            rootItem = parent
+            
+            if self.fileSystemModel.permissions(item.parent()) & QtCore.QFileDevice.WriteOwner:
+                pass
             
             
             
