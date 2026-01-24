@@ -568,7 +568,7 @@ See also jaccard
     return SequenceMatcher(None, a, b).ratio()
 
 def pluralize(s: str, n: int = 1) -> str:
-    if not isinstance(s.str):
+    if not isinstance(s, str):
         return ""
     return InflectEngine.plural(s, n)
 

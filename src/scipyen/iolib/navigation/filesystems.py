@@ -63,7 +63,11 @@ else:
 #                                                                   is not readable the tree should collapse and hide its contents
 #                                                                   thjerefore, ReadOwner is implied to be True, in this column
 
-
+# class FileSystemItemData:
+#     def __init__(self, value):
+#         self.value = value
+#         
+# FileSystemItemDataType = QtCore.QMetaType.registerType(FileSystemItemData, "FileSystemItemData")
 
 class FsType(IntEnum):pass
 FsType = IntEnum("FsType", 
@@ -105,6 +109,24 @@ fsMap = [
         FsInfo(FsType.Fat, "msdos"),
         FsInfo(FsType.Fuse, "fuseblk"),
     ]
+
+class CopyFilesJob(QtCore.QThread):
+    sig_finished = Signal(name="finished")
+    def __init__(self, sourceFileNames: typing.Sequence[str], 
+                 destinationFileNames: typing.Sequence[str], 
+                 parent:typing.Optional[QtCore.QObject]=None):
+        assert(len(sourceFileNames) == len(destinationFileNames)), f"Mismatch between number of source ({len(sourceFileNames)}) and destination files ({destinationFileNames})"
+        self.sourceFileNames = sourceFileNames
+        self.destinationFileNames = destinationFileNames
+        QtCore.QThread.__init__(self, parent=parent)
+
+    def run(self):
+        try:
+            for src, dest in zip(self.sourceFileNames, self.destinationFileNames):
+                QtCore.QFile.copy(src, dest)
+        except:
+            traceback.print_exc()
+        sig_finished.emit()
 
 def typeFromName(name:str):
     from core.prog import scipywarn

@@ -391,7 +391,7 @@ class GuiMessages(object):
         
     @safewrapper
     def questionMessage(self, title, text, default=QtWidgets.QMessageBox.No):
-        return QtWidgets.QMessageBox.question(self, title, text)
+        return QtWidgets.QMessageBox.question(self, title, text, defaultButton=default)
 
     @staticmethod
     def questionMessage_static(obj:typing.Optional[QtWidgets.QWidget]=None, title:str="Question", text:str="", default=QtWidgets.QMessageBox.No):

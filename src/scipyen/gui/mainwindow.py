@@ -352,6 +352,7 @@ from .workspacemodel import WorkspaceModel
                     
 
 from iolib import h5io, jsonio, network, navigation
+from iolib.navigation import filesystems
 from iolib import pictio as pio
 
 
@@ -1591,6 +1592,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         self.navPrevDir = collections.deque()
         self.navNextDir = collections.deque()
+        self.nextFileJob:typing.Optional[str] = None
         self._currentDir_ = None
         self._nMaxWatchedDirectories_ = 1
         self._nMaxWatchedFiles_= 1
@@ -6803,6 +6805,89 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 
         else:
             warnings.warn(f"Launching a terminal on {sys.platform} is not yet supported")
+            
+    @Slot()
+    def _slot_copyFileSystemItems(self):
+        self.nextFileJob = "copy"
+        clipboard = QtGui.QGuiApplication.clipboard()
+        mimeData = QtCore.QMimeData()
+        if not self.fileSystemModel.rootDirectory().isEmpty():
+            selectedItems = [item for item in self.fileSystemTreeView.selectedIndexes()
+                            if item.column() == 0]  # list of QModelIndex
+            fileNames = set([self.fileSystemModel.filePath(i) for i in selectedItems])
+            fileUrls = list(sorted(map(lambda i: f"file:///{i}", fileNames)))
+            
+            if len(fileUrls):
+                mimeData.setUrls(list(map(lambda u: QtCore.QUrl(u), fileUrls)))
+                clipboard.setMimeData(mimeData)
+            
+            print(f"{self.__class__.__name__}._slot_copyFileSystemItems: fileUrls = {fileUrls}")
+            
+    @Slot()
+    def _slot_pasteIntoFileSystemDirectory(self):
+        selectedItems = [item for item in self.fileSystemTreeView.selectedIndexes()
+                        if item.column() == 0]  # list of QModelIndex
+        
+        if len(selectedItems) == 1:
+            item = selectedItems[0]
+            info = item.data(QtGui.QFileSystemModel.FileInfoRole)
+            if not info.exists() or not info.isDir() or not info.isWritable() or not info.isReadable():
+                return
+            itempathstr = self.fileSystemModel.filePath(item)
+            targetDir = QtCore.QDir(itempathstr) 
+        else:
+            targetDir = self.fileSystemModel.rootDirectory()
+            
+        clipboard = QtGui.QGuiApplication.clipboard()
+        mimeData = clipboard.mimeData()
+        if mimeData.hasUrls():
+            urls = list(filter(lambda u: u.isLocalFile(), mimeData.urls()))
+            targetFileNames = list(map(lambda u: u.fileName(), urls))
+            sourceFileNames = list(map(lambda u: u.toLocalFile(), urls))
+            if not targetDir.isEmpty():
+                targetFileNames = list(map(lambda f: self._checkItemExistsInDir_(f, targetDir), targetFileNames))
+            # else:
+
+            targets = list(map(lambda f: pathlib.Path(itempathstr).joinpath(f).as_posix(), targetFileNames))
+            
+            print(f"{self.__class__.__name__}._slot_pasteIntoFileSystemDirectory: targets {targets}")
+            
+        elif any([mimeData.hasText(), mimeData.hasImage(), mimeData.hasHtml(), mimeData.hasColor()]):
+            d = qd.QuickDialog(self, "Paste Clipboard Contents")
+            fileNameInput = qd.StringInput(d, "Enter file name:")
+            if d.exec():
+                fileName = fileNameInput.value()
+                if len(fileName.strip()) == 0:
+                    return
+                
+                if not targetDir.isEmpty():
+                    entries = targetDir.entryList(QtCore.QDir.Dirs | QtCore.QDir.NoDotAndDotDot)
+                    if fileName in entries:
+                        ret = self.questionMessage("Create File", f"File {fileName} already exists. Overwrite?")
+                        if ret != QtWidgets.QMessageBox.Yes:
+                            return 
+                        
+                print(f"{self.__class__.__name__}._slot_pasteIntoFileSystemDirectory will create {fileName} in {targetDir.path()}")
+                
+            else:
+                return
+            
+            
+            
+            
+            
+
+            
+    def _checkItemExistsInDir_(self, fileName:str, testDir:typing.Union[str, QtCore.QDir], autorename:bool=True):
+        if isinstance(testDir, str):
+            testDir = QtCore.QDir(testDir)
+        if testDir.isEmpty():
+            return fileName
+        entries = testDir.entryList(QtCore.QDir.Dirs | QtCore.QDir.NoDotAndDotDot)
+        if fileName in entries:
+            fileName = counter_suffix(fileName, entries, bracketed=True, start=1,
+                                        returns_counter=False)
+        return fileName
 
     @Slot()
     def _slot_createNewFolder(self):
@@ -6831,13 +6916,13 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 return
 
             parent = item
-            itemdir = QtCore.QDir(self.fileSystemModel.filePath(item))
-            entries = itemdir.entryList(QtCore.QDir.Dirs | QtCore.QDir.NoDotAndDotDot)
-
-
-            if folderName in entries:
-                folderName = counter_suffix(folderName, entries, bracketed=True, start=1,
-                                            returns_counter=False)
+            folderName = self._checkItemExistsInDir_(folderName, self.fileSystemModel.filePath(item))
+            # itemdir = QtCore.QDir(self.fileSystemModel.filePath(item))
+            # entries = itemdir.entryList(QtCore.QDir.Dirs | QtCore.QDir.NoDotAndDotDot)
+            # 
+            # if folderName in entries:
+            #     folderName = counter_suffix(folderName, entries, bracketed=True, start=1,
+            #                                 returns_counter=False)
 
         else:
             parent = self.fileSystemModel.rootDirectory()
@@ -7152,20 +7237,34 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         NOTE: The context menu only appears if the collection of selected items
         contains only items pointing to regular files.
     """
+        from core.strutils import pluralize
         action_0 = None
+        create_new = None
+        copy_action = None
+        move_action = None
+        paste_action = None
+        trash_action = None
+        remove_action = None
+        rename_action = None
+        open_link_target_action = None
+        
+        clipboard = QtGui.QGuiApplication.clipboard()
+        mimeData = clipboard.mimeData()
+        if mimeData.hasUrls():
+            nUrls = len(mimeData.urls())
+            pasteActionName = f"Paste {nUrls} {pluralize("item", nUrls)}"
+            
+        elif any([mimeData.hasText(), mimeData.hasImage(), mimeData.hasHtml(), mimeData.hasColor()]):
+            pasteActionName = "Paste clipboard contents"
+            
+        itemAtMouse = self.fileSystemTreeView.indexAt(point)
+        # print(f"{self.__class__.__name__}.slot_fileSystemContextMenuRequest: indexAtMouse: {itemAtMouse.data()}")
         if not self.fileSystemModel.rootDirectory().isEmpty():
             cm = QtWidgets.QMenu("Selected Items", self)
 
             selectedItems = [item for item in self.fileSystemTreeView.selectedIndexes()
                             if item.column() == 0]  # list of QModelIndex
 
-            create_new = None
-            copy_action = None
-            move_action = None
-            trash_action = None
-            remove_action = None
-            rename_action = None
-            open_link_target_action = None
 
             scripts = set()
             spreads = set()
@@ -7173,7 +7272,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             # print(f"{self.__class__.__name__}.slot_fileSystemContextMenuRequest: ")
 
             if len(selectedItems):
-                if not all(self.fileSystemModel.permissions(i) for i in selectedItems):
+                if not all(self.fileSystemModel.permissions(i) & QtCore.QFileDevice.ReadOwner for i in selectedItems):
                     return
                 fileNames = set([self.fileSystemModel.filePath(i) for i in selectedItems])
                 infos = list(map(lambda i: i.data(QtGui.QFileSystemModel.FileInfoRole), selectedItems))
@@ -7233,24 +7332,22 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
                     if all(i.isWritable() for i in parentInfos):
                         cm.addSeparator()
-                        copyFileitemsAction = cm.addAction("Copy")
-
                         cutFilesAction = cm.addAction("Cut")
 
-                        pasteAction = cm.addAction("Paste Clipboard Contents")
+                        copyFileItemsAction = cm.addAction("Copy")
+                        copyFileItemsAction.triggered.connect(self._slot_copyFileSystemItems)
 
-                        trashAction = cm.addAction("Move To trash")
+                        pasteAction = cm.addAction(pasteActionName)
+                        pasteAction.triggered.connect(self._slot_pasteIntoFileSystemDirectory)
+                        paste_action = pasteAction
+
+                        if QtCore.QFile.supportsMoveToTrash():
+                            trashAction = cm.addAction("Move To trash")
 
                         deleteAction = cm.addAction("Delete")
 
-
-
-
-
                     if action_0 is None:
                         action_0 = openFileObjects
-
-
             cm.addSeparator()
 
         else:
@@ -7261,6 +7358,12 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             createNewFolderAction.triggered.connect(self._slot_createNewFolder)
             create_new = createNewFolderAction
             cm.addSeparator()
+            
+        if paste_action is None:
+            pasteAction = cm.addAction(pasteActionName)
+            pasteAction.triggered.connect(self._slot_pasteIntoFileSystemDirectory)
+            paste_action = pasteAction
+            
 
 
         openParentFolderInSystemApp = cm.addAction(
