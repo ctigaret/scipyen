@@ -297,19 +297,26 @@ class OptionalStringInput(QtWidgets.QFrame):
     @Slot(str)
     def _slot_textChanged(self, val:str):
         self.valueChanged.emit(val)
+
+    def setToolTip(self, tip:str):
+        self.variable.setToolTip(tip)
+        self.label.setToolTip(tip)
     
     def setFocus(self):
         self.variable.setFocus()
         
     def setValue(self, text:str):
         self.variable.setText(text)
-            
+
+    def value(self) -> str:
+        return self.text()
+
     def setText(self, text:str):
         self.variable.setText(text)
-    
+
     def text(self):
         return str(self.variable.text())
-    
+
     def unicode(self):
         return unicode(self.variable.text())
 

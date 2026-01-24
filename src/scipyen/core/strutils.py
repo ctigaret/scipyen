@@ -404,7 +404,8 @@ def is_pathname_valid(pathname: str) -> bool:
     # Did we mention this should be shipped with Python already?
 
 
-def get_int_sfx(s: str, sep: str = "_", use_re: bool = False, bracketed:bool=False) -> typing.Tuple[str, int]:
+def get_int_sfx(s: str, sep: str = "_",
+                use_re: bool = False, bracketed:bool=False) -> typing.Tuple[str, int]:
     r"""Parses an integral suffix from the string.
 
     The suffix needs to be delimited by the sep string.
@@ -428,40 +429,43 @@ def get_int_sfx(s: str, sep: str = "_", use_re: bool = False, bracketed:bool=Fal
 
     """
     if not isinstance(s, str) or len(s.strip()) == 0:
-        return ("", 0)
+        return ("", None)
     
     if bracketed:
-        pattern = _re.compile(r"\(\d+\)$")
-        matches = _re.findall(pattern, s)
-        if len(matches) != 1:
-            return (s, 0)
-        match = matches[0].strip("(").strip(")")
-        val = int(match)
-        return (s, val)
-
-
-    if not isinstance(sep, str) or len(sep) == 0 or use_re:
+        # pattern = _re.compile(r"\(\d+\)$")
         pattern = _re.compile(r"(.*?)??(\(\d+\))$")
-        # pattern = _re.compile(r"(.*?)??(\d*)$")
+        matches = _re.findall(pattern, s)
+        if len(matches) == 0:
+            return (s, None)
+        else:
+            match = matches[0]
+            # print(f"match = {match}")
+            ss = match[0].strip()
+            val = int(match[1].strip("(").strip(")"))
+            return (ss, val)
+
+    elif not isinstance(sep, str) or len(sep) == 0 or use_re:
+        # pattern = _re.compile(r"(.*?)??(\(\d+\))$")
+        pattern = _re.compile(r"(.*?)??(\d*)$")
         re_match = pattern.match(s)
         if re_match is not None and len(re_match.groups()) > 1:
             try:
                 base, sfx = re_match.group(1, 2)
             except:
-                base, sfx = s, 0
-                # base, sfx = s, None
+                # base, sfx = s, 0
+                base, sfx = s, None
 
         else:
-            base, sfx = s, 0
-            # base, sfx = s, None
+            # base, sfx = s, 0
+            base, sfx = s, None
 
     else:
         parts = s.split(sep)
 
         # if len(parts) <= 1:
         if len(parts) < 2:
-            return s, 0
-            # return s, None
+            # return s, 0
+            return s, None
 
         sfx = parts[-1]
         base = sep.join(parts[:-1])
@@ -469,38 +473,38 @@ def get_int_sfx(s: str, sep: str = "_", use_re: bool = False, bracketed:bool=Fal
     try:
         sfx = int(sfx)
     except:
-        # sfx = None
-        sfx = 0
+        sfx = None
+        # sfx = 0
 
     return base, sfx
 
-def counter_suffix(x:str, strings:typing.List[str], sep:str="_", start:int=0, ret:bool=False):
+def counter_suffix(x:str, strings:typing.List[str], sep:str="_",
+                   bracketed:bool=False, start:int=0,
+                   returns_counter:typing.Optional[bool]=None) -> typing.Optional[typing.Union[str, int, typing.Tuple[str, int]]]:
     r"""Appends a counter suffix to x:str if x is found in the list of strings
     
     Parameters:
     ==========
     
-    x = str: string to check for existence
+    :x: string to check for existence
     
-    strings = sequence of str to check for existence of x
+    :strings: sequence of str to check for existence of x
     
-    sep: str, default is "_"; suffix separator
-    
-    start: 
-    
-    """
-    # TODO:
-    
-    #base = "AboveTheSky"
-    #p = re.compile("^%s_{0,1}\d*$" % base)
-    #p = re.compile("^%s_{0,1}\d*$" % base)
-    #items = list(filter(lambda x: p.match(x), standardQtGradientPresets.keys()))
-    #items
-    #names = list(standardQtGradientPresets.keys())
-    #names.append("AboveTheSky_1")
-    #items = list(filter(lambda x: p.match(x), names))
-    #items
+    :sep: default is "_"; suffix separator
 
+    :bracketed: When True, uses f=the format <abc...> (x) where 'x' is the counter
+    
+    :start: start value for counter suffix
+
+    :returns_counter: emutaes a tri-state flag ("three-valued logic"):
+
+        * True ↦ the function returns the new counter (int).
+
+        * False ↦ the function returns a suffixed string
+
+        * None (the default) ↦ the function returns a tuple with the new string *and* the new counter.
+
+    """
     if not isinstance(strings, (tuple, list)) and not hasattr(strings, "__iter__"):
         raise TypeError("Second positional parameter was expected to be an iterable; got %s instead" % type(strings).__name__)
     
@@ -510,84 +514,52 @@ def counter_suffix(x:str, strings:typing.List[str], sep:str="_", start:int=0, re
     if not isinstance(sep, str):
         raise TypeError("Separator must be a str; got %s instead" % type(sep).__name__)
     
-    # if len(sep.strip()) == 0:
-    #     raise ValueError("Separator cannot be an empty string")
-    
     if not isinstance(start, int):
         raise TypeError(f"'start' expected to be an int; got {type(start).__name__} instead")
     
     if start < 0:
         raise ValueError(f"'start' expected to be a positive int (>= 0); instead, got {start}")
     
-    # print(f"counter_suffix: x = {x}, strings = {strings}, start = {start}")
-    # print(f"counter_suffix: x = {x}, start = {start}, ret = {ret}")
-    
     if len(strings):
-        base, cc = get_int_sfx(x, sep=sep)#, bracketed=bracketed)
+
+        make_suffix = lambda c: f" ({c})" if bracketed else sep + f"{c}" if isinstance(sep, str) and len(sep) else f"{c}"
+
+        base, cc = get_int_sfx(x, sep=sep, bracketed=bracketed)
         
-        # print(f"counter_suffix: base = {base}, cc = {cc}")
-        
-        #p = re.compile(base)
-        # if bracketed:
-        #     p = re.compile(r"^%s%s{0,1}\(\d*\)$" % (base, sep))
-        # else:
-        #     p = re.compile(r"^%s%s{0,1}\d*$" % (base, sep))
-        p = re.compile(r"^%s%s{0,1}\d*$" % (base, sep))
-        
-        items = sorted(list(filter(lambda x: p.match(x), strings)))
-        
-        # print(f"counter_suffix items = {items}")
-        newsfx = None
-        if len(items):
-            full_ndx = list(range(start, len(items)))
-            currentsfx = list(x[1] for x in sorted(list(filter(lambda x: isinstance(x[1], int), (map(lambda x: get_int_sfx(x, sep=sep), items)))), key=lambda x: x[1]))
-            # currentsfx = list(x[1] for x in sorted(list(filter(lambda x: isinstance(x[1], int), (map(lambda x: get_int_sfx(x, sep=sep, bracketed=bracketed), items)))), key=lambda x: x[1]))
-            if len(currentsfx):
-                min_current = min(currentsfx)
-                max_current = max(currentsfx)
-                if  len(full_ndx) == 0:
-                    newsfx = 0
-                else:
-                    if min_current > min(full_ndx):
-                        newsfx = min(full_ndx)
-                    else:
-                        # find out missing indices
-                        if len(currentsfx) > 1:
-                            dsfx = np.ediff1d(currentsfx)
-                            locs = np.where(dsfx > 1)[0]
-                            if len(locs):
-                                newsfx = locs[0] + 1
-                            else:
-                                newsfx = currentsfx[-1] + 1
-                        else:
-                            newsfx = currentsfx[-1] + 1
-                        
-                    # newsfx = full_ndx[-1]
-                    
-            else:
-                newsfx = start   
-                
-            # if bracketed:
-            #     result = sep.join([base, "(%d)" % newsfx])
-            # else:
-            #     result = sep.join([base, "%d" % newsfx])
-            result = sep.join([base, "%d" % newsfx])
-            
-            if ret:
-                return result, newsfx
-            
-            return result
-        
+        print(f"counter_suffix: base = {base}, cc = {cc}")
+
+        clashes = list(filter(lambda s: s.startswith(base), strings))
+
+        print(f"counter_suffix: clashes = {clashes}")
+
+        if len(clashes) == 0:
+            return None if returns_counter else (x, None)
+
+        candidate_counters = list(filter(lambda t: isinstance(t, int), map(lambda s: get_int_sfx(s, sep=sep, bracketed=bracketed)[1], clashes)))
+
+        print(f"counter_suffix: candidate_counters = {candidate_counters}")
+
+        if len(candidate_counters) == 0:
+            if cc is None:
+                cc = start
+            new_x = base + make_suffix(cc)
+            return (new_x, cc) if returns_counter is None else cc if returns_counter == True else new_x
+
+        min_counter, max_counter = min(candidate_counters), max(candidate_counters)
+        print(f"counter_suffix: min_counter = {min_counter}, max_counter = {max_counter}")
+        if min_counter > start:
+            new_counter = max(range(start, min_counter))
         else:
-            result = x
-            if ret:
-                return x, None
-            return x
-        
-    if ret:
-        return x, None
-    return x
-                
+            new_counter = max_counter+1
+
+        new_x = base + make_suffix(new_counter)
+
+        return (new_x, new_counter) if returns_counter is None else new_counter if returns_counter else new_x
+
+
+    else:
+        return (x, None) if returns_counter is None else None if returns_counter else x
+
 def similar_strings(a:str, b:str) -> bool:
     r"""Similarity between two strings using difflib.SequenceMatcher./
 See also jaccard
@@ -827,7 +799,7 @@ def str2float(s: str) -> float:
     return ret
 
 def isnumber(s: str) -> bool:
-    r"""Returns True if string s can be evalated to a numbers.Number
+    r"""Returns True if string s can be evaluated to a numbers.Number
 
     Strings of the form [-/+]x.y[e][-/+]z return True.
 

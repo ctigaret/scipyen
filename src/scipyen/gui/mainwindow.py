@@ -6803,33 +6803,92 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 
         else:
             warnings.warn(f"Launching a terminal on {sys.platform} is not yet supported")
-        
+
     @Slot()
     def _slot_createNewFolder(self):
         r"""Create a subirectory of 'item' if given, else of current directory"""
-        selectedItems = [item for item in self.fileSystemTreeView.selectedIndexes()
-                         if item.column() == 0]  # list of QModelIndex
 
-        if len(selectedItems) != 1:
-            return
+        folderName = "New Folder"
 
-        item = selectedItems[0]
+        entries = list()
 
-        if not self.fileSystemModel.isDir(item):
-            return
-        # if not isinstance(item, QtCore.QModelIndex) or not item.data(QtGui.QFileSystemModel.FileInfoRole):
-        #     item = self.fileSystemModel.index(self.currentDir)
+        if not self.fileSystemModel.rootDirectory().isEmpty():
+            selectedItems = [item for item in self.fileSystemTreeView.selectedIndexes()
+                            if item.column() == 0]  # list of QModelIndex
 
-        info = item.data(QtGui.QFileSystemModel.FileInfoRole)
-        if not info.exists() or not info.isDir() or not info.isWritable():
-            return
-        
-        folderName = "New folder"
-        
+            if len(selectedItems) != 1:
+                return
+
+            item = selectedItems[0]
+
+            if not self.fileSystemModel.isDir(item):
+                return
+            # if not isinstance(item, QtCore.QModelIndex) or not item.data(QtGui.QFileSystemModel.FileInfoRole):
+            #     item = self.fileSystemModel.index(self.currentDir)
+
+            info = item.data(QtGui.QFileSystemModel.FileInfoRole)
+            if not info.exists() or not info.isDir() or not info.isWritable():
+                return
+
+            parent = item
+            itemdir = QtCore.QDir(self.fileSystemModel.filePath(item))
+            entries = itemdir.entryList(QtCore.QDir.Dirs | QtCore.QDir.NoDotAndDotDot)
+
+
+            if folderName in entries:
+                folderName = counter_suffix(folderName, entries, bracketed=True, start=1,
+                                            returns_counter=False)
+
+        else:
+            parent = self.fileSystemModel.rootDirectory()
+            path = pathlib.Path(self.fileSystemModel.rootPath())
+
         d = qd.QuickDialog(self, "Create New Folder")
+        # d.addLabel("Enter new folder name:")
         folderNameInput = qd.StringInput(d, "New folder name:")
+        folderNameInput.setToolTip("To create a folder with subfolders, separate their names with '/'.\nBe cautious of spaces between the separator '/' and the folder names.")
         folderNameInput.setValue(folderName)
-        
+
+        if d.exec():
+            folderName = folderNameInput.value()
+
+        if folderName in entries:
+            self.criticalMessage("Create New Folder", "Folder already exists")
+            return
+
+        newPath = pathlib.Path(folderName)
+
+        parts = newPath.parts
+
+        if isinstance(parent, QtCore.QModelIndex):
+            if len(parts) > 1:
+                newDirPath = pathlib.Path(self.fileSystemModel.filePath(parent)) / parts[0]
+                for k, part in enumerate(parts):
+                    if k == 0:
+                        self.fileSystemModel.mkdir(parent, part)
+                    else:
+                        newQDir = QtCore.QDir(newDirPath.as_posix())
+                        newQDir.mkdir(part)
+                        newDirPath = newDirPath.joinpath(part)
+                    # currentDir = pathlib.Path(self.fileSystemModel.filePath(parent)) / part
+
+
+            else:
+                self.fileSystemModel.mkdir(parent, folderName)
+
+        elif isinstance(parent, QtCore.QDir):
+            parent.mkdir(parts[0])
+            path = path.joinpath(parts[0])
+            parent = QtCore.QDir(path.as_posix())
+            if len(parts) > 1:
+                for k, part in enumerate(parts[1:]):
+                    parent.mkdir(part)
+                    path = path.joinpath(part)
+                    parent = QtCore.QDir(path.as_posix())
+
+            # else:
+            #     parent.mkdir
+
         # parent = item.parent()
 
         
@@ -7093,94 +7152,113 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         NOTE: The context menu only appears if the collection of selected items
         contains only items pointing to regular files.
     """
-        cm = QtWidgets.QMenu("Selected Items", self)
-
-        selectedItems = [item for item in self.fileSystemTreeView.selectedIndexes()
-                         if item.column() == 0]  # list of QModelIndex
-
         action_0 = None
-        create_new = None
-        copy_action = None
-        move_action = None
-        trash_action = None
-        remove_action = None
-        rename_action = None
-        open_link_target_action = None
+        if not self.fileSystemModel.rootDirectory().isEmpty():
+            cm = QtWidgets.QMenu("Selected Items", self)
 
-        scripts = set()
-        spreads = set()
+            selectedItems = [item for item in self.fileSystemTreeView.selectedIndexes()
+                            if item.column() == 0]  # list of QModelIndex
 
-        print(f"{self.__class__.__name__}.slot_fileSystemContextMenuRequest: ")
+            create_new = None
+            copy_action = None
+            move_action = None
+            trash_action = None
+            remove_action = None
+            rename_action = None
+            open_link_target_action = None
 
-        if len(selectedItems) == 1:
-            item = selectedItems[0]
-            info = item.data(QtGui.QFileSystemModel.FileInfoRole)
-            print(f"\tpath: {self.fileSystemModel.filePath(item)}")
-            print(f"\tisDir {info.isDir()}")
+            scripts = set()
+            spreads = set()
+
+            print(f"{self.__class__.__name__}.slot_fileSystemContextMenuRequest: ")
+
+            if len(selectedItems):
+                if not all(self.fileSystemModel.permissions(i) for i in selectedItems):
+                    return
+                fileNames = set([self.fileSystemModel.filePath(i) for i in selectedItems])
+                infos = list(map(lambda i: i.data(QtGui.QFileSystemModel.FileInfoRole), selectedItems))
+                parents = list(map(lambda i: i.parent(), selectedItems))
+                parentInfos = list(map(lambda i: i.data(QtGui.QFileSystemModel.FileInfoRole), parents))
+
+                if len(selectedItems) == 1:
+                    item = selectedItems[0]
+                    # info = item.data(QtGui.QFileSystemModel.FileInfoRole)
+                    info = infos[0]
+                    # print(f"\tpath: {self.fileSystemModel.filePath(item)}")
+                    # print(f"\tisDir {info.isDir()}")
+                    cm.addSeparator()
+                    if info.exists() and info.isDir() and info.isWritable():
+                        createNewFolderAction = cm.addAction("Create New Folder")
+                        createNewFolderAction.triggered.connect(self._slot_createNewFolder)
+                        action_0 = createNewFolderAction
+
+                    # parent = item.parent()
+                    #
+                    # while self.fileSystemModel.rootPath() != self.fileSystemModel.filePath(parent):
+                    #     parent = parent.parent()
+                    #
+                    # rootItem = parent
+
+
+                # print("fileNames", fileNames)
+
+                # if not all(pio.checkFileReadAccess(f) for f in fileNames):
+                #     return
+
+                if all(i.exists() for i in infos):
+                    openFileObjects = cm.addAction("Open")
+                    openFileObjects.triggered.connect(self.slot_openSelectedFileItems)
+
+                    spreads = set([f for f in fileNames if pio.is_spreadsheet(f)])
+                    scripts = set([f for f in fileNames if pio.is_python_source(f)])
+
+                    if len(fileNames - spreads) == 0:
+                        importAsDataFrame = cm.addAction("Open as DataFrame")
+                        importAsDataFrame.triggered.connect(self.slot_importDataFrame)
+
+                    if len(fileNames - scripts) == 0:
+                        addToScriptManager = cm.addAction("Add to Script Manager")
+                        addToScriptManager.triggered.connect(
+                            self._slot_cm_AddPythonScriptToManager)
+
+                    fileNamesToConsole = cm.addAction("Send Name(s) to Console")
+                    fileNamesToConsole.triggered.connect(self._sendFileNamesToConsole_)
+
+                    cm.addSeparator()
+                    openFilesInSystemApp = cm.addAction("Open With Default Application")
+                    openFilesInSystemApp.triggered.connect(self.slot_systemOpenSelectedFiles)
+
+
+                    if all(i.isWritable() for i in parentInfos):
+                        cm.addSeparator()
+                        copyFileitemsAction = cm.addAction("Copy")
+
+                        cutFilesAction = cm.addAction("Cut")
+
+                        pasteAction = cm.addAction("Paste Clipboard Contents")
+
+                        trashAction = cm.addAction("Move To trash")
+
+                        deleteAction = cm.addAction("Delete")
+
+
+
+
+
+                    if action_0 is None:
+                        action_0 = openFileObjects
+
+
             cm.addSeparator()
-            if info.exists() and info.isDir() and info.isWritable():
-                createNewFolderAction = cm.addAction("Create New Folder")
-                createNewFolderAction.triggered.connect(self._slot_createNewFolder)
 
+        else:
+            cm = QtWidgets.QMenu("", self)
 
-            parent = item.parent()
-
-            while self.fileSystemModel.rootPath() != self.fileSystemModel.filePath(parent):
-                parent = parent.parent()
-
-            rootItem = parent
-
-            if self.fileSystemModel.permissions(item.parent()) & QtCore.QFileDevice.WriteOwner == 0:
-                pass
-
-
-
-            # for f in fileNames:
-
-
-
-
-        if len(selectedItems):
-            if not all(self.fileSystemModel.permissions(i) for i in selectedItems):
-                return
-            fileNames = set([self.fileSystemModel.filePath(i) for i in selectedItems])
-
-            # print("fileNames", fileNames)
-
-            # if not all(pio.checkFileReadAccess(f) for f in fileNames):
-            #     return
-            
-            openFileObjects = cm.addAction("Open")
-            openFileObjects.triggered.connect(self.slot_openSelectedFileItems)
-
-            # for f in fileNames:
-            #     if pio.checkFileReadAccess(f):
-            #         mime_file_type = pio.getMimeAndFileType(f)
-
-
-            spreads = set([f for f in fileNames if pio.is_spreadsheet(f)])
-            scripts = set([f for f in fileNames if pio.is_python_source(f)])
-
-            if len(fileNames - spreads) == 0:
-                importAsDataFrame = cm.addAction("Open as DataFrame")
-                importAsDataFrame.triggered.connect(self.slot_importDataFrame)
-
-            if len(fileNames - scripts) == 0:
-                addToScriptManager = cm.addAction("Add to Script Manager")
-                addToScriptManager.triggered.connect(
-                    self._slot_cm_AddPythonScriptToManager)
-
-            fileNamesToConsole = cm.addAction("Send Name(s) to Console")
-            fileNamesToConsole.triggered.connect(self._sendFileNamesToConsole_)
-
-            cm.addSeparator()
-            openFilesInSystemApp = cm.addAction("Open With Default Application")
-            openFilesInSystemApp.triggered.connect(self.slot_systemOpenSelectedFiles)
-
-            action_0 = openFileObjects
-            
+        createNewFolderAction = cm.addAction("Create New Folder")
+        createNewFolderAction.triggered.connect(self._slot_createNewFolder)
 
         cm.addSeparator()
+
         openParentFolderInSystemApp = cm.addAction(
             "Open Parent Folder In File Manager")
         openParentFolderInSystemApp.triggered.connect(

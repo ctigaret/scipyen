@@ -870,8 +870,8 @@ def delvars(*args, glob=True, ws=None):
 def validate_varname(arg, ws:typing.Optional[dict]=None, 
                      start_counter:int=0, 
                      sep = "_", 
-                     return_counter:bool=False,
-                     checkUnique:bool=True):
+                     returns_counter:bool=False,
+                     checkUnique:bool=True) -> tuple:
     r"""Returns a valid symbol based on an intended variable name.
     
     arg: a string (symbol to be bound to a variable in the namespace `ws`)
@@ -879,19 +879,32 @@ def validate_varname(arg, ws:typing.Optional[dict]=None,
     ws: a namespace (dict), default None => will search for the topmost workspace
     
     start_counter: int (default is 0) the start value of the counter used in the
-            suffix to the variable name is an identical symbol already exists in 
-            ws.
-    
-    sep: str, default is "_"; the separator between the symbol base string and 
+
+            suffix to the variable name if an identical symbol already exists in
+
+            the workspace ``ws``
+
+
+            See also ``strutils.counter_suffix``
+
+    sep: str, default is "_"; the separator between the symbol base string and
+
         its suffix (counter)
-    
-    return_counter:bool, default is False;
-            When True, returns the valid symbol _AND_ the integer counter for 
+
+        .. attention::
+            Python restricts the number of characters that can be used in a symbol
+
+    returns_counter:bool, default is False;
+            When True, returns the valid symbol _AND_ the integer counter for
+
             the suffix.
+
+
+            See also ``strutils.counter_suffix``
     
     Returns:
     
-    • When return_counter is False (default), returns a modified verions of `arg`
+    • When returns_counter is False (default), returns a modified verions of `arg`
         where:
     
         1)  Non-valid characters are replaced with underscores.
@@ -907,7 +920,7 @@ def validate_varname(arg, ws:typing.Optional[dict]=None,
             3.a) If a counter suffix already exists, it will be incremented as
                 necessary.
     
-    • When return_counter is True, returns a two-elements tuple containing the
+    • When returns_counter is True, returns a two-elements tuple containing the
         modified `arg` as above, AND the counter suffix as an int or None (when
         a suffix was not appended to the modified `arg`)
         
@@ -946,7 +959,7 @@ def validate_varname(arg, ws:typing.Optional[dict]=None,
         # already exists)
         if arg not in ws.keys():
             # not need to append suffix since arg symbol is not in the ws
-            if return_counter:
+            if returns_counter:
                 return arg, None
             
             return arg
@@ -959,7 +972,9 @@ def validate_varname(arg, ws:typing.Optional[dict]=None,
                 
             # print(f"validate_varname start_counter = {start_counter}")
             
-        arg = counter_suffix(arg, list(ws.keys()), sep=sep, start=start_counter, ret=return_counter)
+        arg = counter_suffix(arg, list(ws.keys()), sep=sep,
+                             start=start_counter,
+                             returns_counter=returns_counter)
         # print(f"validate_varname return {arg}")
         
     return arg

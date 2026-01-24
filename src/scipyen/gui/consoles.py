@@ -1657,8 +1657,9 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
                 # a "master" frontend is by defition connected to an internal
                 # kernel
                 if n_masters > 0:
-                    normalized_names = [n.replace(" ", "_") for n in existing_master_kernel_names]
-                    kname = counter_suffix("kernel", normalized_names).replace("_", " ")
+                    # normalized_names = [n.replace(" ", "_") for n in existing_master_kernel_names]
+                    # kname = counter_suffix("kernel", normalized_names).replace("_", " ")
+                    kname = counter_suffix("kernel", existing_master_kernel_names, sep=" ", start=0, returns_counter=False)# .replace("_", " ")
                 else:
                     kname = "kernel 0"
                 
