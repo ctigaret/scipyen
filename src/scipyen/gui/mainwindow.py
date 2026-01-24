@@ -7170,7 +7170,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             scripts = set()
             spreads = set()
 
-            print(f"{self.__class__.__name__}.slot_fileSystemContextMenuRequest: ")
+            # print(f"{self.__class__.__name__}.slot_fileSystemContextMenuRequest: ")
 
             if len(selectedItems):
                 if not all(self.fileSystemModel.permissions(i) for i in selectedItems):
@@ -7190,7 +7190,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                     if info.exists() and info.isDir() and info.isWritable():
                         createNewFolderAction = cm.addAction("Create New Folder")
                         createNewFolderAction.triggered.connect(self._slot_createNewFolder)
+                        cm.addSeparator()
                         action_0 = createNewFolderAction
+                        create_new = createNewFolderAction
 
                     # parent = item.parent()
                     #
@@ -7254,10 +7256,12 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         else:
             cm = QtWidgets.QMenu("", self)
 
-        createNewFolderAction = cm.addAction("Create New Folder")
-        createNewFolderAction.triggered.connect(self._slot_createNewFolder)
+        if create_new is None:
+            createNewFolderAction = cm.addAction("Create New Folder")
+            createNewFolderAction.triggered.connect(self._slot_createNewFolder)
+            create_new = createNewFolderAction
+            cm.addSeparator()
 
-        cm.addSeparator()
 
         openParentFolderInSystemApp = cm.addAction(
             "Open Parent Folder In File Manager")
