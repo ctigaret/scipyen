@@ -404,7 +404,7 @@ def is_pathname_valid(pathname: str) -> bool:
     # Did we mention this should be shipped with Python already?
 
 
-def get_int_sfx(s: str, sep: str = "_", use_re: bool = False) -> typing.Tuple[str, int]:
+def get_int_sfx(s: str, sep: str = "_", use_re: bool = False, bracketed:bool=False) -> typing.Tuple[str, int]:
     r"""Parses an integral suffix from the string.
 
     The suffix needs to be delimited by the sep string.
@@ -415,25 +415,35 @@ def get_int_sfx(s: str, sep: str = "_", use_re: bool = False) -> typing.Tuple[st
 
     e.g.:
 
-    get_int_sfx("some_name") -> ("some_name", None)
+    get_int_sfx("some_name", sep="_") -> ("some_name", None)
 
     but:
 
-    get_int_sfx("some_name_0") -> ("some_name", 0)
+    get_int_sfx("some_name_0", sep="_") -> ("some_name", 0)
 
     whereas:
 
-    get_int_sfx("some_name_1") -> ("some_name", 1)
+    get_int_sfx("some_name_1", sep="_") -> ("some_name", 1)
 
 
     """
     if not isinstance(s, str) or len(s.strip()) == 0:
         return ("", 0)
     
+    if bracketed:
+        pattern = _re.compile(r"\(\d+\)$")
+        matches = _re.findall(pattern, s)
+        if len(matches) != 1:
+            return (s, 0)
+        match = matches[0].strip("(").strip(")")
+        val = int(match)
+        return (s, val)
+
+
     if not isinstance(sep, str) or len(sep) == 0 or use_re:
-        # regexp = _re.compile(r"^(\D+)*(\d*)$")
-        regexp = _re.compile(r"(.*?)??(\d*)$")
-        re_match = regexp.match(s)
+        pattern = _re.compile(r"(.*?)??(\(\d+\))$")
+        # pattern = _re.compile(r"(.*?)??(\d*)$")
+        re_match = pattern.match(s)
         if re_match is not None and len(re_match.groups()) > 1:
             try:
                 base, sfx = re_match.group(1, 2)

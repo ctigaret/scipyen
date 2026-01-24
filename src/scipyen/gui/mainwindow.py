@@ -1681,7 +1681,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.currentSessionTreeWidgetItem = None
 
         self.fileSystemModel = QtWidgets.QFileSystemModel(parent=self)
-        self.fileSystemModel.setReadOnly(False)
+        # self.fileSystemModel.setReadOnly(False)
         self.fileSystemModel.setNameFilterDisables(False)
 
         self.currentVarItem = None
@@ -6562,7 +6562,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # ### END workspace view
 
 
-        # ### BEGIN file system view,  navigation widgets & actions
+        # ### BEGIN file system view, navigation widgets & actions
         #
         
         # self.fileSystemTreeView.setUniformRowHeights(True) # set in the ui file
@@ -6582,11 +6582,14 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # self.fileSystemTreeView.setHorizontalScrollBarPolicy(
         #     QtCore.Qt.ScrollBarAlwaysOn)        
 
-        self.fileSystemModel.directoryLoaded[str].connect(self.slot_resizeFileTreeColumnForPath)
+        self.fileSystemModel.directoryLoaded[str].connect(
+            self.slot_resizeFileTreeColumnForPath)
         
-        self.fileSystemModel.rootPathChanged[str].connect(self.slot_rootPathChanged)
+        self.fileSystemModel.rootPathChanged[str].connect(
+            self.slot_rootPathChanged)
         
-        self.fileSystemModel.dataChanged[QtCore.QModelIndex, QtCore.QModelIndex, "QVector<int>"].connect(self.slot_fileSystemDataChanged)
+        self.fileSystemModel.dataChanged[QtCore.QModelIndex, QtCore.QModelIndex, "QVector<int>"].connect(
+            self.slot_fileSystemDataChanged)
 
         self.dirFileMonitor = QtCore.QFileSystemWatcher(parent = self)
         self.dirFileMonitor.directoryChanged.connect(self._slot_monitoredDirectoryContentsChanged)
@@ -6803,17 +6806,23 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         
     @Slot()
     def _slot_createNewFolder(self):
+        r"""Create a subirectory of 'item' if given, else of current directory"""
         selectedItems = [item for item in self.fileSystemTreeView.selectedIndexes()
-                         if item.column() == 0]
+                         if item.column() == 0]  # list of QModelIndex
+
         if len(selectedItems) != 1:
             return
+
         item = selectedItems[0]
-        # parent = item.parent()
+
+        if not self.fileSystemModel.isDir(item):
+            return
+        # if not isinstance(item, QtCore.QModelIndex) or not item.data(QtGui.QFileSystemModel.FileInfoRole):
+        #     item = self.fileSystemModel.index(self.currentDir)
+
         info = item.data(QtGui.QFileSystemModel.FileInfoRole)
         if not info.exists() or not info.isDir() or not info.isWritable():
             return
-        
-        folder = QtCore.QDir()
         
         folderName = "New folder"
         
@@ -6821,6 +6830,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         folderNameInput = qd.StringInput(d, "New folder name:")
         folderNameInput.setValue(folderName)
         
+        # parent = item.parent()
+
         
     @Slot()
     @safewrapper
@@ -7099,14 +7110,45 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         scripts = set()
         spreads = set()
 
+        print(f"{self.__class__.__name__}.slot_fileSystemContextMenuRequest: ")
+
+        if len(selectedItems) == 1:
+            item = selectedItems[0]
+            info = item.data(QtGui.QFileSystemModel.FileInfoRole)
+            print(f"\tpath: {self.fileSystemModel.filePath(item)}")
+            print(f"\tisDir {info.isDir()}")
+            cm.addSeparator()
+            if info.exists() and info.isDir() and info.isWritable():
+                createNewFolderAction = cm.addAction("Create New Folder")
+                createNewFolderAction.triggered.connect(self._slot_createNewFolder)
+
+
+            parent = item.parent()
+
+            while self.fileSystemModel.rootPath() != self.fileSystemModel.filePath(parent):
+                parent = parent.parent()
+
+            rootItem = parent
+
+            if self.fileSystemModel.permissions(item.parent()) & QtCore.QFileDevice.WriteOwner == 0:
+                pass
+
+
+
+            # for f in fileNames:
+
+
+
+
         if len(selectedItems):
-            fileNames = set([self.fileSystemModel.filePath(i)
-                            for i in selectedItems])
+            if not all(self.fileSystemModel.permissions(i) for i in selectedItems):
+                return
+            fileNames = set([self.fileSystemModel.filePath(i) for i in selectedItems])
 
             # print("fileNames", fileNames)
 
-            if not all(pio.checkFileReadAccess(f) for f in fileNames):
-                return
+            # if not all(pio.checkFileReadAccess(f) for f in fileNames):
+            #     return
             
             openFileObjects = cm.addAction("Open")
             openFileObjects.triggered.connect(self.slot_openSelectedFileItems)
@@ -7136,30 +7178,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             openFilesInSystemApp.triggered.connect(self.slot_systemOpenSelectedFiles)
 
             action_0 = openFileObjects
-            
-        if len(selectedItems) == 1:
-            item = selectedItems[0]
-            info = item.data(QtGui.QFileSystemModel.FileInfoRole)
-            cm.addSeparator()
-            if info.exists() and info.isDir() and info.isWritable():
-                createNewFolderAction = cm.addAction("Create New Folder")
-                createNewFolderAction.triggered.connect(self._slot_createNewFolder)
-                
-            
-            parent = item.parent()
-            
-            while self.fileSystemModel.rootPath() != self.fileSystemModel.filePath(parent):
-                parent = parent.parent()
-                
-            rootItem = parent
-            
-            if self.fileSystemModel.permissions(item.parent()) & QtCore.QFileDevice.WriteOwner:
-                pass
-            
-            
-            
-            # for f in fileNames:
-                
             
 
         cm.addSeparator()
