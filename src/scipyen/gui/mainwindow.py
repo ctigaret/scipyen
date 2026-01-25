@@ -3503,7 +3503,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             # print(f"{self.__class__.__name__}.newViewer for {winClass.__name__} listedWindows = {listedWindows}")
 
             if win not in listedWindows:
-                win_title, counter_suffix = validate_varname(win_title, self.workspace, return_counter=True)
+                win_title, counter_suffix = validate_varname(win_title, self.workspace, returns_counter=True)
                 
             # print(f"{self.__class__.__name__}.newViewer for {winClass.__name__} win_title = {win_title}")
             
@@ -6807,22 +6807,33 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             warnings.warn(f"Launching a terminal on {sys.platform} is not yet supported")
             
     @Slot()
+    def _slot_cutFileSystemItems(self):
+        self.fileTransferJob = "move"
+        self._fileSystemOperation_()
+
+
+    @Slot()
     def _slot_copyFileSystemItems(self):
         self.fileTransferJob = "copy"
-        clipboard = QtGui.QGuiApplication.clipboard()
-        mimeData = QtCore.QMimeData()
-        if not self.fileSystemModel.rootDirectory().isEmpty():
-            selectedItems = [item for item in self.fileSystemTreeView.selectedIndexes()
-                            if item.column() == 0]  # list of QModelIndex
-            fileNames = set([self.fileSystemModel.filePath(i) for i in selectedItems])
-            fileUrls = list(sorted(map(lambda i: f"file:///{i}", fileNames)))
-            
-            if len(fileUrls):
-                mimeData.setUrls(list(map(lambda u: QtCore.QUrl(u), fileUrls)))
-                clipboard.setMimeData(mimeData)
-            
-            print(f"{self.__class__.__name__}._slot_copyFileSystemItems: fileUrls = {fileUrls}")
-            
+        self._fileSystemOperation_()
+
+    def _fileSystemOperation_(self):
+        if not isinstance(self.fileTransferJob, str) or self.fileTransferJob not in ("copy", "move", "trash", "delete"):
+            return
+
+        if self.fileTransferJob in ("copy", "move"):
+            clipboard = QtGui.QGuiApplication.clipboard()
+            mimeData = QtCore.QMimeData()
+            if not self.fileSystemModel.rootDirectory().isEmpty():
+                selectedItems = [item for item in self.fileSystemTreeView.selectedIndexes()
+                                if item.column() == 0]  # list of QModelIndex
+                fileNames = set([self.fileSystemModel.filePath(i) for i in selectedItems])
+                fileUrls = list(sorted(map(lambda i: QtCore.QUrl(f"file://{i}"), fileNames)))
+
+                if len(fileUrls):
+                    mimeData.setUrls(fileUrls)
+                    clipboard.setMimeData(mimeData)
+
     @Slot()
     def _slot_pasteIntoFileSystemDirectory(self):
         from iolib.navigation.filesystems import TransferFilesJob
@@ -6838,32 +6849,38 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             targetDir = QtCore.QDir(itempathstr)
         else:
             targetDir = self.fileSystemModel.rootDirectory()
+            itempathstr = self.fileSystemModel.rootPath()
+
+        # print(f"{self.__class__.__name__}._slot_pasteIntoFileSystemDirectory:\ntargetDir:\n\t{targetDir} = {targetDir.fileName()}")
 
         clipboard = QtGui.QGuiApplication.clipboard()
         mimeData = clipboard.mimeData()
+
         if mimeData.hasUrls():
             urls = list(filter(lambda u: u.isLocalFile(), mimeData.urls()))
             sourceFileNames = list(map(lambda u: u.toLocalFile(), urls))
             targetFileNames = list(map(lambda u: u.fileName(), urls))
             if not targetDir.isEmpty():
+                # print(f"{self.__class__.__name__}._slot_pasteIntoFileSystemDirectory:\ntargetFileNames:\n\t{targetFileNames}")
                 targetFileNames = list(map(lambda f: self._checkItemExistsInDir_(f, targetDir), targetFileNames))
             # else:
 
             source = list(map(lambda f: pathlib.Path(f), sourceFileNames))
             dest = list(map(lambda f: pathlib.Path(itempathstr).joinpath(f), targetFileNames))
 
-            print(f"{self.__class__.__name__}._slot_pasteIntoFileSystemDirectory: source: {source}, destination: {dest}")
+            # print(f"{self.__class__.__name__}._slot_pasteIntoFileSystemDirectory:\nsource:\n\t{source},\ndestination:\n\t{dest}\n")
             transferJob = TransferFilesJob(parent=self)
             transferJob.sig_finished.connect(self._slot_transferJobFinished_)
             transferJob.run(source, dest, self.fileTransferJob)
 
         elif any([mimeData.hasText(), mimeData.hasImage(), mimeData.hasHtml(), mimeData.hasColor()]):
             data = None
-            extension = None
+            extension = ""
             fileName = "New file"
             try:
                 if mimeData.hasText():
                     data = mimeData.text()
+                    extension = ".txt"
                 elif mimeData.hasHtml():
                     data = mimeData.html()
                     extension = ".html"
@@ -6878,7 +6895,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                     if not isinstance(data, QtGui.QImage) or data.isNull():
                         return
                     extension = ".png"
-
                 else:
                     data = None
                     # NOTE: 2026-01-25 10:44:00 TODO
@@ -6900,13 +6916,13 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                     return
 
                 if not targetDir.isEmpty():
-                    entries = targetDir.entryList(QtCore.QDir.Dirs | QtCore.QDir.NoDotAndDotDot)
+                    entries = targetDir.entryList(QtCore.QDir.AllEntries | QtCore.QDir.NoDotAndDotDot)
                     if fileName in entries:
                         ret = self.questionMessage("Create File", f"File {fileName} already exists. Overwrite?")
                         if ret != QtWidgets.QMessageBox.Yes:
                             return
 
-                print(f"{self.__class__.__name__}._slot_pasteIntoFileSystemDirectory will create {fileName} in {targetDir.path()}")
+                # print(f"{self.__class__.__name__}._slot_pasteIntoFileSystemDirectory will create {fileName} in {targetDir.path()}\n")
                 target = pathlib.Path(targetDir.path()).joinpath(fileName).as_posix()
 
                 if isinstance(data, str):
@@ -7340,19 +7356,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                         action_0 = createNewFolderAction
                         create_new = createNewFolderAction
 
-                    # parent = item.parent()
-                    #
-                    # while self.fileSystemModel.rootPath() != self.fileSystemModel.filePath(parent):
-                    #     parent = parent.parent()
-                    #
-                    # rootItem = parent
-
-
-                # print("fileNames", fileNames)
-
-                # if not all(pio.checkFileReadAccess(f) for f in fileNames):
-                #     return
-
                 if all(i.exists() for i in infos):
                     openFileObjects = cm.addAction("Open")
                     openFileObjects.triggered.connect(self.slot_openSelectedFileItems)
@@ -7380,6 +7383,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                     if all(i.isWritable() for i in parentInfos):
                         cm.addSeparator()
                         cutFilesAction = cm.addAction("Cut")
+                        cutFilesAction.triggered.connect(self._slot_cutFileSystemItems)
 
                         copyFileItemsAction = cm.addAction("Copy")
                         copyFileItemsAction.triggered.connect(self._slot_copyFileSystemItems)
@@ -7395,6 +7399,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
                     if action_0 is None:
                         action_0 = openFileObjects
+
             cm.addSeparator()
 
         else:

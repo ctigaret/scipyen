@@ -111,18 +111,24 @@ fsMap = [
     ]
 
 class TransferFilesJob(QtCore.QObject):
-    from gui import pictgui as pgui
-    sig_finished = Signal(name="finished")
-    def __init__(self,
-                 parent:typing.Optional[QtCore.QObject]=None):
-        self.loopControl = {"break": False}
+    sig_finished = Signal(name="sig_finished")
+    def __init__(self, parent:typing.Optional[QtCore.QObject]=None):
+        self.loopControl:dict = {"break": False}
+        self.progressCounter:int = 0
+
         QtCore.QObject.__init__(self, parent=parent)
 
-    def run(self,source: typing.Sequence[pathlib.Path],
+    @Slot(object)
+    def workerReady(self, obj):
+        self.loopControl["break"] = False
+        self.sig_finished.emit()
+
+    def run(self, source: typing.Sequence[pathlib.Path],
                  destination: typing.Sequence[pathlib.Path],
                  jobType:str = "copy"):
         from core.strutils import pluralize
-
+        from gui import pictgui as pgui
+        self.progressCounter = 0
         if len(source) == 0:
             return
 
@@ -132,12 +138,17 @@ class TransferFilesJob(QtCore.QObject):
 
         nFiles = len(source)
 
+        subDirs = list(filter(lambda p: p.is_dir(), source))
+
+        for subDir in subDirs:
+            nFiles += self._countEntries_(QtCore.QDir(subDir.as_posix()))
+
         if not isinstance(jobType, str) or len(jobType.strip()) == 0 or jobType.lower() not in ("copy","move"):
             jobType = "copy"
 
         transferName = "Moving" if jobType=="move" else "Copying"
         progressDlg = QtWidgets.QProgressDialog(f"{transferName} {nFiles} {pluralize('File', nFiles)}...",
-                                                "Abort", 0, nFiles, self)
+                                                "Abort", 0, nFiles, parent=self.parent())
         progressDlg.setMinimumDuration(1000)
         progressDlg.canceled.connect(self._slot_breakLoop)
         kw = {"source": source, "destination": destination, "jobType": jobType,
@@ -148,20 +159,23 @@ class TransferFilesJob(QtCore.QObject):
         workerThread.signals.signal_Finished.connect(progressDlg.reset)
         workerThread.start()
 
-
-        # try:
-        #     for src, dest in zip(self.source, self.destination):
-        #         QtCore.QFile.copy(src, dest)
-        # except:
-        #     traceback.print_exc()
-        # sig_finished.emit()
-
     @Slot()
     def _slot_breakLoop(self):
         r"""To be connected to the `canceled` signal of a progress dialog.
         Modifies the loopControl variable to interrupt a worker loop gracefully.
         """
         self.loopControl["break"] = True
+
+    def _countEntries_(self, directory:QtCore.QDir) -> int:
+        if not directory.exists():
+            return 0
+
+        count = len(directory.entryList(QtCore.QDir.NoDotAndDotDot | QtCore.QDir.AllEntries))
+
+        for subDir in directory.entryList(QtCore.QDir.NoDotAndDotDot|QtCore.QDir.Dirs):
+            count += self._countEntries_(directory.filePath(subDir))
+
+        return count
 
     def _transferFiles_(self, **kwargs) -> bool:
         source: typing.optional[typing.Sequence[pathlib.Path]] = kwargs.pop("source", None)
@@ -171,22 +185,34 @@ class TransferFilesJob(QtCore.QObject):
         progressSignal = kwargs.pop("progressSignal", None)
         canceledSignal = kwargs.pop("canceledSignal", None)
 
+        self.progressCounter = 0
+
         OK = True
 
         canceled = False
 
+        print(f"{self.__class__.__name__}._transferFiles_:\nsource:\n{source}\ndestination:\n{destination}\n")
+
         for k, src in enumerate(source):
             try:
-                dest = destination[k]
-                result = QtCore.QFile.copy(src.as_posix(), dest.as_posix())
-                if jobType == "moving" and result:
-                    srcFile = QFile(src.as_posix())
-                    result = srcFile.remove()
+                s = src.as_posix()
+                d = destination[k].as_posix()
+                if src.is_file():
+                    result = self._copyFile_(s,d)
+                    # self.progressCounter += 1
+                elif src.is_dir():
+                    result = self._copyDirectory_(QtCore.QDir(s), QtCore.QDir(d))
+
+                # result = QtCore.QFile.copy(s,d)
+                # print(f"\tcopying {s} to {d} -> {result}")
+                # if jobType == "moving" and result:
+                #     srcFile = QFile(src.as_posix())
+                #     result = srcFile.remove()
 
                 OK &= result
 
                 if OK and isinstance(progressSignal, QtCore.SignalInstance):
-                    progressSignal.emit(k)
+                    progressSignal.emit(self.progressCounter)
             except:
                 traceback.print_exc()
                 continue
@@ -197,6 +223,47 @@ class TransferFilesJob(QtCore.QObject):
                 break
 
         return OK
+
+    def _copyFile_(self, src:str, dest:str) -> bool:
+        self.progressCounter += 1
+        if not QtCore.QFile.exists(src):
+            scipywarn(f"Source file {src} does not exist")
+            return False
+
+        if QtCore.QFile.exists(dest):
+            # remove destination first
+            if not QtCore.QFile.remove(dest):
+                scipywarn(f"Could not remove existing destination file {dest}")
+                return False
+        if not QtCore.QFile.copy(src, dest):
+            scipywarn(f"Could not copy {src} to {dest}")
+            return False
+
+        return True
+
+    def _copyDirectory_(self, src:QtCore.QDir, dest:QtCore.QDir) -> bool:
+        self.progressCounter += 1
+        if not src.exists():
+            scipywarn(f"Source directory {src.fileName()} does not exist")
+            return False
+
+        if not dest.exists():
+            dest.mkpath(".")
+
+        entryInfoList = src.entryInfoList(QtCore.QDir.AllEntries | QtCore.QDir.NoDotAndDotDot)
+
+        for entry in entryInfoList:
+            newDestPath = dest.filePath(entry.fileName())
+            if entry.isDir():
+                if not self._copyDirectory_(entry.filePath(), newDestPath):
+                    return False
+            else:
+                if not QtCore.QFile.copy(entry.filePath(), newDestPath):
+                    scipywarn(f"Failed to copy {entry.filePath()} to {newDestPath}")
+                    return False
+
+        return True
+
 
 
 def typeFromName(name:str):
