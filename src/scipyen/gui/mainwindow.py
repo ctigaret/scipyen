@@ -1592,7 +1592,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         self.navPrevDir = collections.deque()
         self.navNextDir = collections.deque()
-        self.nextFileJob:typing.Optional[str] = None
+        self.fileTransferJob:typing.Optional[str] = None
         self._currentDir_ = None
         self._nMaxWatchedDirectories_ = 1
         self._nMaxWatchedFiles_= 1
@@ -6808,7 +6808,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             
     @Slot()
     def _slot_copyFileSystemItems(self):
-        self.nextFileJob = "copy"
+        self.fileTransferJob = "copy"
         clipboard = QtGui.QGuiApplication.clipboard()
         mimeData = QtCore.QMimeData()
         if not self.fileSystemModel.rootDirectory().isEmpty():
@@ -6825,59 +6825,106 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             
     @Slot()
     def _slot_pasteIntoFileSystemDirectory(self):
+        from iolib.navigation.filesystems import TransferFilesJob
         selectedItems = [item for item in self.fileSystemTreeView.selectedIndexes()
                         if item.column() == 0]  # list of QModelIndex
-        
+
         if len(selectedItems) == 1:
             item = selectedItems[0]
             info = item.data(QtGui.QFileSystemModel.FileInfoRole)
             if not info.exists() or not info.isDir() or not info.isWritable() or not info.isReadable():
                 return
             itempathstr = self.fileSystemModel.filePath(item)
-            targetDir = QtCore.QDir(itempathstr) 
+            targetDir = QtCore.QDir(itempathstr)
         else:
             targetDir = self.fileSystemModel.rootDirectory()
-            
+
         clipboard = QtGui.QGuiApplication.clipboard()
         mimeData = clipboard.mimeData()
         if mimeData.hasUrls():
             urls = list(filter(lambda u: u.isLocalFile(), mimeData.urls()))
-            targetFileNames = list(map(lambda u: u.fileName(), urls))
             sourceFileNames = list(map(lambda u: u.toLocalFile(), urls))
+            targetFileNames = list(map(lambda u: u.fileName(), urls))
             if not targetDir.isEmpty():
                 targetFileNames = list(map(lambda f: self._checkItemExistsInDir_(f, targetDir), targetFileNames))
             # else:
 
-            targets = list(map(lambda f: pathlib.Path(itempathstr).joinpath(f).as_posix(), targetFileNames))
-            
-            print(f"{self.__class__.__name__}._slot_pasteIntoFileSystemDirectory: targets {targets}")
-            
+            source = list(map(lambda f: pathlib.Path(f), sourceFileNames))
+            dest = list(map(lambda f: pathlib.Path(itempathstr).joinpath(f), targetFileNames))
+
+            print(f"{self.__class__.__name__}._slot_pasteIntoFileSystemDirectory: source: {source}, destination: {dest}")
+            transferJob = TransferFilesJob(parent=self)
+            transferJob.sig_finished.connect(self._slot_transferJobFinished_)
+            transferJob.run(source, dest, self.fileTransferJob)
+
         elif any([mimeData.hasText(), mimeData.hasImage(), mimeData.hasHtml(), mimeData.hasColor()]):
+            data = None
+            extension = None
+            fileName = "New file"
+            try:
+                if mimeData.hasText():
+                    data = mimeData.text()
+                elif mimeData.hasHtml():
+                    data = mimeData.html()
+                    extension = ".html"
+                elif mimeData.hasColor():
+                    data = mimeData.colorData()
+                    if not isinstance(data, QtGui.QColor) or not data.isValid():
+                        scipywarn("Clipboard has invalid color data")
+                        return
+                    data = data.name()
+                elif mimeData.hasImage():
+                    data = mimeData.imageData()
+                    if not isinstance(data, QtGui.QImage) or data.isNull():
+                        return
+                    extension = ".png"
+
+                else:
+                    data = None
+                    # NOTE: 2026-01-25 10:44:00 TODO
+                    # code to support other mime formats
+                    return
+            except:
+                traceback.print_exc()
+                return
+
+            # NOTE: 2026-01-25 11:00:23 TODO?
+            # contemplate the use of Qt file save dialogs
+            # (inherited from WorkspaceGuiMixin, FileIOGui)
             d = qd.QuickDialog(self, "Paste Clipboard Contents")
             fileNameInput = qd.StringInput(d, "Enter file name:")
+            fileNameInput.setValue(f"{fileName}{extension}")
             if d.exec():
                 fileName = fileNameInput.value()
                 if len(fileName.strip()) == 0:
                     return
-                
+
                 if not targetDir.isEmpty():
                     entries = targetDir.entryList(QtCore.QDir.Dirs | QtCore.QDir.NoDotAndDotDot)
                     if fileName in entries:
                         ret = self.questionMessage("Create File", f"File {fileName} already exists. Overwrite?")
                         if ret != QtWidgets.QMessageBox.Yes:
-                            return 
-                        
+                            return
+
                 print(f"{self.__class__.__name__}._slot_pasteIntoFileSystemDirectory will create {fileName} in {targetDir.path()}")
-                
+                target = pathlib.Path(targetDir.path()).joinpath(fileName).as_posix()
+
+                if isinstance(data, str):
+                    # text, html, color name
+                    pio.saveText(data, fileName)
+                elif isinstance(data, QtGui.QImage):
+                    data.save(fileName, format="PNG")
+
+                else:
+                    scipywarn("Unsupported data & mime type")
+                    return
             else:
                 return
             
-            
-            
-            
-            
+    @Slot()
+    def _slot_transferJobFinished_(self):
+        self.fileTransferJob = None
 
-            
     def _checkItemExistsInDir_(self, fileName:str, testDir:typing.Union[str, QtCore.QDir], autorename:bool=True):
         if isinstance(testDir, str):
             testDir = QtCore.QDir(testDir)
@@ -7918,7 +7965,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
     @Slot()
     @safewrapper
-    def slot_openSelectedFileItems(self):
+    def slot_openSelectedFileItems(self) -> bool:
         r"""Opens files via (triggered from) context menu in File system browser"""
         selectedItems = [self.fileSystemModel.filePath(item) for item in self.fileSystemTreeView.selectedIndexes()
                          if item.column() == 0 and not self.fileSystemModel.isDir(item)]  # list of QModelIndex
@@ -7977,7 +8024,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         pass
 
     @safewrapper
-    def _openSelectedFileItemsThreaded(self, **kwargs):
+    def _openSelectedFileItemsThreaded(self, **kwargs) -> bool:
         r"""
         Pass this as fileLoaderFn argument to self.loadFiles inherited from WorkspaceGuiMixin.
         """
@@ -7985,7 +8032,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         filePaths = kwargs.pop("filePaths", None)
         
         if not isinstance(filePaths, (tuple, list)) or len(filePaths) == 0: 
-            return
+            return False
         
         loopControl = kwargs.pop("loopControl", None)
         progressSignal = kwargs.pop("progressSignal", None)

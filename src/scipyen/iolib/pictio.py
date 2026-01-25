@@ -364,39 +364,41 @@ def loadImageFile(fileName:typing.Union[str, pathlib.Path], asVolume:bool=False,
 
     return ret
         
-# TODO: diverge onto HDF5, and bioformats handling
-def saveImageFile(data, fileName:typing.Union[str, pathlib.Path], 
+def saveImageFile(data:vigra.VigraArray, fileName:typing.Union[str, pathlib.Path],
                   separateChannels:bool=True):
     r"""
     Writes a vigra array to one of the image file formats supported by Vigra
     library
-    
+
     Positional parameters:
     ======================
     data: VigraArray
-    fileName: string 
-    
+    fileName: string
+
     Keyword parameters:
     ===================
-    separateChannels: bool (default True); if more than one channels, will try to 
+    separateChannels: bool (default True); if more than one channels, will try to
         write each channel to a separate file suffixed with "_channel_X"
-        
-        When FALSE, will try to save data as a VectorXVolume (or VectorXImage). 
+
+        When FALSE, will try to save data as a VectorXVolume (or VectorXImage).
         This depends on whether, after "stripping" the channel axis, the data
         has 3D or 2D.
-        
-    TODO: diverge for HDF5, netcdf, 
-    TODO: support for higher dimensions (up to 5, the upper limit in Vigra)
-    by writing to a sequence of files each containing a 3D array
-    TODO: support for 4 channels (e.g. RGBA, or ARGB?)
+
     """
+# NOTE: 2026-01-25 11:04:36 TODO:
+#diverge onto HDF5, QtGui.QImage, QtGu.QPixmap and bioformats handling
+# TODO: diverge for HDF5, netcdf,
+# TODO: support for higher dimensions (up to 5, the upper limit in Vigra)
+# by writing to a sequence of files each containing a 3D array
+# TODO: support for 4 channels (e.g. RGBA, or ARGB?)
+# TODO: be conbsistent with the use of extensions and only when needed
     #print("ndim:", data.ndim, "nchannels: ", data.channels, "shape:", data.shape)
-    
+
     fileName = pathlib.Path(fileName)
-    
+
     if data.ndim == 2: # trivial
         vigra.impex.writeImage(data, fileName.as_posix(), "")
-        
+
     elif data.ndim == 3: # less trivial
         if data.channels == 1:
             # NOTE: 2019-01-21 12:01:21

@@ -5,7 +5,7 @@
 
 r"""
 """
-import os, sys, pathlib, traceback, typing
+import os, sys, pathlib, traceback, typing, types
 import dataclasses
 import psutil
 from functools import (singledispatch, singledispatchmethod)
@@ -110,23 +110,94 @@ fsMap = [
         FsInfo(FsType.Fuse, "fuseblk"),
     ]
 
-class CopyFilesJob(QtCore.QThread):
+class TransferFilesJob(QtCore.QObject):
+    from gui import pictgui as pgui
     sig_finished = Signal(name="finished")
-    def __init__(self, sourceFileNames: typing.Sequence[str], 
-                 destinationFileNames: typing.Sequence[str], 
+    def __init__(self,
                  parent:typing.Optional[QtCore.QObject]=None):
-        assert(len(sourceFileNames) == len(destinationFileNames)), f"Mismatch between number of source ({len(sourceFileNames)}) and destination files ({destinationFileNames})"
-        self.sourceFileNames = sourceFileNames
-        self.destinationFileNames = destinationFileNames
-        QtCore.QThread.__init__(self, parent=parent)
+        self.loopControl = {"break": False}
+        QtCore.QObject.__init__(self, parent=parent)
 
-    def run(self):
-        try:
-            for src, dest in zip(self.sourceFileNames, self.destinationFileNames):
-                QtCore.QFile.copy(src, dest)
-        except:
-            traceback.print_exc()
-        sig_finished.emit()
+    def run(self,source: typing.Sequence[pathlib.Path],
+                 destination: typing.Sequence[pathlib.Path],
+                 jobType:str = "copy"):
+        from core.strutils import pluralize
+
+        if len(source) == 0:
+            return
+
+        if len(source) != len(destination):
+            scipywarn(f"Mismatch between number of source ({len(source)}) and destination files ({destination})")
+            return
+
+        nFiles = len(source)
+
+        if not isinstance(jobType, str) or len(jobType.strip()) == 0 or jobType.lower() not in ("copy","move"):
+            jobType = "copy"
+
+        transferName = "Moving" if jobType=="move" else "Copying"
+        progressDlg = QtWidgets.QProgressDialog(f"{transferName} {nFiles} {pluralize('File', nFiles)}...",
+                                                "Abort", 0, nFiles, self)
+        progressDlg.setMinimumDuration(1000)
+        progressDlg.canceled.connect(self._slot_breakLoop)
+        kw = {"source": source, "destination": destination, "jobType": jobType,
+              "loopControl": self.loopControl}
+        workerThread = pgui.LoopWorkerThread(self, self._transferFiles_, **kw)
+        workerThread.signals.signal_Progress[int].connect(progressDlg.setValue)
+        workerThread.signals.signal_Result[object].connect(self.workerReady)
+        workerThread.signals.signal_Finished.connect(progressDlg.reset)
+        workerThread.start()
+
+
+        # try:
+        #     for src, dest in zip(self.source, self.destination):
+        #         QtCore.QFile.copy(src, dest)
+        # except:
+        #     traceback.print_exc()
+        # sig_finished.emit()
+
+    @Slot()
+    def _slot_breakLoop(self):
+        r"""To be connected to the `canceled` signal of a progress dialog.
+        Modifies the loopControl variable to interrupt a worker loop gracefully.
+        """
+        self.loopControl["break"] = True
+
+    def _transferFiles_(self, **kwargs) -> bool:
+        source: typing.optional[typing.Sequence[pathlib.Path]] = kwargs.pop("source", None)
+        destination: typing.Optional[typing.Sequence[pathlib.Path]] = kwargs.pop("destination", None)
+        jobType: str = kwargs.pop("jobType", "copy")
+        loopControl = kwargs.pop("loopControl", None)
+        progressSignal = kwargs.pop("progressSignal", None)
+        canceledSignal = kwargs.pop("canceledSignal", None)
+
+        OK = True
+
+        canceled = False
+
+        for k, src in enumerate(source):
+            try:
+                dest = destination[k]
+                result = QtCore.QFile.copy(src.as_posix(), dest.as_posix())
+                if jobType == "moving" and result:
+                    srcFile = QFile(src.as_posix())
+                    result = srcFile.remove()
+
+                OK &= result
+
+                if OK and isinstance(progressSignal, QtCore.SignalInstance):
+                    progressSignal.emit(k)
+            except:
+                traceback.print_exc()
+                continue
+
+            if isinstance(loopControl, dict) and loopControl.get("break", None) == True:
+                if isinstance(canceledSignal, QtCore.SignalInstance):
+                    canceledSignal.emit()
+                break
+
+        return OK
+
 
 def typeFromName(name:str):
     from core.prog import scipywarn
