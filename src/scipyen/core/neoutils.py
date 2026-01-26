@@ -6201,16 +6201,25 @@ def detect_trigger_events(data: neo.Block) -> bool:
         return False
     
 def remove_epochs(data:typing.Union[neo.Block, neo.Segment, typing.Sequence[typing.Union[neo.Block, neo.Segment]]]):
-    if isinstance(data, neo.Segments):
+    if isinstance(data, neo.Segment):
         data.epochs.clear()
 
     elif isinstance(data, neo.Block):
-        for segments in data.segments:
+        for segment in data.segments:
             remove_epochs(segment)
 
     elif isinstance(data, typing.Sequence) and all(isinstance(d, (neo.Block, neo.Segment))):
         for d in data:
             remove_epochs(d)
+            
+def remove_epoch(data:typing.Union[neo.Block, neo.Segment, typing.Sequence[typing.Union[neo.Block, neo.Segment]]],
+                 epoch:typing.Optional[typing.Union[neo.Epoch, typing.Sequence[neo.Epoch]]],
+                 block_index:typing.Optional[int]=None, segment_index:typing.Optional[int]=None,
+                 ):
+    if isinstance(data, neo.Segment):
+        if isinstance(epoch, neo.Epoch) and epoch in data.epochs:
+            ndx = data.epochs.index(epoch)
+            pass # TODO 2026-01-26 23:10:44
 
 def remove_events(segment, event:typing.Optional[typing.Union[neo.Event, str, int, TriggerEventType]]=None, byLabel=True) -> None:
     r"""Removes a specific event from the neo.Segment "segment"

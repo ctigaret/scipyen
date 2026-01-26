@@ -1039,7 +1039,7 @@ class NdarrayTrait(Instance, ScipyenTraitTypeMixin):
 class NeoBaseNeoTrait(Instance, ScipyenTraitTypeMixin):
     r"""Traitlet for BaseNeo objects
     """
-    info_text = "Trais for neo.baseneo.BaseNeo"
+    info_text = "Traits for neo.baseneo.BaseNeo"
     default_value = neo.baseneo.BaseNeo()
     klass = neo.baseneo.BaseNeo
     _cast_types = tuple()
@@ -1078,7 +1078,7 @@ class NeoBaseNeoTrait(Instance, ScipyenTraitTypeMixin):
             args = (default_value,)
             
         else:
-            raise TypeError(f"default_value expected to be {None} or one of {self._valid_defaults}")
+            raise TypeError(f"default_value expected to be {None} or one of {self._valid_defaults}; got {type(default_value).__name__}")
         
         if is_trait(value_trait):
             self._trait = value_trait() if isinstance(value_trait, type) else value_trait
@@ -1390,11 +1390,11 @@ class NeoChannelViewTrait(NeoBaseNeoTrait):
     _valid_defaults = (klass,)
     
 class NeoDataObjectTrait(NeoBaseNeoTrait):
-    klass = neo.dataobject.DataObject
+    klass = neo.core.dataobject.DataObject
     info_text = f"Traitlet for {klass}"
     default_value = Undefined
     _cast_types = tuple()
-    _valid_defaults = (klass,)
+    _valid_defaults = (klass,type(Undefined))
     
     def compare_elements(self, old_value, new_value):
         try:
@@ -1563,11 +1563,12 @@ class NeoObjectListTrait(NeoBaseNeoTrait):
             if result:
                 result = np.all(old_value == new_value)
                 
-            if result:
-                result = len(old_value.all_channel_ids) == len(new_value.all_channel_ids)
-                    
-            if result:
-                result = old_value.all_channel_ids == new_value.all_channel_ids
+            if all(hasattr(v, "all_channel_ids") for v in (old_value, new_value)):
+                if result:
+                    result = len(old_value.all_channel_ids) == len(new_value.all_channel_ids)
+                        
+                if result:
+                    result = old_value.all_channel_ids == new_value.all_channel_ids
                 
             if all(len(v) > 0 for v in (old_value, new_value)):
                 if result:

@@ -638,20 +638,23 @@ class QuickDialogComboBox(QtWidgets.QFrame):
         return self.variable.currentText()
     
     def connectTextChanged(self, slot:object):
-        self.currentTextChanged[str].connect(slot)
+        self.variable.currentTextChanged[str].connect(slot)
         
     def connectIndexChanged(self, slot:object):
         r"""Connects the combobox currentIndexChanged signal.
-        NOTE: this is an overlaoded signal, with to versions 
-        (respectively, with a str and int argument).
-        
-        Therefore it is expected that the connected slot is also overloaded
-        to accept a str or an int
         """
-        self.variable.currentIndexChanged[str].connect(slot)
+        # NOTE: this is an overlaoded signal, with two versions 
+        # (respectively, with a str and int argument).
+        # Therefore it is expected that the connected slot is also overloaded
+        # to accept a str or an int
+        # NOTE:2026-01-26 22:39:23
+        # as of Qt6.10 there seems to be NO MORE overloading; only int arguments are used
+
+        self.variable.currentIndexChanged[int].connect(slot)
         
     def disconnect(self):
-        self.variable.currentIndexChanged[str].disconnect()
+        self.variable.currentIndexChanged[int].disconnect()
+        self.variable.currentTextChanged[str].disconnect()
         
 #class DialogStack(qt.QWidgetStack):
 #    def __init__(self, parent, widgetMapping = None):

@@ -237,6 +237,7 @@ from core import pyabfbridge as pab
 from core import scipyen_plugin_loader
 from core import scipyen_config as scipyenconf
 from core import utilities
+from core import svgutils
 from core import (bgbridge, taxonbridge)
 
 from core.basescipyen import BaseScipyenData
@@ -2206,8 +2207,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             self.hugeToolBarIconSizeAction.setChecked(True)
         else:
             for action in [self.defaultToolBarIconSizeAction, self.smallToolBarIconSizeAction,
-                       self.mediumToolBarIconSizeAction, self.largeToolBarIconSizeAction,
-                       self.hugeToolBarIconSizeAction]:
+                            self.mediumToolBarIconSizeAction, self.largeToolBarIconSizeAction,
+                            self.hugeToolBarIconSizeAction]:
                 action.setChecked(False)
         ww = list(filter(lambda w: isinstance(w, QtWidgets.QMainWindow), self.app.allWidgets()))
         for w in ww:

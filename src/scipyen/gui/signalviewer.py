@@ -907,18 +907,21 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         #### END generic plot options
         
+        # NOTE: 2022-01-17 11:48:04
+        # call super().__init__ with data set to None explicitly; this will 
+        # initialize the ancestors but will avoid calling super().setData(...)
+        # We then call self.setData(...) below, tailored for SignalViewer.
+        #
+        # this will also call self._configureUI_(), see NOTE: 2021-08-25 09:42:54 below
+        #
         # NOTE: 2021-08-25 09:42:54
         # ScipyenFrameViewer initialization - also does the following:
         # 1) calls self._configureUI_() overridden here:
         #   1.1) sets up the UI defined in the .ui file (setupUi)
         #
-        # 3) calls self.loadSettings inherited from 
+        # 2) calls self.loadSettings inherited from 
         # ScipyenViewer <- WorkspaceGuiMixin <- ScipyenConfigurable
         
-        # NOTE: 2022-01-17 11:48:04
-        # call super().__init__ with data set to None explicitly; this will 
-        # initialize the ancestors but will avoid calling super().setData(...)
-        # We then call self.setData(...) below, tailored for SignalViewer.
         super().__init__(data=None, parent=parent, ID=ID, win_title=win_title, 
                          doc_title=doc_title, *args, **kwargs)
         
@@ -1051,18 +1054,49 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         #### END Cursor actions
         
         #### BEGIN Epoch actions
-        self.epochsFromCursorsAction.triggered.connect(self.slot_cursorsToEpoch)
-        icon = self.epochsFromCursorsAction.icon()
-        svgIcon = svgFileForIcon(icon)
-        if len(svgIcon):
-            svgIcon = svgIcon[0]
+        
+        # ### BEGIN NOTE: 2026-01-26 21:25:56
+        #
+        # customize icons for epochs actions for a better distinction
+        try:
+            import drawsvg as dws
+            line1 = dws.Line(11,0,11,10, stroke="#ffaa00")
+            line2 = dws.Line(3,0,3,10, stroke="#ffaa00")
+            line3 = dws.Line(19,0,19,10, stroke="#ffaa00")
+            epochsFromCursorsSVGFile = guiutils.svgFileForIcon(self.epochsFromCursorsAction.icon())
+            if len(epochsFromCursorsSVGFile):
+                epochsFromCursorsSVGBase = pio.loadXMLFile(epochsFromCursorsSVGFile[0])
+                epochFromCursorSVG = svgutils.drawOntoSvg(epochsFromCursorsSVGBase, line1)
+                self.epochFromSelectedCursorAction.setIcon(QtGui.QIcon(guiutils.svg2pixmap(epochFromCursorSVG)))
+                epochsFromCursorsSVG = svgutils.drawOntoSvg(epochsFromCursorsSVGBase, line1, line2, line3)
+                self.epochsFromCursorsAction.setIcon(QtGui.QIcon(guiutils.svg2pixmap(epochsFromCursorsSVG)))
+                epochBetweenCursorsSVG = svgutils.drawOntoSvg(epochsFromCursorsSVGBase, line2, line3)
+                self.epochBetweenCursorsAction.setIcon(QtGui.QIcon(guiutils.svg2pixmap(epochBetweenCursorsSVG)))
+                
+            epochsInDataIconSVGFile = guiutils.svgFileForIcon(self.epochsInDataFromCursorsAction.icon())
+            if len(epochsInDataIconSVGFile):
+                epochsInDataIconSVGBase = pio.loadXMLFile(epochsInDataIconSVGFile[0])
+                epochInDataFromCursorSVG = svgutils.drawOntoSvg(epochsInDataIconSVGBase, line1)
+                epochsInDataFromCursorsSVG = svgutils.drawOntoSvg(epochsInDataIconSVGBase, line1, line2, line3)
+                epochInDataBetweenCursorsSVG = svgutils.drawOntoSvg(epochsInDataIconSVGBase, line2, line3)
+                self.epochInDataFromSelectedCursorAction.setIcon(QtGui.QIcon(guiutils.svg2pixmap(epochInDataFromCursorSVG)))
+                self.epochsInDataFromCursorsAction.setIcon(QtGui.QIcon(guiutils.svg2pixmap(epochsInDataFromCursorsSVG)))
+                self.epochInDataBetweenCursors.setIcon(QtGui.QIcon(guiutils.svg2pixmap(epochInDataBetweenCursorsSVG)))
+        except:
+            traceback.print_exc()
+        #
+        # ### END   NOTE: 2026-01-26 21:25:56
 
+            
+        self.epochsFromCursorsAction.triggered.connect(self.slot_cursorsToEpoch)
         self.epochFromSelectedCursorAction.triggered.connect(self.slot_cursorToEpoch)
         self.epochBetweenCursorsAction.triggered.connect(self.slot_epochBetweenCursors)
+        
         self.epochsInDataFromCursorsAction.triggered.connect(self.slot_cursorsToEpochInData)
         self.epochInDataFromSelectedCursorAction.triggered.connect(self.slot_cursorToEpochInData)
         self.epochInDataBetweenCursors.triggered.connect(self.slot_epochInDataBetweenCursors)
-        self.epochsFromCursorsAction.triggered.connect(self._slot_removeAllEpochs)
+        
+        self.actionRemove_All_Epochs.triggered.connect(self._slot_removeAllEpochs)
         #### END Epoch actions
         
         # ### BEGIN export cursor data actions
@@ -5374,7 +5408,7 @@ anything else       anything else       ❌
             return
 
         ret = self.questionMessage("Remove Epochs — Scipyen","Are you sure you want to remove ALL epochs in the data?")
-        if ret == QtWidgets.QMessageBox.yes:
+        if ret == QtWidgets.QMessageBox.Yes:
             remove_epochs(self._yData_)
             self.displayFrame()
 
@@ -5574,6 +5608,8 @@ anything else       anything else       ❌
         if len(vertAndCrossCursors) == 0:
             return
         
+        cursor = None
+        
         if isinstance(self._yData_, (neo.Block, neo.Segment)) or (isinstance(self._yData_, (tuple, list)) and all([isinstance(s, neo.Segment) for s in self._yData_])):
             d = qd.QuickDialog(self, "Make Epoch From SignalCursor:")
             d.promptWidgets = list()
@@ -5592,8 +5628,8 @@ anything else       anything else       ❌
             else:
                 d.cursorComboBox = qd.QuickDialogComboBox(d, "Select cursor:")
                 d.cursorComboBox.setItems([c.ID for c in vertAndCrossCursors.values()])
-                d.cursorComboBox.conextIndexChanged(partial(self._slot_update_cursor_to_epoch_dlg, d=d))
-                
+                d.namePrompt.setText("%s from %s" % (d.epoch_name, d.cursorComboBox.variable.itemText(0)))
+                d.cursorComboBox.connectTextChanged(partial(self._slot_update_cursor_to_epoch_dlg, d=d))
             
             d.toAllSegmentsCheckBox = qd.CheckBox(d, "Propagate to all segments")
             d.toAllSegmentsCheckBox.setChecked(True)
@@ -5617,10 +5653,17 @@ anything else       anything else       ❌
                 relativeSweep  = d.sweepRelativeCheckBox.isChecked()
                 overwriteEpoch = d. overwriteEpochCheckBox.isChecked()
                 
-            self.cursorsToEpoch(self.selectedDataCursor, name=name, embed=True, 
-                                all_segments = toAllSegments,
-                                relative_to_segment_start = relativeSweep,
-                                overwrite = overwriteEpoch)
+                if hasattr(d, "cursorComboBox"):
+                    if d.cursorComboBox.variable.count() == 0:
+                        return
+                    cid = d.cursorComboBox.variable.itemText(0)
+                    cursor = self.signalCursor(cid)
+                
+            if cursor:
+                self.cursorsToEpoch(cursor, name=name, embed=True, 
+                                    all_segments = toAllSegments,
+                                    relative_to_segment_start = relativeSweep,
+                                    overwrite = overwriteEpoch)
             
             #self.displayFrame() # called by cursorsToEpoch when embed is True
             
@@ -5707,8 +5750,9 @@ anything else       anything else       ❌
                 
     @Slot()
     @safewrapper
-    def _slot_update_cursor_to_epoch_dlg(self, cid, d):
-        if not isinstance(cid, str) or len(cid.strip()) == 0:
+    def _slot_update_cursor_to_epoch_dlg(self, cid:typing.Optional[str]=None, d:typing.Optional[qd.QuickDialog]=None):
+        print(f"{self.__class__.__name__}._slot_update_cursor_to_epoch_dlg(cid={cid}, d={d})")
+        if (not isinstance(cid, str) or len(cid.strip()) == 0) and isinstance(d, qd.QuickDialog):
             if hasattr(d, "cursorComboBox"):
                 if d.cursorComboBox.variable.count() == 0:
                     return
@@ -5928,7 +5972,7 @@ anything else       anything else       ❌
             in the plotted data.
             
         """
-        
+        # print(f"{self.__class__.__name__}.cursorsToEpoch(cursors = {cursors})")
         if len(cursors) == 0:
             cursors = [c for c in collections.ChainMap(self._crosshairSignalCursors_, self._verticalSignalCursors_).values()]
         

@@ -53,8 +53,7 @@ from gui.painting_shared import (FontStyleType, standardQtFontStyles,
 import quantities as pq
 from core.pyqtgraph_patch import pyqtgraph as pg
 
-from core import strutils
-from core import xmlutils
+from core import strutils, xmlutils
 
 class UnitsStringValidator(QtGui.QValidator):
     def __init__(self, parent=None):
@@ -425,10 +424,8 @@ def svgFileForIcon(icon:QtGui.QIcon) -> typing.Sequence[pathlib.Path]:
 
     return list()
 
-
-
 def svg2pixmap(s:str, scale:float=1.0) -> QtGui.QPixmap:
-    if not strutils.is_svg(s):
+    if not strutils.is_svg(s) and not isinstance(s, xmlutils.xml.dom.minidom.Document):
         return QtGui.QPixmap()
     
     w, h = xmlutils.get_svg_size(s)
@@ -441,7 +438,10 @@ def svg2pixmap(s:str, scale:float=1.0) -> QtGui.QPixmap:
         h = w
     pix = QtGui.QPixmap(QtCore.QSize(int(w),int(h)))
     renderer = QtSvg.QSvgRenderer()
-    renderer.load(QtCore.QByteArray(bytes(s.encode())))
+    if isinstance(s, str):
+        renderer.load(QtCore.QByteArray(bytes(s.encode())))
+    else:
+        renderer.load(QtCore.QByteArray(bytes(s.toprettyxml().encode())))
     pix.fill(QtCore.Qt.transparent)
     painter = QtGui.QPainter(pix)
     if renderer.isValid():

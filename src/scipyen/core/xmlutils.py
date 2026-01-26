@@ -727,27 +727,61 @@ def composeStringListForXMLElement(tagname, value):
     
     return ret
     
-def get_svg_size(s:str) -> tuple:
+def get_svg_size(s:typing.Union[str, xml.dom.minidom.Document]) -> tuple:
     from core import strutils
-    
+    # print(type(s))
     try:
         attrib = dict()
-        if not strutils.is_svg(s) and not strutils.is_xml(s):
-            if isinstance(s, str) and os.path.isfile(s):
-                element = ET.parse(s)
-                root = tree.getroot()
-                attrib = root.attrib
+        if isinstance(s, xml.dom.minidom.Document) and is_svg(s):
+            # print(f"is SVG: {is_svg(s)}")
+            svgElements = s.getElementsByTagName("svg")
+            # print(f"{svgElements}")
+            if len(svgElements) == 0:
+                return (None, None)
+            
+            width = svgElements[0].getAttribute("width)")
+            if len(width.strip())==0:
+                width = None
             else:
-                return None, None
+                width = int(width)
+                
+            height = svgElements[0].getAttribute("height)")
+            if len(height.strip()) == 0:
+                height = None
+            else:
+                height = int(height)
+                
+            viewBox = svgElements[0].getAttribute("viewBox")
+            # print(f"viewBox: {viewBox}")
+            if len(viewBox.strip()):
+                x,y, width, height = list(map(lambda v: int(v), viewBox.split()))
+                
+            return width, height
+        
+        if isinstance(s, str):
+            if not strutils.is_svg(s) and not strutils.is_xml(s):
+                if isinstance(s, str) and os.path.isfile(s):
+                    element = ET.parse(s)
+                    root = tree.getroot()
+                    attrib = root.attrib
+                        
+                else:
+                    return None, None
+            else:
+                # Parse the SVG string
+                root = ET.fromstring(s)
+                attrib = root.attrib
+            
+                
         else:
-            # Parse the SVG file
-            root = ET.fromstring(s)
-            attrib = root.attrib
+            return None, None
             
         # Extract width and height attributes
         width = attrib.get('width', None)
         height = attrib.get('height', None)
         viewBox = attrib.get('viewBox', None)
+        
+        # print(f"width: {width}, height: {height}, viewBox: {viewBox}")
         
         # If width and height are None, check viewBox
         if (width is None or height is None) and viewBox:
@@ -765,11 +799,11 @@ def get_svg_size(s:str) -> tuple:
             return None, None
 
     except ET.ParseError:
-        print("Error parsing the SVG file.")
+        scipywarn("Error parsing the SVG file.")
         return None, None
     
     except Exception as e:
-        print(f"An error occurred: {e}")
+        traceback.print_exc()
         return None, None
     
 def is_svg(d:xml.dom.minidom.Document) -> bool:

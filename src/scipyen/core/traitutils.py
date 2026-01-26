@@ -473,7 +473,8 @@ def dynamic_trait(x, *args, **kwargs):
         if issubclass(myclass, list):
             traitlet_class_name = "ListTrait"
         else:
-            traitlet_class_name = "NeoDataObjectTrait"
+            traitlet_class_name = "NeoObjectListTrait"
+            # traitlet_class_name = "NeoDataObjectTrait"
     else:
         traitlet_class_name = f"{traitlet_class_name}Trait"
     
