@@ -198,7 +198,7 @@ class FileOperationJob(QtCore.QObject):
         count = len(directory.entryList(QtCore.QDir.NoDotAndDotDot | QtCore.QDir.AllEntries))
 
         for subDir in directory.entryList(QtCore.QDir.NoDotAndDotDot|QtCore.QDir.Dirs):
-            count += self._countEntries_(directory.filePath(subDir))
+            count += self._countEntries_(QtCore.QDir(directory.filePath(subDir)))
 
         return count
 
