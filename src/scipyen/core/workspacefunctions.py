@@ -870,7 +870,7 @@ def delvars(*args, glob=True, ws=None):
 def validate_varname(arg, ws:typing.Optional[dict]=None, 
                      start_counter:int=0, 
                      sep = "_", 
-                     returns_counter:bool=False,
+                     returns_counter:typing.Optional[bool]=None, # tri-state logic!!!
                      checkUnique:bool=True) -> tuple:
     r"""Returns a valid symbol based on an intended variable name.
     
@@ -959,16 +959,14 @@ def validate_varname(arg, ws:typing.Optional[dict]=None,
         # already exists)
         if arg not in ws.keys():
             # not need to append suffix since arg symbol is not in the ws
-            if returns_counter:
-                return arg, None
-            
-            return arg
+            return (arg, None) if returns_counter is None else None if returns_counter == True else arg
         else:
             # print(f"validate_varname arg {arg} exists")
-            if inspect.isclass(ws[arg]) or isinstance(ws[arg], type):
-                start_counter = 0 # 
-            else:
-                start_counter = 1
+            # if inspect.isclass(ws[arg]) or isinstance(ws[arg], type):
+            #     start_counter = 0 #
+            # else:
+            #     start_counter = 1
+            start_counter = 1
                 
             # print(f"validate_varname start_counter = {start_counter}")
             

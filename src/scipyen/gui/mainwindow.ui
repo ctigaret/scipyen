@@ -49,7 +49,7 @@
      <x>0</x>
      <y>0</y>
      <width>898</width>
-     <height>28</height>
+     <height>29</height>
     </rect>
    </property>
    <property name="sizePolicy">
@@ -788,13 +788,13 @@ NOTE: you can click anywhere in the row to select</string>
     <iconset theme="folder"/>
    </property>
    <property name="toolTip">
-    <string>Scipyen's (read-only) view of the file system</string>
+    <string>Scipyen's (limited) file system manager</string>
    </property>
    <property name="statusTip">
-    <string>Scipyen's (read-only) view of the file system</string>
+    <string>Scipyen's (limited) file system manager</string>
    </property>
    <property name="whatsThis">
-    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Scipyen's (read-only) view of the current (working) directory in the file system.&lt;/p&gt;&lt;p&gt;By design Scipyen does not allow generic file system operations (file or directory creation, removal, duplication or relocation). These operations should be enacted through the host tools (file manager, terminal etc).&lt;/p&gt;&lt;p&gt;Data can be written to files in the current directory using Save or Export actions from the context menu of the symbols (variables) in Scipyen's workspace table.&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Scipyen's (limited) file system manager. &lt;/p&gt;&lt;p&gt;For access to archive files, including archiving/extracting etc, please use the desktop's own file manager.&lt;br/&gt;&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
    </property>
    <property name="features">
     <set>QDockWidget::DockWidgetFeature::DockWidgetFloatable|QDockWidget::DockWidgetFeature::DockWidgetMovable</set>

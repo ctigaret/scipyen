@@ -533,7 +533,7 @@ def counter_suffix(x:str, strings:typing.List[str], sep:str="_",
         # print(f"counter_suffix: clashes = {clashes}")
 
         if len(clashes) == 0:
-            return None if returns_counter else (x, None)
+            return None if returns_counter==True else x if returns_counter==False else (x, None)
 
         candidate_counters = list(filter(lambda t: isinstance(t, int), map(lambda s: get_int_sfx(s, sep=sep, bracketed=bracketed)[1], clashes)))
 

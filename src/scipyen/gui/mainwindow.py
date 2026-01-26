@@ -3509,7 +3509,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             # print(f"{self.__class__.__name__}.newViewer for {winClass.__name__} listedWindows = {listedWindows}")
 
             if win not in listedWindows:
-                win_title, counter_suffix = validate_varname(win_title, self.workspace, returns_counter=True)
+                win_title, counter_suffix = validate_varname(win_title, self.workspace)#, returns_counter=None)
                 
             # print(f"{self.__class__.__name__}.newViewer for {winClass.__name__} win_title = {win_title}")
             
@@ -4698,7 +4698,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         
         if check_name is True:
             # validate name against existing user (visible) variables
-            newVarNameOK = validate_varname(name, self.workspace)
+            newVarNameOK, ctr = validate_varname(name, self.workspace)
             
             # if len(newVarNameOK) == 0:
             #     return
@@ -5728,7 +5728,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         if newVarName != originalVarName:
             if any(s in self.workspace for s in (originalVarName, newVarName)):
                 data = self.workspace.pop(originalVarName, None)
-                newVarName = validate_varname(
+                newVarName, ctr = validate_varname(
                     newVarName, self.workspace, start_counter=1)
                 self.workspace[newVarName] = obj
                 if isinstance(obj, (scipyenviewer.ScipyenViewer, QtWidgets.QWidget)):
@@ -5779,7 +5779,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         if newVarName == varName:
             return
 
-        newVarNameOK = validate_varname(newVarName, self.workspace)
+        newVarNameOK, ctr = validate_varname(newVarName, self.workspace)
 
         if newVarNameOK != newVarName:
             btn = QtWidgets.QMessageBox.question(
@@ -7503,59 +7503,67 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                     # print(f"\tisDir {info.isDir()}")
                     cm.addSeparator()
                     if info.exists() and info.isDir() and info.isWritable():
-                        createNewFolderAction = cm.addAction("Create New Folder")
+                        createNewFolderAction = cm.addAction(QtGui.QIcon.fromTheme("folder-new"), "Create New Folder")
                         createNewFolderAction.triggered.connect(self._slot_createNewFolder)
                         cm.addSeparator()
                         action_0 = createNewFolderAction
                         create_new = createNewFolderAction
 
                 if all(i.exists() for i in infos):
-                    openFileObjects = cm.addAction("Open")
+                    if len(infos) == 1:
+                        if infos[0].isDir():
+                            openIcon = QtGui.QIcon.fromTheme("document-open-folder")
+                        else:
+                            openIcon = QtGui.QIcon.fromTheme("document-open")
+
+                    else:
+                        openIcon = QtGui.QIcon.fromTheme("project-open")
+                    openFileObjects = cm.addAction(openIcon, "Open")
                     openFileObjects.triggered.connect(self.slot_openSelectedFileItems)
 
                     spreads = set([f for f in fileNames if pio.is_spreadsheet(f)])
                     scripts = set([f for f in fileNames if pio.is_python_source(f)])
 
                     if len(fileNames - spreads) == 0:
-                        importAsDataFrame = cm.addAction("Open as DataFrame")
+                        importAsDataFrame = cm.addAction(QtGui.QIcon.fromTheme("document-open"), "Open as DataFrame")
                         importAsDataFrame.triggered.connect(self.slot_importDataFrame)
 
                     if len(fileNames - scripts) == 0:
-                        addToScriptManager = cm.addAction("Add to Script Manager")
+                        addToScriptManager = cm.addAction(QtGui.QIcon.fromTheme("open-for-editing"), "Add to Script Manager")
                         addToScriptManager.triggered.connect(
                             self._slot_cm_AddPythonScriptToManager)
 
-                    fileNamesToConsole = cm.addAction("Send Name(s) to Console")
+                    fileNamesToConsole = cm.addAction(QtGui.QIcon.fromTheme("text-field-framed"), "Send Name(s) to Console")
                     fileNamesToConsole.triggered.connect(self._sendFileNamesToConsole_)
 
                     cm.addSeparator()
-                    openFilesInSystemApp = cm.addAction("Open With Default Application")
+                    openFilesInSystemApp = cm.addAction(QtGui.QIcon.fromTheme("application-menu"), "Open With Default Application")
                     openFilesInSystemApp.triggered.connect(self.slot_systemOpenSelectedFiles)
 
 
                     if all(i.isWritable() for i in parentInfos):
                         cm.addSeparator()
-                        cutFilesAction = cm.addAction("Cut")
+                        cutFilesAction = cm.addAction(QtGui.QIcon.fromTheme("edit-cut"),"Cut")
                         cutFilesAction.triggered.connect(self._slot_cutFileSystemItems)
 
-                        copyFileItemsAction = cm.addAction("Copy")
+                        copyFileItemsAction = cm.addAction(QtGui.QIcon.fromTheme("edit-copy"),"Copy")
                         copyFileItemsAction.triggered.connect(self._slot_copyFileSystemItems)
 
-                        pasteAction = cm.addAction(pasteActionName)
+                        pasteAction = cm.addAction(QtGui.QIcon.fromTheme("edit-paste"), pasteActionName)
                         pasteAction.triggered.connect(self._slot_pasteIntoFileSystemDirectory)
                         paste_action = pasteAction
                         
                         if len(selectedItems) == 1:
                             cm.addSeparator()
-                            renameAction = cm.addAction("Rename")
+                            renameAction = cm.addAction(QtGui.QIcon.fromTheme("edit-rename"),"Rename")
                             renameAction.triggered.connect(self._slot_renameFileSystemItem)
                         
                         cm.addSeparator()
                         if QtCore.QFile.supportsMoveToTrash():
-                            trashAction = cm.addAction("Move To trash")
+                            trashAction = cm.addAction(QtGui.QIcon.fromTheme("trash-empty"),"Move To trash")
                             trashAction.triggered.connect(self._slot_trashFileItems)
 
-                        deleteAction = cm.addAction("Delete")
+                        deleteAction = cm.addAction(QtGui.QIcon.fromTheme("edit-delete"),"Delete")
                         deleteAction.triggered.connect(self._slot_deleteFileItems)
                         cm.addSeparator()
 
@@ -7568,27 +7576,26 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             cm = QtWidgets.QMenu("", self)
 
         if create_new is None:
-            createNewFolderAction = cm.addAction("Create New Folder")
+            createNewFolderAction = cm.addAction(QtGui.QIcon.fromTheme("folder-new"), "Create New Folder")
             createNewFolderAction.triggered.connect(self._slot_createNewFolder)
             create_new = createNewFolderAction
             cm.addSeparator()
             
         if paste_action is None:
-            pasteAction = cm.addAction(pasteActionName)
+            pasteAction = cm.addAction(QtGui.QIcon.fromTheme("edit-paste"), pasteActionName)
             pasteAction.triggered.connect(self._slot_pasteIntoFileSystemDirectory)
             paste_action = pasteAction
             
 
-
-        openParentFolderInSystemApp = cm.addAction(
-            "Open Parent Folder In File Manager")
-        openParentFolderInSystemApp.triggered.connect(
-            self.slot_systemOpenParentFolderForSelectedItems)
-
-        openFolderInFileManager = cm.addAction(
+        openFolderInFileManager = cm.addAction(QtGui.QIcon.fromTheme("document-open-folder"),
             "Open This Folder In File Manager")
         openFolderInFileManager.triggered.connect(
             self.slot_systemOpenCurrentFolder)
+
+        openParentFolderInSystemApp = cm.addAction(QtGui.QIcon.fromTheme("go-parent-folder"),
+            "Open Parent Folder In File Manager")
+        openParentFolderInSystemApp.triggered.connect(
+            self.slot_systemOpenParentFolderForSelectedItems)
 
         if action_0 is None:
             if create_new:
@@ -10474,7 +10481,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             if win not in listedWindows:
                 # create a binding in the workspace
                 win_title = winType.__name__
-                win_title, counter_suffix = validate_varname(win_title, self.workspace, return_counter=True)
+                win_title, counter_suffix = validate_varname(win_title, self.workspace)#, returns_counter=None)
                 self.workspace[win_title] = win
                 self.workspaceModel.update()
                 
