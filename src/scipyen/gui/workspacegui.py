@@ -411,7 +411,8 @@ class GuiMessages(object):
     def detailedMessage(self, title:str, text:str, info:typing.Optional[str]="", detail:typing.Optional[str]="",
                         msgType:typing.Optional[typing.Union[str, QtGui.QPixmap]]="Critical",
                         buttons:typing.Optional[QtWidgets.QMessageBox.StandardButton]=QtWidgets.QMessageBox.Ok,
-                        defaultButton:typing.Optional[QtWidgets.QMessageBox.StandardButton]=None):
+                        defaultButton:typing.Optional[QtWidgets.QMessageBox.StandardButton]=None,
+                        highlightText:bool=False, highlightInfo:bool=False):#, highlightDetail:bool=False):
         r"""Detailed generic message dialog box
         title: str  = dialog title
         text:str =  main message
@@ -427,7 +428,7 @@ class GuiMessages(object):
         # from core.strutils import (is_html, is_markdown)
         from gui import guiutils
         from helpsystem import helputils # TODO 2026-01-21 09:03:35 transfer code from the following, to strutils: mypylight
-
+        lexer = None
         if isinstance(msgType, str) and len(msgType.strip()):
             if getattr(QtWidgets.QMessageBox.Icon, msgType, None) is not None:
                 icon = getattr(QtWidgets.QMessageBox.Icon, msgType, QtWidgets.QMessageBox.NoIcon)
@@ -445,7 +446,7 @@ class GuiMessages(object):
         msgbox = QtWidgets.QMessageBox(parent=self)
         msgbox.setStandardButtons(buttons)
         if isinstance(defaultButton, QtWidgets.QMessageBox.StandardButton):
-            msgbox.setDefaultbutton(defaultButton)
+            msgbox.setDefaultButton(defaultButton)
         if isinstance(icon, QtGui.QPixmap):
             msgbox.setIconPixmap(icon)
         elif isinstance(icon, QtWidgets.QMessageBox.Icon):
@@ -455,18 +456,26 @@ class GuiMessages(object):
             
         msgbox.setSizeGripEnabled(True)
         msgbox.setWindowTitle(title)
-        lexer = helputils.get_lexer_by_name("python", stripall=True)
-        style = "KeplerDark" if guiutils.isDarkGui() else "default"
-        msgText = helputils.highlight(text, lexer, helputils.HtmlFormatter(noclasses=True, nobackground=True, style=style))
-        msgbox.setText(msgText)
         msgbox.setTextFormat(QtCore.Qt.RichText)
-        
+
+        if any([highlightInfo, highlightText]):
+            lexer = helputils.get_lexer_by_name("python", stripall=True)
+            style = "KeplerDark" if guiutils.isDarkGui() else "default"
+            if highlightText:
+                text = helputils.highlight(text, lexer, helputils.HtmlFormatter(noclasses=True, nobackground=True, style=style))
+            if highlightInfo:
+                if isinstance(info, str) and len(info.strip()):
+                    info = helputils.highlight(info, lexer, helputils.HtmlFormatter(noclasses=True, nobackground=True, style=style))
+            # if highlightDetail:
+            #     if isinstance(detail, str) and len(detail.strip()):
+            #         detail = helputils.highlight(detail, lexer, helputils.HtmlFormatter(noclasses=True, nobackground=True, style=style))
+                
+        msgbox.setText(text)
         if isinstance(info, str) and len(info.strip()):
             msgbox.setInformativeText(info)
-            
         if isinstance(detail, str) and len(detail.strip()):
             msgbox.setDetailedText(detail)
-            
+        
         return msgbox.exec()
     
     @safewrapper

@@ -110,6 +110,37 @@ fsMap = [
         FsInfo(FsType.Fuse, "fuseblk"),
     ]
 
+class FileSystemModel(QtGui.QFileSystemModel):
+    CutItemRole = QtCore.Qt.UserRole=1
+    def __init__(self, parent:typing.Optional[QtCore.QObject] = None):
+        super().__init__(parent=parent)
+        self._cutIndexes_:typing.Sequence[QtCore.QModelIndex] = list()
+        
+    def data(self, index:QtCore.QModelIndex, role:QtCore.Qt.ItemDataRole=QtCore.Qt.DisplayRole) -> QtCore.QVariant:
+        # NOTE: 2026-01-25 21:20:01
+        # not sure this does anything meaningful...
+        # simply because the stock QTreeView does not seem to ever query the ForegroundRole
+        # and because this model does define a custom setData(…) to set a ForegroundRole for the items.
+        #
+        # besides, I don;t think this approach works; rather, I use a custom QStyledItemDelegate defined in gui.delegates
+        if index in self._cutIndexes_:
+            if role == QtCore.Qt.ForegroundRole:
+                return QtWidgets.QApplication.palette().brush(QtGui.QPalette.Inactive, QtGui.QPalette.Text)
+            
+        return super().data(index, role)
+    
+    @property
+    def cutIndexes(self) -> list:
+        return self._cutIndexes_
+    
+    @cutIndexes.setter
+    def cutIndexes(self, value:typing.Sequence[QtCore.QModelIndex]):
+        if len(value) and not all(isinstance(v, QtCore.QModelIndex) for v in value):
+            return
+    
+        self._cutIndexes_ = value
+            
+
 class TransferFilesJob(QtCore.QObject):
     sig_finished = Signal(name="sig_finished")
     def __init__(self, parent:typing.Optional[QtCore.QObject]=None):
@@ -129,12 +160,6 @@ class TransferFilesJob(QtCore.QObject):
         from core.strutils import pluralize
         from gui import pictgui as pgui
         self.progressCounter = 0
-        if len(source) == 0:
-            return
-
-        if len(source) != len(destination):
-            scipywarn(f"Mismatch between number of source ({len(source)}) and destination files ({destination})")
-            return
 
         nFiles = len(source)
 
@@ -143,8 +168,8 @@ class TransferFilesJob(QtCore.QObject):
         for subDir in subDirs:
             nFiles += self._countEntries_(QtCore.QDir(subDir.as_posix()))
 
-        if not isinstance(jobType, str) or len(jobType.strip()) == 0 or jobType.lower() not in ("copy","move"):
-            jobType = "copy"
+        if not isinstance(jobType, str) or len(jobType.strip()) == 0 or jobType.lower() not in ("copy","move", "trash", "delete"):
+            raise ValueError(f"Unknown transfer job type {jobType}; allowed values are 'copy', 'move', 'trash', 'delete'")
 
         transferName = "Moving" if jobType=="move" else "Copying"
         progressDlg = QtWidgets.QProgressDialog(f"{transferName} {nFiles} {pluralize('File', nFiles)}...",
@@ -178,12 +203,22 @@ class TransferFilesJob(QtCore.QObject):
         return count
 
     def _transferFiles_(self, **kwargs) -> bool:
-        source: typing.optional[typing.Sequence[pathlib.Path]] = kwargs.pop("source", None)
-        destination: typing.Optional[typing.Sequence[pathlib.Path]] = kwargs.pop("destination", None)
+        from core.prog import scipywarn
+        # print(f"{self.__class__.__name__}._transferFiles_: kwargs = {kwargs}")
         jobType: str = kwargs.pop("jobType", "copy")
+        source: typing.optional[typing.Sequence[pathlib.Path]] = kwargs.pop("source", list())
+        destination: typing.Optional[typing.Sequence[pathlib.Path]] = kwargs.pop("destination", list())
         loopControl = kwargs.pop("loopControl", None)
         progressSignal = kwargs.pop("progressSignal", None)
         canceledSignal = kwargs.pop("canceledSignal", None)
+        
+        # print(f"{self.__class__.__name__}._transferFiles_: jobType = {jobType}")
+        if len(source) == 0:
+            return
+
+        if len(source) != len(destination) and jobType not in ("trash", "delete"):
+            scipywarn(f"Mismatch between number of source ({len(source)}) and destination files ({destination})")
+            return
 
         self.progressCounter = 0
 
@@ -191,36 +226,60 @@ class TransferFilesJob(QtCore.QObject):
 
         canceled = False
 
-        print(f"{self.__class__.__name__}._transferFiles_:\nsource:\n{source}\ndestination:\n{destination}\n")
-
-        for k, src in enumerate(source):
-            try:
-                s = src.as_posix()
-                d = destination[k].as_posix()
-                if src.is_file():
-                    result = self._copyFile_(s,d)
-                    # self.progressCounter += 1
-                elif src.is_dir():
-                    result = self._copyDirectory_(QtCore.QDir(s), QtCore.QDir(d))
-
-                # result = QtCore.QFile.copy(s,d)
-                # print(f"\tcopying {s} to {d} -> {result}")
-                # if jobType == "moving" and result:
-                #     srcFile = QFile(src.as_posix())
-                #     result = srcFile.remove()
-
+        # print(f"{self.__class__.__name__}._transferFiles_:\nsource:\n{source}\ndestination:\n{destination}\n")
+        
+        if jobType == "trash":
+            for src in source:
+                srcFile = QtCore.QFile(src.as_posix())
+                result = srcFile.moveToTrash()
                 OK &= result
+                if result:
+                    self.progressCounter += 1
+                    
+        elif jobType == "delete":
+            for src in source:
+                if src.is_file():
+                    srcFile = QtCore.QFile(src.as_posix())
+                    result = srcFile.remove()
+                    OK &= result
+                    if result:
+                        self.progressCounter += 1
+                elif src.is_dir():
+                    srcDir = QtCore.QDir(src.as_posix())
+                    result = srcDir.removeRecursively()
+                    OK &= result
+                    if result:
+                        self.progressCounter += 1
+        
+        else:
+            for k, src in enumerate(source):
+                try:
+                    s = src.as_posix()
+                    d = destination[k].as_posix()
+                    if src.is_file():
+                        result = self._copyFile_(s,d)
+                        if jobType == "move" and result:
+                            srcFile = QtCore.QFile(src.as_posix())
+                            result = srcFile.remove()
+                        # self.progressCounter += 1
+                    elif src.is_dir():
+                        result = self._copyDirectory_(QtCore.QDir(s), QtCore.QDir(d))
+                        if jobType == "move" and result:
+                            srcDir = QtCore.QDir(src.as_posix())
+                            result = srcDir.removeRecursively()
 
-                if OK and isinstance(progressSignal, QtCore.SignalInstance):
-                    progressSignal.emit(self.progressCounter)
-            except:
-                traceback.print_exc()
-                continue
+                    OK &= result
 
-            if isinstance(loopControl, dict) and loopControl.get("break", None) == True:
-                if isinstance(canceledSignal, QtCore.SignalInstance):
-                    canceledSignal.emit()
-                break
+                    if OK and isinstance(progressSignal, QtCore.SignalInstance):
+                        progressSignal.emit(self.progressCounter)
+                except:
+                    traceback.print_exc()
+                    continue
+
+                if isinstance(loopControl, dict) and loopControl.get("break", None) == True:
+                    if isinstance(canceledSignal, QtCore.SignalInstance):
+                        canceledSignal.emit()
+                    break
 
         return OK
 

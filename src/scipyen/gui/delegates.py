@@ -52,6 +52,18 @@ from gui.widgets import small_widgets as smw
 from gui import quickdialog as qd
 from core import typeenum
 
+class CutFileSystemItemDelegate(QtWidgets.QStyledItemDelegate):
+    # WARNING: 2026-01-25 22:25:36 TODO
+    # needs more work
+    def paint(self, painter, option, index):
+        # BUG: 2026-01-25 22:25:50 TODO/FIXME
+        # screws up painting
+        print(f"{self.__class__.__name__}.paint: option = {option}\n")
+        painter.setPen(QtWidgets.QApplication.palette().color(QtGui.QPalette.Inactive, QtGui.QPalette.Text))
+        super().paint(painter, option, index)
+        # self.initStyleOption()
+        # painter.drawText(option.rect, option.displayAlignment, index.data())
+
 class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
     r"""Provides delegate widgets for editing individual items in tabular data models.
 
