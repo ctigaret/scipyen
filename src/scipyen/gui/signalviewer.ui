@@ -127,7 +127,7 @@
      <x>0</x>
      <y>0</y>
      <width>827</width>
-     <height>28</height>
+     <height>29</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -174,6 +174,7 @@
      <addaction name="actionViewFrame_Navigator"/>
      <addaction name="actionViewSignal_Selectors"/>
      <addaction name="actionViewCursors_Toolbar"/>
+     <addaction name="actionViewEpochs_Toolbar"/>
      <addaction name="actionViewTriggers_Toolbar"/>
      <addaction name="separator"/>
      <addaction name="actionLockToolbars"/>
@@ -282,23 +283,48 @@
      <string>Epochs</string>
     </property>
     <widget class="QMenu" name="makeEpochsMenu">
+     <property name="toolTip">
+      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Creates Epochs and &lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;exports&lt;/span&gt; them to the workspace. &lt;/p&gt;&lt;p&gt;Epochs are &lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;not added&lt;/span&gt; to the data&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+     </property>
+     <property name="statusTip">
+      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Creates Epochs and &lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;exports&lt;/span&gt; them to the workspace. &lt;/p&gt;&lt;p&gt;Epochs are &lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;not added&lt;/span&gt; to the data&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+     </property>
+     <property name="whatsThis">
+      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Creates Epochs and &lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;exports&lt;/span&gt; them to the workspace. &lt;/p&gt;&lt;p&gt;Epochs are &lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;not added&lt;/span&gt; to the data&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+     </property>
      <property name="title">
-      <string>Make Epochs</string>
+      <string>Create Epochs   </string>
+     </property>
+     <property name="icon">
+      <iconset theme="timeline-use-zone-on"/>
      </property>
      <addaction name="epochsFromCursorsAction"/>
      <addaction name="epochFromSelectedCursorAction"/>
      <addaction name="epochBetweenCursorsAction"/>
     </widget>
     <widget class="QMenu" name="makeEpochsInDataMenu">
+     <property name="toolTip">
+      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Creates Epochs and &lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;adds&lt;/span&gt; them to the data. &lt;/p&gt;&lt;p&gt;Epochs are &lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;NOT&lt;/span&gt; exported to the workspace&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+     </property>
+     <property name="statusTip">
+      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Creates Epochs and &lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;adds&lt;/span&gt; them to the data. &lt;/p&gt;&lt;p&gt;Epochs are &lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;NOT&lt;/span&gt; exported to the workspace&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+     </property>
+     <property name="whatsThis">
+      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Creates Epochs and &lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;adds&lt;/span&gt; them to the data. &lt;/p&gt;&lt;p&gt;Epochs are &lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;NOT&lt;/span&gt; exported to the workspace&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+     </property>
      <property name="title">
-      <string>Make Epocks In Data</string>
+      <string>Add Epochs To Data    </string>
+     </property>
+     <property name="icon">
+      <iconset theme="preview-add-zone"/>
      </property>
      <addaction name="epochsInDataFromCursorsAction"/>
      <addaction name="epochInDataFromSelectedCursorAction"/>
      <addaction name="epochInDataBetweenCursors"/>
     </widget>
-    <addaction name="makeEpochsMenu"/>
     <addaction name="makeEpochsInDataMenu"/>
+    <addaction name="makeEpochsMenu"/>
+    <addaction name="actionRemove_All_Epochs"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="cursorsMenu"/>
@@ -376,6 +402,12 @@
    <property name="windowTitle">
     <string>Cursors</string>
    </property>
+   <property name="toolTip">
+    <string>Manage Cursors</string>
+   </property>
+   <property name="statusTip">
+    <string>Manage Cursors</string>
+   </property>
    <attribute name="toolBarArea">
     <enum>TopToolBarArea</enum>
    </attribute>
@@ -408,6 +440,30 @@
    </attribute>
    <addaction name="actionDetect_Triggers"/>
    <addaction name="actionRemoveTriggers"/>
+  </widget>
+  <widget class="QToolBar" name="epochsToolBar">
+   <property name="windowTitle">
+    <string>Epochs</string>
+   </property>
+   <property name="toolTip">
+    <string>Manage Epochs</string>
+   </property>
+   <property name="statusTip">
+    <string>Manage Epochs</string>
+   </property>
+   <property name="whatsThis">
+    <string>Manage Epochs</string>
+   </property>
+   <attribute name="toolBarArea">
+    <enum>TopToolBarArea</enum>
+   </attribute>
+   <attribute name="toolBarBreak">
+    <bool>false</bool>
+   </attribute>
+   <addaction name="epochsInDataFromCursorsAction"/>
+   <addaction name="epochInDataFromSelectedCursorAction"/>
+   <addaction name="epochInDataBetweenCursors"/>
+   <addaction name="actionRemove_All_Epochs"/>
   </widget>
   <action name="actionClose">
    <property name="text">
@@ -473,6 +529,9 @@
    </property>
    <property name="text">
     <string>Remove Cursor...</string>
+   </property>
+   <property name="toolTip">
+    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Removes the currently selected cursor.&lt;/p&gt;&lt;p&gt;Use the &lt;span style=&quot; text-decoration: underline;&quot;&gt;Cursors menu&lt;/span&gt; to remove &lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;all&lt;/span&gt; cursors.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
    </property>
   </action>
   <action name="actionSVG">
@@ -645,33 +704,69 @@
    </property>
   </action>
   <action name="epochsFromCursorsAction">
+   <property name="icon">
+    <iconset theme="timeline-use-zone-on"/>
+   </property>
    <property name="text">
-    <string>From Vertical Cursors</string>
+    <string>Create Epoch From Vertical Cursor...</string>
+   </property>
+   <property name="toolTip">
+    <string>Create Epoch From Vertical Cursor...</string>
    </property>
   </action>
   <action name="epochFromSelectedCursorAction">
+   <property name="icon">
+    <iconset theme="timeline-use-zone-on"/>
+   </property>
    <property name="text">
-    <string>From Selected Vertical Cursor</string>
+    <string>Create Epoch From Selected Vertical Cursor</string>
+   </property>
+   <property name="toolTip">
+    <string>Create Epoch From Selected Vertical Cursor</string>
    </property>
   </action>
   <action name="epochBetweenCursorsAction">
+   <property name="icon">
+    <iconset theme="timeline-use-zone-on"/>
+   </property>
    <property name="text">
-    <string>Between Two Vertical Cursors</string>
+    <string>Create Epoch Between Two Vertical Cursors</string>
+   </property>
+   <property name="toolTip">
+    <string>Create Epoch Between Two Vertical Cursors</string>
    </property>
   </action>
   <action name="epochsInDataFromCursorsAction">
+   <property name="icon">
+    <iconset theme="preview-add-zone"/>
+   </property>
    <property name="text">
-    <string>From Vertical Cursors</string>
+    <string>Add Epoch From Vertical Cursors</string>
+   </property>
+   <property name="toolTip">
+    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Creates an Epoch from several vertical cursors.&lt;/p&gt;&lt;p&gt;Creates an Epoch with &lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;as many intervals as there are vertical cursors selected&lt;/span&gt; in a subsequent dialog.&lt;/p&gt;&lt;p&gt;The Epoch is embedded in the data.&lt;/p&gt;&lt;p&gt;The Epoch will have &lt;span style=&quot; text-decoration: underline;&quot;&gt;one interval for each selected vertical cursor&lt;/span&gt;, defined by &lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;start&lt;/span&gt; and &lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;duration&lt;/span&gt; attributes, centered on the cursors' horizontal (&lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;x&lt;/span&gt;) coordinate, with duration equal to the cursors' horizontal window (&lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;xwindow&lt;/span&gt;).&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
    </property>
   </action>
   <action name="epochInDataFromSelectedCursorAction">
+   <property name="icon">
+    <iconset theme="preview-add-zone"/>
+   </property>
    <property name="text">
-    <string>From Selected Vertical Cursor</string>
+    <string>Add Epoch From Selected Vertical Cursor</string>
+   </property>
+   <property name="toolTip">
+    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Creates an Epoch from a single vertical cursor.&lt;/p&gt;&lt;p&gt;The Epoch is embedded in the data.&lt;/p&gt;&lt;p&gt;The Epoch will have &lt;span style=&quot; text-decoration: underline;&quot;&gt;one interval&lt;/span&gt;, defined by &lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;start&lt;/span&gt; and &lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;duration&lt;/span&gt; attributes, centered on the cursors' horizontal (&lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;x&lt;/span&gt;) coordinate, with duration equal to the cursors' horizontal window (&lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;xwindow&lt;/span&gt;).&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
    </property>
   </action>
   <action name="epochInDataBetweenCursors">
+   <property name="icon">
+    <iconset theme="preview-add-zone"/>
+   </property>
    <property name="text">
-    <string>Between Two Vertical Cursors</string>
+    <string>Add Epoch Between Two Vertical Cursors</string>
+   </property>
+   <property name="toolTip">
+    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Creates an epoch between two Vertical Cursors.&lt;/p&gt;&lt;p&gt;The Epoch is embedded in the data.&lt;/p&gt;&lt;p&gt;The Epochs will contain a single interval, between the two cursors &lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;x&lt;/span&gt; coordinates.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
    </property>
   </action>
   <action name="actionLink_X_axes">
@@ -714,8 +809,14 @@
    </property>
   </action>
   <action name="actionVerticalCursorsFromEpochInCurrentAxis">
+   <property name="icon">
+    <iconset theme="zone-out"/>
+   </property>
    <property name="text">
     <string>In current axis...</string>
+   </property>
+   <property name="toolTip">
+    <string>Create Vertical Cursors from Epoch In current axis</string>
    </property>
   </action>
   <action name="actionMultiAxisVerticalCursorsFromEpoch">
@@ -865,6 +966,22 @@
    </property>
    <property name="text">
     <string>Remove All Events</string>
+   </property>
+  </action>
+  <action name="actionViewEpochs_Toolbar">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Epochs Toolbar</string>
+   </property>
+  </action>
+  <action name="actionRemove_All_Epochs">
+   <property name="icon">
+    <iconset theme="preview-remove-zone"/>
+   </property>
+   <property name="text">
+    <string>Remove All Epochs</string>
    </property>
   </action>
  </widget>

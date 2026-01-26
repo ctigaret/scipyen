@@ -898,11 +898,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self._cursorsDockWidget_enabled_ = True
         self._annotationsDockWidget_enabled_ = True
         self._mainToolBarVisible_ = True
-        self._cursorsToolBarVisible_ = True
-        self._triggersToolBarVisible_ = True
-        self._navigatorVisible_ = True
-        self._selectorsVisible_ = True
-        self._toolbarsLocked_ = True
+        self._cursorsToolBarVisible_:bool = True
+        self._epochsToolBarVisible_:bool = True
+        self._triggersToolBarVisible_:bool = True
+        self._navigatorVisible_:bool = True
+        self._selectorsVisible_:bool = True
+        self._toolbarsLocked_:bool = True
         
         #### END generic plot options
         
@@ -1075,6 +1076,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         self.actionViewMain_Toolbar.toggled.connect(self.slot_toggleMainToolbar)
         self.actionViewCursors_Toolbar.toggled.connect(self.slot_toggleCursorsToolbar)
+        self.actionViewEpochs_Toolbar.toggled.connect(self.slot_toggleEpochsToolbar)
         self.actionViewTriggers_Toolbar.toggled.connect(self.slot_toggleTriggersToolbar)
         self.actionViewFrame_Navigator.toggled.connect(self.slot_toggleNavigator)
         self.actionViewSignal_Selectors.toggled.connect(self.slot_toggleSelectors)
@@ -1211,6 +1213,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         self.mainToolBar.visibilityChanged.connect(self._slot_mainToolbarVisibilityChanged)
         self.cursorsToolBar.visibilityChanged.connect(self._slot_cursorsToolbarVisibilityChanged)
+        self.epochsToolBar.visibilityChanged.connect(self._slot_epochsToolbarVisibilityChanged)
         self.triggersToolBar.visibilityChanged.connect(self._slot_triggersToolbarVisibilityChanged)
         
         self.leftLabelSpace = self.defaultLeftAxisLabelSpace
@@ -1483,7 +1486,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @property
     def cursorsToolBarVisible(self) -> bool:
         return self._cursorsToolBarVisible_
-    
+
     @markConfigurable("CursorsToolBarVisible", "Qt")
     @cursorsToolBarVisible.setter
     def cursorsToolBarVisible(self, value:bool):
@@ -1491,6 +1494,18 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         signalBlockers = [QtCore.QSignalBlocker(w) for w in (self.actionViewCursors_Toolbar, self.cursorsToolBar)]
         self.cursorsToolBar.setVisible(self._cursorsToolBarVisible_)
         self.actionViewCursors_Toolbar.setChecked(self._cursorsToolBarVisible_)
+
+    @property
+    def epochsToolBarVisible(self) -> bool:
+        return self._epochsToolBarVisible_
+    
+    @markConfigurable("EpochsToolBarVisible", "Qt")
+    @epochsToolBarVisible.setter
+    def epochsToolBarVisible(self, value:bool):
+        self._epochsToolBarVisible_ = value
+        signalBlockers = [QtCore.QSignalBlocker(w) for w in (self.actionViewEpochs_Toolbar, self.epochsToolBar)]
+        self.epochsToolBar.setVisible(self._epochsToolBarVisible_)
+        self.actionViewEpochs_Toolbar.setChecked(self._epochsToolBarVisible_)
         
     @property
     def triggersToolBarVisible(self) -> bool:
@@ -3581,6 +3596,12 @@ anything else       anything else       ❌
         self._cursorsToolBarVisible_ = val == True
         signalBlocker = QtCore.QSignalBlocker(self.actionViewCursors_Toolbar)
         self.actionViewCursors_Toolbar.setChecked(self._cursorsToolBarVisible_)
+
+    @Slot(bool)
+    def _slot_epochsToolbarVisibilityChanged(self, val):
+        self._epochsToolBarVisible_ = val == True
+        signalBlocker = QtCore.QSignalBlocker(self.actionViewEpochs_Toolbar)
+        self.actionViewEpochs_Toolbar.setChecked(self._epochsToolBarVisible_)
         
     @Slot(bool)
     def _slot_triggersToolbarVisibilityChanged(self, val):
@@ -4901,12 +4922,22 @@ anything else       anything else       ❌
     @Slot(bool)
     def slot_toggleCursorsToolbar(self, value:bool):
         self.cursorsToolBarVisible = value
+
+    @Slot(bool)
+    def slot_toggleEpochsToolbar(self, value:bool):
+        self.epochsToolBarVisible = value
         
     def hideCursorsToolbar(self):
         self.cursorsToolBarVisible = False
-        
+
     def showCursorsToolbar(self):
         self.cursorsToolBarVisible = True
+
+    def hideEpochsToolbar(self):
+        self.epochsToolBarVisible = False
+        
+    def showEpochsToolbar(self):
+        self.epochsToolBarVisible = True
         
     @Slot(bool)
     def slot_toggleTriggersToolbar(self, value:bool):
@@ -7331,6 +7362,19 @@ anything else       anything else       ❌
                 self._yData_ = y
                 
                 isEphysDataCollection = check_ephys_data_collection(self._yData_)
+
+                supportsEpochs = isEphysDataCollection and (isinstance(self._yData_, neo.Block) or (isinstance(self._yData_, typing.Sequence) and all(isinstance(v, neo.Segment) for v in self._yData_)))
+
+                epochsActions = (self.epochsFromCursorsAction,
+                                 self.epochFromSelectedCursorAction,
+                                 self.epochBetweenCursorsAction,
+                                 self.epochsInDataFromCursorsAction,
+                                 self.epochInDataFromSelectedCursorAction,
+                                 self.epochInDataBetweenCursors)
+
+                for action in epochsActions:
+                    action.setEnabled(supportsEpochs)
+
                 self.actionDetect_Triggers.setEnabled(isEphysDataCollection)
                 self.actionRemoveTriggers.setEnabled(isEphysDataCollection)
 
@@ -7983,7 +8027,7 @@ anything else       anything else       ❌
         else:
             self.statusBar().showMessage(f"Selected axes: {index}")
             
-    def _setAxisIsActive(self, axis, active:False) -> None:
+    def _setAxisIsActive(self, axis:pg.PlotItem, active:bool=False) -> None:
         lblStyle = {"color":"#FF5500" if active else "#000000"}
         # activeAxBorderPen = QtGui.QPen(QtGui.QColor("#AAAAAA"))
         lbl = axis.axes["left"]["item"].labelText
@@ -9520,6 +9564,10 @@ anything else       anything else       ❌
                     self._plot_signal_data_(signal, sig_name, plotItem, plotItemName, *args, **kwargs)
                     
                 plotItem.setVisible(True)
+
+                if len(selected_signals) == 1:
+                    self._setAxisIsActive(plotItem, True)
+
                 
             else:
                 if self._new_data_ and k in hiddenSignals: 
