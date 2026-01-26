@@ -6200,7 +6200,17 @@ def detect_trigger_events(data: neo.Block) -> bool:
     if protocol is None:
         return False
     
-    
+def remove_epochs(data:typing.Union[neo.Block, neo.Segment, typing.Sequence[typing.Union[neo.Block, neo.Segment]]]):
+    if isinstance(data, neo.Segments):
+        data.epochs.clear()
+
+    elif isinstance(data, neo.Block):
+        for segments in data.segments:
+            remove_epochs(segment)
+
+    elif isinstance(data, typing.Sequence) and all(isinstance(d, (neo.Block, neo.Segment))):
+        for d in data:
+            remove_epochs(d)
 
 def remove_events(segment, event:typing.Optional[typing.Union[neo.Event, str, int, TriggerEventType]]=None, byLabel=True) -> None:
     r"""Removes a specific event from the neo.Segment "segment"

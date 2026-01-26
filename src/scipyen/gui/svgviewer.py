@@ -10,7 +10,7 @@ r"""SVG viewer
 
 #### BEGIN core python modules
 from __future__ import print_function
-import os, typing, types
+import os, typing, types, re, xml
 #### END core python modules
 
 #### BEGIN 3rd party modules
@@ -56,7 +56,8 @@ from gui import quickdialog
 #### END pict.gui modules
 
 import iolib.pictio as pio
-from core import strutils
+from core import strutils, xmlutils
+from core.prog import scipywarn
 from gui.widgets import svgwidgets
 
 # NOTE: 2022-12-25 23:08:51
@@ -64,7 +65,8 @@ from gui.widgets import svgwidgets
 __scipyen_plugin__ = None
 
 class SVGViewer(ScipyenViewer):
-    viewer_for_types = {strutils.is_svg:90}
+    viewer_for_types = {strutils.is_svg:100,
+                        xmlutils.is_svg:100}
 
     def __init__(self, data:typing.Optional[str]=None, 
                  parent:typing.Optional[QtWidgets.QWidget]=None,
@@ -85,7 +87,17 @@ class SVGViewer(ScipyenViewer):
         if strutils.is_svg(data):
             self._data_ = data
             self._svgWidget_.setSvg(data)
-            
+        elif xmlutils.is_svg(data):
+            svgElements = data.getElementsByTagName("svg")
+            if len(svgElements):
+                svgElement = svgElements[0]
+                self._data_ = svgElement
+                self._svgWidget_.setSvg(svgElement)
+            else:
+                scipywarn("The XML Document does not seem to contain SVG data")
+                return
+
+
         else:
             raise TypeError("Expecting an SVG string")
         

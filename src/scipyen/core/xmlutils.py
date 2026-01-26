@@ -772,6 +772,12 @@ def get_svg_size(s:str) -> tuple:
         print(f"An error occurred: {e}")
         return None, None
     
+def is_svg(d:xml.dom.minidom.Document) -> bool:
+    if not isinstance(d, xml.dom.minidom.Document):
+        return False
+
+    svgElements = d.getElementsByTagName("svg")
+    return len(svgElements) > 0
 
 
 # # Example usage

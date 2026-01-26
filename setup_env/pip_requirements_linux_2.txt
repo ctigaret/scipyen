@@ -158,6 +158,7 @@ nuitka
 numba>=0.60.0 # needed to get llvmlite and brainglobe installed un environemnts using python 3.13.3
 numpy           
 octave_kernel
+pint
 pandas
 pandas-flavor
 pathy
@@ -219,6 +220,7 @@ sphinx_rtd_theme
 srsly
 stack-data
 statsmodels
+superqt
 sympy
 tables ; python_version >= '3.9.7'
 tabulate

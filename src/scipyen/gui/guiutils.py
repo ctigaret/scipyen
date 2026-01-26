@@ -5,7 +5,7 @@
 
 r"""Various helpers for GUI
 """
-import sys, os, typing, warnings, math, io
+import sys, os, typing, warnings, math, io, pathlib
 import numpy as np
 from ipykernel.inprocess.ipkernel import InProcessInteractiveShell
 from core.utilities import get_least_pwr10
@@ -398,6 +398,34 @@ def isDarkGui() -> bool:
     windowColor = QtWidgets.QApplication.palette().color(QtGui.QPalette.Window)
     _,_,v,_ = windowColor.getHsv()
     return v <= 128
+
+def svgFileForIcon(icon:QtGui.QIcon) -> typing.Sequence[pathlib.Path]:
+    name = icon.name()
+    if not isinstance(name, str) or len(name.strip()) == 0:
+        return list()
+
+    themeName = icon.themeName()
+    if not isinstance(themeName, str) or len(themeName.strip()) == 0:
+        return list()
+
+
+    iconFileDirectories = list(filter(lambda p: p.exists(), map(lambda s: pathlib.Path(s), icon.themeSearchPaths())))
+    if len(iconFileDirectories) == 0:
+        return list()
+
+    found = list()
+
+    for p in iconFileDirectories:
+        files = list(filter(lambda x: icon.themeName() in x.as_posix(), p.rglob(f"{name}.svg")))
+        if len(files):
+            found.extend(list(files))
+
+    if len(found):
+        return list(set(found))
+
+    return list()
+
+
 
 def svg2pixmap(s:str, scale:float=1.0) -> QtGui.QPixmap:
     if not strutils.is_svg(s):

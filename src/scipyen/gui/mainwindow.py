@@ -323,6 +323,7 @@ from . import delegates
 from . import interact
 from . import scipyen_colormaps as colormaps
 from . import consoles
+from . import guiutils
 from . import scipyenviewer
 from . import quickdialog as qd
 # from . import resources_rc #as resources_rc
@@ -987,6 +988,8 @@ class VTH(object):
             objtype = obj
         else:
             objtype = type(obj)
+
+        # print(F"VTH.get_handler_spec for {objtype}")
             
         # if isinstance(obj, str):
         #     print(obj[:10])
@@ -1023,9 +1026,11 @@ class VTH(object):
                                 # print(f"\t\t\tadding{(k, v['action'],  v['types'][vpred])}")
                                 #           viewer type,   action name   priority
                                 act_np.add((k,             v["action"],  v["types"][vtype]))
-                    else:
-                        #           viewer type,   action name   priority
-                        # print(f"\t\t\tvtype: {vtype} -> adding{(k, v['action'],  v['types'][vtype])}")
+                    # else:
+                    #     #           viewer type,   action name   priority
+                    #     # print(f"\t\t\tvtype: {vtype} -> adding{(k, v['action'],  v['types'][vtype])}")
+                    #     act_np.add((k,             v["action"],  v["types"][vtype]))
+                    if v["action"] not in list(map(lambda act: act[1], list(act_np))):
                         act_np.add((k,             v["action"],  v["types"][vtype]))
                     
         if len(act_np):
@@ -6376,7 +6381,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         #
         # ### END   Menus and actions
         
-        # ### BEGIN Toolbar
+        # ### BEGIN Main Toolbar
         #
         
         # add new viewers menu as toolbar action, too
@@ -6478,7 +6483,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # ### END   toolbar icon size
         
         #
-        # ### END   Toolbar
+        # ### END   Main Toolbar
+
 
         # BEGIN do not delete: action for presenting a list of viewer types to choose from
         # self.menuViewer.addSeparator()

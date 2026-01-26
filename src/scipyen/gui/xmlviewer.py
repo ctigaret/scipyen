@@ -211,7 +211,7 @@ class GenericDomModel(QtCore.QAbstractItemModel):
     
     Inherits QtCore.QAbstractItemModel
     
-    WARNING: This uses classes from QtXml which is being DEPRECATED
+    WARNING: This uses classes from QtXml which might become DEPRECATED
     
     '''
     def __init__(self, document: (QtXml.QDomDocument, type(None)) = None, parent=None):

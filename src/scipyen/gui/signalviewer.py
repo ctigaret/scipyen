@@ -202,7 +202,7 @@ from iolib import pictio as pio
 
 #### BEGIN pict.core modules
 import core.signalprocessing as sgp
-from core import (xmlutils, strutils, neoutils, )
+from core import (xmlutils, strutils, neoutils, svgutils)
 import core.scipyen_quantities as scq
 from core.neoutils import (get_domain_name,
                            get_non_empty_spike_trains,
@@ -1052,11 +1052,17 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         #### BEGIN Epoch actions
         self.epochsFromCursorsAction.triggered.connect(self.slot_cursorsToEpoch)
+        icon = self.epochsFromCursorsAction.icon()
+        svgIcon = svgFileForIcon(icon)
+        if len(svgIcon):
+            svgIcon = svgIcon[0]
+
         self.epochFromSelectedCursorAction.triggered.connect(self.slot_cursorToEpoch)
         self.epochBetweenCursorsAction.triggered.connect(self.slot_epochBetweenCursors)
         self.epochsInDataFromCursorsAction.triggered.connect(self.slot_cursorsToEpochInData)
         self.epochInDataFromSelectedCursorAction.triggered.connect(self.slot_cursorToEpochInData)
         self.epochInDataBetweenCursors.triggered.connect(self.slot_epochInDataBetweenCursors)
+        self.epochsFromCursorsAction.triggered.connect(self._slot_removeAllEpochs)
         #### END Epoch actions
         
         # ### BEGIN export cursor data actions
@@ -5357,7 +5363,22 @@ anything else       anything else       ❌
         ret = self.getRelativeCursorCoordinatesAsDataCursors("xy", cursors)
         if len(ret):
             self.exportDataToWorkspace(ret, "crosshairCursorData")
-        
+
+    @Slot()
+    def _slot_removeAllEpochs(self):
+        from core.neoutils import remove_epochs
+        isEphysDataCollection = check_ephys_data_collection(self._yData_)
+        supportsEpochs = isEphysDataCollection and (isinstance(self._yData_, neo.Block) or (isinstance(self._yData_, typing.Sequence) and all(isinstance(v, neo.Segment) for v in self._yData_)))
+        if not supportsEpochs:
+            self.informationMessage("Add Epoch — Scipyen","Data does not support embedded Epoch objects")
+            return
+
+        ret = self.questionMessage("Remove Epochs — Scipyen","Are you sure you want to remove ALL epochs in the data?")
+        if ret == QtWidgets.QMessageBox.yes:
+            remove_epochs(self._yData_)
+            self.displayFrame()
+
+
     @Slot()
     @safewrapper
     def slot_cursorsToEpoch(self):
@@ -5444,6 +5465,13 @@ anything else       anything else       ❌
         r"""Creates a neo.Epoch from current vertical/crosshair cursors.
         The Epoch is embedded in the plotted data.
         """
+        isEphysDataCollection = check_ephys_data_collection(self._yData_)
+        supportsEpochs = isEphysDataCollection and (isinstance(self._yData_, neo.Block) or (isinstance(self._yData_, typing.Sequence) and all(isinstance(v, neo.Segment) for v in self._yData_)))
+
+        if not supportsEpochs:
+            self.informationMessage("Add Epoch — Scipyen","Epoch objects cannot be embedded in the data")
+            return
+
         vertAndCrossCursors = collections.ChainMap(self._crosshairSignalCursors_, self._verticalSignalCursors_)
         
         if len(vertAndCrossCursors) == 0:
@@ -5535,6 +5563,12 @@ anything else       anything else       ❌
     @Slot()
     @safewrapper
     def slot_cursorToEpochInData(self):
+        isEphysDataCollection = check_ephys_data_collection(self._yData_)
+        supportsEpochs = isEphysDataCollection and (isinstance(self._yData_, neo.Block) or (isinstance(self._yData_, typing.Sequence) and all(isinstance(v, neo.Segment) for v in self._yData_)))
+        if not supportsEpochs:
+            self.informationMessage("Add Epoch — Scipyen","Epoch objects cannot be embedded in the data")
+            return
+
         vertAndCrossCursors = collections.ChainMap(self._crosshairSignalCursors_, self._verticalSignalCursors_)
         
         if len(vertAndCrossCursors) == 0:
@@ -5596,6 +5630,12 @@ anything else       anything else       ❌
     @Slot()
     @safewrapper
     def slot_epochInDataBetweenCursors(self):
+        isEphysDataCollection = check_ephys_data_collection(self._yData_)
+        supportsEpochs = isEphysDataCollection and (isinstance(self._yData_, neo.Block) or (isinstance(self._yData_, typing.Sequence) and all(isinstance(v, neo.Segment) for v in self._yData_)))
+        if not supportsEpochs:
+            self.informationMessage("Add Epoch — Scipyen","Epoch objects cannot be embedded in the data")
+            return
+
         vertAndCrossCursors = collections.ChainMap(self._crosshairSignalCursors_, self._verticalSignalCursors_)
         
         if len(vertAndCrossCursors) < 2:
@@ -7370,7 +7410,8 @@ anything else       anything else       ❌
                                  self.epochBetweenCursorsAction,
                                  self.epochsInDataFromCursorsAction,
                                  self.epochInDataFromSelectedCursorAction,
-                                 self.epochInDataBetweenCursors)
+                                 self.epochInDataBetweenCursors,
+                                 self.actionRemove_All_Epochs)
 
                 for action in epochsActions:
                     action.setEnabled(supportsEpochs)
@@ -9566,7 +9607,10 @@ anything else       anything else       ❌
                 plotItem.setVisible(True)
 
                 if len(selected_signals) == 1:
-                    self._setAxisIsActive(plotItem, True)
+                    self.currentPlotItem = plotItem
+                    # plot_index = self.signalAxes.index(plotItem)
+                    # self._setAxisIsActive(plotItem, True)
+                    # self._statusNotifyAxisSelection(plot_index)
 
                 
             else:

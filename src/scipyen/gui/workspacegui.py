@@ -289,7 +289,6 @@ class DirectoryFileWatcher(QtCore.QObject):
         self._observer_.filesChanged(self._source_.dirFileMonitor.files())
         
     
-
 class _X11WMBridge_(QtCore.QObject): # FIXME: 2023-05-08 21:39:42 not used !
     sig_wm_inspect_done = Signal(name="sig_wm_inspect_done")
     
