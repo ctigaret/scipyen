@@ -6852,7 +6852,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
     @Slot()
     def _slot_pasteIntoFileSystemDirectory(self):
-        from iolib.navigation.filesystems import TransferFilesJob
+        from iolib.navigation.filesystems import FileOperationJob
         selectedItems = [item for item in self.fileSystemTreeView.selectedIndexes()
                         if item.column() == 0]  # list of QModelIndex
 
@@ -6885,7 +6885,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             dest = list(map(lambda f: pathlib.Path(itempathstr).joinpath(f), targetFileNames))
 
             # print(f"{self.__class__.__name__}._slot_pasteIntoFileSystemDirectory:\nsource:\n\t{source},\ndestination:\n\t{dest}\n")
-            transferJob = TransferFilesJob(parent=self)
+            transferJob = FileOperationJob(parent=self)
             transferJob.sig_finished.connect(self._slot_transferJobFinished_)
             transferJob.run(source, dest, self.fileTransferJob)
 
@@ -6954,7 +6954,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 return
     @Slot()
     def _slot_trashFileItems(self):
-        from iolib.navigation.filesystems import TransferFilesJob
+        from iolib.navigation.filesystems import FileOperationJob
         self.fileTransferJob = "trash"
         selectedItems = [item for item in self.fileSystemTreeView.selectedIndexes()
                         if item.column() == 0]  # list of QModelIndex
@@ -6977,13 +6977,13 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             if ret != QtWidgets.QMessageBox.Yes:
                 return
             
-        transferJob = TransferFilesJob(parent=self)
+        transferJob = FileOperationJob(parent=self)
         transferJob.sig_finished.connect(self._slot_transferJobFinished_)
         transferJob.run(source, list(), jobType=self.fileTransferJob)
         
     @Slot()
     def _slot_deleteFileItems(self):
-        from iolib.navigation.filesystems import TransferFilesJob
+        from iolib.navigation.filesystems import FileOperationJob
         self.fileTransferJob = "delete"
         selectedItems = [item for item in self.fileSystemTreeView.selectedIndexes()
                         if item.column() == 0]  # list of QModelIndex
@@ -7008,11 +7008,62 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             if ret != QtWidgets.QMessageBox.Yes:
                 return
             
-        transferJob = TransferFilesJob(parent=self)
+        transferJob = FileOperationJob(parent=self)
         transferJob.sig_finished.connect(self._slot_transferJobFinished_)
         transferJob.run(source, list(), jobType=self.fileTransferJob)
         
+    @Slot()
+    def _slot_renameFileSystemItem(self):
+        selectedItems = [item for item in self.fileSystemTreeView.selectedIndexes()
+                        if item.column() == 0]  # list of QModelIndex
         
+        if len(selectedItems) != 1:
+            return
+        
+        item = selectedItems[0]
+        itemPath = self.fileSystemModel.filePath(item)
+        info = item.data(QtGui.QFileSystemModel.FileInfoRole)
+        fileName = info.fileName()
+        parentDir = QtCore.QDir(self.fileSystemModel.filePath(item.parent()))
+        if not parentDir.exists():
+            return
+        
+        entries = parentDir.entryList(QtCore.QDir.AllEntries | QtCore.QDir.NoDotAndDotDot)
+        newFileName = self._checkItemExistsInDir_(fileName, parentDir)
+        d = qd.QuickDialog(self, "Rename Item — Scipyen")
+        fileNameInput = qd.StringInput(d, "Enter new name:")
+        fileNameInput.setValue(newFileName)
+        if d.exec():
+            newFileName = fileNameInput.value()
+            if len(newFileName.strip()) == 0:
+                return
+            
+            newItemPath = pathlib.Path(self.fileSystemModel.filePath(item.parent())).joinpath(newFileName).as_posix()
+            
+            if newFileName in entries:
+                ret = self.questionMessage("Rename Item — Scipyen", f"File {newFileName} already exists. Overwrite?")
+                if ret != QtWidgets.QMessageBox.Yes:
+                    return
+            
+            if pathlib.Path(itemPath).is_file():
+                oldFile = QtCore.QFile(itemPath)
+                result = oldFile.copy(newItemPath)
+                if result:
+                    result = oldFile.remove()
+                    
+                if not result:
+                    scipywarn(f"Could not rename {itemPath} to {newItemPath}")
+                    return
+                
+            elif pathlib.Path(itemPath).is_dir():
+                oldDir = QtCore.QDir(itemPath)
+                result = oldDir.rename(itemPath, newItemPath)
+                
+                if not result:
+                    scipywarn(f"Could not rename {itemPath} to {newItemPath}")
+                    return
+                               
+                               
     @Slot()
     def _slot_transferJobFinished_(self):
         # self.fileSystemTreeView.setItemDelegate(self._defaultFileSystemTreeViewItemDelegate_)
@@ -7410,12 +7461,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         from core.strutils import pluralize
         action_0 = None
         create_new = None
-        copy_action = None
-        move_action = None
         paste_action = None
-        trash_action = None
-        remove_action = None
-        rename_action = None
         open_link_target_action = None
         
         clipboard = QtGui.QGuiApplication.clipboard()
@@ -7498,7 +7544,12 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                         pasteAction = cm.addAction(pasteActionName)
                         pasteAction.triggered.connect(self._slot_pasteIntoFileSystemDirectory)
                         paste_action = pasteAction
-
+                        
+                        if len(selectedItems) == 1:
+                            cm.addSeparator()
+                            renameAction = cm.addAction("Rename")
+                            renameAction.triggered.connect(self._slot_renameFileSystemItem)
+                        
                         cm.addSeparator()
                         if QtCore.QFile.supportsMoveToTrash():
                             trashAction = cm.addAction("Move To trash")

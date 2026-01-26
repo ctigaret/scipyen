@@ -526,18 +526,18 @@ def counter_suffix(x:str, strings:typing.List[str], sep:str="_",
 
         base, cc = get_int_sfx(x, sep=sep, bracketed=bracketed)
         
-        print(f"counter_suffix: base = {base}, cc = {cc}")
+        # print(f"counter_suffix: base = {base}, cc = {cc}")
 
         clashes = list(filter(lambda s: s.startswith(base), strings))
 
-        print(f"counter_suffix: clashes = {clashes}")
+        # print(f"counter_suffix: clashes = {clashes}")
 
         if len(clashes) == 0:
             return None if returns_counter else (x, None)
 
         candidate_counters = list(filter(lambda t: isinstance(t, int), map(lambda s: get_int_sfx(s, sep=sep, bracketed=bracketed)[1], clashes)))
 
-        print(f"counter_suffix: candidate_counters = {candidate_counters}")
+        # print(f"counter_suffix: candidate_counters = {candidate_counters}")
 
         if len(candidate_counters) == 0:
             if cc is None:
@@ -546,7 +546,7 @@ def counter_suffix(x:str, strings:typing.List[str], sep:str="_",
             return (new_x, cc) if returns_counter is None else cc if returns_counter == True else new_x
 
         min_counter, max_counter = min(candidate_counters), max(candidate_counters)
-        print(f"counter_suffix: min_counter = {min_counter}, max_counter = {max_counter}")
+        # print(f"counter_suffix: min_counter = {min_counter}, max_counter = {max_counter}")
         if min_counter > start:
             new_counter = max(range(start, min_counter))
         else:

@@ -141,7 +141,7 @@ class FileSystemModel(QtGui.QFileSystemModel):
         self._cutIndexes_ = value
             
 
-class TransferFilesJob(QtCore.QObject):
+class FileOperationJob(QtCore.QObject):
     sig_finished = Signal(name="sig_finished")
     def __init__(self, parent:typing.Optional[QtCore.QObject]=None):
         self.loopControl:dict = {"break": False}
@@ -178,7 +178,7 @@ class TransferFilesJob(QtCore.QObject):
         progressDlg.canceled.connect(self._slot_breakLoop)
         kw = {"source": source, "destination": destination, "jobType": jobType,
               "loopControl": self.loopControl}
-        workerThread = pgui.LoopWorkerThread(self, self._transferFiles_, **kw)
+        workerThread = pgui.LoopWorkerThread(self, self._operateFile_, **kw)
         workerThread.signals.signal_Progress[int].connect(progressDlg.setValue)
         workerThread.signals.signal_Result[object].connect(self.workerReady)
         workerThread.signals.signal_Finished.connect(progressDlg.reset)
@@ -202,9 +202,9 @@ class TransferFilesJob(QtCore.QObject):
 
         return count
 
-    def _transferFiles_(self, **kwargs) -> bool:
+    def _operateFile_(self, **kwargs) -> bool:
         from core.prog import scipywarn
-        # print(f"{self.__class__.__name__}._transferFiles_: kwargs = {kwargs}")
+        # print(f"{self.__class__.__name__}._operateFile_: kwargs = {kwargs}")
         jobType: str = kwargs.pop("jobType", "copy")
         source: typing.optional[typing.Sequence[pathlib.Path]] = kwargs.pop("source", list())
         destination: typing.Optional[typing.Sequence[pathlib.Path]] = kwargs.pop("destination", list())
@@ -212,7 +212,7 @@ class TransferFilesJob(QtCore.QObject):
         progressSignal = kwargs.pop("progressSignal", None)
         canceledSignal = kwargs.pop("canceledSignal", None)
         
-        # print(f"{self.__class__.__name__}._transferFiles_: jobType = {jobType}")
+        # print(f"{self.__class__.__name__}._operateFile_: jobType = {jobType}")
         if len(source) == 0:
             return
 
@@ -226,7 +226,7 @@ class TransferFilesJob(QtCore.QObject):
 
         canceled = False
 
-        # print(f"{self.__class__.__name__}._transferFiles_:\nsource:\n{source}\ndestination:\n{destination}\n")
+        # print(f"{self.__class__.__name__}._operateFile_:\nsource:\n{source}\ndestination:\n{destination}\n")
         
         if jobType == "trash":
             for src in source:
