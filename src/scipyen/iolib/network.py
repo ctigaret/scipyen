@@ -387,7 +387,9 @@ class ScipyenNetworkManager(QtCore.QObject):
         if fileName is MISSING:
             fileName = self._setSaveFileName(url)
             
-        if isinstance(fileName, str):
+        print(f"{self.__class__.__name__}._startNextDownload: fileName = {fileName}")
+            
+        if isinstance(fileName, str) and len(fileName.strip()):
             self._saveToFile_ = True
             if fileName.lower() == "temp":
                 if not self._tempFile_.open(QtCore.QIODevice.WriteOnly):
@@ -395,6 +397,11 @@ class ScipyenNetworkManager(QtCore.QObject):
                     self._startNextDownload() # NOTE: 2024-12-01 15:09:16 will reset counters if download quere is empty
                     return
             else:
+                filePath = pathlib.Path(fileName)
+                if not filePath.exists():
+                    if not filePath.parent.exists():
+                        fileDir = QtCore.QDir(filePath.parent.as_posix())
+                        fileDir.mkpath(".")
                 self._outputFile_.setFileName(fileName)
                 if not self._outputFile_.open(QtCore.QIODevice.WriteOnly):
                     # NOTE: 2024-12-01 15:08:42

@@ -528,20 +528,24 @@ class BrainAtlasManager(QtCore.QObject):
             print(f"{print_styled(f'{self._atlas_name_to_initialize_}', 'green')} was initialized")
             self._atlas_name_to_initialize_ = None
         
-    def initAtlas(self, name:typing.Optional[str]=None, download:bool=False):
+    def initAtlas(self, name:typing.Optional[str]=None, download:bool=False) -> BrainGlobeAtlas | None:
         if name is None or (isinstance(name, str) and (len(name.strip()) == 0 or name not in self.atlasNames)):
             name = self.selectAtlasName()
             if name is None:
                 return
                     
-        if name not in self.localAtlasNames and download:
-            scipywarn(f"The atlas {name} will be available as the 'atlas' attribute once donwloaded and initialized")
-            self.downloadAtlas(name, True)
+        if name not in self.localAtlasNames:
+            if download:
+                scipywarn(f"The atlas {name} will be available as the 'atlas' attribute once donwloaded and initialized")
+                self.downloadAtlas(name, True)
+            else:
+                scipywarn(f"The atlas {name} must be downloaded manually")
+                return
         else:
             # TODO 2024-11-24 21:23:14
             # make 'check_latest' below a Scipyen configurable variable
             # (not Qt configurable)
-            self._atlas = BrainGlobeAtlas(name, check_latest=False) 
+            self._atlas = BrainGlobeAtlas(name, check_latest=download) 
             self._atlas_name_to_initialize_ = None
             
             return self._atlas
@@ -761,7 +765,7 @@ class BrainAtlasManager(QtCore.QObject):
         
         p = self.localAtlasRepository
         
-        atlasDirsVers = sorted(map(lambda x: x.name.split("_v"), filter(lambda x: x.is_dir(), p.glob("*"))))
+        atlasDirsVers = sorted(map(lambda x: x if len(x)==2 else [x[0], ""], map(lambda x: x.name.split("_v"), filter(lambda x: x.is_dir(), p.glob("*")))))
         
         atlasNames, atlasVers = zip(*atlasDirsVers)
         
@@ -961,7 +965,7 @@ class BrainAtlasManager(QtCore.QObject):
                 atlases_conf_path = pathlib.Path(os.path.join(conf["default_dirs"]["brainglobe_dir"], "last_versions.conf"))
         
         if not isinstance(atlases_conf_path, pathlib.Path) or not atlases_conf_path.exists():
-            scipywarn(f"File {atlases_conf_path} does not exist; a copy from the remote GIN site will be downloaded. You will need to call getAtlasesConfiguration method again")
+            scipywarn(f"File {atlases_conf_path} does not exist; a copy from the remote GIN site will now be downloaded. You will need to call getAtlasesConfiguration method again")
             self.getRemoteAtlasesConfiguration()
         else:
             self._current_atlases_versions_ = self._parseLocalAtlasesConf(atlases_conf_path)
@@ -1004,7 +1008,7 @@ class BrainAtlasManager(QtCore.QObject):
                 file_path = os.path.join(conf["default_dirs"]["brainglobe_dir"], "last_versions.conf")
             
         url = brainglobe_atlasapi.bg_atlas.BrainGlobeAtlas._remote_url_base.format("last_versions.conf")
-        self.netMan = network.ScipyenNetworkManager(progressUIFactory = CancellableQProgressBar)
+        self.netMan = network.ScipyenNetworkManager(progressUIFactory = CancellableQProgressBar, timeout_ms=120000)
         self.netMan.sig_resultReady[object].connect(self._slot_lastVersionsConfDownloaded)
         self.netMan.getUrl(url, destination=file_path, replyHandler = None)
         

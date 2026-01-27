@@ -130,7 +130,7 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
         # 2016-08-10 11:51:07
         # NOTE: in python3 all str are unicode
         if itemsList is None or isinstance(itemsList, list) and (len(itemsList) == 0 or not all([isinstance(x,(str)) for x in itemsList])):
-            QtWidgets.QMessageBox.critical(None, "Error", "Argument must be a list of string or unicode items.")
+            # QtWidgets.QMessageBox.critical(None, "Error", "Argument must be a list of string or unicode items.")
             return False
         return True
 
