@@ -742,11 +742,15 @@ def get_desktop_places(
     # stdPlaces = get_standard_desktop_places(asQUrl, all_folder_icons)
 
     # NOTE: 2023-05-01 13:38:10 TODO
-    # below we are using the file `user-places.xbel` or `recently-used.xbel` located in
+    # on Linux platform, and using a xdg-compliant desktop, use the files
+    # `user-places.xbel` or `recently-used.xbel` located in
     # `xdg.BaseDirectory.xdg_data_home`
+    # to extract locations and icons for them.
     #
-
-    # structure -- user-places.xbel:
+    # currently no icons are added ot the places panel
+    #
+    # Below is an example of an entry in user-places.xbel:
+    # =====================================================
     # <xbel xmlns:bookmark="http://www.freedesktop.org/standards/desktop-bookmarks" xmlns:kdepriv="http://www.kde.org/kdepriv" xmlns:mime="http://www.freedesktop.org/standards/shared-mime-info">
     # <bookmark href="file:///home/cezar">
     # <title>Home</title>
@@ -769,6 +773,8 @@ def get_desktop_places(
         else "drive-harddisk-symbolic"
     )
 
+    # ### BEGIN Resolve disk partitions
+    #
     partitions = filesystems.get_disk_partitions()
 
     if sys.platform.startswith("linux"):
@@ -1092,6 +1098,8 @@ def get_desktop_places(
             ),
             key=lambda x: x.name,
         )
+    #
+    # ### END   Resolve disk partitions
 
     # add standard places, but:
     # avoid the duplicates - including those with a different name but with urls
@@ -1124,30 +1132,9 @@ def get_desktop_places(
                 if key not in ret:
                     ret[key] = place
 
-    # for key, val in dd.items():
-    #     if val.isSeparator():
-    #         if nSeparators == 0:
-    #             ret["separator"] = val
-    #         else:
-    #             ret[f"separator_{nSeparators}"] = val
-    #         nSeparators += 1
-    #     else:
-    #         ret[key] = val
-
-    #     if len(dd):
-    #         # if nSeparators == 0:
-    #         #     ret["separator"] = DEPlace.separator("Devices")
-    #         # else:
-    #         #     ret[f"separator_{nSeparators}"] = DEPlace.separator("Devices")
-    #         # nSeparators +=1
-    #
-    #         for key, val in dd.items():
-    #             ret[key] = val
     return ret
 
 
-# def get_recent_places(asQUrl:bool=False,
-#                        intKeys:bool=True) -> BookmarksMap:
 def get_recent_places(intKeys: bool = True) -> BookmarksMap:
     r"""Collect recent places as defined in the freedesktop.org XDG framework.
     Useful for Linux desktops that comply with XDG (e.g. KDE, GNOME, XFCE, LXDE, etc).

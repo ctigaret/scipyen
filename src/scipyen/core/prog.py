@@ -3504,9 +3504,9 @@ def object_find(oname=str, namespaces=None,
                             return sinfo, ""
 
                         if len(foundinfos) == 0:
-                            foudninfos.append(sinfo)
+                            foundinfos.append(sinfo)
                         else:
-                            candidate.append((soname, sinfo))
+                            candidates.append((soname, sinfo))
                     else:
                         candidates.append((soname, sinfo))
 

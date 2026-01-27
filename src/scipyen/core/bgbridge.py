@@ -13,7 +13,7 @@ Wrapper around BrainGlobe API, with shims
 # TODO: try QNetwork API see what flexibility there is
 #
 # some preparations:
-# 1) figure out where brainglobe downoloads stuff (no need to our own custom locations,
+# 1) figure out where brainglobe downloads stuff (no need to use our own custom locations,
 # we're OK with their defaults):
 #
 # 1.1) get the brainglobe configuration (a configparser ⌣ ) 
@@ -528,13 +528,13 @@ class BrainAtlasManager(QtCore.QObject):
             print(f"{print_styled(f'{self._atlas_name_to_initialize_}', 'green')} was initialized")
             self._atlas_name_to_initialize_ = None
         
-    def initAtlas(self, name:typing.Optional[str]=None):
+    def initAtlas(self, name:typing.Optional[str]=None, download:bool=False):
         if name is None or (isinstance(name, str) and (len(name.strip()) == 0 or name not in self.atlasNames)):
             name = self.selectAtlasName()
             if name is None:
                 return
                     
-        if name not in self.localAtlasNames:
+        if name not in self.localAtlasNames and download:
             scipywarn(f"The atlas {name} will be available as the 'atlas' attribute once donwloaded and initialized")
             self.downloadAtlas(name, True)
         else:
@@ -812,8 +812,11 @@ class BrainAtlasManager(QtCore.QObject):
 
         atlasConf = self.getAtlasesConfiguration()
         
-        return list(atlasConf.keys())
-    
+        if atlasConf:
+            return list(atlasConf.keys())
+        else:
+            return list()
+
     # @Slot(object)
     # def _slot_setAtlas(self, o:object):
     #     self._atlas = o
@@ -906,7 +909,9 @@ class BrainAtlasManager(QtCore.QObject):
             file_path = cls.default_config_file
             
         if not isinstance(file_path, pathlib.Path) or not file_path.exists():
-            return
+            brainglobe_atlasapi.config.write_default_config()
+
+            # return
             
         conf_object = configparser.ConfigParser()
         with open(file_path) as file_object:
@@ -932,7 +937,7 @@ class BrainAtlasManager(QtCore.QObject):
         GIN repository https://gin.g-node.org/brainglobe/atlases/raw/master/last_versions.conf
         and saved as the local configuration file specified above.
         
-        A diferent local configuraiton file can be specified using 'atlases_conf_path'
+        A diferent local configuration file can be specified using 'atlases_conf_path'
         parameter, but the default one (see above) will be used in all other operations 
         by the manager.
         
@@ -946,14 +951,16 @@ class BrainAtlasManager(QtCore.QObject):
         ¹ do NOT confuse with the atlas configuration file
         
         """
+        # atlases_conf_path = None
         if not self.hasBrainGlobeAtlasAPI():
             return dict()
         
         if not isinstance(atlases_conf_path, pathlib.Path) or not atlases_conf_path.exists():
             conf = self.getBrainGlobeConfiguration(conf_path)
-            atlases_conf_path = pathlib.Path(os.path.join(conf["default_dirs"]["brainglobe_dir"], "last_versions.conf"))
+            if conf:
+                atlases_conf_path = pathlib.Path(os.path.join(conf["default_dirs"]["brainglobe_dir"], "last_versions.conf"))
         
-        if not atlases_conf_path.exists():
+        if not isinstance(atlases_conf_path, pathlib.Path) or not atlases_conf_path.exists():
             scipywarn(f"File {atlases_conf_path} does not exist; a copy from the remote GIN site will be downloaded. You will need to call getAtlasesConfiguration method again")
             self.getRemoteAtlasesConfiguration()
         else:
@@ -993,7 +1000,8 @@ class BrainAtlasManager(QtCore.QObject):
         
         if file_path is None:
             conf = self.getBrainGlobeConfiguration()
-            file_path = os.path.join(conf["default_dirs"]["brainglobe_dir"], "last_versions.conf")
+            if conf:
+                file_path = os.path.join(conf["default_dirs"]["brainglobe_dir"], "last_versions.conf")
             
         url = brainglobe_atlasapi.bg_atlas.BrainGlobeAtlas._remote_url_base.format("last_versions.conf")
         self.netMan = network.ScipyenNetworkManager(progressUIFactory = CancellableQProgressBar)

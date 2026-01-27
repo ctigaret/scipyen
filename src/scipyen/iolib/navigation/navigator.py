@@ -1865,6 +1865,9 @@ class PlacesMenu(QtWidgets.QMenu):
 class PlacesButton(UrlNavigatorButtonBase):
     # NOTE: 2025-03-02 08:57:09
     # by CMT - stand-in for a Places selector / places model
+    # NOTE: 2026-01-27 09:00:52 TODO/FIXME
+    # change button's icon based on the current path, when current path is a
+    # subdirectory of a panel "place"
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setToolTip("Jump to another place")

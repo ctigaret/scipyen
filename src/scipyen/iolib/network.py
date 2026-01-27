@@ -36,9 +36,11 @@ else:
     __has_sip__ = True
     
 if __has_sip__:
-    QtType = typing.TypeVar("QtType", bound = "sip.wrappertype")
+    # QtType = typing.TypeVar("QtType", bound = "sip.wrappertype")
+    QtType = sip.wrappertype
 else:
-    QtType = typing.TypeVar("QtType", bound = "Shiboken.Object")
+    # QtType = typing.TypeVar("QtType", bound = "Shiboken.Object")
+    QtType = Shiboken.Object
     
 
 from core.prog import (safewrapper, scipywarn, print_styled)
@@ -70,7 +72,7 @@ class ScipyenNetworkManager(QtCore.QObject):
     sig_networkError = Signal(object,name="sig_networkError")
     defaultMaxDownloadSizeForProgressBar = 2147483647
     
-    def __init__(self, timeout_ms:int = QDefaultTransferTimeoutConstant,
+    def __init__(self, timeout_ms:int = QDefaultTransferTimeoutConstant.value,
                  replyHandler:typing.Optional[typing.Callable] = None,
                  progressUIFactory:typing.Optional[QtType]=None,
                  parent:typing.Optional[QtCore.QObject] = None):
@@ -111,7 +113,7 @@ class ScipyenNetworkManager(QtCore.QObject):
         self.scipyenWindow = wf.getMainScipyenWindow()
         
         # self._verbose_ = verbose
-        self._timeout_ms_ = timeout_ms
+        self._timeout_ms_:int = timeout_ms
         self._downloadQueue_ = collections.deque() # qt5ex
         self._downloadedCount_ = 0 # qt5ex
         self._totalCount_ = 0 # qt5ex
@@ -119,7 +121,7 @@ class ScipyenNetworkManager(QtCore.QObject):
         self._tempFile_ = QtCore.QTemporaryFile()
         self._tempFile_.setAutoRemove(False)
         self._saveToFile_ = False
-        self._networkError_ = QtNetwork.QNetworkReply.NoError
+        self._networkError_:typing.Optional[QtNetwork.QNetworkReply] = None
         self._urlToCheck_ = None
         # self._urlToDownload_ = None
         # self._replyTextBuffer_ = QtCore.QTextStream()
@@ -137,7 +139,8 @@ class ScipyenNetworkManager(QtCore.QObject):
         self._replyInfo_ = None
         
         self._networkReply_ = None # cannot instantiate QNetworkReply (is abstract) # qt5ex
-        self._downloadTime_ = QtCore.QTime() # ~qt5ex
+        # self._downloadTime_ = QtCore.QTime() # ~qt5ex
+        self._downloadTime_ = QtCore.QElapsedTimer() # ~qt5ex
         self._progressUI_ = None # ~qt5ex
         self._progressUIFactory_ = QtWidgets.QProgressBar
 
@@ -440,7 +443,8 @@ class ScipyenNetworkManager(QtCore.QObject):
         self._downloadTime_.start()
         
     def checkUrl(self, url:typing.Union[str, QtCore.QUrl]) -> bool:
-        self._networkError_ = QtNetwork.QNetworkReply.NoError
+        # self._networkError_ = QtNetwork.QNetworkReply.NoError
+        self._networkError_ = None
         if isinstance(url, str):
             url = QtCore.QUrl(url)
             

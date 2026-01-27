@@ -132,6 +132,7 @@ import ephys.ephys as ephys
 #### END Scipyen ephys modules
 
 
+
 fit_bounds_fields = [("lb", object, None), ("ub", object, None), ("keep_feasible", object, None)]
 
 initial_coeffs_fields = [("values",    typing.Sequence,                None),
