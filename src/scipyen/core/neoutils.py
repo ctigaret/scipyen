@@ -2645,8 +2645,7 @@ Returns a list of indices of signals named as specified by 'names', and containe
     Such signals will be skipped / missed!
     """
     
-    scipywarn("WARNING: This function is DEPRECATED and will be removed in future Scipyen versions; plase use neoutils.normalized_index instead",
-            category=warnings.DeprecationWarning)
+    scipywarn("WARNING: This function is DEPRECATED and will be removed in future Scipyen versions; plase use neoutils.normalized_index instead")
     # signal_collection = "%ss" % stype.__name__.lower()
     signal_collection = pluralize(stype.__name__.lower(), 2)
 

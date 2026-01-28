@@ -20,6 +20,7 @@ In particular:
 
 #### BEGIN core python modules
 import os, sys, traceback, warnings, numbers, collections, typing, types, inspect
+import functools
 #### END core python modules
 
 #### BEGIN 3rd party modules
@@ -44,6 +45,14 @@ from core.datatypes import (Real, Complex, Number)
 # from core.traitcontainers import DataBag
 #from .patchneo import *
 #### END pict.core modules
+
+# NOTE: 2026-01-28 12:07:41
+# np.asfarray is gone!
+try:
+    asfarray = np.asfarray
+except:
+    asfarray = functools.partial(np.asarray, dtype = np.dtype(np.float64))
+
 
 
 def fitGauss1DSum(x, y, locations, **kwargs):
@@ -2298,8 +2307,8 @@ def skg_exp_fit(x, y, is_sorted=True):
 def skg_preprocess(x,y, is_sorted=True):
     r"""skg._util.skg_preprocess copied shamelessly here"""
 
-    x = np.asfarray(x).ravel()
-    y = np.asfarray(y).ravel()
+    x = asfarray(x).ravel()
+    y = asfarray(y).ravel()
     
     assert x.shape == y.shape, "Vectors must have the same size"
     

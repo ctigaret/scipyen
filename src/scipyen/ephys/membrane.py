@@ -110,7 +110,7 @@ from core.basescipyen import BaseScipyenData
 from core.triggerevent import (TriggerEvent, TriggerEventType)
 from core.triggerprotocols import (TriggerProtocol, auto_define_trigger_events, auto_detect_trigger_protocols)
 
-from core.prog import (safewrapper, with_doc, scipywarn, print_styled, get_func_param_types)
+from core.prog import (safewrapper, with_doc, scipywarn, print_styled, get_func_param_types, print_traceback)
 #from core.patchneo import *
 
 #### END Scipyen core modules
@@ -130,6 +130,13 @@ import iolib.pictio as pio
 #### BEGIN Scipyen ephys modules
 import ephys.ephys as ephys
 #### END Scipyen ephys modules
+
+# NOTE: 2026-01-28 12:07:41
+# np.asfarray is gone!
+try:
+    asfarray = np.asfarray
+except:
+    asfarray = functools.partial(np.asarray, dtype = np.dtype(np.float64))
 
 
 
@@ -1930,7 +1937,7 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
                    baseEpoch:typing.Optional[typing.Union[neo.Epoch, tuple, list]]=None, 
                    ssEpoch:typing.Optional[typing.Union[neo.Epoch, tuple, list]]=None, 
                    steadyStateDuration = 0.05 * pq.s, 
-                   box_size = 0):
+                   box_size = 0) -> tuple:
     r"""Measurement of passive membrane properties.
     
     Uses membrane potential recorded during sweeps containins a step of somatic 
@@ -2048,6 +2055,9 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
     
     # from scipy.signal import boxcar, convolve
     from scipy.signal import convolve
+
+    print(f"passive_Iclamp: ssEpoch = {ssEpoch}")
+
     try:
         major, minor, micro = tuple(map(lambda x: int(x), scipy.__version__.split('.')))
         if minor < 7:
@@ -2074,6 +2084,9 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
         else:
             raise TypeError("incompatible base epoch specification: %s", baseEpoch)
 
+    elif isinstance(baseEpoch, Interval):
+        baseEpoch = baseEpoch.toNeoEpoch()
+
     # 2) sort out the steady-state epoch parameter
     if isinstance(ssEpoch, (tuple, list)):
         if all([isinstance(v, numbers.Real) for v in ssEpoch]):
@@ -2089,6 +2102,7 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
         else:
             raise TypeError("incompatible steady-state epoch specification: %s", ssEpoch)
         
+
     # 3) get transition times from injected current, attempt to sort out
     # baseline and steady-state epochs using these transition times and
     # steadyStateDuration parameter, if needed
@@ -2174,6 +2188,9 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
         assert isinstance(I_t1, pq.Quantity) and I_t1.size == 1 and scq.unitsConvertible(I_t1.units, pq.s), f"im[2] expected to be a time scalar; got {im[2]} instead"
         
         if baseEpoch is None:
+            # NOTE: 2026-01-28 14:21:44
+            # no baseline epoch was specified => take a region covering 'steadyStateDuration' backwards from
+            # where the injection step begins.
             baseT1 = I_t0
             baseT0 = I_t0 - steadyStateDuration
             
@@ -2228,7 +2245,8 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
     if box_size > 0 :
         window = boxcar(box_size)/box_size
         v_flt = convolve(np.squeeze(vm), window, mode="same", method = "fft")
-        v_flt = neo.AnalogSignal(v_flt[:,np.newaxis], units = vm.units, t_start = vm.t_start, sampling_rate = 1/vm.sampling_period)
+        v_flt = neo.AnalogSignal(v_flt[:,np.newaxis], units = vm.units, t_start = vm.t_start, sampling_rate = vm.sampling_rate)
+        # v_flt = neo.AnalogSignal(v_flt[:,np.newaxis], units = vm.units, t_start = vm.t_start, sampling_rate = 1/vm.sampling_period)
     else:
         v_flt = vm
         
@@ -2282,6 +2300,10 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
 
     t_index = vsagrise.times[vsag10_90_index]
     vsag10_90 = vsagrise.time_slice(t_index[0],t_index[-1])
+
+    # NOTE: 2026-01-28 13:53:02
+    # this needs time to start at 0!
+    vsag10_90.t_start = 0*pq.s
     
     offset = float(vsag10_90[0])
     
@@ -2290,50 +2312,79 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
     delay  = float(vsag10_90.times[0])
     
     decay = 0.1
-    
-    params = [offset, scale, delay, decay]
-    
-        
-    #popt, pcov = optimize.curve_fit(models.generic_single_exponential_decay, vsagrise.times, np.squeeze(vsagrise), [offset, scale, delay, decay])
-    popt, pcov = optimize.curve_fit(models.generic_single_exponential_decay, vsag10_90.times, np.squeeze(vsag10_90), params)
 
-    #print("params ", params)
-    #print("popt ", popt)
+    assert decay != 0, "Decay time constant must be non-zero"
+    
+    params = [offset, scale, delay, -1./decay]
+    # print(f"passive_Iclamp: params = {params}")
+    # params = [offset, scale, delay, decay]
 
-    tau_m = popt[3]
-    
-    xx = np.linspace(float(vsag10_90.t_start), float(ssT0), int((float(ssT0)-float(vsag10_90.t_start))/vm.sampling_period))
-    #xx = np.linspace(float(vsag10_90.times[0]), float(vsag10_90.times[-1]), vm.shape[0])
-    
-    yy = models.generic_single_exponential_decay(xx, *popt)
-    
-    vsag10_90_extended_fit = neo.AnalogSignal(yy[:, np.newaxis], 
-                                     units = pq.mV, \
-                                     t_start = vsag10_90.t_start, \
-                                     sampling_rate = 1/vm.sampling_period)
-    
-    #print("fit time: ", vsag10_90_extended_fit.t_start, vsag10_90_extended_fit.t_stop)
-    
-    t0 = vsag10_90_extended_fit.t_stop - 0.05*pq.s
-    t1 = vsag10_90_extended_fit.t_stop
-    
-    vinf = vsag10_90_extended_fit.time_slice(t0, t1).mean() # "tail" of vfit (at "infinity")
-    
     vfit = dict()
-    vfit["parameters"] = popt
-    vfit["fitcurve"] = vsag10_90_extended_fit
-    vfit["fitted_segment"] = vsag10_90
-    vfit["Vextrapolated"] = vinf
-    
-    Rin = np.abs((vss - vbase) / Iinj).rescale(pq.Mohm)
-    Rss = np.abs((vinf - vbase) / Iinj).rescale(pq.Mohm)
-    
-    time_constant = (popt[-1] * pq.s).rescale(pq.ms)
-    
-    capacitance = (time_constant / Rin).rescale(pq.pF)
-    
-    # return vbase, vss, vsag, vrebound, Rin, Rss, capacitance, time_constant, vfit, v_flt
-    return vbase, vss, vsag, vrebound, Rin, capacitance, time_constant, vfit, v_flt
+    vfit["parameters"] = params
+    vfit["fitted_region"] = vsag10_90
+
+    try:
+        # popt, pcov = optimize.curve_fit(models.exponential, vsag10_90.times, np.squeeze(vsag10_90), params)
+        popt, pcov = optimize.curve_fit(models.exponential, vsag10_90.times.magnitude, np.squeeze(vsag10_90).magnitude, params)
+
+        #popt, pcov = optimize.curve_fit(models.generic_single_exponential_decay, vsagrise.times, np.squeeze(vsagrise), [offset, scale, delay, decay])
+        # popt, pcov = optimize.curve_fit(models.generic_single_exponential_decay, vsag10_90.times, np.squeeze(vsag10_90), params)
+
+        #print("params ", params)
+        #print("popt ", popt)
+
+        # tau_m = popt[3]
+
+        lambda_m = popt[3]
+
+        # print(f"passive_Iclamp: popt = {popt}, lambda_m = {lambda_m}")
+
+        # tau_m = 1/popt[3]
+
+        # xx = np.linspace(float(vsag10_90.t_start), float(ssT0), int((float(ssT0)-float(vsag10_90.t_start))/vm.sampling_period))
+        xx = np.linspace(float(vsag10_90.t_start), float(ssT0), int((float(ssT0)-float(vsag10_90.t_start))*vm.sampling_rate.magnitude))
+        #xx = np.linspace(float(vsag10_90.times[0]), float(vsag10_90.times[-1]), vm.shape[0])
+
+        yy = models.exponential(xx, *popt)
+        # yy = models.generic_single_exponential_decay(xx, *popt)
+
+        vsag10_90_extended_fit = neo.AnalogSignal(yy[:, np.newaxis],
+                                        units = pq.mV, \
+                                        t_start = vsag10_90.t_start, \
+                                        sampling_rate = vm.sampling_rate)
+
+        #print("fit time: ", vsag10_90_extended_fit.t_start, vsag10_90_extended_fit.t_stop)
+
+        t0 = vsag10_90_extended_fit.t_stop - 0.05*pq.s
+        t1 = vsag10_90_extended_fit.t_stop
+
+        vinf = vsag10_90_extended_fit.time_slice(t0, t1).mean() # "tail" of vfit (at "infinity")
+
+        popt[3] = -1./lambda_m if lambda_m != 0. else np.nan
+        vfit["fitted_parameters"] = popt
+        vfit["fitcurve"] = vsag10_90_extended_fit
+        vfit["Vextrapolated"] = vinf
+
+        print(f"passive_Iclamp: vss = {vss}, vbase = {vbase}, iinj = {Iinj}, np.abs((vss - vbase) / Iinj) = {np.abs((vss - vbase) / Iinj)}")
+
+        Rin = np.abs((vss - vbase) / Iinj).rescale(pq.Mohm)
+        Rss = np.abs((vinf - vbase) / Iinj).rescale(pq.Mohm)
+
+        τm = (popt[-1] * pq.s).rescale(pq.ms)
+
+        capacitance = (τm / Rin).rescale(pq.pF)
+
+    except:
+        Rin = np.abs((vss - vbase) / Iinj).rescale(pq.Mohm)
+        Rss = np.nan * pq.Mohm
+        vfit = dict()
+        vfit["fitted_parameters"] = [np.nan] * len(params)
+        vfit["fitcurve"] = None
+        vfit["Vextrapolated"] = np.nan * vsag10_90.units
+        traceback.print_exc()
+
+    return vbase, vss, vsag, vrebound, Rin, Rss, capacitance, τm, vfit, v_flt
+    # return vbase, vss, vsag, vrebound, Rin, capacitance, τm, vfit, v_flt
 
 
 def PassiveMembranePropertiesAnalysis(block:neo.Block, 
@@ -2427,7 +2478,7 @@ def PassiveMembranePropertiesAnalysis(block:neo.Block,
     if plot:
         plt.clf()
         plt.plot(Vm.times, Vm.magnitude, label="Vm", color="k")
-        plt.plot(vfit["fitted_segment"].times, vfit["fitted_segment"], color="r", label="Fitted segment")
+        plt.plot(vfit["fitted_region"].times, vfit["fitted_region"], color="r", label="Fitted region")
         plt.plot(vfit["fitcurve"].times, vfit["fitcurve"], color="blue", label="Fit")
         plt.xlabel("Time (%s)" % Vm.times.units.dimensionality.string)
         plt.ylabel("%s (%s)" % (Vm.name, Vm.units.dimensionality.string))
@@ -2490,6 +2541,7 @@ def ap_waveform_roots(w, value, interpolate=False):
     decay_y         = np.nan
     decay_cslope    = np.nan # chord slope of decay phase around value
 
+
     #print("ap_waveform_roots value", value)
     
     # "ge" stands for >= i.e. "greater than or equal"
@@ -2513,7 +2565,7 @@ def ap_waveform_roots(w, value, interpolate=False):
     # • -1 transitions from 1 (True) to 0 (False)
     # •  0 everywhere else
     #
-    flags_ge_value_diff = np.ediff1d(np.asfarray(flags_ge_value), to_begin=0)
+    flags_ge_value_diff = np.ediff1d(asfarray(flags_ge_value), to_begin=0)
     
     #print("flags_ge_value_diff", flags_ge_value_diff)
     
@@ -3686,7 +3738,7 @@ def detect_AP_rises(s, dsdt, d2sdt2, dsdt_thr, minisi, vm_thr=0,
     # b) d2Vm/dt2 > 0 (dVm/dt is MONOTONICALLY INCREASING)
     #
     #fast_rise_starts = (ds datatypes.magnitude >= dsdt_thr) & (d2sdt2.magnitude > (0 + atol))
-    #fast_rise_start_flags = np.ediff1d(np.asfarray(fast_rise_starts), to_begin = 0) == 1 
+    #fast_rise_start_flags = np.ediff1d(asfarray(fast_rise_starts), to_begin = 0) == 1
     
     #fast_rise_start_times = s.times[fast_rise_start_flags]
     
@@ -3750,7 +3802,7 @@ def detect_AP_rises(s, dsdt, d2sdt2, dsdt_thr, minisi, vm_thr=0,
     fast_rise_starts = (dsdt.magnitude[:,] >= dsdt_thr)
     # 2) as in NOTE: 2019-04-25 09:22:13 get the logical flags for the starts of
     # the regions of dv/dt >= threshold
-    fast_rise_start_flags = np.ediff1d(np.asfarray(fast_rise_starts), to_begin = 0) == 1 
+    fast_rise_start_flags = np.ediff1d(asfarray(fast_rise_starts), to_begin = 0) == 1
     
     # 3) generate enhanced times array, containing putative start times and 
     # including the signal's t_stop; np.append dumps the units but the quantity
@@ -6395,9 +6447,9 @@ def analyse_AP_waveform(vm, dvdt=None, d2vdt2=None, ref_vm = None, ref_vm_relati
     
     dvdt_ge_thr = dvdt >= dvdt_thr
     
-    dvdt_ge_thr_start_flags = np.ediff1d(np.asfarray(dvdt_ge_thr), to_begin=0) == 1
+    dvdt_ge_thr_start_flags = np.ediff1d(asfarray(dvdt_ge_thr), to_begin=0) == 1
     
-    dvdt_ge_thr_stop_flags = np.ediff1d(np.asfarray(dvdt_ge_thr), to_begin=0) == -1
+    dvdt_ge_thr_stop_flags = np.ediff1d(asfarray(dvdt_ge_thr), to_begin=0) == -1
     
     fast_rise_start_times = vm.times[dvdt_ge_thr_start_flags]
     
@@ -7392,7 +7444,7 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
     ret["Treatment"] = treatment
     ret["Current_injection_steps"] = list()
     
-    kwargs["VmSignal"] = VmSignal
+    # kwargs["VmSignal"] = VmSignal
     
     try:
         for k, segment in enumerate(segments):
@@ -7403,7 +7455,7 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
                 im = ImSignal
                 
             try:
-                sweep_result = analyse_AP_step_injection_sweep(segment, ImSignal = im, 
+                sweep_result = analyse_AP_step_injection_sweep(segment, VmSignal = VmSignal, ImSignal = im,
                                                             Itimes_relative = Itimes_relative,
                                                             Itimes_samples = Itimes_samples,
                                                             passive_analysis = passive_analysis,
@@ -7417,7 +7469,11 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
             except:
                 # NOTE: 2023-08-14 17:45:52
                 # this usually happens when no current injection is detected in Im
-                print(f"\x1b[1;31mSkipping segment {k} of {name} because of the following exception:\x1b[0m")
+                # exc = print_traceback(sys.exception())
+                msg = print_styled(f"Skipping segment {k} of {name} because of the following exception:", color="yellow")
+                # print("\n".join([msg, exc]))
+                scipywarn(f"{msg}")
+                # print(f"\x1b[1;31mSkipping segment {k} of {name} because of the following exception:\x1b[0m")
                 traceback.print_exc()
                 continue
             
@@ -8313,7 +8369,7 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
     Passed to passive_Iclamp (when passive_analysis is True)
     -------------------------
     steadyStateDuration: scalar time Quantity, default is 50 * pq.ms
-    box_size: int, default is 0; size of a boxcar filter, see passive_iclamp for details
+    box_size: int, default is 0; size of a boxcar filter, see passive_Iclamp for details
     NOTE: the epochs are determined from the im (analogsignal or triplet of Iinj, start, stop)
             
     
@@ -8353,17 +8409,22 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
     relTime                 = kwargs.pop("relTime", True)
     fAHP_window             = kwargs.pop("fAHP_window", 3 * pq.ms)
     ADP_window              = kwargs.pop("ADP_window", 6 * pq.ms)
+    baselineRegion          = kwargs.pop("baselineRegion", None)
     
     
+    print(f"analyse_AP_step_injection_sweep: {segment.index}")
     # print(f"analyse_AP_step_injection_sweep: passive_analysis = {passive_analysis}")
     kwargs.pop("return_all", None) # remove the debugging parameter
     
     # NOTE: 2019-05-03 13:08:48
     # removed: result now has individual AP analysis for all detected APs
     # 
+
+    # print(f"analyse_AP_step_injection_sweep: VmSignal = {VmSignal}, ImSignal = {ImSignal}")
     
     if isinstance(VmSignal, str):
-        VmSignal = neoutils.get_index_of_named_signal(segment, VmSignal)
+        VmSignal = neoutils.normalized_index(segment, VmSignal)
+        # VmSignal = neoutils.get_index_of_named_signal(segment, VmSignal)
     
     vm = segment.analogsignals[VmSignal].copy()
         
@@ -8379,8 +8440,8 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
     else:
         raise TypeError(f"ImSignal expected a str (signal name) int signal index) or a triplet (amplitude, start & stop times); got {ImSignal} instad")
                 
-    
-    passive_measure_names = ["BaselineVm", "SteadyStateVm", "VSag", "VRebound", "Rin", "Capacitance", "Tau", "VmFit", "VmFiltered"]
+
+    passive_measure_names = ["BaselineVm", "SteadyStateVm", "VSag", "VRebound", "Rin", "Rss", "Capacitance", "Tau", "VmFit", "VmFiltered"]
     
     # print(f"\nanalyse_AP_step_injection_sweep box_size = {box_size}")
     vstep, Ihold, Iinj, istep, i_timings = extract_AP_train(vm,im,
@@ -8395,27 +8456,40 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
                                     Itimes_relative = Itimes_relative,
                                     Itimes_samples = Itimes_samples)
     if passive_analysis:
-        if Iinj < 0 * pq.pA:
-            vbase, vss, vsag, vrebound, Rin, capacitance, time_constant, vfit, v_flt = passive_Iclamp(vm, im, steadyStateDuration = steadyStateDuration,
-                                            box_size = box_size)
-            
-            # # represent vsag and vrebound relative to their bases (vss abd vbase, respectively)
-            # vsag -= vss
-            # vrebound -= vbase
-            
-            # represent vsag and vrebound relative to their bases (vss abd vbase, respectively)
-            vsag = abs(((vsag-vss)/vss).magnitude) * 100
-            vrebound = abs(((vrebound-vbase)/vss).magnitude) * 100
-            
-            passive_measures = (vbase, vss, vsag, vrebound, Rin, capacitance, time_constant, vfit, v_flt)
-            
-            passive = dict(zip(passive_measure_names, passive_measures))
-            
-        else:
-            passive = dict(zip(passive_measure_names, [np.nan] * len(passive_measure_names)))
-            passive["VmFit"] = None
-            passive["VmFiltered"] = None
-        
+        # preallocate so the code below doesn't break the iteration
+        passive = dict(zip(passive_measure_names, [np.nan] * len(passive_measure_names)))
+        passive["VmFit"] = None
+        passive["VmFiltered"] = None
+        try:
+            if Iinj < 0 * pq.pA:
+                # print(f"analyse_AP_step_injection_sweep passive analysis for segment {segment.index}:")
+                # print(f"\tvm = {vm}")
+                # print(f"\tim = {im}")
+
+                vbase, vss, vsag, vrebound, Rin, Rss, Cm, τm, vfit, v_flt = passive_Iclamp(vm, im, baselineRegion,
+                                                                                                        steadyStateDuration = steadyStateDuration,
+                                                                                                        box_size = box_size)
+
+                # # represent vsag and vrebound relative to their bases (vss and vbase, respectively)
+                # vsag -= vss
+                # vrebound -= vbase
+
+                # represent vsag and vrebound relative to their bases (vss abd vbase, respectively)
+                vsag = abs(((vsag-vss)/vss).magnitude) * 100
+                vrebound = abs(((vrebound-vbase)/vss).magnitude) * 100
+
+                passive_measures = (vbase, vss, vsag, vrebound, Rin, Rss, Cm, τm, vfit, v_flt)
+
+                passive = dict(zip(passive_measure_names, passive_measures))
+        except:
+            msg = print_styled(f"In passive properties analysis for segment {segment.index}: ", color="yellow")
+            scipywarn(msg)
+            traceback.print_exc()
+        # else:
+        #     passive = dict(zip(passive_measure_names, [np.nan] * len(passive_measure_names)))
+        #     passive["VmFit"] = None
+        #     passive["VmFiltered"] = None
+
     if smooth_window > 0:
         # should be 1.0 if both resample_with_period or resample_with_rate are None
         upsampling = (vm.sampling_period.rescale(pq.s) / vstep.sampling_period.rescale(pq.s)).magnitude.flatten()[0]
@@ -8838,7 +8912,7 @@ def analyse_AP_step_injection_sweep_old(segment, VmSignal:typing.Union[int, str]
     Passed to passive_Iclamp (when passive_analysis is True)
     -------------------------
     steadyStateDuration: scalar time Quantity, default is 50 * pq.ms
-    box_size: int, default is 0; size of a boxcar filter, see passive_iclamp for details
+    box_size: int, default is 0; size of a boxcar filter, see passive_Iclamp for details
     NOTE: the epochs are determined from the im (analogsignal or triplet of Iinj, start, stop)
             
     
@@ -8922,7 +8996,7 @@ def analyse_AP_step_injection_sweep_old(segment, VmSignal:typing.Union[int, str]
                                     Itimes_samples = Itimes_samples)
     if passive_analysis:
         if Iinj < 0 * pq.pA:
-            vbase, vss, vsag, vrebound, Rin, capacitance, time_constant, vfit, v_flt = passive_Iclamp(vm, im, steadyStateDuration = steadyStateDuration,
+            vbase, vss, vsag, vrebound, Rin, Rss, Cm, τm, vfit, v_flt = passive_Iclamp(vm, im, steadyStateDuration = steadyStateDuration,
                                             box_size = box_size)
             
             # # represent vsag and vrebound relative to their bases (vss abd vbase, respectively)
@@ -8933,7 +9007,7 @@ def analyse_AP_step_injection_sweep_old(segment, VmSignal:typing.Union[int, str]
             vsag = abs(((vsag-vss)/vss).magnitude) * 100
             vrebound = abs(((vrebound-vbase)/vss).magnitude) * 100
             
-            passive_measures = (vbase, vss, vsag, vrebound, Rin, capacitance, time_constant, vfit, v_flt)
+            passive_measures = (vbase, vss, vsag, vrebound, Rin, Rss, Cm, τm, vfit, v_flt)
             
             passive = dict(zip(passive_measure_names, passive_measures))
             

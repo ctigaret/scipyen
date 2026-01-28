@@ -422,7 +422,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                   predicate:typing.Optional[typing.Any]=None, 
                   hideRoot:bool=False, path:tuple=()):
         r"""Builds the tree hierarchy.
-        Originally overriding pyqtgraph.DataTreeWidget.buildTree(), now see NOTE: 2025-11-23 08:22:37 
+        Initially written to override pyqtgraph.DataTreeWidget.buildTree(), but now see NOTE: 2025-11-23 08:22:37
         
         Positional parameters:
         ----------------------
@@ -676,6 +676,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         • typeTip: a string indicating the type of the key (for dict data) or of
             the index (for sequences, this is always an int, except for namedtuples
             where it can be a str)
+
         
         CHANGELOG (most recent first):
         ------------------------------

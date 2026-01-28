@@ -176,10 +176,14 @@ class DataViewer(ScipyenViewer):
                         ScipyenDataclass:0}
     
     # view_action_name = "Object"
+
+    mappingTypes = (dict,types.MappingProxyType)
+    sequenceTypes = (typing.Sequence, tuple, list,  deque, bytes)
+    iterableCollectionTypes =  sequenceTypes + mappingTypes
     
     def __init__(self, data: typing.Optional[object] = None, 
                  parent: typing.Optional[QtWidgets.QMainWindow] = None, 
-                 ID: typing.Optional[int] = None,  
+                 ID: typing.Optional[int] = None,
                  win_title: typing.Optional[str] = None, 
                  doc_title: typing.Optional[str] = None, 
                  useTableEditor:bool = True, 
@@ -834,7 +838,7 @@ class DataViewer(ScipyenViewer):
         
         try:
             self._subselections_.clear()
-            
+            # print(f"\n{self.__class__.__name__}._get_path_for_item_ START")
             leafSubSelection = list()
             widget = self.treeWidget.itemWidget(item, 0)
     
@@ -878,25 +882,27 @@ class DataViewer(ScipyenViewer):
             expr = [element] if parentIndexType == str else [parentIndexType(element)]
                             
             # print(f"{self.__class__.__name__}._get_path_for_item_: first expr = {expr}")
-            
+
             p = item.parent()
             k: int = 0
             while p is not None:
                 pdatatype = p.data(1, QtCore.Qt.UserRole)
-                # print(f"{self.__class__.__name__}._get_path_for_item_: pdatatype -> {pdatatype}")
                 pKeyType = p.data(0, QtCore.Qt.UserRole)
                 element = p.data(0, QtCore.Qt.DisplayRole)
-                # print(f"{self.__class__.__name__}._get_path_for_item_: p = {p} -> element = {element}")
-                # path_parts.append(f"'{element}'" if pKeyType == str else element) 
-                path_parts.append(f"'{element}'" if pKeyType == str else pKeyType(element)) 
+                # print(f"\t{self.__class__.__name__}._get_path_for_item_: {k} pdatatype -> {pdatatype}, pKeyType -> {pKeyType}, element -> {element}")
+                # path_parts.append(f"'{element}'" if pKeyType == str else element)
+                path_parts.append(f"'{element}'" if pKeyType == str else pKeyType(element))
                 # expr.append(f"'{element}'" if pKeyType == str else element)
                 expr.append(element if pKeyType == str else pKeyType(element))
+                # print(f"\t{self.__class__.__name__}._get_path_for_item_: {k} expr -> {expr}")
                 k += 1
-                if pdatatype in (typing.Sequence, tuple, list, dict, deque, types.MappingProxyType):
+                if pdatatype in self.iterableCollectionTypes or issubclass(pdatatype, self.iterableCollectionTypes):
+                    # print(f"\t\t{self.__class__.__name__}._get_path_for_item_: {k} parent is a iterableCollectionType")
                     if is_namedtuple(pdatatype):
                         expr[k-1] = f".{expr[k-1]}"
-                        
-                    elif issubclass(pdatatype, (dict, types.MappingProxyType)):
+
+                    elif pdatatype in self.mappingTypes or issubclass(pdatatype, self.mappingTypes):
+                        # print(f"\t\t{self.__class__.__name__}._get_path_for_item_: {k} parent is a mapping")
                         expr[k-1] = f"['{expr[k-1]}']" if isinstance(expr[k-1], str) else f"[{pKeyType(expr[k-1])}]"
                         
                     else:
@@ -925,10 +931,10 @@ class DataViewer(ScipyenViewer):
             expr.reverse()
             directAccess = True
             
-            # print(f"{self.__class__.__name__}._get_path_for_item_: expr = {expr}")
+            # print(f"{self.__class__.__name__}._get_path_for_item_: expr -> {expr}")
             
             access = ("".join(expr) if external else "".join(expr[1:]) if len(expr)>1 else "", "", elementDataType, targetDataType)
-            # print(f"access: {access}")
+            # print(f"{self.__class__.__name__}._get_path_for_item_: access -> {access}")
             
             if len(leafSubSelection):
                 # contents can be EITHER a list of QModelIndex (from a table widget)
@@ -1100,7 +1106,7 @@ class DataViewer(ScipyenViewer):
                 self.errorMessage(type(exc).__name__, msg)
                 raise
             
-            # print(f"{self.__class__.__name__}_export_data_items_ path = {path}, access = {accessList}")
+            # print(f"\n{self.__class__.__name__}_export_data_items_ path = {path}, access -> {accessList}")
             
             if len(path) == 0:
                 continue
@@ -1121,7 +1127,7 @@ class DataViewer(ScipyenViewer):
                 if direct:
                     if len(accessList) > 1:
                         for k, statement, eAccess, oType, tType in enumerate(accessList):
-                            # print(f"statement: {statement}, eAccess: {eAccess}, oType: {oType}, tType: {tType}")
+                            print(f"statement: {statement}, eAccess: {eAccess}, oType: {oType}, tType: {tType}")
                             if len(eAccess):
                                 call, rowNdx, colNdx, hiNdx = eAccess
                                 rNdx = f"np.array({list(rowNdx)})" if isinstance(rowNdx, np.ndarray) else f"{rowNdx}"
@@ -1160,7 +1166,7 @@ class DataViewer(ScipyenViewer):
                             names.append(f"{name}_{k}")
                     else:
                         statement, eAccess, oType, tType = accessList[0]
-                        # print(f"statement: {statement}, eAccess: {eAccess}, oType: {oType}, tType: {tType}")
+                        # print(f"{self.__class__.__name__}._export_data_items_: statement: {statement}, eAccess: {eAccess}, oType: {oType}, tType: {tType}")
                         if len(eAccess):
                             # unpack accessor elements
                             call, rowNdx, colNdx, hiNdx = eAccess
@@ -1176,7 +1182,7 @@ class DataViewer(ScipyenViewer):
                                     hNdx = f"{hiNdx}"
                                 accstmt = accstmt + f"{hNdx}"
                                 
-                            # print(f"accstmt: {accstmt}")
+                            # print(f"{self.__class__.__name__}._export_data_items_: accstmt: {accstmt}")
                             if path_only:
                                 obj = f"{statement}{accstmt}"
                             else:

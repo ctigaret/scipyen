@@ -508,7 +508,7 @@ def _newInterval_(cls, times = None, durations = None, units=None, labels=None,
         
 class Interval(DataObject):
     r"""
-Class similar to neo.Epoch and DataZone with the following characteristics:
+Class similar to **neo.Epoch** and **DataZone** with the following characteristics:
         
 1. As neo.Epoch and DataZone, the domain coordinates are stored as two Quantity
 1D arrays (vectors) of the same size and physical units, and with as many elements
@@ -523,7 +523,9 @@ effectively aliased `times` and `durations`).
 and the bool attribute `extent` which defines how `t0` and `t1` are calculated
 from the `times` and `durations` attributes:
         
-When `extent` is True, a sub-interval 𝒌 is defined as :
+When `extent` is True, the object behaves like a SignalCursor, which is
+defined by a central coordinate and a symmetric window around it, *i.e.*,
+a sub-interval 𝒌 is defined as :
 
     self[𝒌] - self.durations[𝒌]/2 ⋯ self[𝒌] ⋯ self[𝒌] + self.durations[𝒌]/2
         
@@ -531,13 +533,11 @@ When `extent` is True, a sub-interval 𝒌 is defined as :
 
     Therefore:
         
-    `t0` is calculated as self - self.durations/2
-    `t1` is calculated as self + self.durations/2
+    `t0` is calculated as self - self.durations/2 — i.e., this is the *first* domain coordinate
+    `t1` is calculated as self + self.durations/2 — i.e., this is the *last* domain coordinate
         
-    This behaviour is similar to that of a SignalCursor, which is defined by a 
-central coordinate and a symmetric window around it.
-        
-When `extent` is False, a sub-interval 𝒌 is defined as:
+When `extent` is False, the object behaves like a neo.Epoch, *i.e.*,
+a sub-interval 𝒌 is defined as:
 
     self[𝒌] ⋯ self[𝒌] + self.durations[𝒌]
 
@@ -1270,7 +1270,7 @@ coordinates are NOT restricted to time units.
         r"""Export to neo.Epoch or DataZone
     Constructs a neo.Epoch or a DataZone based on the values of 't0' and 't1'.
     
-    Returns a neo.Epoch is this Interval is defined in the time domain and
+    Returns a neo.Epoch if this Interval is defined in the time domain and
     'enforceDataZone' is False (the default); otherwise, returns a DataZone.
     
     An epoch 𝒌 is defined as:
@@ -1297,7 +1297,7 @@ coordinates are NOT restricted to time units.
     times of the Interval.
     
     By default, compensateExtent is True, so that Interval objects created from
-    a neo.Epoch or DataZone using extent True will always recreate the original
+    a neo.Epoch or DataZone using ``extent = True`` will always recreate the original
     neo.Epoch or DataZone by this method. To circumvent this behaviour and create
     a left-shifted verison of the original neo.Epoch or DataZone, the pass
     'compensateExtent=False'.

@@ -3629,7 +3629,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
                             sweep:int = 0,
                             holding:bool=True,
                             fromRunStart:bool=False) -> neo.Epoch:
-        r"""Construct a neo.Epoch object from a specified ABFEpoch
+        r"""Construct a neo.Epoch object from a specified *single* ABFEpoch
         See also dacEpochsToNeoEpoch and getEpochsTable with asNeoEpoch = True
     """
         t0, t1 = (self.getEpochStart(epoch, dac, sweep, holding, fromRunStart, False),
@@ -3682,12 +3682,33 @@ class ABFProtocol(ElectrophysiologyProtocol):
                 isAlternateDigital = dac.physicalIndex != self.activeDACChannel
           
         return isAlternateDigital
+
+    def getEpochForDAC(self, epochIndex:typing.Union[str, int], /,
+                       dac:typing.Optional[typing.Union[ABFOutputConfiguration, int, str]]=None,
+                       sweep:int = 0,
+                       holding:bool=True,
+                       fromRunStart:bool=False,
+                       asNeoEpoch:bool=False,
+                       ) -> typing.Optional[ABFEpoch | neo.Epoch] :
+
+        r"""Return an epoch specified by its *index* or *name*
+
+    """
+
+        dac = self.getDAC(dac)
+        if isinstance(epochIndex, (str, int)):
+            epoch = dac.getEpoch(epochIndex)
+
+        if asNeoEpoch:
+            return self.getEpochAsNeoEpoch(epoch, dac, sweep, holding, fromRunStart)
     
     def getEpochsTable(self, sweep:int = 0, /,
                        dac:typing.Optional[typing.Union[ABFOutputConfiguration, int, str]]=None,
                        includeDigitalPattern:bool=True,
+                       holding:bool=True,
+                       fromRunStart:bool=False,
                        asNeoEpoch:bool=False, 
-                       fromRunStart:bool=False) -> pd.DataFrame | neo.Epoch:
+                       ) -> typing.Optional[pd.DataFrame | neo.Epoch] :
         r"""Returns the Epochs Description table for a specific DAC.
         
         Parameters:
@@ -3773,44 +3794,44 @@ class ABFProtocol(ElectrophysiologyProtocol):
         
         isAlternateDigital = self.getIsAlternateDigital(sweep, dac)
         
-# ### BEGIN NOTE: 2025-05-27 11:14:01 moved to a separate method
-#         isAlternateDigital = False
-#         
-#         if self.alternateDigitalOutputsEnabled:
-#             # NOTE: 2024-10-27 15:53:06
-#             # use the active DAC to get the epoch parameters for the main DIG
-#             # and the next DAC to get epoch params for the alt DIG
-#             
-#             # if dac.physicalIndex == self.activeDACChannel:
-#             if actualOutput:
-#                 if hoDACActive:
-#                     # when active DAC is a HO DAC the "main" pattern (def'ed on 
-#                     # the HO DAC) is ignored; instead, the "alt" pattern is used
-#                     # but with timings of DAC0 for even sweeps and those of DAC1
-#                     # on odd sweeps.
-#                     # If neither DAC0 nor DAC1 defined digital bit patterns, then
-#                     # no DIG pattern is emitted.
-#                     isAlternateDigital =  True # force the use of the "alt" pattern
-#                                                # sort out timings below 
-#                 else:
-#                     # odd sweep -> must query alternate DIG pattern, NOT for the 
-#                     # active DAC, but for the DAC where the alternative pattern is 
-#                     # defined; this is because that DAC might have defined different  
-#                     # values for the relevant epoch parameters: 
-#                     # first duration, delta duration, pulse width & frequency
-#                     #
-#                     # If the "active" DAC index is 0 then the "alternate" DAC 
-#                     # index is that of the next higher index DAC where
-#                     # this epoch is defined, else, it is that of the higher 
-#                     # previous DAC index where the epoch is defined.
-#                     #
-#                     # If there is no other DAC where this epoch is defined, this
-#                     # means there is no alternate DIG pattern emitted.
-#                     isAlternateDigital =  sweep % 2 > 0
-#             else:
-#                 isAlternateDigital = dac.physicalIndex != self.activeDACChannel
-#           
-# ### END   NOTE: 2025-05-27 11:14:01 moved to a separate method
+        # ### BEGIN NOTE: 2025-05-27 11:14:01 moved to a separate method
+        #         isAlternateDigital = False
+        #
+        #         if self.alternateDigitalOutputsEnabled:
+        #             # NOTE: 2024-10-27 15:53:06
+        #             # use the active DAC to get the epoch parameters for the main DIG
+        #             # and the next DAC to get epoch params for the alt DIG
+        #
+        #             # if dac.physicalIndex == self.activeDACChannel:
+        #             if actualOutput:
+        #                 if hoDACActive:
+        #                     # when active DAC is a HO DAC the "main" pattern (def'ed on
+        #                     # the HO DAC) is ignored; instead, the "alt" pattern is used
+        #                     # but with timings of DAC0 for even sweeps and those of DAC1
+        #                     # on odd sweeps.
+        #                     # If neither DAC0 nor DAC1 defined digital bit patterns, then
+        #                     # no DIG pattern is emitted.
+        #                     isAlternateDigital =  True # force the use of the "alt" pattern
+        #                                                # sort out timings below
+        #                 else:
+        #                     # odd sweep -> must query alternate DIG pattern, NOT for the
+        #                     # active DAC, but for the DAC where the alternative pattern is
+        #                     # defined; this is because that DAC might have defined different
+        #                     # values for the relevant epoch parameters:
+        #                     # first duration, delta duration, pulse width & frequency
+        #                     #
+        #                     # If the "active" DAC index is 0 then the "alternate" DAC
+        #                     # index is that of the next higher index DAC where
+        #                     # this epoch is defined, else, it is that of the higher
+        #                     # previous DAC index where the epoch is defined.
+        #                     #
+        #                     # If there is no other DAC where this epoch is defined, this
+        #                     # means there is no alternate DIG pattern emitted.
+        #                     isAlternateDigital =  sweep % 2 > 0
+        #             else:
+        #                 isAlternateDigital = dac.physicalIndex != self.activeDACChannel
+        #
+        # ### END   NOTE: 2025-05-27 11:14:01 moved to a separate method
 
         # ### BEGIN set up row labels for output data frame
         if sweep not in range(self.nSweeps):
@@ -3822,6 +3843,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
             outputNdx = f"(as defined in DAC #{dac.physicalIndex})"
             
         if asNeoEpoch:
+            # convert *all* epochs to neo.Epoch
             labels = list(map(lambda e: e.name, dac.epochs))
             
             times, durations = zip(*list(map(lambda e: self.getEpochStartStop(e, dac, sweep, holding=True,

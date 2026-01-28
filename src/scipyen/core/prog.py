@@ -1298,6 +1298,18 @@ def print_styled(s: str, color: str = "yellow", bright: bool = True):
     pre = f"{c}{colorama.Style.BRIGHT}" if bright else c
     return f"{pre}{s}{colorama.Style.RESET_ALL}"
 
+def print_traceback(exc = None) -> str:
+    if exc is None:
+        return
+    ret = None
+    try:
+        with io.StringIO() as bf:
+            traceback.print_exc(exc, file = bf)
+            ret = bf.getvalue()
+    except:
+        traceback.print_exc()
+
+    return ret
 
 def scipywarn(message, category=None, stacklevel=1, source=None, out=None):
     from warnings import filters, defaultaction
