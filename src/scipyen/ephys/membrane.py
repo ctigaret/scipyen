@@ -1936,7 +1936,8 @@ def extract_Vm_Im(data, VmSignal="Vm_prim_1", ImSignal="Im_sec_1", t0=None, t1=N
 def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list], 
                    baseEpoch:typing.Optional[typing.Union[neo.Epoch, tuple, list]]=None, 
                    ssEpoch:typing.Optional[typing.Union[neo.Epoch, tuple, list]]=None, 
-                   steadyStateDuration = 0.05 * pq.s, 
+                   steadyStateDuration:pq.Quantity = 0.05 * pq.s, 
+                   tail = 0.2 * pq.s,
                    box_size = 0) -> tuple:
     r"""Measurement of passive membrane properties.
     
@@ -2102,11 +2103,33 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
         else:
             raise TypeError("incompatible steady-state epoch specification: %s", ssEpoch)
         
+    elif isinstance(ssEpoch, Interval):
+        ssEpoch = ssEpoch.toNeoEpoch()
+        
 
-    # 3) get transition times from injected current, attempt to sort out
-    # baseline and steady-state epochs using these transition times and
-    # steadyStateDuration parameter, if needed
-    if isinstance(im, neo.AnalogSignal):
+    # 3) get current injection magnitude and timing (``Iinj``, ``I_t0``, ``I_t1``)
+    #
+    # 3.a)  if ``im`` is a command signal proxy these can be "parsed" from ``im`` (3.a)
+    # 3.b) if ``im`` is a 3-tuple, it is expected to contain (``Iinj``, ``I_t0``, ``I_t1``)
+    # 3.c) if``im`` ia a scalar quantity, it represents ``Iinj``, and both 
+    # baseEpoch and ssEpoch **should have been passed to the function call**
+    #
+    # Then sort out baseline and steady-state epochs using these transition times 
+    # and steadyStateDuration parameter, if needed
+    #
+    # At the end of this little exercise we end up with additional variables:
+    # ``baseT0``, ``baseT1``, ``ssT0`` and ``ssT1`` — the start, stop times,
+    # respectively for the baseline and the steady-state Vm during hyperpolarization
+    #
+    # NOTE: 2026-01-28 23:22:12
+    # baseEpoch should be contiguous with the current injection epoch, i.e., 
+    # baseT1 should coincide with the start of curent injection.
+    #
+    # similarly, ssEpoch shoudl be contiguous with the vm relaxation i.e., 
+    # ssT1 should coincide with the stop of current injection
+    #
+    
+    if isinstance(im, neo.AnalogSignal):                                        # 3.a)
         # injected current passed as a signal here => infer amplitude, start & stop times
         # NOTE: 2017-08-30 21:53:33
         # there are only two states
@@ -2153,7 +2176,7 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
         
         if baseEpoch is None:
             # infer baseEpoch from the current injection waveform (ie. BEFORE the step)
-            baseT1 = np.min([down, up]) * pq.s # because down and up are quantities and this strips their units away!
+            baseT1 = np.min([down, up]) * pq.s # because down and up are quantities but this strips their units away!
             baseT0 = baseT1 - steadyStateDuration
         else:
             assert isinstance(baseEpoch, neo.Epoch), "Expecting baseEpoch a neo.Epoch or None, by now"
@@ -2175,7 +2198,7 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
         # the amount of injected Im
         Iinj = np.diff(centroids.ravel()) * im.units
         
-    elif isinstance(im, (tuple, list)) and len(im) == 3:
+    elif isinstance(im, (tuple, list)) and len(im) == 3:                        # 3.b)
         # im passed as a sequence of 3 values: amplitude, t start, t stop
         
         Iinj = im[0]
@@ -2215,8 +2238,7 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
             
         assert ssT0 > baseT1, "baseline and steay state epochs overlap"
         
-        
-    elif isinstance(im, pq.Quantity):
+    elif isinstance(im, pq.Quantity) and im.size==0:                            # 3.c)
         Iinj = im
         
         if isinstance(Iinj, numbers.Real):
@@ -2225,7 +2247,7 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
         assert isinstance(Iinj, pq.Quantity) and Iinj.size == 1 and scq.unitsConvertible(Iinj.units, pq.A), f"im[0] expected to be an electrical current scalar; got {im[0]} instead"
 
         if not isinstance(baseEpoch, neo.Epoch):
-            raise ValueError("base epoch must be specified")
+            raise ValueError("When ``im`` is a scalar quantity, base epoch (``baseEpoch``) must be specified")
         
         # when an epoch WAS specified, we take it as given i.e. as indicating the 
         # ACTUAL baseline or steady-state epochs used for analysis
@@ -2233,7 +2255,7 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
         baseT1 = baseT0 + baseEpoch.durations
 
         if not isinstance(ssEpoch, neo.Epoch):
-            raise ValueError("steady-state epoch (ssEpoch) must be specified")
+            raise ValueError("When ``im`` is a scalar quantity, steady-state epoch (``ssEpoch``) must be specified")
             
         
         ssT0 = ssEpoch.times
@@ -2242,9 +2264,19 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
     else:
         raise TypeError("im must be specified as a analog signal, current quantity, or triplet of current, t_start and t_stop quantities")
     
+    # readjust the tail, in case it points past the vm end
+    tail = min(vm.t_stop-ssT1, tail)
+    
+    # if ``box_size`` is given, filter the ``vm`` signal with a normalized boxcar window of ``box_size``
     if box_size > 0 :
         window = boxcar(box_size)/box_size
         v_flt = convolve(np.squeeze(vm), window, mode="same", method = "fft")
+        # remove convolution artifacts at ends; these are box_size//2 samples
+        # that we replace with the ones from the original signal (crude but effective and OK for small box_sizes)
+        half_box = box_size//2
+        v_flt[:half_box] = vm.magnitude[0,:half_box]
+        v_flt[-half_box:] = vm.magnitude[0,-half_box:]
+        
         v_flt = neo.AnalogSignal(v_flt[:,np.newaxis], units = vm.units, t_start = vm.t_start, sampling_rate = vm.sampling_rate)
         # v_flt = neo.AnalogSignal(v_flt[:,np.newaxis], units = vm.units, t_start = vm.t_start, sampling_rate = 1/vm.sampling_period)
     else:
@@ -2252,35 +2284,66 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
         
     vmin = vm.min()
     
-    "baseline Vm"
+    # extract the baseline Vm
     vbase = v_flt.time_slice(baseT0, baseT1).mean()
     
-    "steady-state hyperpolarization"
+    # extract the steady-state hyperpolarization Vm — NOTE: this is NOT the entire hyperpolarization Vm, but only the final region!
     vss = v_flt.time_slice(ssT0, ssT1).mean()
     
+    # sagVm happens before the Vm reaches steady-state; 
+    # as the steady-state region is user-defined, it follows that it can be used
+    # to extract sagVm from vm as the Vm region between I_t0 and ssT0
+    #
+    # NOTE: 2026-01-28 22:54:31
+    # there might be no sag, but a slight(er) decline rate of the vm toward steady-state
+    #
+    # in this case the code will report a "false" sag here; hence it is good to know
+    # time of its minimum — if this is very enar the sagVm t_stop then this is unlikely
+    # to be a sag, but rather an artifact;
+    # it is basically up to the user to define the steady-state properly
+    sagVm = v_flt.time_slice(baseT1, ssT0)
     
-    # sag & rebound peak values (on filtered data => ~ average of box_size samples)
-    # BUG 2023-06-19 14:56:19 breaks down when box_size = 0 FIXME
-    vsag            = v_flt[box_size+1:-(box_size+1),:].min() # avoid filter artifacts at ends
-    vrebound        = v_flt[box_size+1:-(box_size+1),:].max()
+    # reboundVm occurs after the current injection has ceased, therefore it is 
+    # extracted as the vm region starting at I-T1 and lasting as long as the tail
+    #
+    # NOTE: 2026-01-28 22:57:11 as for sag (see NOTE: 2026-01-28 22:54:31)
+    # there might not be rebound, just a slowe(er) relaxation of the vm toward baseline
+    #
+    # in this case the code will report a "false" rebound; as above, it helps to know
+    # the time of the rebound maximum: if it is too close to reboundVm.t_stop then
+    # it is likely an artifact
+    #
+    # I just let the user judge, for now...
+    reboundVm = v_flt.time_slice(ssT1, ssT1 + tail)
     
-    #time of sag minimum
-    sagMinTime      = (v_flt.argmin() + 1) * vm.sampling_period
-    reboundMaxTime  = (v_flt.argmax() - 1) * vm.sampling_period
+    # sag Vm value at the "trough" — as I mention above there may be no such "trough"
+    vsag            = sagVm.min() 
+    # time of sag minimum
+    sagMinTime      = (sagVm.argmin()+1) * vm.sampling_period + baseT1
+    
+    # rebound value at the "peak" — as I mention above there may be no such "peak"
+    vrebound        = reboundVm.max()
+    # time of rebound minimum
+    reboundMaxTime  = (reboundVm.argmax()) * vm.sampling_period + ssT1
+    
     
     #print("sag trough: ", vsag, " found at ", sagMinTime)
-
-    vsagrise        = v_flt.time_slice(baseT1, sagMinTime)
     
+    # NOTE: 2026-01-28 23:02:14
+    # the sagVm also happens to be the "first" phenomenon before reaching steady-state
+    # and its accumulating phase (downstroke) is its "rise"; this must be taken into account
+    # then fitting an exponential decay
+    vsagrise        = v_flt.time_slice(baseT1, sagMinTime)
+
     vsagmin = vsagrise.min()
     vsagmax = vsagrise.max()
     
     vsagrange = vsagmin - vsagmax
     
-    # NOTE: if we use state_levels, below, we actually get a better fit & sag separation
+    # NOTE: would using state_levels, below, yield a better fit & sag separation?
     
     #vsag10 = vsagmax + 0.1  * vsagrange
-    #vsag90 = vsagmax + 0.98  * vsagrange
+    #vsag90 = vsagmax + 0.9  * vsagrange
     vsag10 = vsagmax
     vsag90 = vsagmin
     
@@ -2295,6 +2358,7 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
     #### vice-versa for the 90%
     #vsag90 = sigp.state_levels(vsagrise, levels=0.1)[1]
 
+    # the actual region used in fitting the accumulating phase is between 10%-90% of the whole accummulating phase
     vsag10_90_index = (np.squeeze(vsagrise) <= vsag10) & (np.squeeze(vsagrise) >= vsag90)
     
 
@@ -8468,6 +8532,7 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
 
                 vbase, vss, vsag, vrebound, Rin, Rss, Cm, τm, vfit, v_flt = passive_Iclamp(vm, im, baselineRegion,
                                                                                                         steadyStateDuration = steadyStateDuration,
+                                                                                                        tail = tail,
                                                                                                         box_size = box_size)
 
                 # # represent vsag and vrebound relative to their bases (vss and vbase, respectively)
