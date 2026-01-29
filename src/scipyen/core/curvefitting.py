@@ -1183,7 +1183,7 @@ def fit_model(data, func, p0, *args, **kwargs):
     bounds, jac, method, ftol, xtol, gtol, x_scale, loss, f_scale, max_nfev,
     diff_step, tr_solver, tr_options, jac_sparsity, verbose
     
-    (see scipy manual for details)
+    (see scipy documentation for details)
     
     Defaults are:
     
@@ -1271,7 +1271,7 @@ def fit_model(data, func, p0, *args, **kwargs):
     # check first argument
     atypes = set()
     prog.unwind_type_sig(args_annots[0][1], atypes)
-    assert any(t in atypes for t in (np.ndarray, float)), f"First argument to 'func' {func} must be a float or an np.ndarray; instead, got {args_annots[0][1]}"
+    # assert any(t in atypes for t in (np.ndarray, float)), f"First argument to 'func' {func} must be a float or an np.ndarray; instead, got {args_annots[0][1]}"
         
     to_unpack:bool = True
     
@@ -1292,7 +1292,7 @@ def fit_model(data, func, p0, *args, **kwargs):
         for k, aa in enumerate(args_annots):
             atypes.clear()
             prog.unwind_type_sig(aa[1], atypes)
-            assert any(t in atypes for t in (np.ndarray, float, np.ndarray | float)), f"Argument {k+1} argument to 'func' {func} should require a float or an np.ndarray; instead, got {args_annots[0][1]}"
+            # assert any(t in atypes for t in (np.ndarray, float, np.ndarray | float)), f"Argument {k+1} argument to 'func' {func} should require a float or an np.ndarray; instead, got {args_annots[0][1]}"
         to_unpack = True
         
     # print(f"prog.fit_model: to_unpack = {to_unpack}")
@@ -1359,7 +1359,7 @@ def fit_model(data, func, p0, *args, **kwargs):
                 
     else:
         try:
-            coeff_names = models.model_parameters(func)
+            coeff_names = func.coefficients
         except:
             traceback.print_exc()
             coeff_names = [f"Coefficient {k}" for k in range(len(p0))]
@@ -1491,7 +1491,7 @@ def fit_model(data, func, p0, *args, **kwargs):
                                    "Fit": res,
                                    "Coefficients": coefficients})
     
-    initialSupport = np.full((data.shape[0],), np.NaN)
+    initialSupport = np.full((data.shape[0],), np.nan)
     
     fittedCurve = initialSupport.copy()
     

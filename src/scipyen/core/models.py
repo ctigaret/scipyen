@@ -38,7 +38,7 @@ A biased, scaled and shifted version of (1) is:
 .. attention:: Please consider decorating all model functions with the ``modelfunction`` decorator.
 This will help identifying these functions easily from other Scipyen components.
 """
-import typing, types, traceback, sys, os
+import typing, types, traceback, sys, os, itertools
 import numbers
 import neo
 import numpy as np
@@ -449,6 +449,8 @@ https://wiki.python.org/moin/PythonDecoratorLibrary#Creating_decorator_with_opti
             setattr(f, "coefficients", tuple())
         
         starred = tuple(filter(lambda c: "*" in c, f.coefficients))
+        unstarred = tuple(filter(lambda c: not c.endswith("*"), f.coefficients))
+        setattr(f, "unstarred_coefficients", unstarred)
         setattr(f, "starred_coefficients", starred)
         
         setattr(f, "expression", expression)
@@ -521,6 +523,33 @@ https://wiki.python.org/moin/PythonDecoratorLibrary#Creating_decorator_with_opti
         #
         # ### END   NOTE: 2025-12-26 14:50:30 various optins - do NOT delete; instead, keep for future reference
         
+        def __getCoefficients__(f, *initial) -> tuple:
+            destarred = tuple(map(lambda c: c.strip("*"), f.starred_coefficients))
+            
+            nStarredGroups = f.starredRepeats(*initial)
+            concrete_names = f.unstarred_coefficients + tuple(itertools.chain.from_iterable(map(lambda k: tuple(map(lambda c: f"{c}{k}", destarred)), range(nStarredGroups))))
+            
+            return concrete_names
+        
+        setattr(f, "expanded_coefficients", types.MethodType(__getCoefficients__, f))
+        
+        def __getStarredGroups__(f, *initial) -> int:
+            nStarred = len(f.starred_coefficients)
+            if nStarred == 0:
+                return 0
+            nUnstarred = len(f.unstarred_coefficients)
+            if len(initial):
+                assert len(initial) >= nUnstarred + nStarred, f"Invalid number of coefficient values; expecting at least {nUnstarred + nStarred}"
+                nUnstarredValues = len(initial) - nUnstarred
+                assert nUnstarredValues % nStarred == 0, f"Unexpected number of coefficient values ({len(initial)}); must be {nStarred} × 𝒏 + {nUnstarred} where 𝒏 is the number of instances of each starred coefficient"
+                nStarredGroups = nUnstarredValues // nStarred
+            else:
+                nStarredGroups = 1
+                
+            return nStarredGroups
+        
+        setattr(f, "starredRepeats", types.MethodType(__getStarredGroups__, f))
+                
         def __expression2SVG__(f):
             d = renderModelExpression(f.expression, out="svg")
             return d.get("svg", None) if isinstance(d, dict) else None
@@ -654,15 +683,18 @@ A tuple (result:pd.Dataframe,
 
 
     if len(f.coefficients):
-        starred = list(filter(lambda c: c.endswith("*"), f.coefficients))
-        destarred = list(map(lambda c: c.strip("*"), starred))
-        unstarred = list(filter(lambda c: not c.endswith("*"), f.coefficients))
+        # starred = f.starred_coefficients
+        # # starred = list(filter(lambda c: c.endswith("*"), f.coefficients))
+        # unstarred = list(filter(lambda c: not c.endswith("*"), f.coefficients))
+        destarred = list(map(lambda c: c.strip("*"), f.starred_coefficients))
 
-        order = list(map(lambda c: f.coefficients.index(c), unstarred + starred))
-        unstarredorder = list(map(lambda c: f.coefficients.index(c), unstarred))
-        starredorder = list(map(lambda c: f.coefficients.index(c), starred))
+        # order = list(map(lambda c: f.coefficients.index(c), unstarred + starred))
+        # unstarredorder = list(map(lambda c: f.coefficients.index(c), unstarred))
+        # starredorder = list(map(lambda c: f.coefficients.index(c), starred))
 
-        concrete_names = unstarred + list(map(lambda c: f"{c}0", destarred))
+        # concrete_names = unstarred + list(map(lambda c: f"{c}0", destarred))
+        concrete_names = f.expanded_coefficients(*initial)
+        nStarredGroups = f.starredRepeats(*initial)
 
         # nStarredCoeffs = len(starred)
         # self._destarredCoeffs_= destarred
@@ -676,13 +708,16 @@ A tuple (result:pd.Dataframe,
         # so, currently we need to create a tuple of starred coeffs and repeat this at least once
 
         if len(initial) > 0:
-            if len(destarred) == 0:
-                if len(initial) != len(unstarred):
-                    raise RuntimeError(f"Too {'many' if len(initial) > len(unstarred) else 'few'} initial coefficient values ({len(initial)}) while expecting {len(unstarred)}")
-
-            else:
-                if len(initial) < len(concrete_names):
-                    raise RuntimeError(f"Too few initial coefficient values ({len(initial)}) while expecting at least {len(concrete_names)}")
+#             if len(destarred) == 0:
+#                 if len(initial) != len(unstarred):
+#                     raise RuntimeError(f"Too {'many' if len(initial) > len(unstarred) else 'few'} initial coefficient values ({len(initial)}) while expecting {len(unstarred)}")
+# 
+#             else:
+#                 if len(initial) < len(concrete_names):
+#                     raise RuntimeError(f"Too few initial coefficient values ({len(initial)}) while expecting at least {len(concrete_names)}")
+#                 
+#                 if (len(initial) - len(unstarred)) % 2 != 0:
+#                     raise RuntimeError(f"Unexpected number of coefficient values ({len(initial)}); must be {len(starred)} × 𝒏 + {len(unstarred)} where 𝒏 is the number of instances of each starred coefficient")
 
             if not all(isinstance(v, Real) for v in initial):
                 raise TypeError("All initial coefficient values MUST be real scalars")
@@ -736,7 +771,7 @@ A tuple (result:pd.Dataframe,
         if not isFittingCoefficientsDict(f.fitting):
             all_names = fdict.pop("Names")
             ret = pd.DataFrame(fdict, index=(concrete_names))
-            return ret, destarred, starredGroups, all_names
+            return ret, destarred, nStarredGroups, all_names
 
         mfd = {"Names":list(), "Initial Value": list(), "Lower Bound": list(), "Upper Bound": list(), "Keep Feasible": list()}
 
