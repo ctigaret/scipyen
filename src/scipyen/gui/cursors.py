@@ -138,7 +138,15 @@ class CursorLine(pg.InfiniteLine):
     sig_double_clicked = Signal()
     
     def _init__(self, **kwargs):
-        super().__init__(**kwargs)
+        # selected = kwargs.pop("selected", False)
+        # selectedPen = kwargs.pop("selectedPen", None)
+
+        pg.InfiniteLine.__init__(self, **kwargs)
+
+        # self._selectedPen_ = selectedPen
+        #
+        # self._isSelected_:bool = False
+
         
     # NOTE: 2023-04-26 09:03:25
     # do not delete -- I may have to revisit this
@@ -164,13 +172,16 @@ class CursorLine(pg.InfiniteLine):
         if self.mouseHovering:
             if isinstance(getattr(self, "label", None), pg.InfLineLabel):
                 self.label.setColor(self.hoverPen.color())
-            
+
         super().setHoverPen(*args, **kwargs)
+        self.update()
         
     def setMouseHover(self, hover):
+        # print(f"{self.__class__.__name__}.setMouseHover({hover})")
         if self.mouseHovering == hover:
             return
         self.mouseHovering = hover
+
         if hover:
             self.currentPen = self.hoverPen
         else:
@@ -234,6 +245,8 @@ class SignalCursor(QtCore.QObject):
                  pen:typing.Optional[QtGui.QPen]=None, 
                  hoverPen:typing.Optional[QtGui.QPen]=None, 
                  linkedPen:typing.Optional[QtGui.QPen]=None, 
+                 penStyle:typing.Optional[QtCore.Qt.PenStyle] = None,
+                 selectedPenStyle:typing.Optional[QtCore.Qt.PenStyle] = None,
                  movable_label:bool=True, 
                  label_position:float = 0.5,
                  show_value:bool=False, 
@@ -311,6 +324,10 @@ class SignalCursor(QtCore.QObject):
             hoverPen:typing.Optional[QtGui.QPen]=None
             
             linkedPen:typing.Optional[QtGui.QPen]=None
+
+            selectedPen:typing.Optional[QtGui.QPen]=None
+
+            selectedHoverPen:typing.Optional[QtGui.QPen]=None
             
             movable_label:bool=True
             
@@ -346,8 +363,8 @@ class SignalCursor(QtCore.QObject):
         
         self._follows_mouse_ = follower
         
-        self._is_selected_ = False
-        
+        self._is_selected_:bool = False
+
         self._hl_ = None
         self._vl_ = None
         
@@ -375,12 +392,17 @@ class SignalCursor(QtCore.QObject):
             
         else:
             self._linkedPen_ = None
+
+        # if isinstance(selectedPen, QtGui.QPen):
+        #     self._selectedPen_ = selectedPen
+        # else:
+        #     self._selectedPen_ = None
             
-        self._pen_.setStyle(QtCore.Qt.DashLine)
-        self._hoverPen_.setStyle(QtCore.Qt.DashLine)
+        self._penStyle_ = penStyle if isinstance(penStyle, QtCore.Qt.PenStyle) else QtCore.Qt.SolidLine
+        self._selectedPenStyle_ = selectedPenStyle if isinstance(selectedPenStyle, QtCore.Qt.PenStyle) else QtCore.Qt.DashLine
+        self._pen_.setStyle(self._penStyle_)
+        self._hoverPen_.setStyle(self._penStyle_)
             
-        # self._selectedPen_ = QtGui.QPen(self._pen_)
-        
         # NOTE: 2023-01-14 14:01:17
         # valid ranges where the cursor lines can go
         # NOTE: 2023-01-14 14:01:24
@@ -869,12 +891,36 @@ class SignalCursor(QtCore.QObject):
             else:
                 self._is_selected_ = val
                 
+        lineStyle = self._selectedPenStyle_ if self._is_selected_ else self._penStyle_
+
         for l in (self._hl_, self._vl_):
-            if isinstance(l, pg.InfiniteLine):
-                l.pen.setStyle(QtCore.Qt.SolidLine if self._is_selected_ else QtCore.Qt.DashLine)
+            # if isinstance(l, pg.InfiniteLine):
+            if isinstance(l, CursorLine):
+                l.setSelected(self._is_selected_)
+                l.pen.setStyle(lineStyle)
+                l.hoverPen.setStyle(lineStyle)
                 l.update()
         
-            
+    @property
+    def penStyle(self) -> QtCore.Qt.PenStyle:
+        return self._penStyle_
+
+    @penStyle.setter
+    def penStyle(self, val:QtCore.Qt.PenStyle):
+        if not isinstance(val, QtCore.Qt.PenStyle):
+            return
+        self._penStyle_ = val
+
+    @property
+    def selectedPenStyle(self) -> QtCore.Qt.PenStyle:
+        return self._selectedPenStyle_
+
+    @selectedPenStyle.setter
+    def selectedPenStyle(self, val:QtCore.Qt.PenStyle):
+        if not isinstance(val, QtCore.Qt.PenStyle):
+            return
+        self._selectedPenStyle_ = val
+
     def setBounds(self, host:typing.Optional[pg.GraphicsItem]=None,
                   xBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None, 
                   yBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None):

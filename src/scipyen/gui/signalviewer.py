@@ -548,6 +548,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     
     
     default_antialias = True
+
+    defaultCursorLineStyle = QtCore.Qt.DashLine
+    defaultSelectedCursorLineStyle = QtCore.Qt.SolidLine
     
     defaultCursorColors = Bunch({"crosshair":"#C173B088", "horizontal":"#B1D28F88", "vertical":"#ff007f88"})
     defaultLinkedCursorColors = Bunch({"crosshair":QtGui.QColor(defaultCursorColors["crosshair"]).darker().name(QtGui.QColor.HexArgb),
@@ -637,6 +640,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self._verticalSignalCursors_ = dict()
         self._horizontalSignalCursors_ = dict()
         self._cursorHoverColor_ = self.defaultCursorHoverColor
+
+        self._cursorLineStyle_ = self.defaultCursorLineStyle
+        self._selectedCursorLineStyle_ = self.defaultSelectedCursorLineStyle
+
         self._data_cursors_ = collections.ChainMap(self._crosshairSignalCursors_, self._horizontalSignalCursors_, self._verticalSignalCursors_)
         # maps signal name with list of cursors
         # NOTE: 2019-03-08 13:20:50
@@ -1649,9 +1656,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self.verticalCursorColor = QtGui.QColor(val["vertical"]).name(QtGui.QColor.HexArgb)
 
     @property
-    def crosshairCursorColor(self):
+    def crosshairCursorColor(self) -> str:
         return self._cursorColors_["crosshair"]
-    
+
     @markConfigurable("CrosshairCursorColor", trait_notifier=True)
     @crosshairCursorColor.setter
     def crosshairCursorColor(self, val:str):
@@ -1722,6 +1729,33 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     def cursorHoverColor(self, val:str):
         self._set_cursors_color(val, "hover")
         
+    @property
+    def cursorLineStyle(self) -> str:
+        return self._cursorLineStyle_.name
+
+    @markConfigurable("CursorLineStyle", trait_notifier=True)
+    @cursorLineStyle.setter
+    def cursorLineStyle(self, val:str):
+        if not isinstance(val, str) or len(val.strip()) == 0 or val not in QtCore.Qt.PenStyle.__dict__:
+            return
+
+        self._cursorLineStyle_ = QtCore.Qt.PenStyle[val]
+
+        for cursor in self.cursors:
+            cursor.penStyle = self._cursorLineStyle_
+            cursor.update()
+
+    @property
+    def selectedCursorLineStyle(self) -> str:
+        return self._selectedCursorLineStyle_.name
+
+    @markConfigurable("SelectedCursorLineStyle", trait_notifier = True)
+    @selectedCursorLineStyle.setter
+    def selectedCursorLineStyle(self, val:str):
+        for cursor in self.cursors:
+            cursor.selectedPenStyle = self._selectedCursorLineStyle_
+            cursor.update()
+
     @property
     def scene(self) -> pg.GraphicsScene:
         r"""The graphics scene where axes are plotted."""
@@ -3919,9 +3953,9 @@ anything else       anything else       ❌
         
         for cursor in cursors:
             if cursortype == "hover":
-                pen = cursor.hoverPen
-                pen.setColor(color)
-                cursor.hoverPen = pen
+                cursor.hoverPen.setColor(color)
+                # pen.setColor(color)
+                # cursor.hoverPen = pen
             else:
                 pen = cursor.linkedPen if linked else cursor.pen
                 pen.setColor(color)
@@ -3945,6 +3979,8 @@ anything else       anything else       ❌
                     follows_mouse: bool = False, 
                     precision:typing.Optional[int] = None, 
                     editFirst: bool = False,
+                    penStyle: typing.Optional[QtCore.Qt.PenStyle] = None,
+                    selectedPenStyle: typing.Optional[QtCore.Qt.PenStyle] = None,
                     **kwargs) -> str:
         r"""Common landing zone for signal cursor creation methods.
         kwargs: var-keyword parameters for SignalCursor constructor (pen, etc)
@@ -4046,28 +4082,36 @@ anything else       anything else       ❌
             
             ywindow = 0.0 * yUnits if isinstance(yUnits, pq.Quantity) else 0.0
             
-            pen = QtGui.QPen(QtGui.QColor(self.cursorColors["vertical"]), 1, QtCore.Qt.SolidLine)
-            linkedPen = QtGui.QPen(QtGui.QColor(self.linkedCursorColors["vertical"]), 1, QtCore.Qt.SolidLine)
+            # pen = QtGui.QPen(QtGui.QColor(self.cursorColors["vertical"]), 1, QtCore.Qt.SolidLine)
+            pen = QtGui.QPen(QtGui.QColor(self.cursorColors["vertical"]), 1., self._cursorLineStyle_)
+            linkedPen = QtGui.QPen(QtGui.QColor(self.linkedCursorColors["vertical"]), 1., self._cursorLineStyle_)
+            hoverPen = QtGui.QPen(QtGui.QColor(self._cursorHoverColor_), 1., self._cursorLineStyle_)
+
             pen.setCosmetic(True)
             linkedPen.setCosmetic(True)
-            
+            hoverPen.setCosmetic(True)
+
         elif cursor_type in ("horizontal", "h", SignalCursorTypes.horizontal):
             cursorDict = self._horizontalSignalCursors_
             crsPrefix = "dh" if follows_mouse else "h"
             xwindow = 0.0 * xUnits if isinstance(xUnits, pq.Quantity) else 0.0
-            pen = QtGui.QPen(QtGui.QColor(self.cursorColors["horizontal"]), 1, QtCore.Qt.SolidLine)
-            linkedPen = QtGui.QPen(QtGui.QColor(self.linkedCursorColors["horizontal"]), 1, QtCore.Qt.SolidLine)
+            pen = QtGui.QPen(QtGui.QColor(self.cursorColors["horizontal"]), 1, self._cursorLineStyle_)
+            linkedPen = QtGui.QPen(QtGui.QColor(self.linkedCursorColors["horizontal"]), 1, self._cursorLineStyle_)
+            hoverPen = QtGui.QPen(QtGui.QColor(self._cursorHoverColor_), 1, self._cursorLineStyle_)
             pen.setCosmetic(True)
             linkedPen.setCosmetic(True)
-            
+            hoverPen.setCosmetic(True)
+
         elif cursor_type in ("crosshair", "c", SignalCursorTypes.crosshair):
             cursorDict = self._crosshairSignalCursors_
             crsPrefix = "dc" if follows_mouse else "c"
-            pen = QtGui.QPen(QtGui.QColor(self.cursorColors["crosshair"]), 1, QtCore.Qt.SolidLine)
-            linkedPen = QtGui.QPen(QtGui.QColor(self.linkedCursorColors["crosshair"]), 1, QtCore.Qt.SolidLine)
+            pen = QtGui.QPen(QtGui.QColor(self.cursorColors["crosshair"]), 1, self._cursorLineStyle_)
+            linkedPen = QtGui.QPen(QtGui.QColor(self.linkedCursorColors["crosshair"]), 1, self._cursorLineStyle_)
+            hoverPen = QtGui.QPen(QtGui.QColor(self._cursorHoverColor_), 1, self._cursorLineStyle_)
             pen.setCosmetic(True)
             linkedPen.setCosmetic(True)
-            
+            hoverPen.setCosmetic(True)
+
         else:
             raise ValueError("unsupported cursor type %s" % cursor_type)
         #### END figure out cursor type; adjust cursor windows as needed (set 0 for unused cursor lines)
@@ -4193,8 +4237,8 @@ anything else       anything else       ❌
         if not isinstance(cursor_type, (str, SignalCursorTypes)):
             raise TypeError("cursor_type expected to be a str or a SignalCursorTypes; got %s instead" % type(cursor_type).__name__)
 
-        hoverPen = QtGui.QPen(QtGui.QColor(self._cursorHoverColor_), 1, QtCore.Qt.SolidLine)
-        hoverPen.setCosmetic(True)
+        # hoverPen = QtGui.QPen(QtGui.QColor(self._cursorHoverColor_), 1, QtCore.Qt.SolidLine)
+        # hoverPen.setCosmetic(True)
         
         nCursors = len(cursorDict)
         
@@ -4238,9 +4282,11 @@ anything else       anything else       ❌
                                    x = x, y = y, xwindow=xwindow, ywindow=ywindow,
                                    cursor_type = cursor_type,
                                    cursorID = crsId,
+                                   pen = pen,
                                    linkedPen = linkedPen,
-                                   pen = pen, 
                                    hoverPen=hoverPen,
+                                   penStyle = self._cursorLineStyle_,
+                                   selectedPenStyle = self._selectedCursorLineStyle_,
                                    # parent = self, 
                                    parent = axis, 
                                    follower = follows_mouse, 
