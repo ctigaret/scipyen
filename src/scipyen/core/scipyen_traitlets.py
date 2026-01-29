@@ -379,9 +379,9 @@ class DictTrait(Dict, ScipyenTraitTypeMixin):
                 silent = bool(np.all(old_value == new_value))
             
         except:
-            # if there is an error in comparing, default to not notify
-            traceback.print_exc()
-            silent = True
+            # if there is an error in comparing, default to notify - might penalize, though!
+            # traceback.print_exc()
+            silent = False
 
         if silent is not True:
             self.hashed = new_hash

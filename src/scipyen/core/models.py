@@ -527,11 +527,12 @@ https://wiki.python.org/moin/PythonDecoratorLibrary#Creating_decorator_with_opti
             
         setattr(f, "expressionAsSVG", types.MethodType(__expression2SVG__, f))
         
-        def __generateFitTable__(f) -> tuple:
-            return makeCoefficientsFitTable(f)
+        def __generateFitTable__(f, *initial, **kwargs) -> tuple:
+            return makeCoefficientsFitTable(f, *initial, **kwargs)
         
         setattr(f, "generateFitTable", types.MethodType(__generateFitTable__, f))
-        
+        # f.generateFitTable.__doc__ = makeCoefficientsFitTable.__doc__
+
         # NOTE: 2025-12-26 14:55:28
         # enable the display of the function call syntax (a.k.a quick help) AND
         # of the graphic (LaTeX) representation of its mathematical expression
@@ -607,12 +608,50 @@ https://wiki.python.org/moin/PythonDecoratorLibrary#Creating_decorator_with_opti
     
     return wrapper(f)
 
-def makeCoefficientsFitTable(f:types.FunctionType) -> tuple:
+def makeCoefficientsFitTable(f:types.FunctionType, *initial, **kwargs) -> tuple:
+    r"""Generates coefficient values (initial lower, upper and names) for curve fitting
+
+Var-positional parameters:
+==========================
+
+:*initial:
+    Initial coefficient values (scalars). When given, this must have:
+
+        *exactly* the same number of elements as there are unstarred coefficients, or
+
+        *at least* the number of unstarred plus the number of starred coefficients
+
+    If omitted, the initial values will get a default value of 0.
+
+Var-keyword parameters:
+=======================
+:lower:
+    A sequence of lower bounds (scalars), or ``None`` (default).
+
+:upper:
+    A sequence of upper bounds (scalars), or ``None`` (default).
+
+:feasible:
+    A sequence of ``bool``, or ``None`` (defaault).
+
+Fields that map to ``None`` will be automatically assigned a sequence of ``-np.inf`` for ``lower``, ``np.inf`` for ``upper``, and ``True`` for feasible.
+
+Returns:
+=======
+
+A tuple (result:pd.Dataframe,
+        starred:typing.Sequence[str],
+        destarred:typing.Sequence[str],
+        starredGroups:int,
+        all_names:typing.Sequence[str])
+
+"""
     from core import strutils
     assert isModelFunction(f), f"Expecting a model function ('@modelfunction'-decorated regular Python function); instead, got {f}"
     ret = pd.DataFrame()
     destarred:list = list()
     starredGroups:int = 0
+
 
     if len(f.coefficients):
         starred = list(filter(lambda c: c.endswith("*"), f.coefficients))
@@ -636,19 +675,68 @@ def makeCoefficientsFitTable(f:types.FunctionType) -> tuple:
 
         # so, currently we need to create a tuple of starred coeffs and repeat this at least once
 
+        if len(initial) > 0:
+            if len(destarred) == 0:
+                if len(initial) != len(unstarred):
+                    raise RuntimeError(f"Too {'many' if len(initial) > len(unstarred) else 'few'} initial coefficient values ({len(initial)}) while expecting {len(unstarred)}")
+
+            else:
+                if len(initial) < len(concrete_names):
+                    raise RuntimeError(f"Too few initial coefficient values ({len(initial)}) while expecting at least {len(concrete_names)}")
+
+            if not all(isinstance(v, Real) for v in initial):
+                raise TypeError("All initial coefficient values MUST be real scalars")
+
+            lower = kwargs.pop("lower", None)
+            if lower is None:
+                lower = [-np.inf] * len(initial)
+
+            elif isinstance(lower, typing.Sequence):
+                if not all(isinstance(v, Real) for v in lower):
+                    raise TypeError("All lower coefficient bounds MUST be real scalars")
+
+            else:
+                raise TypeError(f"Lower coefficient bounds expected to be a sequencce of Real scalars or None; instead got {type(lower).__name__}")
+
+            upper = kwargs.pop("upper", None)
+            if upper is None:
+                upper = [np.inf] * len(initial)
+
+            elif isinstance(upper, typing.Sequence):
+                if not all(isinstance(v, Real) for v in upper):
+                    raise TypeError("All upper coefficient bounds MUST be real scalars")
+            else:
+                raise TypeError(f"Upper coefficient bounds expected to be a sequencce of Real scalars or None; instead got {type(upper).__name__}")
+
+
+            feasible = kwargs.pop("feasible", None)
+            if feasible is None:
+                feasible = [True] * len(initial)
+
+            elif isinstance(feasible, typing.Sequence):
+                if not all(isinstance(v, bool) for v in feasible):
+                    raise TypeError("All feasible flags MUST be booleans")
+            else:
+                raise TypeError(f"Feasibility flags expected to be a sequencce of bool or None; instead got {type(feasible).__name__}")
+
+        else:
+            initial = [0.] * len(concrete_names)
+            lower = [-np.inf] * len(concrete_names)
+            upper = [np.inf] * len(concrete_names)
+            feasible = [True] * len(concrete_names)
+
         fdict = dict()
 
         fdict["Names"] = concrete_names
-        fdict["Initial Value"] = [0.] * len(fdict["Names"])
-        fdict["Lower Bound"] = [-np.inf] * len(fdict["Names"])
-        fdict["Upper Bound"] = [np.inf] * len(fdict["Names"])
-        fdict["Keep Feasible"] = [True] * len(fdict["Names"])
+        fdict["Initial Value"] = initial
+        fdict["Lower Bound"] = lower
+        fdict["Upper Bound"] = upper
+        fdict["Keep Feasible"] = feasible
 
         if not isFittingCoefficientsDict(f.fitting):
-            fd = fdict.copy()
-            fd.pop("Names")
-            ret = pd.DataFrame(fd, index=(concrete_names))
-            return ret, destarred, starredGroups
+            all_names = fdict.pop("Names")
+            ret = pd.DataFrame(fdict, index=(concrete_names))
+            return ret, destarred, starredGroups, all_names
 
         mfd = {"Names":list(), "Initial Value": list(), "Lower Bound": list(), "Upper Bound": list(), "Keep Feasible": list()}
 
@@ -657,40 +745,40 @@ def makeCoefficientsFitTable(f:types.FunctionType) -> tuple:
 
         assert(ncoeffs >= len(fdict["Names"]) and (ncoeffs-len(unstarred)) % len(starred) ) == 0, f"Unexpected number of coefficients ({ncoeffs}); must be {nStarredCoeffs} × n + {len(unstarred)} for n components"
 
-        initial     = f.fitting.get("initial", list())
-        lower       = f.fitting.get("lower", list())
-        upper       = f.fitting.get("upper", list())
-        feasible    = f.fitting.get("feasible", list())
+        init    = initial or f.fitting.get("initial", list())
+        lo      = lower or f.fitting.get("lower", list())
+        up      = upper or f.fitting.get("upper", list())
+        feas    = feasible or f.fitting.get("feasible", list())
 
-        assert(all(len(v) == len(initial) for v in (lower, upper, feasible))), "Model has inconsistent fitting attribute"
+        assert(all(len(v) == len(init) for v in (lo, up, feas))), "Model has inconsistent fitting attribute"
 
         for k, name in enumerate(names):
             if name in fdict["Names"]:
                 ndx = fdict["Names"].index(name)
-                if ndx < len(initial):
-                    fdict["Initial Value"][ndx] = initial[ndx]
-                if ndx < len(lower):
-                    fdict["Lower Bound"][ndx] = lower[ndx]
-                if ndx < len(upper):
-                    fdict["Upper Bound"][ndx] = upper[ndx]
-                if ndx < len(feasible):
-                    fdict["Keep Feasible"][ndx] = feasible[ndx]
+                if ndx < len(init):
+                    fdict["Initial Value"][ndx] = init[ndx]
+                if ndx < len(lo):
+                    fdict["Lower Bound"][ndx] = lo[ndx]
+                if ndx < len(up):
+                    fdict["Upper Bound"][ndx] = up[ndx]
+                if ndx < len(feas):
+                    fdict["Keep Feasible"][ndx] = feas[ndx]
 
             else:
                 # add possibly extra concrete values for starred coeffs
                 stripped, sfx = strutils.get_int_sfx(name, sep="")
                 if f"{stripped}*" in starred:
                     fdict["Names"].append(name)
-                    fdict["Initial Value"].append(initial[k])
-                    fdict["Lower Bound"].append(lower[k])
-                    fdict["Upper Bound"].append(upper[k])
-                    fdict["Keep Feasible"].append(feasible[k])
+                    fdict["Initial Value"].append(init[k])
+                    fdict["Lower Bound"].append(lor[k])
+                    fdict["Upper Bound"].append(upr[k])
+                    fdict["Keep Feasible"].append(feas[k])
 
         fd = fdict.copy()
-        fd.pop("Names")
+        all_names = fd.pop("Names")
         ret = pd.DataFrame(fd, index=(fdict["Names"]))
         
-    return ret, destarred, starredGroups
+    return ret, destarred, starredGroups, all_names
     
 def parseCoefficientsFitTable(f: types.FunctionType, df:typing.Union[pd.DataFrame, dict]) -> tuple:
     from core import strutils
@@ -2522,7 +2610,7 @@ def isModelFunction(func:typing.Callable):
     
     return isinstance(getattr(func, "model_function", None), bool) and isinstance(getattr(func, "nvars", None), int)
 
-def get_initial_coefficient_values(func:typing.Callable) -> pd.DataFrame | None:
+def get_initial_coefficient_values(func:typing.Callable) -> pd.DataFrame | None: # TODO 2026-01-29 14:50:57
     if not isModelFunction(func):
         raise TypeError(f"{func} is not a model function")
     

@@ -2270,12 +2270,21 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
     # if ``box_size`` is given, filter the ``vm`` signal with a normalized boxcar window of ``box_size``
     if box_size > 0 :
         window = boxcar(box_size)/box_size
-        v_flt = convolve(np.squeeze(vm), window, mode="same", method = "fft")
+        # pad the signal with box_size samples at both ends
+        y = np.full((vm.shape[0] + 2* box_size, 1), fill_value = 0.)
+        y[:box_size,0] = np.squeeze(vm)[:box_size]
+        y[box_size:-box_size,0] = np.squeeze(vm)[:]
+        y[-box_size:,0] = np.squeeze(vm)[-box_size:]
+
+        v_flt = convolve(np.squeeze(y), window, mode="same", method = "fft")
+
+        # remove the pads
+        v_flt = v_flt[box_size:-box_size]
         # remove convolution artifacts at ends; these are box_size//2 samples
         # that we replace with the ones from the original signal (crude but effective and OK for small box_sizes)
-        half_box = box_size//2
-        v_flt[:half_box] = vm.magnitude[0,:half_box]
-        v_flt[-half_box:] = vm.magnitude[0,-half_box:]
+        # half_box = box_size//2
+        # v_flt[:half_box] = vm.magnitude[:half_box, 0]
+        # v_flt[-half_box:] = vm.magnitude[-half_box:, 0]
         
         v_flt = neo.AnalogSignal(v_flt[:,np.newaxis], units = vm.units, t_start = vm.t_start, sampling_rate = vm.sampling_rate)
         # v_flt = neo.AnalogSignal(v_flt[:,np.newaxis], units = vm.units, t_start = vm.t_start, sampling_rate = 1/vm.sampling_period)
@@ -2342,10 +2351,10 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
     
     # NOTE: would using state_levels, below, yield a better fit & sag separation?
     
-    #vsag10 = vsagmax + 0.1  * vsagrange
-    #vsag90 = vsagmax + 0.9  * vsagrange
-    vsag10 = vsagmax
-    vsag90 = vsagmin
+    vsag10 = vsagmax + 0.1  * vsagrange
+    vsag90 = vsagmax + 0.9  * vsagrange
+    # vsag10 = vsagmax
+    # vsag90 = vsagmin
     
     #print("vsag10 ", vsag10)
     #print("vsag90 ", vsag90)
@@ -2367,11 +2376,12 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
 
     # NOTE: 2026-01-28 13:53:02
     # this needs time to start at 0!
-    vsag10_90.t_start = 0*pq.s
+    # vsag10_90_copy = vsag10_90.copy() # ← use THIS for fitting ? NOT, unless delay is set to 0!
+    # vsag10_90_copy.t_start = 0*pq.s   #   (starts t 0*pq.s)
     
-    offset = float(vsag10_90[0])
+    offset = float(np.squeeze(vsag10_90[0]))
     
-    scale  = float(vsag10_90[-1]) - offset
+    scale  = float(np.squeeze(vsag10_90[-1])) - offset
     
     delay  = float(vsag10_90.times[0])
     
@@ -2380,17 +2390,23 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
     assert decay != 0, "Decay time constant must be non-zero"
     
     params = [offset, scale, delay, -1./decay]
+
+    fitParams, _, _, _ = models.exponential.generateFitTable(*params)
+
     # print(f"passive_Iclamp: params = {params}")
     # params = [offset, scale, delay, decay]
 
     vfit = dict()
-    vfit["parameters"] = params
+    vfit["parameters"] = fitParams
     vfit["fitted_region"] = vsag10_90
 
     try:
         # popt, pcov = optimize.curve_fit(models.exponential, vsag10_90.times, np.squeeze(vsag10_90), params)
-        popt, pcov = optimize.curve_fit(models.exponential, vsag10_90.times.magnitude, np.squeeze(vsag10_90).magnitude, params)
+        # popt, pcov = optimize.curve_fit(models.exponential, vsag10_90_copy.times.magnitude, np.squeeze(vsag10_90_copy).magnitude, params)
+        # popt, pcov = optimize.curve_fit(models.exponential, vsag10_90.times.magnitude, np.squeeze(vsag10_90).magnitude, params)
 
+        fitResult = crvf.fit_model(np.squeeze(vsag10_90).magnitude, models.exponential, list(fitParams["Initial Value"]),
+                                   x = vsag10_90.times.magnitude)
         #popt, pcov = optimize.curve_fit(models.generic_single_exponential_decay, vsagrise.times, np.squeeze(vsagrise), [offset, scale, delay, decay])
         # popt, pcov = optimize.curve_fit(models.generic_single_exponential_decay, vsag10_90.times, np.squeeze(vsag10_90), params)
 
