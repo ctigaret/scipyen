@@ -50,6 +50,7 @@ from iolib import pictio as pio
 from gui import guiutils, workspacegui
 import gui.quickdialog as qd
 from gui.widgets.small_widgets import QuantitySpinBox
+from core.datasignal import DataSignal
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 Ui_ModelFittingWidget, QWidget = loadUiType(os.path.join(__module_path__, "ModelFittingWidget.ui"))
@@ -183,7 +184,7 @@ Named Parameters:
         self.addStarredRowsPushButton.clicked.connect(self._slot_addRowsForStarredCoeffs)
         self.removeStarredRowsPushButton.clicked.connect(self._slot_removeRowsForStarredCoeffs)
         self.fitDataPushButton.clicked.connect(self._slot_fitData)
-        self.channelSpinBox.valueChanged.connect(self._slot_dataChannelSelected)
+        self.channelSpinBox.valueChanged.connect(self._slot_dataChannelChanged_)
         self.pythonHelpPushButton.setEnabled(False)
         self.generateWaveformPushButton.setEnabled(False)
         self.waveformExpressionPushButton.setEnabled(False)
@@ -228,19 +229,8 @@ Named Parameters:
         assert models.isModelFunction(model), f"Expecting a model function — which is NOT a regular Python function; instead, got {model}"
         
         if isinstance(data, (neo.AnalogSignal, DataSignal)):
-            start = data.t_start
-            duration = data.duration
-            samplingRate = data.sampling_rate
-            waveformUnits = data.units
-            self._data_ = data
-            self.fitDataPushButton.setEnabled(True)
-            if self._data_.ndims > 1 and self._data_shape[1] > 0:
-                sigBlock = QtCore.QSignalBlocker(self.channelSpinBox)
-                self.channelSpinBox.setVisible(True)
-                self.channelSpinBox.setMinimum(0)
-                self.channelSpinBox.setMaximum(self._data_.shape[1])
-                self._dataChannel_ = 0
-                self.channelSpinBox.setValue(self._dataChannel_)
+            self.setData(data)
+
         else:
             if isinstance(start, (float, int)):
                 start = start*pq.s
@@ -428,13 +418,51 @@ Named Parameters:
     def model(self) -> types.FunctionType:
         return self._model_
 
-    def setData(self, val:typing.Optional[neo.AnalogSignal  DataSignal] = None):
+    def setData(self, val:typing.Optional[neo.AnalogSignal | DataSignal] = None):
+        sigBlock = QtCore.QSignalBlocker(self.channelSpinBox)
         if not isinstance(val, (neo.AnalogSignal, DataSignal)) or val.size == 0:
             self._data_ = None
+            self._dataChannel_ = 0
+            self.channelSpinBox.setMinimum(0)
+            self.channelSpinBox.setMaximum(0)
+            self.channelSpinBox.setValue(self._dataChannel_)
+            
+            self.channelSpinBox.setEnabled(False)
+            self.channelSpinBox.setVisible(False)
             self.fitDataPushButton.setEnabled(False)
+            return
 
+        start = val.t_start
+        duration = val.duration
+        samplingRate = val.sampling_rate
+        waveformUnits = val.units
+        if val.ndim == 1 or (val.ndim==2 and val.shape[1] > 0):
+            self._dataChannel_ = 0
+            self.channelSpinBox.setMinimum(0)
+            self.channelSpinBox.setMaximum(0)
+            self.channelSpinBox.setValue(0)
+            self.channelSpinBox.setVisible(False)
+            self.channelSpinBox.setEnabled(False)
+            self.fitDataPushButton.setEnabled(True)
+            
+        elif val.ndim == 2:
+            
+            if self._dataChannel_ < -val.shape[1]:
+                self._dataChannel_ = -val.shape[-1]
+            elif self._dataChannel_ >= val.shape[-1]:
+                self._dataChannel_ = val.shape[-1]-1
+                
+            self.channelSpinBox.setMinimum(-val.shape[1])
+            self.channelSpinBox.setMaximum(val.shape[1]-1)
+            
+            self.channelSpinBox.setVisible(True)
+            self.channelSpinBox.setEnabled(True)
+            self.fitDataPushButton.setEnabled(True)
+            self.channelSpinBox.setValue(self._dataChannel_)
+        else:
+            raise ValueError("Data with more than two dimensions is not supported")
+            
         self._data_ = val
-        self.fitDataPushButton.setEnabled(True)
 
     def setModel(self, model:types.FunctionType, coefficients:pd.DataFrame):
         if models.isModelFunction(model):
@@ -876,7 +904,7 @@ Named Parameters:
         self.generateWaveform()
 
     @Slot(int)
-    def _slot_dataChannelSelected(self, val:int):
+    def _slot_dataChannelChanged_(self, val:int):
         if not isinstance(val, int) or val < 0:
             self._dataChannel_ = 0
         else:
@@ -887,7 +915,25 @@ Named Parameters:
         return self._dataChannel_
 
     @dataChannel.setter
-    def dataChannel(self, )
+    def dataChannel(self, val:int):
+        print(f"{self.__class__.__name__}.dataChannel.setter({val})")
+        if not isinstance(val, int):
+            raise TypeError(f"Expecting an int; got {type(val).__name__} instead")
+        
+        if self._data_:
+            if self._data_.ndim ==1 or self._data_.ndim==2 and self._data_.shape[1] == 1:
+                if val != 0:
+                    raise ValueError(f"Wrong channel index {val} for 1D data or a singleton second dimension")
+                
+            elif val < -self._data_.shape[1] or val >= self._data_.shape[1]:
+                raise ValueError(f"Wrong channel index {val}. New channel index must be between {-self._data_.shape[1]} and {self._data_.shape[1]-1}")
+        else:
+            if val != 0:
+                raise ValueError(f"In the absence of data the channel can only be 0")
+            
+        self._dataChannel_ = val
+        signalBlock = QtCore.QSignalBlocker(self.channelSpinBox)
+        self.channelSpinBox.setValue(self._dataChannel_)
 
     @Slot()
     def _slot_fitData(self):
