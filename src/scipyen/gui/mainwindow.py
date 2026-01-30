@@ -4723,13 +4723,15 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                                                 f"An object named '{name}' exists in the workspace.\nDo you wish to rename, overwrite or cancel?",
                                                 QtWidgets.QMessageBox.StandardButtons(QtWidgets.QMessageBox.Cancel),
                                                 parent = self)
-                qbox.addButton("Rename", QtWidgets.QMessageBox.YesRole) # → returns 0
-                qbox.addButton("Overwrite", QtWidgets.QMessageBox.AcceptRole) # → returns 1
+                qbox.addButton("Rename", QtWidgets.QMessageBox.YesRole) # → returns 2
+                qbox.addButton("Overwrite", QtWidgets.QMessageBox.AcceptRole) # → returns 3
                 qbox.setDefaultButton(QtWidgets.QMessageBox.Cancel)
                 
                 btn = qbox.exec()
+
+                # print(f"{self.__class__.__name__}.assignToWorkspace: btn -> {btn}")
                 
-                if btn == 0: # ⇒ should rename
+                if btn == 2: # ⇒ should rename
                     dlg = qd.QuickDialog(self, "Rename object")
                     dlg.addLabel(f"Rename {name}")
                     pw = qd.StringInput(dlg, "To :")
@@ -4744,7 +4746,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                     else:
                         name = pw.text()
                         
-                elif btn != 1: # → 1 is OK to overwrite, anything else returns
+                elif btn != 3: # → 1 is OK to overwrite, anything else returns
                     return False
                 
         self.workspaceModel.bindObjectInNamespace(name, val)

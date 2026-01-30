@@ -1091,16 +1091,17 @@ def exponential(x:np.ndarray | Real,
     
     Parameters:
     ===========
-    x: independent variable (e.g., time): 1D numpy array
+    :x: independent variable (e.g., time): 1D numpy array
 
-    coefficients are given as floats in the following order:
+    Coefficients are given as floats in the following order:
 
-    α (offset or additive bias, in units of "y"), 
-    β (scale, or multiplicative bias; dimensionless), 
-    x₀ (onset, delay or shift, in units of "x"), 
-    λ (exponential constant; in (units of "x")⁻¹)
+    :α: (offset or additive bias, in units of "y"),
+    :β: (scale, or multiplicative bias; dimensionless),
+    :x₀: (onset, delay or shift, in units of "x"),
+    :λ: (exponential constant; in (units of "x")⁻¹)
 
-    NOTE: "rate" constant τ is the inverse of λ: τ = 1/λ
+    .. note::
+        "rate" constant τ = 1/λ
 
     """
     x = check_independent_variable(x)

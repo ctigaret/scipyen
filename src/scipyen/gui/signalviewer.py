@@ -9737,9 +9737,6 @@ anything else       anything else       ❌
         if len(analog) + len(irregs) == 0:
             return None, None
         
-        # if len(self.signalAxes) != len(analog) + len(irregs):
-        #     scipywarn(f"{len(self.signalAxes)} signal axes for {len(analog)} analog signals + {len(irregs)} irregularly sampled signals = {len(analog)+len(irregs)}")
-        
         assert len(self.signalAxes) >= len(analog) + len(irregs), f"Mismatch between number of signal axes ({len(self.signalAxes)}) and available signals (analog {len(analog)} + irregs {len(irregs)} = {len(analog) + len(irregs)})"
 
         # NOTE: 2023-01-12 16:45:48
@@ -9916,11 +9913,13 @@ anything else       anything else       ❌
         
         self._setup_signal_choosers_(analog=analog, irregular=irregs)
         
-        sig_name = kwargs.pop("name", None)
-        
         signal_name = getattr(signal, "name", "Signal")
-        
+
         domain_name = neoutils.get_domain_name(signal)
+
+        codomain_name = neoutils.get_codomain_name(signal)
+
+        sig_name = kwargs.pop("name", codomain_name)
         
         if isinstance(signal, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)):
             if signal.shape[1] > 1:
@@ -9995,7 +9994,6 @@ anything else       anything else       ❌
                 self._plot_numeric_data_(self.signalAxis(k), 
                                          np.array(sig.times),
                                          np.array(sig[:,channel].magnitude),
-                                         # name = ch_name,
                                          xlabel=xlabel,
                                          ylabel=ylabel, 
                                          *args, **kwargs)

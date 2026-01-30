@@ -465,16 +465,32 @@ def get_int_sfx(s: str, sep: str = "_",
         # if len(parts) <= 1:
         if len(parts) < 2:
             # return s, 0
-            return s, None
+            sfx = None
+            base = s
 
-        sfx = parts[-1]
-        base = sep.join(parts[:-1])
+        if len(parts) == 2:
+            # make sure the 2nd part is not a number; if there is, then lump them back together
+            try:
+                sfx = int(parts[-1])
+                base = parts[0]
+            except:
+                sfx = None
+                base = sep.join(parts)
 
-    try:
-        sfx = int(sfx)
-    except:
-        sfx = None
-        # sfx = 0
+        elif len(parts) > 2:
+            # there may be more than one sep e.g. some symbol named a_b_0, -> a_b_1, etc
+            try:
+                sfx = int(parts[-1])
+                base = sep.join(parts[:-1])
+            except:
+                sfx = None
+                base = sep.join(parts)
+
+    # try:
+    #     sfx = int(sfx)
+    # except:
+    #     sfx = None
+    #     # sfx = 0
 
     return base, sfx
 

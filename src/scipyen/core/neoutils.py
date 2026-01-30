@@ -386,6 +386,26 @@ def block_duration(x: neo.Block):
         + sweep_duration(x.segments[-1])
     )
 
+@singledispatch
+def get_codomain_name(obj):
+    raise NotImplementedError(f"Objects of type {type(obj).__name__} are not suported")
+
+@get_codomain_name.register(neo.AnalogSignal)
+@get_codomain_name.register(neo.IrregularlySampledSignal)
+@get_codomain_name.register(neo.Epoch)
+@get_codomain_name.register(neo.Event)
+@get_codomain_name.register(neo.SpikeTrain)
+@get_codomain_name.register(DataSignal)
+@get_codomain_name.register(IrregularlySampledDataSignal)
+@get_codomain_name.register(DataZone)
+@get_codomain_name.register(DataMark)
+@get_codomain_name.register(TriggerEvent)
+def _(obj):
+    codomain_name = None
+    if hasattr(obj, "annotations"):
+        codomain_name = obj.annotations.get("codomain_name", None)
+
+    return unitFamilyName(obj.units) if not isinstance(codomain_name, str) or len(codomain_name.strip()) == 0 else codomain_name
 
 @singledispatch
 def get_domain_name(obj):
@@ -9570,7 +9590,7 @@ def plot_neo(
     name = obj.name
     if name is None or len(name.strip()) == 0:
         name = unitFamilyName(obj.units)
-    sig_name = obj.annotations.get("signal_name", name)
+    sig_name = obj.annotations.get("codomain_name", name)
     ylabel = f"{name}"
     if obj.units != pq.dimensionless:
         ylabel += f" ({obj.units.dimensionality.string})"

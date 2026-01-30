@@ -2373,26 +2373,44 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
 
     t_index = vsagrise.times[vsag10_90_index]
     vsag10_90 = vsagrise.time_slice(t_index[0],t_index[-1])
+#     α = float(np.squeeze(vsag10_90[0]))
+#
+#     β  = float(np.squeeze(vsag10_90[-1])) - α
+#
+#     x0  = float(vsag10_90.times[0]) # WRONG!
+
 
     # NOTE: 2026-01-28 13:53:02
     # this needs time to start at 0!
-    # vsag10_90_copy = vsag10_90.copy() # ← use THIS for fitting ? NOT, unless delay is set to 0!
-    # vsag10_90_copy.t_start = 0*pq.s   #   (starts t 0*pq.s)
+    vsag10_90_copy = vsag10_90.copy() # ← use THIS for fitting ? NOT, unless delay is set to 0!
+    vsag10_90_copy.t_start = 0*pq.s   #   (starts t 0*pq.s)
     
-    α = float(np.squeeze(vsag10_90[0]))
+    α = float(np.squeeze(vsag10_90_copy[0]))
     
-    β  = float(np.squeeze(vsag10_90[-1])) - offset
+    β  = float(np.squeeze(vsag10_90_copy[-1])) - α
     
-    x0  = float(vsag10_90.times[0])
+    x0  = float(vsag10_90_copy.t_start)
     
-    τ = 0.1
+    τ = 0.01
 
     assert τ != 0, "Decay time constant must be non-zero"
     
-    params = [α, β, x0, -1./τ]
+    # params = [α, β, x0, -1./τ]
+    params = [α, -β, x0, -1./τ]
 
     fitParams, _, _, _ = models.exponential.generateFitTable(*params)
 
+    fP, _, _, _ = models.bounded_exponential_rise.generateFitTable(*params)
+
+    p0 = list(fitParams["Initial Value"])
+    lb = list(fitParams["Lower Bound"])
+    ub = list(fitParams["Upper Bound"])
+    kf = list(fitParams["Keep Feasible"])
+
+    p1  = list(fP["Initial Value"])
+    lb1 = list(fP["Lower Bound"])
+    ub1 = list(fP["Upper Bound"])
+    kf1 = list(fP["Keep Feasible"])
     # print(f"passive_Iclamp: params = {params}")
     # params = [offset, scale, delay, decay]
 
@@ -2405,8 +2423,8 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
         # popt, pcov = optimize.curve_fit(models.exponential, vsag10_90_copy.times.magnitude, np.squeeze(vsag10_90_copy).magnitude, params)
         # popt, pcov = optimize.curve_fit(models.exponential, vsag10_90.times.magnitude, np.squeeze(vsag10_90).magnitude, params)
 
-        fitResult = crvf.fit_model(np.squeeze(vsag10_90).magnitude, models.exponential, list(fitParams["Initial Value"]),
-                                   x = vsag10_90.times.magnitude, bounds = optimize.Bounds(lb=list(fitParams["Lower Bound"]), ub=list(fitParams["Upper Bound"]), keep_feasible=list(fitParams["Keep Feasible"])))
+        fitResult = crvf.fit_model(np.squeeze(vsag10_90_copy).magnitude, models.exponential, p0,
+                                   x = vsag10_90_copy.times.magnitude, bounds = optimize.Bounds(lb=lb, ub=ub, keep_feasible=kf))
         #popt, pcov = optimize.curve_fit(models.generic_single_exponential_decay, vsagrise.times, np.squeeze(vsagrise), [offset, scale, delay, decay])
         # popt, pcov = optimize.curve_fit(models.generic_single_exponential_decay, vsag10_90.times, np.squeeze(vsag10_90), params)
 
