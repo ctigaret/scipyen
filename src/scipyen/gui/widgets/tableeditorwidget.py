@@ -113,7 +113,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
     sig_dataChanged = Signal(name="sig_dataChanged")
     
     def __init__(self, parent:typing.Optional[QtWidgets.QMainWindow]=None,
-                 readOnly:bool=True) -> None:
+                 readOnly:bool=True, enforceFloat:bool=False) -> None:
         super().__init__(parent=parent)
         # FIXME: 2025-11-23 09:58:38 next line is DEPRECATED
         self._is_vigra_filter_kernel_:bool = False # needed in future implementations of editing functionality
@@ -122,6 +122,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         # self._dataModel_.sig_columnsPopulated.connect(self._slot_columnsPopulated)
         self._selectedIndexes_ = list()
         self._readOnly_:bool = readOnly == True
+        self._enforceFloat_:bool = enforceFloat == True
         
         # NOTE: 2021-10-18 09:32:45
         # ### BEGIN keep this  - you may re-enable the possibility to use other custom tabular
@@ -137,7 +138,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         self._configureUI_()
         
         self._defaultItemDelegate_ = self.tableView.itemDelegate()
-        self._editItemDelegate_ = PythonItemDelegate(parent=self)
+        self._editItemDelegate_ = PythonItemDelegate(parent=self, enforceFloat = self._enforceFloat_)
         
         # NOTE: 2021-08-16 17:22:20
         # By default, this is defined in the .ui file as:
@@ -312,6 +313,17 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         self.tableView.setModel(self._dataModel_)
         if hasattr(self._dataModel_, "sig_modelDataChanged") and isinstance(type(self._dataModel_).sig_modelDataChanged, Signal):
             self._dataModel_.sig_modelDataChanged.connect(self.sig_dataChanged) # connect signal to signal directly
+            
+    @property
+    def enforceFloat(self) -> bool:
+        return self._enforceFloat_
+    
+    @enforceFloat.setter
+    def enforceFloat(self, val:bool):
+        self._enforceFloat_ = val == True
+        if not self.readOnly and isinstance(self.tableView.itemDelegate(), PythonItemDelegate):
+            self.tableView.itemDelegate().enforceFloat = self._enforceFloat_
+            
         
     @property
     def readOnly(self):

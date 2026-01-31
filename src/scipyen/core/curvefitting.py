@@ -1153,8 +1153,7 @@ def fit_model(data, func, p0, *args, **kwargs):
     
         func(x, p, /, *args, **kwargs)
     
-        NOTE: This function can be one of the model functions defined in 
-        Scipyen's ``core.models`` module.
+        NOTE: This function *should* be one of the model functions defined in  Scipyen's ``core.models`` module.
     
     p0: sequence of initial values for the coefficients in the model realized by
     `func` - in the same order as expected by func
@@ -1162,22 +1161,33 @@ def fit_model(data, func, p0, *args, **kwargs):
     Var-keyword parameters (**kwargs):
     =================================
     
-    x: the independent variable, array-like, with the same shape as `data`.
+    :x: 
+        the independent variable, array-like, with the same shape as `data`.
         This is mandatory when ``data`` is a generic numpy array or Quantity array.
     
         When ``data`` is a neo.AnalogSignal, this can be omitted, because the 
         signal object provides its own independent data (the "domain") in the 
         ``times`` attribute.
     
-    channel: int, default is 0; this is useful to select the channel from a 
-        multi-channel signal
+    :channel: 
+        int, default is 0; this is useful to select the channel from a multi-channel signal
     
-    fargs: tuple with var-positional parameters to `func`
+        .. note ::
+            You can always "extract" a single channel from a multi-channel signal *before* passing it to this function
     
-    fkwargs: dict with keyword parameters to `func`
+    :fargs: 
+        tuple with var-positional parameters to `func`
     
-    coeff_names: tuple with model parameter names or symbols (str)
+    :fkwargs: 
+        dict with keyword parameters to `func`
     
+    :coeff_names: 
+        tuple with model parameter names or symbols (str)
+    
+    :willRaise:
+        When ``False`` (the **default**), any exceptions will be just printed to the standard error output stream (typically, on the system console).
+    
+        When ``True`` exceptions will be raised up the call stack
     
     The following are passed directly to scipy.optimize.least_squares:
     bounds, jac, method, ftol, xtol, gtol, x_scale, loss, f_scale, max_nfev,

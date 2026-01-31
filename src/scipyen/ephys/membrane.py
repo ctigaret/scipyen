@@ -2385,9 +2385,9 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
     vsag10_90_copy = vsag10_90.copy() # ← use THIS for fitting ? NOT, unless delay is set to 0!
     vsag10_90_copy.t_start = 0*pq.s   #   (starts t 0*pq.s)
     
-    α = float(np.squeeze(vsag10_90_copy[0]))
+    α = float(np.squeeze(vsag10_90_copy[-1]))       # because we're trying to fit a Vm decay, the "offset" is the most negative part
     
-    β  = float(np.squeeze(vsag10_90_copy[-1])) - α
+    β  = α / float(np.squeeze(vsag10_90_copy[0]))   # this is a "scale" !
     
     x0  = float(vsag10_90_copy.t_start)
     
@@ -2407,10 +2407,10 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
     ub = list(fitParams["Upper Bound"])
     kf = list(fitParams["Keep Feasible"])
 
-    p1  = list(fP["Initial Value"])
-    lb1 = list(fP["Lower Bound"])
-    ub1 = list(fP["Upper Bound"])
-    kf1 = list(fP["Keep Feasible"])
+    # p1  = list(fP["Initial Value"])
+    # lb1 = list(fP["Lower Bound"])
+    # ub1 = list(fP["Upper Bound"])
+    # kf1 = list(fP["Keep Feasible"])
     # print(f"passive_Iclamp: params = {params}")
     # params = [offset, scale, delay, decay]
 

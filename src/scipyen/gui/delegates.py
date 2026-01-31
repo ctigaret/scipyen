@@ -96,7 +96,8 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
     def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None,
                  columnChoices: typing.Optional[dict[int, dict[typing.Sequence, bool]]] = None,
                  immutableColumns: typing.Optional[typing.Sequence[int]] = None,
-                 immutableRows: typing.Optional[typing.Sequence[int]] = None):
+                 immutableRows: typing.Optional[typing.Sequence[int]] = None,
+                 enforceFloat:bool=False):
         r"""Instantiates a PythonItemDelegate.
 
     Parameters:
@@ -130,6 +131,8 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
     """
         super().__init__(parent=parent)
         self._model_ = None
+        
+        self._enforceFloat_:bool = enforceFloat
         
         if self._checkColumnChoiceDict_(columnChoices):
             self._columnChoices_ = columnChoices
@@ -170,6 +173,14 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             return False
             
         return True
+    
+    @property
+    def enforceFloat(self) -> bool:
+        return self._enforceFloat_
+    
+    @enforceFloat.setter
+    def enforceFloat(self, val:bool):
+        self._enforceFloat_ = val == True
             
     @property
     def columnChoices(self) -> dict:
@@ -328,17 +339,27 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             if isinstance(data, bool) or "bool" in type(data).__name__:
                 widget = QtWidgets.QCheckBox(parent)
                 
-            elif isinstance(data, int) or "int" in type(data).__name__: # to include numpy array int dtypes
-                widget = QtWidgets.QSpinBox(parent)
-                widget.setMinimum(-1000)
-                widget.setMaximum(1000)
-                
-            elif isinstance(data, float) or "float" in type(data).__name__: # to include numpy array float dtypes
-                widget = QtWidgets.QDoubleSpinBox(parent)
-                widget.setMinimum(-math.inf)
-                widget.setMaximum(math.inf)
-                widget.setSingleStep(1)
-                
+            elif isinstance(data, (int, float)) or any(v in type(data).__name__ for v in ("int", "float")):
+                if self._enforceFloat_:
+                    # widget = QtWidgets.QDoubleSpinBox(parent)
+                    widget = smw.QuantitySpinBox(parent)
+                    widget.setMinimum(-math.inf)
+                    widget.setMaximum(math.inf)
+                    widget.setSingleStep(1)
+                    
+                else:
+                    if isinstance(data, int) or "int" in type(data).__name__: # to include numpy array int dtypes
+                        widget = QtWidgets.QSpinBox(parent)
+                        widget.setMinimum(-9999)
+                        widget.setMaximum(9999)
+                        
+                    elif isinstance(data, float) or "float" in type(data).__name__: # to include numpy array float dtypes
+                        # widget = QtWidgets.QDoubleSpinBox(parent)
+                        widget = smw.QuantitySpinBox(parent)
+                        widget.setMinimum(-math.inf)
+                        widget.setMaximum(math.inf)
+                        widget.setSingleStep(1)
+                        
             elif isinstance(data, pq.Quantity):
                 if isinstance(data, pq.UnitQuantity): # unlikely, but here we go...
                     widget = smw.QuantityChooserWidget(parent)

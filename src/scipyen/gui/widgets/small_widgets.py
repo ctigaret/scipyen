@@ -1212,8 +1212,8 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
     
             v = float(value.rescale(self.units).magnitude)
             
-        elif isinstance(value, float):
-            v = value
+        elif isinstance(value, (float, int)):
+            v = float(value)
         else:
             raise TypeError(f"Expecting a scalar quantity or float; instead, got a {type(value).__name__}")
         

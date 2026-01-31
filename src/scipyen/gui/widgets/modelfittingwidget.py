@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # $Id: modelfittingwidget.py $
-# SPDX-FileCopyrightText: 2022 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-FileCopyrightText: 2026 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
@@ -221,6 +221,8 @@ Named Parameters:
         self.overlayDataCheckbox.setChecked(self._plot_data_overlaid_)
         self.overlayDataCheckbox.setEnabled(False)
         self.overlayDataCheckbox.toggled.connect(self._slot_setDataOverlay_)
+        self.modelCoefficientsTable.enforceFloat = True
+        self.modelCoefficientsTable.readOnly = False
 
         if self._waveformUnits_ is None:
             self.unitsLabel.setText("")
