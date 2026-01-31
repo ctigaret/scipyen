@@ -3805,13 +3805,13 @@ def concatenate_signals(
     methods, but allows a sequence of signal objects, instead of being restricted 
     to two signal objects.
 
-    When the 'axis' parameters is the default (1, one) this is useful to collapse
-    several analog signals into a single multi-channel signal ('merging').
+    When the 'axis' parameters is the default (1) this is useful to collapse
+    several analog signals into a single multi-channel signal (a.k.a 'merging').
 
     Here a "channel" is one data column in the signal.
 
     When the 'axis' parameter is 0, this simply collates the signals 'end-to-end'
-    ('concatenating').
+    (a.k.a 'concatenating').
 
     Source signals should have identical units, and compatible domains.
 

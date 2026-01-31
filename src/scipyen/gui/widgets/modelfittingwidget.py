@@ -11,6 +11,8 @@ import numpy as np
 import quantities as pq
 import pandas as pd
 import neo
+from scipy import optimize
+
 import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
 from qtpy.QtCore import (Signal, Slot, Property,)
@@ -45,12 +47,14 @@ from core.strutils import (str2symbol, is_svg, str2svg, get_int_sfx)
 from core import models
 from core import scipyen_quantities as scq
 from core import datasignal
+from core.datasignal import DataSignal
+from core import neoutils
+from core import curvefitting as crvf
 
 from iolib import pictio as pio
 from gui import guiutils, workspacegui
 import gui.quickdialog as qd
 from gui.widgets.small_widgets import QuantitySpinBox
-from core.datasignal import DataSignal
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 Ui_ModelFittingWidget, QWidget = loadUiType(os.path.join(__module_path__, "ModelFittingWidget.ui"))
@@ -132,6 +136,12 @@ Named Parameters:
         self._data_:typing.Optional[neo.AnalogSignal | DataSignal] = None
         self._dataChannel_:int = 0
 
+        self._fittedCurve_:typing.Optional[np.ndarray] = None
+        self._fitResult_:typing.Optional[types.SimpleNamespace] = None
+        self._use_fitted_:bool = False
+
+        self._plot_data_overlaid_:bool = False
+
         self._model_:typing.Optional[types.FunctionType] = None
 
         self._model_fit_coefficients_:typing.Optional[pd.DataFrame] = None
@@ -169,7 +179,19 @@ Named Parameters:
         if not pix.isNull():
             self.makeUnitAmplitudePushButton.setIcon(QtGui.QIcon(pix))
             self.makeUnitAmplitudePushButton.setText("")
-            self.makeUnitAmplitudePushButton.setFlat(True)
+        else:
+            self.makeUnitAmplitudePushButton.setText("Unit Amplitude")
+        self.makeUnitAmplitudePushButton.setFlat(True)
+
+        dsvg = str2svg("SI", 16, 16, x=8, y=15, font_size=16, text_anchor="middle", dominant_baseline="hanging").as_svg()
+        pix = svg2pixmap(dsvg)
+        if not pix.isNull():
+            self.waveformUnitsPushButton.setIcon(QtGui.QIcon(pix))
+            self.waveformUnitsPushButton.setText("")
+        else:
+            self.waveformUnitsPushButton.setText("Change")
+        self.waveformUnitsPushButton.setFlat(True)
+
         self.makeUnitAmplitudePushButton.clicked.connect(self._slot_makeUnitAmplitudeModel)
         self.startSpinBox.setDecimals(5)
         self.startSpinBox.sig_valueChanged.connect(self._slot_waveformStartChanged)
@@ -196,6 +218,9 @@ Named Parameters:
         self.addStarredRowsPushButton.setEnabled(False)
         self.removeStarredRowsPushButton.setEnabled(False)
         self.channelSpinBox.setVisible(False)
+        self.overlayDataCheckbox.setChecked(self._plot_data_overlaid_)
+        self.overlayDataCheckbox.setEnabled(False)
+        self.overlayDataCheckbox.toggled.connect(self._slot_setDataOverlay_)
 
         if self._waveformUnits_ is None:
             self.unitsLabel.setText("")
@@ -212,6 +237,12 @@ Named Parameters:
         sizes[0] = 0
         sizes[-1] = self.modelCoefficientsTable.size().height()
         self.labelsSplitter.setSizes(sizes)
+        csizes = self.controlsSplitter.sizes()
+        # print(f"{self.__class__.__name__}._configureUI_: csizes = {csizes}")
+        csizes[-1] = self.modelCoefficientsTable.size().width()
+        csizes[0] = (self.size().width() - self.modelCoefficientsTable.size().width()) // 2
+        # print(f"{self.__class__.__name__}._configureUI_: csizes adjusted = {csizes}")
+        self.controlsSplitter.setSizes(csizes)
             
     def _setModelData_(self, model:types.FunctionType,
                        data:typing.Optional[neo.AnalogSignal | DataSignal] = None,
@@ -260,15 +291,22 @@ Named Parameters:
 
             if isinstance(model.units, pq.Quantity):
                 waveformUnits = waveformUnits.magnitude * model.units if isinstance(waveformUnits, pq.Quantity) else waveformUnits * model.units if isinstance(waveformUnits, float) else 1*model.units
+            else:
+                waveformUnits = pq.dimensionless
 
             self._data_ = None
             self.fitDataPushButton.setEnabled(False)
 
-        self._waveformStart_ = start
-        self._waveformDuration_ = duration
-        self._waveformSamplingRate_ = samplingRate
+            self._waveformStart_ = start
+            self._waveformDuration_ = duration
+            self._waveformSamplingRate_ = samplingRate
+            self._waveformUnits_ = waveformUnits
 
+            self._populate_WaveControls_()
 
+        self._setModelFunction_(model, coefficients)# , *initial, **lbubkf)
+
+    def _populate_WaveControls_(self):
         domainUnitsFamily = scq.getUnitFamily(self._waveformDuration_)
         if domainUnitsFamily == "Time":
             self._waveformSamplingRate_.rescale(pq.Hz)
@@ -283,10 +321,8 @@ Named Parameters:
         self.startSpinBox.setValue(self._waveformStart_)
         self.durationSpinBox.setValue(self._waveformDuration_)
         self.samplingRateSpinBox.setValue(self._waveformSamplingRate_)
-        self.waveformUnits = waveformUnits # will also set up the unitsLabel
-        # self.waveformUnitsChooser.setValue(self._waveformUnits_)
-           
-        self._setModelFunction_(model, coefficients)# , *initial, **lbubkf)
+        self.waveformUnits = self._waveformUnits_ # will also set up the unitsLabel
+
         
     def _setModelFunction_(self, model:types.FunctionType, coefficients=None): #, *initial, **lbubkf):
         # from core.strutils import is_svg
@@ -294,7 +330,7 @@ Named Parameters:
         self._model_ = model
         self._model_name_ = model.title
 
-        self.modelNameLabel.setText(self._model_name_)
+        self.modelNameLabel.setText(f"{self._model_name_} model formula: ↴")
         self.modelNameLabel.setToolTip(f"Model function: {self._model_.__module__}.{self._model_.__name__}\nDrag (⇓) the splitter below to reveal the mathematical formula")
         self.pythonHelpPushButton.setToolTip(f"Python help for function {self._model_.__module__}.{self._model_.__name__}")
         self.pythonHelpPushButton.setEnabled(True)
@@ -419,8 +455,9 @@ Named Parameters:
         return self._model_
 
     def setData(self, val:typing.Optional[neo.AnalogSignal | DataSignal] = None):
+        print(f"\n{self.__class__.__name__}.setData({type(val).__name__})\n")
         sigBlock = QtCore.QSignalBlocker(self.channelSpinBox)
-        if not isinstance(val, (neo.AnalogSignal, DataSignal)) or val.size == 0:
+        if not isinstance(val, (neo.AnalogSignal, DataSignal)):
             self._data_ = None
             self._dataChannel_ = 0
             self.channelSpinBox.setMinimum(0)
@@ -430,12 +467,19 @@ Named Parameters:
             self.channelSpinBox.setEnabled(False)
             self.channelSpinBox.setVisible(False)
             self.fitDataPushButton.setEnabled(False)
+            self.overlayDataCheckbox.setEnabled(False)
+            self.overlayDataCheckbox.setChecked(False)
+
             return
+
+        if val.size == 0:
+            raise ValueError("Received an empty signal!")
 
         start = val.t_start
         duration = val.duration
         samplingRate = val.sampling_rate
         waveformUnits = val.units
+
         if val.ndim == 1 or (val.ndim==2 and val.shape[1] > 0):
             self._dataChannel_ = 0
             self.channelSpinBox.setMinimum(0)
@@ -444,25 +488,35 @@ Named Parameters:
             self.channelSpinBox.setVisible(False)
             self.channelSpinBox.setEnabled(False)
             self.fitDataPushButton.setEnabled(True)
-            
+
         elif val.ndim == 2:
-            
+
             if self._dataChannel_ < -val.shape[1]:
                 self._dataChannel_ = -val.shape[-1]
             elif self._dataChannel_ >= val.shape[-1]:
                 self._dataChannel_ = val.shape[-1]-1
-                
+
             self.channelSpinBox.setMinimum(-val.shape[1])
             self.channelSpinBox.setMaximum(val.shape[1]-1)
-            
+
             self.channelSpinBox.setVisible(True)
             self.channelSpinBox.setEnabled(True)
             self.fitDataPushButton.setEnabled(True)
             self.channelSpinBox.setValue(self._dataChannel_)
+            self.overlayData.setEnabled(True)
         else:
             raise ValueError("Data with more than two dimensions is not supported")
-            
+
         self._data_ = val
+        self._waveformStart_ = start
+        self._waveformDuration_ = duration
+        self._waveformSamplingRate_ = samplingRate
+        self._waveformUnits_ = waveformUnits
+
+        self._populate_WaveControls_()
+
+        self.overlayDataCheckbox.setEnabled(True)
+        self.overlayDataCheckbox.setChecked(False)
 
     def setModel(self, model:types.FunctionType, coefficients:pd.DataFrame):
         if models.isModelFunction(model):
@@ -735,18 +789,16 @@ Named Parameters:
         self._waveformSamplingRate_ = self.samplingRateSpinBox.value()
         return np.linspace(self._waveformStart_.magnitude, self._waveformStart_.magnitude + self._waveformDuration_.magnitude, self._calculateWaveformSamples())
         
-    def generateWaveform(self) -> neo.basesignal.BaseSignal | None:
-        from gui.guiutils import getScipyenMainWindow
+    def generateModelWaveform(self, *coeffs) -> neo.basesignal.BaseSignal | None:
         if not isinstance(self._model_, types.FunctionType) or not models.isModelFunction(self._model_):
             return
+
         try:
             self._waveformStart_ = self.startSpinBox.value()
             self._waveformDuration_ = self.durationSpinBox.value()
             self._waveformSamplingRate_ = self.samplingRateSpinBox.value()
-
             x = self._generateWaveformDomain_()
-
-            coeffs = self.coefficientValues
+            coeffs = coeffs or self.coefficientValues
             # coeffs = list(self._model_fit_coefficients_["Initial Value"])
 
             with warnings.catch_warnings(record=True) as wrn:
@@ -756,7 +808,10 @@ Named Parameters:
             sigName = f"{self._model_name_} model"
 
             name = f"{self._model_name_} model" if  self._waveformUnits_.units==pq.dimensionless else f"{scq.unitFamilyName(self._waveformUnits_.units)}"
-            
+
+            # if sig.units != pq.dimensionless.units:
+            #     sig.name = scq.unitFamilyName(sig.units)
+
             if scq.unitsConvertible(self._waveformUnits_.units, pq.V):
                 sigName = "Potential"
 
@@ -766,9 +821,8 @@ Named Parameters:
                 sig = datasignal.DataSignal(y, t_start = self._waveformStart_, units = sigUnits, domain_units = self._waveformDuration_.units,
                                         sampling_rate=self._waveformSamplingRate_, name=name, codomain_name=sigName)
 
-            if sig.units != pq.dimensionless.units:
-                sig.name = scq.unitFamilyName(sig.units)
-            
+
+            sig.array_annotate(channel_names = [f"Realization or {self._model_.title}"])
 
             if wrn:
                 warningMessages = self.unpackWarnings(wrn)
@@ -787,25 +841,89 @@ Named Parameters:
             self.errorMessage(type(exc).__name__, msg)
             return
 
-        self.sig_waveformReady.emit(sig)
-
-        if self.receivers(self.sig_waveformReady) == 0: # and self._waveViewer_ is None:
-            varname = f"{self._model_name_}_waveform" if isinstance(self._model_name_, str) and len(self._model_name_.strip()) else "model_waveform"
-            getScipyenMainWindow().assignToWorkspace(varname, sig)
-
-        if isinstance(self._waveViewer_, mpl.figure.Figure):
-            plt.figure(self._waveViewer_)
-            plt.plot(sig)
-
-        elif isinstance(self._waveViewer_, QtWidgets.QMainWindow):
-            self._waveViewer_.view(sig)
-
         return sig
+
+    def generateWaveform(self) -> neo.basesignal.BaseSignal | None:
+        from gui.guiutils import getScipyenMainWindow
+
+        if not isinstance(self._model_, types.FunctionType) or not models.isModelFunction(self._model_):
+            return
+
+        try:
+            yData = None
+            if isinstance(self._data_, (neo.AnalogSignal, DataSignal)):
+                yData = self._data_
+
+                if "channel_names" not in yData.array_annotations:
+                    yData.array_annotate(channel_names = list(map(lambda k: f"Channel {k}", range(yData.shape[1]))))
+
+            if self._use_fitted_:
+                if isinstance(yData, (neo.AnalogSignal, DataSignal)) and isinstance(self._fittedCurve_, np.ndarray) and self._fittedCurve_.shape[0] == yData.shape[0]:
+                    name = yData.name
+                    if not isinstance(name, str) or len(name.strip()):
+                        name = f"Model fit through data"
+                    else:
+                        name = f"Model fit through {name}"
+
+                    y_ = type(yData)(self._fittedCurve_, units = yData.units,
+                                    t_start = yData.t_start,
+                                    sampling_rate = yData.sampling_rate,
+                                    name = f"{self._model_.title} model fit through {yData.name}")
+
+                    y_.array_annotate(channel_names = [f"Fitted data channel {self._dataChannel_}"])
+
+                elif isinstance(self._fitResult_, types.SimpleNamespace):
+                    y_ = self.generateModelWaveform(self._fitResult_.Coefficients.Fitted)
+                    y_.name = f"{self._model_.title} model fit"
+                    y_.array_annotate(channel_names = ["Fitted data channel"])
+            else:
+                y_ = self.generateModelWaveform()
+                # if self._plot_data_overlaid_:
+                #     y-
+
+            # print(f"{self.__class__.__name__}.generateWaveform: yData: {type(yData).__name__}, y_: {type(y_).__name__}")
+
+            if isinstance(yData, (neo.AnalogSignal, DataSignal)) and self._plot_data_overlaid_ :
+                sig = neoutils.concatenate_signals(yData, y_, axis=1)
+                if self._use_fitted_:
+                    placeHolder = f"{self._model_.title} fit"
+                else:
+                    placeHolder = f"{self._model_.title} model"
+
+                name = yData.name if isinstance(yData.name, str) and len(yData.name) else yData.annotations.get("codomain_name", None)
+
+                yDataName = f"{name if (isinstance(name, str) and len(name.strip())) else "Data"} + {placeHolder}"
+                # y_Name = f"{self._model_.title} fit" if (not isinstance(y_.name, str) or len(y_.name.strip()) == 0) else y_.name
+                # sig.name = f"Overlay of {yDataName} and {y_.name}"
+                sig.name = yDataName
+                sig.array_annotate(**neoutils.merge_array_annotations(yData.array_annotations,
+                                                                      y_.array_annotations))
+            else:
+                sig = y_
+
+        except:
+            traceback.print_exc()
+            exc = sys.exception()
+            msg = "".join(traceback.format_exception_only(exc))
+            self.errorMessage(type(exc).__name__, msg)
+            return
+
+        if isinstance(sig, neo.basesignal.BaseSignal):
+            self.sig_waveformReady.emit(sig)
+
+            if self.receivers(self.sig_waveformReady) == 0 and self._waveViewer_ is None:
+                varname = f"{self._model_name_}_waveform" if isinstance(self._model_name_, str) and len(self._model_name_.strip()) else "model_waveform"
+                getScipyenMainWindow().assignToWorkspace(varname, sig)
+
+            if isinstance(self._waveViewer_, mpl.figure.Figure):
+                plt.figure(self._waveViewer_)
+                plt.plot(sig)
+
+            elif isinstance(self._waveViewer_, QtWidgets.QMainWindow):
+                self._waveViewer_.view(sig)
+
+            return sig
         
-    # @Slot()
-    # def _slot_modelCoefficientsChanged(self):
-    #     pass
-    
     @Slot()
     def _slot_showModelExpression(self):
         # from core.strutils import is_svg
@@ -899,8 +1017,13 @@ Named Parameters:
         self._populateCoefficientsTable_(newDf)
         # pass
 
+    @Slot(bool)
+    def _slot_setDataOverlay_(self, val:bool):
+        self._plot_data_overlaid_ = val == True
+
     @Slot()
     def _slot_generateWaveform(self):
+        self._use_fitted_ = False
         self.generateWaveform()
 
     @Slot(int)
@@ -937,13 +1060,57 @@ Named Parameters:
 
     @Slot()
     def _slot_fitData(self):
-        if self._data_ is None:
+        if not isinstance(self._data_, (neo.AnalogSignal, DataSignal)) or self._data_.size == 0:
             return
 
-        if self._data_.ndim==2 and self._data_.size[1] > 1:
-            pass
+        if not models.isModelFunction(self._model_):
+            return
 
+        fitParams = self._model_fit_coefficients_
+        if not isinstance(fitParams, pd.DataFrame) or \
+            not all(v in fitParams.columns for v in ("Initial Value", "Lower Bound", "Upper Bound", "Keep Feasible")) or \
+                fitParams.size == 0:
+            return
 
+        if self._data_.ndim==2 and self._data_.shape[1] > 1:
+            if self._dataChannel_ not in range(-self._data_.shape[1], self._data_.shape[1]):
+                return
+
+            data = self._data_[:,self._dataChannel_].flatten().magnitude
+
+        else:
+            data = self._data_.flatten().magnitude
+
+        x = self._data_.times.flatten().magnitude
+
+        p0 = list(fitParams["Initial Value"])
+        lb = list(fitParams["Lower Bound"])
+        ub = list(fitParams["Upper Bound"])
+        kf = list(fitParams["Keep Feasible"])
+
+        bounds = optimize.Bounds(lb=lb, ub=ub, keep_feasible = kf)
+
+        self._fittedCurve_, self._fitResult_ = crvf.fit_model(data, self._model_, p0, x = x, bounds=bounds)
+
+        if self._fitResult_:
+            self._model_fit_coefficients_["Fitted"] = self._fitResult_.Coefficients.Fitted
+            self._populateCoefficientsTable_(self._model_fit_coefficients_)
+            fitInfo  = [
+                        f"message:\t{self._fitResult_.Fit.message}",
+                        f"success:\t{self._fitResult_.Fit.success}",
+                        f"cost:\t{self._fitResult_.Fit.cost}",
+                        f"optimality:\t{self._fitResult_.Fit.optimality}",
+                        ]
+            fitInfo += list(map(lambda i: f"{i[0]}:\t{i[1]}", self._fitResult_.Coefficients.GoF.__dict__.items()))
+
+            self.fitResultsTextEdit.setPlainText ("\n".join(fitInfo))
+
+        else:
+            self.fitResultsTextEdit.setPlainText("")
+
+        self._use_fitted_ = True
+
+        self.generateWaveform()
 
     @Slot()
     def _slot_makeUnitAmplitudeModel(self):
@@ -1021,6 +1188,20 @@ Named Parameters:
             raise TypeError(f"Wrong value type ({type(val).__name__})")
         
         self.waveformSamplingRate = rate
+
+    @property
+    def fitResult(self) -> types.SimpleNamespace | None:
+        return self._fitResult_
+
+    @property
+    def overlayData(self) -> bool:
+        return self._plot_data_overlaid_
+
+    @overlayData.setter
+    def overlayData(self, val:bool):
+        self._plot_data_overlaid_ = val == True
+        sigBlock = QtCore.QSignalBlocker(self.overlayDataCheckbox)
+        self.overlayDataCheckbox.setChecked(self._plot_data_overlaid_)
         
     @property
     def waveformUnits(self) -> pq.Quantity | None:
