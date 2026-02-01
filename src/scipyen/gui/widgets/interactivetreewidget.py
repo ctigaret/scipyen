@@ -138,6 +138,8 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         super().__init__(parent=parent)
         self._ready_:bool = False
 
+        self._readOnly_:bool = True
+
         self._use_TableEditor_ = kwargs.pop("useTableEditor", False)
         self._supported_data_types_ = kwargs.pop("supported_data_types", tuple())
         if not isinstance(self._supported_data_types_, tuple) or not all(isinstance(v, type) for v in self._supported_data_types_):
@@ -445,7 +447,8 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         #from pyqtgraph.python2_3 import asUnicode
         
         # NOTE: 2021-07-24 13:15:38
-        # throughout this function 'node' is a QtWidgets.QTreeWidgetItem
+        # throughout this function 'node' is a QtWidgets.QTreeWidgetItem.
+        #
         # the root node is named after the symbol of the nested data structure
         # shown by DataViewer, or by _docTitle_, hence it is always a str
         #
@@ -995,3 +998,10 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
             # print(f"{self.__class__.__name__}.parse data type : {type(data).__name__}, data: {data}")
             raise
         
+    @property
+    def readOnly(self) -> bool:
+        return self._readOnly_
+
+    @readOnly.setter
+    def readOnly(self, val:bool):
+        self._readOnly_ = val == True

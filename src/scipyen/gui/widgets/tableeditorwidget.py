@@ -812,20 +812,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
     #
     def canFetchMore(self, parentIndex:QtCore.QModelIndex) -> bool:
         return False if parentIndex.isValid() else self._displayedRows_ < self._modelDataRows_ or self._displayedColumns_ < self._modelDataColumns_
-        # ret = False if parentIndex.isValid() else self._displayedRows_ < self._modelDataRows_ or self._displayedColumns_ < self._modelDataColumns_
-        # print(f"{self.__class__.__name__}.canFetchMore -> {ret}")
-        # return ret
-    
-        # if parentIndex.isValid():
-        #     return False
-        # return self._displayedRows_ < self._modelDataRows_
-        # #return self._displayedRows_ < self._modelDataRows_
-        # #ret = self._displayedColumns_ < self._modelDataColumns_ or self._displayedRows_ < self._modelDataRows_
-        # #print("displayed columns %d" % self._displayedColumns_, "rows %d" % self._displayedRows_)
-        # #print("canFetchMore: %s" % ret)
-        # #return ret
         
-    def fetchMore(self, parentIndex):
+    def fetchMore(self, parentIndex:QtCore.QModelIndex):
         if parentIndex.isValid():
             # print(f"{self.__class__.__name__}.fetchMore: parent is valid, nothing to fetch")
             return 
@@ -861,7 +849,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 
     #### BEGIN item data handling
     #
-    def data(self, modelIndex, role=QtCore.Qt.DisplayRole) -> QtCore.QVariant:
+    def data(self, modelIndex:QtCore.QModelIndex,
+             role:QtCore.Qt.ItemDataRole = QtCore.Qt.DisplayRole) -> QtCore.QVariant:
         try:
             if self._modelData_ is None:
                 return QtCore.QVariant()
@@ -900,7 +889,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
     
     #### BEGIN editable items
     #
-    def flags(self, modelIndex):
+    def flags(self, modelIndex:QtCore.QModelIndex):
         if not modelIndex.isValid():
             return QtCore.Qt.ItemIsEnabled
         

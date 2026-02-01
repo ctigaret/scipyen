@@ -6,19 +6,13 @@
     
 r"""
 """
-import sys, os, typing
-from qtpy import QtCore, QtGui, QtWidgets, QtSvg
-from qtpy.QtCore import Signal, Slot, Property
-from qtpy.uic import loadUiType as __loadUiType__
-from core.prog import safeWrapper
-from core.sysutils import adapt_ui_path
-
-__module_path__ = os.path.abspath(os.path.dirname(__file__))
+from __future__ import print_function
 
 import os, warnings, types, traceback, itertools, inspect, dataclasses, numbers
 import pathlib
 import datetime
 import fractions, decimal
+import pkgutil
 import typing
 import enum
 from collections import deque
@@ -46,14 +40,14 @@ if os.environ["QT_API"] == "pyside6":
 else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
-        
+
     from qtpy import sip
     from qtpy.uic import loadUiType
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
     __has_sip__ = True
-    
+
 
 
 # from pyqtgraph import (DataTreeWidget, TableWidget, )
@@ -102,5 +96,18 @@ from gui.widgets.tablewidget import SimpleTableWidget
 from gui.widgets.tableeditorwidget import (TableEditorWidget, TabularDataModel,)
 from gui.pictgui import WorkerThread
 
-NOTMEMOIZED = (tuple, type(None), type(MISSING), type(pd.NA), type, np.ndarray)
+NOTMEMOIZED = (tuple, type(None), type(MISSING), type(pd.NA), type, np.ndarray, types.ModuleType, pkgutil.ModuleInfo)
 PODS = (bool, int, float, bytes, bytearray, str)
+
+class DataTreeModel(QtCore.QAbstractTableModel):
+    sig_editCompleted = Signal([pd.DataFrame], [pd.Series], [np.ndarray], name="sig_editCompleted")
+    sig_modelDataChanged = Signal(name="sig_modelDataChanged")
+
+    def __init__(self, data=None, parent=None):
+        super(DataTreeModel, self).__init__(parent=parent)
+
+
+class DataTreeView(QtWidgets.QTreeView):
+    def __init__(self, , *args, **kwargs):
+        parent = kwargs.pop("parent", None)
+        super().__init__(parent=parent)
