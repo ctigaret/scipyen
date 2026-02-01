@@ -97,6 +97,7 @@ from core.traitcontainers import (DataBag, DataBagTraitsObserver,)
 from gui.widgets.tablewidget import SimpleTableWidget
 from gui.widgets.tableeditorwidget import (TableEditorWidget, TabularDataModel,)
 from gui.pictgui import WorkerThread
+from gui.delegates import PythonItemDelegate
 
 NOTMEMOIZED = (tuple, type(None), type(MISSING), type(pd.NA), type, np.ndarray, types.ModuleType, pkgutil.ModuleInfo)
 PODS = (bool, int, float, bytes, bytearray, str)
@@ -621,7 +622,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
             # self.widgets.append(widget)
             subnode = QtWidgets.QTreeWidgetItem(["", "", ""])
             node.addChild(subnode)
-            self.setItemWidget(subnode, 0, widget)
+            self.setItemWidget(subnode, 0, widget) # inherited from QTreeWidget; the widget will go in column 0 of the child
             modelndx = self.indexFromItem(subnode)
             parentndx = self.indexFromItem(node)
             self.setFirstColumnSpanned(modelndx.row(), parentndx, True)
@@ -675,7 +676,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         • typeStr - a string representation of the data type
         • description  - a short string representation
         • a dict of sub-objects (children) to be parsed further
-        • optional widget to display as sub-node
+        • an optional widget to display/edit as sub-node (default is None)
         • typeTip: a string indicating the type of the key (for dict data) or of
             the index (for sequences, this is always an int, except for namedtuples
             where it can be a str)
@@ -797,7 +798,8 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                         
                 elif issubclass(type(data), (list, tuple, deque, set)):
                     # NOTE: 2025-05-21 16:17:37
-                    # 'widget' is None, here
+                    # 'widget' is None, here — this will force the caller (i.e. buildTree)
+                    # to descend into the children of the data and build up a subtree
                     desc = "length=%d" % len(data)
                     # NOTE: 2021-07-24 14:57:02
                     # accommodate namedtuple types
@@ -944,6 +946,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                     widget.setMaximumHeight(200)
                     widget.setReadOnly(True)
                 else:
+                    # no widget here; just display it in the 2nd column of the item's row
                     desc = data if isinstance(data, str) else data.decode()
                     
             elif isinstance(data, (bool, int, float, complex, fractions.Fraction, decimal.Decimal, numbers.Number)):

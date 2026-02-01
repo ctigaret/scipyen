@@ -775,6 +775,10 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
     WARNING use with caution
     """
+    
+    # NOTE: 2026-02-01 22:47:01 
+    # we NEVER store any data in the QModelIndex instances, here...
+    
     sig_editCompleted = Signal([pd.DataFrame], [pd.Series], [np.ndarray], name="sig_editCompleted")
     sig_modelDataChanged = Signal(name="sig_modelDataChanged")
     # NOTE: 2025-11-23 14:03:48 sig_rowsPopulated(startRow, count, total)
