@@ -1,3 +1,13 @@
+# -*- coding: utf-8 -*-
+# $Id: tabledataview.py $
+# SPDX-FileCopyrightText: 2025 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
+# NOTE: 2026-02-02 08:32:09
+# DO NOT REMOVE
+# used in tableeditorwidget.TableEditorWidget and tableeditor.TableEditor
+
 #### BEGIN core python modules
 from __future__ import print_function
 
@@ -8,14 +18,11 @@ from functools import (singledispatch, singledispatchmethod)
 
 #### BEGIN 3rd party modules
 import pandas as pd
-# -*- coding: utf-8 -*-
-# $Id: tabledataview.py $
-# SPDX-FileCopyrightText: 2025 Cezar M. Tigaret <cezar.tigaret@gmail.com>
-# SPDX-License-Identifier: GPL-3.0-or-later
-# SPDX-License-Identifier: LGPL-2.1-or-later
 
 r"""Custom table view, with placeholder text
 """
+
+
 
 import quantities as pq
 #import xarray as xa
@@ -40,14 +47,14 @@ if os.environ["QT_API"] == "pyside6":
 else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
-        
+
     from qtpy import sip
     from qtpy.uic import loadUiType
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
     __has_sip__ = True
-    
+
 class TableDataView(QtWidgets.QTableView):
     r"""Custom table view, with placeholder text
     """

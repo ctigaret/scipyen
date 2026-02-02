@@ -5,6 +5,28 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
     
 r"""
+.. note::
+
+    NOTE: 2026-02-02 08:56:30
+
+    Hitting a wall of bricks here...
+
+    The only QModelIndex constructor API exposed in PyQt6 QModelIndex
+    seems to be:
+
+.. ::
+
+    QModelIndex()
+    QModelIndex(a0: QModelIndex)
+    QModelIndex(a0: QPersistentModelIndex)
+
+
+I.e., there seems to be no way I can generate a QModelIndex via, say,
+
+.. ::
+
+    QtCore.QModelIndex(row:int, column:int, data:typing.Any)
+
 """
 from __future__ import print_function
 
@@ -102,7 +124,7 @@ from gui.delegates import PythonItemDelegate
 NOTMEMOIZED = (tuple, type(None), type(MISSING), type(pd.NA), type, np.ndarray, types.ModuleType, pkgutil.ModuleInfo)
 PODS = (bool, int, float, bytes, bytearray, str)
 
-# class DataTreeItem(QtGui.QStandardItem):
+# ### BEGIN class DataTreeItem(object)
 class DataTreeItem(object):
 
     # NOTE: 2026-02-01 14:46:39
@@ -162,16 +184,36 @@ Returns:
             return siblings.index(self)
 
         return -1
-    
-    def index(self, column:int) -> QModelIndex:
-        row = self.row()
-        if row == -1 or column not in range(len(self._itemData_)):
-            return QtCore.QModelIndex() # invalid model index
-        
-        return QtCore.QModelIndex(row, column, None)
 
-class DataTreeModel(QtCore.QAbstractItemModel):
+#     def index(self, column:int) -> QModelIndex:
+#         row = self.row()
+#         if row == -1 or column not in range(len(self._itemData_)):
+#             return QtCore.QModelIndex() # invalid model index
+#
+#         return QtCore.QModelIndex(row, column, None) # this API is NOT exposed to Python!
+
+# ### END   class DataTreeItem(object)
+
+# ### BEGIN class DataTreeStandardItem(QtGui.QStandardItem)
+class DataTreeStandardItem(QtGui.QStandardItem):
+    def __init__(self, *args, **kwargs):
+        if len(args) == 1 and isinstance(args[0], str):
+            super().__init__(args[0]) # item c'tor with a string
+
+        elif len(args) == 2:
+            if isinstance(args[0], QtGui.QIcon) and isinstance(args[1], str) or \
+                all(isinstance(a, int) and a>=0 for a in args):
+            super().__init__(*args) # item c'tor with an icon + string or row + column
+
+        else:
+            raise TypeError("Expecting a str, or a QtGui.QIcon and str, or two int values")
+
+
+# ### END   class DataTreeStandardItem(QtGui.QStandardItem)
+
+# ### BEGIN class DataTreeModel(QtCore.QAbstractItemModel)
 # class DataTreeModel(QtGui.QStandardItemModel):
+class DataTreeModel(QtCore.QAbstractItemModel):
     r"""
 
 General rule for delegate use in this model:
@@ -190,9 +232,9 @@ General rule for delegate use in this model:
 
 * similarly, indexes in sequence-like collections are **not** editable
 
-.. note:: 
+.. note::
 
-    There may be a case to modify a mapping's structure by changing the "key" to which a value is mapped, 
+    There may be a case to modify a mapping's structure by changing the "key" to which a value is mapped,
         BUT this may controversial:
         * would change the semantics of the mapping object (i.e. break expectations for the user(s) of that object - change API 'contract')
         * would be tricky to implement
@@ -299,7 +341,7 @@ General rule for delegate use in this model:
 
     name(symbol) -> type -> value/information
         |
-        CHILDREN:   
+        CHILDREN:
             -> int key (index) -> type -> value/information — CHILDREN delegates on column 0 or ITEM delegate in column 2
 
 """
@@ -337,7 +379,7 @@ General rule for delegate use in this model:
             return QtCore.QVariant()
 
         # avoid calling internalPointer() -> it will CRASH!
-        # instad, rely on the QModelIndex API, knowing that the all QModelIndex 
+        # instad, rely on the QModelIndex API, knowing that the all QModelIndex
         # in an item only has data for column 0 (the DataTreeItem can have several QModelIndex objects, one per column)
         return modelIndex.data(0, role)
 
@@ -347,7 +389,7 @@ General rule for delegate use in this model:
     def fetchMore(self, parentIndex:QtCore.QModelIndex): # TODO datetime2Qt
         if parentIndex.isValid():
             return
-        
+
     def flags(self, modelIndex:QtCore.QModelIndex) -> QtCore.Qt.ItemFlag:
         #  'ItemIsAutoTristate',
         #  'ItemIsDragEnabled',
@@ -358,7 +400,7 @@ General rule for delegate use in this model:
         #  'ItemIsUserCheckable',
         #  'ItemIsUserTristate',
         #  'ItemNeverHasChildren'
-        
+
         return super().flags(modelIndex) if modelIndex.isValid() else QtCore.Qt.NoItemFlags # TODO 2026-02-01 21:31:43 — revisit this !!!
 
     def setModelData(self, data:typing.Any, name:str="",
@@ -373,22 +415,25 @@ General rule for delegate use in this model:
         # 'Horizontal',
         # 'Vertical'
         return self._rootItem_.data(section) if orientation == QtCore.Qt.Horizontal and role == QtCore.Qt.DisplayRole else QtCore.QVariant()
-    
+
     def index(self, row:int, column:int, parentIndex:QtCore.QModelIndex) -> QtCore.QModelIndex:
         # NOTE: 2026-02-01 21:59:46
         # There is no access to protected functions or signals for objects not created from Python;
         # this means one cannot call self.createIndex(…) here, and cannot override it!
         if not self.hasIndex(row, column, parent):
             return QtCore.QModelIndex() # invalid index
-        
+
         # if parentIndex.isValid():
         #     return parentIndex.model().
-            
-            
-            
-        
-        
-        
+
+        if parentIndex.isValid() and super().checkIndex(parentIndex):
+            pass
+
+# ### END   class DataTreeModel(QtCore.QAbstractItemModel)
+
+
+
+
         
 
 class DataTreeView(QtWidgets.QTreeView):

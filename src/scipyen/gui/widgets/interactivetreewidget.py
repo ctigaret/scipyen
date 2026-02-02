@@ -95,8 +95,10 @@ from core.prog import (safewrapper, safeguiwrapper, print_styled)
 from core.traitcontainers import (DataBag, DataBagTraitsObserver,)
 
 from gui.widgets.tablewidget import SimpleTableWidget
-from gui.widgets.tableeditorwidget import (TableEditorWidget, TabularDataModel,)
+from gui.widgets.tableeditorwidget import TableEditorWidget
+# from gui.widgets.tableeditorwidget import (TableEditorWidget, TabularDataModel,)
 from gui.pictgui import WorkerThread
+from gui.widgets.small_widgets import (QuantitySpinBox, ComplexSpinBox)
 from gui.delegates import PythonItemDelegate
 
 NOTMEMOIZED = (tuple, type(None), type(MISSING), type(pd.NA), type, np.ndarray, types.ModuleType, pkgutil.ModuleInfo)
@@ -127,6 +129,36 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
     # child widgets are either None, TableEditorWidget, SimpleTableWidget, or QPlainTextEdit
     
     _default_widget_height_ = 200
+
+    # NOTE: 2026-02-02 09:20:10
+    # stand-in for QStyledItemDelegate:
+    # until I get my head around a new DataTreeModel/Item/View beign worked on,
+    # in the ``gui.widgets.datatreeview`` module
+    #
+    # a map of object type ↦ dict: editing widget class ↦ predicate
+    #
+    #   predicate is a unary function returning a bool, used to check the condition under
+    # a specified widget is to be used with the given data type
+
+
+    _editors_ ={bool:               {QtWidgets.QCheckBox:       lambda o: True},
+                np.bool:            {QtWidgets.QCheckBox:       lambda o: True},
+                int:                {QtWidgets.QSpinBox:        lambda o: True},
+                np.integer:         {QuantitySpinBox:           lambda o: True},
+                float:              {QuantitySpinBox:           lambda o: True},
+                np.floating:        {QuantitySpinBox:           lambda o: True},
+                complex:            {ComplexSpinBox:            lambda o: True},
+                np.complexfloating: {ComplexSpinBox:            lambda o: True},
+                np.ndarray:         {QuantitySpinBox:           lambda o: o.size == 1,
+                                     TableEditorWidget:         lambda o: o.size > 1,
+                                    },
+                str:                {QtWidgets.QLineEdit:       lambda o: len(o)<= 100,
+                                     QtWidgets.QPlainTextEdit:  lambda o: len(o)> 100},
+                bytes:              {QtWidgets.QLineEdit:       lambda o: len(o)<= 100,
+                                     QtWidgets.QPlainTextEdit:  lambda o: len(o)> 100},
+                bytearray:          {QtWidgets.QLineEdit:       lambda o: len(o)<= 100,
+                                     QtWidgets.QPlainTextEdit:  lambda o: len(o)> 100},
+                }
     
     def __init__(self, *args, **kwargs):
         r"""
@@ -139,7 +171,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         super().__init__(parent=parent)
         self._ready_:bool = False
 
-        self._readOnly_:bool = True
+        self._readOnly_:bool = kwargs.pop("readOnly", True)
 
         self._use_TableEditor_ = kwargs.pop("useTableEditor", False)
         self._supported_data_types_ = kwargs.pop("supported_data_types", tuple())
@@ -194,6 +226,14 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                     break
                 
         self.update()
+
+    def _getEditor_(self, data) -> QtWidgets.QWidget | None:
+        editor_dicts = list(filter(lambda v: v, map(lambda i: i[1] if i[0] in inspect.getmro(type(data)) else None, self._editors_.items())))
+        if len(editor_dicts):
+            editor_dict = editor_dicts[0]
+            editors = list(filter(lambda v: v, map(lambda k: (k[0] if k[1](data) else None), editor_dict.items())))
+            if len(editors):
+                return editors[0]
         
     def _makeTableWidget_(self, data):
         if self._use_TableEditor_:
@@ -897,11 +937,20 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                 
             elif isinstance(data, neo.core.dataobject.DataObject):
                 desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
+                editor_dict = filter(lambda k,v : k in inspect.getmro(type(data)), self._editors_.items())
                 if data.size == 1:
                     widget = QtWidgets.QLabel(str(data))
                 else:
                     widget = self._makeTableWidget_(data)
-                    
+#                 if len(editor_dict):
+#
+#                 if not self.readOnly:
+#                 else:
+#                     if data.size == 1:
+#                         widget = QtWidgets.QLabel(str(data))
+#                     else:
+#                         widget = self._makeTableWidget_(data)
+
             elif isinstance(data, pq.Quantity):
                 if data.ndim == 0 or (data.ndim == 1 and data.size <= 1):
                     desc = f"{data}"
