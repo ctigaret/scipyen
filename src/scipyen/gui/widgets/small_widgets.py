@@ -262,7 +262,7 @@ class LazyLineEdit(QtWidgets.QLineEdit):
 
     def keyPressEvent(self, event):
         if event.key() in (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter):
-            print(f"{self.__class__.__name__}.keyPressEvent: text = '{self.text()}'")
+            # print(f"{self.__class__.__name__}.keyPressEvent: text = '{self.text()}'")
             self.sig_enterPressed.emit(self.text())
         else:
             super().keyPressEvent(event)
