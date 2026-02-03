@@ -73,8 +73,8 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
     Data type                       Widget
     -----------------------------------------
     int                             QSpinBox
-    float                           QDoubleSpinBox
-    str                             QLineEdit or QComboBox¹
+    float                           QuantitySpinBox
+    str                             QLineEdit or QComboBox¹, or QPlainTextEdit
     bool                            QCheckBox
     pq.Quantity (scalar)            small_widgets.QuantityChooserWidget
     Enum value                      QLineEdit or QComboBox¹
