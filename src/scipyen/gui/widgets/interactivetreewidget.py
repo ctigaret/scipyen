@@ -209,7 +209,8 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         self._widget_height_ = self._default_widget_height_
         self.setUniformRowHeights(False)
         
-        self.itemClicked.connect(self._slot_setLastActive)
+        if not self._readOnly_:
+            self.itemClicked.connect(self._slot_setLastActive) # not documented in Qt6 ?!?
         
         self._widgetsWithSelection_ = set()
         

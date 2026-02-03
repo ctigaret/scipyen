@@ -47,6 +47,7 @@ from core.sysutils import adapt_ui_path
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
 import numpy as np
+import vigra
 import quantities as pq
 from core import scipyen_quantities as scq
 from gui.widgets import small_widgets as smw
@@ -286,10 +287,12 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         Do **NOT** use within the Model/View paradigm!
 
     """
+        from gui.widgets.tableeditorwidget import TableEditorWidget # import here to avoid circular imports (delegates is imported by tableeditorwidget as well)
         widget = None
 
         if isinstance(data, (bool, np.bool)):# or "bool" in type(data).__name__:
             widget = QtWidgets.QCheckBox(parent)
+            widget.toggled.connect(self.slot_dataChanged)
 
         elif isinstance(data, (int, float, np.floating, np.integer)):# or any(v in type(data).__name__ for v in ("int", "float")):
             if self._enforceFloat_:
@@ -298,12 +301,14 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                 widget.setMinimum(-math.inf)
                 widget.setMaximum(math.inf)
                 widget.setSingleStep(1)
+                widget.sig_valueChanged.connect(self.slot_dataChanged)
 
             else:
                 if isinstance(data, (int, np.integer)):# or "int" in type(data).__name__: # to include numpy array int dtypes
                     widget = QtWidgets.QSpinBox(parent)
                     widget.setMinimum(-9999)
                     widget.setMaximum(9999)
+                    widget.valueChanged.connect(self.slot_dataChanged)
 
                 elif isinstance(data, (float, np.floating)):# or "float" in type(data).__name__: # to include numpy array float dtypes
                     # widget = QtWidgets.QDoubleSpinBox(parent)
@@ -311,18 +316,18 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                     widget.setMinimum(-math.inf)
                     widget.setMaximum(math.inf)
                     widget.setSingleStep(1)
-                    widget.sig_valueChanged.connect(self.sig_dataChanged)
+                    widget.sig_valueChanged.connect(self.slot_dataChanged)
 
         elif isinstance(data, (complex, np.complexfloating)):
             widget = smw.ComplexSpinBox(parent)
-            widget.sig_valueChanged.connect(self.sig_dataChanged)
+            widget.sig_valueChanged.connect(self.slot_dataChanged)
             # TODO: 2026-02-03 09:31:21
             # set up other properties as well...
 
         elif isinstance(data, pq.Quantity):
             if isinstance(data, pq.UnitQuantity): # unlikely, but here we go...
                 widget = smw.QuantityChooserWidget(parent)
-                widget.unitChanged.connect(self.sig_dataChanged)
+                widget.unitChanged.connect(self.slot_dataChanged)
             else:
                 if data.ndim == 0 or (data.ndim ==1 and data.size == 1):
                     widget = smw.QuantitySpinBox(parent, enforceImmutableUnits=True) # disallow units change for individual data points in a Quantity
@@ -330,15 +335,34 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                     widget.setMaximum(math.inf * data.units)
                     widget.setSingleStep(1.0  * data.units)
                     widget.disableUnitChange = True
-                    widget.sig_valueChanged.connect(self.sig_dataChanged)
+                    widget.sig_valueChanged.connect(self.slot_dataChanged)
 
                 else:
                     if inModel:
+                        print("return none for Quantity")
                         return
                     else:
                         widget = TableEditorWidget(parent, readOnly=False)
                         widget.setData(data)
-                        widget.sig_dataChanged.connect(self.sig_contentsChanged)
+                        widget.sig_dataChanged.connect(self.slot_dataChanged)
+                        
+        elif isinstance(data, np.ndarray):
+            if data.ndim == 0 or (data.ndim ==1 and data.size == 1):
+                widget = smw.QuantitySpinBox(parent, enforceImmutableUnits=True) # disallow units change for individual data points in a Quantity
+                widget.setMinimum(-math.inf * data.units)
+                widget.setMaximum(math.inf * data.units)
+                widget.setSingleStep(1.0  * data.units)
+                widget.disableUnitChange = True
+                widget.sig_valueChanged.connect(self.slot_dataChanged)
+
+            else:
+                if inModel:
+                    return
+                else:
+                    widget = TableEditorWidget(parent, readOnly=False)
+                    widget.setData(data)
+                    widget.sig_dataChanged.connect(self.slot_dataChanged)
+            
 
         elif isinstance(data, (vigra.filters.Kernel1D, vigra.filters.Kernel2D)):
             if inModel:
@@ -346,7 +370,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             else:
                 widget = TableEditorWidget(parent, readOnly=False)
                 widget.setData(data)
-                widget.sig_dataChanged.connect(self.sig_contentsChanged)
+                widget.sig_dataChanged.connect(self.slot_dataChanged)
 
         elif isinstance(data, (str, np.character, bytes, bytearray)): # or "str" in type(a).__name__: # for numpy.str_ type
             if isinstance(data, str) and isinstance(choices, typing.Sequence) and len(choices) > 0 and all(isinstance(c, str) for c in choices):
@@ -366,7 +390,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                     widget.setMaximumHeight(200)
                     if isinstance(data, str):
                         widget.setReadOnly(False)
-                        widget.textChanged().connect(self.sig_contentsChanged)
+                        widget.textChanged().connect(self.slot_dataChanged)
                     else:
                         widget.setReadOnly(True)
                 else:
@@ -374,7 +398,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                         # widget = QtWidgets.QLineEdit(parent)
                         widget = smw.LazyLineEdit(parent)
                         widget.setText(data)
-                        widget.sig_enterPressed.connect(self.sig_dataChanged)
+                        widget.sig_enterPressed.connect(self.slot_dataChanged)
                     else:
                         return
 
@@ -386,6 +410,24 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         widget.setAutoFillBackground(True)
         return widget
 
+    @Slot()
+    @Slot(object)
+    @Slot(bool)
+    @Slot(int)
+    @Slot(np.integer)
+    @Slot(float)
+    @Slot(np.floating)
+    @Slot(str)
+    @Slot(np.character)
+    @Slot(complex)
+    @Slot(np.complexfloating)
+    @Slot(pq.Quantity)
+    @Slot(np.ndarray)
+    @Slot(vigra.filters.Kernel1D)
+    @Slot(vigra.filters.Kernel2D)
+    def slot_dataChanged(self, o:typing.Any):
+        print(f"{o}")
+        
 
     def createEditor(self, parent:QtWidgets.QWidget, option:int, index:QtCore.QModelIndex) -> QtWidgets.QWidget | None:
         # NOTE: 2025-09-27 10:29:14 ATTENTION
