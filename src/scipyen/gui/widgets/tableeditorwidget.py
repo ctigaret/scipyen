@@ -113,7 +113,8 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
     sig_dataChanged = Signal(name="sig_dataChanged")
     
     def __init__(self, parent:typing.Optional[QtWidgets.QMainWindow]=None,
-                 readOnly:bool=True, enforceFloat:bool=False) -> None:
+                 readOnly:bool=True, enforceFloat:bool=False,
+                 enforceReadOnly:bool=False) -> None:
         super().__init__(parent=parent)
         # FIXME: 2025-11-23 09:58:38 next line is DEPRECATED
         self._is_vigra_filter_kernel_:bool = False # needed in future implementations of editing functionality
@@ -123,6 +124,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         self._selectedIndexes_ = list()
         self._readOnly_:bool = readOnly == True
         self._enforceFloat_:bool = enforceFloat == True
+        self._enforceReadOnly_:bool=False
         
         # NOTE: 2021-10-18 09:32:45
         # ### BEGIN keep this  - you may re-enable the possibility to use other custom tabular
@@ -324,7 +326,23 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         if not self.readOnly and isinstance(self.tableView.itemDelegate(), PythonItemDelegate):
             self.tableView.itemDelegate().enforceFloat = self._enforceFloat_
             
-        
+    @property
+    def enforceReadOnly(self) -> bool:
+        return self._enforceReadOnly_
+
+    @enforceReadOnly.setter
+    def enforceReadOnly(self, val:bool):
+        self._enforceReadOnly_ = val == True
+
+        sigBlocker = QtCore.QSignalBlocker(self.setEditableToolButton)
+        if self._enforceReadOnly_:
+            self.readOnly = True
+            self.setEditableToolButton.setChecked(False)
+            self.setEditableToolButton.setEnabled(False)
+            self.setEditableToolButton.setIcon(QtGui.QIcon.fromTheme("object-locked"))
+            self.setEditableToolButton.setToolTip("Editing disabled; set enforceReadOnly to True to enable this switch then then toggle to enable")
+
+
     @property
     def readOnly(self):
         return self._readOnly_
@@ -919,7 +937,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             if col >= self._modelData_.shape[1] + 1:
                 return False
             
-        elif col >= self._modelData_.shape[1]:
+        elif self._modelData_.ndim < 2 or col  >= self._modelData_.shape[1]:
             return False
         
         # print(f"{self.__class__.__name__}.setData: role = {role}")

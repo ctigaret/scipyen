@@ -188,6 +188,7 @@ class DataViewer(ScipyenViewer):
                  doc_title: typing.Optional[str] = None, 
                  useTableEditor:bool = True, 
                  predicate: typing.Optional[typing.Any] = None, 
+                 readOnly: bool = True,
                  # hideRoot:bool=False, 
                  *args, **kwargs):
         r"""
@@ -224,6 +225,7 @@ class DataViewer(ScipyenViewer):
         self._showMethods_:bool=kwargs.get("showMethods", False)
         self._showPrivateMembers_:bool = kwargs.get("showPrivate", False)
         self._useTableEditor_ = useTableEditor
+        self._readOnly_ = readOnly == True
         
         
         if inspect.isfunction(predicate):
@@ -260,7 +262,8 @@ class DataViewer(ScipyenViewer):
     def _configureUI_(self):
         self.treeWidget = InteractiveTreeWidget(parent = self, 
                                                 useTableEditor = self._useTableEditor_,
-                                                supported_data_types = tuple(self.viewer_for_types))
+                                                supported_data_types = tuple(self.viewer_for_types),
+                                                readOnly = self._readOnly_)
         
         self.treeWidget.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
         
@@ -759,6 +762,15 @@ class DataViewer(ScipyenViewer):
         else:
             if (obj, name) in self._obj_cache_:
                 return self._obj_cache_.index((obj, name))
+
+    @property
+    def readOnly(self) -> bool:
+        return self._readOnly_
+
+    @readOnly.setter
+    def readOnly(self, val:bool):
+        self._readOnly_ = val == True
+        self.treeWidget._setupData_(None)
         
     @Slot()
     @safewrapper

@@ -119,17 +119,29 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
 
     Inspired by pyqtgraph.widget.DataTreeWidget (originally, a subclass of it)
 
-    NOTE: 2025-11-23 08:22:37 
-    CHANGELOG:
-    Up to mid March 2025: subclass of pyqtgraph.widget.DataTreeWidget
-    After that: direct subclass of QtWidgets.QTreeWidget
-    
+
     """
+    # NOTE: 2025-11-23 08:22:37
+    # CHANGELOG:
+    # Up to mid March 2025: subclass of pyqtgraph.widget.DataTreeWidget
+    # After that: direct subclass of QtWidgets.QTreeWidget
+
     # NOTE: 2025-05-24 22:21:05
     # child widgets are either None, TableEditorWidget, SimpleTableWidget, or QPlainTextEdit
     
     _default_widget_height_ = 200
 
+    # NOTE: 2026-02-03 14:29:21
+    # ATTENTION this NEVER changes the object's structure (dict keys, sequence indices,
+    # row/column indexes of dataframe/series field names of dataclasses and named tuples,
+    # fields of structured arrays )
+    #
+    # However, these object CAN be manipulated at the console...
+    #
+    # So, this widget is ONLY concerned with the CONTENT (values) of the fields,
+    # and NOT their symbols.
+
+    #
     # NOTE: 2026-02-02 09:20:10
     # stand-in for QStyledItemDelegate:
     # until I get my head around a new DataTreeModel/Item/View beign worked on,
@@ -141,24 +153,24 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
     # a specified widget is to be used with the given data type
 
 
-    _editors_ ={bool:               {QtWidgets.QCheckBox:       lambda o: True},
-                np.bool:            {QtWidgets.QCheckBox:       lambda o: True},
-                int:                {QtWidgets.QSpinBox:        lambda o: True},
-                np.integer:         {QuantitySpinBox:           lambda o: True},
-                float:              {QuantitySpinBox:           lambda o: True},
-                np.floating:        {QuantitySpinBox:           lambda o: True},
-                complex:            {ComplexSpinBox:            lambda o: True},
-                np.complexfloating: {ComplexSpinBox:            lambda o: True},
-                np.ndarray:         {QuantitySpinBox:           lambda o: o.size == 1,
-                                     TableEditorWidget:         lambda o: o.size > 1,
-                                    },
-                str:                {QtWidgets.QLineEdit:       lambda o: len(o)<= 100,
-                                     QtWidgets.QPlainTextEdit:  lambda o: len(o)> 100},
-                bytes:              {QtWidgets.QLineEdit:       lambda o: len(o)<= 100,
-                                     QtWidgets.QPlainTextEdit:  lambda o: len(o)> 100},
-                bytearray:          {QtWidgets.QLineEdit:       lambda o: len(o)<= 100,
-                                     QtWidgets.QPlainTextEdit:  lambda o: len(o)> 100},
-                }
+    # _editors_ ={bool:               {QtWidgets.QCheckBox:       lambda o: True},
+    #             np.bool:            {QtWidgets.QCheckBox:       lambda o: True},
+    #             int:                {QtWidgets.QSpinBox:        lambda o: True},
+    #             np.integer:         {QuantitySpinBox:           lambda o: True},
+    #             float:              {QuantitySpinBox:           lambda o: True},
+    #             np.floating:        {QuantitySpinBox:           lambda o: True},
+    #             complex:            {ComplexSpinBox:            lambda o: True},
+    #             np.complexfloating: {ComplexSpinBox:            lambda o: True},
+    #             np.ndarray:         {QuantitySpinBox:           lambda o: o.size == 1,
+    #                                  TableEditorWidget:         lambda o: o.size > 1,
+    #                                 },
+    #             str:                {QtWidgets.QLineEdit:       lambda o: len(o)<= 100,
+    #                                  QtWidgets.QPlainTextEdit:  lambda o: len(o)> 100},
+    #             bytes:              {QtWidgets.QLineEdit:       lambda o: len(o)<= 100,
+    #                                  QtWidgets.QPlainTextEdit:  lambda o: len(o)> 100},
+    #             bytearray:          {QtWidgets.QLineEdit:       lambda o: len(o)<= 100,
+    #                                  QtWidgets.QPlainTextEdit:  lambda o: len(o)> 100},
+    #             }
     
     def __init__(self, *args, **kwargs):
         r"""
@@ -204,6 +216,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         self._scipyenWindow_ = None
         self.predicate = None
         self.showPrivate = False
+        self.hideRoot = False
         
         
         #  NOTE: 2025-06-26 21:29:48
@@ -224,24 +237,26 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                     else:
                         self._scipyenWindow_ = f[0].f_globals["ScipyenWindow"].instance()
                     break
+
+        self._delegate_ = PythonItemDelegate()
                 
         self.update()
 
-    def _getEditor_(self, data) -> QtWidgets.QWidget | None:
-        editor_dicts = list(filter(lambda v: v, map(lambda i: i[1] if i[0] in inspect.getmro(type(data)) else None, self._editors_.items())))
-        if len(editor_dicts):
-            editor_dict = editor_dicts[0]
-            editors = list(filter(lambda v: v, map(lambda k: (k[0] if k[1](data) else None), editor_dict.items())))
-            if len(editors):
-                return editors[0]
-        
+    # def _getEditor_(self, data) -> QtWidgets.QWidget | None:
+    #     editor_dicts = list(filter(lambda v: v, map(lambda i: i[1] if i[0] in inspect.getmro(type(data)) else None, self._editors_.items())))
+    #     if len(editor_dicts):
+    #         editor_dict = editor_dicts[0]
+    #         editors = list(filter(lambda v: v, map(lambda k: (k[0] if k[1](data) else None), editor_dict.items())))
+    #         if len(editors):
+    #             return editors[0]
+
     def _makeTableWidget_(self, data):
         if self._use_TableEditor_:
             # ### BEGIN Timing for debugging
             #
             # timer = QtCore.QElapsedTimer()
-            widget = TableEditorWidget(parent=self, readOnly=True)
-            signalBlocker = QtCore.QSignalBlocker(widget.tableView)
+            widget = TableEditorWidget(parent=self, readOnly=True, enforceReadOnly=True)
+            signalBlocker = QtCore.QSignalBlocker(widget.tableView) # is this needed !?!
             
             # timer.start()
             # NOTE: 2025-11-23 08:55:27
@@ -370,7 +385,19 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         self.setData(data, predicate=predicate, showPrivate=showPrivate,
                      top_title=top_title, dataTypeStr=dataTypeStr,
                      hideRoot=hideRoot)
-            
+
+    def _setupData_(self, typeStr):
+        self.clear()
+        self.nodes = {}
+        worker = WorkerThread(self, self.buildTree, self._private_data_,
+                              self.invisibleRootItem(),
+                              keyType=str, typeStr=typeStr,
+                              predicate=self.predicate,
+                              hideRoot=self.hideRoot,
+                              readOnly=self._readOnly_)
+        worker.signals.signal_Finished.connect(self._slot_treeBuilt)
+        worker.run()
+
     def setData(self, data, predicate=None, showPrivate:bool=False,
                 top_title:str = "", dataTypeStr = None, hideRoot=False):
         r"""data should be a dictionary."""
@@ -378,6 +405,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         self._visited_.clear()
         self.predicate = predicate
         self.showPrivate = showPrivate
+        self.hideRoot = hideRoot
         
         # NOTE: 2025-06-28 13:55:20
         # self._private_data_ is used to build the tree model; it can be the
@@ -391,36 +419,40 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
             self.top_title = "/"
         else:
             self.top_title = top_title
-            
-        # NOTE: 2022-12-15 23:25:05
-        # super().setData(data) # calls self.buildTree(...), which then calls self.parse(...)
-        self.clear()
-        # self.widgets = []
-        self.nodes = {}
-        
-        # NOTE: 2025-11-24 16:46:02
-        # ### BEGIN  DECIDE on one:
-        #
-        # Either this:
-        #
-#         self.buildTree(self._private_data_, self.invisibleRootItem(), 
-#                        keyType=str,typeStr=dataTypeStr, predicate=predicate,
-#                        hideRoot=hideRoot)
-#         
-#         self.topLevelItem(0).setText(0, self.top_title)
-        # self._slot_treeBuilt()
-        
-        #
-        # OR this:
-        #
-        
-        worker = WorkerThread(self, self.buildTree, self._private_data_, self.invisibleRootItem(),
-                              keyType = str, typeStr = dataTypeStr, predicate=predicate, hideRoot=hideRoot)
-        worker.signals.signal_Finished.connect(self._slot_treeBuilt)
-        worker.run()
-        
-        #
-        # ### END    DECIDE on one:
+
+        # NOTE: 2026-02-03 13:51:59
+        # having decided to go with the WorkerThread option, I moved that code in
+        # a separate method so that it can be called independently of self.setData()
+        self._setupData_(dataTypeStr)
+#         # NOTE: 2022-12-15 23:25:05
+#         # super().setData(data) # calls self.buildTree(...), which then calls self.parse(...)
+#         self.clear()
+#         # self.widgets = []
+#         self.nodes = {}
+#
+#         # NOTE: 2025-11-24 16:46:02
+#         # ### BEGIN  DECIDE on one:
+#         #
+#         # Either this:
+#         #
+# #         self.buildTree(self._private_data_, self.invisibleRootItem(),
+# #                        keyType=str,typeStr=dataTypeStr, predicate=predicate,
+# #                        hideRoot=hideRoot)
+# #
+# #         self.topLevelItem(0).setText(0, self.top_title)
+#         # self._slot_treeBuilt()
+#
+#         #
+#         # OR this:
+#         #
+#
+#         worker = WorkerThread(self, self.buildTree, self._private_data_, self.invisibleRootItem(),
+#                               keyType = str, typeStr = dataTypeStr, predicate=predicate, hideRoot=hideRoot)
+#         worker.signals.signal_Finished.connect(self._slot_treeBuilt)
+#         worker.run()
+#
+#         #
+#         # ### END    DECIDE on one:
         
     def _parse_dataclass(self, data) -> tuple:
         datafields = dataclasses.fields(data)
@@ -463,7 +495,8 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
     def buildTree(self, data:object, parent:QtWidgets.QTreeWidgetItem,
                   name:str="", keyType:type=str, nameTip:str="", typeStr:typing.Optional[str] = None, 
                   predicate:typing.Optional[typing.Any]=None, 
-                  hideRoot:bool=False, path:tuple=()):
+                  hideRoot:bool=False, readOnly:bool=True,
+                  path:tuple=()):
         r"""Builds the tree hierarchy.
         Initially written to override pyqtgraph.DataTreeWidget.buildTree(), but now see NOTE: 2025-11-23 08:22:37
         
@@ -903,13 +936,25 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                 
             elif isinstance(data, pd.DataFrame):
                 desc = "length=%d, columns=%d" % (len(data), len(data.columns))
-                widget = self._makeTableWidget_(data)
-                
+                if self.readOnly:
+                    widget = self._makeTableWidget_(data)
+                else:
+                    widget = self.delegate.createWidget(data, list(), False, self)
+                    widget.setMaximumHeight(self._widget_height_)
+
             elif isinstance(data, pd.Series):
                 desc = "length=%d, dtype=%s" % (len(data), data.dtype)
-                widget = self._makeTableWidget_(data)
+                if self.readOnly:
+                    widget = self._makeTableWidget_(data)
+                else:
+                    widget = self.delegate.createWidget(data, list(), False, self)
+                    widget.setMaximumHeight(self._widget_height_)
                 
             elif isinstance(data, pd.Index):
+                # NOTE: 2026-02-03 14:29:21
+                # pd.Index is ALWAYS read-only;
+                # this NEVER changes the object's structure (dict keys, row/column indexes of dataframe/series
+                # field names of dataclasses and named tuples, fields of structured arrays )
                 desc = "length=%d" % len(data)
                 widget = self._makeTableWidget_(data)
                 
@@ -938,45 +983,63 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
             elif isinstance(data, neo.core.dataobject.DataObject):
                 desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
                 editor_dict = filter(lambda k,v : k in inspect.getmro(type(data)), self._editors_.items())
-                if data.size == 1:
-                    widget = QtWidgets.QLabel(str(data))
+
+                if self.readOnly:
+                    if data.size == 1:
+                        widget = QtWidgets.QLabel(str(data))
+                    else:
+                        widget = self._makeTableWidget_(data)
+
                 else:
-                    widget = self._makeTableWidget_(data)
-#                 if len(editor_dict):
-#
-#                 if not self.readOnly:
-#                 else:
-#                     if data.size == 1:
-#                         widget = QtWidgets.QLabel(str(data))
-#                     else:
-#                         widget = self._makeTableWidget_(data)
+                    widget = self.delegate.createWidget(data, list(), False, self)
+                    widget.setMaximumHeight(self._widget_height_)
 
             elif isinstance(data, pq.Quantity):
-                if data.ndim == 0 or (data.ndim == 1 and data.size <= 1):
-                    desc = f"{data}"
+                # NOTE: 2026-02-03 14:27:22
+                # these also include pq.UnitQuantity, so might install a QuantityChooserWidget
+                if self.readOnly:
+                    if data.ndim == 0 or (data.ndim == 1 and data.size <= 1):
+                        desc = f"{data}"
+                    else:
+                        desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
+                        if data.ndim < 3 or not any(v > 1 for v in data.shape[2:]):
+                            widget = self._makeTableWidget_(data)
+
                 else:
-                    desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
-                    if data.ndim < 3 or not any(v > 1 for v in data.shape[2:]):
-                        widget = self._makeTableWidget_(data)
+                    widget = self.delegate.createWidget(data, list(), False, self)
+                    widget.setMaximumHeight(self._widget_height_)
                     
             elif isinstance(data, pq.dimensionality.Dimensionality):
                 desc = f"{data}"
                 
             elif isinstance(data, np.ndarray):
-                if data.size == 1:
-                    desc = f"{data}"
+                if self.readOnly:
+                    if data.size == 1:
+                        desc = f"{data}"
+                    else:
+                        desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
+                        if data.ndim < 3 or not any(v > 1 for v in data.shape[2:]):
+                            widget = self._makeTableWidget_(data)
                 else:
-                    desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
-                    if data.ndim < 3 or not any(v > 1 for v in data.shape[2:]):
-                        widget = self._makeTableWidget_(data)
-                    
+                    widget = self.delegate.createWidget(data, list(), False, self)
+                    widget.setMaximumHeight(self._widget_height_)
+
             elif isinstance(data, (vigra.filters.Kernel1D, vigra.filters.Kernel2D)):
-                widget = self._makeTableWidget_(data)
+                if self.readOnly:
+                    widget = self._makeTableWidget_(data)
+                else:
+                    widget = self.delegate.createWidget(data, list(), False, self)
+                    widget.setMaximumHeight(self._widget_height_)
                     
             elif isinstance(data, (datetime.datetime, datetime.date, datetime.time, datetime.timedelta, datetime.timezone)):
+                # NOTE: 2026-02-03 14:22:50 TODO
+                # read only for now; add QDateTimeEdit, QDateEdit and QTimeEdit to the delegate's createWidget
+                # to enable changing these
                 desc = f"{data}"
                 
             elif isinstance(data, types.TracebackType):  ## convert traceback to a list of strings
+                # NOTE: 2026-02-03 14:23:50
+                # ALWAYS READ-ONLY !!!
                 frames = list(map(str.strip, traceback.format_list(traceback.extract_tb(data))))
                 widget = QtWidgets.QPlainTextEdit(str('\n'.join(frames)))
                 widget.setMaximumHeight(200)
@@ -986,20 +1049,30 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                 children = {"lb": data.lb, "ub": data.ub, "keep_feasible": data.keep_feasible}
                 
             elif isinstance(data, (str, bytes, bytearray)):
-                if len(data)> 100:
-                    _data = data[:97] if isinstance(data, str) else data.decode()[:97]
-                    _data += "..."
-                    desc = f"{type(data)} with {len(data)} elements"
-                    txt = data if isinstance(data, str) else data.decode()
-                    widget = QtWidgets.QPlainTextEdit(txt)
-                    widget.setMaximumHeight(200)
-                    widget.setReadOnly(True)
+                # NOTE: 2026-02-03 14:24:47
+                # disable editing byte and bytearray types
+                if self.readOnly or isinstance(data, (bytes, bytearray)):
+                    if len(data)> 100:
+                        _data = data[:97] if isinstance(data, str) else data.decode()[:97]
+                        _data += "..."
+                        desc = f"{type(data)} with {len(data)} elements"
+                        txt = data if isinstance(data, str) else data.decode()
+                        widget = QtWidgets.QPlainTextEdit(txt)
+                        widget.setMaximumHeight(self._widget_height_)
+                        widget.setReadOnly(True)
+                    else:
+                        # no widget here; just display it in the 2nd column of the item's row
+                        desc = data if isinstance(data, str) else data.decode()
                 else:
-                    # no widget here; just display it in the 2nd column of the item's row
-                    desc = data if isinstance(data, str) else data.decode()
-                    
+                    widget = self.delegate.createWidget(data, list(), False, self)
+                    widget.setMaximumHeight(self._widget_height_)
+
             elif isinstance(data, (bool, int, float, complex, fractions.Fraction, decimal.Decimal, numbers.Number)):
-                desc = f"{data}"
+                if not self.readOnly:
+                    desc = f"{data}"
+                else:
+                    widget = self.delegate.createWidget(data, list(), False, self)
+
                 
             elif dataclasses.is_dataclass(data):
                 datafields = dataclasses.fields(data)
@@ -1050,6 +1123,14 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
             # print(f"{self.__class__.__name__}.parse data type : {type(data).__name__}, data: {data}")
             raise
         
+    @property
+    def delegate(self) -> QtWidgets.QStyledItemDelegate:
+        r"""The instance of styled item delegate used.
+    Read-only property
+
+    """
+        return self._delegate_
+
     @property
     def readOnly(self) -> bool:
         return self._readOnly_

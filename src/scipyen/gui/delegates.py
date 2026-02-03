@@ -46,6 +46,7 @@ from core.sysutils import adapt_ui_path
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
+import numpy as np
 import quantities as pq
 from core import scipyen_quantities as scq
 from gui.widgets import small_widgets as smw
@@ -88,6 +89,8 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
 
 """
+    sig_dataChanged = Signal(object, name = "sig_dataChanged")
+    sig_contentsChanged = Signal(name="sig_contentsChanged")
     
     # TODO/FIXME: 2025-10-28 12:57:09
     # decide how to handle the case where the combo box is editable (and its 
@@ -213,7 +216,11 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         Here, you can:
         • insert or edit the choices for a column
         """
-        
+        # TODO: 2025-09-25 23:42:02
+        # for datetime.datetime use QDateTimeEdit (with QDate and QTime)
+        # for datetime.date use QDateEdit (with QDate)
+        # for datetime.time use QTimeEdit (with QTime)
+
         if self._checkColumnChoiceDict_(choiceData):
             if len(choiceData) == 1:
                 if isinstance(self._columnChoices_, dict):
@@ -266,7 +273,120 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                     
             else:
                 scipywarn(f"{self.__class__.__name__}.setChoicesForColumn: invalid choiceData: {choiceData}")
-                
+
+    def createWidget(self, data:typing.Any, choices:typing.Optional[typing.Sequence[str]] = None,
+                     inModel:bool=True,
+                     parent:typing.Optional[QtWidgets.QWidget] = None) -> QtWidgets.QWidget:
+        r"""Work around for use with InteractiveTreeWidget and possibly others.
+
+    Bypasses the QModelIndex paradigm because a QTreeWidgetItem does not expose QModelIndex API
+
+    .. warning::
+
+        Do **NOT** use within the Model/View paradigm!
+
+    """
+        widget = None
+
+        if isinstance(data, (bool, np.bool)):# or "bool" in type(data).__name__:
+            widget = QtWidgets.QCheckBox(parent)
+
+        elif isinstance(data, (int, float, np.floating, np.integer)):# or any(v in type(data).__name__ for v in ("int", "float")):
+            if self._enforceFloat_:
+                # widget = QtWidgets.QDoubleSpinBox(parent)
+                widget = smw.QuantitySpinBox(parent)
+                widget.setMinimum(-math.inf)
+                widget.setMaximum(math.inf)
+                widget.setSingleStep(1)
+
+            else:
+                if isinstance(data, (int, np.integer)):# or "int" in type(data).__name__: # to include numpy array int dtypes
+                    widget = QtWidgets.QSpinBox(parent)
+                    widget.setMinimum(-9999)
+                    widget.setMaximum(9999)
+
+                elif isinstance(data, (float, np.floating)):# or "float" in type(data).__name__: # to include numpy array float dtypes
+                    # widget = QtWidgets.QDoubleSpinBox(parent)
+                    widget = smw.QuantitySpinBox(parent)
+                    widget.setMinimum(-math.inf)
+                    widget.setMaximum(math.inf)
+                    widget.setSingleStep(1)
+                    widget.sig_valueChanged.connect(self.sig_dataChanged)
+
+        elif isinstance(data, (complex, np.complexfloating)):
+            widget = smw.ComplexSpinBox(parent)
+            widget.sig_valueChanged.connect(self.sig_dataChanged)
+            # TODO: 2026-02-03 09:31:21
+            # set up other properties as well...
+
+        elif isinstance(data, pq.Quantity):
+            if isinstance(data, pq.UnitQuantity): # unlikely, but here we go...
+                widget = smw.QuantityChooserWidget(parent)
+                widget.unitChanged.connect(self.sig_dataChanged)
+            else:
+                if data.ndim == 0 or (data.ndim ==1 and data.size == 1):
+                    widget = smw.QuantitySpinBox(parent, enforceImmutableUnits=True) # disallow units change for individual data points in a Quantity
+                    widget.setMinimum(-math.inf * data.units)
+                    widget.setMaximum(math.inf * data.units)
+                    widget.setSingleStep(1.0  * data.units)
+                    widget.disableUnitChange = True
+                    widget.sig_valueChanged.connect(self.sig_dataChanged)
+
+                else:
+                    if inModel:
+                        return
+                    else:
+                        widget = TableEditorWidget(parent, readOnly=False)
+                        widget.setData(data)
+                        widget.sig_dataChanged.connect(self.sig_contentsChanged)
+
+        elif isinstance(data, (vigra.filters.Kernel1D, vigra.filters.Kernel2D)):
+            if inModel:
+                return
+            else:
+                widget = TableEditorWidget(parent, readOnly=False)
+                widget.setData(data)
+                widget.sig_dataChanged.connect(self.sig_contentsChanged)
+
+        elif isinstance(data, (str, np.character, bytes, bytearray)): # or "str" in type(a).__name__: # for numpy.str_ type
+            if isinstance(data, str) and isinstance(choices, typing.Sequence) and len(choices) > 0 and all(isinstance(c, str) for c in choices):
+                if data not in choices:
+                    scipywarn(f"Data ({data}) is not in the supplied choices ({choices})")
+                    return
+
+                ndx = choices.index(data)
+                widget = QtWidgets.QComboBox(parent)
+                widget.insertItems(0, choices)
+                widget.setEditable(False)
+                widget.setCurrentIndex(ndx)
+            else:
+                if len(data) > 100:
+                    txt = data if isinstance(data, str) else data.decode()
+                    widget = QtWidgets.QPlainTextEdit(txt)
+                    widget.setMaximumHeight(200)
+                    if isinstance(data, str):
+                        widget.setReadOnly(False)
+                        widget.textChanged().connect(self.sig_contentsChanged)
+                    else:
+                        widget.setReadOnly(True)
+                else:
+                    if isinstance(data, str):
+                        # widget = QtWidgets.QLineEdit(parent)
+                        widget = smw.LazyLineEdit(parent)
+                        widget.setText(data)
+                        widget.sig_enterPressed.connect(self.sig_dataChanged)
+                    else:
+                        return
+
+        else: # TODO: 2025-09-23 16:16:56 FIXME use a pushbutton to open a complex viewer/editor
+            return
+
+        if hasattr(widget, "setFrame"):
+            widget.setFrame(False)
+        widget.setAutoFillBackground(True)
+        return widget
+
+
     def createEditor(self, parent:QtWidgets.QWidget, option:int, index:QtCore.QModelIndex) -> QtWidgets.QWidget | None:
         # NOTE: 2025-09-27 10:29:14 ATTENTION
         # editor data, although it can also be set here, it should be set through
@@ -309,74 +429,85 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                 
             elif index.column() in immutableColumns or index.row() in immutableRows:
                 return
+
+        choices = list()
             
-        if index.column() in self._columnChoices_: # TODO: 2025-10-28 09:28:20 finalize me
+        if index.column() in self._columnChoices_:
             if not isinstance(data, str):
                 scipywarn(f"{self.__class__.__name__}.createEditor: data type ({type(data).__name__}) is not supported for combo box")
                 return 
             
             choices = self._columnChoices_[index.column()]["choices"]
-            
-            if data not in choices:
-                scipywarn(f"{self.__class__.__name__}.createEditor: data {data} does not belong to choices ({choices})")
-                return
-            
-            ndx = choices.index(data)
-            
-            widget = QtWidgets.QComboBox(parent)
-            widget.insertItems(0, choices)
-            widget.setEditable(False) # prevent editing for now; must revisit this FIXME/TODO
-            # widget.setEditable(self._columnChoices_[index.column()]["editable"])
-            widget.setCurrentIndex(ndx)
-            
-        else:
-            
-            # TODO: 2025-09-25 23:42:02
-            # for datetime.datetime use QDateTimeEdit (with QDate and QTime)
-            # for datetime.date use QDateEdit (with QDate)
-            # for datetime.time use QTimeEdit (with QTime)
-            
-            if isinstance(data, bool) or "bool" in type(data).__name__:
-                widget = QtWidgets.QCheckBox(parent)
-                
-            elif isinstance(data, (int, float)) or any(v in type(data).__name__ for v in ("int", "float")):
-                if self._enforceFloat_:
-                    # widget = QtWidgets.QDoubleSpinBox(parent)
-                    widget = smw.QuantitySpinBox(parent)
-                    widget.setMinimum(-math.inf)
-                    widget.setMaximum(math.inf)
-                    widget.setSingleStep(1)
-                    
-                else:
-                    if isinstance(data, int) or "int" in type(data).__name__: # to include numpy array int dtypes
-                        widget = QtWidgets.QSpinBox(parent)
-                        widget.setMinimum(-9999)
-                        widget.setMaximum(9999)
-                        
-                    elif isinstance(data, float) or "float" in type(data).__name__: # to include numpy array float dtypes
-                        # widget = QtWidgets.QDoubleSpinBox(parent)
-                        widget = smw.QuantitySpinBox(parent)
-                        widget.setMinimum(-math.inf)
-                        widget.setMaximum(math.inf)
-                        widget.setSingleStep(1)
-                        
-            elif isinstance(data, pq.Quantity):
-                if isinstance(data, pq.UnitQuantity): # unlikely, but here we go...
-                    widget = smw.QuantityChooserWidget(parent)
-                else:
-                    if data.ndim > 0: # no editing of Quantity ARRAYS; only scalar Quantities can be edited; unlikely to encounter this, but here we go...
-                        return
-                    widget = smw.QuantitySpinBox(parent, enforceImmutableUnits=True) # disallow units change for individual data points in a Quantity
-                    widget.setMinimum(-math.inf * data.units)
-                    widget.setMaximum(math.inf * data.units)
-                    widget.setSingleStep(1.0  * data.units)
-                    widget.disableUnitChange = True
-                    
-            elif isinstance(data, str) or "str" in type(a).__name__: # for numpy.str_ type
-                widget = QtWidgets.QLineEdit(parent)
-                
-            else: # TODO: 2025-09-23 16:16:56 FIXME use a pushbutton to open a complex viewer/editor
-                return
+
+        return self.createWidget(data, choices, True, parent)
+
+#         if index.column() in self._columnChoices_:
+#             if not isinstance(data, str):
+#                 scipywarn(f"{self.__class__.__name__}.createEditor: data type ({type(data).__name__}) is not supported for combo box")
+#                 return
+#
+#             choices = self._columnChoices_[index.column()]["choices"]
+#
+#             if data not in choices:
+#                 scipywarn(f"{self.__class__.__name__}.createEditor: data {data} does not belong to choices ({choices})")
+#                 return
+#
+#             ndx = choices.index(data)
+#
+#             widget = QtWidgets.QComboBox(parent)
+#             widget.insertItems(0, choices)
+#             widget.setEditable(False) # prevent editing for now; must revisit this FIXME/TODO
+#             # widget.setEditable(self._columnChoices_[index.column()]["editable"])
+#             widget.setCurrentIndex(ndx)
+#
+#         else:
+#
+#             # TODO: 2025-09-25 23:42:02
+#             # for datetime.datetime use QDateTimeEdit (with QDate and QTime)
+#             # for datetime.date use QDateEdit (with QDate)
+#             # for datetime.time use QTimeEdit (with QTime)
+#
+#             if isinstance(data, bool) or "bool" in type(data).__name__:
+#                 widget = QtWidgets.QCheckBox(parent)
+#
+#             elif isinstance(data, (int, float)) or any(v in type(data).__name__ for v in ("int", "float")):
+#                 if self._enforceFloat_:
+#                     # widget = QtWidgets.QDoubleSpinBox(parent)
+#                     widget = smw.QuantitySpinBox(parent)
+#                     widget.setMinimum(-math.inf)
+#                     widget.setMaximum(math.inf)
+#                     widget.setSingleStep(1)
+#
+#                 else:
+#                     if isinstance(data, int) or "int" in type(data).__name__: # to include numpy array int dtypes
+#                         widget = QtWidgets.QSpinBox(parent)
+#                         widget.setMinimum(-9999)
+#                         widget.setMaximum(9999)
+#
+#                     elif isinstance(data, float) or "float" in type(data).__name__: # to include numpy array float dtypes
+#                         # widget = QtWidgets.QDoubleSpinBox(parent)
+#                         widget = smw.QuantitySpinBox(parent)
+#                         widget.setMinimum(-math.inf)
+#                         widget.setMaximum(math.inf)
+#                         widget.setSingleStep(1)
+#
+#             elif isinstance(data, pq.Quantity):
+#                 if isinstance(data, pq.UnitQuantity): # unlikely, but here we go...
+#                     widget = smw.QuantityChooserWidget(parent)
+#                 else:
+#                     if data.ndim > 0: # no editing of Quantity ARRAYS; only scalar Quantities can be edited; unlikely to encounter this, but here we go...
+#                         return
+#                     widget = smw.QuantitySpinBox(parent, enforceImmutableUnits=True) # disallow units change for individual data points in a Quantity
+#                     widget.setMinimum(-math.inf * data.units)
+#                     widget.setMaximum(math.inf * data.units)
+#                     widget.setSingleStep(1.0  * data.units)
+#                     widget.disableUnitChange = True
+#
+#             elif isinstance(data, str) or "str" in type(a).__name__: # for numpy.str_ type
+#                 widget = QtWidgets.QLineEdit(parent)
+#
+#             else: # TODO: 2025-09-23 16:16:56 FIXME use a pushbutton to open a complex viewer/editor
+#                 return
         
         if hasattr(widget, "setFrame"):
             widget.setFrame(False)
@@ -384,6 +515,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         return widget
     
     def setEditorData(self, editor:QtWidgets.QWidget, index:QtCore.QModelIndex):
+        r"""Sets the value of the editor widget based on the EditRole data in the QModelIndex"""
         data = index.data(QtCore.Qt.EditRole)
         disp = index.data(QtCore.Qt.DisplayRole)
         
@@ -455,6 +587,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             
             
     def setModelData(self, editor:QtWidgets.QWidget, model:QtCore.QAbstractItemModel, index:QtCore.QModelIndex):
+        r"""Sets data back into the QModelIndex"""
         if isinstance(editor, (QtWidgets.QSpinBox, QtWidgets.QDoubleSpinBox, smw.QuantitySpinBox)):
             data = editor.value()
         elif isinstance(editor, QtWidgets.QLineEdit):
