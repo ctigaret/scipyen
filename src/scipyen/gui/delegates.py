@@ -90,7 +90,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
 
 """
-    sig_dataChanged = Signal(object, name = "sig_dataChanged")
+    sig_dataChanged = Signal(name = "sig_dataChanged")
     sig_contentsChanged = Signal(name="sig_contentsChanged")
     
     # TODO/FIXME: 2025-10-28 12:57:09
@@ -153,6 +153,8 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             self._immutableRows_ = immutableRows 
         else:
             self._immutableRows_ = list()
+
+        self._currentData_:typing.Optional[typing.Any] = None
         
     def _checkColumnChoiceDict_(self, d:dict) -> bool:
         if not isinstance(d, dict):
@@ -292,6 +294,8 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
         if isinstance(data, (bool, np.bool)):# or "bool" in type(data).__name__:
             widget = QtWidgets.QCheckBox(parent)
+            if not inModel:
+                widget.setChecked(data == True)
             widget.toggled.connect(self.slot_dataChanged)
 
         elif isinstance(data, (int, float, np.floating, np.integer)):# or any(v in type(data).__name__ for v in ("int", "float")):
@@ -318,9 +322,14 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                     widget.setSingleStep(1)
                     widget.sig_valueChanged.connect(self.slot_dataChanged)
 
+            if widget and not inModel:
+                widget.setValue(data)
+
         elif isinstance(data, (complex, np.complexfloating)):
             widget = smw.ComplexSpinBox(parent)
             widget.sig_valueChanged.connect(self.slot_dataChanged)
+            if not inModel:
+                widget.setValue(data)
             # TODO: 2026-02-03 09:31:21
             # set up other properties as well...
 
@@ -345,7 +354,10 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                         widget = TableEditorWidget(parent, readOnly=False)
                         widget.setData(data)
                         widget.sig_dataChanged.connect(self.slot_dataChanged)
-                        
+
+            if widget and not inModel:
+                widget.setValue(data)
+
         elif isinstance(data, np.ndarray):
             if data.ndim == 0 or (data.ndim ==1 and data.size == 1):
                 widget = smw.QuantitySpinBox(parent, enforceImmutableUnits=True) # disallow units change for individual data points in a Quantity
@@ -354,6 +366,9 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                 widget.setSingleStep(1.0  * data.units)
                 widget.disableUnitChange = True
                 widget.sig_valueChanged.connect(self.slot_dataChanged)
+
+                if widget and not inModel:
+                    widget.setValue(data)
 
             else:
                 if inModel:
@@ -426,7 +441,9 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
     @Slot(vigra.filters.Kernel1D)
     @Slot(vigra.filters.Kernel2D)
     def slot_dataChanged(self, o:typing.Any):
-        print(f"{o}")
+        print(f"{self.__class__.__name__}.slot_dataChanged({o})")
+        self._currentData_ = o
+        self.sig_dataChanged.emit()
         
 
     def createEditor(self, parent:QtWidgets.QWidget, option:int, index:QtCore.QModelIndex) -> QtWidgets.QWidget | None:

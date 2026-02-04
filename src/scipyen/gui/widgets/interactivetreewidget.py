@@ -102,7 +102,7 @@ from gui.widgets.small_widgets import (QuantitySpinBox, ComplexSpinBox)
 from gui.delegates import PythonItemDelegate
 
 NOTMEMOIZED = (tuple, type(None), type(MISSING), type(pd.NA), type, np.ndarray, types.ModuleType, pkgutil.ModuleInfo)
-PODS = (bool, int, float, bytes, bytearray, str)
+PODS = (bool, int, float, bytes, bytearray, str, np.floating, np.complexfloating, complex)
 
 class InteractiveTreeWidget(QtWidgets.QTreeWidget):
     r"""QTreeWidget that enables:
@@ -153,24 +153,6 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
     # a specified widget is to be used with the given data type
 
 
-    # _editors_ ={bool:               {QtWidgets.QCheckBox:       lambda o: True},
-    #             np.bool:            {QtWidgets.QCheckBox:       lambda o: True},
-    #             int:                {QtWidgets.QSpinBox:        lambda o: True},
-    #             np.integer:         {QuantitySpinBox:           lambda o: True},
-    #             float:              {QuantitySpinBox:           lambda o: True},
-    #             np.floating:        {QuantitySpinBox:           lambda o: True},
-    #             complex:            {ComplexSpinBox:            lambda o: True},
-    #             np.complexfloating: {ComplexSpinBox:            lambda o: True},
-    #             np.ndarray:         {QuantitySpinBox:           lambda o: o.size == 1,
-    #                                  TableEditorWidget:         lambda o: o.size > 1,
-    #                                 },
-    #             str:                {QtWidgets.QLineEdit:       lambda o: len(o)<= 100,
-    #                                  QtWidgets.QPlainTextEdit:  lambda o: len(o)> 100},
-    #             bytes:              {QtWidgets.QLineEdit:       lambda o: len(o)<= 100,
-    #                                  QtWidgets.QPlainTextEdit:  lambda o: len(o)> 100},
-    #             bytearray:          {QtWidgets.QLineEdit:       lambda o: len(o)<= 100,
-    #                                  QtWidgets.QPlainTextEdit:  lambda o: len(o)> 100},
-    #             }
     
     def __init__(self, *args, **kwargs):
         r"""
@@ -182,6 +164,8 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         parent =  kwargs.pop("parent", None)
         super().__init__(parent=parent)
         self._ready_:bool = False
+
+        self.nodes = {} # path ↦ (node, widget)
 
         self._readOnly_:bool = kwargs.pop("readOnly", True)
 
@@ -218,6 +202,8 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         self.predicate = None
         self.showPrivate = False
         self.hideRoot = False
+
+        self._editor_nodes_dict_:dict = dict()
         
         
         #  NOTE: 2025-06-26 21:29:48
@@ -240,6 +226,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                     break
 
         self._delegate_ = PythonItemDelegate()
+        self._delegate_.sig_dataChanged.connect(self._slot_delegateDataChanged)
                 
         self.update()
 
@@ -324,6 +311,11 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         # print(f"{self.__class__.__name__}<{self.parent().windowTitle()}, {self.parent().parent().windowTitle()}> _slot_setLastActive item {item.data(0,QtCore.Qt.DisplayRole)}")
         self._last_active_item_ = item.data(0,QtCore.Qt.DisplayRole)
         self._last_active_item_column_ = column
+
+    @Slot()
+    def _slot_delegateDataChanged(self):
+        print(f"{self.__class__.__name__}._slot_delegateDataChanged: {self._delegate_._currentData_}")
+        pass
         
     @Slot()
     def _slot_treeBuilt(self):
@@ -595,12 +587,6 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         # record the path to the node so it can be retrieved later
         # (this is used by the tree widget)
         
-        # NOTE: 2021-08-15 14:41:32
-        # self.nodes is a dict
-        # path is a tuple (as index branch path) - this is immutable, hence 
-        # hashable, hence usable as dict key
-        self.nodes[path] = node
-        
         # NOTE: 2025-11-16 14:31:50
         # call self.parse(…) in order to get the type, descctiption, collection 
         # of children (if any), the widget (delegate?) to display this data and 
@@ -612,7 +598,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         # 
         # timer = QtCore.QElapsedTimer()
         # timer.start()
-        typeStr_, desc, children, widget, typeTip, showDescInParentNode = self.parse(data, path, predicate=predicate)
+        typeStr_, desc, children, widget, typeTip, showDescInParentNode, widgetColumn = self.parse(data, path, predicate=predicate)
         # print(f"{self.__class__.__name__}.buildTree: parsing {typeStr_} data with {len(children)} children and {type(widget).__name__} widget took {(timer.elapsed() *pq.ms).rescale(pq.s)}")
         # print(f"{self.__class__.__name__}.buildTree: parsing {typeStr_} data with {len(children)} children and {type(widget).__name__} widget took {timer.elapsed()} milliseconds")
         #
@@ -694,14 +680,31 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
             # for the newly created subnode
             # 
             # self.widgets.append(widget)
-            subnode = QtWidgets.QTreeWidgetItem(["", "", ""])
-            node.addChild(subnode)
-            self.setItemWidget(subnode, 0, widget) # inherited from QTreeWidget; the widget will go in column 0 of the child
-            modelndx = self.indexFromItem(subnode)
-            parentndx = self.indexFromItem(node)
-            self.setFirstColumnSpanned(modelndx.row(), parentndx, True)
-            # self.setFirstItemColumnSpanned(subnode, True) # obsolete !!!
+
+            # NOTE 2026-02-04 08:42:17
+            # if parse(…) returns a widget for column 0, set this up as a SUBNODE
+            #   that spans all three columns
+            # else just set it up as widget to the CURRENT node, in the specified column
+            if widgetColumn == 0:
+                subnode = QtWidgets.QTreeWidgetItem(["", "", ""])
+                node.addChild(subnode)
+                self.setItemWidget(subnode, 0, widget) # inherited from QTreeWidget; the widget will go in column 0 of the child
+                modelndx = self.indexFromItem(subnode)
+                parentndx = self.indexFromItem(node)
+                self.setFirstColumnSpanned(modelndx.row(), parentndx, True)
+            else:
+                assert widgetColumn > 0 and widgetColumn <=2, f"Invalid widgetColumn specified ({widgetColumn}; should be 1 or 2)"
+                self.setItemWidget(node, widgetColumn, widget)
+
+            # print(f"{self.__class__.__name__}.buildTree: path for widget: {path}")
             
+        # NOTE: 2026-02-04 09:52:48
+        # move here, and updated to store the tuple (node, widget); widget may be None
+        # self.nodes is a dict
+        # path is a tuple (as index branch path) - this is immutable, hence
+        # hashable, hence usable as dict key
+        self.nodes[path] = (node, widget)
+
         # NOTE: 2025-11-23 08:43:04
         # recurse into children (a dict)
         if isinstance(children, dict):
@@ -747,13 +750,37 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         
         Returns:
         ========
+        4-Tuple
+
+        .. ::
+
+            (typeStr:str, desc:str, children:dict, widget:QWidget, typeTip:str,
+            showDescInParentNode:bool, widgetColumn:int in (0,2) )
+
+
         • typeStr - a string representation of the data type
+
         • description  - a short string representation
+
         • a dict of sub-objects (children) to be parsed further
+
         • an optional widget to display/edit as sub-node (default is None)
+
         • typeTip: a string indicating the type of the key (for dict data) or of
+
             the index (for sequences, this is always an int, except for namedtuples
+
             where it can be a str)
+
+        • showDescriptionInParentNode: bool
+
+        • widgetColumn: index of column where the widget should go;
+
+            can be only 0 or 2; when 0, the widget goes to a subnode; when 2, the
+
+            widget will go in the place of value/information display, as a one-line editor
+
+            therefore only a subset of widgets are allowed in the 3rd column (column 2)
 
         
         CHANGELOG (most recent first):
@@ -782,6 +809,8 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                                         PVStateShard, PVStateValue, PVIndexedValue, PVSubIndexedValue, 
                                         PVSubIndexedValueList, PVLinescanDefinition)
         
+        targetColumnForWidget = 0
+
         # NOTE: 2022-12-30 11:37:05
         # allow pre-empting the type string (e.g. when passed a dict created
         # dynamically from an object of some type)
@@ -829,21 +858,21 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                         else:
                             full_path = "/".join([self.top_title, path])
                     desc = "<reference to %s at %s >" % (objtype.__name__, full_path)
-                    return typeStr, desc, children, widget, typeTip, showDescInParentNode
+                    return typeStr, desc, children, widget, typeTip, showDescInParentNode, targetColumnForWidget
             else:
                 self.memoize(data, path)
                 
         if data is None:
             typeStr = "(None)"
-            return typeStr, desc, children, widget, typeTip, showDescInParentNode
+            return typeStr, desc, children, widget, typeTip, showDescInParentNode, targetColumnForWidget
         
         elif data is dataclasses.MISSING:
             desc = str(MISSING)
-            return typeStr, desc, children, widget, typeTip, showDescInParentNode
+            return typeStr, desc, children, widget, typeTip, showDescInParentNode, targetColumnForWidget
         
         elif type(data) is type(pd.NA):
             desc = str(pd.NA)
-            return typeStr, desc, children, widget, typeTip, showDescInParentNode
+            return typeStr, desc, children, widget, typeTip, showDescInParentNode, targetColumnForWidget
             
         # print(f"{self.__class__.__name__}.parse -> data_type: {data_type} ")
         try:
@@ -942,6 +971,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                 else:
                     widget = self.delegate.createWidget(data, list(), False, self)
                     widget.setMaximumHeight(self._widget_height_)
+                targetColumnForWidget = 0
 
             elif isinstance(data, pd.Series):
                 desc = "length=%d, dtype=%s" % (len(data), data.dtype)
@@ -950,7 +980,8 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                 else:
                     widget = self.delegate.createWidget(data, list(), False, self)
                     widget.setMaximumHeight(self._widget_height_)
-                
+                targetColumnForWidget = 0
+
             elif isinstance(data, pd.Index):
                 # NOTE: 2026-02-03 14:29:21
                 # pd.Index is ALWAYS read-only;
@@ -958,21 +989,22 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                 # field names of dataclasses and named tuples, fields of structured arrays )
                 desc = "length=%d" % len(data)
                 widget = self._makeTableWidget_(data)
-                
+                targetColumnForWidget = 0
+
             elif isinstance(data, Interval):
                 desc = f"Interval '{data.name}' with {len(data)} subinterval(s)"
-                children = {"t0": data.t0, "t1": data.t1, "durations": data.durations, 
+                children = {"t0": data.t0, "t1": data.t1, "durations": data.durations,
                             "extent": data.extent, "labels": data.labels,
                             "annotations": data.annotations,
                             "description": data.description,
                             }
-                
+
             elif isinstance(data, (neo.Epoch, DataZone)):
                 desc = f"{type(data).__name__} '{data.name}' with {len(data)} subinterval(s)"
-                children = {"times": data.times, "durations": data.durations, 
+                children = {"times": data.times, "durations": data.durations,
                             "labels": data.labels, "annotations": data.annotations,
                             "description": data.description}
-                
+
             elif isinstance(data, (neo.Event, DataMark, TriggerEvent)):
                 desc = f"{type(data).__name__} '{data.name}' with {len(data)} mark(s)"
                 children = {"times": data.times, "labels": data.labels}
@@ -980,7 +1012,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                     children.update({"type": data.type, "relative": data.relative})
                 children.update({"annotations": data.annotations,
                                  "description": data.description})
-                
+
             elif isinstance(data, neo.core.dataobject.DataObject):
                 desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
                 editor_dict = filter(lambda k,v : k in inspect.getmro(type(data)), self._editors_.items())
@@ -994,6 +1026,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                 else:
                     widget = self.delegate.createWidget(data, list(), False, self)
                     widget.setMaximumHeight(self._widget_height_)
+                    targetColumnForWidget = 0
 
             elif isinstance(data, pq.Quantity):
                 # NOTE: 2026-02-03 14:27:22
@@ -1009,10 +1042,11 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                 else:
                     widget = self.delegate.createWidget(data, list(), False, self)
                     widget.setMaximumHeight(self._widget_height_)
-                    
+                    targetColumnForWidget = 0
+
             elif isinstance(data, pq.dimensionality.Dimensionality):
                 desc = f"{data}"
-                
+
             elif isinstance(data, np.ndarray):
                 if self.readOnly:
                     if data.size == 1:
@@ -1024,6 +1058,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                 else:
                     widget = self.delegate.createWidget(data, list(), False, self)
                     widget.setMaximumHeight(self._widget_height_)
+                    targetColumnForWidget = 0
 
             elif isinstance(data, (vigra.filters.Kernel1D, vigra.filters.Kernel2D)):
                 if self.readOnly:
@@ -1031,13 +1066,14 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                 else:
                     widget = self.delegate.createWidget(data, list(), False, self)
                     widget.setMaximumHeight(self._widget_height_)
-                    
+                    targetColumnForWidget = 0
+
             elif isinstance(data, (datetime.datetime, datetime.date, datetime.time, datetime.timedelta, datetime.timezone)):
                 # NOTE: 2026-02-03 14:22:50 TODO
                 # read only for now; add QDateTimeEdit, QDateEdit and QTimeEdit to the delegate's createWidget
                 # to enable changing these
                 desc = f"{data}"
-                
+
             elif isinstance(data, types.TracebackType):  ## convert traceback to a list of strings
                 # NOTE: 2026-02-03 14:23:50
                 # ALWAYS READ-ONLY !!!
@@ -1045,10 +1081,11 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                 widget = QtWidgets.QPlainTextEdit(str('\n'.join(frames)))
                 widget.setMaximumHeight(200)
                 widget.setReadOnly(True)
-                
+                targetColumnForWidget = 0
+
             elif isinstance(data, scipy.optimize.Bounds):
                 children = {"lb": data.lb, "ub": data.ub, "keep_feasible": data.keep_feasible}
-                
+
             elif isinstance(data, (str, bytes, bytearray)):
                 # NOTE: 2026-02-03 14:24:47
                 # disable editing byte and bytearray types
@@ -1061,18 +1098,21 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                         widget = QtWidgets.QPlainTextEdit(txt)
                         widget.setMaximumHeight(self._widget_height_)
                         widget.setReadOnly(True)
+                        targetColumnForWidget = 0
                     else:
                         # no widget here; just display it in the 2nd column of the item's row
                         desc = data if isinstance(data, str) else data.decode()
                 else:
                     widget = self.delegate.createWidget(data, list(), False, self)
                     widget.setMaximumHeight(self._widget_height_)
+                    targetColumnForWidget = 2
 
             elif isinstance(data, (bool, int, float, complex, fractions.Fraction, decimal.Decimal, numbers.Number)):
-                if not self.readOnly:
+                if self.readOnly:
                     desc = f"{data}"
                 else:
                     widget = self.delegate.createWidget(data, list(), False, self)
+                    targetColumnForWidget = 2
 
                 
             elif dataclasses.is_dataclass(data):
@@ -1118,7 +1158,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                     if b.iconSize() != self._scipyenWindow_.iconSize():
                         b.setIconSize(self._scipyenWindow_.iconSize())
                 
-            return typeStr, desc, children, widget, typeTip, showDescInParentNode
+            return typeStr, desc, children, widget, typeTip, showDescInParentNode, targetColumnForWidget
         
         except:
             # print(f"{self.__class__.__name__}.parse data type : {type(data).__name__}, data: {data}")

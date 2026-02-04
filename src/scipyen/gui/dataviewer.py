@@ -770,7 +770,8 @@ class DataViewer(ScipyenViewer):
     @readOnly.setter
     def readOnly(self, val:bool):
         self._readOnly_ = val == True
-        self.treeWidget._setupData_(None)
+        self.slot_refreshDataDisplay()
+        # self.treeWidget._setupData_(None)
         
     @Slot()
     @safewrapper
@@ -813,6 +814,9 @@ class DataViewer(ScipyenViewer):
         self._obj_to_view_ = (dataclasses.MISSING, "")
         
     # @safewrapper
+    # TODO: 2026-02-04 16:45:51
+    # move this to InteractiveTreeWidget
+    # requires moving self._subselections_ to InteractiveTreeWidget as well
     def _get_path_for_item_(self, item:QtWidgets.QTreeWidgetItem, 
                             external:bool = False) -> tuple:#, as_expression:bool=True):
         r"""Returns a tree (indexing) path to item, as a list of 'nodes'.
@@ -852,14 +856,32 @@ class DataViewer(ScipyenViewer):
             self._subselections_.clear()
             # print(f"\n{self.__class__.__name__}._get_path_for_item_ START")
             leafSubSelection = list()
-            widget = self.treeWidget.itemWidget(item, 0)
-    
+            widget0 = self.treeWidget.itemWidget(item, 0)
+            widget1 = self.treeWidget.itemWidget(item, 2)
+
+            widget = None
+
+            if widget0:
+                widget = widget0
+
+            elif widget1:
+                widget = widget1
+
+            print(f"{self.__class__.__name__}._get_path_for_item_: item = {item} -> widget = {widget} widget0 = {widget0}, widget1 = {widget1}")
+
             # TODO: 2025-05-26 20:53:08 FIXME
             # crunching through many model indexes is getting very slow, especially
             # for large tabular data
             # TODO: Consider using QItemSelection and QItemSelectionRange objects
             #
             if widget:
+
+                # NOTE: 2026-02-04 14:24:10
+                # testing code, no't delete
+                paths = list(filter(lambda i: i is not None, map(lambda i: i[0] if widget in i[1] else None, self.treeWidget.nodes.items())))
+                print(f"{self.__class__.__name__}._get_path_for_item_: -> paths = {paths}")
+
+
                 # special case - this is a child item with a widget showing the 
                 # contents of the data represented by the parent item!
                 # ∴ the item's parent is the actual data we're after !
@@ -1084,6 +1106,9 @@ class DataViewer(ScipyenViewer):
             # self.errorMessage(type(exc).__name__, msg)
             raise
         
+    # TODO: 2026-02-04 16:47:14
+    # move this to InteractiveTreeWidget
+    # requires moving self._subselections_ to InteractiveTreeWidget as well
     @safewrapper
     def _export_data_items_(self, items:list[QtWidgets.QTreeWidgetItem], 
                             fullPathAsName:bool=False, path_only:bool=False) -> tuple[list]:
