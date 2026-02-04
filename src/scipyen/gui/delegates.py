@@ -90,7 +90,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
 
 """
-    sig_dataChanged = Signal(name = "sig_dataChanged")
+    sig_dataChanged = Signal(QtWidgets.QWidget, name = "sig_dataChanged")
     sig_contentsChanged = Signal(name="sig_contentsChanged")
     
     # TODO/FIXME: 2025-10-28 12:57:09
@@ -337,6 +337,8 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             if isinstance(data, pq.UnitQuantity): # unlikely, but here we go...
                 widget = smw.QuantityChooserWidget(parent)
                 widget.unitChanged.connect(self.slot_dataChanged)
+                if not inModel:
+                    widget.setValue(data)
             else:
                 if data.ndim == 0 or (data.ndim ==1 and data.size == 1):
                     widget = smw.QuantitySpinBox(parent, enforceImmutableUnits=True) # disallow units change for individual data points in a Quantity
@@ -345,18 +347,18 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                     widget.setSingleStep(1.0  * data.units)
                     widget.disableUnitChange = True
                     widget.sig_valueChanged.connect(self.slot_dataChanged)
+                    
+                    if not inModel:
+                        widget.setValue(data)
 
                 else:
                     if inModel:
-                        print("return none for Quantity")
+                        # print("return none for Quantity")
                         return
                     else:
                         widget = TableEditorWidget(parent, readOnly=False)
                         widget.setData(data)
                         widget.sig_dataChanged.connect(self.slot_dataChanged)
-
-            if widget and not inModel:
-                widget.setValue(data)
 
         elif isinstance(data, np.ndarray):
             if data.ndim == 0 or (data.ndim ==1 and data.size == 1):
@@ -367,7 +369,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                 widget.disableUnitChange = True
                 widget.sig_valueChanged.connect(self.slot_dataChanged)
 
-                if widget and not inModel:
+                if not inModel:
                     widget.setValue(data)
 
             else:

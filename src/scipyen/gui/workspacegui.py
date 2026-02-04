@@ -367,8 +367,8 @@ class GuiMessages(object):
         errMsgDlg.showMessage(text)
         
     @staticmethod
-    def errorMessage_static(obj:typing.Optional[QtWidgets.QWidget]=None, title:str="Error Message", text:str="Error"):
-        errMsgDlg = QtWidgets.QErrorMessage(obj)
+    def errorMessage_static(parent:typing.Optional[QtWidgets.QWidget]=None, title:str="Error Message", text:str="Error"):
+        errMsgDlg = QtWidgets.QErrorMessage(parent)
         errMsgDlg.setWindowTitle(title)
         errMsgDlg.showMessage(text)
         
@@ -377,33 +377,33 @@ class GuiMessages(object):
         return QtWidgets.QMessageBox.critical(self, title, text)
     
     @staticmethod    
-    def criticalMessage_static(obj:typing.Optional[QtWidgets.QWidget]=None, title:str="Critical", text:str="A critical error has occurred", default=QtWidgets.QMessageBox.No):
-        return QtWidgets.QMessageBox.critical(obj, title, text)
+    def criticalMessage_static(parent:typing.Optional[QtWidgets.QWidget]=None, title:str="Critical", text:str="A critical error has occurred", default=QtWidgets.QMessageBox.No):
+        return QtWidgets.QMessageBox.critical(parent, title, text)
         
     @safewrapper
     def informationMessage(self, title, text, default=QtWidgets.QMessageBox.No):
         return QtWidgets.QMessageBox.information(self, title, text)
 
     @staticmethod
-    def informationMessage_static(obj:typing.Optional[QtWidgets.QWidget]=None, title:str="Information", text:str="", default=QtWidgets.QMessageBox.No):
-        return QtWidgets.QMessageBox.information(obj, title, text)
+    def informationMessage_static(parent:typing.Optional[QtWidgets.QWidget]=None, title:str="Information", text:str="", default=QtWidgets.QMessageBox.No):
+        return QtWidgets.QMessageBox.information(parent, title, text)
         
     @safewrapper
     def questionMessage(self, title, text, default=QtWidgets.QMessageBox.No):
         return QtWidgets.QMessageBox.question(self, title, text, defaultButton=default)
 
     @staticmethod
-    def questionMessage_static(obj:typing.Optional[QtWidgets.QWidget]=None, title:str="Question", text:str="", default=QtWidgets.QMessageBox.No):
+    def questionMessage_static(parent:typing.Optional[QtWidgets.QWidget]=None, title:str="Question", text:str="", default=QtWidgets.QMessageBox.No):
         r"""Check the return value for equality to QtWidgets.QMessageBox.Yes"""
-        return QtWidgets.QMessageBox.question(obj, title, text, defaultButton=default)
+        return QtWidgets.QMessageBox.question(parent, title, text, defaultButton=default)
         
     @safewrapper
     def warningMessage(self, title, text, default=QtWidgets.QMessageBox.No):
         return QtWidgets.QMessageBox.warning(self, title, text, defaultButton=default)
     
     @staticmethod
-    def warningMessage_static(obj:typing.Optional[QtWidgets.QWidget]=None, title:str="Warning", text:str="", default=QtWidgets.QMessageBox.No):
-        return QtWidgets.QMessageBox.warning(obj, title, text, defaultButton=default)
+    def warningMessage_static(parent:typing.Optional[QtWidgets.QWidget]=None, title:str="Warning", text:str="", default=QtWidgets.QMessageBox.No):
+        return QtWidgets.QMessageBox.warning(parent, title, text, defaultButton=default)
         
 
     @safewrapper
@@ -488,7 +488,7 @@ class GuiMessages(object):
             return selectedFont
        
     @staticmethod
-    def detailedMessage_static(obj:typing.Optional[QtWidgets.QWidget]=None, 
+    def detailedMessage_static(parent:typing.Optional[QtWidgets.QWidget]=None, 
                                title:str="Message", text:str="", 
                                info:typing.Optional[str]="", 
                                detail:typing.Optional[str]="", 
@@ -519,7 +519,7 @@ class GuiMessages(object):
                 except:
                     icon = QtWidgets.QMessageBox.NoIcon
         
-        msgbox = QtWidgets.QMessageBox(parent=obj)
+        msgbox = QtWidgets.QMessageBox(parent=parent)
         msgbox.addButton(QtWidgets.QMessageBox.Ok)
         if isinstance(icon, QtGui.QPixmap):
             msgbox.setIconPixmap(icon)
@@ -674,7 +674,7 @@ class FileIOGui(object):
         return fn, fl
     
     @staticmethod
-    def chooseFile_static(obj:typing.Optional[QtWidgets.QWidget]=None, caption:typing.Optional[str]=None, fileFilter:typing.Optional[str]=None, single:typing.Optional[bool]=True, save:bool=False, targetDir:typing.Optional[str]=None):
+    def chooseFile_static(parent:typing.Optional[QtWidgets.QWidget]=None, caption:typing.Optional[str]=None, fileFilter:typing.Optional[str]=None, single:typing.Optional[bool]=True, save:bool=False, targetDir:typing.Optional[str]=None):
         r"""Launcher of file open dialog (static version)
         
         Parameters:
@@ -735,7 +735,7 @@ class FileIOGui(object):
         if isinstance(fileFilter, str) and len(fileFilter.strip()):
             opener = partial(opener, filter=fileFilter)
         
-        fn, fl = opener(parent=obj, directory=targetDir, **kw)
+        fn, fl = opener(parent=parent, directory=targetDir, **kw)
         
         return fn, fl
     
@@ -755,7 +755,7 @@ class FileIOGui(object):
         return dirName
 
     @staticmethod
-    def chooseDirectory_static(obj:typing.Optional[QtWidgets.QWidget]=None, caption:typing.Optional[str]=None,targetDir:typing.Optional[str]=None):
+    def chooseDirectory_static(parent:typing.Optional[QtWidgets.QWidget]=None, caption:typing.Optional[str]=None,targetDir:typing.Optional[str]=None):
         if sys.platform.startswith("win32"):
             options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
             kw = {"options":options}
@@ -763,9 +763,9 @@ class FileIOGui(object):
             kw = {}
 
         if targetDir is not None and targetDir != "" and os.path.exists(targetDir):
-            dirName = str(QtWidgets.QFileDialog.getExistingDirectory(obj, caption=caption, directory=targetDir, **kw))
+            dirName = str(QtWidgets.QFileDialog.getExistingDirectory(parent, caption=caption, directory=targetDir, **kw))
         else:
-            dirName = str(QtWidgets.QFileDialog.getExistingDirectory(obj, caption=caption, **kw))
+            dirName = str(QtWidgets.QFileDialog.getExistingDirectory(parent, caption=caption, **kw))
             
         return dirName
     
