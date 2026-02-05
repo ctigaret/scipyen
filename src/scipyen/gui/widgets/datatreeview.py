@@ -108,7 +108,8 @@ from core import xmlutils, strutils
 
 from core.workspacefunctions import (validate_varname, user_workspace)
 
-#from core.utilities import (get_nested_value, set_nested_value, counter_suffix, )
+# from core.utilities import (get_nested_value, set_nested_value,
+#                               counter_suffix, )
 
 from core.utilities import (NestedFinder, unique)
 
@@ -117,7 +118,8 @@ from core.prog import (safewrapper, safeguiwrapper, print_styled, qVariants)
 from core.traitcontainers import (DataBag, DataBagTraitsObserver,)
 
 from gui.widgets.tablewidget import SimpleTableWidget
-from gui.widgets.tableeditorwidget import (TableEditorWidget, TabularDataModel,)
+from gui.widgets.tableeditorwidget import (TableEditorWidget, 
+                                           TabularDataModel,)
 from gui.pictgui import WorkerThread
 from gui.delegates import PythonItemDelegate
 
@@ -132,85 +134,85 @@ PODS = (bool, int, float, bytes, bytearray, str)
 # use QTreeView with QStyledItemDelegate subclass and QStandardItem
 
 # ### BEGIN class DataTreeItem(object)
-class DataTreeItem(object):
 
-    # NOTE: 2026-02-01 14:46:39
-    # Sicne a tree mode is a "hierarchical" data model, the children of a DataTreeItem
-    # will each occupy a row counted from 0; rows are counted for 0  - do not confuse with
-    # a table model where rows are a single collection of indices for the entire data model !
-    def.__init__(self, data:typing.Sequence[QtCore.QVariant], parentItem:typing.Self, model:QtCore.QAbstractItemModel) -> typing.Self:
-        # super().__init__()
-        self._itemData_ = data # sequence of QVariant, one per column
-        self._parentItem_ = parentItem # this item occupies one ROW beneath the parent item; it is None for the root item
-        self._childItems_:typing.List(typing.Self) = list() # each DataTreeItem as a child of this one occupies one ROW beneath it
-        self._model_ = model
-
-    def appendChild(self, childItem:typing.Self):
-        # all children are DataTreeItem objects, one per row
-        # so this one effectively adds one row beneath itself
-        self._childItems_.append(childItem)
-
-    def childCount(self) -> int:
-        # how many rows beneath this item?
-        return len(self._childItems_)
-
-    def columnCount(self) -> int: # should always be 3, right !? -> ["Object", "Type", "Value / Information"]
-        # one QVariant per column! -> how many QVariant in this row (and by implication, in its row)
-        return len(self._itemData_)
-
-    def child(self, row:int) -> typing.Self | None:
-        # the DataTreeItem at specified row , or None
-        return self._childItems_[row] if row >= 0 and row < self.childCount() else None
-
-    def data(self, column:int) -> QtCore.QVariant: # may be null (isNull() -> True)
-        # the QVariant at specified column
-        return self._itemData_[column] if column >= 0 and column < len(self._itemData_) else QtCore.QVariant()
-
-    def parentItem(self) -> typing.Self | None:
-        # returns its parent or None; if this is the root, parent is always None
-        return self._parentItem_
-
-    def row(self) -> int:
-        r"""The row of this item, in the branch of its parent.
-
-Returns:
-========
-* 0 if this item has no parent
-
-* -1 of this item is not found among its parent's children (technically should vener happen)
-
-* the index of this item in the parent's children
-
-"""
-        if self._parentItem_ is None:
-            return 0
-
-        siblings = self._parentItem_._childItems_
-        if self in siblings:
-            # index of this item in the parent's children
-            return siblings.index(self)
-
-        return -1
-
-#     def index(self, column:int) -> QModelIndex:
-#         row = self.row()
-#         if row == -1 or column not in range(len(self._itemData_)):
-#             return QtCore.QModelIndex() # invalid model index
-#
-#         return QtCore.QModelIndex(row, column, None) # this API is NOT exposed to Python!
+# class DataTreeItem(object):
+# 
+#     # NOTE: 2026-02-01 14:46:39
+#     # Since a tree mode is a "hierarchical" data model, the children of a DataTreeItem
+#     # will each occupy a row counted from 0; rows are counted for 0  - do not confuse with
+#     # a table model where rows are a single collection of indices for the entire data model !
+#     def __init__(self, data:typing.Sequence[QtCore.QVariant], parentItem:typing.Self, model:QtCore.QAbstractItemModel) -> typing.Self:
+#         # super().__init__()
+#         self._itemData_ = data # sequence of QVariant, one per column
+#         self._parentItem_ = parentItem # this item occupies one ROW beneath the parent item; it is None for the root item
+#         self._childItems_:typing.List(typing.Self) = list() # each DataTreeItem as a child of this one occupies one ROW beneath it
+#         self._model_ = model
+# 
+#     def appendChild(self, childItem:typing.Self):
+#         # all children are DataTreeItem objects, one per row
+#         # so this one effectively adds one row beneath itself
+#         self._childItems_.append(childItem)
+# 
+#     def childCount(self) -> int:
+#         # how many rows beneath this item?
+#         return len(self._childItems_)
+# 
+#     def columnCount(self) -> int: # should always be 3, right !? -> ["Object", "Type", "Value / Information"]
+#         # one QVariant per column! -> how many QVariant in this row (and by implication, in its row)
+#         return len(self._itemData_)
+# 
+#     def child(self, row:int) -> typing.Self | None:
+#         # the DataTreeItem at specified row , or None
+#         return self._childItems_[row] if row >= 0 and row < self.childCount() else None
+# 
+#     def data(self, column:int) -> QtCore.QVariant: # may be null (isNull() -> True)
+#         # the QVariant at specified column
+#         return self._itemData_[column] if column >= 0 and column < len(self._itemData_) else QtCore.QVariant()
+# 
+#     def parentItem(self) -> typing.Self | None:
+#         # returns its parent or None; if this is the root, parent is always None
+#         return self._parentItem_
+# 
+#     def row(self) -> int:
+#         r"""The row of this item, in the branch of its parent.
+# 
+# Returns:
+# ========
+# * 0 if this item has no parent
+# 
+# * -1 of this item is not found among its parent's children (technically should vener happen)
+# 
+# * the index of this item in the parent's children
+# 
+# """
+#         if self._parentItem_ is None:
+#             return 0
+# 
+#         siblings = self._parentItem_._childItems_
+#         if self in siblings:
+#             # index of this item in the parent's children
+#             return siblings.index(self)
+# 
+#         return -1
+# 
+# #     def index(self, column:int) -> QModelIndex:
+# #         row = self.row()
+# #         if row == -1 or column not in range(len(self._itemData_)):
+# #             return QtCore.QModelIndex() # invalid model index
+# #
+# #         return QtCore.QModelIndex(row, column, None) # this API is NOT exposed to Python!
 
 # ### END   class DataTreeItem(object)
 
 # ### BEGIN class DataTreeStandardItem(QtGui.QStandardItem)
-class DataTreeStandardItem(QtGui.QStandardItem):
+
+
+class DataTreeItem(QtGui.QStandardItem):
     def __init__(self, *args, **kwargs):
         if len(args) == 1 and isinstance(args[0], str):
             super().__init__(args[0]) # item c'tor with a string
 
-        elif len(args) == 2:
-            if isinstance(args[0], QtGui.QIcon) and isinstance(args[1], str) or \
-                all(isinstance(a, int) and a>=0 for a in args):
-            super().__init__(*args) # item c'tor with an icon + string or row + column
+
 
         else:
             raise TypeError("Expecting a str, or a QtGui.QIcon and str, or two int values")
@@ -219,9 +221,42 @@ class DataTreeStandardItem(QtGui.QStandardItem):
 # ### END   class DataTreeStandardItem(QtGui.QStandardItem)
 
 # ### BEGIN class DataTreeModel(QtCore.QAbstractItemModel)
+
 # class DataTreeModel(QtGui.QStandardItemModel):
-class DataTreeModel(QtCore.QAbstractItemModel):
+
+
+class DataTreeModel(QtGui.QStandardItemModel):
     r"""
+
+Approach:
+
+.. ::
+
+    model = QtGui.QStandardItemModel(0,3)
+    invisibleRootItem = model.invisibleRootItem()
+    top_item0 = QtGui.QStandardItem("d")
+    top_item1 = QtGui.QStandardItem(type(d).__name__)
+    top_item2 = QtGui.QStandardItem(f"{len(d)}")
+    invisibleRootItem.insertRow(0, [top_item0, top_item1, top_item2])
+    parentItem = top_item0
+    for k, (key, val) in enumerate(d.items()):
+        item0 = QtGui.QStandardItem(key)
+        item1 = QtGui.QStandardItem(type(val).__name__)
+        item2 = QtGui.QStandardItem("a thing")
+        parentItem.insertRow(k, [item0, item1, item2])
+
+    treeView = QtWidgets.QTreeView()
+    treeView.setModel(model)
+    treeView.show()
+
+"Root" item: should be populatd with tol-leve object info (the "data" object)
+
+Depending on what data type is, add children to this root item
+
+Have the model create items for each of the three columns
+(see InteractiveTreeWidget) using 1st-level object info
+
+
 
 General rule for delegate use in this model:
 * the ones that occupy a single row go to column 2 of CURRENT item -> makes it easy to edit the object represented by the item
@@ -355,18 +390,18 @@ General rule for delegate use in this model:
     sig_editCompleted = Signal([pd.DataFrame], [pd.Series], [np.ndarray], name="sig_editCompleted")
     sig_modelDataChanged = Signal(name="sig_modelDataChanged")
 
-    def __init__(self, data:typing.Optional[typing.Any]=None, dataName:str=None,
-                 parent:typing.Optional[QtCore.QObject]=None,
+    def __init__(self, data: typing.Optional[typing.Any] = None, dataName: str = None,
+                 parent: typing.Optional[QtCore.QObject] = None,
                  **kwargs):
-        super(TreeDataModel, self).__init__(parent=parent)
+        super(DataTreeModel, self).__init__(0, 3, parent=parent)
         self._supported_data_types_ = kwargs.pop("supported_data_types", tuple())
         if not isinstance(self._supported_data_types_, tuple) or not all(isinstance(v, type) for v in self._supported_data_types_):
             self._supported_data_types_ = tuple()
-        self._modelDataColumns_:int = 3
-        self._modelDataRows_:int = 0
-        self._displayedColumns_:int = 3
-        self._displayedRows_:int = 0
-        self._rootItem_:DataTreeItem(qVariants(["Object", "Type", "Value / Information"]))))
+        self._modelDataColumns_: int = 3
+        self._modelDataRows_: int = 0
+        self._displayedColumns_: int = 3
+        self._displayedRows_: int = 0
+        self._rootItem_: DataTreeItem(qVariants(["Object", "Type", "Value / Information"]))
 
         if isinstance(dataName, str) and len(dataName.strip()):
             self._dataName_ = dataName
@@ -377,73 +412,77 @@ General rule for delegate use in this model:
 
         self.setModelData(self._modelData_, name = self._dataName_)
 
-    def data(self, modelIndex:QtCore.QModelIndex,
-             role:QtCore.Qt.ItemDataRole = QtCore,Qt.DisplayRole) -> QtCore.QVariant: # TODO 2026-02-01 21:31:55
-        if self._modelData_ is None:
-            return QtCore.QVariant()
-
-        if not modelIndex.isValid():
-            return QtCore.QVariant()
-
-        # avoid calling internalPointer() -> it will CRASH!
-        # instad, rely on the QModelIndex API, knowing that the all QModelIndex
-        # in an item only has data for column 0 (the DataTreeItem can have several QModelIndex objects, one per column)
-        return modelIndex.data(0, role)
-
-    def canFetchMore(self, parentIndex:QtCore.QModelIndex) -> bool: # TODO 2026-02-01 21:31:46
-        return False if parentIndex.isValid() else self._displayedRows_ < self._modelDataRows_ or self._displayedColumns_ < self._modelDataColumns_
-
-    def fetchMore(self, parentIndex:QtCore.QModelIndex): # TODO datetime2Qt
-        if parentIndex.isValid():
-            return
-
-    def flags(self, modelIndex:QtCore.QModelIndex) -> QtCore.Qt.ItemFlag:
-        #  'ItemIsAutoTristate',
-        #  'ItemIsDragEnabled',
-        #  'ItemIsDropEnabled',
-        #  'ItemIsEditable',
-        #  'ItemIsEnabled',
-        #  'ItemIsSelectable',
-        #  'ItemIsUserCheckable',
-        #  'ItemIsUserTristate',
-        #  'ItemNeverHasChildren'
-
-        return super().flags(modelIndex) if modelIndex.isValid() else QtCore.Qt.NoItemFlags # TODO 2026-02-01 21:31:43 — revisit this !!!
-
-    def setModelData(self, data:typing.Any, name:str="",
-                     showPrivate:bool=False, predicate=None,
-                     top_title:str = "/", dataTypeStr:str=""): # TODO 2026-02-01 21:32:05
-
-
-        pass
-
-    def headerData(self, section:int, orientation:QtCore.Qt.Orientation,
-                   role:QtCore.Qt.ItemDataRole=QtCore.Qt.DisplayRole) -> QtCore.QVariant:
-        # 'Horizontal',
-        # 'Vertical'
-        return self._rootItem_.data(section) if orientation == QtCore.Qt.Horizontal and role == QtCore.Qt.DisplayRole else QtCore.QVariant()
-
-    def index(self, row:int, column:int, parentIndex:QtCore.QModelIndex) -> QtCore.QModelIndex:
-        # NOTE: 2026-02-01 21:59:46
-        # There is no access to protected functions or signals for objects not created from Python;
-        # this means one cannot call self.createIndex(…) here, and cannot override it!
-        if not self.hasIndex(row, column, parent):
-            return QtCore.QModelIndex() # invalid index
-
-        # if parentIndex.isValid():
-        #     return parentIndex.model().
-
-        if parentIndex.isValid() and super().checkIndex(parentIndex):
-            pass
+    # def data(self, modelIndex: QtCore.QModelIndex,
+    #          role: QtCore.Qt.ItemDataRole = QtCore.Qt.DisplayRole) -> QtCore.QVariant: # TODO 2026-02-01 21:31:55
+    #     if self._modelData_ is None:
+    #         return QtCore.QVariant()
+    # 
+    #     if not modelIndex.isValid():
+    #         return QtCore.QVariant()
+    # 
+    #     # avoid calling internalPointer() -> it will CRASH!
+    #     # instad, rely on the QModelIndex API, knowing that the all QModelIndex
+    #     # in an item only has data for column 0 (the DataTreeItem can have 
+    #     # several QModelIndex objects, one per column)
+    #     return modelIndex.data(0, role)
+    # 
+    # def canFetchMore(self, parentIndex: QtCore.QModelIndex) -> bool:
+    #     # TODO 2026-02-01 21:31:46
+    #     return False if parentIndex.isValid() else self._displayedRows_ < self._modelDataRows_ or self._displayedColumns_ < self._modelDataColumns_
+    # 
+    # def fetchMore(self, parentIndex:QtCore.QModelIndex): 
+    #     # TODO datetime2Qt
+    #     if parentIndex.isValid():
+    #         return
+    # 
+    # def flags(self, modelIndex: QtCore.QModelIndex) -> QtCore.Qt.ItemFlag:
+    #     #  'ItemIsAutoTristate',
+    #     #  'ItemIsDragEnabled',
+    #     #  'ItemIsDropEnabled',
+    #     #  'ItemIsEditable',
+    #     #  'ItemIsEnabled',
+    #     #  'ItemIsSelectable',
+    #     #  'ItemIsUserCheckable',
+    #     #  'ItemIsUserTristate',
+    #     #  'ItemNeverHasChildren'
+    # 
+    #     return super().flags(modelIndex) if modelIndex.isValid() else QtCore.Qt.NoItemFlags # TODO 2026-02-01 21:31:43 — revisit this !!!
+    # 
+    # def setModelData(self, data: typing.Any, name: str = "",
+    #                  showPrivate: bool = False, predicate = None,
+    #                  top_title: str = "/", dataTypeStr: str = ""):
+    #     # TODO 2026-02-01 21:32:05
+    # 
+    # 
+    #     pass
+    # 
+    # def headerData(self, section: int, orientation: QtCore.Qt.Orientation,
+    #                role:QtCore.Qt.ItemDataRole=QtCore.Qt.DisplayRole) -> QtCore.QVariant:
+    #     # 'Horizontal',
+    #     # 'Vertical'
+    #     return self._rootItem_.data(section) if orientation == QtCore.Qt.Horizontal and role == QtCore.Qt.DisplayRole else QtCore.QVariant()
+    # 
+    # def index(self, row:int, column:int, parentIndex:QtCore.QModelIndex) -> QtCore.QModelIndex:
+    #     # NOTE: 2026-02-01 21:59:46
+    #     # There is no access to protected functions or signals for objects not created from Python;
+    #     # this means one cannot call self.createIndex(…) here, and cannot override it!
+    #     if not self.hasIndex(row, column, parent):
+    #         return QtCore.QModelIndex() # invalid index
+    # 
+    #     # if parentIndex.isValid():
+    #     #     return parentIndex.model().
+    # 
+    #     if parentIndex.isValid() and super().checkIndex(parentIndex):
+    #         pass
 
 # ### END   class DataTreeModel(QtCore.QAbstractItemModel)
 
 
 
 
-        
+
 
 class DataTreeView(QtWidgets.QTreeView):
-    def __init__(self, , *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         parent = kwargs.pop("parent", None)
         super().__init__(parent=parent)
