@@ -751,7 +751,7 @@ class DataViewer(ScipyenViewer):
     def readOnly(self, val:bool):
         self._readOnly_ = val is True
         self.treeWidget.readOnly = self._readOnly_
-        self.slot_refreshDataDisplay()
+        # self.slot_refreshDataDisplay()
         # self.treeWidget._setupData_(None)
         
     @Slot()

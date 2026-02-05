@@ -195,7 +195,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
     sequenceTypes = (typing.Sequence, tuple, list, deque, bytes)
     iterableCollectionTypes = sequenceTypes + mappingTypes
     
-    sig_valueChanged = Signal(object, name="sig_valueChanged")
+    sig_valueChanged = Signal(object, object, name="sig_valueChanged")
 
     def __init__(self, *args, **kwargs):
         r"""
@@ -385,12 +385,12 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
 
     @Slot(QtWidgets.QWidget)
     def _slot_delegateDataChanged(self, widget: QtWidgets.QWidget):
-        print(
-            f"{self.__class__.__name__}._slot_delegateDataChanged: {self._delegate_._currentData_}"
-        )
-        
         path = self.getObjectPathForWidget(widget)
                 
+        # print(
+        #     f"{self.__class__.__name__}._slot_delegateDataChanged: {self._delegate_._currentData_}, path = {path}"
+        # )
+
         self.sig_valueChanged.emit(self._delegate_._currentData_, path)
         pass
     
@@ -406,10 +406,13 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
 
     @Slot()
     def _slot_treeBuilt(self):
+        print(f"{self.__class__.__name__}._slot_treeBuilt: self._readOnly_ = {self._readOnly_}")
+
         self.expandToDepth(3)
         self.resizeColumnToContents(0)
 
         self.topLevelItem(0).setText(0, self.root_title)
+
 
         self._ready_ = True
 
@@ -431,6 +434,8 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                     self.scrollToItem(target, self._last_active_item_column_)
                 target.setSelected(True)
                 self.scrollTo(index, QtWidgets.QAbstractItemView.PositionAtCenter)
+
+        self._setWidgetsEditableState_()
 
     @Slot()
     def _slot_tableEditorWidgetSelectionChanged(self):
@@ -478,7 +483,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         self.clear()
         self.nodes = dict()
         self._visited_ = dict()
-        print(f"{self.__class__.__name__}._setupData: readOnly -> {self._readOnly_}")
+        print(f"{self.__class__.__name__}._setupData_: readOnly -> {self._readOnly_}")
         worker = WorkerThread(
             self,
             self.buildTree,
@@ -488,7 +493,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
             typeStr=self._dataTypeStr_,
             predicate=self.predicate,
             hideRoot=self.hideRoot,
-            readOnly=self._readOnly_,
+            # readOnly=self._readOnly_,
         )
         worker.signals.signal_Finished.connect(self._slot_treeBuilt)
         worker.run()
@@ -590,7 +595,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         typeStr: typing.Optional[str] = None,
         predicate: typing.Optional[typing.Any] = None,
         hideRoot: bool = False,
-        readOnly: bool = True,
+        # readOnly: bool = True,
         path: tuple = (),
     ):
         r"""Builds the tree hierarchy.
@@ -708,7 +713,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
             typeTip,
             showDescInParentNode,
             widgetColumn,
-        ) = self.parse(data, path, predicate=predicate, readOnly=readOnly)
+        ) = self.parse(data, path, predicate=predicate) # , readOnly=readOnly)
         # ### END   Timing measures for debugging
 
         if not isinstance(typeStr, str) or len(typeStr.strip()) == 0:
@@ -781,6 +786,9 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         # memoize(), getWidgetSelection(), _parse_data_(), _parse_dataclass(), 
         # _makeTableWidget_() and maybe:
         # _slot_tableEditorWidgetSelectionChanged(), setSupportedDataTypes()
+        #
+        #
+
         if widget is not None:
             # NOTE: 2025-11-16 14:36:15
             # is a widget has been created by self.parse, use it as item widget
@@ -798,16 +806,21 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                 node.addChild(subnode)
                 # below, inherited from QTreeWidget;
                 # the widget will go in column 0 of the child
+                # Column 0 is really only for TableEditorWidget
                 self.setItemWidget(subnode, 0, widget)
                 modelndx = self.indexFromItem(subnode)
                 parentndx = self.indexFromItem(node)
                 self.setFirstColumnSpanned(modelndx.row(), parentndx, True)
+                # if isinstance(widget, TableEditorWidget):
+                #     widget.readOnly = self.readOnly
+                # self.itemWidget(subnode, 0).setVisible(not readOnly)
             else:
                 assert (
                     widgetColumn > 0 and widgetColumn <= 2
                 ), f"Invalid widgetColumn specified ({widgetColumn}; should be 1 or 2)"
 
                 self.setItemWidget(node, widgetColumn, widget)
+                # self.itemWidget(node, widgetColumn).setVisible(not readOnly)
 
             # print(f"{self.__class__.__name__}.buildTree: path for widget: {path}")
 
@@ -816,6 +829,10 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         # self.nodes is a dict
         # path is a tuple (as index branch path) - this is immutable, hence
         # hashable, hence usable as dict key
+        #
+        # TODO: 2026-02-05 12:02:11
+        # shouldn't need another pointer to widget, here: widget can be accessed
+        # via self.itemWidget(item:QTreeWidgetItem, column:int)
         self.nodes[path] = (node, widget)
 
         # NOTE: 2025-11-23 08:43:04
@@ -846,7 +863,9 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
 
                 elif isinstance(
                     data,
-                    (tuple, list, deque, typing.Sequence, dict, types.MappingProxyType),
+                    (tuple, list, deque, typing.Sequence, dict,
+                     types.MappingProxyType
+                     ),
                 ):
                     keyrepr = f"{key}"
                     # this here is crucial; I want type of key not type of what
@@ -865,14 +884,15 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                     keyType=keyType,
                     nameTip=keytip,
                     predicate=predicate,
-                    readOnly=readOnly,
+                    # readOnly=readOnly,
                     path=path + (keyrepr,),
                 )  # so hideRoot is always False?
 
     def parse(self, data: typing.Any, path: typing.Sequence, /,
               predicate: typing.Optional[types.FunctionType] = None, 
               typeStr: typing.Optional[str] = None,
-              readOnly: bool = True) -> tuple:
+              # readOnly: bool = True,
+              ) -> tuple:
         r"""Figures out if data is to be represented as a (sub)tree or a widget.
 
         Returns:
@@ -936,12 +956,6 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
             HAVE_METAARRAY = None
 
         from core.datatypes import is_namedtuple, TypeEnum
-        # from imaging.axiscalibration import (
-        #     AxesCalibration,
-        #     AxisCalibrationData,
-        #     ChannelCalibrationData,
-        # )
-        # from imaging.axisutils import axisTypeStrings
         from systems.PrairieView import (
             PVObject,
             PVScan,
@@ -955,6 +969,8 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
             PVSubIndexedValueList,
             PVLinescanDefinition,
         )
+
+        # print(f"{self.__class__.__name__}.parse(readOnly = {readOnly})")
 
         targetColumnForWidget = 0
 
@@ -1020,39 +1036,39 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
 
         if data is None:
             typeStr = "(None)"
-            return (
-                typeStr,
-                desc,
-                children,
-                widget,
-                typeTip,
-                showDescInParentNode,
-                targetColumnForWidget,
-            )
+            # return (
+            #     typeStr,
+            #     desc,
+            #     children,
+            #     widget,
+            #     typeTip,
+            #     showDescInParentNode,
+            #     targetColumnForWidget,
+            # )
 
         elif data is dataclasses.MISSING:
             desc = str(MISSING)
-            return (
-                typeStr,
-                desc,
-                children,
-                widget,
-                typeTip,
-                showDescInParentNode,
-                targetColumnForWidget,
-            )
+            # return (
+            #     typeStr,
+            #     desc,
+            #     children,
+            #     widget,
+            #     typeTip,
+            #     showDescInParentNode,
+            #     targetColumnForWidget,
+            # )
 
         elif type(data) is type(pd.NA):
             desc = str(pd.NA)
-            return (
-                typeStr,
-                desc,
-                children,
-                widget,
-                typeTip,
-                showDescInParentNode,
-                targetColumnForWidget,
-            )
+            # return (
+            #     typeStr,
+            #     desc,
+            #     children,
+            #     widget,
+            #     typeTip,
+            #     showDescInParentNode,
+            #     targetColumnForWidget,
+            # )
 
         # print(f"{self.__class__.__name__}.parse -> data_type: {data_type} ")
         try:
@@ -1108,9 +1124,6 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                         children = data._asdict()
                     else:
                         children = dict(enumerate(data))
-
-                # else:
-                #     print("fallthrough")
 
             elif HAVE_METAARRAY and (
                 hasattr(data, "implements") and data.implements("MetaArray")
@@ -1192,29 +1205,37 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
 
             elif isinstance(data, pd.DataFrame):
                 desc = "length=%d, columns=%d" % (len(data), len(data.columns))
-                if readOnly:
-                    widget = self._makeTableWidget_(data)
-                else:
-                    widget = self.delegate.createWidget(data, list(), False, self)
-                    widget.setMaximumHeight(self._widget_height_)
+                widget = self.delegate.createWidget(data, list(), False,self)
+                widget.setMaximumHeight(self._widget_height_)
                 targetColumnForWidget = 0
+
+                # if readOnly:
+                #     widget = self._makeTableWidget_(data)
+                # else:
+                #     widget = self.delegate.createWidget(data, list(), False, False, self)
+                #     widget.setMaximumHeight(self._widget_height_)
 
             elif isinstance(data, pd.Series):
                 desc = "length=%d, dtype=%s" % (len(data), data.dtype)
-                if readOnly:
-                    widget = self._makeTableWidget_(data)
-                else:
-                    widget = self.delegate.createWidget(data, list(), False, self)
-                    widget.setMaximumHeight(self._widget_height_)
+                widget = self.delegate.createWidget(data, list(), False, self)
+                widget.setMaximumHeight(self._widget_height_)
+                # if readOnly:
+                #     widget = self._makeTableWidget_(data)
+                # else:
+                #     widget = self.delegate.createWidget(data, list(), False, self)
+                #     widget.setMaximumHeight(self._widget_height_)
                 targetColumnForWidget = 0
 
             elif isinstance(data, pd.Index):
                 # NOTE: 2026-02-03 14:29:21
-                # pd.Index is ALWAYS read-only;
-                # this NEVER changes the object's structure (dict keys, row/column indexes of dataframe/series
-                # field names of dataclasses and named tuples, fields of structured arrays )
+                # pd.Index should ALWAYS be read-only; however this branch is
+                # executed for stand-alone OIOndex objects (i.e. NOT when part
+                # of a DataFrame, when the widget is a TableEditorWidget which
+                # NEVER changes the associated Index (be it row or column index)
                 desc = "length=%d" % len(data)
-                widget = self._makeTableWidget_(data)
+                widget = self.delegate.createWidget(data, list(), False, self)
+                widget.setMaximumHeight(self._widget_height_)
+                # widget = self._makeTableWidget_(data)
                 targetColumnForWidget = 0
 
             elif isinstance(data, Interval):
@@ -1250,62 +1271,87 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
 
             elif isinstance(data, neo.core.dataobject.DataObject):
                 desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
-                editor_dict = filter(
-                    lambda k, v: k in inspect.getmro(type(data)), self._editors_.items()
-                )
 
-                if self.readOnly:
-                    if data.size == 1:
-                        widget = QtWidgets.QLabel(str(data))
-                    else:
-                        widget = self._makeTableWidget_(data)
+                widget = self.delegate.createWidget(data, list(), False, self)
+                widget.setMaximumHeight(self._widget_height_)
+                targetColumnForWidget = 0
 
-                else:
-                    widget = self.delegate.createWidget(data, list(), False, self)
-                    widget.setMaximumHeight(self._widget_height_)
-                    targetColumnForWidget = 0
+                # if self.readOnly:
+                #     if data.size == 1:
+                #         widget = QtWidgets.QLabel(str(data))
+                #     else:
+                #         widget = self._makeTableWidget_(data)
+                #
+                # else:
+                #     widget = self.delegate.createWidget(data, list(), False, self)
+                #     widget.setMaximumHeight(self._widget_height_)
+                #     targetColumnForWidget = 0
 
             elif isinstance(data, pq.Quantity):
                 # NOTE: 2026-02-03 14:27:22
                 # these also include pq.UnitQuantity, so might install a QuantityChooserWidget
-                if readOnly:
-                    if data.ndim == 0 or (data.ndim == 1 and data.size <= 1):
-                        desc = f"{data}"
-                    else:
-                        desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
-                        if data.ndim < 3 or not any(v > 1 for v in data.shape[2:]):
-                            widget = self._makeTableWidget_(data)
-
+                if data.ndim == 0 or (data.ndim == 1 and data.size <= 1):
+                    desc = f"{data}"
                 else:
-                    column = 2 if (data.ndim == 0 or (data.ndim == 1 and data.size <= 1)) else 0
-                    widget = self.delegate.createWidget(data, list(), False, self)
-                    widget.setMaximumHeight(self._widget_height_)
-                    targetColumnForWidget = column
+                    desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
+
+                column = 2 if (data.ndim == 0 or (data.ndim == 1 and data.size <= 1)) else 0
+                widget = self.delegate.createWidget(data, list(), False, self)
+                widget.setMaximumHeight(self._widget_height_)
+                targetColumnForWidget = column
+
+                # if readOnly:
+                #     if data.ndim == 0 or (data.ndim == 1 and data.size <= 1):
+                #         desc = f"{data}"
+                #     else:
+                #         desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
+                #         if data.ndim < 3 or not any(v > 1 for v in data.shape[2:]):
+                #             widget = self._makeTableWidget_(data)
+                #
+                # else:
+                #     column = 2 if (data.ndim == 0 or (data.ndim == 1 and data.size <= 1)) else 0
+                #     widget = self.delegate.createWidget(data, list(), False, self)
+                #     widget.setMaximumHeight(self._widget_height_)
+                #     targetColumnForWidget = column
 
             elif isinstance(data, pq.dimensionality.Dimensionality):
                 desc = f"{data}"
 
             elif isinstance(data, np.ndarray):
-                if readOnly:
-                    if data.size == 1:
-                        desc = f"{data}"
-                    else:
-                        desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
-                        if data.ndim < 3 or not any(v > 1 for v in data.shape[2:]):
-                            widget = self._makeTableWidget_(data)
+                if data.size == 1:
+                    desc = f"{data}"
                 else:
-                    column = 2 if (data.ndim == 0 or (data.ndim == 1 and data.size <= 1)) else 0
-                    widget = self.delegate.createWidget(data, list(), False, self)
-                    widget.setMaximumHeight(self._widget_height_)
-                    targetColumnForWidget = column
+                    desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
+
+                column = 2 if (data.ndim == 0 or (data.ndim == 1 and data.size <= 1)) else 0
+                widget = self.delegate.createWidget(data, list(), False, self)
+                widget.setMaximumHeight(self._widget_height_)
+                targetColumnForWidget = column
+#
+#                 if readOnly:
+#                     if data.size == 1:
+#                         desc = f"{data}"
+#                     else:
+#                         desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
+#                         if data.ndim < 3 or not any(v > 1 for v in data.shape[2:]):
+#                             widget = self._makeTableWidget_(data)
+#                 else:
+#                     column = 2 if (data.ndim == 0 or (data.ndim == 1 and data.size <= 1)) else 0
+#                     widget = self.delegate.createWidget(data, list(), False, self)
+#                     widget.setMaximumHeight(self._widget_height_)
+#                     targetColumnForWidget = column
 
             elif isinstance(data, (vigra.filters.Kernel1D, vigra.filters.Kernel2D)):
-                if readOnly:
-                    widget = self._makeTableWidget_(data)
-                else:
-                    widget = self.delegate.createWidget(data, list(), False, self)
-                    widget.setMaximumHeight(self._widget_height_)
-                    targetColumnForWidget = 0
+                widget = self.delegate.createWidget(data, list(), False, self)
+                widget.setMaximumHeight(self._widget_height_)
+                targetColumnForWidget = 0
+
+                # if readOnly:
+                #     widget = self._makeTableWidget_(data)
+                # else:
+                #     widget = self.delegate.createWidget(data, list(), False, self)
+                #     widget.setMaximumHeight(self._widget_height_)
+                #     targetColumnForWidget = 0
 
             elif isinstance(
                 data,
@@ -1343,23 +1389,24 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                 }
 
             elif isinstance(data, (str, bytes, bytearray)):
-                # NOTE: 2026-02-03 14:24:47
-                # disable editing byte and bytearray types
-                if readOnly or isinstance(data, (bytes, bytearray)):
-                    if len(data) > 100:
-                        _data = (
-                            data[:97] if isinstance(data, str) else data.decode()[:97]
-                        )
-                        _data += "..."
-                        desc = f"{type(data)} with {len(data)} elements"
-                        txt = data if isinstance(data, str) else data.decode()
-                        widget = QtWidgets.QPlainTextEdit(txt)
-                        widget.setMaximumHeight(self._widget_height_)
-                        widget.setReadOnly(True)
-                        targetColumnForWidget = 0
-                    else:
-                        # no widget here; just display it in the 2nd column of the item's row
-                        desc = data if isinstance(data, str) else data.decode()
+                if len(data) > 100:
+                    _data = (
+                        data[:97] if isinstance(data, str) else data.decode()[:97]
+                    )
+                    _data += "..."
+                else:
+                    desc = data if isinstance(data, str) else data.decode()
+
+                if isinstance(data, (bytes, bytearray)):
+                    # NOTE: 2026-02-03 14:24:47
+                    # disable editing byte and bytearray types
+                    # ALWAYS READ-ONLY
+                    desc = f"{type(data)} with {len(data)} elements"
+                    txt = data if isinstance(data, str) else data.decode()
+                    widget = QtWidgets.QPlainTextEdit(txt)
+                    widget.setMaximumHeight(self._widget_height_)
+                    widget.setReadOnly(True)
+                    targetColumnForWidget = 0
                 else:
                     widget = self.delegate.createWidget(data, list(), False, self)
                     widget.setMaximumHeight(self._widget_height_)
@@ -1377,11 +1424,15 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                     numbers.Number,
                 ),
             ):
-                if readOnly:
-                    desc = f"{data}"
-                else:
-                    widget = self.delegate.createWidget(data, list(), False, self)
-                    targetColumnForWidget = 2
+                desc = f"{data}"
+                widget = self.delegate.createWidget(data, list(), False, self)
+                targetColumnForWidget = 2
+
+                # if readOnly:
+                #     desc = f"{data}"
+                # else:
+                #     widget = self.delegate.createWidget(data, list(), False, self)
+                #     targetColumnForWidget = 2
 
             elif dataclasses.is_dataclass(data):
                 datafields = dataclasses.fields(data)
@@ -1458,11 +1509,27 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
     def readOnly(self) -> bool:
         return self._readOnly_
 
+    def _setWidgetsEditableState_(self):
+        print(f"{self.__class__.__name__}._setWidgetsEditableState_: self._readOnly_ = {self._readOnly_}")
+        for path, node_tuple in self.nodes.items():
+            item = node_tuple[0]
+            # first, check if there is an editor widget to column 2
+            w = self.itemWidget(item, 2)
+            if w:
+                # hide one-liners in column 2 when read-only
+                w.setVisible(not self._readOnly_)
+            else:
+                # set the editor in column 0 to read-only
+                w = self.itemWidget(item,0)
+                if isinstance(w, TableEditorWidget):
+                    w.readOnly = self._readOnly
+                elif isinstance(w, QtWidgets.QWidget):
+                    w.setEnabled(not self._readOnly_)
+
     @readOnly.setter
     def readOnly(self, val: bool):
         self._readOnly_ = val == True
-        if not self._readOnly_:
-            self._setupData_()
+        self._setWidgetsEditableState_()
 
     def getObjectPathForItem(
         self, item: QtWidgets.QTreeWidgetItem, external: bool = False

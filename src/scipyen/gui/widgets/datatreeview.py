@@ -124,6 +124,13 @@ from gui.delegates import PythonItemDelegate
 NOTMEMOIZED = (tuple, type(None), type(MISSING), type(pd.NA), type, np.ndarray, types.ModuleType, pkgutil.ModuleInfo)
 PODS = (bool, int, float, bytes, bytearray, str)
 
+# NOTE 2026-02-05 17:48:51 TODO/FIXME
+# look at:
+# QItemEditorFactory
+# QItemEditorCreatorBase
+# QStandardItemEditorCreator
+# use QTreeView with QStyledItemDelegate subclass and QStandardItem
+
 # ### BEGIN class DataTreeItem(object)
 class DataTreeItem(object):
 

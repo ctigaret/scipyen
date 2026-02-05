@@ -425,6 +425,18 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         if hasattr(widget, "setFrame"):
             widget.setFrame(False)
         widget.setAutoFillBackground(True)
+        # if not inModel:
+        #     widget.setVisible(not editable)
+        #     if not editable:
+        #     widget
+        # if not editable:
+        #     if inModel:
+        #         widget.setEnabled(False)
+        #     else:
+        #         widget.setVisible(False)
+        #         widget.setVisible(False)
+        #         widget.setVisible(False)
+        #         else
         return widget
 
     @Slot()
@@ -443,9 +455,9 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
     @Slot(vigra.filters.Kernel1D)
     @Slot(vigra.filters.Kernel2D)
     def slot_dataChanged(self, o:typing.Any):
-        print(f"{self.__class__.__name__}.slot_dataChanged({o})")
+        # print(f"{self.__class__.__name__}.slot_dataChanged({o})")
         self._currentData_ = o
-        self.sig_dataChanged.emit()
+        self.sig_dataChanged.emit(self.sender())
         
 
     def createEditor(self, parent:QtWidgets.QWidget, option:int, index:QtCore.QModelIndex) -> QtWidgets.QWidget | None:
