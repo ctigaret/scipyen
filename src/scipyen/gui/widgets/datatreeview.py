@@ -30,20 +30,25 @@ I.e., there seems to be no way I can generate a QModelIndex via, say,
 """
 from __future__ import print_function
 
-import os, warnings, types, traceback, itertools, inspect, dataclasses, numbers
+import os
+import warnings
+import types
+import traceback
+import itertools
+import inspect
+import dataclasses
+import numbers
 import pathlib
 import datetime
-import fractions, decimal
+import fractions
+import decimal
 import pkgutil
 import typing
 import enum
+from functools import (singledispatch, singledispatchmethod)
 from collections import deque
-import dataclasses
 from dataclasses import MISSING
 import math
-#### END core python modules
-
-#### BEGIN 3rd party modules
 import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
 from qtpy.QtCore import (Signal, Slot, Property,)
@@ -82,9 +87,9 @@ import numpy as np
 import scipy
 import pandas as pd
 import vigra
-#### END 3rd party modules
+# ### END 3rd party modules
 
-#### BEGIN pict.core modules
+# ### BEGIN pict.core modules
 import core.datatypes as datatypes
 
 from imaging import vigrautils
@@ -106,6 +111,8 @@ from core.datazone import (DataZone, Interval)
 
 from core import xmlutils, strutils
 
+from core import scipyen_quantities as scq
+
 from core.workspacefunctions import (validate_varname, user_workspace)
 
 # from core.utilities import (get_nested_value, set_nested_value,
@@ -117,14 +124,37 @@ from core.prog import (safewrapper, safeguiwrapper, print_styled, qVariants)
 
 from core.traitcontainers import (DataBag, DataBagTraitsObserver,)
 
+from core.scipyendataclasses import isDataclass
+
 from gui.widgets.tablewidget import SimpleTableWidget
 from gui.widgets.tableeditorwidget import (TableEditorWidget, 
                                            TabularDataModel,)
 from gui.pictgui import WorkerThread
 from gui.delegates import PythonItemDelegate
 
-NOTMEMOIZED = (tuple, type(None), type(MISSING), type(pd.NA), type, np.ndarray, types.ModuleType, pkgutil.ModuleInfo)
-PODS = (bool, int, float, bytes, bytearray, str)
+NOTMEMOIZED = (
+    tuple,
+    type(None),
+    type(MISSING),
+    type(pd.NA),
+    type,
+    np.ndarray,
+    types.ModuleType,
+    pkgutil.ModuleInfo,
+)
+
+PODS = (
+    bool,
+    int,
+    float,
+    complex,
+    bytes,
+    bytearray,
+    str,
+    np.integer,
+    np.floating,
+    np.complexfloating,
+)
 
 # NOTE 2026-02-05 17:48:51 TODO/FIXME
 # look at:
@@ -204,7 +234,7 @@ PODS = (bool, int, float, bytes, bytearray, str)
 
 # ### END   class DataTreeItem(object)
 
-# ### BEGIN class DataTreeStandardItem(QtGui.QStandardItem)
+# ### BEGIN class DataTreeItem(QtGui.QStandardItem)
 
 
 class DataTreeItem(QtGui.QStandardItem):
@@ -218,12 +248,7 @@ class DataTreeItem(QtGui.QStandardItem):
             raise TypeError("Expecting a str, or a QtGui.QIcon and str, or two int values")
 
 
-# ### END   class DataTreeStandardItem(QtGui.QStandardItem)
-
-# ### BEGIN class DataTreeModel(QtCore.QAbstractItemModel)
-
-# class DataTreeModel(QtGui.QStandardItemModel):
-
+# ### END   class DataTreeItem(QtGui.QStandardItem)
 
 class DataTreeModel(QtGui.QStandardItemModel):
     r"""
@@ -231,6 +256,8 @@ class DataTreeModel(QtGui.QStandardItemModel):
 Approach:
 
 .. ::
+
+    # d = dict(...)
 
     model = QtGui.QStandardItemModel(0,3)
     invisibleRootItem = model.invisibleRootItem()
@@ -387,30 +414,244 @@ General rule for delegate use in this model:
             -> int key (index) -> type -> value/information — CHILDREN delegates on column 0 or ITEM delegate in column 2
 
 """
+    mappingTypes = (dict, types.MappingProxyType)
+    sequenceTypes = (typing.Sequence, tuple, list, deque, bytes)
+    iterableCollectionTypes = sequenceTypes + mappingTypes
+
     sig_editCompleted = Signal([pd.DataFrame], [pd.Series], [np.ndarray], name="sig_editCompleted")
     sig_modelDataChanged = Signal(name="sig_modelDataChanged")
 
-    def __init__(self, data: typing.Optional[typing.Any] = None, dataName: str = None,
+    def __init__(self: typing.Self, data: typing.Optional[typing.Any] = None,
+                 dataName: str = None,
                  parent: typing.Optional[QtCore.QObject] = None,
                  **kwargs):
         super(DataTreeModel, self).__init__(0, 3, parent=parent)
-        self._supported_data_types_ = kwargs.pop("supported_data_types", tuple())
-        if not isinstance(self._supported_data_types_, tuple) or not all(isinstance(v, type) for v in self._supported_data_types_):
-            self._supported_data_types_ = tuple()
-        self._modelDataColumns_: int = 3
-        self._modelDataRows_: int = 0
-        self._displayedColumns_: int = 3
-        self._displayedRows_: int = 0
-        self._rootItem_: DataTreeItem(qVariants(["Object", "Type", "Value / Information"]))
+        self._data_: typing.Optional[typing.Any] = None
+        self._dataTypeStr_: str = ""
+        self._visited_: dict = dict()
+        self._rootTitle_ = "/"
+        self._hasDynamicPrivate_: bool = False
+        self._privateData_: typing.Mapping = None
+        self._predicate_: types.FunctionType = None
+        self._showPrivate_: bool = False
+        self._hideRoot_: bool = False
 
-        if isinstance(dataName, str) and len(dataName.strip()):
-            self._dataName_ = dataName
+        self._supportedDataTypes_ = kwargs.pop("supportedTypes", tuple())
+        if not isinstance(self._supportedDataTypes_, tuple) or not all(
+            isinstance(v, type) for v in self._supportedDataTypes_
+        ):
+            self._supportedDataTypes_ = tuple()
+
+        self.setHorizontalHeaderLabels(["Object", "Type", "Value / Information"])
+
+
+    def setModelData(
+        self: typing.Self,
+        data: typing.Any,
+        predicate: typing.Optional[types.FunctionType] = None,
+        showPrivate: bool = False,
+        rootTitle: str = "",
+        dataTypeStr: typing.Optional[str] = None,
+        hideRoot: bool = False,
+    ):
+        self._visited_.clear()
+        self._predicate_ = predicate
+        self._showPrivate_ = showPrivate
+        self._hideRoot_ = hideRoot
+
+        self._privateData_,
+        self._hasDynamicPrivate_ = self._parseData_(data, self._showPrivate_)
+
+        self._data_ = data
+        self._dataTypeStr_ = dataTypeStr
+
+        self._rootTitle_ = rootTitle if len(rootTitle.strip()) else "/"
+
+    def _makeRowItems_(self: typing.Self, obj: object, /,
+                       objName: str = "", info: str = ""):
+
+        if len(objName.strip()) == 0:
+            objName = "/"
+
+        typeName = type(obj).__name__
+
+        if not isinstance(info, str) or len(info.strip()) == 0:
+            info = self._getObjInfo_(obj)
+
+        item0 = QtGui.QStandardItem(objName)
+        item1 = QtGui.QStandardItem(typeName)
+        item2 = QtGui.QStandardItem(info)
+
+        return (item0, item1, item2)
+
+
+    @singledispatchmethod
+    def _getObjInfo_(self: typing.Self, obj: object) -> str:
+        if obj in (None, MISSING, pd.NA):
+            info = f"{obj}"
+
+        elif isDataclass(obj):
+            datafields = dataclasses.fields(data)
+            n = len(datafields)
+            info = f"{n} {strutils.pluralize('field', n)}"
+
         else:
-            self._dataName_ = f"{data}"
+            raise NotImplementedError(
+            f"Objects of type {type(obj).__name__} are not supported"
+            )
 
-        self._modelData_ = data
+        return info
 
-        self.setModelData(self._modelData_, name = self._dataName_)
+    @_getObjInfo_.register(type)
+    def _(self: typing.Self, obj: type) -> str:
+        return f"Type object: {obj.__name__}"
+
+    @_getObjInfo_.register(str)
+    @_getObjInfo_.register(bytes)
+    @_getObjInfo_.register(bytearray)
+    def _(self: typing.Self, obj: typing.Union[str, bytes, bytearray]) -> str:
+        n = len(obj)
+        if n > 100:
+            info = (
+                obj[:97] if isinstance(obj, str) else obj.decode()[:97]
+            )
+            info += "..."
+        else:
+            info = obj if isinstance(obj, str) else obj.decode()
+
+        return info
+
+    @_getObjInfo_.register(bool)
+    @_getObjInfo_.register(int)
+    @_getObjInfo_.register(float)
+    @_getObjInfo_.register(complex)
+    @_getObjInfo_.register(np.integer)
+    @_getObjInfo_.register(np.floating)
+    @_getObjInfo_.register(np.complexfloating)
+    def _(self: typing.Self,
+          obj: typing.Union[bool, int, float, complex,
+                            np.integer, np.floating,
+                            np.complexfloating]) -> str:
+        return f"{obj}"
+
+    @_getObjInfo_.register(list, tuple, deque, set)
+    def _(self: typing.Self, obj: typing.Union[list, tuple, deque,
+                                               set]) -> str:
+        n = len(obj)
+        return f"{n} {strutils.pluralize('element', n)}"
+
+    @_getObjInfo_.register(typing.Mapping)
+    def _(self: typing.Self, obj: typing.Mapping) -> str:
+        n = len(obj)
+        return f"{len(obj)} key / value {strutils.pluralize('pair', n)}"
+
+    @_getObjInfo_.register(pq.UnitQuantity)
+    @_getObjInfo_.register(pq.Quantity)
+    def _(self:typing.Self, obj: pq.Quantity) -> str:
+        if isinstance(pq.UnitQuantity):
+            info = f"{obj} {scq.unitFamilyName(obj)}"
+        else:
+            if obj.size <= 1:
+                info = f"{obj}"
+            else:
+                n = obj.size
+                s = obj.shape
+                info = f"Quantity array ({obj.units.dimensionality}) with {n} {strutils.pluralize('samples', n)}, shape {s}, and dtype {obj.dtype}"
+
+        return info
+
+
+    @_getObjInfo_.register(np.ndarray)
+    def _(self: typing.Self, obj: np.ndarray) -> str:
+        n = obj.size
+        s = obj.shape
+        if obj.size <= 1:
+            info = f"{obj}"
+        else:
+            info = f"Array with {n} {strutils.pluralize('samples', n)}, shape {s}, and dtype {obj.dtype}"
+
+        return info
+
+    @_getObjInfo_.register(vigra.filters.Kernel1D)
+    @_getObjInfo_.register(vigra.filters.Kernel2D)
+    def _(self: typing.Self,
+          obj: typing.Union[vigra.filters.Kernel1D,
+                            vigra.filters.Kernel2D]) -> str:
+
+        if isinstance(obj, vigra.filters.Kernel1D):
+            n = int(obj.size())
+            info = f"with {n} {strutils.pluralize('sample', n)}"
+        else:
+            h = int(obj.height())
+            w = int(obj.width())
+            info = f"with {h} × {w} {strutils.pluralize('sample', h*w)}"
+
+        return info
+
+
+
+
+    def _buildTree_(self: typing.Self,
+                    data: object,
+                    name: str = "",
+                    keyType: type = str,
+                    nameTip: str = "",
+                    typeStr: typing.Optional[str] = None,
+                    predicate: typing.Optional[types.FunctionType] = None,
+                    hideRoot: bool = False,
+                    path: tuple = tuple()):
+
+        # 1. get the top object symbol, type and some information, as items to
+        # go as the first (and only) top-level row in the model
+
+        pass
+
+    def _parseData_(self: typing.Self, data: typing.Any,
+                    includePrivateMembers: bool = True) -> tuple:
+        mro = inspect.getmro(type(data))
+        flag = False
+
+        # NOTE: 2025-06-28 13:57:28
+        # generate a mapping representation of data's members upon which
+        # the tree model is built
+        # for dataclasses, use their fields
+        # for non-dict classes inspect their members, allowing to ignore the
+        # "private" members, i.e., those bound to symbols starting with
+        # underscore ('_')
+        if isDataclass(data):
+            datafields = dataclasses.fields(data)
+            pData = dict(map(lambda x: (x.name, getattr(data, x.name)), datafields))
+            flag = True
+
+        elif (
+            all(t not in self._supportedDataTypes_ for t in mro)
+            and not inspect.isroutine(data)
+            and not isinstance(data, (types.ModuleType, pkgutil.ModuleInfo))
+            and data is not None
+        ):
+            pData = datatypes.inspect_members(data, self.predicate)
+
+            flag = True
+
+        else:
+            # NOTE: 2025-06-28 13:58:14
+            # The data is suitable for direct representation by a tree model
+            pData = data
+
+
+        if not includePrivateMembers:
+            pData = dict(
+                list(
+                    filter(
+                        lambda x: not x[0].startswith("_"), pData.items()
+                    )
+                )
+            )
+
+        return pData, flag
+
+
+
 
     # def data(self, modelIndex: QtCore.QModelIndex,
     #          role: QtCore.Qt.ItemDataRole = QtCore.Qt.DisplayRole) -> QtCore.QVariant: # TODO 2026-02-01 21:31:55
@@ -475,7 +716,6 @@ General rule for delegate use in this model:
     #     if parentIndex.isValid() and super().checkIndex(parentIndex):
     #         pass
 
-# ### END   class DataTreeModel(QtCore.QAbstractItemModel)
 
 
 

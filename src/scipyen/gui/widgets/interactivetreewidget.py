@@ -128,6 +128,7 @@ NOTMEMOIZED = (
     types.ModuleType,
     pkgutil.ModuleInfo,
 )
+
 PODS = (
     bool,
     int,
@@ -135,9 +136,10 @@ PODS = (
     bytes,
     bytearray,
     str,
+    complex,
+    np.integer,
     np.floating,
     np.complexfloating,
-    complex,
 )
 
 
@@ -192,7 +194,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
     # a specified widget is to be used with the given data type
 
     mappingTypes = (dict, types.MappingProxyType)
-    sequenceTypes = (typing.Sequence, tuple, list, deque, bytes)
+    sequenceTypes = (typing.Sequence, tuple, list, deque, bytes, bytearray)
     iterableCollectionTypes = sequenceTypes + mappingTypes
     
     sig_valueChanged = Signal(object, object, name="sig_valueChanged")
@@ -955,7 +957,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
         except Exception:
             HAVE_METAARRAY = None
 
-        from core.datatypes import is_namedtuple, TypeEnum
+        from core.datatypes import (is_namedtuple, TypeEnum)
         from systems.PrairieView import (
             PVObject,
             PVScan,
