@@ -3,7 +3,7 @@
 # SPDX-FileCopyrightText: 2026 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
-    
+
 r"""
 .. note::
 
@@ -127,7 +127,7 @@ from core.traitcontainers import (DataBag, DataBagTraitsObserver,)
 from core.scipyendataclasses import isDataclass
 
 from gui.widgets.tablewidget import SimpleTableWidget
-from gui.widgets.tableeditorwidget import (TableEditorWidget, 
+from gui.widgets.tableeditorwidget import (TableEditorWidget,
                                            TabularDataModel,)
 from gui.pictgui import WorkerThread
 from gui.delegates import PythonItemDelegate
@@ -166,7 +166,7 @@ PODS = (
 # ### BEGIN class DataTreeItem(object)
 
 # class DataTreeItem(object):
-# 
+#
 #     # NOTE: 2026-02-01 14:46:39
 #     # Since a tree mode is a "hierarchical" data model, the children of a DataTreeItem
 #     # will each occupy a row counted from 0; rows are counted for 0  - do not confuse with
@@ -177,54 +177,54 @@ PODS = (
 #         self._parentItem_ = parentItem # this item occupies one ROW beneath the parent item; it is None for the root item
 #         self._childItems_:typing.List(typing.Self) = list() # each DataTreeItem as a child of this one occupies one ROW beneath it
 #         self._model_ = model
-# 
+#
 #     def appendChild(self, childItem:typing.Self):
 #         # all children are DataTreeItem objects, one per row
 #         # so this one effectively adds one row beneath itself
 #         self._childItems_.append(childItem)
-# 
+#
 #     def childCount(self) -> int:
 #         # how many rows beneath this item?
 #         return len(self._childItems_)
-# 
+#
 #     def columnCount(self) -> int: # should always be 3, right !? -> ["Object", "Type", "Value / Information"]
 #         # one QVariant per column! -> how many QVariant in this row (and by implication, in its row)
 #         return len(self._itemData_)
-# 
+#
 #     def child(self, row:int) -> typing.Self | None:
 #         # the DataTreeItem at specified row , or None
 #         return self._childItems_[row] if row >= 0 and row < self.childCount() else None
-# 
+#
 #     def data(self, column:int) -> QtCore.QVariant: # may be null (isNull() -> True)
 #         # the QVariant at specified column
 #         return self._itemData_[column] if column >= 0 and column < len(self._itemData_) else QtCore.QVariant()
-# 
+#
 #     def parentItem(self) -> typing.Self | None:
 #         # returns its parent or None; if this is the root, parent is always None
 #         return self._parentItem_
-# 
+#
 #     def row(self) -> int:
 #         r"""The row of this item, in the branch of its parent.
-# 
+#
 # Returns:
 # ========
 # * 0 if this item has no parent
-# 
+#
 # * -1 of this item is not found among its parent's children (technically should vener happen)
-# 
+#
 # * the index of this item in the parent's children
-# 
+#
 # """
 #         if self._parentItem_ is None:
 #             return 0
-# 
+#
 #         siblings = self._parentItem_._childItems_
 #         if self in siblings:
 #             # index of this item in the parent's children
 #             return siblings.index(self)
-# 
+#
 #         return -1
-# 
+#
 # #     def index(self, column:int) -> QModelIndex:
 # #         row = self.row()
 # #         if row == -1 or column not in range(len(self._itemData_)):
@@ -426,12 +426,12 @@ General rule for delegate use in this model:
                  parent: typing.Optional[QtCore.QObject] = None,
                  **kwargs):
         super(DataTreeModel, self).__init__(0, 3, parent=parent)
-        self._data_: typing.Optional[typing.Any] = None
+        self._data_: typing.Optional[object] = None
         self._dataTypeStr_: str = ""
         self._visited_: dict = dict()
         self._rootTitle_ = "/"
         self._hasDynamicPrivate_: bool = False
-        self._privateData_: typing.Mapping = None
+        self._privateData_: dict = None
         self._predicate_: types.FunctionType = None
         self._showPrivate_: bool = False
         self._hideRoot_: bool = False
@@ -444,28 +444,30 @@ General rule for delegate use in this model:
 
         self.setHorizontalHeaderLabels(["Object", "Type", "Value / Information"])
 
-
     def setModelData(
-        self: typing.Self,
-        data: typing.Any,
+        self,
+        obj: object,
         predicate: typing.Optional[types.FunctionType] = None,
         showPrivate: bool = False,
         rootTitle: str = "",
         dataTypeStr: typing.Optional[str] = None,
         hideRoot: bool = False,
     ):
+        print(f"{self.__class__.__name__}.setModelData(obj: {type(obj).__name__})")
         self._visited_.clear()
         self._predicate_ = predicate
         self._showPrivate_ = showPrivate
         self._hideRoot_ = hideRoot
 
-        self._privateData_,
-        self._hasDynamicPrivate_ = self._parseData_(data, self._showPrivate_)
+        (self._privateData_,
+         self._hasDynamicPrivate_) = self._parseData_(obj, self._showPrivate_)
 
-        self._data_ = data
+        self._data_ = obj
         self._dataTypeStr_ = dataTypeStr
 
         self._rootTitle_ = rootTitle if len(rootTitle.strip()) else "/"
+
+        self._buildTree_(self._privateData_)
 
     def _makeRowItems_(self: typing.Self, obj: object, /,
                        objName: str = "", info: str = ""):
@@ -484,14 +486,13 @@ General rule for delegate use in this model:
 
         return (item0, item1, item2)
 
-
     @singledispatchmethod
     def _getObjInfo_(self: typing.Self, obj: object) -> str:
         if obj in (None, MISSING, pd.NA):
             info = f"{obj}"
 
         elif isDataclass(obj):
-            datafields = dataclasses.fields(data)
+            datafields = dataclasses.fields(obj)
             n = len(datafields)
             info = f"{n} {strutils.pluralize('field', n)}"
 
@@ -534,14 +535,17 @@ General rule for delegate use in this model:
                             np.complexfloating]) -> str:
         return f"{obj}"
 
-    @_getObjInfo_.register(list, tuple, deque, set)
+    @_getObjInfo_.register(list)
+    @_getObjInfo_.register(tuple)
+    @_getObjInfo_.register(deque)
+    @_getObjInfo_.register(set)
     def _(self: typing.Self, obj: typing.Union[list, tuple, deque,
                                                set]) -> str:
         n = len(obj)
         return f"{n} {strutils.pluralize('element', n)}"
 
-    @_getObjInfo_.register(typing.Mapping)
-    def _(self: typing.Self, obj: typing.Mapping) -> str:
+    @_getObjInfo_.register(dict)
+    def _(self: typing.Self, obj: dict) -> str:
         n = len(obj)
         return f"{len(obj)} key / value {strutils.pluralize('pair', n)}"
 
@@ -559,7 +563,6 @@ General rule for delegate use in this model:
                 info = f"Quantity array ({obj.units.dimensionality}) with {n} {strutils.pluralize('samples', n)}, shape {s}, and dtype {obj.dtype}"
 
         return info
-
 
     @_getObjInfo_.register(np.ndarray)
     def _(self: typing.Self, obj: np.ndarray) -> str:
@@ -588,11 +591,8 @@ General rule for delegate use in this model:
 
         return info
 
-
-
-
     def _buildTree_(self: typing.Self,
-                    data: object,
+                    obj: object,
                     name: str = "",
                     keyType: type = str,
                     nameTip: str = "",
@@ -604,46 +604,88 @@ General rule for delegate use in this model:
         # 1. get the top object symbol, type and some information, as items to
         # go as the first (and only) top-level row in the model
 
-        pass
+        # self._privateData_,
+        # self._hasDynamicPrivate_ = self._parseData_(obj,
+        #                                             self._showPrivate_)
+        rootItems = self._makeRowItems_(obj, name)
+        self.invisibleRootItem().insertRow(0, rootItems)
+        parentItem = rootItems[0]
+        if isinstance(self._privateData_, dict):
+            k = 0
+            for (key, value) in self._privateData_.items():
+                if isinstance(key, str):
+                    vName = key
+                else:
+                    vName = f"{key}"
+                rowItems = self._makeRowItems_(value, vName)
+                parentItem.insertRow(k, rowItems)
+                k += 1
 
-    def _parseData_(self: typing.Self, data: typing.Any,
+    @singledispatchmethod
+    def _buildBranch_(self: typing.Self,
+                      obj: object,
+                      objName: str,
+                      parentItem: QtGui.QStandardItem,
+                      row: int):
+        rowItems = self._makeRowItems_(obj, objName)
+        parentItem.insertRow(row, rowItems)
+
+    @_buildBranch_.register(dict)
+    def _(self: typing.Self, obj: dict, objName: str,
+          parentItem: QtGui.QStandardItem, row: int):
+        rowItems = self._makeRowItems_(obj, objName)
+        parentItem.insertRow(row, rowItems)
+        pItem = rowItems[0]
+        k = 0
+        for key, value in obj.items():
+            self._buildBranch_(value, key, pItem, k)
+            k += 1
+
+
+    def _parseData_(self, obj: object,
                     includePrivateMembers: bool = True) -> tuple:
-        mro = inspect.getmro(type(data))
+        mro = inspect.getmro(type(obj))
         flag = False
 
+        print(f"{self.__class__.__name__}._parseData_(obj: {type(obj).__name__})")
+
+        introspectable = (all(t not in self._supportedDataTypes_ for t in mro)
+                         and not inspect.isroutine(obj)
+                         and not isinstance(obj, (types.ModuleType,
+                                             pkgutil.ModuleInfo))
+                         and obj is not None)
+
         # NOTE: 2025-06-28 13:57:28
-        # generate a mapping representation of data's members upon which
+        # generate a mapping representation of obj's members upon which
         # the tree model is built
         # for dataclasses, use their fields
         # for non-dict classes inspect their members, allowing to ignore the
         # "private" members, i.e., those bound to symbols starting with
         # underscore ('_')
-        if isDataclass(data):
-            datafields = dataclasses.fields(data)
-            pData = dict(map(lambda x: (x.name, getattr(data, x.name)), datafields))
+        if isDataclass(obj):
+            datafields = dataclasses.fields(obj)
+            pData = dict(map(lambda x: (x.name, getattr(obj, x.name)), datafields))
             flag = True
 
-        elif (
-            all(t not in self._supportedDataTypes_ for t in mro)
-            and not inspect.isroutine(data)
-            and not isinstance(data, (types.ModuleType, pkgutil.ModuleInfo))
-            and data is not None
-        ):
-            pData = datatypes.inspect_members(data, self.predicate)
+        elif isinstance(obj, dict):
+            # NOTE: 2025-06-28 13:58:14
+            # The obj is suitable for direct representation by a tree model
+            pData = obj
+            flag = False
 
+        elif introspectable :
+            pData = datatypes.inspect_members(obj, self._predicate_)
             flag = True
 
         else:
-            # NOTE: 2025-06-28 13:58:14
-            # The data is suitable for direct representation by a tree model
-            pData = data
+            pData = obj
+            flag = False
 
-
-        if not includePrivateMembers:
+        if isinstance(pData, dict) and not includePrivateMembers:
             pData = dict(
                 list(
                     filter(
-                        lambda x: not x[0].startswith("_"), pData.items()
+                        lambda x: not isinstance(x[0], str) or not x[0].startswith("_"), pData.items()
                     )
                 )
             )
@@ -657,25 +699,25 @@ General rule for delegate use in this model:
     #          role: QtCore.Qt.ItemDataRole = QtCore.Qt.DisplayRole) -> QtCore.QVariant: # TODO 2026-02-01 21:31:55
     #     if self._modelData_ is None:
     #         return QtCore.QVariant()
-    # 
+    #
     #     if not modelIndex.isValid():
     #         return QtCore.QVariant()
-    # 
+    #
     #     # avoid calling internalPointer() -> it will CRASH!
     #     # instad, rely on the QModelIndex API, knowing that the all QModelIndex
-    #     # in an item only has data for column 0 (the DataTreeItem can have 
+    #     # in an item only has data for column 0 (the DataTreeItem can have
     #     # several QModelIndex objects, one per column)
     #     return modelIndex.data(0, role)
-    # 
+    #
     # def canFetchMore(self, parentIndex: QtCore.QModelIndex) -> bool:
     #     # TODO 2026-02-01 21:31:46
     #     return False if parentIndex.isValid() else self._displayedRows_ < self._modelDataRows_ or self._displayedColumns_ < self._modelDataColumns_
-    # 
-    # def fetchMore(self, parentIndex:QtCore.QModelIndex): 
+    #
+    # def fetchMore(self, parentIndex:QtCore.QModelIndex):
     #     # TODO datetime2Qt
     #     if parentIndex.isValid():
     #         return
-    # 
+    #
     # def flags(self, modelIndex: QtCore.QModelIndex) -> QtCore.Qt.ItemFlag:
     #     #  'ItemIsAutoTristate',
     #     #  'ItemIsDragEnabled',
@@ -686,33 +728,33 @@ General rule for delegate use in this model:
     #     #  'ItemIsUserCheckable',
     #     #  'ItemIsUserTristate',
     #     #  'ItemNeverHasChildren'
-    # 
+    #
     #     return super().flags(modelIndex) if modelIndex.isValid() else QtCore.Qt.NoItemFlags # TODO 2026-02-01 21:31:43 — revisit this !!!
-    # 
+    #
     # def setModelData(self, data: typing.Any, name: str = "",
     #                  showPrivate: bool = False, predicate = None,
     #                  top_title: str = "/", dataTypeStr: str = ""):
     #     # TODO 2026-02-01 21:32:05
-    # 
-    # 
+    #
+    #
     #     pass
-    # 
+    #
     # def headerData(self, section: int, orientation: QtCore.Qt.Orientation,
     #                role:QtCore.Qt.ItemDataRole=QtCore.Qt.DisplayRole) -> QtCore.QVariant:
     #     # 'Horizontal',
     #     # 'Vertical'
     #     return self._rootItem_.data(section) if orientation == QtCore.Qt.Horizontal and role == QtCore.Qt.DisplayRole else QtCore.QVariant()
-    # 
+    #
     # def index(self, row:int, column:int, parentIndex:QtCore.QModelIndex) -> QtCore.QModelIndex:
     #     # NOTE: 2026-02-01 21:59:46
     #     # There is no access to protected functions or signals for objects not created from Python;
     #     # this means one cannot call self.createIndex(…) here, and cannot override it!
     #     if not self.hasIndex(row, column, parent):
     #         return QtCore.QModelIndex() # invalid index
-    # 
+    #
     #     # if parentIndex.isValid():
     #     #     return parentIndex.model().
-    # 
+    #
     #     if parentIndex.isValid() and super().checkIndex(parentIndex):
     #         pass
 
