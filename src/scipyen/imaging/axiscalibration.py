@@ -1434,7 +1434,7 @@ class AxisCalibrationData(CalibrationData):
                         ret.channels = channels # use the CalibrationChannelsDescriptor
                     else:
                         raise TypeError("Incompatible types in channels specification")
-                elif isinstance(channels (CalSpec, ChannelCalibrationData)):
+                elif isinstance(channels, (CalSpec, ChannelCalibrationData)):
                     ret.channel = [channels]
                     
                 elif channels is not None:
