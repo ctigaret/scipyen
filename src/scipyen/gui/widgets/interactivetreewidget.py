@@ -100,7 +100,7 @@ from core.workspacefunctions import validate_varname, user_workspace
 
 # from core.utilities import (get_nested_value, set_nested_value, counter_suffix, )
 
-from core.utilities import NestedFinder, unique
+from core.utilities import (NestedFinder, unique)
 
 from core.prog import safewrapper, safeguiwrapper, print_styled
 

@@ -75,6 +75,10 @@ else:
     QShortcut = QtWidgets.QShortcut
     __has_sip__ = True
 
+try:
+    from pyqtgraph.widgets.DataTreeWidget import HAVE_METAARRAY
+except Exception:
+    HAVE_METAARRAY = None
 
 
 # from pyqtgraph import (DataTreeWidget, TableWidget, )
@@ -95,7 +99,12 @@ import core.datatypes as datatypes
 from imaging import vigrautils
 
 import imaging.axiscalibration
-from imaging.axiscalibration import AxesCalibration
+from imaging.axiscalibration import (
+    AxesCalibration,
+    AxisCalibrationData,
+    ChannelCalibrationData,
+)
+from imaging.axisutils import axisTypeStrings
 
 import imaging.scandata
 from imaging.scandata import (ScanData, AnalysisUnit)
@@ -115,10 +124,9 @@ from core import scipyen_quantities as scq
 
 from core.workspacefunctions import (validate_varname, user_workspace)
 
-# from core.utilities import (get_nested_value, set_nested_value,
-#                               counter_suffix, )
-
-from core.utilities import (NestedFinder, unique)
+from core.utilities import (NestedFinder,
+                            get_nested_value, set_nested_value,
+                            unique)
 
 from core.prog import (safewrapper, safeguiwrapper, print_styled, qVariants)
 
@@ -130,7 +138,9 @@ from gui.widgets.tablewidget import SimpleTableWidget
 from gui.widgets.tableeditorwidget import (TableEditorWidget,
                                            TabularDataModel,)
 from gui.pictgui import WorkerThread
+from gui.widgets.small_widgets import QuantitySpinBox, ComplexSpinBox
 from gui.delegates import PythonItemDelegate
+from gui.workspacegui import GuiMessages
 
 NOTMEMOIZED = (
     tuple,
@@ -414,12 +424,42 @@ General rule for delegate use in this model:
             -> int key (index) -> type -> value/information — CHILDREN delegates on column 0 or ITEM delegate in column 2
 
 """
+    try:
+        from pyqtgraph.widgets.DataTreeWidget import HAVE_METAARRAY
+    except Exception:
+        HAVE_METAARRAY = None
+
+    from core.datatypes import (is_namedtuple, TypeEnum)
+
+    # NOTE: 2026-02-07 09:14:19 FIXME/TODO
+    # these MUST be imported here to avoid cycling dependencies in
+    # systems.PrairieView which needs this for the importer gui
+    # (although, te latter should really go into a separate module to break the
+    # cycle - TODO/FIXME 2026-02-07 09:15:32)
+    from systems.PrairieView import (
+        PVObject,
+        PVScan,
+        PVSequence,
+        PVFrame,
+        PVSystemConfiguration,
+        PVStateShard,
+        PVStateValue,
+        PVIndexedValue,
+        PVSubIndexedValue,
+        PVSubIndexedValueList,
+        PVLinescanDefinition,
+    )
+
+
     mappingTypes = (dict, types.MappingProxyType)
     sequenceTypes = (typing.Sequence, tuple, list, deque, bytes)
     iterableCollectionTypes = sequenceTypes + mappingTypes
 
     sig_editCompleted = Signal([pd.DataFrame], [pd.Series], [np.ndarray], name="sig_editCompleted")
     sig_modelDataChanged = Signal(name="sig_modelDataChanged")
+
+    _check_private_member_ = lambda x: (not isinstance(x[0], str)
+                                        or not x[0].startswith("_"))
 
     def __init__(self: typing.Self, data: typing.Optional[typing.Any] = None,
                  dataName: str = None,
@@ -447,9 +487,9 @@ General rule for delegate use in this model:
     def setModelData(
         self,
         obj: object,
+        rootTitle: str = "",
         predicate: typing.Optional[types.FunctionType] = None,
         showPrivate: bool = False,
-        rootTitle: str = "",
         dataTypeStr: typing.Optional[str] = None,
         hideRoot: bool = False,
     ):
@@ -467,7 +507,7 @@ General rule for delegate use in this model:
 
         self._rootTitle_ = rootTitle if len(rootTitle.strip()) else "/"
 
-        self._buildTree_(self._privateData_)
+        self._buildTree_(self._privateData_, self._rootTitle_)
 
     def _makeRowItems_(self: typing.Self, obj: object, /,
                        objName: str = "", info: str = ""):
@@ -486,31 +526,365 @@ General rule for delegate use in this model:
 
         return (item0, item1, item2)
 
+    # @singledispatchmethod
+    # def _getObjInfo_(self: typing.Self, obj: object) -> tuple:
+    #     tip = type(obj).__name__
+    #     if obj in (None, MISSING, pd.NA):
+    #         info = f"{obj}"
+    #         tip  = str(obj)
+    #
+    #     elif isDataclass(obj):
+    #         datafields = dataclasses.fields(obj)
+    #         n = len(datafields)
+    #         info = f"{n} {strutils.pluralize('field', n)}"
+    #         tip += " (dataclass)"
+    #
+    #     else:
+    #         raise NotImplementedError(
+    #         f"Objects of type {type(obj).__name__} are not supported"
+    #         )
+    #
+    #     return info, tip
+
+    # @_getObjInfo_.register(str)
+    # @_getObjInfo_.register(bytes)
+    # @_getObjInfo_.register(bytearray)
+    # def _(self: typing.Self, obj: typing.Union[str, bytes, bytearray]) -> tuple:
+    #     tip = type(obj).__name__
+    #     n = len(obj)
+    #     if n > 100:
+    #         info = (
+    #             obj[:97] if isinstance(obj, str) else obj.decode()[:97]
+    #         )
+    #         info += "..."
+    #     else:
+    #         info = obj if isinstance(obj, str) else obj.decode()
+    #
+    #     return info, tip
+
+    # @_getObjInfo_.register(bool)
+    # @_getObjInfo_.register(int)
+    # @_getObjInfo_.register(float)
+    # @_getObjInfo_.register(complex)
+    # @_getObjInfo_.register(np.integer)
+    # @_getObjInfo_.register(np.floating)
+    # @_getObjInfo_.register(np.complexfloating)
+    # def _(self: typing.Self,
+    #       obj: typing.Union[bool, int, float, complex,
+    #                         np.integer, np.floating,
+    #                         np.complexfloating]) -> tuple:
+    #     return f"{obj}", type(obj).__name__
+
+    # @_getObjInfo_.register(list)
+    # @_getObjInfo_.register(tuple)
+    # @_getObjInfo_.register(deque)
+    # @_getObjInfo_.register(set)
+    # def _(self: typing.Self, obj: typing.Union[list, tuple, deque,
+    #                                            set]) -> tuple:
+    #     n = len(obj)
+    #     tip = type(obj).__name__
+    #     if is_namedtuple(obj):
+    #         tip += " (namedtuple)"
+    #     return f"{n} {strutils.pluralize('element', n)}", tip
+
+    # @_getObjInfo_.register(dict)
+    # def _(self: typing.Self, obj: dict) -> tuple:
+    #     n = len(obj)
+    #     return (f"{len(obj)} key / value {strutils.pluralize('pair', n)}",
+    #             type(obj).__name__)
+
+    # @_getObjInfo_.register(types.SimpleNamespace)
+    # def _(self: typing.Self, obj: types.SimpleNamespace) -> tuple:
+    #     d = obj.__dict__
+    #     n = len(d)
+    #     return f"{n} {strutils.pluralize('element', n)}", type(obj).__name__
+
+    # @_getObjInfo_.register(pq.UnitQuantity)
+    # @_getObjInfo_.register(pq.Quantity)
+    # def _(self:typing.Self, obj: pq.Quantity) -> tuple:
+    #     tip = scq.unitFamilyName(obj.units)
+    #     if isinstance(pq.UnitQuantity):
+    #         info = f"{obj} {scq.unitFamilyName(obj)}"
+    #     else:
+    #         if obj.size <= 1:
+    #             info = f"{obj}"
+    #         else:
+    #             n = obj.size
+    #             s = obj.shape
+    #             info = f"Quantity array ({obj.units.dimensionality}) with {n} {strutils.pluralize('samples', n)}, shape {s}, and dtype {obj.dtype}"
+    #
+    #     return info, tip
+
+    # @_getObjInfo_.register(np.ndarray)
+    # def _(self: typing.Self, obj: np.ndarray) -> tuple:
+    #     n = obj.size
+    #     s = obj.shape
+    #     if obj.size <= 1:
+    #         info = f"{obj}"
+    #     else:
+    #         info = f"Array with {n} {strutils.pluralize('samples', n)}, shape {s}, and dtype {obj.dtype}"
+    #
+    #     return info, type(obj).__name__
+
+    # @_getObjInfo_.register(vigra.filters.Kernel1D)
+    # @_getObjInfo_.register(vigra.filters.Kernel2D)
+    # def _(self: typing.Self,
+    #       obj: typing.Union[vigra.filters.Kernel1D,
+    #                         vigra.filters.Kernel2D]) -> tuple:
+    #
+    #     if isinstance(obj, vigra.filters.Kernel1D):
+    #         n = int(obj.size())
+    #         info = f"with {n} {strutils.pluralize('sample', n)}"
+    #     else:
+    #         h = int(obj.height())
+    #         w = int(obj.width())
+    #         info = f"with {h} × {w} {strutils.pluralize('sample', h*w)}"
+    #
+    #     return info, type(obj).__name__
+
+    def _buildTree_(self: typing.Self,
+                    obj: object,
+                    name: str = "",
+                    keyType: type = str,
+                    nameTip: str = "",
+                    typeStr: typing.Optional[str] = None,
+                    # predicate: typing.Optional[types.FunctionType] = None,
+                    # hideRoot: bool = False,
+                    path: tuple = tuple()):
+
+        # 1. get the top object symbol, type and some information, as items to
+        # go as the first (and only) top-level row in the model
+
+        # print(f"{self.__class__.__name__}._buildTree_(obj: {type(obj).__name__})")
+        if isinstance(self._privateData_, dict):
+            self._buildBranch_(self._privateData_, name,
+                               self.invisibleRootItem(), 0)
+
     @singledispatchmethod
-    def _getObjInfo_(self: typing.Self, obj: object) -> str:
+    def _buildBranch_(self: typing.Self,
+                      obj: object,
+                      objName: str,
+                      parentItem: QtGui.QStandardItem,
+                      row: int):
+        # print(f"{self.__class__.__name__}._buildBranch_(obj: {type(obj).__name__})")
+        rowItems = self._makeRowItems_(obj, objName)
+        parentItem.insertRow(row, rowItems)
+
+    @_buildBranch_.register(dict)
+    def _(self: typing.Self, obj: dict, objName: str,
+          parentItem: QtGui.QStandardItem, row: int):
+        # print(f"{self.__class__.__name__}._buildBranch_(obj: {type(obj).__name__})")
+        rowItems = self._makeRowItems_(obj, objName)
+        parentItem.insertRow(row, rowItems)
+        pItem = rowItems[0]
+        k = 0
+        for key, value in obj.items():
+            if isinstance(key, str):
+                vName = key
+            else:
+                vName = f"{key}"
+            self._buildBranch_(value, vName, pItem, k)
+            k += 1
+
+    def _introspectable_(self: typing.Self, obj: object) -> bool:
+        return (all(t not in self._supportedDataTypes_ for t in mro)
+                         and not inspect.isroutine(obj)
+                         and not isinstance(obj, (types.ModuleType,
+                                             pkgutil.ModuleInfo))
+                         and obj is not None)
+
+    def _parseData(self: typing.Self, obj: object,
+                   includePrivateMembers: bool = True) -> tuple:
+        # NOTE: 2025-06-28 13:57:28
+        # generate a mapping representation of obj's members upon which
+        # the tree model is built
+        # for dataclasses, use their fields
+        # for non-dict classes inspect their members, allowing to ignore the
+        # "private" members, i.e., those bound to symbols starting with
+        # underscore ('_')
+        pData, asPrivate = self._parseObj_(obj)
+        if isinstance(pData, dict) and not includePrivateMembers:
+            pData = dict(
+                list(
+                    filter(
+                        self._check_private_member_,
+                        pData.items()
+                    )
+                )
+            )
+
+        return pData, asPrivate
+
+    @singledispatchmethod
+    def _parseObj_(self, obj: object,
+                   includePrivateMembers: bool = True) -> tuple:
+        r"""
+Returns:
+========
+a tuple: (parsed data, info dict), where *info dict* contains the mapping:
+
+    "asPrivate" ↦ bool
+        When ``True`` this flag the the object is represented by way of a private
+        mapping (``self._privateData_``)
+
+    dictwill trigger creation of sub-branches representing
+        the structure in private data (a dict)
+    ""
+
+    """
+        mro = inspect.getmro(type(obj))
+        asPrivate: bool = False
+        tip: str = type(obj).__name__
+        hasChildren: bool = False
+
+        print(f"{self.__class__.__name__}._parseObj_(obj: {tip})")
+
         if obj in (None, MISSING, pd.NA):
+            pData = obj
+            asPrivate = False
             info = f"{obj}"
+            tip = f"{obj}"
+            hasChildren: bool = False
 
         elif isDataclass(obj):
             datafields = dataclasses.fields(obj)
-            n = len(datafields)
-            info = f"{n} {strutils.pluralize('field', n)}"
+            try:
+                fieldnames = list(map(lambda f: f.name, datafields))
+                membernames = list(data.__dict__.keys())
+                childnames = list(sorted(unique(membernames + fieldnames)))
+                pData = dict(map(lambda c: (c, getattr(data, c)), childnames))
+            except:
+                traceback.print_exc()
+                print(
+                    f"{print_styled(f'for {type(data).__name__} data', color='red')}"
+                )
+                pData = dict(map(lambda x: (x.name, getattr(obj, x.name)), datafields))
+
+            if not includePrivateMembers:
+                pData = dict(
+                    list(
+                        filter(
+                            self._check_private_member_,
+                            pData.items()
+                        )
+                    )
+                )
+
+            n = len(pData)
+
+            info = f"{n} {strutils.pluralize('member', n)}"
+            tip = f"{type(obj).__name__} (dataclass)"
+            asPrivate = True
+            hasChildren: bool = True
+
+        elif self.HAVE_METAARRAY and (
+                hasattr(obj, "implements") and obj.implements("MetaArray")
+            ):
+            # NOTE: 2026-02-07 09:16:25 FIXME/TODO
+            # either break the cycling import dependency at
+            # NOTE: 2026-02-07 09:14:19 FIXME/TODO, or make sure to refer to
+            # HAVE_METAARRAY int he self's namespace, where it is defined
+            #
+            # WARNING: 2026-02-07 09:18:42 Do the same with PrairieView object
+            #
+            pData = dict(
+                    [("data", obj.view(np.ndarray)), ("meta", obj.infoCopy())]
+                )
+            asPrivate = True
+            hasChildren: True
+            info = ""
+
+        elif self._introspectable_(obj) :
+            pData = datatypes.inspect_members(obj, self._predicate_)
+            if not includePrivateMembers:
+                pData = dict(
+                    list(
+                        filter(
+                            self._check_private_member_,
+                            pData.items()
+                        )
+                    )
+                )
+
+            asPrivate = True
+            hasChildren = True
+
+            n = len(pData)
+            info = f"{n} {strutils.pluralize('member', n)}"
 
         else:
             raise NotImplementedError(
             f"Objects of type {type(obj).__name__} are not supported"
             )
+            # pData = obj
+            # asPrivate = False
+            # info = ""
 
-        return info
+        return pData, asPrivate, hasChildren, info, tip
 
-    @_getObjInfo_.register(type)
-    def _(self: typing.Self, obj: type) -> str:
-        return f"Type object: {obj.__name__}"
+    @_parseObj_.register(type)
+    def _(self: typing.Self, obj: type,
+                   includePrivateMembers: bool = True) -> tuple:
+        info = f"Type object: {obj.__name__}"
+        tip = str(obj)
+        pData = obj
+        return pData, False, False, info, tip
 
-    @_getObjInfo_.register(str)
-    @_getObjInfo_.register(bytes)
-    @_getObjInfo_.register(bytearray)
-    def _(self: typing.Self, obj: typing.Union[str, bytes, bytearray]) -> str:
+    @_parseObj_.register(dict)
+    def _(self: typing.Self, obj: dict,
+                   includePrivateMembers: bool = True) -> tuple:
+        if not includePrivateMembers:
+            pData = dict(
+                list(
+                    self._check_private_member_,
+                    obj.items())
+                    )
+                )
+        else:
+            pData = obj
+
+        n = len(pData)
+        info = f"{len(obj)} key / value {strutils.pluralize('pair', n)}"
+        tip = type(obj).__name__
+        return obj, False, True, info, tip
+
+    @_parseObj_.register(list)
+    @_parseObj_.register(tuple)
+    @_parseObj_.register(deque)
+    @_parseObj_.register(set)
+    def _(self: typing.Self,
+          obj: typing.Union[list, tuple, deque, set],
+                   includePrivateMembers: bool = True) -> tuple:
+
+        tip = type(obj).__name__
+
+        if is_namedtuple(obj):
+            pData = obj._asDict()
+            tip += "(namedtuple)"
+        else:
+            pData = dict(enumerate(obj))
+
+        if not includePrivateMembers:
+            pData = dict(
+            list(
+                    filter(
+                        self._check_private_member_,
+                        pData.items()
+                    )
+                )
+            )
+
+        n = len(pData)
+        info = f"{n} {strutils.pluralize('element', n)}"
+
+        return pData, True, True, info, tip
+
+    @_parseObj_.register(str)
+    @_parseObj_.register(bytes)
+    @_parseObj_.register(bytearray)
+    def _(self: typing.Self, obj: typing.Union[str, bytes, bytearray],
+          _: bool = True) -> tuple:
+        tip = type(obj).__name__
         n = len(obj)
         if n > 100:
             info = (
@@ -520,38 +894,177 @@ General rule for delegate use in this model:
         else:
             info = obj if isinstance(obj, str) else obj.decode()
 
-        return info
+        return  obj, False, False, info, tip
 
-    @_getObjInfo_.register(bool)
-    @_getObjInfo_.register(int)
-    @_getObjInfo_.register(float)
-    @_getObjInfo_.register(complex)
-    @_getObjInfo_.register(np.integer)
-    @_getObjInfo_.register(np.floating)
-    @_getObjInfo_.register(np.complexfloating)
+    @_parseObj_.register(bool)
+    @_parseObj_.register(int)
+    @_parseObj_.register(float)
+    @_parseObj_.register(complex)
+    @_parseObj_.register(fractions.Fraction)
+    @_parseObj_.register(decimal.Decimal)
+    @_parseObj_.register(numbers.Number)
+    @_parseObj_.register(np.integer)
+    @_parseObj_.register(np.floating)
+    @_parseObj_.register(np.complexfloating)
     def _(self: typing.Self,
           obj: typing.Union[bool, int, float, complex,
-                            np.integer, np.floating,
-                            np.complexfloating]) -> str:
-        return f"{obj}"
+                            fractions.Fraction,
+                            decimal.Decimal,
+                            numbers.Number,
+                            np.integer, np.floating, np.complexfloating],
+          _: bool=True) -> tuple:
 
-    @_getObjInfo_.register(list)
-    @_getObjInfo_.register(tuple)
-    @_getObjInfo_.register(deque)
-    @_getObjInfo_.register(set)
-    def _(self: typing.Self, obj: typing.Union[list, tuple, deque,
-                                               set]) -> str:
+        return obj, False, False, f"{obj}", type(obj).__name__
+
+    @_parseObj_.register(types.SimpleNamespace)
+    def _(self: typing.Self, obj: types.SimpleNamespace,
+                   includePrivateMembers: bool = True) -> tuple:
+        pData = obj.__dict__
+        if not includePrivateMembers:
+            pData = dict(
+            list(
+                    filter(
+                        self._check_private_member_,
+                        pData.items()
+                    )
+                )
+            )
+
+        n = len(pData)
+        info = f"{n} {strutils.pluralize('element', n)}"
+        tip = type(obj).__name__
+        return pData, True, True, info, tip
+
+    @_parseObj_.register(types.ModuleType)
+    def _(self: typing.Self, obj: types.ModuleType,
+          includePrivateMembers: bool = True) -> tuple:
+        tip = type(obj).__name__
+
+        if hasattr(obj, "__name__"):
+            mname = f" {obj._name__}"
+        else:
+            mname = ""
+
+        if hasattr(obj, "__file__"):
+            mfile = " from file " + obj.__file__
+        else:
+            mfile = ""
+
+        mname = getattr(obj, "__name__", None)
+        info = f"Module{mname}{mfile}"
+
+        pData = obj.__dict__
+
+        if not includePrivateMembers:
+            pData = dict(
+            list(
+                    filter(
+                        self._check_private_member_,
+                        pData.items()
+                    )
+                )
+            )
+
+        return pData, True, True, info, tip
+
+    @_parseObj_.register(vigra.filters.Kernel1D)
+    @_parseObj_.register(vigra.filters.Kernel2D)
+    def_(self: typing.Self,
+         obj: typing.Union[vigra.filters.Kernel1D, vigra.filters.Kernel2D],
+         _: bool = True) -> tuple:
+        if isinstance(obj, vigra.filters.Kernel1D):
+            n = int(obj.size())
+            info = f"with {n} {strutils.pluralize('sample', n)}"
+        else:
+            h = int(obj.height())
+            w = int(obj.width())
+            info = f"with {h} × {w} {strutils.pluralize('sample', h*w)}"
+
+        return obj, False, False, info, type(obj).__name__
+
+    @_parseObj_.register(pd.DataFrame)
+    @_parseObj_.register(pd.Series)
+    @_parseObj_.register(pd.Index)
+    def _(self: typing.Self,
+          obj: typing.Union[pd.DataFrame, pd.Series, pd.Index],
+          _: bool = True) -> tuple:
+        nrows = len(obj)
+        if isinstance(obj, pd.DataFrame):
+            ncols = len(obj.columns)
+            rows = strutils.pluralize('row', nrows)
+
+            cols = strutils.pluralize('column', ncols)
+
+            info = f"{nrows} {rows} × {ncols} {cols}"
+
+        elif isinstance(obj, pd.Series):
+            rows = strutils.pluralize('row', nrows)
+            info = f"{nrows} {rows}, dtype = {obj.dtype}"
+
+        else:
+            rows = strutils.pluralize('element', nrows)
+            info = f"{nrows} {rows}"
+
+        tip = type(obj).__name__
+        return obj, False, False, info, tip
+
+
+    @_parseObj_.register(Interval)
+    def _(self: typing.Self, obj: Interval) -> tuple:
+        pData = {
+                    "t0": obj.t0,
+                    "t1": obj.t1,
+                    "durations": obj.durations,
+                    "extent": obj.extent,
+                    "labels": obj.labels,
+                    "annotations": obj.annotations,
+                    "description": obj.description,
+                }
         n = len(obj)
-        return f"{n} {strutils.pluralize('element', n)}"
+        desc = strutils.pluralize('subinterval', n)
+        info = f"Interval '{obj.name}' with {len(obj)} {desc}"
+        return pData, True, True, info, type(obj).__name__
 
-    @_getObjInfo_.register(dict)
-    def _(self: typing.Self, obj: dict) -> str:
+    @_parseObj_.register(neo.Epoch)
+    @_parseObj_.register(DataZone)
+    def _(self: typing.Self, obj: typing.Union[neo.Epoch, DataZone]) -> tuple:
+        pData = {
+                    "times": obj.times,
+                    "durations": obj.durations,
+                    "labels": obj.labels,
+                    "annotations": obj.annotations,
+                    "description": obj.description,
+                }
+
         n = len(obj)
-        return f"{len(obj)} key / value {strutils.pluralize('pair', n)}"
+        klass = "Zone" if isinstance(obj, DataZone) else Epoch
+        desc = strutils.pluralize('subinterval', n)
+        info = f"{klass} '{obj.name}' with {len(obj)} {desc}"
+        return pData, True, True, info, type(obj).__name__
 
-    @_getObjInfo_.register(pq.UnitQuantity)
-    @_getObjInfo_.register(pq.Quantity)
-    def _(self:typing.Self, obj: pq.Quantity) -> str:
+    @_parseObj_.register(neo.Event)
+    @_parseObj_.register(DataMark)
+    @_parseObj_.register(TriggerEvent)
+    def _(self: typing.Self,
+          obj: typing.Union[neo.Event, DataMark, TriggerEvent]) -> tuple:
+        pData = {"times": obj.times, "labels": obj.labels}
+
+        if isinstance(obj, (DataMark, TriggerEvent)):
+            pData.update({"type": obj.type, "relative": obj.relative})
+
+        pData.update({"annotations": obj.annotations, "description": obj.description})
+
+        klass = "Mark" if isinstance(obj, DataMark) else tip
+
+        tip = type(obj).__name__
+        desc = strutils.pluralize('subinterval', n)
+        info = f"{klass} '{obj.name}' with {len(obj)} {desc}"
+
+        return pData, True, True, info, tip
+
+    @_parseObj_.register(pq.Quantity)
+    def _(self: typing.Self, obj: pq.Quantity, _: bool=True) -> tuple:
+        tip = scq.unitFamilyName(obj.units)
         if isinstance(pq.UnitQuantity):
             info = f"{obj} {scq.unitFamilyName(obj)}"
         else:
@@ -562,201 +1075,110 @@ General rule for delegate use in this model:
                 s = obj.shape
                 info = f"Quantity array ({obj.units.dimensionality}) with {n} {strutils.pluralize('samples', n)}, shape {s}, and dtype {obj.dtype}"
 
-        return info
+        return obj, False, False, info, tip
 
-    @_getObjInfo_.register(np.ndarray)
-    def _(self: typing.Self, obj: np.ndarray) -> str:
+    @_parseObj_.register(vigra.VigraArray)
+    def _(self: typing.Self, obj:vigra.VigraArray, _: bool = True) -> tuple:
         n = obj.size
         s = obj.shape
+        samples = strutils.pluralize('samples', n)
         if obj.size <= 1:
             info = f"{obj}"
         else:
-            info = f"Array with {n} {strutils.pluralize('samples', n)}, shape {s}, and dtype {obj.dtype}"
+            info = f"Vigra Array with {n} {samples}, shape {s}, and dtype {obj.dtype}"
 
-        return info
+        pData = dict(enumerate(obj.axistags))
 
-    @_getObjInfo_.register(vigra.filters.Kernel1D)
-    @_getObjInfo_.register(vigra.filters.Kernel2D)
+        return pData, True, True, info, type(obj.__name__)
+
+    @_parseObj_.register(np.ndarray)
+    def _(self: typing.Self, obj: np.ndarray, _: bool = True) -> tuple:
+        n = obj.size
+        s = obj.shape
+        samples = strutils.pluralize('samples', n)
+        if obj.size <= 1:
+            info = f"{obj}"
+        else:
+            info = f"Array with {n} {samples}, shape {s}, and dtype {obj.dtype}"
+
+        return obj, False, False, info, type(obj).__name__
+
+    @_parseObj_.register(AxesCalibration)
+    def _(self: typing.Self, obj: AxesCalibration, _:bool=True) -> tuple:
+        pData = dict(enumerate(obj.calibrations))
+        n = len(pData)
+        info = f"{n} {strutils.pluralize('calibration', n)}"
+        tip = type(obj).__name__
+
+        return pData, True,, True, info, tip
+
+    @_parseObj_.register(AxesCalibrationData)
+    def _(self: typing.Self, obj: AxesCalibrationData) -> tuple:
+        tip = type(obj).__name__
+        asPrivate = False
+        hasChildren = False
+        if obj.isChannels:
+            pData = dict(enumerate(obj.channels))
+            asPrivate = True
+            hasChildren = True
+        else:
+            pData = obj
+
+        return pData, asPrivate, hasChildren, info, tip
+
+    @_parseObj_.register(ChannelCalibrationData)
     def _(self: typing.Self,
-          obj: typing.Union[vigra.filters.Kernel1D,
-                            vigra.filters.Kernel2D]) -> str:
+          obj: ChannelCalibrationData, _: bool = True) -> tuple:
+        tip = f"{type(obj).__name__}"
+        info = " ".join(
+            [
+                tip,
+                "with name:",
+                f"'{obj.name}'",
+                "index:",
+                f"{obj.index}",
+                "acquisition index:",
+                f"{obj.acquisition_index}",
+            ]
+        )
 
-        if isinstance(obj, vigra.filters.Kernel1D):
-            n = int(obj.size())
-            info = f"with {n} {strutils.pluralize('sample', n)}"
-        else:
-            h = int(obj.height())
-            w = int(obj.width())
-            info = f"with {h} × {w} {strutils.pluralize('sample', h*w)}"
+            return obj, False, False, info, tip
 
-        return info
+    @_parseObj_.register(self.PVObject)
+    def _(self: typing.Self, obj: self.PVObject) -> tuple:
+        tip = type(obj).__name__
+        info = tip
+        if isinstance(obj, PVScan):
+            info = f"{data_attributes}"
 
-    def _buildTree_(self: typing.Self,
-                    obj: object,
-                    name: str = "",
-                    keyType: type = str,
-                    nameTip: str = "",
-                    typeStr: typing.Optional[str] = None,
-                    predicate: typing.Optional[types.FunctionType] = None,
-                    hideRoot: bool = False,
-                    path: tuple = tuple()):
+        elif isinstance(obj, PVSequence):
+            nframes = len(obj.frames)
+            info = f"{obj.attributes['sequencetypename']} with {nframes} {strutils.pluralize('frame', nframes)}"
 
-        # 1. get the top object symbol, type and some information, as items to
-        # go as the first (and only) top-level row in the model
+        elif isinstance(obj, PVFrame):
+            info = f"Channels: {obj.channels}"
 
-        # self._privateData_,
-        # self._hasDynamicPrivate_ = self._parseData_(obj,
-        #                                             self._showPrivate_)
-        rootItems = self._makeRowItems_(obj, name)
-        self.invisibleRootItem().insertRow(0, rootItems)
-        parentItem = rootItems[0]
-        if isinstance(self._privateData_, dict):
-            k = 0
-            for (key, value) in self._privateData_.items():
-                if isinstance(key, str):
-                    vName = key
-                else:
-                    vName = f"{key}"
-                rowItems = self._makeRowItems_(value, vName)
-                parentItem.insertRow(k, rowItems)
-                k += 1
+        elif isinstance(obj, (PVSystemConfiguration, PVIndexedValue, PVSubIndexedValue)):
+            if (
+                hasattr(obj, "description")
+                and isinstance(obj.description, str)
+                and len(obj.description.strip())
+                ):
+                info = data.description
 
-    @singledispatchmethod
-    def _buildBranch_(self: typing.Self,
-                      obj: object,
-                      objName: str,
-                      parentItem: QtGui.QStandardItem,
-                      row: int):
-        rowItems = self._makeRowItems_(obj, objName)
-        parentItem.insertRow(row, rowItems)
+        return obj.as_dict(), True, True, info, tip
 
-    @_buildBranch_.register(dict)
-    def _(self: typing.Self, obj: dict, objName: str,
-          parentItem: QtGui.QStandardItem, row: int):
-        rowItems = self._makeRowItems_(obj, objName)
-        parentItem.insertRow(row, rowItems)
-        pItem = rowItems[0]
-        k = 0
-        for key, value in obj.items():
-            self._buildBranch_(value, key, pItem, k)
-            k += 1
-
-
-    def _parseData_(self, obj: object,
-                    includePrivateMembers: bool = True) -> tuple:
-        mro = inspect.getmro(type(obj))
-        flag = False
-
-        print(f"{self.__class__.__name__}._parseData_(obj: {type(obj).__name__})")
-
-        introspectable = (all(t not in self._supportedDataTypes_ for t in mro)
-                         and not inspect.isroutine(obj)
-                         and not isinstance(obj, (types.ModuleType,
-                                             pkgutil.ModuleInfo))
-                         and obj is not None)
-
-        # NOTE: 2025-06-28 13:57:28
-        # generate a mapping representation of obj's members upon which
-        # the tree model is built
-        # for dataclasses, use their fields
-        # for non-dict classes inspect their members, allowing to ignore the
-        # "private" members, i.e., those bound to symbols starting with
-        # underscore ('_')
-        if isDataclass(obj):
-            datafields = dataclasses.fields(obj)
-            pData = dict(map(lambda x: (x.name, getattr(obj, x.name)), datafields))
-            flag = True
-
-        elif isinstance(obj, dict):
-            # NOTE: 2025-06-28 13:58:14
-            # The obj is suitable for direct representation by a tree model
-            pData = obj
-            flag = False
-
-        elif introspectable :
-            pData = datatypes.inspect_members(obj, self._predicate_)
-            flag = True
-
-        else:
-            pData = obj
-            flag = False
-
-        if isinstance(pData, dict) and not includePrivateMembers:
-            pData = dict(
-                list(
-                    filter(
-                        lambda x: not isinstance(x[0], str) or not x[0].startswith("_"), pData.items()
-                    )
-                )
-            )
-
-        return pData, flag
-
-
-
-
-    # def data(self, modelIndex: QtCore.QModelIndex,
-    #          role: QtCore.Qt.ItemDataRole = QtCore.Qt.DisplayRole) -> QtCore.QVariant: # TODO 2026-02-01 21:31:55
-    #     if self._modelData_ is None:
-    #         return QtCore.QVariant()
-    #
-    #     if not modelIndex.isValid():
-    #         return QtCore.QVariant()
-    #
-    #     # avoid calling internalPointer() -> it will CRASH!
-    #     # instad, rely on the QModelIndex API, knowing that the all QModelIndex
-    #     # in an item only has data for column 0 (the DataTreeItem can have
-    #     # several QModelIndex objects, one per column)
-    #     return modelIndex.data(0, role)
-    #
-    # def canFetchMore(self, parentIndex: QtCore.QModelIndex) -> bool:
-    #     # TODO 2026-02-01 21:31:46
-    #     return False if parentIndex.isValid() else self._displayedRows_ < self._modelDataRows_ or self._displayedColumns_ < self._modelDataColumns_
-    #
-    # def fetchMore(self, parentIndex:QtCore.QModelIndex):
-    #     # TODO datetime2Qt
-    #     if parentIndex.isValid():
-    #         return
-    #
-    # def flags(self, modelIndex: QtCore.QModelIndex) -> QtCore.Qt.ItemFlag:
-    #     #  'ItemIsAutoTristate',
-    #     #  'ItemIsDragEnabled',
-    #     #  'ItemIsDropEnabled',
-    #     #  'ItemIsEditable',
-    #     #  'ItemIsEnabled',
-    #     #  'ItemIsSelectable',
-    #     #  'ItemIsUserCheckable',
-    #     #  'ItemIsUserTristate',
-    #     #  'ItemNeverHasChildren'
-    #
-    #     return super().flags(modelIndex) if modelIndex.isValid() else QtCore.Qt.NoItemFlags # TODO 2026-02-01 21:31:43 — revisit this !!!
-    #
-    # def setModelData(self, data: typing.Any, name: str = "",
-    #                  showPrivate: bool = False, predicate = None,
-    #                  top_title: str = "/", dataTypeStr: str = ""):
-    #     # TODO 2026-02-01 21:32:05
-    #
-    #
-    #     pass
-    #
-    # def headerData(self, section: int, orientation: QtCore.Qt.Orientation,
-    #                role:QtCore.Qt.ItemDataRole=QtCore.Qt.DisplayRole) -> QtCore.QVariant:
-    #     # 'Horizontal',
-    #     # 'Vertical'
-    #     return self._rootItem_.data(section) if orientation == QtCore.Qt.Horizontal and role == QtCore.Qt.DisplayRole else QtCore.QVariant()
-    #
-    # def index(self, row:int, column:int, parentIndex:QtCore.QModelIndex) -> QtCore.QModelIndex:
-    #     # NOTE: 2026-02-01 21:59:46
-    #     # There is no access to protected functions or signals for objects not created from Python;
-    #     # this means one cannot call self.createIndex(…) here, and cannot override it!
-    #     if not self.hasIndex(row, column, parent):
-    #         return QtCore.QModelIndex() # invalid index
-    #
-    #     # if parentIndex.isValid():
-    #     #     return parentIndex.model().
-    #
-    #     if parentIndex.isValid() and super().checkIndex(parentIndex):
-    #         pass
+    @_parseObj_.register(scipy.optimize.Bounds)
+    def _(self: typing.Self,
+          obj: scipy.optimize.Bounds, _:bool = True) -> tuple:
+        tip = type(obj).__name__
+        pData = {
+                    "lb": obj.lb,
+                    "ub": obj.ub,
+                    "keep_feasible": obj.keep_feasible,
+                }
+        info = ""
+        return pData, True, True, info, tip
 
 
 
