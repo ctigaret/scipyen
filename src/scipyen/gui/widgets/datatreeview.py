@@ -272,167 +272,6 @@ PODS = (
 
 class DataTreeModel(QtGui.QStandardItemModel):
     r"""
-
-Approach:
-
-.. ::
-
-    # d = dict(...)
-
-    model = QtGui.QStandardItemModel(0,3)
-    invisibleRootItem = model.invisibleRootItem()
-    top_item0 = QtGui.QStandardItem("d")
-    top_item1 = QtGui.QStandardItem(type(d).__name__)
-    top_item2 = QtGui.QStandardItem(f"{len(d)}")
-    invisibleRootItem.insertRow(0, [top_item0, top_item1, top_item2])
-    parentItem = top_item0
-    for k, (key, val) in enumerate(d.items()):
-        item0 = QtGui.QStandardItem(key)
-        item1 = QtGui.QStandardItem(type(val).__name__)
-        item2 = QtGui.QStandardItem("a thing")
-        parentItem.insertRow(k, [item0, item1, item2])
-
-    treeView = QtWidgets.QTreeView()
-    treeView.setModel(model)
-    treeView.show()
-
-"Root" item: should be populatd with tol-leve object info (the "data" object)
-
-Depending on what data type is, add children to this root item
-
-Have the model create items for each of the three columns
-(see InteractiveTreeWidget) using 1st-level object info
-
-
-
-General rule for delegate use in this model:
-* the ones that occupy a single row go to column 2 of CURRENT item -> makes it easy to edit the object represented by the item
-    * QCheckBox
-    * QSpinBox
-    * QuantitySpinBox
-    * ComplexSpinBox
-    * QLineEdit
-
-* the ones that take-up more screen estate need expanding and therefore go in column 0 OF A CHILD of the item to be modified:
-    * QTextEdit
-    * table editor widget
-
-* mapping *keys* are **not** editable, see the following note; these are all **hashable** objects.
-
-* similarly, indexes in sequence-like collections are **not** editable
-
-.. note::
-
-    There may be a case to modify a mapping's structure by changing the "key" to which a value is mapped,
-        BUT this may controversial:
-        * would change the semantics of the mapping object (i.e. break expectations for the user(s) of that object - change API 'contract')
-        * would be tricky to implement
-        * would only apply to keys of a type for which we have item delegates in place: str (QLineEdit), int (QSpinBox)
-
-1. POD objects, str, bytes and bytearray:
-
-.. ::
-
-    name (symbol) -> type -> value/information — NO CHILDREN
-                            delegate in column 2 according to data type:
-                                    bool -> QCheckBox
-                                    int -> QSpinBox
-                                    float -> QuantitySpinBox
-                                    complex -> ComplexSpinBox
-                                    str -> QLineEdit or QTextEditq
-                                    bytes/bytearray -> QLineEdit or TextEdit ONLY WHEN it makes sense...
-
-                                    anything else: QLabel with object repr
-
-2. numpy arrays:
-
-    1. generic numpy arrays
-
-.. ::
-
-    name (symbol) -> type -> value/information — NO CHILDREN if data size <= 1
-                            delegate in column 2 according to array dtype:
-                                    bool -> QCheckBox
-                                    int -> QSpinBox
-                                    float -> QuantitySpinBox
-                                    complex -> ComplexSpinBox
-                                    str -> QLineEdit
-                                    anything else: QLabel with object repr
-        |
-        CHILDREN (if data size > 1)
-            delegate in column 0 = table editor widget
-
-    2. special numpy array cases:
-
-        1. vigra.VigraArray
-
-.. ::
-
-    name (symbol) -> type -> value/information
-                            delegate in column 2 else according to array dtype if data.size <= 1:
-                                        bool -> QChecBox (is this even possible in a VigraArray? Theoretically, yes but would be converted to float wheb writing to files)
-                                        int -> QSpinBox,
-                                        float -> QuantitySpinBox
-                                        complex -> ComplexSpinBox
-                                        str -> QLineEdit (is this even possible in a VigraArray?)
-                                        anything else: QLabel
-        |
-        CHILDREN:
-            -> AxisInfo name (symbol) -> type ("AxisInfo") -> value
-                    |
-                    CHILDREN: attributes of axis info
-            ⋮
-            -> as above for each AxisInfo
-
-            -> (if data.size > 1) table editor widget delegate in column 0
-
-            2. struct arrays - not supported yet, treat as POD with QLabel as delegate for column 3
-
-            3. neo.data objects
-
-.. ::
-
-    name (symbol) -> type -> value/information
-                            delegate in column 3 else according to array dtype if data.size <= 1:
-                                        bool -> QChecBox (is this even possible in a VigraArray? Theoretically, yes but would be converted to float wheb writing to files)
-                                        int -> QSpinBox,
-                                        float -> QuantitySpinBox
-                                        complex -> ComplexSpinBox
-                                        str -> QLineEdit (is this even possible in a VigraArray?)
-                                        anything else: QLabel
-        |
-        CHILDREN:
-        -> array data delegate for column 0: table editor widget if data.size > 0, else according to dtype:
-                                        int -> QSpinBox,
-                                        float -> QuantitySpinBox
-                                        complex -> ComplexSpinBox
-                                        str -> QLineEdit
-                                        anything else: QLabel
-
-3. Standard Pyton collections:
-
-    1. dict, mappings
-
-.. ::
-
-    name(symbol) -> type -> value/information
-        |
-        CHILDREN:
-            -> name(symbol)     -> type         -> value/information — CHILDREN delegates on column 0 or ITEM delegate in column 2
-                string repr         dict item       dict item value
-                of dict key         value type
-
-                tooltip: key type
-
-    2. sequences (tuple, list, deque)
-
-.. ::
-
-    name(symbol) -> type -> value/information
-        |
-        CHILDREN:
-            -> int key (index) -> type -> value/information — CHILDREN delegates on column 0 or ITEM delegate in column 2
-
 """
 
 
@@ -442,15 +281,19 @@ General rule for delegate use in this model:
 
     standaloneEditorWidgetRole = QtCore.Qt.UserRole + 2
     objectDataAccessRole = QtCore.Qt.UserRole + 3
+    objectDataRole = QtCore.Qt.UserRole + 4
 
     sig_editCompleted = Signal([pd.DataFrame], [pd.Series], [np.ndarray], name="sig_editCompleted")
     sig_modelDataChanged = Signal(name="sig_modelDataChanged")
 
-    _check_private_member_ = lambda x: (not isinstance(x[0], str)
-                                        or not x[0].startswith("_"))
+    @staticmethod
+    def _check_private_member_(x: object, y: typing.Optional[object] = None):
+        return (not isinstance(x[0], str)
+                or not x[0].startswith("_"))
 
-    _check_private_member_2_ = lambda x, y: (not isinstance(x, str)
-                                        or not x.startswith("_"))
+    # @staticmethod
+    # def _check_private_member_2_(x: object, y: object):
+    #     return self._check_private_member_(x)
 
     def __init__(self: typing.Self, data: typing.Optional[typing.Any] = None,
                  dataName: str = None,
@@ -512,6 +355,8 @@ General rule for delegate use in this model:
             objName = "/"
 
         item0 = QtGui.QStandardItem(objName)
+        item0.setData(QtCore.QVariant(objDict["memberAccess"]), self.objectDataAccessRole)
+        item0.setData(QtCore.QVariant(obj), self.objectDataRole)
         item1 = QtGui.QStandardItem(typeName)
         item2 = QtGui.QStandardItem(info)
         flags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsDragEnabled | QtCore.Qt.ItemIsEnabled
@@ -544,9 +389,10 @@ General rule for delegate use in this model:
 
     @singledispatchmethod
     def _buildBranch_(self: typing.Self, obj: object, objDict: dict,
-                      objName: str, parentItem: QtGui.QStandardItem, row: int):
+                      objKey: str, parentItem: QtGui.QStandardItem, row: int):
         # print(f"{self.__class__.__name__}._buildBranch_(obj: {type(obj).__name__})")
-        rowItems = self._makeObjectRow_(obj, objDict, objName)
+        rowItems = self._makeObjectRow_(obj, objDict, objKey)
+        # rowItems[0].setData(QtCore.QVariant())
         parentItem.insertRow(row, rowItems)
         if objDict["objDataAsChild"]:
             # NOTE: 2026-02-08 09:52:28 TODO
@@ -572,10 +418,10 @@ General rule for delegate use in this model:
             # 2) disable editing when we're read-only
 
     @_buildBranch_.register(dict)
-    def _(self: typing.Self, obj: dict, objDict: dict, objName: str,
+    def _(self: typing.Self, obj: dict, objDict: dict, objKey: str,
           parentItem: QtGui.QStandardItem, row: int):
 
-        rowItems = self._makeObjectRow_(obj, objDict, objName)
+        rowItems = self._makeObjectRow_(obj, objDict, objKey)
         parentItem.insertRow(row, rowItems)
         pItem = rowItems[0]
 
@@ -654,9 +500,12 @@ a tuple: (``parsedData``, ``infoDict``), where:
     "objTip" ↦ str
         Contents of the UI tooltip to be shown when the *object row* is hovered.
 
+    "memberAccess" ↦ typing.Tuple[str]
+
     "choices" ↦ dict, mapping name ↦ value - used in enums and enum-like objects
         where a combo box is appropriate for choosing a value from a predefined
         set; for all other object types, this will be empty.
+
     """
 # NOTE: 2026-02-07 22:19:09 NOT USED
 #     "keyType" ↦ str
@@ -689,6 +538,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
             info = f"{obj}"
             tip = f"{obj}"
             objDataAsChild = False
+            memberAccess = tuple()
 
         elif isDataclass(obj):
             datafields = dataclasses.fields(obj)
@@ -708,7 +558,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
                 pData = dict(
                     list(
                         filter(
-                            self._check_private_member_2_,
+                            self._check_private_member_,
                             pData.items()
                         )
                     )
@@ -720,6 +570,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
             tip = f"{type(obj).__name__} (dataclass)"
             indirect = True
             objDataAsChild = False
+            memberAccess = (".",)
 
         elif self.HAVE_METAARRAY and (
                 hasattr(obj, "implements") and obj.implements("MetaArray")
@@ -737,6 +588,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
             indirect = True
             objDataAsChild = False
             info = ""
+            memberAccess = ("[", "]")
 
         # elif self._introspect_ and self._introspectable_(obj) :
         #     pData = datatypes.inspect_members(obj, self._predicate_)
@@ -766,6 +618,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
 
         return pData, {"indirect": indirect, "objDataAsChild": objDataAsChild,
                        "objInfo": info, "objType": type(obj).__name__,
+                       "memberAccess": memberAccess,
                        "objTip": tip}
 
     @_parseObject_.register(types.FunctionType)
@@ -778,6 +631,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
 
         return obj, {"indirect": False, "objDataAsChild": False, "objInfo": info,
                      "objType": type(obj).__name__, "objTip": tip,
+                     "memberAccess": tuple(),
                      "choices": dict()}
 
     @_parseObject_.register(type)
@@ -789,6 +643,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
         tip = str(obj)
         pData = obj
         choices = dict()
+        memberAccess = (".", )
         if isinstance(obj, (enum.EnumType, TypeEnum)):
             choices = obj.__members__
 
@@ -809,7 +664,8 @@ a tuple: (``parsedData``, ``infoDict``), where:
 
         return pData, {"indirect": False, "objDataAsChild": False,
                        "objInfo": info, "objType": type(obj).__name__,
-                       "objTip": tip, "choices": choices}
+                       "objTip": tip, "memberAccess": memberAccess,
+                       "choices": choices}
 
     @_parseObject_.register(dict)
     @_parseObject_.register(types.MappingProxyType)
@@ -833,7 +689,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
             pData = dict(
                 list(
                     filter(
-                        self._check_private_member_2_,
+                        self._check_private_member_,
                         pData.items()
                     )
                     )
@@ -844,7 +700,8 @@ a tuple: (``parsedData``, ``infoDict``), where:
         tip = type(obj).__name__
         return obj, {"indirect":False, "objDataAsChild":False, "objInfo":info,
                      "objType": type(obj).__name__,
-                     "objTip":tip, "choices": dict()}
+                     "objTip":tip, "memberAccess": ("[", "]"),
+                     "choices": dict()}
 
     @_parseObject_.register(list)
     @_parseObject_.register(tuple)
@@ -867,7 +724,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
             pData = dict(
             list(
                     filter(
-                        self._check_private_member_2_,
+                        self._check_private_member_,
                         pData.items()
                     )
                 )
@@ -878,7 +735,9 @@ a tuple: (``parsedData``, ``infoDict``), where:
 
         return pData, {"indirect": True, "objDataAsChild": False,
                        "objInfo": info, "objType": type(obj).__name__,
-                       "objTip": tip, "choices": dict()}
+                       "objTip": tip,
+                       "memberAccess": ("[","]"),
+                       "choices": dict()}
 
     @_parseObject_.register(str)
     @_parseObject_.register(bytes)
@@ -897,7 +756,9 @@ a tuple: (``parsedData``, ``infoDict``), where:
 
         return  obj, {"indirect": False, "objDataAsChild": False,
                       "objInfo": info, "objType": type(obj).__name__,
-                      "objTip": tip, "choices": dict()}
+                      "objTip": tip,
+                      "memberAccess": tuple(),
+                      "choices": dict()}
 
     @_parseObject_.register(bool)
     @_parseObject_.register(int)
@@ -919,7 +780,9 @@ a tuple: (``parsedData``, ``infoDict``), where:
         tip = type(obj).__name__
         return obj, {"indirect": False, "objDataAsChild": False,
                      "objInfo": f"{obj}", "objType": type(obj).__name__,
-                     "objTip": tip, "choices": dict()}
+                     "objTip": tip,
+                     "memberAccess": tuple(),
+                     "choices": dict()}
 
     @_parseObject_.register(types.SimpleNamespace)
     def _(self: typing.Self, obj: types.SimpleNamespace,
@@ -929,7 +792,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
             pData = dict(
             list(
                     filter(
-                        self._check_private_member_2_,
+                        self._check_private_member_,
                         pData.items()
                     )
                 )
@@ -940,7 +803,9 @@ a tuple: (``parsedData``, ``infoDict``), where:
         tip = type(obj).__name__
         return pData, {"indirect": True, "objDataAsChild": False,
                        "objInfo": info, "objType": type(obj).__name__,
-                       "objTip": tip, "choices": dict()}
+                       "objTip": tip,
+                       "memberAccess": (".", ),
+                       "choices": dict()}
 
     @_parseObject_.register(types.ModuleType)
     def _(self: typing.Self, obj: types.ModuleType,
@@ -966,7 +831,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
             pData = dict(
                         list(
                                 filter(
-                                    self._check_private_member_2_,
+                                    self._check_private_member_,
                                     pData.items()
                                 )
                             )
@@ -974,25 +839,122 @@ a tuple: (``parsedData``, ``infoDict``), where:
 
         return pData, {"indirect": True, "objDataAsChild": False,
                        "objInfo": info, "objType": type(obj).__name__,
-                       "objTip": tip, "choices": dict()}
+                       "objTip": tip,
+                       "memberAccess": (".", ),
+                       "choices": dict()}
 
     @_parseObject_.register(vigra.filters.Kernel1D)
     @_parseObject_.register(vigra.filters.Kernel2D)
     def _(self: typing.Self,
            obj: typing.Union[vigra.filters.Kernel1D, vigra.filters.Kernel2D],
            _: bool = True) -> tuple:
+
+        # ### BEGIN NOTE: 2026-02-08 21:20:00 TODO/FIXME
+        #
+        # enable representation of the kernel as: (think hard & choose one)
+        #
+        # for 1D kernels:
+        # ===============
+        #
+        # REMEMBER: read-write access to the sample values for a 1D kernel is:
+        # k1d[k] where k varies from [-s to s] where s is the kernel window,
+        # e.g.
+        #
+        # .. ::
+        #
+        #   from matplotlib import pyplot as plt
+        #
+        #   g1d = vigra.filters.Kernel1D()
+        #   g1d.initGaussian(1.0, 1.0, 2.0) # window = 2
+        #   x,y = vigrautils.lernel2array(g1d)
+        #   x
+        #   array([-2, -1,  0,  1,  2])
+        #   y
+        #   array([0.0545, 0.2442, 0.4026, 0.2442, 0.0545])
+        #
+        #   g1d[-1] = 0.3
+        #
+        #   -> y = array([0.0545, 0.3, 0.4026, 0.2442, 0.0545])
+        #
+        #   plt.plot(x,y,'o')
+        #
+        #
+        # (a) pd.Series -> TabeEditorWidget: probably the most intuitively
+        #   accessible, but not straightforward as it involves an extra layer
+        #  of bidirectional conversion
+        #
+        # (b) 2D np.ndarray, with sample indices in the 1st, *immutable* column,
+        #   and sample values in the second -> TableEditorWidget
+        #
+        #   also requires bidirectional conversion, but the vigrautils can do the
+        #   trick, and editing is done directly without need to convert indices.
+        #
+        # (c) as a dict mapping kernel_sample_index ↦ sample value
+        #   {-2: 0.0545, -1: 0.2442, 0: 0.4026, 1: 0.2442, 2: 0.0545}
+        #   -> delegate editor for each value
+        #       this MAY seem straightforward, but unwieldy / cumbersome
+        #       appearance for large kernels
+        #
+        #
+        # for 2D kernels:
+        # ===============
+        #
+        # Read-write access to the sample is of the form k2d[x,y]
+        #
+        # .. ::
+        #
+        #   from matplotlib import pyplot as plt
+        #
+        #   g2d = vigra.filters.Kernel2D()
+        #   g2d.initDisk(1) # disk (averaging) kernel with radius 1
+        #   x, y, z = vigrautils.kernel2array(g2d)
+        #
+        #   x
+        #   -> array([[ 1,  0, -1],
+        #             [ 1,  0, -1],
+        #             [ 1,  0, -1]], shape=(3, 3)) # x coordinates of each column
+        #
+        #   y
+        #   -> array([[ 1,  1,  1],
+        #             [ 0,  0,  0],
+        #             [-1, -1, -1]], shape=(3, 3)) # y coordinates of each row
+        #
+        #   z
+        #   -> array([[0.1111, 0.1111, 0.1111],
+        #             [0.1111, 0.1111, 0.1111],
+        #             [0.1111, 0.1111, 0.1111]], shape=(3, 3)) # sample values
+        #
+        #   fig, ax = plt.subplots()
+        #   ax.pcolormesh(x,y,z)
+        #
+        # I don't seem to have many options here: use ogrid option to get the
+        #   x, y mesh coordinates and kernel sample values, then create a
+        #   pd.DataFrame with column index the X array, roww index Y array
+        #   and data, the sample values ... then use TableEditorWidget...
+        #
+        # TODO/FIXME: 2026-02-08 23:12:56
+        # Better still, enable direct editing in
+        # TableEditorWidget/TabularDataModel possibly via pd.DataFrame
+        # FIXME/TODO
+        #
+        # ### END   NOTE: 2026-02-08 21:20:00 TODO/FIXME
+
         tip = type(obk).__name__
         if isinstance(obj, vigra.filters.Kernel1D):
             n = int(obj.size())
             info = f"with {n} {strutils.pluralize('sample', n)}"
+            memberAccess = ("[","]")
         else:
             h = int(obj.height())
             w = int(obj.width())
             info = f"with {h} × {w} {strutils.pluralize('sample', h*w)}"
+            memberAccess = ("[", ",", "]")
 
         return obj, {"indirect": False, "objDataAsChild": False,
                      "objInfo": info, "objType": type(obj).__name__,
-                     "objTip": tip, "choices": dict()}
+                     "objTip": tip,
+                     "memberAccess": memberAccess,
+                     "choices": dict()}
 
     @_parseObject_.register(pd.DataFrame)
     @_parseObject_.register(pd.Series)
@@ -1000,6 +962,12 @@ a tuple: (``parsedData``, ``infoDict``), where:
     def _(self: typing.Self,
           obj: typing.Union[pd.DataFrame, pd.Series, pd.Index],
           _: bool = True) -> tuple:
+
+        # TableEditorWidget gives direct read-write access
+        memberAccess = tuple()
+
+        # Don;t be fooled by the nomenclature; for a column index, this is the
+        # number of columns
         nrows = len(obj)
         if isinstance(obj, pd.DataFrame):
             ncols = len(obj.columns)
@@ -1015,13 +983,16 @@ a tuple: (``parsedData``, ``infoDict``), where:
 
         else:
             rows = strutils.pluralize('element', nrows)
+
             info = f"{nrows} {rows}"
 
         tip = type(obj).__name__
 
         return obj, {"indirect": False, "objDataAsChild": True,
                      "objInfo": info, "objType": type(obj).__name__,
-                     "objTip": tip, "choices": dict()}
+                     "objTip": tip,
+                     "memberAccess": memberAccess,
+                     "choices": dict()}
 
 
     @_parseObject_.register(Interval)
@@ -1043,7 +1014,9 @@ a tuple: (``parsedData``, ``infoDict``), where:
         return pData, {"indirect": True, "objDataAsChild": False,
                        "objInfo": info,
                        "objType": type(obj).__name__,
-                       "objTip": tip, "choices": dict()}
+                       "objTip": tip,
+                       "memberAccess": (".", ),
+                       "choices": dict()}
 
     @_parseObject_.register(neo.Epoch)
     @_parseObject_.register(DataZone)
@@ -1064,7 +1037,9 @@ a tuple: (``parsedData``, ``infoDict``), where:
 
         return pData, {"indirect": True, "objDataAsChild": False,
                        "objInfo": info, "objType": type(obj).__name__,
-                       "objTip": tip, "choices": dict()}
+                       "objTip": tip,
+                       "memberAccess": (".", ),
+                       "choices": dict()}
 
     @_parseObject_.register(neo.Event)
     @_parseObject_.register(DataMark)
@@ -1086,7 +1061,12 @@ a tuple: (``parsedData``, ``infoDict``), where:
 
         return pData, {"indirect": True, "objDataAsChild": False,
                        "objInfo": info, "objType": type(obj).__name__,
-                       "objTip": tip, "choices": dict()}
+                       "objTip": tip,
+                       "memberAccess": (".", ),
+                       "choices": dict()}
+
+    # TODO 2026-02-08 22:49:01 URGENTLY
+    # neo.BaseSignal
 
     @_parseObject_.register(pq.Quantity)
     def _(self: typing.Self, obj: pq.Quantity, _: bool=True) -> tuple:
@@ -1106,10 +1086,14 @@ a tuple: (``parsedData``, ``infoDict``), where:
 
         return obj, {"indirect": False, "objDataAsChild": objDataAsChild,
                      "objInfo": info, "objType": type(obj).__name__,
-                     "objTip": tip, "choices": dict()}
+                     "objTip": tip,
+                     "memberAccess": (".", ),
+                     "choices": dict()}
 
     @_parseObject_.register(vigra.VigraArray)
     def _(self: typing.Self, obj:vigra.VigraArray, _: bool = True) -> tuple:
+        # member access relates to metadata (axistags)
+        # the array data has read-write access through TableEditorWidget
         n = obj.size
         # s = " × ".join(list(map(lambda x: f"{x}", obj.shape)))
         s = f"{obj.shape}"
@@ -1127,13 +1111,16 @@ a tuple: (``parsedData``, ``infoDict``), where:
 
         return pData, {"indirect": True, "objDataAsChild": True,
                        "objInfo": info, "objType": type(obj).__name__,
-                       "objTip": tip, "choices": dict()}
+                       "objTip": tip,
+                       "memberAccess": (".", ),
+                       "choices": dict()}
 
-    # TODO: 2026-02-07 23:00:31
+    # TODO: 2026-02-07 23:00:31 URGENTLY
     # struct array, recarray
 
     @_parseObject_.register(np.ndarray)
     def _(self: typing.Self, obj: np.ndarray, _: bool = False) -> tuple:
+        # TableEditorWidget gives read-write access to array data
         tip = type(obj).__name__
         n = obj.size
         shape = obj.shape
@@ -1147,6 +1134,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
 
         return obj, {"indirect": False, "objDataAsChild": True, "objInfo": info,
                      "objType": type(obj).__name__, "objTip": tip,
+                     "memberAccess": tuple(),
                      "choices": dict()}
 
     @_parseObject_.register(vigra.AxisInfo)
@@ -1158,15 +1146,20 @@ a tuple: (``parsedData``, ``infoDict``), where:
 
         return pData, {"indirect": True, "objDataAsChild": False,
                        "objInfo": info, "objType": type(obj).__name__,
-                       "objTip": tip, "choices": dict()}
+                       "objTip": tip,
+                       "memberAccess": (".", ),
+                       "choices": dict()}
 
     @_parseObject_.register(vigra.AxisType)
     def _(self: typing.Self, obj: vigra.AxisType, _: bool = False) -> tuple:
+        # NOTE: 2026-02-08 22:54:09 TODO
+        # Don't really want to edit this via GUI, so no member access for now
         tip = type(obj).__name__
         info = f"{tip}: {getNameForAxisType(obj)} ({getValueForAxisType(obj)})"
 
         return obj, {"indirect": False, "objDataAsChild": False, "objInfo": info,
                      "objType": type(obj).__name__, "objTip": tip,
+                     "memberAccess": tuple(),
                      "choices":  {vigra.AxisType.names}}
 
     @_parseObject_.register(AxesCalibration)
@@ -1178,7 +1171,9 @@ a tuple: (``parsedData``, ``infoDict``), where:
 
         return pData, {"indirect": True, "objDataAsChild": False,
                        "objInfo": info, "objType": type(obj).__name__,
-                       "objTip": tip, "choices": dict()}
+                       "objTip": tip,
+                       "memberAccess": (".", ),
+                       "choices": dict()}
 
     @_parseObject_.register(AxisCalibrationData)
     def _(self: typing.Self, obj: AxisCalibrationData) -> tuple:
@@ -1198,7 +1193,9 @@ a tuple: (``parsedData``, ``infoDict``), where:
 
         return pData, {"indirect": indirect, "objDataAsChild": objDataAsChild,
                        "objInfo": info, "objType": type(obj).__name__,
-                       "objTip": tip, "choices": dict()}
+                       "objTip": tip,
+                       "memberAccess": (".", ),
+                       "choices": dict()}
 
     @_parseObject_.register(ChannelCalibrationData)
     def _(self: typing.Self,
@@ -1210,14 +1207,16 @@ a tuple: (``parsedData``, ``infoDict``), where:
 
         return pData, {"indirect": True, "objDataAsChild": False,
                        "objInfo": info, "objType": type(obj).__name__,
-                       "objTip": tip, "choices": dict()}
+                       "objTip": tip,
+                       "memberAccess": (".", ),
+                       "choices": dict()}
 
     @_parseObject_.register(PVObject)
     def _(self: typing.Self, obj: PVObject) -> tuple:
         tip = type(obj).__name__
         info = tip
         if isinstance(obj, PVScan):
-            info = f"{data_attributes}"
+            info = f"{obj.attributes}"
 
         elif isinstance(obj, PVSequence):
             nframes = len(obj.frames)
@@ -1236,7 +1235,9 @@ a tuple: (``parsedData``, ``infoDict``), where:
 
         return obj.as_dict(), {"indirect": True, "objDataAsChild": False,
                                "objInfo": info, "objType": type(obj).__name__,
-                               "objtip": tip, "choices": dict()}
+                               "objtip": tip,
+                               "memberAccess": (".", ),
+                               "choices": dict()}
 
     @_parseObject_.register(scipy.optimize.Bounds)
     def _(self: typing.Self,
@@ -1250,7 +1251,9 @@ a tuple: (``parsedData``, ``infoDict``), where:
         info = ""
         return pData, {"indirect": True, "objDataAsChild": False,
                        "objInfo": info, "objType": type(obj).__name__,
-                       "objTip": tip , "choices": dict()}
+                       "objTip": tip ,
+                       "memberAccess": (".", ),
+                       "choices": dict()}
 
     def itemChildren(self: typing.Self,
                      item: QtGui.QStandardItem) -> typing.List:
@@ -1287,6 +1290,8 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
                         # index = model.indexFromItem(objItem)
                         self.setFirstColumnSpanned(0, index, True)
                         editorWidget = TableEditorWidget()
+                        objData = item.data(model.objectDataRole)
+                        editorWidget.setData(objData)
                         self.setIndexWidget(childIndex, editorWidget)
 
                 self._setupChildDataItem_(childItem)
