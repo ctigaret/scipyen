@@ -150,7 +150,7 @@ from gui.widgets.tableeditorwidget import (TableEditorWidget,
 from gui.pictgui import WorkerThread
 from gui.widgets.small_widgets import QuantitySpinBox, ComplexSpinBox
 from gui.delegates import PythonItemDelegate
-from gui.workspacegui import GuiMessages
+from gui.workspacegui import GuiMessages, WorkspaceGuiMixin
 
 NOTMEMOIZED = (
     tuple,
@@ -257,15 +257,15 @@ PODS = (
 # ### BEGIN class DataTreeItem(QtGui.QStandardItem)
 
 
-class DataTreeItem(QtGui.QStandardItem):
-    def __init__(self, *args, **kwargs):
-        if len(args) == 1 and isinstance(args[0], str):
-            super().__init__(args[0]) # item c'tor with a string
-
-
-
-        else:
-            raise TypeError("Expecting a str, or a QtGui.QIcon and str, or two int values")
+# class DataTreeItem(QtGui.QStandardItem):
+#     def __init__(self, *args, **kwargs):
+#         if len(args) == 1 and isinstance(args[0], str):
+#             super().__init__(args[0]) # item c'tor with a string
+#
+#
+#
+#         else:
+#             raise TypeError("Expecting a str, or a QtGui.QIcon and str, or two int values")
 
 
 # ### END   class DataTreeItem(QtGui.QStandardItem)
@@ -440,11 +440,17 @@ General rule for delegate use in this model:
     sequenceTypes = (typing.Sequence, tuple, list, deque, bytes)
     iterableCollectionTypes = sequenceTypes + mappingTypes
 
+    standaloneEditorWidgetRole = QtCore.Qt.UserRole + 2
+    objectDataAccessRole = QtCore.Qt.UserRole + 3
+
     sig_editCompleted = Signal([pd.DataFrame], [pd.Series], [np.ndarray], name="sig_editCompleted")
     sig_modelDataChanged = Signal(name="sig_modelDataChanged")
 
     _check_private_member_ = lambda x: (not isinstance(x[0], str)
                                         or not x[0].startswith("_"))
+
+    _check_private_member_2_ = lambda x, y: (not isinstance(x, str)
+                                        or not x.startswith("_"))
 
     def __init__(self: typing.Self, data: typing.Optional[typing.Any] = None,
                  dataName: str = None,
@@ -479,27 +485,28 @@ General rule for delegate use in this model:
         dataTypeStr: typing.Optional[str] = None,
         hideRoot: bool = False,
     ):
-        print(f"{self.__class__.__name__}.setModelData(obj: {type(obj).__name__})")
+        # print(f"{self.__class__.__name__}.setModelData(obj: {type(obj).__name__})")
         self._visited_.clear()
         self._predicate_ = predicate
         self._showPrivate_ = showPrivate
         self._hideRoot_ = hideRoot
 
-        pData, objDict = self._parseObject_(obj,
-                                          includePrivateMembers = self._showPrivate_)
-
-        self._privateData_ = pData
-
-        self._data_ = obj
-        self._dataTypeStr_ = objDict["objType"]
-
-
         self._rootTitle_ = rootTitle if len(rootTitle.strip()) else "/"
 
-        self._buildTree_(self._privateData_, self._rootTitle_)
+        self._data_ = obj
 
-    def _makeRowItems_(self: typing.Self, obj: object, /,
-                       objName: str, typeName: str, info: str):
+        pData, objDict = self._parseObject_(obj, self._showPrivate_)
+
+        self._privateData_ = pData
+        self._dataTypeStr_ = objDict["objType"]
+
+        self._buildTree_(self._privateData_, objDict, self._rootTitle_)
+
+    def _makeObjectRow_(self: typing.Self, obj: object, /,
+                       objDict: dict, objName: str) -> tuple:
+
+        typeName = objDict["objType"]
+        info = objDict["objInfo"]
 
         if len(objName.strip()) == 0:
             objName = "/"
@@ -507,131 +514,19 @@ General rule for delegate use in this model:
         item0 = QtGui.QStandardItem(objName)
         item1 = QtGui.QStandardItem(typeName)
         item2 = QtGui.QStandardItem(info)
+        flags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsDragEnabled | QtCore.Qt.ItemIsEnabled
+        for item in (item0, item1, item2):
+            item.setFlags(flags)
 
         return (item0, item1, item2)
 
-    # @singledispatchmethod
-    # def _getObjInfo_(self: typing.Self, obj: object) -> tuple:
-    #     tip = type(obj).__name__
-    #     if obj in (None, MISSING, pd.NA):
-    #         info = f"{obj}"
-    #         tip  = str(obj)
-    #
-    #     elif isDataclass(obj):
-    #         datafields = dataclasses.fields(obj)
-    #         n = len(datafields)
-    #         info = f"{n} {strutils.pluralize('field', n)}"
-    #         tip += " (dataclass)"
-    #
-    #     else:
-    #         raise NotImplementedError(
-    #         f"Objects of type {type(obj).__name__} are not supported"
-    #         )
-    #
-    #     return info, tip
-
-    # @_getObjInfo_.register(str)
-    # @_getObjInfo_.register(bytes)
-    # @_getObjInfo_.register(bytearray)
-    # def _(self: typing.Self, obj: typing.Union[str, bytes, bytearray]) -> tuple:
-    #     tip = type(obj).__name__
-    #     n = len(obj)
-    #     if n > 100:
-    #         info = (
-    #             obj[:97] if isinstance(obj, str) else obj.decode()[:97]
-    #         )
-    #         info += "..."
-    #     else:
-    #         info = obj if isinstance(obj, str) else obj.decode()
-    #
-    #     return info, tip
-
-    # @_getObjInfo_.register(bool)
-    # @_getObjInfo_.register(int)
-    # @_getObjInfo_.register(float)
-    # @_getObjInfo_.register(complex)
-    # @_getObjInfo_.register(np.integer)
-    # @_getObjInfo_.register(np.floating)
-    # @_getObjInfo_.register(np.complexfloating)
-    # def _(self: typing.Self,
-    #       obj: typing.Union[bool, int, float, complex,
-    #                         np.integer, np.floating,
-    #                         np.complexfloating]) -> tuple:
-    #     return f"{obj}", type(obj).__name__
-
-    # @_getObjInfo_.register(list)
-    # @_getObjInfo_.register(tuple)
-    # @_getObjInfo_.register(deque)
-    # @_getObjInfo_.register(set)
-    # def _(self: typing.Self, obj: typing.Union[list, tuple, deque,
-    #                                            set]) -> tuple:
-    #     n = len(obj)
-    #     tip = type(obj).__name__
-    #     if is_namedtuple(obj):
-    #         tip += " (namedtuple)"
-    #     return f"{n} {strutils.pluralize('element', n)}", tip
-
-    # @_getObjInfo_.register(dict)
-    # def _(self: typing.Self, obj: dict) -> tuple:
-    #     n = len(obj)
-    #     return (f"{len(obj)} key / value {strutils.pluralize('pair', n)}",
-    #             type(obj).__name__)
-
-    # @_getObjInfo_.register(types.SimpleNamespace)
-    # def _(self: typing.Self, obj: types.SimpleNamespace) -> tuple:
-    #     d = obj.__dict__
-    #     n = len(d)
-    #     return f"{n} {strutils.pluralize('element', n)}", type(obj).__name__
-
-    # @_getObjInfo_.register(pq.UnitQuantity)
-    # @_getObjInfo_.register(pq.Quantity)
-    # def _(self:typing.Self, obj: pq.Quantity) -> tuple:
-    #     tip = scq.unitFamilyName(obj.units)
-    #     if isinstance(pq.UnitQuantity):
-    #         info = f"{obj} {scq.unitFamilyName(obj)}"
-    #     else:
-    #         if obj.size <= 1:
-    #             info = f"{obj}"
-    #         else:
-    #             n = obj.size
-    #             s = obj.shape
-    #             info = f"Quantity array ({obj.units.dimensionality}) with {n} {strutils.pluralize('samples', n)}, shape {s}, and dtype {obj.dtype}"
-    #
-    #     return info, tip
-
-    # @_getObjInfo_.register(np.ndarray)
-    # def _(self: typing.Self, obj: np.ndarray) -> tuple:
-    #     n = obj.size
-    #     s = obj.shape
-    #     if obj.size <= 1:
-    #         info = f"{obj}"
-    #     else:
-    #         info = f"Array with {n} {strutils.pluralize('samples', n)}, shape {s}, and dtype {obj.dtype}"
-    #
-    #     return info, type(obj).__name__
-
-    # @_getObjInfo_.register(vigra.filters.Kernel1D)
-    # @_getObjInfo_.register(vigra.filters.Kernel2D)
-    # def _(self: typing.Self,
-    #       obj: typing.Union[vigra.filters.Kernel1D,
-    #                         vigra.filters.Kernel2D]) -> tuple:
-    #
-    #     if isinstance(obj, vigra.filters.Kernel1D):
-    #         n = int(obj.size())
-    #         info = f"with {n} {strutils.pluralize('sample', n)}"
-    #     else:
-    #         h = int(obj.height())
-    #         w = int(obj.width())
-    #         info = f"with {h} × {w} {strutils.pluralize('sample', h*w)}"
-    #
-    #     return info, type(obj).__name__
-
     def _buildTree_(self: typing.Self,
                     obj: object,
+                    objDict: dict,
                     name: str = "",
-                    keyType: type = str,
-                    nameTip: str = "",
-                    typeStr: typing.Optional[str] = None,
+                    # keyType: type = str,
+                    # nameTip: str = "",
+                    # typeStr: typing.Optional[str] = None,
                     # predicate: typing.Optional[types.FunctionType] = None,
                     # hideRoot: bool = False,
                     path: tuple = tuple()):
@@ -641,36 +536,65 @@ General rule for delegate use in this model:
 
         # print(f"{self.__class__.__name__}._buildTree_(obj: {type(obj).__name__})")
         if isinstance(self._privateData_, dict):
-            self._buildBranch_(self._privateData_, name,
+            self._buildBranch_(self._privateData_, objDict, name,
                                self.invisibleRootItem(), 0)
 
         else: # TODO 2026-02-08 00:37:05 URGENT
             pass
 
     @singledispatchmethod
-    def _buildBranch_(self: typing.Self,
-                      obj: object,
-                      objName: str,
-                      parentItem: QtGui.QStandardItem,
-                      row: int):
+    def _buildBranch_(self: typing.Self, obj: object, objDict: dict,
+                      objName: str, parentItem: QtGui.QStandardItem, row: int):
         # print(f"{self.__class__.__name__}._buildBranch_(obj: {type(obj).__name__})")
-        rowItems = self._makeRowItems_(obj, objName)
+        rowItems = self._makeObjectRow_(obj, objDict, objName)
         parentItem.insertRow(row, rowItems)
+        if objDict["objDataAsChild"]:
+            # NOTE: 2026-02-08 09:52:28 TODO
+            # use data item roles to:
+            # 1) flag to the TreeView using this model, that this is a dataItem
+            #   and therefore span the entire row (i.e, ALL columns)
+            #
+            # 2) flag to the TreeView using this model, that this needs an
+            #   item delegate for tabular-like data (DataFrame, Series, Index,
+            #   ndarray)
+            #
+            #   2.1) set this to read-only in usual circumstances
+            #
+            objItem = rowItems[0]
+            dataItem = QtGui.QStandardItem("")
+            dataItem.setData(QtCore.QVariant(True), self.standaloneEditorWidgetRole)
+            objItem.insertRow(0, [dataItem])
+        else:
+            dataItem = rowItems[-1]
+            # NOTE: 2026-02-08 14:41:20 TODO
+            # use data item roles to
+            # 1) flag that this needs an item-deletage that occupies a single row
+            # 2) disable editing when we're read-only
 
     @_buildBranch_.register(dict)
-    def _(self: typing.Self, obj: dict, objName: str,
+    def _(self: typing.Self, obj: dict, objDict: dict, objName: str,
           parentItem: QtGui.QStandardItem, row: int):
-        # print(f"{self.__class__.__name__}._buildBranch_(obj: {type(obj).__name__})")
-        rowItems = self._makeRowItems_(obj, objName)
+
+        rowItems = self._makeObjectRow_(obj, objDict, objName)
         parentItem.insertRow(row, rowItems)
         pItem = rowItems[0]
+
         k = 0
+
+        if objDict["objDataAsChild"]:
+            # NOTE: 2026-02-08 09:53:31 TODO
+            # see NOTE: 2026-02-08 09:52:28 TODO
+            dataItem = QtGui.QStandardItem("")
+            pItem.insertRow(0, [dataItem])
+            k += 1
+
         for key, value in obj.items():
             if isinstance(key, str):
                 vName = key
             else:
                 vName = f"{key}"
-            self._buildBranch_(value, vName, pItem, k)
+            pValue, valDict = self._parseObject_(value, self._showPrivate_)
+            self._buildBranch_(pValue, valDict, vName, pItem, k)
             k += 1
 
     def _introspectable_(self: typing.Self, obj: object) -> bool:
@@ -680,31 +604,11 @@ General rule for delegate use in this model:
                                              pkgutil.ModuleInfo))
                          and obj is not None)
 
-    # def _parseData(self: typing.Self, obj: object,
-    #                includePrivateMembers: bool = True) -> tuple:
-    #     # NOTE: 2025-06-28 13:57:28
-    #     # generate a mapping representation of obj's members upon which
-    #     # the tree model is built
-    #     # for dataclasses, use their fields
-    #     # for non-dict classes inspect their members, allowing to ignore the
-    #     # "private" members, i.e., those bound to symbols starting with
-    #     # underscore ('_')
-    #     pData, indirect = self._parseObject_(obj)
-    #     if isinstance(pData, dict) and not includePrivateMembers:
-    #         pData = dict(
-    #             list(
-    #                 filter(
-    #                     self._check_private_member_,
-    #                     pData.items()
-    #                 )
-    #             )
-    #         )
-    #
-    #     return pData, indirect
-
     @singledispatchmethod
     def _parseObject_(self, obj: object,
-                   includePrivateMembers: bool = False) -> tuple:
+                      includePrivateMembers: bool = False,
+                      objBinding: typing.Optional[typing.Union[str, int]] = None,
+                   ) -> tuple:
         r"""
 Returns:
 ========
@@ -804,7 +708,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
                 pData = dict(
                     list(
                         filter(
-                            self._check_private_member_,
+                            self._check_private_member_2_,
                             pData.items()
                         )
                     )
@@ -929,7 +833,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
             pData = dict(
                 list(
                     filter(
-                        self._check_private_member_,
+                        self._check_private_member_2_,
                         pData.items()
                     )
                     )
@@ -963,7 +867,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
             pData = dict(
             list(
                     filter(
-                        self._check_private_member_,
+                        self._check_private_member_2_,
                         pData.items()
                     )
                 )
@@ -1025,7 +929,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
             pData = dict(
             list(
                     filter(
-                        self._check_private_member_,
+                        self._check_private_member_2_,
                         pData.items()
                     )
                 )
@@ -1062,7 +966,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
             pData = dict(
                         list(
                                 filter(
-                                    self._check_private_member_,
+                                    self._check_private_member_2_,
                                     pData.items()
                                 )
                             )
@@ -1207,7 +1111,8 @@ a tuple: (``parsedData``, ``infoDict``), where:
     @_parseObject_.register(vigra.VigraArray)
     def _(self: typing.Self, obj:vigra.VigraArray, _: bool = True) -> tuple:
         n = obj.size
-        s = " × ".join(list(map(lambda x: f"{x}", obj.shape)))
+        # s = " × ".join(list(map(lambda x: f"{x}", obj.shape)))
+        s = f"{obj.shape}"
         c = obj.channels
         axtags = ", ".join(list(map(lambda i: f"'{i.key}'", obj.axistags)))
         samples = strutils.pluralize('samples', n)
@@ -1231,8 +1136,10 @@ a tuple: (``parsedData``, ``infoDict``), where:
     def _(self: typing.Self, obj: np.ndarray, _: bool = False) -> tuple:
         tip = type(obj).__name__
         n = obj.size
-        s = " × ".join(list(map(lambda x: f"{x}", obj.shape)))
-        samples = strutils.pluralize('samples', n)
+        shape = obj.shape
+        # s = " × ".join(list(map(lambda x: f"{x}", obj.shape)))
+        s = f"{obj.shape}"
+        samples = strutils.pluralize('sample', n)
         if obj.size <= 1:
             info = f"{obj}"
         else:
@@ -1254,7 +1161,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
                        "objTip": tip, "choices": dict()}
 
     @_parseObject_.register(vigra.AxisType)
-    def _(self: typing.Self, obj.vigra.AxisType, _: bool = False) -> tuple:
+    def _(self: typing.Self, obj: vigra.AxisType, _: bool = False) -> tuple:
         tip = type(obj).__name__
         info = f"{tip}: {getNameForAxisType(obj)} ({getValueForAxisType(obj)})"
 
@@ -1345,7 +1252,57 @@ a tuple: (``parsedData``, ``infoDict``), where:
                        "objInfo": info, "objType": type(obj).__name__,
                        "objTip": tip , "choices": dict()}
 
-class DataTreeView(QtWidgets.QTreeView):
-    def __init__(self, *args, **kwargs):
+    def itemChildren(self: typing.Self,
+                     item: QtGui.QStandardItem) -> typing.List:
+        if not item.hasChildren():
+            return list()
+
+        return list(map(lambda k: item.child(k, 0), range(item.rowCount())))
+
+class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
+    def __init__(self: typing.Self, *args, **kwargs):
         parent = kwargs.pop("parent", None)
         super().__init__(parent=parent)
+        super().setModel(DataTreeModel())
+
+    def setModel(self: typing.Self, model: QtCore.QAbstractItemModel):
+        # disallow changing the model
+        pass
+
+    def _setupChildDataItem_(self: typing.Self,
+                                    item: QtGui.QStandardItem):
+        if not self.model():
+            return
+
+        model = self.model()
+        if item.hasChildren():
+            for row in range(item.rowCount()):
+                childItem = item.child(row, 0)
+                if row == 0:
+                    hasEditorWidgetChild = childItem.data(model.standaloneEditorWidgetRole)
+                    # if hasEditorWidgetChild and hasEditorWidgetChild.value() is True:
+                    if hasEditorWidgetChild is True:
+                        index = item.index()
+                        childIndex = item.child(0).index()
+                        # index = model.indexFromItem(objItem)
+                        self.setFirstColumnSpanned(0, index, True)
+                        editorWidget = TableEditorWidget()
+                        self.setIndexWidget(childIndex, editorWidget)
+
+                self._setupChildDataItem_(childItem)
+
+    def setData(self: typing.Self, obj: object,
+                name: typing.Optional[str] = None):
+        model = self.model()
+        model.setModelData(obj, name)
+        root = model.invisibleRootItem()
+        if root.hasChildren():
+            # NOTE: 2026-02-08 15:23:06
+            # there is exactly one of these and it is the visible "root" of the
+            # tree; all of objects "internals" are child rows of it.
+            objItem = root.child(0,0)
+            self._setupChildDataItem_(objItem)
+
+
+
+
