@@ -31,10 +31,10 @@ I.e., there seems to be no way I can generate a QModelIndex via, say,
 from __future__ import print_function
 
 import os
-import warnings
+# import warnings
 import types
 import traceback
-import itertools
+# import itertools
 import inspect
 import dataclasses
 import numbers
@@ -81,6 +81,7 @@ except Exception:
     HAVE_METAARRAY = None
 
 
+
 # from pyqtgraph import (DataTreeWidget, TableWidget, )
 
 import neo
@@ -93,18 +94,27 @@ import pandas as pd
 import vigra
 # ### END 3rd party modules
 
-# ### BEGIN pict.core modules
 import core.datatypes as datatypes
+from core.datatypes import (is_namedtuple, TypeEnum)
+
+# NOTE: 2026-02-07 09:14:19 FIXME/TODO
+# to break cycling dependencies in systems.PrairieView, which needs this for the
+# importer gui, MOVE the latter to a separate module
+from systems.PrairieView import *
 
 from imaging import vigrautils
 
 import imaging.axiscalibration
+
 from imaging.axiscalibration import (
     AxesCalibration,
     AxisCalibrationData,
     ChannelCalibrationData,
 )
-from imaging.axisutils import axisTypeStrings
+
+from imaging.axisutils import (axisTypeStrings,
+                               getValueForAxisType,
+                               getNameForAxisType)
 
 import imaging.scandata
 from imaging.scandata import (ScanData, AnalysisUnit)
@@ -424,31 +434,6 @@ General rule for delegate use in this model:
             -> int key (index) -> type -> value/information — CHILDREN delegates on column 0 or ITEM delegate in column 2
 
 """
-    try:
-        from pyqtgraph.widgets.DataTreeWidget import HAVE_METAARRAY
-    except Exception:
-        HAVE_METAARRAY = None
-
-    from core.datatypes import (is_namedtuple, TypeEnum)
-
-    # NOTE: 2026-02-07 09:14:19 FIXME/TODO
-    # these MUST be imported here to avoid cycling dependencies in
-    # systems.PrairieView which needs this for the importer gui
-    # (although, te latter should really go into a separate module to break the
-    # cycle - TODO/FIXME 2026-02-07 09:15:32)
-    from systems.PrairieView import (
-        PVObject,
-        PVScan,
-        PVSequence,
-        PVFrame,
-        PVSystemConfiguration,
-        PVStateShard,
-        PVStateValue,
-        PVIndexedValue,
-        PVSubIndexedValue,
-        PVSubIndexedValueList,
-        PVLinescanDefinition,
-    )
 
 
     mappingTypes = (dict, types.MappingProxyType)
@@ -475,6 +460,7 @@ General rule for delegate use in this model:
         self._predicate_: types.FunctionType = None
         self._showPrivate_: bool = False
         self._hideRoot_: bool = False
+        self._introspect_: bool = False
 
         self._supportedDataTypes_ = kwargs.pop("supportedTypes", tuple())
         if not isinstance(self._supportedDataTypes_, tuple) or not all(
@@ -499,26 +485,24 @@ General rule for delegate use in this model:
         self._showPrivate_ = showPrivate
         self._hideRoot_ = hideRoot
 
-        (self._privateData_,
-         self._hasDynamicPrivate_) = self._parseData_(obj, self._showPrivate_)
+        pData, objDict = self._parseObject_(obj,
+                                          includePrivateMembers = self._showPrivate_)
+
+        self._privateData_ = pData
 
         self._data_ = obj
-        self._dataTypeStr_ = dataTypeStr
+        self._dataTypeStr_ = objDict["objType"]
+
 
         self._rootTitle_ = rootTitle if len(rootTitle.strip()) else "/"
 
         self._buildTree_(self._privateData_, self._rootTitle_)
 
     def _makeRowItems_(self: typing.Self, obj: object, /,
-                       objName: str = "", info: str = ""):
+                       objName: str, typeName: str, info: str):
 
         if len(objName.strip()) == 0:
             objName = "/"
-
-        typeName = type(obj).__name__
-
-        if not isinstance(info, str) or len(info.strip()) == 0:
-            info = self._getObjInfo_(obj)
 
         item0 = QtGui.QStandardItem(objName)
         item1 = QtGui.QStandardItem(typeName)
@@ -660,6 +644,9 @@ General rule for delegate use in this model:
             self._buildBranch_(self._privateData_, name,
                                self.invisibleRootItem(), 0)
 
+        else: # TODO 2026-02-08 00:37:05 URGENT
+            pass
+
     @singledispatchmethod
     def _buildBranch_(self: typing.Self,
                       obj: object,
@@ -693,58 +680,111 @@ General rule for delegate use in this model:
                                              pkgutil.ModuleInfo))
                          and obj is not None)
 
-    def _parseData(self: typing.Self, obj: object,
-                   includePrivateMembers: bool = True) -> tuple:
-        # NOTE: 2025-06-28 13:57:28
-        # generate a mapping representation of obj's members upon which
-        # the tree model is built
-        # for dataclasses, use their fields
-        # for non-dict classes inspect their members, allowing to ignore the
-        # "private" members, i.e., those bound to symbols starting with
-        # underscore ('_')
-        pData, asPrivate = self._parseObj_(obj)
-        if isinstance(pData, dict) and not includePrivateMembers:
-            pData = dict(
-                list(
-                    filter(
-                        self._check_private_member_,
-                        pData.items()
-                    )
-                )
-            )
-
-        return pData, asPrivate
+    # def _parseData(self: typing.Self, obj: object,
+    #                includePrivateMembers: bool = True) -> tuple:
+    #     # NOTE: 2025-06-28 13:57:28
+    #     # generate a mapping representation of obj's members upon which
+    #     # the tree model is built
+    #     # for dataclasses, use their fields
+    #     # for non-dict classes inspect their members, allowing to ignore the
+    #     # "private" members, i.e., those bound to symbols starting with
+    #     # underscore ('_')
+    #     pData, indirect = self._parseObject_(obj)
+    #     if isinstance(pData, dict) and not includePrivateMembers:
+    #         pData = dict(
+    #             list(
+    #                 filter(
+    #                     self._check_private_member_,
+    #                     pData.items()
+    #                 )
+    #             )
+    #         )
+    #
+    #     return pData, indirect
 
     @singledispatchmethod
-    def _parseObj_(self, obj: object,
-                   includePrivateMembers: bool = True) -> tuple:
+    def _parseObject_(self, obj: object,
+                   includePrivateMembers: bool = False) -> tuple:
         r"""
 Returns:
 ========
-a tuple: (parsed data, info dict), where *info dict* contains the mapping:
+a tuple: (``parsedData``, ``infoDict``), where:
 
-    "asPrivate" ↦ bool
-        When ``True`` this flag the the object is represented by way of a private
-        mapping (``self._privateData_``)
+    ``parsedData`` if either ``obj`` itself, or a ``dict`` representation of it
 
-    dictwill trigger creation of sub-branches representing
-        the structure in private data (a dict)
-    ""
+    ``infoDict`` is the mapping:
 
+    "indirect" ↦ bool
+        When ``False``, ``self._privateData_`` attribute is ``obj`` itself, and
+        ``obj`` is represented by a single row (the *object row*). The
+        *object row* ia a child of the parent tree item, which is either the
+        *invisibile root item* of the model or a row / branch representation of
+        the container of ``obj``.
+
+        When ``True`` this flag indicates that ``parsedData`` is in fact a
+        ``dict`` representation of the object's structure. Members of ``obj``
+        are to be represented as tree sub-branches (*member rows*) children of
+        the *object row*. When ``includePrivateMembers`` is ``False`` (the default),
+        private members of ``obj`` are excluded from this representation. All
+        *member rows* follow a possible *data row* (see below).
+
+    "objDataAsChild" ↦ bool
+        When ``True``, the contents of ``obj`` should be displayed in a widget
+        on its own, in the first row (*data row*) child (branch) of the *object row*.
+        If, in addition, ``obj`` is represented indirectly by a ``dict``
+        (``parsedData``, see above), all *member rows* **must** follow the
+        *data row*.
+
+    "objInfo" ↦ str
+        When ``obj`` is a scalar number or singleton array, this is a string
+        representaion of ``obj`` *value* and can be made editable, unless the
+        model is configured to introspect all members of ``obj``.
+
+        When ``obj`` is representable as a ``dict`` (see above) **or** the model
+        is set up to introspect members of ``obj`` regardless of its type, then
+        **objInfo** contains abrief description of ``obj`` (one line).
+
+    "objType" ↦ str
+        The type name of ``obj``.
+
+    "objTip" ↦ str
+        Contents of the UI tooltip to be shown when the *object row* is hovered.
+
+    "choices" ↦ dict, mapping name ↦ value - used in enums and enum-like objects
+        where a combo box is appropriate for choosing a value from a predefined
+        set; for all other object types, this will be empty.
     """
+# NOTE: 2026-02-07 22:19:09 NOT USED
+#     "keyType" ↦ str
+#         The type name of the *key* used in the mapping representation of ``obj``
+#
+#         **keyType** is:
+#
+#             * "str" when ``obj`` is a mapping, a dataclass, a named tuple, a
+#             a struct array (from numpy package), and for introspected objects.
+#
+#             * the type name of any *hashable* object than can be used as
+#             keys in a mapping, when `obj`` is a mapping.
+#
+#             * "int" when ``obj`` is a sequence, a mapping, or a set
+#
+# .. warning ::
+#     A ``set`` in Python is NOT iterable; the *key* is here only for display
+#         purposes and should *not* be used as subscript
+#
         mro = inspect.getmro(type(obj))
-        asPrivate: bool = False
+        indirect: bool = False
         tip: str = type(obj).__name__
-        hasChildren: bool = False
+        objDataAsChild: bool = False
 
-        print(f"{self.__class__.__name__}._parseObj_(obj: {tip})")
+        # print(f"{self.__class__.__name__}._parseObject_(obj: {tip})")
 
         if obj in (None, MISSING, pd.NA):
             pData = obj
-            asPrivate = False
+            indirect = False
             info = f"{obj}"
             tip = f"{obj}"
-            hasChildren: bool = False
+            objDataAsChild = False
 
         elif isDataclass(obj):
             datafields = dataclasses.fields(obj)
@@ -774,8 +814,8 @@ a tuple: (parsed data, info dict), where *info dict* contains the mapping:
 
             info = f"{n} {strutils.pluralize('member', n)}"
             tip = f"{type(obj).__name__} (dataclass)"
-            asPrivate = True
-            hasChildren: bool = True
+            indirect = True
+            objDataAsChild = False
 
         elif self.HAVE_METAARRAY and (
                 hasattr(obj, "implements") and obj.implements("MetaArray")
@@ -790,70 +830,125 @@ a tuple: (parsed data, info dict), where *info dict* contains the mapping:
             pData = dict(
                     [("data", obj.view(np.ndarray)), ("meta", obj.infoCopy())]
                 )
-            asPrivate = True
-            hasChildren: True
+            indirect = True
+            objDataAsChild = False
             info = ""
 
-        elif self._introspectable_(obj) :
-            pData = datatypes.inspect_members(obj, self._predicate_)
-            if not includePrivateMembers:
-                pData = dict(
-                    list(
-                        filter(
-                            self._check_private_member_,
-                            pData.items()
-                        )
-                    )
-                )
-
-            asPrivate = True
-            hasChildren = True
-
-            n = len(pData)
-            info = f"{n} {strutils.pluralize('member', n)}"
+        # elif self._introspect_ and self._introspectable_(obj) :
+        #     pData = datatypes.inspect_members(obj, self._predicate_)
+        #     if not includePrivateMembers:
+        #         pData = dict(
+        #             list(
+        #                 filter(
+        #                     self._check_private_member_,
+        #                     pData.items()
+        #                 )
+        #             )
+        #         )
+        #
+        #     indirect = True
+        #     objDataAsChild = True
+        #
+        #     n = len(pData)
+        #     info = f"{n} {strutils.pluralize('member', n)}"
 
         else:
             raise NotImplementedError(
             f"Objects of type {type(obj).__name__} are not supported"
             )
             # pData = obj
-            # asPrivate = False
+            # indirect = False
             # info = ""
 
-        return pData, asPrivate, hasChildren, info, tip
+        return pData, {"indirect": indirect, "objDataAsChild": objDataAsChild,
+                       "objInfo": info, "objType": type(obj).__name__,
+                       "objTip": tip}
 
-    @_parseObj_.register(type)
-    def _(self: typing.Self, obj: type,
+    @_parseObject_.register(types.FunctionType)
+    @_parseObject_.register(types.MethodType)
+    def _(self: typing.Self, obj: (types.FunctionType, types.MethodType),
+          _:bool = False) -> tuple:
+        tip = f"{obj}"
+        word = "Fuction" if isinstance(obj, types.FunctionType) else "Method"
+        info = f"{word} {obj.__qualname__}{inspect.signature(obj)} from module {obj.__module__}"
+
+        return obj, {"indirect": False, "objDataAsChild": False, "objInfo": info,
+                     "objType": type(obj).__name__, "objTip": tip,
+                     "choices": dict()}
+
+    @_parseObject_.register(type)
+    @_parseObject_.register(enum.EnumType)
+    @_parseObject_.register(TypeEnum)
+    def _(self: typing.Self, obj: typing.Union[type, enum.EnumType, TypeEnum],
                    includePrivateMembers: bool = True) -> tuple:
         info = f"Type object: {obj.__name__}"
         tip = str(obj)
         pData = obj
-        return pData, False, False, info, tip
+        choices = dict()
+        if isinstance(obj, (enum.EnumType, TypeEnum)):
+            choices = obj.__members__
 
-    @_parseObj_.register(dict)
-    def _(self: typing.Self, obj: dict,
+        elif isinstance(obj, pkgutil.ModuleInfo):
+            info += " ".join(
+                    [
+                        "Fields:",
+                        "; ".join(
+                            list(
+                                map(
+                                    lambda f: f" {f} = {getattr(obj, f, None)}",
+                                    obj._fields,
+                                )
+                            )
+                        ),
+                    ]
+                )
+
+        return pData, {"indirect": False, "objDataAsChild": False,
+                       "objInfo": info, "objType": type(obj).__name__,
+                       "objTip": tip, "choices": choices}
+
+    @_parseObject_.register(dict)
+    @_parseObject_.register(types.MappingProxyType)
+    def _(self: typing.Self, obj: (dict, types.MappingProxyType),
                    includePrivateMembers: bool = True) -> tuple:
+        # NOTE: 2021-07-20 09:52:34
+        # dict objects with mixed key types cannot be sorted
+        # therefore we resort to an indexing vector
+        ndx = [
+            i[1]
+            for i in sorted(
+                (str(k[0]), k[1])
+                for k in zip(obj.keys(), range(len(obj)))
+            )
+        ]
+
+        items = [i for i in obj.items()]
+        pData = dict([items[k] for k in ndx])
+
         if not includePrivateMembers:
             pData = dict(
                 list(
-                    self._check_private_member_,
-                    obj.items())
+                    filter(
+                        self._check_private_member_,
+                        pData.items()
+                    )
                     )
                 )
-        else:
-            pData = obj
 
-        n = len(pData)
+        n = len(pData) # CAUTION: this might include private members !!!
         info = f"{len(obj)} key / value {strutils.pluralize('pair', n)}"
         tip = type(obj).__name__
-        return obj, False, True, info, tip
+        return obj, {"indirect":False, "objDataAsChild":False, "objInfo":info,
+                     "objType": type(obj).__name__,
+                     "objTip":tip, "choices": dict()}
 
-    @_parseObj_.register(list)
-    @_parseObj_.register(tuple)
-    @_parseObj_.register(deque)
-    @_parseObj_.register(set)
+    @_parseObject_.register(list)
+    @_parseObject_.register(tuple)
+    @_parseObject_.register(deque)
+    @_parseObject_.register(NeoObjectList)
+    @_parseObject_.register(set)
     def _(self: typing.Self,
-          obj: typing.Union[list, tuple, deque, set],
+          obj: typing.Union[list, tuple, deque, set, NeoObjectList],
                    includePrivateMembers: bool = True) -> tuple:
 
         tip = type(obj).__name__
@@ -877,11 +972,13 @@ a tuple: (parsed data, info dict), where *info dict* contains the mapping:
         n = len(pData)
         info = f"{n} {strutils.pluralize('element', n)}"
 
-        return pData, True, True, info, tip
+        return pData, {"indirect": True, "objDataAsChild": False,
+                       "objInfo": info, "objType": type(obj).__name__,
+                       "objTip": tip, "choices": dict()}
 
-    @_parseObj_.register(str)
-    @_parseObj_.register(bytes)
-    @_parseObj_.register(bytearray)
+    @_parseObject_.register(str)
+    @_parseObject_.register(bytes)
+    @_parseObject_.register(bytearray)
     def _(self: typing.Self, obj: typing.Union[str, bytes, bytearray],
           _: bool = True) -> tuple:
         tip = type(obj).__name__
@@ -894,18 +991,20 @@ a tuple: (parsed data, info dict), where *info dict* contains the mapping:
         else:
             info = obj if isinstance(obj, str) else obj.decode()
 
-        return  obj, False, False, info, tip
+        return  obj, {"indirect": False, "objDataAsChild": False,
+                      "objInfo": info, "objType": type(obj).__name__,
+                      "objTip": tip, "choices": dict()}
 
-    @_parseObj_.register(bool)
-    @_parseObj_.register(int)
-    @_parseObj_.register(float)
-    @_parseObj_.register(complex)
-    @_parseObj_.register(fractions.Fraction)
-    @_parseObj_.register(decimal.Decimal)
-    @_parseObj_.register(numbers.Number)
-    @_parseObj_.register(np.integer)
-    @_parseObj_.register(np.floating)
-    @_parseObj_.register(np.complexfloating)
+    @_parseObject_.register(bool)
+    @_parseObject_.register(int)
+    @_parseObject_.register(float)
+    @_parseObject_.register(complex)
+    @_parseObject_.register(fractions.Fraction)
+    @_parseObject_.register(decimal.Decimal)
+    @_parseObject_.register(numbers.Number)
+    @_parseObject_.register(np.integer)
+    @_parseObject_.register(np.floating)
+    @_parseObject_.register(np.complexfloating)
     def _(self: typing.Self,
           obj: typing.Union[bool, int, float, complex,
                             fractions.Fraction,
@@ -913,10 +1012,12 @@ a tuple: (parsed data, info dict), where *info dict* contains the mapping:
                             numbers.Number,
                             np.integer, np.floating, np.complexfloating],
           _: bool=True) -> tuple:
+        tip = type(obj).__name__
+        return obj, {"indirect": False, "objDataAsChild": False,
+                     "objInfo": f"{obj}", "objType": type(obj).__name__,
+                     "objTip": tip, "choices": dict()}
 
-        return obj, False, False, f"{obj}", type(obj).__name__
-
-    @_parseObj_.register(types.SimpleNamespace)
+    @_parseObject_.register(types.SimpleNamespace)
     def _(self: typing.Self, obj: types.SimpleNamespace,
                    includePrivateMembers: bool = True) -> tuple:
         pData = obj.__dict__
@@ -933,9 +1034,11 @@ a tuple: (parsed data, info dict), where *info dict* contains the mapping:
         n = len(pData)
         info = f"{n} {strutils.pluralize('element', n)}"
         tip = type(obj).__name__
-        return pData, True, True, info, tip
+        return pData, {"indirect": True, "objDataAsChild": False,
+                       "objInfo": info, "objType": type(obj).__name__,
+                       "objTip": tip, "choices": dict()}
 
-    @_parseObj_.register(types.ModuleType)
+    @_parseObject_.register(types.ModuleType)
     def _(self: typing.Self, obj: types.ModuleType,
           includePrivateMembers: bool = True) -> tuple:
         tip = type(obj).__name__
@@ -957,21 +1060,24 @@ a tuple: (parsed data, info dict), where *info dict* contains the mapping:
 
         if not includePrivateMembers:
             pData = dict(
-            list(
-                    filter(
-                        self._check_private_member_,
-                        pData.items()
-                    )
-                )
-            )
+                        list(
+                                filter(
+                                    self._check_private_member_,
+                                    pData.items()
+                                )
+                            )
+                        )
 
-        return pData, True, True, info, tip
+        return pData, {"indirect": True, "objDataAsChild": False,
+                       "objInfo": info, "objType": type(obj).__name__,
+                       "objTip": tip, "choices": dict()}
 
-    @_parseObj_.register(vigra.filters.Kernel1D)
-    @_parseObj_.register(vigra.filters.Kernel2D)
-    def_(self: typing.Self,
-         obj: typing.Union[vigra.filters.Kernel1D, vigra.filters.Kernel2D],
-         _: bool = True) -> tuple:
+    @_parseObject_.register(vigra.filters.Kernel1D)
+    @_parseObject_.register(vigra.filters.Kernel2D)
+    def _(self: typing.Self,
+           obj: typing.Union[vigra.filters.Kernel1D, vigra.filters.Kernel2D],
+           _: bool = True) -> tuple:
+        tip = type(obk).__name__
         if isinstance(obj, vigra.filters.Kernel1D):
             n = int(obj.size())
             info = f"with {n} {strutils.pluralize('sample', n)}"
@@ -980,11 +1086,13 @@ a tuple: (parsed data, info dict), where *info dict* contains the mapping:
             w = int(obj.width())
             info = f"with {h} × {w} {strutils.pluralize('sample', h*w)}"
 
-        return obj, False, False, info, type(obj).__name__
+        return obj, {"indirect": False, "objDataAsChild": False,
+                     "objInfo": info, "objType": type(obj).__name__,
+                     "objTip": tip, "choices": dict()}
 
-    @_parseObj_.register(pd.DataFrame)
-    @_parseObj_.register(pd.Series)
-    @_parseObj_.register(pd.Index)
+    @_parseObject_.register(pd.DataFrame)
+    @_parseObject_.register(pd.Series)
+    @_parseObject_.register(pd.Index)
     def _(self: typing.Self,
           obj: typing.Union[pd.DataFrame, pd.Series, pd.Index],
           _: bool = True) -> tuple:
@@ -1006,10 +1114,13 @@ a tuple: (parsed data, info dict), where *info dict* contains the mapping:
             info = f"{nrows} {rows}"
 
         tip = type(obj).__name__
-        return obj, False, False, info, tip
+
+        return obj, {"indirect": False, "objDataAsChild": True,
+                     "objInfo": info, "objType": type(obj).__name__,
+                     "objTip": tip, "choices": dict()}
 
 
-    @_parseObj_.register(Interval)
+    @_parseObject_.register(Interval)
     def _(self: typing.Self, obj: Interval) -> tuple:
         pData = {
                     "t0": obj.t0,
@@ -1020,13 +1131,18 @@ a tuple: (parsed data, info dict), where *info dict* contains the mapping:
                     "annotations": obj.annotations,
                     "description": obj.description,
                 }
+        tip = type(obj).__name__
         n = len(obj)
         desc = strutils.pluralize('subinterval', n)
         info = f"Interval '{obj.name}' with {len(obj)} {desc}"
-        return pData, True, True, info, type(obj).__name__
 
-    @_parseObj_.register(neo.Epoch)
-    @_parseObj_.register(DataZone)
+        return pData, {"indirect": True, "objDataAsChild": False,
+                       "objInfo": info,
+                       "objType": type(obj).__name__,
+                       "objTip": tip, "choices": dict()}
+
+    @_parseObject_.register(neo.Epoch)
+    @_parseObject_.register(DataZone)
     def _(self: typing.Self, obj: typing.Union[neo.Epoch, DataZone]) -> tuple:
         pData = {
                     "times": obj.times,
@@ -1036,15 +1152,19 @@ a tuple: (parsed data, info dict), where *info dict* contains the mapping:
                     "description": obj.description,
                 }
 
+        tip = type(obj).__name__
         n = len(obj)
         klass = "Zone" if isinstance(obj, DataZone) else Epoch
         desc = strutils.pluralize('subinterval', n)
         info = f"{klass} '{obj.name}' with {len(obj)} {desc}"
-        return pData, True, True, info, type(obj).__name__
 
-    @_parseObj_.register(neo.Event)
-    @_parseObj_.register(DataMark)
-    @_parseObj_.register(TriggerEvent)
+        return pData, {"indirect": True, "objDataAsChild": False,
+                       "objInfo": info, "objType": type(obj).__name__,
+                       "objTip": tip, "choices": dict()}
+
+    @_parseObject_.register(neo.Event)
+    @_parseObject_.register(DataMark)
+    @_parseObject_.register(TriggerEvent)
     def _(self: typing.Self,
           obj: typing.Union[neo.Event, DataMark, TriggerEvent]) -> tuple:
         pData = {"times": obj.times, "labels": obj.labels}
@@ -1060,92 +1180,133 @@ a tuple: (parsed data, info dict), where *info dict* contains the mapping:
         desc = strutils.pluralize('subinterval', n)
         info = f"{klass} '{obj.name}' with {len(obj)} {desc}"
 
-        return pData, True, True, info, tip
+        return pData, {"indirect": True, "objDataAsChild": False,
+                       "objInfo": info, "objType": type(obj).__name__,
+                       "objTip": tip, "choices": dict()}
 
-    @_parseObj_.register(pq.Quantity)
+    @_parseObject_.register(pq.Quantity)
     def _(self: typing.Self, obj: pq.Quantity, _: bool=True) -> tuple:
-        tip = scq.unitFamilyName(obj.units)
+        tip = f"{scq.unitFamilyName(obj.units)} quantity"
         if isinstance(pq.UnitQuantity):
             info = f"{obj} {scq.unitFamilyName(obj)}"
+            objDataAsChild = False
         else:
             if obj.size <= 1:
                 info = f"{obj}"
+                objDataAsChild = False
             else:
                 n = obj.size
-                s = obj.shape
-                info = f"Quantity array ({obj.units.dimensionality}) with {n} {strutils.pluralize('samples', n)}, shape {s}, and dtype {obj.dtype}"
+                s = " × ".join(list(map(lambda x: f"{x}", obj.shape)))
+                info = f"Quantity array ({obj.units.dimensionality}) with {n} {strutils.pluralize('samples', n)}; shape {s}; dtype {obj.dtype}."
+                objDataAsChild = True
 
-        return obj, False, False, info, tip
+        return obj, {"indirect": False, "objDataAsChild": objDataAsChild,
+                     "objInfo": info, "objType": type(obj).__name__,
+                     "objTip": tip, "choices": dict()}
 
-    @_parseObj_.register(vigra.VigraArray)
+    @_parseObject_.register(vigra.VigraArray)
     def _(self: typing.Self, obj:vigra.VigraArray, _: bool = True) -> tuple:
         n = obj.size
-        s = obj.shape
+        s = " × ".join(list(map(lambda x: f"{x}", obj.shape)))
+        c = obj.channels
+        axtags = ", ".join(list(map(lambda i: f"'{i.key}'", obj.axistags)))
         samples = strutils.pluralize('samples', n)
         if obj.size <= 1:
             info = f"{obj}"
         else:
-            info = f"Vigra Array with {n} {samples}, shape {s}, and dtype {obj.dtype}"
+            info = f"Vigra Array with {n} {samples}; shape {s}; axistags: {axtags}; {c} channels; dtype {obj.dtype}."
 
         pData = dict(enumerate(obj.axistags))
 
-        return pData, True, True, info, type(obj.__name__)
+        tip = type(obj).__name__
 
-    @_parseObj_.register(np.ndarray)
-    def _(self: typing.Self, obj: np.ndarray, _: bool = True) -> tuple:
+        return pData, {"indirect": True, "objDataAsChild": True,
+                       "objInfo": info, "objType": type(obj).__name__,
+                       "objTip": tip, "choices": dict()}
+
+    # TODO: 2026-02-07 23:00:31
+    # struct array, recarray
+
+    @_parseObject_.register(np.ndarray)
+    def _(self: typing.Self, obj: np.ndarray, _: bool = False) -> tuple:
+        tip = type(obj).__name__
         n = obj.size
-        s = obj.shape
+        s = " × ".join(list(map(lambda x: f"{x}", obj.shape)))
         samples = strutils.pluralize('samples', n)
         if obj.size <= 1:
             info = f"{obj}"
         else:
-            info = f"Array with {n} {samples}, shape {s}, and dtype {obj.dtype}"
+            info = f"Array with {n} {samples}; shape {s}; dtype {obj.dtype}."
 
-        return obj, False, False, info, type(obj).__name__
+        return obj, {"indirect": False, "objDataAsChild": True, "objInfo": info,
+                     "objType": type(obj).__name__, "objTip": tip,
+                     "choices": dict()}
 
-    @_parseObj_.register(AxesCalibration)
+    @_parseObject_.register(vigra.AxisInfo)
+    def _(self: typing.Self, obj: vigra.AxisInfo, _: bool = False) -> tuple:
+        info = f"{type(obj).__name__} ({getNameForAxisType(obj.typeFlags)}) key {obj.key}"
+        tip = type(obj).__name__
+        pData = {"resolution": obj.resolution, "description": obj.description,
+                 "typeFlags": obj.typeFlags}
+
+        return pData, {"indirect": True, "objDataAsChild": False,
+                       "objInfo": info, "objType": type(obj).__name__,
+                       "objTip": tip, "choices": dict()}
+
+    @_parseObject_.register(vigra.AxisType)
+    def _(self: typing.Self, obj.vigra.AxisType, _: bool = False) -> tuple:
+        tip = type(obj).__name__
+        info = f"{tip}: {getNameForAxisType(obj)} ({getValueForAxisType(obj)})"
+
+        return obj, {"indirect": False, "objDataAsChild": False, "objInfo": info,
+                     "objType": type(obj).__name__, "objTip": tip,
+                     "choices":  {vigra.AxisType.names}}
+
+    @_parseObject_.register(AxesCalibration)
     def _(self: typing.Self, obj: AxesCalibration, _:bool=True) -> tuple:
         pData = dict(enumerate(obj.calibrations))
         n = len(pData)
         info = f"{n} {strutils.pluralize('calibration', n)}"
         tip = type(obj).__name__
 
-        return pData, True,, True, info, tip
+        return pData, {"indirect": True, "objDataAsChild": False,
+                       "objInfo": info, "objType": type(obj).__name__,
+                       "objTip": tip, "choices": dict()}
 
-    @_parseObj_.register(AxesCalibrationData)
-    def _(self: typing.Self, obj: AxesCalibrationData) -> tuple:
+    @_parseObject_.register(AxisCalibrationData)
+    def _(self: typing.Self, obj: AxisCalibrationData) -> tuple:
         tip = type(obj).__name__
-        asPrivate = False
-        hasChildren = False
-        if obj.isChannels:
-            pData = dict(enumerate(obj.channels))
-            asPrivate = True
-            hasChildren = True
+        indirect = True
+        objDataAsChild = False
+        fields = dataclasses.fields(obj)
+        fieldnames = list(map(lambda f: f.name, datafields))
+        pData = dict(map(lambda c: (c, getattr(data, c)), filter(lambda f: f != "channel", fieldnames)))
+        if not obj.isChannels:
+            pData = dict(map(lambda c: (c, getattr(data, c)), filter(lambda f: f != "channel", fieldnames)))
+            info = f"Axis calibration for axis {obj.index} (type {obj.type}; key {obj.key}); size {obj.size}"
         else:
-            pData = obj
+            pData = dict(map(lambda c: (c, getattr(data, c)), fieldnames))
+            c = len(obj.channels)
+            info = f"Channel axis calibration with {c} {strutils.pluralize('channel', c)}"
 
-        return pData, asPrivate, hasChildren, info, tip
+        return pData, {"indirect": indirect, "objDataAsChild": objDataAsChild,
+                       "objInfo": info, "objType": type(obj).__name__,
+                       "objTip": tip, "choices": dict()}
 
-    @_parseObj_.register(ChannelCalibrationData)
+    @_parseObject_.register(ChannelCalibrationData)
     def _(self: typing.Self,
           obj: ChannelCalibrationData, _: bool = True) -> tuple:
         tip = f"{type(obj).__name__}"
-        info = " ".join(
-            [
-                tip,
-                "with name:",
-                f"'{obj.name}'",
-                "index:",
-                f"{obj.index}",
-                "acquisition index:",
-                f"{obj.acquisition_index}",
-            ]
-        )
+        fields = dataclasses.fields(obj)
+        fieldnames = list(map(lambda f: f.name, datafields))
+        pData = dict(map(lambda c: (c, getattr(data, c)), fieldnames))
 
-            return obj, False, False, info, tip
+        return pData, {"indirect": True, "objDataAsChild": False,
+                       "objInfo": info, "objType": type(obj).__name__,
+                       "objTip": tip, "choices": dict()}
 
-    @_parseObj_.register(self.PVObject)
-    def _(self: typing.Self, obj: self.PVObject) -> tuple:
+    @_parseObject_.register(PVObject)
+    def _(self: typing.Self, obj: PVObject) -> tuple:
         tip = type(obj).__name__
         info = tip
         if isinstance(obj, PVScan):
@@ -1166,9 +1327,11 @@ a tuple: (parsed data, info dict), where *info dict* contains the mapping:
                 ):
                 info = data.description
 
-        return obj.as_dict(), True, True, info, tip
+        return obj.as_dict(), {"indirect": True, "objDataAsChild": False,
+                               "objInfo": info, "objType": type(obj).__name__,
+                               "objtip": tip, "choices": dict()}
 
-    @_parseObj_.register(scipy.optimize.Bounds)
+    @_parseObject_.register(scipy.optimize.Bounds)
     def _(self: typing.Self,
           obj: scipy.optimize.Bounds, _:bool = True) -> tuple:
         tip = type(obj).__name__
@@ -1178,13 +1341,9 @@ a tuple: (parsed data, info dict), where *info dict* contains the mapping:
                     "keep_feasible": obj.keep_feasible,
                 }
         info = ""
-        return pData, True, True, info, tip
-
-
-
-
-
-
+        return pData, {"indirect": True, "objDataAsChild": False,
+                       "objInfo": info, "objType": type(obj).__name__,
+                       "objTip": tip , "choices": dict()}
 
 class DataTreeView(QtWidgets.QTreeView):
     def __init__(self, *args, **kwargs):

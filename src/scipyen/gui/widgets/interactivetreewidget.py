@@ -196,7 +196,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
     mappingTypes = (dict, types.MappingProxyType)
     sequenceTypes = (typing.Sequence, tuple, list, deque, bytes, bytearray)
     iterableCollectionTypes = sequenceTypes + mappingTypes
-    
+
     sig_valueChanged = Signal(object, object, name="sig_valueChanged")
 
     def __init__(self, *args, **kwargs):
@@ -388,19 +388,19 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
     @Slot(QtWidgets.QWidget)
     def _slot_delegateDataChanged(self, widget: QtWidgets.QWidget):
         path = self.getObjectPathForWidget(widget)
-                
+
         # print(
         #     f"{self.__class__.__name__}._slot_delegateDataChanged: {self._delegate_._currentData_}, path = {path}"
         # )
 
         self.sig_valueChanged.emit(self._delegate_._currentData_, path)
         pass
-    
+
     def getObjectPathForWidget(self, widget: QtWidgets.QWidget):
         paths = list(filter(lambda i: i is not None, map(lambda i: i[0] if widget in i[1] else None, self.nodes.items())))
         if len(paths):
             return paths[0]
-    
+
     def getItemForWidget(self, widget: QtWidgets.QWidget) -> QtWidgets.QTreeWidgetItem | None:
         items = list(filter(lambda i: i is not None, map(lambda i: i[1][0] if widget in i[1] else None, self.nodes.items())))
         if len(items) == 1:
@@ -683,7 +683,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
 
         # NOTE: 2025-05-26 19:36:29
         # data in user role:
-        # column 0: type of the key (int or str) - except for the top child 
+        # column 0: type of the key (int or str) - except for the top child
         # where key type is str
         # column 1: type of the data represented by the child
         node = QtWidgets.QTreeWidgetItem([name, "", ""])
@@ -778,14 +778,14 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
 
         # Add widget to new subnode
         # TODO 2025-09-21 22:33:30
-        # this seems like a good place to create/insert a delegate widget for 
+        # this seems like a good place to create/insert a delegate widget for
         # data editing as appropriate
-        # FIXME: this needs defining a model (currently this uses 
+        # FIXME: this needs defining a model (currently this uses
         # QAbstractItemModel)
-        # TODO: the way to go seems to take out the parse() and buildTree() 
-        # code and place it into a custom TreeModel (to be created); other code 
+        # TODO: the way to go seems to take out the parse() and buildTree()
+        # code and place it into a custom TreeModel (to be created); other code
         # to move there:
-        # memoize(), getWidgetSelection(), _parse_data_(), _parse_dataclass(), 
+        # memoize(), getWidgetSelection(), _parse_data_(), _parse_dataclass(),
         # _makeTableWidget_() and maybe:
         # _slot_tableEditorWidgetSelectionChanged(), setSupportedDataTypes()
         #
@@ -872,7 +872,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                     keyrepr = f"{key}"
                     # this here is crucial; I want type of key not type of what
                     # is mapped to it
-                    keytip = f"index type: {type(key).__name__}"  
+                    keytip = f"index type: {type(key).__name__}"
 
                 else:
                     keyrepr = str(key)
@@ -891,7 +891,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
                 )  # so hideRoot is always False?
 
     def parse(self, data: typing.Any, path: typing.Sequence, /,
-              predicate: typing.Optional[types.FunctionType] = None, 
+              predicate: typing.Optional[types.FunctionType] = None,
               typeStr: typing.Optional[str] = None,
               # readOnly: bool = True,
               ) -> tuple:
@@ -903,11 +903,11 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
 
         .. ::
 
-            (typeStr: str, 
-             desc: str, children: dict, 
+            (typeStr: str,
+             desc: str, children: dict,
              widget: QWidget, typeTip: str,
-             showDescInParentNode: bool, 
-             widgetColumn: int (0 or 2) 
+             showDescInParentNode: bool,
+             widgetColumn: int (0 or 2)
             )
 
 
@@ -921,7 +921,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
 
         • typeTip — a string indicating the type of the key (for dict data) or
 
-            of the index (for sequences, this is always an int, except for 
+            of the index (for sequences, this is always an int, except for
 
             namedtuples, where it can be a str)
 
@@ -929,9 +929,9 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
 
         • widgetColumn: index of column where the widget should go;
 
-            can be only 0 or 2; when 0, the widget goes to a subnode; 
-    
-            when 2, the widget will go in the place of value/information 
+            can be only 0 or 2; when 0, the widget goes to a subnode;
+
+            when 2, the widget will go in the place of value/information
             display, as a one-line editor
 
             therefore only a subset of widgets are allowed in the 3rd column
@@ -1530,7 +1530,7 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
 
     @readOnly.setter
     def readOnly(self, val: bool):
-        self._readOnly_ = val == True
+        self._readOnly_ = val is True
         self._setWidgetsEditableState_()
 
     def getObjectPathForItem(
