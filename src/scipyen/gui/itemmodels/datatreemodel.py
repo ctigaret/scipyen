@@ -152,6 +152,7 @@ from gui.pictgui import WorkerThread
 from gui.widgets.small_widgets import QuantitySpinBox, ComplexSpinBox
 from gui.delegates import PythonItemDelegate
 from gui.workspacegui import GuiMessages, WorkspaceGuiMixin
+from gui.itemmodels.roles import *
 
 NOTMEMOIZED = (
     tuple,
@@ -192,12 +193,6 @@ class DataTreeModel(QtGui.QStandardItemModel):
     mappingTypes = (dict, types.MappingProxyType)
     sequenceTypes = (typing.Sequence, tuple, list, deque, bytes)
     iterableCollectionTypes = sequenceTypes + mappingTypes
-
-    standaloneEditorWidgetRole = QtCore.Qt.UserRole + 2
-    objectDataAccessRole = QtCore.Qt.UserRole + 20
-    objectDataRole = QtCore.Qt.UserRole + 40
-    objectKeyRole = QtCore.Qt.UserRole + 50
-    objectKeyTypeRole = QtCore.Qt.UserRole + 60
 
     sig_editCompleted = Signal([pd.DataFrame], [pd.Series], [np.ndarray], name="sig_editCompleted")
     sig_modelDataChanged = Signal(name="sig_modelDataChanged")
@@ -292,14 +287,58 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
         item0 = QtGui.QStandardItem(objName)
         item0.setData(objName, QtCore.Qt.DisplayRole)
-        item0.setData(QtCore.QVariant(objDict["memberAccess"]), self.objectDataAccessRole)
-        item0.setData(QtCore.QVariant(obj), self.objectDataRole)
-        item0.setData(QtCore.QVariant(objKey), self.objectKeyRole)
-        item0.setData(QtCore.QVariant(keyType), self.objectKeyTypeRole)
+
+        # NOTE: 2026-02-09 21:47:10
+        # used to construct the acess path to the object for this item
+        item0.setData(QtCore.QVariant(objDict["memberAccess"]),
+                      ObjectDataAccessRole)
+
+        # NOTE: 2026-02-09 21:47:38
+        # reference to the actual Python object
+        item0.setData(QtCore.QVariant(obj), ObjectDataRole)
+
+        # NOTE: 2026-02-09 21:47:57
+        # reference to the object's binding in its parent: e.g. symbol of an
+        # attribute or field, index (for sequences), key (for mappings)
+        item0.setData(QtCore.QVariant(objKey), ObjectKeyRole)
+
+        # NOTE: 2026-02-09 21:49:05
+        # object "bindings" are are int for sequences, any hashable object type
+        # (including str and int) for mappings, str for attributes & fields.
+        #
+        # iterators are NOT supported (they're used to yield elements of a
+        # collection dynamically, anyway, and a reason for using them is a
+        # "lazy" evaluation of the colleciton's contents - in itself for a good
+        # reason) ; therefore, I apply the same philosophy here
+        #
+        item0.setData(QtCore.QVariant(keyType), ObjectKeyTypeRole)
+
+        # for user's benefit — good to know the type of the object represented
+        # in this row.
         item1 = QtGui.QStandardItem(typeName)
         item1.setData(typeName, QtCore.Qt.DisplayRole)
+
+        # either:
+        #
+        # a) display some object info for the user's benefit; this can be:
+        #
+        #   a.1) a string representation of the object's value — can be edited
+        #        if required, see below
+        #
+        #   a.2) additional information such as size, shape, dtype, for tabular
+        #       data (arrays, pandas objects) — these are editable via an editor
+        #       in the first child of item 0 when needed, to be set up by the
+        #       client user of this model
+        #
+        # b) offer a delegate editor widget so that user can modify the value
+        #
+        # "choices" goes as item data with objectDataRole for THIS item
         item2 = QtGui.QStandardItem(info)
         item2.setData(info, QtCore.Qt.DisplayRole)
+        item2.setData(QtCore.QVariant(obj), ObjectDataRole)
+        item2.setData(objDict.get("choices", list()), DataChoicesRole)
+
+        #
         flags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsDragEnabled | QtCore.Qt.ItemIsEnabled
         for item in (item0, item1, item2):
             item.setFlags(flags)
@@ -309,13 +348,8 @@ class DataTreeModel(QtGui.QStandardItemModel):
     def _buildTree_(self: typing.Self,
                     obj: object,
                     objDict: dict,
-                    name: str = "",
-                    # keyType: type = str,
-                    # nameTip: str = "",
-                    # typeStr: typing.Optional[str] = None,
-                    # predicate: typing.Optional[types.FunctionType] = None,
-                    # hideRoot: bool = False,
-                    path: tuple = tuple()):
+                    name: str = ""): #,
+                    # path: tuple = tuple()):
 
         # 1. get the top object symbol, type and some information, as items to
         # go as the first (and only) top-level row in the model
@@ -351,7 +385,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             #   2.1) set this to read-only in usual circumstances
             #
             dataItem = QtGui.QStandardItem("")
-            dataItem.setData(QtCore.QVariant(True), self.standaloneEditorWidgetRole)
+            dataItem.setData(QtCore.QVariant(True), StandaloneEditorWidgetRole)
             objItem.insertRow(0, [dataItem])
         else:
             dataItem = rowItems[-1]
@@ -454,25 +488,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
         set; for all other object types, this will be empty.
 
     """
-# NOTE: 2026-02-07 22:19:09 NOT USED
-#     "keyType" ↦ str
-#         The type name of the *key* used in the mapping representation of ``obj``
-#
-#         **keyType** is:
-#
-#             * "str" when ``obj`` is a mapping, a dataclass, a named tuple, a
-#             a struct array (from numpy package), and for introspected objects.
-#
-#             * the type name of any *hashable* object than can be used as
-#             keys in a mapping, when `obj`` is a mapping.
-#
-#             * "int" when ``obj`` is a sequence, a mapping, or a set
-#
-# .. warning ::
-#     A ``set`` in Python is NOT iterable; the *key* is here only for display
-#         purposes and should *not* be used as subscript
-#
-        mro = inspect.getmro(type(obj))
+        # mro = inspect.getmro(type(obj))
         indirect: bool = False
         tip: str = type(obj).__name__
         objDataAsChild: bool = False
@@ -491,13 +507,13 @@ a tuple: (``parsedData``, ``infoDict``), where:
             datafields = dataclasses.fields(obj)
             try:
                 fieldnames = list(map(lambda f: f.name, datafields))
-                membernames = list(data.__dict__.keys())
+                membernames = list(obj.__dict__.keys())
                 childnames = list(sorted(unique(membernames + fieldnames)))
-                pData = dict(map(lambda c: (c, getattr(data, c)), childnames))
+                pData = dict(map(lambda c: (c, getattr(obj, c)), childnames))
             except:
                 traceback.print_exc()
                 print(
-                    f"{print_styled(f'for {type(data).__name__} data', color='red')}"
+                    f"{print_styled(f'for {type(obj).__name__} data', color='red')}"
                 )
                 pData = dict(map(lambda x: (x.name, getattr(obj, x.name)), datafields))
 
@@ -1224,7 +1240,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
             return eval(accessExpr)
 
         else:
-            return leaf.data(self.objectDataRole)
+            return leaf.data(ObjectDataRole)
             # return self._getPyObj_(leaf)
 
     def getPathForLeaf(self: typing.Self,
@@ -1252,17 +1268,17 @@ a tuple: (``parsedData``, ``infoDict``), where:
     def _(self: typing.Self, item: QtGui.QStandardItem) -> typing.Sequence:
         # print(f"{self.__class__.__name__}._getPathForItemOrIndex_(item: {item.data(QtCore.Qt.DisplayRole)})")
         path = list()
-        if item.data(self.standaloneEditorWidgetRole):
+        if item.data(StandaloneEditorWidgetRole):
             item = item.parent()
             if item is None:
                 return path
 
         parentItem = item.parent()
         if parentItem:
-            parentAccess = parentItem.data(self.objectDataAccessRole)
+            parentAccess = parentItem.data(ObjectDataAccessRole)
             parentBinding = parentItem.data(QtCore.Qt.DisplayRole)
-            bindingType = item.data(self.objectKeyTypeRole)
-            itemBinding = item.data(self.objectKeyRole)
+            bindingType = item.data(ObjectKeyTypeRole)
+            itemBinding = item.data(ObjectKeyRole)
             # else:
             #     itemBinding = itemBinding # BUG 2026-02-09 12:20:22 FIXME/TODO
 

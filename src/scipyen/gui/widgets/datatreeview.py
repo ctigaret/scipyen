@@ -89,69 +89,70 @@ if neo.__version__ >= '0.13.0':
     from neo.core.objectlist import ObjectList as NeoObjectList
 import quantities as pq
 import numpy as np
-import scipy
+# import scipy
 import pandas as pd
-import vigra
+# import vigra
 # ### END 3rd party modules
 
-import core.datatypes as datatypes
-from core.datatypes import (is_namedtuple, TypeEnum)
+# import core.datatypes as datatypes
+# from core.datatypes import (is_namedtuple, TypeEnum)
 
 # NOTE: 2026-02-07 09:14:19 FIXME/TODO
 # to break cycling dependencies in systems.PrairieView, which needs this for the
 # importer gui, MOVE the latter to a separate module
-from systems.PrairieView import *
+# from systems.PrairieView import *
 
-from imaging import vigrautils
+# from imaging import vigrautils
 
-import imaging.axiscalibration
+# import imaging.axiscalibration
 
-from imaging.axiscalibration import (
-    AxesCalibration,
-    AxisCalibrationData,
-    ChannelCalibrationData,
-)
+# from imaging.axiscalibration import (
+#     AxesCalibration,
+#     AxisCalibrationData,
+#     ChannelCalibrationData,
+# )
 
-from imaging.axisutils import (axisTypeStrings,
-                               getValueForAxisType,
-                               getNameForAxisType)
+# from imaging.axisutils import (axisTypeStrings,
+#                                getValueForAxisType,
+#                                getNameForAxisType)
 
-import imaging.scandata
-from imaging.scandata import (ScanData, AnalysisUnit)
+# import imaging.scandata
+# from imaging.scandata import (ScanData, AnalysisUnit)
 
-from core.triggerprotocols import TriggerProtocol
-from core.triggerevent import (DataMark, TriggerEvent, TriggerEventType)
+# from core.triggerprotocols import TriggerProtocol
+# from core.triggerevent import (DataMark, TriggerEvent, TriggerEventType)
 
-import core.datasignal as datasignal
-from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
+# import core.datasignal as datasignal
+# from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
 
-import core.datazone as datazone
-from core.datazone import (DataZone, Interval)
+# import core.datazone as datazone
+# from core.datazone import (DataZone, Interval)
 
-from core import xmlutils, strutils
+# from core import xmlutils, strutils
 
-from core import scipyen_quantities as scq
+# from core import scipyen_quantities as scq
 
 from core.workspacefunctions import (validate_varname, user_workspace)
 
-from core.utilities import (NestedFinder,
-                            get_nested_value, set_nested_value,
-                            unique)
+# from core.utilities import (NestedFinder,
+#                             get_nested_value, set_nested_value,
+#                             unique)
 
-from core.prog import (safewrapper, safeguiwrapper, print_styled, qVariants,
-                       is_hashable)
+# from core.prog import (safewrapper, safeguiwrapper, print_styled, qVariants,
+#                        is_hashable)
 
-from core.traitcontainers import (DataBag, DataBagTraitsObserver,)
+# from core.traitcontainers import (DataBag, DataBagTraitsObserver,)
 
-from core.scipyendataclasses import isDataclass
+# from core.scipyendataclasses import isDataclass
 
-from gui.widgets.tablewidget import SimpleTableWidget
-from gui.widgets.tableeditorwidget import (TableEditorWidget,
-                                           TabularDataModel,)
+# from gui.widgets.tablewidget import SimpleTableWidget
+# from gui.widgets.tableeditorwidget import (TableEditorWidget,
+#                                            TabularDataModel,)
 from gui.pictgui import WorkerThread
-from gui.widgets.small_widgets import QuantitySpinBox, ComplexSpinBox
+# from gui.widgets.small_widgets import QuantitySpinBox, ComplexSpinBox
 from gui.delegates import PythonItemDelegate
 from gui.workspacegui import GuiMessages, WorkspaceGuiMixin
+from gui.itemmodels.roles import *
 from gui.itemmodels.datatreemodel import DataTreeModel
 
 NOTMEMOIZED = (
@@ -184,27 +185,52 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         super().__init__(parent=parent)
         super().setModel(DataTreeModel())
         self._delegate_ = PythonItemDelegate()
+        self._defaultDelegate_ = self.itemDelegate()
 
     def setModel(self: typing.Self, model: QtCore.QAbstractItemModel):
         # disallow changing the model
         pass
 
-    def _setupChildDataItem_(self: typing.Self,
-                                    item: QtGui.QStandardItem):
+    def _setupChildDataItem_(self: typing.Self, item: QtGui.QStandardItem,
+                             objData: typing.Optional[typing.Any] = None):
+        r"""Sets up the editor widgets for the items in the tree model.
+For a given item:
+    * if the child first row child on column 0 represents a hierarchical data
+        structure, it simply becomes is a new branch point, with children representing its elements or members
+        (fields, attributes, etc)
+
+    * else if the contains tabular data (essentially,
+        pandas or numpy array object) then it will iself gain a child item in
+        column 0 that uses a TableEditorWidget (by way of PythonItemDelegate)
+        for read-write access to elements of the data.
+
+    * if the
+
+    """
+        # NOTE: 2026-02-09 21:41:40
+        # Python sequence, mappings, and set types are treated as hierarchical data
+        # structures. Nevertheless, there is a case for accessing sequences via a
+        # list data model/view couple - I should revisit this. For now, I use a
+        # use hierarchical representation throughout, where sequences and sets are
+        # first transformed to a mapping (index ↦ value)
+        #
         if not self.model():
             return
 
         model = self.model()
-        if item.hasChildren():
+        index = item.index()
+        if objData is None:
+            objData = item.data(ObjectDataRole)
+        if index.column() == 0 and item.hasChildren():
             for row in range(item.rowCount()):
                 childItem = item.child(row, 0)
+                infoItem = item.child(row, 2)
                 if row == 0:
-                    hasEditorWidgetChild = childItem.data(model.standaloneEditorWidgetRole)
+                    hasEditorWidgetChild = childItem.data(StandaloneEditorWidgetRole)
                     if hasEditorWidgetChild is True:
-                        index = item.index()
                         childIndex = item.child(0).index()
                         self.setFirstColumnSpanned(0, index, True)
-                        objData = item.data(model.objectDataRole)
+                        # self.setFirstColumnSpanned(0, childIndex, True)
                         editorWidget = self._delegate_.createWidget(objData,
                                                                     list(),
                                                                     False,
@@ -217,6 +243,27 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
                         item.child(0).setFlags(flags)
 
                 self._setupChildDataItem_(childItem)
+                if infoItem:
+                    self._setupChildDataItem_(infoItem, objData)
+
+        elif index.column() == 2:
+            print(f"{self.__class__.__name__}._setupChildDataItem_: index row {index.row()}, column {index.column}, data {index.data(ObjectDataRole)}")
+            # index = infoItem.index()
+            row = index.row()
+            infoItem = model.itemFromIndex(index)
+            choices = infoItem.data(DataChoicesRole)
+            # editorWidget = self._delegate_.createWidget(objData,
+            #                                             choices,
+            #                                             False,
+            #                                             self)
+            # self.setIndexWidget(index, editorWidget)
+            #
+            #
+            self.setItemDelegateForColumn(index.column(), self._delegate_)
+            self.setItemDelegateForRow(row, self._delegate_)
+            flags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsEditable
+            infoItem.setFlags(flags)
+
 
     def setData(self: typing.Self, obj: object,
                 name: typing.Optional[str] = None):

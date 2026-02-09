@@ -82,6 +82,7 @@ from gui.scipyenviewer import ScipyenViewer #, ScipyenFrameViewer
 from gui import quickdialog
 from gui.delegates import PythonItemDelegate
 from gui.widgets.tabledataview import TableDataView
+from gui.itemmodels.roles import *
 # from gui import resources_rc
 # from gui import icons_rc
 #### END pict.gui modules
