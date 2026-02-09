@@ -440,23 +440,10 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         return widget
 
     @Slot()
-    @Slot(object)
-    @Slot(bool)
-    @Slot(int)
-    @Slot(np.integer)
-    @Slot(float)
-    @Slot(np.floating)
-    @Slot(str)
-    @Slot(np.character)
-    @Slot(complex)
-    @Slot(np.complexfloating)
-    @Slot(pq.Quantity)
-    @Slot(np.ndarray)
-    @Slot(vigra.filters.Kernel1D)
-    @Slot(vigra.filters.Kernel2D)
-    def slot_dataChanged(self, o:typing.Any):
+    def slot_dataChanged(self): #, o:typing.Any):
         # print(f"{self.__class__.__name__}.slot_dataChanged({o})")
-        self._currentData_ = o
+        # o = self.sender().getValue()
+        # self._currentData_ = o
         self.sig_dataChanged.emit(self.sender())
         
 

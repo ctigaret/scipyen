@@ -1378,6 +1378,7 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         parent = kwargs.pop("parent", None)
         super().__init__(parent=parent)
         super().setModel(DataTreeModel())
+        self._delegate_ = PythonItemDelegate()
 
     def setModel(self: typing.Self, model: QtCore.QAbstractItemModel):
         # disallow changing the model
@@ -1394,16 +1395,21 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
                 childItem = item.child(row, 0)
                 if row == 0:
                     hasEditorWidgetChild = childItem.data(model.standaloneEditorWidgetRole)
-                    # if hasEditorWidgetChild and hasEditorWidgetChild.value() is True:
                     if hasEditorWidgetChild is True:
                         index = item.index()
                         childIndex = item.child(0).index()
-                        # index = model.indexFromItem(objItem)
                         self.setFirstColumnSpanned(0, index, True)
-                        editorWidget = TableEditorWidget()
                         objData = item.data(model.objectDataRole)
-                        editorWidget.setData(objData)
+                        editorWidget = self._delegate_.createWidget(objData,
+                                                                    list(),
+                                                                    False,
+                                                                    self)
+                        # if isinstance(editorWidget, TableEditorWidget):
+                        #     editorWidget.model.dataChanged.connect
+                        # editorWidget.setData(objData)
                         self.setIndexWidget(childIndex, editorWidget)
+                        flags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsEditable
+                        item.child(0).setFlags(flags)
 
                 self._setupChildDataItem_(childItem)
 

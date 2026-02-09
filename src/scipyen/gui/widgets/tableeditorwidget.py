@@ -926,25 +926,22 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         r"""Set a new data with the specified role, at the specified model index in this model"""
         if self._modelData_ is None:
             return False
-        
+
         row = modelIndex.row()
         col = modelIndex.column()
-        
-        if row >= self._modelData_.shape[0]:
-            return False
-        
-        if isinstance(self._modelData_, neo.core.dataobject.DataObject):
-            if col >= self._modelData_.shape[1] + 1:
-                return False
-            
-        elif self._modelData_.ndim < 2 or col  >= self._modelData_.shape[1]:
-            return False
-        
-        # print(f"{self.__class__.__name__}.setData: role = {role}")
-            
+        # print(f"{self.__class__.__name__}.setData({modelIndex}, {value}, {role})")
+        # print(f"\trow: {row}, col: {col} for model data with shape {self._modelData_.shape}")
+
         if role not in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole):
             return False
-        
+
+        # if isinstance(self._modelData_, neo.core.dataobject.DataObject):
+        #
+        # elif self._modelData_.ndim < 2: or col  >= self._modelData_.shape[1]:
+        #     return False
+
+        # print(f"{self.__class__.__name__}.setData: role = {role}")
+
         if self._setDataValue_(value, row, col):
             # NOTE: This signal (inherited from Qt?) notifies the itemview (here, 
             # the tableView in the TableEditorWidget class) that the data for a
@@ -955,6 +952,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             # a selective update in the view, for the data that has actually changed
             # thus avoiding unnecessary repaints in views that display large models
             #
+            print(f"{self.__class__.__name__}.)_setDataValue_({value}, {row}, {col}) -> OK")
             self.dataChanged.emit(modelIndex, modelIndex)
             
             # I should a similar mechanism to notify other viewers that share the same
@@ -1494,6 +1492,9 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 
             # print(f"{self.__class__.__name__}._setDataValue_: row={row}, col={col} -> pyvalue={pyvalue}")
                 
+            if row >= self._modelData_.shape[0]:
+                return False
+
             if isinstance(self._modelData_, pd.DataFrame):
                 self._modelData_.iloc[row, col] = pyvalue
                 # self._modelData_.at[row, col] = pyvalue
@@ -1508,8 +1509,13 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 # self._modelData_.at[data_row] = pyvalue
                 
             elif isinstance(self._modelData_, neo.dataobject.DataObject):
+                if col >= self._modelData_.shape[1] + 1:
+                    # because the signal's domain is on column 0, what is shown
+                    # here has one extra column
+                    return False
                 if col == 0:
                     if isinstance(self._modelData_, (neo.AnalogSignal, DataSignal)) :
+                        # for analog signals only t_start can be edited
                         if row == 0:
                             # allow setting t_start
                             if isinstance(pyvalue, pq.Quantity):
@@ -1560,7 +1566,10 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                         return False
                             
             elif isinstance(self._modelData_, np.ndarray):
-                self._modelData_[row, col] = pyvalue
+                if self._modelData_.ndim == 1:
+                    self._modelData_[row] = pyvalue
+                elif self._modelData_.ndim == 2:
+                    self._modelData_[row, col] = pyvalue
                 if self._is_vigra_filter_kernel_:
                     self._original_data_ = vigrautils.kernelfromarray(self._modelData_)
                     

@@ -101,7 +101,7 @@ from gui.scipyenviewer import ScipyenViewer #, ScipyenFrameViewer
 from gui import quickdialog
 from gui.pictgui import WorkerThread
 from gui.widgets import datatreeview
-from datatreeview import DataTreeModel, DataTreeView
+from gui.widgets.datatreeview import (DataTreeModel, DataTreeView)
 
 # from . import resources_rc
 # from . import icons_rc

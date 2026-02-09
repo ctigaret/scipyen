@@ -1050,27 +1050,9 @@ class InteractiveTreeWidget(QtWidgets.QTreeWidget):
 
         elif data is dataclasses.MISSING:
             desc = str(MISSING)
-            # return (
-            #     typeStr,
-            #     desc,
-            #     children,
-            #     widget,
-            #     typeTip,
-            #     showDescInParentNode,
-            #     targetColumnForWidget,
-            # )
 
         elif type(data) is type(pd.NA):
             desc = str(pd.NA)
-            # return (
-            #     typeStr,
-            #     desc,
-            #     children,
-            #     widget,
-            #     typeTip,
-            #     showDescInParentNode,
-            #     targetColumnForWidget,
-            # )
 
         # print(f"{self.__class__.__name__}.parse -> data_type: {data_type} ")
         try:
