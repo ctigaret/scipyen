@@ -138,7 +138,8 @@ from core.utilities import (NestedFinder,
                             get_nested_value, set_nested_value,
                             unique)
 
-from core.prog import (safewrapper, safeguiwrapper, print_styled, qVariants)
+from core.prog import (safewrapper, safeguiwrapper, print_styled, qVariants,
+                       is_hashable)
 
 from core.traitcontainers import (DataBag, DataBagTraitsObserver,)
 
@@ -280,8 +281,10 @@ class DataTreeModel(QtGui.QStandardItemModel):
     iterableCollectionTypes = sequenceTypes + mappingTypes
 
     standaloneEditorWidgetRole = QtCore.Qt.UserRole + 2
-    objectDataAccessRole = QtCore.Qt.UserRole + 3
-    objectDataRole = QtCore.Qt.UserRole + 4
+    objectDataAccessRole = QtCore.Qt.UserRole + 20
+    objectDataRole = QtCore.Qt.UserRole + 40
+    objectKeyRole = QtCore.Qt.UserRole + 50
+    objectKeyTypeRole = QtCore.Qt.UserRole + 60
 
     sig_editCompleted = Signal([pd.DataFrame], [pd.Series], [np.ndarray], name="sig_editCompleted")
     sig_modelDataChanged = Signal(name="sig_modelDataChanged")
@@ -310,6 +313,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
         self._showPrivate_: bool = False
         self._hideRoot_: bool = False
         self._introspect_: bool = False
+        self._topObjectItem_: typing.Optional[QtGui.QStandardItem] = None
 
         self._supportedDataTypes_ = kwargs.pop("supportedTypes", tuple())
         if not isinstance(self._supportedDataTypes_, tuple) or not all(
@@ -318,6 +322,10 @@ class DataTreeModel(QtGui.QStandardItemModel):
             self._supportedDataTypes_ = tuple()
 
         self.setHorizontalHeaderLabels(["Object", "Type", "Value / Information"])
+
+    @property
+    def topObjectItem(self: typing.Self) -> QtGui.QStandardItem | None:
+        return self._topObjectItem_
 
     def setModelData(
         self,
@@ -346,19 +354,37 @@ class DataTreeModel(QtGui.QStandardItemModel):
         self._buildTree_(self._privateData_, objDict, self._rootTitle_)
 
     def _makeObjectRow_(self: typing.Self, obj: object, /,
-                       objDict: dict, objName: str) -> tuple:
+                       objDict: dict, objKey: object) -> tuple:
 
         typeName = objDict["objType"]
         info = objDict["objInfo"]
 
+        keyType = type(objKey)
+
+        if isinstance(objKey, str):
+            objName = objKey
+
+        elif is_hashable(objKey):
+            objName = f"{objKey}"
+
+        else:
+            objName = ""
+
         if len(objName.strip()) == 0:
             objName = "/"
 
+        # print(f"{self.__class__.__name__}._makeObjectRow_: objName -> {objName}")
+
         item0 = QtGui.QStandardItem(objName)
+        item0.setData(objName, QtCore.Qt.DisplayRole)
         item0.setData(QtCore.QVariant(objDict["memberAccess"]), self.objectDataAccessRole)
         item0.setData(QtCore.QVariant(obj), self.objectDataRole)
+        item0.setData(QtCore.QVariant(objKey), self.objectKeyRole)
+        item0.setData(QtCore.QVariant(keyType), self.objectKeyTypeRole)
         item1 = QtGui.QStandardItem(typeName)
+        item1.setData(typeName, QtCore.Qt.DisplayRole)
         item2 = QtGui.QStandardItem(info)
+        item2.setData(info, QtCore.Qt.DisplayRole)
         flags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsDragEnabled | QtCore.Qt.ItemIsEnabled
         for item in (item0, item1, item2):
             item.setFlags(flags)
@@ -381,7 +407,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
         # print(f"{self.__class__.__name__}._buildTree_(obj: {type(obj).__name__})")
         if isinstance(self._privateData_, dict):
-            self._buildBranch_(self._privateData_, objDict, name,
+            self._topObjectItem_ = self._buildBranch_(self._privateData_, objDict, name,
                                self.invisibleRootItem(), 0)
 
         else: # TODO 2026-02-08 00:37:05 URGENT
@@ -389,9 +415,12 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
     @singledispatchmethod
     def _buildBranch_(self: typing.Self, obj: object, objDict: dict,
-                      objKey: str, parentItem: QtGui.QStandardItem, row: int):
+                      objKey: object,
+                      parentItem: QtGui.QStandardItem,
+                      row: int) -> QtGui.QStandardItem:
         # print(f"{self.__class__.__name__}._buildBranch_(obj: {type(obj).__name__})")
         rowItems = self._makeObjectRow_(obj, objDict, objKey)
+        objItem = rowItems[0]
         # rowItems[0].setData(QtCore.QVariant())
         parentItem.insertRow(row, rowItems)
         if objDict["objDataAsChild"]:
@@ -406,7 +435,6 @@ class DataTreeModel(QtGui.QStandardItemModel):
             #
             #   2.1) set this to read-only in usual circumstances
             #
-            objItem = rowItems[0]
             dataItem = QtGui.QStandardItem("")
             dataItem.setData(QtCore.QVariant(True), self.standaloneEditorWidgetRole)
             objItem.insertRow(0, [dataItem])
@@ -417,9 +445,11 @@ class DataTreeModel(QtGui.QStandardItemModel):
             # 1) flag that this needs an item-deletage that occupies a single row
             # 2) disable editing when we're read-only
 
+        return objItem
+
     @_buildBranch_.register(dict)
-    def _(self: typing.Self, obj: dict, objDict: dict, objKey: str,
-          parentItem: QtGui.QStandardItem, row: int):
+    def _(self: typing.Self, obj: dict, objDict: dict, objKey: object,
+          parentItem: QtGui.QStandardItem, row: int) -> QtGui.QStandardItem:
 
         rowItems = self._makeObjectRow_(obj, objDict, objKey)
         parentItem.insertRow(row, rowItems)
@@ -442,6 +472,8 @@ class DataTreeModel(QtGui.QStandardItemModel):
             pValue, valDict = self._parseObject_(value, self._showPrivate_)
             self._buildBranch_(pValue, valDict, vName, pItem, k)
             k += 1
+
+        return pItem
 
     def _introspectable_(self: typing.Self, obj: object) -> bool:
         return (all(t not in self._supportedDataTypes_ for t in mro)
@@ -1261,6 +1293,91 @@ a tuple: (``parsedData``, ``infoDict``), where:
             return list()
 
         return list(map(lambda k: item.child(k, 0), range(item.rowCount())))
+
+    def getDataObjectForLeaf(self: typing.Self,
+                             leaf: typing.Union[QtCore.QModelIndex,
+                                                QtGui.QStandardItem],
+                             byPath: bool = True,
+                             ) -> object:
+
+        if byPath:
+            path = self._getPathForItemOrIndex_(leaf)
+            if len(path):
+                path[-1] = "self._data_"
+
+            accessExpr = "".join(list(reversed(path)))
+            return eval(accessExpr)
+
+        else:
+            return self._getPyObj_(leaf)
+
+    @singledispatch
+    def _getPyObj_(self: typing.Self, obj: object) -> object:
+        raise NotImplementedError
+
+    @_getPyObj_.register(QtCore.QModelIndex)
+    def _(self: typing.Self, obj: QtCore.QModelIndex) -> object:
+        return obj.data(self.objectDataRole)
+
+    @_getPyObj_.register(QtGui.QStandardItem)
+    def _(self: typing.Self, obj: QtGui.QStandardItem) -> object:
+        return obj.data(self.objectDataRole)
+
+    def getPathForLeaf(self: typing.Self,
+                       leaf: typing.Union[QtCore.QModelIndex,
+                                          QtGui.QStandardItem]
+                       ) -> str:
+        path = self._getPathForItemOrIndex_(leaf)
+        if len(path):
+            return "".join(list(reversed(path)))
+        return ""
+
+    @singledispatchmethod
+    def _getPathForItemOrIndex_(self: typing.Self, index: object) -> typing.Sequence:
+        raise NotImplementedError
+
+    @_getPathForItemOrIndex_.register(QtCore.QModelIndex)
+    def _(self: typing.Self, index: QtCore.QModelIndex) -> typing.Sequence:
+        item = self.itemFromIndex(index)
+        if item:
+            return self._getPathForItemOrIndex_(item)
+        else:
+            return list()
+
+    @_getPathForItemOrIndex_.register(QtGui.QStandardItem)
+    def _(self: typing.Self, item: QtGui.QStandardItem) -> typing.Sequence:
+        # print(f"{self.__class__.__name__}._getPathForItemOrIndex_(item: {item.data(QtCore.Qt.DisplayRole)})")
+        path = list()
+        if item.data(self.standaloneEditorWidgetRole):
+            item = item.parent()
+            if item is None:
+                return path
+
+        parentItem = item.parent()
+        if parentItem:
+            parentAccess = parentItem.data(self.objectDataAccessRole)
+            parentBinding = parentItem.data(QtCore.Qt.DisplayRole)
+            bindingType = item.data(self.objectKeyTypeRole)
+            itemBinding = item.data(self.objectKeyRole)
+            # else:
+            #     itemBinding = itemBinding # BUG 2026-02-09 12:20:22 FIXME/TODO
+
+            if len(parentAccess) == 1:
+                path.append(f"{parentAccess[0]}{itemBinding}")
+            elif len(parentAccess) == 2:
+                if bindingType is str:
+                    itemBinding = f"'{itemBinding}'"
+                # elif bindingType is int:
+                #     itemBinding = bindingType(itemBinding)
+                path.append(f"{parentAccess[0]}{itemBinding}{parentAccess[1]}")
+
+            path += self._getPathForItemOrIndex_(parentItem)
+
+        elif item == self._topObjectItem_:
+            path = [self._topObjectItem_.data(QtCore.Qt.DisplayRole)]
+
+        return path
+
 
 class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
     def __init__(self: typing.Self, *args, **kwargs):
