@@ -321,6 +321,8 @@ class DataTreeModel(QtGui.QStandardItemModel):
         ):
             self._supportedDataTypes_ = tuple()
 
+        self._readOnly_ = kwargs.pop("readOnly", True)
+
         self.setHorizontalHeaderLabels(["Object", "Type", "Value / Information"])
 
     @property
@@ -1309,19 +1311,11 @@ a tuple: (``parsedData``, ``infoDict``), where:
             return eval(accessExpr)
 
         else:
-            return self._getPyObj_(leaf)
+            return leaf.data(self.objectDataRole)
+            # return self._getPyObj_(leaf)
 
-    @singledispatch
-    def _getPyObj_(self: typing.Self, obj: object) -> object:
-        raise NotImplementedError
-
-    @_getPyObj_.register(QtCore.QModelIndex)
-    def _(self: typing.Self, obj: QtCore.QModelIndex) -> object:
-        return obj.data(self.objectDataRole)
-
-    @_getPyObj_.register(QtGui.QStandardItem)
-    def _(self: typing.Self, obj: QtGui.QStandardItem) -> object:
-        return obj.data(self.objectDataRole)
+    # def _getPyObj_(self: typing.Self, obj: ) -> object:
+    #     print(f"{self.__class__.__name__}._getPyObj_: obj: {type(obj).__name__}")
 
     def getPathForLeaf(self: typing.Self,
                        leaf: typing.Union[QtCore.QModelIndex,
@@ -1425,6 +1419,17 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
             objItem = root.child(0,0)
             self._setupChildDataItem_(objItem)
 
+    @property
+    def readOnly(self: typing.Self) -> bool:
+        return self._readOnly_
+
+    @readOnly.setter
+    def readOnly(self: typing.Self, val: bool):
+        self._readOnly_ = val is True
+        # TODO: 2026-02-09 12:50:43
+        # set all editors in column 1 to readOnly
+        # set all delegates in column 2 to readOnly
+        # WARNING: delegates are handled by the viewer owner of this model!
 
 
 
